@@ -23,6 +23,9 @@ const OPS: Record<BrainControlOp, { answerMs: number; use: boolean; inTurn: bool
   "import-project": { answerMs: 300_000, use: true, inTurn: true },
   "remove-project": { answerMs: 30_000, use: true, inTurn: true },
   projects: { answerMs: 30_000, use: true, inTurn: true },
+  // Bookkeeping after the Mac's own refresh: never a reason to stay awake.
+  "copies-current": { answerMs: 30_000, use: false, inTurn: true },
+  "project-settings": { answerMs: 30_000, use: false, inTurn: true },
   "sign-ins": { answerMs: 5_000, use: true, inTurn: true },
   stop: { answerMs: 15_000, use: false, inTurn: true },
   // At once, so it never closes the brain after its waker gave up waiting behind a long request.

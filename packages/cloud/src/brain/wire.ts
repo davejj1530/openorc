@@ -278,6 +278,10 @@ export type BrainControlRequest =
   | { op: "remove-project"; source: string }
   /** The Mac projects the brain has copies of. */
   | { op: "projects" }
+  /** The Mac found these copies hold its branch as it is now: each that still holds that commit counts as synced now. */
+  | { op: "copies-current"; copies: { source: string; macHead: string }[] }
+  /** The settings the Mac project has, for the brain's copy of it: its setup script runs in each new thread's sandbox. */
+  | { op: "project-settings"; source: string; settings: CopySettings }
   /** What the brain holds of each sign-in besides Claude's, so the Mac takes its word over its own record. */
   | { op: "sign-ins" }
   /** Close gracefully and exit; the sandbox keeps running. */
@@ -297,6 +301,12 @@ export type BrainControlRequest =
   /** The Mac took the thread: the brain deletes its copy, its sandbox and the package. */
   | { op: "handed-off"; relocation: string };
 export type BrainControlOp = BrainControlRequest["op"];
+/** What a Mac project's settings say about the work in it, which its copy on the brain takes as its own. */
+export interface CopySettings {
+  setupScript: string | null;
+  branchPrefix: string;
+  worktreeInclude: string[];
+}
 export type HandoverRequest = Extract<BrainControlRequest, { op: "handover" }>;
 
 export interface BrainStatus {
@@ -328,6 +338,9 @@ export interface BrainControlResults {
   "import-project": ProjectCopy | { lacksBase: true };
   "remove-project": { removed: boolean; threads: number };
   projects: { copies: (ProjectCopy & { source: string; threads: number })[] };
+  "copies-current": { marked: number };
+  /** False when the brain has no copy of that project. */
+  "project-settings": { applied: boolean };
   /** The id of the Codex login it holds, the signInPrint of its GitHub sign-in, and its push key's id; null for none. */
   "sign-ins": { codex: string | null; github: string | null; push: string | null };
   stop: { stopping: true };
@@ -377,6 +390,12 @@ const REQUESTS = variants<BrainControlRequest>({
   "import-project": object({ op: literal("import-project"), source: projectSource, name: folderName, branch: branchName, bundle: text(255, /^\w[\w.-]*$/) }, { origin: text(2048) }),
   "remove-project": object({ op: literal("remove-project"), source: projectSource }),
   projects: object({ op: literal("projects") }),
+  "copies-current": object({ op: literal("copies-current"), copies: list(object({ source: projectSource, macHead: commit }), 10_000) }),
+  "project-settings": object({
+    op: literal("project-settings"),
+    source: projectSource,
+    settings: object({ setupScript: nullable(text(65_536)), branchPrefix: textOrEmpty(100), worktreeInclude: list(text(1000), 1000) }),
+  }),
   "sign-ins": object({ op: literal("sign-ins") }),
   stop: object({ op: literal("stop") }),
   "stop-for-update": object({ op: literal("stop-for-update") }),
@@ -399,6 +418,8 @@ const RESULTS: { [K in BrainControlOp]: Parse<BrainControlResults[K]> } = {
   "import-project": (value, field) => (isRecord(value) && value["lacksBase"] === true ? object({ lacksBase: literal(true) }) : projectCopy)(value, field),
   "remove-project": object({ removed: literal(true, false), threads: count }),
   projects: object({ copies: list(object({ source: projectSource, projectId: text(100), macHead: commit, head: commit, threads: count }), 10_000) }),
+  "copies-current": object({ marked: count }),
+  "project-settings": object({ applied: literal(true, false) }),
   "sign-ins": object({ codex: nullable(text(100)), github: nullable(text(64)), push: nullable(text(64)) }),
   stop: object({ stopping: literal(true) }),
   "stop-for-update": object({ stopping: literal(true) }),

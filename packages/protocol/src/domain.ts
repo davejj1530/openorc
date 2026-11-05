@@ -42,6 +42,8 @@ export const Project = z.object({
   settings: ProjectSettings,
   createdAt: z.number(),
   updatedAt: z.number(),
+  /** On the cloud brain, a project that is the Mac's copy: when it last took the Mac's branch or heard GitHub's. */
+  copy: z.object({ syncedAt: z.number() }).optional(),
 });
 export type Project = z.infer<typeof Project>;
 

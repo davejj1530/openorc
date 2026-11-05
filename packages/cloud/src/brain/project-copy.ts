@@ -2,13 +2,15 @@
  * A Mac project's copy on the cloud brain, moved through git bundles of its default branch: the Mac bundles what the copy
  * lacks, and the brain takes it. Only the branch's commits cross; GitHub stays the copy's origin.
  */
-import { mkdir, mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { GitError, git, originUrl, revParse } from "@openorc/git";
 
 /** Where a copy keeps the Mac's branch as last taken, so each later bundle builds on it whatever the copy's branch does. */
 const macRef = (branch: string) => `refs/openorc/mac/${branch}`;
+/** When a copy last took the Mac's branch or heard its origin's, in ms, beside its git: reading it runs no git. */
+const SYNCED = "openorc-synced";
 
 /** The commit a branch is on; null when the repository has no such branch, or no commit on it. */
 export async function branchHead(root: string, branch: string): Promise<string | null> {
@@ -64,15 +66,64 @@ export async function takeBranch(folder: string, bundle: string, branch: string,
   await followOrigin(folder, origin);
   const macHead = await revParse(folder, incoming);
   const local = await branchHead(folder, branch);
-  const checkedOut = (await git(folder, ["symbolic-ref", "--quiet", "HEAD"], { okCodes: [0, 1] })).stdout.trim() === `refs/heads/${branch}`;
-  if (local === null) await git(folder, checkedOut ? ["checkout", "--quiet", "-B", branch, macHead] : ["branch", branch, macHead]);
-  else if (local !== macHead && (await isAncestor(folder, local, macHead)))
-    await git(folder, checkedOut ? ["merge", "--ff-only", "--quiet", macHead] : ["update-ref", `refs/heads/${branch}`, macHead, local]).catch((error: unknown) => {
-      throw error instanceof GitError && error.stderr.includes("would be overwritten") ? new Error("The cloud copy has uncommitted changes in the way.") : error;
-    });
+  if (local === null || (local !== macHead && (await isAncestor(folder, local, macHead)))) await moveBranch(folder, branch, local, macHead);
   await git(folder, ["update-ref", macRef(branch), macHead]);
   await git(folder, ["update-ref", "-d", incoming]);
+  await markSynced(folder);
   return { macHead, head: (await branchHead(folder, branch)) ?? macHead };
+}
+
+/** Puts `branch` on `target`: made there, or fast-forwarded, its files following when the copy has it checked out. */
+async function moveBranch(folder: string, branch: string, local: string | null, target: string): Promise<void> {
+  const checkedOut = (await git(folder, ["symbolic-ref", "--quiet", "HEAD"], { okCodes: [0, 1] })).stdout.trim() === `refs/heads/${branch}`;
+  if (local === null) await git(folder, checkedOut ? ["checkout", "--quiet", "-B", branch, target] : ["branch", branch, target]);
+  else
+    await git(folder, checkedOut ? ["merge", "--ff-only", "--quiet", target] : ["update-ref", `refs/heads/${branch}`, target, local]).catch((error: unknown) => {
+      throw error instanceof GitError && error.stderr.includes("would be overwritten") ? new Error("The cloud copy has uncommitted changes in the way.") : error;
+    });
+}
+
+/** What a copy's branch did when compared with its origin's before a thread started from it. */
+export type OriginCatchUp = "updated" | "current" | "kept" | "unreachable" | "no-origin";
+
+/**
+ * Before a thread starts from a copy: its branch fast-forwards to its origin's (GitHub's) when that is ahead and the copy
+ * has nothing of its own; a copy with commits its origin lacks, such as the Mac's unpushed work, stays as it is. The fetch
+ * is cut off after `timeoutMs`, so an origin out of reach holds a start up that long at most. A private origin needs the
+ * GitHub sign-in the brain's own git holds; a public one needs none.
+ */
+export async function catchUpWithOrigin(folder: string, branch: string, timeoutMs = 8_000): Promise<OriginCatchUp> {
+  if (!(await originUrl(folder))) return "no-origin";
+  const fetched = `refs/openorc/origin/${branch}`;
+  const reached = await git(folder, ["fetch", "--quiet", "--no-tags", "origin", `+refs/heads/${branch}:${fetched}`], { timeoutMs }).then(
+    () => true,
+    () => false,
+  );
+  if (!reached) return "unreachable";
+  await markSynced(folder);
+  const origin = await revParse(folder, fetched);
+  const local = await branchHead(folder, branch);
+  if (local === origin) return "current";
+  if (local !== null && !(await isAncestor(folder, local, origin))) return "kept";
+  await moveBranch(folder, branch, local, origin);
+  return "updated";
+}
+
+async function markSynced(folder: string): Promise<void> {
+  await writeFile(path.join(folder, ".git", SYNCED), String(Date.now()));
+}
+
+/** The Mac found its branch where the copy took it last: the copy counts as synced now. False once it took another since. */
+export async function confirmSynced(folder: string, macHead: string): Promise<boolean> {
+  if ((await copyHeads(folder))?.macHead !== macHead) return false;
+  await markSynced(folder);
+  return true;
+}
+
+/** When the copy at `folder` last took the Mac's branch or heard its origin's; null for a folder that holds no copy. */
+export async function copySyncedAt(folder: string): Promise<number | null> {
+  const at = Number(await readFile(path.join(folder, ".git", SYNCED), "utf8").catch(() => ""));
+  return Number.isFinite(at) && at > 0 ? at : null;
 }
 
 /** What a copy last took from the Mac and its own branch's commit; null for a folder that holds no copy. */

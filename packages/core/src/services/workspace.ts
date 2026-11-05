@@ -1,4 +1,5 @@
 import { stopProcess, waitForProcessGroup } from "@openorc/agents";
+import { catchUpWithOrigin } from "@openorc/cloud";
 import { audit, retiredTeams, tasks, threads, type CloudMirrorState, type CloudProviderId, type Db } from "@openorc/db";
 import { diskUsage, emptyTree, fetch, git, repoInfo, revParse, worktree } from "@openorc/git";
 import { WORKSPACE_ID, type BranchLoss, type CloudThreadState, type Project, type RemovalImpact, type Task, type Thread, type WorkspaceMode } from "@openorc/protocol";
@@ -88,6 +89,7 @@ export class WorkspaceService {
   private readonly preparingThreads = new Map<string, Promise<Thread>>();
   private readonly operations = new Set<Promise<unknown>>();
   private readonly setups = new Map<ChildProcess, Promise<void>>();
+  private readonly catchingUp = new Map<string, Promise<void>>();
   private closing = false;
 
   constructor(
@@ -311,7 +313,7 @@ export class WorkspaceService {
         await mkdir(path.dirname(worktreePath), { recursive: true });
         this.assertOpen();
         const base = baseRef ?? project.defaultBranch ?? "HEAD";
-        const startPoint = await this.resolveStartPoint(project, base);
+        const startPoint = this.cloudOnly && base === project.defaultBranch ? await this.copyStart(project, base) : await this.resolveStartPoint(project, base);
         this.assertOpen();
         this.log.info(`worktree for thread "${thread.title}" at ${worktreePath} on ${branch} from ${base} (${startPoint.slice(0, 8)})`);
         // A cloud conversation's sandbox gets the same commit while the worktree is made.
@@ -331,6 +333,33 @@ export class WorkspaceService {
       },
       inherited,
     );
+  }
+
+  /**
+   * On the cloud brain a project is the Mac's copy, which GitHub may have moved past since: a thread starts from the
+   * copy's branch once it caught up with GitHub's, or from the copy as it is when it holds commits GitHub lacks, such as
+   * the Mac's unpushed work. Never origin's branch over the copy's.
+   */
+  private async copyStart(project: Project, branch: string): Promise<string> {
+    await assertCanBranch(project);
+    await this.catchUp(project, branch);
+    this.assertOpen();
+    return revParse(project.rootPath, branch);
+  }
+
+  /** One look at a time per copy, cut off after a few seconds. */
+  private catchUp(project: Project, branch: string): Promise<void> {
+    const running = this.catchingUp.get(project.rootPath);
+    if (running) return running;
+    const look = catchUpWithOrigin(project.rootPath, branch)
+      .then((outcome) => {
+        if (outcome === "updated") this.log.info(`${project.name}'s copy caught up with its origin's ${branch}`);
+        if (outcome === "kept") this.log.info(`${project.name}'s copy keeps commits its origin's ${branch} lacks`);
+      })
+      .catch((error: unknown) => this.log.warn(`${project.name}'s copy was not compared with its origin: ${error instanceof Error ? error.message : String(error)}`))
+      .finally(() => this.catchingUp.delete(project.rootPath));
+    this.catchingUp.set(project.rootPath, look);
+    return look;
   }
 
   /** A new worktree with the project's included files, submodules and a hooks check. */

@@ -1,5 +1,6 @@
+import { copySyncedAt } from "@openorc/cloud";
 import { Db } from "@openorc/db";
-import { WORKSPACE_ID } from "@openorc/protocol";
+import { WORKSPACE_ID, type Project } from "@openorc/protocol";
 import { ProjectService } from "../services/projects.js";
 import { configureWorkspace, folderMissing, workspaceHome } from "../services/workspace-home.js";
 import { type Transport } from "../transport.js";
@@ -9,13 +10,22 @@ type Dependencies = {
   projectService: Pick<ProjectService, "list" | "get" | "git" | "checkoutBranch" | "import" | "remove" | "updateSettings">;
   invalidate: (keys: string[]) => void;
   transport: Transport;
+  /** On the cloud brain, where each project is the Mac's copy and says how fresh it is. */
+  copies?: boolean;
 };
+
+/** A project that is the Mac's copy on the cloud brain, with when it last took the Mac's branch or heard GitHub's. */
+async function withCopy(project: Project): Promise<Project> {
+  const syncedAt = await copySyncedAt(project.rootPath);
+  return syncedAt === null ? project : { ...project, copy: { syncedAt } };
+}
 
 export function createProjectsHandlers({
   db,
   projectService,
   invalidate,
   transport,
+  copies = false,
 }: Dependencies): Pick<
   Handlers,
   | "workspace.get"
@@ -36,8 +46,12 @@ export function createProjectsHandlers({
       transport.push({ type: "invalidate", keys: ["workspace", "projects"] });
       return home;
     },
-    "projects.list": () => projectService.list(),
-    "projects.get": ({ id }) => (id === WORKSPACE_ID ? workspaceHome(db) : projectService.get(id)),
+    "projects.list": () => (copies ? Promise.all(projectService.list().map(withCopy)) : projectService.list()),
+    "projects.get": ({ id }) => {
+      if (id === WORKSPACE_ID) return workspaceHome(db);
+      const project = projectService.get(id);
+      return copies && project ? withCopy(project) : project;
+    },
     "projects.checkoutBranch": ({ id }) => (id === WORKSPACE_ID ? null : projectService.checkoutBranch(id)),
     "projects.git": async ({ id }) => {
       if (id === WORKSPACE_ID) return "none";

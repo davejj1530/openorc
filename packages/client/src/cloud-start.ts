@@ -77,6 +77,7 @@ export function cloudPlaceLabel(cloud: CloudThreadState): string {
   if (cloud.state === "removed") return "Sandbox removed";
   return cloud.provider === "vercel" ? "Vercel Sandbox" : "Simulated sandbox";
 }
+
 const MOVE_ORDER: Record<"mac" | "cloud", MoveStep[]> = { cloud: ["packing", "waking", "sending"], mac: ["waking", "packing", "sending"] };
 const MOVE_LABELS: Record<"mac" | "cloud", Record<MoveStep, string>> = {
   cloud: { packing: "Packing the conversation", waking: "Waking the cloud brain", sending: "Sending it to the cloud" },

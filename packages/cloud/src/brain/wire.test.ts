@@ -113,10 +113,13 @@ describe("control requests and replies", () => {
       { op: "import-project", source: "p1", name: ".dotfiles", branch: "release/v2", bundle: "p1.bundle" },
       { op: "remove-project", source: "4c1f0a52-7a0e-4b44-9d7e-1f0c2a6b8e11" },
       { op: "projects" },
+      { op: "project-settings", source: "p1", settings: { setupScript: "pnpm install\npnpm build", branchPrefix: "", worktreeInclude: [".env"] } },
+      { op: "project-settings", source: "p1", settings: { setupScript: null, branchPrefix: "openorc", worktreeInclude: [] } },
       { op: "stop" },
       { op: "stop-for-update" },
     ];
     for (const request of requests) expect(parseControlRequest(JSON.stringify(request))).toEqual(request);
+    expect(parseControlReply("project-settings", JSON.stringify({ ok: true, result: { applied: false } }))).toEqual({ ok: true, result: { applied: false } });
   });
 
   it("reads what a Mac and a brain one version apart write, in either direction", () => {

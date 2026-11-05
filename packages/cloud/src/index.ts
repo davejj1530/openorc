@@ -43,6 +43,7 @@ export {
   type BrainKey,
   type BrainStart,
   type BrainStatus,
+  type CopySettings,
   type DoorConfig,
   type HandoverKind,
   type HandoverRequest,
@@ -71,6 +72,6 @@ export {
   type ProvisionOptions,
   type WakeResult,
 } from "./brain/machine.js";
-export { branchHead, bundleBranch, copyHeads, takeBranch, type Taken } from "./brain/project-copy.js";
+export { branchHead, bundleBranch, catchUpWithOrigin, confirmSynced, copyHeads, copySyncedAt, takeBranch, type OriginCatchUp, type Taken } from "./brain/project-copy.js";
 export { DOOR_EPOCH_MS, DOOR_PROJECT, brainDoor, doorEpoch, ticketStanding, type BrainDoor, type BrainDoorKey } from "./brain/door.js";
 export { closeDoor, openDoor, removeDoor, type DoorAccess, type DoorBundle, type DoorDeployOptions, type DoorOpening, type OpenedDoor } from "./brain/door-deploy.js";

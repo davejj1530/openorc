@@ -1,6 +1,7 @@
 import { rm } from "node:fs/promises";
 import path from "node:path";
 import {
+  confirmSynced,
   copyHeads,
   openHandover,
   takeBranch,
@@ -133,6 +134,17 @@ async function listCopies(core: OpenOrc, layout: BrainLayout): Promise<BrainCont
   return { copies: copies.filter((copy) => copy !== null) };
 }
 
+/** Each copy the Mac found current counts as synced now, unless it took another commit of the Mac's since. */
+async function copiesCurrent(core: OpenOrc, layout: BrainLayout, { copies }: Extract<BrainControlRequest, { op: "copies-current" }>): Promise<BrainControlResults["copies-current"]> {
+  let marked = 0;
+  for (const { source, macHead } of copies) {
+    const id = copyOf(core, layout, source);
+    const root = id ? projects.get(core.db, id)?.rootPath : null;
+    if (root && (await confirmSynced(root, macHead))) marked++;
+  }
+  return { marked };
+}
+
 /** A Mac project's copy goes, unlisted as the core removes a project, only while the brain has no thread in it. */
 async function removeProject(core: OpenOrc, layout: BrainLayout, { source }: Extract<BrainControlRequest, { op: "remove-project" }>): Promise<BrainControlResults["remove-project"]> {
   const folder = copiesOf(layout, source);
@@ -191,6 +203,12 @@ export function controlHandlers({ core, key, layout, github, stop, answering }: 
     "import-project": (request) => importProject(core, layout, request),
     "remove-project": (request) => removeProject(core, layout, request),
     projects: () => listCopies(core, layout),
+    "copies-current": (request) => copiesCurrent(core, layout, request),
+    "project-settings": async ({ source, settings }) => {
+      const id = copyOf(core, layout, source);
+      if (id) core.projects.updateSettings(id, settings);
+      return { applied: id !== null };
+    },
     "sign-ins": async () => ({ codex: await core.codexCloudLogin.heldId(), github: github.print(), push: (await core.remote.status()).push.keyId }),
     stop: async () => {
       setImmediate(stop);

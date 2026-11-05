@@ -140,7 +140,8 @@ process.parentPort.on("message", (e) => {
     const asleep = e.data.state === "suspend";
     void corePromise
       .then((core) => {
-        if (asleep) return core.cloudStandby.away();
+        // Best effort before sleep: what is new on the chosen projects' branches reaches a brain that is awake.
+        if (asleep) return Promise.all([core.cloudStandby.away(), core.brainRouting?.freshen()]).then(() => undefined);
         // Back from sleep, maybe on another network: the cloud brain is dialed again now, not at the next retry.
         if (core.brainRouting?.active) core.brainRouting.link.awoke();
         return core.cloudStandby.back();

@@ -90,6 +90,8 @@ describe("the control socket", () => {
       "import-project": { op: "import-project", source: "p1", name: "demo", branch: "main", bundle: "demo.bundle" },
       "remove-project": { op: "remove-project", source: "p1" },
       projects: { op: "projects" },
+      "copies-current": { op: "copies-current", copies: [{ source: "p1", macHead: "a".repeat(40) }] },
+      "project-settings": { op: "project-settings", source: "p1", settings: { setupScript: null, branchPrefix: "", worktreeInclude: [] } },
       "sign-ins": { op: "sign-ins" },
       stop: { op: "stop" },
       "stop-for-update": { op: "stop-for-update" },

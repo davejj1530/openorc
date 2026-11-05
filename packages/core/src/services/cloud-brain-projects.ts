@@ -1,4 +1,6 @@
-import { brainTakesProject, branchHead, bundleBranch, type BrainControlResults, type BrainMachine } from "@openorc/cloud";
+import { createHash } from "node:crypto";
+import { brainTakesProject, branchHead, bundleBranch, type BrainControlResults, type BrainMachine, type CopySettings } from "@openorc/cloud";
+import { projects, type Db } from "@openorc/db";
 import { defaultBranch, originUrl } from "@openorc/git";
 import type { Project } from "@openorc/protocol";
 import { projectGit } from "./project-git.js";
@@ -19,6 +21,8 @@ export interface BrainProject {
   threads: number;
   /** Why the last send failed. */
   error: string | null;
+  /** The print of the project settings the copy last took; absent until it took any. */
+  settings?: string;
 }
 
 export function switchedOn(id: string, branch: string): BrainProject {
@@ -62,6 +66,72 @@ export async function copyBranch(project: Project, followed?: string): Promise<{
 /** Whether the project's branch is on a commit other than the one the brain last took. */
 export async function moved(project: Project, record: BrainProject): Promise<boolean> {
   return (await branchHead(project.rootPath, record.branch).catch(() => null)) !== record.sent;
+}
+
+/** The settings a copy takes from its Mac project: what runs and is copied into each new thread's folder, and its branch names. */
+function copySettings({ settings }: Project): CopySettings {
+  return { setupScript: settings.setupScript, branchPrefix: settings.branchPrefix, worktreeInclude: settings.worktreeInclude };
+}
+
+const settingsPrint = (project: Project) =>
+  createHash("sha256")
+    .update(JSON.stringify(copySettings(project)))
+    .digest("base64url");
+
+/** Whether the brain's copy lacks the project's settings as they are now. */
+const settingsMoved = (project: Project, record: BrainProject) => record.brainId !== null && record.settings !== settingsPrint(project);
+
+/** Whether the brain's copy lacks the project's branch or its settings as they are on this Mac. */
+export async function stale(project: Project, record: BrainProject): Promise<boolean> {
+  return settingsMoved(project, record) || (await moved(project, record));
+}
+
+/**
+ * Brings the brain's copy up to the project here: its branch when it moved, then its settings, as the project's other
+ * settings reach the copy, so its setup script runs in the brain's thread sandboxes too.
+ */
+export async function freshCopy(machine: Pick<BrainMachine, "importProject" | "control">, project: Project, record: BrainProject): Promise<BrainProject> {
+  const sent = (await moved(project, record)) ? await sendProject(machine, project, record) : record;
+  if (!settingsMoved(project, sent)) return sent;
+  const { applied } = await machine.control({ op: "project-settings", source: project.id, settings: copySettings(project) });
+  return applied ? { ...sent, settings: settingsPrint(project) } : sent;
+}
+
+/**
+ * Whether a project the brain has a copy of moved on this Mac since the brain took it, read here without asking the
+ * brain. A project whose last send failed at the commit its branch is on now waits until the branch moves again.
+ */
+export async function anyMoved(db: Db, records: readonly BrainProject[], stuck: ReadonlyMap<string, string | null>): Promise<boolean> {
+  for (const record of records) {
+    const project = record.brainId ? projects.get(db, record.id) : null;
+    const head = project ? await branchHead(project.rootPath, record.branch).catch(() => null) : null;
+    if (project && head !== record.sent && !(stuck.has(record.id) && stuck.get(record.id) === head)) return true;
+    if (project && !record.error && settingsMoved(project, record)) return true;
+  }
+  return false;
+}
+
+/**
+ * Tells the brain which copies hold this Mac's branch as it is now, so the phone's "synced" age counts from this look
+ * rather than from the last commit sent. A brain from before this request refuses it; nothing else depends on it.
+ */
+export async function confirmCurrent(machine: Pick<BrainMachine, "control">, db: Db, records: readonly BrainProject[]): Promise<void> {
+  const copies: { source: string; macHead: string }[] = [];
+  for (const record of records) {
+    const project = record.brainId && record.sent ? projects.get(db, record.id) : null;
+    if (project && record.sent && !(await moved(project, record))) copies.push({ source: record.id, macHead: record.sent });
+  }
+  if (copies.length) await machine.control({ op: "copies-current", copies }).catch(() => undefined);
+}
+
+/** Each project whose last send failed, with the commit its branch was on then. */
+export async function failedAt(db: Db, records: readonly BrainProject[]): Promise<Map<string, string | null>> {
+  const failed = new Map<string, string | null>();
+  for (const record of records) {
+    const project = record.error ? projects.get(db, record.id) : null;
+    if (project) failed.set(record.id, await branchHead(project.rootPath, record.branch).catch(() => null));
+  }
+  return failed;
 }
 
 /** An origin to hand on, without a sign-in an https URL carries. */

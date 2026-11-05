@@ -114,6 +114,34 @@ describe("a cloud-only core", () => {
     expect(local).not.toHaveBeenCalled();
   });
 
+  it("starts a thread from GitHub's branch when the copy has nothing of its own, and from the copy when it holds the Mac's", async () => {
+    const github = path.join(root, "github.git");
+    await git(root, ["clone", "-q", "--bare", checkout, github]);
+    await git(checkout, ["remote", "add", "origin", github]);
+    const clone = path.join(root, "someone");
+    await git(root, ["clone", "-q", github, clone]);
+    await writeFile(path.join(clone, "pushed.md"), "pushed to GitHub\n");
+    await git(clone, ["add", "-A"]);
+    await git(clone, ["-c", "user.email=f@example.com", "-c", "user.name=F", "commit", "-qm", "Pushed"]);
+    await git(clone, ["push", "-q", "origin", "HEAD:main"]);
+    const pushed = (await git(clone, ["rev-parse", "HEAD"])).stdout.trim();
+    await open(cloudOnly);
+    const copyOf = async () => (await rpc("projects.list", {})).find((each) => each.id === project.id)?.copy;
+    expect(await copyOf()).toBeUndefined();
+    const began = Date.now();
+    const behind = await core.threads.start({ ...start, projectId: project.id });
+    await vi.waitFor(() => expect(core.threads.get(behind.thread.id)?.baseSha).toBe(pushed), { timeout: 10_000 });
+    expect((await git(checkout, ["rev-parse", "main"])).stdout.trim()).toBe(pushed);
+    expect((await copyOf())?.syncedAt).toBeGreaterThanOrEqual(began);
+    expect((await rpc("projects.get", { id: project.id }))?.copy?.syncedAt).toBeGreaterThanOrEqual(began);
+
+    await writeFile(path.join(checkout, "unpushed.md"), "only on the Mac\n");
+    await commitAll(checkout, "Unpushed");
+    const unpushed = (await git(checkout, ["rev-parse", "main"])).stdout.trim();
+    const ahead = await core.threads.start({ ...start, projectId: project.id });
+    await vi.waitFor(() => expect(core.threads.get(ahead.thread.id)?.baseSha).toBe(unpushed), { timeout: 10_000 });
+  });
+
   it("stays busy from a conversation's start until its first message has been delivered", async () => {
     await open(cloudOnly);
     let release = () => {};

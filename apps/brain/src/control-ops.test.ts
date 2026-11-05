@@ -280,6 +280,14 @@ describe("control requests on the brain's core", () => {
       });
     });
 
+    it("takes the Mac project's setup script and other settings for its copy, and none for a project it has no copy of", async () => {
+      const { projectId } = await send(null);
+      const settings = { setupScript: "pnpm install", branchPrefix: "", worktreeInclude: [".env"] };
+      expect(await ops()({ op: "project-settings", source: SOURCE, settings })).toEqual({ applied: true });
+      expect(core.projects.get(projectId)?.settings).toMatchObject(settings);
+      expect(await ops()({ op: "project-settings", source: "not-a-copy", settings })).toEqual({ applied: false });
+    });
+
     it("keeps commits made on the brain's copy, saying so with its own head", async () => {
       const first = (await git(mac, ["rev-parse", "HEAD"])).stdout.trim();
       const { projectId } = await send(null);
@@ -300,6 +308,28 @@ describe("control requests on the brain's core", () => {
       expect(core.projects.list()).toEqual([]);
       expect(await stat(path.join(layout.data, "projects", SOURCE, "My App")).catch(() => null)).toBeNull();
       expect(await readdir(layout.inbox)).toEqual([]);
+    });
+
+    it("counts a copy as synced when the Mac found it current, not when it took another commit of the Mac's since", async () => {
+      const first = (await git(mac, ["rev-parse", "HEAD"])).stdout.trim();
+      const { projectId } = await send(null);
+      const copy = core.projects.get(projectId)!.rootPath;
+      await writeFile(path.join(copy, ".git", "openorc-synced"), "1000");
+      expect(
+        await ops()({
+          op: "copies-current",
+          copies: [
+            { source: SOURCE, macHead: first },
+            { source: "no-such-copy", macHead: first },
+          ],
+        }),
+      ).toEqual({ marked: 1 });
+      expect(await copySyncedAt(copy)).toBeGreaterThan(Date.now() - 60_000);
+      await commitOn(mac, "b.txt", "b1\n");
+      await send(first);
+      await writeFile(path.join(copy, ".git", "openorc-synced"), "1000");
+      expect(await ops()({ op: "copies-current", copies: [{ source: SOURCE, macHead: first }] })).toEqual({ marked: 0 });
+      expect(await copySyncedAt(copy)).toBe(1000);
     });
 
     it("is removed only while the brain has no thread in it, and removing it again changes nothing", async () => {

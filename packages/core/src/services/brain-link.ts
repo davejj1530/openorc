@@ -27,6 +27,8 @@ export interface BrainEndpoint {
   /** Wakes the brain for a window's own intent, as Wake does; resolves once it runs. */
   wake(): Promise<void>;
   projects(): Promise<ProjectMapping>;
+  /** Sends the brain what is new on this Mac's chosen branches, while it runs. Never wakes it. */
+  freshen?(): Promise<void>;
 }
 
 /** A call the brain cannot answer now, in words a window shows. */

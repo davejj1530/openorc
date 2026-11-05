@@ -577,7 +577,7 @@ export class OpenOrc {
         planLimits: () => readPlanLimits({ db: this.db, usage: this.providerUsage, availability: async () => harnessAvailability(await this.claudeSystemInfo()) }),
         invalidate,
       }),
-      createProjectsHandlers({ db: this.db, projectService: this.projects, invalidate, transport: this.options.transport }),
+      createProjectsHandlers({ db: this.db, projectService: this.projects, invalidate, transport: this.options.transport, copies: this.options.cloudOnly ?? false }),
       createPullRequestHandlers({ pullRequests: this.pullRequests }),
       createReviewerAppHandlers({ reviewerApp: this.reviewerApp }),
       createThreadQueriesHandlers({ threadService: this.threads, db: this.db, ledger: this.ledger, imports: this.imports }),

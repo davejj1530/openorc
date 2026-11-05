@@ -21,7 +21,8 @@ import { claudeAccounts, projects, redact, type Db } from "@openorc/db";
 import type { BrainRegion, CloudBrainMachine, CloudBrainPairing, CloudBrainProject, CloudBrainSignIns, CloudBrainStatus, CloudBrainStep, Project } from "@openorc/protocol";
 import type { ClaudeCloudTokens } from "./claude-cloud-tokens.js";
 import { BrainDoorKeeper, vercelDoors, type BrainDoors } from "./cloud-brain-door.js";
-import { blocked, copyBranch, hasThreads, keptOwn, moved, seen, sendProject, switchedOn, type BrainProject } from "./cloud-brain-projects.js";
+import { anyMoved, blocked, confirmCurrent, copyBranch, failedAt, freshCopy, hasThreads, keptOwn, seen, stale, switchedOn, type BrainProject } from "./cloud-brain-projects.js";
+import { claudeToSend, sameSent, sent, type Sent } from "./cloud-brain-claude.js";
 import { NO_SIGN_INS, claimsSignIns, heardSignIns, signInChanges, signInsView, switchGitHub, type SignInRecord, type SignInSources } from "./cloud-brain-signins.js";
 import { apiKeyAuth } from "./codex-cloud-login.js";
 import type { ProtectedSecretStore } from "./extraction-credentials.js";
@@ -40,20 +41,13 @@ export interface BrainBundleSource {
 }
 
 /** The parts of BrainMachine this uses; tests pass a stand-in. Moving threads uses the transfers too. */
-export type BrainMachineLike = Pick<BrainMachine, "status" | "provision" | "wake" | "control" | "importProject" | "remove"> & Partial<Pick<BrainMachine, "receiveThread" | "readOutbox">>;
+export type BrainMachineLike = Pick<BrainMachine, "status" | "provision" | "wake" | "control" | "importProject" | "remove"> & Partial<Pick<BrainMachine, "receiveThread" | "readOutbox" | "costSince">>;
 
 /** The brain's machine on a team. Its project is made only when `create`; otherwise a team without one has none. */
 export type OpenBrainMachine = (access: BrainAccess, create: boolean) => Promise<BrainMachineLike | null>;
 const openMachine: OpenBrainMachine = (access, create) => (create ? BrainMachine.connect(access) : BrainMachine.find(access));
 
 /** What the brain last took of one Claude account, to name it in Settings and to tell a change since. */
-interface Sent {
-  id: string;
-  name: string;
-  default: boolean;
-  /** When the token sent was made or pasted. */
-  tokenAt: number;
-}
 
 /** Kept in protected storage. The key alone opens the brain's secrets, so it is saved before anything is made. */
 interface Stored extends SignInRecord {
@@ -92,8 +86,6 @@ const MACHINE: Record<BrainMachineStatus["state"], CloudBrainMachine | "missing"
   failed: "failed",
   missing: "missing",
 };
-
-const sameSent = (a: Sent[], b: Sent[]) => JSON.stringify(a) === JSON.stringify(b);
 
 export interface CloudBrainDeps {
   db: Db;
@@ -180,6 +172,30 @@ export class CloudBrain {
       const machine = await this.machine();
       await this.wakeUp(machine);
       return work(machine);
+    });
+  }
+
+  /**
+   * While the brain and this Mac are both awake, its copies follow this Mac's branches: each project switched on whose
+   * branch moved since the brain took it is sent. Light: the branches are read here first, and the brain is asked only
+   * when one moved. Never wakes the brain; one asleep meanwhile is refreshed at its next wake.
+   */
+  async freshenProjects(): Promise<void> {
+    const stored = await this.read().catch(() => null);
+    if (!stored?.ready || !stored.projects?.length || this.sendingProject) return;
+    if (!(await anyMoved(this.deps.db, stored.projects, this.stuck))) return;
+    await this.serialize(() => this.refreshProjects()).catch(() => undefined);
+    this.stuck = await failedAt(this.deps.db, (await this.read().catch(() => null))?.projects ?? []);
+  }
+
+  /** What the brain and its thread sandboxes ran this month, at Vercel's list prices; null before setup. Never wakes it. */
+  async cost(now = Date.now()): Promise<CloudBrainCost | null> {
+    const stored = await this.read().catch(() => null);
+    if (!stored?.ready) return null;
+    return this.costs.read(now, async (since) => {
+      const vercel = await this.deps.vercel();
+      const machine = vercel ? await this.open({ token: vercel.token, teamId: stored.teamId }, false) : null;
+      return machine?.costSince ? machine.costSince(since) : null;
     });
   }
 
@@ -495,10 +511,12 @@ export class CloudBrain {
     }
     const records = stored.projects.map((record) => seen(record, copies));
     await this.saveProjects(records);
+    await confirmCurrent(machine, this.deps.db, records);
+    if (!send) return;
     for (const record of records) {
       const project = projects.get(this.deps.db, record.id);
-      if (!project || !(await moved(project, record))) continue;
-      const next = await this.sending(project, () => sendProject(machine, project, record)).catch(async (error: unknown) =>
+      if (!project || !(await stale(project, record))) continue;
+      const next = await this.sending(project, () => freshCopy(machine, project, record)).catch(async (error: unknown) =>
         error instanceof BrainUnavailable ? null : { ...record, error: await this.scrub(error) },
       );
       if (!next) return;
@@ -648,17 +666,8 @@ export class CloudBrain {
     return this.deps.signIns ?? NO_SIGN_INS;
   }
 
-  /** Every enabled Claude account with a cloud token, the default marked. One turned off here does not run there either. */
-  private async claude(): Promise<(Sent & { token: string })[]> {
-    const access = await this.deps.tokens.status();
-    const defaultId = claudeAccounts.defaultId(this.deps.db);
-    const accounts: (Sent & { token: string })[] = [];
-    for (const { id, name } of claudeAccounts.list(this.deps.db).filter((account) => account.enabled)) {
-      const tokenAt = access[id]?.createdAt;
-      const token = tokenAt == null ? null : await this.deps.tokens.token(id);
-      if (token && tokenAt != null) accounts.push({ id, name, default: id === defaultId, tokenAt, token });
-    }
-    return accounts;
+  private claude(): Promise<(Sent & { token: string })[]> {
+    return claudeToSend(this.deps.db, this.deps.tokens);
   }
 
   /** How Vercel reports the brain's machine; null with a reason when it cannot be asked. */
@@ -782,10 +791,6 @@ export class CloudBrain {
     }
     this.cache = next;
   }
-}
-
-function sent({ id, name, default: isDefault, tokenAt }: Sent): Sent {
-  return { id, name, default: isDefault, tokenAt };
 }
 
 function words(error: unknown): string {

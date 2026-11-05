@@ -19,6 +19,7 @@ import {
   type BrainControlResults,
   type BrainKey,
   type BrainMachineStatus,
+  type CopySettings,
   type DoorAccess,
   type DoorBundle,
   type DoorDeployOptions,
@@ -67,6 +68,10 @@ class FakeBrain implements BrainMachineLike {
   copies = "";
   /** Threads it has in each copy, by the Mac project's id. */
   threads = new Map<string, number>();
+  /** The copies the Mac said hold its branch as it is now. */
+  confirmed: { source: string; macHead: string }[] = [];
+  /** Each copy's settings as the Mac last sent them, by Mac project. */
+  settings = new Map<string, CopySettings>();
   /** The version it ran as each project came. */
   importedOn: (string | null)[] = [];
   /** Its copies lack the commit any bundle builds on, as when that commit went missing. */
@@ -117,6 +122,14 @@ class FakeBrain implements BrainMachineLike {
       await this.beforeProjects();
       if (this.refusesProjects) throw new BrainRefused(this.refusesProjects);
       return (await this.listCopies()) as never;
+    }
+    if (request.op === "copies-current") {
+      this.confirmed.push(...request.copies);
+      return { marked: request.copies.length } as never;
+    }
+    if (request.op === "project-settings") {
+      this.settings.set(request.source, request.settings);
+      return { applied: true } as never;
     }
     if (request.op === "remove-project") {
       const threads = this.threads.get(request.source) ?? 0;
@@ -220,7 +233,8 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await core.close();
-  await rm(root, { recursive: true, force: true });
+  // A copy's git may still be writing as the folder goes.
+  await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
 });
 
 describe("the cloud brain from the Mac", () => {
@@ -597,8 +611,8 @@ describe("the cloud brain from the Mac", () => {
       brain.calls = [];
       await choose(app.id, true);
       const head = git(app.folder, "rev-parse", "main");
-      await vi.waitFor(() => expect(records()).toEqual([{ id: app.id, brainId: `brain-${app.id}`, branch: "main", sent: head, head, threads: 0, error: null }]));
-      expect(brain.calls.filter((call) => call !== "status")).toEqual(["wake", "control projects", "import app whole"]);
+      await vi.waitFor(() => expect(records()).toEqual([{ id: app.id, brainId: `brain-${app.id}`, branch: "main", sent: head, head, threads: 0, error: null, settings: expect.any(String) }]));
+      expect(brain.calls.filter((call) => call !== "status")).toEqual(["wake", "control projects", "import app whole", "control project-settings"]);
       const copy = brain.copy(app.id, "app");
       expect(git(copy, "rev-parse", "main")).toBe(head);
       expect(git(copy, "remote", "get-url", "origin")).toBe("https://github.com/me/app.git");
@@ -633,6 +647,57 @@ describe("the cloud brain from the Mac", () => {
       await vi.waitFor(() => expect(records()).toEqual([expect.objectContaining({ sent: next, head: next })]));
       expect(git(copy, "rev-parse", "main")).toBe(next);
       expect(imports()).toEqual(["import app incremental"]);
+    });
+
+    it("sends what is new while the brain and this Mac are awake, asking it nothing while no branch moved, and never waking it", async () => {
+      const app = await sent();
+      const freshen = () => (core as unknown as { cloudParts: { brain: CloudBrain } }).cloudParts.brain.freshenProjects();
+      brain.state = "running";
+      await freshen();
+      expect(brain.calls).toEqual([]);
+      const next = commit(app.folder, "b.txt", "b1\n");
+      await freshen();
+      expect(imports()).toEqual(["import app incremental"]);
+      expect(records()).toEqual([expect.objectContaining({ sent: next, head: next, error: null })]);
+      commit(app.folder, "c.txt", "c1\n");
+      brain.state = "stopped";
+      brain.calls = [];
+      await freshen();
+      expect(brain.calls).toEqual(["control projects"]);
+      expect(records()).toEqual([expect.objectContaining({ sent: next, error: null })]);
+    });
+
+    it("gives the brain's copy the project's setup script, again when it changes while both are awake, and never waking it", async () => {
+      const app = await sent();
+      expect(brain.settings.get(app.id)).toMatchObject({ setupScript: null, branchPrefix: "openorc" });
+      const freshen = () => (core as unknown as { cloudParts: { brain: CloudBrain } }).cloudParts.brain.freshenProjects();
+      brain.state = "running";
+      const updated = await core.handle({ type: "rpc", id: 1, method: "projects.updateSettings", params: { id: app.id, settings: { setupScript: "pnpm install" } } });
+      expect(updated.type).toBe("rpc.result");
+      brain.calls = [];
+      await freshen();
+      expect(brain.settings.get(app.id)).toMatchObject({ setupScript: "pnpm install" });
+      expect(imports()).toEqual([]);
+      brain.calls = [];
+      await freshen();
+      expect(brain.calls).toEqual([]);
+    });
+
+    it("tries a send that failed again only once the branch moved on, not at every look while both are awake", async () => {
+      const app = await sent();
+      const freshen = () => (core as unknown as { cloudParts: { brain: CloudBrain } }).cloudParts.brain.freshenProjects();
+      brain.state = "running";
+      brain.refusesImport = "The cloud copy has uncommitted changes in the way.";
+      commit(app.folder, "b.txt", "b1\n");
+      await freshen();
+      expect(records()).toEqual([expect.objectContaining({ error: "The cloud copy has uncommitted changes in the way." })]);
+      brain.calls = [];
+      await freshen();
+      expect(brain.calls).toEqual([]);
+      brain.refusesImport = null;
+      const next = commit(app.folder, "c.txt", "c1\n");
+      await freshen();
+      expect(records()).toEqual([expect.objectContaining({ sent: next, error: null })]);
     });
 
     it("sends what is new after pairing a phone, the code first, and after handing over sign-ins", async () => {
@@ -739,7 +804,7 @@ describe("the cloud brain from the Mac", () => {
       expect(brain.calls.filter((call) => call !== "status").slice(0, 2)).toEqual(["wake", "control remove-project"]);
       expect((await projects())[0]).toMatchObject({ on: true, blocked: HAS_THREADS });
       expect(records()).toEqual([expect.objectContaining({ id: app.id, threads: 1 })]);
-      await vi.waitFor(() => expect(brain.calls).toContain("control projects"));
+      await vi.waitFor(() => expect(brain.calls).toContain("control copies-current"));
 
       brain.calls = [];
       await choose(app.id, false);

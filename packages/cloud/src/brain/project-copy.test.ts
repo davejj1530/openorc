@@ -4,7 +4,8 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { branchHead, bundleBranch, copyHeads, takeBranch } from "./project-copy.js";
+import { createServer, type Socket } from "node:net";
+import { branchHead, bundleBranch, catchUpWithOrigin, copyHeads, copySyncedAt, takeBranch } from "./project-copy.js";
 
 const IDENTITY = { GIT_AUTHOR_NAME: "Test", GIT_AUTHOR_EMAIL: "test@example.com", GIT_COMMITTER_NAME: "Test", GIT_COMMITTER_EMAIL: "test@example.com" };
 const ORIGIN = "https://github.com/example/app.git";
@@ -189,5 +190,75 @@ describe("a Mac project's copy on the brain", () => {
     mkdirSync(empty);
     git(empty, "init", "-q", "-b", "main");
     expect(await branchHead(empty, "main")).toBeNull();
+  });
+});
+
+describe("a copy caught up with its origin before a thread starts from it", () => {
+  let origin: string;
+
+  /** The copy as the Mac sent it, its origin a GitHub stand-in that had the Mac's branch pushed. */
+  async function copyWithOrigin(): Promise<void> {
+    await takeBranch(copy, (await send(null)).file, "main", ORIGIN);
+    origin = path.join(base, "github.git");
+    git(base, "clone", "-q", "--bare", mac, origin);
+    git(copy, "remote", "set-url", "origin", origin);
+  }
+
+  /** A commit someone pushed to the origin, made in a clone of it. */
+  function pushed(name: string): string {
+    const clone = path.join(base, `clone-${Math.random().toString(36).slice(2)}`);
+    git(base, "clone", "-q", "-b", "main", origin, clone);
+    const made = commit(clone, name, `${name}\n`);
+    git(clone, "push", "-q", "origin", "main");
+    return made;
+  }
+
+  it("fast-forwards to the origin when it is ahead and the copy has nothing of its own, its files too", async () => {
+    await copyWithOrigin();
+    const ahead = pushed("from-github.txt");
+    expect(await catchUpWithOrigin(copy, "main")).toBe("updated");
+    expect(git(copy, "rev-parse", "main")).toBe(ahead);
+    expect(readFileSync(path.join(copy, "from-github.txt"), "utf8")).toBe("from-github.txt\n");
+    expect(await catchUpWithOrigin(copy, "main")).toBe("current");
+  });
+
+  it("keeps a copy with commits its origin lacks, as the Mac's unpushed work, ahead or diverged", async () => {
+    await copyWithOrigin();
+    git(mac, "switch", "-q", "main");
+    const unpushed = commit(mac, "unpushed.txt", "only on the Mac\n");
+    await takeBranch(copy, (await send(first)).file, "main", origin);
+    expect(await catchUpWithOrigin(copy, "main")).toBe("kept");
+    pushed("elsewhere.txt");
+    expect(await catchUpWithOrigin(copy, "main")).toBe("kept");
+    expect(git(copy, "rev-parse", "main")).toBe(unpushed);
+  });
+
+  it("gives up on an origin that never answers within its time, and leaves the copy be", async () => {
+    await copyWithOrigin();
+    const held: Socket[] = [];
+    const silent = createServer((socket) => void held.push(socket));
+    await new Promise<void>((resolve) => silent.listen(0, "127.0.0.1", resolve));
+    const { port } = silent.address() as { port: number };
+    git(copy, "remote", "set-url", "origin", `http://127.0.0.1:${port}/app.git`);
+    const before = git(copy, "rev-parse", "main");
+    const began = Date.now();
+    try {
+      expect(await catchUpWithOrigin(copy, "main", 500)).toBe("unreachable");
+      expect(Date.now() - began).toBeLessThan(5_000);
+    } finally {
+      held.forEach((socket) => socket.destroy());
+      silent.close();
+    }
+    expect(git(copy, "rev-parse", "main")).toBe(before);
+    git(copy, "remote", "remove", "origin");
+    expect(await catchUpWithOrigin(copy, "main")).toBe("no-origin");
+  });
+
+  it("says when the copy last took the Mac's branch or heard its origin's, and nothing for a folder that is no copy", async () => {
+    const began = Date.now();
+    await takeBranch(copy, (await send(null)).file, "main", ORIGIN);
+    const taken = await copySyncedAt(copy);
+    expect(taken).toBeGreaterThanOrEqual(began);
+    expect(await copySyncedAt(mac)).toBeNull();
   });
 });

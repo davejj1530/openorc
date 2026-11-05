@@ -30,8 +30,12 @@ function cloudBrainEndpoint(brain: CloudBrain): BrainEndpoint {
       return { url: linkUrl({ kind: "public", host: target.address, port: 443 }, brainKey, nodeCrypto), brainKey, ownerKeys: ownerLinkKeys(target.key) };
     },
     wake: () => brain.withMachine(true, async () => undefined),
+    freshen: () => brain.freshenProjects(),
   };
 }
+
+/** How often, while the brain is awake, this Mac looks whether a chosen project's branch moved. */
+const FRESHEN_MS = 2 * 60_000;
 
 async function projectMapping(brain: CloudBrain): Promise<ProjectMapping> {
   const copies = ((await brain.moves())?.projects ?? []).filter((record) => record.brainId);
@@ -78,6 +82,22 @@ export class BrainRouting {
       log,
     });
     this.router = new BrainRouter({ db, link: this.link, mirrors: this.mirrors, local, windows, mapping: () => endpoint.projects(), notificationsOn, log });
+    this.endpoint = endpoint;
+    this.log = log;
+    this.link.onReach((reach) => void (reach === "live" && this.freshen()));
+  }
+
+  private readonly endpoint: BrainEndpoint;
+  private readonly log: Logger;
+  private freshening: ReturnType<typeof setInterval> | null = null;
+
+  /**
+   * The brain's copies follow this Mac's branches while both are awake: when the brain answers, now and then after, and
+   * once more as this Mac goes to sleep. Never wakes the brain.
+   */
+  freshen(): Promise<void> {
+    if (!this.active || this.link.reach !== "live" || !this.endpoint.freshen) return Promise.resolve();
+    return this.endpoint.freshen().catch((error: unknown) => this.log.warn(`the cloud brain's project copies did not refresh: ${error instanceof Error ? error.message : String(error)}`));
   }
 
   readonly mirrors: BrainMirrors;
@@ -87,16 +107,27 @@ export class BrainRouting {
   /** At start and whenever the cloud brain changed: routing follows whether one is set up; a wake may let the link dial. */
   async refresh(): Promise<void> {
     const ready = await this.ready();
-    if (ready && !this.active) this.link.start();
+    if (ready && !this.active) {
+      this.link.start();
+      this.freshening = setInterval(() => void this.freshen(), FRESHEN_MS);
+      this.freshening.unref();
+    }
     if (!ready && this.active) {
       this.link.close();
       this.router.pages.clear();
+      this.stopFreshening();
     }
     this.active = ready;
     if (ready) this.link.awoke();
   }
 
+  private stopFreshening(): void {
+    if (this.freshening) clearInterval(this.freshening);
+    this.freshening = null;
+  }
+
   close(): void {
+    this.stopFreshening();
     this.link.close();
     this.router.close();
   }

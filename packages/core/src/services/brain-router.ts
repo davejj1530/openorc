@@ -176,6 +176,37 @@ export class BrainRouter {
   /** A call about one task: this Mac's own answers it; one the brain holds goes there. */
   private task(request: RpcRequest, method: RpcMethod, params: Record<string, unknown>, id: string | undefined): Promise<RpcReply> {
     if (!id || tasks.get(this.deps.db, id)) return this.deps.local(request);
+    const known = this.holdsTask(id);
+    return this.forward(request, method, params, this.wakes(request, method, known), known);
+  }
+
+  /**
+   * Whether a call wakes the brain: only a person's own. A window reading again what it shows never does, and a read
+   * does only for a thread or task the brain is known to hold, so a pane of a thread just deleted here never wakes it.
+   */
+  private wakes(request: RpcRequest, method: RpcMethod, known: boolean): boolean {
+    return !request.refresh && (known || !ROUTED_READS.has(method));
+  }
+
+  /** The brain holds this thread as far as this Mac knows: in its last lists, open here as a copy, or coming here. */
+  private holdsThread(id: string): boolean {
+    if (incomingMove(this.deps.db, id) || this.deps.mirrors.folder(id)) return true;
+    return this.pages
+      .recent()
+      .some(({ method, result }) =>
+        method === "threads.list"
+          ? (result as ThreadSummary[]).some((row) => row.id === id)
+          : method === "inbox.list" && (result as InboxList).items.some((item) => item.kind === "thread" && item.thread.id === id),
+      );
+  }
+
+  /** The brain holds this task as far as its last lists say. */
+  private holdsTask(id: string): boolean {
+    return this.pages
+      .recent()
+      .some(({ method, result }) =>
+        method === "tasks.list" ? (result as Task[]).some((row) => row.id === id) : method === "inbox.list" && (result as InboxList).items.some((item) => item.kind === "task" && item.task.id === id),
+      );
   }
 
   /**

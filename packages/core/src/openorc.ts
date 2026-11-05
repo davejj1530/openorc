@@ -17,7 +17,7 @@ import { createBrainSyncHandlers } from "./handlers/brain-sync.js";
 import { createCloudHandlers } from "./handlers/cloud.js";
 import { createCodeExplanationHandlers } from "./handlers/code-explanations.js";
 import { createDeviceHandlers } from "./handlers/devices.js";
-import { invalidParamsMessage, resultSummary } from "./handlers/diagnostics.js";
+import { invalidParamsMessage, rpcLogLine } from "./handlers/diagnostics.js";
 import { createEventsHandlers } from "./handlers/events.js";
 import { createFilesHandlers } from "./handlers/files.js";
 import { createInboxHandlers } from "./handlers/inbox.js";
@@ -513,7 +513,6 @@ export class OpenOrc {
 
   private async dispatch(request: RpcRequest, origin?: RequestOrigin): Promise<RpcReply> {
     const { id, method } = request;
-    const privateParams = method.startsWith("slack.") || method === "memory.settings.set" || method === "remote.push.setKey";
     try {
       if (!Object.hasOwn(rpcParams, method)) return { type: "rpc.error", id, message: `unknown method ${method}` };
       const parsed = rpcParams[method as RpcMethod].safeParse(request.params ?? {});
@@ -523,7 +522,7 @@ export class OpenOrc {
       const started = Date.now();
       const result = await requestOrigin.run(origin, () => handler(parsed.data));
       if (process.env["OPENORC_RPC_LOG"] === "1") {
-        console.log(`[rpc] ${method} ${privateParams ? "[private]" : JSON.stringify(parsed.data).slice(0, 120)} -> ${resultSummary(result)} in ${Date.now() - started} ms`);
+        console.log(rpcLogLine(method, parsed.data, result, Date.now() - started));
       }
       return { type: "rpc.result", id, result: result ?? null };
     } catch (e) {

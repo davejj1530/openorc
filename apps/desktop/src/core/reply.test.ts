@@ -57,6 +57,20 @@ describe("window ports", () => {
     expect(window.received).toEqual([{ type: "rpc.error", id: 5, message: "core failed to start" }]);
   });
 
+  it("hands the core a window's refresh as the window marked it, so a poll never wakes the cloud brain", async () => {
+    const heard: RpcRequest[] = [];
+    const windows = windowPorts(async (request) => {
+      heard.push(request);
+      return echo(request);
+    });
+    const window = new FakeWindow();
+    windows.attach(window);
+    window.emit("message", { data: { type: "rpc", id: 1, method: "git.threadLog", params: { threadId: "t" }, refresh: true } });
+    window.request(2, null);
+    await settled();
+    expect(heard.map((request) => request.refresh)).toEqual([true, undefined]);
+  });
+
   it("delivers what the core broadcast while answering before the answer", async () => {
     const frame: Broadcast = { type: "frame", frame: { runId: "run", seq: 1, events: [] } };
     const windows = windowPorts(async (request) => {

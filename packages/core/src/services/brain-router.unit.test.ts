@@ -85,8 +85,8 @@ function harness(answers: { mac?: ThreadSummary[]; cloud?: ThreadSummary[]; clou
 }
 
 let id = 0;
-async function ask(router: BrainRouter, method: RpcMethod, params: unknown): Promise<unknown> {
-  const reply: RpcReply = await router.handle({ type: "rpc", id: ++id, method, params } as RpcRequest);
+async function ask(router: BrainRouter, method: RpcMethod, params: unknown, refresh?: true): Promise<unknown> {
+  const reply: RpcReply = await router.handle({ type: "rpc", id: ++id, method, params, ...(refresh ? { refresh } : {}) } as RpcRequest);
   if (reply.type === "rpc.error") throw new Error(reply.message);
   return reply.result;
 }

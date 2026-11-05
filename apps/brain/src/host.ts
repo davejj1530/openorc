@@ -13,7 +13,7 @@ import {
   type BrainStatus,
   type RunnerFile,
 } from "@openorc/cloud";
-import { OpenOrc, type RequestOrigin, type RpcReply } from "@openorc/core";
+import { OpenOrc, usesHost, type RequestOrigin, type RpcReply } from "@openorc/core";
 import { useGitHubSignIn } from "@openorc/git";
 import type { RpcRequest } from "@openorc/protocol";
 import { BrainAwake, NO_SANDBOX, type SleepReason } from "./awake.js";
@@ -85,11 +85,12 @@ class Host {
 
   /**
    * Phones' requests, refused once the brain is closing so nothing new starts under it. Each one starts the idle clock
-   * again, so a phone that looked in between two of the policy's looks still gets the whole grace after it leaves.
+   * again, so a phone that looked in between two of the policy's looks still gets the whole grace after it leaves; the
+   * Mac's list refreshes do not.
    */
   readonly answer = (request: RpcRequest, origin?: RequestOrigin): Promise<RpcReply> => {
     if (this.phase === "closing" || !this.core) return Promise.resolve({ type: "rpc.error", id: request.id, message: NOT_READY.closing });
-    this.awake?.touch();
+    if (usesHost(request.method, origin)) this.awake?.touch();
     return this.core.handle(request, origin);
   };
 

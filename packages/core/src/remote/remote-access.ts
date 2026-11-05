@@ -37,6 +37,7 @@ import { taskBoard } from "../handlers/brain-sync.js";
 import type { ProtectedSecretStore } from "../services/extraction-credentials.js";
 import { PREVIEW_THREAD_GONE, previewThreadLive } from "../services/preview.js";
 import type { Broadcast, Logger } from "../transport.js";
+import { OWNER_DEVICE } from "../request-origin.js";
 import { readRemoteAsset } from "./assets.js";
 import { removedBrains } from "./removed-brains.js";
 import { listen, type Listener } from "./listener.js";
@@ -166,7 +167,7 @@ export class RemoteAccess {
    * its lists, counts only while it watches a run: someone at the Mac has a cloud conversation open.
    */
   get busy(): boolean {
-    return [...this.sessions].some((session) => session.live && (session.deviceId !== OWNER || session.watching));
+    return [...this.sessions].some((session) => session.live && (session.deviceId !== OWNER_DEVICE || session.watching));
   }
 
   async status(): Promise<RemoteStatus> {
@@ -220,7 +221,7 @@ export class RemoteAccess {
       }
       case "door.key":
         // The owner wakes the brain through Vercel, never through the door.
-        return deviceId === OWNER ? null : (this.network.door?.(deviceId) ?? null);
+        return deviceId === OWNER_DEVICE ? null : (this.network.door?.(deviceId) ?? null);
       case "host.kind":
         return this.network.publicAddress ? "brain" : "mac";
       case "brains.removed":
@@ -411,10 +412,10 @@ export class RemoteAccess {
       device: (deviceId, method, params) => this.device(deviceId, method, params),
       preview: this.previews,
       watchable: (id) => previewThreadLive(db, id),
-      owner: role === OWNER,
+      owner: role === OWNER_DEVICE,
     });
     // Removing a phone ends the sessions it finds, and this one may have been admitted just before.
-    if (session.deviceId !== OWNER && remoteDevices.byKey(db, accepted.session.remoteStatic)?.id !== session.deviceId) {
+    if (session.deviceId !== OWNER_DEVICE && remoteDevices.byKey(db, accepted.session.remoteStatic)?.id !== session.deviceId) {
       session.close("removed");
       return;
     }
@@ -432,8 +433,8 @@ export class RemoteAccess {
     const { db } = this.options;
     const now = Date.now();
     if (this.network.owner && equalBytes(publicKey, this.network.owner)) {
-      const owner = { id: OWNER, name: hello.device.name, publicKey, createdAt: now, lastSeenAt: now };
-      return { ok: true, value: owner, hello: this.hello(OWNER) };
+      const owner = { id: OWNER_DEVICE, name: hello.device.name, publicKey, createdAt: now, lastSeenAt: now };
+      return { ok: true, value: owner, hello: this.hello(OWNER_DEVICE) };
     }
     let device = remoteDevices.byKey(db, publicKey);
     if (!device && hello.pair) {

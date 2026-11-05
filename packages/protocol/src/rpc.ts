@@ -400,6 +400,22 @@ export const rpcParams = {
 export type RpcMethod = keyof typeof rpcParams;
 export type RpcParams<M extends RpcMethod> = z.infer<(typeof rpcParams)[M]>;
 
+/**
+ * Methods whose params carry a credential, besides every slack.* method: the core never logs their params. core's
+ * diagnostics test fails for a method with a credential field left off.
+ */
+const SECRET_PARAMS: ReadonlySet<RpcMethod> = new Set<RpcMethod>([
+  "memory.settings.set",
+  "remote.push.setKey",
+  "cloud.vercel.connect",
+  "cloud.claude.save",
+  "cloud.codex.apiKey",
+  "cloud.brain.codex.apiKey",
+  "providers.codex.reset",
+]);
+
+export const secretParams = (method: string): boolean => method.startsWith("slack.") || SECRET_PARAMS.has(method as RpcMethod);
+
 export interface SystemInfo {
   dataDir: string;
   /**
@@ -640,6 +656,8 @@ export const RpcRequest = z.object({
   id: z.number().int(),
   method: z.string(),
   params: z.unknown(),
+  /** A window reading again what it already shows, on a timer or after a change, rather than for a person. */
+  refresh: z.literal(true).optional(),
 });
 export type RpcRequest = z.infer<typeof RpcRequest>;
 

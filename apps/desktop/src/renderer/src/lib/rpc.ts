@@ -24,7 +24,7 @@ class CoreClient implements CoreConnection {
   private port: MessagePort | null = null;
   private nextId = 1;
   private readonly pending = new Map<number, Pending>();
-  private readonly queued: Array<{ id: number; method: string; params: unknown }> = [];
+  private readonly queued: Array<{ id: number; method: string; params: unknown; refresh?: true }> = [];
   private readonly pushListeners = new Set<Listener<ClientPush>>();
   private readonly logListeners = new Set<Listener<{ level: string; message: string }>>();
   private readonly benchListeners = new Set<Listener<{ eventsSent: number; framesSent: number; durationMs: number }>>();
@@ -65,11 +65,11 @@ class CoreClient implements CoreConnection {
     return () => this.devicePanelListeners.delete(fn);
   }
 
-  call<M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> {
+  call<M extends RpcMethod>(method: M, params: RpcParams<M>, options?: { refresh: true }): Promise<RpcResults[M]> {
     const id = this.nextId++;
     return new Promise<RpcResults[M]>((resolve, reject) => {
       this.pending.set(id, { resolve: resolve as (v: unknown) => void, reject });
-      const message = { id, method, params };
+      const message = { id, method, params, ...options };
       if (this.port) this.port.postMessage({ type: "rpc", ...message });
       else this.queued.push(message);
     });

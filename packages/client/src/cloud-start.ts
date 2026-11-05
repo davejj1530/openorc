@@ -53,6 +53,9 @@ export function ownerMark(thread: Pick<ThreadSummary, "owner" | "moving">): { la
 /** A cloud thread before its first turn, with its cloud state. */
 export type StartingCloudThread = ThreadSummary & { cloud: CloudThreadState };
 
+/** What a cloud start's steps and failure read from its thread. */
+export type CloudStartThread = Pick<ThreadSummary, "agent" | "owner" | "queued"> & { cloud: CloudThreadState };
+
 /** A cloud thread before its first turn: its first message waits in the queue while the sandbox gets ready. */
 export function startingInCloud(thread: ThreadSummary | null | undefined, runs: number): thread is StartingCloudThread {
   return Boolean(thread?.cloud && runs === 0 && thread.queued.length > 0);
@@ -69,7 +72,7 @@ export type CloudStartStepState = "pending" | "running" | "done";
 const sandboxStart: Record<CloudThreadState["provider"], string> = { vercel: "Starting a Vercel sandbox", agent37: "Starting an Agent37 instance", local: "Starting the sandbox" };
 const brainStart: Record<NonNullable<CloudThreadState["brain"]>, string> = { waking: "Waking the cloud brain", updating: "Updating the cloud brain" };
 
-function stepLabel(step: CloudStartStep, thread: StartingCloudThread): string {
+function stepLabel(step: CloudStartStep, thread: CloudStartThread): string {
   if (step === "brain") return brainStart[thread.cloud.brain ?? "waking"];
   if (step === "sandbox") return sandboxStart[thread.cloud.provider];
   if (step === "code") return "Sending your code";
@@ -91,14 +94,14 @@ function currentStep(cloud: CloudThreadState): CloudStartStep {
  * The sandbox's setup as steps: every step before the current one is done; the agent starts once the sandbox is ready. A
  * thread on the cloud brain first has the brain woken, and updated when this Mac carries a newer one.
  */
-export function cloudStartSteps(thread: StartingCloudThread): { step: CloudStartStep; label: string; state: CloudStartStepState }[] {
+export function cloudStartSteps(thread: CloudStartThread): { step: CloudStartStep; label: string; state: CloudStartStepState }[] {
   const order: CloudStartStep[] = [...(thread.owner?.brain === "cloud" ? (["brain"] as const) : []), "sandbox", "code", ...(thread.cloud.setup ? (["setup"] as const) : []), "agent"];
   const current = order.indexOf(currentStep(thread.cloud));
   return order.map((step, index) => ({ step, label: stepLabel(step, thread), state: stepState(index, current) }));
 }
 
 /** Why a starting cloud thread's setup failed, or null while it has not; its waiting message is sent again to retry. */
-export function cloudStartFailure(thread: StartingCloudThread): string | null {
+export function cloudStartFailure(thread: CloudStartThread): string | null {
   const message = thread.queued[0];
   if (thread.cloud.state !== "failed" && !message?.interrupted) return null;
   return thread.cloud.error ?? message?.error ?? "Something went wrong while it was being set up.";

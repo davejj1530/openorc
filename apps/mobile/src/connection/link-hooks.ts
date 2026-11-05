@@ -2,7 +2,8 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import type { ConnectionManager } from "./manager";
 
 /** Something read from the Mac, as a screen shows it. */
-export type LinkRead<T> = { state: "loading" } | { state: "ready"; value: T } | { state: "failed" };
+/** A failed read keeps the Mac's or the phone's words for why, for a view that can say more than "unavailable". */
+export type LinkRead<T> = { state: "loading" } | { state: "ready"; value: T } | { state: "failed"; reason?: string };
 
 type Done<T> = { key: string; read: LinkRead<T>; session: number | null };
 
@@ -40,7 +41,7 @@ export function linkHooks(link: Pick<ConnectionManager, "subscribe" | "getState"
       const on = sessionNow();
       read(key).then(
         (value) => current && setDone({ key, read: { state: "ready", value }, session: on }),
-        () => current && setDone({ key, read: { state: "failed" }, session: on }),
+        (error: unknown) => current && setDone({ key, read: error instanceof Error ? { state: "failed", reason: error.message } : { state: "failed" }, session: on }),
       );
       return () => {
         current = false;

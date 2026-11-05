@@ -86,12 +86,17 @@ export interface Route {
 }
 
 /**
- * Bytes a phone may fetch, always by a reference its transcript already holds, never by a path on the Mac. An
+ * Bytes a phone may fetch, always by a reference its transcript already holds, never by a path it chose. An
  * attachment by its stored file name, a tool image by the URL the ledger stored, an image an agent generated or
- * viewed by the activity that recorded it, and the newest frame of a Preview the session watches, by its `seq`.
+ * viewed by the activity that recorded it, the newest frame of a Preview the session watches, by its `seq`, and an
+ * image an agent put in a reply, by the message and the path as that message wrote it.
  */
 export type AssetRef =
-  { kind: "attachment"; name: string } | { kind: "tool-image"; url: string } | { kind: "activity"; runId: string; activityId: string } | { kind: "preview"; threadId: string; seq: number };
+  | { kind: "attachment"; name: string }
+  | { kind: "tool-image"; url: string }
+  | { kind: "activity"; runId: string; activityId: string }
+  | { kind: "preview"; threadId: string; seq: number }
+  | { kind: "reply-image"; runId: string; messageId: string; path: string };
 
 /**
  * The pushes a phone hears. `ready` carries nothing about the Mac's processes or ports. `preview` and `preview.ended`

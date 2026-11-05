@@ -248,6 +248,28 @@ describe("phone access", () => {
     await expect(phone.asset({ kind: "tool-image", url: `file://${saved}` })).rejects.toThrow("not available");
   });
 
+  it("serves an image a reply shows to that reply alone, a relative path from the thread's folder", async () => {
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64");
+    const folder = await mkdtemp(path.join(os.tmpdir(), "openorc-reply-image-"));
+    await mkdir(path.join(folder, "shots"));
+    await writeFile(path.join(folder, "shots", "dot.png"), png);
+    await writeFile(path.join(folder, "shots", "other.png"), png);
+    const shown = path.join(folder, "shots", "dot.png");
+    const project = projects.insert(core.db, { name: "Reply images", rootPath: folder, gitRemote: null, defaultBranch: "main", settings: {} });
+    const thread = threads.insert(core.db, { projectId: project.id, title: "Screens", agent: "claude", model: null, mode: "act", permissionMode: "trusted" });
+    const run = runs.insert(core.db, { id: "run-reply-image", taskId: null, threadId: thread.id, agent: "claude", model: null, mode: "act", permissionMode: "trusted" });
+    core.ledger.push({ type: "message.completed", runId: run.id, ts: 1, messageId: "m1", role: "assistant", text: `Fixed:\n\n![Dark](${shown})\n\n![Same, relative](shots/dot.png)` });
+    const phone = await pairPhone();
+    const ask = (messageId: string, at: string) => phone.asset({ kind: "reply-image", runId: run.id, messageId, path: at });
+
+    expect((await ask("m1", shown)).mime).toBe("image/png");
+    expect(Buffer.from((await ask("m1", "shots/dot.png")).bytes)).toEqual(png);
+    // The phone names a file, but the reply never showed it, or names the shown file under another message.
+    await expect(ask("m1", path.join(folder, "shots", "other.png"))).rejects.toThrow("not available");
+    await expect(ask("m2", shown)).rejects.toThrow("not available");
+    await rm(folder, { recursive: true, force: true });
+  });
+
   it("keeps each phone's push registration under its own device, counts it, and forgets it on null or removal", async () => {
     const [first, second] = [await pairPhone("First"), await pairPhone("Second")];
     const before = (await core.remote.status()).push.phones;

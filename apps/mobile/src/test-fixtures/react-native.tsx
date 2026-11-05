@@ -75,7 +75,10 @@ export const View = host("div");
 export const Text = host("span");
 export const Pressable = host("button");
 export const ScrollView = host("div");
-export const Image = host("img");
+/** An image view whose files measure as 16:9, as a phone reads a loaded image's size. */
+export const Image = Object.assign(host("img"), {
+  getSize: (_uri: string, success: (width: number, height: number) => void) => success(1600, 900),
+});
 export const Modal = host("div");
 export const TextInput = host("input");
 

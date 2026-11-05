@@ -55,6 +55,21 @@ export function transcriptPage(db: Db, runId: string, request: { fromTurn?: numb
   return { events: rows.map((row) => readRow(runId, row)), fromTurn };
 }
 
+/** One message's final text as the ledger keeps it, or null while the run has not completed it. */
+export function messageText(db: Db, runId: string, messageId: string): string | null {
+  const body = "COALESCE(a.content, e.payload)";
+  const row = db
+    .stmt(
+      `SELECT ${body} AS payload FROM events e LEFT JOIN artifacts a ON a.event_id = e.id AND a.kind = 'payload'
+       WHERE e.run_id = ? AND e.kind = 'message.completed' AND json_valid(${body}) AND json_extract(${body}, '$.messageId') = ?
+       ORDER BY e.seq DESC LIMIT 1`,
+    )
+    .get(runId, messageId) as { payload: string } | undefined;
+  if (!row) return null;
+  const event = readRow(runId, { id: 0, ts: 0, payload: row.payload });
+  return event.type === "message.completed" ? event.text : null;
+}
+
 /** A row that no longer parses reads as a non-fatal error, as listEvents does, rather than failing the page. */
 function readRow(runId: string, row: { id: number; ts: number; payload: string }): AgentEvent {
   try {

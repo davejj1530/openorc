@@ -1,7 +1,8 @@
 import type { AssetRef } from "@openorc/protocol";
-import { useContext, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Image, Keyboard, Pressable, View } from "react-native";
 import { assetUri, useLinkRead } from "../client";
+import { OLDER_MAC_IMAGE } from "../connection/link-connection";
 import { HostContext } from "../connection/host-context";
 import { Text } from "../ui/Text";
 import { ImageViewer } from "./ImageViewer";
@@ -18,6 +19,27 @@ const readAsset = (key: string) => {
   return assetUri(ref, host);
 };
 
+/** Tall screenshots stop at 3:4 and wide ones at 21:9, so one image never fills the screen or shrinks to a strip. */
+const ASPECT = { tallest: 3 / 4, widest: 21 / 9 };
+
+/** An image's width over its height once it has loaded, held between the tallest and widest a tile takes. */
+function useAspect(uri: string | null): number | null {
+  const [aspect, setAspect] = useState<number | null>(null);
+  useEffect(() => {
+    if (!uri) return;
+    let current = true;
+    Image.getSize(
+      uri,
+      (width, height) => current && height > 0 && setAspect(Math.min(ASPECT.widest, Math.max(ASPECT.tallest, width / height))),
+      () => undefined,
+    );
+    return () => {
+      current = false;
+    };
+  }, [uri]);
+  return aspect;
+}
+
 /**
  * An image in the transcript as an r16 tile that opens full screen. `compact` is the prompt's thumbnail size; an
  * agent's image takes the column's width.
@@ -25,12 +47,13 @@ const readAsset = (key: string) => {
 export function ImageTile({ asset, label, compact = false }: { asset: AssetRef; label: string; compact?: boolean }) {
   const loaded = useLinkRead(JSON.stringify([useContext(HostContext), asset]), readAsset);
   const [open, setOpen] = useState(false);
-  // A prompt's thumbnail is a 72 pt square; an agent's image takes the column at 16:9.
-  const size = compact ? { width: 72, height: 72 } : { width: "100%" as const, aspectRatio: 16 / 9 };
+  const aspect = useAspect(loaded.state === "ready" ? loaded.value : null);
+  // A prompt's thumbnail is a 72 pt square; an agent's image takes the column at its own shape, within reason.
+  const size = compact ? { width: 72, height: 72 } : { width: "100%" as const, aspectRatio: aspect ?? 16 / 9 };
   if (loaded.state !== "ready")
     return (
-      <View className="items-center justify-center rounded-xl bg-surface-2" style={size}>
-        {loaded.state === "failed" ? <Text className="text-xs text-ink-4">Image unavailable</Text> : null}
+      <View className="items-center justify-center rounded-xl bg-surface-2 px-6" style={size}>
+        {loaded.state === "failed" ? <Text className="text-center text-xs text-ink-4">{loaded.reason === OLDER_MAC_IMAGE ? OLDER_MAC_IMAGE : "Image unavailable"}</Text> : null}
       </View>
     );
   return (

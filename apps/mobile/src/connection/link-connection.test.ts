@@ -1,7 +1,7 @@
 import type { ClientPush } from "@openorc/client";
 import { LinkCloseCode, type PhoneMessage } from "@openorc/link";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DROPPED } from "./link-connection";
+import { DROPPED, OLDER_MAC_IMAGE } from "./link-connection";
 import { ConnectionManager } from "./manager";
 import { effectsFor, FakeMac, lan, pairedWith } from "./test-fixtures/fake-mac";
 
@@ -37,13 +37,39 @@ describe("calls over the link", () => {
     const { connection } = connect(mac);
     await advance(10);
     const declaration = mac.heard.find((message) => message.t !== "ping");
-    expect(declaration).toMatchObject({ t: "rpc", method: "session.negotiate", params: { capabilities: ["subagent-threads"] } });
+    expect(declaration).toMatchObject({ t: "rpc", method: "session.negotiate", params: { capabilities: ["subagent-threads", "reply-images"] } });
     if (declaration?.t !== "rpc") throw new Error("no capability declaration");
     mac.send({ t: "rpc.error", id: declaration.id, message: "This is not available from a phone." });
     mac.answer = (method) => (method === "projects.list" ? [] : undefined);
     const reply = connection.call("projects.list", {});
     await advance(10);
     expect(await reply).toEqual([]);
+  });
+
+  it("asks for a reply's image only from a Mac that said it serves them", async () => {
+    const ref = { kind: "reply-image", runId: "run-1", messageId: "m1", path: "/Users/me/shot.png" } as const;
+    const negotiate = (mac: FakeMac) => {
+      const declaration = mac.heard.find((message) => message.t === "rpc" && message.method === "session.negotiate");
+      if (declaration?.t !== "rpc") throw new Error("no capability declaration");
+      return declaration.id;
+    };
+    const older = new FakeMac();
+    older.behave(lan, { kind: "answer" });
+    const first = connect(older);
+    await advance(10);
+    // An older Mac refuses the declaration; its link would refuse the request too and drop the session.
+    older.send({ t: "rpc.error", id: negotiate(older), message: "Unknown method." });
+    await expect(first.connection.asset(ref)).rejects.toThrow(OLDER_MAC_IMAGE);
+    expect(older.heard.some((message) => message.t === "asset")).toBe(false);
+
+    const current = new FakeMac();
+    current.behave(lan, { kind: "answer" });
+    const second = connect(current);
+    await advance(10);
+    current.send({ t: "rpc.result", id: negotiate(current), result: { capabilities: ["subagent-threads", "reply-images"] } });
+    void second.connection.asset(ref).catch(() => undefined);
+    await advance(10);
+    expect(current.heard).toContainEqual(expect.objectContaining({ t: "asset", ref }));
   });
 
   it("drops and logs a failed frame application at the link boundary, then handles the next frame", async () => {

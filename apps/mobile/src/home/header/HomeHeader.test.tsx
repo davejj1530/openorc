@@ -122,3 +122,22 @@ it("offers the task list only once a host answers with one, so a host from befor
   bar(connected, 0);
   expect(screen.getByRole("button", { name: "Tasks" })).toBeTruthy();
 });
+
+it("heads the shown host's threads with its name and how this phone reaches it while its partner is listed too", () => {
+  const cloud: LinkState = { kind: "connected", mac: { id: "cloud", name: "Cloud" }, route: { kind: "public", host: "cloud.example", port: 1 }, serial: 1 };
+  render(<MacLine state={cloud} host="brain" {...scrolled(0)} />);
+  expect(screen.getByRole("button", { name: "Cloud, Connected over Internet" })).toBeTruthy();
+  expect(screen.getByText("Cloud")).toBeTruthy();
+  expect(screen.getByText("Connected over Internet")).toBeTruthy();
+  expect(screen.queryByText(/·/)).toBeNull();
+  cleanup();
+  render(<MacLine state={{ kind: "waiting", mac: studio, why: "silent", retryAt: null }} host="mac" {...scrolled(0)} />);
+  expect(screen.getByText("Studio")).toBeTruthy();
+  expect(screen.getByText("Not reachable")).toBeTruthy();
+});
+
+it("keeps a quick connect's words back in the heading without giving up the line", () => {
+  render(<MacLine state={quickConnect} host="mac" {...scrolled(0)} />);
+  expect(screen.queryByText("Connecting")).toBeNull();
+  expect(screen.getAllByTestId("link-dot")).toHaveLength(1);
+});

@@ -108,6 +108,6 @@ it("offers Forget on every Mac's row to VoiceOver, as its swipe does, and forget
 
 it("pairs another Mac over Settings", () => {
   render(<MacSection state={connected} />);
-  act(() => screen.getByRole("button", { name: "Pair another Mac" }).click());
+  act(() => screen.getByRole("button", { name: "Pair a Mac or cloud brain" }).click());
   expect(nav.stack).toEqual(["/", "/settings", "/pair"]);
 });

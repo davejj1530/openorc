@@ -9,7 +9,7 @@ import { link, partnerClient, partnerLink, queryClient, useHostGroup, useLinkSta
 import { HostScope } from "../connection/HostScope";
 import { HostContext } from "../connection/host-context";
 import type { LinkState } from "../connection/manager";
-import { Cloud, Laptop, Plus } from "../generated/icons";
+import { Plus } from "../generated/icons";
 import { motion } from "../generated/tokens";
 import { reportFirstFrame } from "../startup";
 import { usePerfAutoOpen } from "../thread/PerfProbe";
@@ -20,7 +20,7 @@ import { swipes } from "../ui/swipe";
 import { Text } from "../ui/Text";
 import { rowMotion, useFoldMotion, type RowMotion } from "./fold-motion";
 import { HOME_BAR_HEIGHT, HomeBar } from "./header/HomeBar";
-import { MacLine, lineOverRows, type HomeScroll } from "./header/MacLine";
+import { HostHeading, MacLine, lineOverRows, useHostLink, type HomeScroll, type HostKind } from "./header/MacLine";
 import { HomeHeading, RetryRow, SectionToggle, ShowMore, ShowMoreChildren, type HeadingRoom } from "./HomeHeading";
 import { newThreadRoute } from "./out-of-reach";
 import { owned, type HomeItem, type Waiting } from "./home-items";
@@ -38,10 +38,11 @@ const slide = LinearTransition.duration(motion.duration.resize).easing(ease.outT
 
 /**
  * The partner host's section rides at the end of the list as one item rather than its footer, so it slides with the
- * rows over it as their folds move.
+ * rows over it as their folds move. Keyed by the partner: the list keeps an item it has drawn under the same key, so a
+ * partner swapped for the host shown before it would go on drawing the one it replaced.
  */
-const PARTNER = { kind: "partner", key: "partner" } as const;
-type Listed = HomeItem | typeof PARTNER;
+type PartnerItem = { kind: "partner"; key: string; host: string };
+type Listed = HomeItem | PartnerItem;
 
 /** The room above the heading at `index`: none under a folded heading, so a run of folded projects stacks tight. */
 function headingRoom(items: readonly HomeItem[], index: number): HeadingRoom {
@@ -124,22 +125,17 @@ function PartnerWaiting({ onWaiting }: { onWaiting: (waiting: readonly Waiting[]
 function PartnerThreads({ partner }: { partner: string }) {
   const state = usePartnerLinkState();
   const home = useHomeItems(state.kind === "connected", { waitingShownElsewhere: true, selectedId: useSelectedThreadId() });
-  const name = useSavedMacs().find((host) => host.id === partner)?.name;
+  const name = useSavedMacs().find((host) => host.id === partner)?.name ?? "Cloud";
+  const link = useHostLink(state, name);
   const owner = usePartnerOwner(partner);
   const items = owned(home.items, owner);
   const folds = useHomeFolds(home);
   const still = useReducedMotion();
-  const Mark = owner.brain === "cloud" ? Cloud : Laptop;
   return (
     <View className="pb-24">
-      {/* The other host's section opens under its name as the shown one's opens under the wordmark, on the same grid. */}
-      <View accessible accessibilityRole="header" accessibilityLabel={name ?? "Cloud"} className="mt-8 flex-row items-center gap-3 px-5">
-        <View className="w-7 items-center">
-          <Mark size={22} className="text-ink-4" />
-        </View>
-        <Text numberOfLines={1} className="flex-1 text-title-sm">
-          {name ?? "Cloud"}
-        </Text>
+      {/* The other host's section opens under a heading in the same form as the shown one's, on the same grid. */}
+      <View accessible accessibilityRole="header" accessibilityLabel={link.label} className="mt-8 px-5">
+        <HostHeading kind={owner.brain === "cloud" ? "brain" : "mac"} name={name} link={link} />
       </View>
       {items.map((item, index) => (
         <Animated.View key={item.key} layout={still ? undefined : slide}>
@@ -158,6 +154,13 @@ function useShownAway(state: Paired): NonNullable<ThreadSummary["owner"]> | null
   return { brain: brain ? "cloud" : "mac", reach: brain ? "asleep" : "offline", heardAt: Date.now() };
 }
 
+/** What the shown host is, while its Mac or cloud brain is listed with it; null when it is listed alone. */
+function useShownKind(group: { primary: string | null; partner: string | null }): HostKind | null {
+  const brain = useSavedMacs().find((host) => host.id === group.primary)?.kind === "brain";
+  if (!group.partner) return null;
+  return brain ? "brain" : "mac";
+}
+
 function Threads({ state, scrollY, lineBottom }: HomeScroll & { state: Paired }) {
   const insets = useSafeAreaInsets();
   const group = useHostGroup();
@@ -173,6 +176,8 @@ function Threads({ state, scrollY, lineBottom }: HomeScroll & { state: Paired })
   const folds = useHomeFolds(home);
   const still = useReducedMotion();
   const refresh = useRefresh(group.partner);
+  const shownKind = useShownKind(group);
+  const partnerItem = useMemo((): PartnerItem | null => (group.partner ? { kind: "partner", key: `partner:${group.partner}`, host: group.partner } : null), [group.partner]);
   // One object for the list's life: a new one each render would make the list resubscribe and rewrite the offset.
   const sharedValues = useMemo(() => ({ scrollOffset: scrollY }), [scrollY]);
   return (
@@ -183,7 +188,7 @@ function Threads({ state, scrollY, lineBottom }: HomeScroll & { state: Paired })
         </HostScope>
       ) : null}
       <AnimatedLegendList<Listed>
-        data={group.partner ? [...home.items, PARTNER] : home.items}
+        data={partnerItem ? [...home.items, partnerItem] : home.items}
         keyExtractor={(item) => item.key}
         getItemType={(item) => item.kind}
         recycleItems
@@ -191,14 +196,14 @@ function Threads({ state, scrollY, lineBottom }: HomeScroll & { state: Paired })
         extraData={folds.motions}
         renderItem={({ item, index }) =>
           item.kind === "partner" ? (
-            <HostScope host={group.partner!}>
-              <PartnerThreads partner={group.partner!} />
+            <HostScope host={item.host}>
+              <PartnerThreads partner={item.host} />
             </HostScope>
           ) : (
             <HomeRow item={item} home={home} index={index} motion={rowMotion(folds.motions, item.key)} fold={folds.toggle} />
           )
         }
-        ListHeaderComponent={<MacLine state={state} scrollY={scrollY} lineBottom={lineBottom} />}
+        ListHeaderComponent={<MacLine state={state} host={shownKind} scrollY={scrollY} lineBottom={lineBottom} />}
         ListHeaderComponentStyle={lineOverRows}
         ListFooterComponent={group.partner ? null : <View className="h-24" />}
         sharedValues={sharedValues}

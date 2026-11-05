@@ -6,6 +6,7 @@ import { scheduleOnRN } from "react-native-worklets";
 import { lostWords, type LinkTone } from "../../connection/link-words";
 import type { LinkState, LostMac } from "../../connection/manager";
 import { useLinkWords } from "../../connection/use-link-words";
+import { Cloud, Laptop } from "../../generated/icons";
 import { cn } from "../../ui/cn";
 import { LinkDot } from "../../ui/LinkDot";
 import { Text } from "../../ui/Text";
@@ -61,41 +62,95 @@ export function StatusWords({ status, trouble, className, ...text }: TextProps &
 /** List headers draw over the rows, so the line's touch can run on through the first row's top margin. */
 export const lineOverRows = { zIndex: 1 };
 
+/** A Mac, or a Mac's cloud brain. */
+export type HostKind = "mac" | "brain";
+
+/** How a host's heading says the phone stands with it: spelled out, as the name is on a line of its own. */
+export interface HostLink {
+  tone: LinkTone;
+  /** Empty while a quick connect holds its words back, so the line keeps its height. */
+  status: string;
+  trouble: boolean;
+  label: string;
+}
+
+export function useHostLink(state: LinkState, name: string): HostLink {
+  const words = useLinkWords(state);
+  const quiet = state.kind === "connecting" && words.status === null;
+  const status = state.kind === "connected" ? words.spoken : (words.status ?? (quiet ? "" : words.spoken));
+  return { tone: words.tone, status, trouble: words.tone !== "ok", label: `${name}, ${words.spoken}` };
+}
+
 /**
- * The Mac Home shows, on the line under the wordmark, scrolling with the rows. It always holds text, so its words
- * changing never moves a row. It sits on Home's grid: the dot in the lead column under the wordmark's cube, the words
- * where the name and row titles start. A tap opens Settings, where the Mac's row says more. The touch is as wide as
- * the words and runs from the bar down to the first row, over that row's top margin (`lineOverRows`), so rows stay
- * where they are. Once the line has gone under the bar, the bar says the same, so VoiceOver skips this one.
+ * A host's threads open under its heading while Home lists a Mac and its cloud brain together, so which one this phone
+ * is connected to reads at a glance: the mark and name on the lead and text columns, and under them the link's dot and
+ * how the phone reaches it.
  */
-export function MacLine({ state, scrollY, lineBottom }: HomeScroll & { state: Paired }) {
+export function HostHeading({ kind, name, link }: { kind: HostKind; name: string; link: HostLink }) {
+  const Mark = kind === "brain" ? Cloud : Laptop;
+  return (
+    <View className="gap-0.5">
+      <View className="flex-row items-center gap-3">
+        <View className="w-7 items-center">
+          <Mark size={22} className="text-ink-4" />
+        </View>
+        <Text numberOfLines={1} className="shrink text-title-sm">
+          {name}
+        </Text>
+      </View>
+      <View className="flex-row items-center gap-3">
+        <View className="w-7 items-center">
+          <LinkDot tone={link.tone} />
+        </View>
+        <StatusWords status={link.status} trouble={link.trouble} className="shrink" />
+      </View>
+    </View>
+  );
+}
+
+/**
+ * The Mac Home shows, on the line under the wordmark, scrolling with the rows; with its cloud brain or Mac listed
+ * below, its heading in the same form as that one's (`host`). It always holds text, so its words changing never moves
+ * a row. It sits on Home's grid: the dot in the lead column under the wordmark's cube, the words where the name and
+ * row titles start. A tap opens Settings, where the Mac's row says more. The touch is as wide as the words and runs
+ * from the bar down to the first row, over that row's top margin (`lineOverRows`), so rows stay where they are. Once
+ * the line has gone under the bar, the bar says the same, so VoiceOver skips this one.
+ */
+export function MacLine({ state, host, scrollY, lineBottom }: HomeScroll & { state: Paired; host?: HostKind | null }) {
   const line = useMacLine(state);
+  const link = useHostLink(state, line.name);
   const under = useLineUnder({ scrollY, lineBottom });
   return (
     <View accessibilityElementsHidden={under} importantForAccessibility={under ? "no-hide-descendants" : "auto"} className="-mb-3 px-5">
       <Link href="/settings" asChild>
-        <Pressable accessibilityRole="button" accessibilityLabel={line.label} className="self-start pb-4 pt-2 active:opacity-60">
+        <Pressable accessibilityRole="button" accessibilityLabel={line.label} className={cn("self-start pb-4 active:opacity-60", host ? "pt-4" : "pt-2")}>
           <View
-            className="flex-row items-center gap-3"
+            className={host ? undefined : "flex-row items-center gap-3"}
             onLayout={(event) => {
               const { y, height } = event.nativeEvent.layout;
               lineBottom.value = y + height;
             }}
           >
-            <View className="w-7 items-center">
-              <LinkDot tone={line.tone} />
-            </View>
-            <View className="shrink flex-row">
-              <Text numberOfLines={1} className="shrink text-detail text-ink-4">
-                {line.name}
-              </Text>
-              {line.status ? (
-                <Text className="text-detail text-ink-4">
-                  {" · "}
-                  <StatusWords status={line.status} trouble={line.trouble} />
-                </Text>
-              ) : null}
-            </View>
+            {host ? (
+              <HostHeading kind={host} name={line.name} link={link} />
+            ) : (
+              <>
+                <View className="w-7 items-center">
+                  <LinkDot tone={line.tone} />
+                </View>
+                <View className="shrink flex-row">
+                  <Text numberOfLines={1} className="shrink text-detail text-ink-4">
+                    {line.name}
+                  </Text>
+                  {line.status ? (
+                    <Text className="text-detail text-ink-4">
+                      {" · "}
+                      <StatusWords status={line.status} trouble={line.trouble} />
+                    </Text>
+                  ) : null}
+                </View>
+              </>
+            )}
           </View>
         </Pressable>
       </Link>

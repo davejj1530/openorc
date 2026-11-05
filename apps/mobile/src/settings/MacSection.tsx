@@ -126,8 +126,10 @@ export function MacSection({ state }: { state: LinkState }) {
     );
   if (state.kind === "connected" && state.route.kind === "demo") return <DemoSection state={state} />;
   const others = macs.filter((mac) => mac.id !== state.mac.id);
+  // A Mac's cloud brain pairs here too, from the Mac's Settings.
+  const withCloud = macs.some((mac) => mac.kind === "brain");
   return (
-    <Section title="Mac">
+    <Section title={withCloud ? "Mac and cloud" : "Mac"}>
       <Card>
         <ShownMac state={state} />
         {state.kind === "connected" ? null : (
@@ -143,7 +145,7 @@ export function MacSection({ state }: { state: LinkState }) {
           </Fragment>
         ))}
         <Divider />
-        <PairRow label="Pair another Mac" />
+        <PairRow label="Pair a Mac or cloud brain" />
       </Card>
     </Section>
   );

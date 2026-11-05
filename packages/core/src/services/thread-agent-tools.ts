@@ -371,14 +371,23 @@ export class ThreadAgentTools {
     return { parent: thread, run };
   }
 
-  /** The started thread's agent, model and Fast mode: the parent's, unless the call names others. */
+  /**
+   * The started thread's agent, model and Fast mode: the parent's, unless the call names others. On another agent with
+   * no model named, the model last used with that agent that can still run; the agent's own default only when there is
+   * none, since an agent's default can be a free trial model that stops mid-task.
+   */
   private async childModel(parent: Thread, input: ThreadStartInput): Promise<Pick<StartThreadInput, "agent" | "model" | "effort" | "fastMode">> {
     const agent = input.agent ?? parent.agent;
     if (input.model) {
       const model = pickModel(await this.runs.models(agent), agent, input.model);
       return { agent, model: model.id, effort: input.effort ?? model.defaultEffort ?? undefined, fastMode: input.fast ?? false };
     }
-    if (agent !== parent.agent) return { agent, model: undefined, effort: input.effort, fastMode: input.fast ?? false };
+    if (agent !== parent.agent) {
+      const options = await this.runs.models(agent);
+      const usable = (id: string) => options.find((option) => option.id === id && !option.unavailable && !option.legacy);
+      const last = runRepo.recentModels(this.db, agent).map(usable).find(Boolean);
+      return { agent, model: last?.id, effort: input.effort ?? last?.defaultEffort ?? undefined, fastMode: input.fast ?? false };
+    }
     return { agent, model: parent.model ?? undefined, effort: input.effort ?? parent.effort ?? undefined, fastMode: input.fast ?? parent.fastMode };
   }
 

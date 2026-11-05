@@ -2,8 +2,8 @@ import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { CodexAdapter, RunHandle } from "@openorc/agents";
-import { projects, settings, threads } from "@openorc/db";
+import { ClaudeAdapter, CodexAdapter, RunHandle } from "@openorc/agents";
+import { projects, runs, settings, threads } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
 import type { ModelOption, Project, RpcParams, RunSpec } from "@openorc/protocol";
 import { OpenOrc } from "./openorc.js";
@@ -25,29 +25,32 @@ const model = (id: string, label: string, fast = false): ModelOption => ({
   fastMode: { supported: fast },
 });
 
+/** A provider that answers only when the test says so. */
+function scripted(spec: RunSpec): RunHandle {
+  let close!: (code: number) => void;
+  const done = new Promise<number>((resolve) => {
+    close = resolve;
+  });
+  let closed = false;
+  const handle = new RunHandle(spec.runId, {
+    done,
+    send: async () => undefined,
+    interrupt() {},
+    close() {
+      if (closed) return;
+      closed = true;
+      handle.emit("exit", 0);
+      close(0);
+    },
+  });
+  turns.set(spec.runId, { spec, handle });
+  return handle;
+}
+
 beforeEach(async () => {
   folder = await mkdtemp(path.join(os.tmpdir(), "openorc-thread-start-"));
   turns = new Map();
-  vi.spyOn(CodexAdapter.prototype, "start").mockImplementation((spec) => {
-    let close!: (code: number) => void;
-    const done = new Promise<number>((resolve) => {
-      close = resolve;
-    });
-    let closed = false;
-    const handle = new RunHandle(spec.runId, {
-      done,
-      send: async () => undefined,
-      interrupt() {},
-      close() {
-        if (closed) return;
-        closed = true;
-        handle.emit("exit", 0);
-        close(0);
-      },
-    });
-    turns.set(spec.runId, { spec, handle });
-    return handle;
-  });
+  vi.spyOn(CodexAdapter.prototype, "start").mockImplementation(scripted);
   core = await OpenOrc.create({ dataDir: path.join(folder, "data"), ephemeral: true, transport: { push: () => {} } });
   settings.set(core.db, "extraction.provider", "off");
   const root = path.join(folder, "repository");
@@ -164,6 +167,26 @@ it("finds a model by the name the user gave it, and answers a name it can't plac
   expect(() => pickModel(options, "codex", "6.1")).toThrow(/fits several codex models.*GPT-6.1 Sol \(gpt-6.1-sol\)/);
   expect(() => pickModel(options, "codex", "7.0 ultra")).toThrow(/No codex model is called "7.0 ultra"/);
   await expect(startThread(runId, { prompt: "Generate assets", model: "7.0 ultra" })).rejects.toThrow(/Choose one of/);
+});
+
+it("starts a thread on another agent with the model last used there that can still run", async () => {
+  vi.spyOn(ClaudeAdapter.prototype, "start").mockImplementation(scripted);
+  const claude = (id: string, unavailable?: string): ModelOption => ({ ...model(id, id), agent: "claude", ...(unavailable ? { unavailable } : {}) });
+  const codexModels = await core.runs.models("codex");
+  vi.spyOn(core.runs, "models").mockImplementation(async (agent) =>
+    agent === "claude" ? [claude("claude-trial"), claude("claude-steady"), claude("claude-retired", "Not on this plan")] : codexModels,
+  );
+  const earlier = threads.insert(core.db, { projectId: project.id, title: "Earlier", agent: "claude", model: null, mode: "act", permissionMode: "trusted" });
+  const ran = (id: string, model: string, startedAt: number) => {
+    runs.insert(core.db, { id, taskId: null, threadId: earlier.id, agent: "claude", model, mode: "act", permissionMode: "trusted" });
+    core.db.stmt("UPDATE runs SET started_at = ? WHERE id = ?").run(startedAt, id);
+  };
+  ran("earlier-steady", "claude-steady", 1_000);
+  ran("earlier-retired", "claude-retired", 2_000);
+  const { runId } = await parent();
+  const started = await startThread(runId, { prompt: "Draft the copy", agent: "claude" });
+  expect(started.model).toBe("claude-steady");
+  expect(threads.get(core.db, started.thread.id)?.model).toBe("claude-steady");
 });
 
 it("starts a thread in Fast mode when asked, and refuses it on a model without Fast", async () => {

@@ -658,6 +658,11 @@ export const runs = {
   listUnfinished(db: Db): Run[] {
     return (db.stmt("SELECT * FROM runs WHERE state IN ('starting', 'running') ORDER BY started_at").all() as unknown as RunRow[]).map(runFromRow);
   },
+  /** The models this provider's runs used, the latest first. */
+  recentModels(db: Db, agent: Run["agent"], limit = 5): string[] {
+    const rows = db.stmt("SELECT model FROM runs WHERE agent = ? AND model IS NOT NULL GROUP BY model ORDER BY MAX(started_at) DESC LIMIT ?").all(agent, limit) as unknown as { model: string }[];
+    return rows.map((row) => row.model);
+  },
   /** The thread whose run produced a provider session, so the CLI's copy is not offered for import twice. */
   threadForSession(db: Db, externalSessionId: string): string | null {
     const r = db.stmt("SELECT thread_id FROM runs WHERE external_session_id = ? AND thread_id IS NOT NULL LIMIT 1").get(externalSessionId) as { thread_id: string } | undefined;

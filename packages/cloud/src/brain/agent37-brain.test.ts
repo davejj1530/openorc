@@ -17,14 +17,27 @@ let fake: FakeAgent37;
 let api: Agent37Api;
 let home: BrainHome<Agent37BrainVm>;
 
-/** flock without the kernel's lock, which macOS lacks: a folder the first start makes, and a second start finds. */
+/**
+ * flock without the kernel's lock, which macOS lacks: a folder the first start makes, a second start finds, and the
+ * command's exit removes. A held descriptor, as the keeper's own lock, is always free here.
+ */
 const FLOCK = `#!/bin/sh
 code=1
 while [ $# -gt 0 ]; do case "$1" in -E) code=$2; shift 2 ;; -n) shift ;; *) break ;; esac; done
 lock=$1
 shift
+case "$lock" in *[!0-9]*) ;; *) exit 0 ;; esac
 mkdir "$lock.held" 2>/dev/null || exit "$code"
-exec "$@"
+"$@"
+status=$?
+rmdir "$lock.held"
+exit $status
+`;
+
+/** setsid, which macOS lacks, through Perl's, noting each keeper's pid where it starts. */
+const SETSID = `#!/bin/sh
+printf '%s\\n' $$ >> keeper.pids
+exec perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV or die' "$@"
 `;
 
 /** A brain that writes down the line it started with and its pid, says it is ready, and runs until it is killed. */
@@ -49,6 +62,7 @@ beforeEach(async () => {
   const bin = path.join(base, "bin");
   await mkdir(bin);
   await writeFile(path.join(bin, "flock"), FLOCK, { mode: 0o755 });
+  await writeFile(path.join(bin, "setsid"), SETSID, { mode: 0o755 });
   await mkdir(path.join(base, "instances"));
   fake = await startFakeAgent37(path.join(base, "instances"), { env: () => ({ ...process.env, PATH: `${bin}:/usr/bin:/bin:${path.dirname(process.execPath)}` }) });
   api = agent37Api(fake.key, fake.endpoints);
@@ -68,6 +82,17 @@ const alive = (pid: number) => {
     return false;
   }
 };
+
+/** Ends every keeper a start left in `root`, as a boot would. */
+async function killKeepers(root: string): Promise<void> {
+  for (const pid of (await readFile(path.join(root, "keeper.pids"), "utf8")).split("\n").filter(Boolean)) {
+    try {
+      process.kill(Number(pid), "SIGKILL");
+    } catch {
+      // Gone already: a second keeper leaves once it finds the brain running.
+    }
+  }
+}
 
 async function eventually<T>(look: () => Promise<T | null>, ms = 5000): Promise<T> {
   const deadline = Date.now() + ms;
@@ -203,14 +228,32 @@ describe("the brain's Agent37 instance", () => {
     expect(edits()).toBe(1);
     expect(await machine.control({ op: "status" })).toMatchObject({ state: "ready", version: "v-test" });
 
-    // A boot ends every process; the hook starts the brain again from the kept line.
+    // A boot ends every process, the keeper's too; the hook starts the brain again from the kept line.
+    await killKeepers(layout.root);
     process.kill(first.pid, "SIGKILL");
     await rm(path.join(layout.root, "started"));
-    await rm(`${layout.lock}.held`, { recursive: true });
+    await rm(`${layout.lock}.held`, { recursive: true, force: true });
     expect((await api.exec(instance.id, `sh ${hook}`)).exit_code).toBe(0);
     const again = await eventually(() => started(layout.root));
     expect(again.line).toBe(first.line);
     expect(again.pid).not.toBe(first.pid);
+  });
+
+  it("starts the brain again when it stops without choosing to, and says so in the keeper's log", async () => {
+    const machine = await BrainMachine.connect({ service: "agent37", key: fake.key, endpoints: fake.endpoints }, { startMs: 10_000, pollMs: 50 });
+    const { instance } = await home.open({ vcpus: 1 });
+    const layout = await installed(instance);
+    expect(await machine.wake({ key: newBrainKey(), name: "Cloud" })).toMatchObject({ state: "ready" });
+    const first = (await started(layout.root))!;
+    process.kill(first.pid, "SIGKILL");
+    const again = await eventually(async () => {
+      const now = await started(layout.root);
+      return now && now.pid !== first.pid ? now : null;
+    });
+    expect(again.line).toBe(first.line);
+    expect(await readFile(path.join(layout.logs, "keeper.log"), "utf8")).toMatch(/The brain stopped \(exit 137\); starting it again\./);
+    await killKeepers(layout.root);
+    process.kill(again.pid, "SIGKILL");
   });
 
   it("writes the hook again when the start changed", async () => {

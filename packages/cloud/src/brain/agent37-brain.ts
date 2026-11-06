@@ -7,6 +7,7 @@ import { Agent37Sandbox, OPENING, STATES, agent37Disk, agent37HostOf, instanceSe
 import type { InstanceProcess } from "../instance-port.js";
 import { runnerFiles, type RunnerFile } from "../runner-client.js";
 import type { SandboxExecResult, SandboxInfo } from "../sandbox.js";
+import { keptStart } from "./keeper.js";
 import { BRAIN_PORT } from "./layout.js";
 import type { BrainAccess, BrainCommand, BrainHome, BrainStartCommand, BrainVm } from "./machine.js";
 
@@ -239,6 +240,8 @@ export function agent37Home(access: Extract<BrainAccess, { service: "agent37" }>
       return resume ? awake(found) : new Agent37BrainVm(found, api, serverSource);
     },
     launch: (brain, { threadSize }) => ({ vercel: null, agent37: { connection: { key: access.key, ...(threadSize ?? AGENT37_SIZES[0]) }, instance: brain.instance.id } }),
+    // Nothing outside the instance starts the brain again when it stops while the instance runs, as the Vercel door does.
+    startCommand: keptStart,
     keep: (brain, start) => brain.keep(start),
     /**
      * Agent37 reports spending by instance, so a thread instance deleted already counts no more: what it spent leaves

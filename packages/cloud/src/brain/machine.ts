@@ -142,6 +142,11 @@ export interface BrainHome<Vm extends BrainVm = BrainVm> {
   /** The brain's machine first, so it cannot make another thread machine meanwhile, then every thread machine it made. */
   removeAll(): Promise<void>;
   /**
+   * How the brain starts on this service, its start line on stdin, when not as `brain.mjs serve` under the lock: where no
+   * waker comes when the brain stops while its machine runs, a start that runs it again after an exit it did not choose.
+   */
+  startCommand?(layout: BrainLayout): BrainStartCommand;
+  /**
    * Before each start, with its line and command: what lets the machine start the brain again by itself, where a reboot
    * ends the brain's process with no waker there to start it.
    */
@@ -411,7 +416,7 @@ export class BrainMachine {
     if (!address) return { state: "needs-provision", detail: `The brain's sandbox does not open port ${BRAIN_PORT}.` };
     const layout = brainLayout(path.posix.join(vm.cwd, ROOT_FOLDER));
     const line = encodeLaunch({ key: input.key, name: input.name, address, port: BRAIN_PORT, ...this.home.launch(vm, input) });
-    const command: BrainStartCommand = { cmd: "sh", args: ["-c", STEPS.start.script, STEPS.start.label, layout.root, layout.serve, layout.lock] };
+    const command: BrainStartCommand = this.home.startCommand?.(layout) ?? { cmd: "sh", args: ["-c", STEPS.start.script, STEPS.start.label, layout.root, layout.serve, layout.lock] };
     const secrets = [...this.home.secrets, brainKeyText(input.key)];
     const deadline = Date.now() + this.timing.startMs;
     try {

@@ -33,6 +33,7 @@ describe("settings persistence", () => {
       look: { palette: "linear", colors: { dark: { "--accent": "#5e6ad2" } } },
       idleProcessMinutes: null,
       claudeUserMcpServers: false,
+      claudeAccountAutoSwitch: true,
     };
     service.set(values);
     const reopened = new AppSettingsService(db);

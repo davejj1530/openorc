@@ -30,6 +30,7 @@ export const demoSettings: AppSettings = {
   look: null,
   idleProcessMinutes: 10,
   claudeUserMcpServers: true,
+  claudeAccountAutoSwitch: false,
 };
 
 const MINUTE = 60_000;

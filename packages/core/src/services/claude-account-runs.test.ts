@@ -1,14 +1,16 @@
 import { claudeConfigDir, RunHandle, type AgentLaunchEnvironment } from "@openorc/agents";
 import { Db, LedgerWriter, projects, runs, threads } from "@openorc/db";
 import { git } from "@openorc/git";
-import type { Project, RunSpec } from "@openorc/protocol";
+import { DEFAULT_CLAUDE_ACCOUNT, type AllowanceWindow, type Project, type ProviderUsage, type RunSpec } from "@openorc/protocol";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { FrameCoalescer } from "../frames.js";
+import { ClaudeAccountSwitch } from "./claude-account-switch.js";
 import { ClaudeAccountService } from "./claude-accounts.js";
 import { claudeRunAccount } from "./claude-run-account.js";
+import type { RunHooks } from "./run-types.js";
 import { RunService } from "./runs.js";
 import { ShellEnvironment } from "./shell-environment.js";
 import { ThreadService } from "./threads.js";
@@ -24,12 +26,14 @@ let workspace: WorkspaceService;
 let conversations: ThreadService;
 let project: Project;
 let folder: (accountId: string) => string;
+let turnSettled: RunHooks["onTurnSettled"];
 const quiet = { info() {}, warn() {}, error() {} };
 const start = vi.fn((_spec: RunSpec, _launch: AgentLaunchEnvironment): RunHandle => {
   throw new Error("Fixture not ready");
 });
 
 beforeEach(async () => {
+  turnSettled = undefined;
   root = await mkdtemp(path.join(os.tmpdir(), "openorc-account-runs-"));
   await git(root, ["init", "-q", "-b", "main"]);
   db = Db.memory();
@@ -75,6 +79,7 @@ beforeEach(async () => {
       brief: () => "",
       onRunFinished() {},
       onThreadTurn() {},
+      onTurnSettled: (...args) => turnSettled?.(...args),
       notify() {},
       claudeVersion: async () => null,
     },
@@ -205,6 +210,113 @@ it("shows a turn stopped by the usage limit as failed while its process is still
   expect(service.threadSession(thread.id)).toEqual({ status: "error", message: "You've hit your 5-hour limit", recovery: { kind: "usage", provider: "claude" } });
   await conversations.switchClaudeAccount(thread.id, personal);
   expect([runs.get(db, run!.id)?.state, service.threadSession(thread.id).status]).toEqual(["error", "idle"]);
+});
+
+/** The Claude Code login every Mac starts with, signed out in these fixtures. */
+const signedOut = (): ProviderUsage => ({ ...fiveHourReport(0), status: "disconnected", windows: [] });
+
+function fiveHourReport(fiveHourUsed: number, weekUsed = 10, observedAt = Date.now()): ProviderUsage {
+  const window = (id: string, label: string, usedPercent: number): AllowanceWindow => ({
+    id,
+    label,
+    usedPercent,
+    remainingPercent: 100 - usedPercent,
+    resetsAt: null,
+    observedAt,
+    exhausted: usedPercent >= 100,
+  });
+  return {
+    provider: "claude",
+    status: "available",
+    source: "fixture",
+    context: "fixture",
+    plan: "Max",
+    checkedAt: observedAt,
+    refreshedAt: observedAt,
+    message: null,
+    windows: [window("five_hour", "5-hour window", fiveHourUsed), window("seven_day", "7-day window", weekUsed)],
+    credits: [],
+    accountUrl: "",
+    localRuns: null,
+  };
+}
+
+it("moves a conversation stopped at its usage limit to the enabled account with the most 5-hour usage left, carrying its session", async () => {
+  const [work, personal, client, spare, off] = ["Work", "Personal", "Client", "Spare", "Off"].map((name) => accounts.add(name).id) as [string, string, string, string, string];
+  accounts.update({ id: off, enabled: false });
+  // Spare has the most 5-hour usage left but none of its week; Off has more still, but it is disabled.
+  const reports: Record<string, ProviderUsage> = { [personal]: fiveHourReport(70), [client]: fiveHourReport(40), [spare]: fiveHourReport(0, 100), [off]: fiveHourReport(0) };
+  const recent = vi.fn(async (_provider: string, id: string | undefined) => reports[id!] ?? signedOut());
+  let enabled = true;
+  const switcher = new ClaudeAccountSwitch({ db, settings: { get: () => ({ claudeAccountAutoSwitch: enabled }) }, usage: { recent }, runs: service, threads: conversations, log: quiet });
+  turnSettled = (run, scope, _project, outcome) => switcher.settled(run, scope, outcome);
+
+  const { thread, run } = await conversations.start({ ...input, projectId: project.id, claudeAccountId: work });
+  runs.update(db, run!.id, { externalSessionId: "work-session" });
+  const sessions = path.join(folder(work), "projects", "-fixture");
+  await mkdir(sessions, { recursive: true });
+  await writeFile(path.join(sessions, "work-session.jsonl"), '{"type":"user"}\n');
+  const limit = (handle: RunHandle, runId: string) => {
+    const ts = Date.now();
+    handle.emit("event", { type: "activity.updated", runId, ts, activityId: "rate-limit", label: "Rate limit reached", status: "error", recovery: { kind: "usage", provider: "claude" } });
+    handle.emit("event", { type: "turn.completed", runId, ts, turnId: "fixture", status: "error", resultText: "You've hit your 5-hour limit", durationMs: 1 });
+  };
+  limit(start.mock.results[0]!.value, run!.id);
+
+  await vi.waitFor(() => expect(start).toHaveBeenCalledTimes(2));
+  const [spec, launch] = start.mock.lastCall!;
+  expect([spec.resumeSessionId, spec.forkSession, path.basename(launch.env.CLAUDE_CONFIG_DIR!)]).toEqual(["work-session", true, client]);
+  expect(spec.prompt.split("\n")[0]).toBe("Moved to the Claude account Client after Work reached its usage limit. Continue where you left off.");
+  expect(threads.get(db, thread.id)?.claudeAccountId).toBe(client);
+  expect(recent.mock.calls.map(([, id]) => id).sort()).toEqual([DEFAULT_CLAUDE_ACCOUNT, client, personal, spare].sort());
+
+  // With the setting off, the next limit leaves the conversation where it stopped.
+  enabled = false;
+  const moved = service.liveRunForThread(thread.id)!;
+  limit(start.mock.results[1]!.value, moved.id);
+  await vi.waitFor(() => expect(service.threadSession(thread.id).recovery?.kind).toBe("usage"));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect([start.mock.calls.length, threads.get(db, thread.id)?.claudeAccountId]).toEqual([2, client]);
+});
+
+it("leaves a stopped conversation alone when no account has 5-hour usage left, or the person moved it while usage was read", async () => {
+  const [work, personal, client] = ["Work", "Personal", "Client"].map((name) => accounts.add(name).id) as [string, string, string];
+  const reports: Record<string, ProviderUsage> = { [personal]: fiveHourReport(100), [client]: fiveHourReport(30, 10, Date.now() - 10 * 60_000) };
+  let read!: () => void;
+  const answered = new Promise<void>((resolve) => {
+    read = resolve;
+  });
+  const recent = vi.fn(async (_provider: string, id: string | undefined) => {
+    await answered;
+    return reports[id!] ?? signedOut();
+  });
+  const switcher = new ClaudeAccountSwitch({ db, settings: { get: () => ({ claudeAccountAutoSwitch: true }) }, usage: { recent }, runs: service, threads: conversations, log: quiet });
+  turnSettled = (run, scope, _project, outcome) => switcher.settled(run, scope, outcome);
+  const { thread, run } = await conversations.start({ ...input, projectId: project.id, claudeAccountId: work });
+  const ts = Date.now();
+  const handle = start.mock.results[0]!.value;
+  handle.emit("event", { type: "activity.updated", runId: run!.id, ts, activityId: "rate-limit", label: "Rate limit reached", status: "error", recovery: { kind: "usage", provider: "claude" } });
+  handle.emit("event", { type: "turn.completed", runId: run!.id, ts, turnId: "fixture", status: "error", resultText: "You've hit your 5-hour limit", durationMs: 1 });
+  await vi.waitFor(() => expect(recent).toHaveBeenCalledTimes(3));
+
+  // Personal's 5-hour window is used up and Client's report is ten minutes old, so neither is a place to go.
+  read();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect([start.mock.calls.length, threads.get(db, thread.id)?.claudeAccountId]).toEqual([1, work]);
+
+  // A fresh report would choose Client, but the person moved the conversation to Personal first.
+  reports[client] = fiveHourReport(30);
+  const again = new ClaudeAccountSwitch({
+    db,
+    settings: { get: () => ({ claudeAccountAutoSwitch: true }) },
+    usage: { recent: async (_provider, id) => (await conversations.switchClaudeAccount(thread.id, personal), reports[id!] ?? signedOut()) },
+    runs: service,
+    threads: conversations,
+    log: quiet,
+  });
+  again.settled(runs.get(db, run!.id)!, { task: null, thread: threads.get(db, thread.id)! }, { status: "error", snapshotId: null, error: "You've hit your 5-hour limit" });
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect([start.mock.calls.length, threads.get(db, thread.id)?.claudeAccountId]).toEqual([1, personal]);
 });
 
 it("captures the default on new threads and records the account even if a launch fails", async () => {

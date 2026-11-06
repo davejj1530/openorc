@@ -67,6 +67,7 @@ import { forgetKeptSessions } from "./services/agent-sessions.js";
 import type { OpenCodeCloudKeys } from "./services/cloud-opencode.js";
 import { AgentUpdateService } from "./services/agent-updates.js";
 import { AttachmentService } from "./services/attachments.js";
+import { ClaudeAccountSwitch } from "./services/claude-account-switch.js";
 import { ClaudeAccountService } from "./services/claude-accounts.js";
 import { claudeRunAccount } from "./services/claude-run-account.js";
 import { withCloudCodexLogin } from "./services/cloud-codex.js";
@@ -143,6 +144,7 @@ export class OpenOrc {
   readonly claudeAccounts: ClaudeAccountService;
   readonly environment: ShellEnvironment;
   readonly providerUsage: ProviderUsageService;
+  private readonly claudeAccountSwitch: ClaudeAccountSwitch;
   readonly memory: MemoryService;
   readonly orclings: OrclingService;
   readonly textGeneration: TextGenerationService;
@@ -293,6 +295,7 @@ export class OpenOrc {
     this.providerUsage = new ProviderUsageService(db, this.system, { apiKey: () => this.memory.credentialStatus() }, (id) =>
       id ? this.claudeAccounts.environment(this.environment.current(), id) : this.environment.current(),
     );
+    this.claudeAccountSwitch = new ClaudeAccountSwitch({ db, settings: this.settings, usage: this.providerUsage, runs: this.runs, threads: this.threads, log: this.log });
     this.lifecycle = new LifecycleService(db, invalidate, this.log);
     this.schedules = new ScheduleService(db, this.threads, invalidate, notify, this.log, {
       maintenance: () => this.agentUpdates.get().updating,
@@ -425,6 +428,7 @@ export class OpenOrc {
       onTurnSettled: (run, scope, _project, outcome) => {
         this.comments?.settled(run, outcome);
         if (scope.comment) return;
+        this.claudeAccountSwitch.settled(run, scope, outcome);
         this.slack?.settled(run.id, outcome);
       },
       onThreadTurn: (thread, exchange) => {

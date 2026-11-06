@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { ClaudeAccountConnection } from "@openorc/protocol";
 import { Button, Input, TextButton } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
-import { Section, Status } from "./settings-shared";
+import { Section, Status, Toggle, usePreference } from "./settings-shared";
 
 export function ClaudeAccountSettings({ active }: { active: boolean }) {
   const accounts = useRpc(
@@ -58,6 +58,7 @@ export function ClaudeAccountSettings({ active }: { active: boolean }) {
           </div>
         </form>
       </div>
+      {(accounts.data?.accounts.filter((account) => account.enabled).length ?? 0) > 1 ? <AutoSwitch /> : null}
       {accounts.isPending ? <p className="settings-note">Checking accounts…</p> : null}
       {error ? (
         <p role="alert" className="text-sm text-bad mt-2">
@@ -65,6 +66,21 @@ export function ClaudeAccountSettings({ active }: { active: boolean }) {
         </p>
       ) : null}
     </Section>
+  );
+}
+
+function AutoSwitch() {
+  const preference = usePreference("app.settings.set");
+  return (
+    <div className="settings-group">
+      <Toggle
+        label="Switch accounts at usage limits"
+        hint="When a thread's account reaches its usage limit, the thread continues on the account with the most 5-hour usage left."
+        checked={preference.value.claudeAccountAutoSwitch ?? false}
+        disabled={preference.disabled}
+        onChange={(claudeAccountAutoSwitch) => void preference.commit({ claudeAccountAutoSwitch })}
+      />
+    </div>
   );
 }
 

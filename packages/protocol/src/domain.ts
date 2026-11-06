@@ -408,6 +408,8 @@ export const AppSettings = z.object({
   idleProcessMinutes: z.number().int().positive().nullable(),
   /** Whether Claude Code connects the MCP servers from the user's own Claude configuration in threads. Off, only OpenOrc's tools load and the CLI starts about two seconds sooner. */
   claudeUserMcpServers: z.boolean(),
+  /** Whether a conversation stopped by its Claude account's usage limit goes on with the enabled account that has the most 5-hour usage left. */
+  claudeAccountAutoSwitch: z.boolean(),
 });
 export type AppSettings = z.infer<typeof AppSettings>;
 

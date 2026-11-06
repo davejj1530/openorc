@@ -234,7 +234,7 @@ function TakeoverSection({ enabled }: { enabled: boolean }) {
     <Section title="When this Mac sleeps">
       <Toggle
         label="Carry working threads on in the cloud"
-        hint="A thread in a worktree keeps working in its sandbox while this Mac sleeps, and its turn shows here when the Mac wakes."
+        hint="While a thread in a worktree works, a sandbox keeps a copy of it. If this Mac sleeps mid-task, the sandbox finishes the task and the thread moves to the cloud."
         checked={takeover.isPending && takeover.variables ? takeover.variables.enabled : enabled}
         disabled={takeover.isPending}
         onChange={(next) => takeover.mutate({ enabled: next })}

@@ -1,6 +1,11 @@
 import { SIDEBAR_LIST, sidebarDayKey, sidebarDayOpen, sidebarFoldKey, sidebarSectionOpen, threadTreeRows, visibleThreadForest, type SidebarDayList, type ThreadTreeRow } from "@openorc/client";
 import type { ThreadOwner, ThreadSummary } from "@openorc/protocol";
 
+/** The host listed below the shown one: none while the cloud brain is chosen, whose threads are the only ones shown then. */
+export function listedPartner(group: { primary: string | null; partner: string | null }, kinds: ReadonlyMap<string, "mac" | "brain">): string | null {
+  return group.primary !== null && kinds.get(group.primary) === "brain" ? null : group.partner;
+}
+
 /**
  * A Mac lists its cloud brain's threads among its own, marked as the cloud's. Beside that brain's own section they
  * would show twice, so a Mac listed with its brain keeps only its own.

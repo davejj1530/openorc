@@ -1,7 +1,7 @@
 import { sidebarDayList, sidebarThreadPage, THREAD_PAGE, type SidebarFilter } from "@openorc/client";
 import { WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 import { describe, expect, it } from "vitest";
-import { homeItems, homeWaiting, owned, ownRows, shownApartFromBrain, type HomeItem, type HomeList, type HomeOptions } from "./home-items";
+import { homeItems, homeWaiting, listedPartner, owned, ownRows, shownApartFromBrain, type HomeItem, type HomeList, type HomeOptions } from "./home-items";
 import { newThreadRoute } from "./out-of-reach";
 import { fixtureProjects, fixtureThreads } from "./test-fixtures/threads";
 
@@ -262,5 +262,18 @@ describe("a Mac listed beside its cloud brain", () => {
     expect(ownRows(rows, true).map((row) => row.id)).toEqual([own!.id]);
     expect(ownRows(rows, false)).toBe(rows);
     expect(ownRows(undefined, true)).toBeUndefined();
+  });
+});
+
+describe("the host listed below the shown one", () => {
+  const kinds = new Map<string, "mac" | "brain">([
+    ["mac", "mac"],
+    ["brain", "brain"],
+  ]);
+
+  it("is none while the cloud brain is chosen, so only its threads show, and the brain below a chosen Mac", () => {
+    expect(listedPartner({ primary: "brain", partner: "mac" }, kinds)).toBeNull();
+    expect(listedPartner({ primary: "mac", partner: "brain" }, kinds)).toBe("brain");
+    expect(listedPartner({ primary: "mac", partner: null }, kinds)).toBeNull();
   });
 });

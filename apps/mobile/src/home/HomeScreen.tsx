@@ -23,7 +23,7 @@ import { HOME_BAR_HEIGHT, HomeBar } from "./header/HomeBar";
 import { HostHeading, MacLine, lineOverRows, useHostLink, type HomeScroll, type HostKind } from "./header/MacLine";
 import { HomeHeading, RetryRow, SectionToggle, ShowMore, ShowMoreChildren, type HeadingRoom } from "./HomeHeading";
 import { newThreadRoute } from "./out-of-reach";
-import { owned, type HomeItem, type Waiting } from "./home-items";
+import { listedPartner, owned, type HomeItem, type Waiting } from "./home-items";
 import { refreshHome } from "./refresh";
 import { ThreadRow } from "./ThreadRow";
 import { Unpaired } from "./Unpaired";
@@ -166,25 +166,28 @@ function Threads({ state, scrollY, lineBottom }: HomeScroll & { state: Paired })
   const insets = useSafeAreaInsets();
   const group = useHostGroup();
   const [partnerWaiting, setPartnerWaiting] = useState(NO_WAITING);
-  const partnerOwner = usePartnerOwner(group.partner);
+  const saved = useSavedMacs();
+  // With the cloud brain chosen, its threads are the only ones listed: the Mac's stay on the Mac.
+  const partner = listedPartner(group, new Map(saved.map((each) => [each.id, each.kind === "brain" ? "brain" : "mac"])));
+  const partnerOwner = usePartnerOwner(partner);
   const handed = useMemo(
-    () => (group.partner ? partnerWaiting.map((each) => ({ ...each, host: group.partner!, thread: { ...each.thread, owner: partnerOwner } })) : NO_WAITING),
-    [group.partner, partnerWaiting, partnerOwner],
+    () => (partner ? partnerWaiting.map((each) => ({ ...each, host: partner, thread: { ...each.thread, owner: partnerOwner } })) : NO_WAITING),
+    [partner, partnerWaiting, partnerOwner],
   );
   const shown = useHomeItems(state.kind === "connected", { partnerWaiting: handed, selectedId: useSelectedThreadId() });
   const away = useShownAway(state);
   const home = away ? { ...shown, items: owned(shown.items, away) } : shown;
   const folds = useHomeFolds(home);
   const still = useReducedMotion();
-  const refresh = useRefresh(group.partner);
+  const refresh = useRefresh(partner);
   const shownKind = useShownKind(group);
-  const partnerItem = useMemo((): PartnerItem | null => (group.partner ? { kind: "partner", key: `partner:${group.partner}`, host: group.partner } : null), [group.partner]);
+  const partnerItem = useMemo((): PartnerItem | null => (partner ? { kind: "partner", key: `partner:${partner}`, host: partner } : null), [partner]);
   // One object for the list's life: a new one each render would make the list resubscribe and rewrite the offset.
   const sharedValues = useMemo(() => ({ scrollOffset: scrollY }), [scrollY]);
   return (
     <>
-      {group.partner ? (
-        <HostScope host={group.partner}>
+      {partner ? (
+        <HostScope host={partner}>
           <PartnerWaiting onWaiting={setPartnerWaiting} />
         </HostScope>
       ) : null}
@@ -206,7 +209,7 @@ function Threads({ state, scrollY, lineBottom }: HomeScroll & { state: Paired })
         }
         ListHeaderComponent={<MacLine state={state} host={shownKind} scrollY={scrollY} lineBottom={lineBottom} />}
         ListHeaderComponentStyle={lineOverRows}
-        ListFooterComponent={group.partner ? null : <View className="h-24" />}
+        ListFooterComponent={partner ? null : <View className="h-24" />}
         sharedValues={sharedValues}
         contentContainerStyle={{ paddingTop: insets.top + HOME_BAR_HEIGHT, paddingBottom: insets.bottom }}
         // The list lowers the spinner by its top padding, below the bar. Without a tint, iOS draws none.

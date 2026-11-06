@@ -1,6 +1,6 @@
 import { useKeyboardChatComposerInset } from "@legendapp/list/keyboard";
 import type { LegendListRef } from "@legendapp/list/react-native";
-import { conversationActivity, conversationSendDisabledReason, processFit, queueAfterStart, startingInCloud, type SubmitRequest } from "@openorc/client";
+import { conversationActivity, conversationSendDisabledReason, preparingCloud, processFit, queueAfterStart, startingInCloud, type SubmitRequest } from "@openorc/client";
 import { isSubagentThread, type Run, type ThreadSummary } from "@openorc/protocol";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
@@ -209,6 +209,7 @@ export function ThreadScreen() {
             <Composer
               thread={thread}
               queued={queueAfterStart(thread, runs.length)}
+              preparing={preparingCloud(thread, runs.length)}
               settings={settings}
               request={request}
               live={live && activeRun ? { runId: activeRun.id } : null}

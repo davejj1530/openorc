@@ -11,6 +11,8 @@ export {
   cloudPlaceLabel,
   cloudStartFailure,
   cloudStartSteps,
+  failureParts,
+  preparingCloud,
   queueAfterStart,
   runsInCloud,
   startingInCloud,
@@ -23,7 +25,7 @@ export {
   type CloudStartStepState,
   type StartingCloudThread,
 } from "./cloud-start.js";
-export { composerActivity, composerSendHint } from "./composer-presentation.js";
+export { composerActivity, composerSendHint, queueHint } from "./composer-presentation.js";
 export type { ClientPush, CoreConnection, Notice } from "./connection.js";
 export { conversationActivity, conversationCanSteer, conversationPlaceholder, conversationSendDisabledReason, conversationSteerReason } from "./conversation-presentation.js";
 export type { SavedThreadSettings } from "./conversation-settings.js";

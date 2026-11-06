@@ -1,11 +1,13 @@
 import { composerActivity, conversationPlaceholder, type ClientState } from "@openorc/client";
 import { harnessShortName, isHarnessId, type QueuedMessage, type ThreadSummary } from "@openorc/protocol";
+import type { StartingCloudThread } from "@openorc/client";
 import { useState } from "react";
 import { Pressable, View, type LayoutChangeEvent } from "react-native";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRpcMutation } from "../client";
 import { Square } from "../generated/icons";
+import { CloudPreparing } from "../thread/CloudStart";
 import { SessionRecovery } from "../thread/SessionRecovery";
 import { cn } from "../ui/cn";
 import { Text } from "../ui/Text";
@@ -20,6 +22,8 @@ export interface ComposerProps extends Omit<ComposerInput, "threadId"> {
   thread: ThreadSummary;
   /** The messages waiting above the composer: a starting cloud thread shows its first in its own card. */
   queued: QueuedMessage[];
+  /** The thread, when it has run before and its sandbox is being set up again: the step under way shows above the queue. */
+  preparing: StartingCloudThread | null;
   settings: Settings;
   generatingImage: boolean;
   onLayout: (event: LayoutChangeEvent) => void;
@@ -54,7 +58,7 @@ function Queue({ thread, queued, canSteer, typing, onSent }: { thread: ThreadSum
  * bar of attach, model and mode on the left, and activity, Queue, Stop and the send pill on the right. What a send does
  * (into the turn, after it, the warm process or a new one) is the desktop's send tree.
  */
-export function Composer({ thread, queued, settings, generatingImage, onLayout, ...input }: ComposerProps) {
+export function Composer({ thread, queued, preparing, settings, generatingImage, onLayout, ...input }: ComposerProps) {
   const insets = useSafeAreaInsets();
   const composer = useComposer({ ...input, threadId: thread.id });
   const [typing, setTyping] = useState(false);
@@ -64,6 +68,7 @@ export function Composer({ thread, queued, settings, generatingImage, onLayout, 
   return (
     <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom }}>
       <View onLayout={onLayout} className="gap-2 bg-bg px-3 pt-2" style={{ paddingBottom: insets.bottom + 8 }}>
+        {preparing ? <CloudPreparing thread={preparing} /> : null}
         <Queue thread={thread} queued={queued} canSteer={input.canSteer} typing={typing} onSent={input.onSent} />
         {typing || input.working ? null : <SessionRecovery thread={thread} request={input.request} disabled={input.disabledReason !== null} onSent={input.onSent} />}
         {failure ? (

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { cloudStartFailure, cloudStartSteps, startingInCloud, type StartingCloudThread } from "@openorc/client";
+import { cloudStartFailure, cloudStartSteps, failureParts, startingInCloud, type StartingCloudThread } from "@openorc/client";
 import type { QueuedMessage, ThreadSummary } from "@openorc/protocol";
 import { Button } from "./ui";
 import { StepMark } from "./WorkSteps";
@@ -8,14 +8,22 @@ import "./CloudStart.css";
 
 export { queueAfterStart } from "@openorc/client";
 
+/** What went wrong in a line, Try again, and what the sandbox printed, such as a daemon's log, only when asked for. */
 function Failed({ thread, message, failure }: { thread: StartingCloudThread; message: QueuedMessage; failure: string }) {
   const retry = useRpcMutation("threads.sendQueued");
+  const { headline, details } = failureParts(failure);
   return (
     <>
       <div className="text-md text-ink">The cloud workspace did not start</div>
       <p role="alert" className="cloud-start-error">
-        {failure}
+        {headline}
       </p>
+      {details ? (
+        <details className="cloud-start-details">
+          <summary>Details</summary>
+          <pre>{details}</pre>
+        </details>
+      ) : null}
       <div className="mt-4">
         <Button disabled={retry.isPending} onClick={() => retry.mutate({ id: thread.id, messageId: message.id })}>
           Try again

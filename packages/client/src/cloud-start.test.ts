@@ -1,7 +1,19 @@
 import type { CloudSignIn, ThreadSummary } from "@openorc/protocol";
 import { NO_CLOUD_SERVICE, NOT_ON_BRAIN, WORKSPACE_ID } from "@openorc/protocol";
 import { expect, it } from "vitest";
-import { canMoveToCloud, cloudPlaceLabel, cloudStartBlocked, cloudStartSteps, missingCloudSignIn, threadMoveCard, type StartingCloudThread } from "./cloud-start.js";
+import {
+  canMoveToCloud,
+  cloudPlaceLabel,
+  cloudStartBlocked,
+  cloudStartFailure,
+  cloudStartSteps,
+  failureParts,
+  missingCloudSignIn,
+  preparingCloud,
+  threadMoveCard,
+  type StartingCloudThread,
+} from "./cloud-start.js";
+import { queueHint } from "./composer-presentation.js";
 
 const thread = (more: Partial<ThreadSummary>) => ({ agent: "claude", projectId: "openorc", teamInstanceId: null, cloud: undefined, ...more }) as ThreadSummary;
 
@@ -86,4 +98,33 @@ it("names the one sign-in a cloud turn lacks: its Claude account, the Codex of w
     way: "key",
     error: null,
   });
+});
+
+it("shows a retried start's steps, not the failure before it, and a sandbox set up again after runs as steps too", () => {
+  const failed = thread({
+    queued: [{ id: "m", text: "What branch are you on", attachments: [], queuedAt: 1, interrupted: true, error: "Docker did not start in the sandbox.\nfailed to start daemon" }],
+    cloud: { provider: "agent37", state: "failed", step: null, setup: false, error: "Docker did not start in the sandbox.\nfailed to start daemon" },
+  }) as StartingCloudThread;
+  expect(cloudStartFailure(failed)).toBe("Docker did not start in the sandbox.\nfailed to start daemon");
+  // A message sent since set the sandbox up again: its waiting message is still marked interrupted until then.
+  const retrying = { ...failed, cloud: { ...failed.cloud, state: "preparing" as const, step: "sandbox" as const, error: null } };
+  expect(cloudStartFailure(retrying)).toBeNull();
+  expect(cloudStartSteps(retrying)[0]).toMatchObject({ label: "Starting an Agent37 instance", state: "running" });
+  expect(preparingCloud(retrying, 0)).toBeNull();
+  expect(preparingCloud(retrying, 2)).toBe(retrying);
+  expect(preparingCloud({ ...retrying, cloud: { ...retrying.cloud, state: "ready" } }, 2)).toBeNull();
+});
+
+it("says what went wrong in a failure's first line, and keeps a daemon's log after it for when it is asked for", () => {
+  expect(failureParts("Docker did not start in the sandbox.\ntime=1 level=info\nfailed to start daemon\n")).toEqual({
+    headline: "Docker did not start in the sandbox.",
+    details: "time=1 level=info\nfailed to start daemon",
+  });
+  expect(failureParts("The instance did not start.")).toEqual({ headline: "The instance did not start.", details: null });
+});
+
+it("says queued messages send when the agent finishes, unless none of them will without a retry", () => {
+  expect(queueHint([{}, { interrupted: true }], "Claude")).toBe("Sends when Claude finishes");
+  expect(queueHint([{ interrupted: true }], "Claude")).toBe("Didn't send");
+  expect(queueHint([{}], undefined)).toBe("Runs after this turn");
 });

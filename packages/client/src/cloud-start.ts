@@ -107,11 +107,26 @@ export function cloudStartSteps(thread: CloudStartThread): { step: CloudStartSte
   return order.map((step, index) => ({ step, label: stepLabel(step, thread), state: stepState(index, current) }));
 }
 
-/** Why a starting cloud thread's setup failed, or null while it has not; its waiting message is sent again to retry. */
+/**
+ * Why a starting cloud thread's setup failed, or null while it has not, or while it is set up again: a retry shows its
+ * steps, not the failure before it. Its waiting message is sent again to retry.
+ */
 export function cloudStartFailure(thread: CloudStartThread): string | null {
   const message = thread.queued[0];
+  if (thread.cloud.state === "preparing") return null;
   if (thread.cloud.state !== "failed" && !message?.interrupted) return null;
   return thread.cloud.error ?? message?.error ?? "Something went wrong while it was being set up.";
+}
+
+/** A cloud thread that has run before, its sandbox being set up again, as when a message brings back one deleted or failed; else null. */
+export function preparingCloud(thread: ThreadSummary | null | undefined, runs: number): StartingCloudThread | null {
+  return thread?.cloud && runs > 0 && thread.cloud.state === "preparing" ? (thread as StartingCloudThread) : null;
+}
+
+/** A failure's first line, what went wrong, apart from what follows it, such as a daemon's log, shown on demand. */
+export function failureParts(text: string): { headline: string; details: string | null } {
+  const [first = "", ...rest] = text.trim().split("\n");
+  return { headline: first.trim(), details: rest.join("\n").trim() || null };
 }
 
 const placeLabels: Record<CloudThreadState["provider"], string> = { vercel: "Vercel Sandbox", agent37: "Agent37 instance", local: "Simulated sandbox" };

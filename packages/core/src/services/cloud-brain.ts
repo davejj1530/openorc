@@ -7,8 +7,6 @@ import {
   brainVersionNewer,
   newBrainKey,
   sealHandover,
-  type Agent37Connection,
-  type AgentVersions,
   type BrainAccess,
   type BrainControlResults,
   type BrainKey,
@@ -16,7 +14,7 @@ import {
   type HandoverCodexLogin,
   type WakeInput,
 } from "@openorc/cloud";
-import { projects, redact, type Db } from "@openorc/db";
+import { projects, redact } from "@openorc/db";
 import type {
   BrainRegion,
   CloudBrainCost,
@@ -31,18 +29,17 @@ import type {
 } from "@openorc/protocol";
 import { BrainCosts } from "./cloud-brain-cost.js";
 import { stopForUpdate, type UpdateWait } from "./cloud-brain-update.js";
-import { openMachine, shownMachine, type BrainBundleSource, type BrainMachineLike, type OpenBrainMachine } from "./cloud-brain-machine.js";
+import { openMachine, shownMachine, type BrainBundleSource, type BrainMachineLike } from "./cloud-brain-machine.js";
 import { BrainPhones } from "./cloud-brain-phones.js";
 import { BrainElsewhere, SERVICE_NAMES, accessHere, brainConnections, placeOf, provisionAt, reach, regionOf, serviceOf, threadCloud, threadSizes, type BrainConnections } from "./cloud-brain-place.js";
 import { BrainRecord, type StoredBrain } from "./cloud-brain-record.js";
-import type { ClaudeCloudTokens } from "./claude-cloud-tokens.js";
-import { BrainDoorKeeper, vercelDoors, type BrainDoors } from "./cloud-brain-door.js";
+import { BrainDoorKeeper, vercelDoors } from "./cloud-brain-door.js";
 import { anyMoved, confirmCurrent, copyBranch, failedAt, freshCopy, hasThreads, projectsShown, seen, stale, switchedOn, type BrainProject } from "./cloud-brain-projects.js";
 import { claudeToSend, sameSent, sent, type Sent } from "./cloud-brain-claude.js";
 import { NO_SIGN_INS, claimsSignIns, heardSignIns, signInChanges, signInsView, switchGitHub, type CloudSource, type SignInRecord, type SignInSources } from "./cloud-brain-signins.js";
 import { alignAgentVersions } from "./cloud-brain-versions.js";
+import type { CloudBrainDeps } from "./cloud-brain-deps.js";
 import { apiKeyAuth } from "./codex-cloud-login.js";
-import type { ProtectedSecretStore } from "./extraction-credentials.js";
 
 /** What phones show for the brain. */
 const BRAIN_NAME = "Cloud";
@@ -54,31 +51,7 @@ type Activity = { kind: "setting-up"; step: CloudBrainStep } | { kind: "removing
 /** What a ready brain shows it is at while each operation runs. */
 const WORKING: Partial<Record<Activity["kind"], Extract<CloudBrainStatus, { state: "ready" }>["working"]>> = { waking: "waking", sending: "sending", updating: "updating" };
 
-export interface CloudBrainDeps {
-  db: Db;
-  store: ProtectedSecretStore | undefined;
-  tokens: Pick<ClaudeCloudTokens, "status" | "token">;
-  /** The Vercel connection a brain on Vercel is made with. The brain keeps its own project on the team. */
-  vercel: BrainConnections["vercel"];
-  /** The Agent37 connection a brain on Agent37 is made with; none unless given. */
-  agent37?: () => Promise<Agent37Connection | null>;
-  /** The service a new brain is made on; Vercel while it is connected, unless given. */
-  service?: () => Promise<CloudService | null>;
-  bundle: (() => Promise<BrainBundleSource | null>) | undefined;
-  changed: () => void;
-  open?: OpenBrainMachine;
-  doors?: BrainDoors;
-  /** The brain's project and its door's; the product's own unless given, as for a QA brain kept apart. */
-  projects?: { brain?: string; door?: string };
-  /** This Mac's sign-ins besides Claude's that the brain is kept on; none unless given. */
-  signIns?: SignInSources;
-  /** This Mac's agent CLI versions, which the brain is brought to at each wake; none unless given. */
-  agentVersions?: () => Promise<AgentVersions>;
-  /** How long a wake waits for a busy brain to restart onto its update; a minute, asking every five seconds, unless given. */
-  updateWait?: UpdateWait;
-  /** Where its phones are kept; the brain's own unless given, as for one set up or removed beside it in a move. */
-  phonesKey?: string;
-}
+export type { CloudBrainDeps } from "./cloud-brain-deps.js";
 
 const UPDATE_WAIT: UpdateWait = { waitMs: 5000, forMs: 60_000 };
 
@@ -173,22 +146,21 @@ export class CloudBrain {
 
   /** Whether the brain's machine runs now, as its service says. Never wakes it. */
   async machineRuns(): Promise<boolean> {
-    const stored = await this.record.read().catch(() => null);
-    if (!stored) return false;
-    const machine = await this.reach(stored)
-      .then((access) => this.open(access, false))
-      .catch(() => null);
-    return (await machine?.status().catch(() => null))?.state === "running";
+    return (await (await this.asItIs(false))?.status().catch(() => null))?.state === "running";
   }
 
   /** When the brain was last in use, by its service: now while it runs, null before it is set up. Never wakes it. */
   async lastUsed(): Promise<number | null> {
+    return (await (await this.asItIs(true))?.lastUsed?.().catch(() => null)) ?? null;
+  }
+
+  /** The brain's machine as its service has it, never woken; null with no brain, one not set up when `ready`, or no answer. */
+  private async asItIs(ready: boolean): Promise<BrainMachineLike | null> {
     const stored = await this.record.read().catch(() => null);
-    if (!stored?.ready) return null;
-    const machine = await this.reach(stored)
+    if (!stored || (ready && !stored.ready)) return null;
+    return this.reach(stored)
       .then((access) => this.open(access, false))
       .catch(() => null);
-    return (await machine?.lastUsed?.().catch(() => null)) ?? null;
   }
 
   /** What moving threads, or the brain itself, needs of the brain this Mac set up, once it has started; null before. Never wakes it. */

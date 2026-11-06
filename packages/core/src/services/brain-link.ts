@@ -283,17 +283,7 @@ export class BrainLink {
     try {
       socket = await (this.deps.dial ?? ((url) => dial(url, this.deps.connectMs ?? CONNECT_MS)))(target.url);
     } catch (error) {
-      // Up, but behind another key's path: its key is asked of it again, and dialed once more.
-      if (error instanceof Refused && error.status === 404 && !relearned && this.deps.endpoint.relearn) {
-        await this.deps.endpoint.relearn().catch(() => undefined);
-        return this.open(true, true);
-      }
-      // Its machine runs with nothing behind its address: the brain stopped there, as Agent37's sleep can stop it, and
-      // only its owner starts it again.
-      if (error instanceof Refused && !woke && !this.restarted && (await this.deps.endpoint.running?.().catch(() => false))) return this.restart();
-      this.failed(error instanceof Error ? error.message : String(error));
-      this.fell(error instanceof Refused ? "asleep" : "offline");
-      return null;
+      return this.unreached(error, woke, relearned);
     }
     const result = await connectLink({ socket, crypto: nodeCrypto, device: target.ownerKeys, macKey: target.brainKey, hello: { device: { name: "Mac" } }, timeoutMs: 10_000 });
     if (!result.ok) {
@@ -301,8 +291,27 @@ export class BrainLink {
       this.fell("asleep");
       return null;
     }
+    return this.begin(result.session);
+  }
+
+  /** A dial that did not reach the brain: what its address answered decides whether to dial again, or start it. */
+  private async unreached(error: unknown, woke: boolean, relearned: boolean): Promise<PhoneSession | null> {
+    // Up, but behind another key's path: its key is asked of it again, and dialed once more.
+    if (error instanceof Refused && error.status === 404 && !relearned && this.deps.endpoint.relearn) {
+      await this.deps.endpoint.relearn().catch(() => undefined);
+      return this.open(true, true);
+    }
+    // Its machine runs with nothing behind its address: the brain stopped there, as Agent37's sleep can stop it, and
+    // only its owner starts it again.
+    if (error instanceof Refused && !woke && !this.restarted && (await this.deps.endpoint.running?.().catch(() => false))) return this.restart();
+    this.failed(error instanceof Error ? error.message : String(error));
+    this.fell(error instanceof Refused ? "asleep" : "offline");
+    return null;
+  }
+
+  /** A session just made: kept, told what this Mac speaks and which runs its windows watch. */
+  private async begin(session: PhoneSession): Promise<PhoneSession> {
     this.lastFailure = null;
-    const session = result.session;
     this.adopt(session);
     await this.request(session, "session.negotiate", { capabilities: [...PHONE_CAPABILITIES] }).catch(() => undefined);
     if (this.interest.length) session.send({ t: "interest", runIds: this.interest });

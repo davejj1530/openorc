@@ -5,7 +5,6 @@ import { WORKSPACE_ID, isSubagentThread } from "@openorc/protocol";
 import { useRef, useState } from "react";
 import { CoversPreview } from "../lib/browser-preview";
 import { useRpc, useRpcMutation } from "../lib/client";
-import { cloudOffered } from "../lib/cloud-offered";
 import { orclingHome, useOrclings } from "../lib/orclings";
 import { MAX_THREAD_PANES, newSubthread, openThread, useRouter } from "../lib/router";
 import { useThreadMutationPending } from "../lib/thread-mutations";
@@ -130,7 +129,7 @@ function ThreadMenuContent({ thread, parts: M }: { thread: ThreadSummary; parts:
           {thread.workspaceMode === "worktree" ? <Laptop size={13} /> : <GitBranch size={13} />} {thread.workspaceMode === "worktree" ? "Move to the checkout" : "Move to a worktree"}
         </M.Item>
       ) : null}
-      {cloudOffered ? <CloudMoveItems thread={thread} parts={M} /> : null}
+      <CloudMoveItems thread={thread} parts={M} />
       <M.Separator className={menuSeparator} />
       <M.Item className={menuItem} disabled={lifecycleBlocked} closeOnClick onClick={() => patch({ archived: !resolved })}>
         {resolved ? <RotateCcw size={13} /> : <CircleCheck size={13} />} {resolved ? "Reopen" : "Resolve"}

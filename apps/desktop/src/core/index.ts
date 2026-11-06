@@ -84,11 +84,10 @@ const corePromise = OpenOrc.create({
   formatter: new WorkerFormatter(() => new Worker(join(import.meta.dirname, "formatter-worker.mjs"))),
   intelligence: new WorkerIntelligence(() => new Worker(join(import.meta.dirname, "intelligence-worker.mjs"), { resourceLimits: { maxOldGenerationSizeMb: 1024 } })),
   benchmarks: __OPENORC_QA__,
-  // As the window's own menus offer them: development and QA builds, until cloud threads ship.
-  cloudOffered: __OPENORC_QA__,
+  cloudOffered: true,
   cloudRunnerFiles: Object.entries(cloudRunner).map(([file, content]) => ({ name: basename(file), content: Buffer.from(content) })),
-  // These builds run from the repository's apps/desktop/out/main, so the brain is the one built beside them. A release carries none yet.
-  ...(__OPENORC_QA__ ? { cloudBrainBundle: () => newestBrainBundle(join(import.meta.dirname, "../../../brain/dist")) } : {}),
+  // A packaged app carries the brain in its resources; a build run from the repository uses the one built beside it.
+  cloudBrainBundle: () => newestBrainBundle(process.env["OPENORC_BRAIN_DIR"] ?? join(import.meta.dirname, "../../../brain/dist")),
 });
 
 // Main hosts the Terminal panels and wants the login PATH the core adopted.

@@ -1,4 +1,3 @@
-import { cloudOffered } from "./cloud-offered";
 import { BookText, Brain, Cloud, Laptop, Link2, MessageSquare, Signal, SlidersHorizontal, Smartphone, SunMoon, Tablet } from "../components/icons";
 import { SETTINGS_SECTIONS, type Route, type SettingsSection } from "./router";
 
@@ -16,11 +15,8 @@ const presentation: Record<SettingsSection, { label: string; description: string
   data: { label: "Data", description: "Your work lives on this device.", Icon: Laptop },
 };
 
-/** Cloud threads are offered only in development and QA builds until they run on a real provider by default. */
-const offered = (id: SettingsSection) => id !== "cloud" || cloudOffered;
-
 /** Settings' sections, in the order the sidebar lists them. */
-export const settingsSections = SETTINGS_SECTIONS.filter(offered).map((id) => ({ id, ...presentation[id] }));
+export const settingsSections = SETTINGS_SECTIONS.map((id) => ({ id, ...presentation[id] }));
 
 /** The section a settings route opens: Usage, unless it names another. */
 export function settingsSection(route: Extract<Route, { view: "settings" }>) {

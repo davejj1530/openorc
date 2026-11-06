@@ -102,7 +102,7 @@ function startCore(): UtilityProcess {
   const child = utilityProcess.fork(join(here, "core.mjs"), [], {
     serviceName: "openorc-core",
     stdio: "pipe",
-    env: { ...process.env, OPENORC_DATA_DIR: app.getPath("userData"), OPENORC_FILE_KEY: fileKey },
+    env: { ...process.env, OPENORC_DATA_DIR: app.getPath("userData"), OPENORC_FILE_KEY: fileKey, ...(app.isPackaged ? { OPENORC_BRAIN_DIR: join(process.resourcesPath, "brain") } : {}) },
   });
   // A UtilityProcess hands the listener the raw payload; only MessagePorts wrap it in an event.
   listenForShellEnv(child);

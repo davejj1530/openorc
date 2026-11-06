@@ -13,7 +13,6 @@ vi.mock("../lib/client", async (original) => ({
   },
 }));
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onPush: () => () => {} } }));
-vi.mock("../lib/cloud-offered", () => ({ cloudOffered: true }));
 vi.mock("../lib/thread-mutations", () => ({ useThreadMutationPending: () => false }));
 vi.mock("../lib/orclings", () => ({ useOrclings: () => [], orclingHome: () => null }));
 

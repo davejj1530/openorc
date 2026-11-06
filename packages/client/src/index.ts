@@ -133,6 +133,8 @@ export { liveVerb, stateLabel, toolCallPresentation, type Tone, type ToolIconNam
 export { toolResult, toolResultDetails, type ToolResultMedia } from "./tool-result.js";
 export { languageFor, type ChangeStatus, type ChangedFile, type MatchGroup, type MatchLine, type TestTally } from "./tool-text.js";
 export { joinPath, toolInputView, toolOutputView, type CommandStep, type Field, type InputView, type OutputView } from "./tool-view.js";
+export { readStep, type StepReading } from "./command-steps.js";
+export { printedOutput, type FileRef, type PrintedLine, type PrintedOutput, type PrintedTone } from "./printed-output.js";
 export { subagentGroups, subagentStatusLabel, type SubagentCard } from "./transcript-subagents.js";
 export { activityBlockId, activityIdOf, emptyRun, type Block, type RunTranscript } from "./transcript.js";
 export { turnReply, turnStatus, turnStatusWords, useTicking, useTurnModel, type TurnStatus } from "./turn-model.js";

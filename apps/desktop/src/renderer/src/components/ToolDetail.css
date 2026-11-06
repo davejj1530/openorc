@@ -1,8 +1,9 @@
 /* An opened tool call. Each part is styled for what it is, quiet enough to sit inside the work list: a command as
-   its steps on a recessed plane, code highlighted as in replies, matches and files as lists with their marks. */
+   rows of plain words with the command faint beside them, what it printed in a recessed well read line by line,
+   code highlighted as in replies, matches and files as lists with their marks. */
 .tool-view {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
   padding: 4px 0 10px;
   font-size: var(--text-xs);
@@ -11,34 +12,104 @@
 }
 .tool-view-command {
   display: grid;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
-  padding: 10px 12px;
-  border-radius: var(--radius-lg);
-  background: var(--surface-2);
-}
-.tool-view-step {
-  display: grid;
-  min-width: 0;
-}
-.tool-view-step > code {
-  font-family: var(--font-mono);
-  color: var(--ink);
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-/* A comment the agent left between steps reads as a note, not as something that ran. */
-.tool-view-step > code[data-comment] {
-  color: var(--ink-3);
-}
-.tool-view-prompt {
-  margin-right: 8px;
-  color: var(--ink-3);
-  user-select: none;
 }
 .tool-view-cwd {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: start;
+  max-width: 100%;
   font-family: var(--font-mono);
   color: var(--ink-3);
+}
+/* One grid for every step, so the commands start on one line whatever the longest label. */
+.tool-view-steps {
+  display: grid;
+  grid-template-columns: fit-content(42%) minmax(0, 1fr);
+  column-gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tool-view-step,
+.tool-view-step-row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  min-width: 0;
+}
+.tool-view-step-row {
+  align-items: baseline;
+  min-height: 26px;
+  margin: 0 -8px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  color: inherit;
+  transition: background-color var(--duration-quick) var(--ease-out);
+}
+.tool-view-step-row:hover {
+  background: var(--surface-2);
+}
+.tool-view-step-row:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.tool-view-step-label {
+  grid-column: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+}
+.tool-view-step-detail {
+  margin-left: 6px;
+  color: var(--ink-3);
+}
+.tool-view-step-command {
+  grid-column: 2;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  color: var(--ink-3);
+  user-select: text;
+}
+/* A command people would not know by name is its own label. */
+.tool-view-step[data-bare] .tool-view-step-command {
+  grid-column: 1 / -1;
+  color: var(--ink-2);
+}
+.tool-view-step-row[aria-expanded="true"] .tool-view-step-command {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--ink-2);
+}
+.tool-view-step-row[aria-expanded="true"] .tool-view-step-label {
+  white-space: normal;
+}
+/* What only trims or silences the output (`2>&1 | tail -3`) is not what the step did. */
+.tool-view-plumbing {
+  color: var(--ink-4);
+}
+.tool-view-note-step {
+  grid-column: 1 / -1;
+  padding: 4px 0;
+  color: var(--ink-3);
+}
+.tool-view-script {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 4px;
+  min-width: 0;
+  margin: 0 0 6px;
+}
+.tool-view-script[data-folded] .tool-view-code {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 36px), transparent);
 }
 .tool-view-target {
   display: flex;
@@ -119,9 +190,73 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-/* A failed call's output carries the failure at its edge. */
-.tool-view[data-error] > .tool-view-plain {
-  box-shadow: inset 2px 0 0 var(--bad);
+/* What a command printed: a recessed well, read line by line. A long one shows its first lines and fades. */
+.tool-view-output {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.tool-view-exit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  justify-self: start;
+  color: var(--bad);
+}
+.tool-view-quiet {
+  color: var(--ink-3);
+}
+.tool-view-printed {
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  color: var(--ink-2);
+}
+.tool-view-printed-lines > div {
+  min-height: 18px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.tool-view-printed-lines[data-folded] {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 54px), transparent);
+}
+.tool-view-printed [data-tone="bad"] {
+  color: var(--bad);
+}
+.tool-view-printed [data-tone="warn"] {
+  color: var(--warn);
+}
+/* What Claude Code says about the shell after the command ("Shell cwd was reset to …") is its note, not output. */
+.tool-view-printed [data-tone="note"] {
+  font-family: var(--font-sans);
+  color: var(--ink-4);
+}
+.tool-view-printed a {
+  color: var(--ink);
+  text-decoration: none;
+}
+.tool-view-printed a:hover {
+  text-decoration: underline;
+}
+/* A divider the program printed (`⎯⎯ Failed Tests 1 ⎯⎯`, `=== results ===`) reads as a quiet heading over a rule. */
+.tool-view-printed-lines > .tool-view-rule {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 2px;
+  font-family: var(--font-sans);
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.tool-view-printed-lines > .tool-view-rule:first-child {
+  margin-top: 0;
+}
+.tool-view-rule::after {
+  content: "";
+  flex: 1;
+  border-top: var(--hairline) solid color-mix(in oklab, var(--ink) 12%, transparent);
 }
 .tool-view-code {
   min-width: 0;
@@ -133,7 +268,7 @@
    It has no header, so the copy bar that floats over a header has nowhere to sit; the raw call has the script. */
 .tool-view-code[data-script] {
   min-width: 0;
-  margin: 2px 0 4px 3px;
+  margin-left: 3px;
   padding-left: 12px;
   border-left: var(--hairline) solid var(--line);
 }
@@ -262,34 +397,6 @@
   color: var(--bad);
 }
 
-.tool-view-tests {
-  display: grid;
-  gap: 8px;
-}
-.tool-view-tally {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-.tool-view-tally > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 8px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-2);
-  color: var(--ink-3);
-  font-variant-numeric: tabular-nums;
-}
-.tool-view-tally > span[data-tone="ok"] {
-  background: var(--ok-soft);
-  color: var(--ok);
-}
-.tool-view-tally > span[data-tone="bad"] {
-  background: var(--bad-soft);
-  color: var(--bad);
-}
 /* In the transcript the matches sit on the detail's own fill; the guide rule beside them goes. */
 [data-transcript] .tool-view-matches ol {
   margin-left: 0;

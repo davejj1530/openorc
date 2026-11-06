@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import type { CloudBrainProject, CloudBrainStatus } from "@openorc/protocol";
 import { afterEach, expect, it, vi } from "vitest";
@@ -19,16 +19,35 @@ afterEach(() => {
 });
 
 const ready: CloudBrainStatus = { state: "ready", service: "vercel", region: "sin1", machine: "awake", claude: [], behind: false, working: null, door: null, threads: 0, error: null };
-const project = (id: string, name: string, shown: Partial<CloudBrainProject> = {}): CloudBrainProject => ({ id, name, on: false, blocked: null, sending: false, kept: false, error: null, ...shown });
+const project = (id: string, name: string, shown: Partial<CloudBrainProject> = {}): CloudBrainProject => ({
+  id,
+  name,
+  on: false,
+  blocked: null,
+  sending: false,
+  kept: false,
+  error: null,
+  ...shown,
+});
+
+/** What the project's .env files hold, as `cloud.env.fromFile` reads them. */
+let dotEnv: { files: string[]; entries: { name: string; value: string }[] } = { files: [], entries: [] };
 
 function show(projects: CloudBrainProject[], status: CloudBrainStatus = ready) {
   vi.mocked(core.call).mockImplementation(async (method: string, params: unknown) => {
     if (method === "cloud.brain.projects") return projects as never;
     if (method === "cloud.brain.cost") return null as never;
     if (method === "cloud.brain.phones") return [] as never;
+    if (method === "cloud.env") return { projectId: (params as { projectId: string }).projectId, names: [] } as never;
+    if (method === "cloud.env.fromFile") return dotEnv as never;
+    if (method === "cloud.env.set") {
+      const { projectId, entries } = params as { projectId: string; entries: { name: string }[] };
+      return { projectId, names: entries.map((entry) => entry.name) } as never;
+    }
     if (method === "cloud.brain.project") {
       const { projectId, on } = params as { projectId: string; on: boolean };
-      return projects.map((each) => (each.id === projectId ? { ...each, on } : each)) as never;
+      projects = projects.map((each) => (each.id === projectId ? { ...each, on } : each));
+      return projects as never;
     }
     if (method === "cloud.brain.signIns")
       return {
@@ -46,34 +65,61 @@ function show(projects: CloudBrainProject[], status: CloudBrainStatus = ready) {
   );
 }
 
-const toggle = (name: string) => screen.getByRole("switch", { name }) as HTMLInputElement;
-const reason = (name: string) => toggle(name).closest("[data-tooltip]")?.getAttribute("data-tooltip") ?? null;
+const row = (name: string) => screen.getByText(name, { selector: ".settings-field span" }).closest(".settings-field") as HTMLElement;
+const remove = (name: string) => within(row(name)).getByRole("button", { name: "Remove" }) as HTMLButtonElement;
+const reason = (name: string) => remove(name).closest("[data-tooltip]")?.getAttribute("data-tooltip") ?? null;
 const picker = () => screen.getByRole("combobox", { name: "Project" }) as HTMLSelectElement;
+const sheet = () => screen.getByRole("dialog");
 
-it("lists the projects the brain has with a switch each, and adds another from one picker", async () => {
+it("lists the projects the brain has, each with its environment and Remove, and adds another through a sheet that sends its .env along", async () => {
+  dotEnv = { files: [".env"], entries: [{ name: "API_URL", value: "https://dev.example" }] };
   show([project("p1", "app"), project("p2", "site", { on: true }), project("p3", "docs")]);
   await screen.findByText("Projects");
-  expect(toggle("site").checked).toBe(true);
-  expect(screen.queryByRole("switch", { name: "app" })).toBeNull();
-  // Each project the brain has keeps its own environment for cloud threads.
-  expect(screen.getAllByRole("button", { name: "Environment" })).toHaveLength(1);
+  expect(within(row("site")).getByRole("button", { name: "Environment" })).toBeTruthy();
+  expect(screen.queryByRole("switch")).toBeNull();
   expect([...picker().options].map((option) => option.textContent)).toEqual(["app", "docs"]);
   fireEvent.change(picker(), { target: { value: "p3" } });
   fireEvent.click(screen.getByRole("button", { name: "Add" }));
+  expect(await screen.findByRole("heading", { name: "Add docs to the cloud brain" })).toBeTruthy();
+  await waitFor(() =>
+    expect(
+      within(sheet())
+        .getAllByRole("textbox", { name: "Name" })
+        .map((input) => (input as HTMLInputElement).value),
+    ).toEqual(["API_URL"]),
+  );
+  expect(core.call).not.toHaveBeenCalledWith("cloud.brain.project", expect.anything());
+  fireEvent.click(within(sheet()).getByRole("button", { name: "Add" }));
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.project", { projectId: "p3", on: true }));
-  await waitFor(() => expect(toggle("docs").checked).toBe(true));
-  fireEvent.click(toggle("site"));
+  const calls = vi.mocked(core.call).mock.calls.map(([method]) => method);
+  expect(calls.indexOf("cloud.env.set")).toBeLessThan(calls.indexOf("cloud.brain.project"));
+  expect(core.call).toHaveBeenCalledWith("cloud.env.set", { projectId: "p3", entries: [{ name: "API_URL", value: "https://dev.example" }] });
+  await waitFor(() => expect(remove("docs")).toBeTruthy());
+  fireEvent.click(remove("site"));
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.project", { projectId: "p2", on: false }));
 });
 
-it("offers one it cannot move only as a disabled choice that names why, and keeps a blocked switch as it is", async () => {
+it("adds a project whose .env files hold nothing without saving an environment", async () => {
+  dotEnv = { files: [], entries: [] };
+  show([project("p1", "app")]);
+  await screen.findByText("Projects");
+  fireEvent.click(screen.getByRole("button", { name: "Add" }));
+  await screen.findByRole("heading", { name: "Add app to the cloud brain" });
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.env.fromFile", { projectId: "p1" }));
+  expect(within(sheet()).queryByText("This project has no .env or .env.local.")).toBeNull();
+  fireEvent.click(within(sheet()).getByRole("button", { name: "Add" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.project", { projectId: "p1", on: true }));
+  expect(core.call).not.toHaveBeenCalledWith("cloud.env.set", expect.anything());
+});
+
+it("offers one it cannot move only as a disabled choice that names why, and keeps a Remove that would cut threads short disabled", async () => {
   show([project("p1", "notes", { blocked: "Not a Git repository." }), project("p2", "app", { on: true, blocked: "It has threads on the cloud brain." })]);
   await screen.findByText("Projects");
   const notes = [...picker().options].find((option) => option.value === "p1")!;
   expect([notes.disabled, notes.textContent]).toEqual([true, "notes · Not a Git repository."]);
   expect((screen.getByRole("button", { name: "Add" }) as HTMLButtonElement).disabled).toBe(true);
-  expect([toggle("app").checked, toggle("app").disabled, reason("app")]).toEqual([true, true, "It has threads on the cloud brain."]);
-  fireEvent.click(toggle("app"));
+  expect([remove("app").disabled, reason("app")]).toEqual([true, "It has threads on the cloud brain."]);
+  fireEvent.click(remove("app"));
   expect(core.call).not.toHaveBeenCalledWith("cloud.brain.project", expect.anything());
 });
 

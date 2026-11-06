@@ -67,16 +67,57 @@ function EnvRows({ rows, setRows, disabled }: { rows: Row[]; setRows: (rows: Row
   );
 }
 
-function EnvForm({ projectId, names, close }: { projectId: string; names: string[]; close: () => void }) {
+/** A project's environment as a sheet edits it, from the names saved; `fill` adds what its .env files hold. */
+export function useEnvDraft(projectId: string, names: string[]) {
   const [rows, setRows] = useState<Row[]>(() => (names.length ? names.map((name) => row(name, "", true)) : [row("", "", false)]));
   const [noFile, setNoFile] = useState(false);
-  const save = useRpcMutation("cloud.env.set");
   const fromFile = useRpcMutation("cloud.env.fromFile");
-  const busy = save.isPending || fromFile.isPending;
-  const kept = rows.filter((each) => each.name.trim() || each.value);
+  /** `quietly`, a project without .env files says nothing, as when a sheet fills itself on opening. */
+  const fill = (quietly = false) =>
+    fromFile.mutate(
+      { projectId },
+      {
+        onSuccess: ({ files, entries }) => {
+          if (!quietly) setNoFile(!files.length);
+          if (entries.length) setRows((current) => filled(current, entries));
+        },
+      },
+    );
+  const entries = () => rows.filter((each) => each.name.trim() || each.value).map((each) => ({ name: each.name.trim(), ...(keepsSaved(each) ? {} : { value: each.value }) }));
+  return { rows, setRows, fill, noFile, filling: fromFile.isPending, error: fromFile.error, entries };
+}
+
+export type EnvDraft = ReturnType<typeof useEnvDraft>;
+
+/** The note every environment sheet carries: who reads the variables. */
+export const ENV_NOTE = "Cloud threads in this project and its setup script get these. The agent can read them, so use development values.";
+
+/** The rows, with a row to add and the project's .env files to fill from. */
+export function EnvEditor({ draft, disabled }: { draft: EnvDraft; disabled: boolean }) {
+  const busy = disabled || draft.filling;
+  return (
+    <>
+      <EnvRows rows={draft.rows} setRows={draft.setRows} disabled={busy} />
+      <div className="flex gap-3">
+        <TextButton tone="muted" disabled={busy || draft.rows.length >= CLOUD_ENV_LIMITS.entries} onClick={() => draft.setRows([...draft.rows, row("", "", false)])}>
+          Add variable
+        </TextButton>
+        <TextButton tone="muted" disabled={busy} onClick={() => draft.fill()}>
+          Fill from .env
+        </TextButton>
+      </div>
+      {draft.noFile ? <p className="text-ink-3">This project has no .env or .env.local.</p> : null}
+      <Failure error={draft.error} />
+    </>
+  );
+}
+
+function EnvForm({ projectId, names, close }: { projectId: string; names: string[]; close: () => void }) {
+  const draft = useEnvDraft(projectId, names);
+  const save = useRpcMutation("cloud.env.set");
   const submit = () =>
     save.mutate(
-      { projectId, entries: kept.map((each) => ({ name: each.name.trim(), ...(keepsSaved(each) ? {} : { value: each.value }) })) },
+      { projectId, entries: draft.entries() },
       {
         onSuccess: (env: CloudEnv) => {
           queryClient.setQueryData(["cloud.env", { projectId }], env);
@@ -84,35 +125,16 @@ function EnvForm({ projectId, names, close }: { projectId: string; names: string
         },
       },
     );
-  const fill = () =>
-    fromFile.mutate(
-      { projectId },
-      {
-        onSuccess: ({ files, entries }) => {
-          setNoFile(!files.length);
-          if (entries.length) setRows(filled(rows, entries));
-        },
-      },
-    );
   return (
     <div className="space-y-3">
-      <p className="text-ink-3">Cloud threads in this project and its setup script get these. The agent can read them, so use development values.</p>
-      <EnvRows rows={rows} setRows={setRows} disabled={busy} />
-      <div className="flex gap-3">
-        <TextButton tone="muted" disabled={busy || rows.length >= CLOUD_ENV_LIMITS.entries} onClick={() => setRows([...rows, row("", "", false)])}>
-          Add variable
-        </TextButton>
-        <TextButton tone="muted" disabled={busy} onClick={fill}>
-          Fill from .env
-        </TextButton>
-      </div>
-      {noFile ? <p className="text-ink-3">This project has no .env or .env.local.</p> : null}
-      <Failure error={save.error ?? fromFile.error} />
+      <p className="text-ink-3">{ENV_NOTE}</p>
+      <EnvEditor draft={draft} disabled={save.isPending} />
+      <Failure error={save.error} />
       <div className="flex justify-end gap-2">
         <Button variant="ghost" onClick={close}>
           Cancel
         </Button>
-        <Button variant="primary" disabled={busy} onClick={submit}>
+        <Button variant="primary" disabled={save.isPending || draft.filling} onClick={submit}>
           Save
         </Button>
       </div>

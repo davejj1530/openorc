@@ -185,15 +185,22 @@ function turnParts(turn: { id: string; blocks: Block[] }, live: boolean, fallbac
     const writing = after.some((block) => block.kind === "message" && block.role === "assistant" && block.streaming);
     rows.push({ kind: "head", key: `head:${turn.id}`, runId, live: timing.live, writing, startedAt: timing.startedAt, durationMs: timing.durationMs, outcome: timing.outcome });
   }
-  if (work.length) {
-    const current = turn.blocks.findLast(isLive);
-    const now: WorkNow = current?.kind === "message" ? "reply" : (current ?? null);
-    rows.push({ kind: "work", key: `work:${turn.id}`, turnId: turn.id, runId, work, live: timing.live, now });
-  }
+  if (work.length) rows.push({ kind: "work", key: `work:${turn.id}`, turnId: turn.id, runId, work, live: timing.live, now: workNow(turn.blocks, after, timing.live) });
   rows.push(...afterTurnRows(after, runId));
   const reply = turnReply(after);
   if (spoke && !timing.live && reply) rows.push({ kind: "actions", key: `actions:${turn.id}`, text: reply.text });
   return rows;
+}
+
+/**
+ * What a turn's work row says the turn is on: the live block, the reply being written, or, with nothing live while the
+ * turn runs, a note that just finished below the work, which names the step it announced.
+ */
+function workNow(blocks: Block[], after: Block[], live: boolean): WorkNow {
+  const current = blocks.findLast(isLive);
+  if (current) return current.kind === "message" ? "reply" : current;
+  const note = live ? after.at(-1) : undefined;
+  return note?.kind === "message" && note.role === "assistant" ? note : null;
 }
 
 /** The space above a row in a turn, by the row above it; the turn's first row takes `opening`. */

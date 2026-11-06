@@ -1,3 +1,4 @@
+import { liveHeadline, workEntries } from "@openorc/client";
 import { describe, expect, it } from "vitest";
 import { emptyRowMemo, endMark, fixedHeight, isNews, newestRow, transcriptRows, unsentRows, withWaitingApprovals, type Row } from "./rows";
 import { activity, finishedTurn, runStore, type Draft } from "./test-fixtures/run-store";
@@ -142,6 +143,26 @@ describe("transcriptRows", () => {
     expect(worded.filter((row, i) => row !== titled[i]).map((row) => row.kind)).toEqual(["work"]);
     run = frame({ type: "thinking.delta", messageId: "why", text: " two warnings." });
     expect(transcriptRows(run.blocks, activity(run), "r", memo)).toBe(worded);
+  });
+
+  it("keeps a finished step done while a note that announced the next one waits for its first call", () => {
+    const { frame } = runStore();
+    frame(...finishedTurn);
+    const run = frame(
+      { type: "turn.started", turnId: "t2" },
+      { type: "message.completed", messageId: "ask-2", role: "user", text: "Do it" },
+      { type: "tool.started", toolCallId: "page", name: "mcp__openorc__browser", input: { action: "open", url: "http://localhost:4321/" }, parentToolCallId: null },
+      { type: "tool.completed", toolCallId: "page", name: "mcp__openorc__browser", output: "Opened", isError: false },
+      { type: "message.completed", messageId: "note", role: "assistant", text: "I opened the page in Preview. Next I'll build the site to make sure nothing else used those rules." },
+    );
+    const work = transcriptRows(run.blocks, activity(run), "r", emptyRowMemo()).findLast((row) => row.kind === "work");
+    expect(work?.kind === "work" && work.live).toBe(true);
+    const now = work?.kind === "work" ? work.now : null;
+    expect(now !== null && now !== "reply" && now.kind === "message" && now.id).toBeTruthy();
+    expect(liveHeadline(workEntries(work?.kind === "work" ? work.work : []), now && now !== "reply" ? [now] : [])).toMatchObject({
+      label: "Build the site to make sure nothing else used those rules",
+      entryId: null,
+    });
   });
 
   it("changes only the work row while a step runs, and the head once the turn ends", () => {

@@ -1102,9 +1102,8 @@ span.property-chip {
     display: none;
   }
 }
-/* Settings is a surface sheet beside the settings sidebar. Its r12 corners follow the window's
-   r20 corners at an 8px inset. Its toolbar is the window chrome
-   inside the sheet; the open section heads a left-aligned 860px column. Cards inside it are tile
+/* Settings is one flush surface plane beside the settings sidebar, like the work panel, its
+   toolbar included. The open section heads a left-aligned 860px column. Cards inside it are tile
    cards (--bg) on the sheet. */
 .settings-sheet {
   display: flex;
@@ -1112,27 +1111,10 @@ span.property-chip {
   flex-direction: column;
   min-height: 0;
   min-width: 0;
-  /* The well gutter. --spacing-well is an inline theme value, so it has no runtime variable. */
-  margin: 8px 8px 8px 0;
-  border-radius: var(--radius-lg);
   background: var(--surface);
 }
-.settings-sheet[data-sidebar="closed"] {
-  margin-left: 8px;
-}
-.app-shell .well:has(> .settings-sheet)::before {
-  top: 0;
-}
-/* The toolbar reaches up into the sheet's top gutter, so its controls share the window chrome's
-   centerline with the traffic lights and every other view's header. With the sidebar hidden it
-   reaches into the left gutter too, so the window corner keeps its place beside the lights. */
 .app-shell .settings-sheet .settings-sheet-bar {
-  position: relative;
-  top: -8px;
   background: transparent;
-}
-.app-shell .settings-sheet[data-sidebar="closed"] .settings-sheet-bar {
-  margin-left: -8px;
 }
 .settings-shell {
   --settings-content-width: 860px;
@@ -1143,8 +1125,6 @@ span.property-chip {
   min-height: 0;
   min-width: 0;
   overflow: hidden;
-  /* The sheet leaves its toolbar unclipped, so the scroller rounds its own bottom corners. */
-  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }
 .settings-page-head {
   display: flex;

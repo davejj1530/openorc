@@ -42,9 +42,8 @@ export function Settings({ route }: { route: SettingsRoute }) {
     return () => cancelAnimationFrame(frame);
   }, [route]);
   const info = useRpc("system.info", { refresh: true });
-  const sidebarOpen = useLayout((s) => s.sidebarOpen);
   return (
-    <div className="settings-sheet" data-plane data-sidebar={sidebarOpen ? "open" : "closed"}>
+    <div className="settings-sheet" data-plane>
       <TopBar showProject={false} className="settings-sheet-bar">
         {null}
       </TopBar>

@@ -17,6 +17,8 @@ export const PROTECTED_SECRET_FILES = {
   "codex-cloud.secrets": "codex-cloud-login.enc",
   /** OpenCode's provider keys entered for the cloud. */
   "opencode-cloud.secrets": "opencode-cloud-keys.enc",
+  /** Each project's environment variables for its cloud threads. */
+  "cloud-env.secrets": "cloud-env.enc",
   /** The cloud brain's key, team and region. */
   "cloud-brain.secrets": "cloud-brain.enc",
   /** A new cloud brain's, set up on the other service while the brain moves there. */

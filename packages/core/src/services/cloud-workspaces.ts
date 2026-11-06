@@ -35,6 +35,7 @@ import { cloudAgents, SANDBOX_OWN, type CloudAgents, type CloudRunWho } from "./
 import { CodexCloudSignIn } from "./cloud-codex.js";
 import { OpenCodeCloudKeys, OpenCodeCloudSignIn } from "./cloud-opencode.js";
 import { sandboxHome } from "./agent-homes.js";
+import { SandboxSkills, type CloudSkillSource } from "./cloud-skills.js";
 import type { StartThreadInput } from "./thread-inputs.js";
 import { usesDocker } from "./uses-docker.js";
 
@@ -56,6 +57,10 @@ export interface CloudWorkspaceOptions {
   sessions?: AgentSessions;
   /** Every conversation runs in a cloud sandbox: any agent launch that would run on this machine is refused. */
   cloudOnly?: boolean;
+  /** The user's skills each agent gets in its sandboxes; none unless given. */
+  skills?: CloudSkillSource;
+  /** A project's cloud environment, which its turns and setup script get; none unless given. */
+  projectEnv?: (projectId: string) => Promise<Record<string, string>>;
 }
 
 const SETUP_OUTPUT_TAIL = 2000;
@@ -178,6 +183,7 @@ export class CloudWorkspaceService {
   private readonly pristine = new Set<string>();
   /** The preparing step each conversation is on. */
   private readonly progress = new Map<string, { step: CloudStep; setup: boolean }>();
+  private readonly skills: SandboxSkills;
 
   constructor(
     private readonly db: Db,
@@ -187,6 +193,7 @@ export class CloudWorkspaceService {
     this.files = options.files ?? null;
     this.awake = new CloudAwake({ released: (threadId) => this.sleep(threadId), log });
     this.agents = options.agents ?? cloudAgents({ claude: SANDBOX_OWN, codex: new CodexCloudSignIn(undefined), opencode: new OpenCodeCloudSignIn(new OpenCodeCloudKeys(undefined)) });
+    this.skills = new SandboxSkills(options.skills, (message) => log.warn(message));
   }
 
   /** Every conversation here runs in a cloud sandbox, whatever its start asked for. */
@@ -409,7 +416,7 @@ export class CloudWorkspaceService {
       const state = await seed(location, (await originUrl(project.rootPath)) ?? undefined);
       if (script) {
         this.step(threadId, { step: "setup", setup: true });
-        await this.runSetup(location, script, path.basename(mirror));
+        await this.runSetup(location, script, path.basename(mirror), project.id);
       }
       return state;
     } catch (error) {
@@ -460,7 +467,7 @@ export class CloudWorkspaceService {
     const placed = await this.location(record, thread.worktreePath);
     const { sandbox } = placed.install;
     // Each turn signs in as the account it runs on, so changing the thread's account takes effect at the next turn.
-    const env = await this.turnEnv({ ...run, agent: run.agent }, placed, record.provider);
+    const env = await this.turnEnv({ ...run, agent: run.agent, projectId: thread.projectId }, placed, record.provider);
     // The VM stays awake from here until the agent's process has started, then for as long as each process runs.
     const launching = this.awake.hold(thread.id, sandbox);
     const unused = setTimeout(launching, LAUNCH_HOLD_MS);
@@ -573,7 +580,7 @@ export class CloudWorkspaceService {
    * project uses it.
    */
   async turnEnv(
-    run: { agent: string; claudeAccountId?: string | null | undefined; model?: string | null | undefined },
+    run: { agent: string; claudeAccountId?: string | null | undefined; model?: string | null | undefined; projectId?: string },
     location: CloudLocation,
     provider: CloudProviderId,
   ): Promise<Record<string, string>> {
@@ -584,14 +591,17 @@ export class CloudWorkspaceService {
     const folders = await signIn.homeEnv(location.install.state, provider, who(run));
     const home = async () => folders && sandboxHome(location.install.sandbox, run.agent as HarnessId, folders);
     const { sandbox } = location.install;
-    if (!sandbox.broker) return { ...folders, ...(await signIn.prepare(home, provider, who(run), false)).env };
+    // Under the agent's folders, so a project's own variable never moves its sign-in.
+    const project = run.projectId ? await this.projectEnv(run.projectId) : {};
+    if (folders) await this.skills.place(sandbox, run.agent, folders);
+    if (!sandbox.broker) return { ...project, ...folders, ...(await signIn.prepare(home, provider, who(run), false)).env };
     let turn = await signIn.prepare(home, provider, who(run), !this.brokeringRefused);
     if (!(await this.broker(sandbox, turn.headers))) {
       turn = await signIn.prepare(home, provider, who(run), false);
       // Headers an earlier session set would replace the sign-in the sandbox holds now.
       await this.broker(sandbox, turn.headers);
     }
-    return { ...folders, ...turn.env };
+    return { ...project, ...folders, ...turn.env };
   }
 
   /**
@@ -673,9 +683,13 @@ export class CloudWorkspaceService {
     return connection;
   }
 
-  private async runSetup(location: WorkspaceLocation, script: string, name: string): Promise<void> {
+  private async projectEnv(projectId: string): Promise<Record<string, string>> {
+    return (await this.options.projectEnv?.(projectId)) ?? {};
+  }
+
+  private async runSetup(location: WorkspaceLocation, script: string, name: string, projectId: string): Promise<void> {
     const { repo } = location;
-    const env = { OPENORC_WORKSPACE_PATH: repo, OPENORC_ROOT_PATH: repo, OPENORC_WORKSPACE_NAME: name, OPENORC_CLOUD: "1" };
+    const env = { ...(await this.projectEnv(projectId)), OPENORC_WORKSPACE_PATH: repo, OPENORC_ROOT_PATH: repo, OPENORC_WORKSPACE_NAME: name, OPENORC_CLOUD: "1" };
     const result = await location.install.sandbox.exec("bash", ["-lc", script], { cwd: repo, env });
     if (result.code === 0) return;
     const output = `${result.stdout.toString("utf8")}${result.stderr}`.trim().slice(-SETUP_OUTPUT_TAIL);

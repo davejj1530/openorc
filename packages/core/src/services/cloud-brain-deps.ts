@@ -28,6 +28,8 @@ export interface CloudBrainDeps {
   projects?: { brain?: string; door?: string };
   /** This Mac's sign-ins besides Claude's that the brain is kept on; none unless given. */
   signIns?: SignInSources;
+  /** The user's skills chosen for cloud sessions, as this Mac sends them to the brain; none unless given. */
+  skills?: () => Promise<{ digest: string; bytes: Buffer; count: number }>;
   /** This Mac's agent CLI versions, which the brain is brought to at each wake; none unless given. */
   agentVersions?: () => Promise<AgentVersions>;
   /** How long a wake waits for a busy brain to restart onto its update; a minute, asking every five seconds, unless given. */

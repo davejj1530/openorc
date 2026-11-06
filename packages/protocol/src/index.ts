@@ -24,6 +24,7 @@ export * from "./cloud-brain.js";
 export * from "./brain-sync.js";
 export * from "./cloud.js";
 export * from "./cloud-sign-ins.js";
+export * from "./cloud-carry.js";
 export * from "./code-explanations.js";
 export * from "./code-intelligence.js";
 export * from "./devices.js";

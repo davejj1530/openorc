@@ -433,6 +433,7 @@ const SECRET_PARAMS: ReadonlySet<RpcMethod> = new Set<RpcMethod>([
   "cloud.claude.save",
   "cloud.codex.apiKey",
   "cloud.opencode.saveKey",
+  "cloud.env.set",
   "cloud.brain.codex.apiKey",
   "providers.codex.reset",
 ]);

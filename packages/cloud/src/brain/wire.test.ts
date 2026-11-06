@@ -124,6 +124,7 @@ describe("control requests and replies", () => {
       { op: "projects" },
       { op: "project-settings", source: "p1", settings: { setupScript: "pnpm install\npnpm build", branchPrefix: "", worktreeInclude: [".env"] } },
       { op: "project-settings", source: "p1", settings: { setupScript: null, branchPrefix: "openorc", worktreeInclude: [] } },
+      { op: "cloud-skills", file: "4c1f0a52.skills.json", digest: "a".repeat(64) },
       { op: "stop" },
       { op: "stop-for-update" },
     ];
@@ -277,6 +278,21 @@ describe("handovers", () => {
     const holds = { codex: "mac-login-1", github: signInPrint(github), push: "ABC123DEFG", memory: signInPrint({ apiKey: "sk-ant-fixture-0123456789abcdef" }) };
     expect(parseControlRequest(JSON.stringify({ op: "sign-ins" }))).toEqual({ op: "sign-ins" });
     expect(parseControlReply("sign-ins", encodeControlReply({ ok: true, result: holds }))).toEqual({ ok: true, result: holds });
+  });
+
+  it("carry each project's cloud environment sealed, larger than a sign-in, or null to take it away", () => {
+    const key = newBrainKey();
+    const env = { projects: [{ source: "p1", vars: [{ name: "API_URL", value: "https://dev.example" }] }] };
+    const line = JSON.stringify(sealHandover(key, { env }));
+    expect(line).not.toContain("dev.example");
+    const request = parseControlRequest(line);
+    if (request.op !== "handover") throw new Error("expected a handover");
+    expect(openHandover(key, request)).toMatchObject({ env });
+    expect(openHandover(key, sealHandover(key, { env: null }))).toMatchObject({ env: null });
+    // The most a Mac lets every project hold together still fits in one sealed value.
+    const large = { projects: Array.from({ length: 8 }, (_, index) => ({ source: `p${index}`, vars: [{ name: "BLOB", value: "x".repeat(32_000) }] })) };
+    expect(openHandover(key, parseControlRequest(JSON.stringify(sealHandover(key, { env: large }))) as never)).toMatchObject({ env: large });
+    expect(refusal(() => openHandover(key, sealHandover(key, { env: { projects: [{ source: "p1", vars: [{ name: "BAD-NAME", value: "x" }] }] } }))).field).toBe("projects[0].vars[0].name");
   });
 
   it("carry the memory's Anthropic API key sealed, or null to take it away", () => {

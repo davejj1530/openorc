@@ -90,6 +90,18 @@ export interface OpenOrcOptions {
   codexCloudSecrets?: ProtectedSecretStore;
   /** Keeps OpenCode's provider keys for the cloud, entered for the cloud only. */
   opencodeCloudSecrets?: ProtectedSecretStore;
+  /** Keeps each project's cloud environment, set in Settings, or on a cloud brain handed over by its Mac. */
+  cloudEnvSecrets?: ProtectedSecretStore;
+  /**
+   * On a cloud brain: where it keeps the skills its Mac chose for cloud sessions, which its sandboxes get. On a Mac,
+   * absent: the skills are the user's own, chosen in Settings.
+   */
+  cloudSkillsDir?: string;
+  /**
+   * On a cloud brain: the Mac project a project here is a copy of, by its folder, which its cloud environment is kept
+   * under; null for one that is no copy. On a Mac, absent: a project's own id.
+   */
+  cloudEnvSource?: (rootPath: string) => string | null;
   /** Starts a command in a terminal of its own, for CLIs whose sign-in screens need one. Without it they get pipes. */
   terminal?: SpawnTerminal;
   /** Overrides the credentials Settings keeps, for tests and smoke scripts. While it resolves to null, new cloud conversations run in sandboxes on this Mac. */

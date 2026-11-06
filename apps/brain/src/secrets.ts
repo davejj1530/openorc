@@ -16,6 +16,7 @@ export const BRAIN_SECRETS = {
   claudeCloudSecrets: "claude-cloud",
   codexCloudSecrets: "codex-cloud",
   opencodeCloudSecrets: "opencode-cloud",
+  cloudEnvSecrets: "cloud-env",
   memorySecrets: "memory",
   githubSecrets: "github",
   // The connections arrive with every start, and where threads run by handover, in its own channel (cloud.ts).

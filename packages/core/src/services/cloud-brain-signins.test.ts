@@ -15,6 +15,7 @@ import {
   type BrainMachineStatus,
   type WakeResult,
 } from "@openorc/cloud";
+import { projects } from "@openorc/db";
 import type { RpcMethod, RpcParams, RpcResults } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
 import type { BrainMachineLike } from "./cloud-brain-machine.js";
@@ -67,7 +68,18 @@ class FakeBrain implements BrainMachineLike {
     if (opened.memory !== undefined) this.holds.memory = opened.memory && signInPrint(opened.memory);
     if (opened.opencode !== undefined) this.holds.opencode = opened.opencode && signInPrint(opened.opencode);
     if (opened.cloud !== undefined) this.holds.cloud = signInPrint(opened.cloud);
+    if (opened.env !== undefined) this.holds.env = opened.env && signInPrint(opened.env);
     return { applied: kinds } as never;
+  }
+  /** Each set of skills the brain took, by agent. */
+  skillSends: Record<string, { name: string; files: { path: string; data: string }[] }[]>[] = [];
+  async sendSkills(payload: Uint8Array, digest: string) {
+    if (this.state !== "running" || !this.key) throw new BrainUnavailable();
+    const { agents } = JSON.parse(Buffer.from(payload).toString("utf8")) as { agents: FakeBrain["skillSends"][number] };
+    this.skillSends.push(agents);
+    const kept = Object.values(agents).flat().length;
+    this.holds.skills = kept ? digest : null;
+    return { kept };
   }
   async importProject(): Promise<never> {
     throw new Error("unexpected import");
@@ -134,6 +146,7 @@ let claudeTokens: ReturnType<typeof memoryStore>;
 let push: ReturnType<typeof memoryStore>;
 let memoryKey: ReturnType<typeof memoryStore>;
 let opencodeKeys: ReturnType<typeof memoryStore>;
+let cloudEnv: ReturnType<typeof memoryStore>;
 let ghToken: string;
 let env: NodeJS.ProcessEnv;
 /** The brain this Mac's build carries. */
@@ -159,6 +172,7 @@ async function open(settings?: ReturnType<typeof memoryStore>): Promise<void> {
     pushSecrets: push,
     memorySecrets: memoryKey,
     opencodeCloudSecrets: opencodeKeys,
+    cloudEnvSecrets: cloudEnv,
     ...(settings ? { cloudSecrets: settings } : { cloudCredentials: fixed }),
     cloudBrainBundle: async () => ({ version: carried, read: async () => Buffer.from("archive") }),
     cloudBrainMachine: async () => brain,
@@ -202,6 +216,7 @@ beforeEach(async () => {
   push = memoryStore();
   memoryKey = memoryStore();
   opencodeKeys = memoryStore();
+  cloudEnv = memoryStore();
   await open();
 });
 
@@ -350,6 +365,68 @@ describe("the cloud brain's sign-ins besides Claude", () => {
     await call("cloud.opencode.removeKey", { provider: "anthropic" });
     await call("cloud.opencode.removeKey", { provider: "openrouter" });
     await vi.waitFor(() => expect(brain.others()).toEqual({ opencode: null }));
+  });
+
+  it("hands the brain each project's cloud environment, again when it changes, and takes it away when the last is removed", async () => {
+    const project = projects.insert(core.db, { name: "Fixture", rootPath: root, gitRemote: null, defaultBranch: "main", settings: { setupScript: null, worktreeInclude: [] } });
+    await setUp();
+    expect(await call("cloud.env.set", { projectId: project.id, entries: [{ name: "API_URL", value: "https://dev.example" }] })).toEqual({ projectId: project.id, names: ["API_URL"] });
+    await vi.waitFor(() => expect(brain.others()).toEqual({ env: { projects: [{ source: project.id, vars: [{ name: "API_URL", value: "https://dev.example" }] }] } }));
+    expect(kept()).not.toContain("dev.example");
+    expect(await call("cloud.env", { projectId: project.id })).toEqual({ projectId: project.id, names: ["API_URL"] });
+    await vi.waitFor(async () => expect((await signIns()).env).toEqual({ has: true, behind: false }));
+    await call("cloud.env.set", { projectId: project.id, entries: [{ name: "API_URL" }, { name: "DEBUG", value: "1" }] });
+    await vi.waitFor(() =>
+      expect(brain.others()).toEqual({
+        env: {
+          projects: [
+            {
+              source: project.id,
+              vars: [
+                { name: "API_URL", value: "https://dev.example" },
+                { name: "DEBUG", value: "1" },
+              ],
+            },
+          ],
+        },
+      }),
+    );
+    await call("cloud.env.set", { projectId: project.id, entries: [] });
+    await vi.waitFor(() => expect(brain.others()).toEqual({ env: null }));
+    await vi.waitFor(async () => expect((await signIns()).env).toEqual({ has: false, behind: false }));
+  });
+
+  it("hands the brain the skills chosen for cloud sessions, again when they change, and none once none are chosen", async () => {
+    const home = path.join(root, "home");
+    const claudeDir = path.join(home, ".claude");
+    const skillFile = path.join(claudeDir, "skills", "review", "SKILL.md");
+    await mkdir(path.dirname(skillFile), { recursive: true });
+    await writeFile(skillFile, "---\nname: review\ndescription: Reviews a diff\n---\nFirst\n");
+    const opencode = path.join(root, "bin", "opencode");
+    await writeFile(opencode, "#!/bin/sh\nexit 1\n");
+    await chmod(opencode, 0o755);
+    // Every agent's own folders here are the fixture's, never this Mac's.
+    const own = { HOME: home, CLAUDE_CONFIG_DIR: claudeDir, XDG_CONFIG_HOME: path.join(home, ".config"), OPENORC_OPENCODE_BIN: opencode };
+    Object.assign(env, own);
+    for (const [name, value] of Object.entries(own)) vi.stubEnv(name, value);
+    await core.close();
+    await open();
+    await setUp();
+    const claude = async () => (await call("cloud.skills", {})).agents.find((agent) => agent.agent === "claude");
+    expect(await claude()).toEqual({ agent: "claude", skills: [{ name: "review", description: "Reviews a diff", chosen: false }], error: null });
+    expect(brain.skillSends).toEqual([]);
+    await call("cloud.skills.choose", { agent: "claude", name: "review", on: true });
+    await vi.waitFor(() => expect(brain.skillSends.at(-1)?.["claude"]?.map((skill) => skill.name)).toEqual(["review"]));
+    expect(brain.skillSends.at(-1)?.["codex"]).toEqual([]);
+    await vi.waitFor(async () => expect((await signIns()).skills).toEqual({ has: true, behind: false }));
+    await writeFile(skillFile, "---\nname: review\ndescription: Reviews a diff\n---\nSecond\n");
+    expect((await signIns()).skills).toEqual({ has: true, behind: true });
+    await call("cloud.brain.wake", {});
+    await vi.waitFor(() => expect(brain.skillSends).toHaveLength(2));
+    expect(Buffer.from(brain.skillSends[1]!["claude"]![0]!.files.find((file) => file.path === "SKILL.md")!.data, "base64").toString()).toContain("Second");
+    await call("cloud.skills.choose", { agent: "claude", name: "review", on: false });
+    await vi.waitFor(() => expect(brain.holds.skills).toBeNull());
+    await vi.waitFor(async () => expect((await signIns()).skills).toEqual({ has: false, behind: false }));
   });
 
   it("gives the memory key again to a brain that lost it, though it holds nothing else", async () => {

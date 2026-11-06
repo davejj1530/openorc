@@ -11,6 +11,7 @@ import type { Project, Thread } from "@openorc/protocol";
 import { cloudAgents, SANDBOX_OWN } from "./cloud-agents.js";
 import { CodexCloudSignIn } from "./cloud-codex.js";
 import { OpenCodeCloudKeys, OpenCodeCloudSignIn } from "./cloud-opencode.js";
+import { readSkills } from "./cloud-skills.js";
 import { CloudWorkspaceService, cloudSandboxProviders, LOCAL_LAUNCH_REFUSED, NOTHING_CONNECTED } from "./cloud-workspaces.js";
 import { WorkspaceService } from "./workspace.js";
 import { WorkspaceWriters } from "./workspace-writers.js";
@@ -81,6 +82,27 @@ describe("cloud workspace preparation", () => {
       head: expect.stringMatching(/^[0-9a-f]{40}$/),
       known: [expect.stringMatching(/^[0-9a-f]{40}$/)],
     });
+  });
+
+  it("runs the setup script with the project's cloud environment", async () => {
+    const cloud = new CloudWorkspaceService(
+      db,
+      { providers: [sandboxes], projectEnv: async (id): Promise<Record<string, string>> => (id === project.id ? { API_URL: "https://dev.example" } : {}) },
+      quiet,
+    );
+    const withEnv = new WorkspaceService(db, { dataDir: path.join(directory, "data-env"), cloud }, quiet, new WorkspaceWriters());
+    const script = { ...project, settings: { ...project.settings, setupScript: 'printf "%s\\n" "$API_URL" > setup-env.txt' } };
+    try {
+      const thread = db.transaction(() => {
+        const inserted = threads.insert(db, { projectId: project.id, title: "Cloud work", agent: "claude", model: null, mode: "act", permissionMode: "trusted", workspaceMode: "worktree" });
+        withEnv.admitCloud(inserted.id, "local");
+        return inserted;
+      });
+      const prepared = await withEnv.prepareThread(thread, script, "HEAD");
+      expect(readFileSync(path.join(sandboxRepo(prepared), "setup-env.txt"), "utf8")).toBe("https://dev.example\n");
+    } finally {
+      await withEnv.shutdown();
+    }
   });
 
   it("leaves a ready workspace alone when the conversation continues", async () => {
@@ -194,6 +216,40 @@ describe("an agent in a sandbox for a turn", () => {
     runs.length = 0;
     await cloud.turnEnv({ agent: "opencode", model: "opencode/free" }, location, "local");
     expect(runs.filter(([cmd]) => cmd === "npm")).toEqual([]);
+  });
+
+  it("gets its project's cloud environment under its own folders, and the skills chosen for it where it finds them", async () => {
+    const home = path.join(directory, "sandbox-home");
+    await mkdir(home);
+    // A home of its own: nothing lands in this Mac's agent folders.
+    const real = await new LocalSandboxProvider(path.join(directory, "own"), () => ({ PATH: process.env["PATH"], HOME: home })).open("skills");
+    const sandbox = {
+      exec: (cmd: string, args: string[], options?: object) =>
+        args[1]?.includes("--version") ? Promise.resolve({ code: 0, stdout: Buffer.from("opencode v2.0.10\n"), stderr: "" }) : real.exec(cmd, args, options),
+      readFile: (file: string) => real.readFile(file),
+      writeFile: (file: string, bytes: Buffer) => real.writeFile(file, bytes),
+    };
+    const state = path.join(real.root, ".openorc");
+    const location = { install: { sandbox, state }, repo: path.join(real.root, "repo") } as never;
+    const source = path.join(directory, "skill-source", "review");
+    await mkdir(source, { recursive: true });
+    await writeFile(path.join(source, "SKILL.md"), "---\nname: review\ndescription: Reviews\n---\n");
+    const chosen = await readSkills([{ name: "review", folder: source }]);
+    const cloud = new CloudWorkspaceService(
+      db,
+      {
+        providers: [sandboxes],
+        skills: { bundle: async (agent) => (agent === "opencode" ? chosen : readSkills([])) },
+        projectEnv: async (id): Promise<Record<string, string>> => (id === project.id ? { API_URL: "https://dev.example", XDG_DATA_HOME: "/would/move/its/sessions" } : {}),
+      },
+      quiet,
+    );
+    expect(await cloud.turnEnv({ agent: "opencode", model: "opencode/free", projectId: project.id }, location, "vercel")).toEqual({
+      API_URL: "https://dev.example",
+      XDG_DATA_HOME: path.join(state, "opencode"),
+    });
+    expect(readFileSync(path.join(home, ".config", "opencode", "skills", "review", "SKILL.md"), "utf8")).toContain("name: review");
+    expect(await cloud.turnEnv({ agent: "opencode", model: "opencode/free" }, location, "vercel")).toEqual({ XDG_DATA_HOME: path.join(state, "opencode") });
   });
 
   describe("with its sign-in kept outside the sandbox", () => {

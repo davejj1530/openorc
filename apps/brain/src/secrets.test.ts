@@ -88,7 +88,16 @@ describe("sealed secrets", () => {
 
   it("gives the core a store for every channel the brain keeps, and none for Slack or the Vercel connection", async () => {
     const stores = (await SealedSecrets.open(dir, newBrainKey())).stores();
-    expect(Object.keys(stores).sort()).toEqual(["claudeCloudSecrets", "codexCloudSecrets", "githubSecrets", "memorySecrets", "opencodeCloudSecrets", "pushSecrets", "remoteSecrets"]);
+    expect(Object.keys(stores).sort()).toEqual([
+      "claudeCloudSecrets",
+      "cloudEnvSecrets",
+      "codexCloudSecrets",
+      "githubSecrets",
+      "memorySecrets",
+      "opencodeCloudSecrets",
+      "pushSecrets",
+      "remoteSecrets",
+    ]);
     await stores.githubSecrets.save("reviewer-app-key");
     expect(await readFile(path.join(dir, `${BRAIN_SECRETS.githubSecrets}.sealed`))).toBeTruthy();
   });

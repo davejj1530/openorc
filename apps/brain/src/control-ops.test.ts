@@ -173,13 +173,14 @@ describe("control requests on the brain's core", () => {
   });
 
   it("says which sign-ins it holds besides Claude's, so the Mac takes its word over its own record", async () => {
-    expect(await ops()({ op: "sign-ins" })).toEqual({ codex: null, github: null, push: null, memory: null, opencode: null, cloud: null });
+    expect(await ops()({ op: "sign-ins" })).toEqual({ codex: null, github: null, push: null, memory: null, opencode: null, cloud: null, env: null, skills: null });
     const signIn = { token: GH_TOKEN, name: null, email: "fixture@example.com" };
     const pem = generateKeyPairSync("ec", { namedCurve: "prime256v1" }).privateKey.export({ format: "pem", type: "pkcs8" }).toString();
     const codex = { id: "mac-login-1", mode: "chatgpt", auth: codexAuth("first", 0), email: null, plan: null } as const;
     const keys = [{ provider: "openrouter", key: "sk-or-fixture-key" }];
     const cloud = { service: "agent37", agent37: { key: "sk_live_fixture", cpu: 2, memory: 4 }, vercel: null } as const;
-    await ops()(sealHandover(start.key, { codex, github: signIn, push: { keyId: "ABC123DEFG", pem }, memory: { apiKey: MEMORY_KEY }, opencode: { keys }, cloud }));
+    const env = { projects: [{ source: "p1", vars: [{ name: "API_URL", value: "https://dev.example" }] }] };
+    await ops()(sealHandover(start.key, { codex, github: signIn, push: { keyId: "ABC123DEFG", pem }, memory: { apiKey: MEMORY_KEY }, opencode: { keys }, cloud, env }));
     expect(await ops()({ op: "sign-ins" })).toEqual({
       codex: "mac-login-1",
       github: signInPrint({ email: "fixture@example.com", name: null, token: GH_TOKEN }),
@@ -187,7 +188,38 @@ describe("control requests on the brain's core", () => {
       memory: signInPrint({ apiKey: MEMORY_KEY }),
       opencode: signInPrint({ keys }),
       cloud: signInPrint(cloud),
+      env: signInPrint(env),
+      skills: null,
     });
+  });
+
+  it("keeps each Mac project's cloud environment sealed, by the Mac project's id, and drops it on null", async () => {
+    const env = { projects: [{ source: "p1", vars: [{ name: "API_URL", value: "https://dev.example" }] }] };
+    expect(await ops()(sealHandover(start.key, { env }))).toEqual({ applied: ["env"] });
+    expect(await sealedBytes()).not.toContain("dev.example");
+    expect(await core.cloudProjectEnv.vars("p1")).toEqual({ API_URL: "https://dev.example" });
+    expect(await ops()(sealHandover(start.key, { env: null }))).toEqual({ applied: ["env"] });
+    expect(await core.cloudProjectEnv.all()).toEqual([]);
+  });
+
+  it("keeps exactly the skills its Mac sent for the sandboxes it makes, says which by their digest, and never keeps the upload", async () => {
+    const take = async (agents: object, digest: string) => {
+      const file = `${randomUUID()}.skills.json`;
+      await mkdir(layout.inbox, { recursive: true });
+      await writeFile(path.join(layout.inbox, file), JSON.stringify({ v: 1, agents }));
+      return ops()({ op: "cloud-skills", file, digest });
+    };
+    const review = { name: "review", files: [{ path: "SKILL.md", data: Buffer.from("---\nname: review\n---\n").toString("base64"), executable: false }] };
+    expect(await take({ claude: [review], codex: [], opencode: [review] }, "a".repeat(64))).toEqual({ kept: 2 });
+    expect(await readFile(path.join(layout.data, "cloud-skills", "claude", "review", "SKILL.md"), "utf8")).toContain("name: review");
+    expect(await readdir(layout.inbox)).toEqual([]);
+    expect(await ops()({ op: "sign-ins" })).toMatchObject({ skills: "a".repeat(64) });
+    await expect(take({ claude: [{ ...review, name: "../out" }] }, "b".repeat(64))).rejects.toThrow(/cannot be kept/);
+    expect(await readdir(layout.inbox)).toEqual([]);
+    expect(await ops()({ op: "sign-ins" })).toMatchObject({ skills: "a".repeat(64) });
+    expect(await take({ claude: [], codex: [], opencode: [] }, "c".repeat(64))).toEqual({ kept: 0 });
+    expect(await ops()({ op: "sign-ins" })).toMatchObject({ skills: null });
+    expect(await readdir(path.join(layout.data, "cloud-skills"))).toEqual([]);
   });
 
   it("keeps the Mac's OpenCode keys sealed, for the cloud turn whose model needs one, and drops them on null", async () => {
@@ -355,6 +387,13 @@ describe("control requests on the brain's core", () => {
       const next = await commitOn(mac, "b.txt", "b1\n");
       expect(await send(old, { branch: "main" })).toEqual({ projectId, macHead: next, head: next });
       expect(core.projects.get(projectId)?.defaultBranch).toBe("main");
+    });
+
+    it("finds its cloud environment under the Mac project's id, which the copy's folder names", async () => {
+      const imported = await send(null);
+      const options = brainOptions({ layout, appDir: path.join(root, "app", "v1"), start, cloud, secrets: await SealedSecrets.open(layout.secrets, start.key), transport, runnerFiles: [] });
+      expect(options.cloudEnvSource?.(core.projects.get(imported.projectId)!.rootPath)).toBe(SOURCE);
+      expect(options.cloudEnvSource?.(path.join(root, "elsewhere", "My App"))).toBeNull();
     });
 
     it("takes the Mac project's setup script and other settings for its copy, and none for a project it has no copy of", async () => {

@@ -141,7 +141,7 @@ function BrainGitHub({ github, busy }: { github: SignIns["github"]; busy: boolea
   );
 }
 
-/** A key of this Mac's the brain keeps a copy of: its push key, its memory's API key. Shown only once there is one. */
+/** What of this Mac's the brain keeps a copy of: its push key, its memory's API key, skills, environments. Shown only once there is one. */
 function Handed({ label, handed, busy }: { label: string; handed: SignIns["push"]; busy: boolean }) {
   if (!handed.has && !handed.behind) return null;
   return <SettingRow label={label}>{handed.behind ? <Send busy={busy} /> : <Status ok>On</Status>}</SettingRow>;
@@ -164,7 +164,7 @@ export function BrainGitHubSection({ active, busy }: { active: boolean; busy: bo
   );
 }
 
-/** The keys of this Mac's the brain keeps a copy of, which need no sign-in. */
+/** What of this Mac's the brain keeps a copy of, which needs no sign-in. */
 export function CloudBrainHanded({ active, busy }: { active: boolean; busy: boolean }) {
   const signIns = useRpc("cloud.brain.signIns", {}, { enabled: active });
   if (!signIns.data) return null;
@@ -172,6 +172,8 @@ export function CloudBrainHanded({ active, busy }: { active: boolean; busy: bool
     <>
       <Handed label="Notifications" handed={signIns.data.push} busy={busy} />
       <Handed label="Anthropic API key" handed={signIns.data.memory} busy={busy} />
+      {signIns.data.skills ? <Handed label="Skills" handed={signIns.data.skills} busy={busy} /> : null}
+      {signIns.data.env ? <Handed label="Project environments" handed={signIns.data.env} busy={busy} /> : null}
     </>
   );
 }

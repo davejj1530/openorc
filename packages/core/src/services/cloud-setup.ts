@@ -1,6 +1,6 @@
 import type { Agent37Connection, AgentVersions, VercelConnection } from "@openorc/cloud";
 import type { CloudService, HarnessId } from "@openorc/protocol";
-import { claudeAccounts, type Db, type LedgerWriter } from "@openorc/db";
+import { claudeAccounts, projects, type Db, type LedgerWriter } from "@openorc/db";
 import type { OpenOrcOptions } from "../options.js";
 import type { Logger } from "../transport.js";
 import type { ClaudeAccountService } from "./claude-accounts.js";
@@ -19,6 +19,8 @@ import { cloudAgents, type CloudAgents } from "./cloud-agents.js";
 import { CloudChecks } from "./cloud-check.js";
 import { CodexCloudSignIn } from "./cloud-codex.js";
 import { OpenCodeCloudKeys, OpenCodeCloudSignIn } from "./cloud-opencode.js";
+import { CloudProjectEnv } from "./cloud-env.js";
+import { CloudSkills, StoredCloudSkills, skillsPayload, type CloudSkillSource } from "./cloud-skills.js";
 import { CloudHandoff } from "./cloud-handoff.js";
 import { CodexBrowserSignIn, CodexCloudLogin } from "./codex-cloud-login.js";
 import { spawnWithPipes } from "./terminal-process.js";
@@ -72,6 +74,7 @@ function cloudBrain(
   signIns: SignInSources,
   invalidate: (keys: string[]) => void,
   agentVersions: () => Promise<AgentVersions>,
+  skills: CloudBrainDeps["skills"],
 ): { brain: CloudBrain; beside: BrainMoveDeps["beside"] } {
   // "cloud" too: the brain's region is where this Mac's sandboxes run unless another is chosen.
   const changed = () => invalidate(["cloud-brain", "cloud"]);
@@ -82,6 +85,7 @@ function cloudBrain(
     ...sources,
     signIns,
     agentVersions,
+    ...(skills ? { skills } : {}),
     bundle: options.cloudBrainBundle,
     changed,
     open: options.cloudBrainMachine ?? machineOpener(options.cloudRunnerFiles),
@@ -132,12 +136,16 @@ function sandboxServices(options: OpenOrcOptions, sources: CloudSources, env: ()
   });
 }
 
-/** The cloud's parts, made together: where sandboxes run, how agents sign in there, and the sandboxes themselves. */
-export function createCloud(input: CloudInput): {
+/** The cloud's parts. */
+export interface CloudParts {
   settings: CloudSettings;
   tokens: ClaudeCloudTokens;
   codex: CodexCloudLogin;
   opencode: OpenCodeCloudKeys;
+  /** Each project's cloud environment. */
+  env: CloudProjectEnv;
+  /** The user's own skills and which go to cloud sessions; null on a cloud brain, which keeps what its Mac chose. */
+  skills: CloudSkills | null;
   cloud: CloudWorkspaceService;
   checks: CloudChecks;
   sandboxes: CloudSandboxes;
@@ -150,7 +158,36 @@ export function createCloud(input: CloudInput): {
   coordinator: RelocationCoordinator | null;
   /** Moves the brain to the other service; null on the brain itself, and without a store for the new one. */
   move: BrainMove | null;
-} {
+}
+
+/** What cloud sessions carry besides a project's files: each project's environment, and the user's skills chosen for them. */
+function carryParts({ db, options, accounts, environment, invalidate }: CloudInput, brain: () => CloudBrain) {
+  const env = new CloudProjectEnv(options.cloudEnvSecrets, () => {
+    invalidate(["cloud-env", "cloud-brain"]);
+    brain().cloudChanged();
+  });
+  const chosen = options.cloudSkillsDir
+    ? null
+    : new CloudSkills({
+        db,
+        root: options.dataDir,
+        claudeEnv: () => accounts.environment(environment(), accounts.defaultId()).env,
+        changed: () => {
+          invalidate(["cloud-skills", "cloud-brain"]);
+          brain().cloudChanged();
+        },
+      });
+  const skills: CloudSkillSource = chosen ?? new StoredCloudSkills(options.cloudSkillsDir!);
+  // On a cloud brain a project is a copy, whose environment the Mac set under its own project's id.
+  const projectEnv = async (projectId: string): Promise<Record<string, string>> => {
+    const source = options.cloudEnvSource ? options.cloudEnvSource(projects.get(db, projectId)?.rootPath ?? "") : projectId;
+    return source ? env.vars(source) : {};
+  };
+  return { env, chosen, skills, projectEnv };
+}
+
+/** The cloud's parts, made together: where sandboxes run, how agents sign in there, and the sandboxes themselves. */
+export function createCloud(input: CloudInput): CloudParts {
   const { db, options, accounts, environment, invalidate, log } = input;
   const settings = new CloudSettings(options.cloudSecrets, { brainRegion: () => brain.region() });
   const sources = cloudSources(options, settings);
@@ -170,8 +207,10 @@ export function createCloud(input: CloudInput): {
     push: () => savedPushKey(db, options.pushSecrets),
     memory: () => macMemoryKey(input.memory()),
     opencode: () => opencode.all(),
+    env: () => env.all(),
     codex: new CodexBrowserSignIn({ ...codexDeps, changed: () => invalidate(["cloud-brain"]) }),
   };
+  const { env, chosen, skills, projectEnv } = carryParts(input, () => brain);
   const { brain, beside } = cloudBrain(
     db,
     options,
@@ -180,6 +219,7 @@ export function createCloud(input: CloudInput): {
     signIns,
     (keys) => [invalidate(keys), void input.routing?.()?.refresh()],
     () => everyVersion(versions),
+    chosen ? () => skillsPayload(chosen) : undefined,
   );
   // On a cloud-only host the cloud login is the only one, so whether Codex is signed in changes with it.
   const codexLogin = new CodexCloudLogin(options.codexCloudSecrets, { ...codexDeps, changed: () => invalidate(options.cloudOnly ? ["cloud", "system", "models"] : ["cloud"]) });
@@ -196,7 +236,7 @@ export function createCloud(input: CloudInput): {
   const changed = (id: string) => invalidate(["threads", `thread:${id}`]);
   const cloud = new CloudWorkspaceService(
     db,
-    { ...sandboxes, agents, sessions, versions, changed, cloudOnly: options.cloudOnly, ...(options.cloudRunnerFiles ? { files: options.cloudRunnerFiles } : {}) },
+    { ...sandboxes, agents, sessions, versions, changed, skills, projectEnv, cloudOnly: options.cloudOnly, ...(options.cloudRunnerFiles ? { files: options.cloudRunnerFiles } : {}) },
     log,
   );
   const checks = new CloudChecks(
@@ -230,7 +270,7 @@ export function createCloud(input: CloudInput): {
   const { relocations, coordinator } = createRelocations({ input, sessions, cloud, runs, brain, changed: moved });
   const flow = new CloudSignInsFlow({ db, tokens, codex: codexLogin, opencode, brain, mac: macSignIns(environment), changed: () => invalidate(["cloud-sign-ins"]) });
   const move = brainMove(input, { brain, beside, coordinator, connections: sources });
-  return { settings, tokens, codex: codexLogin, opencode, cloud, checks, sandboxes: list, handoff, standby, brain, signIns: flow, relocations, coordinator, move };
+  return { settings, tokens, codex: codexLogin, opencode, env, skills: chosen, cloud, checks, sandboxes: list, handoff, standby, brain, signIns: flow, relocations, coordinator, move };
 }
 
 /** The cloud brain's sandboxes, asked only while it is awake and linked: Settings never wakes it to list them. */

@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { CloudBrainProject, RpcParams } from "@openorc/protocol";
 import { Button, Select, Switch, Tooltip } from "../components/ui";
 import { queryClient, useRpc, useRpcMutation } from "../lib/client";
+import { CloudEnvButton } from "./settings-cloud-env";
 import { Failure } from "./settings-secret-field";
 import { Section, SettingRow, Status } from "./settings-shared";
 
@@ -32,6 +33,7 @@ function OnProject({ project, choose }: { project: CloudBrainProject; choose: Ch
   return (
     <SettingRow label={project.name} hint={hint(project)}>
       {project.sending ? <Status>Sending</Status> : null}
+      <CloudEnvButton project={project} />
       {project.blocked ? <Tooltip label={project.blocked}>{toggle}</Tooltip> : toggle}
     </SettingRow>
   );

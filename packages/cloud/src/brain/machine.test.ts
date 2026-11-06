@@ -827,6 +827,26 @@ describe("asking and removing a brain", () => {
     expect(vercel.sandboxes.get("brain")!.state).toBe("stopped");
   });
 
+  it("uploads the chosen skills to the running brain's inbox and has it keep them, never waking a sleeping one", async () => {
+    const { vercel, brain, machine } = await provisioned();
+    const heard: BrainControlRequest[] = [];
+    machine.answer = (request) => {
+      heard.push(request);
+      if (request.op !== "cloud-skills") return { code: 69 };
+      const uploaded = machine.files.get(`${ROOT}/inbox/${request.file}`);
+      return { code: 0, stdout: `${encodeControlReply<"cloud-skills">({ ok: true, result: { kept: uploaded?.toString() === "skills" ? 1 : 0 } })}\n` };
+    };
+    expect(await brain.sendSkills(Buffer.from("skills"), "d".repeat(64))).toEqual({ kept: 1 });
+    expect(heard).toEqual([{ op: "cloud-skills", file: expect.stringMatching(/^[\w-]+\.skills\.json$/), digest: "d".repeat(64) }]);
+    expect(vercel.gets.every((get) => !get.resume)).toBe(true);
+
+    vercel.sandboxes.get("brain")!.state = "stopped";
+    machine.changes.length = 0;
+    await expect(brain.sendSkills(Buffer.from("skills"), "d".repeat(64))).rejects.toThrow(BrainUnavailable);
+    expect(machine.changes).toEqual([]);
+    expect(vercel.sandboxes.get("brain")!.state).toBe("stopped");
+  });
+
   it("keeps a brain made in another project there, and makes its thread sandboxes there too", async () => {
     const vercel = new FakeVercel();
     const access = { service: "vercel", token: TOKEN, teamId: "team_1", project: "openorc-brain-qa" } as const;

@@ -2,6 +2,7 @@ import os from "node:os";
 import { signInPrint, type BrainControlResults, type BrainHandover, type HandoverCodexLogin, type HandoverValues } from "@openorc/cloud";
 import { GitError, git, run } from "@openorc/git";
 import type { CloudBrainSignIns } from "@openorc/protocol";
+import { handedEnv } from "./cloud-env.js";
 import type { CodexBrowserSignIn } from "./codex-cloud-login.js";
 import type { MemoryService } from "./memory.js";
 
@@ -21,6 +22,10 @@ export interface SignInRecord {
   opencode?: string | null;
   /** The signInPrint of where the brain's threads run, as it holds it; null while it holds none and runs them where it lives. */
   cloud?: string | null;
+  /** The signInPrint of the projects' cloud environments the brain holds; null while it holds none. */
+  env?: string | null;
+  /** The digest of the user's skills the brain keeps for cloud sessions; null while it keeps none. */
+  skills?: string | null;
 }
 
 export type MacGitHub = NonNullable<HandoverValues["github"]> | { blocked: string };
@@ -35,6 +40,8 @@ export interface SignInSources {
   memory(): Promise<string | null>;
   /** OpenCode's provider keys for the cloud. */
   opencode(): Promise<{ provider: string; key: string }[]>;
+  /** Each project's cloud environment, by this Mac's project id; none unless given. */
+  env?(): Promise<{ source: string; vars: Record<string, string> }[]>;
   codex: Pick<CodexBrowserSignIn, "signingIn" | "error" | "start" | "cancel" | "finished">;
 }
 
@@ -85,6 +92,12 @@ async function openCodeChange(sent: string | null | undefined, mac: () => Promis
   return (sent ?? null) === print ? null : { value: keys.length ? { keys } : null, print };
 }
 
+async function envChange(sent: string | null | undefined, mac: SignInSources["env"]): Promise<{ value: Others["env"]; print: string | null } | null> {
+  const projects = handedEnv(mac ? await mac() : []);
+  const print = projects.length ? signInPrint({ projects }) : null;
+  return (sent ?? null) === print ? null : { value: projects.length ? { projects } : null, print };
+}
+
 /** Where the brain's threads run, which follows Settings; null while nothing is connected, so the brain keeps what it has. */
 export type CloudSource = () => Promise<HandoverValues["cloud"] | null>;
 
@@ -100,7 +113,7 @@ async function cloudChange(sent: string | null | undefined, mac: CloudSource | u
  */
 export async function signInChanges(
   record: SignInRecord,
-  sources: Pick<SignInSources, "github" | "push" | "memory" | "opencode"> & { cloud?: CloudSource },
+  sources: Pick<SignInSources, "github" | "push" | "memory" | "opencode" | "env"> & { cloud?: CloudSource },
 ): Promise<{ handover: Others; took: <T extends SignInRecord>(record: T) => T }> {
   const handover: Others = {};
   const edits: Edit[] = [];
@@ -138,6 +151,13 @@ export async function signInChanges(
       taken.opencode = opencode.print;
     });
   }
+  const env = await envChange(record.env, sources.env?.bind(sources));
+  if (env) {
+    handover.env = env.value;
+    edits.push((taken) => {
+      taken.env = env.print;
+    });
+  }
   const cloud = await cloudChange(record.cloud, sources.cloud);
   if (cloud) {
     handover.cloud = cloud.value;
@@ -154,7 +174,8 @@ export async function signInChanges(
 }
 
 /** Whether the record says the brain holds any of them, so asking it could find one gone. */
-export const claimsSignIns = (record: SignInRecord): boolean => Boolean(record.codex || record.github?.sent || record.push || record.memory || record.opencode || record.cloud);
+export const claimsSignIns = (record: SignInRecord): boolean =>
+  Boolean(record.codex || record.github?.sent || record.push || record.memory || record.opencode || record.cloud || record.env || record.skills);
 
 /** The record once the brain said what it holds: its word wins, as after its disk went back to an empty snapshot. */
 export function heardSignIns<T extends SignInRecord>(record: T, holds: BrainControlResults["sign-ins"]): T {
@@ -167,6 +188,8 @@ export function heardSignIns<T extends SignInRecord>(record: T, holds: BrainCont
   heard.memory = holds.memory;
   heard.opencode = holds.opencode ?? null;
   heard.cloud = holds.cloud ?? null;
+  heard.env = holds.env ?? null;
+  heard.skills = holds.skills ?? null;
   return heard;
 }
 
@@ -194,6 +217,7 @@ export async function signInsView(record: SignInRecord, sources: SignInSources):
     github: { on, blocked: mac && "blocked" in mac ? mac.blocked : null, behind: "github" in handover },
     push: { has: (record.push ?? null) !== null, behind: "push" in handover },
     memory: { has: (record.memory ?? null) !== null, behind: "memory" in handover },
+    env: { has: (record.env ?? null) !== null, behind: "env" in handover },
   };
 }
 

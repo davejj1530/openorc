@@ -1,4 +1,4 @@
-import { rm } from "node:fs/promises";
+import { readFile, rm, writeFile } from "node:fs/promises";
 import { alignAgents } from "./agent-versions.js";
 import path from "node:path";
 import {
@@ -16,7 +16,8 @@ import {
   type HandoverKind,
   type HandoverValues,
 } from "@openorc/cloud";
-import { markLeaving, type OpenOrc } from "@openorc/core";
+import { handedEnv, markLeaving, parseSkillsPayload, storeSkills, type OpenOrc } from "@openorc/core";
+import { macProjectOf, projectsFolder, skillsDigestFile, skillsFolder } from "./carry.js";
 import { claudeAccounts, projects, redact, threads } from "@openorc/db";
 import type { Project } from "@openorc/protocol";
 import type { BrainCloud } from "./cloud.js";
@@ -87,6 +88,8 @@ const HANDOVER: { [K in HandoverKind]: Take<K> } = {
   opencode: ({ core }, value) => core.openCodeCloudKeys.adopt(value?.keys ?? []),
   // The core's sandbox services ask it at each use: threads started from now on run where it says.
   cloud: ({ cloud }, value) => cloud.take(value),
+  // By the Mac project's id: a thread in its copy finds its own through the folder the copy lives in.
+  env: ({ core }, value) => core.cloudProjectEnv.adopt((value?.projects ?? []).map(({ source, vars }) => ({ source, vars: Object.fromEntries(vars.map(({ name, value }) => [name, value])) }))),
 };
 const HANDOVER_KINDS = Object.keys(HANDOVER) as HandoverKind[];
 
@@ -102,8 +105,6 @@ async function phonesOf(core: OpenOrc): Promise<BrainControlResults["phones"]> {
   return { phones: (await core.remote.status()).devices };
 }
 
-/** Every Mac project's copies, under a folder named for the Mac project's id. */
-const projectsFolder = (layout: BrainLayout) => path.join(layout.data, "projects");
 /** The copies of one Mac project: each in a folder with the Mac project's name, so two of one name both fit. */
 const copiesOf = (layout: BrainLayout, source: string) => path.join(projectsFolder(layout), source);
 
@@ -182,7 +183,20 @@ function copyOf(core: OpenOrc, layout: BrainLayout, source: string): string | nu
 /** The Mac project a copy belongs to, from the folder it lives in. */
 function sourceOf(core: OpenOrc, layout: BrainLayout, projectId: string): string | null {
   const root = projects.get(core.db, projectId)?.rootPath;
-  return root?.startsWith(`${projectsFolder(layout)}${path.sep}`) ? path.basename(path.dirname(root)) : null;
+  return root ? macProjectOf(layout, root) : null;
+}
+
+/** Keeps exactly the skills the Mac sent, named by `digest`, in place of any before. A file taken leaves the inbox. */
+async function takeSkills(layout: BrainLayout, { file, digest }: Extract<BrainControlRequest, { op: "cloud-skills" }>): Promise<BrainControlResults["cloud-skills"]> {
+  const inbox = path.join(layout.inbox, file);
+  try {
+    const kept = await storeSkills(skillsFolder(layout), parseSkillsPayload(await readFile(inbox, "utf8")));
+    if (kept) await writeFile(skillsDigestFile(layout), digest);
+    else await rm(skillsDigestFile(layout), { force: true });
+    return { kept };
+  } finally {
+    await rm(inbox, { force: true });
+  }
 }
 
 /** A thread's move between its Mac and the brain, onto the core's relocations. A package taken leaves the inbox. */
@@ -218,6 +232,7 @@ export function controlHandlers({ core, key, layout, github, cloud, stop, answer
       return { applied };
     },
     "import-project": (request) => importProject(core, layout, request),
+    "cloud-skills": (request) => takeSkills(layout, request),
     "remove-project": (request) => removeProject(core, layout, request),
     projects: () => listCopies(core, layout),
     "copies-current": (request) => copiesCurrent(core, layout, request),
@@ -239,6 +254,7 @@ export function controlHandlers({ core, key, layout, github, cloud, stop, answer
     "sign-ins": async () => {
       const apiKey = await core.memory.apiKey();
       const keys = (await core.openCodeCloudKeys.all()).sort((a, b) => (a.provider < b.provider ? -1 : 1));
+      const env = handedEnv(await core.cloudProjectEnv.all());
       return {
         codex: await core.codexCloudLogin.heldId(),
         github: github.print(),
@@ -246,6 +262,8 @@ export function controlHandlers({ core, key, layout, github, cloud, stop, answer
         memory: apiKey && signInPrint({ apiKey }),
         opencode: keys.length ? signInPrint({ keys }) : null,
         cloud: cloud.print(),
+        env: env.length ? signInPrint({ projects: env }) : null,
+        skills: (await readFile(skillsDigestFile(layout), "utf8").catch(() => null))?.trim() || null,
       };
     },
     stop: async () => {

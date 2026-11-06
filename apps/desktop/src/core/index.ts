@@ -74,6 +74,7 @@ const corePromise = OpenOrc.create({
   claudeCloudSecrets: secrets.store("claude-cloud.secrets"),
   codexCloudSecrets: secrets.store("codex-cloud.secrets"),
   opencodeCloudSecrets: secrets.store("opencode-cloud.secrets"),
+  cloudEnvSecrets: secrets.store("cloud-env.secrets"),
   cloudBrainSecrets: secrets.store("cloud-brain.secrets"),
   cloudBrainMoveSecrets: secrets.store("cloud-brain-move.secrets"),
   terminal,

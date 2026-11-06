@@ -55,6 +55,8 @@ it("lists the projects the brain has with a switch each, and adds another from o
   await screen.findByText("Projects");
   expect(toggle("site").checked).toBe(true);
   expect(screen.queryByRole("switch", { name: "app" })).toBeNull();
+  // Each project the brain has keeps its own environment for cloud threads.
+  expect(screen.getAllByRole("button", { name: "Environment" })).toHaveLength(1);
   expect([...picker().options].map((option) => option.textContent)).toEqual(["app", "docs"]);
   fireEvent.change(picker(), { target: { value: "p3" } });
   fireEvent.click(screen.getByRole("button", { name: "Add" }));

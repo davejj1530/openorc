@@ -15,6 +15,8 @@ import { createCatalogHandlers } from "./handlers/catalog.js";
 import { createClaudeAccountHandlers } from "./handlers/claude-accounts.js";
 import { createBrainSyncHandlers } from "./handlers/brain-sync.js";
 import { createCloudHandlers } from "./handlers/cloud.js";
+import { createCloudCarryHandlers } from "./handlers/cloud-carry.js";
+import type { CloudProjectEnv } from "./services/cloud-env.js";
 import { createCodeExplanationHandlers } from "./handlers/code-explanations.js";
 import { createDeviceHandlers } from "./handlers/devices.js";
 import { invalidParamsMessage, rpcLogLine } from "./handlers/diagnostics.js";
@@ -368,6 +370,11 @@ export class OpenOrc {
     return this.cloudParts.opencode;
   }
 
+  /** Each project's cloud environment: set on the Mac, handed over sealed to its brain. */
+  get cloudProjectEnv(): CloudProjectEnv {
+    return this.cloudParts.env;
+  }
+
   /** A deleted thread's Preview goes with it, and the session copies kept aside for it. */
   private threadGone(threadId: string): void {
     this.previewGone(threadId);
@@ -614,6 +621,7 @@ export class OpenOrc {
         invalidate,
         removed: (linkKey) => this.brainRemoved(linkKey),
       }),
+      createCloudCarryHandlers({ db: this.db, env: this.cloudParts.env, skills: this.cloudParts.skills }),
       createClaudeAccountHandlers(this.claudeAccounts),
       createBrainSyncHandlers({ db: this.db, memory: this.memory, textGeneration: this.textGeneration, cloudOnly: this.options.cloudOnly ?? false, invalidate }),
       createSystemHandlers({

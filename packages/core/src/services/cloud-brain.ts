@@ -15,21 +15,10 @@ import {
   type WakeInput,
 } from "@openorc/cloud";
 import { projects, redact } from "@openorc/db";
-import type {
-  BrainRegion,
-  CloudBrainCost,
-  CloudBrainMachine,
-  CloudBrainPairing,
-  CloudBrainProject,
-  CloudBrainSignIns,
-  CloudBrainStatus,
-  CloudBrainStep,
-  CloudService,
-  Project,
-} from "@openorc/protocol";
+import type { BrainRegion, CloudBrainCost, CloudBrainPairing, CloudBrainProject, CloudBrainSignIns, CloudBrainStatus, CloudBrainStep, CloudService, Project } from "@openorc/protocol";
 import { BrainCosts } from "./cloud-brain-cost.js";
 import { stopForUpdate, type UpdateWait } from "./cloud-brain-update.js";
-import { openMachine, shownMachine, type BrainBundleSource, type BrainMachineLike } from "./cloud-brain-machine.js";
+import { lookAt, openMachine, type BrainBundleSource, type BrainMachineLike } from "./cloud-brain-machine.js";
 import { BrainPhones } from "./cloud-brain-phones.js";
 import { BrainElsewhere, SERVICE_NAMES, accessHere, brainConnections, placeOf, provisionAt, reach, regionOf, serviceOf, threadCloud, threadSizes, type BrainConnections } from "./cloud-brain-place.js";
 import { BrainRecord, type StoredBrain } from "./cloud-brain-record.js";
@@ -38,6 +27,7 @@ import { anyMoved, confirmCurrent, copyBranch, failedAt, freshCopy, hasThreads, 
 import { claudeToSend, sameSent, sent, type Sent } from "./cloud-brain-claude.js";
 import { NO_SIGN_INS, claimsSignIns, heardSignIns, signInChanges, signInsView, switchGitHub, type CloudSource, type SignInRecord, type SignInSources } from "./cloud-brain-signins.js";
 import { alignAgentVersions } from "./cloud-brain-versions.js";
+import { handSkills, skillsChange, skillsView } from "./cloud-brain-skills.js";
 import type { CloudBrainDeps } from "./cloud-brain-deps.js";
 import { apiKeyAuth } from "./codex-cloud-login.js";
 
@@ -104,7 +94,10 @@ export class CloudBrain {
     const where = { service: serviceOf(stored), region: regionOf(stored) };
     if (this.activity?.kind === "setting-up") return { state: "setting-up", ...where, step: this.activity.step };
     if (!stored.ready) return { state: "incomplete", ...where, error: this.error };
-    const { machine, error } = await this.look(stored);
+    const { machine, error } = await lookAt(
+      async () => this.open(await this.reach(stored), false),
+      async (failure) => `Could not ask ${SERVICE_NAMES[serviceOf(stored)]} about the cloud brain. ${await this.scrub(failure)}`,
+    );
     if (machine === "missing") return { state: "incomplete", ...where, error: this.error ?? "The cloud brain's machine is gone." };
     const working = (this.activity && WORKING[this.activity.kind]) ?? null;
     const behind = !sameSent((await this.claude().catch(() => [])).map(sent), stored.claude);
@@ -318,7 +311,8 @@ export class CloudBrain {
   /** What the brain signs in with besides Claude. Never wakes the brain. */
   async signIns(): Promise<CloudBrainSignIns> {
     const record: SignInRecord = (await this.record.read().catch(() => null)) ?? {};
-    return signInsView(this.codexWaiting === undefined ? record : { ...record, codexNext: this.codexWaiting }, this.sources());
+    const view = await signInsView(this.codexWaiting === undefined ? record : { ...record, codexNext: this.codexWaiting }, this.sources());
+    return { ...view, skills: await skillsView(record.skills, this.deps.skills) };
   }
 
   /** Opens the browser to sign in to Codex for the brain alone. The login goes to the brain, woken for it, and this Mac keeps none once it took it. */
@@ -398,8 +392,9 @@ export class CloudBrain {
   }
 
   /**
-   * A connection, a size or "Run on" changed: a running brain takes where its new threads run at once, an asleep one at
-   * its next wake, so this never wakes it. A Vercel brain's door takes the token and size, since it wakes the brain with them.
+   * A connection, a size or "Run on" changed, or what the brain's threads carry, a project's cloud environment or the
+   * skills: a running brain takes it at once, an asleep one at its next wake, so this never wakes it. A Vercel brain's
+   * door takes the token and size, since it wakes the brain with them.
    */
   cloudChanged(): void {
     this.refreshDoor();
@@ -685,6 +680,8 @@ export class CloudBrain {
     await machine.control(sealHandover(brainKeyFrom(stored.key), { claude: { accounts: handed }, ...others?.handover }));
     const now = { ...(await this.stored()), claude: accounts.map(sent) };
     await this.record.write(others ? others.took(now) : now);
+    const skills = others && (await handSkills(machine, now.skills, this.deps.skills));
+    if (skills) await this.record.write({ ...(await this.stored()), ...skills });
   }
 
   /**
@@ -707,7 +704,8 @@ export class CloudBrain {
     const stored = await this.record.read();
     if (!stored) return false;
     if (!sameSent((await this.claude()).map(sent), stored.claude)) return true;
-    return Object.keys((await signInChanges(stored, this.sources(stored))).handover).length > 0;
+    if (Object.keys((await signInChanges(stored, this.sources(stored))).handover).length > 0) return true;
+    return (await skillsChange(stored.skills, this.deps.skills)) !== null;
   }
 
   /** This Mac's sign-ins, with where the threads of the brain set up as `stored` run. */
@@ -718,16 +716,6 @@ export class CloudBrain {
 
   private claude(): Promise<(Sent & { token: string })[]> {
     return claudeToSend(this.deps.db, this.deps.tokens);
-  }
-
-  /** How its service reports the brain's machine; null with a reason when it cannot be asked. */
-  private async look(stored: StoredBrain): Promise<{ machine: CloudBrainMachine | "missing" | null; error: string | null }> {
-    try {
-      const machine = await this.open(await this.reach(stored), false);
-      return { machine: machine ? shownMachine[(await machine.status()).state] : "missing", error: null };
-    } catch (error) {
-      return { machine: null, error: `Could not ask ${SERVICE_NAMES[serviceOf(stored)]} about the cloud brain. ${await this.scrub(error)}` };
-    }
   }
 
   private reach(stored: StoredBrain): Promise<BrainAccess> {

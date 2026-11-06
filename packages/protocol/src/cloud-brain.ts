@@ -200,6 +200,10 @@ export interface CloudBrainSignIns {
   push: { has: boolean; behind: boolean };
   /** This Mac's memory's Anthropic API key, which the brain's memory distils with while the Mac's does. */
   memory: { has: boolean; behind: boolean };
+  /** The user's own skills chosen for cloud sessions, which the brain's sandboxes get too. Absent from an older core. */
+  skills?: { has: boolean; behind: boolean };
+  /** The projects' cloud environments, which the brain's threads in their copies get. Absent from an older core. */
+  env?: { has: boolean; behind: boolean };
 }
 
 export interface CloudBrainPairing {

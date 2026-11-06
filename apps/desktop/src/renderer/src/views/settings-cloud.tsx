@@ -17,6 +17,7 @@ import { BrainCodexRow, BrainGitHubSection } from "./settings-cloud-brain-signin
 import { RegionSelect } from "./settings-cloud-place";
 import { CloudCheckCard } from "./settings-cloud-check";
 import { CloudSandboxesSection } from "./settings-cloud-sandboxes";
+import { CloudSkillsSection } from "./settings-cloud-skills";
 import { BringMissing, missingRows } from "./settings-cloud-sign-ins";
 import { CloudStep, cloudSteps, nextStep, serviceOf, type CloudStepId } from "./settings-cloud-steps";
 import { Field, LoadError, Section, SettingRow, Status, Toggle } from "./settings-shared";
@@ -329,6 +330,7 @@ export function CloudSettings({ active }: { active: boolean }) {
       {service ? (
         <>
           <TakeoverSection enabled={status.data.takeover} />
+          <CloudSkillsSection active={active} />
           <CloudSandboxesSection active={active} />
         </>
       ) : null}

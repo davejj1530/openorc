@@ -499,6 +499,18 @@ export class BrainMachine {
     });
   }
 
+  /**
+   * Uploads the user's skills chosen for cloud sessions, every agent's, and has the running brain keep exactly these for
+   * the sandboxes it makes. Never wakes the brain.
+   */
+  sendSkills(payload: Uint8Array, digest: string): Promise<BrainControlResults["cloud-skills"]> {
+    const file = `${randomUUID()}.skills.json`;
+    return this.whileRunning(async (vm, layout) => {
+      await vm.writeFiles([{ path: path.posix.join(layout.inbox, file), content: payload }]);
+      return this.ask(vm, layout, { op: "cloud-skills", file, digest });
+    });
+  }
+
   /** Uploads a thread's relocation package and asks the running brain to take it. Never wakes the brain. */
   receiveThread(relocation: string, bytes: Uint8Array): Promise<BrainControlResults["receive-thread"]> {
     const file = `${relocation}.thread`;

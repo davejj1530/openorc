@@ -2,6 +2,7 @@ import path from "node:path";
 import { Worker } from "node:worker_threads";
 import { WorkerEmbedder, ownerLinkKeys, pathProbe, type OpenOrcOptions, type Transport } from "@openorc/core";
 import { brainDoor, type BrainDoorKey, type BrainKey, type BrainLayout, type BrainStart, type RunnerFile } from "@openorc/cloud";
+import { macProjectOf, skillsFolder } from "./carry.js";
 import type { BrainCloud } from "./cloud.js";
 import { brainPath } from "./machine-check.js";
 import type { SealedSecrets } from "./secrets.js";
@@ -54,5 +55,8 @@ export function brainOptions({ layout, appDir, start, cloud, secrets, transport,
     cloudAgent37: () => cloud.agent37(),
     cloudService: () => cloud.service(),
     cloudRunnerFiles: runnerFiles,
+    // What its Mac chose: the skills its sandboxes get, and each copy's environment under the Mac project it copies.
+    cloudSkillsDir: skillsFolder(layout),
+    cloudEnvSource: (rootPath) => macProjectOf(layout, rootPath),
   };
 }

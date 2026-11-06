@@ -27,6 +27,8 @@ const OPS: Record<BrainControlOp, { answerMs: number; use: boolean; inTurn: bool
   "copies-current": { answerMs: 30_000, use: false, inTurn: true },
   "project-settings": { answerMs: 30_000, use: false, inTurn: true },
   "sign-ins": { answerMs: 5_000, use: true, inTurn: true },
+  // Reads and writes up to tens of megabytes of skills.
+  "cloud-skills": { answerMs: 120_000, use: true, inTurn: true },
   // Read while the Mac's Settings is open, so never a reason to stay awake; a removal is.
   phones: { answerMs: 5_000, use: false, inTurn: true },
   "remove-phone": { answerMs: 15_000, use: true, inTurn: true },

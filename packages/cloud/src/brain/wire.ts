@@ -263,6 +263,8 @@ export interface HandoverValues {
    * on a team it has none on. Each is null while the Mac has it unconnected.
    */
   cloud: { service: CloudService; agent37: Agent37Connection | null; vercel: Omit<VercelConnection, "projectId"> | null };
+  /** Each project's cloud environment, by the Mac project's id: the brain's threads in its copy get these variables. */
+  env: { projects: { source: string; vars: { name: string; value: string }[] }[] } | null;
 }
 export type HandoverKind = keyof HandoverValues;
 export type BrainHandover = Partial<HandoverValues>;
@@ -296,6 +298,7 @@ const HANDOVER: { [K in HandoverKind]: Parse<HandoverValues[K]> } = {
     agent37: nullable(object({ key: text(4096), cpu: literal(2, 4), memory: literal(4, 8, 16, 32) })),
     vercel: nullable(object({ token: text(4096), teamId: text(255) }, { vcpus: int(1, 64), region: text(32, /^[a-z0-9]+$/) })),
   }),
+  env: nullable(object({ projects: list(object({ source: text(200), vars: list(object({ name: text(128, /^[A-Za-z_][A-Za-z0-9_]*$/), value: text(32_768) }), 100) }), 1000) })),
 };
 const HANDOVER_KINDS = Object.keys(HANDOVER) as HandoverKind[];
 
@@ -322,6 +325,11 @@ export type BrainControlRequest =
   | { op: "project-settings"; source: string; settings: CopySettings }
   /** What the brain holds of each sign-in besides Claude's, so the Mac takes its word over its own record. */
   | { op: "sign-ins" }
+  /**
+   * The user's skills chosen for cloud sessions, every agent's, as a file already in the brain's inbox: the brain keeps
+   * exactly these, for the sandboxes it makes, and `digest` names them.
+   */
+  | { op: "cloud-skills"; file: string; digest: string }
   /** The phones paired with the brain. */
   | { op: "phones" }
   /** Unpairs a phone, which can no longer connect; one already gone changes nothing. Answers the phones left. */
@@ -408,7 +416,19 @@ export interface BrainControlResults {
    * of where its threads run, and its push key's id; null for none. A brain from before OpenCode keys, or before the
    * cloud kind, names none of those.
    */
-  "sign-ins": { codex: string | null; github: string | null; push: string | null; memory: string | null; opencode?: string | null; cloud?: string | null };
+  "sign-ins": {
+    codex: string | null;
+    github: string | null;
+    push: string | null;
+    memory: string | null;
+    opencode?: string | null;
+    cloud?: string | null;
+    /** The signInPrint of the projects' cloud environments it holds; null for none. */
+    env?: string | null;
+    /** The digest of the skills it keeps for cloud sessions; null for none. */
+    skills?: string | null;
+  };
+  "cloud-skills": { kept: number };
   phones: { phones: BrainPhone[] };
   "remove-phone": { phones: BrainPhone[] };
   stop: { stopping: true };
@@ -428,6 +448,7 @@ export type BrainControlResult<R extends BrainControlRequest> = BrainControlResu
 export type BrainControlReply<Op extends BrainControlOp> = { ok: true; result: BrainControlResults[Op] } | { ok: false; error: string };
 
 const sealedText = text(131_072, /^[A-Za-z0-9_-]+$/);
+const sealedEnv = text(524_288, /^[A-Za-z0-9_-]+$/);
 const projectSource = text(100, /^[A-Za-z0-9_-]+$/);
 /** One folder's name: no separator or control character, and not . or .. */
 const folderName: Parse<string> = (value, field) => {
@@ -462,9 +483,11 @@ const REQUESTS = variants<BrainControlRequest>({
   pair: object({ op: literal("pair") }),
   handover: object({
     op: literal("handover"),
-    sealed: object({}, Object.fromEntries(HANDOVER_KINDS.map((kind) => [kind, sealedText])) as Record<HandoverKind, Parse<string>>),
+    // The projects' environments may run larger than a sign-in; the whole request still fits ctl's line.
+    sealed: object({}, Object.fromEntries(HANDOVER_KINDS.map((kind) => [kind, kind === "env" ? sealedEnv : sealedText])) as Record<HandoverKind, Parse<string>>),
   }),
   "import-project": object({ op: literal("import-project"), source: projectSource, name: folderName, branch: branchName, bundle: text(255, /^\w[\w.-]*$/) }, { origin: text(2048) }),
+  "cloud-skills": object({ op: literal("cloud-skills"), file: text(255, /^\w[\w.-]*$/), digest: text(64, /^[a-f0-9]{64}$/) }),
   "remove-project": object({ op: literal("remove-project"), source: projectSource }),
   projects: object({ op: literal("projects") }),
   "copies-current": object({ op: literal("copies-current"), copies: list(object({ source: projectSource, macHead: commit }), 10_000) }),
@@ -502,7 +525,11 @@ const RESULTS: { [K in BrainControlOp]: Parse<BrainControlResults[K]> } = {
   projects: object({ copies: list(object({ source: projectSource, projectId: text(100), macHead: commit, head: commit, threads: count }), 10_000) }),
   "copies-current": object({ marked: count }),
   "project-settings": object({ applied: literal(true, false) }),
-  "sign-ins": object({ codex: nullable(text(100)), github: nullable(text(64)), push: nullable(text(64)), memory: nullable(text(64)) }, { opencode: nullable(text(64)), cloud: nullable(text(64)) }),
+  "sign-ins": object(
+    { codex: nullable(text(100)), github: nullable(text(64)), push: nullable(text(64)), memory: nullable(text(64)) },
+    { opencode: nullable(text(64)), cloud: nullable(text(64)), env: nullable(text(64)), skills: nullable(text(64)) },
+  ),
+  "cloud-skills": object({ kept: int(0, 10_000) }),
   phones,
   "remove-phone": phones,
   stop: object({ stopping: literal(true) }),
@@ -549,6 +576,7 @@ export function sealHandover(key: BrainKey, handover: BrainHandover): HandoverRe
     memory: seal("memory"),
     opencode: seal("opencode"),
     cloud: seal("cloud"),
+    env: seal("env"),
   };
   return { op: "handover", sealed };
 }
@@ -569,6 +597,7 @@ export function openHandover(key: BrainKey, request: HandoverRequest): BrainHand
     memory: open("memory"),
     opencode: open("opencode"),
     cloud: open("cloud"),
+    env: open("env"),
   };
   return handover;
 }

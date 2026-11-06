@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { brainSyncRpcParams, type BrainSyncRpcResults } from "./brain-sync.js";
+import { cloudCarryRpcParams, type CloudCarryRpcResults } from "./cloud-carry.js";
 import { ClaudeAccountId } from "./claude-accounts.js";
 import { BrainRegion, cloudBrainRpcParams, type CloudBrainRpcResults } from "./cloud-brain.js";
 import { cloudSignInRpcParams, OpenCodeProviderId, type CloudSignInRpcResults } from "./cloud-sign-ins.js";
@@ -224,9 +225,10 @@ export const cloudRpcParams = {
   ...cloudBrainRpcParams,
   ...cloudSignInRpcParams,
   ...brainSyncRpcParams,
+  ...cloudCarryRpcParams,
 };
 
-export interface CloudRpcResults extends CloudBrainRpcResults, CloudSignInRpcResults, BrainSyncRpcResults {
+export interface CloudRpcResults extends CloudBrainRpcResults, CloudSignInRpcResults, BrainSyncRpcResults, CloudCarryRpcResults {
   "cloud.status": CloudStatus;
   "cloud.bringToMac": null;
   "cloud.keep": null;

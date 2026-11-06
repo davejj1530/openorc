@@ -71,11 +71,14 @@ describe("sidebar days", () => {
       thread("quiet", at(2)),
       thread("parent", at(1)),
       thread("working child", at(1), { parentThreadId: "parent", parentRelation: "subagent", activity: "running" }),
+      // A finished subagent is never opened, so its unread mark says nothing about its parent.
+      thread("helped", at(1)),
+      thread("done child", at(1), { parentThreadId: "helped", parentRelation: "subagent", unread: true }),
     ];
     const list = sidebarDayList({ pages: [page(fetched)], pinnedOnly: false, activeId: "open", now });
     const week = list.sections.find((section) => section.day === "week")!;
     expect(list.shownInDay(week.roots, false).map((root) => root.id)).toEqual(["waiting", "unread", "open", "parent"]);
-    expect(list.shownInDay(week.roots, true).map((root) => root.id)).toEqual(["waiting", "unread", "quiet", "open", "parent"]);
+    expect(list.shownInDay(week.roots, true).map((root) => root.id)).toEqual(["waiting", "unread", "quiet", "open", "parent", "helped"]);
     // Pinned and Snoozed fold behind their counts, keeping only the open thread.
     expect(list.shown(week.roots, false).map((root) => root.id)).toEqual(["open"]);
   });

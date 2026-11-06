@@ -1,4 +1,4 @@
-import type { ThreadSummary } from "@openorc/protocol";
+import { isSubagentThread, type ThreadSummary } from "@openorc/protocol";
 import { sidebarFoldKey, type ThreadPage } from "./sidebar-thread-groups.js";
 import { threadTreeActivity, threadTreeMatches, threadTreeRoot } from "./thread-tree.js";
 
@@ -73,9 +73,12 @@ export function sidebarListGrows({ end, hasMore, collapsed, limit = 0 }: { end: 
   return !end || sidebarDayOpen(collapsed, end) || sidebarDayOpen(collapsed, "older");
 }
 
-/** A thread that needs you: unread, waiting on you, or with an agent on it. A folded day still shows these. */
+/**
+ * A thread that needs you: unread, waiting on you, or with an agent on it. A folded day still shows these. A subagent
+ * counts only while it works: its parent reads its result, so a finished one stays unread forever.
+ */
 export function threadNeedsYou(thread: ThreadSummary): boolean {
-  return thread.activity !== "idle" || thread.unread;
+  return thread.activity !== "idle" || (thread.unread && !isSubagentThread(thread));
 }
 
 /** How many threads that need you the list reads past its pages. Older hosts ignore that filter and answer with their newest threads. */

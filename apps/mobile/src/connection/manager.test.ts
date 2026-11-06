@@ -842,6 +842,40 @@ describe("a cloud brain", () => {
     expect(plain.effects.doors.knocks).toEqual([]);
   });
 
+  it("waits on a sleeping brain with no door while its service wakes it for the call, saying Waking, then connects", async () => {
+    const cloud = brain();
+    // Agent37 holds a call to a sleeping brain until it restores, longer than a route's few seconds.
+    cloud.behave(publicRoute, { kind: "answer", delayMs: 9_000 });
+    const effects = pairedWith(cloud);
+    effects.macs.save({ ...effects.macs.saved.get(cloud.id)!, kind: "brain" });
+    const { manager, states } = start(cloud, "wifi", effects);
+    await advance(4_100);
+    expect(manager.getState()).toMatchObject({ kind: "connecting", why: "waking" });
+    await advance(9_000);
+    expect(manager.getState()).toMatchObject({ kind: "connected", route: publicRoute });
+    expect(states.some((state) => state.kind === "waiting")).toBe(false);
+    expect(effects.doors.knocks).toEqual([]);
+  });
+
+  it("gives a brain with no door three minutes to wake, then says it isn't answering, and waits a minute before waiting on it again", async () => {
+    const cloud = brain();
+    cloud.behave(publicRoute, { kind: "silent" });
+    const effects = pairedWith(cloud);
+    effects.macs.save({ ...effects.macs.saved.get(cloud.id)!, kind: "brain" });
+    const { manager } = start(cloud, "wifi", effects);
+    await advance(4_100);
+    expect(manager.getState()).toMatchObject({ kind: "connecting", why: "waking" });
+    await advance(179_000);
+    expect(manager.getState()).toMatchObject({ kind: "connecting", why: "waking" });
+    await advance(1_000);
+    expect(manager.getState()).toMatchObject({ kind: "waiting", why: "unreachable" });
+    // Its few-second tries go on meanwhile; the next long wait comes a minute after this one ended.
+    await advance(50_000);
+    expect(manager.getState()).not.toMatchObject({ why: "waking" });
+    await advance(30_000);
+    expect(manager.getState()).toMatchObject({ kind: "connecting", why: "waking" });
+  });
+
   it("says only the Mac can help when a brain with no door answers at its address with no brain behind it", async () => {
     const cloud = brain();
     cloud.behave(publicRoute, { kind: "http", status: 502 });

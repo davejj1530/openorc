@@ -137,6 +137,8 @@ const STALE_AFTER_MS = 5_000;
 const DRAIN_MS = 5_000;
 /** A host's door is knocked on at most this often. */
 const KNOCK_EVERY_MS = 60_000;
+/** Agent37 holds a call to a sleeping brain until it restores, and asks callers to wait at least three minutes. */
+const BRAIN_WAKE_MS = 180_000;
 const REFUSED = Number.POSITIVE_INFINITY;
 
 const closingReasons: ReadonlySet<string> = new Set<ClosingReason>(["update", "shutdown", "removed", "disabled"]);
@@ -477,6 +479,7 @@ export class ConnectionManager {
     if (epoch !== this.epoch) return;
     // A cloud brain with no door (Agent37) wakes for any request; its address answering with no brain behind it means
     // the brain is not running, and only its Mac can start it again.
+    if (!hasDoor && mac.kind === "brain" && !answered) return this.wakeByCalling(mac, why, tried);
     if (!hasDoor) return this.retryLater(answered && mac.kind === "brain" ? "needs-mac" : this.unanswered(why, true, tried));
     this.knocked.set(mac.id, this.effects.clock.now());
     this.enter({ kind: "connecting", why: "waking" });
@@ -502,6 +505,31 @@ export class ConnectionManager {
       case "unanswered":
         return this.retryLater(this.unanswered(why, true, tried));
     }
+  }
+
+  /**
+   * A cloud brain with no door (Agent37) wakes for a call to its address: its service holds the call while the brain
+   * restores, longer than a route's few seconds. One race waits for that, saying Waking, and the next waits a minute
+   * after it ended. Leaving the host calls it off.
+   */
+  private async wakeByCalling(mac: SavedMac, why: DownReason | null, tried: readonly Route[]): Promise<void> {
+    const epoch = this.epoch;
+    const key = await this.keyPair(mac.id);
+    if (epoch !== this.epoch) return;
+    if (!key) return this.forget(mac.id, "key-lost");
+    this.knocked.set(mac.id, this.effects.clock.now());
+    this.enter({ kind: "connecting", why: "waking" });
+    const abort = new AbortController();
+    this.knocking = abort;
+    const result = await raceRoutes(tried, (route) => this.dial(route, fromBase64Url(mac.id), key), this.effects.clock, closeLinked, {
+      timeoutMs: BRAIN_WAKE_MS,
+      signal: abort.signal,
+    });
+    if (this.knocking === abort) this.knocking = null;
+    if (epoch !== this.epoch) return result.ok ? closeLinked(result.value) : undefined;
+    this.knocked.set(mac.id, this.effects.clock.now());
+    if (!result.ok && !result.refused) return this.retryLater(result.answered ? "needs-mac" : this.unanswered(why, true, tried));
+    this.settleRace(mac, result, why, true, tried);
   }
 
   /**

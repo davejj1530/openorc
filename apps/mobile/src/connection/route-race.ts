@@ -28,9 +28,16 @@ export const ROUTE_TIMEOUT_MS = 4_000;
 /**
  * Tries `routes` in order: the first at once, each next one 250 ms after the one before or as soon as that one fails.
  * The first handshake to finish wins and the others are cancelled; one that finishes anyway is handed to `discard`.
- * A refusal ends the race, since every route reaches the same Mac. Each try gets 4 s.
+ * A refusal ends the race, since every route reaches the same Mac. Each try gets 4 s unless `timeoutMs` says otherwise,
+ * and `signal` calls the whole race off.
  */
-export function raceRoutes<T>(routes: readonly Route[], dial: (route: Route) => Attempt<T>, clock: Clock, discard: (value: T) => void): Promise<RaceResult<T>> {
+export function raceRoutes<T>(
+  routes: readonly Route[],
+  dial: (route: Route) => Attempt<T>,
+  clock: Clock,
+  discard: (value: T) => void,
+  { timeoutMs = ROUTE_TIMEOUT_MS, signal }: { timeoutMs?: number; signal?: AbortSignal } = {},
+): Promise<RaceResult<T>> {
   return new Promise((resolve) => {
     const running = new Set<Attempt<T>>();
     let next = 0;
@@ -76,11 +83,13 @@ export function raceRoutes<T>(routes: readonly Route[], dial: (route: Route) => 
       const timer = clock.setTimeout(() => {
         attempt.cancel();
         settle({ ok: false, refused: null });
-      }, ROUTE_TIMEOUT_MS);
+      }, timeoutMs);
       attempt.answer.then(settle, () => settle({ ok: false, refused: null }));
       if (next < routes.length) stagger = clock.setTimeout(start, ROUTE_STAGGER_MS);
     };
 
+    if (signal?.aborted) return finish({ ok: false, refused: null });
+    signal?.addEventListener("abort", () => done || finish({ ok: false, refused: null }), { once: true });
     start();
   });
 }

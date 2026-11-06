@@ -8,6 +8,7 @@ import {
   conversationSendDisabledReason,
   conversationSteerReason,
   messageBody,
+  preparingCloud,
   processFit,
   RESTART_PROMPT,
   type SubmitRequest,
@@ -31,7 +32,7 @@ import { ConversationVoice, useRunVoices } from "../lib/turn-authors";
 import { useTurnFooters } from "../lib/turn-footers";
 import { BackgroundCommands } from "./BackgroundCommands";
 import { useCloudSignInGate } from "./CloudSignInOffer";
-import { CloudStart, queueAfterStart } from "./CloudStart";
+import { CloudPreparing, CloudStart, queueAfterStart } from "./CloudStart";
 import { Composer, type SlashCommand } from "./Composer";
 import { ComposerChoice } from "./ComposerChoice";
 import { GitBranch, Laptop } from "./icons";
@@ -206,6 +207,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
       <div className="composer-padding shrink-0 px-6 pb-6 pt-2">
         <div className="max-w-chat w-full min-w-0 mx-auto grid grid-cols-1 gap-2">
           <ThreadMoveCard thread={thread} />
+          <CloudPreparing thread={preparingCloud(thread, runs.length)} />
           {thread ? (
             <MessageQueue
               messages={queueAfterStart(thread, runs.length)}

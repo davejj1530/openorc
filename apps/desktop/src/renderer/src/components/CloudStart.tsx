@@ -34,6 +34,25 @@ function Failed({ thread, message, failure }: { thread: StartingCloudThread; mes
 }
 
 /**
+ * A thread that has run before while its sandbox is set up again, as when a message brings back one deleted or failed:
+ * the step under way, in one line above the composer, so a slow send says what it waits for. Nothing otherwise.
+ */
+export function CloudPreparing({ thread }: { thread: StartingCloudThread | null }) {
+  if (!thread) return null;
+  const steps = cloudStartSteps(thread);
+  const current = steps.find((step) => step.state === "running") ?? steps.at(-1)!;
+  return (
+    <div className="cloud-preparing" role="status" aria-label="Cloud workspace">
+      <StepMark state="running" />
+      <span className="cloud-preparing-label">{current.label}</span>
+      <span className="cloud-preparing-count tabular">
+        {steps.indexOf(current) + 1} of {steps.length}
+      </span>
+    </div>
+  );
+}
+
+/**
  * A starting cloud thread's card: the sandbox's setup as steps, and the message that goes to the agent once it is
  * ready. Any other thread gets `fallback`.
  */

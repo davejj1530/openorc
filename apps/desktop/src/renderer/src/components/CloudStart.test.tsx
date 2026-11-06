@@ -2,7 +2,8 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { CloudThreadState, ThreadSummary } from "@openorc/protocol";
 import { afterEach, expect, it, vi } from "vitest";
-import { CloudStart, queueAfterStart } from "./CloudStart";
+import { preparingCloud } from "@openorc/client";
+import { CloudPreparing, CloudStart, queueAfterStart } from "./CloudStart";
 import { core } from "../lib/rpc";
 
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
@@ -106,6 +107,28 @@ it("offers to try again with the waiting message when the sandbox failed", async
   expect(screen.getByRole("alert").textContent).toBe("Vercel refused the sandbox: quota reached");
   fireEvent.click(screen.getByRole("button", { name: "Try again" }));
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("threads.sendQueued", { id: "thread", messageId: "first" }));
+});
+
+it("says what failed in a line and keeps the sandbox's log under Details, and shows a retry's steps, not the old failure", () => {
+  const error = "Docker did not start in the sandbox.\nfailed to start daemon: iptables: Protocol not supported";
+  const failedFirst = { ...first, interrupted: true, error };
+  show(cloudThread({ ...preparing, provider: "agent37", state: "failed", step: null, setup: false, error }, [failedFirst]));
+  expect(screen.getByRole("alert").textContent).toBe("Docker did not start in the sandbox.");
+  expect(screen.getByText("Details").closest("details")?.open).toBe(false);
+  expect(screen.getByText(/iptables: Protocol not supported/)).toBeTruthy();
+  cleanup();
+  show(cloudThread({ ...preparing, provider: "agent37", state: "preparing", step: "sandbox", setup: false }, [failedFirst]));
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(screen.getByText("Starting an Agent37 instance")).toBeTruthy();
+});
+
+it("shows the step a sandbox set up again is on above the composer, once the thread has run, and nothing otherwise", () => {
+  const again = cloudThread({ ...preparing, provider: "agent37", step: "code", setup: false }, []);
+  render(<CloudPreparing thread={preparingCloud(again, 2)} />);
+  expect(screen.getByRole("status").textContent).toBe("Sending your code2 of 3");
+  cleanup();
+  render(<CloudPreparing thread={preparingCloud(again, 0)} />);
+  expect(screen.queryByRole("status")).toBeNull();
 });
 
 it("leaves threads that are not starting in the cloud to the ordinary conversation", () => {

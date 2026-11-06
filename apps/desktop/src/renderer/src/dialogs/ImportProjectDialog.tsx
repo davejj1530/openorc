@@ -1,13 +1,14 @@
 import { Button, Dialog, Field, Input } from "../components/ui";
+import type { Project } from "@openorc/protocol";
 import { useEffect, useState } from "react";
 
-import { useRouter } from "../lib/router";
-import { useRpcMutation } from "../lib/client";
+import { newThread } from "../lib/router";
+import { useLayout } from "../lib/layout";
+import { queryClient, useRpcMutation } from "../lib/client";
 import { core } from "../lib/rpc";
 
 export function ImportProjectDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const importProject = useRpcMutation("projects.import");
-  const navigate = useRouter((s) => s.navigate);
   const [path, setPath] = useState("");
   const [missing, setMissing] = useState<string | null>(null);
   const rootPath = path.trim();
@@ -38,8 +39,11 @@ export function ImportProjectDialog({ open, onOpenChange }: { open: boolean; onO
       { rootPath, create },
       {
         onSuccess: (p) => {
+          // The project list is still refreshing; until it lands the new thread screen would call this project unavailable.
+          queryClient.setQueryData<Project[]>(["projects.list", {}], (list) => (list && !list.some((known) => known.id === p.id) ? [...list, p] : list));
           onOpenChange(false);
-          navigate({ view: "project", projectId: p.id });
+          useLayout.getState().setProject(p.id);
+          newThread(p.id);
         },
       },
     );

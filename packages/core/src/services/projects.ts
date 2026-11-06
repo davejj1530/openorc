@@ -75,7 +75,8 @@ export class ProjectService {
 
   /**
    * What git offers the project now. A folder can gain git, a first commit or an origin after it was added, so a
-   * missing remote or default branch is filled in once git reports it. Known values stay as they are.
+   * missing remote is filled in once git reports it, and the default branch follows git's as it changes, as from master
+   * to main. A known remote stays as it is.
    */
   async git(id: string): Promise<{ state: ProjectGit; changed: boolean }> {
     const project = projects.get(this.db, id);
@@ -83,7 +84,7 @@ export class ProjectService {
     const state = await projectGit(project);
     if (state === "none") return { state, changed: false };
     const gitRemote = project.gitRemote ?? (await originUrl(project.rootPath));
-    const branch = project.defaultBranch ?? (await defaultBranch(project.rootPath));
+    const branch = (await defaultBranch(project.rootPath, project.defaultBranch)) ?? project.defaultBranch;
     if (gitRemote === project.gitRemote && branch === project.defaultBranch) return { state, changed: false };
     projects.updateGit(this.db, id, { gitRemote, defaultBranch: branch });
     return { state, changed: true };

@@ -11,7 +11,7 @@ export interface BrainProject {
   id: string;
   /** The brain's project for it, once the brain has a copy. */
   brainId: string | null;
-  /** The branch its copy follows: the Mac project's default branch when it was switched on. */
+  /** The branch its copy follows: the Mac project's default branch as the brain last took it. */
   branch: string;
   /** The Mac's commit the brain last took; null until it has a copy. */
   sent: string | null;
@@ -72,15 +72,28 @@ export async function copyBranch(project: Project, followed?: string): Promise<{
   if (state === null) return { blocked: "Its folder is missing." };
   if (state === "none") return { blocked: "Not a Git repository." };
   if (state === "no_commits") return { blocked: "No commits yet." };
-  const branch = followed ?? project.defaultBranch ?? (await defaultBranch(project.rootPath));
+  const branch = followed ?? (await following(project));
   if (!branch) return { blocked: "No default branch." };
   if (!brainTakesProject(project.name, branch)) return { blocked: "The cloud brain can't take this project's name or branch." };
   return (await branchHead(project.rootPath, branch)) ? { branch } : { blocked: `No commits on ${branch}.` };
 }
 
-/** Whether the project's branch is on a commit other than the one the brain last took. */
+/** The project's default branch as git has it now, which a copy follows when it moves, as from master to main. */
+async function following(project: Project, record?: BrainProject): Promise<string | null> {
+  const known = project.defaultBranch ?? record?.branch ?? null;
+  return (await defaultBranch(project.rootPath, known).catch(() => null)) ?? known;
+}
+
+/** The branch the copy follows now and the commit it is on here. */
+async function now(project: Project, record: BrainProject): Promise<{ branch: string; head: string | null }> {
+  const branch = (await following(project, record)) ?? record.branch;
+  return { branch, head: await branchHead(project.rootPath, branch).catch(() => null) };
+}
+
+/** Whether the project's default branch, or the commit it is on, is another than the brain last took. */
 export async function moved(project: Project, record: BrainProject): Promise<boolean> {
-  return (await branchHead(project.rootPath, record.branch).catch(() => null)) !== record.sent;
+  const { branch, head } = await now(project, record);
+  return branch !== record.branch || head !== record.sent;
 }
 
 /** The settings a copy takes from its Mac project: what runs and is copied into each new thread's folder, and its branch names. */
@@ -119,8 +132,8 @@ export async function freshCopy(machine: Pick<BrainMachine, "importProject" | "c
 export async function anyMoved(db: Db, records: readonly BrainProject[], stuck: ReadonlyMap<string, string | null>): Promise<boolean> {
   for (const record of records) {
     const project = record.brainId ? projects.get(db, record.id) : null;
-    const head = project ? await branchHead(project.rootPath, record.branch).catch(() => null) : null;
-    if (project && head !== record.sent && !(stuck.has(record.id) && stuck.get(record.id) === head)) return true;
+    const { branch, head } = project ? await now(project, record) : { branch: record.branch, head: null };
+    if (project && (branch !== record.branch || head !== record.sent) && !(stuck.has(record.id) && stuck.get(record.id) === head)) return true;
     if (project && !record.error && settingsMoved(project, record)) return true;
   }
   return false;
@@ -144,7 +157,7 @@ export async function failedAt(db: Db, records: readonly BrainProject[]): Promis
   const failed = new Map<string, string | null>();
   for (const record of records) {
     const project = record.error ? projects.get(db, record.id) : null;
-    if (project) failed.set(record.id, await branchHead(project.rootPath, record.branch).catch(() => null));
+    if (project) failed.set(record.id, (await now(project, record)).head);
   }
   return failed;
 }
@@ -160,17 +173,19 @@ async function origin(root: string): Promise<string | null> {
 }
 
 /**
- * Sends the brain what it lacks of the project's branch: what came after the last commit it took, or the whole branch
- * the first time and whenever its copy lacks that commit.
+ * Sends the brain what it lacks of the project's default branch: what came after the last commit it took, or the whole
+ * branch the first time and whenever its copy lacks that commit. A default that moved, as from master to main, goes as
+ * the branch the copy follows from now on.
  */
 export async function sendProject(machine: Pick<BrainMachine, "importProject">, project: Project, record: BrainProject): Promise<BrainProject> {
-  const copy = await copyBranch(project, record.branch);
+  const copy = await copyBranch(project, (await now(project, record)).branch);
   if ("blocked" in copy) throw new Error(copy.blocked);
+  const { branch } = copy;
   const url = await origin(project.rootPath);
-  const send = async (bundle: Buffer) => machine.importProject({ source: project.id, name: project.name, branch: record.branch, bundle, ...(url ? { origin: url } : {}) });
-  const first = await bundleBranch(project.rootPath, record.branch, record.sent);
+  const send = async (bundle: Buffer) => machine.importProject({ source: project.id, name: project.name, branch, bundle, ...(url ? { origin: url } : {}) });
+  const first = await bundleBranch(project.rootPath, branch, record.sent);
   let reply = await send(first.bytes);
-  if ("lacksBase" in reply && first.incremental) reply = await send((await bundleBranch(project.rootPath, record.branch, null)).bytes);
+  if ("lacksBase" in reply && first.incremental) reply = await send((await bundleBranch(project.rootPath, branch, null)).bytes);
   if ("lacksBase" in reply) throw new Error("The cloud brain could not take this project's branch.");
-  return { ...record, brainId: reply.projectId, sent: reply.macHead, head: reply.head, error: null };
+  return { ...record, branch, brainId: reply.projectId, sent: reply.macHead, head: reply.head, error: null };
 }

@@ -8,7 +8,8 @@ import path from "node:path";
 import { GitError, git, originUrl, revParse } from "@openorc/git";
 
 /** Where a copy keeps the Mac's branch as last taken, so each later bundle builds on it whatever the copy's branch does. */
-const macRef = (branch: string) => `refs/openorc/mac/${branch}`;
+const MAC_REFS = "refs/openorc/mac/";
+const macRef = (branch: string) => `${MAC_REFS}${branch}`;
 /** When a copy last took the Mac's branch or heard its origin's, in ms, beside its git: reading it runs no git. */
 const SYNCED = "openorc-synced";
 
@@ -67,10 +68,26 @@ export async function takeBranch(folder: string, bundle: string, branch: string,
   const macHead = await revParse(folder, incoming);
   const local = await branchHead(folder, branch);
   if (local === null || (local !== macHead && (await isAncestor(folder, local, macHead)))) await moveBranch(folder, branch, local, macHead);
-  await git(folder, ["update-ref", macRef(branch), macHead]);
+  await follow(folder, branch, macHead);
   await git(folder, ["update-ref", "-d", incoming]);
   await markSynced(folder);
   return { macHead, head: (await branchHead(folder, branch)) ?? macHead };
+}
+
+/**
+ * The copy follows `branch` from now on, the one the Mac's commit is kept for, as when the Mac's default moved from master
+ * to main. A copy that had the branch it followed before checked out moves its checkout too; one on another branch or a
+ * detached HEAD keeps it. The old branch stays for threads that started from it.
+ */
+async function follow(folder: string, branch: string, macHead: string): Promise<void> {
+  await git(folder, ["update-ref", macRef(branch), macHead]);
+  const before = (await git(folder, ["for-each-ref", "--format=%(refname)", MAC_REFS])).stdout.split("\n").filter((ref) => ref && ref !== macRef(branch));
+  for (const ref of before) await git(folder, ["update-ref", "-d", ref]);
+  const checkedOut = (await git(folder, ["symbolic-ref", "--quiet", "HEAD"], { okCodes: [0, 1] })).stdout.trim();
+  if (!before.some((ref) => checkedOut === `refs/heads/${ref.slice(MAC_REFS.length)}`)) return;
+  await git(folder, ["checkout", "--quiet", branch]).catch((error: unknown) => {
+    throw error instanceof GitError && error.stderr.includes("would be overwritten") ? new Error("The cloud copy has uncommitted changes in the way.") : error;
+  });
 }
 
 /** Puts `branch` on `target`: made there, or fast-forwarded, its files following when the copy has it checked out. */
@@ -128,10 +145,10 @@ export async function copySyncedAt(folder: string): Promise<number | null> {
 
 /** What a copy last took from the Mac and its own branch's commit; null for a folder that holds no copy. */
 export async function copyHeads(folder: string): Promise<{ macHead: string; head: string } | null> {
-  const refs = await git(folder, ["for-each-ref", "--count=1", "--format=%(objectname) %(refname)", "refs/openorc/mac/"]).catch(() => null);
+  const refs = await git(folder, ["for-each-ref", "--count=1", "--format=%(objectname) %(refname)", MAC_REFS]).catch(() => null);
   const [macHead, ref] = refs?.stdout.trim().split(" ") ?? [];
   if (!macHead || !ref) return null;
-  return { macHead, head: (await branchHead(folder, ref.slice("refs/openorc/mac/".length))) ?? macHead };
+  return { macHead, head: (await branchHead(folder, ref.slice(MAC_REFS.length))) ?? macHead };
 }
 
 async function followOrigin(folder: string, origin: string | null): Promise<void> {

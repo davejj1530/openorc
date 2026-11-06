@@ -162,10 +162,15 @@ it("fills in the remote and default branch once a folder added without git gains
   expect(await handlers["projects.git"]({ id: project.id })).toBe("ready");
   expect(invalidate).toHaveBeenCalledWith(["projects", `project:${project.id}`]);
   expect(service.get(project.id)).toMatchObject({ gitRemote: "https://github.com/example/later.git", defaultBranch: "trunk", updatedAt: project.updatedAt });
-  // Known values stay put, even when git would now guess another branch.
+  // Checking out another branch leaves the default where it is.
   await git(folder, ["checkout", "-q", "-b", "other"]);
   expect(await service.git(project.id)).toEqual({ state: "ready", changed: false });
   expect(service.get(project.id)?.defaultBranch).toBe("trunk");
+  // A default that moved on origin, as from trunk to main, moves the project's with it.
+  await git(folder, ["branch", "main"]);
+  await git(folder, ["update-ref", "refs/remotes/origin/main", "main"]);
+  expect(await service.git(project.id)).toEqual({ state: "ready", changed: true });
+  expect(service.get(project.id)?.defaultBranch).toBe("main");
 });
 
 it("rejects Workspace and unknown IDs without changing the visible list", async () => {

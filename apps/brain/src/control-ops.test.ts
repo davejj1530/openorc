@@ -304,9 +304,9 @@ describe("control requests on the brain's core", () => {
       return (await git(folder, ["rev-parse", "HEAD"])).stdout.trim();
     }
 
-    /** The Mac's main from `since`, uploaded to the inbox, then the op the Mac asks. */
-    async function upload(since: string | null, project: { source?: string; name?: string } = {}) {
-      const { bytes } = await bundleBranch(mac, "main", since);
+    /** The Mac's main, or the branch given, from `since`, uploaded to the inbox, then the op the Mac asks. */
+    async function upload(since: string | null, project: { source?: string; name?: string; branch?: string } = {}) {
+      const { bytes } = await bundleBranch(mac, project.branch ?? "main", since);
       const bundle = `${randomUUID()}.bundle`;
       await mkdir(layout.inbox, { recursive: true });
       await writeFile(path.join(layout.inbox, bundle), bytes);
@@ -314,7 +314,7 @@ describe("control requests on the brain's core", () => {
     }
 
     /** As `upload`, for a bundle the copy can take. */
-    async function send(since: string | null, project: { source?: string; name?: string } = {}): Promise<ProjectCopy> {
+    async function send(since: string | null, project: { source?: string; name?: string; branch?: string } = {}): Promise<ProjectCopy> {
       const taken = await upload(since, project);
       if ("lacksBase" in taken) throw new Error("the copy lacks the bundle's base");
       return taken;
@@ -344,6 +344,17 @@ describe("control requests on the brain's core", () => {
           { source: "another-mac-project", projectId: other.projectId, macHead: second, head: second, threads: 0 },
         ]),
       });
+    });
+
+    it("starts new threads from the Mac's default branch after it moves, as from master to main", async () => {
+      await git(mac, ["branch", "-m", "main", "master"]);
+      const old = (await git(mac, ["rev-parse", "HEAD"])).stdout.trim();
+      const { projectId } = await send(null, { branch: "master" });
+      expect(core.projects.get(projectId)?.defaultBranch).toBe("master");
+      await git(mac, ["switch", "-q", "-c", "main"]);
+      const next = await commitOn(mac, "b.txt", "b1\n");
+      expect(await send(old, { branch: "main" })).toEqual({ projectId, macHead: next, head: next });
+      expect(core.projects.get(projectId)?.defaultBranch).toBe("main");
     });
 
     it("takes the Mac project's setup script and other settings for its copy, and none for a project it has no copy of", async () => {

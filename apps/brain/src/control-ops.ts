@@ -127,8 +127,10 @@ async function importProject(
     const folder = path.join(copiesOf(layout, source), name);
     const taken = await takeBranch(folder, file, branch, origin ?? null);
     if ("lacksBase" in taken) return taken;
-    const { id } = (await rpc(core, "projects.import", { rootPath: folder })) as Project;
-    return { projectId: id, ...taken };
+    const project = (await rpc(core, "projects.import", { rootPath: folder })) as Project;
+    // Threads start from the project's default branch: the one the Mac's copy follows, which moves when the Mac's does.
+    if (project.defaultBranch !== branch) projects.updateGit(core.db, project.id, { gitRemote: project.gitRemote, defaultBranch: branch });
+    return { projectId: project.id, ...taken };
   } finally {
     await rm(file, { force: true });
   }

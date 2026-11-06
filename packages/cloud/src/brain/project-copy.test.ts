@@ -51,6 +51,22 @@ afterEach(async () => {
 });
 
 describe("a Mac project's copy on the brain", () => {
+  it("follows the Mac's default branch when it moves, as from master to main: checked out, and the only one its Mac commit is kept for", async () => {
+    git(mac, "switch", "-q", "-c", "master", "main");
+    const old = commit(mac, "old.txt", "on master\n");
+    expect(await takeBranch(copy, (await send(null, "master")).file, "master", ORIGIN)).toEqual({ macHead: old, head: old });
+    git(mac, "switch", "-q", "main");
+    git(mac, "merge", "-q", "--ff-only", "master");
+    const now = commit(mac, "new.txt", "on main\n");
+    expect(await takeBranch(copy, (await send(old, "main")).file, "main", ORIGIN)).toEqual({ macHead: now, head: now });
+    expect(git(copy, "symbolic-ref", "--short", "HEAD")).toBe("main");
+    expect(readFileSync(path.join(copy, "new.txt"), "utf8")).toBe("on main\n");
+    expect(git(copy, "for-each-ref", "--format=%(refname)", "refs/openorc/mac/")).toBe("refs/openorc/mac/main");
+    expect(await copyHeads(copy)).toEqual({ macHead: now, head: now });
+    // Threads that started from the old branch keep it.
+    expect(git(copy, "rev-parse", "master")).toBe(old);
+  });
+
   it("clones the default branch with its history and the Mac's origin the first time, whatever branch the Mac is on", async () => {
     const second = (git(mac, "switch", "-q", "main"), commit(mac, "a.txt", "a2\n"));
     git(mac, "switch", "-q", "feature");

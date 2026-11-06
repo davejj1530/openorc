@@ -761,6 +761,22 @@ describe("the cloud brain from the Mac", () => {
       expect(records()).toEqual([expect.objectContaining({ sent: next, error: null })]);
     });
 
+    it("moves the brain's copy to the project's new default branch, as from master to main, while both are awake", async () => {
+      const app = await macProject("app", { branch: "master", origin: "https://github.com/example/app.git" });
+      await setUp();
+      await choose(app.id, true);
+      await vi.waitFor(() => expect(records()).toEqual([expect.objectContaining({ branch: "master", sent: git(app.folder, "rev-parse", "master") })]));
+      // Origin's default became main: the Mac has main from origin, and origin no longer has master.
+      git(app.folder, "switch", "-q", "-c", "main");
+      const next = commit(app.folder, "b.txt", "b1\n");
+      git(app.folder, "update-ref", "refs/remotes/origin/main", "main");
+      brain.calls = [];
+      await (core as unknown as { cloudParts: { brain: CloudBrain } }).cloudParts.brain.freshenProjects();
+      expect(records()).toEqual([expect.objectContaining({ branch: "main", sent: next, head: next, error: null })]);
+      expect(imports()).toEqual(["import app incremental"]);
+      expect(git(brain.copy(app.id, "app"), "symbolic-ref", "--short", "HEAD")).toBe("main");
+    });
+
     it("gives the brain's copy the project's setup script, again when it changes while both are awake, and never waking it", async () => {
       const app = await sent();
       expect(brain.settings.get(app.id)).toMatchObject({ setupScript: null, branchPrefix: "openorc" });

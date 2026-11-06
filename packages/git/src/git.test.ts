@@ -1,9 +1,9 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { git } from "./exec.js";
-import { changedFiles, gitState, isDirty, log, patchAgainst, repoInfo } from "./repo.js";
+import { changedFiles, defaultBranch, gitState, isDirty, log, patchAgainst, repoInfo } from "./repo.js";
 import { diffStat, treeHash } from "./snapshot.js";
 import { commitAll, pullRequestTemplate, push, unpushedCommits } from "./publish.js";
 import { pinObject, unpinAll } from "./refs.js";
@@ -25,6 +25,43 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await rm(root, { recursive: true, force: true });
+});
+
+describe("default branch", () => {
+  let repo: string;
+  let sha: string;
+  beforeEach(async () => {
+    repo = await mkdtemp(path.join(os.tmpdir(), "openorc-default-branch-"));
+    await git(repo, ["init", "-q", "-b", "master"]);
+    await git(repo, ["config", "user.email", "test@example.com"]);
+    await git(repo, ["config", "user.name", "Test"]);
+    await writeFile(path.join(repo, "README.md"), "# demo\n");
+    sha = await commitAll(repo, "init");
+    await git(repo, ["branch", "main"]);
+  });
+  afterEach(async () => {
+    await rm(repo, { recursive: true, force: true });
+  });
+
+  it("moves from master to main once origin has only main, as a renamed default leaves it", async () => {
+    await git(repo, ["update-ref", "refs/remotes/origin/main", sha]);
+    expect(await defaultBranch(repo, "master")).toBe("main");
+  });
+
+  it("keeps the branch known before while origin has it, or while it is still here when there is no origin", async () => {
+    expect(await defaultBranch(repo, "master")).toBe("master");
+    expect(await defaultBranch(repo)).toBe("main");
+    await git(repo, ["update-ref", "refs/remotes/origin/main", sha]);
+    await git(repo, ["update-ref", "refs/remotes/origin/master", sha]);
+    expect(await defaultBranch(repo, "master")).toBe("master");
+  });
+
+  it("takes origin/HEAD over the branch known before", async () => {
+    await git(repo, ["update-ref", "refs/remotes/origin/main", sha]);
+    await git(repo, ["update-ref", "refs/remotes/origin/master", sha]);
+    await git(repo, ["symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main"]);
+    expect(await defaultBranch(repo, "master")).toBe("main");
+  });
 });
 
 describe("repo", () => {

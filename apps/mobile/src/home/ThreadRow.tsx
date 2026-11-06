@@ -8,6 +8,7 @@ import {
   threadMark,
   threadPlace,
   threadStatus,
+  workspaceLabel,
   type ThreadHeadline,
   type ThreadMark,
   type ThreadTreeRow,
@@ -122,8 +123,8 @@ function rowMarks(thread: ThreadSummary, compact: boolean, asleep: boolean) {
 
 /**
  * A root row's last line: its project's glyph at the margin, where the tree's line leaves for its sub threads, the
- * project's name (and the host it lives on, while that is another), then its pull request at the end, in the state's
- * own glyph and tone, with its number.
+ * project's name, where in it the thread works (and its host's state, while that is another), then its pull request
+ * at the end, in the state's own glyph and tone, with its number.
  */
 function ProjectLine({ thread, project, host, onNode }: { thread: ThreadSummary; project: string | null; host: string | null; onNode: (mid: number) => void }) {
   const pull = pullRequestMark(thread);
@@ -133,7 +134,8 @@ function ProjectLine({ thread, project, host, onNode }: { thread: ThreadSummary;
     <View className="flex-row items-center gap-1.5" onLayout={(event) => onNode(event.nativeEvent.layout.y + event.nativeEvent.layout.height / 2)}>
       <Glyph size={16} className="text-ink-4" />
       <Text numberOfLines={1} className="shrink text-detail text-ink-4">
-        {[project, host].filter(Boolean).join(" · ")}
+        {/* The cloud is named as where it works; the host's other states follow it. */}
+        {[project, workspaceLabel(thread), host === "Cloud" ? null : host].filter(Boolean).join(" · ")}
       </Text>
       {pull && PullIcon ? (
         <View accessibilityLabel={pull.label} className="ml-auto flex-row items-center gap-1 pl-2">

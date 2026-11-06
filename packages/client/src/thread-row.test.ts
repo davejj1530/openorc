@@ -1,6 +1,6 @@
 import { WORKSPACE_ID } from "@openorc/protocol";
 import { describe, expect, it } from "vitest";
-import { pullRequestNumber, renamedTitle, threadMark, threadPlace } from "./thread-row.js";
+import { pullRequestNumber, renamedTitle, threadMark, threadPlace, workspaceLabel } from "./thread-row.js";
 
 const resting = { activity: "idle", session: { status: "idle", message: null }, unread: false, prUrl: null, prState: null } as const;
 const pr = "https://github.com/me/openorc/pull/482";
@@ -36,6 +36,26 @@ describe("threadPlace", () => {
     expect(threadPlace({ branch: null, prUrl: pr, projectId: "p" })).toEqual({ kind: "pull", label: "PR #482" });
     expect(threadPlace({ branch: null, prUrl: null, projectId: WORKSPACE_ID })).toEqual({ kind: "folder", label: "Local" });
     expect(threadPlace({ branch: null, prUrl: null, projectId: "p" })).toEqual({ kind: "folder", label: "No branch" });
+  });
+});
+
+describe("workspaceLabel", () => {
+  const checkout = { workspaceMode: "current", branch: "main", prUrl: null } as const;
+  const cloud = { provider: "vercel", state: "ready", step: null, setup: false, error: null } as const;
+
+  it("names the cloud, else a worktree of its own, else the checkout's branch", () => {
+    expect(workspaceLabel(checkout)).toBe("main");
+    expect(workspaceLabel({ ...checkout, branch: null })).toBeNull();
+    expect(workspaceLabel({ ...checkout, workspaceMode: "worktree", branch: "openorc/sidebar-a1b2c3" })).toBe("worktree");
+    expect(workspaceLabel({ ...checkout, workspaceMode: "worktree", cloud })).toBe("cloud");
+    expect(workspaceLabel({ ...checkout, owner: { brain: "cloud", reach: "asleep", heardAt: 1 } })).toBe("cloud");
+    expect(workspaceLabel({ ...checkout, owner: { brain: "mac", reach: "live", heardAt: 1 } })).toBe("main");
+  });
+
+  it("leaves a pull request to say where the work is, except that the next turn runs in the cloud", () => {
+    expect(workspaceLabel({ ...checkout, prUrl: pr })).toBeNull();
+    expect(workspaceLabel({ ...checkout, workspaceMode: "worktree", prUrl: pr })).toBeNull();
+    expect(workspaceLabel({ ...checkout, workspaceMode: "worktree", prUrl: pr, cloud })).toBe("cloud");
   });
 });
 

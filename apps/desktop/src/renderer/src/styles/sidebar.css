@@ -265,6 +265,21 @@ button.sidebar-nav-row:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Where the thread works gives way first; the project's name keeps its width, up to most of the line. */
+.thread-preview-project-name:has(+ .thread-preview-workspace) {
+  flex-shrink: 0;
+  max-width: 60%;
+}
+.thread-preview-workspace {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.thread-preview-workspace::before {
+  content: "·" / "";
+  margin-right: 6px;
+}
 .thread-preview-pull {
   display: inline-flex;
   flex-shrink: 0;

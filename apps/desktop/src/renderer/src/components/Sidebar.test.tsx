@@ -9,7 +9,7 @@ vi.hoisted(() => Object.assign(window, { openorc: { platform: "darwin" } }));
 const fixture: {
   projects: { id: string; name: string; rootPath: string }[];
   threads: (Pick<ThreadSummary, "id" | "title" | "projectId" | "agent" | "activity" | "unread" | "session" | "pinnedAt" | "snoozedUntil" | "lastActivityAt"> &
-    Partial<Pick<ThreadSummary, "createdAt" | "archivedAt" | "parentThreadId" | "parentRelation" | "subagent" | "prUrl" | "prState">>)[];
+    Partial<Pick<ThreadSummary, "createdAt" | "archivedAt" | "parentThreadId" | "parentRelation" | "subagent" | "prUrl" | "prState" | "workspaceMode" | "branch" | "owner">>)[];
 } = vi.hoisted(() => ({ projects: [], threads: [] }));
 
 /** The core's answer to a thread list, as the fixture's threads read. */
@@ -439,6 +439,25 @@ it("names each thread's project under its title, with its pull request at the en
   expect(pull.textContent).toBe("#8");
   expect(pull.getAttribute("class")).toContain("text-ok");
   expect(screen.getByRole("button", { name: /Yesterday's notes/ }).querySelector(".thread-preview-pull")).toBeNull();
+});
+
+it("says after the project where each thread works, and leaves it to a pull request unless that is the cloud", async () => {
+  dayThreads();
+  const [recent, yesterday, week, older] = fixture.threads;
+  const pull = { prUrl: "https://github.com/acme/app/pull/8", prState: "open" } as const;
+  fixture.threads = [
+    { ...recent!, workspaceMode: "current", branch: "main" },
+    { ...yesterday!, workspaceMode: "worktree", branch: "openorc/notes-a1b2c3" },
+    { ...week!, workspaceMode: "worktree", branch: "openorc/week-d4e5f6", ...pull },
+    { ...older!, workspaceMode: "worktree", branch: "openorc/old-g7h8i9", ...pull, owner: { brain: "cloud", reach: "live", heardAt: 1 } },
+  ];
+  useLayout.setState({ collapsed: ["day-open:yesterday", "day-open:week", "day-open:older"] });
+  mountSidebar();
+  const workspace = async (name: RegExp) => (await screen.findByRole("button", { name })).querySelector(".thread-preview-workspace");
+  expect((await workspace(/Recent notes/))?.textContent).toBe("main");
+  expect(await workspace(/Yesterday's notes/)).toMatchObject({ textContent: "worktree", title: "openorc/notes-a1b2c3" });
+  expect(await workspace(/This week's notes/)).toBeNull();
+  expect((await workspace(/Old notes/))?.textContent).toBe("cloud");
 });
 
 it("sweeps a working thread's title and puts its spinner under the title line, where a parent's chevron sits above", async () => {

@@ -1,5 +1,17 @@
 import { ContextMenu } from "@base-ui/react/context-menu";
-import { ownerMark, pullRequestMark, pullRequestNumber, relativeTime, subagentStatusLabel, threadPlace, threadStatus, useTicking, workDuration, type ThreadPlace } from "@openorc/client";
+import {
+  ownerMark,
+  pullRequestMark,
+  pullRequestNumber,
+  relativeTime,
+  subagentStatusLabel,
+  threadPlace,
+  threadStatus,
+  useTicking,
+  workDuration,
+  workspaceLabel,
+  type ThreadPlace,
+} from "@openorc/client";
 import { harnessShortName, isHarnessId, type ThreadSummary } from "@openorc/protocol";
 import { useMemo, type ReactNode } from "react";
 import { CoversPreview } from "../lib/browser-preview";
@@ -189,13 +201,20 @@ function ThreadLines({ thread, project }: { thread: ThreadSummary; project?: Row
   );
 }
 
+/** A root row's last line: its project, where in it the thread works, then its pull request. */
 function ProjectLine({ thread, project, trailing }: { thread: ThreadSummary; project: RowProject; trailing: ReactNode }) {
+  const workspace = workspaceLabel(thread);
   return (
     <span className="thread-preview-project">
       <span className="thread-preview-project-icon">{project.rootPath ? <ProjectIcon rootPath={project.rootPath} /> : <Globe size={14} />}</span>
       <span className="thread-preview-project-name" title={project.name}>
         {project.name}
       </span>
+      {workspace ? (
+        <span className="thread-preview-workspace" title={thread.branch ?? undefined}>
+          {workspace}
+        </span>
+      ) : null}
       <PullRequestStatus thread={thread} />
       {trailing}
     </span>

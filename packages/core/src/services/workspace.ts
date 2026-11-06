@@ -8,6 +8,7 @@ import { createHash } from "node:crypto";
 import { access, copyFile, glob, lstat, mkdir } from "node:fs/promises";
 import path from "node:path";
 import type { Logger } from "../transport.js";
+import { checkoutBranch } from "./checkout-branch.js";
 import type { CloudWorkspaceService } from "./cloud-workspaces.js";
 import { assertCanBranch, projectGit } from "./project-git.js";
 import { inUnvettedCopy } from "./review-copies.js";
@@ -282,13 +283,20 @@ export class WorkspaceService {
     return this.track(preparation);
   }
 
+  /** A thread in the checkout works on whatever branch the checkout is on now, so each turn records that branch, not the one it started on. */
+  private async followCheckout(thread: Thread, project: Project): Promise<Thread> {
+    const branch = (await projectGit(project)) === "none" ? null : await checkoutBranch(project.rootPath);
+    this.assertOpen();
+    return branch === thread.branch ? thread : threads.update(this.db, thread.id, { branch });
+  }
+
   private async prepareThreadWorkspace(thread: Thread, project: Project, baseRef?: string, inherited?: WorkspaceLease): Promise<Thread> {
     this.assertOpen();
     if (project.id === WORKSPACE_ID) {
       if (thread.workspaceMode !== "current") throw new Error("Workspace conversations use their selected folder.");
       return thread;
     }
-    if (thread.workspaceMode === "current" && thread.baseSha) return thread;
+    if (thread.workspaceMode === "current" && thread.baseSha) return this.followCheckout(thread, project);
     if (thread.workspaceMode === "worktree" && thread.worktreePath && (await exists(thread.worktreePath))) {
       this.assertOpen();
       await this.options.cloud?.prepare(thread, project);

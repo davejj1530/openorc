@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { CloudBrainCopy } from "./cloud-brain.js";
 import { HarnessId } from "./harness.js";
 
 /**
@@ -52,6 +53,8 @@ export const cloudCarryRpcParams = {
     .strict(),
   /** What the project's .env files hold, to fill its cloud environment from. Saves nothing. */
   "cloud.env.fromFile": z.object({ projectId: ProjectId }).strict(),
+  /** The branch and commit a copy of the project on the cloud brain would take now. */
+  "cloud.brain.copy": z.object({ projectId: ProjectId }).strict(),
 };
 
 export interface CloudCarryRpcResults {
@@ -60,4 +63,5 @@ export interface CloudCarryRpcResults {
   "cloud.env": CloudEnv;
   "cloud.env.set": CloudEnv;
   "cloud.env.fromFile": CloudEnvFile;
+  "cloud.brain.copy": CloudBrainCopy;
 }

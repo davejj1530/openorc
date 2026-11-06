@@ -1,9 +1,10 @@
 import { projects, type Db } from "@openorc/db";
+import { copyPreview } from "../services/cloud-brain-projects.js";
 import { projectDotEnv, type CloudProjectEnv } from "../services/cloud-env.js";
 import type { CloudSkills } from "../services/cloud-skills.js";
 import type { Handlers } from "./types.js";
 
-type CarryMethod = "cloud.skills" | "cloud.skills.choose" | "cloud.env" | "cloud.env.set" | "cloud.env.fromFile";
+type CarryMethod = "cloud.skills" | "cloud.skills.choose" | "cloud.env" | "cloud.env.set" | "cloud.env.fromFile" | "cloud.brain.copy";
 
 interface Dependencies {
   db: Db;
@@ -31,5 +32,6 @@ export function createCloudCarryHandlers({ db, env, skills }: Dependencies): Pic
     "cloud.env": async ({ projectId }) => ({ projectId, names: await env.names(project(projectId).id) }),
     "cloud.env.set": async ({ projectId, entries }) => ({ projectId, names: await env.set(project(projectId).id, entries) }),
     "cloud.env.fromFile": ({ projectId }) => projectDotEnv(project(projectId).rootPath),
+    "cloud.brain.copy": ({ projectId }) => copyPreview(project(projectId)),
   };
 }

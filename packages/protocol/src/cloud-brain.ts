@@ -175,6 +175,18 @@ export interface CloudBrainProject {
   kept: boolean;
   /** Why the last send failed. */
   error: string | null;
+  /** The branch its copy follows, as the brain last took it; null while it has none. */
+  branch: string | null;
+}
+
+/** What a copy of a project takes when it is added: the branch it follows, and the commit that branch is on now. */
+export interface CloudBrainCopy {
+  branch: string;
+  /** Short. */
+  commit: string;
+  subject: string;
+  /** The branch this Mac's folder has checked out, when it is another, whose work stays here. */
+  checkedOut: string | null;
 }
 
 /** What the brain signs in with besides Claude, as this Mac last handed it over; `behind` while this Mac's changed since. */

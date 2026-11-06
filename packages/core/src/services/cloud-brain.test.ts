@@ -688,7 +688,7 @@ describe("the cloud brain from the Mac", () => {
       const empty = await macProject("empty", { commits: false });
       await setUp();
       brain.calls = [];
-      const row = { on: false, sending: false, kept: false, error: null };
+      const row = { on: false, sending: false, kept: false, error: null, branch: null };
       expect(await projects()).toEqual([
         { id: empty.id, name: "empty", ...row, blocked: "No commits yet." },
         { id: notes.id, name: "notes", ...row, blocked: "Not a Git repository." },
@@ -728,7 +728,19 @@ describe("the cloud brain from the Mac", () => {
       expect(git(copy, "rev-parse", "main")).toBe(head);
       expect(git(copy, "remote", "get-url", "origin")).toBe("https://github.com/me/app.git");
       expect(record.saved.join("\n")).not.toContain("ghp_fixture-secret");
-      expect((await projects())[0]).toEqual({ id: app.id, name: "app", on: true, blocked: null, sending: false, kept: false, error: null });
+      expect((await projects())[0]).toEqual({ id: app.id, name: "app", on: true, blocked: null, sending: false, kept: false, error: null, branch: "main" });
+    });
+
+    it("says, before a project is added, which branch its copy takes, the commit it is on, and the branch checked out here when another", async () => {
+      const app = await macProject("app");
+      commit(app.folder, "login.ts", "export const login = 1;\n");
+      const head = git(app.folder, "rev-parse", "--short", "main");
+      expect(await rpc("cloud.brain.copy", { projectId: app.id })).toEqual({ branch: "main", commit: head, subject: "login.ts", checkedOut: null });
+      git(app.folder, "checkout", "-q", "-b", "feature-x");
+      commit(app.folder, "draft.ts", "draft\n");
+      expect(await rpc("cloud.brain.copy", { projectId: app.id })).toEqual({ branch: "main", commit: head, subject: "login.ts", checkedOut: "feature-x" });
+      const notes = await macProject("notes", { repository: false });
+      await expect(rpc("cloud.brain.copy", { projectId: notes.id })).rejects.toThrow("Not a Git repository.");
     });
 
     it("never wakes the brain, nor asks Vercel, to show them", async () => {

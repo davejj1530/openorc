@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 import { brainTakesProject, branchHead, bundleBranch, type BrainControlResults, type BrainMachine, type CopySettings } from "@openorc/cloud";
 import { projects, type Db } from "@openorc/db";
-import { defaultBranch, originUrl } from "@openorc/git";
-import type { CloudBrainProject, Project } from "@openorc/protocol";
+import { defaultBranch, git, originUrl } from "@openorc/git";
+import type { CloudBrainCopy, CloudBrainProject, Project } from "@openorc/protocol";
 import { projectGit } from "./project-git.js";
 
 /** A Mac project switched on for the cloud brain, kept in the brain's record so removing the brain forgets it. */
@@ -54,7 +54,7 @@ export async function projectsShown(db: Db, kept: readonly BrainProject[], sendi
     [...listed, ...unlisted].map(async (project) => {
       const record = records.get(project.id);
       const shown = { on: record !== undefined, blocked: await blocked(project, record), sending: sending === project.id, kept: record ? keptOwn(record) : false };
-      return { id: project.id, name: project.name, ...shown, error: record?.error ?? null };
+      return { id: project.id, name: project.name, ...shown, error: record?.error ?? null, branch: record?.branch ?? null };
     }),
   );
 }
@@ -76,6 +76,19 @@ export async function copyBranch(project: Project, followed?: string): Promise<{
   if (!branch) return { blocked: "No default branch." };
   if (!brainTakesProject(project.name, branch)) return { blocked: "The cloud brain can't take this project's name or branch." };
   return (await branchHead(project.rootPath, branch)) ? { branch } : { blocked: `No commits on ${branch}.` };
+}
+
+/** What a copy of the project takes now: the branch it follows, the commit that branch is on, and the branch checked out here when another. */
+export async function copyPreview(project: Project): Promise<CloudBrainCopy> {
+  const copy = await copyBranch(project);
+  if ("blocked" in copy) throw new Error(copy.blocked);
+  const [log, current] = await Promise.all([
+    git(project.rootPath, ["log", "-1", "--format=%h%x00%s", `refs/heads/${copy.branch}`]),
+    git(project.rootPath, ["branch", "--show-current"], { okCodes: [0, 128] }),
+  ]);
+  const [commit = "", subject = ""] = log.stdout.trim().split("\0");
+  const here = current.stdout.trim();
+  return { branch: copy.branch, commit, subject, checkedOut: here && here !== copy.branch ? here : null };
 }
 
 /** The project's default branch as git has it now, which a copy follows when it moves, as from master to main. */

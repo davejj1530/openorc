@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import type { CloudBrainProject, CloudEnv, RpcParams } from "@openorc/protocol";
+import type { CloudBrainCopy, CloudBrainProject, CloudEnv, RpcParams } from "@openorc/protocol";
+import { GitBranch } from "../components/icons";
 import { Button, Dialog, Select, TextButton, Tooltip } from "../components/ui";
 import { queryClient, useRpc, useRpcMutation } from "../lib/client";
 import { CloudEnvButton, ENV_NOTE, EnvEditor, useEnvDraft } from "./settings-cloud-env";
@@ -8,9 +9,29 @@ import { Section, SettingRow, Status } from "./settings-shared";
 
 const shown = (projects: CloudBrainProject[]) => queryClient.setQueryData(["cloud.brain.projects", {}], projects);
 
-function hint({ error, kept }: CloudBrainProject) {
+function hint({ error, kept, branch }: CloudBrainProject) {
   if (error) return <span className="text-bad">{error}</span>;
-  return kept ? "The cloud copy has commits this Mac doesn't, so it wasn't updated." : undefined;
+  if (kept) return "The cloud copy has commits this Mac doesn't, so it wasn't updated.";
+  return branch ? `Follows ${branch}` : undefined;
+}
+
+/** The branch a copy takes and the commit it is on now, and the branch checked out here when it is another. */
+function CopyBranch({ copy }: { copy: CloudBrainCopy }) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex min-w-0 items-center gap-2 rounded-lg bg-surface-2 px-3 py-2.5" aria-label="Branch copied">
+        <GitBranch size={14} className="shrink-0 text-ink-3" />
+        <span className="shrink-0 font-mono">{copy.branch}</span>
+        <span className="shrink-0 font-mono text-ink-4">{copy.commit}</span>
+        <span className="min-w-0 truncate text-ink-3">{copy.subject}</span>
+      </div>
+      {copy.checkedOut ? (
+        <p className="text-ink-3">
+          This Mac has <span className="font-mono">{copy.checkedOut}</span> checked out. Its work stays here until it reaches {copy.branch}.
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 type Choose = {
@@ -41,7 +62,21 @@ function OnProject({ project, choose }: { project: CloudBrainProject; choose: Ch
  * The sheet that adds a project: what the brain gets of it, and the environment its threads need, filled from its .env
  * files while it has none saved. Adding saves the environment first, so the copy's first thread has it.
  */
-function AddSheet({ project, names, choose, close }: { project: CloudBrainProject; names: string[]; choose: Choose; close: () => void }) {
+function AddSheet({
+  project,
+  names,
+  preview,
+  choose,
+  close,
+}: {
+  project: CloudBrainProject;
+  names: string[];
+  /** The copy it would take; its error, when it cannot have one now, takes its place and Add waits. */
+  preview: { data?: CloudBrainCopy | undefined; error: Error | null };
+  choose: Choose;
+  close: () => void;
+}) {
+  const copy = preview.data;
   const draft = useEnvDraft(project.id, names);
   const save = useRpcMutation("cloud.env.set");
   // eslint-disable-next-line react-hooks/exhaustive-deps -- Fills once as the sheet opens; later edits are the person's own.
@@ -65,7 +100,16 @@ function AddSheet({ project, names, choose, close }: { project: CloudBrainProjec
   };
   return (
     <div className="space-y-3">
-      <p className="text-ink-2">The cloud brain gets a copy of its committed code, for threads you start from your phone. Files Git ignores, like .env, stay on this Mac.</p>
+      {copy ? <CopyBranch copy={copy} /> : null}
+      {preview.error ? (
+        <p role="alert" className="text-bad">
+          {preview.error.message}
+        </p>
+      ) : null}
+      <p className="text-ink-2">
+        Threads you start from your phone work in a copy of {copy ? copy.branch : "its default branch"}, which follows it as it moves. Uncommitted changes and files Git ignores, like .env, stay on
+        this Mac.
+      </p>
       <p className="text-ink-3">{ENV_NOTE}</p>
       <EnvEditor draft={draft} disabled={save.isPending} />
       <Failure error={save.error} />
@@ -73,7 +117,7 @@ function AddSheet({ project, names, choose, close }: { project: CloudBrainProjec
         <Button variant="ghost" onClick={close}>
           Cancel
         </Button>
-        <Button variant="primary" disabled={save.isPending || draft.filling} onClick={add}>
+        <Button variant="primary" disabled={!copy || save.isPending || draft.filling} onClick={add}>
           Add
         </Button>
       </div>
@@ -86,6 +130,7 @@ function AddProject({ projects, first, choose }: { projects: CloudBrainProject[]
   const [picked, setPicked] = useState("");
   const [adding, setAdding] = useState<CloudBrainProject | null>(null);
   const env = useRpc("cloud.env", { projectId: adding?.id ?? "" }, { enabled: adding !== null });
+  const copy = useRpc("cloud.brain.copy", { projectId: adding?.id ?? "" }, { enabled: adding !== null });
   const open = projects.filter((project) => !project.blocked);
   const id = open.some((project) => project.id === picked) ? picked : (open[0]?.id ?? "");
   if (!projects.length) return null;
@@ -102,7 +147,7 @@ function AddProject({ projects, first, choose }: { projects: CloudBrainProject[]
         Add
       </Button>
       <Dialog open={adding !== null} onOpenChange={(next) => (next ? undefined : setAdding(null))} title={`Add ${adding?.name ?? "a project"} to the cloud brain`} width={560}>
-        {adding && env.data ? <AddSheet key={adding.id} project={adding} names={env.data.names} choose={choose} close={() => setAdding(null)} /> : <Failure error={env.error} />}
+        {adding && env.data ? <AddSheet key={adding.id} project={adding} names={env.data.names} preview={copy} choose={choose} close={() => setAdding(null)} /> : <Failure error={env.error} />}
       </Dialog>
     </SettingRow>
   );

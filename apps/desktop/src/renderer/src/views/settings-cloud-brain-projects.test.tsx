@@ -27,6 +27,7 @@ const project = (id: string, name: string, shown: Partial<CloudBrainProject> = {
   sending: false,
   kept: false,
   error: null,
+  branch: null,
   ...shown,
 });
 
@@ -40,6 +41,7 @@ function show(projects: CloudBrainProject[], status: CloudBrainStatus = ready) {
     if (method === "cloud.brain.phones") return [] as never;
     if (method === "cloud.env") return { projectId: (params as { projectId: string }).projectId, names: [] } as never;
     if (method === "cloud.env.fromFile") return dotEnv as never;
+    if (method === "cloud.brain.copy") return { branch: "main", commit: "a1b2c3d", subject: "Fix the login flow", checkedOut: "feature-x" } as never;
     if (method === "cloud.env.set") {
       const { projectId, entries } = params as { projectId: string; entries: { name: string }[] };
       return { projectId, names: entries.map((entry) => entry.name) } as never;
@@ -73,14 +75,18 @@ const sheet = () => screen.getByRole("dialog");
 
 it("lists the projects the brain has, each with its environment and Remove, and adds another through a sheet that sends its .env along", async () => {
   dotEnv = { files: [".env"], entries: [{ name: "API_URL", value: "https://dev.example" }] };
-  show([project("p1", "app"), project("p2", "site", { on: true }), project("p3", "docs")]);
+  show([project("p1", "app"), project("p2", "site", { on: true, branch: "main" }), project("p3", "docs")]);
   await screen.findByText("Projects");
   expect(within(row("site")).getByRole("button", { name: "Environment" })).toBeTruthy();
+  expect(within(row("site")).getByText("Follows main")).toBeTruthy();
   expect(screen.queryByRole("switch")).toBeNull();
   expect([...picker().options].map((option) => option.textContent)).toEqual(["app", "docs"]);
   fireEvent.change(picker(), { target: { value: "p3" } });
   fireEvent.click(screen.getByRole("button", { name: "Add" }));
   expect(await screen.findByRole("heading", { name: "Add docs to the cloud brain" })).toBeTruthy();
+  const branch = await within(sheet()).findByLabelText("Branch copied");
+  expect(branch.textContent).toBe("maina1b2c3dFix the login flow");
+  expect(within(sheet()).getByText(/checked out\. Its work stays here until it reaches main\./)).toBeTruthy();
   await waitFor(() =>
     expect(
       within(sheet())
@@ -97,6 +103,21 @@ it("lists the projects the brain has, each with its environment and Remove, and 
   await waitFor(() => expect(remove("docs")).toBeTruthy());
   fireEvent.click(remove("site"));
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.project", { projectId: "p2", on: false }));
+});
+
+it("names why a project cannot be added once its sheet is open, and waits", async () => {
+  show([project("p1", "app")]);
+  const before = vi.mocked(core.call).getMockImplementation()!;
+  vi.mocked(core.call).mockImplementation(async (method: string, params: unknown) => {
+    if (method === "cloud.brain.copy") throw new Error("No commits on main.");
+    return before(method as never, params as never);
+  });
+  await screen.findByText("Projects");
+  fireEvent.click(screen.getByRole("button", { name: "Add" }));
+  // Reads are tried twice before they fail.
+  expect(await within(await screen.findByRole("dialog")).findByText("No commits on main.", {}, { timeout: 4000 })).toBeTruthy();
+  expect((within(sheet()).getByRole("button", { name: "Add" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(within(sheet()).queryByLabelText("Branch copied")).toBeNull();
 });
 
 it("adds a project whose .env files hold nothing without saving an environment", async () => {

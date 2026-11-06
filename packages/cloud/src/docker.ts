@@ -29,8 +29,9 @@ const INSTALL = [
   // Where an init system runs, the packages would start their own daemon, with other settings, before ours.
   `if [ ! -e /usr/sbin/policy-rc.d ]; then printf '#!/bin/sh\\nexit 101\\n' > /usr/sbin/policy-rc.d && chmod +x /usr/sbin/policy-rc.d && trap 'rm -f /usr/sbin/policy-rc.d' EXIT; fi`,
   "apt-get update -q",
-  // Pulling images needs the certificates the package only recommends.
-  "apt-get install -y -q --no-install-recommends docker.io ca-certificates",
+  // Pulling images needs the certificates the package only recommends, and the daemon's firewall rules the kernel modules
+  // kmod loads, which the package only suggests.
+  "apt-get install -y -q --no-install-recommends docker.io ca-certificates kmod",
   // Debian 13 moved the docker command to a package of its own.
   "command -v docker >/dev/null || apt-get install -y -q --no-install-recommends docker-cli",
   `for name in docker-compose-v2 docker-compose-plugin; do docker compose version >/dev/null 2>&1 && break; apt-get install -y -q --no-install-recommends "$name" || true; done`,
@@ -51,6 +52,18 @@ const INSTALL = [
   // Nor at the next boot, where the package's service would take the socket before ours.
   "if command -v systemctl >/dev/null; then systemctl disable --now docker.socket docker.service >/dev/null 2>&1 || true; fi",
   "docker compose version",
+].join("\n");
+
+/**
+ * The kernel loads netfilter's modules when Docker's iptables asks for them, through modprobe. An image without kmod,
+ * as Agent37's base on a VM, has none, and the daemon fails with "Failed to initialize nft: Protocol not supported".
+ * Installs it where it is missing and apt-get is there; anything else is left for the daemon's own error to say.
+ */
+const MODPROBE = [
+  "command -v modprobe >/dev/null && exit 0",
+  "command -v apt-get >/dev/null || exit 0",
+  "export DEBIAN_FRONTEND=noninteractive",
+  "apt-get install -y -q --no-install-recommends kmod || { apt-get update -q && apt-get install -y -q --no-install-recommends kmod; }",
 ].join("\n");
 
 /**
@@ -85,6 +98,7 @@ export async function ensureDocker(sandbox: Sandbox, wait: DockerWait = WAIT): P
     const installed = await sandbox.exec("sh", ["-c", INSTALL], { sudo: true });
     if (installed.code !== 0) throw new Error(`Docker could not be installed in the sandbox (exit ${installed.code ?? "signal"}).\n${tail(`${installed.stdout.toString("utf8")}${installed.stderr}`)}`);
   }
+  await sandbox.exec("sh", ["-c", MODPROBE], { sudo: true });
   const group = await sandbox.exec("id", ["-gn"]);
   if (group.code !== 0) throw new Error(`Could not tell the sandbox user's group for Docker. ${group.stderr.trim()}`.trim());
   const state = path.posix.join(sandbox.root, ".openorc");

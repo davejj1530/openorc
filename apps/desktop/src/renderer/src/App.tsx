@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { AppUpdateNotice } from "./components/AppUpdateNotice";
 import { CommandPalette } from "./components/CommandPalette";
 import { Sidebar } from "./components/Sidebar";
+import { Wordmark } from "./components/SidebarListHead";
 import { DeleteThreadDialog } from "./components/ThreadActions";
 import { ThreadMoveDialog } from "./components/ThreadMoveDialog";
 import { ThreadWorkspace } from "./components/ThreadWorkspace";
@@ -108,7 +109,9 @@ export function App() {
     return (
       <div className="onboarding-root">
         <header className="onboarding-chrome" data-traffic-lights={trafficLights || undefined}>
-          <span className="onboarding-brand">OpenOrc</span>
+          <span className="onboarding-brand">
+            <Wordmark />
+          </span>
         </header>
         <main className="onboarding-surface">
           <div className="document-skeleton" aria-label="Checking setup" />

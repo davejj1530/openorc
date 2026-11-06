@@ -15,12 +15,14 @@
   color: var(--ink);
 }
 
+/* The label centers on the window, so the grid keeps equal edges and the native window controls
+   push only the cell beside them. */
 .onboarding-chrome {
   -webkit-app-region: drag;
   height: var(--height-topbar);
   flex: 0 0 auto;
   display: grid;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: var(--spacing-lg);
   padding: 0 var(--spacing-lg);
@@ -29,17 +31,19 @@
   line-height: var(--text-sm--line-height);
 }
 
-.onboarding-chrome[data-traffic-lights="true"] {
-  padding-left: var(--spacing-traffic);
+/* The wordmark lands where the sidebar's sits once setup ends. */
+.onboarding-brand {
+  display: flex;
+  min-width: 0;
+}
+
+.onboarding-chrome[data-traffic-lights="true"] .onboarding-brand {
+  margin-left: calc(var(--spacing-traffic) - var(--spacing-lg));
 }
 
 /* Windows and Linux draw their window controls over the header's right end, where recovery's Close sits. */
-.onboarding-chrome[data-window-controls="true"] {
-  padding-right: var(--spacing-controls);
-}
-
-.onboarding-brand {
-  color: var(--ink-2);
+.onboarding-chrome[data-window-controls="true"] .onboarding-preview-trigger {
+  margin-right: calc(var(--spacing-controls) - var(--spacing-lg));
 }
 
 /* A progress track: one segment per step under its name. Steps done and the current one fill
@@ -594,7 +598,7 @@
     display: none;
   }
   .onboarding-chrome {
-    grid-template-columns: 1fr auto;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 }
 

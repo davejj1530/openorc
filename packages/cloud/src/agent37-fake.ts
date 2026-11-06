@@ -56,6 +56,8 @@ export interface FakeAgent37Options {
   wakeMs?: number;
   /** How long without calls, commands or bytes before an auto-sleep instance sleeps; its idle_timeout_seconds when absent. */
   idleMs?: number;
+  /** The most a request to an instance's address may carry, as the Cloudflare edge in front of Agent37 allows; 100 MB when absent. */
+  bodyLimit?: number;
 }
 
 export interface FakeAgent37 {
@@ -183,6 +185,10 @@ class FakeAccount {
     private readonly dir: string,
     private readonly options: FakeAgent37Options,
   ) {}
+
+  get bodyLimit(): number {
+    return this.options.bodyLimit ?? 100 * 1024 * 1024;
+  }
 
   find(id: string, work: (entry: Held) => Answer | Promise<Answer>): Answer | Promise<Answer> {
     const entry = this.held.get(id);
@@ -380,6 +386,13 @@ async function proxy(account: FakeAccount, request: http.IncomingMessage, respon
   if (typeof port !== "number") return reply(response, port);
   // As Agent37's own edge does: an instance address answers /health itself, whatever listens on the port.
   if ((match[3] ?? "/") === "/health") return reply(response, ok({ ok: true }));
+  // As the Cloudflare edge in front of Agent37 does, a body over its limit is refused with a page of its own.
+  if (Number(request.headers["content-length"] ?? 0) > account.bodyLimit) {
+    response.writeHead(413, { "content-type": "text/html" });
+    return void response.end(
+      "<html>\r\n<head><title>413 Payload Too Large</title></head>\r\n<body>\r\n<center><h1>413 Payload Too Large</h1></center>\r\n<hr><center>cloudflare</center>\r\n</body>\r\n</html>\r\n",
+    );
+  }
   const headers = { ...request.headers };
   delete headers["x-agent37-key"];
   const upstream = http.request({ host: "127.0.0.1", port, method: request.method, path: `${match[3] ?? "/"}${search}`, headers, agent: false }, (answer) => {

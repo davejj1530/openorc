@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { PassThrough, Writable, type Readable } from "node:stream";
 import type { PortAddress } from "./agent37.js";
 
@@ -32,7 +33,22 @@ export interface InstanceProcess {
 /** What OpenOrc's server of `build` answers at /openorc/health. */
 export const instanceServerAnswer = (build: string) => `openorc-instance-server ${build}`;
 
-/** The code in a service's error body, `{"error": "<code>"}` or `{"error": {"code"}}`, else its first words. */
+/**
+ * The most one request to an instance's address carries. The Cloudflare edge in front of Agent37 refuses a body over
+ * 100 MB with 413, so a larger file goes in pieces well under that, which OpenOrc's server joins.
+ */
+export const PIECE_BYTES = 32 * 1024 * 1024;
+
+/** A refused request in a few words: its status, and what the answer said beside it when that is not the status again. */
+function refusal(status: number, text: string): string {
+  const words = answerCode(text);
+  return words.startsWith(String(status)) ? words : `${status} ${words}`.trim();
+}
+
+/**
+ * The code in a service's error body, `{"error": "<code>"}` or `{"error": {"code"}}`, else its first words: a web
+ * page's title rather than its markup, as Cloudflare's "413 Payload Too Large".
+ */
 function answerCode(text: string): string {
   try {
     const body = JSON.parse(text) as { error?: unknown };
@@ -41,7 +57,9 @@ function answerCode(text: string): string {
   } catch {
     // Not JSON: its words, briefly.
   }
-  return text.trim().slice(0, 80);
+  const title = /<title>([^<]*)<\/title>/i.exec(text)?.[1];
+  const words = title ?? text.replace(/<[^>]*>/g, " ");
+  return words.replace(/\s+/g, " ").trim().slice(0, 80);
 }
 
 /** The Mac's client for OpenOrc's server in an instance (runner/instance-server.ts), through the service's port address. */
@@ -50,6 +68,7 @@ export class InstancePort {
   constructor(
     private readonly address: PortAddress,
     private readonly build = "dev",
+    private readonly pieceBytes = PIECE_BYTES,
   ) {}
 
   private url(pathname: string, file?: string): string {
@@ -78,16 +97,30 @@ export class InstancePort {
     }
   }
 
+  /** Writes the file whole, or in pieces under PIECE_BYTES that the server joins and puts in place after the last. */
   async putFile(file: string, content: Buffer): Promise<void> {
-    const response = await fetch(this.url("/openorc/file", file), { method: "PUT", headers: this.address.headers, body: new Uint8Array(content) });
-    if (!response.ok) throw new Error(`Could not write ${file} in the cloud instance (${response.status}). ${await response.text()}`.trim());
+    if (content.length <= this.pieceBytes) return this.put(this.url("/openorc/file", file), content);
+    const upload = randomBytes(8).toString("hex");
+    for (let at = 0; at < content.length; at += this.pieceBytes) {
+      const piece = content.subarray(at, at + this.pieceBytes);
+      const url = new URL(this.url("/openorc/file", file));
+      url.searchParams.set("upload", upload);
+      url.searchParams.set("at", String(at));
+      if (at + piece.length >= content.length) url.searchParams.set("last", "1");
+      await this.put(url.toString(), piece);
+    }
+  }
+
+  private async put(url: string, body: Buffer): Promise<void> {
+    const response = await fetch(url, { method: "PUT", headers: this.address.headers, body: new Uint8Array(body) });
+    if (!response.ok) throw new Error(`Could not send a file to the cloud instance (${refusal(response.status, await response.text())}).`);
   }
 
   /** Null when the file does not exist. */
   async getFile(file: string): Promise<Buffer | null> {
     const response = await fetch(this.url("/openorc/file", file), { headers: this.address.headers });
     if (response.status === 404) return null;
-    if (!response.ok) throw new Error(`Could not read ${file} in the cloud instance (${response.status}). ${await response.text()}`.trim());
+    if (!response.ok) throw new Error(`Could not read a file from the cloud instance (${refusal(response.status, await response.text())}).`);
     return Buffer.from(await response.arrayBuffer());
   }
 

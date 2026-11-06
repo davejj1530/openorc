@@ -6,6 +6,8 @@
  *
  *   GET  /openorc/health            "openorc-instance-server <id>"
  *   PUT  /openorc/file?path=/abs    writes the body, whole or not at all
+ *   PUT  /openorc/file?path=/abs&upload=<id>&at=<byte>[&last=1]
+ *                                   one piece of a file too large for one request, in order; the last puts it in place
  *   GET  /openorc/file?path=/abs    the file, or 404
  *   WebSocket /openorc/process      one command: its input in, its output out by channel, its exit code last
  *
@@ -260,6 +262,28 @@ async function putFile(file: string, request: http.IncomingMessage): Promise<voi
   }
 }
 
+/**
+ * One piece of a file sent in pieces, appended to its upload's own temporary file, which the last piece moves into
+ * place. A piece that does not start where the upload has reached is refused; the first starts it over.
+ */
+async function putPiece(file: string, request: http.IncomingMessage, url: URL, response: http.ServerResponse): Promise<void> {
+  const upload = url.searchParams.get("upload") ?? "";
+  const at = Number(url.searchParams.get("at"));
+  if (!/^[0-9a-f]{16}$/.test(upload) || !Number.isSafeInteger(at) || at < 0) return void response.writeHead(400).end("A piece needs its upload and where it starts.");
+  await mkdir(path.dirname(file), { recursive: true });
+  const temp = path.join(path.dirname(file), `.${path.basename(file)}.${upload}.upload`);
+  const reached = at === 0 ? 0 : ((await stat(temp).catch(() => null))?.size ?? 0);
+  if (at !== reached) return void response.writeHead(409).end(`The upload has reached byte ${reached}, not ${at}.`);
+  try {
+    await pipeline(request, createWriteStream(temp, { flags: at === 0 ? "w" : "a" }));
+    if (url.searchParams.get("last") === "1") await rename(temp, file);
+  } catch (error) {
+    await rm(temp, { force: true });
+    throw error;
+  }
+  response.writeHead(204).end();
+}
+
 async function getFile(file: string, response: http.ServerResponse): Promise<void> {
   const info = await stat(file).catch(() => null);
   if (!info?.isFile()) return void response.writeHead(404).end();
@@ -273,6 +297,7 @@ async function handle(request: http.IncomingMessage, response: http.ServerRespon
   if (url.pathname !== "/openorc/file") return void response.writeHead(404).end();
   const file = url.searchParams.get("path");
   if (!file || !path.isAbsolute(file)) return void response.writeHead(400).end("The path must be absolute.");
+  if (request.method === "PUT" && url.searchParams.has("upload")) return putPiece(file, request, url, response);
   if (request.method === "PUT") {
     await putFile(file, request);
     return void response.writeHead(204).end();

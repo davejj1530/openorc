@@ -63,7 +63,24 @@ it("writes a 3 MB binary file into folders it makes, reads it back byte for byte
 it("answers null for a missing file or a folder, and refuses a relative path", async () => {
   expect(await instance.getFile(path.join(dir, "missing"))).toBeNull();
   expect(await instance.getFile(dir)).toBeNull();
-  await expect(instance.putFile("relative.txt", Buffer.from("x"))).rejects.toThrow("(400)");
+  await expect(instance.putFile("relative.txt", Buffer.from("x"))).rejects.toThrow("Could not send a file to the cloud instance (400 The path must be absolute.).");
+});
+
+it("joins a file sent in pieces, in order only, and puts it in place after the last", async () => {
+  const content = randomBytes(1024 * 1024 + 7);
+  const file = path.join(dir, "pieces", "project.bundle");
+  await new InstancePort(instanceAddress(), "dev", 256 * 1024).putFile(file, content);
+  expect((await readFile(file)).equals(content)).toBe(true);
+  expect(await readdir(path.dirname(file))).toEqual(["project.bundle"]);
+
+  const piece = (query: string, body: string) => fetch(`http://127.0.0.1:${port}/openorc/file?path=${encodeURIComponent(file)}&upload=0123456789abcdef&${query}`, { method: "PUT", body });
+  expect((await piece("at=0", "new ")).status).toBe(204);
+  const skipped = await piece("at=99", "late");
+  expect([skipped.status, await skipped.text()]).toEqual([409, "The upload has reached byte 4, not 99."]);
+  expect((await readFile(file)).equals(content)).toBe(true);
+  expect((await piece("at=4&last=1", "copy")).status).toBe(204);
+  expect(await readFile(file, "utf8")).toBe("new copy");
+  expect(await readdir(path.dirname(file))).toEqual(["project.bundle"]);
 });
 
 it("carries stdout and stderr apart, then the exit code", async () => {

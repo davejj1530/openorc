@@ -216,6 +216,27 @@ describe("an Agent37 sandbox", () => {
     expect(serverStarts()).toBe(1);
   });
 
+  it("sends a file too large for one request in pieces, as Agent37's edge refuses a large body, and says so in words", async () => {
+    const edge = await startFakeAgent37(path.join(base, "instances"), { bodyLimit: 256 * 1024, env: () => ({ ...process.env, PATH: `${path.dirname(process.execPath)}:/usr/bin:/bin` }) });
+    try {
+      const behind = new Agent37SandboxProvider({ credentials: async () => ({ key: edge.key, cpu: 2, memory: 4 }), files: runnerFiles(), api: (key) => agent37Api(key, edge.endpoints) });
+      const sandbox = await behind.open("openorc-big");
+      await sandbox.writeFile(path.posix.join(sandbox.root, "small.txt"), Buffer.from("starts the server"));
+      const [instance] = await agent37Api(edge.key, edge.endpoints).list();
+      const address = agent37Api(edge.key, edge.endpoints).port(instance!.id, INSTANCE_SERVER_PORT);
+      const build = (await new InstancePort(address).probe())!.split(" ").at(-1)!;
+      const content = randomBytes(600 * 1024);
+      const file = path.posix.join(sandbox.root, "inbox", "project.bundle");
+      await expect(new InstancePort(address, build).putFile(file, content)).rejects.toThrow("Could not send a file to the cloud instance (413 Payload Too Large).");
+      await new InstancePort(address, build, 100 * 1024).putFile(file, content);
+      expect((await sandbox.readFile(file))?.equals(content)).toBe(true);
+      const inbox = await sandbox.exec("ls", ["-a", path.posix.dirname(file)]);
+      expect(inbox.stdout.toString().split("\n").filter(Boolean).sort()).toEqual([".", "..", "project.bundle"]);
+    } finally {
+      await edge.close();
+    }
+  });
+
   it("reaches its server only with the account's key", async () => {
     const sandbox = await provider.open("openorc-a");
     await sandbox.writeFile(path.posix.join(sandbox.root, "x.txt"), Buffer.from("x"));

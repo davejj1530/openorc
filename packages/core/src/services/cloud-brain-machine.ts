@@ -10,7 +10,8 @@ export interface BrainBundleSource {
 }
 
 /** The parts of BrainMachine this Mac uses; tests pass a stand-in. Moving threads uses the transfers too. */
-export type BrainMachineLike = Pick<BrainMachine, "status" | "provision" | "wake" | "control" | "importProject" | "remove"> & Partial<Pick<BrainMachine, "receiveThread" | "readOutbox" | "costSince">>;
+export type BrainMachineLike = Pick<BrainMachine, "status" | "provision" | "wake" | "control" | "importProject" | "remove"> &
+  Partial<Pick<BrainMachine, "receiveThread" | "readOutbox" | "costSince" | "lastUsed">>;
 
 /** The brain's machine on a team. Its project is made only when `create`; otherwise a team without one has none. */
 export type OpenBrainMachine = (access: BrainAccess, create: boolean) => Promise<BrainMachineLike | null>;

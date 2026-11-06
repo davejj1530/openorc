@@ -8,6 +8,8 @@ export const BRAIN_PROJECT = "openorc-brain";
 export const BRAIN_SANDBOX = "brain";
 /** The session timeout the brain is made and resumed with: a brain that stops extending it sleeps within this. */
 export const BRAIN_AWAY_MS = 10 * 60_000;
+/** Idle this long and the brain sleeps; Agent37's own idle timeout for it is the same. */
+export const BRAIN_IDLE_MS = 5 * 60_000;
 /** The line `serve` prints on stdout, followed by a space and its version, once phones and `ctl` can reach it. */
 export const BRAIN_READY = "openorc-brain ready";
 /** How `serve` and `ctl` end when they do not succeed, after sysexits.h. */

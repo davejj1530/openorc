@@ -139,6 +139,8 @@ export interface BrainHome<Vm extends BrainVm = BrainVm> {
   readonly secrets: string[];
   /** What the brain and the thread machines it made ran from `since` to `now`, by the service's own numbers. Reads only. */
   costSince(since: number, now: number): Promise<number>;
+  /** When the brain was last in use, by the service's record: now while it runs, null where it cannot say. Reads only. */
+  lastUsed?(): Promise<number | null>;
   /** The brain's machine first, so it cannot make another thread machine meanwhile, then every thread machine it made. */
   removeAll(): Promise<void>;
   /**
@@ -506,6 +508,11 @@ export class BrainMachine {
   /** What the brain and the thread machines it made ran from `since` on, by its service's numbers. A sleeping brain stays asleep. */
   costSince(since: number, now = Date.now()): Promise<number> {
     return this.home.costSince(since, now);
+  }
+
+  /** When the brain was last in use, by its service: now while it runs. A sleeping brain stays asleep. */
+  lastUsed(): Promise<number | null> {
+    return this.home.lastUsed?.() ?? Promise.resolve(null);
   }
 
   /** Deletes the brain's machine, then every thread machine it made. */

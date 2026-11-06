@@ -7,7 +7,7 @@ import { startFakeAgent37, type FakeAgent37 } from "../agent37-fake.js";
 import { Agent37SandboxProvider } from "../agent37-sandbox.js";
 import { runnerFiles } from "../runner-client.js";
 import { agent37Home, type Agent37BrainVm } from "./agent37-brain.js";
-import { BRAIN_PORT, brainLayout } from "./layout.js";
+import { BRAIN_IDLE_MS, BRAIN_PORT, brainLayout } from "./layout.js";
 import { BrainMachine, BrainUnavailable, type BrainHome } from "./machine.js";
 import { agent37Self } from "./self.js";
 import { brainKeyText, newBrainKey, parseLaunch } from "./wire.js";
@@ -182,6 +182,16 @@ describe("the brain's Agent37 instance", () => {
     await vm.writeFiles([{ path: file, content: new Uint8Array(Buffer.from("package")) }]);
     expect(Buffer.from((await vm.readFile(file))!).toString()).toBe("package");
     expect(await vm.readFile(`${file}.missing`)).toBeNull();
+  });
+
+  it("says when it was last used without waking it: now while it runs, and asleep, when it fell asleep less its idle time", async () => {
+    const vm = await home.open({ vcpus: 1 });
+    expect(Math.abs((await home.lastUsed!())! - Date.now())).toBeLessThan(2_000);
+    await api.sleep(vm.instance.id);
+    const asleep = (await api.get(vm.instance.id))!;
+    const execs = fake.execs.length;
+    expect(await home.lastUsed!()).toBe(asleep.slept_at! * 1000 - BRAIN_IDLE_MS);
+    expect([(await api.get(vm.instance.id))?.status, fake.execs.length]).toEqual(["sleeping", execs]);
   });
 
   it("is looked at without waking: asleep, it reads as stopped and no brain answers, and it stays asleep", async () => {

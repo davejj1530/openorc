@@ -1,4 +1,4 @@
-import { BRAIN_AWAY_MS, type BrainSelf } from "@openorc/cloud";
+import { BRAIN_AWAY_MS, BRAIN_IDLE_MS, type BrainSelf } from "@openorc/cloud";
 
 export interface AwakeTiming {
   /** How often the policy looks. */
@@ -11,7 +11,7 @@ export interface AwakeTiming {
   lastCallMs: number;
 }
 
-export const AWAKE: AwakeTiming = { tickMs: 60_000, awayMs: BRAIN_AWAY_MS, idleMs: 5 * 60_000, lastCallMs: 60_000 };
+export const AWAKE: AwakeTiming = { tickMs: 60_000, awayMs: BRAIN_AWAY_MS, idleMs: BRAIN_IDLE_MS, lastCallMs: 60_000 };
 
 export interface AwakeState {
   /** The last moment anything was busy. Starts at the start: a brain someone just woke waits for them. */

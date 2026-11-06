@@ -320,3 +320,25 @@ it("passes every step of the cloud check end to end, installing Claude Code the 
   expect(progress.find((entry) => entry.step === "tools" && entry.state === "done")?.detail).toMatch(/^Node \d+\.\d+\.\d+ · Git \S+ · Claude Code 2\.1\.316$/);
   expect(await api.list()).toEqual([]);
 }, 60_000);
+
+it("waits on a call to a sleeping instance while it restores, as Agent37 holds it, after it fell asleep with nothing reaching it", async () => {
+  await mkdir(path.join(base, "slow"));
+  const env = () => ({ ...process.env, PATH: `${path.join(base, "bin")}:/usr/bin:/bin:${path.dirname(process.execPath)}` });
+  const slow = await startFakeAgent37(path.join(base, "slow"), { env, wakeMs: 600, idleMs: 300 });
+  try {
+    const slowApi = agent37Api(slow.key, slow.endpoints);
+    const sandboxes = new Agent37SandboxProvider({ credentials: async () => ({ key: slow.key, cpu: 2, memory: 4 }), files: runnerFiles(), api: (key) => agent37Api(key, slow.endpoints) });
+    const sandbox = await sandboxes.open("openorc-slow");
+    const file = path.posix.join(sandbox.root, "kept.txt");
+    await sandbox.writeFile(file, Buffer.from("kept"));
+    const id = (await slowApi.list())[0]!.id;
+    await eventually(async () => (await slowApi.get(id))?.status === "sleeping");
+    expect((await slowApi.get(id))?.slept_at).toBeGreaterThan(0);
+    const asked = Date.now();
+    expect((await sandbox.readFile(file))?.toString("utf8")).toBe("kept");
+    expect(Date.now() - asked).toBeGreaterThanOrEqual(550);
+    expect((await slowApi.get(id))?.status).toBe("running");
+  } finally {
+    await slow.close();
+  }
+}, 30_000);

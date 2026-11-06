@@ -175,6 +175,16 @@ export class CloudBrain {
     return (await machine?.status().catch(() => null))?.state === "running";
   }
 
+  /** When the brain was last in use, by its service: now while it runs, null before it is set up. Never wakes it. */
+  async lastUsed(): Promise<number | null> {
+    const stored = await this.record.read().catch(() => null);
+    if (!stored?.ready) return null;
+    const machine = await this.reach(stored)
+      .then((access) => this.open(access, false))
+      .catch(() => null);
+    return (await machine?.lastUsed?.().catch(() => null)) ?? null;
+  }
+
   /** What moving threads, or the brain itself, needs of the brain this Mac set up, once it has started; null before. Never wakes it. */
   async moves(): Promise<{ address: string; key: BrainKey; linkKey: string | null; projects: BrainProject[]; moving: StoredBrain["moving"] } | null> {
     const stored = await this.record.read().catch(() => null);
@@ -237,6 +247,14 @@ export class CloudBrain {
     await this.serialize(async () => {
       const stored = await this.stored();
       if (stored.linkKey !== linkKey) await this.record.write({ ...stored, linkKey });
+    });
+  }
+
+  /** The brain answered at its address but not at the path its stored link key makes: the next dial asks it for its key. */
+  async forgetLinkKey(): Promise<void> {
+    await this.serialize(async () => {
+      const { linkKey: _stale, ...stored } = await this.stored();
+      await this.record.write(stored);
     });
   }
 

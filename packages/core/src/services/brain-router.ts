@@ -55,6 +55,12 @@ export class BrainPages {
 
   constructor(private readonly db: Db) {}
 
+  /** When the brain last answered a list here, across restarts too; null when it never has. */
+  lastHeard(): number | null {
+    const times = [...this.pages.values()].map((page) => page.heardAt);
+    return times.length ? Math.max(...times) : null;
+  }
+
   /** Read once, at the first list a window asks with a brain set up. */
   private get pages(): Map<string, Page> {
     if (this.kept) return this.kept;

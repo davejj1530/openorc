@@ -194,3 +194,77 @@ it("never dials a brain whose address would wake it while it sleeps, and dials i
   expect([dials, wakes, link.reach]).toEqual([1, 1, "live"]);
   link.close();
 });
+
+it("says once why it can't reach the brain, until the reason changes, since nothing on screen does", async () => {
+  server = createHttpServer();
+  let status = 502;
+  server.on("upgrade", (_request, socket) => socket.end(`HTTP/1.1 ${status} Nope\r\ncontent-length: 0\r\n\r\n`));
+  await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as { port: number };
+  const keys = { publicKey: new Uint8Array(32), privateKey: new Uint8Array(32) };
+  const warnings: string[] = [];
+  let located = true;
+  const link = new BrainLink({
+    endpoint: {
+      ready: async () => true,
+      locate: async () => (located ? { url: `ws://127.0.0.1:${port}/link`, brainKey: new Uint8Array(32), ownerKeys: keys } : null),
+      wake: async () => {},
+      projects: async () => ({ toCloud: () => null, toMac: () => null }),
+    },
+    log: { info: () => {}, warn: (text: string) => void warnings.push(text), error: () => {} } as never,
+    connectMs: 2_000,
+  });
+  const tries = async () => {
+    for (let i = 0; i < 2; i++) await link.call("threads.list", {}, { wake: false }).catch(() => undefined);
+  };
+  await tries();
+  status = 404;
+  await tries();
+  located = false;
+  await tries();
+  expect(warnings).toEqual([
+    "the cloud brain could not be reached: its address answered 502 instead of the link",
+    "the cloud brain could not be reached: its address answered 404 instead of the link",
+    "the cloud brain could not be reached: this Mac has no address or link key for it yet",
+  ]);
+  link.close();
+});
+
+it("asks the brain for its key again when its address answers 404 at the path the stored key makes, and dials once more", async () => {
+  server = createHttpServer();
+  const paths: string[] = [];
+  let answer = (path: string) => (path === "/link/new" ? 502 : 404);
+  server.on("upgrade", (request, socket) => {
+    paths.push(request.url ?? "");
+    socket.end(`HTTP/1.1 ${answer(request.url ?? "")} Nope\r\ncontent-length: 0\r\n\r\n`);
+  });
+  await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as { port: number };
+  const keys = { publicKey: new Uint8Array(32), privateKey: new Uint8Array(32) };
+  const warnings: string[] = [];
+  let key = "old";
+  let relearned = 0;
+  const link = new BrainLink({
+    endpoint: {
+      ready: async () => true,
+      locate: async () => ({ url: `ws://127.0.0.1:${port}/link/${key}`, brainKey: new Uint8Array(32), ownerKeys: keys }),
+      wake: async () => {},
+      relearn: async () => {
+        relearned++;
+        key = "new";
+      },
+      projects: async () => ({ toCloud: () => null, toMac: () => null }),
+    },
+    log: { info: () => {}, warn: (text: string) => void warnings.push(text), error: () => {} } as never,
+    connectMs: 2_000,
+  });
+  await link.call("threads.list", {}, { wake: false }).catch(() => undefined);
+  expect([paths, relearned, warnings]).toEqual([["/link/old", "/link/new"], 1, ["the cloud brain could not be reached: its address answered 502 instead of the link"]]);
+
+  // A brain that answers 404 whatever its key is asked once a dial, then said why.
+  answer = () => 404;
+  paths.length = 0;
+  await link.call("threads.list", {}, { wake: false }).catch(() => undefined);
+  expect([paths, relearned, warnings.at(-1)]).toEqual([["/link/new", "/link/new"], 2, "the cloud brain could not be reached: its address answered 404 instead of the link"]);
+  link.close();
+});

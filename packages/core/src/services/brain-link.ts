@@ -33,6 +33,10 @@ export interface BrainEndpoint {
   dialable?(): Promise<boolean>;
   /** Wakes the brain for a window's own intent, as Wake does; resolves once it runs. */
   wake(): Promise<void>;
+  /** When the brain was last in use, by its service: now while it runs, null where it cannot say. Never wakes it. */
+  lastUsed?(): Promise<number | null>;
+  /** The brain answered at its address but not at its stored key's path, as once it was set up again: learn its key anew. */
+  relearn?(): Promise<void>;
   projects(): Promise<ProjectMapping>;
   /** Sends the brain what is new on this Mac's chosen branches, while it runs. Never wakes it. */
   freshen?(): Promise<void>;
@@ -54,16 +58,20 @@ export class BrainOutOfReach extends Error {
 export type BrainPush = { type: "push"; push: RemotePush } | { type: "gap"; runIds: string[] };
 
 /** A refused upgrade: the brain's address answers, but no brain runs there (410/502 while it sleeps). */
-class Refused extends Error {}
+class Refused extends Error {
+  constructor(readonly status: number | undefined) {
+    super(status ? `its address answered ${status} instead of the link` : "its address refused the link");
+  }
+}
 
 /** Dials with `ws`; a refused upgrade reads as asleep, anything else, a dial that never answers too, as out of reach. */
 function dial(url: string, connectMs: number): Promise<LinkSocket> {
   const ws = new WebSocket(url, { handshakeTimeout: connectMs });
   return new Promise((resolve, reject) => {
     ws.once("open", () => resolve(linkSocket(ws)));
-    ws.once("unexpected-response", () => {
+    ws.once("unexpected-response", (_request, response) => {
       ws.terminate();
-      reject(new Refused());
+      reject(new Refused(response.statusCode));
     });
     ws.once("error", reject);
   });
@@ -90,6 +98,10 @@ export class BrainLink {
   private session: PhoneSession | null = null;
   private connecting: Promise<PhoneSession | null> | null = null;
   private current: OwnerReach = "offline";
+  /** When the brain last stopped being live here. */
+  private lastLive: number | null = null;
+  /** Why the last dial did not reach the brain, logged once until another reason or a session. */
+  private lastFailure: string | null = null;
   /** The wake under way, which every call waiting for the brain shares. While it runs, a refused dial means not up yet. */
   private waking: Promise<void> | null = null;
   private interest: string[] = [];
@@ -164,6 +176,17 @@ export class BrainLink {
     return () => this.reaches.delete(listener);
   }
 
+  /** The last moment this Mac heard the brain live: now while it does, null when it has not since starting. */
+  heardUntil(): number | null {
+    return this.current === "live" ? Date.now() : this.lastLive;
+  }
+
+  /** Wakes the brain for this Mac's own sake, as Wake does, then dials it. */
+  async bringUp(): Promise<void> {
+    await this.wake();
+    await this.connect(true);
+  }
+
   /** After something this Mac did that may have woken the brain: dial, at most every few seconds. */
   awoke(): void {
     if (this.session || this.closed || Date.now() - this.dialed < 5_000) return;
@@ -178,6 +201,13 @@ export class BrainLink {
     this.session?.close(1000, "closing");
     this.session = null;
     this.set("offline");
+  }
+
+  /** Says once why dials stop short of the brain, since nothing on screen does. */
+  private failed(why: string): void {
+    if (why === this.lastFailure) return;
+    this.lastFailure = why;
+    this.deps.log.warn(`the cloud brain could not be reached: ${why}`);
   }
 
   /** A dial or a wake that did not reach the brain. */
@@ -201,6 +231,7 @@ export class BrainLink {
 
   private set(reach: OwnerReach): void {
     if (reach === this.current) return;
+    if (this.current === "live") this.lastLive = Date.now();
     this.current = reach;
     for (const listener of this.reaches) listener(reach);
   }
@@ -214,26 +245,37 @@ export class BrainLink {
     return this.connecting;
   }
 
-  private async open(woke: boolean): Promise<PhoneSession | null> {
+  private async open(woke: boolean, relearned = false): Promise<PhoneSession | null> {
     this.dialed = Date.now();
     if (!woke && this.deps.endpoint.dialable && !(await this.deps.endpoint.dialable())) {
       this.fell("asleep");
       return null;
     }
     const target = await this.deps.endpoint.locate().catch(() => null);
-    if (!target) return null;
+    if (!target) {
+      this.failed("this Mac has no address or link key for it yet");
+      return null;
+    }
     let socket: LinkSocket;
     try {
       socket = await (this.deps.dial ?? ((url) => dial(url, this.deps.connectMs ?? CONNECT_MS)))(target.url);
     } catch (error) {
+      // Up, but behind another key's path: its key is asked of it again, and dialed once more.
+      if (error instanceof Refused && error.status === 404 && !relearned && this.deps.endpoint.relearn) {
+        await this.deps.endpoint.relearn().catch(() => undefined);
+        return this.open(true, true);
+      }
+      this.failed(error instanceof Error ? error.message : String(error));
       this.fell(error instanceof Refused ? "asleep" : "offline");
       return null;
     }
     const result = await connectLink({ socket, crypto: nodeCrypto, device: target.ownerKeys, macKey: target.brainKey, hello: { device: { name: "Mac" } }, timeoutMs: 10_000 });
     if (!result.ok) {
+      this.failed(result.refused ? `it declined this Mac: ${result.refused}` : `its handshake failed: ${result.error}`);
       this.fell("asleep");
       return null;
     }
+    this.lastFailure = null;
     const session = result.session;
     this.adopt(session);
     await this.request(session, "session.negotiate", { capabilities: [...PHONE_CAPABILITIES] }).catch(() => undefined);

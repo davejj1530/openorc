@@ -145,8 +145,12 @@ process.parentPort.on("message", (e) => {
       .then((core) => {
         // Best effort before sleep: what is new on the chosen projects' branches reaches a brain that is awake.
         if (asleep) return Promise.all([core.cloudStandby.away(), core.brainRouting?.freshen()]).then(() => undefined);
-        // Back from sleep, maybe on another network: the cloud brain is dialed again now, not at the next retry.
-        if (core.brainRouting?.active) core.brainRouting.link.awoke();
+        // Back from sleep, maybe on another network: the cloud brain is dialed again now, not at the next retry, and woken
+        // if a phone used it meanwhile, so its new threads list here.
+        if (core.brainRouting?.active) {
+          core.brainRouting.link.awoke();
+          void core.brainRouting.catchUp();
+        }
         return core.cloudStandby.back();
       })
       .catch((error: unknown) => console.error("[core] cloud takeover", error));

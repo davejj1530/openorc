@@ -39,6 +39,10 @@ interface Held {
   serverPort: number;
   /** The process groups its commands started. */
   groups: Set<number>;
+  /** Its restore, while a call waits for it. */
+  waking?: Promise<void>;
+  /** Puts it to sleep once nothing reached it for its idle time. */
+  idle?: NodeJS.Timeout;
 }
 
 export interface FakeAgent37Options {
@@ -48,6 +52,10 @@ export interface FakeAgent37Options {
   instanceLimit?: number;
   /** How long a stopped instance takes to start; start answers 202 meanwhile. */
   startMs?: number;
+  /** How long a sleeping instance takes to restore; a call or command to it waits that long, as Agent37 holds it. */
+  wakeMs?: number;
+  /** How long without calls, commands or bytes before an auto-sleep instance sleeps; its idle_timeout_seconds when absent. */
+  idleMs?: number;
 }
 
 export interface FakeAgent37 {
@@ -181,10 +189,34 @@ class FakeAccount {
     return entry ? work(entry) : refused(404, "not_found", "No instance has this id.");
   }
 
-  /** A request or command wakes a sleeping instance; a stopped one stays down until started. */
-  awake(entry: Held): boolean {
-    if (entry.instance.status === "sleeping") entry.instance.status = "running";
+  /**
+   * A request or command wakes a sleeping instance and waits while it restores, as Agent37's edge holds it; a stopped one
+   * stays down until started.
+   */
+  async awake(entry: Held): Promise<boolean> {
+    if (entry.instance.status === "sleeping") {
+      entry.instance.status = "waking";
+      entry.waking = new Promise<void>((resolve) => setTimeout(resolve, this.options.wakeMs ?? 0).unref()).then(() => {
+        if (entry.instance.status === "waking") entry.instance.status = "running";
+      });
+    }
+    if (entry.instance.status === "waking") await entry.waking;
+    this.touch(entry);
     return entry.instance.status === "running";
+  }
+
+  /** Something reached the instance: its idle time starts over. Asleep, it keeps its processes, as Agent37's sleep usually does. */
+  touch(entry: Held): void {
+    clearTimeout(entry.idle);
+    if (!entry.instance.auto_sleep || entry.instance.status !== "running") return;
+    entry.idle = setTimeout(
+      () => {
+        if (entry.instance.status !== "running") return;
+        entry.instance.status = "sleeping";
+        entry.instance.slept_at = Math.floor(Date.now() / 1000);
+      },
+      this.options.idleMs ?? entry.instance.idle_timeout_seconds * 1000,
+    ).unref();
   }
 
   async create(params: Agent37CreateParams): Promise<Answer> {
@@ -215,7 +247,9 @@ class FakeAccount {
       past_due: false,
       created: Math.floor(Date.now() / 1000),
     };
-    this.held.set(id, { instance, env: { ...params.env }, serverPort: await freePort(), groups: new Set() });
+    const entry: Held = { instance, env: { ...params.env }, serverPort: await freePort(), groups: new Set() };
+    this.held.set(id, entry);
+    this.touch(entry);
     return ok(instance, 201);
   }
 
@@ -256,10 +290,14 @@ class FakeAccount {
     const { instance } = entry;
     if (!this.options.startMs) {
       instance.status = "running";
+      this.touch(entry);
       return ok({ id: instance.id, status: "running" });
     }
     instance.status = "starting";
-    setTimeout(() => (instance.status = "running"), this.options.startMs).unref();
+    setTimeout(() => {
+      instance.status = "running";
+      this.touch(entry);
+    }, this.options.startMs).unref();
     return ok({ id: instance.id, status: "starting" }, 202);
   }
 
@@ -296,7 +334,7 @@ class FakeAccount {
     if (!entry) return flat(404, "not_found");
     const params = parse(body);
     if (typeof params.command !== "string") return flat(400, "invalid_request");
-    if (!this.awake(entry)) return flat(409, "instance_not_running");
+    if (!(await this.awake(entry))) return flat(409, "instance_not_running");
     this.execs.push({ id: entry.instance.id, command: params.command, user: typeof params.user === "string" ? params.user : null, name: typeof params.name === "string" ? params.name : null });
     return ok(await this.exec(entry, params.command));
   }
@@ -312,13 +350,13 @@ class FakeAccount {
   }
 
   /** Where a request to an instance's address goes on this Mac, or why it does not. A public port needs no key. */
-  target(request: http.IncomingMessage, match: RegExpExecArray): number | Answer {
+  async target(request: http.IncomingMessage, match: RegExpExecArray): Promise<number | Answer> {
     const entry = this.held.get(match[1]!);
     const port = Number(match[2]);
     const open = entry?.instance.public_ports.some((each) => each.port === port);
     if (!open && request.headers["x-agent37-key"] !== this.key) return flat(401, "invalid_api_key");
     if (!entry) return flat(404, "not_found");
-    if (!this.awake(entry)) return flat(502, "container_unavailable");
+    if (!(await this.awake(entry))) return flat(502, "container_unavailable");
     if (this.unrouted.has(entry.instance.id)) return flat(502, "container_unreachable");
     return port === INSTANCE_SERVER_PORT ? entry.serverPort : port;
   }
@@ -337,8 +375,8 @@ const HOSTING: [string, RegExp, (account: FakeAccount, id: string, body: Record<
   ["GET", /^\/v1\/usage$/, (account, _id, _body, url) => account.spending(url)],
 ];
 
-function proxy(account: FakeAccount, request: http.IncomingMessage, response: http.ServerResponse, match: RegExpExecArray, search: string): void {
-  const port = account.target(request, match);
+async function proxy(account: FakeAccount, request: http.IncomingMessage, response: http.ServerResponse, match: RegExpExecArray, search: string): Promise<void> {
+  const port = await account.target(request, match);
   if (typeof port !== "number") return reply(response, port);
   // As Agent37's own edge does: an instance address answers /health itself, whatever listens on the port.
   if ((match[3] ?? "/") === "/health") return reply(response, ok({ ok: true }));
@@ -353,15 +391,18 @@ function proxy(account: FakeAccount, request: http.IncomingMessage, response: ht
 }
 
 /** Passes a WebSocket through to the instance's port as is, minus the key. */
-function proxyUpgrade(account: FakeAccount, upgraded: Set<Duplex>, request: http.IncomingMessage, socket: Duplex, head: Buffer): void {
+async function proxyUpgrade(account: FakeAccount, upgraded: Set<Duplex>, request: http.IncomingMessage, socket: Duplex, head: Buffer): Promise<void> {
   const url = new URL(request.url ?? "/", "http://fake");
   const match = PORT_PATH.exec(url.pathname);
   const refuse = (answer: Answer) =>
     socket.end(`HTTP/1.1 ${answer.status} ${http.STATUS_CODES[answer.status]}\r\ncontent-type: application/json\r\nconnection: close\r\n\r\n${JSON.stringify(answer.body)}`);
   if (!match) return void refuse(flat(404, "not_found"));
-  const port = account.target(request, match);
+  const port = await account.target(request, match);
   if (typeof port !== "number") return void refuse(port);
+  const entry = account.held.get(match[1]!)!;
   const upstream = net.connect(port, "127.0.0.1");
+  // Bytes either way keep it awake; an open connection with nothing moving does not.
+  for (const side of [socket, upstream]) side.on("data", () => account.touch(entry));
   upgraded.add(socket).add(upstream);
   socket.on("close", () => {
     upgraded.delete(socket);
@@ -400,7 +441,7 @@ export async function startFakeAgent37(dir: string, options: FakeAgent37Options 
   const server = http.createServer((request, response) => {
     serve(request, response).catch((error: unknown) => reply(response, flat(500, error instanceof Error ? error.message : "internal")));
   });
-  server.on("upgrade", (request: http.IncomingMessage, socket: Duplex, head: Buffer) => proxyUpgrade(account, upgraded, request, socket, head));
+  server.on("upgrade", (request: http.IncomingMessage, socket: Duplex, head: Buffer) => void proxyUpgrade(account, upgraded, request, socket, head).catch(() => socket.destroy()));
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 
@@ -416,6 +457,7 @@ export async function startFakeAgent37(dir: string, options: FakeAgent37Options 
       if (entry) Object.assign(entry.instance, { status, status_reason: reason ? { code: status, message: reason } : null });
     },
     close: async () => {
+      for (const entry of account.held.values()) clearTimeout(entry.idle);
       await Promise.all([...account.held.values()].map((entry) => killAll(entry.groups)));
       for (const socket of upgraded) socket.destroy();
       server.closeAllConnections();

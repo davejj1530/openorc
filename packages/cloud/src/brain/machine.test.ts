@@ -2,7 +2,7 @@ import path from "node:path";
 import { APIError } from "@vercel/sandbox";
 import { describe, expect, it } from "vitest";
 import type { SandboxInfo } from "../sandbox.js";
-import { BRAIN_AWAY_MS, BRAIN_PORT } from "./layout.js";
+import { BRAIN_AWAY_MS, BRAIN_IDLE_MS, BRAIN_PORT } from "./layout.js";
 import { vercelSandboxCost } from "../vercel-sandbox.js";
 import { BrainMachine, BrainRefused, BrainUnavailable, brainVersionNewer, type BrainCommand, type BrainVm } from "./machine.js";
 import { sessionShare, type BrainApi, type BrainOpenParams, type BrainSettings, type SessionUsage } from "./vercel-brain.js";
@@ -232,6 +232,8 @@ class FakeVercel implements BrainApi {
   readonly projects: string[] = [];
   /** The next command finds the sandbox stopped, though the look before it saw it running, as when it stops between. */
   stopsUnder = false;
+  /** When each sandbox's state last changed, as Vercel lists it. */
+  readonly changedAt = new Map<string, number>();
 
   constructor(readonly machine = new FakeMachine()) {}
 
@@ -265,6 +267,11 @@ class FakeVercel implements BrainApi {
     };
     this.sandboxes.set(name, vm);
     return vm;
+  }
+
+  async listed({ name }: { name: string }) {
+    const vm = this.sandboxes.get(name);
+    return vm ? { running: vm.state === "running", changedAt: this.changedAt.get(name) ?? 0 } : null;
   }
 
   async project(_token: string, _teamId: string, name: string) {
@@ -350,6 +357,19 @@ async function provisioned() {
   vercel.machine.fed.length = 0;
   return { vercel, brain, machine: vercel.machine };
 }
+
+describe("when the brain was last used", () => {
+  it("says so without waking it: now while it runs, and stopped, when it stopped less the time it idles first", async () => {
+    const { vercel, brain } = await provisioned();
+    expect(Math.abs((await brain.lastUsed())! - Date.now())).toBeLessThan(2_000);
+    const vm = vercel.sandboxes.get("brain")!;
+    vm.state = "stopped";
+    vercel.changedAt.set("brain", 1_800_000_000_000);
+    const gets = vercel.gets.length;
+    expect(await brain.lastUsed()).toBe(1_800_000_000_000 - BRAIN_IDLE_MS);
+    expect([vm.state, vercel.gets.slice(gets).some((get) => get.resume)]).toEqual(["stopped", false]);
+  });
+});
 
 describe("provisioning a brain", () => {
   it("makes the sandbox, sets up the machine and installs the bundle, and a second run writes nothing", async () => {

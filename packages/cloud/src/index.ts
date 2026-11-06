@@ -52,7 +52,7 @@ export { RunnerClient, installRunner, runRunner, runnerFiles, type RunnerConnect
 export { CHECK_STEPS, checkSandbox, type CheckProgress, type CheckStep } from "./check.js";
 export { pullWorkspace, pushWorkspace, seedFromCommit, seedWorkspace, type MirrorState, type PullResult, type WorkspaceLocation } from "./sync.js";
 export { VercelRefusal, ensureVercelProject, vercelDenied, type VercelProject, type VercelRequest } from "./vercel-projects.js";
-export { BRAIN_AWAY_MS, BRAIN_EXIT, BRAIN_PORT, BRAIN_PROJECT, BRAIN_READY, BRAIN_SANDBOX, brainLayout, type BrainLayout } from "./brain/layout.js";
+export { BRAIN_AWAY_MS, BRAIN_EXIT, BRAIN_IDLE_MS, BRAIN_PORT, BRAIN_PROJECT, BRAIN_READY, BRAIN_SANDBOX, brainLayout, type BrainLayout } from "./brain/layout.js";
 export {
   BrainWireError,
   brainKeyFrom,

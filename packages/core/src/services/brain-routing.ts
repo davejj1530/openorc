@@ -32,12 +32,16 @@ function cloudBrainEndpoint(brain: CloudBrain): BrainEndpoint {
     },
     dialable: () => brain.dialable(),
     wake: () => brain.withMachine(true, async () => undefined),
+    lastUsed: () => brain.lastUsed(),
+    relearn: () => brain.forgetLinkKey(),
     freshen: () => brain.freshenProjects(),
   };
 }
 
 /** How often, while the brain is awake, this Mac looks whether a chosen project's branch moved. */
 const FRESHEN_MS = 2 * 60_000;
+/** Use this soon after this Mac last heard the brain is the tail of that same visit, as the brain notes busy once a minute. */
+const SAME_VISIT_MS = 60_000;
 
 async function projectMapping(brain: CloudBrain): Promise<ProjectMapping> {
   const copies = ((await brain.moves())?.projects ?? []).filter((record) => record.brainId);
@@ -146,10 +150,24 @@ export class BrainRouting {
 
   private readonly ready: () => Promise<boolean>;
 
+  /**
+   * Back from sleep, or started: a brain used after this Mac last heard it may hold threads a phone began meanwhile,
+   * which the lists here lack, so it is woken once to list them. One nobody used stays asleep.
+   */
+  async catchUp(): Promise<void> {
+    if (!this.active || this.link.reach === "live" || !this.endpoint.lastUsed) return;
+    const heard = Math.max(this.link.heardUntil() ?? 0, this.router.pages.lastHeard() ?? 0);
+    const used = await this.endpoint.lastUsed().catch(() => null);
+    if (used === null || used <= heard + SAME_VISIT_MS) return;
+    this.log.info("the cloud brain was used while this Mac was away: waking it to list what changed");
+    await this.link.bringUp().catch((error: unknown) => this.log.warn(`the cloud brain did not wake to catch up: ${error instanceof Error ? error.message : String(error)}`));
+  }
+
   /** At start and whenever the cloud brain changed: routing follows whether one is set up; a wake may let the link dial. */
   async refresh(): Promise<void> {
     const ready = await this.ready();
-    if (ready && !this.active) {
+    const started = ready && !this.active;
+    if (started) {
       this.link.start();
       this.freshening = setInterval(() => void this.freshen(), FRESHEN_MS);
       this.freshening.unref();
@@ -161,6 +179,7 @@ export class BrainRouting {
     }
     this.active = ready;
     if (ready) this.link.awoke();
+    if (started) void this.catchUp();
     this.router.starts.brainChanged();
   }
 

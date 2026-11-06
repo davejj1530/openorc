@@ -1,7 +1,7 @@
 import { APIError, Sandbox as SdkSandbox, Snapshot } from "@vercel/sandbox";
 import { STATES, vercelSandboxCost, type VercelCredentials } from "../vercel-sandbox.js";
 import { ensureVercelProject, findVercelProject } from "../vercel-projects.js";
-import { BRAIN_AWAY_MS, BRAIN_PORT, BRAIN_SANDBOX } from "./layout.js";
+import { BRAIN_AWAY_MS, BRAIN_IDLE_MS, BRAIN_PORT, BRAIN_SANDBOX } from "./layout.js";
 import type { BrainAccess, BrainHome, BrainVm } from "./machine.js";
 import { billedSnapshots, snapshotStorageCost, type ListedSnapshot } from "./snapshot-storage.js";
 
@@ -43,6 +43,8 @@ export interface BrainApi {
   list(params: VercelCredentials): Promise<string[]>;
   /** What the project's sandboxes ran from `since` on, one entry per session, as Vercel counts it. Reads only. */
   sessions(params: VercelCredentials & { since: number }): Promise<SessionUsage[]>;
+  /** The named sandbox's status and when it last changed, as Vercel lists it; null when it is not there. Reads only. */
+  listed?(params: VercelCredentials & { name: string }): Promise<{ running: boolean; changedAt: number } | null>;
   /** Every snapshot the project's sandboxes made, kept or deleted. Reads only. */
   snapshots(params: VercelCredentials): Promise<ListedSnapshot[]>;
   /** The project's snapshot storage on the team's bill from `since` on, and where the bill ends; null when the token may not read it. */
@@ -114,6 +116,10 @@ export const vercelSdk: BrainApi = {
     }
   },
   list: async ({ token, teamId, projectId }) => (await (await SdkSandbox.list({ projectId, token, teamId })).toArray()).map((sandbox) => sandbox.name),
+  listed: async ({ token, teamId, projectId, name }) => {
+    for await (const listed of await SdkSandbox.list({ projectId, token, teamId })) if (listed.name === name) return { running: listed.status === "running", changedAt: listed.updatedAt };
+    return null;
+  },
   sessions: async ({ token, teamId, projectId, since }) => {
     const used: SessionUsage[] = [];
     const now = Date.now();
@@ -175,6 +181,12 @@ export function vercelHome(access: Extract<BrainAccess, { service: "vercel" }>, 
       return vm;
     },
     get: (resume) => api.get({ ...credentials, name, resume }),
+    /** Now while it runs; stopped, when it stopped less the brain's idle time, since the brain stops itself once idle. */
+    async lastUsed() {
+      const listed = await api.listed?.({ ...credentials, name });
+      if (!listed) return null;
+      return listed.running ? Date.now() : listed.changedAt - BRAIN_IDLE_MS;
+    },
     launch: (_vm, { threadVcpus }) => ({ vercel: { connection: { ...credentials, ...(threadVcpus ? { vcpus: threadVcpus } : {}) }, sandbox: name } }),
     /** From the sessions Vercel counts, at its list prices, and what the snapshots cost to keep. */
     async costSince(since, now) {

@@ -1,7 +1,7 @@
 import { mkdtemp, realpath, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LedgerWriter, projects, remoteDevices, runs, settings, threads } from "@openorc/db";
 import { fromBase64Url, linkPath } from "@openorc/link";
 import { nodeCrypto } from "@openorc/link/node";
@@ -211,4 +211,48 @@ it("routes nothing and reads nothing for the brain on a Mac without one", async 
   await new Promise((resolve) => setTimeout(resolve, 50));
   expect(dialed).not.toHaveBeenCalled();
   expect(machine).not.toHaveBeenCalled();
+});
+
+describe("coming back to this Mac", () => {
+  let asleep = true;
+  let used: number | null = null;
+  /** A brain that sleeps until woken, and says when it was last used without waking. */
+  const sleeping: BrainEndpoint = {
+    ...endpoint,
+    dialable: async () => !asleep,
+    wake: async () => {
+      wakes++;
+      asleep = false;
+    },
+    lastUsed: async () => used,
+  };
+
+  async function reopen(): Promise<void> {
+    await mac!.close();
+    windows = [];
+    mac = await openMac({ brainEndpoint: sleeping });
+  }
+
+  it("wakes a brain a phone used while it was away, and lists the thread the phone started", async () => {
+    [asleep, used] = [true, Date.now()];
+    await reopen();
+    await until(() => wakes === 1 && mac!.brainRouting!.link.reach === "live");
+    await listedWithTheBrains();
+    expect((await listed()).map((row) => row.id)).toContain("cloud-thread");
+  });
+
+  it("leaves a brain asleep that nobody used after this Mac last heard it, beyond the tail of that visit", async () => {
+    [asleep, used] = [true, null];
+    await reopen();
+    const routing = mac!.brainRouting!;
+    const heardAt = Date.now() - 10 * 60_000;
+    routing.router.pages.heard("threads.list", {}, [], heardAt);
+    used = heardAt + 30_000;
+    await routing.catchUp();
+    expect([wakes, routing.link.reach]).toEqual([0, "asleep"]);
+    used = heardAt + 5 * 60_000;
+    await routing.catchUp();
+    await until(() => routing.link.reach === "live");
+    expect(wakes).toBe(1);
+  });
 });

@@ -8,13 +8,13 @@ import type { InstanceProcess } from "../instance-port.js";
 import { runnerFiles, type RunnerFile } from "../runner-client.js";
 import type { SandboxExecResult, SandboxInfo } from "../sandbox.js";
 import { keptStart } from "./keeper.js";
-import { BRAIN_PORT } from "./layout.js";
+import { BRAIN_IDLE_MS, BRAIN_PORT } from "./layout.js";
 import type { BrainAccess, BrainCommand, BrainHome, BrainStartCommand, BrainVm } from "./machine.js";
 
 /** The brain's instance. Agent37 does not keep names unique, so it is found by its tag. */
 const BRAIN = { template: "agent37-base", name: "OpenOrc brain", tag: "brain" } as const;
 /** Agent37's shortest: a brain keeps itself awake while used, and this is how soon it sleeps when nothing keeps it. */
-const IDLE_SECONDS = 300;
+const IDLE_SECONDS = BRAIN_IDLE_MS / 1000;
 /** Run by Agent37 at every boot, from the default user's home. */
 const BOOT_HOOK = ".agent37/hooks/post-restart.sh";
 /** The start line the boot hook starts the brain with. */
@@ -243,6 +243,16 @@ export function agent37Home(access: Extract<BrainAccess, { service: "agent37" }>
     // Nothing outside the instance starts the brain again when it stops while the instance runs, as the Vercel door does.
     startCommand: keptStart,
     keep: (brain, start) => brain.keep(start),
+    /**
+     * Now while it runs or wakes; asleep, when Agent37 says it fell asleep less the brain's own idle time, since the brain
+     * puts itself to sleep then while its instance's idle timeout runs longer. Reads only.
+     */
+    async lastUsed() {
+      const found = await find();
+      if (!found) return null;
+      if (found.status === "running" || found.status === "waking") return Date.now();
+      return found.slept_at ? found.slept_at * 1000 - BRAIN_IDLE_MS : null;
+    },
     /**
      * Agent37 reports spending by instance, so a thread instance deleted already counts no more: what it spent leaves
      * the sum with it.

@@ -59,7 +59,7 @@ it("lists each sandbox with its conversation, whether it is awake, its size and 
   expect(screen.getByText("Awake for 12 min · 8 vCPUs · 16 GB · On Vercel")).toBeTruthy();
   expect(screen.getByText("Asleep, awake 1 h 5 min in all · 2 vCPUs · 4 GB · On Vercel")).toBeTruthy();
   expect(screen.getByText("openorc-check-1a2b")).toBeTruthy();
-  expect(screen.getByText("Asleep · 2 vCPUs · 4 GB · On Vercel · No conversation")).toBeTruthy();
+  expect(screen.getByText("Asleep · 2 vCPUs · 4 GB · On Vercel · No thread")).toBeTruthy();
   expect(screen.getByText("$0.35")).toBeTruthy();
   expect(screen.getByText("under $0.01")).toBeTruthy();
   expect(screen.getByText("Vercel about $0.36 at list prices")).toBeTruthy();
@@ -68,7 +68,7 @@ it("lists each sandbox with its conversation, whether it is awake, its size and 
 it("removes a sandbox, but not one whose agent is at work", async () => {
   show();
   await screen.findByText("Add a footer");
-  const removes = screen.getAllByRole("button", { name: "Remove" }) as HTMLButtonElement[];
+  const removes = screen.getAllByRole("button", { name: "Delete sandbox" }) as HTMLButtonElement[];
   expect(removes.map((button) => button.disabled)).toEqual([true, false, false]);
   fireEvent.click(removes[1]!);
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.sandboxes.remove", { name: "openorc-b" }));

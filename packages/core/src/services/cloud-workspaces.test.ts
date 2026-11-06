@@ -471,3 +471,37 @@ describe("a cloud workspace's busy signal", () => {
     await cloud.close();
   });
 });
+
+describe("a thread whose sandbox was deleted", () => {
+  /** A second service, simulated in a folder of its own: the one new threads run on now. */
+  const agent37 = () => Object.assign(Object.create(new LocalSandboxProvider(path.join(directory, "agent37"))) as LocalSandboxProvider, { id: "agent37" as const });
+
+  it("comes back where new threads run now, and stays where it was while its agent cannot sign in there", async () => {
+    const elsewhere = agent37();
+    const cloud = new CloudWorkspaceService(db, { providers: [sandboxes, elsewhere], forNewThreads: async () => elsewhere }, quiet);
+    const workspaces = new WorkspaceService(db, { dataDir: path.join(directory, "data-moved"), cloud }, quiet, new WorkspaceWriters());
+    const started = (agent: "claude" | "codex") =>
+      db.transaction(() => {
+        const thread = threads.insert(db, { projectId: project.id, title: `On ${agent}`, agent, model: null, mode: "act", permissionMode: "trusted", workspaceMode: "worktree" });
+        workspaces.admitCloud(thread.id, "local");
+        return thread;
+      });
+    try {
+      const claude = await workspaces.prepareThread(started("claude"), project, "HEAD");
+      const codex = await workspaces.prepareThread(started("codex"), project, "HEAD");
+      for (const thread of [claude, codex]) await cloud.removeSandbox("local", `openorc-${thread.id}`);
+
+      await cloud.prepare(claude, project);
+      expect(cloud.get(claude.id)).toMatchObject({ provider: "agent37", state: "ready" });
+      expect(existsSync(path.join(directory, "agent37", `openorc-${claude.id}`, "repo"))).toBe(true);
+      expect(existsSync(sandboxRepo(claude))).toBe(false);
+
+      // Codex has no sign-in for the cloud here, so its thread stays on the service it started on.
+      await cloud.prepare(codex, project);
+      expect(cloud.get(codex.id)).toMatchObject({ provider: "local", state: "ready" });
+      expect(existsSync(sandboxRepo(codex))).toBe(true);
+    } finally {
+      await workspaces.shutdown();
+    }
+  });
+});

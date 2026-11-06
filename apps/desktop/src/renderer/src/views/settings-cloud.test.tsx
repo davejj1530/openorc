@@ -148,7 +148,7 @@ it("starts with connecting a service, and holds the check and the cloud brain un
     expect(within(stepOf(title)).getByText("Connect a cloud service first.")).toBeTruthy();
   }
   expect(screen.queryByText("When this Mac sleeps")).toBeNull();
-  expect(screen.queryByText("Sandboxes")).toBeNull();
+  expect(screen.queryByText("Cloud threads")).toBeNull();
 });
 
 it("judges the check by where new threads run: a Vercel failure from before Agent37 was connected does not count", async () => {

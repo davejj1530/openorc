@@ -324,8 +324,9 @@ export class CloudWorkspaceService {
   }
 
   private async prepareOnce(thread: Thread, project: Project): Promise<void> {
-    const record = cloudWorkspaces.get(this.db, thread.id);
-    if (!record || record.state === "ready") return;
+    const found = cloudWorkspaces.get(this.db, thread.id);
+    if (!found || found.state === "ready") return;
+    const record = found.state === "removed" ? await this.followNewThreads(thread, found) : found;
     const { worktreePath, branch } = thread;
     if (!worktreePath || !branch) throw new Error("A cloud conversation needs its worktree before its sandbox.");
     // The conversation may have run on this Mac, or in a sandbox since replaced: its session goes up with the code.
@@ -338,6 +339,24 @@ export class CloudWorkspaceService {
       return state;
     };
     this.ready(thread.id, await this.build(thread.id, project, worktreePath, seed));
+  }
+
+  /**
+   * A conversation whose sandbox was deleted has nothing left where it ran, so its next sandbox goes where new
+   * conversations run now, as when someone switched services since it started. It stays put when its agent cannot sign
+   * in there, or when nothing is connected.
+   */
+  private async followNewThreads(thread: Thread, record: CloudWorkspaceRecord): Promise<CloudWorkspaceRecord> {
+    const provider = await this.forNewThreads().catch(() => null);
+    if (!provider || provider.id === record.provider || !isHarnessId(thread.agent)) return record;
+    const signsIn = await this.agents[thread.agent].signIn.assertCanRun(provider.id, who(thread)).then(
+      () => true,
+      () => false,
+    );
+    if (!signsIn) return record;
+    cloudWorkspaces.moveRemoved(this.db, thread.id, provider.id);
+    this.log.info(`thread ${thread.id}: its deleted sandbox on ${record.provider} comes back on ${provider.id}, where new conversations run`);
+    return { ...record, provider: provider.id };
   }
 
   /** After a turn: the conversation's session comes to this host, and a Codex login refreshed in the sandbox comes back. */

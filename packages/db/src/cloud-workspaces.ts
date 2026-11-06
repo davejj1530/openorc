@@ -89,6 +89,10 @@ export const cloudWorkspaces = {
   preparing(db: Db, threadId: string, at = Date.now()): void {
     db.stmt("UPDATE cloud_workspaces SET state = 'preparing', error = NULL, updated_at = ? WHERE thread_id = ? AND state IN ('failed', 'removed')").run(at, threadId);
   },
+  /** A conversation whose sandbox was deleted, moved to another service before its next sandbox is made there. */
+  moveRemoved(db: Db, threadId: string, provider: CloudProviderId, at = Date.now()): void {
+    db.stmt("UPDATE cloud_workspaces SET provider = ?, updated_at = ? WHERE thread_id = ? AND state = 'removed'").run(provider, at, threadId);
+  },
   /** Its sandbox was deleted. What the sandbox had synced stays in the worktree, which the next sandbox starts from. */
   removed(db: Db, threadId: string, at = Date.now()): void {
     db.stmt(

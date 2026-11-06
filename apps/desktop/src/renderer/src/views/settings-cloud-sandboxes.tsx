@@ -43,7 +43,7 @@ function details(sandbox: CloudSandbox, now: number): string {
   const resting = sandbox.state === "running" ? "Awake" : stateLabels[sandbox.state];
   const ran = sandbox.awakeMs > 0 ? `, awake ${duration(sandbox.awakeMs)} in all` : "";
   const size = sandbox.vcpus ? `${sandbox.vcpus} vCPUs · ${Math.round((sandbox.memoryMb ?? sandbox.vcpus * 2048) / 1024)} GB` : null;
-  return [awake ?? `${resting}${ran}`, size, places[sandbox.provider], sandbox.thread ? null : "No conversation"].filter(Boolean).join(" · ");
+  return [awake ?? `${resting}${ran}`, size, places[sandbox.provider], sandbox.thread ? null : "No thread"].filter(Boolean).join(" · ");
 }
 
 function SandboxRow({ sandbox, now }: { sandbox: CloudSandbox; now: number }) {
@@ -58,7 +58,7 @@ function SandboxRow({ sandbox, now }: { sandbox: CloudSandbox; now: number }) {
           title={sandbox.working ? "Its agent is at work there" : undefined}
           onClick={() => remove.mutate({ name: sandbox.name })}
         >
-          Remove
+          Delete sandbox
         </TextButton>
       </SettingRow>
       {remove.error ? (
@@ -92,11 +92,11 @@ export function CloudSandboxesSection({ active }: { active: boolean }) {
   const list = sandboxes.data ?? [];
   const total = spent(list);
   return (
-    <Section title="Sandboxes" description="One per cloud thread. Remove deletes its files, and the thread's next message makes a new one.">
+    <Section title="Cloud threads" description="Each runs in a sandbox of its own and stays on its service. Delete a sandbox and the thread's next message makes a new one where new threads run now.">
       {list.map((sandbox) => (
         <SandboxRow key={`${sandbox.provider}:${sandbox.name}`} sandbox={sandbox} now={now} />
       ))}
-      {sandboxes.data && list.length === 0 ? <p className="settings-hint py-2">No sandboxes.</p> : null}
+      {sandboxes.data && list.length === 0 ? <p className="settings-hint py-2">No cloud threads yet.</p> : null}
       {total ? (
         <SettingRow label="So far">
           <span className="text-ink-2 tabular-nums">{total}</span>

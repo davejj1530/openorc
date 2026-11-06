@@ -1,4 +1,5 @@
-/* Lines up under the title; a working thread's spinner takes the end of the line. */
+/* Lines up under the title, one step fainter so the title leads; only a call for you takes color. A working
+   thread's spinner takes the end of the line. */
 .thread-preview-headline-line {
   display: flex;
   align-items: center;
@@ -16,9 +17,6 @@
   line-height: 16px;
   letter-spacing: 0;
   color: var(--ink-4);
-}
-.thread-preview-headline[data-tone="live"] {
-  color: var(--ink-3);
 }
 .thread-preview-headline[data-tone="attention"] {
   color: var(--warn);

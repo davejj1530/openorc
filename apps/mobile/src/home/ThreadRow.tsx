@@ -46,7 +46,7 @@ const NODE_REACH = 6;
 /** Where a root row's project line is centered before it lays out: the 8 pt padding, the title's 22 pt line, the 4 pt gap and half an 18 pt line. */
 const NODE_MID = 8 + 22 + 4 + 9;
 // The desktop's headline tones (ThreadHeadline.css).
-const headlineTones: Record<ThreadHeadline["tone"], string> = { live: "text-ink-3", attention: "text-warn", done: "text-ink-4" };
+const headlineTones: Record<ThreadHeadline["tone"], string> = { live: "text-ink-4", attention: "text-warn", done: "text-ink-4" };
 
 /** Where it works, who works on it and when it last moved: the details a row keeps for its menu and for VoiceOver. */
 function rowFacts(thread: ThreadSummary, where: string): string[] {

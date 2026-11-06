@@ -84,7 +84,8 @@ export function useHostLink(state: LinkState, name: string): HostLink {
 /**
  * A host's threads open under its heading while Home lists a Mac and its cloud brain together, so which one this phone
  * is connected to reads at a glance: the mark and name on the lead and text columns, and under them the link's dot and
- * how the phone reaches it.
+ * how the phone reaches it. The name is one step above row titles and below the wordmark, so it heads its threads
+ * without competing with the app's name.
  */
 export function HostHeading({ kind, name, link }: { kind: HostKind; name: string; link: HostLink }) {
   const Mark = kind === "brain" ? Cloud : Laptop;
@@ -92,9 +93,9 @@ export function HostHeading({ kind, name, link }: { kind: HostKind; name: string
     <View className="gap-0.5">
       <View className="flex-row items-center gap-3">
         <View className="w-7 items-center">
-          <Mark size={22} className="text-ink-4" />
+          <Mark size={18} className="text-ink-4" />
         </View>
-        <Text numberOfLines={1} className="shrink text-title-sm">
+        <Text numberOfLines={1} className="shrink text-xl">
           {name}
         </Text>
       </View>

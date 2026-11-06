@@ -215,7 +215,9 @@ button.sidebar-nav-row:hover {
 
 /* Thread rows: a muted title with what the thread needs at its end, what its agent is doing while it
    works, then the project's icon and name with its pull request at the end. The icon's column is where
-   a parent's tree line leaves. The open row sits on the current-row fill with --navigation-ink. */
+   a parent's tree line leaves. The title leads: its taller line gives it room above the faint lines under
+   it, and the project's artwork stays held back until the row is hovered or open. The open row sits on
+   the current-row fill with --navigation-ink. */
 .app-shell .thread-preview {
   position: relative;
   display: flex;
@@ -225,7 +227,7 @@ button.sidebar-nav-row:hover {
   width: 100%;
   min-width: 0;
   min-height: var(--control-row);
-  padding: 9px 10px;
+  padding: 8px 10px;
   border-radius: var(--radius-md);
   color: var(--ink-3);
   text-align: left;
@@ -243,7 +245,7 @@ button.sidebar-nav-row:hover {
 .thread-preview-project {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   min-width: 0;
   font-size: var(--text-xs);
   line-height: 16px;
@@ -258,6 +260,13 @@ button.sidebar-nav-row:hover {
 .thread-preview-project-icon > * {
   width: 14px;
   height: 14px;
+}
+.thread-preview-project-icon > img {
+  opacity: 0.6;
+  transition: opacity var(--duration-leave) var(--ease-out);
+}
+.app-shell .thread-preview:is(:hover, [data-open]) .thread-preview-project-icon > img {
+  opacity: 1;
 }
 .thread-preview-project-name {
   min-width: 0;
@@ -278,7 +287,7 @@ button.sidebar-nav-row:hover {
 }
 .thread-preview-workspace::before {
   content: "·" / "";
-  margin-right: 6px;
+  margin-right: 5px;
 }
 .thread-preview-pull {
   display: inline-flex;
@@ -306,7 +315,7 @@ button.sidebar-nav-row:hover {
   flex: 1;
   min-width: 0;
   font-size: var(--text-base);
-  line-height: 16px;
+  line-height: 18px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;

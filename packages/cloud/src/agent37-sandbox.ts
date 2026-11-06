@@ -51,9 +51,11 @@ const SERVER_START_MS = 60_000;
 const SERVER_POLL_MS = 250;
 /**
  * Ends any OpenOrc server already running in the instance, as one an older OpenOrc left on the port, before this one
- * starts. Matched by its command line, which begins `node instance-server.ts`; the shell running this never does.
+ * starts. Matched by its command line, `node instance-server.ts --port <this instance's port>`: in an Agent37 instance
+ * that is every one, and on a Mac running many stand-in instances, only this instance's. The shell running this never
+ * matches.
  */
-const STOP_OLD_SERVERS = `{ for p in /proc/[0-9]*; do tr '\\0' ' ' < "$p/cmdline" 2>/dev/null | grep -q '^node instance-server.ts ' && kill "\${p#/proc/}" 2>/dev/null; done; sleep 0.5; true; }`;
+const STOP_OLD_SERVERS = `{ port="\${OPENORC_INSTANCE_PORT:-${INSTANCE_SERVER_PORT}}"; for p in /proc/[0-9]*; do tr '\\0' ' ' < "$p/cmdline" 2>/dev/null | grep -q "^node instance-server.ts --port $port " && kill "\${p#/proc/}" 2>/dev/null; done; sleep 0.5; true; }`;
 
 /** Agent37 refuses an exec request over 128 KB; this leaves room for the JSON around the command. */
 const COMMAND_LIMIT = 120 * 1024;

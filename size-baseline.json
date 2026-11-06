@@ -7,7 +7,7 @@
   },
   "files": {
     "apps/desktop/src/renderer/src/components/Transcript.tsx": 857,
-    "packages/core/src/services/threads.ts": 836
+    "packages/core/src/services/threads.ts": 841
   },
   "functions": {
     "apps/desktop/src/main/browser-page.ts::pageOperation": {
@@ -167,7 +167,7 @@
       "complexity": 38
     },
     "apps/desktop/src/renderer/src/views/Onboarding.tsx::OnboardingFlow": {
-      "lines": 190,
+      "lines": 194,
       "complexity": 28
     },
     "apps/desktop/src/renderer/src/views/Scheduled.tsx::ScheduleDialog": {

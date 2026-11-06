@@ -18,9 +18,11 @@ import type { DoorKey, Route } from "@openorc/protocol";
 import type { PhoneDoors, WakeOutcome } from "../door";
 import type { ConnectionEffects, OpeningSocket } from "../manager";
 import type { DeviceKeys, MacStore, SavedMac } from "../saved-macs";
+import { SocketFailed } from "../socket-failure";
 
 /** How one address behaves: a Mac that answers (after `delayMs`), declines, never answers, or nothing listening. */
-export type Behavior = { kind: "answer"; delayMs?: number } | { kind: "refuse"; reason: Refusal } | { kind: "silent" } | { kind: "down" };
+/** `http`: a server at the address answers the upgrade itself, as Agent37 does for an instance with nothing on its port. */
+export type Behavior = { kind: "answer"; delayMs?: number } | { kind: "refuse"; reason: Refusal } | { kind: "silent" } | { kind: "down" } | { kind: "http"; status: number };
 
 export const lan: Route = { kind: "lan", host: "studio.local", port: 47820 };
 export const lanAddress: Route = { kind: "lan", host: "192.168.1.20", port: 47820 };
@@ -96,6 +98,7 @@ export class FakeMac {
     const behavior = (ownPath && this.behaviors.get(route.host)) || { kind: "down" };
     if (behavior.kind === "down") return { opened: Promise.reject(new Error("connection refused")), close: () => undefined };
     if (behavior.kind === "silent") return { opened: new Promise(() => undefined), close: () => undefined };
+    if (behavior.kind === "http") return { opened: Promise.reject(new SocketFailed(behavior.status)), close: () => undefined };
     const { phone, mac } = socketPair();
     void acceptLink({ socket: mac, crypto: nobleCrypto, local: this.keys, admit: (key, hello) => this.admit(key, hello, behavior) }).then((accepted) => {
       if (!accepted) return;

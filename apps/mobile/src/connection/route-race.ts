@@ -8,8 +8,11 @@ export interface Clock {
   clearTimeout(handle: unknown): void;
 }
 
-/** One route's answer: a session, the Mac declining this phone, or nothing usable (`refused: null`). */
-export type Answer<T> = { ok: true; value: T } | { ok: false; refused: Refusal | null };
+/**
+ * One route's answer: a session, the Mac declining this phone, or nothing usable (`refused: null`). `answered`: a server
+ * at the address answered the upgrade itself, with no OpenOrc host behind it.
+ */
+export type Answer<T> = { ok: true; value: T } | { ok: false; refused: Refusal | null; answered?: boolean };
 
 /** One route being tried. `cancel` gives up on it, closing whatever it opened. */
 export interface Attempt<T> {
@@ -17,7 +20,7 @@ export interface Attempt<T> {
   cancel(): void;
 }
 
-export type RaceResult<T> = { ok: true; route: Route; value: T } | { ok: false; refused: Refusal | null };
+export type RaceResult<T> = { ok: true; route: Route; value: T } | { ok: false; refused: Refusal | null; answered?: boolean };
 
 export const ROUTE_STAGGER_MS = 250;
 export const ROUTE_TIMEOUT_MS = 4_000;
@@ -33,6 +36,7 @@ export function raceRoutes<T>(routes: readonly Route[], dial: (route: Route) => 
     let next = 0;
     let stagger: unknown = null;
     let done = false;
+    let answered = false;
 
     const finish = (result: RaceResult<T>) => {
       done = true;
@@ -48,7 +52,7 @@ export function raceRoutes<T>(routes: readonly Route[], dial: (route: Route) => 
       if (done) return;
       const route = routes[next++];
       if (!route) {
-        if (running.size === 0) finish({ ok: false, refused: null });
+        if (running.size === 0) finish({ ok: false, refused: null, ...(answered ? { answered } : {}) });
         return;
       }
       const attempt = dial(route);
@@ -60,6 +64,7 @@ export function raceRoutes<T>(routes: readonly Route[], dial: (route: Route) => 
           return;
         }
         settled = true;
+        if (!answer.ok && answer.answered) answered = true;
         clock.clearTimeout(timer);
         running.delete(attempt);
         if (done) {

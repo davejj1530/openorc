@@ -20,6 +20,7 @@ import type { PhoneDoors } from "./door";
 import { LinkConnection, type PhoneLine } from "./link-connection";
 import { raceRoutes, ROUTE_TIMEOUT_MS, type Attempt, type Clock, type RaceResult } from "./route-race";
 import { learnRoutes, routesFor, type DeviceKeys, type MacStore, type NetworkKind, type SavedMac } from "./saved-macs";
+import { SocketFailed } from "./socket-failure";
 
 /**
  * Why the phone is not connected to the Mac it shows, as far as it knows. `unreachable`: no route answered, or the
@@ -389,10 +390,14 @@ export class ConnectionManager {
     const hello = { device: { name: this.effects.deviceName.slice(0, 80) || "iPhone" }, ...(pair ? { pair } : {}) };
     const answer = socket.opened.then(
       (opened) => connectLink({ socket: opened, crypto: this.effects.crypto, device, macKey, hello, timeoutMs: ROUTE_TIMEOUT_MS }),
-      () => ({ ok: false, refused: null, error: "no socket" }) as const,
+      (error: unknown) => ({ ok: false, refused: null, error: "no socket", answered: error instanceof SocketFailed && error.status !== null }) as const,
     );
     return {
-      answer: answer.then((result) => (result.ok ? { ok: true, value: { session: result.session, hello: result.hello } } : { ok: false, refused: result.refused })),
+      answer: answer.then((result) =>
+        result.ok
+          ? { ok: true, value: { session: result.session, hello: result.hello } }
+          : { ok: false, refused: result.refused, ...("answered" in result && result.answered ? { answered: true } : {}) },
+      ),
       cancel: () => socket.close(),
     };
   }
@@ -447,7 +452,7 @@ export class ConnectionManager {
       case "busy":
         return this.retryLater("busy");
       default:
-        if (online && this.mayKnock(mac.id)) return void this.knock(mac, why, tried);
+        if (online && this.mayKnock(mac.id)) return void this.knock(mac, why, tried, result.answered === true);
         return this.retryLater(this.unanswered(why, online, tried));
     }
   }
@@ -466,11 +471,13 @@ export class ConnectionManager {
    * Nothing answered and the internet does: a host asleep behind its proxy fails just so, and its door can wake it.
    * Once the door says the host is ready, the phone races again at once. The door finishes a wake the phone left.
    */
-  private async knock(mac: SavedMac, why: DownReason | null, tried: readonly Route[]): Promise<void> {
+  private async knock(mac: SavedMac, why: DownReason | null, tried: readonly Route[], answered: boolean): Promise<void> {
     const epoch = this.epoch;
     const hasDoor = await this.effects.doors.has(mac.id);
     if (epoch !== this.epoch) return;
-    if (!hasDoor) return this.retryLater(this.unanswered(why, true, tried));
+    // A cloud brain with no door (Agent37) wakes for any request; its address answering with no brain behind it means
+    // the brain is not running, and only its Mac can start it again.
+    if (!hasDoor) return this.retryLater(answered && mac.kind === "brain" ? "needs-mac" : this.unanswered(why, true, tried));
     this.knocked.set(mac.id, this.effects.clock.now());
     this.enter({ kind: "connecting", why: "waking" });
     const abort = new AbortController();

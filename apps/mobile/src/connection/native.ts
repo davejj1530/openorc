@@ -8,6 +8,7 @@ import { perfEnabled, timeRecord } from "../thread/perf-probe";
 import { streamLines, type DoorKeyStore, type DoorPost } from "./door";
 import type { OpeningSocket } from "./manager";
 import type { Clock } from "./route-race";
+import { answeredStatus, SocketFailed } from "./socket-failure";
 import type { DeviceKeys, MacStore, SavedMac } from "./saved-macs";
 
 /** The link's crypto on the phone: OpenSSL through react-native-quick-crypto, which boot installs. */
@@ -57,7 +58,7 @@ export function openSocket(route: Route, hostKey: Uint8Array): OpeningSocket {
   };
   const opened = new Promise<LinkSocket>((resolve, reject) => {
     ws.onopen = () => resolve(socket);
-    ws.onerror = () => reject(new Error("The socket failed."));
+    ws.onerror = (event) => reject(new SocketFailed(answeredStatus((event as { message?: unknown }).message)));
     ws.onclose = (event) => {
       reject(new Error("The socket closed."));
       onClose(event.code, event.reason);

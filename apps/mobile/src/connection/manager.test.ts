@@ -842,6 +842,38 @@ describe("a cloud brain", () => {
     expect(plain.effects.doors.knocks).toEqual([]);
   });
 
+  it("says only the Mac can help when a brain with no door answers at its address with no brain behind it", async () => {
+    const cloud = brain();
+    cloud.behave(publicRoute, { kind: "http", status: 502 });
+    // Known as a brain from when it was paired.
+    const effects = pairedWith(cloud);
+    effects.macs.save({ ...effects.macs.saved.get(cloud.id)!, kind: "brain" });
+    const { manager } = start(cloud, "wifi", effects);
+    await advance(10);
+    expect(manager.getState()).toMatchObject({ kind: "waiting", why: "needs-mac" });
+    await advance(70_000);
+    expect(manager.getState()).toMatchObject({ kind: "waiting", why: "needs-mac" });
+    // Its Mac starts the brain again, and the phone is back on its next try.
+    cloud.behave(publicRoute, { kind: "answer" });
+    await advance(16_000);
+    expect(manager.getState()).toMatchObject({ kind: "connected" });
+  });
+
+  it("keeps reconnecting a brain whose address answers nothing, and a Mac whose address answers with no host", async () => {
+    const quiet = brain();
+    quiet.behave(publicRoute, { kind: "down" });
+    const unanswered = start(quiet, "wifi", pairedWith(quiet)).manager;
+    const proxied = brain();
+    proxied.hostKind = "mac";
+    proxied.behave(publicRoute, { kind: "http", status: 502 });
+    const effects = pairedWith(proxied);
+    effects.macs.save({ ...effects.macs.saved.get(proxied.id)!, kind: "mac" });
+    const mac = start(proxied, "wifi", effects).manager;
+    await advance(10);
+    expect(unanswered.getState()).toMatchObject({ kind: "waiting", why: "unreachable" });
+    expect(mac.getState()).toMatchObject({ kind: "waiting", why: "unreachable" });
+  });
+
   it("says when the door will not take this phone, or only the Mac can help, until something answers", async () => {
     for (const [outcome, why] of [
       ["refused", "wake-refused"],

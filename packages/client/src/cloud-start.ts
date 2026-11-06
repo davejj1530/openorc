@@ -2,6 +2,7 @@ import {
   DEFAULT_CLAUDE_ACCOUNT,
   harnessShortName,
   isHarnessId,
+  NO_CLOUD_SERVICE,
   NOT_ON_BRAIN,
   OPENCODE_FREE_PROVIDER,
   openCodeProvider,
@@ -37,9 +38,15 @@ export function offersBrainMove(thread: ThreadSummary): boolean {
  * Why a new thread on this project can't start in the cloud, or null. With a cloud brain set up, a cloud thread starts on
  * the brain, so only on a project it has a copy of; without one, in a sandbox of its own.
  */
-export function cloudStartBlocked(offer: Pick<CloudOffer, "brain"> | undefined, projectId: string): string | null {
+export function cloudStartBlocked(offer: Pick<CloudOffer, "brain" | "provider"> | Pick<CloudOffer, "brain"> | undefined, projectId: string): string | null {
   const brain = offer?.brain;
-  return brain && !brain.projects.some((project) => project.mac === projectId) ? NOT_ON_BRAIN : null;
+  if (brain) return brain.projects.some((project) => project.mac === projectId) ? null : NOT_ON_BRAIN;
+  return cloudServiceMissing(offer);
+}
+
+/** Why nothing can go to the cloud yet: no brain to take it, and no service connected for a sandbox of its own. */
+export function cloudServiceMissing(offer: Pick<CloudOffer, "brain" | "provider"> | Pick<CloudOffer, "brain"> | undefined): string | null {
+  return offer && !offer.brain && "provider" in offer && offer.provider === null ? NO_CLOUD_SERVICE : null;
 }
 
 /** The quiet word a row shows for where it lives, dimmed while its owner cannot be reached; null for this host's own. */

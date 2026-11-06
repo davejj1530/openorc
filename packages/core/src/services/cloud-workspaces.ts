@@ -97,8 +97,10 @@ export function cloudSandboxProviders(input: {
   files?: RunnerFile[];
   override?: SandboxProvider;
   cloudOnly?: boolean;
+  /** A Mac with no service connected simulates sandboxes in folders of its own. */
+  simulated?: boolean;
 }): Pick<CloudWorkspaceOptions, "providers" | "forNewThreads"> {
-  const local = input.cloudOnly ? null : new LocalSandboxProvider(path.join(input.dataDir, "cloud-sandboxes"), input.env);
+  const local = input.cloudOnly || input.simulated === false ? null : new LocalSandboxProvider(path.join(input.dataDir, "cloud-sandboxes"), input.env);
   const credentials = input.credentials ?? (async () => null);
   const vercel = new VercelSandboxProvider({ credentials });
   // A cloud-only host is the cloud brain, whose thread instances share the Agent37 account with the Mac's.
@@ -110,7 +112,7 @@ export function cloudSandboxProviders(input: {
   const chosen = async (): Promise<SandboxProvider> => {
     const where = await service();
     if (where) return where === "agent37" ? agent37 : vercel;
-    // With nothing connected, a Mac simulates sandboxes; a cloud-only host goes to Vercel, which asks for a connection.
+    // With nothing connected, a Mac that simulates sandboxes uses one; any other host goes to Vercel, which asks for a connection.
     return local ?? vercel;
   };
   return { providers, forNewThreads: async () => override ?? (await chosen()) };

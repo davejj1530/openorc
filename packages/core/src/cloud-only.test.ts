@@ -213,4 +213,14 @@ describe("a core that is not cloud-only", () => {
     expect(await rpc("cloud.offer", {})).toMatchObject({ offered: true });
     expect((await rpc("claude.accounts.list", {})).accounts.find((account) => account.id === DEFAULT_CLAUDE_ACCOUNT)?.status).toBe("signed_out");
   });
+
+  it("simulates sandboxes on this Mac with no service connected, as development builds do", async () => {
+    await open({});
+    expect(await rpc("cloud.offer", {})).toMatchObject({ offered: true, provider: "local" });
+  });
+
+  it("has nowhere to start a cloud thread until a service is connected, as a release", async () => {
+    await open({ cloudSimulated: false });
+    expect(await rpc("cloud.offer", {})).toMatchObject({ offered: true, provider: null });
+  });
 });

@@ -1,5 +1,5 @@
 import { Menu } from "@base-ui/react/menu";
-import { canMoveToCloud, offersBrainMove, snoozePresets, threadResolved } from "@openorc/client";
+import { canMoveToCloud, cloudServiceMissing, offersBrainMove, snoozePresets, threadResolved } from "@openorc/client";
 import type { ThreadSummary } from "@openorc/protocol";
 import { WORKSPACE_ID, isSubagentThread } from "@openorc/protocol";
 import { useRef, useState } from "react";
@@ -189,10 +189,12 @@ function CloudThreadItems({ thread, parts: M }: { thread: ThreadSummary; parts: 
 
 /** With a cloud brain, the move is the brain's and may be refused with its reason; without one, today's sandbox move. */
 function MoveToCloudItem({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
-  const brain = Boolean(useRpc("cloud.offer", {}).data?.brain);
+  const offer = useRpc("cloud.offer", {}).data;
+  const brain = Boolean(offer?.brain);
   if (!(brain ? offersBrainMove(thread) : canMoveToCloud(thread))) return null;
+  const missing = cloudServiceMissing(offer);
   return (
-    <M.Item className={menuItem} disabled={thread.activity !== "idle"} onClick={() => useUi.getState().setMoveThread(thread.id, "cloud")}>
+    <M.Item className={menuItem} disabled={thread.activity !== "idle" || Boolean(missing)} title={missing ?? undefined} onClick={() => useUi.getState().setMoveThread(thread.id, "cloud")}>
       <Cloud size={13} /> Move to cloud
     </M.Item>
   );

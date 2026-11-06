@@ -3,10 +3,13 @@ import type { ThreadSummary } from "@openorc/protocol";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
-const { mutations, offer } = vi.hoisted(() => ({ mutations: new Map<string, ReturnType<typeof vi.fn>>(), offer: { brain: null as null | { host: string; projects: [] } } }));
+const { mutations, offer } = vi.hoisted(() => ({
+  mutations: new Map<string, ReturnType<typeof vi.fn>>(),
+  offer: { brain: null as null | { host: string; projects: [] }, provider: "vercel" as "vercel" | null },
+}));
 vi.mock("../lib/client", async (original) => ({
   ...(await original<object>()),
-  useRpc: (method: string) => ({ isSuccess: true, data: method === "cloud.offer" ? { offered: true, provider: "vercel", brain: offer.brain } : [] }),
+  useRpc: (method: string) => ({ isSuccess: true, data: method === "cloud.offer" ? { offered: true, provider: offer.provider, brain: offer.brain } : [] }),
   useRpcMutation: (method: string) => {
     if (!mutations.has(method)) mutations.set(method, vi.fn());
     return { mutate: mutations.get(method), isPending: false, error: null };
@@ -39,6 +42,7 @@ function open(thread: Partial<ThreadSummary>): void {
 beforeEach(() => {
   mutations.clear();
   offer.brain = { host: "brain-key", projects: [] };
+  offer.provider = "vercel";
 });
 afterEach(cleanup);
 
@@ -70,4 +74,13 @@ it("keeps today's sandbox move without a brain", () => {
   offer.brain = null;
   open({ agent: "codex" });
   expect(screen.getByText("Move to cloud").closest("[role=menuitem]")?.getAttribute("aria-disabled")).not.toBe("true");
+});
+
+it("says what to connect when there is no brain and no cloud service to move to", () => {
+  offer.brain = null;
+  offer.provider = null;
+  open({ agent: "claude" });
+  const item = screen.getByText("Move to cloud").closest("[role=menuitem]");
+  expect(item?.getAttribute("aria-disabled")).toBe("true");
+  expect(item?.getAttribute("title")).toBe("Connect Vercel or Agent37 in Settings > Cloud first.");
 });

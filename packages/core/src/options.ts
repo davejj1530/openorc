@@ -75,6 +75,11 @@ export interface OpenOrcOptions {
   /** Cloud threads are offered in this build; a paired phone offers them when the Mac does. */
   cloudOffered?: boolean;
   /**
+   * With no cloud service connected, cloud threads run in sandboxes simulated in folders on this Mac, as development
+   * and QA builds do; otherwise, until Vercel or Agent37 is connected, there is nowhere to start one. True unless set.
+   */
+  cloudSimulated?: boolean;
+  /**
    * Every conversation runs in a cloud sandbox and no agent starts on this machine, as on the cloud brain, whose process
    * holds the key to its secrets. Project conversations start in the cloud whatever the request says, Workspace and
    * checkout conversations are refused, there are no sandboxes simulated in folders, and nothing is offered: there is no

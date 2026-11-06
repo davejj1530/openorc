@@ -1,4 +1,4 @@
-import { canMoveToCloud } from "@openorc/client";
+import { canMoveToCloud, cloudServiceMissing } from "@openorc/client";
 import { isSubagentThread, type ThreadSummary } from "@openorc/protocol";
 import { useRpc } from "../client";
 import { useMover } from "./use-mover";
@@ -76,7 +76,8 @@ export function useThreadHeaderMenu(thread: ThreadSummary | null, now: Date, run
   const uncommitted = useChangesCount(actionable);
   const preview = usePreviewPanel(actionable);
   const cloudOffer = useRpc("cloud.offer", {});
-  const toCloud = Boolean(cloudOffer.data?.offered && actionable && canMoveToCloud(actionable));
+  // Not while the Mac has nowhere to run it: no brain, and no cloud service connected.
+  const toCloud = Boolean(cloudOffer.data?.offered && !cloudServiceMissing(cloudOffer.data) && actionable && canMoveToCloud(actionable));
   const moves = useMover();
   return useMemo(() => thread && headerMenu(threadMenu(thread, "header", now, { uncommitted, preview, toCloud, moves }), run), [thread, run, now, uncommitted, preview, toCloud, moves]);
 }

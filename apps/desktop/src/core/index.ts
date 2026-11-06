@@ -85,6 +85,8 @@ const corePromise = OpenOrc.create({
   intelligence: new WorkerIntelligence(() => new Worker(join(import.meta.dirname, "intelligence-worker.mjs"), { resourceLimits: { maxOldGenerationSizeMb: 1024 } })),
   benchmarks: __OPENORC_QA__,
   cloudOffered: true,
+  // Development and QA builds simulate sandboxes on this Mac until a service is connected; a release asks for one.
+  cloudSimulated: __OPENORC_QA__,
   cloudRunnerFiles: Object.entries(cloudRunner).map(([file, content]) => ({ name: basename(file), content: Buffer.from(content) })),
   // A packaged app carries the brain in its resources; a build run from the repository uses the one built beside it.
   cloudBrainBundle: () => newestBrainBundle(process.env["OPENORC_BRAIN_DIR"] ?? join(import.meta.dirname, "../../../brain/dist")),

@@ -84,6 +84,8 @@ interface Dependencies {
   move: BrainMove | null;
   /** Cloud threads are offered in this build. */
   offered: boolean;
+  /** With no service connected, new cloud threads run in sandboxes simulated on this Mac. */
+  simulated: boolean;
   invalidate: (keys: string[]) => void;
   /** After the brain was removed, with the key phones know it by: what this Mac kept of it goes. */
   removed: (linkKey: string | null) => Promise<void>;
@@ -111,6 +113,7 @@ export function createCloudHandlers({
   coordinator,
   move,
   offered,
+  simulated,
   invalidate,
   removed,
 }: Dependencies): Pick<Handlers, CloudMethod> {
@@ -166,7 +169,8 @@ export function createCloudHandlers({
       if (!offered) return { offered: false, provider: null };
       const moves = await brain.moves();
       const projects = (moves?.projects ?? []).flatMap((copy) => (copy.brainId ? [{ mac: copy.id, cloud: copy.brainId }] : []));
-      return { offered: true, provider: (await settings.service()) ?? "local", brain: moves ? { host: moves.linkKey, projects } : null };
+      // With no service connected and no simulated sandboxes, no provider: new cloud threads have nowhere to start yet.
+      return { offered: true, provider: (await settings.service()) ?? (simulated ? "local" : null), brain: moves ? { host: moves.linkKey, projects } : null };
     },
     // With a cloud brain set up, the brain takes the thread; without one, it moves to a sandbox driven from this Mac.
     "cloud.move": async ({ threadId }) => {

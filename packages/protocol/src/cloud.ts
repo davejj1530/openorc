@@ -90,7 +90,7 @@ export interface CloudSandbox {
 /** Whether this Mac offers cloud threads, and where a new one would run: what a phone needs to offer them too. */
 export interface CloudOffer {
   offered: boolean;
-  /** Null when cloud threads are not offered. */
+  /** Null when cloud threads are not offered, or no cloud service is connected to start one on. */
   provider: CloudProvider | null;
   /** The cloud brain this Mac set up, once it has started: Move to cloud hands threads to it. Absent on older Macs. */
   brain?: CloudBrainOffer | null;

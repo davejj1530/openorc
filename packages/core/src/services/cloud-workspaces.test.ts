@@ -371,6 +371,12 @@ describe("where cloud conversations run", () => {
     expect(options.providers.map((provider) => provider.id)).toEqual(["local", "vercel", "agent37"]);
   });
 
+  it("never runs a cloud conversation on this Mac when sandboxes are not simulated, as in a release", async () => {
+    const options = cloudSandboxProviders({ dataDir: directory, env: () => process.env, credentials: async () => null, simulated: false });
+    expect(options.providers.map((provider) => provider.id)).toEqual(["vercel", "agent37"]);
+    expect((await options.forNewThreads!()).id).toBe("vercel");
+  });
+
   it("lets a provider passed in take new conversations, whatever is connected", async () => {
     const cloud = new CloudWorkspaceService(
       db,

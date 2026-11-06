@@ -1,5 +1,5 @@
 import type { CloudSignIn, ThreadSummary } from "@openorc/protocol";
-import { NOT_ON_BRAIN, WORKSPACE_ID } from "@openorc/protocol";
+import { NO_CLOUD_SERVICE, NOT_ON_BRAIN, WORKSPACE_ID } from "@openorc/protocol";
 import { expect, it } from "vitest";
 import { canMoveToCloud, cloudPlaceLabel, cloudStartBlocked, cloudStartSteps, missingCloudSignIn, threadMoveCard, type StartingCloudThread } from "./cloud-start.js";
 
@@ -27,6 +27,10 @@ it("starts a new cloud thread on the cloud brain only for a project it has a cop
   expect(cloudStartBlocked({ brain: null }, "website")).toBeNull();
   expect(cloudStartBlocked({}, "website")).toBeNull();
   expect(cloudStartBlocked(undefined, "website")).toBeNull();
+  // No brain, and no service connected: nowhere to start it yet.
+  expect(cloudStartBlocked({ brain: null, provider: null }, "website")).toBe(NO_CLOUD_SERVICE);
+  expect(cloudStartBlocked({ brain: null, provider: "vercel" }, "website")).toBeNull();
+  expect(cloudStartBlocked({ brain, provider: null }, "openorc")).toBeNull();
 });
 
 it("starts a thread on the cloud brain by waking it, updated first when this Mac carries a newer one, then the brain's own steps", () => {

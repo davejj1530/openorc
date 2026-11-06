@@ -127,6 +127,7 @@ function sandboxServices(options: OpenOrcOptions, sources: CloudSources, env: ()
     ...(options.cloudRunnerFiles ? { files: options.cloudRunnerFiles } : {}),
     ...(options.cloudSandboxes ? { override: options.cloudSandboxes } : {}),
     cloudOnly: options.cloudOnly,
+    simulated: options.cloudSimulated ?? true,
   });
 }
 

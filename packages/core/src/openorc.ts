@@ -603,7 +603,13 @@ export class OpenOrc {
   private buildHandlers(invalidate: (keys: string[]) => void): Handlers {
     return composeHandlers(
       createSlackHandlers({ slack: this.slack, invalidate }),
-      createCloudHandlers({ ...this.cloudParts, offered: Boolean(this.options.cloudOffered && !this.options.cloudOnly), invalidate, removed: (linkKey) => this.brainRemoved(linkKey) }),
+      createCloudHandlers({
+        ...this.cloudParts,
+        offered: Boolean(this.options.cloudOffered && !this.options.cloudOnly),
+        simulated: this.options.cloudSimulated ?? true,
+        invalidate,
+        removed: (linkKey) => this.brainRemoved(linkKey),
+      }),
       createClaudeAccountHandlers(this.claudeAccounts),
       createBrainSyncHandlers({ db: this.db, memory: this.memory, textGeneration: this.textGeneration, cloudOnly: this.options.cloudOnly ?? false, invalidate }),
       createSystemHandlers({

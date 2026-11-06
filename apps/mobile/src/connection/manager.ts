@@ -17,7 +17,7 @@ import {
 } from "@openorc/link";
 import type { Route } from "@openorc/protocol";
 import { wakeByAddress, type CallAddress } from "./address-wake";
-import type { PhoneDoors } from "./door";
+import type { PhoneDoors, WakeOutcome } from "./door";
 import { LinkConnection, type PhoneLine } from "./link-connection";
 import { raceRoutes, ROUTE_TIMEOUT_MS, type Attempt, type Clock, type RaceResult } from "./route-race";
 import { learnRoutes, routesFor, type DeviceKeys, type MacStore, type NetworkKind, type SavedMac } from "./saved-macs";
@@ -493,6 +493,11 @@ export class ConnectionManager {
     if (epoch !== this.epoch) return;
     // A wake may take minutes; the next waits a minute from this one's end.
     this.knocked.set(mac.id, this.effects.clock.now());
+    this.woke(mac, outcome, why, tried);
+  }
+
+  /** What a wake came to: race again at once once the host is ready, or wait saying why. */
+  private woke(mac: SavedMac, outcome: WakeOutcome, why: DownReason | null, tried: readonly Route[]): void {
     switch (outcome.kind) {
       case "ready": {
         const saved = this.active() ?? mac;

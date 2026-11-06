@@ -2,17 +2,21 @@ import { isSubagentThread, type ThreadSummary } from "@openorc/protocol";
 import { sidebarFoldKey, type ThreadPage } from "./sidebar-thread-groups.js";
 import { threadTreeActivity, threadTreeMatches, threadTreeRoot } from "./thread-tree.js";
 
-/** When a thread last saw work, as the sidebar groups it. The last two start folded and open on demand. */
-export type SidebarDay = "today" | "yesterday" | "week" | "older";
+/** When a thread last saw work, as the sidebar groups it: the last few hours, then by calendar day. Recent and Today start open. */
+export type SidebarDay = "recent" | "today" | "yesterday" | "week" | "older";
+
+/** How far back Recent reaches. Work in the last hours stays together on top, whatever day it fell on. */
+export const RECENT_MS = 3 * 60 * 60 * 1000;
 
 export const SIDEBAR_DAYS: readonly { day: SidebarDay; label: string }[] = [
+  { day: "recent", label: "Recent" },
   { day: "today", label: "Today" },
   { day: "yesterday", label: "Yesterday" },
   { day: "week", label: "Last 7 days" },
   { day: "older", label: "Older" },
 ];
 
-const OPEN_AT_FIRST: ReadonlySet<SidebarDay> = new Set(["today", "yesterday"]);
+const OPEN_AT_FIRST: ReadonlySet<SidebarDay> = new Set(["recent", "today"]);
 
 function startOfDay(now: number, daysAgo: number): number {
   const date = new Date(now);
@@ -21,8 +25,9 @@ function startOfDay(now: number, daysAgo: number): number {
   return date.getTime();
 }
 
-/** The day group for a time, by local calendar days: today, yesterday, the five days before, then older. */
+/** The group for a time: the last three hours, then by local calendar day: today, yesterday, the five days before, older. */
 export function sidebarDay(at: number, now: number): SidebarDay {
+  if (at >= now - RECENT_MS) return "recent";
   if (at >= startOfDay(now, 0)) return "today";
   if (at >= startOfDay(now, 1)) return "yesterday";
   if (at >= startOfDay(now, 6)) return "week";
@@ -41,9 +46,14 @@ export function sidebarDayOpen(collapsed: readonly string[], day: SidebarDay): b
 /** The one list's name in the saved keys of its Pinned and Snoozed folds. */
 export const SIDEBAR_LIST = "threads";
 
-/** Whether a saved fold still names a part of the list: a sub thread tree, a day, or the list's Pinned or Snoozed. */
+const DAY_FOLDS: ReadonlySet<string> = new Set(SIDEBAR_DAYS.map(({ day }) => sidebarDayKey(day)));
+
+/**
+ * Whether a saved fold still names a part of the list: a sub thread tree, a day, or the list's Pinned or Snoozed. A day's
+ * fold that went back to its start, since the day now starts that way, says nothing more.
+ */
 export function liveSidebarFold(key: string): boolean {
-  return /^(thread|day)-(open|closed):/.test(key) || key === sidebarFoldKey.pinned(SIDEBAR_LIST) || key === sidebarFoldKey.snoozed(SIDEBAR_LIST);
+  return /^thread-(open|closed):/.test(key) || DAY_FOLDS.has(key) || key === sidebarFoldKey.pinned(SIDEBAR_LIST) || key === sidebarFoldKey.snoozed(SIDEBAR_LIST);
 }
 
 export type SidebarDaySection = { day: SidebarDay; label: string; roots: ThreadSummary[] };

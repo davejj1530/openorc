@@ -157,7 +157,7 @@ function needsYouItems(waiting: readonly Waiting[]): HomeItem[] {
 
 /**
  * Home, as the desktop's sidebar lists threads: every thread waiting on you first, across projects and the partner host,
- * then pinned threads, then the rest by the day they last saw work (today and yesterday open, the last week and older
+ * then pinned threads, then the rest by when they last saw work (the last three hours and today open, earlier days
  * folded), with snoozed threads folded at the foot. A waiting thread appears once, under Needs you, which never folds.
  */
 export function homeItems(list: HomeList, options: HomeOptions): HomeItem[] {

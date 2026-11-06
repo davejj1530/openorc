@@ -20,7 +20,7 @@ const rows = (items: HomeItem[]) => outline(items).filter((line) => !line.starts
 const now = Date.UTC(2026, 9, 23, 12);
 const names = new Map([[WORKSPACE_ID, "Workspace"], ...fixtureProjects.map(({ id, name }): [string, string] => [id, name])]);
 /** Every day open, so tests about something else see every row whatever the time zone. */
-const allOpen = ["day-open:week", "day-open:older"];
+const allOpen = ["day-open:yesterday", "day-open:week", "day-open:older"];
 
 /** What a host's lists give Home: one page across projects, newest work first, and every pin from its own read. */
 function list(
@@ -58,20 +58,22 @@ describe("homeItems", () => {
     expect(outline(items)[3]).toBe("§ Pinned 2");
   });
 
-  it("groups the rest by local calendar day, today and yesterday open and the last week and older folded, keeping the open thread", () => {
+  it("groups the rest into the last hours, then by local calendar day folded past today, keeping the open thread", () => {
     const at = new Date(2026, 9, 23, 20).getTime();
     const base = { ...fixtureThreads[0]!, pinnedAt: null };
     const threads = [
       { ...base, id: "a", lastActivityAt: new Date(2026, 9, 23, 19).getTime() },
+      { ...base, id: "e", lastActivityAt: new Date(2026, 9, 23, 10).getTime() },
       { ...base, id: "b", lastActivityAt: new Date(2026, 9, 22, 10).getTime() },
       { ...base, id: "c", lastActivityAt: new Date(2026, 9, 20, 10).getTime() },
       { ...base, id: "d", lastActivityAt: new Date(2026, 9, 1, 10).getTime() },
     ];
     expect(outline(homeItems(list(threads, { at }), options({ now: at, collapsed: [] })))).toEqual([
-      "§ Today",
+      "§ Recent",
       "a @ Workspace",
-      "§ Yesterday",
-      "b @ Workspace",
+      "§ Today",
+      "e @ Workspace",
+      "§ Yesterday folded",
       "§ Last 7 days folded",
       "§ Older folded",
     ]);

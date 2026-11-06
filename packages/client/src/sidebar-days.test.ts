@@ -1,9 +1,9 @@
 import type { ThreadSummary } from "@openorc/protocol";
 import { describe, expect, it } from "vitest";
-import { liveSidebarFold, sidebarDay, sidebarDayKey, sidebarDayList, sidebarDayOpen, sidebarDaySections, sidebarListGrows } from "./sidebar-days.js";
+import { liveSidebarFold, RECENT_MS, sidebarDay, sidebarDayKey, sidebarDayList, sidebarDayOpen, sidebarDaySections, sidebarListGrows } from "./sidebar-days.js";
 import { sidebarThreadPage, toggleSidebarFold } from "./sidebar-thread-groups.js";
 
-const now = new Date(2026, 10, 6, 1, 30).getTime();
+const now = new Date(2026, 10, 6, 20, 0).getTime();
 const at = (day: number, hour = 12) => new Date(2026, 10, day, hour).getTime();
 
 function thread(id: string, lastActivityAt: number, values: Partial<ThreadSummary> = {}): ThreadSummary {
@@ -11,7 +11,12 @@ function thread(id: string, lastActivityAt: number, values: Partial<ThreadSummar
 }
 
 describe("sidebar days", () => {
-  it("groups by local calendar day, not by hours ago", () => {
+  it("keeps the last three hours together on top, then groups by local calendar day", () => {
+    expect(sidebarDay(now - 1000, now)).toBe("recent");
+    expect(sidebarDay(now - RECENT_MS, now)).toBe("recent");
+    expect(sidebarDay(now - RECENT_MS - 1, now)).toBe("today");
+    // Just past midnight, last night's work is recent, not yesterday's.
+    expect(sidebarDay(at(5, 23), at(6, 1))).toBe("recent");
     expect(sidebarDay(at(6, 0), now)).toBe("today");
     expect(sidebarDay(at(5, 23), now)).toBe("yesterday");
     expect(sidebarDay(at(5, 0), now)).toBe("yesterday");
@@ -20,12 +25,12 @@ describe("sidebar days", () => {
     expect(sidebarDay(at(-1, 23), now)).toBe("older");
   });
 
-  it("opens today and yesterday at first, folds the rest, and saves only the reader's change", () => {
-    expect((["today", "yesterday", "week", "older"] as const).map((day) => sidebarDayOpen([], day))).toEqual([true, true, false, false]);
-    const saved = toggleSidebarFold(toggleSidebarFold([], sidebarDayKey("yesterday")), sidebarDayKey("older"));
-    expect(sidebarDayOpen(saved, "yesterday")).toBe(false);
-    expect(sidebarDayOpen(saved, "older")).toBe(true);
-    expect(sidebarDayOpen(saved, "today")).toBe(true);
+  it("opens recent and today at first, folds the rest, and saves only the reader's change", () => {
+    expect((["recent", "today", "yesterday", "week", "older"] as const).map((day) => sidebarDayOpen([], day))).toEqual([true, true, false, false, false]);
+    const saved = toggleSidebarFold(toggleSidebarFold([], sidebarDayKey("today")), sidebarDayKey("yesterday"));
+    expect(sidebarDayOpen(saved, "today")).toBe(false);
+    expect(sidebarDayOpen(saved, "yesterday")).toBe(true);
+    expect(sidebarDayOpen(saved, "recent")).toBe(true);
   });
 
   it("files a parent by its family's latest work and keeps the given order", () => {
@@ -33,7 +38,8 @@ describe("sidebar days", () => {
     const child = thread("child", now - 1000, { parentThreadId: "parent", parentRelation: "subagent" });
     const sections = sidebarDaySections([thread("a", at(6)), parent, thread("b", at(5)), thread("c", at(1))], [parent, child], now);
     expect(sections.map((section) => [section.day, section.roots.map((root) => root.id)])).toEqual([
-      ["today", ["a", "parent"]],
+      ["recent", ["parent"]],
+      ["today", ["a"]],
       ["yesterday", ["b"]],
       ["week", ["c"]],
     ]);
@@ -51,12 +57,14 @@ describe("sidebar days", () => {
       const last = roots.at(-1);
       return sidebarListGrows({ end: last ? sidebarDay(last.lastActivityAt, now) : null, hasMore, collapsed });
     };
-    expect(grows([thread("a", at(6)), thread("b", at(5))])).toBe(true);
-    expect(grows([thread("a", at(6)), thread("b", at(5))], [], false)).toBe(false);
-    expect(grows([thread("a", at(6)), thread("b", at(3))])).toBe(false);
+    const recent = thread("recent", now - 1000);
+    expect(grows([recent, thread("b", at(6))])).toBe(true);
+    expect(grows([recent, thread("b", at(6))], [], false)).toBe(false);
+    expect(grows([recent, thread("b", at(6))], [sidebarDayKey("today")])).toBe(false);
+    expect(grows([thread("a", at(6)), thread("b", at(5))])).toBe(false);
+    expect(grows([thread("a", at(6)), thread("b", at(5))], [sidebarDayKey("yesterday")])).toBe(true);
     expect(grows([thread("a", at(6)), thread("b", at(3))], [sidebarDayKey("week")])).toBe(true);
     expect(grows([thread("a", at(6)), thread("b", at(3))], [sidebarDayKey("older")])).toBe(true);
-    expect(grows([thread("a", at(6)), thread("b", at(5))], [sidebarDayKey("yesterday")])).toBe(false);
     expect(grows([thread("a", at(6)), thread("b", at(-2))], [sidebarDayKey("older")])).toBe(false);
     expect(grows([])).toBe(true);
   });
@@ -96,12 +104,14 @@ describe("sidebar days", () => {
     ]);
     expect(list.all.find((row) => row.id === "yesterday")?.unread).toBe(false);
     expect(list.end).toBe("yesterday");
-    expect(sidebarListGrows({ end: list.end, hasMore: list.hasMore, collapsed: [] })).toBe(true);
+    expect(sidebarListGrows({ end: list.end, hasMore: list.hasMore, collapsed: [sidebarDayKey("yesterday")] })).toBe(true);
     expect(sidebarDayList({ pages: [loaded], needsYou, pinnedOnly: true, activeId: null, now }).rest).toEqual([]);
   });
 
-  it("keeps the saved folds the list still has and drops the project groups", () => {
+  it("keeps the saved folds the list still has and drops the project groups and folds a day now starts with", () => {
     const saved = ["snoozed", "project:one", "pinned:one", "snoozed-open:one", "pinned:threads", "snoozed-open:threads", "thread-closed:a", "thread-open:b", "day-closed:today", "day-open:older"];
     expect(saved.filter(liveSidebarFold)).toEqual(["pinned:threads", "snoozed-open:threads", "thread-closed:a", "thread-open:b", "day-closed:today", "day-open:older"]);
+    // Yesterday used to start open, so folding it saved a key; it starts folded now.
+    expect(["day-closed:yesterday", "day-open:today", "day-closed:recent", "day-open:yesterday"].filter(liveSidebarFold)).toEqual(["day-closed:recent", "day-open:yesterday"]);
   });
 });

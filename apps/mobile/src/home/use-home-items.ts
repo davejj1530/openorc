@@ -1,4 +1,15 @@
-import { cachedListPage, NEEDS_YOU_PAGE, sidebarDayList, sidebarListGrows, sidebarThreadPage, THREAD_PAGE, threadFoldIds, useChildThreadPages, type SidebarFilter } from "@openorc/client";
+import {
+  cachedListPage,
+  NEEDS_YOU_PAGE,
+  sidebarDayList,
+  sidebarListGrows,
+  sidebarThreadPage,
+  THREAD_PAGE,
+  threadFoldIds,
+  useChildThreadPages,
+  useSidebarNow,
+  type SidebarFilter,
+} from "@openorc/client";
 import { WORKSPACE_ID, type InboxList, type ThreadSummary } from "@openorc/protocol";
 import { useQueryClient } from "@tanstack/react-query";
 import { useContext, useEffect, useState } from "react";
@@ -66,7 +77,7 @@ function useThreadList(connected: boolean, selectedId: string | undefined) {
   const opened = useRpc("threads.get", { id: selectedId ?? "" }, { enabled: Boolean(selectedId) }).data;
   const selected = opened && projectIds.includes(opened.projectId) ? opened : null;
   const family = useSelectedFamily(selected, filter, new Set(fetched.flatMap((page) => page?.rows.map((thread) => thread.id) ?? [])), children);
-  const now = Date.now();
+  const now = useSidebarNow();
   const withFamily = (rows: readonly ThreadSummary[] | undefined) => (rows ? [...new Map([...rows, ...(family ?? [])].map((thread) => [thread.id, thread])).values()] : rows);
   const pages = fetched.map((page) => sidebarThreadPage({ projectId: selected?.projectId ?? WORKSPACE_ID, fetched: withFamily(page?.rows), selected, filter, limit: page?.limit ?? limit, now }));
   const apart = (rows: ThreadSummary[] | undefined) => sidebarThreadPage({ projectId: WORKSPACE_ID, fetched: rows, selected: null, filter, limit: Number.MAX_SAFE_INTEGER, now });

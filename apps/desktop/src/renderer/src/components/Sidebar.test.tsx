@@ -365,7 +365,7 @@ function projectThreads() {
 function dayThreads() {
   fixture.projects = [{ id: "one", name: "First project", rootPath: "/projects/one" }];
   fixture.threads = [
-    { id: "today", title: "Today's notes", lastActivityAt: Date.now() - 1000 },
+    { id: "recent", title: "Recent notes", lastActivityAt: Date.now() - 1000 },
     { id: "yesterday", title: "Yesterday's notes", lastActivityAt: ago(1) },
     { id: "week", title: "This week's notes", lastActivityAt: ago(3) },
     { id: "older", title: "Old notes", lastActivityAt: ago(30) },
@@ -392,27 +392,28 @@ it("keeps what needs you in a folded day, even past the loaded pages, and nothin
   expect(["Last 7 days", "Older"].map(section)).toEqual(["false", "false"]);
 });
 
-it("lists threads by day, today and yesterday open, the last week and older folded, and keeps the reader's folds", async () => {
+it("lists the last hours' threads, then the rest by day folded, hides an empty day, and keeps the reader's folds", async () => {
   dayThreads();
   const view = mountSidebar();
-  await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["today", "yesterday"]));
-  expect(["Today", "Yesterday", "Last 7 days", "Older"].map(section)).toEqual(["true", "true", "false", "false"]);
-  expect(screen.queryByRole("button", { name: /This week's notes|Old notes/ })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Last 7 days" }));
-  expect(useUi.getState().threadOrder).toEqual(["today", "yesterday", "week"]);
-  fireEvent.click(screen.getByRole("button", { name: "Today" }));
-  expect(useUi.getState().threadOrder).toEqual(["yesterday", "week"]);
+  await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["recent"]));
+  expect(["Recent", "Yesterday", "Last 7 days", "Older"].map(section)).toEqual(["true", "false", "false", "false"]);
+  expect(screen.queryByRole("button", { name: "Today" })).toBeNull();
+  expect(screen.queryByRole("button", { name: /Yesterday's notes|This week's notes|Old notes/ })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Yesterday" }));
+  expect(useUi.getState().threadOrder).toEqual(["recent", "yesterday"]);
+  fireEvent.click(screen.getByRole("button", { name: "Recent" }));
+  expect(useUi.getState().threadOrder).toEqual(["yesterday"]);
   view.unmount();
   mountSidebar();
-  await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["yesterday", "week"]));
-  expect(JSON.parse(localStorage.getItem("openorc.layout")!).collapsed).toEqual(["day-open:week", "day-closed:today"]);
+  await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["yesterday"]));
+  expect(JSON.parse(localStorage.getItem("openorc.layout")!).collapsed).toEqual(["day-open:yesterday", "day-closed:recent"]);
 });
 
 it("keeps the open thread in view inside a folded day without unfolding it", async () => {
   dayThreads();
   useRouter.setState({ route: { view: "thread", threadId: "older" } });
   mountSidebar();
-  await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["today", "yesterday", "older"]));
+  await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["recent", "older"]));
   expect(section("Older")).toBe("false");
   expect(screen.getByRole("button", { name: /Old notes/ }).getAttribute("aria-current")).toBe("page");
   expect(screen.queryByRole("button", { name: /This week's notes/ })).toBeNull();
@@ -422,7 +423,7 @@ it("leads with pinned threads however long ago they last worked", async () => {
   dayThreads();
   fixture.threads[3]!.pinnedAt = 1;
   mountSidebar();
-  await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["older", "today", "yesterday"]));
+  await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["older", "recent"]));
   expect(section("Pinned")).toBe("true");
   expect(screen.queryByRole("button", { name: "Older" })).toBeNull();
 });
@@ -430,8 +431,9 @@ it("leads with pinned threads however long ago they last worked", async () => {
 it("names each thread's project under its title, with its pull request at the end", async () => {
   dayThreads();
   fixture.threads[0] = { ...fixture.threads[0]!, prUrl: "https://github.com/acme/app/pull/8", prState: "merged" };
+  useLayout.setState({ collapsed: ["day-open:yesterday"] });
   mountSidebar();
-  const row = await screen.findByRole("button", { name: /Today's notes/ });
+  const row = await screen.findByRole("button", { name: /Recent notes/ });
   expect(row.querySelector(".thread-preview-project-name")?.textContent).toBe("First project");
   const pull = within(row).getByRole("img", { name: "Pull request #8, merged" });
   expect(pull.textContent).toBe("#8");
@@ -442,8 +444,9 @@ it("names each thread's project under its title, with its pull request at the en
 it("sweeps a working thread's title and puts its spinner under the title line, where a parent's chevron sits above", async () => {
   dayThreads();
   fixture.threads[0] = { ...fixture.threads[0]!, activity: "running" };
+  useLayout.setState({ collapsed: ["day-open:yesterday"] });
   mountSidebar();
-  const row = await screen.findByRole("button", { name: /Today's notes/ });
+  const row = await screen.findByRole("button", { name: /Recent notes/ });
   expect(row.querySelector(".thread-preview-title")?.hasAttribute("data-working")).toBe(true);
   expect(row.querySelector(".thread-preview-heading [aria-label='Working']")).toBeNull();
   // The line right under the title: what its agent is doing when there is a headline, else its project.

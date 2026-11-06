@@ -21,6 +21,7 @@ import {
   threadTreeRows,
   threadFoldIds,
   useChildThreadPages,
+  useSidebarNow,
 } from "@openorc/client";
 import { useOrclings } from "../lib/orclings";
 import { useRpc, useRpcs } from "../lib/client";
@@ -171,8 +172,8 @@ function ListFeedback({ state, shown, snoozed }: { state: ThreadList; shown: num
 }
 
 /** The list's parts from its pages: pins first, then the rest in their days, snoozed threads apart. */
-function dayList({ pages, pinPage, needsYouPage, pinnedOnly, activeId }: ThreadList) {
-  return sidebarDayList({ pages, pins: pinPage, needsYou: needsYouPage, pinnedOnly, activeId, now: Date.now() });
+function dayList({ pages, pinPage, needsYouPage, pinnedOnly, activeId }: ThreadList, now: number) {
+  return sidebarDayList({ pages, pins: pinPage, needsYou: needsYouPage, pinnedOnly, activeId, now });
 }
 
 type ListPart = { key: string; label: string; count?: number; open: boolean; fold: string; roots: ThreadSummary[]; more: boolean };
@@ -196,12 +197,12 @@ function listParts(list: SidebarDayList, collapsed: readonly string[], pinnedOnl
   return [...(list.pinned.length ? [pins] : []), ...days];
 }
 
-/** The threads by when they last saw work: pinned ones first, then today and yesterday open, the last week and older folded. Search reaches the rest. */
+/** The threads by when they last saw work: pinned ones first, then the last hours and today open, earlier days folded. Search reaches the rest. */
 function DayThreadBrowser({ children }: { children: ChildPages }) {
   const state = useThreadList(children);
   const { projects, activeId, pinnedOnly, pending, limit, loadMore } = state;
   const collapsed = useLayout((s) => s.collapsed);
-  const list = dayList(state);
+  const list = dayList(state, useSidebarNow());
   const parts = listParts(list, collapsed, pinnedOnly);
   const snoozedOpen = sidebarSectionOpen(collapsed, "snoozed", SIDEBAR_LIST);
   const snoozed = list.shown(list.snoozed, snoozedOpen);

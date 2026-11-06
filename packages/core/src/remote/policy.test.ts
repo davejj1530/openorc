@@ -32,6 +32,16 @@ describe("phone policy", () => {
     expect(admitRemoteRequest("threads.start", named, context, "owner")).toEqual({ ok: true });
   });
 
+  it("lets only the brain's own Mac list and delete the brain's sandboxes", () => {
+    for (const [method, params] of [
+      ["cloud.sandboxes", {}],
+      ["cloud.sandboxes.remove", { name: "openorc-t1" }],
+    ] as const) {
+      expect(admitRemoteRequest(method, params, context)).toEqual({ ok: false, message: "This is not available from a phone." });
+      expect(admitRemoteRequest(method, params, context, "owner")).toEqual({ ok: true });
+    }
+  });
+
   it("keeps phone access and its push key out of a phone's reach", () => {
     expect(Object.keys(remoteRpcParams)).toEqual(expect.arrayContaining(["remote.push.setKey", "remote.push.removeKey", "remote.push.test"]));
     for (const method of Object.keys(remoteRpcParams)) expect(isRemoteMethod(method), method).toBe(false);

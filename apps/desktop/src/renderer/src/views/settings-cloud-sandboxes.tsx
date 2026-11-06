@@ -43,7 +43,7 @@ function details(sandbox: CloudSandbox, now: number): string {
   const resting = sandbox.state === "running" ? "Awake" : stateLabels[sandbox.state];
   const ran = sandbox.awakeMs > 0 ? `, awake ${duration(sandbox.awakeMs)} in all` : "";
   const size = sandbox.vcpus ? `${sandbox.vcpus} vCPUs · ${Math.round((sandbox.memoryMb ?? sandbox.vcpus * 2048) / 1024)} GB` : null;
-  return [awake ?? `${resting}${ran}`, size, places[sandbox.provider], sandbox.thread ? null : "No thread"].filter(Boolean).join(" · ");
+  return [awake ?? `${resting}${ran}`, size, places[sandbox.provider], sandbox.brain ? "Cloud brain" : null, sandbox.thread ? null : "No thread"].filter(Boolean).join(" · ");
 }
 
 function SandboxRow({ sandbox, now }: { sandbox: CloudSandbox; now: number }) {
@@ -89,6 +89,9 @@ function spent(sandboxes: CloudSandbox[]): string | null {
 export function CloudSandboxesSection({ active }: { active: boolean }) {
   const sandboxes = useRpc("cloud.sandboxes", {}, { enabled: active, refetchInterval: active ? REFRESH_MS : false });
   const now = useNow(REFRESH_MS);
+  // The brain's own threads are listed only while it is awake: Settings never wakes it to ask.
+  const brain = useRpc("cloud.brain.status", {}, { enabled: active }).data;
+  const brainAsleep = brain?.state === "ready" && brain.machine !== "awake";
   const list = sandboxes.data ?? [];
   const total = spent(list);
   return (
@@ -96,7 +99,8 @@ export function CloudSandboxesSection({ active }: { active: boolean }) {
       {list.map((sandbox) => (
         <SandboxRow key={`${sandbox.provider}:${sandbox.name}`} sandbox={sandbox} now={now} />
       ))}
-      {sandboxes.data && list.length === 0 ? <p className="settings-hint py-2">No cloud threads yet.</p> : null}
+      {sandboxes.data && list.length === 0 && !brainAsleep ? <p className="settings-hint py-2">No cloud threads yet.</p> : null}
+      {brainAsleep ? <p className="settings-hint py-2">Threads on the cloud brain show here while it's awake.</p> : null}
       {total ? (
         <SettingRow label="So far">
           <span className="text-ink-2 tabular-nums">{total}</span>

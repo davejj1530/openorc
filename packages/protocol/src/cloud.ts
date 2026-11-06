@@ -85,6 +85,8 @@ export interface CloudSandbox {
   /** Its conversation's agent is at work there, so it cannot be removed now. */
   working: boolean;
   createdAt: number;
+  /** The cloud brain made it for a thread of its own, and deletes it when asked; absent for this Mac's. */
+  brain?: true;
 }
 
 /** Whether this Mac offers cloud threads, and where a new one would run: what a phone needs to offer them too. */

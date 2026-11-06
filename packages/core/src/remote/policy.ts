@@ -132,6 +132,9 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   "threads.movePreview": allow,
   "cloud.bringToMac": allow,
   "cloud.keep": allow,
+  // The brain's sandboxes are for its own Mac's Settings, which the owner guards let through.
+  "cloud.sandboxes": () => NOT_FROM_PHONE,
+  "cloud.sandboxes.remove": () => NOT_FROM_PHONE,
   "threads.start": (params, context) => {
     if (params.workingDirectory !== undefined) return "Choose a folder for this conversation on your Mac.";
     // Only the brain's own Mac names a thread's id, for the thread its windows show before the brain has it.
@@ -207,6 +210,8 @@ export const remoteReplies: { [M in RemoteMethod]: Reply<M> } = {
   "threads.movePreview": same,
   "cloud.bringToMac": same,
   "cloud.keep": same,
+  "cloud.sandboxes": same,
+  "cloud.sandboxes.remove": same,
   "threads.start": same,
   "threads.update": same,
   "threads.switchClaudeAccount": same,
@@ -250,10 +255,14 @@ export type RemoteAdmission = { ok: true } | { ok: false; message: string };
 
 /**
  * The brain's own Mac asks under a phone's guards except here, where its windows do more with the threads they forward:
- * they keep a thread's draft, done mark and pull request, and attach any file the Mac stored on the brain first.
+ * they keep a thread's draft, done mark and pull request, and attach any file the Mac stored on the brain first; its
+ * Settings list and delete the brain's sandboxes.
  */
 const ownerGuards: Partial<{ [M in RemoteMethod]: Guard<M> }> = {
   "threads.update": allow,
+  // Its Settings list the sandboxes the brain made for its threads, and delete one there.
+  "cloud.sandboxes": allow,
+  "cloud.sandboxes.remove": allow,
   "threads.start": ({ id: _id, ...params }, context) => remoteGuards["threads.start"]({ ...params, attachments: undefined }, context) ?? storedFiles(params.attachments, context),
   "runs.start": (params, context) => storedFiles(params.attachments, context),
   "runs.send": (params, context) => storedFiles(params.attachments, context),

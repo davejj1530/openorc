@@ -21,7 +21,7 @@ import { OpenCodeCloudKeys, OpenCodeCloudSignIn } from "./cloud-opencode.js";
 import { CloudHandoff } from "./cloud-handoff.js";
 import { CodexBrowserSignIn, CodexCloudLogin } from "./codex-cloud-login.js";
 import { spawnWithPipes } from "./terminal-process.js";
-import { CloudSandboxes, type CloudSandboxRuns } from "./cloud-sandboxes.js";
+import { CloudSandboxes, type BrainSandboxes, type CloudSandboxRuns } from "./cloud-sandboxes.js";
 import { CloudSignInsFlow } from "./cloud-sign-ins.js";
 import { macSignIns } from "./mac-agent-keys.js";
 import { agentHomes, everyVersion, hostVersions } from "./agent-homes.js";
@@ -209,7 +209,7 @@ export function createCloud(input: CloudInput): {
     closeAndWait: (id) => input.runs().closeAndWait(id),
     interrupt: (id) => input.runs().interrupt(id),
   };
-  const list = new CloudSandboxes(db, cloud, runs);
+  const list = new CloudSandboxes(db, cloud, runs, () => brainSandboxes(input.routing?.() ?? null));
   const handoff = new CloudHandoff({ db, cloud, runs, toWorktree: (id) => input.threads().moveWorkspace(id, "worktree"), changed, log });
   const standby = new CloudStandby({
     db,
@@ -230,6 +230,18 @@ export function createCloud(input: CloudInput): {
   const flow = new CloudSignInsFlow({ db, tokens, codex: codexLogin, opencode, brain, mac: macSignIns(environment), changed: () => invalidate(["cloud-sign-ins"]) });
   const move = brainMove(input, { brain, beside, coordinator, connections: sources });
   return { settings, tokens, codex: codexLogin, opencode, cloud, checks, sandboxes: list, handoff, standby, brain, signIns: flow, relocations, coordinator, move };
+}
+
+/** The cloud brain's sandboxes, asked only while it is awake and linked: Settings never wakes it to list them. */
+function brainSandboxes(routing: BrainRouting | null): BrainSandboxes | null {
+  if (!routing?.active || routing.link.reach !== "live") return null;
+  const { link } = routing;
+  return {
+    list: () => link.call("cloud.sandboxes", {}, { wake: false }),
+    remove: async (name) => {
+      await link.call("cloud.sandboxes.remove", { name }, { wake: false });
+    },
+  };
 }
 
 /** Moving the brain to the other service: the Mac's alone, given a store for the new brain's record. */

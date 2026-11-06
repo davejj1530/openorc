@@ -92,3 +92,31 @@ it("names each sandbox's service and totals each service apart, never calling Ag
   expect(screen.getByText("Vercel under $0.01 at list prices · Agent37 $0.12")).toBeTruthy();
   expect(screen.queryByText(/Vercel's list prices/)).toBeNull();
 });
+
+it("marks the cloud brain's threads, and says they show only while it is awake", async () => {
+  const fromBrain: CloudSandbox = { ...sandboxes[1]!, name: "openorc-e", provider: "agent37", thread: { id: "e", title: "Started on the phone" }, brain: true };
+  let machine = "awake";
+  vi.mocked(core.call).mockImplementation(async (method: string) => {
+    if (method === "cloud.sandboxes") return (machine === "awake" ? [fromBrain] : []) as never;
+    if (method === "cloud.brain.status") return { state: "ready", service: "agent37", region: null, machine, claude: [], behind: false, working: null, door: null, threads: 1, error: null } as never;
+    return null as never;
+  });
+  const { unmount } = render(
+    <QueryClientProvider client={queryClient}>
+      <CloudSandboxesSection active />
+    </QueryClientProvider>,
+  );
+  await screen.findByText("Started on the phone");
+  expect(screen.getByText("Asleep, awake 1 h 5 min in all · 2 vCPUs · 4 GB · On Agent37 · Cloud brain")).toBeTruthy();
+  expect(screen.queryByText(/show here while it's awake/)).toBeNull();
+  unmount();
+  queryClient.clear();
+  machine = "asleep";
+  render(
+    <QueryClientProvider client={queryClient}>
+      <CloudSandboxesSection active />
+    </QueryClientProvider>,
+  );
+  expect(await screen.findByText("Threads on the cloud brain show here while it's awake.")).toBeTruthy();
+  expect(screen.queryByText("No cloud threads yet.")).toBeNull();
+});

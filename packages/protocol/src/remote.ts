@@ -62,6 +62,9 @@ export const REMOTE_METHODS = [
   // The Mac coordinates every move to and from its cloud brain: a phone asks it to bring a thread home or keep one put.
   "cloud.bringToMac",
   "cloud.keep",
+  // The brain's own Mac lists the sandboxes the brain made for its threads and deletes one; phones are refused.
+  "cloud.sandboxes",
+  "cloud.sandboxes.remove",
 ] as const satisfies readonly RpcMethod[];
 export type RemoteMethod = (typeof REMOTE_METHODS)[number];
 

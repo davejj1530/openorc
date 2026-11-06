@@ -102,6 +102,13 @@ const answers: Answers = {
     throw new Error("Cloud threads are not available on this Mac.");
   },
   "cloud.keep": () => null,
+  // Only a brain's own Mac lists or deletes its sandboxes; a phone is refused, as by a real Mac.
+  "cloud.sandboxes": () => {
+    throw new Error("This is not available from a phone.");
+  },
+  "cloud.sandboxes.remove": () => {
+    throw new Error("This is not available from a phone.");
+  },
   "threads.start": (core, params) => {
     const id = core.id("demo-thread");
     const title = params.title ?? params.prompt.split("\n")[0]!.slice(0, 60);

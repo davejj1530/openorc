@@ -278,7 +278,7 @@ User prompts are r18 plane bubbles, aligned right, capped at 88% of the column o
 
 The conversation composer is one r20 surface on `--composer-input` with no inner well. One bar holds attach, the project or destination chip, model, and mode on the left, and activity, the context ring, and send on the right. Send, Queue, and Stop are layers of one 32px ink pill. The mode pill grows a small menu of the levels the agent offers; it does not step. Clicking the context ring opens its details; only Compact compacts. Below, one footer shows the working folder on the left and the branch chip and the Commit chip (Commit plus its +N −M totals) on the right. Queued messages stack as a pile that fans out on click.
 
-New thread keeps the tile ground. Its toolbar holds only the panel toggle, which shows and hides the panel; the 28/34 question is the page title; the r24 white composer has a 15/24 prompt and a 34px send. The location sentence (Local checkout or Worktree) sits under it, starter pills below for an empty project draft, then "Pick up where you left off" rows.
+New thread keeps the tile ground. Its toolbar holds only the panel toggle, which shows and hides the panel; the 28/34 question is the page title; when the checkout has changes, the Commit chip sits right over the composer on its left edge; the r24 white composer has a 15/24 prompt and a 34px send. The location sentence (Local checkout or Worktree) sits under it with the Claude account at the row's end, starter pills below for an empty project draft, then "Pick up where you left off" rows.
 
 ### Work panel
 

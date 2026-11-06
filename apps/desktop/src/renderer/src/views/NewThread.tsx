@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ClaudeAccountPicker } from "../components/ClaudeAccountPicker";
 import { useCloudSignInGate } from "../components/CloudSignInOffer";
 import { Composer } from "../components/Composer";
+import { ComposerCommitChip } from "../components/ComposerFooter";
 import { FolderGit2 } from "../components/icons";
 import { ComposerModelPicker, ModelPicker, type ModelChoice, type OrclingPickerChoices } from "../components/ModelPicker";
 import { NewThreadRecent, useArrivalActivity } from "../components/NewThreadActivity";
@@ -202,6 +203,9 @@ function NewThreadProject({
               <>
                 <NewThreadQuestion projectId={projectId} projects={projects} disabled={start.isPending} onProject={onProject} />
                 <div className="relative">
+                  <div className="new-thread-changes empty:hidden">
+                    <ComposerCommitChip changes={composerChanges} />
+                  </div>
                   <div className="mb-2 empty:hidden">{signIn.offer}</div>
                   <Composer
                     draftKey={`newthread.${projectId}.attachments`}
@@ -243,7 +247,6 @@ function NewThreadProject({
                   disabled={start.isPending}
                   onFolder={(workingDirectory) => changeDraft({ workingDirectory })}
                   onMode={(workspace) => changeDraft({ workspace })}
-                  changes={composerChanges}
                   account={
                     usesClaude && !orcling ? (
                       <ClaudeAccountPicker compact accounts={accounts.data} value={claudeAccountId} onChange={(claudeAccountId) => changeDraft({ claudeAccountId })} disabled={start.isPending} />

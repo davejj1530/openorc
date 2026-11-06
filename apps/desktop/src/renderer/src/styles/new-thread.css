@@ -52,6 +52,12 @@
   font-size: var(--text-base);
 }
 
+/* Uncommitted changes sit right over the composer, on its left edge. */
+.new-thread-changes {
+  display: flex;
+  margin-bottom: 10px;
+}
+
 /* The composer: r24 on the writing-area role, a 15px prompt and one bar with a 34px send. */
 .composer-new-thread .composer-shell {
   min-height: 156px;
@@ -88,7 +94,7 @@
   height: var(--control-send-hero);
 }
 
-/* Under the composer: where the thread works, the Claude account and uncommitted changes. */
+/* Under the composer: where the thread works, then the Claude account at the row's end. */
 .new-thread-options {
   display: flex;
   align-items: center;

@@ -1,9 +1,8 @@
 import type { ReactNode } from "react";
 import type { NewThreadPlace } from "@openorc/client";
 import { WORKSPACE_ID } from "@openorc/protocol";
-import type { ComposerChanges, ComposerProps } from "./Composer";
+import type { ComposerProps } from "./Composer";
 import { ComposerChoice } from "./ComposerChoice";
-import { ComposerCommitChip } from "./ComposerFooter";
 import { Cloud, Folder, GitBranch, Laptop } from "./icons";
 import { Button } from "./ui";
 import type { NewThreadCloud } from "../lib/cloud-offered";
@@ -29,7 +28,7 @@ function LocationSentence({ mode, branch }: { mode: NewThreadPlace; branch: stri
   return <span className="new-thread-sentence">Works in the local checkout{name ? <> on {name}</> : null}</span>;
 }
 
-/** Under the New thread composer: where the thread works (a menu or the Workspace folder), the Claude account and uncommitted changes. */
+/** Under the New thread composer: where the thread works (a menu or the Workspace folder), then the Claude account at the row's end. */
 export function NewThreadOptions(props: {
   projectId: string;
   mode: NewThreadPlace;
@@ -40,7 +39,6 @@ export function NewThreadOptions(props: {
   onFolder: (folder: string) => void;
   onMode: (mode: NewThreadPlace) => void;
   account?: ReactNode;
-  changes?: ComposerChanges | null;
 }) {
   const chooseFolder = async () => {
     const folder = await window.openorc.pickDirectory();
@@ -80,7 +78,6 @@ export function NewThreadOptions(props: {
         )}
       </div>
       {props.account}
-      <ComposerCommitChip changes={props.changes} />
     </div>
   );
 }

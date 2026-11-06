@@ -65,7 +65,7 @@ export class SlackRunner {
     const conversation = `slack.workspace-thread:${JSON.stringify([job.workspaceId, job.userId, job.channelId, job.threadTs])}`;
     const existing = settings.get(this.core.db, conversation);
     let thread = existing ? this.core.threads.get(existing) : null;
-    if (thread?.archivedAt) return reply("This OpenOrc thread is archived. Unarchive it on your desktop or start a new Slack thread.");
+    if (thread?.archivedAt) return reply("This OpenOrc thread is resolved. Reopen it on your desktop or start a new Slack thread.");
     if (thread && thread.activity !== "idle") return reply("This OpenOrc thread is busy. Wait for the local turn to finish.");
     if (!thread) {
       const created = await this.core.threads.createWorkspaceConversation({

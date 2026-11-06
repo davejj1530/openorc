@@ -1,20 +1,9 @@
-import {
-  SIDEBAR_LIST,
-  sidebarDayKey,
-  sidebarDayOpen,
-  sidebarFoldKey,
-  sidebarSectionOpen,
-  threadTreeRows,
-  visibleThreadForest,
-  type SidebarDayList,
-  type SidebarFilter,
-  type ThreadTreeRow,
-} from "@openorc/client";
+import { SIDEBAR_LIST, sidebarDayKey, sidebarDayOpen, sidebarFoldKey, sidebarSectionOpen, threadTreeRows, visibleThreadForest, type SidebarDayList, type ThreadTreeRow } from "@openorc/client";
 import type { ThreadOwner, ThreadSummary } from "@openorc/protocol";
 
 /** What Home read from a host: its threads as the sidebar lists them, and every project's name. */
 export interface HomeList {
-  /** Pins, the rest in their days, and snoozed threads, as the desktop's sidebar shows them. */
+  /** Pins, the rest in their days, snoozed threads and Resolved, as the desktop's sidebar shows them. */
   days: SidebarDayList;
   /** Every project's name by id, Workspace's included. */
   names: ReadonlyMap<string, string>;
@@ -22,20 +11,22 @@ export interface HomeList {
   read: readonly ThreadSummary[];
   /** The host could not list its threads. */
   failed: boolean;
+  /** The host answered with its list, so Resolved has a place to stand. */
+  listed: boolean;
 }
 
 /** One row of Home's list. Headings and threads share one flat list so the virtualizer can recycle by kind. */
 export type HomeItem =
   /** Needs you's heading: what waits on you across projects and hosts. It never folds. */
   | { kind: "heading"; key: string; title: string; count: number }
-  /** A part of the list that folds under its label: Pinned, a day, or Snoozed. `count` where it is the part's whole. */
+  /** A part of the list that folds under its label: Pinned, a day, Snoozed or Resolved. `count` where it is the part's whole. */
   | { kind: "section"; key: string; label: string; count?: number; open: boolean }
   /**
    * `project` is the name a root row shows under its title; sub threads show none. `arriving` rises it in. `host` names
    * the partner host a thread under the shown host's Needs you lives on.
    */
   | { kind: "thread"; key: string; thread: ThreadSummary; tree: ThreadTreeRow; project: string | null; arriving: boolean; host?: string }
-  /** The foot of Older (or of Pinned, under the pinned filter) while the host has more threads to give. */
+  /** The foot of Resolved (or of Pinned, under the pinned filter) while the host has more threads to give. */
   | { kind: "more"; key: string }
   | { kind: "children-more"; key: string; tree: ThreadTreeRow; count: number }
   /** A list the host could not give: the projects, or the threads. */
@@ -43,8 +34,7 @@ export type HomeItem =
 
 export interface HomeOptions {
   now: number;
-  /** What Home lists: the active threads (only the pinned ones with `pinnedOnly`), or the archive. */
-  filter: SidebarFilter;
+  /** Home lists only the pinned threads. */
   pinnedOnly: boolean;
   /** The reader's saved fold keys. */
   collapsed: readonly string[];
@@ -72,9 +62,6 @@ export interface Waiting {
 const newestFirst = (a: ThreadSummary, b: ThreadSummary) => b.lastActivityAt - a.lastActivityAt;
 const isWaiting = (thread: ThreadSummary) => thread.activity === "waiting";
 
-/** The archive lists every archived thread in its day; the other views leave waiting ones to Needs you. */
-const listsWaiting = (options: HomeOptions) => options.filter === "archived";
-
 /** Rows and headings another host owns, marked with it: the shown host's when it cannot be reached, all of the partner's. */
 export function owned(items: HomeItem[], owner: ThreadOwner): HomeItem[] {
   return items.map((item) => (item.kind === "thread" && !item.host ? { ...item, thread: { ...item.thread, owner } } : item));
@@ -82,10 +69,9 @@ export function owned(items: HomeItem[], owner: ThreadOwner): HomeItem[] {
 
 /**
  * This host's threads waiting on you, once each, newest first: from every thread the lists read and from the inbox,
- * whose reads skip what a list already read. None in the archive, which lists them in their days.
+ * whose reads skip what a list already read.
  */
 export function homeWaiting(list: HomeList, options: HomeOptions): Waiting[] {
-  if (listsWaiting(options)) return [];
   const all = visibleThreadForest([...new Map([...options.waiting, ...list.read].map((thread) => [thread.id, thread])).values()], false, options.now);
   return all
     .filter((thread) => isWaiting(thread) && !thread.archivedAt && !thread.teamInstanceId)
@@ -120,7 +106,7 @@ interface Part {
   /** Shows how many roots it holds: Pinned and Snoozed, whose rows are all loaded. */
   counted?: boolean;
   more?: boolean;
-  /** Older stands while more threads are left to load, before any of it has. */
+  /** Resolved stands with none of it loaded, since it reads its threads once opened. */
   standsEmpty?: boolean;
   /** A day, which folded still shows the threads that need you. */
   day?: boolean;
@@ -157,8 +143,9 @@ function needsYouItems(waiting: readonly Waiting[]): HomeItem[] {
 
 /**
  * Home, as the desktop's sidebar lists threads: every thread waiting on you first, across projects and the partner host,
- * then pinned threads, then the rest by when they last saw work (the last three hours and today open, earlier days
- * folded), with snoozed threads folded at the foot. A waiting thread appears once, under Needs you, which never folds.
+ * then pinned threads, then the rest by when they last saw work (the last three hours and today open, yesterday
+ * folded), then snoozed threads and Resolved, which holds everything older, folded at the foot. A waiting thread appears
+ * once, under Needs you, which never folds.
  */
 export function homeItems(list: HomeList, options: HomeOptions): HomeItem[] {
   const { days } = list;
@@ -170,6 +157,7 @@ export function homeItems(list: HomeList, options: HomeOptions): HomeItem[] {
   const waiting = options.waitingShownElsewhere ? [] : [...own, ...partner].sort((a, b) => newestFirst(a.thread, b.thread));
   const pinsKey = sidebarFoldKey.pinned(SIDEBAR_LIST);
   const snoozedKey = sidebarFoldKey.snoozed(SIDEBAR_LIST);
+  const resolvedKey = sidebarFoldKey.resolved(SIDEBAR_LIST);
   const parts: Part[] = [
     { key: pinsKey, label: "Pinned", roots: days.pinned, open: sidebarSectionOpen(options.collapsed, "pinned", SIDEBAR_LIST), counted: true, more: options.pinnedOnly && days.hasMore },
     ...days.sections.map(({ day, label, roots }) => ({
@@ -177,8 +165,6 @@ export function homeItems(list: HomeList, options: HomeOptions): HomeItem[] {
       label,
       roots,
       open: sidebarDayOpen(options.collapsed, day),
-      more: day === "older" && days.hasMore,
-      standsEmpty: day === "older",
       day: true,
     })),
   ];
@@ -188,5 +174,18 @@ export function homeItems(list: HomeList, options: HomeOptions): HomeItem[] {
     ...parts.flatMap((part) => partItems(part, list, options, waitingRoots)),
     ...(list.failed ? [{ kind: "retry", key: "retry:threads", projects: false } as const] : []),
     ...partItems({ key: snoozedKey, label: "Snoozed", roots: days.snoozed, open: sidebarSectionOpen(options.collapsed, "snoozed", SIDEBAR_LIST), counted: true }, list, options, waitingRoots),
+    ...partItems(
+      {
+        key: resolvedKey,
+        label: "Resolved",
+        roots: days.resolved.roots,
+        open: sidebarSectionOpen(options.collapsed, "resolved", SIDEBAR_LIST),
+        more: days.resolved.hasMore,
+        standsEmpty: list.listed && !options.pinnedOnly,
+      },
+      list,
+      options,
+      waitingRoots,
+    ),
   ];
 }

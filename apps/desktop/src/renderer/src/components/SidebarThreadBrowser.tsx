@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Menu } from "@base-ui/react/menu";
 import { useQueryClient } from "@tanstack/react-query";
-import { WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
+import { isSubagentThread, WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 import { CoversPreview } from "../lib/browser-preview";
 import { useLayout } from "../lib/layout";
 import {
@@ -20,6 +20,8 @@ import {
   THREAD_PAGE,
   threadTreeRows,
   threadFoldIds,
+  resolvedRows,
+  threadResolved,
   useChildThreadPages,
   useSidebarNow,
 } from "@openorc/client";
@@ -29,6 +31,7 @@ import { useRouter } from "../lib/router";
 import { useUi } from "../lib/ui";
 import { Check, ChevronRight, Funnel, Pin, SlidersHorizontal } from "./icons";
 import { SidebarProjectVisibility } from "./SidebarProjectVisibility";
+import { ResolvedDrawer, useResolveThread, useThreadDrop } from "./SidebarResolved";
 import type { RowProject } from "./ThreadLibraryRow";
 import { ThreadTreeList } from "./ThreadTreeList";
 import { menuItem, menuPopup, menuSeparator } from "./menu";
@@ -99,56 +102,52 @@ export function SidebarThreadBrowser() {
  */
 function useThreadList(children: ChildPages) {
   const queryClient = useQueryClient();
-  const chosen = useLayout((s) => s.sidebarFilter);
   const pinnedOnly = useLayout((s) => s.pinnedOnly);
+  const resolvedOpen = useLayout((s) => sidebarSectionOpen(s.collapsed, "resolved", SIDEBAR_LIST));
   const [limit, setLimit] = useState(THREAD_PAGE);
+  const [resolvedLimit, setResolvedLimit] = useState(THREAD_PAGE);
   const { query: projects, visible, allHidden } = useSidebarProjects();
   const projectIds = visible.map((project) => project.id).sort();
   const homes = new Set(useOrclings().map((orcling) => orcling.threadId));
   const activeId = useRouter((s) => (s.route.view === "thread" ? s.route.threadId : null));
   const active = useRpc("threads.get", { id: activeId ?? "" }, { enabled: Boolean(activeId) });
-  const listed = { projectIds, filter: chosen, orderBy: "activity" as const, includeChildren: true, ...children.params() };
+  const listed = { projectIds, filter: "active" as const, orderBy: "activity" as const, includeChildren: true, ...children.params() };
   const params = [{ ...listed, pinnedOnly, limit: limit + 1 }];
   const queries = useRpcs("threads.list", params, { enabled: Boolean(projects.data), refetchInterval: 60_000 });
-  const besides = { enabled: Boolean(projects.data) && chosen === "active" && !pinnedOnly, refetchInterval: 60_000 };
+  const besides = { enabled: Boolean(projects.data) && !pinnedOnly, refetchInterval: 60_000 };
   const pins = useRpc("threads.list", { ...listed, pinnedOnly: true }, besides);
   const needsYou = useRpc("threads.list", { ...listed, needsYou: true, limit: NEEDS_YOU_PAGE }, besides);
+  // Resolved reads the threads put there only while it is open.
+  const resolved = useRpc("threads.list", { ...listed, filter: "archived", limit: resolvedLimit + 1 }, { ...besides, enabled: besides.enabled && resolvedOpen });
+  const resolvedPending = resolvedOpen && !pinnedOnly && resolved.isPending;
   const fetched = queries.map((query, index) => (query.data ? { rows: query.data, limit } : cachedListPage(queryClient, params[index]!)));
-  const family = useSelectedFamily(
-    active.data,
-    chosen,
-    fetched.map((page) => page?.rows),
-    children,
-  );
+  const family = useSelectedFamily(active.data, active.data?.archivedAt ? "archived" : "active", [...fetched.map((page) => page?.rows), resolved.data], children);
   const selected = active.data && projectIds.includes(active.data.projectId) && (!pinnedOnly || active.data.pinnedAt) ? active.data : null;
-  const pages = fetched.map((page) =>
-    sidebarThreadPage({
-      projectId: selected?.projectId ?? WORKSPACE_ID,
-      fetched: withFamily(page?.rows, family, projectIds),
-      selected,
-      filter: chosen,
-      limit: page?.limit ?? limit,
-      now: Date.now(),
-      hidden: homes,
-    }),
-  );
+  const page = (rows: ThreadSummary[] | undefined, filter: SidebarFilter, shown: number) =>
+    sidebarThreadPage({ projectId: selected?.projectId ?? WORKSPACE_ID, fetched: withFamily(rows, family, projectIds), selected, filter, limit: shown, now: Date.now(), hidden: homes });
   const apart = (rows: ThreadSummary[] | undefined) =>
-    sidebarThreadPage({ projectId: WORKSPACE_ID, fetched: rows, selected: null, filter: chosen, limit: Number.MAX_SAFE_INTEGER, now: Date.now(), hidden: homes });
-  const pinPage = apart(pins.data);
-  const needsYouPage = apart(needsYou.data);
-  const pending = queries.some((query) => query.isPending);
+    sidebarThreadPage({ projectId: WORKSPACE_ID, fetched: rows, selected: null, filter: "active", limit: Number.MAX_SAFE_INTEGER, now: Date.now(), hidden: homes });
+  const pages = fetched.map((fetchedPage) => page(fetchedPage?.rows, "active", fetchedPage?.limit ?? limit));
+  const putRows = resolvedRows(resolvedOpen, resolved.data, selected);
   return {
     projects,
     queries,
     pages,
-    pinPage,
-    needsYouPage,
+    pinPage: apart(pins.data),
+    needsYouPage: apart(needsYou.data),
+    resolvedPage: putRows && page(putRows, "archived", resolvedLimit),
     activeId,
     pinnedOnly,
     allHidden,
-    pending,
+    pending: queries.some((query) => query.isPending),
+    resolvedPending,
     limit,
     loadMore: () => setLimit((old) => old + THREAD_PAGE),
+    /** Resolved's next page: of the threads put there, and of the list, where its quiet threads come from. */
+    loadMoreResolved: () => {
+      setResolvedLimit((old) => old + THREAD_PAGE);
+      if (pages.some((each) => each.hasMore)) setLimit((old) => old + THREAD_PAGE);
+    },
   };
 }
 
@@ -172,13 +171,13 @@ function ListFeedback({ state, shown, snoozed }: { state: ThreadList; shown: num
 }
 
 /** The list's parts from its pages: pins first, then the rest in their days, snoozed threads apart. */
-function dayList({ pages, pinPage, needsYouPage, pinnedOnly, activeId }: ThreadList, now: number) {
-  return sidebarDayList({ pages, pins: pinPage, needsYou: needsYouPage, pinnedOnly, activeId, now });
+function dayList({ pages, pinPage, needsYouPage, resolvedPage, pinnedOnly, activeId }: ThreadList, now: number) {
+  return sidebarDayList({ pages, pins: pinPage, needsYou: needsYouPage, resolved: resolvedPage, pinnedOnly, activeId, now });
 }
 
 type ListPart = { key: string; label: string; count?: number; open: boolean; fold: string; roots: ThreadSummary[]; more: boolean };
 
-/** The parts that fold, in order: Pinned, then each day. Paging sits at the end of Pinned under the pinned filter, else of Older. */
+/** The parts that fold, in order: Pinned, then each day. Paging sits at the end of Pinned under the pinned filter, else in Resolved. */
 function listParts(list: SidebarDayList, collapsed: readonly string[], pinnedOnly: boolean): ListPart[] {
   const pinsOpen = sidebarSectionOpen(collapsed, "pinned", SIDEBAR_LIST);
   const pins: ListPart = {
@@ -192,7 +191,7 @@ function listParts(list: SidebarDayList, collapsed: readonly string[], pinnedOnl
   };
   const days = list.sections.map((section) => {
     const open = sidebarDayOpen(collapsed, section.day);
-    return { key: section.day, label: section.label, open, fold: sidebarDayKey(section.day), roots: list.shownInDay(section.roots, open), more: section.day === "older" && list.hasMore };
+    return { key: section.day, label: section.label, open, fold: sidebarDayKey(section.day), roots: list.shownInDay(section.roots, open), more: false };
   });
   return [...(list.pinned.length ? [pins] : []), ...days];
 }
@@ -202,13 +201,23 @@ function DayThreadBrowser({ children }: { children: ChildPages }) {
   const state = useThreadList(children);
   const { projects, activeId, pinnedOnly, pending, limit, loadMore } = state;
   const collapsed = useLayout((s) => s.collapsed);
-  const list = dayList(state, useSidebarNow());
+  const now = useSidebarNow();
+  const list = dayList(state, now);
   const parts = listParts(list, collapsed, pinnedOnly);
   const snoozedOpen = sidebarSectionOpen(collapsed, "snoozed", SIDEBAR_LIST);
   const snoozed = list.shown(list.snoozed, snoozedOpen);
+  const resolvedOpen = !pinnedOnly && sidebarSectionOpen(collapsed, "resolved", SIDEBAR_LIST);
+  const resolvedIds = new Set(list.resolved.roots.map((root) => root.id));
+  const resolvedShown = list.shown(list.resolved.roots, resolvedOpen);
+  const resolve = useResolveThread();
+  const reopen = useThreadDrop(
+    (id) => resolvedIds.has(id),
+    (id) => resolve(id, false),
+  );
   const rowProjects = new Map<string, RowProject>((projects.data ?? []).map((project) => [project.id, { name: project.name, rootPath: project.rootPath }]));
   rowProjects.set(WORKSPACE_ID, { name: "Workspace" });
-  const orderKey = JSON.stringify(threadTreeRows([...parts.flatMap((part) => part.roots), ...snoozed], list.all, collapsed, activeId ? [activeId] : [], children.limits).map((row) => row.thread.id));
+  const shownRoots = [...parts.flatMap((part) => part.roots), ...snoozed, ...resolvedShown];
+  const orderKey = JSON.stringify(threadTreeRows(shownRoots, list.all, collapsed, activeId ? [activeId] : [], children.limits).map((row) => row.thread.id));
   useEffect(() => {
     useUi.getState().setThreadOrder(JSON.parse(orderKey) as string[]);
   }, [orderKey]);
@@ -220,7 +229,7 @@ function DayThreadBrowser({ children }: { children: ChildPages }) {
   const toggle = (fold: string) => () => useLayout.getState().toggleCollapsed(fold);
   return (
     <section className="conversation-browser" aria-label="Thread browser">
-      <div className="browser-threads">
+      <div className="browser-threads" data-drop={reopen.over || undefined} {...reopen.props}>
         {projects.isError ? (
           <button className="browser-empty" onClick={() => void projects.refetch()}>
             Couldn’t load projects. Retry
@@ -232,15 +241,37 @@ function DayThreadBrowser({ children }: { children: ChildPages }) {
             {part.open && part.more ? <LoadMore pending={pending} onClick={loadMore} /> : null}
           </Section>
         ))}
-        <ListFeedback state={state} shown={list.pinned.length + list.rest.length} snoozed={list.snoozed.length} />
+        <ListFeedback state={state} shown={list.pinned.length + list.rest.length + list.resolved.roots.length} snoozed={list.snoozed.length} />
         {list.snoozed.length ? (
           <Section label="Snoozed" count={list.snoozed.length} open={snoozedOpen} onToggle={toggle(sidebarFoldKey.snoozed(SIDEBAR_LIST))}>
             {rows(snoozed)}
           </Section>
         ) : null}
       </div>
+      {pinnedOnly ? null : (
+        <ResolvedDrawer open={resolvedOpen} onToggle={toggle(sidebarFoldKey.resolved(SIDEBAR_LIST))} accepts={resolvable(list, now)} holding={resolvedShown.length > 0}>
+          {rows(resolvedShown)}
+          {resolvedOpen ? <ResolvedFeedback list={list} pending={state.resolvedPending || pending} onShowMore={state.loadMoreResolved} /> : null}
+        </ResolvedDrawer>
+      )}
     </section>
   );
+}
+
+/** Which dragged threads Resolved takes: a listed thread, not a subagent's, not there already. */
+function resolvable(list: SidebarDayList, now: number) {
+  const byId = new Map(list.all.map((thread) => [thread.id, thread]));
+  return (id: string) => {
+    const thread = byId.get(id);
+    return Boolean(thread) && !isSubagentThread(thread) && !threadResolved(thread!, now) && !list.resolved.roots.some((root) => root.id === id);
+  };
+}
+
+/** Resolved's paging, or why it lists nothing. */
+function ResolvedFeedback({ list, pending, onShowMore }: { list: SidebarDayList; pending: boolean; onShowMore: () => void }) {
+  if (list.resolved.hasMore) return <LoadMore pending={pending} onClick={onShowMore} />;
+  if (list.resolved.roots.length) return null;
+  return <p className="browser-empty">{pending ? "Loading threads…" : "No resolved threads."}</p>;
 }
 
 function LoadMore({ pending, onClick }: { pending: boolean; onClick: () => void }) {
@@ -273,51 +304,39 @@ function Section({ label, count, open, onToggle, children }: { label: string; co
   );
 }
 
-const FILTER_NAMES: Record<SidebarFilter | "pinned", string> = { active: "Active threads", archived: "Archived threads", pinned: "Pinned threads" };
-
-/** The filter's mark: pins show their own, so the pinned list never looks like the whole one. */
-function FilterMark({ selection }: { selection: SidebarFilter | "pinned" }) {
-  return selection === "pinned" ? <Pin size={16} /> : <Funnel size={16} />;
-}
-
-/** The thread list's filter: active, archived or pinned threads, which projects show, and importing terminal sessions. */
+/** The thread list's filter: every thread or the pinned ones, which projects show, and importing terminal sessions. */
 export function ThreadFilter() {
-  const filter = useLayout((s) => s.sidebarFilter);
   const pinned = useLayout((s) => s.pinnedOnly);
-  const setFilter = useLayout((s) => s.setSidebarFilter);
+  const setPinnedOnly = useLayout((s) => s.setPinnedOnly);
   const projectId = useLayout((s) => s.projectId);
   const hiddenProjects = useLayout((s) => s.hiddenProjects);
   const [editingProjects, setEditingProjects] = useState(false);
-  const selection = pinned ? "pinned" : filter;
-  const narrowed = selection !== "active" || hiddenProjects.length > 0;
+  const narrowed = pinned || hiddenProjects.length > 0;
   return (
     <>
       <Menu.Root>
         <Menu.Trigger
           render={
             <IconButton
-              aria-label={`Filter threads${selection === "active" ? "" : `: ${FILTER_NAMES[selection]}`}${hiddenProjects.length ? ": projects filtered" : ""}`}
+              aria-label={`Filter threads${pinned ? ": Pinned threads" : ""}${hiddenProjects.length ? ": projects filtered" : ""}`}
               size="lg"
               className={cn("no-drag", narrowed && "text-accent-ink")}
             />
           }
         >
-          <FilterMark selection={selection} />
+          {/* Pins show their own mark, so the pinned list never looks like the whole one. */}
+          {pinned ? <Pin size={16} /> : <Funnel size={16} />}
         </Menu.Trigger>
         <Menu.Portal>
           <CoversPreview />
           <Menu.Positioner sideOffset={6} align="end" className="z-40" collisionPadding={8}>
             <Menu.Popup ref={floatingGround} className={menuPopup}>
-              {(["active", "archived"] as const).map((value) => (
-                <Menu.Item key={value} className={menuItem} onClick={() => setFilter(value)}>
-                  <Check size={13} className={filter === value && !pinned ? "text-accent-ink" : "text-transparent"} />
-                  {FILTER_NAMES[value]}
+              {[false, true].map((value) => (
+                <Menu.Item key={String(value)} className={menuItem} onClick={() => setPinnedOnly(value)}>
+                  <Check size={13} className={pinned === value ? "text-accent-ink" : "text-transparent"} />
+                  {value ? "Pinned threads" : "All threads"}
                 </Menu.Item>
               ))}
-              <Menu.Item className={menuItem} onClick={() => setFilter("active", !pinned)}>
-                <Check size={13} className={pinned ? "text-accent-ink" : "text-transparent"} />
-                Pinned threads
-              </Menu.Item>
               <Menu.Separator className={menuSeparator} />
               <Menu.Item className={menuItem} onClick={() => setEditingProjects(true)}>
                 <SlidersHorizontal size={13} className="text-ink-4" />

@@ -18,15 +18,15 @@ beforeEach(() => {
 });
 
 it("keeps folds per Mac in the desktop's keys, across launches", () => {
-  toggleFold("day-open:week");
+  toggleFold("day-open:yesterday");
   toggleFold("snoozed-open:threads");
-  expect(phone.saved.get("home.collapsed.studio")).toBe(JSON.stringify(["day-open:week", "snoozed-open:threads"]));
+  expect(phone.saved.get("home.collapsed.studio")).toBe(JSON.stringify(["day-open:yesterday", "snoozed-open:threads"]));
   phone.mac = "laptop";
   expect(savedFolds()).toEqual([]);
   phone.mac = "studio";
-  expect(savedFolds()).toEqual(["day-open:week", "snoozed-open:threads"]);
+  expect(savedFolds()).toEqual(["day-open:yesterday", "snoozed-open:threads"]);
   expect(savedFolds()).toBe(savedFolds());
-  toggleFold("day-open:week");
+  toggleFold("day-open:yesterday");
   expect(savedFolds()).toEqual(["snoozed-open:threads"]);
 });
 
@@ -44,10 +44,10 @@ it("forgets a Mac's folds with the Mac", () => {
 });
 
 it("keeps the partner host's folds under its own id, apart from the shown Mac's", () => {
-  toggleFold("day-open:week", "brain");
-  expect(savedFolds("brain")).toEqual(["day-open:week"]);
+  toggleFold("day-open:yesterday", "brain");
+  expect(savedFolds("brain")).toEqual(["day-open:yesterday"]);
   expect(savedFolds()).toEqual([]);
   expect(savedFolds("brain")).toBe(savedFolds("brain"));
   toggleFold("day-closed:today");
-  expect([savedFolds(), savedFolds("brain")]).toEqual([["day-closed:today"], ["day-open:week"]]);
+  expect([savedFolds(), savedFolds("brain")]).toEqual([["day-closed:today"], ["day-open:yesterday"]]);
 });

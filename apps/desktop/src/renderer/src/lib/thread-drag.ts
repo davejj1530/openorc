@@ -4,7 +4,8 @@ let draggedThread: string | null = null;
 
 export function startThreadDrag(transfer: DataTransfer, id: string): void {
   draggedThread = id;
-  transfer.effectAllowed = "copy";
+  // Copy opens it beside; move puts it in or out of Resolved.
+  transfer.effectAllowed = "copyMove";
   transfer.setData(THREAD_DRAG_TYPE, id);
 }
 

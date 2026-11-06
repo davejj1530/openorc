@@ -1,4 +1,4 @@
-import { liveSidebarFold, pruneThreadFolds, toggleSidebarFold, toggleThreadTree, type PanelTool, type SidebarFilter } from "@openorc/client";
+import { liveSidebarFold, pruneThreadFolds, toggleSidebarFold, toggleThreadTree, type PanelTool } from "@openorc/client";
 import type { RpcParams } from "@openorc/protocol";
 import { WORKSPACE_ID } from "@openorc/protocol";
 import { create } from "zustand";
@@ -43,8 +43,7 @@ interface LayoutState {
   panelThreadId: string | null;
   toggleThreadPanel: (id: string) => void;
   openThreadPanel: (id: string, tab: PanelTab) => void;
-  sidebarFilter: SidebarFilter;
-  /** Only the pinned active threads. Never persisted: a relaunch lists them all again. */
+  /** Only the pinned threads. Never persisted: a relaunch lists them all again. */
   pinnedOnly: boolean;
   /** Projects omitted from the sidebar's thread lists, independently of the thread filter. */
   hiddenProjects: string[];
@@ -66,8 +65,7 @@ interface LayoutState {
   setPanelWidth: (px: number) => void;
   togglePanelSide: () => void;
   setProject: (id: string | null) => void;
-  /** Choosing a filter clears pinned-only unless it is asked for again. */
-  setSidebarFilter: (filter: SidebarFilter, pinnedOnly?: boolean) => void;
+  setPinnedOnly: (pinnedOnly: boolean) => void;
   setProjectShown: (id: string, shown: boolean) => void;
   setProjectsShown: (ids: readonly string[], shown: boolean) => void;
   showOnlyProject: (id: string, listedIds: readonly string[]) => void;
@@ -84,9 +82,7 @@ export const limits = {
 
 const KEY = "openorc.layout";
 
-function read(): Partial<
-  Pick<LayoutState, "sidebarOpen" | "sidebarWidth" | "panelOpen" | "panelWidth" | "panelSide" | "projectId" | "sidebarFilter" | "hiddenProjects" | "collapsed" | "previewUrls">
-> {
+function read(): Partial<Pick<LayoutState, "sidebarOpen" | "sidebarWidth" | "panelOpen" | "panelWidth" | "panelSide" | "projectId" | "hiddenProjects" | "collapsed" | "previewUrls">> {
   try {
     return JSON.parse(localStorage.getItem(KEY) ?? "{}") as Partial<LayoutState>;
   } catch {
@@ -105,7 +101,6 @@ function persist(s: LayoutState): void {
         panelWidth: s.panelWidth,
         panelSide: s.panelSide,
         projectId: s.projectId,
-        sidebarFilter: s.sidebarFilter,
         hiddenProjects: s.hiddenProjects,
         collapsed: s.collapsed,
         previewUrls: s.previewUrls,
@@ -164,7 +159,6 @@ export const useLayout = create<LayoutState>((set, get) => {
     workspaceChanges: null,
     projectId: saved.projectId === undefined ? WORKSPACE_ID : saved.projectId,
     panelThreadId: null,
-    sidebarFilter: saved.sidebarFilter === "archived" ? ("archived" as const) : ("active" as const),
     pinnedOnly: false,
     hiddenProjects: saved.hiddenProjects ?? [],
     collapsed: (saved.collapsed ?? []).filter(liveSidebarFold),
@@ -221,7 +215,7 @@ export const useLayout = create<LayoutState>((set, get) => {
       const open = get().panelThreadId !== id || !get().panelOpen;
       commit({ panelThreadId: id, panelOpen: open, ...(open ? {} : { panelExpanded: false }) });
     },
-    setSidebarFilter: (sidebarFilter, pinnedOnly = false) => commit({ sidebarFilter, pinnedOnly }),
+    setPinnedOnly: (pinnedOnly) => commit({ pinnedOnly }),
     setProjectShown: (id, shown) => commit({ hiddenProjects: withProjectsShown(get().hiddenProjects, [id], shown) }),
     setProjectsShown: (ids, shown) => commit({ hiddenProjects: withProjectsShown(get().hiddenProjects, ids, shown) }),
     showOnlyProject: (id, listedIds) => commit({ hiddenProjects: withOnlyProject(get().hiddenProjects, id, listedIds) }),

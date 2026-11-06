@@ -18,12 +18,12 @@ beforeEach(() => {
   queryClient.clear();
   vi.spyOn(core, "call").mockImplementation(async <M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> => {
     if (method === "threads.update") updates.push(params as RpcParams<"threads.update">);
-    return { id: "t10", pinnedAt: null, archivedAt: null, unread: false } as unknown as RpcResults[M];
+    return { id: "t10", pinnedAt: null, archivedAt: null, unread: false, activity: "idle", lastActivityAt: Date.now() } as unknown as RpcResults[M];
   });
   useRouter.setState({ route: { view: "thread", threadId: "t10" }, threadIds: ["t10", "t11"], history: [{ view: "inbox" }], future: [{ view: "memory" }] });
   useUi.getState().setThreadOrder(Array.from({ length: 11 }, (_, i) => `t${i + 1}`));
   useUi.setState({ palette: false, paletteMode: "all" });
-  useLayout.setState({ sidebarOpen: true, panelOpen: false, panelThreadId: null, panelRequest: null, sidebarFilter: "active" });
+  useLayout.setState({ sidebarOpen: true, panelOpen: false, panelThreadId: null, panelRequest: null });
   useFilesTool.setState({ host: null, focus: null, tools: {} });
 });
 
@@ -74,7 +74,7 @@ const cases: { chord: string; does: string; given?: () => void; then: () => unkn
     },
   },
   { chord: "⇧p", does: "pins the focused thread", then: () => vi.waitFor(() => expect(updates).toEqual([{ id: "t10", patch: { pinned: true } }])) },
-  { chord: "⇧a", does: "archives the focused thread", then: () => vi.waitFor(() => expect(updates).toEqual([{ id: "t10", patch: { archived: true } }])) },
+  { chord: "⇧a", does: "resolves the focused thread", then: () => vi.waitFor(() => expect(updates).toEqual([{ id: "t10", patch: { archived: true } }])) },
   { chord: "⇧u", does: "marks the focused thread unread", then: () => vi.waitFor(() => expect(updates).toEqual([{ id: "t10", patch: { seen: false } }])) },
 ];
 

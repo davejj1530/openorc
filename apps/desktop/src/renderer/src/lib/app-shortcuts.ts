@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { threadResolved } from "@openorc/client";
 import { isSubagentThread, type RpcParams, type ThreadSummary } from "@openorc/protocol";
 import { openFilesTool } from "./files-tool";
 import { useLayout } from "./layout";
@@ -74,7 +75,7 @@ export const shortcuts: ReadonlyMap<string, Shortcut> = new Map([
   ["⇧n", act(({ projectId }) => useUi.getState().openNewTask(projectId))],
   ["⇧f", ({ focusedThreadId }) => openFilesTool("contents", focusedThreadId)],
   ["⇧p", onFocusedThread((thread) => ({ pinned: !thread.pinnedAt }))],
-  ["⇧a", onFocusedThread((thread) => ({ archived: !thread.archivedAt }))],
+  ["⇧a", onFocusedThread((thread) => ({ archived: !threadResolved(thread, Date.now()) }))],
   ["⇧u", onFocusedThread((thread) => ({ seen: thread.unread }))],
 ]);
 

@@ -69,23 +69,24 @@ export function sidebarThreadPage({
   return { list, pinned, rest, snoozed, hasMore: roots.length > limit };
 }
 
-/** A part of a project's list that folds: the project itself, its pinned threads, or its snoozed threads. */
-export type SidebarFold = "project" | "pinned" | "snoozed";
+/** A part of a project's list that folds: the project itself, its pinned threads, its snoozed threads, or its resolved ones. */
+export type SidebarFold = "project" | "pinned" | "snoozed" | "resolved";
 
 /**
- * The saved key of each fold. Projects and pins are listed while they are open, so their keys mark a fold; snoozed
- * threads start folded, so theirs marks an opening.
+ * The saved key of each fold. Projects and pins are listed while they are open, so their keys mark a fold; snoozed and
+ * resolved threads start folded, so theirs mark an opening.
  */
 export const sidebarFoldKey: Record<SidebarFold, (projectId: string) => string> = {
   project: (id) => `project:${id}`,
   pinned: (id) => `pinned:${id}`,
   snoozed: (id) => `snoozed-open:${id}`,
+  resolved: (id) => `resolved-open:${id}`,
 };
 
 /** Whether a section shows its threads, by the keys the reader saved. */
 export function sidebarSectionOpen(collapsed: readonly string[], fold: SidebarFold, projectId: string): boolean {
   const saved = collapsed.includes(sidebarFoldKey[fold](projectId));
-  return fold === "snoozed" ? saved : !saved;
+  return fold === "snoozed" || fold === "resolved" ? saved : !saved;
 }
 
 /** The saved keys after the reader folds or opens the section `key` names. */

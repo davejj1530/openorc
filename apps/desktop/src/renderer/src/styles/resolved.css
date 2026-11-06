@@ -1,0 +1,43 @@
+/* Resolved sits at the list's foot, right above the dock, behind a hairline. Folded, it is its
+   heading, with the chevron pointing up the way it opens. Open, it rises over the list, up to most of
+   the column, and scrolls on its own. A thread held over it, or a resolved one held over the list,
+   lights where it would land. */
+.resolved-drawer {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 37px;
+  padding: 4px 10px;
+  border-top: var(--hairline) solid var(--line);
+  transition: max-height var(--duration-resize) var(--ease-out);
+}
+.resolved-drawer[data-open] {
+  max-height: 62%;
+}
+.resolved-drawer-toggle {
+  flex: none;
+}
+.resolved-drawer-chevron {
+  transform: rotate(-90deg);
+  transition: transform var(--duration-resize) var(--ease-out);
+}
+.resolved-drawer-toggle:not([data-folded]) .resolved-drawer-chevron {
+  transform: rotate(90deg);
+}
+.resolved-drawer-list {
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 6px;
+}
+.resolved-drawer[data-drop] .resolved-drawer-toggle,
+.browser-threads[data-drop] {
+  background-color: var(--current-row-fill);
+  color: var(--ink);
+}
+@media (prefers-reduced-motion: reduce) {
+  .resolved-drawer,
+  .resolved-drawer-chevron {
+    transition: none;
+  }
+}

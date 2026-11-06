@@ -13,6 +13,7 @@
 @import "./settings-design.css";
 /* Surface stylesheets, in cascade order. The keyboard focus fill in controls.css loads after the sidebar and floating rules and before the conversation, composer and queue rules, which override it on their own controls. */
 @import "./styles/sidebar.css";
+@import "./styles/resolved.css";
 @import "./styles/floating.css";
 @import "./styles/controls.css";
 @import "./styles/motion.css";

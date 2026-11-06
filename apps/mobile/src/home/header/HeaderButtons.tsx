@@ -3,7 +3,6 @@ import { Pressable, View } from "react-native";
 import { endDemo } from "../../client";
 import { Funnel, ListChecks, Pin, Settings } from "../../generated/icons";
 import { useTaskBoard } from "../../tasks/use-task-board";
-import { cn } from "../../ui/cn";
 import { Text } from "../../ui/Text";
 import { FILTER_CHOICES, filterChoice, useHomeFilter } from "../filter";
 
@@ -17,13 +16,13 @@ const reach = 2;
 /** The filter's mark, as the sidebar's: pins show their own, inked while the list is narrowed. */
 export function FilterButton() {
   const choice = filterChoice(useHomeFilter());
-  const narrowed = choice !== "active";
+  const narrowed = choice !== "all";
   const label = FILTER_CHOICES.find((item) => item.choice === choice)?.label;
   return (
     <Link href="/filter" asChild>
       <Pressable accessibilityRole="button" accessibilityLabel={narrowed ? `Show, ${label}` : "Show"} hitSlop={reach} className={circle}>
         {choice === "pinned" ? <Pin size={20} className="text-ink" /> : null}
-        {choice === "active" || choice === "archived" ? <Funnel size={20} className={cn("text-ink-3", narrowed && "text-ink")} /> : null}
+        {choice === "all" ? <Funnel size={20} className="text-ink-3" /> : null}
       </Pressable>
     </Link>
   );

@@ -15,13 +15,15 @@ const shown = async () => {
   return filterChoice(renderHook(useHomeFilter).result.current);
 };
 
-it("forgets a filter chosen in the demo when it ends, back to the one kept", async () => {
-  expect(await shown()).toBe("archived");
+it("lists every thread at first, forgetting the archive filter Resolved replaced", async () => {
+  expect(await shown()).toBe("all");
+  expect(kept.has("home.filter")).toBe(false);
+});
+
+it("forgets the pinned filter chosen in the demo when it ends", async () => {
   storage.scratch(true);
   chooseFilter("pinned");
   expect(await shown()).toBe("pinned");
-  chooseFilter("active");
   storage.scratch(false);
-  expect(await shown()).toBe("archived");
-  expect(kept.get("home.filter")).toBe("archived");
+  expect(await shown()).toBe("all");
 });

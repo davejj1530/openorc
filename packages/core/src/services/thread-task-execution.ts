@@ -49,7 +49,7 @@ export class ThreadTaskExecution {
     if (this.startingTaskThreads.has(task.id) || this.runs.liveRunForTask(task.id)) throw new Error("Wait for this task to stop before changing its execution location.");
     if (retiredTeams.hasTask(this.db, task.id) || (task.threadId && retiredTeams.isHidden(this.db, task.threadId))) throw new Error("This item is no longer available.");
     const assigned = task.executionThreadId ? this.context.executionThreadFor(task.id) : null;
-    if (assigned?.archivedAt != null) throw new Error("Unarchive the execution conversation before changing its location.");
+    if (assigned?.archivedAt != null) throw new Error("Reopen the execution conversation before changing its location.");
     if (assigned?.hasStarted || assigned?.worktreePath || task.worktreePath || runRepo.listForTask(this.db, task.id).length)
       throw new Error("Move this task's thread to change its execution location.");
     if (task.projectId === WORKSPACE_ID) throw new Error("Workspace tasks use their conversation folder. Open a project to use a worktree.");
@@ -223,7 +223,7 @@ export class ThreadTaskExecution {
     this.assertTaskThreadStartAllowed(task, workspaceMode, input);
     const thread = this.context.taskThreadForStart(taskId, input ? { agent: input.agent, model: input.model ?? null, effort: input.effort ?? null } : undefined);
     if (workspaceMode && workspaceMode !== thread.workspaceMode) throw new Error("Move the thread to change its workspace before starting this task.");
-    if (thread.archivedAt !== null) throw new Error("Unarchive this thread before starting work.");
+    if (thread.archivedAt !== null) threads.reopen(this.db, thread.id);
     if (!input && thread.mode !== "act") throw new Error("Switch the thread to Act before starting this task.");
     this.queue.reserveTaskThread(thread.id);
     return { task, thread };

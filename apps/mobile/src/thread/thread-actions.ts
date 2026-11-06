@@ -1,4 +1,4 @@
-import { fileCount, panelToolLabels, snoozePresets } from "@openorc/client";
+import { fileCount, panelToolLabels, snoozePresets, threadResolved } from "@openorc/client";
 import { isSubagentThread, type RpcParams, type ThreadSummary } from "@openorc/protocol";
 import type { Link } from "expo-router";
 import type { ComponentProps } from "react";
@@ -95,22 +95,22 @@ export function threadMenu(thread: ThreadSummary, place: MenuPlace, now: Date, p
     ...(panels.toCloud ? [{ kind: "screen", label: "Move to Cloud", icon: "icloud.and.arrow.up", pathname: "/move-to-cloud" } as const] : []),
     ...brainMoves(thread, panels.moves),
   ];
-  const archive: ThreadAction[] = team
+  const resolve: ThreadAction[] = team
     ? []
     : [
-        thread.archivedAt
-          ? { kind: "patch", label: "Unarchive", icon: "tray.and.arrow.up", patch: { archived: false } }
-          : { kind: "patch", label: "Archive", icon: "archivebox", patch: { archived: true } },
+        threadResolved(thread, now.getTime())
+          ? { kind: "patch", label: "Reopen", icon: "arrow.uturn.backward.circle", patch: { archived: false } }
+          : { kind: "patch", label: "Resolve", icon: "checkmark.circle", patch: { archived: true } },
       ];
-  const sections = place === "header" ? [[...screens, rename], organize, [...pull, ...move], archive] : [organize, [rename, ...pull], archive];
+  const sections = place === "header" ? [[...screens, rename], organize, [...pull, ...move], resolve] : [organize, [rename, ...pull], resolve];
   return sections.filter((section) => section.length > 0);
 }
 
 type Swipe = { label: string; patch: OrganizePatch };
 
-/** A Home row's two swipes, as Mail's: leading marks read or unread, trailing archives (not a team's thread). */
-export function threadSwipes(thread: ThreadSummary): { leading: Swipe; trailing: Swipe | null } {
+/** A Home row's two swipes, as Mail's: leading marks read or unread, trailing resolves or reopens (not a team's thread). */
+export function threadSwipes(thread: ThreadSummary, now = Date.now()): { leading: Swipe; trailing: Swipe | null } {
   const leading: Swipe = thread.unread ? { label: "Read", patch: { seen: true } } : { label: "Unread", patch: { seen: false } };
   if (thread.teamInstanceId || isSubagentThread(thread)) return { leading, trailing: null };
-  return { leading, trailing: thread.archivedAt ? { label: "Unarchive", patch: { archived: false } } : { label: "Archive", patch: { archived: true } } };
+  return { leading, trailing: threadResolved(thread, now) ? { label: "Reopen", patch: { archived: false } } : { label: "Resolve", patch: { archived: true } } };
 }

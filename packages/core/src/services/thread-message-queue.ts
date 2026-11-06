@@ -68,8 +68,9 @@ export class ThreadMessageQueue {
     if (this.closing) throw new Error("OpenOrc is closing.");
     this.rejectRetiredThread(input.threadId);
     const thread = this.thread(input.threadId);
-    if (thread.archivedAt !== null) throw new Error("Unarchive this conversation before sending a message.");
     if ((!input.text.trim() && !input.attachments?.length) || !input.requestKey.trim()) throw new Error("A message and request key are required.");
+    // A message brings a resolved thread back.
+    if (thread.archivedAt !== null) threads.reopen(this.db, thread.id);
     const message = threadQueue.enqueue(this.db, { ...input, attachments: input.attachments ?? [] });
     this.invalidate(["threads", `thread:${thread.id}`]);
     // Let the caller finish linking its durable receipt before attempting delivery.
@@ -110,7 +111,7 @@ export class ThreadMessageQueue {
   async sendQueued(id: string, messageId: string): Promise<QueuedMessage[]> {
     this.rejectRetiredThread(id);
     const thread = this.thread(id);
-    if (thread.archivedAt !== null) throw new Error("Unarchive this conversation before sending a message.");
+    if (thread.archivedAt !== null) threads.reopen(this.db, id);
     const item = threadQueue.list(this.db, id).find((message) => message.id === messageId);
     if (!item) throw new Error("That queued message is gone.");
     if (item.state === "delivering" || this.draining.has(id)) throw new Error("A queued message is being delivered.");
@@ -199,7 +200,7 @@ export class ThreadMessageQueue {
   /** A message into a thread from the outside: another thread, or the user relaying between them. */
   async send(id: string, text: string, from: Thread | null): Promise<void> {
     const thread = this.thread(id);
-    if (thread.archivedAt) throw new Error("the thread is archived");
+    if (thread.archivedAt) throw new Error("the thread is resolved");
     const body = from ? `Message from the thread "${from.title}" (id ${from.id}):\n\n${text}` : text;
     await this.deliver(thread, body, "system");
     audit.record(this.db, { actor: from ? "agent" : "user", action: "thread.message", resourceType: "thread", resourceId: id, metadata: { from: from?.id ?? null } });

@@ -289,7 +289,7 @@ export class ThreadService {
     const plan = plans.list(this.db, id)[0];
     if (!plan || plan.id !== planId || plan.state !== "ready" || !plan.text.trim()) throw new Error("The plan changed or is unfinished. Review the latest completed revision first.");
     if (this.runs.threadActivity(id) !== "idle") throw new Error("Wait for this turn to finish before implementing the plan.");
-    if (thread.archivedAt) throw new Error("Unarchive this conversation before implementing its plan.");
+    if (thread.archivedAt) threads.reopen(this.db, id);
     // Reserve before any await. An uncertain launch never silently replays an implementation.
     settings.set(this.db, receipt, JSON.stringify({ permissionMode }));
     const run = await this.continueThread(id, {
@@ -454,15 +454,16 @@ export class ThreadService {
     if (patch.permissionMode !== undefined || patch.mode !== undefined) this.runs.assertThreadPermissions(id);
     const { archived, pinned, done, seen, ...rest } = patch;
     const now = Date.now();
-    const t = threads.update(this.db, id, {
+    const updated = threads.update(this.db, id, {
       ...rest,
-      ...(archived === undefined ? {} : { archivedAt: archived ? now : null }),
+      ...(archived ? { archivedAt: now } : {}),
       // A pinned thread that is put away loses its pin; the pin meant "keep this in front of me".
       ...(pinned === undefined ? {} : { pinnedAt: pinned ? now : null }),
       // Legacy clients may still send done; conversations always remain continuable.
       doneAt: null,
       ...(seen === undefined ? {} : { seenAt: seen ? now : null }),
     });
+    const t = archived === false ? this.reopened(id) : updated;
     if (archived !== undefined || done !== undefined || pinned !== undefined || patch.snoozedUntil !== undefined) {
       audit.record(this.db, {
         actor: "user",
@@ -476,6 +477,12 @@ export class ThreadService {
     this.invalidate(["threads", `thread:${id}`]);
     if (archived === false) void this.messageQueue.drainQueue(id);
     return t;
+  }
+
+  /** Brings a thread back from Resolved, as activity that keeps its read state. */
+  private reopened(id: string): Thread {
+    threads.reopen(this.db, id);
+    return this.thread(id);
   }
 
   /** The conversation goes on with another Claude account from its next message, which carries its session there. */

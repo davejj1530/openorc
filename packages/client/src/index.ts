@@ -91,16 +91,19 @@ export {
   SIDEBAR_LIST,
   RECENT_MS,
   liveSidebarFold,
-  sidebarDay,
   sidebarDayKey,
   sidebarDayList,
   sidebarDayOpen,
   sidebarDaySections,
   sidebarListGrows,
+  resolvedRows,
+  sidebarPlace,
   threadNeedsYou,
+  threadResolved,
   type SidebarDay,
   type SidebarDayList,
   type SidebarDaySection,
+  type SidebarPlace,
 } from "./sidebar-days.js";
 export { useSidebarNow } from "./sidebar-clock.js";
 export { snoozePresets, snoozePresetsChangeAt, snoozeWakeLabel } from "./snooze.js";

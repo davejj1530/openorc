@@ -12,21 +12,21 @@ describe("a thread's menu on the phone", () => {
     expect(outline(threadMenu(thread("t-plan"), "row", wednesday))).toEqual([
       ["Pin", "Snooze ▸ In 1 hour, In 3 hours, This evening, Tomorrow morning, Next week", "Mark as Unread"],
       ["Rename…"],
-      ["Archive"],
+      ["Resolve"],
     ]);
   });
 
-  it("turns each action around for a pinned, unread, snoozed or archived thread, with the pull request beside Rename", () => {
+  it("turns each action around for a pinned, unread, snoozed or resolved thread, with the pull request beside Rename", () => {
     const notes = { ...thread("t-headline"), unread: true, snoozedUntil: wednesday.getTime() + 60_000, archivedAt: 1 };
     expect(outline(threadMenu(notes, "row", wednesday))).toEqual([
       ["Unpin", "Snoozed ▸ In 1 hour, In 3 hours, This evening, Tomorrow morning, Next week, Wake Now", "Mark as Read"],
       ["Rename…", "Open Pull Request"],
-      ["Unarchive"],
+      ["Reopen"],
     ]);
   });
 
   it("leads with Rename in the thread's header", () => {
-    expect(outline(threadMenu(thread("t-settings"), "header", wednesday)).map((section) => section[0])).toEqual(["Rename…", "Pin", "Open Pull Request", "Archive"]);
+    expect(outline(threadMenu(thread("t-settings"), "header", wednesday)).map((section) => section[0])).toEqual(["Rename…", "Pin", "Open Pull Request", "Resolve"]);
   });
 
   it("puts Changes first in the header of a thread with Git, the uncommitted files beneath it, and keeps the rest in order", () => {
@@ -95,18 +95,18 @@ describe("a thread's menu on the phone", () => {
     expect(outline(threadMenu(idle, "row", wednesday, onBrain)).flat()).not.toContain("Bring to Mac");
   });
 
-  it("leaves a team thread's snooze and archive to the team on the Mac", () => {
+  it("leaves a team thread's snooze and resolving to the team on the Mac", () => {
     expect(outline(threadMenu({ ...thread("t-plan"), teamInstanceId: "team-1" }, "row", wednesday))).toEqual([["Pin", "Mark as Unread"], ["Rename…"]]);
   });
 
   it("saves each change as the patch the phone may send", () => {
-    const [organize, , archive] = threadMenu(thread("t-plan"), "row", wednesday);
+    const [organize, , resolve] = threadMenu(thread("t-plan"), "row", wednesday);
     const snooze = organize![1]!;
     expect(organize![0]).toMatchObject({ patch: { pinned: true } });
     const inAnHour = snooze.kind === "menu" ? snooze.actions[0] : undefined;
     expect(inAnHour?.kind === "snooze" && inAnHour.until(wednesday)).toBe(wednesday.getTime() + 3_600_000);
     expect(organize![2]).toMatchObject({ patch: { seen: false } });
-    expect(archive![0]).toMatchObject({ patch: { archived: true } });
+    expect(resolve![0]).toMatchObject({ patch: { archived: true } });
   });
 });
 

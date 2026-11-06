@@ -1021,6 +1021,26 @@ describe("thread lifecycle", () => {
     expect(deliver).toHaveBeenCalledTimes(1);
   });
 
+  it("brings a resolved conversation back when it gets a message, and counts a reopen as activity that keeps it read", () => {
+    const t = insert("Resolved");
+    const r = runRepo.insert(core.db, { id: "reopen-run", taskId: null, threadId: t.id, agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
+    vi.spyOn(core.threads, "continueThread").mockResolvedValue(r);
+    core.threads.update(t.id, { archived: true });
+    core.threads.queueFollowUp({ threadId: t.id, text: "One more thing", requestKey: "reopen" });
+    expect(core.threads.get(t.id)?.archivedAt).toBeNull();
+
+    // Quiet for weeks, so resolved by its age: a reopen brings it to the top of the list without marking it unread.
+    const quiet = insert("Quiet for weeks");
+    const unread = insert("Unread for weeks");
+    core.db.stmt("UPDATE threads SET last_activity_at = 2000, seen_at = 3000 WHERE id = ?").run(quiet.id);
+    core.db.stmt("UPDATE threads SET last_activity_at = 2000, seen_at = 1000 WHERE id = ?").run(unread.id);
+    const before = Date.now();
+    core.threads.update(quiet.id, { archived: false });
+    core.threads.update(unread.id, { archived: false });
+    expect(core.threads.get(quiet.id)).toMatchObject({ archivedAt: null, unread: false, lastActivityAt: expect.toSatisfy((at: number) => at >= before) });
+    expect(core.threads.get(unread.id)).toMatchObject({ unread: true, lastActivityAt: expect.toSatisfy((at: number) => at >= before) });
+  });
+
   it("handles a rejected send-now while another follow-up waits on the same delivery", async () => {
     const t = insert("Rejected steering");
     const r = runRepo.insert(core.db, { id: "steer-rejected-run", taskId: null, threadId: t.id, agent: "codex", model: null, mode: "act", permissionMode: "trusted" });

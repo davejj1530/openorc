@@ -33,24 +33,24 @@ const items: HomeItem[] = [
   ...rows.slice(0, 4).map(thread),
   { kind: "children-more", key: "children-more:parent", tree: rows[0]!, count: 2 },
   thread(rows[4]!),
-  { kind: "section", key: "day-open:week", label: "Last 7 days", open: true },
+  { kind: "section", key: "day-open:yesterday", label: "Yesterday", open: true },
 ];
 const order = items.map((item) => item.key);
 
 it("fades a closing parent's whole tree, its next page included, and marks the parent so its chevron turns at once", () => {
   const motions = foldMotions(items, { key: "parent", open: false });
-  expect(order).toEqual(["day-closed:today", "parent", "a", "a1", "b", "children-more:parent", "sibling", "day-open:week"]);
+  expect(order).toEqual(["day-closed:today", "parent", "a", "a1", "b", "children-more:parent", "sibling", "day-open:yesterday"]);
   expect(motions.get("parent")).toEqual({ folding: true });
   expect(["a", "a1", "b", "children-more:parent"].map((key) => motions.get(key))).toEqual([{ leave: true }, { leave: true }, { leave: true }, { leave: true }]);
   expect(motions.has("sibling")).toBe(false);
-  expect(motions.has("day-open:week")).toBe(false);
+  expect(motions.has("day-open:yesterday")).toBe(false);
 });
 
 it("rises an opening fold's rows in one after another, and a day holds its rows up to the next day", () => {
   const motions = foldMotions(items, { key: "day-closed:today", open: true });
   expect(order.slice(1, 7).map((key) => motions.get(key)?.arrive)).toEqual([0, 1, 2, 3, 4, 5]);
   expect(motions.has("day-closed:today")).toBe(false);
-  expect(motions.has("day-open:week")).toBe(false);
+  expect(motions.has("day-open:yesterday")).toBe(false);
   expect(foldMotions(items, null).size).toBe(0);
 });
 
@@ -79,7 +79,7 @@ it("commits a pending close when another fold moves, and every fold at once unde
   const commit = vi.fn();
   const { result } = renderHook(() => useFoldMotion(items, commit));
   act(() => result.current.toggle("parent", false));
-  act(() => result.current.toggle("day-open:week", false));
+  act(() => result.current.toggle("day-open:yesterday", false));
   expect(commit).toHaveBeenCalledExactlyOnceWith("parent", false);
   motion.reduced = true;
   const still = renderHook(() => useFoldMotion(items, commit));

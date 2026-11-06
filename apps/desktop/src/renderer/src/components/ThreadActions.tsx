@@ -1,5 +1,5 @@
 import { Menu } from "@base-ui/react/menu";
-import { canMoveToCloud, offersBrainMove, snoozePresets } from "@openorc/client";
+import { canMoveToCloud, offersBrainMove, snoozePresets, threadResolved } from "@openorc/client";
 import type { ThreadSummary } from "@openorc/protocol";
 import { WORKSPACE_ID, isSubagentThread } from "@openorc/protocol";
 import { useRef, useState } from "react";
@@ -11,7 +11,7 @@ import { MAX_THREAD_PANES, openThread, useRouter } from "../lib/router";
 import { useThreadMutationPending } from "../lib/thread-mutations";
 import { useUi } from "../lib/ui";
 import { floatingGround } from "../lib/use-anchor-ground";
-import { AlarmClock, AppWindow, Archive, ArchiveRestore, ChevronRight, Cloud, Columns2, Folder, GitBranch, GitFork, Laptop, MailOpen, Pencil, Pin, PinOff, Trash2 } from "./icons";
+import { AlarmClock, AppWindow, ChevronRight, CircleCheck, Cloud, Columns2, Folder, GitBranch, GitFork, Laptop, MailOpen, Pencil, Pin, PinOff, RotateCcw, Trash2 } from "./icons";
 import { menuItem, menuItemDanger, menuPopup, menuSeparator } from "./menu";
 import { Button, Dialog } from "./ui";
 
@@ -58,7 +58,7 @@ function ThreadMenuContent({ thread, parts: M }: { thread: ThreadSummary; parts:
   const addPane = useRouter((s) => s.addThreadPane);
   const cannotSplit = useRouter((s) => s.threadIds.includes(thread.id) || s.threadIds.length >= MAX_THREAD_PANES);
   const patch = (p: Parameters<typeof update.mutate>[0]["patch"]) => update.mutate({ id: thread.id, patch: p });
-  const archived = Boolean(thread.archivedAt);
+  const resolved = threadResolved(thread, Date.now());
   const busy = thread.activity !== "idle";
   const team = Boolean(thread.teamInstanceId);
   // Mutations can outlive a closed menu. Reopening it must not enable sibling writes.
@@ -126,8 +126,8 @@ function ThreadMenuContent({ thread, parts: M }: { thread: ThreadSummary; parts:
       ) : null}
       {cloudOffered ? <CloudMoveItems thread={thread} parts={M} /> : null}
       <M.Separator className={menuSeparator} />
-      <M.Item className={menuItem} disabled={lifecycleBlocked} closeOnClick onClick={() => patch({ archived: !archived })}>
-        {archived ? <ArchiveRestore size={13} /> : <Archive size={13} />} {archived ? "Unarchive" : "Archive"}
+      <M.Item className={menuItem} disabled={lifecycleBlocked} closeOnClick onClick={() => patch({ archived: !resolved })}>
+        {resolved ? <RotateCcw size={13} /> : <CircleCheck size={13} />} {resolved ? "Reopen" : "Resolve"}
       </M.Item>
 
       <M.Item className={menuItemDanger} disabled={team || mutating} title={deleteReason ?? undefined} onClick={() => useUi.getState().setDeleteThread(thread.id)}>

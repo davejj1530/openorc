@@ -101,18 +101,19 @@ it("reads the next page by itself while today is unfinished, keeping its rows me
   await waitFor(() => expect(mac.pages.has(THREAD_PAGE * 2 + 1)).toBe(true));
   expect(outline(home.result.current.items)).toEqual(first);
   await answer(THREAD_PAGE * 2);
-  await waitFor(() => expect(outline(home.result.current.items)).toEqual(["section", ...threads.map((thread) => thread.id)]));
+  await waitFor(() => expect(outline(home.result.current.items)).toEqual(["section", ...threads.map((thread) => thread.id), "section"]));
 });
 
 it("shows a thread that needs you from past the loaded pages in its folded day, and nothing else of that day", async () => {
   const days = (count: number) => Date.now() - count * 86_400_000;
-  const week = Array.from({ length: THREAD_PAGE + 1 }, (_, index): ThreadSummary => ({ ...threads[0]!, id: `week-${index}`, lastActivityAt: days(3) - index }));
-  const unread = { ...threads[0]!, id: "old-unread", unread: true, lastActivityAt: days(30) };
+  const yesterday = Array.from({ length: THREAD_PAGE + 1 }, (_, index): ThreadSummary => ({ ...threads[0]!, id: `yesterday-${index}`, lastActivityAt: days(1) - index }));
+  const unread = { ...threads[0]!, id: "unread-past-page", unread: true, lastActivityAt: days(1) - 1000 };
   const home = renderHook(() => useHomeItems(true), { wrapper: mac.phone!.wrapper });
   await waitFor(() => expect(mac.pages.has(THREAD_PAGE + 1) && mac.pages.has(NEEDS_YOU_PAGE)).toBe(true));
-  await act(async () => mac.pages.get(THREAD_PAGE + 1)!(week));
+  await act(async () => mac.pages.get(THREAD_PAGE + 1)!(yesterday));
   await act(async () => mac.pages.get(NEEDS_YOU_PAGE)!([unread]));
-  await waitFor(() => expect(outline(home.result.current.items)).toEqual(["section", "section", "old-unread"]));
+  // Yesterday folded with the unread thread, then Resolved.
+  await waitFor(() => expect(outline(home.result.current.items)).toEqual(["section", "unread-past-page", "section"]));
   expect(mac.pages.has(THREAD_PAGE * 2 + 1)).toBe(false);
 });
 
@@ -140,9 +141,9 @@ it("prunes only deleted thread folds after checking the Mac, leaving off-page an
   mac.waiting = [{ ...threads[0]!, id: "kept" }];
   toggleFold("thread-open:deleted");
   toggleFold("thread-closed:kept");
-  toggleFold("day-open:week");
+  toggleFold("day-open:yesterday");
   renderHook(() => useHomeItems(true), { wrapper: mac.phone!.wrapper });
   await waitFor(() => expect(savedFolds()).not.toContain("thread-open:deleted"));
   expect(savedFolds()).toContain("thread-closed:kept");
-  expect(savedFolds()).toContain("day-open:week");
+  expect(savedFolds()).toContain("day-open:yesterday");
 });

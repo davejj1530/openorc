@@ -19,6 +19,6 @@ it("folds a part of the list from its label, naming Pinned's count but no day's"
   fireEvent.click(button);
   expect(toggled).toHaveBeenCalledOnce();
   cleanup();
-  const day = render(<SectionToggle section={{ kind: "section", key: "day-open:week", label: "Last 7 days", open: false }} motion={{}} onToggle={toggled} />);
-  expect(day.getByRole("button", { name: "Last 7 days" }).getAttribute("aria-expanded")).toBe("false");
+  const day = render(<SectionToggle section={{ kind: "section", key: "day-open:yesterday", label: "Yesterday", open: false }} motion={{}} onToggle={toggled} />);
+  expect(day.getByRole("button", { name: "Yesterday" }).getAttribute("aria-expanded")).toBe("false");
 });

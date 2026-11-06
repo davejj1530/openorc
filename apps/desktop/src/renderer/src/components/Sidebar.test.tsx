@@ -93,7 +93,7 @@ beforeEach(() => {
   fixture.threads = [];
   localStorage.clear();
   useWindow.setState({ fullscreen: false });
-  useLayout.setState({ collapsed: [], projectId: null, sidebarOpen: true, sidebarFilter: "active", pinnedOnly: false, hiddenProjects: [] });
+  useLayout.setState({ collapsed: [], projectId: null, sidebarOpen: true, pinnedOnly: false, hiddenProjects: [] });
   useRouter.setState({ route: { view: "newthread" }, history: [], future: [], threadIds: [] });
 });
 
@@ -381,22 +381,23 @@ it("keeps what needs you in a folded day, even past the loaded pages, and nothin
   ];
   const base = { agent: "codex", activity: "idle", unread: false, session: { status: "idle", message: null }, pinnedAt: null, snoozedUntil: null } as const;
   fixture.threads = [
-    ...Array.from({ length: 14 }, (_, index) => ({ ...base, id: `week-${index}`, title: `Week notes ${index}`, projectId: "one", lastActivityAt: ago(3) - index })),
-    { ...base, id: "waiting", title: "Waiting on you", projectId: "one", lastActivityAt: ago(3) - 100, activity: "waiting" as const },
-    { ...base, id: "unread", title: "Old unread result", projectId: "two", lastActivityAt: ago(30), unread: true },
-    { ...base, id: "quiet", title: "Old quiet notes", projectId: "two", lastActivityAt: ago(30) },
+    ...Array.from({ length: 14 }, (_, index) => ({ ...base, id: `yesterday-${index}`, title: `Yesterday's notes ${index}`, projectId: "one", lastActivityAt: ago(1) - index })),
+    { ...base, id: "waiting", title: "Waiting on you", projectId: "one", lastActivityAt: ago(1) - 100, activity: "waiting" as const },
+    { ...base, id: "unread", title: "Unread result", projectId: "two", lastActivityAt: ago(1) - 1000, unread: true },
+    { ...base, id: "quiet", title: "Quiet notes", projectId: "two", lastActivityAt: ago(1) - 1000 },
   ];
   mountSidebar();
   await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["waiting", "unread"]));
-  expect(screen.queryByRole("button", { name: /Old quiet notes|Week notes 0/ })).toBeNull();
-  expect(["Last 7 days", "Older"].map(section)).toEqual(["false", "false"]);
+  expect(screen.queryByRole("button", { name: /Quiet notes|Yesterday's notes 0/ })).toBeNull();
+  expect(["Yesterday", "Resolved"].map(section)).toEqual(["false", "false"]);
 });
 
-it("lists the last hours' threads, then the rest by day folded, hides an empty day, and keeps the reader's folds", async () => {
+it("lists the last hours' threads, then yesterday folded and the rest in Resolved, hides an empty day, and keeps the reader's folds", async () => {
   dayThreads();
   const view = mountSidebar();
   await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["recent"]));
-  expect(["Recent", "Yesterday", "Last 7 days", "Older"].map(section)).toEqual(["true", "false", "false", "false"]);
+  expect(["Recent", "Yesterday", "Resolved"].map(section)).toEqual(["true", "false", "false"]);
+  expect(screen.queryByRole("button", { name: "Last 7 days" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Today" })).toBeNull();
   expect(screen.queryByRole("button", { name: /Yesterday's notes|This week's notes|Old notes/ })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Yesterday" }));
@@ -409,12 +410,12 @@ it("lists the last hours' threads, then the rest by day folded, hides an empty d
   expect(JSON.parse(localStorage.getItem("openorc.layout")!).collapsed).toEqual(["day-open:yesterday", "day-closed:recent"]);
 });
 
-it("keeps the open thread in view inside a folded day without unfolding it", async () => {
+it("keeps the open thread in view inside a folded Resolved without unfolding it", async () => {
   dayThreads();
   useRouter.setState({ route: { view: "thread", threadId: "older" } });
   mountSidebar();
   await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["recent", "older"]));
-  expect(section("Older")).toBe("false");
+  expect(section("Resolved")).toBe("false");
   expect(screen.getByRole("button", { name: /Old notes/ }).getAttribute("aria-current")).toBe("page");
   expect(screen.queryByRole("button", { name: /This week's notes/ })).toBeNull();
 });
@@ -422,10 +423,12 @@ it("keeps the open thread in view inside a folded day without unfolding it", asy
 it("leads with pinned threads however long ago they last worked", async () => {
   dayThreads();
   fixture.threads[3]!.pinnedAt = 1;
+  useLayout.setState({ collapsed: ["resolved-open:threads"] });
   mountSidebar();
-  await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["older", "recent"]));
+  // The old pin leads, and Resolved holds only what no pin keeps out.
+  await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["older", "recent", "week"]));
   expect(section("Pinned")).toBe("true");
-  expect(screen.queryByRole("button", { name: "Older" })).toBeNull();
+  expect(screen.getAllByRole("button", { name: /Old notes/ })).toHaveLength(1);
 });
 
 it("names each thread's project under its title, with its pull request at the end", async () => {
@@ -451,7 +454,7 @@ it("says after the project where each thread works, and leaves it to a pull requ
     { ...week!, workspaceMode: "worktree", branch: "openorc/week-d4e5f6", ...pull },
     { ...older!, workspaceMode: "worktree", branch: "openorc/old-g7h8i9", ...pull, owner: { brain: "cloud", reach: "live", heardAt: 1 } },
   ];
-  useLayout.setState({ collapsed: ["day-open:yesterday", "day-open:week", "day-open:older"] });
+  useLayout.setState({ collapsed: ["day-open:yesterday", "resolved-open:threads"] });
   mountSidebar();
   const workspace = async (name: RegExp) => (await screen.findByRole("button", { name })).querySelector(".thread-preview-workspace");
   expect((await workspace(/Recent notes/))?.textContent).toBe("main");
@@ -475,7 +478,7 @@ it("sweeps a working thread's title and puts its spinner under the title line, w
   expect(idle.querySelector(".thread-preview-working")).toBeNull();
 });
 
-it("reads on by itself until an open day is whole, then pages Older when asked", async () => {
+it("reads on by itself until an open day is whole, then pages Resolved when asked", async () => {
   projectThreads();
   const base = fixture.threads[1]!;
   fixture.threads = [
@@ -487,7 +490,7 @@ it("reads on by itself until an open day is whole, then pages Older when asked",
   mountSidebar();
   await waitFor(() => expect(useUi.getState().threadOrder).toEqual(today));
   expect(screen.queryByRole("button", { name: "Load more threads" })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Older" }));
+  fireEvent.click(screen.getByRole("button", { name: "Resolved" }));
   await waitFor(() => expect(useUi.getState().threadOrder).toEqual([...today, ...old(9)]));
   fireEvent.click(await screen.findByRole("button", { name: "Load more threads" }));
   await waitFor(() => expect(useUi.getState().threadOrder).toEqual([...today, ...old(21)]));
@@ -496,7 +499,7 @@ it("reads on by itself until an open day is whole, then pages Older when asked",
   expect(screen.queryByRole("button", { name: "Load more threads" })).toBeNull();
 });
 
-it("keeps pinned and archived filters available", async () => {
+it("keeps the pinned filter, and lists resolved threads in Resolved rather than a filter", async () => {
   projectThreads();
   const base = fixture.threads[0]!;
   fixture.threads = [
@@ -512,9 +515,60 @@ it("keeps pinned and archived filters available", async () => {
   fireEvent.click(screen.getByRole("button", { name: /^Filter threads/ }));
   fireEvent.click(await screen.findByRole("menuitem", { name: "Pinned threads" }));
   await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["pinned"]));
+  expect(screen.queryByRole("button", { name: "Resolved" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: /^Filter threads/ }));
-  fireEvent.click(await screen.findByRole("menuitem", { name: "Archived threads" }));
-  await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["archived"]));
+  expect(screen.queryByRole("menuitem", { name: /Archived/ })).toBeNull();
+  fireEvent.click(await screen.findByRole("menuitem", { name: "All threads" }));
+  await screen.findByRole("button", { name: /New 13/ });
+  expect(screen.queryByRole("button", { name: /Archived notes/ })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Resolved" }));
+  await screen.findByRole("button", { name: /Archived notes/ });
+  expect(useUi.getState().threadOrder.at(-1)).toBe("archived");
+});
+
+/** A drag as the browser carries it, for jsdom, which has no DataTransfer. */
+function dragData() {
+  const data = new Map<string, string>();
+  return {
+    effectAllowed: "all",
+    dropEffect: "none",
+    get types() {
+      return [...data.keys()];
+    },
+    setData: (type: string, value: string) => data.set(type, value),
+    getData: (type: string) => data.get(type) ?? "",
+  };
+}
+
+it("resolves a thread dropped on Resolved and reopens a resolved one dropped on the list", async () => {
+  dayThreads();
+  useLayout.setState({ collapsed: ["resolved-open:threads"] });
+  mountSidebar();
+  const drawer = (await screen.findByRole("button", { name: "Resolved" })).parentElement!;
+  await screen.findByRole("button", { name: /Old notes/ });
+  const drag = (name: RegExp, onto: Element) => {
+    const dataTransfer = dragData();
+    fireEvent.dragStart(screen.getByRole("button", { name }), { dataTransfer });
+    fireEvent.dragOver(onto, { dataTransfer });
+    fireEvent.drop(onto, { dataTransfer });
+    fireEvent.dragEnd(screen.getByRole("button", { name }), { dataTransfer });
+  };
+  const updates = () =>
+    vi
+      .mocked(core.call)
+      .mock.calls.filter(([method]) => method === "threads.update")
+      .map(([, params]) => params);
+  drag(/Recent notes/, drawer);
+  await waitFor(() => expect(updates()).toEqual([{ id: "recent", patch: { archived: true } }]));
+  // Dropped back on Resolved, a resolved thread stays as it is; on the list it comes back.
+  drag(/Old notes/, drawer);
+  drag(/Old notes/, document.querySelector(".browser-threads")!);
+  await waitFor(() =>
+    expect(updates()).toEqual([
+      { id: "recent", patch: { archived: true } },
+      { id: "older", patch: { archived: false } },
+    ]),
+  );
 });
 
 it("keeps snoozed threads in one shared section", async () => {
@@ -569,7 +623,7 @@ it("shows and hides projects, keeping the open conversation and scope", async ()
   expect(useLayout.getState().hiddenProjects).toEqual([]);
 });
 
-it("keeps hidden projects out of pinned and archived threads", async () => {
+it("keeps hidden projects out of pinned and resolved threads", async () => {
   projectThreads();
   fixture.threads[3]!.pinnedAt = 1;
   const base = fixture.threads[0]!;
@@ -577,13 +631,16 @@ it("keeps hidden projects out of pinned and archived threads", async () => {
   useLayout.setState({ hiddenProjects: ["one"] });
   mountSidebar();
   await screen.findByRole("button", { name: /Other notes/ });
-  for (const filter of ["Pinned threads", "Archived threads", "Active threads"]) {
+  for (const filter of ["Pinned threads", "All threads"]) {
     fireEvent.click(screen.getByRole("button", { name: /^Filter threads/ }));
     fireEvent.click(await screen.findByRole("menuitem", { name: filter }));
-    await screen.findByRole("button", { name: filter === "Archived threads" ? /Other archived notes/ : /Other notes/ });
-    expect(screen.queryByRole("button", { name: /Regular notes|Pinned notes|Snoozed notes|Hidden archived notes/ })).toBeNull();
-    expect(useLayout.getState().hiddenProjects).toEqual(["one"]);
+    await screen.findByRole("button", { name: /Other notes/ });
+    expect(screen.queryByRole("button", { name: /Regular notes|Pinned notes|Snoozed notes/ })).toBeNull();
   }
+  fireEvent.click(screen.getByRole("button", { name: "Resolved" }));
+  await screen.findByRole("button", { name: /Other archived notes/ });
+  expect(screen.queryByRole("button", { name: /Hidden archived notes/ })).toBeNull();
+  expect(useLayout.getState().hiddenProjects).toEqual(["one"]);
 });
 
 it("can hide every project including Workspace, then show one again", async () => {

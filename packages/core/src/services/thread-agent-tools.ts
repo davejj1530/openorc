@@ -28,9 +28,6 @@ import type { SpawnTaskInput, ThreadService } from "./threads.js";
  */
 export const MAX_AGENT_HOPS = 20;
 
-/** How many threads one conversation may have working at once from thread_start. */
-export const MAX_WORKING_CHILDREN = 3;
-
 export interface ThreadStartInput {
   prompt: string;
   title?: string;
@@ -324,8 +321,8 @@ export class ThreadAgentTools {
 
   /**
    * Starts a thread that works beside the caller: in its folder, in its mode and with its permissions, with the caller
-   * as its parent. The two talk through thread_send. A started thread can't start its own, and a parent has at most
-   * MAX_WORKING_CHILDREN of them working at once.
+   * as its parent. The two talk through thread_send. A started thread can't start its own; a parent may start as many as
+   * it needs.
    */
   async toolThreadStart(runId: string, input: ThreadStartInput): Promise<{ thread: { id: string; title: string }; agent: AgentKind; model: string | null; message: string }> {
     const { parent, run } = this.startingParent(runId);
@@ -345,7 +342,7 @@ export class ThreadAgentTools {
         title: input.title ?? titleFromPrompt(input.prompt),
       },
       {
-        assertCanAdmit: () => this.assertRoomForChild(parent),
+        assertCanAdmit: () => undefined,
         onAdmitted: (child) => threads.update(this.db, child.id, { parentThreadId: parent.id, startedByAgent: true }),
       },
     );
@@ -360,8 +357,8 @@ export class ThreadAgentTools {
   }
 
   /**
-   * A thread a person starts under another, working in its folder. Nothing limits how many or how deep: those limits
-   * keep an agent's thread_start in check.
+   * A thread a person starts under another, working in its folder. Nothing limits how many or how deep; a thread an
+   * agent starts with thread_start starts none of its own.
    */
   startUnder(parentId: string, input: Omit<StartThreadInput, "id" | "projectId" | "workingDirectory" | "workspaceMode" | "baseRef" | "checkout" | "cloud">) {
     const parent = threads.get(this.db, parentId);
@@ -405,13 +402,6 @@ export class ThreadAgentTools {
       return { agent, model: last?.id, effort: input.effort ?? last?.defaultEffort ?? undefined, fastMode: input.fast ?? false };
     }
     return { agent, model: parent.model ?? undefined, effort: input.effort ?? parent.effort ?? undefined, fastMode: input.fast ?? parent.fastMode };
-  }
-
-  private assertRoomForChild(parent: Thread): void {
-    const working = threads.children(this.db, parent.id).filter((child) => child.startedByAgent && this.runs.threadActivity(child.id) !== "idle");
-    if (working.length < MAX_WORKING_CHILDREN) return;
-    const names = working.map((child) => `"${child.title}"`).join(", ");
-    throw new Error(`${working.length} threads this thread started are still working (${names}). Wait for one to finish, or give it more work with thread_send.`);
   }
 
   /** The thread a run speaks for: its own thread, or the thread that owns its task. */

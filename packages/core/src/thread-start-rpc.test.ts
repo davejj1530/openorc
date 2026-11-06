@@ -7,7 +7,7 @@ import { projects, runs, settings, threads } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
 import { THREAD_EXISTS, type ModelOption, type Project, type RpcParams, type RunSpec } from "@openorc/protocol";
 import { OpenOrc } from "./openorc.js";
-import { MAX_WORKING_CHILDREN, pickModel } from "./services/thread-agent-tools.js";
+import { pickModel } from "./services/thread-agent-tools.js";
 import { rpcClient } from "./rpc-test-client.js";
 
 let core: OpenOrc;
@@ -205,25 +205,15 @@ it("starts a thread in Fast mode when asked, and refuses it on a model without F
   await expect(startThread(runId, { prompt: "Build it", model: "6.1 sol", fast: true })).rejects.toThrow(/Fast mode is unavailable/);
 });
 
-it(`keeps ${MAX_WORKING_CHILDREN} started threads working at once, none of their own, and none from Plan mode`, async () => {
+it("starts as many threads working at once as it asks for, none of their own, and none from Plan mode", async () => {
   const { runId } = await parent();
   const children: Started[] = [];
-  for (let index = 0; index < MAX_WORKING_CHILDREN; index++) children.push(await startThread(runId, { prompt: `Part ${index + 1}` }));
-  await expect(startThread(runId, { prompt: "One more" })).rejects.toThrow(/still working/);
+  for (let index = 0; index < 6; index++) children.push(await startThread(runId, { prompt: `Part ${index + 1}` }));
+  for (const child of children) expect(core.runs.threadActivity(child.thread.id)).not.toBe("idle");
   const first = await firstSpec(children[0]!.thread.id);
   await expect(startThread(first.runId, { prompt: "A grandchild" })).rejects.toThrow(/can't start its own/);
-  endTurn(first.runId);
-  await vi.waitFor(() => expect(core.runs.threadActivity(children[0]!.thread.id)).toBe("idle"));
-  await expect(startThread(runId, { prompt: "One more" })).resolves.toMatchObject({ thread: { title: "One more" } });
   const planning = await parent({ mode: "plan", prompt: "Think it through" });
   await expect(startThread(planning.runId, { prompt: "Do it" })).rejects.toThrow(/Plan mode/);
-});
-
-it("counts only independently started threads toward the thread_start limit", async () => {
-  const { runId } = await parent();
-  for (let index = 0; index < MAX_WORKING_CHILDREN; index++)
-    turns.get(runId)!.handle.emit("event", { type: "subagent.started", runId, ts: Date.now(), subagentId: `agent-${index}`, title: "Explore" });
-  await expect(startThread(runId, { prompt: "Independent work" })).resolves.toMatchObject({ thread: { title: "Independent work" } });
 });
 
 it("rejects Git, cloud and workspace mutations of a subagent before any side effects", async () => {
@@ -254,11 +244,11 @@ it("lists messageable conversations before applying the agent's 30-thread limit"
 const subthread = (parentThreadId: string, input: Partial<RpcParams<"threads.start">> = {}) =>
   call("threads.start", { projectId: project.id, parentThreadId, agent: "codex", model: "fixture-codex", mode: "act", permissionMode: "trusted", prompt: "Look into the flaky test", ...input });
 
-it("starts as many subthreads as a person asks for, in the parent's worktree, without counting them against its agent", async () => {
+it("starts as many subthreads as a person asks for, in the parent's worktree", async () => {
   const { thread: home, runId } = await parent({ workspaceMode: "worktree" });
   const worktree = threads.get(core.db, home.id)!.worktreePath!;
   const mine = [];
-  for (let index = 0; index <= MAX_WORKING_CHILDREN; index++) mine.push((await subthread(home.id, { prompt: `Part ${index + 1}` })).thread);
+  for (let index = 0; index < 4; index++) mine.push((await subthread(home.id, { prompt: `Part ${index + 1}` })).thread);
   for (const each of mine) {
     expect(threads.get(core.db, each.id)).toMatchObject({
       parentThreadId: home.id,

@@ -26,7 +26,7 @@ import type { SpawnTaskInput, ThreadService } from "./threads.js";
  * How many agent messages in a row may pass between conversations before a person has to write. Agents end an
  * exchange by not replying; this only stops two of them that never do.
  */
-export const MAX_AGENT_HOPS = 20;
+export const MAX_AGENT_HOPS = 50;
 
 export interface ThreadStartInput {
   prompt: string;

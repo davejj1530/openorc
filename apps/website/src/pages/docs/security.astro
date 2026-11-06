@@ -105,7 +105,7 @@ const address = "http://127.0.0.1:<port>/mcp/<random UUID without dashes>";
     <p>OpenOrc's own tools let an agent reach beyond its thread. Each follows the calling thread's mode:</p>
     <ul>
       <li>
-        <strong>Messaging another thread.</strong> A message to a thread in the same or a stricter mode is delivered at once. One to a more permissive thread asks you first, and from Plan an agent can message only Plan threads. After 20
+        <strong>Messaging another thread.</strong> A message to a thread in the same or a stricter mode is delivered at once. One to a more permissive thread asks you first, and from Plan an agent can message only Plan threads. After 50
         agent messages in a row with nobody writing, sending stops until a person writes.
       </li>
       <li>

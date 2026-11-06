@@ -110,7 +110,7 @@ const notice = `Message from the thread "API work" (id …):`;
   <section aria-labelledby="limits">
     <h2 id="limits">How exchanges end</h2>
     <p>OpenOrc tells agents to message another thread only when its work depends on theirs or they need something from it, and never just to say thanks. An exchange ends when one side has nothing to send back.</p>
-    <p>As a backstop, OpenOrc counts agent messages in a row with no person writing in between. After 20, it refuses to send more and tells the agent to ask you to continue. When you write in a thread, its count starts over.</p>
+    <p>As a backstop, OpenOrc counts agent messages in a row with no person writing in between. After 50, it refuses to send more and tells the agent to ask you to continue. When you write in a thread, its count starts over.</p>
     <Callout>The count is kept in memory while OpenOrc runs, so quitting OpenOrc also starts it over.</Callout>
   </section>
 

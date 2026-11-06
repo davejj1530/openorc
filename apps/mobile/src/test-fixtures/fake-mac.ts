@@ -45,6 +45,8 @@ export function fakeMac(answer: (method: RpcMethod, params: unknown) => Promise<
       storage,
       shownMacId: () => "mac-1",
       useLinkState: () => connected,
+      useHostGroup: () => ({ primary: "mac-1", partner: null }),
+      useSavedMacs: () => [],
       useRpc: client.useRpc,
       useRpcs: client.useRpcs,
       useRpcMutation: client.useRpcMutation,

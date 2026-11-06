@@ -21,3 +21,19 @@ it("keeps a host's task list for the next launch, as old as the phone heard it",
   expect(after.getQueryData(["tasks.board"])).toEqual(board);
   expect(after.getQueryState(["tasks.board"])?.dataUpdatedAt).toBe(1_000_000);
 });
+
+it("keeps the last usage a host reported, so Settings has it on a cold start while that host is away", () => {
+  vi.useFakeTimers({ now: 1_000_000 });
+  const saved = new Map<string, string>();
+  const storage = { getString: (key: string) => saved.get(key), set: (key: string, value: string) => void saved.set(key, value), remove: (key: string) => void saved.delete(key) };
+  const before = new QueryClient();
+  const stop = keepLists(before, storage, () => "studio");
+  const limits = [{ id: "claude:rainy", provider: "claude", name: "Claude · Rainy", plan: "Max", status: "available", windows: [], refreshedAt: 999_000 }];
+  before.setQueryData(["providers.limits", {}], limits);
+  vi.advanceTimersByTime(1_000);
+  stop();
+
+  const after = new QueryClient();
+  expect(restoreLists(after, storage, "studio")).toBe(true);
+  expect(after.getQueryData(["providers.limits", {}])).toEqual(limits);
+});

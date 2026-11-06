@@ -2,8 +2,8 @@ import type { DeviceMethod, RpcMethod } from "@openorc/protocol";
 import type { Query, QueryClient, QueryKey } from "@tanstack/react-query";
 import type { KeyValue } from "./scratch-store";
 
-/** The reads the phone paints from on a cold start, before the Mac answers: Home's lists and task list, and the Mac's look in its settings. */
-const KEPT: ReadonlySet<string> = new Set<RpcMethod | DeviceMethod>(["projects.list", "threads.list", "app.settings.get", "tasks.board"]);
+/** The reads the phone paints from on a cold start, before the Mac answers: Home's lists and task list, the Mac's look in its settings, and the last usage it reported. */
+const KEPT: ReadonlySet<string> = new Set<RpcMethod | DeviceMethod>(["projects.list", "threads.list", "app.settings.get", "tasks.board", "providers.limits"]);
 const SAVE_AFTER_MS = 1_000;
 
 type Storage = KeyValue;

@@ -38,6 +38,8 @@ vi.mock("../client", async () => ({
   },
   useLinkState: () => phone.state,
   useSavedMacs: () => phone.macs,
+  useHostGroup: () => ({ primary: "studio", partner: null }),
+  usePartnerLinkState: () => phone.state,
   storage: new (await import("../scratch-store")).ScratchStore({
     getString: (key) => phone.saved.get(key),
     set: (key, value) => void phone.saved.set(key, value),
@@ -46,7 +48,7 @@ vi.mock("../client", async () => ({
   endDemo: () => void phone.forgot.push("end demo"),
 }));
 
-const usage = vi.hoisted(() => ({ now: 0, current: null as Usage | null }));
+const usage = vi.hoisted(() => ({ now: 0, retried: 0, current: null as Usage | null }));
 vi.mock("./use-usage", () => ({ useUsage: () => usage.current }));
 
 const { SettingsScreen } = await import("./SettingsScreen");
@@ -71,7 +73,7 @@ beforeEach(() => {
   phone.macs = [studio, laptop];
   phone.forgot = [];
   phone.saved.clear();
-  usage.current = { accounts: [codex], state: "ready", live: true, readAt: now, now };
+  usage.current = { accounts: [codex], state: "ready", live: true, readAt: now, now, hostName: "Studio", retry: () => void (usage.retried += 1) };
 });
 afterEach(cleanup);
 
@@ -162,7 +164,7 @@ it("picks the appearance from one row's menu, with a check on the current choice
 });
 
 it("dims the last read while not connected and says when it was read, above the cards", () => {
-  usage.current = { accounts: [codex], state: "ready", live: false, readAt: now, now };
+  usage.current = { accounts: [codex], state: "ready", live: false, readAt: now, now, hostName: "Studio", retry: () => undefined };
   render(<SettingsScreen />);
   const read = screen.getByText(`Last read at ${new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(now)}`);
   const label = screen.getByText("Usage");
@@ -176,6 +178,19 @@ it("shows the usage at full strength, with no read time, while connected", () =>
   render(<SettingsScreen />);
   expect(screen.queryByText(/^Last read at/)).toBeNull();
   expect(dimmed(screen.getByRole("header", { name: "Codex, Pro" }))).toBe(false);
+});
+
+it("waits for the host by name, and offers another try after a read that failed, instead of a dead end", () => {
+  usage.current = { accounts: [], state: "loading", live: false, readAt: null, now, hostName: "Eliass-MacBook-Pro", retry: () => undefined };
+  const waiting = render(<SettingsScreen />);
+  expect(screen.getByText("Waiting for Eliass-MacBook-Pro")).toBeTruthy();
+  waiting.unmount();
+
+  usage.retried = 0;
+  usage.current = { accounts: [], state: "failed", live: true, readAt: null, now, hostName: "Studio", retry: () => void (usage.retried += 1) };
+  render(<SettingsScreen />);
+  act(() => screen.getByRole("button", { name: /Couldn’t read usage/ }).click());
+  expect(usage.retried).toBe(1);
 });
 
 /** Whether a view or one around it is drawn faded. */

@@ -1,11 +1,11 @@
 import { router } from "expo-router";
 import { Fragment, useState, type ReactNode } from "react";
 import { Alert, View } from "react-native";
-import { alerts, endDemo, link, useSavedMacs } from "../client";
+import { alerts, endDemo, link, useHostGroup, usePartnerLinkState, useSavedMacs } from "../client";
 import type { LinkState, MacName } from "../connection/manager";
 import type { SavedMac } from "../connection/saved-macs";
 import { useLinkWords } from "../connection/use-link-words";
-import { Laptop, Plus, RefreshCw } from "../generated/icons";
+import { Cloud, Laptop, Plus, RefreshCw } from "../generated/icons";
 import { cn } from "../ui/cn";
 import { haptic } from "../ui/haptics";
 import { LinkDot } from "../ui/LinkDot";
@@ -62,9 +62,20 @@ function ShownMac({ state }: { state: Paired }) {
 }
 
 function OtherMac({ mac }: { mac: SavedMac }) {
+  const Mark = mac.kind === "brain" ? Cloud : Laptop;
   return (
     <MacRow mac={mac} shown={false} label={mac.name}>
-      <RowLines lead={<Laptop size={16} className="text-ink-4" />} label={mac.name} labelClassName="text-ink-3" />
+      <RowLines lead={<Mark size={16} className="text-ink-4" />} label={mac.name} labelClassName="text-ink-3" />
+    </MacRow>
+  );
+}
+
+/** The host the shown one pairs with: the phone stays connected to it too, so its row says whether it answers. */
+function PartnerMac({ mac }: { mac: SavedMac }) {
+  const words = useLinkWords(usePartnerLinkState());
+  return (
+    <MacRow mac={mac} shown={false} label={`${mac.name}, ${words.spoken}`}>
+      <RowLines lead={<LinkDot tone={words.tone} />} label={mac.name} labelClassName="text-ink-3" detail={words.status} />
     </MacRow>
   );
 }
@@ -116,6 +127,7 @@ function DemoSection({ state }: { state: Paired }) {
  */
 export function MacSection({ state }: { state: LinkState }) {
   const macs = useSavedMacs();
+  const { partner } = useHostGroup();
   if (state.kind === "unpaired")
     return (
       <Section title="Mac">
@@ -141,7 +153,7 @@ export function MacSection({ state }: { state: LinkState }) {
         {others.map((mac) => (
           <Fragment key={mac.id}>
             <Divider />
-            <OtherMac mac={mac} />
+            {mac.id === partner ? <PartnerMac mac={mac} /> : <OtherMac mac={mac} />}
           </Fragment>
         ))}
         <Divider />

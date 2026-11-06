@@ -38,6 +38,8 @@ const macReasons: ReadonlySet<DownReason> = new Set(["restarting", "disabled", "
 export interface MacName {
   id: string;
   name: string;
+  /** A cloud brain or a Mac, as saved; hosts saved before read as Macs. */
+  kind?: "mac" | "brain";
 }
 
 /** Why the phone has no Mac any more: the Mac removed it, or the Keychain lost the key it pairs with. */
@@ -687,7 +689,7 @@ export class ConnectionManager {
   private enter(phase: Phase): void {
     this.phase = phase;
     const mac = this.active();
-    this.state = toState(phase, mac && { id: mac.id, name: mac.name });
+    this.state = toState(phase, mac && { id: mac.id, name: mac.name, kind: mac.kind });
     for (const listener of this.listeners) listener();
   }
 }

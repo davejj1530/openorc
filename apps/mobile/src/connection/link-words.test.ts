@@ -39,6 +39,16 @@ it("says what a host's door is doing, at once, while it wakes the host or could 
   expect(words.result.current.status).toBe("Waking");
 });
 
+it("never calls a cloud brain a Mac, and says where to look instead", () => {
+  const brain = { id: "cloud", name: "Cloud", kind: "brain" as const };
+  for (const why of ["unreachable", "silent"] as const)
+    expect(linkWords({ kind: "waiting", mac: brain, why, retryAt: 1 }).detail).toBe("This cloud brain isn’t answering. Check it in OpenOrc’s Cloud settings on your Mac.");
+  for (const why of ["restarting", "disabled", "busy", "no-route", "tailnet", "offline", "waking", "wake-refused", "needs-mac", "wake-failed"] as const)
+    expect(linkWords({ kind: "waiting", mac: brain, why, retryAt: 1 }).detail).not.toMatch(/this Mac/);
+  expect(linkWords({ kind: "incompatible", mac: brain } as LinkState).detail).toBe("Update OpenOrc on this iPhone and on your Mac.");
+  expect(linkWords({ kind: "waiting", mac, why: "silent", retryAt: 1 }).detail).toBe("This Mac isn’t answering. It may be asleep or on another network.");
+});
+
 it("says the demo Mac lives on this iPhone, with no route to name", () => {
   const demo: LinkState = { kind: "connected", mac: { id: "demo", name: "Demo Mac" }, route: { kind: "demo" }, serial: 1 };
   expect(linkWords(demo)).toEqual({ tone: "ok", status: null, spoken: "On this iPhone", detail: "On this iPhone" });

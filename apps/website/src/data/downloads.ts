@@ -1,6 +1,9 @@
 import type { ChangelogRelease } from "./changelog";
 import type { ReleaseAsset } from "./release-assets";
 
+/** OpenOrc for iPhone. The link names no storefront, so the App Store opens in the visitor's own country. */
+export const iphoneAppUrl = "https://apps.apple.com/app/openorc/id6827221510";
+
 /** `file` completes `OpenOrc-<version>-`; Linux packages keep each format's own name for x64. */
 export const installerTargets = [
   { id: "mac-arm64", title: "macOS", chip: "Apple Silicon", detail: "For Macs with an M-series chip", file: "mac-arm64.dmg", format: "DMG" },

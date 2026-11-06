@@ -14,6 +14,7 @@ import AppPreview from "../components/mocks/AppPreview.astro";
 import LiquidWord from "../components/LiquidWord.astro";
 import { getPublishedReleases, releaseAnchor } from "../data/changelog";
 import { questions } from "../data/faq";
+import { iphoneAppUrl } from "../data/downloads";
 import "../styles/home.css";
 
 /** The stage: neutral grays drifting slowly under a fine grain. */
@@ -41,7 +42,10 @@ const releaseDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "num
           <div class="hero-copy">
             <h1 id="hero-title" class="hero-title" data-arrive><LiquidWord>Your coding agents,</LiquidWord> <span class="quiet">working together.</span></h1>
             <div class="hero-actions" data-arrive style="--arrive-index: 1">
-              <DownloadButton />
+              <div class="hero-buttons">
+                <DownloadButton />
+                <a class="button button-secondary" href={iphoneAppUrl} rel="noopener">Also on iPhone<Icon name="arrow" size={15} /></a>
+              </div>
               <AgentLogos />
             </div>
           </div>

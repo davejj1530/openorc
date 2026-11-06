@@ -3,6 +3,7 @@ import DocsLayout from "../../layouts/DocsLayout.astro";
 import Callout from "../../components/docs/Callout.astro";
 import LinkCards from "../../components/docs/LinkCards.astro";
 import { docHref } from "../../data/docs";
+import { iphoneAppUrl } from "../../data/downloads";
 ---
 
 <DocsLayout slug="phone">
@@ -13,7 +14,7 @@ import { docHref } from "../../data/docs";
 
   <section aria-labelledby="pair">
     <h2 id="pair">Pair your phone</h2>
-    <p>Install OpenOrc on your iPhone from the App Store. Then pair it with OpenOrc on your computer:</p>
+    <p>Install OpenOrc on your iPhone from the <a href={iphoneAppUrl}>App Store</a>. Then pair it with OpenOrc on your computer:</p>
     <ol class="docs-steps">
       <li>On your computer, open Settings → <strong>Phone</strong> and turn on <strong>Allow paired phones</strong>.</li>
       <li>Click <strong>Pair a phone</strong>. A pairing code appears, and expires after five minutes.</li>

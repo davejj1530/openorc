@@ -42,7 +42,8 @@ export interface CloudCheck {
   passed: boolean | null;
   steps: {
     step: CloudCheckStep;
-    state: "pending" | "running" | "done" | "failed";
+    /** `skipped`: the step does not apply where the check ran, and `detail` says why; it counts as passed. */
+    state: "pending" | "running" | "done" | "skipped" | "failed";
     ms: number | null;
     detail: string | null;
     error: string | null;

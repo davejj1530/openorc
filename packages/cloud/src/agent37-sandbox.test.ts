@@ -336,8 +336,8 @@ it("passes every step of the cloud check end to end, installing Claude Code the 
   const passed = await checkSandbox(provider, { files: runnerFiles(), node: process.execPath, agent, report: (entry) => progress.push(entry) });
   expect(progress.filter((entry) => entry.state === "failed")).toEqual([]);
   expect(passed).toBe(true);
-  expect(progress.filter((entry) => entry.state === "done").map((entry) => entry.step)).toEqual(["sandbox", "tools", "runner", "relay", "signins", "sync", "remove"]);
-  expect(progress.find((entry) => entry.step === "signins" && entry.state === "done")?.detail).toBe("This service keeps each agent's sign-in in its sandbox");
+  expect(progress.filter((entry) => entry.state === "done").map((entry) => entry.step)).toEqual(["sandbox", "tools", "runner", "relay", "sync", "remove"]);
+  expect(progress.find((entry) => entry.step === "signins" && entry.state === "skipped")?.detail).toBe("This service keeps each agent's sign-in in its sandbox.");
   expect(progress.find((entry) => entry.step === "tools" && entry.state === "done")?.detail).toMatch(/^Node \d+\.\d+\.\d+ · Git \S+ · Claude Code 2\.1\.316$/);
   expect(await api.list()).toEqual([]);
 }, 60_000);

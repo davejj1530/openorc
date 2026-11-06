@@ -25,7 +25,8 @@ function CheckSteps({ check }: { check: CloudCheck }) {
     <ol className="cloud-check-steps" aria-label="Cloud check">
       {check.steps.map(({ step, state, ms, detail, error }) => (
         <li key={step} data-state={state}>
-          <StepMark state={state} />
+          {/* A step that does not apply here is no pass: an empty ring, its reason beside it. */}
+          <StepMark state={state === "skipped" ? "pending" : state} />
           <span className="cloud-check-step">
             <span>{CHECK_STEP_LABELS[step]}</span>
             {detail ? <span className="cloud-check-detail">{detail}</span> : null}

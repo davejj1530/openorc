@@ -64,3 +64,15 @@ it("names the step that failed, with what went wrong, and what it found before",
   expect(screen.getByText("1.2 s")).toBeTruthy();
   expect((screen.getByRole("button", { name: "Run again" }) as HTMLButtonElement).disabled).toBe(false);
 });
+
+it("marks a step that does not apply on the service with an empty ring and its reason, not a check", () => {
+  const ran = steps(["done", "done", "done", "done", "skipped", "done", "done"]);
+  ran[4] = { ...ran[4]!, detail: "This service keeps each agent's sign-in in its sandbox." };
+  show({ provider: "agent37", passed: true, steps: ran }, "agent37");
+  const row = within(screen.getByRole("list", { name: "Cloud check" }))
+    .getByText("Keep sign-ins outside the sandbox")
+    .closest("li")!;
+  expect(row.dataset.state).toBe("skipped");
+  expect(row.querySelector(".step-mark")?.getAttribute("data-state")).toBe("pending");
+  expect(within(row).getByText("This service keeps each agent's sign-in in its sandbox.")).toBeTruthy();
+});

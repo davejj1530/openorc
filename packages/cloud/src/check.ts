@@ -18,12 +18,18 @@ export type CheckStep = (typeof CHECK_STEPS)[number];
 
 export interface CheckProgress {
   step: CheckStep;
-  state: "running" | "done" | "failed";
+  /** `skipped`: the step does not apply here, which `detail` says why. */
+  state: "running" | "done" | "skipped" | "failed";
   /** How long the step took, once it ended. */
   ms?: number;
   /** What the step found, such as the tool versions. */
   detail?: string;
   error?: string;
+}
+
+/** A step that does not apply where the check runs, and why. */
+class Skipped {
+  constructor(readonly why: string) {}
 }
 
 /** The oldest Node that runs TypeScript without flags, which the runner needs. */
@@ -129,8 +135,8 @@ async function probeAnswer(client: RunnerClient, sandbox: Sandbox, node: string)
  * made-up key, which the API reads as a key, and the sandbox's Node trusts the certificate the firewall answers with.
  * Nothing secret is added, and the rule is cleared after.
  */
-async function signIns(client: RunnerClient, sandbox: Sandbox, node: string, simulated: boolean): Promise<string | void> {
-  if (!sandbox.broker) return simulated ? "Sandboxes on this Mac use this Mac's sign-ins" : "This service keeps each agent's sign-in in its sandbox";
+async function signIns(client: RunnerClient, sandbox: Sandbox, node: string, simulated: boolean): Promise<string | Skipped | void> {
+  if (!sandbox.broker) return new Skipped(simulated ? "Sandboxes on this Mac use this Mac's sign-ins." : "This service keeps each agent's sign-in in its sandbox.");
   const without = await probeAnswer(client, sandbox, node);
   try {
     await sandbox.broker([{ domain: SIGN_IN_PROBE.domain, name: SIGN_IN_PROBE.header, value: `openorc-check-${randomUUID()}` }]);
@@ -194,12 +200,13 @@ export async function checkSandbox(
   let sandbox: Sandbox | null = null;
   let client: RunnerClient | null = null;
   let install: RunnerInstall | null = null;
-  const step = async (id: CheckStep, work: () => Promise<string | void>, timeout = STEP_TIMEOUT_MS): Promise<boolean> => {
+  const step = async (id: CheckStep, work: () => Promise<string | Skipped | void>, timeout = STEP_TIMEOUT_MS): Promise<boolean> => {
     const started = Date.now();
     options.report({ step: id, state: "running" });
     try {
-      const detail = await within(timeout, work(), "This step");
-      options.report({ step: id, state: "done", ms: Date.now() - started, ...(detail ? { detail } : {}) });
+      const found = await within(timeout, work(), "This step");
+      if (found instanceof Skipped) options.report({ step: id, state: "skipped", detail: found.why });
+      else options.report({ step: id, state: "done", ms: Date.now() - started, ...(found ? { detail: found } : {}) });
       return true;
     } catch (error) {
       options.report({ step: id, state: "failed", ms: Date.now() - started, error: error instanceof Error ? error.message : String(error) });

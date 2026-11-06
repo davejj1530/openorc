@@ -2,11 +2,10 @@ import { useState } from "react";
 import type { CloudBrainSignIns as SignIns } from "@openorc/protocol";
 import { Button, Switch, TextButton, Tooltip } from "../components/ui";
 import { queryClient, useRpc, useRpcMutation } from "../lib/client";
-import { codexWho } from "./settings-cloud-codex";
-import { Failure, StillWorks, TokenField, type RevokedAt } from "./settings-secret-field";
+import { codexWho, OpenAIKeyField } from "./settings-cloud-codex";
+import { Failure, StillWorks, type RevokedAt } from "./settings-secret-field";
 import { Section, SettingRow, Status } from "./settings-shared";
 
-const KEYS_URL = "https://platform.openai.com/api-keys";
 const shown = (signIns: SignIns) => queryClient.setQueryData(["cloud.brain.signIns", {}], signIns);
 
 /** Sends what changed, the same as the Claude accounts' Send. */
@@ -115,24 +114,7 @@ function BrainCodex({ codex, busy }: { codex: SignIns["codex"]; busy: boolean })
       <SettingRow label="Cloud brain" hint={codexHint(codex)}>
         <CodexControls codex={codex} act={act} />
       </SettingRow>
-      {pasting && !codex.mode && !codex.signingIn && !codex.pending ? (
-        <TokenField
-          label="API key"
-          placeholder="Paste key"
-          hint={
-            <>
-              Create one in{" "}
-              <TextButton underline onClick={() => window.openorc.openExternal(KEYS_URL)}>
-                your OpenAI account
-              </TextButton>
-              .
-            </>
-          }
-          action="Save"
-          busy={pending}
-          onSave={save}
-        />
-      ) : null}
+      {pasting && !codex.mode && !codex.signingIn && !codex.pending ? <OpenAIKeyField busy={pending} onSave={save} /> : null}
       <StillWorks at={remove.isSuccess ? removed : null} />
       <Failure error={error} />
     </>

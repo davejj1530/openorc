@@ -13,6 +13,34 @@ export function codexWho(codex: Pick<CodexCloudAccess, "mode" | "email" | "plan"
   return [codex.email, codex.plan ? `ChatGPT ${codex.plan[0]!.toUpperCase()}${codex.plan.slice(1)}` : null].filter(Boolean).join(" · ") || "Signed in with ChatGPT";
 }
 
+/** Whether any of a login's mutations runs, and the first error among them, else the login's own. */
+export function together(mutations: { isPending: boolean; error: Error | null }[], own: string | null): { busy: boolean; error: Error | null } {
+  const failed = mutations.find((mutation) => mutation.error)?.error;
+  return { busy: mutations.some((mutation) => mutation.isPending), error: failed ?? (own ? new Error(own) : null) };
+}
+
+/** Where an OpenAI API key for Codex is pasted, with the way to make one. */
+export function OpenAIKeyField({ busy, onSave }: { busy: boolean; onSave: (key: string) => void }) {
+  return (
+    <TokenField
+      label="API key"
+      placeholder="Paste key"
+      hint={
+        <>
+          Create one in{" "}
+          <TextButton underline onClick={() => window.openorc.openExternal(KEYS_URL)}>
+            your OpenAI account
+          </TextButton>
+          .
+        </>
+      }
+      action="Save"
+      busy={busy}
+      onSave={onSave}
+    />
+  );
+}
+
 function hint(codex: CodexCloudAccess): string {
   if (codex.signingIn) return "Sign in to ChatGPT in the browser that opened.";
   return codex.mode ? codexWho(codex) : "Your ChatGPT plan, or an API key";
@@ -73,7 +101,7 @@ export function CodexCloudSection({ codex, brain }: { codex: CodexCloudAccess; b
   const [pasting, setPasting] = useState(false);
   /** The kind of sign-in last removed, until another is begun. */
   const [removed, setRemoved] = useState<RevokedAt | null>(null);
-  const busy = signIn.isPending || cancel.isPending || apiKey.isPending || remove.isPending;
+  const { busy, error } = together([signIn, cancel, apiKey, remove], codex.error);
   const act: Mutations = {
     busy,
     signIn: () => {
@@ -90,30 +118,12 @@ export function CodexCloudSection({ codex, brain }: { codex: CodexCloudAccess; b
       setPasting(!pasting);
     },
   };
-  const error = signIn.error ?? cancel.error ?? apiKey.error ?? remove.error ?? (codex.error ? new Error(codex.error) : null);
   return (
     <Section title="Codex" description={brain ? WITH_BRAIN : ALONE}>
       <SettingRow label={brain ? "This Mac's cloud threads" : "Sign-in"} hint={hint(codex)}>
         <Controls codex={codex} act={act} />
       </SettingRow>
-      {pasting && !codex.mode && !codex.signingIn ? (
-        <TokenField
-          label="API key"
-          placeholder="Paste key"
-          hint={
-            <>
-              Create one in{" "}
-              <TextButton underline onClick={() => window.openorc.openExternal(KEYS_URL)}>
-                your OpenAI account
-              </TextButton>
-              .
-            </>
-          }
-          action="Save"
-          busy={busy}
-          onSave={(key) => apiKey.mutate({ key }, { onSuccess: () => setPasting(false) })}
-        />
-      ) : null}
+      {pasting && !codex.mode && !codex.signingIn ? <OpenAIKeyField busy={busy} onSave={(key) => apiKey.mutate({ key }, { onSuccess: () => setPasting(false) })} /> : null}
       <StillWorks at={remove.isSuccess && !codex.mode ? removed : null} />
       <Failure error={error} />
       {brain}

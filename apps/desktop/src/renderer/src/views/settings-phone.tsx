@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { relativeTime } from "@openorc/client";
 import type { PairingOfferView, RemoteDevice, Route } from "@openorc/protocol";
-import { ChevronDown } from "../components/icons";
+import { ChevronDown, Loader2 } from "../components/icons";
 import { QrCode } from "../components/QrCode";
 import { Button, Dialog, TextButton } from "../components/ui";
 import { queryClient, useRpc, useRpcMutation } from "../lib/client";
@@ -207,6 +207,12 @@ export function useTicker(active: boolean) {
   }, [active]);
 }
 
+/** Under the code: how long it lasts, or that it is being made. */
+function codeLine(sheet: PairingSheet<PairingCodeOffer>): string | null {
+  if (sheet.kind === "live") return `Expires in ${countdown(sheet.secondsLeft)}`;
+  return sheet.kind === "starting" ? "Making the code" : null;
+}
+
 export function PairingCode({ sheet, retry }: { sheet: PairingSheet<PairingCodeOffer>; retry: () => void }) {
   if (sheet.kind === "failed")
     return (
@@ -222,7 +228,13 @@ export function PairingCode({ sheet, retry }: { sheet: PairingSheet<PairingCodeO
     <div className="pairing-code">
       <div className="pairing-code-stage">
         <div className="pairing-code-plate" data-state={sheet.kind}>
-          {sheet.kind !== "starting" && <QrCode value={sheet.offer.url} label="Pairing code" />}
+          {sheet.kind === "starting" ? (
+            <span className="pairing-code-loader" role="status" aria-label="Making the code">
+              <Loader2 size={20} className="tool-row-live" />
+            </span>
+          ) : (
+            <QrCode value={sheet.offer.url} label="Pairing code" />
+          )}
         </div>
         {expired && (
           <Button variant="primary" size="sm" className="motion-arrive" onClick={retry}>
@@ -233,7 +245,7 @@ export function PairingCode({ sheet, retry }: { sheet: PairingSheet<PairingCodeO
       <div>
         <p className="text-ink-2">Scan with OpenOrc on your phone. {sheet.kind === "live" ? <CopyLink url={sheet.offer.url} /> : null}</p>
         <p className="motion-swap min-h-5 text-sm text-ink-4 tabular">
-          <span aria-hidden={expired}>{sheet.kind === "live" ? `Expires in ${countdown(sheet.secondsLeft)}` : null}</span>
+          <span aria-hidden={expired}>{codeLine(sheet)}</span>
           <span aria-hidden={!expired}>This code expired.</span>
         </p>
       </div>

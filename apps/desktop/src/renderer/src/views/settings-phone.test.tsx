@@ -4,7 +4,7 @@ import type { PairingOfferView, RemoteDevice, RemotePushStatus, RemoteStatus, Rp
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { invalidateTags, queryClient } from "../lib/client";
 import { core } from "../lib/rpc";
-import { PairPhone, PhoneSettings } from "./settings-phone";
+import { PairPhone, PairingCode, PhoneSettings } from "./settings-phone";
 
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
 
@@ -303,4 +303,15 @@ describe("pairing a phone", () => {
     expect(screen.getByText("David's iPhone")).toBeTruthy();
     expect(calls("remote.pairing.cancel")).toEqual([]);
   });
+});
+
+it("shows the code being made until it arrives, then the code in its place", () => {
+  const { rerender } = render(<PairingCode sheet={{ kind: "starting" }} retry={vi.fn()} />);
+  expect(screen.getByRole("status", { name: "Making the code" })).toBeTruthy();
+  expect(screen.getByText("Making the code")).toBeTruthy();
+  expect(screen.queryByRole("img", { name: "Pairing code" })).toBeNull();
+  rerender(<PairingCode sheet={{ kind: "live", offer: { url: "openorc://pair#v1.code", expiresAt: Date.now() + 120_000 }, secondsLeft: 120 }} retry={vi.fn()} />);
+  expect(screen.getByRole("img", { name: "Pairing code" })).toBeTruthy();
+  expect(screen.queryByRole("status", { name: "Making the code" })).toBeNull();
+  expect(screen.queryByText("Making the code")).toBeNull();
 });

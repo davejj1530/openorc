@@ -70,7 +70,7 @@ async function main() {
     effort: "high",
     fastMode: false,
     mode: "act",
-    permissionMode: "review",
+    permissionMode: "trusted",
     workspaceMode: "current",
     branch: "main",
     worktreePath: null,
@@ -98,13 +98,19 @@ async function main() {
     taskCount: 0,
     openTaskCount: 0,
   };
+  // The sidebar lists threads by when they last saw work, so the samples spread over Recent, Today and Yesterday.
+  const midnight = new Date(now).setHours(0, 0, 0, 0);
+  const at = (time: number) => ({ lastActivityAt: time, updatedAt: time });
+  const minutesAgo = (minutes: number) => at(now - minutes * 60000);
+  const earlierToday = at(Math.max(midnight + 60000, now - 5 * 3600000));
+  const yesterday = (hour: number) => at(midnight - (24 - hour) * 3600000);
   const threads = [
-    { ...base, id: "onboarding", title: "Make the first five minutes count" },
-    { ...base, id: "onboarding-branch", title: "Build a thoughtful onboarding" },
-    { ...base, id: "search", title: "A faster command menu", agent: "claude", model: "claude-opus-5-5[1m]", activity: "running" },
-    { ...base, id: "tokens", title: "Simplify the design tokens" },
-    { ...base, id: "welcome", projectId: "website", title: "Tell the product story" },
-    { ...base, id: "perf", projectId: "atlas", title: "Review the search endpoint" },
+    { ...base, id: "onboarding", title: "Make the first five minutes count", ...minutesAgo(4) },
+    { ...base, id: "onboarding-branch", title: "Build a thoughtful onboarding", ...yesterday(17) },
+    { ...base, id: "search", title: "A faster command menu", agent: "claude", model: "claude-opus-5-5[1m]", activity: "running", ...minutesAgo(0) },
+    { ...base, id: "tokens", title: "Simplify the design tokens", workspaceMode: "worktree", branch: "openorc/design-tokens-2c91f0", ...earlierToday },
+    { ...base, id: "welcome", projectId: "website", title: "Tell the product story", ...minutesAgo(38) },
+    { ...base, id: "perf", projectId: "atlas", title: "Review the search endpoint", agent: "claude", model: "claude-opus-5-5[1m]", ...yesterday(11) },
   ];
   const orclings = ["Rini", "Atlas", "Pip"].map((name, index) => ({
     id: name.toLowerCase(),
@@ -234,6 +240,7 @@ async function main() {
       return params.id === "openorc-workspace" ? { ...project, id: "openorc-workspace", name: "Workspace", rootPath: "/Projects" } : (projects.find((p) => p.id === params.id) ?? project);
     if (method === "projects.checkoutBranch") return "main";
     if (method === "workspace.get") return { ...project, id: "openorc-workspace", name: "Workspace" };
+    if (method === "threads.resolvedCount") return 14;
     if (method === "threads.list") return threads.filter((t) => (!params.projectId || t.projectId === params.projectId) && (params.filter === "archived" ? Boolean(t.archivedAt) : !t.archivedAt));
     if (method === "threads.get") return threads.find((t) => t.id === params.id) ?? threads[0];
     if (method === "threads.messages") return working ? [] : messages;
@@ -245,7 +252,7 @@ async function main() {
       if (index >= 0) threads[index] = { ...threads[index], ...params.patch };
       return threads[index] ?? threads[0];
     }
-    if (method === "threads.permissions") return { requested: "review", effective: "review", pendingRestart: false, runs: [], mode: { requested: "act", effective: "act", pending: false } };
+    if (method === "threads.permissions") return { requested: "trusted", effective: "trusted", pendingRestart: false, runs: [], mode: { requested: "act", effective: "act", pending: false } };
     if (method === "tasks.list" || method === "tasks.listForThread") return tasks.filter((task) => !params.projectId || task.projectId === params.projectId);
     if (method === "tasks.get") return tasks.find((t) => t.id === params.id) ?? tasks[0];
     if (method === "tasks.update") return Object.assign(tasks.find((t) => t.id === params.id) ?? tasks[0], params.patch, { updatedAt: Date.now() });

@@ -62,6 +62,8 @@ class FakeBrain implements BrainMachineLike {
   /** The bundle on its machine, and the one its brain runs; null while no brain runs. */
   installed: string | null = null;
   running: string | null = null;
+  /** What the brain says keeps it awake. */
+  busy: string | null = null;
   /** Why the brain will not stop for an update: work running, or a brain from before such stops. */
   refusesUpdate: string | null = null;
   /** It stops for an update, but its answer never arrives. */
@@ -129,6 +131,7 @@ class FakeBrain implements BrainMachineLike {
       return { applied: ["claude"] } as never;
     }
     if (request.op === "pair") return { url: "openorc://pair#v1.fixture", expiresAt: Date.now() + 120_000 } as never;
+    if (request.op === "status") return { state: "ready", version: this.running, pid: 1, since: 1, busy: this.busy } as never;
     if (request.op === "phones") return { phones: this.phones } as never;
     if (request.op === "remove-phone") {
       this.phones = this.phones.filter((phone) => phone.id !== request.id);
@@ -334,6 +337,20 @@ describe("the cloud brain from the Mac", () => {
     brain.usd = 2;
     expect(await rpc("cloud.brain.cost", {})).toEqual({ usd: 1.25, since });
     expect(brain.calls).toEqual([`cost ${since}`]);
+  });
+
+  it("says what keeps the brain awake as it says it, and nothing while it sleeps, never waking it", async () => {
+    expect(await rpc("cloud.brain.busy", {})).toBeNull();
+    await setUp();
+    brain.busy = "phones";
+    expect(await rpc("cloud.brain.busy", {})).toBe("phones");
+    brain.busy = null;
+    expect(await rpc("cloud.brain.busy", {})).toBeNull();
+    brain.state = "stopped";
+    brain.busy = "agents";
+    brain.calls = [];
+    expect(await rpc("cloud.brain.busy", {})).toBeNull();
+    expect(brain.calls.filter((call) => call === "wake")).toEqual([]);
   });
 
   it("answers the status without waking a sleeping brain", async () => {

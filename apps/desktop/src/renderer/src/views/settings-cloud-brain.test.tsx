@@ -27,6 +27,9 @@ const ready: Extract<CloudBrainStatus, { state: "ready" }> = {
   error: null,
 };
 
+/** What the brain says keeps it awake, as `cloud.brain.busy` answers. */
+let keptAwakeBy: string | null = null;
+
 function show(
   status: CloudBrainStatus,
   timeZone = "Asia/Manila",
@@ -42,6 +45,7 @@ function show(
     if (method === "cloud.brain.pair") return { url: "openorc://pair#v1.brain-fixture", expiresAt: Date.now() + 120_000 } as never;
     if (method === "cloud.brain.projects") return [] as never;
     if (method === "cloud.brain.cost") return cost as never;
+    if (method === "cloud.brain.busy") return keptAwakeBy as never;
     if (method === "cloud.signIns") return signIns as never;
     if (method === "cloud.brain.phones" || method === "cloud.brain.phones.remove") return phones as never;
     if (method === "cloud.brain.signIns")
@@ -121,6 +125,24 @@ it("says quietly what the brain and its thread sandboxes cost this month, once V
   show(ready);
   expect(await screen.findByText("Asleep")).toBeTruthy();
   expect(screen.queryByText(/this month/)).toBeNull();
+});
+
+it("says why an awake brain is awake before its cost, and nothing of it while the brain sleeps", async () => {
+  keptAwakeBy = "phones";
+  show({ ...ready, machine: "awake" }, "Asia/Manila", { usd: 3.456, since: 1 });
+  expect(await screen.findByText(/^A phone is connected ·/)).toBeTruthy();
+  cleanup();
+  queryClient.clear();
+  keptAwakeBy = null;
+  show({ ...ready, machine: "awake" });
+  expect(await screen.findByText("Idle, sleeps after 5 minutes")).toBeTruthy();
+  cleanup();
+  queryClient.clear();
+  vi.mocked(core.call).mockClear();
+  show(ready, "Asia/Manila", { usd: 3.456, since: 1 });
+  expect(await screen.findByText("$3.46 this month")).toBeTruthy();
+  expect(screen.queryByText(/Idle|connected/)).toBeNull();
+  expect(vi.mocked(core.call).mock.calls.some(([method]) => method === "cloud.brain.busy")).toBe(false);
 });
 
 it("pairs a phone with the brain's own code", async () => {

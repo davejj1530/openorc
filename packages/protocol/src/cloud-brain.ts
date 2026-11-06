@@ -240,6 +240,11 @@ export const cloudBrainRpcParams = {
   "cloud.brain.projects": z.object({}),
   /** What the brain and its thread machines cost this month, from its service's own numbers; null before setup. Never wakes it. */
   "cloud.brain.cost": z.object({}),
+  /**
+   * What keeps the brain awake, as it says, such as "phones"; null when nothing does and it sleeps once idle, and while it
+   * sleeps or cannot be asked. Never wakes it, and asking is not use.
+   */
+  "cloud.brain.busy": z.object({}),
   /** Sends a project to the brain, or removes its copy there, waking the brain. */
   "cloud.brain.project": z.object({ projectId: z.string().min(1), on: z.boolean() }).strict(),
   /** What the brain signs in with besides Claude. Never wakes the brain. */
@@ -271,6 +276,7 @@ export interface CloudBrainRpcResults {
   "cloud.brain.recount": CloudBrainStatus;
   "cloud.brain.projects": CloudBrainProject[];
   "cloud.brain.cost": CloudBrainCost | null;
+  "cloud.brain.busy": string | null;
   "cloud.brain.project": CloudBrainProject[];
   "cloud.brain.signIns": CloudBrainSignIns;
   "cloud.brain.codex.signIn": CloudBrainSignIns;

@@ -54,6 +54,7 @@ type CloudMethod =
   | "cloud.brain.recount"
   | "cloud.brain.projects"
   | "cloud.brain.cost"
+  | "cloud.brain.busy"
   | "cloud.brain.project"
   | "cloud.brain.signIns"
   | "cloud.brain.codex.signIn"
@@ -267,6 +268,7 @@ function brainHandlers(brain: CloudBrain, move: BrainMove | null, removed: Depen
     },
     "cloud.brain.projects": () => brain.projects(),
     "cloud.brain.cost": () => brain.cost(),
+    "cloud.brain.busy": () => brain.busy(),
     "cloud.brain.project": async ({ projectId, on }) => {
       await brain.setProject(projectId, on);
       return brain.projects();

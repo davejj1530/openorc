@@ -51,8 +51,6 @@ type Activity = { kind: "setting-up"; step: CloudBrainStep } | { kind: "removing
 /** What a ready brain shows it is at while each operation runs. */
 const WORKING: Partial<Record<Activity["kind"], Extract<CloudBrainStatus, { state: "ready" }>["working"]>> = { waking: "waking", sending: "sending", updating: "updating" };
 
-export type { CloudBrainDeps } from "./cloud-brain-deps.js";
-
 const UPDATE_WAIT: UpdateWait = { waitMs: 5000, forMs: 60_000 };
 
 /**
@@ -147,6 +145,12 @@ export class CloudBrain {
   /** Whether the brain's machine runs now, as its service says. Never wakes it. */
   async machineRuns(): Promise<boolean> {
     return (await (await this.asItIs(false))?.status().catch(() => null))?.state === "running";
+  }
+
+  /** What keeps the brain awake, as it says; null when nothing does, and while it sleeps or cannot be asked. Never wakes it. */
+  async busy(): Promise<string | null> {
+    const machine = await this.asItIs(true);
+    return machine ? ((await machine.control({ op: "status" }).catch(() => null))?.busy ?? null) : null;
   }
 
   /** When the brain was last in use, by its service: now while it runs, null before it is set up. Never wakes it. */

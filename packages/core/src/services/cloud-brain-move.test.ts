@@ -21,7 +21,8 @@ import {
 import { Db, projects, threads } from "@openorc/db";
 import { WORKSPACE_ID, type CloudService } from "@openorc/protocol";
 import type { BrainDoors } from "./cloud-brain-door.js";
-import { CloudBrain, type CloudBrainDeps } from "./cloud-brain.js";
+import { CloudBrain } from "./cloud-brain.js";
+import type { CloudBrainDeps } from "./cloud-brain-deps.js";
 import type { BrainMachineLike } from "./cloud-brain-machine.js";
 import { BrainMove, MOVE_PHONES, type BrainThread } from "./cloud-brain-move.js";
 import { NO_SIGN_INS } from "./cloud-brain-signins.js";

@@ -182,14 +182,43 @@ function RemoveBrain({ disabled, service, threads = 0 }: { disabled: boolean; se
   );
 }
 
-/** What the brain and its thread machines ran this month, quietly; how it is counted on demand. Never wakes the brain. */
-function BrainCost({ active, service }: { active: boolean; service: CloudService }) {
+/** What keeps an awake brain awake, as it says; anything else it is doing is a request from this Mac. */
+const AWAKE_BECAUSE: Record<string, string> = {
+  phones: "A phone is connected",
+  agents: "An agent is working",
+  "background-commands": "A background command is running",
+  "queued-messages": "A queued message is on its way",
+  schedules: "A schedule is starting a thread",
+  memory: "Memory is being updated",
+  "text-generation": "A title is being written",
+  "claude-sign-in": "Claude is signing in",
+  "agent-updates": "Its agents are updating",
+  "cloud-sandboxes": "A cloud sandbox is being set up",
+};
+
+/** Why an awake brain is awake, while this card is open; null until it says, and while it sleeps. Never wakes it. */
+function useAwakeBecause(active: boolean, awake: boolean): string | null {
+  const busy = useRpc("cloud.brain.busy", {}, { enabled: active && awake, refetchInterval: active && awake ? 30_000 : false });
+  if (!awake || busy.data === undefined) return null;
+  if (busy.data === null) return "Idle, sleeps after 5 minutes";
+  return AWAKE_BECAUSE[busy.data] ?? "Busy with a request from this Mac";
+}
+
+/**
+ * Why it is awake while it is, then what the brain and its thread machines ran this month, quietly; how it is counted
+ * on demand. Never wakes the brain.
+ */
+function BrainHint({ active, service, awake }: { active: boolean; service: CloudService; awake: boolean }) {
   const cost = useRpc("cloud.brain.cost", {}, { enabled: active, staleTime: 5 * 60_000 }).data;
-  if (!cost) return null;
+  const why = useAwakeBecause(active, awake);
+  if (!cost) return why;
   return (
-    <Tooltip label={SERVICES[service].cost}>
-      <span>{cost.usd < 0.01 ? "Less than $0.01 this month" : `$${cost.usd.toFixed(2)} this month`}</span>
-    </Tooltip>
+    <>
+      {why ? `${why} · ` : null}
+      <Tooltip label={SERVICES[service].cost}>
+        <span>{cost.usd < 0.01 ? "Less than $0.01 this month" : `$${cost.usd.toFixed(2)} this month`}</span>
+      </Tooltip>
+    </>
   );
 }
 
@@ -203,7 +232,7 @@ function BrainCard({ brain, active, services, busy, waking }: { brain: Ready; ac
   const to = services.find((service) => service !== brain.service);
   return (
     <div className="settings-group cloud-step-lead">
-      <SettingRow label={placeWords(brain)} hint={<BrainCost active={active} service={brain.service} />}>
+      <SettingRow label={placeWords(brain)} hint={<BrainHint active={active} service={brain.service} awake={brain.machine === "awake"} />}>
         {machine ? <Status ok={machine.ok}>{machine.label}</Status> : null}
         {brain.machine === "asleep" && !working ? (
           <TextButton tone="muted" onClick={() => wake.mutate({})}>

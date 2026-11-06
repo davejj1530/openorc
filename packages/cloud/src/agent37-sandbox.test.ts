@@ -175,8 +175,11 @@ describe("an Agent37 sandbox", () => {
   it("launches a command that outlives the call", async () => {
     const sandbox = await provider.open("openorc-a");
     const marker = path.posix.join(sandbox.root, "launched.txt");
-    await sandbox.launch("sh", ["-c", `sleep 2; echo done > "$0"`, marker]);
+    const go = path.posix.join(sandbox.root, "go.txt");
+    // It waits on a file the test writes, so a slow call cannot outlast it, and stops if the test removes its folder.
+    await sandbox.launch("sh", ["-c", `until [ -e "$1" ]; do [ -d "\${0%/*}" ] || exit; sleep 0.05; done; echo done > "$0"`, marker, go]);
     expect(await sandbox.readFile(marker)).toBeNull();
+    await sandbox.writeFile(go, Buffer.from("go"));
     await eventually(async () => (await sandbox.readFile(marker))?.toString("utf8") === "done\n");
   });
 

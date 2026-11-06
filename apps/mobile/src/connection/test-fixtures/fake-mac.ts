@@ -18,15 +18,19 @@ import type { DoorKey, Route } from "@openorc/protocol";
 import type { PhoneDoors, WakeOutcome } from "../door";
 import type { ConnectionEffects, OpeningSocket } from "../manager";
 import type { DeviceKeys, MacStore, SavedMac } from "../saved-macs";
-import { SocketFailed } from "../socket-failure";
 
-/** How one address behaves: a Mac that answers (after `delayMs`), declines, never answers, or nothing listening. */
-/** `http`: a server at the address answers the upgrade itself, as Agent37 does for an instance with nothing on its port. */
+/**
+ * How one address behaves: a Mac that answers (after `delayMs`), declines, never answers, or nothing listening. `http`:
+ * the address answers itself, as Agent37's does with `status` 502 for an instance with nothing on its port.
+ */
 export type Behavior = { kind: "answer"; delayMs?: number } | { kind: "refuse"; reason: Refusal } | { kind: "silent" } | { kind: "down" } | { kind: "http"; status: number };
 
 export const lan: Route = { kind: "lan", host: "studio.local", port: 47820 };
 export const lanAddress: Route = { kind: "lan", host: "192.168.1.20", port: 47820 };
 export const tailnet: Route = { kind: "tailnet", host: "100.64.0.7", port: 47820 };
+/** iOS gives up on a call that has heard nothing for a minute. */
+const CALL_HELD_MS = 60_000;
+
 /** A cloud brain's address behind Vercel's proxy. */
 export const publicRoute: Route = { kind: "public", host: "sb-brain.vercel.run", port: 443 };
 
@@ -57,6 +61,14 @@ export class FakeMac {
   hostKind: "mac" | "brain" | "unknown" | "held" = "mac";
   /** The brains it says it removed; "unknown" is a host from before the question. */
   removedBrains: string[] | "unknown" = [];
+  /**
+   * Asleep behind a service that wakes it for a plain call to its address, `wakeMs` after the first, as Agent37 does.
+   * Its link does not answer meanwhile.
+   */
+  asleep: { wakeMs: number } | null = null;
+  /** Every plain call to its addresses, by host. */
+  readonly calls: Array<{ host: string; at: number }> = [];
+  private waking: Promise<void> | null = null;
 
   constructor(readonly name = "Studio") {}
 
@@ -92,13 +104,47 @@ export class FakeMac {
     return Promise.resolve(this.internet === "up");
   }
 
+  /**
+   * A plain GET to one of its addresses: a host's listener answers 404, an `http` address its status, and nothing
+   * listening nothing. Asleep, the call wakes it and is held till then, as long as iOS waits.
+   */
+  callAddress(url: string, signal: AbortSignal): Promise<number | null> {
+    const { host } = new URL(url);
+    this.calls.push({ host, at: Date.now() });
+    if (this.asleep)
+      this.waking ??= new Promise((resolve) =>
+        setTimeout(() => {
+          this.asleep = null;
+          this.waking = null;
+          resolve();
+        }, this.asleep!.wakeMs),
+      );
+    return new Promise((resolve) => {
+      const give = (status: number | null) => {
+        clearTimeout(held);
+        signal.removeEventListener("abort", cut);
+        resolve(status);
+      };
+      const cut = () => give(null);
+      const held = setTimeout(cut, CALL_HELD_MS);
+      signal.addEventListener("abort", cut, { once: true });
+      const answer = () => {
+        const behavior = this.behaviors.get(host) ?? { kind: "down" };
+        if (behavior.kind === "down") give(null);
+        else if (behavior.kind === "http") give(behavior.status);
+        else if (behavior.kind !== "silent") give(404);
+      };
+      if (this.waking) void this.waking.then(answer);
+      else answer();
+    });
+  }
+
   openSocket(route: Route, hostKey: Uint8Array): OpeningSocket {
     this.dials.push({ host: route.host, at: Date.now() });
     const ownPath = linkPath(route.kind, hostKey, nobleCrypto) === linkPath(route.kind, this.keys.publicKey, nobleCrypto);
-    const behavior = (ownPath && this.behaviors.get(route.host)) || { kind: "down" };
-    if (behavior.kind === "down") return { opened: Promise.reject(new Error("connection refused")), close: () => undefined };
+    const behavior = (!this.asleep && ownPath && this.behaviors.get(route.host)) || { kind: this.asleep ? "silent" : "down" };
+    if (behavior.kind === "down" || behavior.kind === "http") return { opened: Promise.reject(new Error("connection refused")), close: () => undefined };
     if (behavior.kind === "silent") return { opened: new Promise(() => undefined), close: () => undefined };
-    if (behavior.kind === "http") return { opened: Promise.reject(new SocketFailed(behavior.status)), close: () => undefined };
     const { phone, mac } = socketPair();
     void acceptLink({ socket: mac, crypto: nobleCrypto, local: this.keys, admit: (key, hello) => this.admit(key, hello, behavior) }).then((accepted) => {
       if (!accepted) return;
@@ -209,6 +255,8 @@ export function effectsFor(
     deviceName: "Test iPhone",
     forgetCache: (id) => void forgotten.push(id),
     reachesInternet: (signal) => mac.reachesInternet(signal),
+    callAddress: (url, signal) => mac.callAddress(url, signal),
+    mayWake: () => true,
     doors: memoryDoors(),
     brainsRemoved: (macId, ids) => void removed.push([macId, ids]),
     forgotten,

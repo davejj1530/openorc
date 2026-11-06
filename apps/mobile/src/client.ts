@@ -10,10 +10,10 @@ import { randomUUID } from "react-native-quick-crypto";
 import { createAssetCache } from "./connection/asset-cache";
 import { linkHooks } from "./connection/link-hooks";
 import { HostContext } from "./connection/host-context";
-import { doorsOnIntent, groupOf, namedBrain, partnerStore, forgetRemovedBrains, withPartnerRecord } from "./connection/hosts";
+import { groupOf, namedBrain, partnerStore, forgetRemovedBrains, withPartnerRecord } from "./connection/hosts";
 import { ConnectionManager, showsDemo, type LinkState } from "./connection/manager";
 import { phoneDoors } from "./connection/door";
-import { keychainDoorKeys, keychainKeys, openSocket, phoneCrypto, postKnock, reachesInternet, storedMacs, systemClock } from "./connection/native";
+import { callAddress, keychainDoorKeys, keychainKeys, openSocket, phoneCrypto, postKnock, reachesInternet, storedMacs, systemClock } from "./connection/native";
 import type { NetworkKind, SavedMac } from "./connection/saved-macs";
 import { createDemoMac, DEMO_MAC } from "./demo/demo-mac";
 import { forgetFolds } from "./home/fold-keys";
@@ -42,6 +42,7 @@ const effects = {
   keys: keychainKeys,
   deviceName: Constants.deviceName ?? "iPhone",
   reachesInternet,
+  callAddress,
   doors: phoneDoors({ crypto: phoneCrypto, clock: systemClock, post: postKnock, keys: keychainDoorKeys }),
   brainsRemoved: forgetRemovedBrains(macs, (id) => void link.forget(id)),
 };
@@ -49,6 +50,7 @@ const effects = {
 /** The phone's connection to the host it shows. Created at load, so the route race starts while React mounts. */
 export const link = new ConnectionManager({
   ...effects,
+  mayWake: () => true,
   macs,
   forgetCache: (macId) => {
     forgetLists(storage, macId);
@@ -62,7 +64,7 @@ let partnerScreens = 0;
 /** The connection to the host the shown one pairs with: a Mac and its cloud brain. It never pairs or forgets. */
 export const partnerLink = new ConnectionManager({
   ...effects,
-  doors: doorsOnIntent(effects.doors, () => partnerScreens > 0),
+  mayWake: () => partnerScreens > 0,
   macs: partnerStore(macs, () => partnerId),
   forgetCache: () => undefined,
 });

@@ -2,7 +2,7 @@ import { LinkCloseCode, toBase64Url } from "@openorc/link";
 import { nobleCrypto } from "@openorc/link/test-fixtures/noble-crypto";
 import type { ClientPush } from "@openorc/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { doorsOnIntent, forgetRemovedBrains } from "./hosts";
+import { forgetRemovedBrains } from "./hosts";
 import { ConnectionManager, type LinkState } from "./manager";
 import { effectsFor, FakeMac, lan, lanAddress, pairedWith, publicRoute, tailnet } from "./test-fixtures/fake-mac";
 import type { NetworkKind } from "./saved-macs";
@@ -842,61 +842,98 @@ describe("a cloud brain", () => {
     expect(plain.effects.doors.knocks).toEqual([]);
   });
 
-  it("waits on a sleeping brain with no door while its service wakes it for the call, saying Waking, then connects", async () => {
-    const cloud = brain();
-    // Agent37 holds a call to a sleeping brain until it restores, longer than a route's few seconds.
-    cloud.behave(publicRoute, { kind: "answer", delayMs: 9_000 });
+  /** A brain with no door, known as a brain from when it was paired. */
+  function doorless(cloud = brain(), network: NetworkKind = "wifi") {
     const effects = pairedWith(cloud);
     effects.macs.save({ ...effects.macs.saved.get(cloud.id)!, kind: "brain" });
-    const { manager, states } = start(cloud, "wifi", effects);
+    return { cloud, ...start(cloud, network, effects) };
+  }
+  const called = (cloud: FakeMac) => cloud.calls.map(({ at }) => at - started);
+
+  it("wakes a sleeping brain with no door by calling its address, saying Waking, then connects", async () => {
+    const cloud = brain();
+    // Agent37 holds a call to a sleeping instance while it restores; its link answers nothing till then.
+    cloud.asleep = { wakeMs: 9_000 };
+    const { manager, states, effects } = doorless(cloud);
     await advance(4_100);
     expect(manager.getState()).toMatchObject({ kind: "connecting", why: "waking" });
+    expect(cloud.calls).toEqual([{ host: publicRoute.host, at: started + 4_000 }]);
     await advance(9_000);
     expect(manager.getState()).toMatchObject({ kind: "connected", route: publicRoute });
     expect(states.some((state) => state.kind === "waiting")).toBe(false);
+    expect(cloud.calls).toHaveLength(1);
     expect(effects.doors.knocks).toEqual([]);
   });
 
-  it("gives a brain with no door three minutes to wake, then says it isn't answering, and waits a minute before waiting on it again", async () => {
+  it("calls a sleeping brain again when iOS gives up on a call held a minute, until it wakes", async () => {
     const cloud = brain();
-    cloud.behave(publicRoute, { kind: "silent" });
-    const effects = pairedWith(cloud);
-    effects.macs.save({ ...effects.macs.saved.get(cloud.id)!, kind: "brain" });
-    const { manager } = start(cloud, "wifi", effects);
+    cloud.asleep = { wakeMs: 100_000 };
+    const { manager, states } = doorless(cloud);
+    await advance(100_000);
+    expect(manager.getState()).toMatchObject({ kind: "connecting", why: "waking" });
+    expect(called(cloud)).toEqual([4_000, 67_000]);
+    await advance(5_000);
+    expect(manager.getState()).toMatchObject({ kind: "connected", route: publicRoute });
+    expect(states.some((state) => state.kind === "waiting")).toBe(false);
+  });
+
+  it("gives a brain with no door three minutes to wake, then says it isn't answering, and calls again a minute after", async () => {
+    const cloud = brain();
+    cloud.asleep = { wakeMs: 3_600_000 };
+    const { manager } = doorless(cloud);
     await advance(4_100);
     expect(manager.getState()).toMatchObject({ kind: "connecting", why: "waking" });
     await advance(179_000);
     expect(manager.getState()).toMatchObject({ kind: "connecting", why: "waking" });
     await advance(1_000);
     expect(manager.getState()).toMatchObject({ kind: "waiting", why: "unreachable" });
-    // Its few-second tries go on meanwhile; the next long wait comes a minute after this one ended.
+    expect(called(cloud)).toEqual([4_000, 67_000, 130_000]);
+    // Its few-second tries go on meanwhile; the next wake comes a minute after this one ended.
     await advance(50_000);
     expect(manager.getState()).not.toMatchObject({ why: "waking" });
     await advance(30_000);
     expect(manager.getState()).toMatchObject({ kind: "connecting", why: "waking" });
   });
 
-  it("says only the Mac can help when a brain with no door answers at its address with no brain behind it", async () => {
+  it("gives a brain booting afresh a moment, then says only the Mac can help while its address has no brain behind it", async () => {
     const cloud = brain();
     cloud.behave(publicRoute, { kind: "http", status: 502 });
-    // Known as a brain from when it was paired.
-    const effects = pairedWith(cloud);
-    effects.macs.save({ ...effects.macs.saved.get(cloud.id)!, kind: "brain" });
-    const { manager } = start(cloud, "wifi", effects);
+    const { manager, states } = doorless(cloud);
     await advance(10);
+    expect(manager.getState()).toMatchObject({ kind: "connecting", why: "waking" });
+    await advance(30_000);
     expect(manager.getState()).toMatchObject({ kind: "waiting", why: "needs-mac" });
+    const calls = cloud.calls.length;
+    // It asks again each minute under that reason, and never says Waking for it.
+    const shown = states.length;
     await advance(70_000);
-    expect(manager.getState()).toMatchObject({ kind: "waiting", why: "needs-mac" });
+    expect(cloud.calls.length).toBeGreaterThan(calls);
+    expect(states.slice(shown).every((state) => state.kind !== "connected" && "why" in state && state.why === "needs-mac")).toBe(true);
     // Its Mac starts the brain again, and the phone is back on its next try.
     cloud.behave(publicRoute, { kind: "answer" });
     await advance(16_000);
     expect(manager.getState()).toMatchObject({ kind: "connected" });
   });
 
-  it("keeps reconnecting a brain whose address answers nothing, and a Mac whose address answers with no host", async () => {
+  it("says only the Mac can help when a brain's address is no longer public, and it didn't start when the service refuses", async () => {
+    for (const [status, why] of [
+      [401, "needs-mac"],
+      [402, "wake-failed"],
+    ] as const) {
+      const cloud = brain();
+      cloud.behave(publicRoute, { kind: "http", status });
+      const { manager } = doorless(cloud);
+      await advance(10);
+      expect(manager.getState(), String(status)).toMatchObject({ kind: "waiting", why });
+      expect(cloud.calls, String(status)).toHaveLength(1);
+      manager.release();
+    }
+  });
+
+  it("calls only a brain's address, never a Mac's, and keeps reconnecting either when nothing answers", async () => {
     const quiet = brain();
     quiet.behave(publicRoute, { kind: "down" });
-    const unanswered = start(quiet, "wifi", pairedWith(quiet)).manager;
+    const unanswered = doorless(quiet).manager;
     const proxied = brain();
     proxied.hostKind = "mac";
     proxied.behave(publicRoute, { kind: "http", status: 502 });
@@ -904,8 +941,11 @@ describe("a cloud brain", () => {
     effects.macs.save({ ...effects.macs.saved.get(proxied.id)!, kind: "mac" });
     const mac = start(proxied, "wifi", effects).manager;
     await advance(10);
-    expect(unanswered.getState()).toMatchObject({ kind: "waiting", why: "unreachable" });
     expect(mac.getState()).toMatchObject({ kind: "waiting", why: "unreachable" });
+    expect(proxied.calls).toEqual([]);
+    await advance(180_000);
+    expect(unanswered.getState()).toMatchObject({ kind: "waiting" });
+    expect(unanswered.getState()).not.toMatchObject({ why: "needs-mac" });
   });
 
   it("says when the door will not take this phone, or only the Mac can help, until something answers", async () => {
@@ -942,20 +982,31 @@ describe("a cloud brain", () => {
     expect(mac.effects.doors.knocks.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("as the partner beside the shown Mac, knocks only while the person has one of its screens open", async () => {
+  it("as the partner beside the shown Mac, wakes it only while the person has one of its screens open", async () => {
+    let opened = false;
     const cloud = brain();
     cloud.behave(publicRoute, { kind: "down" });
-    const effects = pairedWith(cloud);
+    const effects = { ...pairedWith(cloud), mayWake: () => opened };
     effects.doors.keys.set(cloud.id, KEY);
-    let opened = false;
-    const { manager } = start(cloud, "cellular", { ...effects, doors: { ...effects.doors, ...doorsOnIntent(effects.doors, () => opened) } });
+    const { manager } = start(cloud, "cellular", effects);
+    const bare = brain();
+    bare.asleep = { wakeMs: 9_000 };
+    const bareEffects = { ...pairedWith(bare), mayWake: () => opened };
+    bareEffects.macs.save({ ...bareEffects.macs.saved.get(bare.id)!, kind: "brain" });
+    const partner = start(bare, "wifi", bareEffects).manager;
     await advance(130_000);
     expect(effects.doors.knocks).toEqual([]);
+    expect(bare.calls).toEqual([]);
     expect(manager.getState()).toMatchObject({ kind: "waiting" });
+    expect(partner.getState()).toMatchObject({ kind: "waiting" });
     opened = true;
     await manager.retry();
-    await advance(10);
+    void partner.retry();
+    await advance(4_100);
     expect(effects.doors.knocks).toEqual([cloud.id]);
+    expect(bare.calls).toHaveLength(1);
+    await advance(9_000);
+    expect(partner.getState()).toMatchObject({ kind: "connected" });
   });
 
   it("as the partner, dials with the key the phone holds now once it let the host go, as Forget and a new pairing leave it", async () => {

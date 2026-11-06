@@ -8,7 +8,6 @@ import { perfEnabled, timeRecord } from "../thread/perf-probe";
 import { streamLines, type DoorKeyStore, type DoorPost } from "./door";
 import type { OpeningSocket } from "./manager";
 import type { Clock } from "./route-race";
-import { answeredStatus, SocketFailed } from "./socket-failure";
 import type { DeviceKeys, MacStore, SavedMac } from "./saved-macs";
 
 /** The link's crypto on the phone: OpenSSL through react-native-quick-crypto, which boot installs. */
@@ -41,6 +40,16 @@ export async function reachesInternet(signal: AbortSignal): Promise<boolean> {
   }
 }
 
+/** A plain GET to an address: its status once it answered, null when nothing did before the phone stopped waiting. */
+export async function callAddress(url: string, signal: AbortSignal): Promise<number | null> {
+  try {
+    const response = await expoFetch(url, { method: "GET", headers: { "cache-control": "no-store" }, signal });
+    return response.status;
+  } catch {
+    return null;
+  }
+}
+
 /** A React Native WebSocket to the host's link endpoint, as a session uses it. */
 export function openSocket(route: Route, hostKey: Uint8Array): OpeningSocket {
   const ws = new WebSocket(linkUrl(route, hostKey, phoneCrypto));
@@ -58,7 +67,7 @@ export function openSocket(route: Route, hostKey: Uint8Array): OpeningSocket {
   };
   const opened = new Promise<LinkSocket>((resolve, reject) => {
     ws.onopen = () => resolve(socket);
-    ws.onerror = (event) => reject(new SocketFailed(answeredStatus((event as { message?: unknown }).message)));
+    ws.onerror = () => reject(new Error("The socket failed."));
     ws.onclose = (event) => {
       reject(new Error("The socket closed."));
       onClose(event.code, event.reason);

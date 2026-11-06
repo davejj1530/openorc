@@ -44,6 +44,7 @@ vi.mock("./connection/native", () => {
     keychainDoorKeys: { read: async () => null, write: async () => undefined, remove: async () => undefined },
     postKnock: () => new Promise(() => undefined),
     reachesInternet: async () => true,
+    callAddress: async () => null,
   };
 });
 

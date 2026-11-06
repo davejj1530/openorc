@@ -1,4 +1,3 @@
-import type { PhoneDoors } from "./door";
 import type { MacStore, SavedMac } from "./saved-macs";
 
 /**
@@ -34,14 +33,6 @@ export function partnerStore(store: MacStore, partner: () => string | null): Mac
     save: (host) => store.save(host),
     remove: () => undefined,
   };
-}
-
-/**
- * The partner's doors: it may wake a host asleep behind its proxy only while the person has one of that host's screens
- * open. Home listing the partner's threads is not a reason to wake it.
- */
-export function doorsOnIntent(doors: PhoneDoors, opened: () => boolean): PhoneDoors {
-  return { ...doors, has: async (macId) => opened() && (await doors.has(macId)) };
 }
 
 /**

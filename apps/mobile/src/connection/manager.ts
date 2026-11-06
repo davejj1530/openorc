@@ -16,11 +16,11 @@ import {
   type Refusal,
 } from "@openorc/link";
 import type { Route } from "@openorc/protocol";
+import { wakeByAddress, type CallAddress } from "./address-wake";
 import type { PhoneDoors } from "./door";
 import { LinkConnection, type PhoneLine } from "./link-connection";
 import { raceRoutes, ROUTE_TIMEOUT_MS, type Attempt, type Clock, type RaceResult } from "./route-race";
 import { learnRoutes, routesFor, type DeviceKeys, type MacStore, type NetworkKind, type SavedMac } from "./saved-macs";
-import { SocketFailed } from "./socket-failure";
 
 /**
  * Why the phone is not connected to the Mac it shows, as far as it knows. `unreachable`: no route answered, or the
@@ -109,6 +109,13 @@ export interface ConnectionEffects {
   reachesInternet(signal: AbortSignal): Promise<boolean>;
   /** Hosts' doors: each session's key, and the knock that wakes a host asleep behind its proxy. */
   doors: PhoneDoors;
+  /** Wakes a cloud brain with no door (Agent37), whose service wakes it for any call to its address. */
+  callAddress: CallAddress;
+  /**
+   * Whether this link may wake its host when it does not answer: the shown host's may; the partner's only while the
+   * person has one of its screens open, so a brain looked past is left to sleep.
+   */
+  mayWake(): boolean;
   /** A host named the cloud brains it removed. Only the shown host's link forgets hosts, so every link hands them there. */
   brainsRemoved(macId: string, removed: readonly string[]): void;
 }
@@ -135,10 +142,8 @@ const INTERNET_WITHIN_MS = 3_000;
 const STALE_AFTER_MS = 5_000;
 /** How long a session replaced by a better route keeps answering calls already sent over it. */
 const DRAIN_MS = 5_000;
-/** A host's door is knocked on at most this often. */
+/** A host is woken at most this often, counted from when the last wake ended. */
 const KNOCK_EVERY_MS = 60_000;
-/** Agent37 holds a call to a sleeping brain until it restores, and asks callers to wait at least three minutes. */
-const BRAIN_WAKE_MS = 180_000;
 const REFUSED = Number.POSITIVE_INFINITY;
 
 const closingReasons: ReadonlySet<string> = new Set<ClosingReason>(["update", "shutdown", "removed", "disabled"]);
@@ -392,14 +397,10 @@ export class ConnectionManager {
     const hello = { device: { name: this.effects.deviceName.slice(0, 80) || "iPhone" }, ...(pair ? { pair } : {}) };
     const answer = socket.opened.then(
       (opened) => connectLink({ socket: opened, crypto: this.effects.crypto, device, macKey, hello, timeoutMs: ROUTE_TIMEOUT_MS }),
-      (error: unknown) => ({ ok: false, refused: null, error: "no socket", answered: error instanceof SocketFailed && error.status !== null }) as const,
+      () => ({ ok: false, refused: null, error: "no socket" }) as const,
     );
     return {
-      answer: answer.then((result) =>
-        result.ok
-          ? { ok: true, value: { session: result.session, hello: result.hello } }
-          : { ok: false, refused: result.refused, ...("answered" in result && result.answered ? { answered: true } : {}) },
-      ),
+      answer: answer.then((result) => (result.ok ? { ok: true, value: { session: result.session, hello: result.hello } } : { ok: false, refused: result.refused })),
       cancel: () => socket.close(),
     };
   }
@@ -454,7 +455,7 @@ export class ConnectionManager {
       case "busy":
         return this.retryLater("busy");
       default:
-        if (online && this.mayKnock(mac.id)) return void this.knock(mac, why, tried, result.answered === true);
+        if (online && this.mayKnock(mac.id)) return void this.knock(mac, why, tried);
         return this.retryLater(this.unanswered(why, online, tried));
     }
   }
@@ -470,24 +471,28 @@ export class ConnectionManager {
   }
 
   /**
-   * Nothing answered and the internet does: a host asleep behind its proxy fails just so, and its door can wake it.
-   * Once the door says the host is ready, the phone races again at once. The door finishes a wake the phone left.
+   * Nothing answered and the internet does: a host asleep behind its proxy fails just so, and its door can wake it. A
+   * cloud brain with no door (Agent37) wakes for a call to its address instead. Once the host is said ready, the phone
+   * races again at once. The door finishes a wake the phone left.
    */
-  private async knock(mac: SavedMac, why: DownReason | null, tried: readonly Route[], answered: boolean): Promise<void> {
+  private async knock(mac: SavedMac, why: DownReason | null, tried: readonly Route[]): Promise<void> {
     const epoch = this.epoch;
+    if (!this.effects.mayWake()) return this.retryLater(this.unanswered(why, true, tried));
     const hasDoor = await this.effects.doors.has(mac.id);
     if (epoch !== this.epoch) return;
-    // A cloud brain with no door (Agent37) wakes for any request; its address answering with no brain behind it means
-    // the brain is not running, and only its Mac can start it again.
-    if (!hasDoor && mac.kind === "brain" && !answered) return this.wakeByCalling(mac, why, tried);
-    if (!hasDoor) return this.retryLater(answered && mac.kind === "brain" ? "needs-mac" : this.unanswered(why, true, tried));
+    const address = hasDoor || mac.kind !== "brain" ? undefined : tried.find((route) => route.kind === "public");
+    if (!hasDoor && !address) return this.retryLater(this.unanswered(why, true, tried));
     this.knocked.set(mac.id, this.effects.clock.now());
-    this.enter({ kind: "connecting", why: "waking" });
+    // Once only the Mac can help, the phone asks again each minute under that reason rather than saying Waking.
+    const down = why === "needs-mac";
+    this.enter({ kind: "connecting", why: down ? why : "waking" });
     const abort = new AbortController();
     this.knocking = abort;
-    const outcome = await this.effects.doors.knock(mac.id, abort.signal);
+    const outcome = address ? await wakeByAddress(address, this.effects.callAddress, this.effects.clock, abort.signal, down) : await this.effects.doors.knock(mac.id, abort.signal);
     if (this.knocking === abort) this.knocking = null;
     if (epoch !== this.epoch) return;
+    // A wake may take minutes; the next waits a minute from this one's end.
+    this.knocked.set(mac.id, this.effects.clock.now());
     switch (outcome.kind) {
       case "ready": {
         const saved = this.active() ?? mac;
@@ -505,31 +510,6 @@ export class ConnectionManager {
       case "unanswered":
         return this.retryLater(this.unanswered(why, true, tried));
     }
-  }
-
-  /**
-   * A cloud brain with no door (Agent37) wakes for a call to its address: its service holds the call while the brain
-   * restores, longer than a route's few seconds. One race waits for that, saying Waking, and the next waits a minute
-   * after it ended. Leaving the host calls it off.
-   */
-  private async wakeByCalling(mac: SavedMac, why: DownReason | null, tried: readonly Route[]): Promise<void> {
-    const epoch = this.epoch;
-    const key = await this.keyPair(mac.id);
-    if (epoch !== this.epoch) return;
-    if (!key) return this.forget(mac.id, "key-lost");
-    this.knocked.set(mac.id, this.effects.clock.now());
-    this.enter({ kind: "connecting", why: "waking" });
-    const abort = new AbortController();
-    this.knocking = abort;
-    const result = await raceRoutes(tried, (route) => this.dial(route, fromBase64Url(mac.id), key), this.effects.clock, closeLinked, {
-      timeoutMs: BRAIN_WAKE_MS,
-      signal: abort.signal,
-    });
-    if (this.knocking === abort) this.knocking = null;
-    if (epoch !== this.epoch) return result.ok ? closeLinked(result.value) : undefined;
-    this.knocked.set(mac.id, this.effects.clock.now());
-    if (!result.ok && !result.refused) return this.retryLater(result.answered ? "needs-mac" : this.unanswered(why, true, tried));
-    this.settleRace(mac, result, why, true, tried);
   }
 
   /**

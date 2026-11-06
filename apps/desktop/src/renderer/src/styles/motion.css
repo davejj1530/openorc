@@ -16,6 +16,9 @@
    motion-collapse    on an element shown and hidden with the hidden attribute: it opens to its
                       natural height and folds to nothing, fading as it goes. It clips, with room
                       for rows that reach 8px past its edge.
+   swapInPlace        (lib/motion.ts) a view transition: the parts a screen names for its type
+                      cross-fade where they stand and glide to where they land; a part only one
+                      side has arrives or leaves. The rest of the window changes at once.
 
    Remounts and history loads should not take motion-arrive: only new things arrive. */
 
@@ -141,4 +144,52 @@ details.motion-disclosure::details-content {
 }
 details.motion-disclosure[open]::details-content {
   block-size: auto;
+}
+
+/* swapInPlace. Unchanged pixels stay solid through the cross-fade, since both sides share one
+   duration and curve. Clicks reach the window beneath, so nothing waits on the swap. */
+:root:active-view-transition::view-transition {
+  pointer-events: none;
+}
+/* A dialog closing as a swap starts stays above the parts that swap beneath it. */
+:root:active-view-transition .dialog-backdrop {
+  view-transition-name: swap-dialog-backdrop;
+}
+:root:active-view-transition .dialog-sheet {
+  view-transition-name: swap-dialog;
+}
+:root:active-view-transition::view-transition-old(root) {
+  display: none;
+}
+:root:active-view-transition::view-transition-new(root) {
+  animation: none;
+}
+:root:active-view-transition::view-transition-group(*) {
+  animation-duration: var(--duration-resize);
+  animation-timing-function: var(--ease-out);
+}
+:root:active-view-transition::view-transition-old(*),
+:root:active-view-transition::view-transition-new(*) {
+  animation-duration: var(--duration-arrive);
+  animation-timing-function: var(--ease-out);
+}
+:root:active-view-transition::view-transition-new(*):only-child {
+  animation-name: swap-arrive;
+}
+:root:active-view-transition::view-transition-old(*):only-child {
+  animation-name: swap-leave;
+  animation-duration: var(--duration-leave);
+}
+@keyframes swap-arrive {
+  from {
+    opacity: 0;
+    filter: blur(var(--arrive-blur));
+    translate: 0 var(--arrive-rise);
+  }
+}
+@keyframes swap-leave {
+  to {
+    opacity: 0;
+    filter: blur(var(--arrive-blur));
+  }
 }

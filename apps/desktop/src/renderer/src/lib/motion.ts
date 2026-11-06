@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { flushSync } from "react-dom";
 
 /**
  * The shape-resize duration, --duration-resize in app.css. The panel shell animates its width
@@ -21,6 +22,20 @@ export function prefersReducedMotion(): boolean {
 /** The system reduced-motion setting, following changes while mounted. */
 export function useReducedMotion(): boolean {
   return useSyncExternalStore(subscribeToReducedMotion, prefersReducedMotion);
+}
+
+/**
+ * Applies a change that swaps a screen's content in place, as a view transition of the given type. The
+ * screen's CSS names its parts only while that type runs (:active-view-transition-type), so the parts
+ * cross-fade where they stand and glide to where they land, even across a remount. Under reduced
+ * motion, or where view transitions are missing, the change applies at once.
+ */
+export function swapInPlace(type: string, change: () => void): void {
+  if (typeof document.startViewTransition !== "function" || prefersReducedMotion()) {
+    change();
+    return;
+  }
+  document.startViewTransition({ update: () => flushSync(change), types: [type] });
 }
 
 /**

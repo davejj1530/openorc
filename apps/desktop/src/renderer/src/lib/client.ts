@@ -18,6 +18,7 @@ export const {
   useRpc,
   useRpcs,
   useRpcMutation,
+  ensureRpc,
   invalidateTags,
   runs,
   useRun,

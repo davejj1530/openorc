@@ -7,7 +7,7 @@ import { StatusDot } from "./ui";
 import { StatusIcon, statusLabel } from "./status";
 import { cn } from "../lib/cn";
 import { useLayout } from "../lib/layout";
-import { useRpc, useRpcs } from "../lib/client";
+import { ensureRpc, useRpc, useRpcs } from "../lib/client";
 import { relativeTime, threadListParams } from "@openorc/client";
 import { openThread, useRouter } from "../lib/router";
 
@@ -28,6 +28,11 @@ export function useArrivalActivity(): ArrivalActivity {
     tasks.data ?? [],
     projectId,
   );
+}
+
+/** Loads the threads the arrival list shows once a project is the current one. */
+export function loadArrivalActivity(projectId: string): Promise<unknown> {
+  return ensureRpc("threads.list", threadListParams(projectId, "active"));
 }
 
 /**

@@ -5,7 +5,6 @@ import { Check, Globe, Plus, Search } from "./icons";
 import { ProjectIconPicker } from "./ProjectIconPicker";
 import { ProjectMenu } from "./ProjectMenu";
 import { CoversPreview } from "../lib/browser-preview";
-import { useLayout } from "../lib/layout";
 import { useUi } from "../lib/ui";
 import { floatingGround } from "../lib/use-anchor-ground";
 
@@ -41,7 +40,7 @@ function ProjectOption({ project, selected, onSelect }: { project: PickerProject
   );
 }
 
-/** The new thread's question, its project the switch. Choosing one also makes it the app's current project. */
+/** The new thread's question, its project the switch. */
 export function NewThreadQuestion({
   projectId,
   projects,
@@ -56,16 +55,9 @@ export function NewThreadQuestion({
   return (
     <h1 className="new-thread-question">
       What should we work on in{" "}
-      <ProjectPicker
-        projectId={projectId}
-        projects={projects}
-        disabled={disabled}
-        onProject={(id) => {
-          useLayout.getState().setProject(id);
-          onProject(id);
-        }}
-      />
-      ?
+      <span className="new-thread-question-name">
+        <ProjectPicker projectId={projectId} projects={projects} disabled={disabled} onProject={onProject} />?
+      </span>
     </h1>
   );
 }

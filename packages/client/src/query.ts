@@ -87,6 +87,8 @@ export function createQueries(connection: CoreConnection, invalidationBatchMs: n
     useRpc: <M extends RpcMethod>(method: M, params: RpcParams<M>, options?: RpcQueryOptions<M>) => useRpcOf(q, method, params, options),
     useRpcs: <M extends RpcMethod>(method: M, paramsList: readonly RpcParams<M>[], options?: RpcQueryOptions<M>) => useRpcsOf(q, method, paramsList, options),
     useRpcMutation: <M extends RpcMethod>(method: M) => useRpcMutationOf(q, method),
+    /** A read as useRpc would hold it: from the cache when there, otherwise loaded into it. */
+    ensureRpc: <M extends RpcMethod>(method: M, params: RpcParams<M>) => q.client.ensureQueryData<RpcResults[M]>(rpcQuery(q, method, params, {})),
   };
 }
 

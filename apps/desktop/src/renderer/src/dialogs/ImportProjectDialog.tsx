@@ -2,8 +2,9 @@ import { Button, Dialog, Field, Input } from "../components/ui";
 import type { Project } from "@openorc/protocol";
 import { useEffect, useState } from "react";
 
-import { newThread } from "../lib/router";
+import { newThread, useRouter } from "../lib/router";
 import { useLayout } from "../lib/layout";
+import { swapInPlace } from "../lib/motion";
 import { queryClient, useRpcMutation } from "../lib/client";
 import { core } from "../lib/rpc";
 
@@ -42,8 +43,13 @@ export function ImportProjectDialog({ open, onOpenChange }: { open: boolean; onO
           // The project list is still refreshing; until it lands the new thread screen would call this project unavailable.
           queryClient.setQueryData<Project[]>(["projects.list", {}], (list) => (list && !list.some((known) => known.id === p.id) ? [...list, p] : list));
           onOpenChange(false);
-          useLayout.getState().setProject(p.id);
-          newThread(p.id);
+          const open = () => {
+            useLayout.getState().setProject(p.id);
+            newThread(p.id);
+          };
+          // Added from the new thread screen, the project swaps in as if chosen in its question.
+          if (useRouter.getState().route.view === "newthread") swapInPlace("project", open);
+          else open();
         },
       },
     );

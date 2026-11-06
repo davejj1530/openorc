@@ -2,6 +2,7 @@ import { NOT_ON_BRAIN, WORKSPACE_ID, harnessIds, type CloudSignIns, type Project
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readNewThreadDraft, writeNewThreadDraft } from "../lib/new-thread-draft";
+import { useLayout } from "../lib/layout";
 import { useRouter } from "../lib/router";
 
 const start = vi.fn();
@@ -16,6 +17,8 @@ let settings: Partial<RpcResults["app.settings.get"]>;
 let offer: RpcResults["cloud.offer"] | undefined;
 let signIns: CloudSignIns;
 const mutated: [string, unknown][] = [];
+/** A project's reads held open by a test; any other project's are already in. */
+const arrivalReads: Record<string, Promise<unknown>> = {};
 
 vi.mock("../lib/client", async (original) => ({
   ...(await original<object>()),
@@ -44,7 +47,11 @@ vi.mock("../lib/client", async (original) => ({
 vi.mock("../lib/rpc", () => ({ core: { call: async (method: string) => (method === "cloud.signIns" ? signIns : null), onReady: () => () => {}, onPush: () => () => {} } }));
 vi.mock("../lib/skill-commands", () => ({ useSkillCommands: () => [] }));
 vi.mock("../lib/composer-changes", () => ({ useComposerChanges: () => null }));
-vi.mock("../components/NewThreadActivity", () => ({ useArrivalActivity: () => ({ any: false }), NewThreadRecent: () => null }));
+vi.mock("../components/NewThreadActivity", () => ({
+  useArrivalActivity: () => ({ any: false }),
+  NewThreadRecent: () => null,
+  loadArrivalActivity: (id: string) => arrivalReads[id] ?? Promise.resolve(),
+}));
 vi.mock("../components/NewThreadMascot", () => ({ NewThreadMascot: () => null }));
 vi.mock("../components/Panel", () => ({ Panel: () => null }));
 vi.mock("../components/ProjectIconPicker", () => ({ ProjectIconPicker: () => null, ProjectIcon: () => null }));
@@ -171,9 +178,10 @@ describe("NewThread", () => {
     fireEvent.click(screen.getByRole("button", { name: "Project: p1" }));
     expect(screen.getByRole("heading").textContent).toBe("What should we work on in p1?");
     fireEvent.click(await screen.findByRole("button", { name: "p2" }));
+    await screen.findByRole("button", { name: "Project: p2" });
     const message = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" });
     expect(message.value).toBe("Second project");
-    expect(screen.getByRole("button", { name: "Project: p2" })).toBeTruthy();
+    expect(useLayout.getState().projectId).toBe("p2");
     fireEvent.keyDown(message, { key: "Enter", code: "Enter" });
     await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ projectId: "p2", prompt: "Second project" })));
     expect(readNewThreadDraft("p1").prompt).toBe("First project");
@@ -187,7 +195,23 @@ describe("NewThread", () => {
     fireEvent.change(field, { target: { value: "p7" } });
     expect(screen.queryByRole("button", { name: "p2" })).toBeNull();
     expect(fireEvent.keyDown(field, { key: "Enter" })).toBe(false);
-    expect(screen.getByRole("button", { name: "Project: p7" })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Project: p7" })).toBeTruthy();
+  });
+
+  it("lands on the last project chosen when an earlier switch is still reading", async () => {
+    projects = ["p1", "p2", "p3"].map(makeProject);
+    let finishP2Reads = () => {};
+    arrivalReads.p2 = new Promise<void>((resolve) => (finishP2Reads = resolve));
+    render(<NewThread projectId="p1" />);
+    fireEvent.click(screen.getByRole("button", { name: "Project: p1" }));
+    fireEvent.click(await screen.findByRole("button", { name: "p2" }));
+    fireEvent.click(screen.getByRole("button", { name: "Project: p1" }));
+    fireEvent.click(await screen.findByRole("button", { name: "p3" }));
+    await screen.findByRole("button", { name: "Project: p3" });
+    await act(async () => finishP2Reads());
+    expect(screen.getByRole("button", { name: "Project: p3" })).toBeTruthy();
+    expect(useLayout.getState().projectId).toBe("p3");
+    delete arrivalReads.p2;
   });
 
   it("chooses a worktree above the prompt and uses it for the first turn", async () => {

@@ -7,7 +7,7 @@ import { Composer } from "../components/Composer";
 import { ComposerCommitChip } from "../components/ComposerFooter";
 import { FolderGit2 } from "../components/icons";
 import { ComposerModelPicker, ModelPicker, type ModelChoice, type OrclingPickerChoices } from "../components/ModelPicker";
-import { NewThreadRecent, useArrivalActivity } from "../components/NewThreadActivity";
+import { loadArrivalActivity, NewThreadRecent, useArrivalActivity } from "../components/NewThreadActivity";
 import { NewThreadOptions } from "../components/NewThreadOptions";
 import { NewThreadStarters } from "../components/NewThreadStarters";
 import { Panel } from "../components/Panel";
@@ -21,15 +21,19 @@ import { usePublishComposerAccount } from "../lib/composer-account";
 import { useComposerChanges } from "../lib/composer-changes";
 import { useDefaultHarness } from "../lib/default-harness";
 import { useLayout } from "../lib/layout";
+import { swapInPlace } from "../lib/motion";
 import { evaluateNewThreadAvailability } from "../lib/new-thread-availability";
 import { readNewThreadDraft, readNewThreadProject, rememberNewThreadProject, writeNewThreadDraft } from "../lib/new-thread-draft";
 import { useNewThreadLocation } from "../lib/new-thread-location";
 import { orclingById, useOrclings } from "../lib/orclings";
-import { branchingReason, useProjectGit } from "../lib/project-git";
+import { branchingReason, loadProjectGit, useProjectGit } from "../lib/project-git";
 import { openThread, useRouter } from "../lib/router";
 import { useSkillCommands } from "../lib/skill-commands";
 import { useUi } from "../lib/ui";
 import { startNewThread } from "./new-thread-start";
+
+/** How long a project switch waits for the reads that size the screen before it swaps without them. */
+const SWITCH_READS_MS = 250;
 
 /** Project changes remount the composer so prompt, target and image drafts move together. */
 export function NewThread({ projectId }: { projectId?: string }) {
@@ -47,13 +51,30 @@ export function NewThread({ projectId }: { projectId?: string }) {
   useEffect(() => {
     if (!project && projects.data?.[0]) chooseProject(railProject ?? projects.data[0].id);
   }, [project, projects.data, railProject]);
+  // Choosing a project in the question also makes it the app's current one. The screen swaps in place once
+  // the project's recent threads and git state are read, so its sections never blink out and back.
+  const switching = useRef(0);
+  useEffect(() => () => void switching.current++, []);
+  const switchProject = (id: string) => {
+    const turn = ++switching.current;
+    const reads = Promise.all([loadArrivalActivity(id), loadProjectGit(id)]);
+    void Promise.race([reads, new Promise((resolve) => setTimeout(resolve, SWITCH_READS_MS))])
+      .catch(() => undefined)
+      .then(() => {
+        if (turn !== switching.current) return;
+        swapInPlace("project", () => {
+          useLayout.getState().setProject(id);
+          chooseProject(id);
+        });
+      });
+  };
   return (
     <NewThreadProject
       key={project}
       projectId={project}
       projects={home.data ? [home.data, ...(projects.data ?? [])] : projects.data}
       projectsError={projects.error?.message}
-      onProject={chooseProject}
+      onProject={switchProject}
       onRetryProjects={() => void projects.refetch()}
     />
   );

@@ -1,14 +1,9 @@
 import { SIDEBAR_LIST, sidebarDayKey, sidebarDayOpen, sidebarFoldKey, sidebarSectionOpen, threadTreeRows, visibleThreadForest, type SidebarDayList, type ThreadTreeRow } from "@openorc/client";
 import type { ThreadOwner, ThreadSummary } from "@openorc/protocol";
 
-/** The host listed below the shown one: none while the cloud brain is chosen, whose threads are the only ones shown then. */
-export function listedPartner(group: { primary: string | null; partner: string | null }, kinds: ReadonlyMap<string, "mac" | "brain">): string | null {
-  return group.primary !== null && kinds.get(group.primary) === "brain" ? null : group.partner;
-}
-
 /**
- * A Mac lists its cloud brain's threads among its own, marked as the cloud's. Beside that brain's own section they
- * would show twice, so a Mac listed with its brain keeps only its own.
+ * A Mac lists its cloud brain's threads among its own, marked as the cloud's. Once the phone pairs that brain too, the
+ * switch shows one host at a time, so the Mac keeps only its own threads and the brain's show when it is chosen.
  */
 export function shownApartFromBrain(host: string | null, group: { primary: string | null; partner: string | null }, kinds: ReadonlyMap<string, "mac" | "brain">): boolean {
   const shown = host ?? group.primary;
@@ -44,10 +39,9 @@ export type HomeItem =
   /** A part of the list that folds under its label: Pinned, a day, Snoozed or Resolved. `count` where it is the part's whole. */
   | { kind: "section"; key: string; label: string; count?: number; open: boolean }
   /**
-   * `project` is the name a root row shows under its title; sub threads show none. `arriving` rises it in. `host` names
-   * the partner host a thread under the shown host's Needs you lives on.
+   * `project` is the name a root row shows under its title; sub threads show none. `arriving` rises it in.
    */
-  | { kind: "thread"; key: string; thread: ThreadSummary; tree: ThreadTreeRow; project: string | null; arriving: boolean; host?: string }
+  | { kind: "thread"; key: string; thread: ThreadSummary; tree: ThreadTreeRow; project: string | null; arriving: boolean }
   /** The foot of Resolved (or of Pinned, under the pinned filter) while the host has more threads to give. */
   | { kind: "more"; key: string }
   | { kind: "children-more"; key: string; tree: ThreadTreeRow; count: number }
@@ -68,25 +62,20 @@ export interface HomeOptions {
   opened: string | null;
   childLimits?: Readonly<Record<string, number>>;
   selectedId?: string;
-  /** The partner host's threads waiting on you, listed under this host's Needs you with its own. */
-  partnerWaiting?: readonly Waiting[];
-  /** This host is the partner: its waiting threads are listed under the shown host's Needs you, and none here. */
-  waitingShownElsewhere?: boolean;
 }
 
-/** A thread waiting on you, with the project it is in; `host` is the partner host it lives on. */
+/** A thread waiting on you, with the project it is in. */
 export interface Waiting {
   thread: ThreadSummary;
   project: string | null;
-  host?: string;
 }
 
 const newestFirst = (a: ThreadSummary, b: ThreadSummary) => b.lastActivityAt - a.lastActivityAt;
 const isWaiting = (thread: ThreadSummary) => thread.activity === "waiting";
 
-/** Rows and headings another host owns, marked with it: the shown host's when it cannot be reached, all of the partner's. */
+/** The shown host's rows marked as another host's: as out of reach while it cannot be reached. */
 export function owned(items: HomeItem[], owner: ThreadOwner): HomeItem[] {
-  return items.map((item) => (item.kind === "thread" && !item.host ? { ...item, thread: { ...item.thread, owner } } : item));
+  return items.map((item) => (item.kind === "thread" ? { ...item, thread: { ...item.thread, owner } } : item));
 }
 
 /**
@@ -153,38 +142,25 @@ function partItems(part: Part, list: HomeList, options: HomeOptions, waitingRoot
   ];
 }
 
-/** Needs you's heading and rows, this host's waiting threads with the partner's, newest first. */
+/** Needs you's heading and rows, this host's waiting threads, newest first. */
 function needsYouItems(waiting: readonly Waiting[]): HomeItem[] {
   if (!waiting.length) return [];
   const items: HomeItem[] = [{ kind: "heading", key: "needs-you", title: "Needs you", count: waiting.length }];
-  for (const { thread, project, host } of waiting)
-    for (const tree of threadTreeRows([thread], [thread], []))
-      items.push({
-        kind: "thread",
-        key: host ? `${host}:${tree.thread.id}` : tree.thread.id,
-        thread: tree.thread,
-        tree,
-        project: tree.depth ? null : project,
-        arriving: false,
-        ...(host ? { host } : {}),
-      });
+  for (const { thread, project } of waiting)
+    for (const tree of threadTreeRows([thread], [thread], [])) items.push({ kind: "thread", key: tree.thread.id, thread: tree.thread, tree, project: tree.depth ? null : project, arriving: false });
   return items;
 }
 
 /**
- * Home, as the desktop's sidebar lists threads: every thread waiting on you first, across projects and the partner host,
+ * Home, as the desktop's sidebar lists threads: every thread waiting on you first, across projects,
  * then pinned threads, then the rest by when they last saw work (the last three hours and today open, yesterday
  * folded), then snoozed threads and Resolved, which holds everything older, folded at the foot. A waiting thread appears
  * once, under Needs you, which never folds.
  */
 export function homeItems(list: HomeList, options: HomeOptions): HomeItem[] {
   const { days } = list;
-  const own = homeWaiting(list, options);
-  const waitingRoots = new Set(own.map(({ thread }) => thread.id));
-  // A thread that just moved here may still wait in the partner's last list: this host's own row stands for it.
-  const here = new Set([...options.waiting, ...list.read].map((thread) => thread.id));
-  const partner = (options.partnerWaiting ?? []).filter(({ thread }) => !here.has(thread.id));
-  const waiting = options.waitingShownElsewhere ? [] : [...own, ...partner].sort((a, b) => newestFirst(a.thread, b.thread));
+  const waiting = homeWaiting(list, options);
+  const waitingRoots = new Set(waiting.map(({ thread }) => thread.id));
   const pinsKey = sidebarFoldKey.pinned(SIDEBAR_LIST);
   const snoozedKey = sidebarFoldKey.snoozed(SIDEBAR_LIST);
   const resolvedKey = sidebarFoldKey.resolved(SIDEBAR_LIST);

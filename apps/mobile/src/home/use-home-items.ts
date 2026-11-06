@@ -130,7 +130,7 @@ function useThreadList(connected: boolean, selectedId: string | undefined, resol
  * that fails keeps the threads it had and shows no retry: the header says once why. `needsYou` lists a partner host's
  * waiting threads here, or this host's under the shown one's Needs you.
  */
-export function useHomeItems(connected: boolean, needsYou: Pick<HomeOptions, "partnerWaiting" | "waitingShownElsewhere" | "selectedId"> = {}) {
+export function useHomeItems(connected: boolean, needsYou: Pick<HomeOptions, "selectedId"> = {}) {
   // A partner's sections fold on their own host.
   const host = useContext(HostContext);
   const collapsed = useFolds(host);

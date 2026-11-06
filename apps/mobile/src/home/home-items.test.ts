@@ -1,7 +1,7 @@
 import { sidebarDayList, sidebarThreadPage, THREAD_PAGE, type SidebarFilter } from "@openorc/client";
 import { WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 import { describe, expect, it } from "vitest";
-import { homeItems, homeWaiting, listedPartner, owned, ownRows, shownApartFromBrain, type HomeItem, type HomeList, type HomeOptions } from "./home-items";
+import { homeItems, owned, ownRows, shownApartFromBrain, type HomeItem, type HomeList, type HomeOptions } from "./home-items";
 import { newThreadRoute } from "./out-of-reach";
 import { fixtureProjects, fixtureThreads } from "./test-fixtures/threads";
 
@@ -198,37 +198,12 @@ it("lists the waiting child itself in Needs you even when its parent and its day
   expect(listed.filter((item) => item.kind === "thread").map((item) => [item.thread.id, item.tree.depth])).toEqual([["child", 0]]);
 });
 
-describe("Needs you beside a partner host", () => {
-  const cloud = { ...fixtureThreads.find((thread) => thread.id === "t-hero")!, id: "c-review", activity: "waiting" as const, lastActivityAt: Date.UTC(2026, 9, 23, 11, 59) };
-
-  it("lists the partner's waiting threads with the shown host's, newest first, each keyed and marked by its host", () => {
-    const items = homeItems(list(), options({ partnerWaiting: [{ thread: cloud, project: "openorc", host: "brain" }] }));
-    expect(outline(items).slice(0, 4)).toEqual(["# Needs you (3)", "c-review @ openorc", "t-pairing @ openorc", "t-docs @ website"]);
-    expect(items.find((item) => item.kind === "thread" && item.thread.id === "c-review")).toMatchObject({ key: "brain:c-review", host: "brain" });
-  });
-
-  it("lists a thread that just came here from the partner once, as this host's, while the partner's last list still has it", () => {
-    const moved = { ...cloud, id: "t-hero" };
-    const items = homeItems(list(), options({ partnerWaiting: [{ thread: moved, project: "website", host: "brain" }] }));
-    expect(items.filter((item) => item.kind === "thread" && item.thread.id === "t-hero").map((item) => item.key)).toEqual(["t-hero"]);
-  });
-
-  it("leaves a partner's own list without Needs you, its waiting threads out of its days, and hands them over", () => {
-    const partner = outline(homeItems(list(), options({ waitingShownElsewhere: true })));
-    expect(partner).not.toContain("# Needs you (2)");
-    expect(partner.some((line) => line.startsWith("t-pairing"))).toBe(false);
-    expect(homeWaiting(list(), options()).map(({ thread, project }) => `${thread.id} @ ${project}`)).toEqual(["t-pairing @ openorc", "t-docs @ website"]);
-  });
-});
-
 describe("owned", () => {
-  const away = { brain: "mac", reach: "offline", heardAt: 1 } as const;
-  const partner = { brain: "cloud", reach: "live", heardAt: 1 } as const;
-
-  it("marks a host's rows, never a partner's row listed under its Needs you", () => {
-    const items = homeItems(list(), options({ partnerWaiting: [{ thread: { ...fixtureThreads[0]!, id: "cloud-1", activity: "waiting", owner: partner }, project: "openorc", host: "brain-1" }] }));
-    const marked = owned(items, away).flatMap((item) => (item.kind === "thread" ? [[item.thread.id, item.thread.owner?.reach ?? null]] : []));
-    expect(marked.filter(([, reach]) => reach !== "offline")).toEqual([["cloud-1", "live"]]);
+  it("marks every thread row of the shown host as out of reach while it cannot be reached, and leaves headings alone", () => {
+    const away = { brain: "mac", reach: "offline", heardAt: 1 } as const;
+    const items = owned(homeItems(list(), options()), away);
+    expect(items.filter((item) => item.kind === "thread").every((item) => item.kind === "thread" && item.thread.owner === away)).toBe(true);
+    expect(items.some((item) => item.kind === "heading")).toBe(true);
   });
 });
 
@@ -262,18 +237,5 @@ describe("a Mac listed beside its cloud brain", () => {
     expect(ownRows(rows, true).map((row) => row.id)).toEqual([own!.id]);
     expect(ownRows(rows, false)).toBe(rows);
     expect(ownRows(undefined, true)).toBeUndefined();
-  });
-});
-
-describe("the host listed below the shown one", () => {
-  const kinds = new Map<string, "mac" | "brain">([
-    ["mac", "mac"],
-    ["brain", "brain"],
-  ]);
-
-  it("is none while the cloud brain is chosen, so only its threads show, and the brain below a chosen Mac", () => {
-    expect(listedPartner({ primary: "brain", partner: "mac" }, kinds)).toBeNull();
-    expect(listedPartner({ primary: "mac", partner: "brain" }, kinds)).toBe("brain");
-    expect(listedPartner({ primary: "mac", partner: null }, kinds)).toBeNull();
   });
 });

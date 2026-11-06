@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
-import type { CloudStatus } from "@openorc/protocol";
+import type { CloudBrainStatus, CloudProvider, CloudSignIns, CloudStatus } from "@openorc/protocol";
 import { afterEach, expect, it, vi } from "vitest";
 import { CloudSettings } from "./settings-cloud";
 import { queryClient } from "../lib/client";
@@ -26,6 +26,7 @@ const status: CloudStatus = {
   check: null,
   takeover: false,
   error: null,
+  service: "vercel",
 };
 
 const answers: Record<string, unknown> = {
@@ -35,6 +36,8 @@ const answers: Record<string, unknown> = {
   "cloud.brain.status": { state: "unavailable" },
   "cloud.sandboxes": [],
   "cloud.vercel.region": status,
+  "cloud.offer": { offered: true, provider: "vercel" },
+  "cloud.signIns": { rows: [], bringing: false },
 };
 
 it("shows the region new sandboxes run in, and sends a change", async () => {
@@ -44,7 +47,8 @@ it("shows the region new sandboxes run in, and sends a change", async () => {
       <CloudSettings active />
     </QueryClientProvider>,
   );
-  const region = (await screen.findByRole("combobox", { name: /^Sandbox region/ })) as HTMLSelectElement;
+  fireEvent.click(await screen.findByRole("button", { name: /^Connect a cloud service/ }));
+  const region = screen.getByRole("combobox", { name: /^Sandbox region/ }) as HTMLSelectElement;
   expect(region.value).toBe("sin1");
   expect(region.selectedOptions[0]?.textContent).toBe("Singapore · sin1");
   fireEvent.change(region, { target: { value: "hnd1" } });
@@ -62,7 +66,7 @@ function showCloud(cloud: CloudStatus) {
 
 it("asks for a token scoped to one team where Vercel is connected, with the reason on hover", async () => {
   window.openorc = { ...window.openorc, openExternal: vi.fn() };
-  showCloud({ ...status, vercel: null });
+  showCloud({ ...status, vercel: null, service: null });
   const scoped = await screen.findByText("scoped to one team");
   expect(scoped.getAttribute("data-tooltip")).toBe("Under Scope, choose the team, then All Projects. Whoever holds the token can change everything it reaches.");
   fireEvent.click(screen.getByRole("button", { name: "your Vercel account" }));
@@ -110,10 +114,100 @@ it("says once a Claude token is removed that it still works at Anthropic, and wh
 
 it("shows the cloud brain once either service is connected, on Agent37 alone too, and not before", async () => {
   showCloud({ ...status, vercel: null, agent37: { size: { cpu: 2, memory: 4 } }, service: "agent37" });
-  expect(await screen.findByText("Cloud brain")).toBeTruthy();
+  fireEvent.click(await screen.findByRole("button", { name: /^Set up the cloud brain/ }));
+  expect(await screen.findByRole("button", { name: "Set up" })).toBeTruthy();
   cleanup();
   queryClient.clear();
   showCloud({ ...status, vercel: null, agent37: null, service: null });
   expect(await screen.findByText("Vercel")).toBeTruthy();
-  expect(screen.queryByText("Cloud brain")).toBeNull();
+  expect((screen.getByRole("button", { name: /^Set up the cloud brain/ }) as HTMLButtonElement).disabled).toBe(true);
+});
+
+type Answers = { cloud: CloudStatus; place: CloudProvider | null; signIns?: CloudSignIns; brain?: CloudBrainStatus };
+
+function showSteps({ cloud, place, signIns = { rows: [], bringing: false }, brain = { state: "none", error: null } }: Answers) {
+  const by: Record<string, unknown> = { ...answers, "cloud.status": cloud, "cloud.offer": { offered: true, provider: place }, "cloud.signIns": signIns, "cloud.brain.status": brain };
+  vi.mocked(core.call).mockImplementation(async (method: string) => by[method] as never);
+  render(
+    <QueryClientProvider client={queryClient}>
+      <CloudSettings active />
+    </QueryClientProvider>,
+  );
+}
+
+const stepButton = (title: string) => screen.getByRole("button", { name: new RegExp(`^${title}`) });
+const stepOf = (title: string) => stepButton(title).closest(".cloud-step") as HTMLElement;
+
+it("starts with connecting a service, and holds the check and the cloud brain until one is", async () => {
+  showSteps({ cloud: { ...status, vercel: null, service: null }, place: null });
+  await screen.findByText("Vercel or Agent37. One is enough.");
+  expect(stepButton("Connect a cloud service").getAttribute("aria-expanded")).toBe("true");
+  expect(stepOf("Connect a cloud service").dataset.next).toBe("true");
+  for (const title of ["Run the cloud check", "Set up the cloud brain"]) {
+    expect((stepButton(title) as HTMLButtonElement).disabled).toBe(true);
+    expect(within(stepOf(title)).getByText("Connect a cloud service first.")).toBeTruthy();
+  }
+  expect(screen.queryByText("When this Mac sleeps")).toBeNull();
+  expect(screen.queryByText("Sandboxes")).toBeNull();
+});
+
+it("judges the check by where new threads run: a Vercel failure from before Agent37 was connected does not count", async () => {
+  const steps = (["sandbox", "tools", "runner", "relay", "signins", "sync", "remove"] as const).map((step) => ({
+    step,
+    state: step === "sandbox" || step === "remove" ? ("failed" as const) : ("pending" as const),
+    ms: 0,
+    detail: null,
+    error: step === "sandbox" || step === "remove" ? "Connect Vercel in Settings to run in the cloud." : null,
+  }));
+  const signIns: CloudSignIns = { rows: [{ kind: "claude", accountId: "claude-cli", label: "Personal", state: "ready", way: "browser", error: null }], bringing: false };
+  showSteps({
+    cloud: { ...status, vercel: null, agent37: { size: { cpu: 2, memory: 4 } }, service: "agent37", check: { provider: "vercel", passed: false, steps } },
+    place: "agent37",
+    signIns,
+  });
+  expect(await screen.findByText("Not run on Agent37 yet.")).toBeTruthy();
+  expect(stepOf("Run the cloud check").dataset.state).toBe("todo");
+  expect(stepButton("Run the cloud check").getAttribute("aria-expanded")).toBe("true");
+  expect(screen.queryByText(/Connect Vercel/)).toBeNull();
+  expect(within(stepOf("Connect a cloud service")).getByText("Agent37", { selector: ".cloud-step-summary" })).toBeTruthy();
+  expect(within(stepOf("Sign in your agents")).getByText("Claude · Personal ready")).toBeTruthy();
+});
+
+it("closes every step once cloud threads can run, each saying where it stands, and opens one on a click", async () => {
+  const steps = (["sandbox", "tools", "runner", "relay", "signins", "sync", "remove"] as const).map((step) => ({ step, state: "done" as const, ms: 10, detail: null, error: null }));
+  showSteps({
+    cloud: { ...status, check: { provider: "vercel", passed: true, steps } },
+    place: "vercel",
+    signIns: {
+      rows: [
+        { kind: "claude", accountId: "claude-cli", label: "Personal", state: "ready", way: "browser", error: null },
+        { kind: "codex", label: "Codex", state: "missing", way: "browser", error: null },
+      ],
+      bringing: false,
+    },
+  });
+  expect(await screen.findByText("Passed on Vercel")).toBeTruthy();
+  expect(screen.getByText("Vercel · Acme")).toBeTruthy();
+  expect(screen.getByText("Claude · Personal ready, 1 more can sign in")).toBeTruthy();
+  for (const title of ["Connect a cloud service", "Sign in your agents", "Run the cloud check", "Set up the cloud brain"]) {
+    expect(stepButton(title).getAttribute("aria-expanded")).toBe("false");
+  }
+  expect(screen.getByText("When this Mac sleeps")).toBeTruthy();
+  fireEvent.click(stepButton("Run the cloud check"));
+  expect(stepButton("Run the cloud check").getAttribute("aria-expanded")).toBe("true");
+  expect(screen.getByRole("button", { name: "Run again" })).toBeTruthy();
+});
+
+it("names the step a failed check stopped at, where it ran", async () => {
+  const states = ["done", "failed", "pending", "pending", "pending", "pending", "pending"] as const;
+  const steps = (["sandbox", "tools", "runner", "relay", "signins", "sync", "remove"] as const).map((step, index) => ({
+    step,
+    state: states[index]!,
+    ms: 10,
+    detail: null,
+    error: index === 1 ? "Claude Code is not installed in the sandbox." : null,
+  }));
+  showSteps({ cloud: { ...status, vercel: null, agent37: { size: { cpu: 2, memory: 4 } }, service: "agent37", check: { provider: "agent37", passed: false, steps } }, place: "agent37" });
+  expect(await screen.findByText("Find Node, Git and Claude Code failed on Agent37.")).toBeTruthy();
+  expect(stepOf("Run the cloud check").dataset.state).toBe("failed");
 });

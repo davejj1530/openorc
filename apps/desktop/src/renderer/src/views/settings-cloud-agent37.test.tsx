@@ -48,7 +48,8 @@ it("connects Agent37 with a pasted key, which the field forgets", async () => {
 
 it("sizes new instances once connected, and offers no service choice with Agent37 alone", async () => {
   show({ ...base, agent37: { size: { cpu: 2, memory: 4 } }, service: "agent37" });
-  const size = (await screen.findByRole("combobox", { name: /^Instance size/ })) as HTMLSelectElement;
+  fireEvent.click(await screen.findByRole("button", { name: /^Connect a cloud service/ }));
+  const size = screen.getByRole("combobox", { name: /^Instance size/ }) as HTMLSelectElement;
   expect(size.selectedOptions[0]?.textContent).toBe("2 vCPUs · 4 GB");
   fireEvent.change(size, { target: { value: "2" } });
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.agent37.size", { size: { cpu: 4, memory: 16 } }));
@@ -57,7 +58,8 @@ it("sizes new instances once connected, and offers no service choice with Agent3
 
 it("chooses the service new cloud threads run on while both are connected", async () => {
   show({ ...base, vercel: { team: { id: "team_a", name: "Acme" }, project: "openorc-sandboxes", vcpus: null, region: "iad1" }, agent37: { size: { cpu: 2, memory: 4 } }, service: "vercel" });
-  const choice = (await screen.findByRole("combobox", { name: /^Run on/ })) as HTMLSelectElement;
+  fireEvent.click(await screen.findByRole("button", { name: /^Connect a cloud service/ }));
+  const choice = screen.getByRole("combobox", { name: /^Run on/ }) as HTMLSelectElement;
   expect(choice.value).toBe("vercel");
   fireEvent.change(choice, { target: { value: "agent37" } });
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.service", { service: "agent37" }));

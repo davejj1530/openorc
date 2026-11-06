@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { QueryClientProvider } from "@tanstack/react-query";
 import type { CloudBrainSignIns, CloudBrainStatus } from "@openorc/protocol";
 import { afterEach, expect, it, vi } from "vitest";
-import { CloudBrainSection } from "./settings-cloud-brain";
+import { CloudBrain } from "./settings-cloud-brain";
 import { queryClient } from "../lib/client";
 import { core } from "../lib/rpc";
 
@@ -36,7 +36,7 @@ function show(signIns: CloudBrainSignIns, status: CloudBrainStatus = ready) {
   });
   render(
     <QueryClientProvider client={queryClient}>
-      <CloudBrainSection active service="vercel" />
+      <CloudBrain active service="vercel" />
     </QueryClientProvider>,
   );
 }
@@ -57,7 +57,7 @@ it("lists what the brain signs in with besides Claude, quietly, and no notificat
   queryClient.clear();
   show(none);
   await screen.findByText("Codex");
-  expect(within(row("Codex")).getByText("None")).toBeTruthy();
+  expect(within(row("Codex")).getByText("Not signed in")).toBeTruthy();
   expect(github().checked).toBe(false);
   expect(screen.queryByText("Notifications")).toBeNull();
 });

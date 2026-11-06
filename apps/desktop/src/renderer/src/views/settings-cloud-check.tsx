@@ -1,11 +1,11 @@
-import type { CloudCheck, CloudCheckStep, CloudService, CloudStatus } from "@openorc/protocol";
+import type { CloudCheck, CloudCheckStep, CloudProvider } from "@openorc/protocol";
 import { Button } from "../components/ui";
 import { StepMark } from "../components/WorkSteps";
 import { useRpcMutation } from "../lib/client";
-import { Section, SettingRow } from "./settings-shared";
+import { SettingRow } from "./settings-shared";
 import "./settings-cloud-check.css";
 
-const stepLabels: Record<CloudCheckStep, string> = {
+export const CHECK_STEP_LABELS: Record<CloudCheckStep, string> = {
   sandbox: "Start a sandbox",
   tools: "Find Node, Git and Claude Code",
   runner: "Run a process",
@@ -27,7 +27,7 @@ function CheckSteps({ check }: { check: CloudCheck }) {
         <li key={step} data-state={state}>
           <StepMark state={state} />
           <span className="cloud-check-step">
-            <span>{stepLabels[step]}</span>
+            <span>{CHECK_STEP_LABELS[step]}</span>
             {detail ? <span className="cloud-check-detail">{detail}</span> : null}
             {error ? (
               <span role="alert" className="cloud-check-error">
@@ -42,38 +42,32 @@ function CheckSteps({ check }: { check: CloudCheck }) {
   );
 }
 
-const PLACES: Record<CloudService | "local", string> = { vercel: "On Vercel", agent37: "On Agent37", local: "In a sandbox simulated on this Mac" };
+const PLACES: Record<CloudProvider, string> = { vercel: "On Vercel", agent37: "On Agent37", local: "In a sandbox simulated on this Mac" };
 
-/** The check runs where new cloud threads run: the service "Run on" names, else Vercel once it has a team, for older cores. */
-function checkService(status: CloudStatus): CloudService | null {
-  if (status.service !== undefined) return status.service;
-  return status.vercel?.team && status.vercel.project ? "vercel" : null;
-}
-
-function verdict(check: CloudCheck | null): string | undefined {
-  if (!check || check.passed === null) return undefined;
-  return check.passed ? "Cloud threads can run here." : "A cloud thread would fail at the step marked below.";
-}
-
-/** Tries everything a cloud thread needs, in a throwaway sandbox where new cloud threads would run. */
-export function CloudCheckSection({ status }: { status: CloudStatus }) {
+/**
+ * Tries everything a cloud thread needs, in a throwaway sandbox where new cloud threads run: `place`, null while they
+ * have nowhere to run. A check that ran elsewhere, before the service changed, is not shown; one still running is.
+ */
+export function CloudCheckCard({ check, place }: { check: CloudCheck | null; place: CloudProvider | null }) {
   const start = useRpcMutation("cloud.check");
-  const { check } = status;
-  const running = check?.passed === null;
-  const where = PLACES[checkService(status) ?? "local"];
+  const shown = check && (check.provider === place || check.passed === null) ? check : null;
+  const running = shown?.passed === null;
+  const where = shown?.provider ?? place;
+  let label = shown ? "Run again" : "Run check";
+  if (running) label = "Checking";
   return (
-    <Section title="Check" description={verdict(check)}>
-      <SettingRow label="Cloud check" hint={where}>
-        <Button disabled={running || start.isPending} onClick={() => start.mutate({})}>
-          {running ? "Checking" : "Run check"}
+    <div className="settings-group">
+      <SettingRow label="Cloud check" hint={where ? PLACES[where] : undefined}>
+        <Button disabled={!place || running || start.isPending} onClick={() => start.mutate({})}>
+          {label}
         </Button>
       </SettingRow>
-      {check ? <CheckSteps check={check} /> : null}
+      {shown ? <CheckSteps check={shown} /> : null}
       {start.error ? (
         <p role="alert" className="text-bad mt-2">
           {start.error.message}
         </p>
       ) : null}
-    </Section>
+    </div>
   );
 }

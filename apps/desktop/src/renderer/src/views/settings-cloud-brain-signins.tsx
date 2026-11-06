@@ -23,7 +23,7 @@ function Send({ busy }: { busy: boolean }) {
 function codexHint(codex: SignIns["codex"]): string {
   if (codex.signingIn) return "Sign in to ChatGPT in the browser that opened.";
   const login = codex.pending && codex.pending !== "sign-out" ? codex.pending : codex;
-  return login.mode ? codexWho(login) : "None";
+  return login.mode ? codexWho(login) : "Not signed in";
 }
 
 type CodexActions = { open: () => void; cancel: () => void; remove: () => void; paste: () => void; pending: boolean; busy: boolean };

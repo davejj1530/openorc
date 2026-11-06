@@ -1,0 +1,119 @@
+/* The Cloud page as a checklist: each step a mark, a title and where it stands, its settings
+   under the title while open. Marks follow the plan items': ink check, ring, red cross. */
+.cloud-steps {
+  display: grid;
+  gap: 2px;
+  margin-bottom: 32px;
+}
+.cloud-step-head > button {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 16px;
+  align-items: start;
+  column-gap: 14px;
+  width: calc(100% + 24px);
+  margin-inline: -12px;
+  padding: 12px;
+  border-radius: var(--radius-xl);
+  color: var(--ink);
+  text-align: left;
+  transition: background-color var(--duration-arrive) var(--ease-out);
+}
+.cloud-step-head > button:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.cloud-step-head > button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.cloud-step-mark {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1.5px var(--surface-3);
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.cloud-step[data-next] .cloud-step-mark {
+  box-shadow: inset 0 0 0 1.5px var(--ink);
+  color: var(--ink);
+}
+.cloud-step[data-state="done"] .cloud-step-mark {
+  background: var(--ink);
+  box-shadow: none;
+  color: var(--surface);
+}
+.cloud-step[data-state="failed"] .cloud-step-mark {
+  background: var(--bad);
+  box-shadow: none;
+  color: var(--surface);
+}
+.cloud-step[data-state="running"] .cloud-step-mark {
+  box-shadow: none;
+  color: var(--ink-2);
+}
+.cloud-step-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding-top: 2px;
+}
+.cloud-step-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  font-size: var(--text-md);
+  line-height: 20px;
+  letter-spacing: var(--text-md--letter-spacing);
+}
+.cloud-step-head > button:disabled .cloud-step-title {
+  color: var(--ink-3);
+}
+.cloud-step-tag {
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+.cloud-step-summary {
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  line-height: 18px;
+}
+.cloud-step[data-state="failed"] .cloud-step-summary {
+  color: var(--bad);
+}
+.cloud-step-chevron {
+  margin-top: 4px;
+  color: var(--ink-3);
+  transition: rotate var(--duration-arrive) var(--ease-out);
+}
+.cloud-step-head > button[aria-expanded="true"] .cloud-step-chevron {
+  rotate: 180deg;
+}
+/* Settings start under the title, so the marks run down the left edge alone. */
+.cloud-step-body {
+  padding: 4px 0 24px 38px;
+}
+.cloud-step-body .settings-section {
+  margin-bottom: 20px;
+}
+.cloud-step-body .settings-section:last-child,
+.cloud-step-body > .settings-group:last-child {
+  margin-bottom: 0;
+}
+.cloud-step-body .settings-section-intro h3 {
+  color: var(--ink-2);
+  font-size: var(--text-base);
+  line-height: 18px;
+}
+.cloud-step-lead {
+  margin-bottom: 20px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cloud-step-head > button,
+  .cloud-step-chevron {
+    transition: none;
+  }
+}

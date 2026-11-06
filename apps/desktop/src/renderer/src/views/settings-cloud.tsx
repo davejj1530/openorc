@@ -1,13 +1,14 @@
 import { useState, type ReactNode } from "react";
-import { SANDBOX_VCPUS, type BrainRegion, type ClaudeAccountConnection, type ClaudeCloudAccess, type CloudService, type CloudStatus } from "@openorc/protocol";
+import { SANDBOX_VCPUS, type BrainRegion, type ClaudeAccountConnection, type ClaudeCloudAccess, type CloudService, type CloudSignIns, type CloudStatus } from "@openorc/protocol";
 import { Button, Select, TextButton, Tooltip } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { Agent37Settings, CloudServiceChoice } from "./settings-cloud-agent37";
-import { CloudBrainSection } from "./settings-cloud-brain";
+import { CloudBrain } from "./settings-cloud-brain";
 import { RegionSelect } from "./settings-cloud-place";
-import { CloudCheckSection } from "./settings-cloud-check";
+import { CloudCheckCard } from "./settings-cloud-check";
 import { CloudSandboxesSection } from "./settings-cloud-sandboxes";
-import { CloudSignInsSection } from "./settings-cloud-sign-ins";
+import { BringMissing, missingRows } from "./settings-cloud-sign-ins";
+import { CloudStep, cloudSteps, nextStep, serviceOf, type CloudStepId } from "./settings-cloud-steps";
 import { Field, LoadError, Section, SettingRow, Status, Toggle } from "./settings-shared";
 import { CodexCloudSection } from "./settings-cloud-codex";
 import { OpenCodeCloudSection } from "./settings-cloud-opencode";
@@ -236,11 +237,65 @@ function TakeoverSection({ enabled }: { enabled: boolean }) {
 /** The services connected: Vercel once it has a team, Agent37 once it has a key. */
 const connected = (status: CloudStatus): CloudService[] => [...(status.vercel?.team ? (["vercel"] as const) : []), ...(status.agent37 ? (["agent37"] as const) : [])];
 
-/** Where cloud threads run and how their agents sign in. Tokens go to the core and stay in protected storage. */
+/** Both services, a connected one first, and the choice between them once both are. */
+function ServiceStep({ status }: { status: CloudStatus }) {
+  const vercel = <VercelSettings key="vercel" status={status} />;
+  const agent37 = <Agent37Settings key="agent37" status={status} />;
+  return (
+    <>
+      {status.agent37 && !status.vercel ? [agent37, vercel] : [vercel, agent37]}
+      <CloudServiceChoice status={status} />
+    </>
+  );
+}
+
+/** The one step that brings every missing sign-in, above the agents' own rows, while any is missing. */
+function SignInsStep({ status, signIns, active }: { status: CloudStatus; signIns: CloudSignIns | undefined; active: boolean }) {
+  return (
+    <>
+      {signIns && (signIns.bringing || missingRows(signIns).length) ? (
+        <div className="settings-group cloud-step-lead">
+          <BringMissing signIns={signIns} />
+        </div>
+      ) : null}
+      <ClaudeCloudAccounts status={status} active={active} />
+      <CodexCloudSection codex={status.codex} />
+      <OpenCodeCloudSection opencode={status.opencode} />
+    </>
+  );
+}
+
+/** The step a person opened or closed; the others follow `nextStep`, and one worked in stays open. */
+function useOpenSteps(next: CloudStepId | null) {
+  const [chosen, setChosen] = useState<Partial<Record<CloudStepId, boolean>>>({});
+  const open = (id: CloudStepId) => chosen[id] ?? id === next;
+  return {
+    open,
+    toggle: (id: CloudStepId) => setChosen((was) => ({ ...was, [id]: !open(id) })),
+    work: (id: CloudStepId) => setChosen((was) => (was[id] === undefined ? { ...was, [id]: true } : was)),
+  };
+}
+
+/**
+ * Where cloud threads run and how their agents sign in, as the steps to get there: connect a service, sign the agents
+ * in, check a cloud thread runs, then the optional cloud brain. Tokens go to the core and stay in protected storage.
+ */
 export function CloudSettings({ active }: { active: boolean }) {
   const status = useRpc("cloud.status", {}, { enabled: active });
+  const signIns = useRpc("cloud.signIns", {}, { enabled: active });
+  const offer = useRpc("cloud.offer", {}, { enabled: active });
+  const service = status.data ? serviceOf(status.data) : null;
+  const brain = useRpc("cloud.brain.status", {}, { enabled: active && service !== null });
+  const steps = status.data ? cloudSteps({ status: status.data, place: offer.data?.provider ?? null, signIns: signIns.data, brain: brain.data }) : null;
+  const next = steps ? nextStep(steps) : null;
+  const { open, toggle, work } = useOpenSteps(next);
   if (status.isError) return <LoadError retry={() => void status.refetch()} />;
-  if (!status.data) return null;
+  if (!status.data || !steps) return null;
+  const step = (id: CloudStepId, body: ReactNode) => (
+    <CloudStep key={id} id={id} view={steps[id]} next={id === next} open={open(id)} onToggle={() => toggle(id)} onWork={() => work(id)}>
+      {body}
+    </CloudStep>
+  );
   return (
     <>
       {status.data.error ? (
@@ -248,17 +303,19 @@ export function CloudSettings({ active }: { active: boolean }) {
           {status.data.error}
         </p>
       ) : null}
-      <CloudSignInsSection active={active} />
-      <VercelSettings status={status.data} />
-      <Agent37Settings status={status.data} />
-      <CloudServiceChoice status={status.data} />
-      <ClaudeCloudAccounts status={status.data} active={active} />
-      <CodexCloudSection codex={status.data.codex} />
-      <OpenCodeCloudSection opencode={status.data.opencode} />
-      {status.data.service ? <CloudBrainSection active={active} service={status.data.service} services={connected(status.data)} /> : null}
-      <TakeoverSection enabled={status.data.takeover} />
-      <CloudSandboxesSection active={active} />
-      <CloudCheckSection status={status.data} />
+      <div className="cloud-steps">
+        {step("service", <ServiceStep status={status.data} />)}
+        {step("signins", <SignInsStep status={status.data} signIns={signIns.data} active={active} />)}
+        {step("check", <CloudCheckCard check={status.data.check} place={offer.data?.provider ?? null} />)}
+        {step("brain", service ? <CloudBrain active={active} service={service} services={connected(status.data)} /> : null)}
+      </div>
+      <Failure error={signIns.error ?? offer.error} />
+      {service ? (
+        <>
+          <TakeoverSection enabled={status.data.takeover} />
+          <CloudSandboxesSection active={active} />
+        </>
+      ) : null}
     </>
   );
 }

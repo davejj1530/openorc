@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useRef, useState, type ReactNode } from "react";
 import type { RpcParams, RpcResults } from "@openorc/protocol";
 import { Button, Switch } from "../components/ui";
 import { queryClient, useRpc, useRpcMutation } from "../lib/client";
@@ -52,12 +52,16 @@ export function SaveStatus({ status, retry }: { status: string; retry: () => voi
   );
 }
 
+/** Sections inside a step of a checklist, as on the Cloud page, sit a heading level below the step. */
+export const SectionLevel = createContext<2 | 3>(2);
+
 /** A titled section. Its rows sit in one card; `flush` sections lay out their own cards. */
 export function Section({ id, title, children, description, flush }: { id?: string; title: string; children: ReactNode; description?: string; flush?: boolean }) {
+  const Heading = useContext(SectionLevel) === 3 ? "h3" : "h2";
   return (
     <section id={id} className="settings-section">
       <header className="settings-section-intro">
-        <h2>{title}</h2>
+        <Heading>{title}</Heading>
         {description && <p>{description}</p>}
       </header>
       <div className={flush ? "settings-section-body" : "settings-section-body settings-group"}>{children}</div>

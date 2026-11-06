@@ -1,19 +1,11 @@
-import { useState, type ReactNode } from "react";
-import { signInKey, type CloudSignIn, type CloudSignIns } from "@openorc/protocol";
+import { useState } from "react";
+import type { CloudSignIn, CloudSignIns } from "@openorc/protocol";
 import { Button, Dialog } from "../components/ui";
-import { queryClient, useRpc, useRpcMutation } from "../lib/client";
+import { queryClient, useRpcMutation } from "../lib/client";
 import { Failure } from "./settings-secret-field";
-import { Section, SettingRow, Status } from "./settings-shared";
+import { SettingRow, Status } from "./settings-shared";
 
 const shown = (signIns: CloudSignIns) => queryClient.setQueryData(["cloud.signIns", {}], signIns);
-
-const WAYS: Record<CloudSignIn["way"], string> = { browser: "In your browser", "private-window": "In a private window", copy: "From this Mac", key: "Needs an API key" };
-const WORKING: Record<CloudSignIn["way"], string> = {
-  browser: "Sign in in your browser.",
-  "private-window": "Sign in in the private window that opened.",
-  copy: "Copying from this Mac",
-  key: "Saving",
-};
 
 /** What a copy takes from this Mac, for the confirm. */
 function copyName(row: CloudSignIn): string {
@@ -31,30 +23,9 @@ export function missingRows(signIns: CloudSignIns | undefined): CloudSignIn[] {
 }
 
 /** A row names its agent where the name alone could be another's: Claude's accounts beside OpenCode's providers. */
-function title(row: CloudSignIn): string {
+export function signInTitle(row: CloudSignIn): string {
   if (row.kind === "claude") return `Claude · ${row.label}`;
   return row.kind === "opencode" ? `OpenCode · ${row.label}` : row.label;
-}
-
-/** Why it failed, how it gets ready, or what it waits for while it does; nothing once it is ready. */
-function hint(row: CloudSignIn): ReactNode {
-  if (row.state === "ready") return null;
-  if (row.state === "failed" && row.error)
-    return (
-      <span role="alert" className="text-bad">
-        {row.error}
-      </span>
-    );
-  return row.state === "working" ? WORKING[row.way] : WAYS[row.way];
-}
-
-function Row({ row }: { row: CloudSignIn }) {
-  return (
-    <SettingRow label={title(row)} hint={hint(row)}>
-      {row.state === "ready" ? <Status ok>Ready</Status> : null}
-      {row.state === "working" ? <Status>{row.way === "copy" ? "Copying" : "Waiting for sign-in"}</Status> : null}
-    </SettingRow>
-  );
 }
 
 /**
@@ -103,19 +74,5 @@ export function BringMissing({ signIns, label = "Sign-ins" }: { signIns: CloudSi
         </div>
       </Dialog>
     </>
-  );
-}
-
-/** Every sign-in the cloud can use, each ready or how it gets ready, and the one step that brings the missing ones. */
-export function CloudSignInsSection({ active }: { active: boolean }) {
-  const signIns = useRpc("cloud.signIns", {}, { enabled: active });
-  if (!signIns.data?.rows.length) return <Failure error={signIns.error} />;
-  return (
-    <Section title="Sign-ins for the cloud">
-      {signIns.data.rows.map((row) => (
-        <Row key={signInKey(row)} row={row} />
-      ))}
-      <BringMissing signIns={signIns.data} />
-    </Section>
   );
 }

@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { QueryClientProvider } from "@tanstack/react-query";
 import type { CloudBrainCost, CloudBrainStatus, CloudService, CloudSignIns, RemoteDevice } from "@openorc/protocol";
 import { afterEach, expect, it, vi } from "vitest";
-import { CloudBrainSection } from "./settings-cloud-brain";
+import { CloudBrain } from "./settings-cloud-brain";
 import { queryClient } from "../lib/client";
 import { core } from "../lib/rpc";
 
@@ -55,7 +55,7 @@ function show(
   });
   render(
     <QueryClientProvider client={queryClient}>
-      <CloudBrainSection active service={service} services={services} />
+      <CloudBrain active service={service} services={services} />
     </QueryClientProvider>,
   );
 }
@@ -115,13 +115,12 @@ it("shows a set-up brain asleep with the Claude accounts it was sent, and wakes 
 
 it("says quietly what the brain and its thread sandboxes cost this month, once Vercel said", async () => {
   show(ready, "Asia/Manila", { usd: 3.456, since: 1 });
-  expect(await screen.findByText("$3.46")).toBeTruthy();
-  expect(screen.getByText("This month")).toBeTruthy();
+  expect(await screen.findByText("$3.46 this month")).toBeTruthy();
   cleanup();
   queryClient.clear();
   show(ready);
   expect(await screen.findByText("Asleep")).toBeTruthy();
-  expect(screen.queryByText("This month")).toBeNull();
+  expect(screen.queryByText(/this month/)).toBeNull();
 });
 
 it("pairs a phone with the brain's own code", async () => {
@@ -263,18 +262,16 @@ it("sets up again in the region it was made in after setup stopped", async () =>
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.create", { region: "fra1" }));
 });
 
-it("sets up on Agent37 without a region, and names its place, cost and removal for Agent37", async () => {
+it("sets up on Agent37 without a region, and names its cost and removal for Agent37", async () => {
   show({ state: "none", error: null }, "Asia/Manila", null, [], null, "agent37");
   fireEvent.click(await screen.findByRole("button", { name: "Set up" }));
-  expect(screen.getByText("A copy of OpenOrc in your Agent37 account, for your phone while this Mac sleeps.")).toBeTruthy();
   expect(screen.queryByRole("combobox", { name: "Region" })).toBeNull();
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.create", {}));
   cleanup();
   queryClient.clear();
   show({ ...ready, service: "agent37", region: null, threads: 2 }, "Asia/Manila", { usd: 0.42, since: 1 }, [], null, "vercel");
-  expect(await screen.findByText("Runs on Agent37")).toBeTruthy();
-  expect(await screen.findByText("$0.42")).toBeTruthy();
-  expect(screen.getByText("A copy of OpenOrc in your Agent37 account, for your phone while this Mac sleeps.")).toBeTruthy();
+  expect(await screen.findByText("Agent37")).toBeTruthy();
+  expect(await screen.findByText("$0.42 this month")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Remove" }));
   expect((await screen.findByRole("dialog", { name: "Remove the cloud brain?" })).textContent).toContain(
     "This deletes it from your Agent37 account, with its disk, the instances it made and the 2 conversations on it.",
@@ -302,7 +299,6 @@ it("asks where it runs once both services are connected, starting on the one new
   expect(within(choice).getByRole("radio", { name: "Vercel" }).getAttribute("aria-checked")).toBe("true");
   fireEvent.click(within(choice).getByRole("radio", { name: "Agent37" }));
   expect(screen.queryByRole("combobox", { name: "Region" })).toBeNull();
-  expect(screen.getByText("A copy of OpenOrc in your Agent37 account, for your phone while this Mac sleeps.")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Set up" }));
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.create", { service: "agent37" }));
   fireEvent.click(within(choice).getByRole("radio", { name: "Vercel" }));
@@ -318,7 +314,7 @@ it("shows no choice of service with one connected", async () => {
 
 it("names where a ready brain runs, and offers to move it only once the other service is connected", async () => {
   show(ready);
-  expect(await screen.findByText("Runs on Vercel · Singapore")).toBeTruthy();
+  expect(await screen.findByText("Vercel · Singapore")).toBeTruthy();
   expect(screen.queryByRole("button", { name: /^Move to/ })).toBeNull();
   cleanup();
   queryClient.clear();
@@ -416,4 +412,12 @@ it("asks to pair the phone again after a move, with the one pair action", async 
   expect(screen.getAllByRole("button", { name: "Pair phone" })).toHaveLength(1);
   fireEvent.click(within(row).getByRole("button", { name: "Pair phone" }));
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.pair", {}));
+});
+
+it("puts the last failure under the brain's own row, with a way to try again", async () => {
+  show({ ...ready, machine: "awake", error: "Could not reach OpenOrc's server in the cloud instance." });
+  const failure = await screen.findByText("Could not reach OpenOrc's server in the cloud instance.");
+  expect(failure.getAttribute("role")).toBe("alert");
+  fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.wake", {}));
 });

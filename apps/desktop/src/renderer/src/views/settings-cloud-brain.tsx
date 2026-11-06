@@ -1,4 +1,4 @@
-import { useState, type ComponentProps } from "react";
+import { useState } from "react";
 import { brainRegionFor, type BrainRegion, type CloudBrainDoor, type CloudBrainMachine, type CloudBrainPlace, type CloudBrainStatus, type CloudBrainStep, type CloudService } from "@openorc/protocol";
 import { Button, Dialog, Segmented, TextButton, Tooltip } from "../components/ui";
 import { StepMark } from "../components/WorkSteps";
@@ -8,7 +8,6 @@ import { CloudBrainPhones } from "./settings-cloud-brain-phones";
 import { CloudBrainProjects } from "./settings-cloud-brain-projects";
 import { CloudBrainSignIns } from "./settings-cloud-brain-signins";
 import { BringMissing } from "./settings-cloud-sign-ins";
-import { PairingCode, pairingSheet, useTicker } from "./settings-phone";
 import { RegionSelect, SERVICE_NAMES, placeWords } from "./settings-cloud-place";
 import { Failure, StillWorks } from "./settings-secret-field";
 import { Section, SettingRow, Status } from "./settings-shared";
@@ -183,102 +182,85 @@ function RemoveBrain({ disabled, service, threads = 0 }: { disabled: boolean; se
   );
 }
 
-/** The pairing code the brain makes, in the sheet the Phone page shows its own in. */
-function PairBrainPhone({ disabled }: { disabled: boolean }) {
-  const pair = useRpcMutation("cloud.brain.pair");
-  const [open, setOpen] = useState(false);
-  const sheet = pairingSheet({ offer: pair.data, error: pair.error, seen: false, listed: false, now: Date.now() });
-  useTicker(open && sheet.kind === "live");
-  const start = () => {
-    setOpen(true);
-    pair.mutate({});
-  };
-  return (
-    <>
-      <Button disabled={disabled} onClick={start}>
-        Pair phone
-      </Button>
-      <Dialog open={open} onOpenChange={setOpen} title="Pair a phone" width={360}>
-        <PairingCode sheet={sheet} retry={start} />
-      </Dialog>
-    </>
-  );
-}
-
 /** What the brain and its thread machines ran this month, quietly; how it is counted on demand. Never wakes the brain. */
 function BrainCost({ active, service }: { active: boolean; service: CloudService }) {
   const cost = useRpc("cloud.brain.cost", {}, { enabled: active, staleTime: 5 * 60_000 }).data;
   if (!cost) return null;
   return (
-    <SettingRow label="This month">
-      <Tooltip label={SERVICES[service].cost}>
-        <span className="text-ink-3">{cost.usd < 0.01 ? "Less than $0.01" : `$${cost.usd.toFixed(2)}`}</span>
-      </Tooltip>
-    </SettingRow>
+    <Tooltip label={SERVICES[service].cost}>
+      <span>{cost.usd < 0.01 ? "Less than $0.01 this month" : `$${cost.usd.toFixed(2)} this month`}</span>
+    </Tooltip>
   );
 }
 
-/** Pairing, unless a row of its own asks to pair again after a move; moving, once the other service is connected; removing. */
-function BrainActions({
-  brain,
-  busy,
-  to,
-  move,
-}: {
-  brain: Extract<CloudBrainStatus, { state: "ready" }>;
-  busy: boolean;
-  to: CloudService | undefined;
-  move: ComponentProps<typeof MoveBrain>["move"];
-}) {
-  return (
-    <>
-      {brain.pairAgain ? null : <PairBrainPhone disabled={busy} />}
-      {to ? <MoveBrain to={to} disabled={busy} move={move} /> : null}
-      <RemoveBrain disabled={busy} service={brain.service} threads={brain.threads} />
-    </>
-  );
-}
-
-function Ready({ brain, active, services }: { brain: Extract<CloudBrainStatus, { state: "ready" }>; active: boolean; services: CloudService[] }) {
+/** Its place and state first, with what it cost and what can be done to it, and why the last thing done to it failed. */
+function BrainCard({ brain, active, services, busy, waking }: { brain: Ready; active: boolean; services: CloudService[]; busy: boolean; waking: boolean }) {
   const wake = useRpcMutation("cloud.brain.wake");
-  const handover = useRpcMutation("cloud.brain.handover");
   const move = useRpcMutation("cloud.brain.move");
-  const busy = brain.working !== null || wake.isPending || handover.isPending || move.isPending;
-  const machine = machineStatus(brain, brain.working === "waking" || wake.isPending);
+  const machine = machineStatus(brain, waking || wake.isPending);
+  const working = busy || wake.isPending || move.isPending;
   // A move goes to the other service, once it is connected.
   const to = services.find((service) => service !== brain.service);
   return (
-    <>
-      <SettingRow label={`Runs on ${placeWords(brain)}`}>
+    <div className="settings-group cloud-step-lead">
+      <SettingRow label={placeWords(brain)} hint={<BrainCost active={active} service={brain.service} />}>
         {machine ? <Status ok={machine.ok}>{machine.label}</Status> : null}
-        {brain.machine === "asleep" && !busy ? (
+        {brain.machine === "asleep" && !working ? (
           <TextButton tone="muted" onClick={() => wake.mutate({})}>
             Wake
           </TextButton>
         ) : null}
-        <BrainActions brain={brain} busy={busy} to={to} move={move} />
+        {to ? <MoveBrain to={to} disabled={working} move={move} /> : null}
+        <RemoveBrain disabled={working} service={brain.service} threads={brain.threads} />
       </SettingRow>
+      {brain.error ? (
+        <div className="settings-field">
+          <p role="alert" className="text-bad min-w-0 flex-1">
+            {brain.error}
+          </p>
+          {working ? null : (
+            <TextButton tone="muted" onClick={() => wake.mutate({})}>
+              Try again
+            </TextButton>
+          )}
+        </div>
+      ) : null}
       <Failure error={move.error} />
       <MoveNote note={brain.note} />
-      {brain.pairAgain ? (
-        <SettingRow label="Pair your phone again" hint="Phones paired before the move can't reach it.">
-          <PairBrainPhone disabled={busy} />
-        </SettingRow>
-      ) : null}
-      <CloudBrainPhones active={active} busy={busy} />
+      <Door door={brain.door} />
+    </div>
+  );
+}
+
+type Ready = Extract<CloudBrainStatus, { state: "ready" }>;
+
+/** What the brain signs in with: the Claude accounts handed to it, Codex, GitHub and the keys it keeps a copy of. */
+function BrainSignIns({ brain, active, busy }: { brain: Ready; active: boolean; busy: boolean }) {
+  const handover = useRpcMutation("cloud.brain.handover");
+  return (
+    <Section title="Sign-ins">
       <SettingRow label="Claude accounts" hint={brain.claude.length ? brain.claude.join(", ") : "None"}>
         {brain.working === "sending" || handover.isPending ? <Status>Sending</Status> : null}
-        {brain.behind && !busy ? (
+        {brain.behind && !busy && !handover.isPending ? (
           <TextButton tone="muted" onClick={() => handover.mutate({})}>
             Send
           </TextButton>
         ) : null}
       </SettingRow>
       <CloudBrainSignIns active={active} busy={busy} />
-      <Door door={brain.door} />
+    </Section>
+  );
+}
+
+/** A brain set up: its own card, then the phones that reach it, what it signs in with, and the projects it works in. */
+function ReadyBrain({ brain, active, services }: { brain: Ready; active: boolean; services: CloudService[] }) {
+  const busy = brain.working !== null;
+  return (
+    <>
+      <BrainCard brain={brain} active={active} services={services} busy={busy} waking={brain.working === "waking"} />
+      <CloudBrainPhones active={active} busy={busy} again={Boolean(brain.pairAgain)} />
+      <BrainSignIns brain={brain} active={active} busy={busy} />
       <CloudBrainProjects active={active} />
-      <BrainCost active={active} service={brain.service} />
-      <Alert error={brain.error} />
     </>
   );
 }
@@ -290,7 +272,8 @@ interface Place {
   choose: (service: CloudService) => void;
 }
 
-function BrainState({ brain, active, place }: { brain: CloudBrainStatus; active: boolean; place: Place }) {
+/** Every state but a brain set up, which has cards of its own. */
+function BrainState({ brain, place }: { brain: Exclude<CloudBrainStatus, Ready>; place: Place }) {
   const create = useRpcMutation("cloud.brain.create");
   switch (brain.state) {
     case "unavailable":
@@ -327,8 +310,6 @@ function BrainState({ brain, active, place }: { brain: CloudBrainStatus; active:
           <Failure error={create.error} />
         </>
       );
-    case "ready":
-      return <Ready brain={brain} active={active} services={place.services} />;
     case "moving":
       return <MovingBrain brain={brain} />;
     case "removing":
@@ -345,16 +326,16 @@ function BrainState({ brain, active, place }: { brain: CloudBrainStatus; active:
  * projects, paired with a phone, moved between the two. `service` is where new cloud threads run, and so where a brain
  * set up now goes unless another of the connected `services` is chosen.
  */
-export function CloudBrainSection({ active, service, services = [service] }: { active: boolean; service: CloudService; services?: CloudService[] }) {
+export function CloudBrain({ active, service, services = [service] }: { active: boolean; service: CloudService; services?: CloudService[] }) {
   const status = useRpc("cloud.brain.status", {}, { enabled: active, refetchInterval: active ? REFRESH_MS : false });
   const [chosen, choose] = useState<CloudService | null>(null);
   const brain = status.data;
   const place = { service: chosen && services.includes(chosen) ? chosen : service, services, choose };
-  const where = brain && "service" in brain ? brain.service : place.service;
+  if (brain?.state === "ready") return <ReadyBrain brain={brain} active={active} services={services} />;
   return (
-    <Section title="Cloud brain" description={`A copy of OpenOrc in ${SERVICES[where].account}, for your phone while this Mac sleeps.`}>
-      {brain ? <BrainState brain={brain} active={active} place={place} /> : null}
+    <div className="settings-group">
+      {brain ? <BrainState brain={brain} place={place} /> : null}
       <Failure error={status.error} />
-    </Section>
+    </div>
   );
 }

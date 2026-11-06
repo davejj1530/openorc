@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { QueryClientProvider } from "@tanstack/react-query";
 import type { CloudBrainProject, CloudBrainStatus } from "@openorc/protocol";
 import { afterEach, expect, it, vi } from "vitest";
-import { CloudBrainSection } from "./settings-cloud-brain";
+import { CloudBrain } from "./settings-cloud-brain";
 import { queryClient } from "../lib/client";
 import { core } from "../lib/rpc";
 
@@ -41,32 +41,44 @@ function show(projects: CloudBrainProject[], status: CloudBrainStatus = ready) {
   });
   render(
     <QueryClientProvider client={queryClient}>
-      <CloudBrainSection active service="vercel" />
+      <CloudBrain active service="vercel" />
     </QueryClientProvider>,
   );
 }
 
 const toggle = (name: string) => screen.getByRole("switch", { name }) as HTMLInputElement;
 const reason = (name: string) => toggle(name).closest("[data-tooltip]")?.getAttribute("data-tooltip") ?? null;
+const picker = () => screen.getByRole("combobox", { name: "Project" }) as HTMLSelectElement;
 
-it("lists this Mac's projects under the brain with a switch each, and sends one switched on", async () => {
-  show([project("p1", "app"), project("p2", "site", { on: true })]);
+it("lists the projects the brain has with a switch each, and adds another from one picker", async () => {
+  show([project("p1", "app"), project("p2", "site", { on: true }), project("p3", "docs")]);
   await screen.findByText("Projects");
-  expect([toggle("app").checked, toggle("site").checked]).toEqual([false, true]);
-  expect([toggle("app").disabled, reason("app")]).toEqual([false, null]);
-  fireEvent.click(toggle("app"));
-  await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.project", { projectId: "p1", on: true }));
-  await waitFor(() => expect(toggle("app").checked).toBe(true));
+  expect(toggle("site").checked).toBe(true);
+  expect(screen.queryByRole("switch", { name: "app" })).toBeNull();
+  expect([...picker().options].map((option) => option.textContent)).toEqual(["app", "docs"]);
+  fireEvent.change(picker(), { target: { value: "p3" } });
+  fireEvent.click(screen.getByRole("button", { name: "Add" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.project", { projectId: "p3", on: true }));
+  await waitFor(() => expect(toggle("docs").checked).toBe(true));
+  fireEvent.click(toggle("site"));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.project", { projectId: "p2", on: false }));
 });
 
-it("disables a switch it cannot move, with the reason only on hover", async () => {
+it("offers one it cannot move only as a disabled choice that names why, and keeps a blocked switch as it is", async () => {
   show([project("p1", "notes", { blocked: "Not a Git repository." }), project("p2", "app", { on: true, blocked: "It has threads on the cloud brain." })]);
   await screen.findByText("Projects");
-  expect([toggle("notes").checked, toggle("notes").disabled, reason("notes")]).toEqual([false, true, "Not a Git repository."]);
+  const notes = [...picker().options].find((option) => option.value === "p1")!;
+  expect([notes.disabled, notes.textContent]).toEqual([true, "notes · Not a Git repository."]);
+  expect((screen.getByRole("button", { name: "Add" }) as HTMLButtonElement).disabled).toBe(true);
   expect([toggle("app").checked, toggle("app").disabled, reason("app")]).toEqual([true, true, "It has threads on the cloud brain."]);
-  expect(screen.queryByText("Not a Git repository.")).toBeNull();
   fireEvent.click(toggle("app"));
   expect(core.call).not.toHaveBeenCalledWith("cloud.brain.project", expect.anything());
+});
+
+it("asks for the first project with what it is for", async () => {
+  show([project("p1", "app"), project("p2", "site")]);
+  expect(await screen.findByText("Add a project")).toBeTruthy();
+  expect(screen.getByText("Threads you start from your phone work in its copy.")).toBeTruthy();
 });
 
 it("says quietly when a project is on its way, when the brain kept its own commits, and why a send failed", async () => {

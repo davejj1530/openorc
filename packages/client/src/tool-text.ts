@@ -149,10 +149,14 @@ export function fileList(text: string): string[] | null {
   return lines.length && paths.length / lines.length >= 0.8 ? paths : null;
 }
 
-/** The pass and fail counts a test runner prints at the end: vitest, jest, pytest or cargo. */
+const SUMMARIES = [/^\s*Tests\s+(.+?)\s*\(\d+\)\s*$/gm, /^Tests:\s+(.+)$/gm, /^=+\s*(.+?) in [\d.]+s\s*=+\s*$/gm, /^test result: \w+\. (.+)$/gm];
+
+/**
+ * The pass and fail counts a test runner prints at the end: vitest, jest, pytest or cargo. A command that ran the
+ * tests twice printed two summaries; the last is the newest, as the work view reads it.
+ */
 export function testTally(text: string): TestTally | null {
-  const summary =
-    /^\s*Tests\s+(.+?)\s*\(\d+\)\s*$/m.exec(text)?.[1] ?? /^Tests:\s+(.+)$/m.exec(text)?.[1] ?? /^=+\s*(.+?) in [\d.]+s\s*=+\s*$/m.exec(text)?.[1] ?? /^test result: \w+\. (.+)$/m.exec(text)?.[1];
+  const summary = SUMMARIES.map((pattern) => [...text.matchAll(pattern)].at(-1)?.[1]).find((found) => found !== undefined);
   if (!summary) return null;
   const count = (pattern: RegExp) => Number(pattern.exec(summary)?.[1] ?? 0);
   return { passed: count(/(\d+) passed/), failed: count(/(\d+) failed/), skipped: count(/(\d+) (?:skipped|ignored|todo)/) };

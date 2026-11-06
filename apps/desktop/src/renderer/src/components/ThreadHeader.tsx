@@ -6,7 +6,7 @@ import { CoversPreview } from "../lib/browser-preview";
 import { openThread, useRouter } from "../lib/router";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { ThreadOrcling } from "./OrclingAvatar";
-import { SubagentParent } from "./SubagentConversation";
+import { ThreadParent } from "./SubagentConversation";
 import { ThreadMenuItems } from "./ThreadActions";
 import { ThreadClaudeAccount } from "./ThreadClaudeAccount";
 import { ThreadTitle } from "./ThreadTitle";
@@ -99,7 +99,7 @@ export function ThreadHeader({
         </>
       }
     >
-      {isSubagentThread(t) ? <SubagentParent id={t.parentThreadId} /> : <ForkParent parent={t.forkedFromId} />}
+      {t.parentThreadId ? <ThreadParent id={t.parentThreadId} /> : <ForkParent parent={t.forkedFromId} />}
       <ThreadOrcling threadId={t.id} orclingId={t.orclingId} />
       {isSubagentThread(t) ? <span className="truncate text-sm">{t.title}</span> : <ThreadTitle title={t.title} editing={renaming} onEditingChange={onRenamingChange} onSave={onRename} />}
       <span className="thread-header-facts">

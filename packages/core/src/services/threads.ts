@@ -184,7 +184,7 @@ export class ThreadService {
             metadata: { projectId: project.id, agent: input.agent, workspaceMode: admitted.workspaceMode },
           });
           if (project.id === WORKSPACE_ID) admitted.workingDirectory = threads.update(this.db, admitted.id, { workingDirectory: project.rootPath }).workingDirectory;
-          const adopted = input.checkout ? threads.update(this.db, admitted.id, { worktreePath: input.checkout.path, baseSha: input.checkout.baseSha }) : admitted;
+          const adopted = input.checkout ? threads.update(this.db, admitted.id, { worktreePath: input.checkout.path, baseSha: input.checkout.baseSha, branch: input.checkout.branch }) : admitted;
           internal?.onAdmitted(adopted);
           return adopted;
         });
@@ -814,6 +814,9 @@ export class ThreadService {
   }
   toolUpdate(...args: Parameters<ThreadAgentTools["toolUpdate"]>) {
     return this.agentTools.toolUpdate(...args);
+  }
+  startUnder(...args: Parameters<ThreadAgentTools["startUnder"]>) {
+    return this.agentTools.startUnder(...args);
   }
   toolThreadList(...args: Parameters<ThreadAgentTools["toolThreadList"]>) {
     return this.agentTools.toolThreadList(...args);

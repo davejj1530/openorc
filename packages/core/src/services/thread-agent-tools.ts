@@ -60,11 +60,13 @@ export function pickModel(options: ModelOption[], agent: AgentKind, name: string
 }
 
 /** Where a started thread works: in its parent's worktree, checkout, or Workspace folder. */
+/** Where a thread started under `parent` works: in the parent's folder, joining its worktree when it has one. */
 function childFolder(parent: Thread): Pick<StartThreadInput, "workingDirectory" | "workspaceMode" | "checkout"> {
   if (parent.projectId === WORKSPACE_ID) return parent.workingDirectory ? { workingDirectory: parent.workingDirectory } : {};
   if (!parent.worktreePath) return { workspaceMode: "current" };
   if (!parent.baseSha) throw new Error("This thread's worktree has no recorded starting commit, so a thread can't join it. Start one from OpenOrc instead.");
-  return { checkout: { path: parent.worktreePath, baseSha: parent.baseSha } };
+  // On the parent's branch, it is the parent's work; only a pull request's detached copy stays one for its children.
+  return { checkout: { path: parent.worktreePath, baseSha: parent.baseSha, ...(parent.branch ? { branch: parent.branch } : {}) } };
 }
 
 /** What a started thread reads first, ahead of its work: who started it and how to reach them. */
@@ -344,7 +346,7 @@ export class ThreadAgentTools {
       },
       {
         assertCanAdmit: () => this.assertRoomForChild(parent),
-        onAdmitted: (child) => threads.update(this.db, child.id, { parentThreadId: parent.id }),
+        onAdmitted: (child) => threads.update(this.db, child.id, { parentThreadId: parent.id, startedByAgent: true }),
       },
     );
     audit.record(this.db, { actor: "agent", action: "thread.start", resourceType: "thread", resourceId: thread.id, metadata: { runId, parentThreadId: parent.id, agent: settings.agent } });
@@ -357,13 +359,27 @@ export class ThreadAgentTools {
     };
   }
 
+  /**
+   * A thread a person starts under another, working in its folder. Nothing limits how many or how deep: those limits
+   * keep an agent's thread_start in check.
+   */
+  startUnder(parentId: string, input: Omit<StartThreadInput, "id" | "projectId" | "workingDirectory" | "workspaceMode" | "baseRef" | "checkout" | "cloud">) {
+    const parent = threads.get(this.db, parentId);
+    if (!parent || retiredTeams.isHidden(this.db, parent.id)) throw new Error("Thread not found.");
+    this.runs.subagents.assertExecutable({ threadId: parent.id });
+    return this.context.start(
+      { ...input, projectId: parent.projectId, ...childFolder(parent) },
+      { assertCanAdmit: () => undefined, onAdmitted: (child) => threads.update(this.db, child.id, { parentThreadId: parent.id }) },
+    );
+  }
+
   /** The thread a run starts a thread from, when it may. */
   private startingParent(runId: string): { parent: Thread; run: Run } {
     const { thread, task } = this.scopeOf(runId);
     const run = runRepo.get(this.db, runId);
     if (!thread || task || !run) throw new Error("Only a thread can start threads.");
     if (run.mode !== "act") throw new Error("Plan mode can't start threads. Switch this thread to Act first.");
-    if (thread.parentThreadId) {
+    if (thread.startedByAgent && thread.parentThreadId) {
       const title = threads.get(this.db, thread.parentThreadId)?.title ?? "the thread that started this one";
       throw new Error(`A thread started by another thread can't start its own. Ask "${title}" with thread_send.`);
     }
@@ -392,7 +408,7 @@ export class ThreadAgentTools {
   }
 
   private assertRoomForChild(parent: Thread): void {
-    const working = threads.children(this.db, parent.id).filter((child) => child.parentRelation === "started" && this.runs.threadActivity(child.id) !== "idle");
+    const working = threads.children(this.db, parent.id).filter((child) => child.startedByAgent && this.runs.threadActivity(child.id) !== "idle");
     if (working.length < MAX_WORKING_CHILDREN) return;
     const names = working.map((child) => `"${child.title}"`).join(", ");
     throw new Error(`${working.length} threads this thread started are still working (${names}). Wait for one to finish, or give it more work with thread_send.`);

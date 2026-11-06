@@ -228,6 +228,7 @@ interface ThreadRow {
   orcling_id?: string | null;
   parent_thread_id?: string | null;
   parent_relation?: Thread["parentRelation"];
+  started_by_agent?: number;
   created_at: number;
   updated_at: number;
   last_activity_at: number;
@@ -265,6 +266,7 @@ function threadFromRow(r: ThreadRow): Thread {
     orclingId: r.orcling_id ?? null,
     parentThreadId: r.parent_thread_id ?? null,
     parentRelation: r.parent_relation ?? null,
+    startedByAgent: Boolean(r.started_by_agent),
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     lastActivityAt: r.last_activity_at,
@@ -298,6 +300,7 @@ export interface ThreadPatch {
   orclingId?: string | null;
   parentThreadId?: string | null;
   parentRelation?: Thread["parentRelation"];
+  startedByAgent?: boolean;
 }
 
 const threadColumns: Record<keyof ThreadPatch, string> = {
@@ -326,6 +329,7 @@ const threadColumns: Record<keyof ThreadPatch, string> = {
   orclingId: "orcling_id",
   parentThreadId: "parent_thread_id",
   parentRelation: "parent_relation",
+  startedByAgent: "started_by_agent",
 };
 
 export type ThreadListFilter = "active" | "done" | "archived" | "all";
@@ -470,7 +474,7 @@ export const threads = {
   withOpenPr(db: Db): Thread[] {
     return (db.stmt(`SELECT * FROM threads WHERE ${VISIBLE} AND pr_url IS NOT NULL AND (pr_state IS NULL OR pr_state = 'open')`).all() as unknown as ThreadRow[]).map(threadFromRow);
   },
-  /** The unarchived threads `parentId` started with thread_start. */
+  /** The unarchived threads under `parentId`. */
   children(db: Db, parentId: string): Thread[] {
     return (db.stmt(`SELECT * FROM threads WHERE ${VISIBLE} AND parent_thread_id = ? AND archived_at IS NULL`).all(parentId) as unknown as ThreadRow[]).map(threadFromRow);
   },

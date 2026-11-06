@@ -139,9 +139,11 @@ export const Thread = z.object({
   importedFrom: z.string().nullable(),
   /** The Orcling who works in this conversation: its own, or one chosen to work here. */
   orclingId: z.string().nullable().optional(),
-  /** The thread that started this one with thread_start, working in the same folder. */
+  /** The thread this one sits under: a thread started in its folder, by a person or with thread_start, or a subagent of its agent. */
   parentThreadId: z.string().nullable().optional(),
   parentRelation: z.enum(["started", "subagent"]).nullable().optional(),
+  /** Started with thread_start, so it can't start threads of its own and counts toward its parent's limit. */
+  startedByAgent: z.boolean().optional(),
   createdAt: z.number(),
   updatedAt: z.number(),
   lastActivityAt: z.number(),

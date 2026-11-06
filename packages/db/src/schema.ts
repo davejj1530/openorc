@@ -2,7 +2,7 @@ import { claudeAccountMigration } from "./claude-account-schema.js";
 import { taskCommentsMigration } from "./task-comments-schema.js";
 import type { DatabaseSync } from "node:sqlite";
 import { teamTaskMigration } from "./team-task-schema.js";
-import { scheduleMigration, teamNotificationMigration } from "./schedule-schema.js";
+import { retireTeamSchedulesMigration, scheduleMigration, teamNotificationMigration } from "./schedule-schema.js";
 import { teamOriginMigration } from "./team-origin-schema.js";
 import { teamForkMigration } from "./team-fork-schema.js";
 import { teamRestoreMigration } from "./team-restore-schema.js";
@@ -24,7 +24,7 @@ import { orclingAccountMigration, orclingMigration } from "./orcling-schema.js";
 import { remoteDeviceMigration } from "./remote-device-schema.js";
 import { remotePushTargetMigration } from "./remote-push-target-schema.js";
 import { cloudWorkspaceMigration, cloudWorkspaceRemovedMigration } from "./cloud-workspace-schema.js";
-import { subagentMigration, subagentIdentityMigration, subagentObservationMigration } from "./subagent-schema.js";
+import { startedByAgentMigration, subagentMigration, subagentIdentityMigration, subagentObservationMigration } from "./subagent-schema.js";
 import { cloudBrainMigrations } from "./cloud-brain-schema.js";
 /**
  * Migrations run in order; `PRAGMA user_version` records how many applied.
@@ -791,10 +791,7 @@ export const migrations: Migration[] = [
   subagentMigration,
   subagentIdentityMigration,
   subagentObservationMigration,
-  /** Retire automatic team execution without changing its saved configuration or workspaces. */
-  `UPDATE schedules SET enabled=0, version=version+1
-     WHERE json_valid(execution_target) AND json_extract(execution_target, '$.kind')='team';
-   UPDATE schedule_firings SET state='cancelled', reason='Teams are no longer supported.', finished_at=CAST(strftime('%s','now') AS INTEGER)*1000
-     WHERE state='pending' AND json_valid(snapshot) AND json_extract(snapshot, '$.executionTarget.kind')='team';`,
+  retireTeamSchedulesMigration,
   ...cloudBrainMigrations,
+  startedByAgentMigration,
 ];

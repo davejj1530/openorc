@@ -7,11 +7,11 @@ import { CoversPreview } from "../lib/browser-preview";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { cloudOffered } from "../lib/cloud-offered";
 import { orclingHome, useOrclings } from "../lib/orclings";
-import { MAX_THREAD_PANES, openThread, useRouter } from "../lib/router";
+import { MAX_THREAD_PANES, newSubthread, openThread, useRouter } from "../lib/router";
 import { useThreadMutationPending } from "../lib/thread-mutations";
 import { useUi } from "../lib/ui";
 import { floatingGround } from "../lib/use-anchor-ground";
-import { AlarmClock, AppWindow, ChevronRight, CircleCheck, Cloud, Columns2, Folder, GitBranch, GitFork, Laptop, MailOpen, Pencil, Pin, PinOff, RotateCcw, Trash2 } from "./icons";
+import { AlarmClock, AppWindow, ChevronRight, CircleCheck, Cloud, Columns2, Folder, GitBranch, GitFork, Laptop, MailOpen, PenSquare, Pencil, Pin, PinOff, RotateCcw, Trash2 } from "./icons";
 import { menuItem, menuItemDanger, menuPopup, menuSeparator } from "./menu";
 import { Button, Dialog } from "./ui";
 
@@ -30,11 +30,7 @@ export function ThreadMenuItems({ thread, parts: M }: { thread: ThreadSummary; p
         <M.Item className={menuItem} onClick={() => window.openorc.openWindow(`thread:${thread.id}`)}>
           <AppWindow size={13} /> Open in new window
         </M.Item>
-        {thread.parentThreadId ? (
-          <M.Item className={menuItem} onClick={() => openThread(thread.parentThreadId!)}>
-            Open parent
-          </M.Item>
-        ) : null}
+        <OpenParentItem thread={thread} parts={M} />
         {thread.subagent?.status !== "running" && thread.activity === "idle" ? (
           <M.Item className={menuItemDanger} onClick={() => useUi.getState().setDeleteThread(thread.id)}>
             <Trash2 size={13} /> Delete thread
@@ -51,6 +47,15 @@ export function ThreadMenuItems({ thread, parts: M }: { thread: ThreadSummary; p
     );
   }
   return <ThreadMenuContent key={thread.id} thread={thread} parts={M} />;
+}
+
+function OpenParentItem({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
+  const parent = thread.parentThreadId;
+  return parent ? (
+    <M.Item className={menuItem} onClick={() => openThread(parent)}>
+      Open parent
+    </M.Item>
+  ) : null;
 }
 
 function ThreadMenuContent({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
@@ -77,6 +82,7 @@ function ThreadMenuContent({ thread, parts: M }: { thread: ThreadSummary; parts:
       <M.Item className={menuItem} onClick={() => window.openorc.openWindow(`thread:${thread.id}`)}>
         <AppWindow size={13} /> Open in new window
       </M.Item>
+      <OpenParentItem thread={thread} parts={M} />
       <M.Separator className={menuSeparator} />
 
       {actionError ? (
@@ -204,6 +210,9 @@ function ThreadForkActions({ thread, parts: M }: { thread: ThreadSummary; parts:
           {fork.error.message}
         </p>
       ) : null}
+      <M.Item className={menuItem} disabled={Boolean(thread.teamInstanceId) || inCloud} title={inCloud ? "Bring it to this Mac first." : undefined} onClick={() => newSubthread(thread.id)}>
+        <PenSquare size={13} /> New subthread
+      </M.Item>
       <M.Item
         className={menuItem}
         disabled={Boolean(thread.teamInstanceId) || inCloud || mutating || fork.isPending}

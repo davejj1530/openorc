@@ -156,7 +156,7 @@ it("joins the parent's worktree and leaves it standing when the started thread g
   const worktree = threads.get(core.db, home.id)!.worktreePath!;
   expect(worktree).toBeTruthy();
   const started = await startThread(runId, { prompt: "Write the copy" });
-  expect(threads.get(core.db, started.thread.id)).toMatchObject({ workspaceMode: "worktree", worktreePath: worktree });
+  expect(threads.get(core.db, started.thread.id)).toMatchObject({ workspaceMode: "worktree", worktreePath: worktree, branch: threads.get(core.db, home.id)!.branch });
   expect(started.thread.title).toBe("Write the copy");
   expect((await firstSpec(started.thread.id)).cwd).toBe((await firstSpec(home.id)).cwd);
   // Like any shared folder, it can't be cleared away while the parent is mid-turn in it.
@@ -248,4 +248,51 @@ it("lists messageable conversations before applying the agent's 30-thread limit"
   expect((await core.threads.toolThreadList(runId)).map((thread) => thread.id).sort()).toEqual([home.id, started.id].sort());
   expect((await call("threads.list", { projectId: project.id, excludeSubagents: true, limit: 1 })).length).toBe(1);
   expect((await call("threads.list", { projectId: project.id, excludeSubagents: true })).map((thread) => thread.id).sort()).toEqual([home.id, started.id].sort());
+});
+
+/** A thread a person starts under `parentThreadId` from OpenOrc. */
+const subthread = (parentThreadId: string, input: Partial<RpcParams<"threads.start">> = {}) =>
+  call("threads.start", { projectId: project.id, parentThreadId, agent: "codex", model: "fixture-codex", mode: "act", permissionMode: "trusted", prompt: "Look into the flaky test", ...input });
+
+it("starts as many subthreads as a person asks for, in the parent's worktree, without counting them against its agent", async () => {
+  const { thread: home, runId } = await parent({ workspaceMode: "worktree" });
+  const worktree = threads.get(core.db, home.id)!.worktreePath!;
+  const mine = [];
+  for (let index = 0; index <= MAX_WORKING_CHILDREN; index++) mine.push((await subthread(home.id, { prompt: `Part ${index + 1}` })).thread);
+  for (const each of mine) {
+    expect(threads.get(core.db, each.id)).toMatchObject({
+      parentThreadId: home.id,
+      parentRelation: "started",
+      startedByAgent: false,
+      workspaceMode: "worktree",
+      worktreePath: worktree,
+      branch: threads.get(core.db, home.id)!.branch,
+    });
+    expect(core.runs.threadActivity(each.id)).not.toBe("idle");
+  }
+  const spec = await firstSpec(mine[0]!.id);
+  expect(spec.cwd).toBe((await firstSpec(home.id)).cwd);
+  expect(spec.prompt).not.toContain("started this thread");
+  const helper = await startThread(runId, { prompt: "Agent helper" });
+  expect(threads.get(core.db, helper.thread.id)).toMatchObject({ parentThreadId: home.id, startedByAgent: true });
+});
+
+it("lets a person's subthreads nest and their agents start threads, which a thread an agent started can't", async () => {
+  const { thread: home } = await parent();
+  const mine = (await subthread(home.id)).thread;
+  const deeper = (await subthread(mine.id, { prompt: "Go deeper" })).thread;
+  expect(threads.get(core.db, deeper.id)?.parentThreadId).toBe(mine.id);
+  const helper = await startThread((await firstSpec(mine.id)).runId, { prompt: "Helper" });
+  expect(threads.get(core.db, helper.thread.id)).toMatchObject({ parentThreadId: mine.id, startedByAgent: true });
+  await expect(startThread((await firstSpec(helper.thread.id)).runId, { prompt: "Grandchild" })).rejects.toThrow(/can't start its own/);
+});
+
+it("refuses a subthread under a subagent, under a missing thread, or in a place of its own", async () => {
+  const { thread: home, runId } = await parent();
+  turns.get(runId)!.handle.emit("event", { type: "subagent.started", runId, ts: Date.now(), subagentId: "child", title: "Explore" });
+  const child = threads.children(core.db, home.id)[0]!;
+  await expect(subthread(child.id)).rejects.toThrow(/read-only/);
+  await expect(subthread("missing")).rejects.toThrow(/not found/);
+  await expect(subthread(home.id, { workspaceMode: "worktree" })).rejects.toThrow(/works in its folder/);
+  expect(threads.children(core.db, home.id).map((each) => each.id)).toEqual([child.id]);
 });

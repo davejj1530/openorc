@@ -14,6 +14,8 @@ const settingsSections: ReadonlySet<string> = new Set<SettingsSection>(SETTINGS_
 export type Route =
   | { view: "onboarding"; mode?: "first_run" | "recovery"; preview?: boolean }
   | { view: "newthread"; projectId?: string }
+  /** A new thread under `parentId`, working in its folder. */
+  | { view: "newsubthread"; parentId: string }
   | { view: "newtask"; projectId?: string; threadId?: string }
   /** A conversation, optionally with a message to bring into view there, such as a search result. */
   | { view: "thread"; threadId: string; message?: MessageTarget }
@@ -137,6 +139,13 @@ function isPlainView(view: string | undefined): view is PlainView {
   return view !== undefined && plainViews.has(view);
 }
 
+/** Screens a spec names by one id. */
+const idViews: Readonly<Record<string, (id: string) => Route>> = {
+  thread: (threadId) => ({ view: "thread", threadId }),
+  project: (projectId) => ({ view: "project", projectId }),
+  newsubthread: (parentId) => ({ view: "newsubthread", parentId }),
+};
+
 /** "thread:<id>", "task:<id>:<tab>", "pull:<project>:<number>", or a plain screen name, as windows and autorun pass them. */
 export function routeFromSpec(spec: string): Route | null {
   const [view, id, tab] = spec.split(":");
@@ -146,7 +155,7 @@ export function routeFromSpec(spec: string): Route | null {
       ...(id === "recovery" ? { mode: "recovery" as const } : {}),
       ...(id === "preview" || tab === "preview" ? { preview: true } : {}),
     };
-  if (view === "thread" && id) return { view: "thread", threadId: id };
+  if (view && id && Object.hasOwn(idViews, view)) return idViews[view]!(id);
   if (view === "newtask") return { view: "newtask", ...(id ? { projectId: id } : {}) };
   if (view === "task" && id)
     return {
@@ -154,7 +163,6 @@ export function routeFromSpec(spec: string): Route | null {
       taskId: id,
       tab: (tab as TaskTab | undefined) ?? "spec",
     };
-  if (view === "project" && id) return { view: "project", projectId: id };
   if (view === "pull" && id && Number(tab) > 0) return { view: "pull", projectId: id, number: Number(tab) };
 
   if (view === "settings") return settingsFromSpec(id, tab);
@@ -197,9 +205,15 @@ export function specFromRoute(route: Route): string {
       return `pull:${route.projectId}:${route.number}`;
     case "newtask":
       return `newtask${route.projectId ? `:${route.projectId}` : ""}`;
+    case "newsubthread":
+      return `newsubthread:${route.parentId}`;
     default:
       return route.view;
   }
+}
+
+export function newSubthread(parentId: string): void {
+  useRouter.getState().navigate({ view: "newsubthread", parentId });
 }
 
 export function newThread(projectId?: string): void {

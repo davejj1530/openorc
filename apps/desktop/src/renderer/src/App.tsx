@@ -21,6 +21,7 @@ import { useUi } from "./lib/ui";
 import { useTrafficLights } from "./lib/window";
 import { Inbox } from "./views/Inbox";
 import { Memory } from "./views/Memory";
+import { NewSubthread } from "./views/NewSubthread";
 import { NewThread } from "./views/NewThread";
 import { Onboarding } from "./views/Onboarding";
 import { OrclingDesigner } from "./views/OrclingDesigner";
@@ -138,14 +139,7 @@ export function App() {
       <div className="app-shell h-full flex text-ink">
         <Sidebar />
         <div className="work-row flex-1 min-w-0 h-full flex">
-          {route.view === "newthread" ? <NewThread key={route.projectId ?? ""} projectId={route.projectId} /> : null}
-          {route.view === "newtask" ? (
-            <Main>
-              <Suspense fallback={<div className="document-skeleton" aria-label="Loading editor" />}>
-                <NewTask key={`${route.projectId ?? ""}:${route.threadId ?? ""}`} projectId={route.projectId} threadId={route.threadId} />
-              </Suspense>
-            </Main>
-          ) : null}
+          <StartScreen route={route} />
           {route.view === "thread" ? <ThreadWorkspace /> : null}
           {route.view === "task" ? (
             <Suspense
@@ -177,6 +171,20 @@ export function App() {
 }
 
 /** The screens that use the main column alone. */
+/** The screens that start something: a thread, a thread under another, or a task. */
+function StartScreen({ route }: { route: Route }) {
+  if (route.view === "newthread") return <NewThread key={route.projectId ?? ""} projectId={route.projectId} />;
+  if (route.view === "newsubthread") return <NewSubthread key={route.parentId} parentId={route.parentId} />;
+  if (route.view !== "newtask") return null;
+  return (
+    <Main>
+      <Suspense fallback={<div className="document-skeleton" aria-label="Loading editor" />}>
+        <NewTask key={`${route.projectId ?? ""}:${route.threadId ?? ""}`} projectId={route.projectId} threadId={route.threadId} />
+      </Suspense>
+    </Main>
+  );
+}
+
 function MainScreen({ route, currentProject }: { route: Route; currentProject: string | undefined }) {
   const openNewTask = useUi((s) => s.openNewTask);
   let screen: ReactNode;

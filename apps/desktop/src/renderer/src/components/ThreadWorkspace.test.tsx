@@ -36,7 +36,7 @@ vi.mock("../lib/window", () => ({ useTrafficLights: () => true, useWindowsContro
 vi.mock("./Sidebar", () => ({ WindowNav: () => null }));
 vi.mock("./Panel", () => ({ Panel: () => <div data-testid="shared-panel" /> }));
 vi.mock("./ThreadClaudeAccount", () => ({ ThreadClaudeAccount: () => <button>Claude account</button> }));
-vi.mock("./SubagentConversation", () => ({ SubagentConversation: () => null, SubagentParent: () => null }));
+vi.mock("./SubagentConversation", () => ({ SubagentConversation: () => null, ThreadParent: () => null }));
 // Keep real headers and controls; tooltip positioning is exercised in the Electron smoke.
 vi.mock("./ui", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./ui")>()),

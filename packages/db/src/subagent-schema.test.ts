@@ -2,7 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import { expect, it } from "vitest";
 import { Db } from "./database.js";
 import { migrations } from "./schema.js";
-import { subagentIdentityMigration, subagentObservationMigration } from "./subagent-schema.js";
+import { startedByAgentMigration, subagentIdentityMigration, subagentObservationMigration } from "./subagent-schema.js";
 import { projects, runs, threads } from "./repos.js";
 import { subagents } from "./subagents.js";
 import { LedgerWriter, listEvents } from "./ledger.js";
@@ -86,6 +86,37 @@ it("migrates nested native identities to their full parent and merges earlier du
     expect(listEvents(db, `run:${duplicate.id}`)[0]).toMatchObject({ text: "Second answer" });
     expect(listEvents(db, "host2")[0]).toMatchObject({ threadId: first.id });
     expect(() => raw.prepare("UPDATE subagents SET native_id = 'same' WHERE thread_id = ?").run(nested.id)).toThrow(/UNIQUE/);
+  } finally {
+    db.close();
+  }
+});
+
+it("marks the threads started before people could start one as an agent's, on their parent's branch when they share its worktree, once", () => {
+  const raw = new DatabaseSync(":memory:");
+  const db = new Db(raw);
+  try {
+    for (const migration of migrations.slice(0, migrations.indexOf(startedByAgentMigration))) {
+      if (typeof migration === "string") raw.exec(migration);
+      else migration(raw);
+    }
+    const project = projects.insert(db, { name: "Fixture", rootPath: "/repo", gitRemote: null, defaultBranch: null, settings: {} });
+    const make = (title: string) => threads.insert(db, { projectId: project.id, title, agent: "codex", model: null, mode: "act", permissionMode: "autonomous" });
+    const root = make("Parent"),
+      started = make("Started"),
+      subagent = make("Subagent");
+    const elsewhere = make("Elsewhere");
+    threads.update(db, root.id, { worktreePath: "/worktrees/landing", branch: "openorc/landing" });
+    threads.update(db, started.id, { parentThreadId: root.id, parentRelation: "started", worktreePath: "/worktrees/landing" });
+    threads.update(db, elsewhere.id, { parentThreadId: root.id, parentRelation: "started" });
+    threads.update(db, subagent.id, { parentThreadId: root.id, parentRelation: "subagent", worktreePath: "/worktrees/landing" });
+    startedByAgentMigration(raw);
+    const after = [root, started, elsewhere, subagent].map((thread) => threads.get(db, thread.id)!);
+    expect(after.map((thread) => thread.startedByAgent)).toEqual([false, true, true, false]);
+    expect(after.map((thread) => thread.branch)).toEqual(["openorc/landing", "openorc/landing", null, null]);
+    const mine = make("Mine");
+    threads.update(db, mine.id, { parentThreadId: root.id, parentRelation: "started" });
+    startedByAgentMigration(raw);
+    expect(threads.get(db, mine.id)?.startedByAgent).toBe(false);
   } finally {
     db.close();
   }

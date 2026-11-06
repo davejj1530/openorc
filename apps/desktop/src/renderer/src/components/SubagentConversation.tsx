@@ -68,7 +68,8 @@ function SubagentStatusBar({ thread, model }: { thread: ThreadSummary; model: st
   );
 }
 
-export function SubagentParent({ id }: { id: string | null | undefined }) {
+/** The thread a sub thread sits under, ahead of its title in the header. */
+export function ThreadParent({ id }: { id: string | null | undefined }) {
   const parent = useRpc("threads.get", { id: id ?? "" }, { enabled: Boolean(id) });
   if (!id) return null;
   return (

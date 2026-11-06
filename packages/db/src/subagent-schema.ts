@@ -137,3 +137,19 @@ export const subagentObservationMigration = `
   ALTER TABLE subagents_observed RENAME TO subagents;
   CREATE UNIQUE INDEX subagents_identity ON subagents(root_thread_id, native_id);
 `;
+
+/**
+ * A person can start a thread under another too; the limits on threads started with thread_start hold only for an
+ * agent's. A started thread that joined its parent's worktree takes the parent's branch, so it no longer reads as a
+ * pull request's detached copy. Added only where missing, so a ledger migrated again from an earlier version keeps the
+ * threads people started as theirs.
+ */
+export function startedByAgentMigration(raw: DatabaseSync): void {
+  const columns = raw.prepare("PRAGMA table_info(threads)").all() as { name: string }[];
+  if (columns.some((column) => column.name === "started_by_agent")) return;
+  raw.exec(`ALTER TABLE threads ADD COLUMN started_by_agent INTEGER NOT NULL DEFAULT 0;
+  UPDATE threads SET started_by_agent = 1 WHERE parent_relation = 'started';
+  UPDATE threads SET branch = (SELECT parent.branch FROM threads parent WHERE parent.id = threads.parent_thread_id)
+    WHERE parent_relation = 'started' AND branch IS NULL AND worktree_path IS NOT NULL
+      AND worktree_path = (SELECT parent.worktree_path FROM threads parent WHERE parent.id = threads.parent_thread_id);`);
+}

@@ -32,9 +32,15 @@ export const ThreadStartParams = z
     prompt: z.string().min(1),
     attachments: z.array(z.string()).optional(),
     title: z.string().optional(),
+    /** Starts the thread under this one, in its folder, so a start that names it chooses no place of its own. */
+    parentThreadId: z.string().min(1).optional(),
   })
   .strict()
   .superRefine((input, ctx) => {
+    if (input.parentThreadId && [input.id, input.workingDirectory, input.workspaceMode, input.cloud, input.baseRef].some((value) => value !== undefined)) {
+      ctx.addIssue({ code: "custom", message: "A thread started under another works in its folder.", path: ["parentThreadId"] });
+    }
+    if (input.parentThreadId && input.executionTarget?.kind === "orcling") ctx.addIssue({ code: "custom", message: "An Orcling starts its own threads.", path: ["parentThreadId"] });
     if (!input.executionTarget && !input.agent) ctx.addIssue({ code: "custom", message: "Choose a model or an Orcling.", path: ["executionTarget"] });
     if (input.executionTarget && [input.agent, input.model, input.effort, input.fastMode].some((value) => value !== undefined)) {
       ctx.addIssue({ code: "custom", message: "Supply an execution target or legacy model settings, not both.", path: ["executionTarget"] });

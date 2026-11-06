@@ -4,7 +4,7 @@ import type { OrclingService } from "../services/orclings.js";
 import { ThreadService } from "../services/threads.js";
 import type { Handlers } from "./types.js";
 type Dependencies = {
-  threadService: Pick<ThreadService, "implementPlan" | "exportPlan" | "start" | "update" | "switchClaudeAccount">;
+  threadService: Pick<ThreadService, "implementPlan" | "exportPlan" | "start" | "startUnder" | "update" | "switchClaudeAccount">;
   orclings: Pick<OrclingService, "startThread" | "threadPatch">;
   imports: Pick<ImportService, "import">;
 };
@@ -12,6 +12,13 @@ type Dependencies = {
 /** A cloud conversation runs one model; Orclings start on this Mac. */
 function assertCloudTarget(cloud: boolean | undefined, target: RpcParams<"threads.start">["executionTarget"]): void {
   if (cloud && target && target.kind !== "model") throw new Error("Cloud conversations run one model.");
+}
+
+/** The model a start runs on: its execution target's settings, or the separate fields older callers send. */
+function modelSettings({ executionTarget, agent, model, effort, fastMode }: Pick<RpcParams<"threads.start">, "executionTarget" | "agent" | "model" | "effort" | "fastMode">) {
+  const selected = executionTarget?.kind === "model" ? executionTarget.settings : undefined;
+  if (!selected) return { agent: ExecutableAgent.parse(agent), model, effort, fastMode };
+  return { agent: selected.agent, model: selected.model, effort: selected.effort ?? undefined, fastMode: selected.fastMode };
 }
 
 export function createThreadLaunchHandlers({
@@ -40,6 +47,7 @@ export function createThreadLaunchHandlers({
       prompt,
       attachments,
       title,
+      parentThreadId,
     }) => {
       assertCloudTarget(cloud, executionTarget);
       if (executionTarget?.kind === "orcling") {
@@ -55,17 +63,14 @@ export function createThreadLaunchHandlers({
           ...(baseRef ? { baseRef } : {}),
         });
       }
-      const selected = executionTarget?.settings;
-      const executable = ExecutableAgent.parse(selected?.agent ?? agent);
+      const settings = modelSettings({ executionTarget, agent, model, effort, fastMode });
+      if (parentThreadId) return threadService.startUnder(parentThreadId, { claudeAccountId, ...settings, mode, permissionMode, prompt, attachments, title });
       return threadService.start({
         ...(id ? { id } : {}),
         projectId,
         claudeAccountId,
         ...(workingDirectory ? { workingDirectory } : {}),
-        agent: executable,
-        model: selected ? selected.model : model,
-        effort: selected ? (selected.effort ?? undefined) : effort,
-        fastMode: selected ? selected.fastMode : fastMode,
+        ...settings,
         mode,
         permissionMode,
         ...(workspaceMode ? { workspaceMode } : {}),

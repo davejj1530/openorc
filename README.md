@@ -27,6 +27,8 @@ Let a Claude Code thread building your interface ask a Codex thread about an API
 
 An idle thread starts a new turn to read a message; a busy thread receives it during its current turn. Agents can send up to 20 messages in a row across threads, and an exchange ends when one agent doesn't reply. After 20, a person has to write before they can send more.
 
+When an agent hands work to subagents of its own, such as Claude Code subagents and workflows, Codex collaboration agents, or OpenCode child sessions, each one becomes a read-only thread under the thread that started it, so you can follow what it did.
+
 ### Keep what your project learns
 
 Save decisions, lessons, and useful commands as project memory. An agent can retrieve that knowledge in a later task, even if it uses a different provider.
@@ -35,9 +37,9 @@ Memory is optional. Turn it off or configure automatic extraction in Settings.
 
 ### Turn ideas into reviewed changes
 
-Capture an idea as a task, ask multiple models for input, then start implementation when you're ready. Work in your local checkout or an isolated worktree, and review changes beside the conversation.
+Capture an idea as a task, ask multiple models for input, then start implementation when you're ready. Work in your local checkout or an isolated worktree, and review changes beside the conversation. The same panel opens the project's files to read, edit, or have explained in plain English, along with a terminal, a browser preview, and iOS Simulators or Android Emulators that you and your agents can drive.
 
-![OpenOrc with project threads and weekly usage in the sidebar, a Codex conversation ending in the OpenOrc cube, and a source diff in the Changes panel](docs/images/readme/workspace.png)
+![OpenOrc with threads listed by day, the Resolved drawer, and weekly usage in the sidebar, a Codex conversation ending in the OpenOrc cube, and a source diff in the Changes panel](docs/images/readme/workspace.png)
 
 _Screenshots use sample projects and conversations._
 
@@ -50,6 +52,10 @@ Get a second perspective before you build. Request implementation when you're re
 
 </details>
 
+### Keep working from your phone
+
+Pair the OpenOrc iPhone app with the desktop in **Settings → Phone**. The phone shows your threads live, answers approvals and questions, sends and steers messages, starts new threads, and commits, pushes, and opens pull requests. It connects straight to the desktop over your local network or Tailscale, encrypted end to end, with no OpenOrc server in between.
+
 ## Project status
 
 OpenOrc was initially built in private and is now open source. It is in active beta development.
@@ -60,6 +66,8 @@ OpenOrc was initially built in private and is now open source. It is in active b
 | macOS, Intel         | Released, but not fully validated. Release builds pass the packaged startup and update checks; the test suite runs only on Apple Silicon.                                                                                  |
 | Windows x64          | Released, but not fully validated. Release builds are installed and smoke-tested; the test suite does not run on Windows. A beta installer can be unsigned; its release notes say so.                                      |
 | Linux x64            | Released, but not fully validated. Release builds ship as an rpm, a deb and an AppImage; the deb and AppImage are installed and smoke-tested, and CI runs the test suite on Ubuntu. Installs do not update themselves yet. |
+
+The iPhone app in `apps/mobile` is built and tested against the desktop app on a Mac. Cloud threads, which run in a sandbox on your own Vercel or Agent37 account, are offered only in development and QA builds; release builds don't include them yet.
 
 See the [release guide](docs/desktop-updates.md) and [roadmap](ROADMAP.md).
 
@@ -84,7 +92,9 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-Import a project with the plus button next to Projects, then start a thread with **⌘N** (**Ctrl+N** on Windows and Linux).
+Start a thread with **⌘N** (**Ctrl+N** on Windows and Linux). Its heading asks what to work on in the current project. Click the project name to choose another, or choose **Add project** at the end of that list to add a folder. **Workspace** holds conversations that belong to no project.
+
+The sidebar lists threads by when they last worked: **Recent** for the last three hours, then **Today** and **Yesterday**. Pinned and snoozed threads keep their own groups. Other threads quiet since before yesterday, and the ones you resolve, collect in the **Resolved** drawer at the foot of the sidebar. Drag a thread there to resolve it, or out to reopen it. The buttons beside your usage at the bottom open Tasks, Pull requests, Schedules, and Settings, and switch the list to your Orclings.
 
 Tasks save to the backlog until you start them. Choose a local checkout or isolated worktree in the task's **Execution settings**. New tasks default to **Settings → General → Workspace**; tasks created from a conversation use that thread's location. Changing the location after work starts moves the task's conversation.
 
@@ -100,11 +110,15 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for native dependency troubleshooting, ve
 
 ## Data and credentials
 
-Conversations, task records, and project memory are stored on your machine. Each agent's requests go to its own provider, and a small model from the conversation's own agent names the conversation. Memory is off until you turn it on. While it is on, the agent that ran each finished run summarizes it, unless you choose one provider for every run, and the first search by meaning downloads a 91 MB embedding model from Hugging Face, each file checked against a pinned SHA-256. Installed macOS and Windows releases check GitHub Releases for new stable versions, without an installation identifier; Settings → General turns automatic checks off. Betas are published as prereleases, which the updater never offers, so install betas manually. [Network connections](https://openorc.app/docs/network/) lists every connection the app makes.
+Conversations, task records, and project memory are stored on your machine. Each agent's requests go to its own provider, and a small model from the conversation's own agent names the conversation and writes the code explanations you ask for. Memory is off until you turn it on. While it is on, the agent that ran each finished run summarizes it, unless you choose one provider for every run, and the first search by meaning downloads a 91 MB embedding model from Hugging Face, each file checked against a pinned SHA-256. Installed macOS and Windows releases check GitHub Releases for newer stable and beta versions, without an installation identifier; Settings → General turns automatic checks off. **Device support** in Settings → Devices installs its two pinned helper tools with your own npm into the data folder when it first needs them. [Network connections](https://openorc.app/docs/network/) lists every connection the app makes.
 
-The desktop stores its SQLite ledger, attachments, images tools return, and managed workspaces in the application data directory: `~/Library/Application Support/OpenOrc` on macOS, `%APPDATA%\OpenOrc` on Windows, and `~/.config/OpenOrc` on Linux. `OPENORC_USER_DATA` selects a different profile. Treat this directory as private: it can contain prompts, source snippets, terminal output, and project history. Native provider output goes to a debug log in `logs/provider` there, kept for 14 days or 512 MB; deleting a thread does not remove its lines from that log before they expire. Redaction of the ledger, its search index, run results, memories, and logs is a best-effort filter, not a guarantee that all sensitive content is removed. Plans and task comments are stored as written because agents receive them later.
+Phone access is off until you turn on **Allow paired phones** in **Settings → Phone**. While it is on, the desktop listens on port 47820, or another free port when that one is taken, on every network interface. It drops connections from outside private networks, link-local addresses, and Tailscale's address range before reading them, and paired phones talk to it over a Noise session encrypted end to end. Phone notifications need an Apple push key added in the same section; the desktop then seals each alert for one phone and sends it through Apple's Push Notification service.
 
-Agent execution uses the installed CLIs and their existing login flows. The Claude usage display asks the installed Claude Code CLI for its plan usage; OpenOrc never reads the credential Claude Code stores. Direct Slack credentials and the optional memory-extraction API key use Electron's OS-backed protected storage. See [credential storage](docs/credential-storage.md) for recovery and backup considerations.
+In development and QA builds, cloud threads run in a sandbox on the Vercel or Agent37 account you connect in **Settings → Cloud**. Code moves between the desktop and the sandbox as Git bundles while the thread works. Agents there sign in with a token each Claude account makes with `claude setup-token`, and with a Codex or OpenCode sign-in made for the cloud or a key copied from this computer after you approve. To offer those keys, Settings → Cloud reads an OpenAI API key from Codex's `auth.json` and the provider keys OpenCode keeps; ChatGPT and Claude logins are never copied. On Vercel, when the team's plan allows it, the sandbox firewall adds the sign-ins to the agents' requests on their way out, so the sandbox holds only stand-ins; Agent37 sandboxes hold the sign-ins themselves. The optional cloud brain is a headless copy of OpenOrc in the same account. It keeps copies of the projects you choose, shares memory and tasks with the desktop, and answers paired phones while the computer sleeps.
+
+The desktop stores its SQLite ledger, attachments, images tools return, and managed workspaces in the application data directory: `~/Library/Application Support/OpenOrc` on macOS, `%APPDATA%\OpenOrc` on Windows, and `~/.config/OpenOrc` on Linux. `OPENORC_USER_DATA` selects a different profile. Treat this directory as private: it can contain prompts, source snippets, terminal output, and project history. Native provider output goes to a debug log in `logs/provider` there, kept for 14 days or 512 MB; deleting a thread does not remove its lines from that log before they expire. Redaction of the ledger, its search index, run results, memories, and logs is a best-effort filter, not a guarantee that all sensitive content is removed. Plans and task comments are stored as written because agents receive them later. The ledger also records each paired phone with its push token, and each cloud sandbox.
+
+Agent execution uses the installed CLIs and their existing login flows. The Claude usage display asks the installed Claude Code CLI for its plan usage; OpenOrc never reads the credential Claude Code stores. OpenOrc's own secrets use Electron's OS-backed protected storage: direct Slack credentials, the optional memory-extraction API key, the reviewer app's key, the desktop's key for paired phones, the Apple push key, and the cloud connections and sign-ins. See [credential storage](docs/credential-storage.md) for recovery and backup considerations.
 
 ## Develop and verify
 
@@ -121,18 +135,23 @@ CI runs these checks. [Code quality checks](docs/code-quality.md) explains the l
 
 ## Repository guide
 
-| Location            | Responsibility                                                        |
-| ------------------- | --------------------------------------------------------------------- |
-| `apps/desktop`      | Electron shell, core utility-process entry point, and React interface |
-| `apps/website`      | Astro website, docs, and HTML/CSS product demos                       |
-| `packages/core`     | Application workflows and validated RPC handling                      |
-| `packages/protocol` | Shared domain records, events, harness catalog, and RPC schemas       |
-| `packages/agents`   | Vendor CLI adapters and normalized agent events                       |
-| `packages/db`       | SQLite migrations, repositories, ledger, and retrieval storage        |
-| `packages/git`      | Git commands, worktrees, snapshots, and change integration            |
-| `packages/memory`   | Embeddings, extraction, retrieval, and project briefs                 |
-| `packages/mcp`      | Run-scoped local MCP server and host interface                        |
-| `scripts`           | Reproducible QA fixtures and smoke checks                             |
+| Location            | Responsibility                                                                    |
+| ------------------- | --------------------------------------------------------------------------------- |
+| `apps/desktop`      | Electron shell, core utility-process entry point, and React interface             |
+| `apps/mobile`       | Expo iPhone app that pairs with the desktop                                       |
+| `apps/brain`        | The cloud brain: the core running headless in a Linux sandbox                     |
+| `apps/website`      | Astro website, docs, and HTML/CSS product demos                                   |
+| `packages/core`     | Application workflows, validated RPC handling, phone access, and cloud threads    |
+| `packages/protocol` | Shared domain records, events, harness catalog, and RPC schemas                   |
+| `packages/client`   | Client state shared by the desktop renderer and the phone                         |
+| `packages/agents`   | Vendor CLI adapters and normalized agent events                                   |
+| `packages/db`       | SQLite migrations, repositories, ledger, and retrieval storage                    |
+| `packages/git`      | Git commands, worktrees, snapshots, and change integration                        |
+| `packages/memory`   | Embeddings, extraction, retrieval, and project briefs                             |
+| `packages/mcp`      | Run-scoped local MCP server and host interface                                    |
+| `packages/link`     | Encrypted session and pairing code between the desktop and a phone                |
+| `packages/cloud`    | Cloud sandboxes, the runner inside them, Git bundle sync, and the brain's machine |
+| `scripts`           | Reproducible QA fixtures and smoke checks                                         |
 
 Read the [architecture guide](ARCHITECTURE.md) for the process model and module seams, [interface conventions](docs/design-system.md) for visual conventions, and [the documentation index](docs/README.md) for feature references. The [roadmap](ROADMAP.md) records current priorities.
 

@@ -8,7 +8,8 @@ OpenOrc uses its own SVG icon family, generated with Codex. The geometry is orig
 - Application controls import the local family through the shared module.
 - Framework and language project logos are the one exception: `ProjectStackIcon.tsx` displays 24 upstream Devicon SVGs, not original OpenOrc drawings. Their pinned source URLs and hashes live in `assets/project-stacks/manifest.json`; see [artwork provenance](artwork-provenance.md#project-framework-and-language-logos). `scripts/project-stack-size.cjs` measures this selected set without including a whole icon library.
 - RichText supplies the complete Streamdown icon map. The diff viewer uses its `onPostRender` extension to install generated symbols in each shadow root. Native selects use the generated chevron asset. The composer's context ring remains a data visualization.
-- Some export names are retained for call-site compatibility: `Brain` is the layered memory mark, `FolderGit2` is the project folder, and `Workflow` is the coordinated agent mark.
+- Some export names are retained for call-site compatibility: `Brain` is the layered memory mark and `FolderGit2` is the project folder. `Workflow`, the coordinated agent mark, is still exported, but no screen has used it since Teams was removed.
+- The iPhone app draws the same geometry. `pnpm --filter @openorc/mobile design:sync` generates its icons from `icons.tsx`.
 
 ## Regenerate exports
 

@@ -1,6 +1,6 @@
 # Agent questions (`ask_user`)
 
-Every agent in OpenOrc can ask you questions with `ask_user`, a tool on OpenOrc's private MCP connection for that run. Questions appear as a question card in the conversation, in the inbox, and as a notification. Claude Code and Codex also have their own question tools, which OpenOrc shows as the same card.
+Every agent in OpenOrc can ask you questions with `ask_user`, a tool on OpenOrc's private MCP connection for that run. Questions appear as a question card in the conversation, in the inbox, and as a notification, and a paired phone can answer them too. Claude Code and Codex also have their own question tools, which OpenOrc shows as the same card.
 
 ## The tool
 

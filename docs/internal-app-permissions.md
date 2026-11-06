@@ -1,6 +1,6 @@
 # Permissions for OpenOrc's own tools
 
-Agents in OpenOrc can call OpenOrc's own tools, such as tasks, memory, messages to other conversations, and the Preview browser. These tools come from a private MCP connection that OpenOrc creates for each agent process, with a random server name, a local address tied to that run, and a fixed list of tools. Other MCP servers, including one named `openorc` or one that copies these tool names, are treated as external tools.
+Agents in OpenOrc can call OpenOrc's own tools, such as tasks, memory, messages to other conversations, the Preview browser, and the Device panel. These tools come from a private MCP connection that OpenOrc creates for each agent process, with a random server name, a local address tied to that run, and a fixed list of tools. Other MCP servers, including one named `openorc` or one that copies these tool names, are treated as external tools.
 
 ## How each provider is told
 
@@ -25,14 +25,17 @@ If a provider still asks, OpenOrc checks that the request really comes from that
 | `orcling_instructions_update`                   | asks    | asks              | allowed      | allowed    |
 | `thread_send` to a more permissive conversation | blocked | asks              | asks         | allowed    |
 | `orcling_thread_start`                          | blocked | asks              | asks         | allowed    |
+| `device` open and close                         | blocked | allowed           | allowed      | allowed    |
+| `thread_start`                                  | blocked | allowed           | allowed      | allowed    |
 
 When OpenOrc asks, you see the usual approval card. **Allow for this run** covers later actions of the same kind in that run, except password fields, which ask every time.
 
 Everything else is allowed in every mode, because it changes nothing outside OpenOrc's own records:
 
-- Reading: `task_list`, `task_get`, `thread_list`, `thread_read`, `memory_search`, `task_context`, `execution_context`, the Orcling reads `orcling_recall`, `orcling_history`, `orcling_projects`, `orcling_project` and `orcling_thread_read`, and browser `open`, `snapshot`, `screenshot` and `scroll`.
+- Reading: `task_list`, `task_get`, `thread_list`, `thread_read`, `memory_search`, `task_context`, `execution_context`, the Orcling reads `orcling_recall`, `orcling_history`, `orcling_projects`, `orcling_project` and `orcling_thread_read`, browser `open`, `snapshot`, `screenshot` and `scroll`, and `device` `list` and `screenshot`.
 - Asking you: `ask_user`.
-- Documents: `task_create` in the backlog, `orcling_task_create`, `task_update`, and `plan_write`.
+- Documents: `task_create` in the backlog, `orcling_task_create`, `task_update`, `plan_write`, and `visualize`, which adds a view to the conversation.
+- Pull request reviews: `pull_request_diff`, and `pull_request_comment` and `pull_request_summary`, which write the review's drafts for you to post.
 - Task comments: `task_comment_intent`, which records whether a comment asks for work. The work itself starts only after the agent's reply.
 - `approve`: Claude Code's permission prompt. Claude Code calls it, not the model, to hand each tool request to OpenOrc's approval cards and mode rules.
 
@@ -40,19 +43,23 @@ An Orcling's tools exist only in runs where an Orcling speaks. Its permission ca
 
 `task_start` is refused in Plan. It marks the task in progress so the calling conversation can work on it; it does not start another agent. `execution_switch` changes a Slack request's model or folder, never its permissions.
 
+`thread_start` starts a helper thread in the caller's folder, with the caller's mode and permissions, so it asks nothing beyond the mode's own rules. Agents are told to use it only when you ask in the conversation. Plan conversations, task runs, and threads that another thread started cannot start one, and a conversation can have at most 3 of its helper threads working at once.
+
+The `device` tool exists only on a computer with simulators or emulators. It refuses every action until **Device support** and **Agents can use devices** are both on in **Settings → Devices**.
+
 ## Messages to other conversations
 
 `thread_send` has three more rules:
 
 - A message to a conversation in the same or a stricter mode is allowed. That conversation acts under its own permissions, so it can do nothing the sender could not.
-- A chain of agent messages stops after 4 messages in a row with no one writing in between. The count is per conversation and kept in memory. A message from a person, in the app, Slack or a schedule, resets it.
+- A chain of agent messages stops after 20 messages in a row with no one writing in between. The count is per conversation and kept in memory. A message from a person, in the app, Slack or a schedule, resets it.
 - A retried call with the same `request_key` is delivered once. Without a key, the same text to the same conversation from the same run counts as a retry.
 
 ## Memory and passwords
 
 An agent cannot take over the topic key of a memory you wrote, or mark it wrong or stale. `memory_record` limits titles to 120 characters and bodies to 800. The project brief labels each memory with who saved it.
 
-The Preview shares your signed-in sessions (see [agent access to the sidebar preview](agent-browser.md)). A fill aimed at a password field is refused by the page until you allow it; only then does OpenOrc send it again, marked as allowed. Agents cannot set that mark themselves.
+The Preview shares your signed-in sessions (see [agent access to the Preview](agent-browser.md)). A fill aimed at a password field is refused by the page until you allow it; only then does OpenOrc send it again, marked as allowed. Agents cannot set that mark themselves.
 
 ## Nothing starts work on its own
 

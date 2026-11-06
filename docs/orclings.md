@@ -4,7 +4,7 @@ An Orcling is a long-term companion: a saved identity with its own look, name, m
 
 ## What an Orcling is
 
-- **Identity.** Stored in `orclings`: name, look, harness and model, and permission. Names are unique, ignoring case and punctuation (`orclingHandle`). Each Orcling owns one conversation in the Workspace, working in a folder named after it under the app's data directory, such as `orclings/rini`. Renaming it moves that folder between turns, and its next turn starts a fresh session there from a summary; a folder you choose for its conversation yourself never moves. Deleting the Orcling removes that conversation, its instructions and its memories; files it made in its folder stay.
+- **Identity.** Stored in `orclings`: name, look, harness and model, Claude account, and permission. Names are unique, ignoring case and punctuation (`orclingHandle`). Each Orcling owns one conversation in the Workspace, working in a folder named after it under the app's data directory, such as `orclings/rini`. Renaming it moves that folder between turns, and its next turn starts a fresh session there from a summary; a folder you choose for its conversation yourself never moves. Deleting the Orcling removes that conversation, its instructions and its memories; files it made in its folder stay.
 - **Instructions.** Its own prompt, kept in `orcling_instructions` as numbered versions. The Orcling rewrites them with `orcling_instructions_update`; you edit or restore any version in its profile. Restoring saves the old text as the newest version, so no change is ever lost.
 - **Memory.** Rows in `memories` owned by the Orcling (`orcling_id`, scope `orcling`), never tied to a project and left out of every project search. The Orcling saves with `orcling_remember` and searches with `orcling_recall`. After each process of its own conversation ends, memory extraction distills what it learned about you into this memory.
 - **Look.** Shape, eyes, texture, glasses, accessory, body and eye colors. `assets/mascot/orcling.riv` draws it live; `OrclingAvatar` draws a flat version for lists and bylines.
@@ -34,7 +34,7 @@ An Orcling's permission is **Approve** (Review everything: it asks before every 
 
 ## Its model is part of who it is
 
-An Orcling brings its own model, effort and Fast mode wherever it works. Edit the Orcling to change these settings everywhere at once.
+An Orcling brings its own model, effort, Fast mode and, on Claude, its own Claude account wherever it works. Edit the Orcling to change these settings everywhere at once. The editor shows the Claude account field only when the Orcling runs on Claude and you have more than one account.
 
 ## Its own conversation is a private chat
 

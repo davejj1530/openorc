@@ -1,6 +1,6 @@
-# Agent access to the sidebar preview
+# Agent access to the Preview
 
-Agents can use OpenOrc's `browser` tool to open and use websites in the conversation's Preview, in the right sidebar. Each agent session gets the tool and is told to use it first for local and public websites.
+Agents can use OpenOrc's `browser` tool to open and use websites in the conversation's Preview, a tab in the panel beside the conversation. Each agent session gets the tool and is told to use it first for local and public websites.
 
 ## Actions
 
@@ -37,6 +37,7 @@ Every Preview uses one saved browser session (`persist:openorc-preview`), kept s
 - Preview opens for an agent only when the window is showing that conversation. Work in the background keeps its own page, at 1000×720 until you open that conversation, when it takes the panel's size. No window needs to take focus.
 - OpenOrc reuses an existing Preview, preferring a visible one in the focused window, and keeps it for that conversation until it closes. Another window keeps its own Preview.
 - Page text and screenshots go only to the agent that asked for them.
+- A paired phone can watch a thread's Preview live and scroll, tap, and type into it. The phone and the agent take turns, so their input never interleaves.
 
 ## For contributors
 

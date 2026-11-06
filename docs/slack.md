@@ -37,7 +37,7 @@ Buttons expire after ten minutes, and restarting OpenOrc or the relay invalidate
 
 ## Workspace conversations and folders
 
-The **Workspace** group at the top of the thread list, marked with a globe icon, holds direct chats and Slack conversations, separate from project threads. Choose a direct chat’s folder with **Choose folder** when you start it; configure the shared entrypoint in **Settings → Slack**. The default entrypoint is an empty folder in OpenOrc’s application data directory. Changing the entrypoint affects new conversations; existing conversations keep their own folder.
+Direct chats and Slack conversations belong to the **Workspace**, not to a project. They appear in the thread list beside project threads, by when they last worked, with a globe icon and Workspace where a project thread names its project. To start a direct chat, choose Workspace from the project name in the new thread's heading, then pick its folder with **Choose folder**; configure the shared entrypoint in **Settings → Slack**. The default entrypoint is an empty folder in OpenOrc’s application data directory. Changing the entrypoint affects new conversations; existing conversations keep their own folder.
 
 - Mentioning the bot with `hi` starts a normal conversation with the configured default model in the Workspace entrypoint.
 - `what model are you using right now?` goes directly to that model. It can inspect its actual harness and model with `execution_context`.

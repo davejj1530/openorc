@@ -16,6 +16,8 @@ export interface WorkChip {
   kind: ChipKind;
   /** The local file the chip is about. A read opens it; an edit shows its diff. */
   path?: string;
+  /** The lines a read printed, which the file opens to with them selected. */
+  lines?: { line: number; endLine?: number };
   added?: number;
   removed?: number;
   /** Faint words that fill the middle of the row: a file's folder, a search's scope, or its query when the agent's words are the label. */
@@ -144,6 +146,16 @@ function fileChip(path: string, stat?: { added?: number; removed?: number }, kin
   return { key: path, label: basename(path), title: path, kind, path, detail: folderOf(path), ...stat };
 }
 
+/** The lines a Read call asked for: its offset and limit, as the row's note and the range the file opens to. */
+function readLines(input: unknown): Pick<WorkChip, "note" | "lines"> {
+  const record = (input ?? {}) as Record<string, unknown>;
+  const offset = Number(record["offset"]);
+  const limit = Number(record["limit"]);
+  if (!(offset > 0)) return {};
+  if (!(limit > 0)) return { note: `from line ${offset}`, lines: { line: offset } };
+  return { note: `lines ${offset}–${offset + limit - 1}`, lines: { line: offset, endLine: offset + limit - 1 } };
+}
+
 /** The calls a chip opens. An edit opens only its own file's part of each patch, so the diff is the one its numbers count. */
 export function chipCalls(chip: WorkChip): Block[] {
   if (chip.kind !== "edit") return chip.blocks;
@@ -199,7 +211,7 @@ function presentedParts(block: ToolBlock): CallPart[] {
   if (verb === "Edited") return editedParts(block, object);
   const known = sectionFor[verb];
   if (!object) return [{ section: known?.section ?? verb, chip: null }];
-  if (known?.kind === "file") return [{ section: known.section, chip: fileChip(object) }];
+  if (known?.kind === "file") return [{ section: known.section, chip: { ...fileChip(object), ...readLines(block.input) } }];
   const label = chipLabel(verb, known?.kind, object);
   return [{ section: known?.section ?? verb, chip: { key: label, label, title: object, kind: known?.kind ?? "tool" } }];
 }

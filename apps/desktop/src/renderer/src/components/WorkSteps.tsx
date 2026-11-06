@@ -26,6 +26,7 @@ import { FileGlyph } from "./FileGlyph";
 import { useVisited } from "../lib/use-visited";
 import { ThreadLink } from "./ThreadImages";
 import { ObjectGroup } from "./WorkObjects";
+import { fileHref } from "./WorkRead";
 import { OpenedCall, type RenderBlocks } from "./WorkMarks";
 import "./WorkSteps.css";
 
@@ -430,7 +431,7 @@ function ChipView({ chip, live, picked, onPick }: { chip: WorkChip; live: boolea
   if (chip.kind === "file" && chip.path)
     return (
       <span className="work-chip" data-kind={chip.kind} data-live={live || undefined} title={chip.title}>
-        <ThreadLink href={chip.path}>{content}</ThreadLink>
+        <ThreadLink href={fileHref(chip)}>{content}</ThreadLink>
       </span>
     );
   return (

@@ -254,6 +254,18 @@ interface ReadTarget {
   range: string | null;
 }
 
+/**
+ * The first span of lines a read's range names, as numbers to open the file at: "lines 70–100", "line 12",
+ * "from line 5", "first 20 lines". Null for a range counted from the end, which needs the file's length.
+ */
+export function readSpan(range: string | null): { line: number; endLine?: number } | null {
+  const span = range && /^(?:lines? (\d+)(?:–(\d+))?|from line (\d+)|first (\d+) lines?)/.exec(range);
+  if (!span) return null;
+  if (span[4]) return { line: 1, endLine: Number(span[4]) };
+  if (span[3]) return { line: Number(span[3]) };
+  return { line: Number(span[1]), endLine: Number(span[2] ?? span[1]) };
+}
+
 function lines(from: string, to?: string): string {
   if (to === undefined) return `line ${from}`;
   return to === "$" ? `from line ${from}` : `lines ${from}–${to}`;

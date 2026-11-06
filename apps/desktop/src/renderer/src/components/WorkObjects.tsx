@@ -1,22 +1,11 @@
-import { useId, useState, type ReactNode } from "react";
-import {
-  chipCalls,
-  liveSectionLabel,
-  type CommandObject,
-  type EditObject,
-  type FetchObject,
-  type ReadObject,
-  type SearchObject,
-  type ToolObject,
-  type WebObject,
-  type WorkChip,
-  type WorkObject,
-} from "@openorc/client";
+import { useId, useState } from "react";
+import { chipCalls, liveSectionLabel, type CommandObject, type EditObject, type FetchObject, type SearchObject, type ToolObject, type WebObject, type WorkObject } from "@openorc/client";
 import { cn } from "../lib/cn";
 import { Brain, ChevronRight, Globe, Hammer, Search, Terminal } from "./icons";
 import { FileGlyph } from "./FileGlyph";
 import { ThreadLink } from "./ThreadImages";
 import { GitGraph } from "./WorkGit";
+import { ReadView } from "./WorkRead";
 import { TestsRun } from "./WorkTests";
 import { CallOpenScope, CallRow, SizeBlocks, SizeStat, StateMark, type RenderBlocks } from "./WorkMarks";
 import "./WorkObjects.css";
@@ -81,7 +70,7 @@ function ObjectView({ object, renderBlocks }: { object: WorkObject; renderBlocks
     case "edit":
       return <EditView edit={object} renderBlocks={renderBlocks} />;
     case "read":
-      return <ReadView read={object} />;
+      return <ReadView read={object} renderBlocks={renderBlocks} />;
     case "search":
       return <SearchView search={object} renderBlocks={renderBlocks} />;
     case "web":
@@ -93,55 +82,6 @@ function ObjectView({ object, renderBlocks }: { object: WorkObject; renderBlocks
     case "tool":
       return <ToolView tool={object} renderBlocks={renderBlocks} />;
   }
-}
-
-/** A file's row: its language mark, name and folder, and a note at the end. Opens the file. */
-function FileRow({ chip, children }: { chip: WorkChip; children?: ReactNode }) {
-  const content = (
-    <>
-      <FileGlyph path={chip.label} size={14} className="work-chip-icon" />
-      <span className="work-chip-label">{chip.label}</span>
-      <span className="work-chip-detail" aria-hidden={chip.path ? true : undefined}>
-        {chip.detail}
-      </span>
-      {chip.note ? <span className="work-chip-note">{chip.note}</span> : null}
-      {chip.blocks.some((block) => block.kind === "tool" && (block.isError || block.status === "error")) ? (
-        <span className="work-chip-note" data-tone="bad">
-          Failed
-        </span>
-      ) : null}
-      {children}
-    </>
-  );
-  return chip.path ? (
-    <span className="work-chip" data-kind={chip.kind} title={chip.title}>
-      <ThreadLink href={chip.path}>{content}</ThreadLink>
-    </span>
-  ) : (
-    <span className="work-chip" data-kind={chip.kind} title={chip.title}>
-      {content}
-    </span>
-  );
-}
-
-const ROWS = 6;
-
-/** Files read and folders listed; past six, the rest wait behind a count. */
-function ReadView({ read }: { read: ReadObject }) {
-  const [all, setAll] = useState(false);
-  const shown = all ? read.rows : read.rows.slice(0, ROWS);
-  return (
-    <div className="work-chips">
-      {shown.map((row) => (
-        <FileRow key={row.key} chip={row} />
-      ))}
-      {read.rows.length > shown.length ? (
-        <button type="button" className="work-more" onClick={() => setAll(true)}>
-          {read.rows.length - shown.length} more
-        </button>
-      ) : null}
-    </div>
-  );
 }
 
 /** An edit as its file and size, and under it the lines it took out and put in; a file it made says New. */

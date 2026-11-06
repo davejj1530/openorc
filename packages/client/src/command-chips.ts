@@ -1,5 +1,6 @@
-import { readCommand, searchTerms, shortPath, type CommandAction, type RunLabel } from "./command-reader.js";
+import { readCommand, readSpan, searchTerms, shortPath, type CommandAction, type RunLabel } from "./command-reader.js";
 import { basename, joinLabels } from "./run-labels.js";
+import { joinPath } from "./tool-view.js";
 import type { Block } from "./transcript.js";
 import type { CallPart, WorkChip } from "./work-chips.js";
 
@@ -81,15 +82,25 @@ interface RowContext {
 
 type Looked<Type> = Extract<CommandAction, { type: Type }>;
 
-/** A read Codex resolved links to its file; one read from the command opens the call, which shows the lines it printed. */
-function readPart(action: Looked<"read"> & { resolved?: boolean }, { intent }: RowContext): CallPart {
-  const chip: Chip = { key: action.path, label: basename(action.path), title: intent ?? action.path, kind: "file", detail: folderOf(action.path), ...(action.resolved ? { path: action.path } : {}) };
+/** A read opens its file where the call ran, at the lines it printed. Codex's own paths are already resolved. */
+function readPart(action: Looked<"read"> & { resolved?: boolean }, { block, intent }: RowContext): CallPart {
+  const path = action.resolved ? action.path : joinPath(callFolder(block), action.path);
+  const lines = readSpan(action.range);
+  const chip: Chip = { key: action.path, label: basename(action.path), title: intent ?? path, kind: "file", detail: folderOf(action.path), path, ...(lines ? { lines } : {}) };
   return { section: "Read", chip: action.range ? { ...chip, note: action.range } : chip };
 }
 
-function listPart(action: Looked<"listFiles">, { intent }: RowContext): CallPart {
+/** The folder a call started in, when it says: Codex's `cwd`. Claude's shell starts in the workspace. */
+function callFolder(block: ToolBlock): string | null {
+  const input = (block.input ?? {}) as { cwd?: unknown; workdir?: unknown };
+  return text(input.cwd) || text(input.workdir) || null;
+}
+
+/** A listing opens its folder where the call ran. */
+function listPart(action: Looked<"listFiles">, { block, intent }: RowContext): CallPart {
   const label = action.path === "." ? "this folder" : shortPath(action.path);
-  const chip: Chip = { key: `${action.path}:${action.pattern ?? ""}`, label, title: intent ?? action.command, kind: "folder" };
+  const path = joinPath(callFolder(block), action.path);
+  const chip: Chip = { key: `${action.path}:${action.pattern ?? ""}`, label, title: intent ?? action.command, kind: "folder", path };
   return { section: "Listed", chip: action.pattern ? { ...chip, detail: action.pattern } : chip };
 }
 

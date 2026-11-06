@@ -18,8 +18,9 @@ let api: Agent37Api;
 let home: BrainHome<Agent37BrainVm>;
 
 /**
- * flock without the kernel's lock, which macOS lacks: a folder the first start makes, a second start finds, and the
- * command's exit removes. A held descriptor, as the keeper's own lock, is always free here.
+ * flock without the kernel's lock, which macOS lacks: a folder the first start makes with its pid, a second start finds
+ * while that pid lives, and the command's exit removes. A holder that died frees it, as the kernel's lock goes with its
+ * process. A held descriptor, as the keeper's own lock, is always free here.
  */
 const FLOCK = `#!/bin/sh
 code=1
@@ -27,16 +28,24 @@ while [ $# -gt 0 ]; do case "$1" in -E) code=$2; shift 2 ;; -n) shift ;; *) brea
 lock=$1
 shift
 case "$lock" in *[!0-9]*) ;; *) exit 0 ;; esac
-mkdir "$lock.held" 2>/dev/null || exit "$code"
+if ! mkdir "$lock.held" 2>/dev/null; then
+  holder=$(cat "$lock.held/pid" 2>/dev/null)
+  [ -n "$holder" ] && kill -0 "$holder" 2>/dev/null && exit "$code"
+fi
+echo $$ > "$lock.held/pid"
 "$@"
 status=$?
-rmdir "$lock.held"
+rm -rf "$lock.held"
 exit $status
 `;
 
-/** setsid, which macOS lacks, through Perl's, noting each keeper's pid where it starts. */
+/**
+ * setsid, which macOS lacks, through Perl's, noting each keeper's pid where it starts, and the group it makes where the
+ * fake Agent37 asks, so its stop, sleep or boot still ends what the process started.
+ */
 const SETSID = `#!/bin/sh
 printf '%s\\n' $$ >> keeper.pids
+if [ -n "$AGENT37_FAKE_PIDS" ]; then printf '%s\\n' $$ >> "$AGENT37_FAKE_PIDS"; fi
 exec perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV or die' "$@"
 `;
 
@@ -53,8 +62,16 @@ process.stdin.on("data", (chunk) => {
 });
 `;
 
-/** ctl's stand-in: whatever it is asked, the brain is ready. */
-const CTL = `process.stdin.once("data", () => process.stdout.write(JSON.stringify({ ok: true, result: { state: "ready", version: "v-test", pid: 1, since: 1, busy: null } }) + "\\n"));
+/** ctl's stand-in: whatever it is asked, the brain is ready while the one that started last runs, and none answers else. */
+const CTL = `import { readFileSync } from "node:fs";
+let pid = 0;
+try {
+  pid = JSON.parse(readFileSync(new URL("../../started", import.meta.url), "utf8")).pid;
+  process.kill(pid, 0);
+} catch {
+  process.exit(69);
+}
+process.stdin.once("data", () => process.stdout.write(JSON.stringify({ ok: true, result: { state: "ready", version: "v-test", pid, since: 1, busy: null } }) + "\\n"));
 `;
 
 beforeEach(async () => {
@@ -208,7 +225,7 @@ describe("the brain's Agent37 instance", () => {
     expect((await home.get(true))?.state).toBe("running");
   });
 
-  it("starts the brain on a wake with its instance and connection on the start line, which the instance keeps for a boot", async () => {
+  it("starts the brain by booting its instance, with its instance and connection on the start line the instance keeps", async () => {
     const machine = await BrainMachine.connect({ service: "agent37", key: fake.key, endpoints: fake.endpoints }, { startMs: 10_000, pollMs: 50 });
     const { instance } = await home.open({ vcpus: 1 });
     const layout = await installed(instance);
@@ -231,22 +248,48 @@ describe("the brain's Agent37 instance", () => {
     const hook = path.join(instance.mount_path, ".agent37", "hooks", "post-restart.sh");
     expect((await stat(hook)).mode & 0o777).toBe(0o755);
 
-    // Again: the brain running holds the lock, ctl says it is ready, and nothing kept changes.
+    // Again: the brain runs, ctl says it is ready, and nothing kept changes, nor is the instance booted again.
     const edits = () => fake.requests.filter((request) => request === `PATCH /v1/instances/${instance.id}`).length;
-    expect(edits()).toBe(1);
+    const boots = () => fake.requests.filter((request) => request === `POST /v1/instances/${instance.id}/restart`).length;
+    expect([edits(), boots()]).toEqual([1, 1]);
     expect(await machine.wake({ key, name: "Cloud", threadSize: { cpu: 4, memory: 16 } })).toEqual({ state: "ready", address, version: "v-test" });
-    expect(edits()).toBe(1);
+    expect([edits(), boots()]).toEqual([1, 1]);
     expect(await machine.control({ op: "status" })).toMatchObject({ state: "ready", version: "v-test" });
 
     // A boot ends every process, the keeper's too; the hook starts the brain again from the kept line.
-    await killKeepers(layout.root);
-    process.kill(first.pid, "SIGKILL");
-    await rm(path.join(layout.root, "started"));
-    await rm(`${layout.lock}.held`, { recursive: true, force: true });
-    expect((await api.exec(instance.id, `sh ${hook}`)).exit_code).toBe(0);
-    const again = await eventually(() => started(layout.root));
+    await api.restart(instance.id);
+    const again = await eventually(async () => {
+      const now = await started(layout.root);
+      return now && now.pid !== first.pid ? now : null;
+    });
     expect(again.line).toBe(first.line);
-    expect(again.pid).not.toBe(first.pid);
+    expect(alive(first.pid)).toBe(false);
+    await killKeepers(layout.root);
+    process.kill(again.pid, "SIGKILL");
+  });
+
+  it("keeps the brain through a sleep, which ends what a command started, so a call to its address finds it running", async () => {
+    const machine = await BrainMachine.connect({ service: "agent37", key: fake.key, endpoints: fake.endpoints }, { startMs: 10_000, pollMs: 50 });
+    const { instance } = await home.open({ vcpus: 1 });
+    const layout = await installed(instance);
+    expect(await machine.wake({ key: newBrainKey(), name: "Cloud" })).toMatchObject({ state: "ready" });
+    const brain = (await started(layout.root))!;
+    // A process a command left running, as the exec start of brains before this one did.
+    await api.exec(instance.id, "setsid sh -c 'echo $$ > by-exec; exec sleep 600' > /dev/null 2>&1 &");
+    const byExec = Number(await eventually(() => readFile(path.join(instance.mount_path, "by-exec"), "utf8").catch(() => null)));
+    expect(alive(byExec)).toBe(true);
+
+    await api.sleep(instance.id);
+    expect((await api.get(instance.id))?.status).toBe("sleeping");
+    await eventually(async () => (alive(byExec) ? null : true));
+    expect(alive(brain.pid)).toBe(true);
+    // Woken again, as a phone's call wakes it: the brain is there without anything starting it.
+    const boots = fake.requests.filter((request) => request.endsWith("/restart")).length;
+    expect(await machine.wake({ key: newBrainKey(), name: "Cloud" })).toMatchObject({ state: "ready" });
+    expect(fake.requests.filter((request) => request.endsWith("/restart")).length).toBe(boots);
+    expect((await started(layout.root))!.pid).toBe(brain.pid);
+    await killKeepers(layout.root);
+    process.kill(brain.pid, "SIGKILL");
   });
 
   it("starts the brain again when it stops without choosing to, and says so in the keeper's log", async () => {
@@ -300,7 +343,7 @@ describe("the brain's Agent37 instance", () => {
 });
 
 describe("the brain's own Agent37 instance, from inside it", () => {
-  it("keeps itself awake with a command each time, raising its idle timeout once, and sleeps keeping its processes", async () => {
+  it("keeps itself awake with a command each time, raising its idle timeout once, and sleeps", async () => {
     const { instance } = await home.open({ vcpus: 1 });
     const self = agent37Self({ key: fake.key, cpu: 2, memory: 4 }, instance.id, api);
     const before = fake.execs.length;

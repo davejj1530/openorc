@@ -153,6 +153,11 @@ export interface BrainHome<Vm extends BrainVm = BrainVm> {
    * ends the brain's process with no waker there to start it.
    */
   keep?(vm: Vm, start: BrainStartCommand & { line: string }): Promise<void>;
+  /**
+   * Boots the machine again, which starts the brain from what `keep` left there. Present where a sleep ends the processes
+   * a command started, as Agent37's does: only a brain the boot started outlives it, so every start goes this way.
+   */
+  boot?(vm: Vm): Promise<void>;
 }
 
 /** How setup supplies each thing the survey can find missing. */
@@ -423,6 +428,7 @@ export class BrainMachine {
     const deadline = Date.now() + this.timing.startMs;
     try {
       await this.home.keep?.(vm, { ...command, line });
+      if (this.home.boot) return await this.bootStart(vm, layout, address, deadline);
       // A second try only after the first met a brain that was closing and has since exited.
       for (let tries = 0; tries < 2; tries++) {
         const started = await this.start(vm, command, line, deadline);
@@ -438,6 +444,32 @@ export class BrainMachine {
       if (alreadyStopping(error)) return STOPPED_UNDER;
       throw error;
     }
+  }
+
+  /**
+   * Starts the brain by booting its machine, unless a brain runs: one starting or closing is waited for first. Booting
+   * ends no brain, since none runs then. A brain still not ready at the deadline is said why by the end of its log.
+   */
+  private async bootStart(vm: BrainVm, layout: BrainLayout, address: string, deadline: number): Promise<WakeResult> {
+    const running = await this.waitForBrain(vm, layout, deadline);
+    if (running.kind === "ready") return { state: "ready", address, version: running.version };
+    if (running.kind === "timeout") return TIMED_OUT;
+    await this.home.boot!(vm);
+    for (;;) {
+      // Right after the boot the brain may not answer yet, nor OpenOrc's way into the machine.
+      const status = await this.ask(vm, layout, { op: "wake" }).catch(() => null);
+      if (status?.state === "ready") return { state: "ready", address, version: status.version };
+      if (Date.now() + this.timing.pollMs >= deadline) return { state: "failed", detail: await this.bootFailure(vm, layout) };
+      await delay(this.timing.pollMs);
+    }
+  }
+
+  /** Why a booted machine has no brain ready, from the end of the brain's log. */
+  private async bootFailure(vm: BrainVm, layout: BrainLayout): Promise<string> {
+    const log = await vm.readFile(layout.log).catch(() => null);
+    const last = log ? Buffer.from(log).toString("utf8").trim().split("\n").at(-1) : undefined;
+    const said = last ? tail(scrub(last.replace(/^\S+ \w+ /, ""), this.home.secrets)) : "";
+    return `The brain did not start after its machine booted.${said ? ` Its log ends: ${said}` : ""}`;
   }
 
   /** What a start's exit means, other than another brain holding the lock. */

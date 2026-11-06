@@ -124,6 +124,8 @@ export interface Agent37Api {
   addPublicPort(id: string, port: number, label?: string): Promise<Agent37PublicPort>;
   /** Answers once the instance runs. */
   start(id: string): Promise<void>;
+  /** Ends its processes and boots it again, which runs its boot hooks; answers once it runs. */
+  restart(id: string): Promise<void>;
   /** Ends its processes; the disk stays, and it stays down until started. */
   stop(id: string): Promise<void>;
   /** Keeps memory and processes; the next request or command wakes it. */
@@ -197,6 +199,17 @@ export function agent37Api(key: string, endpoints: Agent37Endpoints = AGENT37_EN
     if (error instanceof Agent37Error && error.status === 404) return value;
     throw error;
   };
+  /** Waits for the instance to run, as after a start or a restart. */
+  const running = async (id: string): Promise<void> => {
+    const deadline = Date.now() + START_TIMEOUT_MS;
+    for (;;) {
+      const instance = await api.get(id);
+      if (instance?.status === "running") return;
+      if (!instance || instance.status === "failed") throw new Error(`The Agent37 instance did not start${instance?.status_reason ? `: ${instance.status_reason.message}` : "."}`);
+      if (Date.now() > deadline) throw new Error(`The Agent37 instance was still ${instance.status} after ${START_TIMEOUT_MS / 60_000} minutes.`);
+      await new Promise((resolve) => setTimeout(resolve, START_POLL_MS));
+    }
+  };
   const api: Agent37Api = {
     create: (params) => hosting("POST", "/instances", params),
     list: async () => (await hosting<{ data: Agent37Instance[] }>("GET", "/instances")).data,
@@ -210,14 +223,11 @@ export function agent37Api(key: string, endpoints: Agent37Endpoints = AGENT37_EN
       const started = await send<{ status?: string }>("POST", `${endpoints.api}/instances/${id}/start`, { authorization: `Bearer ${key}` });
       if (started.status === 200 && started.body?.status === "running") return;
       // 202: still starting.
-      const deadline = Date.now() + START_TIMEOUT_MS;
-      for (;;) {
-        const instance = await api.get(id);
-        if (instance?.status === "running") return;
-        if (!instance || instance.status === "failed") throw new Error(`The Agent37 instance did not start${instance?.status_reason ? `: ${instance.status_reason.message}` : "."}`);
-        if (Date.now() > deadline) throw new Error(`The Agent37 instance was still ${instance.status} after ${START_TIMEOUT_MS / 60_000} minutes.`);
-        await new Promise((resolve) => setTimeout(resolve, START_POLL_MS));
-      }
+      await running(id);
+    },
+    restart: async (id) => {
+      await hosting("POST", `/instances/${id}/restart`);
+      await running(id);
     },
     stop: async (id) => {
       await hosting("POST", `/instances/${id}/stop`);

@@ -168,7 +168,13 @@ export class CloudBrain {
    */
   async dialable(): Promise<boolean> {
     const stored = await this.record.read().catch(() => null);
-    if (stored?.service !== "agent37") return true;
+    return stored?.service !== "agent37" || this.machineRuns();
+  }
+
+  /** Whether the brain's machine runs now, as its service says. Never wakes it. */
+  async machineRuns(): Promise<boolean> {
+    const stored = await this.record.read().catch(() => null);
+    if (!stored) return false;
     const machine = await this.reach(stored)
       .then((access) => this.open(access, false))
       .catch(() => null);

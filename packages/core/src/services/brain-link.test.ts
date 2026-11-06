@@ -4,7 +4,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { acceptLink } from "@openorc/link";
 import { nodeCrypto } from "@openorc/link/node";
 import { socketPair } from "@openorc/link/test-fixtures/socket-pair";
-import { BrainLink, BrainOutOfReach } from "./brain-link.js";
+import { BrainLink, BrainOutOfReach, Refused } from "./brain-link.js";
 
 let server: Server | null = null;
 const sockets: Socket[] = [];
@@ -266,5 +266,66 @@ it("asks the brain for its key again when its address answers 404 at the path th
   paths.length = 0;
   await link.call("threads.list", {}, { wake: false }).catch(() => undefined);
   expect([paths, relearned, warnings.at(-1)]).toEqual([["/link/new", "/link/new"], 2, "the cloud brain could not be reached: its address answered 404 instead of the link"]);
+  link.close();
+});
+
+it("starts a brain found down in its running machine once, and leaves a machine alone whose brain will not start or that sleeps", async () => {
+  const brainKeys = nodeCrypto.generateKeyPair();
+  let up = false;
+  let runs = false;
+  let dials = 0;
+  const closes: (() => void)[] = [];
+  const dial = async () => {
+    dials++;
+    // Agent37 answers 502 for an instance with nothing on the brain's port, as a sleeping Vercel sandbox does.
+    if (!up) throw new Refused(502);
+    const { phone, mac } = socketPair();
+    void acceptLink({ socket: mac, crypto: nodeCrypto, local: brainKeys, admit: () => ({ ok: true, value: null, hello: { mac: { name: "Cloud" }, deviceId: "owner", routes: [] } }) }).then(
+      (accepted) => {
+        if (!accepted) return;
+        closes.push(() => accepted.session.close(1000, "gone"));
+        accepted.session.onMessage((message) => {
+          if (message.t === "rpc") accepted.session.send({ t: "rpc.result", id: message.id, result: null });
+        });
+      },
+    );
+    return phone;
+  };
+  let starts = 0;
+  let starting = () => void (up = true);
+  const warnings: string[] = [];
+  const link = new BrainLink({
+    endpoint: {
+      ready: async () => true,
+      locate: async () => ({ url: "ws://brain/link", brainKey: brainKeys.publicKey, ownerKeys: nodeCrypto.generateKeyPair() }),
+      running: async () => runs,
+      wake: async () => {
+        starts++;
+        starting();
+      },
+      projects: async () => ({ toCloud: () => null, toMac: () => null }),
+    },
+    log: { info: () => {}, warn: (text: string) => void warnings.push(text), error: () => {} } as never,
+    dial,
+    retryMs: 20,
+  });
+  link.start();
+  // A machine that does not run sleeps: its address refusing is no reason to start anything.
+  await vi.waitFor(() => expect(dials).toBeGreaterThan(2));
+  expect([starts, link.reach]).toEqual([0, "asleep"]);
+  runs = true;
+  await vi.waitFor(() => expect(link.reach).toBe("live"));
+  expect(starts).toBe(1);
+
+  // It stops again, and this time it does not start: once is tried, then the machine is not dialed until something changes.
+  up = false;
+  starting = () => undefined;
+  closes.at(-1)!();
+  await vi.waitFor(() => expect(starts).toBe(2));
+  await vi.waitFor(() => expect(link.reach).not.toBe("waking"));
+  const parked = dials;
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  expect([dials, starts]).toEqual([parked, 2]);
+  expect(warnings).toContain("the cloud brain's machine runs with no brain behind its address: starting the brain");
   link.close();
 });

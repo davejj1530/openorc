@@ -243,6 +243,9 @@ export function agent37Home(access: Extract<BrainAccess, { service: "agent37" }>
     // Nothing outside the instance starts the brain again when it stops while the instance runs, as the Vercel door does.
     startCommand: keptStart,
     keep: (brain, start) => brain.keep(start),
+    // A sleep ends what Agent37's exec started, the brain's keeper and every process under it, and a wake from sleep runs
+    // no hook, so only a brain the boot started is there when a phone wakes the instance. Seen on 2026-11-07.
+    boot: (brain) => api.restart(brain.instance.id),
     /**
      * Now while it runs or wakes; asleep, when Agent37 says it fell asleep less the brain's own idle time, since the brain
      * puts itself to sleep then while its instance's idle timeout runs longer. Reads only.

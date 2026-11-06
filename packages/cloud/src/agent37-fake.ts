@@ -1,7 +1,7 @@
 import { execFile, spawn } from "node:child_process";
 import { once } from "node:events";
 import { randomBytes } from "node:crypto";
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import http from "node:http";
 import net, { type AddressInfo } from "node:net";
 import os from "node:os";
@@ -39,6 +39,12 @@ interface Held {
   serverPort: number;
   /** The process groups its commands started. */
   groups: Set<number>;
+  /** The process groups its boot hook started. */
+  booted: Set<number>;
+  /** Its sleep ending what its commands started, which a wake waits for. */
+  ending?: Promise<void>;
+  /** Commands through exec not yet answered: a command running is activity, as on Agent37. */
+  running: number;
   /** Its restore, while a call waits for it. */
   waking?: Promise<void>;
   /** Puts it to sleep once nothing reached it for its idle time. */
@@ -111,6 +117,22 @@ function parse(body: Buffer): Record<string, unknown> {
   } catch {
     return {};
   }
+}
+
+/**
+ * How a process started in an instance: by a command through exec, or by its boot hook. A process that leaves its group,
+ * as setsid does, names its new group in the file `AGENT37_FAKE_PIDS` gives, so it ends with the others of its kind.
+ */
+type Origin = "exec" | "boot";
+
+const pidsFile = (entry: Held, origin: Origin) => path.join(entry.instance.mount_path, ".agent37-fake", `${origin}.pids`);
+
+/** The groups that processes started by `origin` made when they left theirs; the file is emptied. */
+async function namedGroups(entry: Held, origin: Origin): Promise<number[]> {
+  const file = pidsFile(entry, origin);
+  const named = (await readFile(file, "utf8").catch(() => "")).split("\n").filter(Boolean).map(Number);
+  await writeFile(file, "").catch(() => undefined);
+  return named;
 }
 
 /** Kills every process in `groups` and everything they started, as an instance stopping ends all of its processes. */
@@ -200,6 +222,7 @@ class FakeAccount {
    * stays down until started.
    */
   async awake(entry: Held): Promise<boolean> {
+    await entry.ending;
     if (entry.instance.status === "sleeping") {
       entry.instance.status = "waking";
       entry.waking = new Promise<void>((resolve) => setTimeout(resolve, this.options.wakeMs ?? 0).unref()).then(() => {
@@ -211,15 +234,49 @@ class FakeAccount {
     return entry.instance.status === "running";
   }
 
-  /** Something reached the instance: its idle time starts over. Asleep, it keeps its processes, as Agent37's sleep usually does. */
+  /**
+   * Ends the processes started one way or both, and forgets them. A sleep ends what its commands started, as Agent37's
+   * did on 2026-11-07, and keeps what its boot started, as Agent37's own processes stay.
+   */
+  async end(entry: Held, origins: readonly Origin[]): Promise<void> {
+    // Taken at once, so a command started meanwhile is not among them.
+    const taken = origins.map((origin) => {
+      const groups = origin === "exec" ? entry.groups : entry.booted;
+      const now = new Set(groups);
+      groups.clear();
+      return { origin, now };
+    });
+    for (const { origin, now } of taken) await killAll(new Set([...now, ...(await namedGroups(entry, origin))]));
+  }
+
+  /** Runs its boot hook in the background, as Agent37 does on every boot; the boot goes on whether it fails or not. */
+  async boot(entry: Held): Promise<void> {
+    const mount = entry.instance.mount_path;
+    const hook = path.join(mount, ".agent37", "hooks", "post-restart.sh");
+    if (!(await stat(hook).catch(() => null))) return;
+    await mkdir(path.dirname(pidsFile(entry, "boot")), { recursive: true });
+    const env = { ...this.environment(entry), AGENT37_FAKE_PIDS: pidsFile(entry, "boot") };
+    const child = spawn("bash", [hook], { cwd: mount, env, stdio: "ignore", detached: true });
+    if (child.pid) entry.booted.add(child.pid);
+    child.on("error", () => undefined);
+  }
+
+  environment(entry: Held): NodeJS.ProcessEnv {
+    const mount = entry.instance.mount_path;
+    return { ...(this.options.env?.() ?? process.env), ...entry.env, HOME: mount, PWD: mount, OPENORC_INSTANCE_PORT: String(entry.serverPort) };
+  }
+
+  /** Something reached the instance: its idle time starts over. */
   touch(entry: Held): void {
     clearTimeout(entry.idle);
     if (!entry.instance.auto_sleep || entry.instance.status !== "running") return;
     entry.idle = setTimeout(
       () => {
         if (entry.instance.status !== "running") return;
+        if (entry.running) return this.touch(entry);
         entry.instance.status = "sleeping";
         entry.instance.slept_at = Math.floor(Date.now() / 1000);
+        entry.ending = this.end(entry, ["exec"]).finally(() => (entry.ending = undefined));
       },
       this.options.idleMs ?? entry.instance.idle_timeout_seconds * 1000,
     ).unref();
@@ -253,7 +310,7 @@ class FakeAccount {
       past_due: false,
       created: Math.floor(Date.now() / 1000),
     };
-    const entry: Held = { instance, env: { ...params.env }, serverPort: await freePort(), groups: new Set() };
+    const entry: Held = { instance, env: { ...params.env }, serverPort: await freePort(), groups: new Set(), booted: new Set(), running: 0 };
     this.held.set(id, entry);
     this.touch(entry);
     return ok(instance, 201);
@@ -277,7 +334,7 @@ class FakeAccount {
   }
 
   async remove(entry: Held): Promise<Answer> {
-    await killAll(entry.groups);
+    await this.end(entry, ["exec", "boot"]);
     this.held.delete(entry.instance.id);
     await rm(entry.instance.mount_path, { recursive: true, force: true });
     return ok({ id: entry.instance.id, deleted: true });
@@ -292,23 +349,36 @@ class FakeAccount {
     return ok(opened, 201);
   }
 
+  /** Boots a stopped instance; a running one stays as it is. */
   start(entry: Held): Answer {
     const { instance } = entry;
-    if (!this.options.startMs) {
+    if (instance.status === "running") return ok({ id: instance.id, status: "running" });
+    const up = () => {
       instance.status = "running";
       this.touch(entry);
+      void this.boot(entry);
+    };
+    if (!this.options.startMs) {
+      up();
       return ok({ id: instance.id, status: "running" });
     }
     instance.status = "starting";
-    setTimeout(() => {
-      instance.status = "running";
-      this.touch(entry);
-    }, this.options.startMs).unref();
+    setTimeout(up, this.options.startMs).unref();
     return ok({ id: instance.id, status: "starting" }, 202);
   }
 
+  /** Ends every process and boots again; a sleeping or stopped one is refused, as Agent37 asks to wake or start it first. */
+  async restart(entry: Held): Promise<Answer> {
+    const { instance } = entry;
+    if (instance.status !== "running") return refused(400, "invalid_request", "Wake or start the instance before restarting it.");
+    await this.end(entry, ["exec", "boot"]);
+    this.touch(entry);
+    await this.boot(entry);
+    return ok({ id: instance.id, status: "running" });
+  }
+
   async down(entry: Held, status: "stopped" | "sleeping"): Promise<Answer> {
-    await killAll(entry.groups);
+    await this.end(entry, status === "sleeping" ? ["exec"] : ["exec", "boot"]);
     entry.instance.status = status;
     if (status === "sleeping") entry.instance.slept_at = Math.floor(Date.now() / 1000);
     return ok({ id: entry.instance.id, status });
@@ -322,13 +392,20 @@ class FakeAccount {
 
   async exec(entry: Held, command: string): Promise<Agent37ExecResult> {
     const mount = entry.instance.mount_path;
-    const env = { ...(this.options.env?.() ?? process.env), ...entry.env, HOME: mount, PWD: mount, OPENORC_INSTANCE_PORT: String(entry.serverPort) };
+    await mkdir(path.dirname(pidsFile(entry, "exec")), { recursive: true });
+    const env = { ...this.environment(entry), AGENT37_FAKE_PIDS: pidsFile(entry, "exec") };
     const child = spawn("sh", ["-c", command], { cwd: mount, env, stdio: ["ignore", "pipe", "pipe"], detached: true });
     if (child.pid) entry.groups.add(child.pid);
+    entry.running++;
     const stdout = capture(child.stdout);
     const stderr = capture(child.stderr);
-    const [code, signal] = (await once(child, "close")) as [number | null, NodeJS.Signals | null];
-    return { exit_code: code ?? 128 + (signal ? os.constants.signals[signal] : 0), stdout: stdout.text(), stderr: stderr.text(), truncated: stdout.cut || stderr.cut };
+    try {
+      const [code, signal] = (await once(child, "close")) as [number | null, NodeJS.Signals | null];
+      return { exit_code: code ?? 128 + (signal ? os.constants.signals[signal] : 0), stdout: stdout.text(), stderr: stderr.text(), truncated: stdout.cut || stderr.cut };
+    } finally {
+      entry.running--;
+      this.touch(entry);
+    }
   }
 
   async serveExec(request: http.IncomingMessage, url: URL, body: Buffer): Promise<Answer> {
@@ -376,6 +453,7 @@ const HOSTING: [string, RegExp, (account: FakeAccount, id: string, body: Record<
   ["DELETE", /^\/v1\/instances\/(\w+)$/, (account, id) => account.find(id, (entry) => account.remove(entry))],
   ["POST", /^\/v1\/instances\/(\w+)\/public-ports$/, (account, id, body) => account.find(id, (entry) => account.addPublicPort(entry, body))],
   ["POST", /^\/v1\/instances\/(\w+)\/start$/, (account, id) => account.find(id, (entry) => account.start(entry))],
+  ["POST", /^\/v1\/instances\/(\w+)\/restart$/, (account, id) => account.find(id, (entry) => account.restart(entry))],
   ["POST", /^\/v1\/instances\/(\w+)\/stop$/, (account, id) => account.find(id, (entry) => account.down(entry, "stopped"))],
   ["POST", /^\/v1\/instances\/(\w+)\/sleep$/, (account, id) => account.find(id, (entry) => account.down(entry, "sleeping"))],
   ["GET", /^\/v1\/usage$/, (account, _id, _body, url) => account.spending(url)],
@@ -471,7 +549,7 @@ export async function startFakeAgent37(dir: string, options: FakeAgent37Options 
     },
     close: async () => {
       for (const entry of account.held.values()) clearTimeout(entry.idle);
-      await Promise.all([...account.held.values()].map((entry) => killAll(entry.groups)));
+      await Promise.all([...account.held.values()].map((entry) => account.end(entry, ["exec", "boot"])));
       for (const socket of upgraded) socket.destroy();
       server.closeAllConnections();
       await new Promise((resolve) => server.close(resolve));

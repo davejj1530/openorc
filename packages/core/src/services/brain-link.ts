@@ -33,6 +33,8 @@ export interface BrainEndpoint {
   dialable?(): Promise<boolean>;
   /** Wakes the brain for a window's own intent, as Wake does; resolves once it runs. */
   wake(): Promise<void>;
+  /** Whether the brain's machine runs now, by its service. Never wakes it. */
+  running?(): Promise<boolean>;
   /** When the brain was last in use, by its service: now while it runs, null where it cannot say. Never wakes it. */
   lastUsed?(): Promise<number | null>;
   /** The brain answered at its address but not at its stored key's path, as once it was set up again: learn its key anew. */
@@ -58,7 +60,7 @@ export class BrainOutOfReach extends Error {
 export type BrainPush = { type: "push"; push: RemotePush } | { type: "gap"; runIds: string[] };
 
 /** A refused upgrade: the brain's address answers, but no brain runs there (410/502 while it sleeps). */
-class Refused extends Error {
+export class Refused extends Error {
   constructor(readonly status: number | undefined) {
     super(status ? `its address answered ${status} instead of the link` : "its address refused the link");
   }
@@ -110,6 +112,11 @@ export class BrainLink {
   private readonly pushes = new Set<(push: BrainPush) => void>();
   private readonly reaches = new Set<(reach: OwnerReach) => void>();
   private retry: ReturnType<typeof setInterval> | null = null;
+  /**
+   * A brain found down in its running machine was started once. Until a session runs or this Mac wakes it on purpose,
+   * it is neither started nor dialed again, so a machine whose brain will not start is left to sleep.
+   */
+  private restarted = false;
   private closed = false;
   private dialed = 0;
 
@@ -131,9 +138,10 @@ export class BrainLink {
   /** Dials now and every few minutes while not connected. */
   start(): void {
     this.closed = false;
+    this.restarted = false;
     if (this.retry) return;
     void this.connect();
-    this.retry = setInterval(() => void (this.session ? undefined : this.connect()), this.deps.retryMs ?? RETRY_MS);
+    this.retry = setInterval(() => void (this.session || this.restarted ? undefined : this.connect()), this.deps.retryMs ?? RETRY_MS);
     this.retry.unref();
   }
 
@@ -183,6 +191,7 @@ export class BrainLink {
 
   /** Wakes the brain for this Mac's own sake, as Wake does, then dials it. */
   async bringUp(): Promise<void> {
+    this.restarted = false;
     await this.wake();
     await this.connect(true);
   }
@@ -190,6 +199,7 @@ export class BrainLink {
   /** After something this Mac did that may have woken the brain: dial, at most every few seconds. */
   awoke(): void {
     if (this.session || this.closed || Date.now() - this.dialed < 5_000) return;
+    this.restarted = false;
     void this.connect();
   }
 
@@ -201,6 +211,19 @@ export class BrainLink {
     this.session?.close(1000, "closing");
     this.session = null;
     this.set("offline");
+  }
+
+  /** Starts the brain its running machine lost, once, then dials it. */
+  private async restart(): Promise<PhoneSession | null> {
+    this.restarted = true;
+    this.deps.log.warn("the cloud brain's machine runs with no brain behind its address: starting the brain");
+    try {
+      await this.wake();
+    } catch (error) {
+      this.failed(`starting it failed: ${error instanceof Error ? error.message : String(error)}`);
+      return null;
+    }
+    return this.open(true);
   }
 
   /** Says once why dials stop short of the brain, since nothing on screen does. */
@@ -265,6 +288,9 @@ export class BrainLink {
         await this.deps.endpoint.relearn().catch(() => undefined);
         return this.open(true, true);
       }
+      // Its machine runs with nothing behind its address: the brain stopped there, as Agent37's sleep can stop it, and
+      // only its owner starts it again.
+      if (error instanceof Refused && !woke && !this.restarted && (await this.deps.endpoint.running?.().catch(() => false))) return this.restart();
       this.failed(error instanceof Error ? error.message : String(error));
       this.fell(error instanceof Refused ? "asleep" : "offline");
       return null;
@@ -287,6 +313,7 @@ export class BrainLink {
 
   private adopt(session: PhoneSession): void {
     this.session = session;
+    this.restarted = false;
     this.set("live");
     const ping = setInterval(() => session.send({ t: "ping", id: 0 }), this.deps.pingMs ?? PING_MS);
     ping.unref();

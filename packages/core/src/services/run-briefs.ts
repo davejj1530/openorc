@@ -1,4 +1,4 @@
-import { orclings, tasks, threads, type Db } from "@openorc/db";
+import { cloudWorkspaces, orclings, tasks, threads, type Db } from "@openorc/db";
 import { WORKSPACE_ID, type Project, type RunMode, type Task, type Thread } from "@openorc/protocol";
 import type { RunHooks } from "./run-types.js";
 
@@ -97,8 +97,13 @@ export class RunBriefs {
     if (project.id === WORKSPACE_ID) {
       return `You are in Workspace conversation "${thread.title}", working in ${project.rootPath}. Workspace is your personal conversation home, not a repository. This folder need not be an imported project or a Git repository. Do not import projects automatically. Respect the current permissions for every operation.`;
     }
+    const head = thread.branch ? `on branch ${thread.branch}` : "at a detached commit, on no branch";
+    // A cloud thread's agent runs in its sandbox, where the worktree's path on the machine that keeps the thread is not.
+    const cloud = cloudWorkspaces.get(this.db, thread.id);
+    if (cloud && cloud.state !== "removed") {
+      return `You are in the thread "${thread.title}" for project ${project.name}, working in this thread's cloud sandbox: your current working directory is its copy of the project, ${head}.`;
+    }
     if (thread.worktreePath) {
-      const head = thread.branch ? `on branch ${thread.branch}` : "at a detached commit, on no branch";
       return `You are in the thread "${thread.title}" for project ${project.name}, working in this thread's own worktree at ${thread.worktreePath} ${head}.`;
     }
     return `You are in the thread "${thread.title}" for project ${project.name}, working directly in the project folder at ${project.rootPath}${project.defaultBranch ? ` on ${project.defaultBranch}` : ""}.`;

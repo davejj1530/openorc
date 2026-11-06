@@ -1,9 +1,19 @@
 import { useState, type ReactNode } from "react";
-import { SANDBOX_VCPUS, type BrainRegion, type ClaudeAccountConnection, type ClaudeCloudAccess, type CloudService, type CloudSignIns, type CloudStatus } from "@openorc/protocol";
+import {
+  SANDBOX_VCPUS,
+  type BrainRegion,
+  type ClaudeAccountConnection,
+  type ClaudeCloudAccess,
+  type CloudBrainStatus,
+  type CloudService,
+  type CloudSignIns,
+  type CloudStatus,
+} from "@openorc/protocol";
 import { Button, Select, TextButton, Tooltip } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { Agent37Settings, CloudServiceChoice } from "./settings-cloud-agent37";
 import { CloudBrain } from "./settings-cloud-brain";
+import { BrainCodexRow, BrainGitHubSection } from "./settings-cloud-brain-signins";
 import { RegionSelect } from "./settings-cloud-place";
 import { CloudCheckCard } from "./settings-cloud-check";
 import { CloudSandboxesSection } from "./settings-cloud-sandboxes";
@@ -249,8 +259,13 @@ function ServiceStep({ status }: { status: CloudStatus }) {
   );
 }
 
-/** The one step that brings every missing sign-in, above the agents' own rows, while any is missing. */
-function SignInsStep({ status, signIns, active }: { status: CloudStatus; signIns: CloudSignIns | undefined; active: boolean }) {
+/**
+ * Every sign-in the cloud uses, in one place: the one row that brings each missing one, then each agent's, the cloud
+ * brain's own Codex login and GitHub among them once there is a brain.
+ */
+function SignInsStep({ status, signIns, brain, active }: { status: CloudStatus; signIns: CloudSignIns | undefined; brain: CloudBrainStatus | undefined; active: boolean }) {
+  const onBrain = signIns?.rows.some((row) => row.kind === "brain-codex") ?? false;
+  const busy = brain?.state === "ready" && brain.working !== null;
   return (
     <>
       {signIns && (signIns.bringing || missingRows(signIns).length) ? (
@@ -259,8 +274,9 @@ function SignInsStep({ status, signIns, active }: { status: CloudStatus; signIns
         </div>
       ) : null}
       <ClaudeCloudAccounts status={status} active={active} />
-      <CodexCloudSection codex={status.codex} />
+      <CodexCloudSection codex={status.codex} brain={onBrain ? <BrainCodexRow active={active} busy={busy} /> : undefined} />
       <OpenCodeCloudSection opencode={status.opencode} />
+      {onBrain ? <BrainGitHubSection active={active} busy={busy} /> : null}
     </>
   );
 }
@@ -305,7 +321,7 @@ export function CloudSettings({ active }: { active: boolean }) {
       ) : null}
       <div className="cloud-steps">
         {step("service", <ServiceStep status={status.data} />)}
-        {step("signins", <SignInsStep status={status.data} signIns={signIns.data} active={active} />)}
+        {step("signins", <SignInsStep status={status.data} signIns={signIns.data} brain={brain.data} active={active} />)}
         {step("check", <CloudCheckCard check={status.data.check} place={offer.data?.provider ?? null} />)}
         {step("brain", service ? <CloudBrain active={active} service={service} services={connected(status.data)} /> : null)}
       </div>

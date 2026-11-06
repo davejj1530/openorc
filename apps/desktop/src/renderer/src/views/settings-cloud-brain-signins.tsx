@@ -4,7 +4,7 @@ import { Button, Switch, TextButton, Tooltip } from "../components/ui";
 import { queryClient, useRpc, useRpcMutation } from "../lib/client";
 import { codexWho } from "./settings-cloud-codex";
 import { Failure, StillWorks, TokenField, type RevokedAt } from "./settings-secret-field";
-import { SettingRow, Status } from "./settings-shared";
+import { Section, SettingRow, Status } from "./settings-shared";
 
 const KEYS_URL = "https://platform.openai.com/api-keys";
 const shown = (signIns: SignIns) => queryClient.setQueryData(["cloud.brain.signIns", {}], signIns);
@@ -49,6 +49,7 @@ function CodexControls({ codex, act }: { codex: SignIns["codex"]; act: CodexActi
   if (codex.mode)
     return (
       <>
+        <Status ok>Ready</Status>
         {codex.mode === "chatgpt" ? (
           <TextButton tone="muted" disabled={act.pending} onClick={act.open}>
             Sign in again
@@ -71,7 +72,7 @@ function CodexControls({ codex, act }: { codex: SignIns["codex"]; act: CodexActi
   );
 }
 
-/** The brain's own Codex login: a ChatGPT sign-in made from here for it alone, or an API key. */
+/** The brain's own Codex login, beside this Mac's cloud threads' one: a ChatGPT sign-in made from here for it alone, or an API key. */
 function BrainCodex({ codex, busy }: { codex: SignIns["codex"]; busy: boolean }) {
   const signIn = useRpcMutation("cloud.brain.codex.signIn");
   const cancel = useRpcMutation("cloud.brain.codex.cancel");
@@ -111,7 +112,7 @@ function BrainCodex({ codex, busy }: { codex: SignIns["codex"]; busy: boolean })
     );
   return (
     <>
-      <SettingRow label="Codex" hint={codexHint(codex)}>
+      <SettingRow label="Cloud brain" hint={codexHint(codex)}>
         <CodexControls codex={codex} act={act} />
       </SettingRow>
       {pasting && !codex.mode && !codex.signingIn && !codex.pending ? (
@@ -151,7 +152,7 @@ function BrainGitHub({ github, busy }: { github: SignIns["github"]; busy: boolea
     />
   );
   return (
-    <SettingRow label="GitHub" hint={github.on ? github.blocked : null}>
+    <SettingRow label="Cloud brain" hint={github.on ? github.blocked : null}>
       {github.behind ? <Send busy={busy} /> : null}
       {blocked ? <Tooltip label={blocked}>{toggle}</Tooltip> : toggle}
     </SettingRow>
@@ -164,14 +165,29 @@ function Handed({ label, handed, busy }: { label: string; handed: SignIns["push"
   return <SettingRow label={label}>{handed.behind ? <Send busy={busy} /> : <Status ok>On</Status>}</SettingRow>;
 }
 
-/** What the brain signs in with besides Claude. `busy` while the brain is at another operation. */
-export function CloudBrainSignIns({ active, busy }: { active: boolean; busy: boolean }) {
+/** The brain's Codex login, a row of the agents' sign-ins. `busy` while the brain is at another operation. */
+export function BrainCodexRow({ active, busy }: { active: boolean; busy: boolean }) {
+  const signIns = useRpc("cloud.brain.signIns", {}, { enabled: active });
+  return signIns.data ? <BrainCodex codex={signIns.data.codex} busy={busy} /> : null;
+}
+
+/** GitHub for the brain's threads, among the agents' sign-ins. */
+export function BrainGitHubSection({ active, busy }: { active: boolean; busy: boolean }) {
+  const signIns = useRpc("cloud.brain.signIns", {}, { enabled: active });
+  if (!signIns.data) return null;
+  return (
+    <Section title="GitHub" description="Threads on the cloud brain push and open pull requests with this Mac's GitHub sign-in.">
+      <BrainGitHub github={signIns.data.github} busy={busy} />
+    </Section>
+  );
+}
+
+/** The keys of this Mac's the brain keeps a copy of, which need no sign-in. */
+export function CloudBrainHanded({ active, busy }: { active: boolean; busy: boolean }) {
   const signIns = useRpc("cloud.brain.signIns", {}, { enabled: active });
   if (!signIns.data) return null;
   return (
     <>
-      <BrainCodex codex={signIns.data.codex} busy={busy} />
-      <BrainGitHub github={signIns.data.github} busy={busy} />
       <Handed label="Notifications" handed={signIns.data.push} busy={busy} />
       <Handed label="Anthropic API key" handed={signIns.data.memory} busy={busy} />
     </>

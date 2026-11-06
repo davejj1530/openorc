@@ -123,10 +123,10 @@ it("shows the cloud brain once either service is connected, on Agent37 alone too
   expect((screen.getByRole("button", { name: /^Set up the cloud brain/ }) as HTMLButtonElement).disabled).toBe(true);
 });
 
-type Answers = { cloud: CloudStatus; place: CloudProvider | null; signIns?: CloudSignIns; brain?: CloudBrainStatus };
+type Answers = { cloud: CloudStatus; place: CloudProvider | null; signIns?: CloudSignIns; brain?: CloudBrainStatus; more?: Record<string, unknown> };
 
-function showSteps({ cloud, place, signIns = { rows: [], bringing: false }, brain = { state: "none", error: null } }: Answers) {
-  const by: Record<string, unknown> = { ...answers, "cloud.status": cloud, "cloud.offer": { offered: true, provider: place }, "cloud.signIns": signIns, "cloud.brain.status": brain };
+function showSteps({ cloud, place, signIns = { rows: [], bringing: false }, brain = { state: "none", error: null }, more = {} }: Answers) {
+  const by: Record<string, unknown> = { ...answers, ...more, "cloud.status": cloud, "cloud.offer": { offered: true, provider: place }, "cloud.signIns": signIns, "cloud.brain.status": brain };
   vi.mocked(core.call).mockImplementation(async (method: string) => by[method] as never);
   render(
     <QueryClientProvider client={queryClient}>
@@ -173,6 +173,47 @@ it("judges the check by where new threads run: a Vercel failure from before Agen
   expect(within(stepOf("Sign in your agents")).getByText("Claude · Personal ready")).toBeTruthy();
 });
 
+it("keeps every sign-in in one step, the cloud brain's own Codex login and GitHub among them, counted once", async () => {
+  const brainAnswers = {
+    "cloud.brain.signIns": {
+      codex: { mode: null, email: null, plan: null, signingIn: false, pending: null, error: null },
+      github: { on: false, blocked: null, behind: false },
+      push: { has: true, behind: false },
+      memory: { has: false, behind: false },
+    },
+    "cloud.brain.phones": [],
+    "cloud.brain.projects": [],
+    "cloud.brain.cost": null,
+  };
+  showSteps({
+    more: brainAnswers,
+    cloud: { ...status, codex: { ...status.codex, mode: "chatgpt", email: "me@example.com", plan: "pro" } },
+    place: "vercel",
+    brain: { state: "ready", service: "vercel", region: "sin1", machine: "asleep", claude: ["Personal"], behind: false, working: null, door: null, threads: 0, error: null },
+    signIns: {
+      rows: [
+        { kind: "claude", accountId: "claude-cli", label: "Personal", state: "ready", way: "browser", error: null },
+        { kind: "codex", label: "Codex", state: "ready", way: "browser", error: null },
+        { kind: "brain-codex", label: "Codex on the cloud brain", state: "missing", way: "browser", error: null },
+        { kind: "github", label: "GitHub", state: "missing", way: "copy", error: null },
+      ],
+      bringing: false,
+    },
+  });
+  expect(await screen.findByText("Claude · Personal, Codex ready · 2 not signed in")).toBeTruthy();
+  fireEvent.click(stepButton("Sign in your agents"));
+  const signIns = stepOf("Sign in your agents");
+  expect(within(signIns).getByText("2 not signed in")).toBeTruthy();
+  const codex = within(signIns).getByRole("heading", { name: "Codex" }).closest("section") as HTMLElement;
+  expect(await within(codex).findByText("Cloud brain")).toBeTruthy();
+  expect(within(codex).getByText("This Mac's cloud threads")).toBeTruthy();
+  expect(within(signIns).getByRole("switch", { name: "GitHub" })).toBeTruthy();
+  const brain = stepOf("Set up the cloud brain");
+  expect(await within(brain).findByText("From this Mac")).toBeTruthy();
+  expect(within(brain).queryByText("Cloud brain")).toBeNull();
+  expect(within(brain).queryByRole("switch", { name: "GitHub", hidden: true })).toBeNull();
+});
+
 it("closes every step once cloud threads can run, each saying where it stands, and opens one on a click", async () => {
   const steps = (["sandbox", "tools", "runner", "relay", "signins", "sync", "remove"] as const).map((step) => ({ step, state: "done" as const, ms: 10, detail: null, error: null }));
   showSteps({
@@ -188,7 +229,7 @@ it("closes every step once cloud threads can run, each saying where it stands, a
   });
   expect(await screen.findByText("Passed on Vercel")).toBeTruthy();
   expect(screen.getByText("Vercel · Acme")).toBeTruthy();
-  expect(screen.getByText("Claude · Personal ready, 1 more can sign in")).toBeTruthy();
+  expect(screen.getByText("Claude · Personal ready · 1 not signed in")).toBeTruthy();
   for (const title of ["Connect a cloud service", "Sign in your agents", "Run the cloud check", "Set up the cloud brain"]) {
     expect(stepButton(title).getAttribute("aria-expanded")).toBe("false");
   }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { CodexCloudAccess } from "@openorc/protocol";
 import { Button, TextButton } from "../components/ui";
 import { useRpcMutation } from "../lib/client";
@@ -57,11 +57,15 @@ function Controls({ codex, act }: { codex: CodexCloudAccess; act: Mutations }) {
   );
 }
 
+const ALONE = "Codex signs in to sandboxes with a ChatGPT sign-in of its own, never this Mac's, or an API key.";
+/** Why there are two rows once there is a cloud brain: a ChatGPT login's refresh works in one place. */
+const WITH_BRAIN = "A ChatGPT sign-in works in one place at a time, so this Mac's cloud threads and the cloud brain each need their own. An API key works for both.";
+
 /**
  * How Codex signs in to sandboxes: a ChatGPT sign-in of its own, so a sandbox never shares this Mac's login, or an
- * OpenAI API key.
+ * OpenAI API key. With a cloud brain, `brain` is its own login's row, under this one.
  */
-export function CodexCloudSection({ codex }: { codex: CodexCloudAccess }) {
+export function CodexCloudSection({ codex, brain }: { codex: CodexCloudAccess; brain?: ReactNode }) {
   const signIn = useRpcMutation("cloud.codex.signIn");
   const cancel = useRpcMutation("cloud.codex.cancel");
   const apiKey = useRpcMutation("cloud.codex.apiKey");
@@ -88,8 +92,8 @@ export function CodexCloudSection({ codex }: { codex: CodexCloudAccess }) {
   };
   const error = signIn.error ?? cancel.error ?? apiKey.error ?? remove.error ?? (codex.error ? new Error(codex.error) : null);
   return (
-    <Section title="Codex" description="Codex signs in to sandboxes with a ChatGPT sign-in of its own, never this Mac's, or an API key.">
-      <SettingRow label="Sign-in" hint={hint(codex)}>
+    <Section title="Codex" description={brain ? WITH_BRAIN : ALONE}>
+      <SettingRow label={brain ? "This Mac's cloud threads" : "Sign-in"} hint={hint(codex)}>
         <Controls codex={codex} act={act} />
       </SettingRow>
       {pasting && !codex.mode && !codex.signingIn ? (
@@ -112,6 +116,7 @@ export function CodexCloudSection({ codex }: { codex: CodexCloudAccess }) {
       ) : null}
       <StillWorks at={remove.isSuccess && !codex.mode ? removed : null} />
       <Failure error={error} />
+      {brain}
     </Section>
   );
 }

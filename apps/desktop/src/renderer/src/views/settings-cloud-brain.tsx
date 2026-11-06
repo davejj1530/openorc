@@ -6,7 +6,7 @@ import { useRpc, useRpcMutation } from "../lib/client";
 import { MoveBrain, MoveNote, MovingBrain } from "./settings-cloud-brain-move";
 import { CloudBrainPhones } from "./settings-cloud-brain-phones";
 import { CloudBrainProjects } from "./settings-cloud-brain-projects";
-import { CloudBrainSignIns } from "./settings-cloud-brain-signins";
+import { CloudBrainHanded } from "./settings-cloud-brain-signins";
 import { BringMissing } from "./settings-cloud-sign-ins";
 import { RegionSelect, SERVICE_NAMES, placeWords } from "./settings-cloud-place";
 import { Failure, StillWorks } from "./settings-secret-field";
@@ -234,11 +234,11 @@ function BrainCard({ brain, active, services, busy, waking }: { brain: Ready; ac
 
 type Ready = Extract<CloudBrainStatus, { state: "ready" }>;
 
-/** What the brain signs in with: the Claude accounts handed to it, Codex, GitHub and the keys it keeps a copy of. */
-function BrainSignIns({ brain, active, busy }: { brain: Ready; active: boolean; busy: boolean }) {
+/** What this Mac handed the brain: its Claude accounts and the keys it keeps a copy of. Its own sign-ins are with the agents'. */
+function FromThisMac({ brain, active, busy }: { brain: Ready; active: boolean; busy: boolean }) {
   const handover = useRpcMutation("cloud.brain.handover");
   return (
-    <Section title="Sign-ins">
+    <Section title="From this Mac">
       <SettingRow label="Claude accounts" hint={brain.claude.length ? brain.claude.join(", ") : "None"}>
         {brain.working === "sending" || handover.isPending ? <Status>Sending</Status> : null}
         {brain.behind && !busy && !handover.isPending ? (
@@ -247,19 +247,19 @@ function BrainSignIns({ brain, active, busy }: { brain: Ready; active: boolean; 
           </TextButton>
         ) : null}
       </SettingRow>
-      <CloudBrainSignIns active={active} busy={busy} />
+      <CloudBrainHanded active={active} busy={busy} />
     </Section>
   );
 }
 
-/** A brain set up: its own card, then the phones that reach it, what it signs in with, and the projects it works in. */
+/** A brain set up: its own card, then the phones that reach it, what this Mac handed it, and the projects it works in. */
 function ReadyBrain({ brain, active, services }: { brain: Ready; active: boolean; services: CloudService[] }) {
   const busy = brain.working !== null;
   return (
     <>
       <BrainCard brain={brain} active={active} services={services} busy={busy} waking={brain.working === "waking"} />
       <CloudBrainPhones active={active} busy={busy} again={Boolean(brain.pairAgain)} />
-      <BrainSignIns brain={brain} active={active} busy={busy} />
+      <FromThisMac brain={brain} active={active} busy={busy} />
       <CloudBrainProjects active={active} />
     </>
   );

@@ -3,7 +3,7 @@ import { Check, ChevronDown, Loader2, X } from "../components/icons";
 import type { CloudBrainStatus, CloudCheck, CloudProvider, CloudService, CloudSignIns, CloudStatus } from "@openorc/protocol";
 import { CHECK_STEP_LABELS } from "./settings-cloud-check";
 import { SERVICE_NAMES, placeWords } from "./settings-cloud-place";
-import { signInTitle } from "./settings-cloud-sign-ins";
+import { missingRows, notSignedIn, signInTitle } from "./settings-cloud-sign-ins";
 import { SectionLevel } from "./settings-shared";
 import "./settings-cloud-steps.css";
 
@@ -46,13 +46,16 @@ function serviceStep(status: CloudStatus): CloudStepView {
   return { state: "done", summary: service === "vercel" && vercel?.team ? `Vercel · ${vercel.team.name}` : SERVICE_NAMES[service] };
 }
 
-/** Done once one agent can sign in there: a cloud thread runs with that agent. The cloud brain's own sign-ins are its step's. */
+/**
+ * Done once one agent can sign in there: a cloud thread runs with that agent. Says what is ready of every sign-in the
+ * step shows, the cloud brain's among them, and how many are missing, the same count as its Bring them row.
+ */
 function signInsStep(signIns: CloudSignIns | undefined): CloudStepView {
-  const rows = (signIns?.rows ?? []).filter((row) => row.kind === "claude" || row.kind === "codex" || row.kind === "opencode");
-  const ready = rows.filter((row) => row.state === "ready");
-  if (!ready.length) return { state: signIns?.bringing ? "running" : "todo", summary: "One agent is enough to start." };
-  const left = rows.length - ready.length;
-  return { state: "done", summary: `${ready.map(signInTitle).join(", ")} ready${left ? `, ${left} more can sign in` : ""}` };
+  const ready = (signIns?.rows ?? []).filter((row) => row.state === "ready");
+  if (!ready.some((row) => row.kind === "claude" || row.kind === "codex" || row.kind === "opencode"))
+    return { state: signIns?.bringing ? "running" : "todo", summary: "One agent is enough to start." };
+  const left = missingRows(signIns).length;
+  return { state: "done", summary: `${ready.map(signInTitle).join(", ")} ready${left ? ` · ${notSignedIn(left)}` : ""}` };
 }
 
 /** Only a check of where new cloud threads run now counts; one from before a service changed is ignored. */

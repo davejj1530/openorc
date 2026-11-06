@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import type { CloudBrainSignIns, CloudBrainStatus } from "@openorc/protocol";
 import { afterEach, expect, it, vi } from "vitest";
 import { CloudBrain } from "./settings-cloud-brain";
+import { BrainCodexRow, BrainGitHubSection } from "./settings-cloud-brain-signins";
 import { queryClient } from "../lib/client";
 import { core } from "../lib/rpc";
 
@@ -34,20 +35,29 @@ function show(signIns: CloudBrainSignIns, status: CloudBrainStatus = ready) {
     if (method.startsWith("cloud.brain.codex.") || method === "cloud.brain.github" || method === "cloud.brain.signIns") return signIns as never;
     return status as never;
   });
+  // As Settings shows them: the brain's Codex row among the agents' sign-ins, GitHub after them, then the brain's step.
   render(
     <QueryClientProvider client={queryClient}>
+      <div data-testid="codex">
+        <BrainCodexRow active busy={false} />
+      </div>
+      <BrainGitHubSection active busy={false} />
       <CloudBrain active service="vercel" />
     </QueryClientProvider>,
   );
 }
 
-const row = (label: string) => screen.getByText(label, { selector: ".settings-field > span > span:first-child" }).closest(".settings-field") as HTMLElement;
+const row = (label: string, scope: HTMLElement = document.body) => within(scope).getByText(label, { selector: ".settings-field > span > span:first-child" }).closest(".settings-field") as HTMLElement;
+/** The brain's Codex row, once it shows. */
+const codex = () => row("Cloud brain", screen.getByTestId("codex"));
+const githubRow = () => row("Cloud brain", screen.getByRole("heading", { name: "GitHub" }).closest("section") as HTMLElement);
 const github = () => screen.getByRole("switch", { name: "GitHub" }) as HTMLInputElement;
 
 it("lists what the brain signs in with besides Claude, quietly, and no notifications row before it has a push key", async () => {
   show({ ...none, codex: { ...none.codex, mode: "chatgpt", email: "brain@example.com", plan: "pro" }, github: { on: true, blocked: null, behind: false }, push: { has: true, behind: false } });
-  await screen.findByText("Codex");
-  expect(within(row("Codex")).getByText("brain@example.com · ChatGPT Pro")).toBeTruthy();
+  await waitFor(codex);
+  expect(within(codex()).getByText("brain@example.com · ChatGPT Pro")).toBeTruthy();
+  expect(within(codex()).getByText("Ready")).toBeTruthy();
   expect(github().checked).toBe(true);
   expect(within(row("Notifications")).getByText("On")).toBeTruthy();
   expect(screen.queryByText("Anthropic API key")).toBeNull();
@@ -56,8 +66,8 @@ it("lists what the brain signs in with besides Claude, quietly, and no notificat
   cleanup();
   queryClient.clear();
   show(none);
-  await screen.findByText("Codex");
-  expect(within(row("Codex")).getByText("Not signed in")).toBeTruthy();
+  await waitFor(codex);
+  expect(within(codex()).getByText("Not signed in")).toBeTruthy();
   expect(github().checked).toBe(false);
   expect(screen.queryByText("Notifications")).toBeNull();
 });
@@ -87,10 +97,10 @@ it("signs the brain in to Codex from here in the browser, or with an API key", a
 it("waits for the browser with a way to cancel, and offers Send only for what this Mac has not handed over", async () => {
   show({ ...none, codex: { ...none.codex, signingIn: true }, push: { has: true, behind: true } });
   expect(await screen.findByText("Waiting for sign-in")).toBeTruthy();
-  expect(within(row("Codex")).getByText("Sign in to ChatGPT in the browser that opened.")).toBeTruthy();
-  fireEvent.click(within(row("Codex")).getByRole("button", { name: "Cancel" }));
+  expect(within(codex()).getByText("Sign in to ChatGPT in the browser that opened.")).toBeTruthy();
+  fireEvent.click(within(codex()).getByRole("button", { name: "Cancel" }));
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.codex.cancel", {}));
-  expect(within(row("Codex")).queryByRole("button", { name: "Send" })).toBeNull();
+  expect(within(codex()).queryByRole("button", { name: "Send" })).toBeNull();
   fireEvent.click(within(row("Notifications")).getByRole("button", { name: "Send" }));
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.handover", {}));
 });
@@ -98,30 +108,30 @@ it("waits for the browser with a way to cancel, and offers Send only for what th
 it("shows a login on its way to the brain, or its sign-out, as waiting for it, with a way to send it again", async () => {
   show({ ...none, codex: { ...none.codex, pending: { mode: "apiKey", email: null, plan: null } } });
   expect(await screen.findByText("Waiting for the brain")).toBeTruthy();
-  expect(within(row("Codex")).getByText("An OpenAI API key, billed by the token")).toBeTruthy();
-  expect(within(row("Codex")).queryByRole("button", { name: "Sign in" })).toBeNull();
-  fireEvent.click(within(row("Codex")).getByRole("button", { name: "Send" }));
+  expect(within(codex()).getByText("An OpenAI API key, billed by the token")).toBeTruthy();
+  expect(within(codex()).queryByRole("button", { name: "Sign in" })).toBeNull();
+  fireEvent.click(within(codex()).getByRole("button", { name: "Send" }));
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.handover", {}));
 
   cleanup();
   queryClient.clear();
   show({ ...none, codex: { ...none.codex, mode: "chatgpt", email: "brain@example.com", plan: null, pending: "sign-out" } });
   expect(await screen.findByText("Waiting for the brain")).toBeTruthy();
-  expect(within(row("Codex")).getByText("brain@example.com")).toBeTruthy();
-  expect(within(row("Codex")).queryByRole("button", { name: "Remove" })).toBeNull();
+  expect(within(codex()).getByText("brain@example.com")).toBeTruthy();
+  expect(within(codex()).queryByRole("button", { name: "Remove" })).toBeNull();
 });
 
 it("says why nothing reached the brain when GitHub is on and this Mac's GitHub CLI is signed out", async () => {
   const blocked = "The GitHub CLI isn't signed in to github.com on this Mac.";
   show({ ...none, github: { on: true, blocked, behind: false } });
-  await screen.findByText("Codex");
+  await waitFor(codex);
   expect([github().checked, github().disabled]).toEqual([true, false]);
-  expect(within(row("GitHub")).getByText(blocked)).toBeTruthy();
+  expect(within(githubRow()).getByText(blocked)).toBeTruthy();
 });
 
 it("switches GitHub on and off here, disabled with the reason only on hover while this Mac's GitHub CLI is signed out", async () => {
   show(none);
-  await screen.findByText("Codex");
+  await waitFor(codex);
   fireEvent.click(github());
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.github", { on: true }));
 
@@ -130,7 +140,7 @@ it("switches GitHub on and off here, disabled with the reason only on hover whil
   vi.mocked(core.call).mockReset();
   const blocked = "The GitHub CLI isn't signed in to github.com on this Mac.";
   show({ ...none, github: { on: false, blocked, behind: false } });
-  await screen.findByText("Codex");
+  await waitFor(codex);
   expect([github().disabled, github().closest("[data-tooltip]")?.getAttribute("data-tooltip")]).toEqual([true, blocked]);
   expect(screen.queryByText(blocked)).toBeNull();
   fireEvent.click(github());
@@ -140,8 +150,8 @@ it("switches GitHub on and off here, disabled with the reason only on hover whil
 it("says once the brain's Codex login is removed that it stays signed in at OpenAI, and where to log it out", async () => {
   window.openorc = { ...window.openorc, openExternal: vi.fn() };
   show({ ...none, codex: { ...none.codex, mode: "chatgpt", email: "brain@example.com", plan: "pro" } });
-  await screen.findByText("Codex");
-  fireEvent.click(within(row("Codex")).getByRole("button", { name: "Remove" }));
+  await waitFor(codex);
+  fireEvent.click(within(codex()).getByRole("button", { name: "Remove" }));
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.brain.codex.remove", {}));
   const chatgpt = await screen.findByRole("button", { name: "ChatGPT" });
   expect(chatgpt.closest("p")?.textContent).toBe("Removed from OpenOrc. It stays signed in until you log out its session in ChatGPT, under Settings > Security.");

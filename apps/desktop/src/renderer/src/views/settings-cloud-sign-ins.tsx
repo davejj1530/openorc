@@ -22,6 +22,9 @@ export function missingRows(signIns: CloudSignIns | undefined): CloudSignIn[] {
   return (signIns?.rows ?? []).filter((row) => row.way !== "key" && (row.state === "missing" || row.state === "failed"));
 }
 
+/** How many sign-ins are still missing, said the same in the step's summary and on its Bring them row. */
+export const notSignedIn = (count: number) => `${count} not signed in`;
+
 /** A row names its agent where the name alone could be another's: Claude's accounts beside OpenCode's providers. */
 export function signInTitle(row: CloudSignIn): string {
   if (row.kind === "claude") return `Claude · ${row.label}`;
@@ -54,7 +57,7 @@ export function BringMissing({ signIns, label = "Sign-ins" }: { signIns: CloudSi
   if (!missing.length) return null;
   return (
     <>
-      <SettingRow label={label} hint={missing.length === 1 ? "1 missing" : `${missing.length} missing`}>
+      <SettingRow label={label} hint={notSignedIn(missing.length)}>
         <Button variant="primary" disabled={bringAll.isPending} onClick={() => (copies.length ? setAsking(true) : start(false))}>
           Bring them
         </Button>

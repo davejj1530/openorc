@@ -34,7 +34,7 @@ const row = (label: string) => screen.getByText(label, { selector: ".settings-fi
 
 it("counts the sign-ins it can bring, leaving out a key that must be typed in", () => {
   show({ rows, bringing: false });
-  expect(within(row("Sign-ins")).getByText("3 missing")).toBeTruthy();
+  expect(within(row("Sign-ins")).getByText("3 not signed in")).toBeTruthy();
 });
 
 it("copies this Mac's keys only after a yes, and brings the browser sign-ins either way", async () => {

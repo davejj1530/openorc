@@ -32,11 +32,14 @@ export type ThreadTreeRow = {
   last: boolean;
   /** Ancestors whose trunk continues past this row to another sibling. */
   continuing: number[];
+  /** The first of a parent's subagents after threads you can talk to. */
+  subagentsStart?: boolean;
   /** Direct children left behind this parent's page, including those not fetched yet. */
   hiddenChildren?: number;
   visibleChildren?: number;
 };
 
+/** Each parent's children, newest first: the threads you can talk to, then its agent's subagents. */
 export function threadChildren(all: readonly ThreadSummary[]): Map<string, ThreadSummary[]> {
   const children = new Map<string, ThreadSummary[]>();
   for (const thread of all) {
@@ -45,7 +48,8 @@ export function threadChildren(all: readonly ThreadSummary[]): Map<string, Threa
     siblings.push(thread);
     children.set(thread.parentThreadId, siblings);
   }
-  for (const siblings of children.values()) siblings.sort((a, b) => b.createdAt - a.createdAt || Number(a.id > b.id) - Number(a.id < b.id));
+  for (const siblings of children.values())
+    siblings.sort((a, b) => Number(isSubagentThread(a)) - Number(isSubagentThread(b)) || b.createdAt - a.createdAt || Number(a.id > b.id) - Number(a.id < b.id));
   return children;
 }
 
@@ -105,15 +109,28 @@ export function threadTreeRows(
   const required = new Set([...reveal, ...forced, ...attention, ...threadAncestors(all, attention)]);
   const rows: ThreadTreeRow[] = [];
   const visited = new Set<string>();
-  const visit = (thread: ThreadSummary, depth: number, last: boolean, continuing: number[]) => {
+  const visit = (thread: ThreadSummary, depth: number, last: boolean, continuing: number[], subagentsStart = false) => {
     if (visited.has(thread.id)) return;
     visited.add(thread.id);
     const expanded = threadTreeOpen(thread, children, saved, new Set(), forced);
     const siblings = children.get(thread.id) ?? [];
     const shown = siblings.filter((child, index) => index < (limits[thread.id] ?? THREAD_CHILD_PAGE) || required.has(child.id));
     const hiddenChildren = (thread.hiddenChildren ?? 0) + siblings.length - shown.length;
-    rows.push({ thread, depth, hasChildren: children.has(thread.id) || hiddenChildren > 0, expanded, last, continuing, hiddenChildren, visibleChildren: shown.length });
-    if (expanded) shown.forEach((child, index) => visit(child, depth + 1, index === shown.length - 1, depth && !last ? [...continuing, depth] : continuing));
+    rows.push({
+      thread,
+      depth,
+      hasChildren: children.has(thread.id) || hiddenChildren > 0,
+      expanded,
+      last,
+      continuing,
+      hiddenChildren,
+      visibleChildren: shown.length,
+      ...(subagentsStart ? { subagentsStart } : {}),
+    });
+    if (expanded)
+      shown.forEach((child, index) =>
+        visit(child, depth + 1, index === shown.length - 1, depth && !last ? [...continuing, depth] : continuing, index > 0 && isSubagentThread(child) && !isSubagentThread(shown[index - 1])),
+      );
   };
   for (const root of roots) visit(root, 0, true, []);
   return rows;

@@ -94,7 +94,7 @@ function BranchRow({ row, project = false, children, paging = false, onToggle }:
   }, []);
   const indent = Math.min(row.depth + Number(paging), 3) * STEP;
   return (
-    <div ref={element} className="sidebar-tree-item" data-parent={onToggle ? true : undefined}>
+    <div ref={element} className="sidebar-tree-item" data-parent={onToggle ? true : undefined} data-subagents-start={(!paging && row.subagentsStart) || undefined}>
       {children}
       {onToggle ? (
         <button

@@ -27,6 +27,16 @@ it("orders children by start time at every depth, breaks ties by id and ignores 
   ).toEqual(expected);
 });
 
+it("lists the threads you can talk to before the agent's subagents, and marks where the subagents begin", () => {
+  const [older, newer] = children(parent, 2);
+  const mine = (id: string, createdAt: number): ThreadSummary => ({ ...parent, id, parentThreadId: parent.id, parentRelation: "started", createdAt });
+  const all = [parent, newer!, mine("mine-old", -5), older!, mine("mine-new", 50)];
+  const rows = threadTreeRows([parent], all, ["thread-open:parent"]);
+  expect(ids(rows)).toEqual(["parent", "mine-new", "mine-old", "parent-1", "parent-0"]);
+  expect(rows.filter((row) => row.subagentsStart).map((row) => row.thread.id)).toEqual(["parent-1"]);
+  expect(threadTreeRows([parent], [parent, older!, newer!], ["thread-open:parent"]).some((row) => row.subagentsStart)).toBe(false);
+});
+
 it("pages five children per parent, adds twelve at a time, and ends the branch at the last visible child", () => {
   const all = [parent, ...children(parent, 20)];
   const first = threadTreeRows([parent], all, ["thread-open:parent"]);

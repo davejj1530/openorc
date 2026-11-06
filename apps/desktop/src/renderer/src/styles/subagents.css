@@ -14,6 +14,10 @@
 .sidebar-tree-children[data-capped] {
   margin-left: 0;
 }
+/* A parent's subagents follow the threads you can talk to, set apart by a step of space the branch line runs through. */
+.sidebar-tree-item[data-subagents-start] {
+  padding-top: 8px;
+}
 .sidebar-tree-lines {
   position: absolute;
   top: 0;

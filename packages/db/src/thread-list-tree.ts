@@ -53,7 +53,7 @@ export function threadTreeSql(where: string, order: string, limit: string): stri
     selected AS (SELECT * FROM threads WHERE id IN (SELECT id FROM forest WHERE root_id IN (
       SELECT id FROM page UNION SELECT id FROM roots WHERE id IN (SELECT id FROM ancestry)
     ))),
-    ranked AS (SELECT id, parent_thread_id, ROW_NUMBER() OVER (PARTITION BY parent_thread_id ORDER BY created_at DESC, id) AS position FROM selected),
+    ranked AS (SELECT id, parent_thread_id, ROW_NUMBER() OVER (PARTITION BY parent_thread_id ORDER BY COALESCE(parent_relation, '') = 'subagent', created_at DESC, id) AS position FROM selected),
     allowed AS (SELECT id, parent_thread_id FROM ranked WHERE position <= COALESCE(
       (SELECT value FROM json_each((SELECT child_limits FROM options)) WHERE key = ranked.parent_thread_id), ${THREAD_CHILD_PAGE})
       OR id IN (SELECT id FROM required)),

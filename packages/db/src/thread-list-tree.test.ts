@@ -57,6 +57,18 @@ it("omits hidden children from the server payload, with a hidden count per paren
   }
 });
 
+it("fills a parent's first page with the threads you can talk to before its subagents", () => {
+  const { db, insert, page } = forest();
+  try {
+    insert("mine", "root", -1, "started");
+    const first = page();
+    expect(first.map((row) => row.id).sort()).toEqual(["c100", "c97", "c98", "c99", "mine", "root"]);
+    expect(first.find((row) => row.id === "root")?.hiddenChildren).toBe(96);
+  } finally {
+    db.close();
+  }
+});
+
 it.each(["selected", "working", "waiting"] as const)("retains the older %s child and its ancestors at each depth", (reason) => {
   const { db, page } = forest();
   try {

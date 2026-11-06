@@ -108,10 +108,11 @@ it("serves bounded child pages with counts and keeps older native work and ordin
   const approval = service.requestApproval(run.id, "choice", "AskUserQuestion", {});
   const page = conversations.list({ projectId: project.id, includeChildren: true });
   expect(page.map((thread) => thread.id)).toEqual(expect.arrayContaining([parent.id, children[0]!.threadId, ordinary.id]));
-  expect(page).toHaveLength(8);
-  expect(page.find((thread) => thread.id === parent.id)).toMatchObject({ hiddenChildren: 14 });
+  // The ordinary child leads the page as a conversation you can talk to, ahead of newer subagents.
+  expect(page).toHaveLength(7);
+  expect(page.find((thread) => thread.id === parent.id)).toMatchObject({ hiddenChildren: 15 });
   expect(page.find((thread) => thread.id === ordinary.id)?.activity).toBe("waiting");
-  expect(conversations.list({ projectId: project.id, includeChildren: true, childLimits: { [parent.id]: 17 } })).toHaveLength(20);
+  expect(conversations.list({ projectId: project.id, includeChildren: true, childLimits: { [parent.id]: 17 } })).toHaveLength(19);
   const selected = conversations.list({ projectId: project.id, includeChildren: true, selectedId: children[1]!.threadId });
   expect(selected.some((thread) => thread.id === children[1]!.threadId)).toBe(true);
   await service.closeAndWait(run.id);

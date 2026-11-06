@@ -27,6 +27,7 @@ export type { ClientPush, CoreConnection, Notice } from "./connection.js";
 export { conversationActivity, conversationCanSteer, conversationPlaceholder, conversationSendDisabledReason, conversationSteerReason } from "./conversation-presentation.js";
 export type { SavedThreadSettings } from "./conversation-settings.js";
 export { composerActions, messageBody, planSubmit, processFit, type ComposerActionsInput, type SubmitInput, type SubmitPlan, type SubmitRequest, type SubmitTarget } from "./conversation-submit.js";
+export { accountsToContinueWith, canContinueWithAnother, CONTINUE_PROMPT, RESTART_PROMPT } from "./session-recovery.js";
 export { patchStat } from "./diff-stat.js";
 export { editedPaths } from "./edited-paths.js";
 export { citationLinks } from "./file-citations.js";

@@ -1,6 +1,6 @@
 import { useComposerChanges } from "../lib/composer-changes";
 import { useProjectGit } from "../lib/project-git";
-import { cloudTurnOf, conversationActivity, conversationPlaceholder, conversationSendDisabledReason, conversationSteerReason, messageBody, processFit, type SubmitRequest } from "@openorc/client";
+import { cloudTurnOf, CONTINUE_PROMPT, conversationActivity, conversationPlaceholder, conversationSendDisabledReason, conversationSteerReason, messageBody, processFit, RESTART_PROMPT, type SubmitRequest } from "@openorc/client";
 import { WORKSPACE_ID, defaultHarnessId, harnessShortName, isSubagentThread, type Project, type Run, type Task, type ThreadSummary, type WorkspaceMode } from "@openorc/protocol";
 import { useCallback, useState } from "react";
 import { useConversationSettings, useConversationTranscript, useRpc, useRpcMutation, useSubmit } from "../lib/client";
@@ -149,8 +149,8 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
     await submitter.submit({ ...request, now }, { text, attachments });
     clearDraft();
   };
-  const restart = () => submitter.submit({ ...request, now: false, restart: true }, { text: "Continue where you left off. Check the working tree first.", attachments: [] }).then(clearDraft);
-  const continueWith = (claudeAccountId: string) => submitter.submit({ ...request, now: false, claudeAccountId }, { text: "Continue where you left off.", attachments: [] }).then(clearDraft);
+  const restart = () => submitter.submit({ ...request, now: false, restart: true }, { text: RESTART_PROMPT, attachments: [] }).then(clearDraft);
+  const continueWith = (claudeAccountId: string) => submitter.submit({ ...request, now: false, claudeAccountId }, { text: CONTINUE_PROMPT, attachments: [] }).then(clearDraft);
 
   const skills = useSkillCommands(project.id, choice?.agent, thread?.workingDirectory);
   const commands: SlashCommand[] = [

@@ -1,5 +1,6 @@
 import { Menu } from "@base-ui/react/menu";
-import { DEFAULT_CLAUDE_ACCOUNT, harnessShortName, type ClaudeAccountConnection, type ThreadSummary } from "@openorc/protocol";
+import { accountsToContinueWith, canContinueWithAnother } from "@openorc/client";
+import { harnessShortName, type ClaudeAccountConnection, type ThreadSummary } from "@openorc/protocol";
 import { CoversPreview } from "../lib/browser-preview";
 import { useRpc } from "../lib/client";
 import { floatingGround } from "../lib/use-anchor-ground";
@@ -35,14 +36,9 @@ export function SessionRecovery({ thread, disabled, onRestart, onContinueWith }:
   );
 }
 
-/** The other signed-in Claude accounts, once the thread's own reached its usage limit. An Orcling speaks on its own. */
 function useAccountsToContinueWith(thread: ThreadSummary): ClaudeAccountConnection[] {
-  const { recovery } = thread.session;
-  const limited = thread.session.status === "error" && thread.agent === "claude" && !thread.orclingId && recovery?.kind === "usage" && recovery.provider === "claude";
-  const accounts = useRpc("claude.accounts.list", {}, { enabled: limited }).data;
-  if (!limited || !accounts) return [];
-  const current = thread.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT;
-  return accounts.accounts.filter((account) => account.id !== current && account.status === "ready");
+  const accounts = useRpc("claude.accounts.list", {}, { enabled: canContinueWithAnother(thread) }).data;
+  return accountsToContinueWith(thread, accounts?.accounts ?? []);
 }
 
 function ContinueWith({ accounts, disabled, onChoose }: { accounts: ClaudeAccountConnection[]; disabled: boolean; onChoose: (accountId: string) => void }) {

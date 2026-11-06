@@ -6,6 +6,7 @@ import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRpcMutation } from "../client";
 import { Square } from "../generated/icons";
+import { SessionRecovery } from "../thread/SessionRecovery";
 import { cn } from "../ui/cn";
 import { Text } from "../ui/Text";
 import { ComposerPlane } from "./ComposerPlane";
@@ -64,6 +65,7 @@ export function Composer({ thread, queued, settings, generatingImage, onLayout, 
     <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom }}>
       <View onLayout={onLayout} className="gap-2 bg-bg px-3 pt-2" style={{ paddingBottom: insets.bottom + 8 }}>
         <Queue thread={thread} queued={queued} canSteer={input.canSteer} typing={typing} onSent={input.onSent} />
+        {typing || input.working ? null : <SessionRecovery thread={thread} request={input.request} disabled={input.disabledReason !== null} onSent={input.onSent} />}
         {failure ? (
           <Text accessibilityRole="alert" className="px-1 text-sm text-bad">
             {failure}

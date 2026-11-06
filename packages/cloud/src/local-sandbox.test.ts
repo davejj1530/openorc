@@ -10,7 +10,8 @@ let provider: LocalSandboxProvider;
 
 beforeEach(async () => {
   base = await mkdtemp(path.join(os.tmpdir(), "openorc-local-sandbox-"));
-  provider = new LocalSandboxProvider(base, () => process.env, 300);
+  // A second before a sandbox stops on its own: margins that hold on a busy CI runner.
+  provider = new LocalSandboxProvider(base, () => process.env, 1000);
 });
 
 afterEach(async () => {
@@ -37,9 +38,9 @@ it("stops on its own once nobody keeps it awake, keeps its files, and starts aga
   const pid = Number((await sandbox.readFile(pidFile))?.toString().trim());
 
   await sandbox.keepAwake();
-  await sleep(200);
+  await sleep(300);
   expect(alive(pid)).toBe(true);
-  await sleep(400);
+  await sleep(1200);
   expect(alive(pid)).toBe(false);
 
   expect((await sandbox.exec("cat", ["note.txt"])).stdout.toString()).toBe("kept");

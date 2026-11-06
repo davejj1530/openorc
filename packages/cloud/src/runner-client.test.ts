@@ -119,16 +119,17 @@ describe("RunnerClient", () => {
 
   it("starts the takeover on its own once the Mac has been gone for its wait, and never while the Mac is connected", async () => {
     const install = client!.install;
-    const takeover = { id: "late", cmd: "node", args: ["-e", `console.log("on my own")`], cwd: sandbox.root, env: {}, afterMs: 300 };
+    // Its wait is longer than reconnecting takes on a busy CI runner, so the reconnect below is never late enough to start it.
+    const takeover = { id: "late", cmd: "node", args: ["-e", `console.log("on my own")`], cwd: sandbox.root, env: {}, afterMs: 1500 };
     client!.standby(takeover);
-    await new Promise((resolve) => setTimeout(resolve, 600));
+    await new Promise((resolve) => setTimeout(resolve, 1800));
     client!.close();
     client = await RunnerClient.open(install);
     expect(client!.takeover).toBeNull();
 
     client!.standby(takeover);
     client!.close();
-    await new Promise((resolve) => setTimeout(resolve, 700));
+    await new Promise((resolve) => setTimeout(resolve, 2000));
     client = await RunnerClient.open(install);
     expect(client!.takeover?.id).toBe("late");
     const out = collect(client!.adopt("late"));

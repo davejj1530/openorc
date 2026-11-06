@@ -389,6 +389,11 @@ function holder(entries: WorkEntry[], current: Block): LiveHeadline | null {
 export function liveHeadline(entries: WorkEntry[], turn: Block[]): LiveHeadline | null {
   const current = turn.findLast(isLive);
   if (current?.kind === "message") return null;
+  // A note that finished while the turn goes on, with nothing after it yet, names the step it announced; until that
+  // step's first call, the work above it is done, not running again.
+  const note = turn[turn.length - 1];
+  if (!current && note?.kind === "message" && note.role === "assistant" && !entries.some((entry) => entry.kind === "phase" && entry.phase.blocks.includes(note)))
+    return { label: narrationTitle(note.text), since: note.at, entryId: null };
   const held = current ? holder(entries, current) : null;
   if (held) return held;
   const gap = gapWords(current);

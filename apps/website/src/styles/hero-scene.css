@@ -247,25 +247,53 @@
   stroke-linecap: round;
 }
 
-/* Sidebar (Sidebar.tsx): 272 wide on the tile, with no seam against the conversation. */
+/* Sidebar (Sidebar.tsx, sidebar.css): 272 wide on the tile, parted from the work column by a hairline seam the
+   window's full height. Like the app's, the seam stays one device pixel at any scale. */
 .hs-sidebar {
+  position: relative;
   display: flex;
   flex: none;
   flex-direction: column;
   width: calc(272 * var(--u));
   overflow: hidden;
 }
+.hs-sidebar::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--hairline);
+  background: var(--hs-line);
+  pointer-events: none;
+}
+.hs-sidebar .hs-round {
+  width: calc(32 * var(--u));
+  height: calc(32 * var(--u));
+}
+/* The window's corner: the wordmark after the traffic lights, then Inbox and the sidebar toggle. */
 .hs-sidebar-head {
   display: flex;
   flex: none;
   align-items: center;
-  justify-content: flex-end;
   height: calc(44 * var(--u));
-  padding: 0 calc(10 * var(--u));
+  padding: 0 calc(10 * var(--u)) 0 calc(86 * var(--u));
 }
-.hs-sidebar-head .hs-round {
-  width: calc(32 * var(--u));
-  height: calc(32 * var(--u));
+.hs-wordmark {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: calc(7 * var(--u));
+  min-width: 0;
+  font-size: calc(15 * var(--u));
+  line-height: calc(16 * var(--u));
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.hs-wordmark svg {
+  flex: none;
+  width: calc(16 * var(--u));
+  height: calc(16 * var(--u));
 }
 .hs-inbox {
   position: relative;
@@ -286,225 +314,250 @@
   line-height: calc(16 * var(--u));
   font-variant-numeric: tabular-nums;
 }
-.hs-nav {
-  display: grid;
-  flex: none;
-  padding: calc(6 * var(--u)) calc(10 * var(--u)) 0;
-}
-.hs-nav-row {
-  display: flex;
-  align-items: center;
-  gap: calc(10 * var(--u));
-  height: calc(34 * var(--u));
-  padding: 0 calc(10 * var(--u));
-  border-radius: calc(10 * var(--u));
-  color: var(--hs-muted);
-  line-height: calc(16 * var(--u));
-}
-.hs-nav-row[data-nav="New thread"] {
-  color: var(--hs-ink);
-}
-.hs-nav-row > .hs-icon:first-child {
-  color: var(--hs-muted);
-}
-.hs-nav-label {
-  flex: 1;
-}
-.hs-nav-count {
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
-}
-.hs-nav-chevron {
-  width: calc(14 * var(--u));
-  height: calc(14 * var(--u));
-  color: var(--hs-faint);
-}
+/* The list head: Search where the titles start, then the filter and New thread at the row's end. */
 .hs-list-head {
   display: flex;
   flex: none;
   align-items: center;
+  gap: calc(2 * var(--u));
   height: calc(34 * var(--u));
-  margin-top: calc(22 * var(--u));
-  padding: 0 calc(13 * var(--u)) 0 calc(10 * var(--u));
+  margin: calc(6 * var(--u)) calc(10 * var(--u)) 0;
 }
-.hs-list-search {
-  width: calc(34 * var(--u));
-  height: calc(34 * var(--u));
-  margin: 0 calc(3 * var(--u)) 0 auto;
-  background: var(--hs-fill);
+.hs-search {
+  display: flex;
+  align-items: center;
+  gap: calc(8 * var(--u));
+  height: calc(32 * var(--u));
+  margin-right: auto;
+  padding: 0 calc(14 * var(--u)) 0 calc(10 * var(--u));
+  color: var(--hs-muted);
+  line-height: calc(16 * var(--u));
 }
-.hs-list-search .hs-icon,
-.hs-list-tool .hs-icon {
-  width: calc(14 * var(--u));
-  height: calc(14 * var(--u));
+.hs-compose {
+  color: var(--hs-ink);
 }
-.hs-list-tool {
-  display: grid;
-  place-items: center;
-  width: calc(24 * var(--u));
-  height: calc(24 * var(--u));
-  color: var(--hs-faint);
-}
-.hs-projects {
+/* One list by day: a quiet 28-unit heading, its chevron showing while the section is folded. */
+.hs-threads {
   flex: 1;
   min-height: 0;
   overflow: hidden;
   padding: calc(14 * var(--u)) calc(10 * var(--u)) calc(16 * var(--u));
 }
-.hs-project + .hs-project {
-  margin-top: calc(6 * var(--u));
-}
-.hs-project-head {
-  display: flex;
-  align-items: center;
-  height: calc(34 * var(--u));
-  padding: 0 calc(10 * var(--u));
-  color: var(--hs-ink);
-  line-height: calc(16 * var(--u));
-}
-.hs-project-head > .hs-icon {
-  margin-right: calc(8 * var(--u));
-  color: var(--hs-faint);
-}
-.hs-project-name {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.hs-project-meta {
-  flex: none;
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
-}
-/* The project counts its running threads from the rows themselves. */
-.hs-project-meta :is([data-running]:not([data-running="0"]), [data-needs]),
-.hs-project:has(.hs-row[data-waiting]) .hs-project-meta [data-running],
-.hs-project:has(.hs-row[data-busy]) [data-running="0"],
-.hs-project:has(.hs-row[data-busy] ~ .hs-row[data-busy]) [data-running="1"] {
-  display: none;
-}
-.hs-project:has(.hs-row[data-busy]) [data-running="1"],
-.hs-project:has(.hs-row[data-busy] ~ .hs-row[data-busy]) [data-running="2"],
-.hs-project:has(.hs-row[data-waiting]) [data-needs] {
-  display: inline;
-}
-.hs-project-meta [data-needs] {
-  color: var(--hs-warn);
-}
-.hs-project-threads {
-  display: grid;
-  gap: calc(2 * var(--u));
-  margin-top: calc(2 * var(--u));
-}
-.hs-row {
+.hs-day {
   display: flex;
   flex-direction: column;
   gap: calc(2 * var(--u));
-  min-height: calc(34 * var(--u));
-  padding: calc(9 * var(--u)) calc(10 * var(--u));
-  border-radius: calc(10 * var(--u));
-  color: var(--hs-muted);
-  line-height: calc(16 * var(--u));
 }
-.hs-row-head {
+.hs-day + .hs-day {
+  margin-top: calc(10 * var(--u));
+}
+.hs-day-head {
   display: flex;
   align-items: center;
-  gap: calc(8 * var(--u));
-}
-.hs-row-status {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: calc(16 * var(--u));
-  height: calc(16 * var(--u));
+  gap: calc(4 * var(--u));
+  height: calc(28 * var(--u));
+  margin-bottom: calc(-2 * var(--u));
+  padding: 0 calc(10 * var(--u));
   color: var(--hs-faint);
+  font-size: calc(12 * var(--u));
 }
-.hs-row-status .hs-icon {
-  display: none;
-  animation: hs-spin 1s linear infinite;
+.hs-day-head .hs-icon {
+  width: calc(12 * var(--u));
+  height: calc(12 * var(--u));
+  opacity: 0;
 }
-.hs-row[data-busy]:not([data-waiting]) .hs-row-status .hs-icon:first-child,
-.hs-row[data-waiting] .hs-row-waiting {
-  display: block;
+.hs-day[data-folded] .hs-day-head .hs-icon {
+  opacity: 1;
 }
-.hs-row-status .hs-row-waiting {
-  width: calc(14 * var(--u));
-  height: calc(14 * var(--u));
-  color: var(--hs-attention);
-  animation: none;
+/* A row: the muted title with what the thread needs at its end, what its agent is doing, then its project and where
+   it works. The open thread sits on the current-row fill with its title in ink. */
+.hs-row {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: calc(2 * var(--u));
+  min-height: calc(34 * var(--u));
+  padding: calc(8 * var(--u)) calc(10 * var(--u));
+  border-radius: calc(10 * var(--u));
+  color: var(--hs-muted);
+}
+.hs-row-heading,
+.hs-row-line,
+.hs-row-project {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.hs-row-heading,
+.hs-row-line {
+  gap: calc(8 * var(--u));
 }
 .hs-row-title {
   flex: 1;
   min-width: 0;
   overflow: hidden;
+  line-height: calc(18 * var(--u));
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.hs-row-headline {
+.hs-row-question,
+.hs-row-spinner {
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
+  margin: 0 calc(1 * var(--u));
+}
+.hs-row-question {
   display: none;
-  padding-left: calc(24 * var(--u));
+  color: var(--hs-attention);
+}
+.hs-row-dot {
+  flex: none;
+  width: calc(7 * var(--u));
+  height: calc(7 * var(--u));
+  margin: 0 calc(4.5 * var(--u));
+  border-radius: 999px;
+  background: var(--hs-attention);
+}
+.hs-row-line {
+  display: none;
+}
+.hs-row-line > span {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
-  color: var(--hs-muted);
+  color: var(--hs-faint);
   font-size: calc(12 * var(--u));
+  line-height: calc(16 * var(--u));
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.hs-row[data-busy] .hs-row-headline {
+.hs-row-line > :is(.hs-row-headline, .hs-row-ask, .hs-row-done),
+.hs-row-spinner {
+  display: none;
+}
+.hs-row-spinner {
+  color: var(--hs-faint);
+  animation: hs-spin 1s linear infinite;
+}
+.hs-row-line > .hs-row-ask {
+  color: var(--hs-warn);
+}
+.hs-row:is([data-busy], [data-waiting], [data-done]) .hs-row-line {
+  display: flex;
+}
+.hs-row[data-busy]:not([data-waiting]) :is(.hs-row-headline, .hs-row-spinner),
+.hs-row[data-waiting] :is(.hs-row-ask, .hs-row-question),
+.hs-row[data-done]:not([data-busy], [data-waiting]) .hs-row-done {
   display: block;
 }
-/* The open thread or page takes the current-row fill, and so does every thread open in a split pane. */
-.hero-scene[data-view="a"] .hs-row[data-row="a"],
-.hero-scene[data-view="b"] .hs-row[data-row="b"],
-.hero-scene[data-view="task"] .hs-nav-row[data-nav="Tasks"],
-.hero-scene:has(.hs-panes[data-split]) .hs-row[data-row="b"],
-.hs-nav-row[data-current],
-.hs-row[data-current] {
-  background: var(--hs-plane);
-  color: var(--hs-ink);
+/* A working title lights up left to right: a band of full ink sweeps across its muted words. */
+.hs-row[data-busy]:not([data-waiting]) .hs-row-title {
+  background: linear-gradient(90deg, var(--hs-muted) 0% 35%, var(--hs-ink) 50%, var(--hs-muted) 65% 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: hs-title-sweep 2s linear infinite;
 }
-.hs-sidebar-foot {
-  display: grid;
-  flex: none;
-  gap: calc(6 * var(--u));
-  padding: calc(6 * var(--u)) calc(10 * var(--u)) calc(10 * var(--u));
+@media (prefers-reduced-motion: reduce) {
+  .hs-row[data-busy]:not([data-waiting]) .hs-row-title {
+    animation: none;
+    background: none;
+    -webkit-text-fill-color: currentColor;
+  }
 }
-.hs-add-project {
-  display: flex;
-  align-items: center;
-  gap: calc(10 * var(--u));
-  height: calc(16 * var(--u));
-  padding: 0 calc(10 * var(--u));
-  color: var(--hs-muted);
-  line-height: calc(16 * var(--u));
-}
-.hs-add-project .hs-icon {
-  color: var(--hs-faint);
-}
-.hs-account {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: calc(34 * var(--u));
-}
-.hs-account .hs-round {
-  width: calc(32 * var(--u));
-  height: calc(32 * var(--u));
-}
-.hs-usage {
-  display: inline-flex;
-  align-items: center;
-  gap: calc(8 * var(--u));
-  height: calc(34 * var(--u));
-  padding: 0 calc(14 * var(--u)) 0 calc(10 * var(--u));
-  border-radius: 999px;
-  background: var(--hs-plane);
-  line-height: calc(16 * var(--u));
-}
-.hs-usage-label {
+.hs-row-project {
+  gap: calc(5 * var(--u));
   color: var(--hs-faint);
   font-size: calc(12 * var(--u));
+  line-height: calc(16 * var(--u));
+  white-space: nowrap;
+}
+.hs-row-project .hs-icon {
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
+  margin: 0 calc(1 * var(--u));
+}
+.hs-row-place {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hs-row-place::before {
+  content: "·";
+  margin-right: calc(5 * var(--u));
+}
+/* The open thread takes the current-row fill, and so does every thread open in a split pane. */
+.hero-scene[data-view="a"] .hs-row[data-row="a"],
+.hero-scene[data-view="b"] .hs-row[data-row="b"],
+.hero-scene:has(.hs-panes[data-split]) .hs-row[data-row="b"],
+.hs-row[data-current] {
+  background: var(--hs-plane);
+}
+.hero-scene[data-view="a"] .hs-row[data-row="a"] .hs-row-title,
+.hero-scene[data-view="b"] .hs-row[data-row="b"] .hs-row-title,
+.hero-scene:has(.hs-panes[data-split]) .hs-row[data-row="b"] .hs-row-title,
+.hs-row[data-current] .hs-row-title {
+  color: var(--hs-ink);
+}
+.hero-scene[data-view="a"] .hs-row[data-row="a"] .hs-row-spinner,
+.hero-scene[data-view="b"] .hs-row[data-row="b"] .hs-row-spinner,
+.hero-scene:has(.hs-panes[data-split]) .hs-row[data-row="b"] .hs-row-spinner,
+.hs-row[data-current] .hs-row-spinner {
+  color: var(--hs-muted);
+}
+/* Resolved at the list's foot, as quiet as the day headings, its count and chevron at the row's end. */
+.hs-resolved {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: calc(8 * var(--u));
+  height: calc(36 * var(--u));
+  margin: calc(4 * var(--u)) calc(10 * var(--u));
+  padding: 0 calc(10 * var(--u));
+  color: var(--hs-faint);
+  font-size: calc(12 * var(--u));
+  line-height: calc(16 * var(--u));
+}
+.hs-resolved > span:first-child {
+  flex: 1;
+}
+.hs-resolved-count {
+  font-variant-numeric: tabular-nums;
+}
+.hs-resolved .hs-icon {
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
+}
+/* The footer: the week's usage, then the screens, Orclings and Settings as round buttons; the open screen sits on
+   the current-row fill. */
+.hs-sidebar-foot {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: calc(4 * var(--u));
+  padding: calc(6 * var(--u)) calc(10 * var(--u)) calc(10 * var(--u));
+}
+.hs-usage {
+  display: flex;
+  align-items: center;
+  gap: calc(6 * var(--u));
+  height: calc(32 * var(--u));
+  margin-right: auto;
+  padding: 0 calc(12 * var(--u)) 0 calc(8 * var(--u));
+  border-radius: 999px;
+  background: var(--hs-control);
+  line-height: calc(16 * var(--u));
+  font-variant-numeric: tabular-nums;
+}
+.hs-dock {
+  display: flex;
+  gap: calc(2 * var(--u));
+}
+.hero-scene[data-view="task"] .hs-dock [data-screen="tasks"] {
+  background: var(--hs-plane);
+  color: var(--hs-ink);
 }
 
 /* Panes: the conversation on the tile, under a 44-unit header of title, faint facts and round buttons. */
@@ -536,7 +589,7 @@
   align-items: center;
   gap: calc(8 * var(--u));
   height: calc(44 * var(--u));
-  padding: 0 calc(8 * var(--u)) 0 calc(12 * var(--u));
+  padding: 0 calc(12 * var(--u));
   line-height: calc(16 * var(--u));
 }
 .hs-title {
@@ -574,8 +627,11 @@
   display: flex;
   flex: none;
   align-items: center;
-  gap: calc(2 * var(--u));
+  gap: calc(4 * var(--u));
   margin-left: auto;
+}
+.hs-tools {
+  display: flex;
 }
 .hs-close-pane {
   display: none;
@@ -825,6 +881,23 @@
   font-size: calc(12 * var(--u));
   text-overflow: ellipsis;
 }
+.hs-size-blocks {
+  display: inline-flex;
+  flex: none;
+  gap: calc(2 * var(--u));
+}
+.hs-size-blocks i {
+  width: calc(7 * var(--u));
+  height: calc(7 * var(--u));
+  border-radius: calc(2 * var(--u));
+  background: var(--hs-fill-strong);
+}
+.hs-size-blocks [data-tone="ok"] {
+  background: var(--hs-ok);
+}
+.hs-size-blocks [data-tone="bad"] {
+  background: var(--hs-bad);
+}
 
 /* OpenOrc talking in the thread, such as a message from another thread: a quiet fill row. */
 .hs-notice {
@@ -1008,11 +1081,60 @@
 .hs-bar {
   display: flex;
   align-items: center;
-  gap: calc(6 * var(--u));
+  gap: calc(8 * var(--u));
+  min-width: 0;
   height: calc(32 * var(--u));
   margin-left: calc(-4 * var(--u));
   font-size: calc(12 * var(--u));
   line-height: calc(16 * var(--u));
+}
+/* As the app's composer-tools: a row that never wraps or squeezes its chips. A composer too narrow for every chip
+   scrolls it sideways and fades the edge that has more, so the context ring and send keep their place. */
+.hs-bar-tools {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: calc(6 * var(--u));
+  min-width: 0;
+  margin: calc(-4 * var(--u)) 0 calc(-4 * var(--u)) calc(-4 * var(--u));
+  padding: calc(4 * var(--u));
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.hs-bar-tools > * {
+  flex-shrink: 0;
+}
+@property --hs-tools-fade-start {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --hs-tools-fade-end {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@supports (animation-timeline: scroll()) {
+  .hs-bar-tools {
+    mask-image: linear-gradient(to right, transparent, #000 var(--hs-tools-fade-start), #000 calc(100% - var(--hs-tools-fade-end)), transparent);
+    animation: hs-tools-fade linear both;
+    animation-timeline: scroll(self inline);
+  }
+}
+@keyframes hs-tools-fade {
+  0% {
+    --hs-tools-fade-start: 0px;
+    --hs-tools-fade-end: calc(24 * var(--u));
+  }
+  8%,
+  92% {
+    --hs-tools-fade-start: calc(24 * var(--u));
+    --hs-tools-fade-end: calc(24 * var(--u));
+  }
+  100% {
+    --hs-tools-fade-start: calc(24 * var(--u));
+    --hs-tools-fade-end: 0px;
+  }
 }
 .hs-attach {
   display: grid;
@@ -1044,10 +1166,6 @@
   height: calc(14 * var(--u));
   color: var(--hs-muted);
 }
-.hs-pill .hs-pill-chevron {
-  width: calc(12 * var(--u));
-  height: calc(12 * var(--u));
-}
 .hs-model-name {
   min-width: 0;
   overflow: hidden;
@@ -1068,6 +1186,7 @@
   align-items: center;
   gap: calc(6 * var(--u));
   height: calc(28 * var(--u));
+  margin-right: calc(-4 * var(--u));
   padding: 0 calc(6 * var(--u));
   color: var(--hs-faint);
   font-variant-numeric: tabular-nums;
@@ -1195,6 +1314,13 @@
   line-height: calc(34 * var(--u));
   letter-spacing: -0.02em;
 }
+/* The project is the heading's own picker, underlined (new-thread.css). */
+.hs-new-project {
+  text-decoration-line: underline;
+  text-decoration-thickness: max(1px, var(--u));
+  text-underline-offset: calc(6 * var(--u));
+  text-decoration-color: color-mix(in srgb, currentColor 30%, transparent);
+}
 .hs-composer[data-layout="new"] .hs-shell {
   gap: calc(18 * var(--u));
   padding: calc(18 * var(--u)) calc(14 * var(--u)) calc(14 * var(--u)) calc(20 * var(--u));
@@ -1264,7 +1390,7 @@
   align-items: center;
   gap: calc(10 * var(--u));
   height: calc(42 * var(--u));
-  padding: 0 calc(12 * var(--u)) 0 calc(38 * var(--u));
+  padding: 0 calc(12 * var(--u));
   line-height: calc(16 * var(--u));
 }
 .hs-recent-row + .hs-recent-row {
@@ -1314,7 +1440,7 @@
 .hs-table :is(th, td) {
   min-width: calc(100 * var(--u));
   padding: calc(10 * var(--u)) calc(14 * var(--u));
-  border-top: var(--u) solid var(--hs-line);
+  border-top: var(--hairline) solid var(--hs-line);
   font-weight: inherit;
   text-align: left;
   vertical-align: top;
@@ -1667,7 +1793,7 @@
 }
 .hs-comment {
   padding-block: calc(20 * var(--u));
-  border-bottom: var(--u) solid var(--hs-line);
+  border-bottom: var(--hairline) solid var(--hs-line);
 }
 .hs-comment-meta {
   display: flex;
@@ -1710,13 +1836,13 @@
   content: "";
   position: absolute;
   left: 0;
-  border-left: var(--u) solid var(--hs-line);
+  border-left: var(--hairline) solid var(--hs-line);
 }
 .hs-response::before {
   top: 0;
   width: calc(20 * var(--u));
   height: var(--reply-turn);
-  border-bottom: var(--u) solid var(--hs-line);
+  border-bottom: var(--hairline) solid var(--hs-line);
   border-bottom-left-radius: var(--reply-curve);
 }
 .hs-response:has(+ .hs-response:not([hidden]))::after {
@@ -1759,7 +1885,7 @@
 }
 .hs-mentions {
   padding: calc(6 * var(--u));
-  border-bottom: var(--u) solid var(--hs-line);
+  border-bottom: var(--hairline) solid var(--hs-line);
 }
 .hs-option {
   display: flex;
@@ -1923,36 +2049,45 @@
   border-radius: calc(20 * var(--u));
   background: var(--hs-plane);
 }
+/* The panel's header (PanelHeader.tsx, panel-browser.css): its pages as text tabs, the open one in ink and the rest
+   faint, then the add button, and the panel's tools at the far end. */
 .hs-panel-header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: calc(2 * var(--u));
+  height: calc(44 * var(--u));
+  padding: 0 calc(10 * var(--u));
+}
+.hs-panel-tabs {
+  display: flex;
+  gap: calc(2 * var(--u));
+}
+.hs-panel-tab {
   display: flex;
   align-items: center;
   gap: calc(6 * var(--u));
-  height: calc(52 * var(--u));
-  padding: 0 calc(8 * var(--u)) 0 calc(10 * var(--u));
-}
-.hs-panel-header .hs-track > span {
-  height: calc(30 * var(--u));
-  padding: 0 calc(14 * var(--u)) 0 calc(12 * var(--u));
+  height: calc(28 * var(--u));
+  padding: 0 calc(10 * var(--u)) 0 calc(8 * var(--u));
+  border-radius: calc(10 * var(--u));
+  color: var(--hs-faint);
   line-height: calc(16 * var(--u));
+  white-space: nowrap;
 }
-.hs-panel-header .hs-track .hs-icon {
+.hs-panel-tab[data-selected] {
+  color: var(--hs-ink);
+}
+.hs-panel-tab :is(.hs-icon, .hs-file-glyph) {
   width: calc(14 * var(--u));
   height: calc(14 * var(--u));
 }
-.hs-panel-add {
-  width: calc(36 * var(--u));
-  height: calc(36 * var(--u));
-  background: var(--hs-control);
-}
-.hs-panel-add .hs-icon,
-.hs-panel-tools .hs-round:first-child .hs-icon,
 .hs-panel-refresh .hs-icon {
   width: calc(15 * var(--u));
   height: calc(15 * var(--u));
 }
 .hs-panel-tools {
   display: flex;
-  gap: calc(6 * var(--u));
+  gap: calc(2 * var(--u));
   margin-left: auto;
 }
 .hs-panel-bar {
@@ -2081,8 +2216,8 @@
   height: clamp(440px, 44vw, 620px);
 }
 
-/* The app at rest, still: one 1248 × 780 window with the thread at the app's narrow reading gutters and the Changes
-   panel's card on the tile, its tab track on the window's top line. */
+/* The app at rest, still: one 1248 × 780 window with the Changes panel dragged narrower than its 536 default, to 480,
+   so the conversation beside it keeps its composer row whole, at the app's narrow reading gutters. */
 .hs-mock-app {
   --hs-canvas: 1248;
   display: flex;
@@ -2091,26 +2226,13 @@
 .hs-mock-app .hs-column {
   padding-inline: calc(12 * var(--u));
 }
+/* The open panel is its own plane from the window's top line to its foot, beside the conversation on the tile. */
 .hs-app-panel {
   display: flex;
   flex: none;
   flex-direction: column;
-  width: calc(500 * var(--u));
-}
-.hs-app-panel .hs-panel-header {
-  flex: none;
-  height: calc(44 * var(--u));
-  padding: 0 calc(16 * var(--u)) 0 0;
-}
-.hs-app-panel .hs-panel-header .hs-track > span {
-  height: calc(30 * var(--u));
-}
-.hs-app-panel-card {
-  flex: 1;
-  min-height: 0;
-  margin: 0 calc(8 * var(--u)) calc(8 * var(--u)) 0;
+  width: calc(480 * var(--u));
   overflow: hidden;
-  border-radius: calc(20 * var(--u));
   background: var(--hs-plane);
   --hs-control: var(--hs-fill);
 }
@@ -2142,9 +2264,6 @@
   --hs-syntax-str: #9ecbff;
   --hs-syntax-fn: #b392f0;
   --hs-syntax-tag: #85e89d;
-}
-.hs-mock-editor .hs-track > span {
-  gap: calc(6 * var(--u));
 }
 .hs-file-toolbar {
   display: flex;
@@ -2335,6 +2454,14 @@
 @keyframes hs-word-in {
   from {
     opacity: 0;
+  }
+}
+@keyframes hs-title-sweep {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
   }
 }
 @keyframes hs-spin {

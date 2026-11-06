@@ -1,7 +1,8 @@
 ---
 /**
- * What a turn's work came to, as the app's TurnReceipt draws it: how long it thought, how many steps it took, and
- * the last check it ran, then the chevron that opens the steps. Items whose words change take one span per window.
+ * What a turn's work came to, as the app's TurnReceipt draws it: how long it thought, then the size of its changes
+ * and the last check it ran, or how many steps it took when it came to neither; then the chevron that opens the
+ * steps. Items whose words change take one span per window.
  */
 import ProductIcon from "./ProductIcon.astro";
 import { timed, type Journey } from "../../data/hero/timeline";
@@ -12,14 +13,19 @@ interface Props extends Record<string, unknown> {
   grow?: boolean;
   journey?: Journey;
   thought?: Words;
+  /** Only for a turn that changed and checked nothing so far. */
   steps?: Words;
-  check?: string;
+  /** "+52 in 1 file". */
+  changes?: Words;
+  /** "tests passed", once the turn is over. */
+  check?: Words;
 }
-const { journey, thought, steps, check, grow, ...rest } = Astro.props;
+const { journey, thought, steps, changes, check, grow, ...rest } = Astro.props;
 const at = (windows: string) => (journey ? timed(journey, windows) : {});
 const items = [
   { icon: "lightbulb", words: thought },
   { icon: "circleCheck", words: steps },
+  { icon: "fileDiff", words: changes },
   { icon: "terminal", words: check },
 ] as const;
 const windows = (words: Words) => (typeof words === "string" ? undefined : words.map((word) => word.show).join(" "));

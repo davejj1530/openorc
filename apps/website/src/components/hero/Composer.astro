@@ -2,8 +2,8 @@
 /**
  * The message composer as the app draws it (Composer.tsx): one plane with the prompt over a bar of attach, model and
  * mode pills, the context ring and send; under it, the conversation's folder beside its branch and the Commit chip
- * with the checkout's uncommitted lines. The new-thread page's composer is larger, names the project in the bar, and
- * leaves the folder row to the page.
+ * with the checkout's uncommitted lines. The new-thread page's composer is larger and leaves the project and the
+ * folder row to the page.
  */
 import Counts from "./Counts.astro";
 import ProductIcon from "./ProductIcon.astro";
@@ -40,14 +40,15 @@ const ring = 2 * Math.PI * 6;
       {prompt ? <span class="hs-caret" /> : null}
     </div>
     <div class="hs-bar">
-      <span class="hs-attach"><ProductIcon name="plus" /></span>
-      {fresh ? <span class="hs-pill"><ProductIcon name="folder" />{project.name}<ProductIcon name="chevronDown" class="hs-pill-chevron" /></span> : null}
-      <span class="hs-pill hs-model">
-        <svg class="hs-logo" data-provider={model.harness} aria-hidden="true"><use href={`#hs-logo-${model.harness}`} /></svg>
-        <span class="hs-model-name">{model.label}</span>
-        <span class="hs-model-effort">{model.effort}</span>
+      <span class="hs-bar-tools">
+        <span class="hs-attach"><ProductIcon name="plus" /></span>
+        <span class="hs-pill hs-model">
+          <svg class="hs-logo" data-provider={model.harness} aria-hidden="true"><use href={`#hs-logo-${model.harness}`} /></svg>
+          <span class="hs-model-name">{model.label}</span>
+          <span class="hs-model-effort">{model.effort}</span>
+        </span>
+        <span class="hs-pill hs-mode"><ProductIcon name="pencil" /><span>{permission}</span></span>
       </span>
-      <span class="hs-pill hs-mode"><ProductIcon name="pencil" /><span>{permission}</span></span>
       <span class="hs-bar-end">
         {!fresh && context !== null ? (
           <span class="hs-context">

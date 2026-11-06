@@ -1,8 +1,8 @@
 ---
 /**
- * One conversation pane as the app draws it (ThreadView.tsx): the title and its faint facts in the header with the
- * round pane buttons, the transcript ending in the OpenOrc cube, and the composer. The `presence` slot sits beside
- * the cube.
+ * One conversation pane as the app draws it (ThreadView.tsx): the title and its faint facts in the header, then
+ * Close pane in a split, More, and the thread's tools (Tasks, the panel's side while it is open, the panel toggle);
+ * the transcript ending in the OpenOrc cube, and the composer. The `presence` slot sits beside the cube.
  */
 import Composer from "./Composer.astro";
 import PresenceMark from "./PresenceMark.astro";
@@ -36,8 +36,11 @@ const { journey } = composer;
       <slot name="status" />
       <span class="hs-round hs-close-pane"><ProductIcon name="close" /></span>
       <span class="hs-round"><ProductIcon name="more" /></span>
-      <span class="hs-round"><ProductIcon name="tasks" /></span>
-      <span class="hs-round" data-on={panel ? "" : undefined}><ProductIcon name="panelRight" /></span>
+      <span class="hs-tools">
+        <span class="hs-round"><ProductIcon name="tasks" /></span>
+        {panel ? <span class="hs-round"><ProductIcon name="arrowLeftRight" /></span> : null}
+        <span class="hs-round" data-on={panel ? "" : undefined}><ProductIcon name="panelRight" /></span>
+      </span>
     </span>
   </header>
   <div class="hs-transcript">

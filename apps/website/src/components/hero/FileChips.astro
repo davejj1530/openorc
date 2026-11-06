@@ -1,5 +1,8 @@
 ---
-/** One kind of work in a step, as the app's WorkSteps groups it: the verb in a quiet column, then a row per file it touched. */
+/**
+ * One kind of work in a step, as the app's WorkObjects draws it: the verb in a quiet column, then a row per file it
+ * touched; an edited file ends in its line counts and five blocks that weigh the edit (WorkMarks.tsx).
+ */
 import Counts from "./Counts.astro";
 import FileGlyph from "./FileGlyph.astro";
 
@@ -11,6 +14,13 @@ interface Props {
 }
 const { label, files, live } = Astro.props;
 const split = (path: string) => [path.slice(0, path.lastIndexOf("/")), path.slice(path.lastIndexOf("/") + 1)];
+/** Each block is ok while it stays under the added share, bad up to the edit's size on a log scale, else empty. */
+const blocks = (added = 0, removed = 0) => {
+  const total = added + removed;
+  const scale = total ? Math.min(5, Math.max(1, Math.ceil(Math.log2(total + 1) / 1.6))) : 0;
+  const good = total ? Math.round((added / total) * scale) : 0;
+  return Array.from({ length: 5 }, (_, i) => (i < good ? "ok" : i < scale ? "bad" : undefined));
+};
 ---
 
 <div class="hs-group">
@@ -24,6 +34,11 @@ const split = (path: string) => [path.slice(0, path.lastIndexOf("/")), path.slic
           <span class="hs-chip-label">{name}</span>
           <span class="hs-chip-detail">{folder}</span>
           <Counts added={file.added} removed={file.removed} />
+          {file.added || file.removed ? (
+            <span class="hs-size-blocks" aria-hidden="true">
+              {blocks(file.added, file.removed).map((tone) => <i data-tone={tone} />)}
+            </span>
+          ) : null}
         </span>
       );
     })}

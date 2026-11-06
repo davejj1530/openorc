@@ -100,6 +100,10 @@ export class ThreadService {
     this.sessions = new ThreadSessions({ db, runs, workspaces, log, claudeFolder, handoffFor: (...args) => this.agentTools.handoffFor(...args) });
   }
 
+  resolvedCount({ projectIds, quietBefore }: RpcParams<"threads.resolvedCount">): number {
+    return threads.resolvedCount(this.db, { projectIds, quietBefore, now: Date.now() });
+  }
+
   list(filter: RpcParams<"threads.list"> = {}): ThreadSummary[] {
     return threads
       .list(this.db, { ...filter, ...(filter.includeChildren || filter.needsYou ? { attentionIds: this.runs.attentionThreadIds() } : {}) })

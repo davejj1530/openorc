@@ -85,6 +85,7 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "projects.list": ["projects"],
   "projects.checkoutBranch": ["projects", "workspace-diff"],
   "threads.list": ["threads"],
+  "threads.resolvedCount": ["threads"],
   "threads.search": ["threads", "messages"],
   "inbox.list": ["inbox", "tasks"],
   // GitHub's side of a pull request, and the draft review kept here.

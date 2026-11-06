@@ -183,9 +183,10 @@ export function StatusDot({ tone, label, className }: { tone: DotTone; label?: s
   return <span role={label ? "img" : undefined} aria-label={label} aria-hidden={label ? undefined : true} className={cn("inline-block size-1.75 shrink-0 rounded-full", dotTones[tone], className)} />;
 }
 
-type CountSize = "sm" | "md";
-const countSizes: Record<CountSize, string> = { sm: "h-4 min-w-4 px-1", md: "h-5 min-w-5 px-1.5" };
-const countTones = { ink: "bg-accent text-accent-fg", quiet: "bg-surface-2 text-ink-3" } as const;
+type CountSize = "sm" | "md" | "text";
+const countSizes: Record<CountSize, string> = { sm: "h-4 min-w-4 px-1", md: "h-5 min-w-5 px-1.5", text: "" };
+/** `plain` is the digits alone, in the text's own color, for a count beside a label. */
+const countTones = { ink: "bg-accent text-accent-fg", quiet: "bg-surface-2 text-ink-3", plain: "" } as const;
 
 /**
  * A count on a round pill. When the number changes the digits roll, up for more and down for

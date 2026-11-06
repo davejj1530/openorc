@@ -35,9 +35,9 @@ const IMAGE_TYPES: Record<string, string> = { png: "image/png", jpg: "image/jpeg
 /** The UUID attachments.saveFile puts before a file's name here; the brain puts its own. */
 const STORED_PREFIX = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}-/;
 
-type Merged = "threads.list" | "inbox.list" | "tasks.list";
+type Merged = "threads.list" | "threads.resolvedCount" | "inbox.list" | "tasks.list";
 /** What windows hear when a merged list changed. */
-const LIST_KEYS: Record<Merged, string> = { "threads.list": "threads", "inbox.list": "inbox", "tasks.list": "tasks" };
+const LIST_KEYS: Record<Merged, string> = { "threads.list": "threads", "threads.resolvedCount": "threads", "inbox.list": "inbox", "tasks.list": "tasks" };
 interface Page {
   method: Merged;
   params: unknown;
@@ -285,6 +285,7 @@ export class BrainRouter {
     const page = cloud ? this.pages.peek(method, cloud) : null;
     if (method === "threads.list") return this.mergeThreads(local, params, page, offset);
     if (!page) return local;
+    if (method === "threads.resolvedCount") return { ...local, result: (local.result as number) + (page.result as number) };
     if (method === "inbox.list") return { ...local, result: mergeInbox([{ inbox: local.result as InboxList }, { inbox: page.result as InboxList }]) };
     const reach: OwnerReach = this.deps.link.reach;
     return {

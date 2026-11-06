@@ -13,6 +13,8 @@ export interface HomeList {
   failed: boolean;
   /** The host answered with its list, so Resolved has a place to stand. */
   listed: boolean;
+  /** How many threads Resolved holds, once the host has said; an older Mac never does. */
+  resolvedCount?: number;
 }
 
 /** One row of Home's list. Headings and threads share one flat list so the virtualizer can recycle by kind. */
@@ -105,6 +107,8 @@ interface Part {
   open: boolean;
   /** Shows how many roots it holds: Pinned and Snoozed, whose rows are all loaded. */
   counted?: boolean;
+  /** How many it holds in all, as the host counts them: Resolved, whose rows load a page at a time. */
+  total?: number;
   more?: boolean;
   /** Resolved stands with none of it loaded, since it reads its threads once opened. */
   standsEmpty?: boolean;
@@ -112,12 +116,18 @@ interface Part {
   day?: boolean;
 }
 
+/** The count a part's heading shows: what it lists where that is all of it, else the host's total when there is one. */
+function countOf(part: Part, roots: readonly ThreadSummary[]): { count?: number } {
+  if (part.counted) return { count: roots.length };
+  return part.total === undefined ? {} : { count: part.total };
+}
+
 function partItems(part: Part, list: HomeList, options: HomeOptions, waitingRoots: ReadonlySet<string>): HomeItem[] {
   const roots = part.roots.filter((thread) => !waitingRoots.has(thread.id));
   if (!roots.length && !part.standsEmpty) return [];
   const all = list.days.all.filter((thread) => !waitingRoots.has(thread.id));
   return [
-    { kind: "section", key: part.key, label: part.label, open: part.open, ...(part.counted ? { count: roots.length } : {}) },
+    { kind: "section", key: part.key, label: part.label, open: part.open, ...countOf(part, roots) },
     ...treeRows((part.day ? list.days.shownInDay : list.days.shown)(roots, part.open), all, list, options, options.opened === part.key),
     ...(part.open && part.more ? [{ kind: "more", key: `more:${part.key}` } as const] : []),
   ];
@@ -181,6 +191,7 @@ export function homeItems(list: HomeList, options: HomeOptions): HomeItem[] {
         roots: days.resolved.roots,
         open: sidebarSectionOpen(options.collapsed, "resolved", SIDEBAR_LIST),
         more: days.resolved.hasMore,
+        total: list.resolvedCount,
         standsEmpty: list.listed && !options.pinnedOnly,
       },
       list,

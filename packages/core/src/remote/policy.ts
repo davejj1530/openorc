@@ -108,6 +108,8 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   // Takes a project id and answers none, no_commits or ready: nothing of the folder's path.
   "projects.git": allow,
   "threads.list": allow,
+  // A number: how many threads Resolved holds in the projects named.
+  "threads.resolvedCount": allow,
   "threads.get": allow,
   "threads.messages": allow,
   "threads.lastMessage": allow,
@@ -183,6 +185,7 @@ export const remoteReplies: { [M in RemoteMethod]: Reply<M> } = {
   "projects.get": same,
   "projects.git": same,
   "threads.list": (rows, { capabilities }) => (supportsSubagents(capabilities) ? rows : rows.filter((row) => row.parentRelation !== "subagent")),
+  "threads.resolvedCount": same,
   "threads.get": (row, { capabilities }) => (!supportsSubagents(capabilities) && row?.parentRelation === "subagent" ? null : row),
   "threads.messages": same,
   "threads.lastMessage": same,

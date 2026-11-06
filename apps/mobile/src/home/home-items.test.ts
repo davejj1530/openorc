@@ -123,6 +123,8 @@ describe("homeItems", () => {
     const resolved = fixtureThreads.map((thread) => (thread.projectId === "website" ? { ...thread, archivedAt: 1, pinnedAt: null } : thread));
     const items = outline(homeItems(list(resolved), options()));
     const website = items.flatMap((line, index) => (line.endsWith("@ website") ? [index] : []));
+    // The heading carries the host's own count, since Resolved loads a page at a time.
+    expect(outline(homeItems({ ...list(resolved), resolvedCount: 120 }, options({ collapsed: [] }))).at(-1)).toBe("§ Resolved 120 folded");
     expect(website).toHaveLength(3);
     expect(website.every((index) => index > items.indexOf("§ Resolved"))).toBe(true);
   });

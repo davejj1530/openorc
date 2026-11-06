@@ -30,8 +30,13 @@ function startOfDay(now: number, daysAgo: number): number {
 export function sidebarPlace(at: number, now: number): SidebarPlace {
   if (at >= now - RECENT_MS) return "recent";
   if (at >= startOfDay(now, 0)) return "today";
-  if (at >= startOfDay(now, 1)) return "yesterday";
+  if (at >= resolvedBefore(now)) return "yesterday";
   return "resolved";
+}
+
+/** When Resolved starts: work before the start of yesterday, local time, is resolved by its age. */
+export function resolvedBefore(now: number): number {
+  return startOfDay(now, 1);
 }
 
 /** Where a root and its family go: by the latest work anywhere in it. */

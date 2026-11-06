@@ -1,43 +1,117 @@
-/* Resolved sits at the list's foot, right above the dock, behind a hairline. Folded, it is its
-   heading, with the chevron pointing up the way it opens. Open, it rises over the list, up to most of
-   the column, and scrolls on its own. A thread held over it, or a resolved one held over the list,
-   lights where it would land. */
+/* Resolved sits at the list's foot, right above the dock, as quiet as the day headings: "Resolved",
+   then how many it holds and a chevron at the row's end. Open, it rises over the list to its rows'
+   height, up to most of the column, and scrolls on its own; its rows arrive a step apart, and fold
+   away with it. While a thread it would take is dragged, the row grows and draws a dashed ring,
+   with a check in place of the chevron; held over it, the ring turns solid on the current row's
+   fill and the count rolls one up. */
 .resolved-drawer {
+  --resolved-head: 36px;
   display: flex;
   flex: none;
   flex-direction: column;
-  min-height: 0;
-  max-height: 37px;
+  height: min(calc(var(--resolved-head) + 8px + var(--resolved-rows, 0px)), 62%);
   padding: 4px 10px;
-  border-top: var(--hairline) solid var(--line);
-  transition: max-height var(--duration-resize) var(--ease-out);
+  transition: height var(--duration-resize) var(--ease-out);
 }
-.resolved-drawer[data-open] {
-  max-height: 62%;
+.resolved-drawer[data-inviting] {
+  --resolved-head: 44px;
 }
-.resolved-drawer-toggle {
+.resolved-toggle {
+  display: flex;
   flex: none;
+  align-items: center;
+  gap: 8px;
+  height: var(--resolved-head);
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  outline: 1px dashed transparent;
+  outline-offset: -1px;
+  font-size: var(--text-sm);
+  color: var(--ink-4);
+  text-align: left;
+  transition:
+    height var(--duration-resize) var(--ease-out),
+    color var(--duration-quick) var(--ease-out),
+    background-color var(--duration-quick) var(--ease-out),
+    outline-color var(--duration-quick) var(--ease-out);
 }
-.resolved-drawer-chevron {
-  transform: rotate(-90deg);
-  transition: transform var(--duration-resize) var(--ease-out);
+.resolved-toggle:hover {
+  color: var(--ink);
 }
-.resolved-drawer-toggle:not([data-folded]) .resolved-drawer-chevron {
+.resolved-label {
+  flex: 1;
+  min-width: 0;
+}
+.resolved-mark {
+  display: grid;
+  place-items: center;
+}
+.resolved-mark > * {
+  grid-area: 1 / 1;
+}
+.resolved-chevron {
+  transition:
+    transform var(--duration-resize) var(--ease-out),
+    opacity var(--duration-quick) var(--ease-out);
+}
+.resolved-chevron[data-open] {
   transform: rotate(90deg);
 }
-.resolved-drawer-list {
-  min-height: 0;
-  overflow-y: auto;
-  padding-bottom: 6px;
+.resolved-check {
+  opacity: 0;
+  scale: 0.6;
+  transition:
+    opacity var(--duration-quick) var(--ease-out),
+    scale var(--duration-confirm) var(--ease-overshoot),
+    color var(--duration-quick) var(--ease-out);
 }
-.resolved-drawer[data-drop] .resolved-drawer-toggle,
-.browser-threads[data-drop] {
+.resolved-drawer[data-inviting] .resolved-toggle {
+  outline-color: var(--line-strong);
+  color: var(--ink-3);
+}
+.resolved-drawer[data-inviting] .resolved-chevron {
+  opacity: 0;
+}
+.resolved-drawer[data-inviting] .resolved-check {
+  opacity: 1;
+  scale: 1;
+}
+.resolved-drawer[data-drop] .resolved-toggle {
+  outline-style: solid;
+  outline-color: var(--accent);
   background-color: var(--current-row-fill);
   color: var(--ink);
 }
-@media (prefers-reduced-motion: reduce) {
-  .resolved-drawer,
-  .resolved-drawer-chevron {
-    transition: none;
+.resolved-drawer[data-drop] .resolved-check {
+  color: var(--accent-ink);
+}
+.resolved-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  opacity: 0;
+  transition: opacity var(--duration-leave) var(--ease-out);
+}
+.resolved-drawer[data-open] .resolved-body {
+  opacity: 1;
+  transition-duration: var(--duration-arrive);
+}
+.resolved-list {
+  padding-top: 2px;
+}
+.resolved-list.motion-stagger > * {
+  animation: resolved-row-arrive var(--duration-arrive) var(--ease-out) var(--motion-delay, 0ms) both;
+}
+@keyframes resolved-row-arrive {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+    filter: blur(2px);
   }
+}
+/* A resolved thread held over the list: the list takes it back. */
+.browser-threads[data-drop] {
+  border-radius: var(--radius-lg);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  background-color: color-mix(in srgb, var(--current-row-fill) 50%, transparent);
 }

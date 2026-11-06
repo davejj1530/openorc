@@ -68,6 +68,8 @@ const answers: Answers = {
   "projects.get": (core, { id }) => core.projects.find((project) => project.id === id) ?? null,
   "projects.git": () => "ready",
   "threads.list": listed,
+  "threads.resolvedCount": (core, { quietBefore }) =>
+    [...core.threads.values()].filter((thread) => !thread.parentThreadId && (thread.archivedAt !== null || (!thread.pinnedAt && thread.lastActivityAt < quietBefore))).length,
   "threads.get": (core, { id }) => core.threads.get(id) ?? null,
   // Messages said outside any run, as other threads leave them; the demo's threads have none, and its runs say the rest.
   "threads.messages": (core, { id }) => {

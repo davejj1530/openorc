@@ -10,6 +10,8 @@ const fixture: {
   projects: { id: string; name: string; rootPath: string }[];
   threads: (Pick<ThreadSummary, "id" | "title" | "projectId" | "agent" | "activity" | "unread" | "session" | "pinnedAt" | "snoozedUntil" | "lastActivityAt"> &
     Partial<Pick<ThreadSummary, "createdAt" | "archivedAt" | "parentThreadId" | "parentRelation" | "subagent" | "prUrl" | "prState" | "workspaceMode" | "branch" | "owner">>)[];
+  /** What the host says Resolved holds, when it says. */
+  resolvedCount?: number;
 } = vi.hoisted(() => ({ projects: [], threads: [] }));
 
 /** The core's answer to a thread list, as the fixture's threads read. */
@@ -44,6 +46,7 @@ vi.mock("../lib/client", async (original) => {
         }
       );
     if (method === "threads.list") return listThreads(params as RpcParams<"threads.list">);
+    if (method === "threads.resolvedCount") return fixture.resolvedCount;
     return undefined;
   };
   return {
@@ -91,6 +94,7 @@ beforeEach(() => {
   );
   fixture.projects = [];
   fixture.threads = [];
+  fixture.resolvedCount = undefined;
   localStorage.clear();
   useWindow.setState({ fullscreen: false });
   useLayout.setState({ collapsed: [], projectId: null, sidebarOpen: true, pinnedOnly: false, hiddenProjects: [] });
@@ -544,7 +548,8 @@ it("resolves a thread dropped on Resolved and reopens a resolved one dropped on 
   dayThreads();
   useLayout.setState({ collapsed: ["resolved-open:threads"] });
   mountSidebar();
-  const drawer = (await screen.findByRole("button", { name: "Resolved" })).parentElement!;
+  fixture.resolvedCount = 2;
+  const drawer = (await screen.findByRole("button", { name: "Resolved, 2" })).parentElement!;
   await screen.findByRole("button", { name: /Old notes/ });
   const drag = (name: RegExp, onto: Element) => {
     const dataTransfer = dragData();
@@ -558,6 +563,14 @@ it("resolves a thread dropped on Resolved and reopens a resolved one dropped on 
       .mocked(core.call)
       .mock.calls.filter(([method]) => method === "threads.update")
       .map(([, params]) => params);
+  // Held over Resolved, the count takes the thread in before it lands.
+  const dataTransfer = dragData();
+  fireEvent.dragStart(screen.getByRole("button", { name: /Recent notes/ }), { dataTransfer });
+  fireEvent.dragOver(drawer, { dataTransfer });
+  expect(screen.getByRole("button", { name: "Resolved, 3" })).toBeTruthy();
+  fireEvent.dragLeave(drawer, { dataTransfer, relatedTarget: document.body });
+  fireEvent.dragEnd(screen.getByRole("button", { name: /Recent notes/ }), { dataTransfer });
+  expect(screen.getByRole("button", { name: "Resolved, 2" })).toBeTruthy();
   drag(/Recent notes/, drawer);
   await waitFor(() => expect(updates()).toEqual([{ id: "recent", patch: { archived: true } }]));
   // Dropped back on Resolved, a resolved thread stays as it is; on the list it comes back.

@@ -125,6 +125,16 @@ it("lists both brains' threads in a window, the brain's on this Mac's project an
   expect(remoteDevices.list(brain!.db)).toEqual([]);
 });
 
+it("counts Resolved across both brains: this Mac's at once, the brain's once it answers", async () => {
+  await until(() => mac!.brainRouting!.link.reach === "live");
+  threads.update(mac!.db, "mac-thread", { archivedAt: 1 });
+  threads.update(brain!.db, "cloud-thread", { archivedAt: 1 });
+  const asked = { projectIds: [macProject.id], quietBefore: 0 };
+  expect(await window("threads.resolvedCount", asked)).toBe(1);
+  await until(() => mac!.brainRouting!.router.pages.peek("threads.resolvedCount", { ...asked, projectIds: [brainProject.id] }) !== null);
+  expect(await window("threads.resolvedCount", asked)).toBe(2);
+});
+
 it("forwards a brain thread's calls, and its frames reach this Mac's windows and none of its phones", async () => {
   const published = vi.spyOn(mac!.remote, "publish");
   expect(await window("threads.get", { id: "cloud-thread" })).toMatchObject({ id: "cloud-thread", projectId: macProject.id, owner: { brain: "cloud" }, worktreePath: null });

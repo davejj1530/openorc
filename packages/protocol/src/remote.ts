@@ -12,6 +12,7 @@ export const REMOTE_METHODS = [
   "projects.get",
   "projects.git",
   "threads.list",
+  "threads.resolvedCount",
   "threads.get",
   "threads.messages",
   "threads.lastMessage",

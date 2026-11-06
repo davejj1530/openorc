@@ -106,6 +106,11 @@ export const rpcParams = {
   "providers.codex.reset": z.object({ attemptId: z.string().uuid(), creditId: z.string().min(1).optional(), confirmationToken: z.string().min(1) }),
   /** Active threads by default; every project when none is named. Offset pages older threads in. */
   "threads.list": ThreadListParams,
+  /**
+   * How many roots the sidebar's Resolved lists across these projects: those put there, and the unpinned, unsnoozed ones
+   * whose tree last worked before `quietBefore`, which the asker's clock sets.
+   */
+  "threads.resolvedCount": z.object({ projectIds: z.array(z.string()), quietBefore: z.number() }).strict(),
   "threads.get": z.object({ id: z.string() }),
   "threads.messages": z.object({ id: z.string() }),
   /** The newest thing the person or an agent said in the conversation, its text clipped for a preview. */
@@ -551,6 +556,7 @@ export interface RpcResults
   "providers.limits": import("./provider-usage.js").PlanLimits[];
   "providers.codex.reset": import("./provider-usage.js").ResetResult;
   "threads.list": ThreadSummary[];
+  "threads.resolvedCount": number;
   "threads.get": ThreadSummary | null;
   "threads.messages": ThreadMessage[];
   "threads.lastMessage": ThreadMessage | null;

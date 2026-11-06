@@ -4,7 +4,7 @@ import { threadTurnChanges } from "../services/thread-turn-changes.js";
 import { ThreadService } from "../services/threads.js";
 import type { Handlers } from "./types.js";
 type Dependencies = {
-  threadService: Pick<ThreadService, "withCheckoutBranches" | "list" | "get" | "messages" | "plans" | "search" | "checkpoints">;
+  threadService: Pick<ThreadService, "withCheckoutBranches" | "list" | "resolvedCount" | "get" | "messages" | "plans" | "search" | "checkpoints">;
   db: Db;
   ledger: Pick<LedgerWriter, "flush">;
   imports: Pick<ImportService, "importable">;
@@ -20,10 +20,20 @@ export function createThreadQueriesHandlers({
   imports,
 }: Dependencies): Pick<
   Handlers,
-  "threads.list" | "threads.get" | "threads.messages" | "threads.lastMessage" | "threads.plans" | "threads.search" | "threads.checkpoints" | "threads.turnChanges" | "threads.importable"
+  | "threads.list"
+  | "threads.resolvedCount"
+  | "threads.get"
+  | "threads.messages"
+  | "threads.lastMessage"
+  | "threads.plans"
+  | "threads.search"
+  | "threads.checkpoints"
+  | "threads.turnChanges"
+  | "threads.importable"
 > {
   return {
     "threads.list": (filter) => threadService.withCheckoutBranches(threadService.list(filter)),
+    "threads.resolvedCount": (params) => threadService.resolvedCount(params),
     "threads.get": async ({ id }) => {
       const thread = threadService.get(id);
       return thread ? (await threadService.withCheckoutBranches([thread]))[0]! : null;

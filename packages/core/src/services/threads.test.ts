@@ -1021,6 +1021,27 @@ describe("thread lifecycle", () => {
     expect(deliver).toHaveBeenCalledTimes(1);
   });
 
+  it("counts what Resolved lists: threads put there, and families quiet since the cutoff that no pin or snooze keeps out", () => {
+    const quietBefore = Date.now() - 86_400_000;
+    const own = projects.insert(core.db, { name: "Resolved count", rootPath: path.join(os.tmpdir(), "resolved-count"), gitRemote: null, defaultBranch: "main", settings: {} });
+    const insert = (title: string) => threads.insert(core.db, { projectId: own.id, title, agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
+    const old = (title: string) => {
+      const thread = insert(title);
+      core.db.stmt("UPDATE threads SET last_activity_at = 1000 WHERE id = ?").run(thread.id);
+      return thread;
+    };
+    old("Quiet");
+    insert("Fresh");
+    core.threads.update(insert("Put there").id, { archived: true });
+    core.threads.update(old("Pinned").id, { pinned: true });
+    core.threads.update(old("Snoozed").id, { snoozedUntil: Date.now() + 60_000 });
+    // A subagent's recent work keeps its old parent out, and counts as nothing of its own.
+    const parent = old("Busy family");
+    threads.update(core.db, insert("Helper").id, { parentThreadId: parent.id, parentRelation: "subagent" });
+    expect(core.threads.resolvedCount({ projectIds: [own.id], quietBefore })).toBe(2);
+    expect(core.threads.resolvedCount({ projectIds: [], quietBefore })).toBe(0);
+  });
+
   it("brings a resolved conversation back when it gets a message, and counts a reopen as activity that keeps it read", () => {
     const t = insert("Resolved");
     const r = runRepo.insert(core.db, { id: "reopen-run", taskId: null, threadId: t.id, agent: "codex", model: null, mode: "act", permissionMode: "trusted" });

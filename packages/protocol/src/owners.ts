@@ -58,6 +58,7 @@ const here = { by: "here" } as const;
 export const OWNER_ROUTES: { [M in RoutedMethod]: OwnerRoute<M> } & { [M in Exclude<RpcMethod, RoutedMethod>]?: OwnerRoute<M> } = {
   "threads.start": { by: "start", cloud: (p) => (p.cloud ? p.projectId : undefined) },
   "threads.list": { by: "merge" },
+  "threads.resolvedCount": { by: "merge" },
   "inbox.list": { by: "merge" },
   "threads.get": byId,
   "threads.messages": byId,
@@ -157,6 +158,7 @@ export const OWNER_ROUTES: { [M in RoutedMethod]: OwnerRoute<M> } & { [M in Excl
  */
 export const ROUTED_READS: ReadonlySet<RpcMethod> = new Set<RpcMethod>([
   "threads.list",
+  "threads.resolvedCount",
   "inbox.list",
   "threads.get",
   "threads.messages",

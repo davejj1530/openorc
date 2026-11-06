@@ -1,6 +1,7 @@
 import {
   cachedListPage,
   NEEDS_YOU_PAGE,
+  resolvedBefore,
   resolvedRows,
   SIDEBAR_LIST,
   sidebarDayList,
@@ -79,6 +80,7 @@ function useThreadList(connected: boolean, selectedId: string | undefined, resol
   const pins = useRpc("threads.list", { ...listed, pinnedOnly: true }, besides);
   const needsYou = useRpc("threads.list", { ...listed, needsYou: true, limit: NEEDS_YOU_PAGE }, besides);
   const resolved = useRpc("threads.list", { ...listed, filter: "archived", limit: resolvedLimit + 1 }, { ...besides, enabled: besides.enabled && resolvedOpen });
+  const resolvedCount = useRpc("threads.resolvedCount", { projectIds, quietBefore: resolvedBefore(Date.now()) }, besides);
   const fetched = lists.map((list, index) => (list.data ? { rows: list.data, limit } : cachedListPage(cache, params[index]!)));
   const opened = useRpc("threads.get", { id: selectedId ?? "" }, { enabled: Boolean(selectedId) }).data;
   const selected = opened && projectIds.includes(opened.projectId) ? opened : null;
@@ -100,6 +102,7 @@ function useThreadList(connected: boolean, selectedId: string | undefined, resol
     names: new Map(choices.map(({ id, name }) => [id, name])),
     failed: connected && lists.some((each) => each.isError),
     listed: fetched.every(Boolean),
+    resolvedCount: resolvedCount.data,
   };
   const pending = lists.some((each) => each.isPending);
   return {

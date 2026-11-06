@@ -96,6 +96,7 @@ export {
   sidebarDayOpen,
   sidebarDaySections,
   sidebarListGrows,
+  resolvedBefore,
   resolvedRows,
   sidebarPlace,
   threadNeedsYou,

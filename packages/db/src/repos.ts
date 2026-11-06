@@ -7,7 +7,7 @@ import { redact, redactJson } from "./redact.js";
 import { retiredTaskIds, retiredTeams, retiredThreadIds } from "./retired-teams.js";
 import { jaccard, normalizeTitle, wordSet } from "./task-similarity.js";
 import { threadListLimit, threadListOrder } from "./thread-list-order.js";
-import { threadTreeArgs, threadTreeSql } from "./thread-list-tree.js";
+import { threadRootCountSql, threadTreeArgs, threadTreeSql } from "./thread-list-tree.js";
 
 const now = () => Date.now();
 
@@ -448,6 +448,17 @@ export const threads = {
       ts,
     );
     return threads.get(db, id) as Thread;
+  },
+  /**
+   * How many roots Resolved lists across `projectIds`: those put there, and the unpinned, unsnoozed ones whose tree last
+   * worked before `quietBefore`. Each is counted as its own list reads it, the archive and the active threads apart.
+   */
+  resolvedCount(db: Db, { projectIds, quietBefore, now: at }: { projectIds: readonly string[]; quietBefore: number; now: number }): number {
+    const projects = projectIds.length ? `project_id IN (${projectIds.map(() => "?").join(",")})` : "0";
+    const count = (where: string, rootWhere: string, args: (string | number)[]) =>
+      Number((db.stmt(threadRootCountSql(`${VISIBLE} AND ${projects} AND ${where}`, rootWhere)).get(...projectIds, ...args) as { n: number }).n);
+    const quiet = "roots.pinned_at IS NULL AND (roots.snoozed_until IS NULL OR roots.snoozed_until <= ?) AND latest.tree_activity < ?";
+    return count("archived_at IS NOT NULL", "1", []) + count("archived_at IS NULL", quiet, [at, quietBefore]);
   },
   /** Threads whose last activity is older than the cutoff and that are still active, for auto-done. */
   idleSince(db: Db, cutoff: number): Thread[] {

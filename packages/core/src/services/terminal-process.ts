@@ -34,6 +34,13 @@ export const spawnWithPipes: SpawnTerminal = async (binary, args, { cwd, env }) 
       child.once("error", () => end(null));
       child.once("close", end);
     },
-    kill: () => stopProcess(child),
+    // Asked from inside its own output listener, so it must not throw: an exiting group can refuse the signal.
+    kill: () => {
+      try {
+        stopProcess(child);
+      } catch {
+        // It is ending anyway; its exit still reaches onExit.
+      }
+    },
   };
 };

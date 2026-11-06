@@ -77,6 +77,8 @@ const MEMORY_KEY = "sk-ant-api03-handed-over-memory-fixture-0123456789";
 const codexAuth = (stamp: string, ms: number) => JSON.stringify({ auth_mode: "chatgpt", tokens: { refresh_token: `refresh-${stamp}` }, last_refresh: new Date(Date.now() + ms).toISOString() });
 /** Git with none of this Mac's own settings, so no credential helper of the person's is ever asked. */
 const isolatedGit = { PATH: process.env["PATH"], HOME: os.tmpdir(), GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null", GIT_TERMINAL_PROMPT: "0" };
+// CI names its own author and committer for the whole job, and git ranks those above the sign-in's config checked here.
+for (const name of ["GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL"]) delete process.env[name];
 
 async function rpc(method: "agents.availability" | "remote.status"): Promise<unknown> {
   const reply = await core.handle({ type: "rpc", id: 1, method, params: {} });

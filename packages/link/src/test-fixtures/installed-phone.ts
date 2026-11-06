@@ -4,9 +4,12 @@ import { initiate } from "../noise.js";
 import type { LinkSocket } from "../session.js";
 
 /*
- * How phone builds already installed read a host's hello and a pairing code: the link package's readers as of 89a9ed15,
- * which TestFlight build 202610270003 runs. They read keys exactly, so a field they do not know locks them out of the
- * host. Frozen on purpose: never change this to make a test pass; a host it rejects is one those phones cannot reach.
+ * How phone builds already installed read a host's hello and a pairing code. They read keys exactly, so a field they do
+ * not know locks them out of the host. Frozen on purpose: never change this to make a test pass; a host a build rejects
+ * is one its phones cannot reach. The builds differ only in how they read routes:
+ * - appStore: App Store 1.0.0 (202610270002), the link package as of 85bf1c5e. It knows lan and tailnet routes and
+ *   refuses a whole hello or code that lists any other kind.
+ * - testFlight: TestFlight 202610270003, as of 89a9ed15. It also knows public routes and drops kinds it does not know.
  */
 
 type Check = (value: unknown) => boolean;
@@ -40,11 +43,17 @@ function variants(tag: string, table: Record<string, Check>): Check {
   };
 }
 
-const ROUTE_KINDS = ["lan", "tailnet", "public"];
 const port: Check = (value) => Number.isInteger(value) && (value as number) >= 1 && (value as number) <= 65_535;
 const route = shape({ kind: present, host: text(253), port });
 
-function readRoutes(value: unknown): Route[] | null {
+/** The routes a hello or code lists, as the build keeps them, or null where it refuses the whole message. */
+type RouteReader = (value: unknown) => Route[] | null;
+
+const appStoreRoute = shape({ kind: oneOf("lan", "tailnet"), host: text(253), port });
+const appStoreRoutes: RouteReader = (value) => (Array.isArray(value) && value.length <= 32 && value.every(appStoreRoute) ? (value as Route[]) : null);
+
+const ROUTE_KINDS = ["lan", "tailnet", "public"];
+const testFlightRoutes: RouteReader = (value) => {
   if (!Array.isArray(value) || value.length > 32) return null;
   const routes: Route[] = [];
   for (const entry of value) {
@@ -54,7 +63,7 @@ function readRoutes(value: unknown): Route[] | null {
     routes.push({ kind: entry["kind"] as Route["kind"], host: entry["host"] as string, port: entry["port"] as number });
   }
   return routes;
-}
+};
 
 const message = (fields: Fields, optional?: Fields) => shape({ t: present, ...fields }, optional);
 const macHello = variants("t", {
@@ -62,8 +71,7 @@ const macHello = variants("t", {
   refused: message({ reason: oneOf("unpaired", "offer-invalid", "incompatible", "busy") }),
 });
 
-/** Throws where an installed phone refuses the hello. */
-export function parseMacHelloAsInstalled(value: unknown): Record<string, unknown> {
+function parseMacHello(value: unknown, readRoutes: RouteReader): Record<string, unknown> {
   if (!macHello(value)) throw new Error("not a Mac hello");
   const hello = value as Record<string, unknown>;
   if (hello["t"] === "refused") return hello;
@@ -107,8 +115,7 @@ function bytes(value: unknown, length: number): Uint8Array {
   return decoded;
 }
 
-/** Throws where an installed phone says "This is not an OpenOrc pairing code." */
-export function decodePairingUrlAsInstalled(text: string) {
+function decodePairingUrl(text: string, readRoutes: RouteReader) {
   if (!text.startsWith(PREFIX)) throw new Error("not a pairing code");
   const body: unknown = JSON.parse(fromUtf8(fromBase64Url(text.slice(PREFIX.length))));
   if (!isRecord(body)) throw new Error("not a pairing code");
@@ -118,6 +125,15 @@ export function decodePairingUrlAsInstalled(text: string) {
   if (!isText(name, 255) || !isText(offer, 64) || !routes?.length || !Number.isSafeInteger(expires)) throw new Error("not a pairing code");
   return { macName: name, macKey: bytes(body["key"], 32), offerId: offer, secret: bytes(body["secret"], 32), routes, expiresAt: expires as number };
 }
+
+const installedPhone = (readRoutes: RouteReader) => ({
+  /** Throws where the build refuses the hello. */
+  parseMacHello: (value: unknown) => parseMacHello(value, readRoutes),
+  /** Throws where the build says "This is not an OpenOrc pairing code." */
+  decodePairingUrl: (text: string) => decodePairingUrl(text, readRoutes),
+});
+
+export const INSTALLED_PHONES = { appStore: installedPhone(appStoreRoutes), testFlight: installedPhone(testFlightRoutes) };
 
 /** The host's hello as sent, unread: an installed phone's handshake on `socket`, which it then closes. */
 export function rawMacHello(options: { socket: LinkSocket; crypto: LinkCrypto; device: KeyPair; macKey: Uint8Array; pair?: { offerId: string; secret: string } }): Promise<unknown> {

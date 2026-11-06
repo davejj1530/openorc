@@ -7,7 +7,8 @@ export const supportsSubagents = (capabilities: readonly string[] = []): boolean
 export const supportsReplyImages = (capabilities: readonly string[] = []): boolean => capabilities.includes("reply-images");
 
 /**
- * Frozen at phone build 202610270003 (aa4d5cfa). Its transcript dispatch throws for any other event type.
+ * Frozen at the installed builds, App Store 1.0.0 (202610270002, 85bf1c5e) and TestFlight 202610270003, whose
+ * transcripts dispatch these same handlers. Their dispatch throws for any other event type.
  * Never derive this from AgentEvent or extend it when adding events: installed binaries cannot learn new handlers.
  */
 export const LEGACY_PHONE_EVENT_TYPES = [

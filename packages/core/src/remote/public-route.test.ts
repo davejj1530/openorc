@@ -7,7 +7,7 @@ import { WebSocket } from "ws";
 import { settings } from "@openorc/db";
 import { decodePairingUrl, linkPath, toBase64Url, type LinkSocket } from "@openorc/link";
 import { nodeCrypto } from "@openorc/link/node";
-import { decodePairingUrlAsInstalled, parseMacHelloAsInstalled, rawMacHello } from "@openorc/link/test-fixtures/installed-phone";
+import { INSTALLED_PHONES, rawMacHello } from "@openorc/link/test-fixtures/installed-phone";
 import { OpenOrc } from "../openorc.js";
 import { listen, type Exposure } from "./listener.js";
 import { currentRoutes } from "./routes.js";
@@ -140,12 +140,13 @@ describe("a host with a public address", () => {
     });
   });
 
-  it("speaks a pairing code and a hello that phones already installed read", async () => {
+  // The App Store build knows no public route, so it cannot pair with a brain; its phones reach Macs only.
+  it("speaks a pairing code and a hello that the TestFlight build reads", async () => {
     await withCloudCore(await freePort(), async (core) => {
       const { listener } = await core.remote.configure(true);
       if (listener.state !== "on") throw new Error("not listening");
       const { url } = await core.remote.beginPairing();
-      const offer = decodePairingUrlAsInstalled(url);
+      const offer = INSTALLED_PHONES.testFlight.decodePairingUrl(url);
       expect(offer.routes).toEqual([{ kind: "public", host: "sb-abc.vercel.run", port: 443 }]);
       const ws = new WebSocket(`ws://127.0.0.1:${listener.port}${linkPath("public", offer.macKey, nodeCrypto)}`);
       await new Promise((resolve, reject) => ws.once("open", resolve).once("error", reject));
@@ -156,7 +157,7 @@ describe("a host with a public address", () => {
         macKey: offer.macKey,
         pair: { offerId: offer.offerId, secret: toBase64Url(offer.secret) },
       });
-      expect(parseMacHelloAsInstalled(hello)).toMatchObject({ t: "hello", mac: { name: "Cloud" }, routes: offer.routes });
+      expect(INSTALLED_PHONES.testFlight.parseMacHello(hello)).toMatchObject({ t: "hello", mac: { name: "Cloud" }, routes: offer.routes });
     });
   });
 

@@ -2,10 +2,15 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
+import { WebSocket } from "ws";
 import { projects, runs, threads } from "@openorc/db";
+import { linkUrl, toBase64Url } from "@openorc/link";
+import { nodeCrypto } from "@openorc/link/node";
+import { INSTALLED_PHONES, rawMacHello } from "@openorc/link/test-fixtures/installed-phone";
 import type { AgentEvent } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
 import { RemoteTestClient } from "./test-client.js";
+import { linkSocket } from "./ws-socket.js";
 
 let core: OpenOrc;
 let dataDir: string;
@@ -41,6 +46,20 @@ async function phone(capable = false) {
   if (capable) await expect(result.request("session.negotiate", { capabilities: ["subagent-threads", "future-capability"] })).resolves.toEqual({ capabilities: ["subagent-threads"] });
   return result;
 }
+
+it.each(Object.entries(INSTALLED_PHONES))("speaks a pairing code and a hello the installed %s build reads", async (_build, installed) => {
+  const offer = installed.decodePairingUrl((await core.remote.beginPairing()).url);
+  const ws = new WebSocket(linkUrl(offer.routes[0]!, offer.macKey, nodeCrypto));
+  await new Promise((resolve, reject) => ws.once("open", resolve).once("error", reject));
+  const hello = await rawMacHello({
+    socket: linkSocket(ws),
+    crypto: nodeCrypto,
+    device: nodeCrypto.generateKeyPair(),
+    macKey: offer.macKey,
+    pair: { offerId: offer.offerId, secret: toBase64Url(offer.secret) },
+  });
+  expect(installed.parseMacHello(hello)).toMatchObject({ t: "hello", mac: { name: "QA" }, routes: offer.routes });
+});
 
 it("gates legacy live frames and history while a capable session gets the same subagent events", async () => {
   const project = projects.insert(core.db, { name: "Compatibility", rootPath: dataDir, gitRemote: null, defaultBranch: "main", settings: {} });

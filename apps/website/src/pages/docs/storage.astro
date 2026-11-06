@@ -7,7 +7,8 @@ import { docHref } from "../../data/docs";
 
 <DocsLayout slug="storage">
   <p>
-    OpenOrc keeps your work on your computer, almost all of it in one data folder. It has no server of its own, and <a href={docHref("network")}>Network connections</a> lists everything that leaves your computer.
+    OpenOrc keeps your work on your computer, almost all of it in one data folder. It has no server of its own, and <a href={docHref("network")}>Network connections</a> lists everything that leaves your computer. Cloud threads and the
+    cloud brain also keep work on the cloud account you connect. See <a href="#cloud">In the cloud</a>.
   </p>
 
   <section aria-labelledby="data-folder">
@@ -73,11 +74,19 @@ import { docHref } from "../../data/docs";
             <td>The tools that run simulators and emulators, and their state, once you turn on device support</td>
           </tr>
           <tr>
+            <td><code>mirrors/</code></td>
+            <td>Read-only copies of cloud brain threads' code, one folder per thread you chose <strong>Open on Mac</strong> for</td>
+          </tr>
+          <tr>
+            <td><code>kept-sessions/</code></td>
+            <td>Copies of an agent's session that a newer copy replaced when a thread moved to or from the cloud, so none is lost. They go when the thread is deleted.</td>
+          </tr>
+          <tr>
             <td><code>agent-processes/</code></td>
             <td>On macOS and Linux, a record of each running agent process: its ID and start time, and OpenOrc's own. The next launch uses it to stop any left behind by a crash. No prompts or credentials.</td>
           </tr>
           <tr>
-            <td><code>slack-secrets.enc</code>, <code>memory-extraction-key.enc</code>, <code>github-reviewer-app.enc</code>, <code>remote-access-key.enc</code>, <code>apns-key.enc</code></td>
+            <td><code>slack-secrets.enc</code>, <code>memory-extraction-key.enc</code>, <code>github-reviewer-app.enc</code>, <code>remote-access-key.enc</code>, <code>apns-key.enc</code>, and the files for cloud threads</td>
             <td>Encrypted secrets; see <a href="#secrets">Settings and secrets</a></td>
           </tr>
           <tr>
@@ -107,13 +116,14 @@ import { docHref } from "../../data/docs";
     <h2 id="outside">Outside the data folder</h2>
     <ul>
       <li>
-        <strong>Your repositories.</strong> Worktree branches, and refs under <code>refs/openorc/</code> that keep each turn's checkpoint and task snapshots. See <a href={docHref("git")}>Git and worktrees</a>.
+        <strong>Your repositories.</strong> Worktree branches, and refs under <code>refs/openorc/</code> that keep each turn's checkpoint, task snapshots, and edits a cloud thread's sync set aside. See <a href={docHref("git")}>Git and worktrees</a>.
       </li>
       <li>
         <strong>Your project's files</strong>, only when you ask: exporting a plan, adding a memory to <code>CLAUDE.md</code> or <code>AGENTS.md</code>, saving a file in the Files or Instructions tab, or a Git action such as committing,
         restoring a checkpoint, moving a thread, or applying a task to your checkout. The Instructions tab can also save your personal instruction file, such as <code>~/.claude/CLAUDE.md</code>.
       </li>
       <li><strong>Claude accounts.</strong> Moving a thread to another Claude account copies its Claude Code session into that account's folder, so the conversation can continue there.</li>
+      <li><strong>The agents' sessions from the cloud.</strong> After each cloud turn, and when a thread comes back from the cloud brain, the agent's session is copied into the agent's own folder on your computer, such as <code>~/.claude/projects</code>.</li>
       <li><strong>Claude's plans folder.</strong> A Claude Code thread in Plan mode creates <code>~/.claude/plans</code>, or <code>plans</code> inside <code>CLAUDE_CONFIG_DIR</code>, if it doesn't exist.</li>
       <li>
         <strong>Temporary folders.</strong> Private folders in your system's temporary folder: one per Claude Code process for the files that hold OpenOrc's tool address, scratch space when Codex writes a title or summary in the
@@ -276,6 +286,26 @@ import { docHref } from "../../data/docs";
             <td><code>apns-key.enc</code></td>
             <td>The Apple push key for phone notifications, if you added one</td>
           </tr>
+          <tr>
+            <td><code>cloud-credentials.enc</code></td>
+            <td>The Vercel token and Agent37 key, and every Settings → Cloud choice: team, sizes, region, where new cloud threads run, and <strong>Carry working threads on in the cloud</strong></td>
+          </tr>
+          <tr>
+            <td><code>claude-cloud-tokens.enc</code></td>
+            <td>Each Claude account's token for cloud sandboxes</td>
+          </tr>
+          <tr>
+            <td><code>codex-cloud-login.enc</code></td>
+            <td>The ChatGPT sign-in or OpenAI API key that Codex uses in cloud sandboxes</td>
+          </tr>
+          <tr>
+            <td><code>opencode-cloud-keys.enc</code></td>
+            <td>OpenCode's provider keys for the cloud</td>
+          </tr>
+          <tr>
+            <td><code>cloud-brain.enc</code>, <code>cloud-brain-move.enc</code></td>
+            <td>The cloud brain's key and where it runs, and a new brain's while the brain moves to the other service</td>
+          </tr>
         </tbody>
       </table>
     </div>
@@ -285,8 +315,32 @@ import { docHref } from "../../data/docs";
       <li>On Linux, OpenOrc refuses to save a secret when the system would store it as plain text.</li>
       <li>On macOS and Linux, development and installed builds use different keychain entries, so one can't read the other's secrets.</li>
     </ul>
-    <p>OpenOrc never reads or stores the agents' sign-ins. Each CLI keeps its own credentials, including Claude Code in the folder of each account you added.</p>
-    <p class="docs-source">Source: <code>packages/core/src/services/settings.ts</code>, <code>apps/desktop/src/main/protected-secrets.ts</code></p>
+    <p>
+      Each CLI keeps its own credentials, including Claude Code in the folder of each account you added. OpenOrc doesn't store them. The only agent credentials OpenOrc keeps are in the cloud files above. They hold the tokens and
+      sign-ins made for the cloud, and the Codex or OpenCode keys you approved copying.
+    </p>
+    <p class="docs-source">Source: <code>packages/core/src/services/settings.ts</code>, <code>apps/desktop/src/main/protected-secrets.ts</code>, <code>apps/desktop/src/shared/protected-secrets.ts</code></p>
+  </section>
+
+  <section aria-labelledby="cloud">
+    <h2 id="cloud">In the cloud</h2>
+    <p>Cloud threads and the cloud brain keep work on the Vercel team or Agent37 account you connect. Your computer still holds each conversation, unless the cloud brain owns it.</p>
+    <ul>
+      <li>
+        <strong>A cloud thread's sandbox</strong> holds the thread's checkout with its uncommitted changes, what the project's setup script installed, the agent's installation, and the agent's sessions. Unless the firewall keeps it
+        outside, the agent's sign-in is there too, as a file or in the agent's environment. The files stay while the sandbox sleeps, until you remove the sandbox or delete the thread.
+      </li>
+      <li>
+        <strong>The cloud brain</strong> holds what OpenOrc holds on a computer for its own threads: its database, the copies of the projects you switched on, the worktrees of its threads, and memory for those projects. Its secrets, such as
+        the cloud tokens, its Codex login, and your GitHub sign-in if you switched it on, are in files sealed with AES-256-GCM under the brain's key.
+      </li>
+      <li>
+        <strong>The brain's key</strong> stays in <code>cloud-brain.enc</code> on your computer, and the brain gets it each time it starts, never on its disk. An Agent37 instance keeps it in its environment, so the brain can start again after
+        a restart. On Vercel, the brain's door keeps the key and your Vercel token in a sensitive environment variable of its own project, <code>openorc-door</code>, so it can wake the brain for a phone.
+      </li>
+    </ul>
+    <p>Removing the cloud brain deletes its machine, its disk, the sandboxes it made, and the conversations on it. See <a href={docHref("cloud") + "#remove"}>Remove cloud resources</a>.</p>
+    <p class="docs-source">Source: <code>packages/core/src/services/cloud-workspaces.ts</code>, <code>packages/cloud/src/brain/sealed-file.ts</code>, <code>brain/wire.ts</code>, <code>apps/brain/src/secrets.ts</code>, <code>host.ts</code></p>
   </section>
 
   <section aria-labelledby="window">
@@ -358,6 +412,7 @@ import { docHref } from "../../data/docs";
       <li>Its runs, events, run summaries, message log, plans, checkpoints, queued messages, and review comments, plus the refs that kept its checkpoints in Git.</li>
       <li>The threads of its subagents.</li>
       <li>Its worktree, unless another thread still uses it, as forks and threads it started do. Uncommitted changes are committed to the worktree's branch first, and the branch stays. A pull request copy's changes are discarded instead.</li>
+      <li>A cloud thread's sandbox, on Vercel or Agent37.</li>
     </ul>
     <p>These stay: tasks the thread created, threads it started, its attachments and memories, audit log entries, its lines in the provider log until they expire, and the agents' own session files.</p>
     <p>An Orcling's own conversation goes only with the Orcling. A subagent's thread can be deleted once it has finished, and takes the subagents under it along. Its parent thread stays.</p>

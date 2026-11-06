@@ -139,6 +139,67 @@ import { docHref } from "../../data/docs";
     <p><strong>Remove</strong> forgets the reviewer app and its key on this computer. The app stays on GitHub until you delete it there.</p>
   </section>
 
+  <section aria-labelledby="cloud">
+    <h2 id="cloud">Cloud</h2>
+    <p>Cloud connects the Vercel or Agent37 account that cloud threads and the cloud brain run on, and the sign-ins agents use there. See <a href={docHref("cloud")}>Cloud threads</a>.</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Setting</th>
+            <th scope="col">What it does</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Sign-ins for the cloud</strong></td>
+            <td>Each sign-in the cloud can use, ready or how it gets ready. <strong>Bring them</strong> brings the missing ones, and asks before it copies a key from this computer.</td>
+          </tr>
+          <tr>
+            <td><strong>Vercel</strong></td>
+            <td>Connects an access token, then the <strong>Team</strong> that sandboxes run in, the <strong>Sandbox size</strong>, and the <strong>Sandbox region</strong>. <strong>Disconnect</strong> forgets the token.</td>
+          </tr>
+          <tr>
+            <td><strong>Agent37</strong></td>
+            <td>Connects an API key, then the <strong>Instance size</strong> for new cloud threads. <strong>Disconnect</strong> forgets the key.</td>
+          </tr>
+          <tr>
+            <td><strong>New cloud threads</strong></td>
+            <td>With both services connected, <strong>Run on</strong> picks where new cloud threads go.</td>
+          </tr>
+          <tr>
+            <td><strong>Claude accounts</strong></td>
+            <td>A token for each Claude account to sign in with in sandboxes. <strong>Create token</strong> runs <code>claude setup-token</code> with that account's sign-in, and <strong>Paste token</strong> takes one you made.</td>
+          </tr>
+          <tr>
+            <td><strong>Codex</strong></td>
+            <td>Codex's sign-in for sandboxes. <strong>Sign in with ChatGPT</strong> makes one separate from this computer's login, or <strong>Use an API key</strong>.</td>
+          </tr>
+          <tr>
+            <td><strong>OpenCode</strong></td>
+            <td>A key for each provider OpenCode uses in sandboxes. <strong>Add a key</strong> adds one.</td>
+          </tr>
+          <tr>
+            <td><strong>Cloud brain</strong></td>
+            <td>Once a service is connected, sets up the cloud brain, pairs phones with it, chooses its projects and sign-ins, moves it to the other service, and removes it. <strong>This month</strong> shows what it cost.</td>
+          </tr>
+          <tr>
+            <td><strong>Carry working threads on in the cloud</strong>, under <strong>When this Mac sleeps</strong></td>
+            <td>Off by default. While it is on, a worktree thread's turn carries on in a sandbox when this computer goes to sleep.</td>
+          </tr>
+          <tr>
+            <td><strong>Sandboxes</strong></td>
+            <td>Every sandbox OpenOrc made, whether it is awake, its size, and what it has cost on Vercel. <strong>Remove</strong> deletes one.</td>
+          </tr>
+          <tr>
+            <td><strong>Check</strong></td>
+            <td><strong>Run check</strong> tries everything a cloud thread needs in a throwaway sandbox, then deletes it.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
   <section aria-labelledby="slack">
     <h2 id="slack">Slack</h2>
     <p>
@@ -443,6 +504,14 @@ import { docHref } from "../../data/docs";
           <tr>
             <td>General (except updates), Memory &amp; models (except the API key), automatic agent update checks, the reviewer app and <strong>Let it approve</strong>, the Workspace entrypoint, Claude accounts, phone access and paired phones, Devices</td>
             <td>The <code>settings</code> table of <code>openorc.sqlite</code>, in the data folder</td>
+          </tr>
+          <tr>
+            <td>Cloud connections and choices, including <strong>Carry working threads on in the cloud</strong></td>
+            <td><code>cloud-credentials.enc</code>, encrypted</td>
+          </tr>
+          <tr>
+            <td>Sign-ins for the cloud, and the cloud brain's key</td>
+            <td><code>claude-cloud-tokens.enc</code>, <code>codex-cloud-login.enc</code>, <code>opencode-cloud-keys.enc</code>, and <code>cloud-brain.enc</code>, encrypted</td>
           </tr>
           <tr>
             <td><strong>Check for updates automatically</strong></td>

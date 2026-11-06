@@ -34,4 +34,4 @@ The existing CLI entry keeps the inherited environment. Managed entries remove i
 
 ## Cloud tokens
 
-In development and QA builds, **Settings → Cloud → Claude accounts** gives each account a token that its agents sign in with inside cloud sandboxes. **Create token** runs `claude setup-token` through that account's own sign-in, in a private window for an added account; you can also paste a token. Each token stays in protected storage (see [credential storage](credential-storage.md)), and removing it does not revoke it at Anthropic.
+**Settings → Cloud → Claude accounts** gives each account a token that its agents sign in with inside cloud sandboxes. **Create token** runs `claude setup-token` through that account's own sign-in, in a private window for an added account; you can also paste a token. Each token stays in protected storage (see [credential storage](credential-storage.md)), and removing it does not revoke it at Anthropic.

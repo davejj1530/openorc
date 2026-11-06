@@ -6,7 +6,10 @@ import { docHref } from "../../data/docs";
 ---
 
 <DocsLayout slug="phone">
-  <p>OpenOrc for iPhone connects straight to OpenOrc on your computer, with no server in between. The agents keep running on the computer, and everything the phone shows comes from it.</p>
+  <p>
+    OpenOrc for iPhone connects straight to OpenOrc on your computer, with no server in between. The agents keep running on the computer, and everything the phone shows comes from it. If you set up a cloud brain, the phone can also reach
+    it on your own cloud account, while your computer sleeps.
+  </p>
 
   <section aria-labelledby="pair">
     <h2 id="pair">Pair your phone</h2>
@@ -31,7 +34,7 @@ import { docHref } from "../../data/docs";
       Each connection is encrypted end to end with keys made on the phone and the computer, so your router, Tailscale, and anyone else on the network can't read or change it. Your computer accepts only the phones paired with it, and only from local and
       Tailscale addresses. The addresses it offers are under <strong>Addresses</strong> in Settings → <strong>Phone</strong>.
     </p>
-    <Callout>The phone works only while OpenOrc is open on your computer and the computer is awake. When it can't reach your computer, the phone says why, such as no internet or the computer being out of reach.</Callout>
+    <Callout>The phone reaches your computer only while OpenOrc is open there and the computer is awake. When it can't reach your computer, the phone says why, such as no internet or the computer being out of reach.</Callout>
   </section>
 
   <section aria-labelledby="use">
@@ -40,12 +43,34 @@ import { docHref } from "../../data/docs";
       <li>See your threads as they change, with what each agent is doing and what needs you.</li>
       <li>Open a thread and read the agent's work and reply as they stream in, including its steps, images, and visualizations.</li>
       <li>Send a message, say something during the turn, queue a message, or stop the turn. Answer questions and approvals on their cards.</li>
-      <li>Start a thread in any project, with the agent and model you choose and, for Claude, the account. It works where new threads on your computer do, as set by <strong>New thread workspace</strong> in Settings → <a href={docHref("settings") + "#general"}>General</a>. Attach photos from the camera or your library.</li>
+      <li>Start a thread in any project, with the agent and model you choose and, for Claude, the account. It works where new threads on your computer do, as set by <strong>New thread workspace</strong> in Settings → <a href={docHref("settings") + "#general"}>General</a>, or choose <strong>Cloud</strong> for a sandbox of its own. Attach photos from the camera or your library.</li>
+      <li>Choose <strong>Move to Cloud</strong> in a thread's menu to send it to the cloud, and <strong>Bring to Mac</strong> to bring a thread back from the cloud brain. See <a href={docHref("cloud") + "#move"}>Cloud threads</a>.</li>
       <li>Pin, snooze, rename, mark as read or unread, and resolve threads, from a thread's menu or by swiping its row.</li>
       <li>Under <strong>Changes</strong> in a thread's menu, read the diff, commit, push, and open a pull request on GitHub.</li>
       <li>Under <strong>Preview</strong>, watch the page the thread's <a href={docHref("browser")}>Preview</a> shows on your computer, and scroll, tap, and type into it.</li>
     </ul>
     <p>To delete or fork a thread, or move it between the checkout and a worktree, use your computer. The phone's Settings shows your usage, without account details, and lets you pair another computer.</p>
+  </section>
+
+  <section aria-labelledby="cloud-brain">
+    <h2 id="cloud-brain">Reach the cloud brain</h2>
+    <p>
+      The <a href={docHref("cloud") + "#brain"}>cloud brain</a> is a copy of OpenOrc on your own Vercel or Agent37 account. Pair your phone with it too, and you can follow and start cloud threads while your computer sleeps or is off.
+    </p>
+    <ol class="docs-steps">
+      <li>On your computer, open Settings → <strong>Cloud</strong>, and under <strong>Cloud brain</strong> click <strong>Pair phone</strong>.</li>
+      <li>On the phone, scan the code as you would for your computer.</li>
+    </ol>
+    <p>
+      The phone reaches the brain over the internet, at its address on Vercel or Agent37, encrypted end to end like the link to your computer. Only phones paired with the brain can connect. Opening the app wakes a sleeping brain, on
+      Vercel through its door, a small function in your Vercel team. The phone says <strong>Waking</strong> meanwhile.
+    </p>
+    <ul>
+      <li>Home lists the threads on your computer and on the brain together, and marks cloud threads <strong>Cloud</strong>. While your computer sleeps, its threads stay listed from its last answer, dimmed and marked <strong>Mac asleep</strong>.</li>
+      <li>A new thread you start in the cloud starts on the brain.</li>
+      <li>If the brain holds your Apple push key, it sends notifications too, sealed the same way as your computer's.</li>
+    </ul>
+    <p>Phones paired with the brain are listed under it in Settings → <strong>Cloud</strong>, each with <strong>Remove</strong>.</p>
   </section>
 
   <section aria-labelledby="remove">

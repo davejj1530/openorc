@@ -38,11 +38,17 @@ export const questions: Question[] = [
     id: "phone",
     question: "Can I use OpenOrc from my phone?",
     answer:
-      "Yes. OpenOrc for iPhone pairs with OpenOrc on your computer and connects to it directly, over your network or Tailscale, encrypted end to end. Follow and answer threads, start new ones, and ship their changes. The agents still run on your computer.",
+      "Yes. OpenOrc for iPhone pairs with OpenOrc on your computer and connects to it directly, over your network or Tailscale, encrypted end to end. Follow and answer threads, start new ones, and ship their changes. The agents still run on your computer, unless you run a thread in the cloud.",
   },
   {
     id: "while-closed",
     question: "Does scheduled or Slack work run while OpenOrc is closed?",
-    answer: "No. Agents run on your computer. Keep OpenOrc open and your computer awake for scheduled work, Slack replies, and the phone app.",
+    answer: "No. Schedules and Slack run on your computer, so keep OpenOrc open and your computer awake for them. The phone app needs your computer too, unless it reaches a cloud brain.",
+  },
+  {
+    id: "cloud",
+    question: "Can agents keep working while my computer sleeps?",
+    answer:
+      "Yes, in a cloud thread. It runs in a sandbox on your own Vercel or Agent37 account, which bills you for it, and its changes sync back to a worktree on your computer. Set up the cloud brain too, and your phone can follow and start cloud threads while the computer sleeps.",
   },
 ];

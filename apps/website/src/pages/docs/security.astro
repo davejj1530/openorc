@@ -23,6 +23,7 @@ const address = "http://127.0.0.1:<port>/mcp/<random UUID without dashes>";
       <li>Web pages, in your browser or in the Preview, can't reach OpenOrc's local servers or the app's own interface.</li>
       <li>Other accounts on the same computer can't read the secret addresses OpenOrc gives agents.</li>
       <li>Other devices on your network can't use OpenOrc. Only phones you paired can connect, and only while you allow them.</li>
+      <li>A cloud thread's sandbox holds only that thread's work, and its agent's sign-in stays outside it where your Vercel plan allows. See <a href="#cloud">Cloud sandboxes and the brain</a>.</li>
       <li>
         Other programs running as you can't start OpenOrc in a way that runs their code inside the app or drives its window, and release builds have no test switch that makes it start agents or approve requests on its own.
       </li>
@@ -153,16 +154,51 @@ const address = "http://127.0.0.1:<port>/mcp/<random UUID without dashes>";
     <p class="docs-source">Source: <code>apps/desktop/electron-builder.yml</code>, <code>apps/desktop/build/entitlements.mac.plist</code>, <code>scripts/desktop-release.cjs</code>, <code>scripts/packaged-release-check.cjs</code></p>
   </section>
 
+  <section aria-labelledby="cloud">
+    <h2 id="cloud">Cloud sandboxes and the brain</h2>
+    <p>
+      A cloud thread runs its agent on a machine of its own on your Vercel or Agent37 account. No two threads share a sandbox. The thread's mode still decides what the agent may do, but its commands run on that machine, not on your
+      computer, and they can reach the internet without limit. Your computer reaches a sandbox only through the service, with your Vercel token, or with your Agent37 key at OpenOrc's own server in the instance. The agent reaches OpenOrc's
+      tools through the same connection, as its own run.
+    </p>
+    <h3>Sign-ins in a sandbox</h3>
+    <ul>
+      <li>
+        On Vercel, when your plan allows it, the sandbox's firewall adds the agent's sign-in to its requests on the way out. The sandbox holds a stand-in that says <code>openorc-sign-in-kept-outside-this-sandbox</code> and works nowhere, so
+        nothing running there can read or take the real one.
+      </li>
+      <li>Otherwise the sandbox holds the sign-in, and the agent and any command it runs can read it. That is always the case on Agent37. A turn gets only the sign-in it needs: its Claude account's token, the Codex login, or the key of its model's provider.</li>
+      <li>
+        Your Claude Code login and a ChatGPT sign-in are never copied to the cloud. Each agent gets a sign-in made for the cloud instead. To offer copies of an OpenAI API key or OpenCode provider keys, OpenOrc reads Codex's
+        <code>auth.json</code> and the credentials OpenCode keeps, and saves a copy only after you approve it.
+      </li>
+    </ul>
+    <h3>Your cloud account</h3>
+    <ul>
+      <li>
+        A Vercel token can do everything its scope allows. Settings → Cloud asks for one scoped to one team and says when a token reaches more. The token stays in protected storage on your computer. A cloud brain on Vercel gets it in memory when it starts,
+        never on its disk, and the brain's door keeps a copy in a sensitive environment variable so it can wake the brain.
+      </li>
+      <li>
+        The cloud brain seals its secrets under its own key, with AES-256-GCM. Your GitHub sign-in reaches it only if you switch it on, and then only its own <code>git</code> and <code>gh</code> get it. No agent and no sandbox does.
+      </li>
+      <li>
+        Phones reach the brain over the same end-to-end encrypted link they use with your computer, and only phones paired with the brain complete the handshake. When you remove a phone from the brain, the door on Vercel refuses that phone too.
+      </li>
+    </ul>
+    <p class="docs-source">Source: <code>packages/core/src/services/cloud-agents.ts</code>, <code>cloud-agent-env.ts</code>, <code>cloud-codex.ts</code>, <code>cloud-opencode.ts</code>, <code>mac-agent-keys.ts</code>, <code>packages/cloud/src/vercel-sandbox.ts</code>, <code>brain/sealed-file.ts</code>, <code>brain/wire.ts</code>, <code>apps/brain/src/github.ts</code></p>
+  </section>
+
   <section aria-labelledby="secrets">
     <h2 id="secrets">Secrets and your data</h2>
     <ul>
       <li>
-        Slack tokens, the optional Anthropic API key for memory, the reviewer app's private key, this computer's key for phone connections, and the Apple push key are encrypted with your system's protected storage and written to files only
-        you can read. They are never in the database. See <a
+        Slack tokens, the optional Anthropic API key for memory, the reviewer app's private key, this computer's key for phone connections, the Apple push key, and the cloud connections and sign-ins are encrypted with your system's
+        protected storage and written to files only you can read. They are never in the database. See <a
           href={docHref("storage") + "#secrets"}>Data and storage</a
         >.
       </li>
-      <li>OpenOrc never reads or stores the agents' sign-ins. Each CLI keeps its own credentials.</li>
+      <li>Each CLI keeps its own credentials, and OpenOrc doesn't store them. The only agent sign-ins OpenOrc keeps are the ones for the cloud.</li>
       <li>Text that looks like a secret is replaced before it is stored. See <a href={docHref("storage") + "#redaction"}>Redaction</a>.</li>
       <li>The database is a plain SQLite file in your data folder, and it isn't encrypted. Your threads, plans, and memories are as private as the rest of your files.</li>
       <li>Your messages reach every agent over standard input. So do background requests, such as titles and memory summaries.</li>
@@ -195,6 +231,10 @@ const address = "http://127.0.0.1:<port>/mcp/<random UUID without dashes>";
         OpenOrc; they don't stop a request that asks an agent to use that access.
       </li>
       <li><strong>What agents are allowed to do.</strong> In Autonomous, an agent's commands run without asking, with your account's access. Choose the mode for the work.</li>
+      <li>
+        <strong>Whoever controls your cloud account.</strong> Vercel or Agent37, and anyone with your token or key, can read what a sandbox or the cloud brain holds, including your code and any sign-in held inside. A sign-in removed in OpenOrc
+        keeps working until you revoke it with its provider.
+      </li>
     </ul>
   </section>
 

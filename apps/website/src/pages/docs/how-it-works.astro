@@ -193,7 +193,7 @@ const envelope = `{ "type": "rpc", "id": 42, "method": "runs.start", "params": {
     </p>
     <p>
       Each agent is then checked with its own commands: <code>--version</code>, plus <code>codex login status</code>, <code>claude auth status</code>, or <code>opencode auth list</code> to see whether you are signed in. Results are cached for
-      60 seconds. OpenOrc never reads the credentials these tools store.
+      60 seconds. These checks never read the credentials the tools store. Only Settings → Cloud looks for API keys to copy, as <a href={docHref("cloud") + "#sign-ins"}>Cloud threads</a> describes.
     </p>
     <h3>Speaking to them</h3>
     <div class="docs-table">

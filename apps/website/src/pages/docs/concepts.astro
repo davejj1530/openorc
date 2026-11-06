@@ -24,6 +24,10 @@ import { docHref } from "../../data/docs";
         <dt>Worktree</dt>
         <dd>A separate folder and branch for one thread, so threads working at the same time don't edit each other's files. OpenOrc creates it in its data folder and names the branch after the thread, under <code>openorc/</code> by default. See <a href={docHref("git")}>Git and worktrees</a>.</dd>
       </div>
+      <div>
+        <dt>Cloud thread</dt>
+        <dd>A thread whose agent works in a sandbox on your own Vercel or Agent37 account, while a worktree on your computer keeps its changes. The optional cloud brain is a copy of OpenOrc on that account, which keeps threads going while your computer sleeps. See <a href={docHref("cloud")}>Cloud threads</a>.</dd>
+      </div>
     </dl>
   </section>
 

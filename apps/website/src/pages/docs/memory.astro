@@ -163,6 +163,7 @@ import { docHref } from "../../data/docs";
     <h2 id="privacy">What leaves your computer</h2>
     <ul>
       <li>Memories, run summaries, and the search index stay in OpenOrc's data folder. Searches run on your computer.</li>
+      <li>With a <a href={docHref("cloud") + "#brain"}>cloud brain</a>, the memory of each project you switch on for it is shared with the brain on your cloud account, and merged both ways while both are awake.</li>
       <li>
         Searching by meaning needs a small embedding model. The first time memory needs it, OpenOrc downloads it (about 91 MB, from Hugging Face) and checks each file against a fixed checksum. Nothing is downloaded
         while memory is off.

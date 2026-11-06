@@ -34,7 +34,7 @@ flowchart LR
 
 Entry points: [`main/index.ts`](apps/desktop/src/main/index.ts), [`preload/index.ts`](apps/desktop/src/preload/index.ts), [`core/index.ts`](apps/desktop/src/core/index.ts), [`renderer/src/main.tsx`](apps/desktop/src/renderer/src/main.tsx), [`apps/mobile/index.ts`](apps/mobile/index.ts), and [`apps/brain/src/main.ts`](apps/brain/src/main.ts).
 
-Cloud threads and the brain are offered only in development and QA builds (`__OPENORC_QA__`); release builds carry neither.
+Every build offers cloud threads and the brain. A packaged app carries the brain's archive and its door function in its resources folder, under `brain/`, which `electron-builder.yml` copies from `apps/brain/dist`. Main passes that folder to the core as `OPENORC_BRAIN_DIR`. A build run from the repository uses `apps/brain/dist` directly. The release workflow builds the brain once on Linux, and every platform's package carries that same brain.
 
 ## Module responsibilities and seams
 

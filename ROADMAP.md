@@ -1,6 +1,6 @@
 # Roadmap
 
-OpenOrc is under active development. The desktop supports conversations, task documents, provider integrations, local memory, and Git review, and the iPhone app drives the same threads from a paired phone. Cloud threads and the cloud brain run in development and QA builds. See the [README](README.md) for setup and the [product model](PRODUCT.md) for behavior.
+OpenOrc is under active development. The desktop supports conversations, task documents, provider integrations, local memory, and Git review, and the iPhone app drives the same threads from a paired phone. Cloud threads and the cloud brain run on the user's own Vercel or Agent37 account. See the [README](README.md) for setup and the [product model](PRODUCT.md) for behavior.
 
 ## Reliability and platform support
 
@@ -15,7 +15,6 @@ The [packaged runtime checks](docs/packaged-runtime-validation.md) describe the 
 
 ## Phone and cloud
 
-- Offer cloud threads and the cloud brain in release builds once each agent has run a real turn on Vercel and on Agent37 with its sign-in kept outside the sandbox where the service allows it.
 - Set up the cloud brain from the phone alone, without the desktop.
 - Keep App Store builds of the phone working against newer desktops by gating each new event or result per phone and testing against the installed builds' readers.
 

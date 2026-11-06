@@ -8,7 +8,7 @@ import { docHref } from "../../data/docs";
 <DocsLayout slug="network">
   <section aria-labelledby="summary">
     <h2 id="summary">Every connection</h2>
-    <p>OpenOrc has no server of its own. Every connection goes straight from your computer to one of the services below. This table lists each one, when it happens, and how to stop it.</p>
+    <p>OpenOrc has no server of its own. Every connection goes straight from your computer to one of the services below. This table lists each one, when it happens, and how to stop it. Cloud threads add connections from a sandbox or the cloud brain on your own account, described under <a href="#cloud">Cloud threads and the brain</a>.</p>
     <div class="docs-table">
       <table>
         <thead>
@@ -115,6 +115,24 @@ import { docHref } from "../../data/docs";
             <td>Apple's push service, <code>api.push.apple.com</code></td>
             <td>When a thread needs you or finishes and a paired phone has notifications on, if you added an Apple push key</td>
             <td>Don't add a key, or turn notifications off on the phone</td>
+          </tr>
+          <tr>
+            <td>Cloud services</td>
+            <td>Vercel at <code>api.vercel.com</code> and, for sandboxes, <code>vercel.com/api</code>, or Agent37 at <code>api.agent37.com</code>, <code>sandbox.agent37.app</code>, and each instance's address on <code>agent37.app</code></td>
+            <td>Connecting a service, while Settings → Cloud is open, and while a cloud thread's sandbox starts, syncs, runs a turn, or stops</td>
+            <td><strong>Disconnect</strong> under Settings → Cloud, after removing what runs there</td>
+          </tr>
+          <tr>
+            <td>Cloud brain</td>
+            <td>The brain's address on <code>vercel.run</code> or <code>agent37.app</code>, over a link encrypted end to end</td>
+            <td>When OpenOrc starts, after your computer wakes, every 2 minutes while not connected, and when you open one of the brain's threads</td>
+            <td><strong>Remove</strong> the cloud brain</td>
+          </tr>
+          <tr>
+            <td>Cloud sign-ins</td>
+            <td>Anthropic through <code>claude setup-token</code>, and OpenAI through Codex</td>
+            <td>When you create a Claude token or sign Codex in for the cloud, and before a sandbox gets a ChatGPT sign-in that is a day old</td>
+            <td>Don't make sign-ins for the cloud</td>
           </tr>
           <tr>
             <td>Device tools</td>
@@ -245,6 +263,27 @@ import { docHref } from "../../data/docs";
     </p>
     <p>The app window loads only files that ship with OpenOrc. Its content security policy blocks remote scripts, styles, fonts, and images.</p>
     <p>See <a href={docHref("security") + "#servers"}>Security model</a> for what keeps web pages and other programs out of these servers.</p>
+  </section>
+
+  <section aria-labelledby="cloud">
+    <h2 id="cloud">Cloud threads and the brain</h2>
+    <p>
+      A cloud thread's sandbox and the cloud brain run on the Vercel or Agent37 account you connect in Settings → Cloud. Your computer talks to Vercel through its API, at <code>api.vercel.com</code> for your teams, projects, and costs, and at <code>vercel.com/api</code> for sandboxes. The sandbox calls
+      also carry each command's input and output, including the connection to OpenOrc's runner inside the sandbox. On Agent37, it talks to OpenOrc's own server in each instance, at the instance's address, with your Agent37 key. Code moves both ways as Git bundles over these connections, never through a Git remote.
+    </p>
+    <p>From inside a sandbox, these connections go out:</p>
+    <ul>
+      <li>The agent's own service, as on your computer. On Vercel, when your plan allows it, the sandbox's firewall adds the agent's sign-in to these requests on their way out.</li>
+      <li><code>registry.npmjs.org</code>, through <code>npm</code>, to install the thread's agent at the version on your computer.</li>
+      <li>Your system's package sources and <code>download.docker.com</code>, to install Docker for a project that uses it.</li>
+      <li>Whatever the agent and its commands open. A sandbox's internet isn't limited.</li>
+    </ul>
+    <p>
+      The cloud brain makes the connections OpenOrc makes on a computer for the work it holds: the agents' services, its own sandboxes on the same account, GitHub if you switched its GitHub sign-in on, Apple's push service if it holds your push
+      key, and Hugging Face for memory's model while memory is on. Paired phones reach the brain at its address. On Vercel they first knock on its door, a small function at <code>openorc-door-….vercel.app</code> in your team that wakes a sleeping brain.
+    </p>
+    <p>See <a href={docHref("cloud")}>Cloud threads</a> for what each service bills, and <a href={docHref("security") + "#cloud"}>Security model</a> for what the sandbox holds.</p>
+    <p class="docs-source">Source: <code>packages/cloud/src/vercel-sandbox.ts</code>, <code>agent37.ts</code>, <code>instance-port.ts</code>, <code>agent-install.ts</code>, <code>docker.ts</code>, <code>brain/door.ts</code>, <code>packages/core/src/services/brain-link.ts</code></p>
   </section>
 
   <section aria-labelledby="never">

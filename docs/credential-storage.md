@@ -15,8 +15,6 @@ The data folder holds a separate encrypted file for each kind of secret, created
 - `opencode-cloud-keys.enc`: OpenCode's provider keys for the cloud.
 - `cloud-brain.enc` and `cloud-brain-move.enc`: the cloud brain's key, team, and region, and a new brain's while it moves to another service.
 
-Only development and QA builds, which offer cloud threads, write the cloud files.
-
 The memory-extraction key is never written to the SQLite database. Each save writes a new owner-only file, syncs it to disk, replaces the old file, and on macOS and Linux syncs the folder before reporting success. Saves to the same file happen one at a time. Linux's `basic_text` backend, which does not encrypt, is refused. Reading a missing file needs no keychain access; saving or reading a key needs working OS protection.
 
 ## Where the data lives

@@ -1,4 +1,4 @@
-import { CHECK_STEPS, checkSandbox, type CheckProgress, type RunnerFile, type SandboxProvider } from "@openorc/cloud";
+import { CHECK_STEPS, checkSandbox, type CheckProgress, type RunnerFile, type Sandbox, type SandboxProvider } from "@openorc/cloud";
 import type { CloudCheck } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
 
@@ -7,6 +7,8 @@ export interface CloudCheckTarget {
   provider: SandboxProvider;
   files: RunnerFile[];
   node?: string;
+  /** Claude Code in the check's sandbox, put there as a thread's first turn puts it. */
+  agent?: (sandbox: Sandbox) => Promise<void>;
 }
 
 /** The cloud check, one run at a time. The last run's steps stay for Settings until OpenOrc quits. */
@@ -27,7 +29,7 @@ export class CloudChecks {
   /** Starts a check unless one is running. Resolves once it has started; its progress arrives through `changed`. */
   async start(): Promise<void> {
     if (this.running) return;
-    const { provider, files, node } = await this.target();
+    const { provider, files, node, agent } = await this.target();
     if (this.running) return;
     const check: CloudCheck = { provider: provider.id, passed: null, steps: CHECK_STEPS.map((step) => ({ step, state: "pending", ms: null, detail: null, error: null })) };
     this.current = check;
@@ -37,7 +39,7 @@ export class CloudChecks {
       if (entry) Object.assign(entry, { state: progress.state, ms: progress.ms ?? null, detail: progress.detail ?? null, error: progress.error ?? null });
       this.changed();
     };
-    this.running = checkSandbox(provider, { files, ...(node ? { node } : {}), report })
+    this.running = checkSandbox(provider, { files, ...(node ? { node } : {}), ...(agent ? { agent } : {}), report })
       .then((passed) => {
         check.passed = passed;
         this.log.info(`cloud check on ${provider.id} ${passed ? "passed" : "failed"}`);

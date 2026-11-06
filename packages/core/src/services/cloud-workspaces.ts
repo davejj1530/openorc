@@ -60,6 +60,8 @@ export interface CloudWorkspaceOptions {
 
 const SETUP_OUTPUT_TAIL = 2000;
 export const LOCAL_LAUNCH_REFUSED = "This machine runs agents only in cloud sandboxes.";
+/** Neither service is connected and nothing is simulated, so a new cloud thread has nowhere to run. */
+export const NOTHING_CONNECTED = "Connect Vercel or Agent37 in Settings to run in the cloud.";
 /** An idle agent keeps its VM awake, so in the cloud its process closes after this at the latest. */
 export const CLOUD_IDLE_PROCESS_MS = 10 * 60_000;
 /** A host made for a turn whose agent never starts lets its VM go after this. */
@@ -82,9 +84,9 @@ const who = (input: { claudeAccountId?: string | null | undefined; model?: strin
 });
 
 /**
- * The sandbox services the app offers: Vercel once it is connected, sandboxes simulated on this Mac otherwise. A
- * provider passed in, as tests do, takes new conversations instead. A cloud-only host has no simulated sandboxes, so
- * without a connection Vercel refuses rather than agents running in folders there.
+ * The sandbox services the app offers: the connected one new conversations are set to run on, sandboxes simulated on
+ * this Mac otherwise. A provider passed in, as tests do, takes new conversations instead. A release or a cloud-only host
+ * simulates nothing, so without a connection a new conversation is refused rather than sent to a service not connected.
  */
 export function cloudSandboxProviders(input: {
   dataDir: string;
@@ -112,8 +114,8 @@ export function cloudSandboxProviders(input: {
   const chosen = async (): Promise<SandboxProvider> => {
     const where = await service();
     if (where) return where === "agent37" ? agent37 : vercel;
-    // With nothing connected, a Mac that simulates sandboxes uses one; any other host goes to Vercel, which asks for a connection.
-    return local ?? vercel;
+    if (local) return local;
+    throw new Error(NOTHING_CONNECTED);
   };
   return { providers, forNewThreads: async () => override ?? (await chosen()) };
 }
@@ -208,7 +210,13 @@ export class CloudWorkspaceService {
   /** Where a new cloud conversation would run, and what its runner needs there, for the cloud check. */
   async checkTarget(): Promise<CloudCheckTarget> {
     this.files ??= runnerFiles();
-    return { provider: await this.forNewThreads(), files: this.files, ...(this.options.node ? { node: this.options.node } : {}) };
+    const provider = await this.forNewThreads();
+    return {
+      provider,
+      files: this.files,
+      ...(this.options.node ? { node: this.options.node } : {}),
+      agent: (sandbox) => this.readyAgent("claude", sandbox, provider.id),
+    };
   }
 
   private async forNewThreads(): Promise<SandboxProvider> {
@@ -527,12 +535,16 @@ export class CloudWorkspaceService {
   }
 
   /** The agent's CLI on the sandbox's PATH at this host's version: a session goes in through it (OpenCode's import) and a turn runs it. */
-  async installAgent(agent: HarnessId, location: WorkspaceLocation, provider: CloudProviderId): Promise<void> {
+  installAgent(agent: HarnessId, location: WorkspaceLocation, provider: CloudProviderId): Promise<void> {
+    return this.readyAgent(agent, location.install.sandbox, provider);
+  }
+
+  private async readyAgent(agent: HarnessId, sandbox: Sandbox, provider: CloudProviderId): Promise<void> {
     const { cli, name } = harnessCatalog[agent];
     // A sandbox simulated here runs this host's own CLI, so only a real one is brought to its version.
     const mayInstall = provider !== "local";
     const version = mayInstall ? ((await this.options.versions?.(agent)) ?? null) : null;
-    await ensureAgent(location.install.sandbox, cli, { name, mayInstall, version, read: releaseOf });
+    await ensureAgent(sandbox, cli, { name, mayInstall, version, read: releaseOf });
   }
 
   /**

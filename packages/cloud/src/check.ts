@@ -31,6 +31,8 @@ const NODE_MIN = [22, 18] as const;
 /** Making a sandbox can include installing Claude Code in it. */
 const SANDBOX_TIMEOUT_MS = 10 * 60_000;
 const STEP_TIMEOUT_MS = 2 * 60_000;
+/** Getting the tools ready can include installing Claude Code, as a thread's first turn does. */
+const TOOLS_TIMEOUT_MS = 5 * 60_000;
 const RELAY_ANSWER = "openorc-check";
 /**
  * An API agents call, which answers a request without a key differently from one with a wrong key: the check's
@@ -60,12 +62,14 @@ async function version(sandbox: Sandbox, command: string): Promise<string | null
   return result.code === 0 ? result.stdout.toString("utf8").trim().split("\n")[0]!.trim() : null;
 }
 
-async function tools(sandbox: Sandbox, node: string): Promise<string> {
-  const [nodeVersion, gitVersion, claudeVersion] = await Promise.all([version(sandbox, node), version(sandbox, "git"), version(sandbox, "claude")]);
+async function tools(sandbox: Sandbox, node: string, agent: ((sandbox: Sandbox) => Promise<void>) | undefined): Promise<string> {
+  const [nodeVersion, gitVersion] = await Promise.all([version(sandbox, node), version(sandbox, "git")]);
   if (!nodeVersion) throw new Error("Node is not installed in the sandbox.");
   const [major = 0, minor = 0] = nodeVersion.replace(/^v/, "").split(".").map(Number);
   if (major < NODE_MIN[0] || (major === NODE_MIN[0] && minor < NODE_MIN[1])) throw new Error(`Node ${nodeVersion} is too old for OpenOrc's runner; it needs ${NODE_MIN.join(".")} or later.`);
   if (!gitVersion) throw new Error("Git is not installed in the sandbox.");
+  await agent?.(sandbox);
+  const claudeVersion = await version(sandbox, "claude");
   if (!claudeVersion) throw new Error("Claude Code is not installed in the sandbox.");
   const number = (text: string) => /\d+(?:\.\d+)+/.exec(text)?.[0] ?? text;
   return `Node ${number(nodeVersion)} · Git ${number(gitVersion)} · Claude Code ${number(claudeVersion)}`;
@@ -175,7 +179,16 @@ async function sync(install: RunnerInstall): Promise<void> {
  * runner and relay, sign-ins kept outside it, and sync both ways. The sandbox is deleted at the end, whatever failed.
  * True when every step passed.
  */
-export async function checkSandbox(provider: SandboxProvider, options: { files: RunnerFile[]; node?: string; report: (progress: CheckProgress) => void }): Promise<boolean> {
+export async function checkSandbox(
+  provider: SandboxProvider,
+  options: {
+    files: RunnerFile[];
+    node?: string;
+    /** Puts Claude Code in the sandbox the way a thread's first turn does, where the service's image has none. */
+    agent?: (sandbox: Sandbox) => Promise<void>;
+    report: (progress: CheckProgress) => void;
+  },
+): Promise<boolean> {
   const node = options.node ?? "node";
   const name = `${SANDBOX_PREFIX}check-${randomUUID().slice(0, 8)}`;
   let sandbox: Sandbox | null = null;
@@ -201,7 +214,7 @@ export async function checkSandbox(provider: SandboxProvider, options: { files: 
       },
       SANDBOX_TIMEOUT_MS,
     )) &&
-    (await step("tools", () => tools(sandbox!, node))) &&
+    (await step("tools", () => tools(sandbox!, node, options.agent), TOOLS_TIMEOUT_MS)) &&
     (await step("runner", async () => {
       install = await installRunner(sandbox!, options.files, node);
       client = await RunnerClient.open(install);

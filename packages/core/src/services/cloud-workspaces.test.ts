@@ -4,14 +4,14 @@ import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { BrokeringUnavailable, LocalSandboxProvider, type BrokeredHeader, type SandboxNeeds, type SandboxProvider } from "@openorc/cloud";
+import { BrokeringUnavailable, LocalSandboxProvider, type BrokeredHeader, type Sandbox, type SandboxNeeds, type SandboxProvider } from "@openorc/cloud";
 import { cloudWorkspaces, Db, projects, threads } from "@openorc/db";
 import { git } from "@openorc/git";
 import type { Project, Thread } from "@openorc/protocol";
 import { cloudAgents, SANDBOX_OWN } from "./cloud-agents.js";
 import { CodexCloudSignIn } from "./cloud-codex.js";
 import { OpenCodeCloudKeys, OpenCodeCloudSignIn } from "./cloud-opencode.js";
-import { CloudWorkspaceService, cloudSandboxProviders, LOCAL_LAUNCH_REFUSED } from "./cloud-workspaces.js";
+import { CloudWorkspaceService, cloudSandboxProviders, LOCAL_LAUNCH_REFUSED, NOTHING_CONNECTED } from "./cloud-workspaces.js";
 import { WorkspaceService } from "./workspace.js";
 import { WorkspaceWriters } from "./workspace-writers.js";
 import type { Logger } from "../transport.js";
@@ -374,7 +374,45 @@ describe("where cloud conversations run", () => {
   it("never runs a cloud conversation on this Mac when sandboxes are not simulated, as in a release", async () => {
     const options = cloudSandboxProviders({ dataDir: directory, env: () => process.env, credentials: async () => null, simulated: false });
     expect(options.providers.map((provider) => provider.id)).toEqual(["vercel", "agent37"]);
-    expect((await options.forNewThreads!()).id).toBe("vercel");
+    const cloud = new CloudWorkspaceService(db, options, quiet);
+    await expect(cloud.place({ agent: "claude" }, project)).rejects.toThrow(NOTHING_CONNECTED);
+    await expect(cloud.checkTarget()).rejects.toThrow(NOTHING_CONNECTED);
+  });
+
+  it("checks where new conversations run: Agent37 when it alone is connected, never Vercel", async () => {
+    const options = cloudSandboxProviders({
+      dataDir: directory,
+      env: () => process.env,
+      credentials: async () => null,
+      agent37: async () => ({ key: "sk_live_x", cpu: 2, memory: 4 }),
+      service: async () => "agent37",
+      simulated: false,
+    });
+    const cloud = new CloudWorkspaceService(db, options, quiet);
+    expect((await cloud.checkTarget()).provider.id).toBe("agent37");
+  });
+
+  it("puts Claude Code in the check's sandbox as a thread's first turn does, at this host's version", async () => {
+    const options = cloudSandboxProviders({
+      dataDir: directory,
+      env: () => process.env,
+      credentials: async () => null,
+      agent37: async () => ({ key: "sk_live_x", cpu: 2, memory: 4 }),
+      service: async () => "agent37",
+      simulated: false,
+    });
+    const cloud = new CloudWorkspaceService(db, { ...options, versions: async (agent) => (agent === "claude" ? "2.1.400" : null) }, quiet);
+    const calls: { cmd: string; args: string[]; sudo: boolean }[] = [];
+    // Agent37's base template: no claude until npm installs it.
+    const sandbox = {
+      exec: async (cmd: string, args: string[], options?: { sudo?: boolean }) => {
+        calls.push({ cmd, args, sudo: options?.sudo ?? false });
+        return { code: cmd === "npm" ? 0 : 1, stdout: Buffer.from(""), stderr: "" };
+      },
+    } as unknown as Sandbox;
+    const target = await cloud.checkTarget();
+    await target.agent!(sandbox);
+    expect(calls.at(-1)).toEqual({ cmd: "npm", args: ["install", "-g", "@anthropic-ai/claude-code@2.1.400"], sudo: true });
   });
 
   it("lets a provider passed in take new conversations, whatever is connected", async () => {
@@ -395,14 +433,11 @@ describe("where cloud conversations run", () => {
 });
 
 describe("a cloud-only host", () => {
-  it("has no sandboxes in folders: without a connection, a new conversation goes to Vercel, which asks for one", async () => {
+  it("has no sandboxes in folders: without a connection, a new conversation is refused", async () => {
     const options = cloudSandboxProviders({ dataDir: directory, env: () => process.env, credentials: async () => null, cloudOnly: true });
     expect(options.providers.map((provider) => provider.id)).toEqual(["vercel", "agent37"]);
     const cloud = new CloudWorkspaceService(db, { ...options, cloudOnly: true }, quiet);
-    const thread = threads.insert(db, { projectId: project.id, title: "Cloud only", agent: "claude", model: null, mode: "act", permissionMode: "trusted", workspaceMode: "worktree" });
-    const record = cloud.admit(thread.id, await cloud.place({ agent: "claude" }, project));
-    expect(record.provider).toBe("vercel");
-    await expect(cloud.location(record, path.join(directory, "mirror"))).rejects.toThrow("Connect Vercel in Settings to run in the cloud.");
+    await expect(cloud.place({ agent: "claude" }, project)).rejects.toThrow(NOTHING_CONNECTED);
   });
 
   it("refuses every launch that would run on this machine, with or without a conversation", async () => {

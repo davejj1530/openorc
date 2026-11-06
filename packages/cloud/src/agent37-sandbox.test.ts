@@ -6,10 +6,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { agent37Api, type Agent37Api, type Agent37Instance } from "./agent37.js";
 import { startFakeAgent37, type FakeAgent37 } from "./agent37-fake.js";
 import { Agent37SandboxProvider, type Agent37Connection } from "./agent37-sandbox.js";
+import { harnessCatalog } from "@openorc/protocol";
+import { ensureAgent } from "./agent-install.js";
 import { checkSandbox, type CheckProgress } from "./check.js";
 import { INSTANCE_SERVER_PORT, InstancePort } from "./instance-port.js";
 import { runnerFiles } from "./runner-client.js";
-import { SANDBOX_AWAY_MS } from "./sandbox.js";
+import { SANDBOX_AWAY_MS, type Sandbox } from "./sandbox.js";
 
 let base: string;
 let fake: FakeAgent37;
@@ -21,8 +23,12 @@ beforeEach(async () => {
   base = await mkdtemp(path.join(os.tmpdir(), "openorc-agent37-sandbox-"));
   const bin = path.join(base, "bin");
   await mkdir(bin);
-  await writeFile(path.join(bin, "claude"), `#!/bin/sh\necho "2.1.316 (Claude Code)"\n`);
-  await chmod(path.join(bin, "claude"), 0o755);
+  // Like agent37-base: Node and git, no agent until something installs one.
+  await writeFile(
+    path.join(bin, "npm"),
+    `#!/bin/sh\n[ "$1 $2" = "install -g" ] && [ "\${3%@*}" = "@anthropic-ai/claude-code" ] || exit 1\nprintf '#!/bin/sh\\necho "%s (Claude Code)"\\n' "\${3##*@}" > "${bin}/claude" && chmod +x "${bin}/claude"\n`,
+  );
+  await chmod(path.join(bin, "npm"), 0o755);
   await mkdir(path.join(base, "instances"));
   fake = await startFakeAgent37(path.join(base, "instances"), { env: () => ({ ...process.env, PATH: `${bin}:/usr/bin:/bin:${path.dirname(process.execPath)}` }) });
   api = agent37Api(fake.key, fake.endpoints);
@@ -302,9 +308,11 @@ describe("listing and removing Agent37 instances", () => {
   });
 });
 
-it("passes every step of the cloud check end to end, and deletes its instance", async () => {
+it("passes every step of the cloud check end to end, installing Claude Code the base template lacks, and deletes its instance", async () => {
   const progress: CheckProgress[] = [];
-  const passed = await checkSandbox(provider, { files: runnerFiles(), node: process.execPath, report: (entry) => progress.push(entry) });
+  const agent = (sandbox: Sandbox) =>
+    ensureAgent(sandbox, harnessCatalog.claude.cli, { name: "Claude Code", mayInstall: true, version: "2.1.316", read: (output) => /\d+\.\d+\.\d+/.exec(output)?.[0] ?? null });
+  const passed = await checkSandbox(provider, { files: runnerFiles(), node: process.execPath, agent, report: (entry) => progress.push(entry) });
   expect(progress.filter((entry) => entry.state === "failed")).toEqual([]);
   expect(passed).toBe(true);
   expect(progress.filter((entry) => entry.state === "done").map((entry) => entry.step)).toEqual(["sandbox", "tools", "runner", "relay", "signins", "sync", "remove"]);

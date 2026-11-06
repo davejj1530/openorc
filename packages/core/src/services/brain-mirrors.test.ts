@@ -123,8 +123,12 @@ it("opens a cloud thread's code on this Mac, read-only, and keeps it current one
   // An edit made in the copy here is kept aside, and never reaches the cloud.
   writeFileSync(path.join(copy, "draft.md"), "edited on the Mac\n");
   writeFileSync(path.join(brainFolder, "agent.md"), "written by the agent\n");
+  // A refresh is done when the windows hear of it; agent.md alone appears mid-checkout, before draft.md is restored.
+  const refreshes = () => windows.filter((push) => push.type === "invalidate" && push.keys.includes("thread:cloud-thread") && push.keys.includes("files")).length;
+  const before = refreshes();
   brain!.remote.publish({ type: "invalidate", keys: ["threaddiff:cloud-thread"] });
-  await until(() => existsSync(path.join(copy, "agent.md")));
+  await until(() => refreshes() > before);
+  expect(readFileSync(path.join(copy, "agent.md"), "utf8")).toBe("written by the agent\n");
   expect(readFileSync(path.join(copy, "draft.md"), "utf8")).toBe("not committed yet\n");
   expect(readFileSync(path.join(brainFolder, "draft.md"), "utf8")).toBe("not committed yet\n");
   const kept = (await git(path.join(root, "app"), ["for-each-ref", "--format=%(objectname)", "refs/openorc/mirror/cloud-thread/kept/"])).stdout.trim();

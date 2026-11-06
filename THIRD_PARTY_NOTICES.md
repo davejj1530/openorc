@@ -58,6 +58,10 @@ The desktop updater uses `electron-updater` 6.8.9 under MIT, Copyright (c) 2015 
 
 Its dependency `lazy-val` 1.0.5 declares MIT and names Vladimir Krivosheev as author, but the published package and its npm source commit contain no copyright/license text. The original package metadata is retained in `licenses/vendor/lazy-val-1.0.5.package.json`; it is evidence of the declaration, not a replacement for the missing notice. OpenOrc retains this dependency under a documented notice exception for version 1.0.5. The artifact audit reports the omission and verifies the preserved metadata and packaged author/license declaration. The exception does not supply the missing upstream notice; any upgrade requires another review.
 
+## Cloud workspaces
+
+Cloud workspaces on Vercel use `@vercel/sandbox`, whose dependency `jsonlines` 0.1.1 declares MIT and names Linus Unnebäck as author, but the published package and its npm source commit contain no copyright/license text. The original package metadata is retained in `licenses/vendor/jsonlines-0.1.1.package.json`; it is evidence of the declaration, not a replacement for the missing notice. OpenOrc retains this dependency under a documented notice exception for version 0.1.1, checked the same way as `lazy-val`. Any upgrade requires another review.
+
 ## Brand and artwork provenance
 
 - Project framework and language logos are a selected set of SVGs from Devicon v2.17.0, Copyright (c) 2015 konpa, under the MIT license. The original notice is preserved in [licenses/vendor/devicon-MIT.txt](licenses/vendor/devicon-MIT.txt); pinned sources and hashes are recorded beside the assets. Logos and names remain the property of their respective owners and are used for identification, without endorsement.

@@ -114,6 +114,11 @@
       "distribution": "desktop"
     },
     {
+      "name": "jsonlines",
+      "version": "0.1.1",
+      "distribution": "desktop"
+    },
+    {
       "name": "typescript",
       "version": "5.9.3",
       "distribution": "desktop"
@@ -653,6 +658,22 @@
       }
     },
     {
+      "id": "jsonlines-declaration",
+      "input": "licenses/vendor/jsonlines-0.1.1.package.json",
+      "source": {
+        "package": "jsonlines",
+        "version": "0.1.1",
+        "path": "package.json",
+        "gitHead": "61eb1a0eb68c59e1fd705985a43401c2fe8d7660",
+        "url": "https://github.com/LinusU/node-jsonlines/tree/61eb1a0eb68c59e1fd705985a43401c2fe8d7660",
+        "note": "Original published metadata only, not a substitute for the missing upstream copyright/license notice."
+      },
+      "sha256": "8d77eab2592c26387e0fff46434334543b36a51ae21ad89ef5949605fb917264",
+      "desktop": {
+        "resource": "licenses/vendor/jsonlines-0.1.1.package.json"
+      }
+    },
+    {
       "id": "typescript-Apache",
       "input": "apps/desktop/node_modules/typescript/LICENSE.txt",
       "source": { "package": "typescript", "version": "5.9.3", "path": "LICENSE.txt" },
@@ -688,6 +709,12 @@
       "version": "1.0.5",
       "evidence": "lazy-val-declaration",
       "reason": "The published metadata declares MIT and names Vladimir Krivosheev as author. The package and its npm source commit omit copyright/license text. Retain this dependency with its original metadata and disclose the omission; this exception does not supply the missing upstream notice or establish licensing clearance. Review again when upgrading."
+    },
+    {
+      "name": "jsonlines",
+      "version": "0.1.1",
+      "evidence": "jsonlines-declaration",
+      "reason": "The published metadata declares MIT and names Linus Unnebäck as author. The package and its npm source commit omit copyright/license text. Retain this dependency with its original metadata and disclose the omission; this exception does not supply the missing upstream notice or establish licensing clearance. Review again when upgrading."
     }
   ]
 }

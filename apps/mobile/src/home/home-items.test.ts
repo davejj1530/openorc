@@ -1,7 +1,7 @@
 import { sidebarDayList, sidebarThreadPage, THREAD_PAGE, type SidebarFilter } from "@openorc/client";
 import { WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 import { describe, expect, it } from "vitest";
-import { homeItems, homeWaiting, owned, type HomeItem, type HomeList, type HomeOptions } from "./home-items";
+import { homeItems, homeWaiting, owned, ownRows, shownApartFromBrain, type HomeItem, type HomeList, type HomeOptions } from "./home-items";
 import { newThreadRoute } from "./out-of-reach";
 import { fixtureProjects, fixtureThreads } from "./test-fixtures/threads";
 
@@ -238,5 +238,29 @@ describe("newThreadRoute", () => {
     expect(newThreadRoute(null, "brain-1")).toBe("/new");
     expect(newThreadRoute({ brain: "cloud", reach: "asleep", heardAt: 1 }, "mac-1")).toBe("/new");
     expect(newThreadRoute({ brain: "mac", reach: "offline", heardAt: 1 }, null)).toBe("/new");
+  });
+});
+
+describe("a Mac listed beside its cloud brain", () => {
+  const kinds = new Map<string, "mac" | "brain">([
+    ["mac", "mac"],
+    ["brain", "brain"],
+    ["other-mac", "mac"],
+  ]);
+
+  it("keeps to its own threads, whichever of the two is shown, and only beside a brain", () => {
+    expect(shownApartFromBrain(null, { primary: "mac", partner: "brain" }, kinds)).toBe(true);
+    expect(shownApartFromBrain("mac", { primary: "brain", partner: "mac" }, kinds)).toBe(true);
+    expect(shownApartFromBrain(null, { primary: "brain", partner: "mac" }, kinds)).toBe(false);
+    expect(shownApartFromBrain(null, { primary: "mac", partner: null }, kinds)).toBe(false);
+    expect(shownApartFromBrain(null, { primary: "mac", partner: "other-mac" }, kinds)).toBe(false);
+  });
+
+  it("drops the rows it relays from its brain, which the brain's own section lists, and keeps them when it is alone", () => {
+    const [own, relayed] = fixtureThreads;
+    const rows = [own!, { ...relayed!, owner: { brain: "cloud" as const, reach: "live" as const, heardAt: 1 } }];
+    expect(ownRows(rows, true).map((row) => row.id)).toEqual([own!.id]);
+    expect(ownRows(rows, false)).toBe(rows);
+    expect(ownRows(undefined, true)).toBeUndefined();
   });
 });

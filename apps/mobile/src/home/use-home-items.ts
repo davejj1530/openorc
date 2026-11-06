@@ -17,10 +17,10 @@ import {
 import { WORKSPACE_ID, type InboxList, type ThreadSummary } from "@openorc/protocol";
 import { useQueryClient } from "@tanstack/react-query";
 import { useContext, useEffect, useState } from "react";
-import { useRpc, useRpcs } from "../client";
+import { useHostGroup, useRpc, useRpcs, useSavedMacs } from "../client";
 import { HostContext } from "../connection/host-context";
 import { projectChoices } from "../projects";
-import { homeItems, homeWaiting, type HomeList, type HomeOptions } from "./home-items";
+import { homeItems, homeWaiting, ownRows, shownApartFromBrain, type HomeList, type HomeOptions } from "./home-items";
 import { useHomeFilter } from "./filter";
 import { pruneMissingFolds, toggleFold, toggleThreadChildren, useFolds } from "./folds";
 
@@ -64,7 +64,7 @@ function useSelectedFamily(selected: ThreadSummary | null, filter: SidebarFilter
  * while Resolved is open, the threads put there. The list reads on by itself until every open day is whole, and
  * Resolved pages on request.
  */
-function useThreadList(connected: boolean, selectedId: string | undefined, resolvedOpen: boolean) {
+function useThreadList(connected: boolean, selectedId: string | undefined, resolvedOpen: boolean, brainApart: boolean) {
   const projects = useRpc("projects.list", {});
   const { pinnedOnly } = useHomeFilter();
   const [limit, setLimit] = useState(THREAD_PAGE);
@@ -81,7 +81,11 @@ function useThreadList(connected: boolean, selectedId: string | undefined, resol
   const needsYou = useRpc("threads.list", { ...listed, needsYou: true, limit: NEEDS_YOU_PAGE }, besides);
   const resolved = useRpc("threads.list", { ...listed, filter: "archived", limit: resolvedLimit + 1 }, { ...besides, enabled: besides.enabled && resolvedOpen });
   const resolvedCount = useRpc("threads.resolvedCount", { projectIds, quietBefore: resolvedBefore(Date.now()) }, besides);
-  const fetched = lists.map((list, index) => (list.data ? { rows: list.data, limit } : cachedListPage(cache, params[index]!)));
+  const own = <T extends readonly ThreadSummary[] | undefined>(rows: T) => ownRows(rows, brainApart);
+  const fetched = lists.map((list, index) => {
+    const read = list.data ? { rows: list.data, limit } : cachedListPage(cache, params[index]!);
+    return read && { ...read, rows: own(read.rows) };
+  });
   const opened = useRpc("threads.get", { id: selectedId ?? "" }, { enabled: Boolean(selectedId) }).data;
   const selected = opened && projectIds.includes(opened.projectId) ? opened : null;
   const listedIds = new Set([...fetched.flatMap((page) => page?.rows ?? []), ...(resolved.data ?? [])].map((thread) => thread.id));
@@ -92,10 +96,10 @@ function useThreadList(connected: boolean, selectedId: string | undefined, resol
     sidebarThreadPage({ projectId: selected?.projectId ?? WORKSPACE_ID, fetched: withFamily(rows), selected, filter, limit: shown, now });
   const pages = fetched.map((fetchedPage) => page(fetchedPage?.rows, "active", fetchedPage?.limit ?? limit));
   const apart = (rows: ThreadSummary[] | undefined) => sidebarThreadPage({ projectId: WORKSPACE_ID, fetched: rows, selected: null, filter: "active", limit: Number.MAX_SAFE_INTEGER, now });
-  const putRows = resolvedRows(resolvedOpen, resolved.data, selected);
+  const putRows = resolvedRows(resolvedOpen, own(resolved.data), selected);
   const resolvedPage = putRows && page(putRows, "archived", resolvedLimit);
-  const days = sidebarDayList({ pages, pins: apart(pins.data), needsYou: apart(needsYou.data), resolved: resolvedPage, pinnedOnly, activeId: selectedId, now });
-  const read = [...(pins.data ?? []), ...(needsYou.data ?? []), ...fetched.flatMap((page) => page?.rows ?? [])];
+  const days = sidebarDayList({ pages, pins: apart(own(pins.data)), needsYou: apart(own(needsYou.data)), resolved: resolvedPage, pinnedOnly, activeId: selectedId, now });
+  const read = [...(own(pins.data) ?? []), ...(own(needsYou.data) ?? []), ...fetched.flatMap((page) => page?.rows ?? [])];
   const list: HomeList = {
     days,
     read,
@@ -130,7 +134,10 @@ export function useHomeItems(connected: boolean, needsYou: Pick<HomeOptions, "pa
   // A partner's sections fold on their own host.
   const host = useContext(HostContext);
   const collapsed = useFolds(host);
-  const { projects, lists, list, pinnedOnly, children, pending, limit, showMore } = useThreadList(connected, needsYou.selectedId, sidebarSectionOpen(collapsed, "resolved", SIDEBAR_LIST));
+  const group = useHostGroup();
+  const saved = useSavedMacs();
+  const brainApart = shownApartFromBrain(host, group, new Map(saved.map((each) => [each.id, each.kind === "brain" ? "brain" : "mac"])));
+  const { projects, lists, list, pinnedOnly, children, pending, limit, showMore } = useThreadList(connected, needsYou.selectedId, sidebarSectionOpen(collapsed, "resolved", SIDEBAR_LIST), brainApart);
   const foldedIds = threadFoldIds(collapsed);
   const folded = useRpcs(
     "threads.get",
@@ -147,7 +154,7 @@ export function useHomeItems(connected: boolean, needsYou: Pick<HomeOptions, "pa
   }, [grows, limit, showMore]);
   const [opened, setOpened] = useOpening();
   const inbox = useRpc("inbox.list", {}, { refetchInterval: 60_000 });
-  const waiting = useWaitingElsewhere(inbox.data, new Set(list.read.map((thread) => thread.id)));
+  const waiting = ownRows(useWaitingElsewhere(inbox.data, new Set(list.read.map((thread) => thread.id))), brainApart);
   const options: HomeOptions = { now: Date.now(), pinnedOnly, collapsed, waiting, projectsFailed: connected && projects.isError, opened, childLimits: children.limits, ...needsYou };
   const items = homeItems(list, options);
   return {

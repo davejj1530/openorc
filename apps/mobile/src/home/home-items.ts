@@ -1,6 +1,21 @@
 import { SIDEBAR_LIST, sidebarDayKey, sidebarDayOpen, sidebarFoldKey, sidebarSectionOpen, threadTreeRows, visibleThreadForest, type SidebarDayList, type ThreadTreeRow } from "@openorc/client";
 import type { ThreadOwner, ThreadSummary } from "@openorc/protocol";
 
+/**
+ * A Mac lists its cloud brain's threads among its own, marked as the cloud's. Beside that brain's own section they
+ * would show twice, so a Mac listed with its brain keeps only its own.
+ */
+export function shownApartFromBrain(host: string | null, group: { primary: string | null; partner: string | null }, kinds: ReadonlyMap<string, "mac" | "brain">): boolean {
+  const shown = host ?? group.primary;
+  const beside = shown === group.primary ? group.partner : group.primary;
+  return shown !== null && beside !== null && kinds.get(shown) !== "brain" && kinds.get(beside) === "brain";
+}
+
+/** A Mac's rows without those it relays from its cloud brain. */
+export function ownRows<T extends readonly ThreadSummary[] | undefined>(rows: T, apart: boolean): T {
+  return (apart && rows ? rows.filter((row) => row.owner?.brain !== "cloud") : rows) as T;
+}
+
 /** What Home read from a host: its threads as the sidebar lists them, and every project's name. */
 export interface HomeList {
   /** Pins, the rest in their days, snoozed threads and Resolved, as the desktop's sidebar shows them. */

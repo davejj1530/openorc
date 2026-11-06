@@ -28,7 +28,14 @@ function codexActions(actions: CodexAction[]): Action[] {
     if (action.type === "read") return [{ type: "read", command, path: text(action.path) || text(action.name), range: same?.type === "read" ? same.range : null, resolved: true }];
     if (action.type === "search")
       return [
-        same ?? { type: "search", command, query: text(action.query) ? searchTerms(text(action.query), true) : command, scope: text(action.path) ? `in ${text(action.path)}` : null, countable: false },
+        same ?? {
+          type: "search",
+          command,
+          query: text(action.query) ? searchTerms(text(action.query), true) : command,
+          scope: text(action.path) ? `in ${text(action.path)}` : null,
+          countable: false,
+          folder: null,
+        },
       ];
     if (action.type === "listFiles") return [same ?? { type: "listFiles", command, path: text(action.path) || ".", pattern: null }];
     // An unknown command that only printed or waited (`echo ---`) has nothing to add beside the rest.

@@ -3,6 +3,7 @@ import { readCommand } from "./command-reader.js";
 import type { RunDomain } from "./run-labels.js";
 import { commandLine, shellSteps, unwrapShell } from "./shell.js";
 import { toolCallPresentation } from "./tool-presentation.js";
+import { joinPath } from "./tool-view.js";
 import type { Block } from "./transcript.js";
 import { callParts, changeKind, commandText, patchSections, type CallPart, type WorkChip } from "./work-chips.js";
 
@@ -180,12 +181,13 @@ const HARNESS_NOTE = /^(Shell cwd was reset to |\[This command modified )/;
 
 type HitLine = { hit: SearchHit } | { skip: "note" | "context" } | null;
 
-function hitLine(line: string, searched: string): HitLine {
+/** `folder` is where the search ran, which the paths it printed are relative to. */
+function hitLine(line: string, searched: string, folder: string | null): HitLine {
   if (COUNTED.test(line) || NONE.test(line) || HARNESS_NOTE.test(line)) return { skip: "note" };
   const match = MATCH.exec(line);
-  if (match) return { hit: { path: match[1] ?? searched, line: Number(match[2]), text: match[3]!.trim() } };
+  if (match) return { hit: { path: joinPath(folder, match[1] ?? searched), line: Number(match[2]), text: match[3]!.trim() } };
   const word = line.trim();
-  if (FILE.test(word) && (/\.\w+$/.test(word) || !CONTEXT.test(word))) return { hit: { path: word, line: null, text: "" } };
+  if (FILE.test(word) && (/\.\w+$/.test(word) || !CONTEXT.test(word))) return { hit: { path: joinPath(folder, word), line: null, text: "" } };
   return CONTEXT.test(line) ? { skip: "context" } : null;
 }
 
@@ -198,8 +200,8 @@ interface ReadHits {
 }
 
 /** The lines a search printed as hits: `path:line:text`, or the files it listed. Lines it cannot read are left out. */
-function searchHits(lines: string[], searched: string): ReadHits {
-  const read = lines.map((line) => hitLine(line, searched));
+function searchHits(lines: string[], searched: string, folder: string | null): ReadHits {
+  const read = lines.map((line) => hitLine(line, searched, folder));
   return {
     hits: read.flatMap((line) => (line && "hit" in line ? [line.hit] : [])),
     notes: read.filter((line) => line && "skip" in line && line.skip === "note").length,
@@ -230,11 +232,19 @@ function searchedPath(block: ToolBlock): string {
   return str(((block.input ?? {}) as Input)["path"]) || (scope?.replace(/^in /, "") ?? "");
 }
 
+/** Where a search ran: the call's own folder, moved by any `cd` before the search. */
+function searchFolder(block: ToolBlock): string | null {
+  const input = (block.input ?? {}) as Input;
+  const cwd = str(input["cwd"]) || str(input["workdir"]) || null;
+  const moved = readCommand(commandText(block)).find((action) => action.type === "search")?.folder ?? null;
+  return moved ? joinPath(cwd, moved) : cwd;
+}
+
 function searchObject(block: ToolBlock, part: CallPart, alone: boolean): SearchObject {
   const chip = plainChip(block, part);
   const digest = block.done ? blockDigest(block) : null;
   // A call that ran several searches printed them together; whose lines are whose cannot be told apart.
-  const read = digest && alone && !block.isError ? searchHits([...digest.head, ...digest.tail], searchedPath(block)) : { hits: [], notes: 0, plain: false };
+  const read = digest && alone && !block.isError ? searchHits([...digest.head, ...digest.tail], searchedPath(block), searchFolder(block)) : { hits: [], notes: 0, plain: false };
   const matches = alone ? matchCount(block.isError ? null : digest, chip, read) : null;
   return { kind: "search", id: `${block.id}:search`, state: objectState(block), blocks: [block], chip, hits: read.hits.slice(0, 6), matches };
 }

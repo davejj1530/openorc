@@ -16,7 +16,8 @@ export type { RunLabel } from "./run-labels.js";
  */
 export type CommandAction =
   | { type: "read"; command: string; path: string; range: string | null }
-  | { type: "search"; command: string; query: string; scope: string | null; countable: boolean }
+  /** `folder` is where a `cd` before it moved the search, which the paths it printed are relative to. */
+  | { type: "search"; command: string; query: string; scope: string | null; countable: boolean; folder: string | null }
   | { type: "listFiles"; command: string; path: string; pattern: string | null }
   | { type: "unknown"; command: string; run: RunLabel | null; preparation: boolean };
 
@@ -155,7 +156,7 @@ class ChainReader {
     const files = parsed.operands.filter((path) => !/[*?[{$]/.test(path) && !path.startsWith(":"));
     // An empty pattern prints whatever it was given, which is no search; with no file to name, it ran as written.
     if (matchesAll(parsed) && !files.length) return [this.run(command)];
-    if (!(inverted(parsed) || matchesAll(parsed)) || !files.length || recursive(parsed)) return [search(command, parsed)];
+    if (!(inverted(parsed) || matchesAll(parsed)) || !files.length || recursive(parsed)) return [search(command, this.folder, parsed)];
     if (parsed.args.flags.has("c") || parsed.args.flags.has("--count")) return [ran(command, said("Counted", `lines in ${names(files)}`))];
     return this.reads(command, files, narrowing(command.rest));
   }
@@ -174,7 +175,7 @@ class ChainReader {
       const piped = { ...command, name, args: [...words.slice(1).filter((word) => word !== "-"), ...files], output: next!.output, rest };
       const parsed = searchArgs(name, piped.args);
       // A file filtered through `grep -v` is still that file, read.
-      if (!inverted(parsed)) return [search(piped, parsed)];
+      if (!inverted(parsed)) return [search(piped, this.folder, parsed)];
     }
     return this.reads(command, files, narrowing(command.rest) ?? target.range);
   }
@@ -188,7 +189,7 @@ class ChainReader {
     const piped = next?.via === "|" ? unwrapWords(next.words) : [];
     const handed = basename(piped[0] ?? "") === "xargs" ? xargsCommand(piped.slice(1)) : [];
     if (SEARCHERS.test(basename(handed[0] ?? ""))) {
-      const found = search({ ...command, name: basename(handed[0]!), args: handed.slice(1), output: next!.output, rest });
+      const found = search({ ...command, name: basename(handed[0]!), args: handed.slice(1), output: next!.output, rest }, this.folder);
       return [
         {
           ...found,
@@ -215,8 +216,8 @@ function ran(command: Command, run: RunLabel | null): CommandAction {
 }
 
 /** A search's action: what it looked for, where, and whether its lines can be counted. */
-function search(command: Command, parsed: SearchArgs = searchArgs(command.name, command.args)): SearchAction {
-  return { type: "search", command: command.text, query: searchQuery(parsed), scope: searchScope(parsed), countable: countable(parsed, command.rest, Boolean(command.output)) };
+function search(command: Command, folder: string | null, parsed: SearchArgs = searchArgs(command.name, command.args)): SearchAction {
+  return { type: "search", command: command.text, query: searchQuery(parsed), scope: searchScope(parsed), countable: countable(parsed, command.rest, Boolean(command.output)), folder };
 }
 
 /** A grep over a listing's names, as the names it kept: "names with “test”". */

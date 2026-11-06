@@ -286,6 +286,13 @@ describe("review findings", () => {
     expect(dated?.kind === "search" && dated.hits[0]).toMatchObject({ path: "src/2024-01-report.ts", line: 12 });
   });
 
+  it("opens a hit where the search ran, after the command moved into a folder", () => {
+    const moved = call("m", { command: 'cd /repo/packages/client/src && rg -n "^export" tool-view.ts shell.ts' }, "tool-view.ts:152:export function toolInputView(");
+    expect(only([moved], "search").hits[0]).toMatchObject({ path: "/repo/packages/client/src/tool-view.ts", line: 152 });
+    const codex = call("c", { command: ["/bin/zsh", "-lc", "cd apps && rg -n useTheme"], cwd: "/repo" }, "desktop/src/a.ts:3:useTheme()");
+    expect(only([codex], "search").hits[0]?.path).toBe("/repo/apps/desktop/src/a.ts");
+  });
+
   it("counts no matches and OpenCode's count", () => {
     const none = only(replay("rg no matches (exit 1 marks error)"), "search");
     expect(none.matches).toBe(0);

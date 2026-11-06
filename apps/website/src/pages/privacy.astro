@@ -12,7 +12,7 @@ import "../styles/prose-page.css";
   <main id="main" class="container prose-page">
     <header class="prose-intro">
       <h1>Privacy policy</h1>
-      <p class="prose-date">Last updated October 26, 2026</p>
+      <p class="prose-date">Last updated November 6, 2026</p>
       <p>This page describes what information the OpenOrc website, the OpenOrc desktop app, and the OpenOrc iPhone app handle.</p>
     </header>
     <article class="prose-article" aria-label="Privacy policy">
@@ -26,11 +26,12 @@ import "../styles/prose-page.css";
         <p>OpenOrc stores its settings, conversation history, tasks, execution events, and project memory on your computer. Project files and Git worktrees stay in their own folders. OpenOrc has no account of its own and sends no usage analytics.</p>
         <p>When an agent runs, its provider receives your request and the context the agent works with, which can include conversation history, project files, and tool output. Providers handle this under their own terms and your account settings. The agent command-line tools you install also connect to their own services and keep their own local transcripts, under their own terms.</p>
         <p>To name a conversation, OpenOrc sends the first 1,500 characters of your first request and of the reply to a small model from the conversation’s own agent. You can choose another provider for titles, or turn them off, in settings.</p>
+        <p>When you ask OpenOrc to explain a code file, it sends the file’s path and text to the same kind of small model, from the conversation’s agent or the provider you chose for titles, and keeps the explanation on your computer. Turning titles off also turns explanations off.</p>
         <p>Memory is off until you turn it on. While it is on, OpenOrc summarizes finished runs to find what is worth remembering, and adds saved memories to later requests, whichever agent runs them. By default the agent that did the work also summarizes it. OpenCode cannot summarize yet, so its runs are skipped. You can instead choose one provider, or your Anthropic API key, to summarize every eligible run, including OpenCode’s. Replies to task comments are never summarized.</p>
         <p>Memory search uses a 91 MB embedding model that runs on your computer. OpenOrc downloads it from Hugging Face the first time memory needs it: when it saves a memory, searches, or indexes saved memories at startup. Each file is checked against a fixed SHA-256 checksum. Nothing is downloaded while memory is off.</p>
         <p>Installed releases ask GitHub Releases for updates shortly after launch and every six hours. These checks send no identifier for your installation, and you can turn them off in settings. Downloading and installing an update always requires your action.</p>
-        <p>On the same schedule, OpenOrc checks whether the agent command-line tools you installed have newer versions. It asks <code>registry.npmjs.org</code>, or <code>formulae.brew.sh</code> for tools installed with Homebrew, without cookies or credentials. These checks are on by default, and you can turn them off in settings. Installing an agent update always waits for you.</p>
-        <p>Before creating a worktree from a named branch, OpenOrc runs your own Git to fetch that branch from the repository’s <code>origin</code> remote. The built-in Preview browser loads the pages you or an agent open, and keeps their cookies and site data in OpenOrc’s application data. The <a href={docHref("network")}>network page</a> lists every connection the app makes.</p>
+        <p>On the same schedule, OpenOrc checks whether the agent command-line tools you installed have newer versions. It asks <code>registry.npmjs.org</code>, <code>formulae.brew.sh</code> for tools installed with Homebrew, or <code>downloads.claude.ai</code> for Claude Code installed with its own installer, without cookies or credentials. These checks are on by default, and you can turn them off in settings. Installing an agent update always waits for you.</p>
+        <p>Before creating a worktree from a named branch, OpenOrc runs your own Git to fetch that branch from the repository’s <code>origin</code> remote. The built-in Preview browser loads the pages you or an agent open, and keeps their cookies and site data in OpenOrc’s application data. Words you type in its address bar that are not an address are sent to Google as a search. If you turn on support for iOS simulators and Android emulators, OpenOrc installs its helper tools from npm with your own npm. The <a href={docHref("network")}>network page</a> lists every connection the app makes.</p>
       </section>
       <section aria-labelledby="iphone-title">
         <h2 id="iphone-title">The iPhone app</h2>

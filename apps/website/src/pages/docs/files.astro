@@ -1,0 +1,101 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+import { docHref } from "../../data/docs";
+---
+
+<DocsLayout slug="files">
+  <p>The <strong>Files</strong> tab shows the folder the conversation works in: the project folder, or the thread's own worktree. You edit the same files the agent does, so its changes and yours meet on disk.</p>
+
+  <section aria-labelledby="open">
+    <h2 id="open">Open a file</h2>
+    <p>Press <kbd>⌘J</kbd> to show the side panel, click <strong>New tab</strong> (+), and choose <strong>Files</strong>. (On Windows and Linux, use <kbd>Ctrl</kbd> wherever this page shows <kbd>⌘</kbd>.) The explorer lists the folder as a tree. Type in <strong>Filter files…</strong> to narrow it. The tree shows every file, including <code>.env</code> files, and leaves out only repository and system files such as <code>.git</code> and <code>.DS_Store</code>.</p>
+    <p>There are other ways to open a file:</p>
+    <ul>
+      <li>Press <kbd>⌘P</kbd> and type part of a file's name.</li>
+      <li>Press <kbd>⌘⇧F</kbd> to search the text of every file. A result opens its file at the matching line.</li>
+      <li>Click a file the agent read in the conversation's <a href={docHref("work")}>work steps</a>, or a file link in a reply.</li>
+    </ul>
+    <p>Each file opens in a tab of its own, named after the file. Markdown files open rendered, with <strong>Preview</strong> and <strong>Source</strong> on the toolbar. Images, PDFs, video, and audio play in the panel. For another kind of file, the <strong>File actions</strong> menu (⋯) has <strong>Open</strong>, which uses its usual app, and an item that shows it in Finder or your file manager.</p>
+    <p>The panel opens on the right of the conversation. To move it to the left, click <strong>Move panel left</strong> in the thread's header. <strong>Expand panel</strong> gives it more room.</p>
+  </section>
+
+  <section aria-labelledby="edit">
+    <h2 id="edit">Edit and save</h2>
+    <p>Click into a file to edit it. When you have unsaved changes, the tab marks them and the toolbar shows <strong>Save</strong>. Press <kbd>⌘S</kbd> to save.</p>
+    <p>When your project has a formatter for the file, saving formats it first. If the formatter fails, the file saves as you typed it and the panel says <strong>Saved without formatting.</strong> with the reason. Files in a copy of a pull request under review are never formatted, since their tools could run code nobody has reviewed.</p>
+    <p>OpenOrc keeps your unsaved edits when you switch tabs or conversations. If the file changes on disk before you save, often because the agent edited it, the panel says <strong>&lt;file&gt; changed after you started editing.</strong> Choose <strong>Keep mine</strong> to go on with your version, or <strong>Use new version</strong> to drop your edits. If the file was deleted, saving creates it again, and <strong>Discard</strong> drops your edits.</p>
+    <p>The <strong>File actions</strong> menu (⋯) has these, among others:</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Action</th>
+            <th scope="col">Keys</th>
+            <th scope="col">What it does</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Format document</strong></td>
+            <td><kbd>⇧⌥F</kbd></td>
+            <td>Formats the file without saving it, with the formatter your project uses: Prettier, Biome, Ruff, Black, <code>gofmt</code>, or <code>rustfmt</code>. Without one, JavaScript, TypeScript, JSON, CSS, HTML, Markdown, YAML, and GraphQL files get the copy of Prettier that ships with OpenOrc, at Prettier's default settings. The panel says <strong>No formatter for this file.</strong> when neither applies.</td>
+          </tr>
+          <tr>
+            <td><strong>Word wrap</strong></td>
+            <td><kbd>⌥Z</kbd></td>
+            <td>Wraps long lines in code and diffs.</td>
+          </tr>
+          <tr>
+            <td><strong>Refresh</strong></td>
+            <td></td>
+            <td>Reads the file from disk again.</td>
+          </tr>
+          <tr>
+            <td><strong>Copy path</strong></td>
+            <td></td>
+            <td>Copies the file's path.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Inside the editor, <kbd>⌘F</kbd> finds and replaces text in the file.</p>
+    <h3>TypeScript and JavaScript</h3>
+    <p>In TypeScript and JavaScript files, the editor understands the code. It reads the project's <code>tsconfig.json</code> or <code>jsconfig.json</code>, and includes your unsaved edits.</p>
+    <ul>
+      <li>Hover a name to see its type and documentation. Suggestions appear as you type.</li>
+      <li>Errors and warnings are underlined. <strong>Problems</strong> (<kbd>⌘⇧M</kbd>) lists them, and <strong>Quick fixes</strong> (<kbd>⌘.</kbd>) offers the fixes TypeScript knows.</li>
+      <li><strong>Go to definition</strong> (<kbd>F12</kbd>, or <kbd>⌘</kbd>-click) and <strong>Find references</strong> (<kbd>⇧F12</kbd>) can open other files. <kbd>⌥←</kbd> and <kbd>⌥→</kbd> go back and forward between the places you jumped to.</li>
+      <li><strong>Outline</strong>, on the toolbar, lists the file's declarations.</li>
+    </ul>
+    <p>A folder with more than 2,000 source files and no <code>tsconfig.json</code> or <code>jsconfig.json</code> gets no code understanding. Add one to choose which files to analyze.</p>
+  </section>
+
+  <section aria-labelledby="explain">
+    <h2 id="explain">Explain a file</h2>
+    <p>A model can explain a code file for someone who doesn't read code. Open the <strong>File actions</strong> menu (⋯) and choose one of these views. <strong>Code</strong> goes back to the file.</p>
+    <dl class="docs-terms">
+      <div>
+        <dt>Plain English</dt>
+        <dd>A short note beside each statement that says what it does.</dd>
+      </div>
+      <div>
+        <dt>Walkthrough</dt>
+        <dd>The file in parts, each with a title, an explanation, and its code with the same notes. A part lists the other files that use it, under <strong>Used by</strong>.</dd>
+      </div>
+      <div>
+        <dt>Diagram</dt>
+        <dd>The file's flow as boxes and arrows. Click a box for more detail and a link to its lines.</dd>
+      </div>
+    </dl>
+    <p>The explanation names the model that wrote it. In a thread or a task, the conversation's own agent explains the file, with the model chosen under <strong>Text generation</strong> in Settings → <a href={docHref("settings") + "#memory"}>Memory &amp; models</a>. With text generation off, the view says so. The file's text goes to that agent's provider, the same as when you name a thread.</p>
+    <p>OpenOrc keeps each explanation for the exact text it explained, so opening the file again shows it at once. If the file changed since, the view says <strong>The file changed since it was explained.</strong> and offers <strong>Explain again</strong>. A file can be explained when it has up to 2,000 lines and 160,000 characters. Markdown and plain text files have no explanations.</p>
+    <Callout>Explanations are kept in the <code>code-explanations</code> folder inside OpenOrc's data folder, up to the 300 most recent. See <a href={docHref("storage")}>Data and storage</a>.</Callout>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "review" }, { slug: "work" }, { slug: "shortcuts" }]} columns={3} />
+  </section>
+</DocsLayout>

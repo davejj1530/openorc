@@ -16,7 +16,9 @@ const tasks = [
   { slug: "review", title: "Review every change", description: "Read the diff beside the conversation, then commit, push, or open a pull request." },
   { slug: "git", title: "Keep parallel work apart", description: "Give a thread its own branch and folder, so threads working at once don't edit the same files." },
   { slug: "memory", title: "Keep what you learn", description: "Save decisions and lessons from finished work, so the next thread starts with them." },
-  { slug: "messaging", title: "Let threads work together", description: "Threads can message each other and start helper threads that work in the same folder." },
+  { slug: "messaging", title: "Let threads work together", description: "Threads can message each other and start helper threads, and you can watch every subagent work." },
+  { slug: "files", title: "Read and edit files", description: "Open the conversation's files beside it, edit and save them, and have a model explain one in plain words." },
+  { slug: "phone", title: "Work from your phone", description: "Follow and answer threads from your iPhone, start new ones, and ship their changes." },
 ];
 
 const resources = [
@@ -28,7 +30,7 @@ const resources = [
 
 <DocsLayout slug="">
   <DocsVisual
-    label="OpenOrc with threads from three projects in the sidebar, one of them still working. The open thread runs Codex in its own worktree. Its reply says every color, radius, and spacing step now comes from one tokens.css file, and the row under the composer names the branch, openorc/design-tokens-2c91f0, with 12 lines added, 4 removed, and a Commit changes button."
+    label="OpenOrc with its threads listed by day in the sidebar, one of them still working in a worktree of its own. The open thread runs Codex in its own worktree. Its reply says every color, radius, and spacing step now comes from one tokens.css file, and the row under the composer names the branch, openorc/design-tokens-2c91f0, with 12 lines added, 4 removed, and a Commit changes button."
   >
     <WorktreeMock />
   </DocsVisual>

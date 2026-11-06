@@ -14,7 +14,7 @@ import { docHref } from "../../data/docs";
       </div>
       <div>
         <dt>Workspace</dt>
-        <dd>The built-in place for threads that don't belong to a project. A Workspace thread works in a folder you choose, by default one inside OpenOrc's data folder, and never uses Git. It's listed first in the sidebar.</dd>
+        <dd>The built-in place for threads that don't belong to a project. A Workspace thread works in a folder you choose, by default one inside OpenOrc's data folder, and never uses Git. It's listed first among the projects on the New thread page.</dd>
       </div>
       <div>
         <dt>Local checkout</dt>
@@ -32,7 +32,18 @@ import { docHref } from "../../data/docs";
     <dl class="docs-terms">
       <div>
         <dt>Thread</dt>
-        <dd>A conversation with an agent about your code. It has a current agent, model, and mode, and it never closes: you can always send another message. See <a href={docHref("threads")}>Threads</a>.</dd>
+        <dd>
+          A conversation with an agent about your code. It has a current agent, model, and mode, and it never closes: you can always send another message. When you're done with one, resolve it to move it out of the list. See <a
+            href={docHref("threads")}>Threads</a
+          >.
+        </dd>
+      </div>
+      <div>
+        <dt>Subagent</dt>
+        <dd>
+          A helper an agent runs on its own during a turn, such as one of Claude Code's agents. OpenOrc shows each subagent as a thread under the one that ran it. Helper threads that an agent starts, and subthreads you start, sit under
+          their parent too. See <a href={docHref("messaging")}>Threads working together</a>.
+        </dd>
       </div>
       <div>
         <dt>Turn</dt>

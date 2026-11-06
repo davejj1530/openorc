@@ -9,8 +9,7 @@ import { docHref } from "../../data/docs";
   <section aria-labelledby="agent">
     <h2 id="agent">An agent is missing or signed out</h2>
     <p>
-      OpenOrc uses the agent CLIs installed on your computer and the sign-ins they already have. <strong>Settings</strong>, then <strong>Connections</strong>, shows each agent as <strong>Connected</strong>, <strong>Not logged in</strong>,
-      <strong>Not installed</strong>, <strong>Fails to start</strong>, or <strong>Connection check failed</strong>. If no agent is ready when you come back to OpenOrc, it opens <strong>Reconnect your coding agent</strong>, which runs the same
+      OpenOrc uses the agent CLIs installed on your computer and the sign-ins they already have. <strong>Settings</strong>, then <strong>Connections</strong>, shows each agent as <strong>Connected</strong>, <strong>Not logged in</strong>, <strong>Not installed</strong>, <strong>Fails to start</strong>, or <strong>Connection check failed</strong>. If no agent is ready when you come back to OpenOrc, it opens <strong>Reconnect your coding agent</strong>, which runs the same
       checks and shows each agent as <strong>Ready</strong>, <strong>Sign-in needed</strong>, <strong>Not installed</strong>, or <strong>Couldn't check</strong>.
     </p>
     <ol class="docs-steps">
@@ -35,8 +34,7 @@ import { docHref } from "../../data/docs";
     <h3>Fails to start</h3>
     <p>
       OpenOrc found the agent, but its <code>--version</code> command failed, so nothing can run through it. After an update check, a row OpenOrc can repair shows a reinstall button, such as <strong>Reinstall Claude</strong>. Otherwise
-      reinstall the agent with the tool that installed it, and refresh. To see what OpenOrc sees, run <code>claude --version</code> (or <code>codex</code>, or <code>opencode</code>) in a terminal. For the sign-in, run
-      <code>claude auth status</code>, <code>codex login status</code>, or <code>opencode auth list</code>.
+      reinstall the agent with the tool that installed it, and refresh. To see what OpenOrc sees, run <code>claude --version</code> (or <code>codex</code>, or <code>opencode</code>) in a terminal. For the sign-in, run <code>claude auth status</code>, <code>codex login status</code>, or <code>opencode auth list</code>.
     </p>
   </section>
 
@@ -128,6 +126,44 @@ import { docHref } from "../../data/docs";
       <li>Check that your default agent is signed in under Connections.</li>
     </ol>
     <p>If the bot stays silent, check that both tokens came from the same Slack app. Replies sent with "Also send to channel" are never picked up. With a shared relay, OpenOrc also has to be open on the computer that hosts it.</p>
+  </section>
+
+  <section aria-labelledby="phone">
+    <h2 id="phone">The phone can't reach your computer</h2>
+    <p>The phone's Home says why it isn't connected. The most common reasons:</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">The phone says</th>
+            <th scope="col">What to do</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Phone access is off</strong></td>
+            <td>On your computer, turn on <strong>Allow paired phones</strong> in Settings → Phone.</td>
+          </tr>
+          <tr>
+            <td><strong>Not on its network</strong></td>
+            <td>Join the same Wi-Fi as your computer, or turn on Tailscale on both.</td>
+          </tr>
+          <tr>
+            <td><strong>Check Tailscale</strong></td>
+            <td>Turn on Tailscale on the phone, and turn off any other VPN.</td>
+          </tr>
+          <tr>
+            <td><strong>Not reachable</strong> or <strong>Reconnecting</strong></td>
+            <td>Wake your computer and open OpenOrc. The phone connects only while both are running.</td>
+          </tr>
+          <tr>
+            <td><strong>Needs an update</strong></td>
+            <td>Update OpenOrc on the phone and on your computer.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>If you removed the phone in Settings, or the pairing code expired before you scanned it, pair again with a new code. See <a href={docHref("phone")}>Phone app</a>.</p>
   </section>
 
   <section aria-labelledby="git">

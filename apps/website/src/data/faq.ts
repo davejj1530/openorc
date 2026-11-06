@@ -22,7 +22,7 @@ export const questions: Question[] = [
     id: "where-work-lives",
     question: "Where does my work live?",
     answer:
-      "Projects, conversation history, tasks, and project memory are stored on your computer. Each agent’s requests go to that agent’s provider, under its data policies. So do conversation titles, and run summaries once you turn memory on, unless you choose another provider in settings.",
+      "Projects, conversation history, tasks, and project memory are stored on your computer. Each agent’s requests go to that agent’s provider, under its data policies. So do conversation titles, the code explanations you ask for, and run summaries once you turn memory on, unless you choose another provider in settings.",
   },
   {
     id: "saving-a-task",
@@ -35,8 +35,14 @@ export const questions: Question[] = [
     answer: "Yes. The Changes panel sits beside the conversation. Read the diff, ask for another pass in the thread, then commit, push, or open a pull request when your Git setup supports it.",
   },
   {
+    id: "phone",
+    question: "Can I use OpenOrc from my phone?",
+    answer:
+      "Yes. OpenOrc for iPhone pairs with OpenOrc on your computer and connects to it directly, over your network or Tailscale, encrypted end to end. Follow and answer threads, start new ones, and ship their changes. The agents still run on your computer.",
+  },
+  {
     id: "while-closed",
     question: "Does scheduled or Slack work run while OpenOrc is closed?",
-    answer: "No. Agents run on your computer. Keep OpenOrc open and your computer awake for scheduled work and Slack replies.",
+    answer: "No. Agents run on your computer. Keep OpenOrc open and your computer awake for scheduled work, Slack replies, and the phone app.",
   },
 ];

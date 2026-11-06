@@ -34,11 +34,11 @@ import { docHref } from "../../data/docs";
     <h2 id="choose">Choose for each thread</h2>
     <ol class="docs-steps">
       <li>Start a new thread with <kbd>⌘N</kbd>.</li>
-      <li>Next to the project, open the location menu and pick <strong>Local checkout</strong> or <strong>Worktree</strong>.</li>
+      <li>Under the composer, click the line that says where the thread works, such as <strong>Works in the local checkout on main</strong>, and pick <strong>Local checkout</strong> or <strong>Worktree</strong>. With a worktree, the line reads <strong>Starts on a new branch from main</strong>.</li>
       <li>Send your first message. A worktree is created now, before the agent starts.</li>
     </ol>
-    <p>New threads start with the location set in <strong>Settings</strong> under <strong>General</strong>, <strong>New thread workspace</strong>: <strong>Local checkout</strong> or <strong>Isolated worktree</strong>. Tasks have their own <strong>Execution location</strong>, and schedules a <strong>Works in</strong> field. Forks, and threads an agent starts with <code>thread_start</code>, work in the same folder as the thread they came from.</p>
-    <p>The message box shows the branch a thread works on, and the sidebar shows it under each thread's title.</p>
+    <p>New threads start with the location set in <strong>Settings</strong> under <strong>General</strong>, <strong>New thread workspace</strong>: <strong>Local checkout</strong> or <strong>Isolated worktree</strong>. Tasks have their own <strong>Execution location</strong>, and schedules a <strong>Works in</strong> field. Forks, subthreads, and threads an agent starts with <code>thread_start</code> work in the same folder as the thread they came from.</p>
+    <p>The row under a thread's composer shows the folder and branch it works on. In the sidebar, each thread's row names its project, then its branch or <strong>worktree</strong>.</p>
   </section>
 
   <section aria-labelledby="worktrees">
@@ -112,7 +112,7 @@ import { docHref } from "../../data/docs";
       <li>It removes the worktree folder. Ignored files in it, such as a copied <code>.env</code>, go with it.</li>
       <li>The branch stays, with all its commits.</li>
     </ol>
-    <p>If that commit fails, for example because Git has no user name set, nothing is deleted. Deleting never touches your checkout, and tasks the thread created stay. Archiving a thread keeps its worktree. A worktree shared with a fork or a helper thread goes only with the last thread that uses it.</p>
+    <p>If that commit fails, for example because Git has no user name set, nothing is deleted. Deleting never touches your checkout, and tasks the thread created stay. Resolving a thread keeps its worktree. A worktree shared with a fork, a subthread, or a helper thread goes only with the last thread that uses it.</p>
   </section>
 
   <section aria-labelledby="repository">

@@ -13,8 +13,7 @@ import { docHref } from "../../data/docs";
   <section aria-labelledby="data-folder">
     <h2 id="data-folder">The data folder</h2>
     <p>
-      The folder is <code>~/Library/Application Support/OpenOrc</code> on macOS, <code>%APPDATA%\OpenOrc</code> on Windows, and <code>~/.config/OpenOrc</code> on Linux. The <code>OPENORC_USER_DATA</code> environment variable picks another folder.
-      <strong>Settings</strong>, then <strong>Data</strong>, shows the path in use.
+      The folder is <code>~/Library/Application Support/OpenOrc</code> on macOS, <code>%APPDATA%\OpenOrc</code> on Windows, and <code>~/.config/OpenOrc</code> on Linux. The <code>OPENORC_USER_DATA</code> environment variable picks another folder. <strong>Settings</strong>, then <strong>Data</strong>, shows the path in use.
     </p>
     <div class="docs-table">
       <table>
@@ -62,11 +61,23 @@ import { docHref } from "../../data/docs";
             <td>Icons OpenOrc found for your projects, and the one you chose</td>
           </tr>
           <tr>
+            <td><code>claude-accounts/</code></td>
+            <td>A folder for each Claude account you added, where Claude Code keeps that account's sign-in, settings, and sessions. Your existing Claude Code login stays in <code>~/.claude</code>.</td>
+          </tr>
+          <tr>
+            <td><code>code-explanations/</code></td>
+            <td>Explanations of code files, kept for the exact text they explain. The 300 most recent stay.</td>
+          </tr>
+          <tr>
+            <td><code>devices/</code></td>
+            <td>The tools that run simulators and emulators, and their state, once you turn on device support</td>
+          </tr>
+          <tr>
             <td><code>agent-processes/</code></td>
             <td>On macOS and Linux, a record of each running agent process: its ID and start time, and OpenOrc's own. The next launch uses it to stop any left behind by a crash. No prompts or credentials.</td>
           </tr>
           <tr>
-            <td><code>slack-secrets.enc</code>, <code>memory-extraction-key.enc</code>, <code>github-reviewer-app.enc</code></td>
+            <td><code>slack-secrets.enc</code>, <code>memory-extraction-key.enc</code>, <code>github-reviewer-app.enc</code>, <code>remote-access-key.enc</code>, <code>apns-key.enc</code></td>
             <td>Encrypted secrets; see <a href="#secrets">Settings and secrets</a></td>
           </tr>
           <tr>
@@ -99,9 +110,10 @@ import { docHref } from "../../data/docs";
         <strong>Your repositories.</strong> Worktree branches, and refs under <code>refs/openorc/</code> that keep each turn's checkpoint and task snapshots. See <a href={docHref("git")}>Git and worktrees</a>.
       </li>
       <li>
-        <strong>Your project's files</strong>, only when you ask: exporting a plan, adding a memory to <code>CLAUDE.md</code> or <code>AGENTS.md</code>, saving a file in a thread's Instructions tab, or a Git action such as committing,
+        <strong>Your project's files</strong>, only when you ask: exporting a plan, adding a memory to <code>CLAUDE.md</code> or <code>AGENTS.md</code>, saving a file in the Files or Instructions tab, or a Git action such as committing,
         restoring a checkpoint, moving a thread, or applying a task to your checkout. The Instructions tab can also save your personal instruction file, such as <code>~/.claude/CLAUDE.md</code>.
       </li>
+      <li><strong>Claude accounts.</strong> Moving a thread to another Claude account copies its Claude Code session into that account's folder, so the conversation can continue there.</li>
       <li><strong>Claude's plans folder.</strong> A Claude Code thread in Plan mode creates <code>~/.claude/plans</code>, or <code>plans</code> inside <code>CLAUDE_CONFIG_DIR</code>, if it doesn't exist.</li>
       <li>
         <strong>Temporary folders.</strong> Private folders in your system's temporary folder: one per Claude Code process for the files that hold OpenOrc's tool address, scratch space when Codex writes a title or summary in the
@@ -159,6 +171,14 @@ import { docHref } from "../../data/docs";
             <td><code>orclings</code>, <code>orcling_instructions</code></td>
           </tr>
           <tr>
+            <td>Claude accounts</td>
+            <td><code>claude_accounts</code></td>
+          </tr>
+          <tr>
+            <td>Paired phones</td>
+            <td><code>remote_devices</code>, <code>remote_push_targets</code></td>
+          </tr>
+          <tr>
             <td>Settings</td>
             <td><code>settings</code></td>
           </tr>
@@ -170,7 +190,8 @@ import { docHref } from "../../data/docs";
       </table>
     </div>
     <p>
-      <code>threads.parent_thread_id</code> links a thread to the thread whose agent started it with <code>thread_start</code>. <code>audit_events</code> records about 70 kinds of action and who took it (you, an agent, or OpenOrc): starting
+      <code>threads.parent_thread_id</code> links a thread to the thread it sits under: the thread whose agent started it with <code>thread_start</code>, the thread you started a subthread from, or, for a subagent, the thread
+      whose agent ran it. <code>audit_events</code> records about 70 kinds of action and who took it (you, an agent, or OpenOrc): starting
       runs, creating tasks, committing, pushing, restoring files, approval decisions, and more.
     </p>
     <p class="docs-source">Source: <code>packages/db/src/database.ts</code>, <code>schema.ts</code>, <code>repos.ts</code></p>
@@ -247,6 +268,14 @@ import { docHref } from "../../data/docs";
             <td><code>github-reviewer-app.enc</code></td>
             <td>The private key of your GitHub reviewer app</td>
           </tr>
+          <tr>
+            <td><code>remote-access-key.enc</code></td>
+            <td>This computer's key pair for encrypted phone connections</td>
+          </tr>
+          <tr>
+            <td><code>apns-key.enc</code></td>
+            <td>The Apple push key for phone notifications, if you added one</td>
+          </tr>
         </tbody>
       </table>
     </div>
@@ -256,7 +285,7 @@ import { docHref } from "../../data/docs";
       <li>On Linux, OpenOrc refuses to save a secret when the system would store it as plain text.</li>
       <li>On macOS and Linux, development and installed builds use different keychain entries, so one can't read the other's secrets.</li>
     </ul>
-    <p>OpenOrc never reads or stores the agents' sign-ins. Each CLI keeps its own credentials.</p>
+    <p>OpenOrc never reads or stores the agents' sign-ins. Each CLI keeps its own credentials, including Claude Code in the folder of each account you added.</p>
     <p class="docs-source">Source: <code>packages/core/src/services/settings.ts</code>, <code>apps/desktop/src/main/protected-secrets.ts</code></p>
   </section>
 
@@ -265,10 +294,10 @@ import { docHref } from "../../data/docs";
     <ul>
       <li>
         Local storage holds drafts and pending requests (<code>openorc.draft.*</code>), such as composer text, task descriptions and comments, and edits in the Instructions tab. It also holds the layout and Preview addresses
-        (<code>openorc.layout</code>), appearance (<code>openorc.theme</code>, <code>openorc.palette</code>, <code>openorc.colors</code>, and two window transparency keys), setup progress (<code>openorc.onboarding</code>), and a few
-        small choices: the project for a new thread, how you last reviewed a pull request, and which notifications were already shown. A thread's draft is also saved in the database.
+        (<code>openorc.layout</code>), the side panel's tabs (<code>openorc.panel-sessions</code>), appearance (<code>openorc.theme</code>, <code>openorc.palette</code>, <code>openorc.colors</code>, <code>openorc.font</code>, <code>openorc.code-font</code>, and two window transparency keys), setup progress (<code>openorc.onboarding</code>), and a few small choices: the project for a new thread, word wrap, how you last reviewed a pull request, and which
+        notifications were already shown. A thread's draft is also saved in the database.
       </li>
-      <li>IndexedDB holds images pasted into task descriptions (<code>openorc-image-drafts</code>).</li>
+      <li>IndexedDB holds images pasted into task descriptions (<code>openorc-image-drafts</code>) and unsaved edits to files in the Files tab (<code>openorc-file-drafts</code>).</li>
       <li>
         The Preview browser has its own persistent session, shared by every Preview. It keeps the cookies and site data of pages you open there, including sign-ins, across restarts. The cookies are encrypted on disk, but on Linux without
         the Secret Service or KWallet they are only obscured; see <a href={docHref("security") + "#package"}>Security model</a>.
@@ -279,8 +308,8 @@ import { docHref } from "../../data/docs";
   <section aria-labelledby="retention">
     <h2 id="retention">How long things stay</h2>
     <p>
-      Almost nothing expires. Threads, events, runs, and memories stay until you delete them, and the database has no size limit. Attachments and audit log entries are never deleted. OpenOrc never archives or completes a thread on its
-      own.
+      Almost nothing expires. Threads, events, runs, and memories stay until you delete them, and the database has no size limit. Attachments and audit log entries are never deleted. A thread with no work since before yesterday shows
+      under Resolved, but nothing about it is stored or removed.
     </p>
     <div class="docs-table">
       <table>
@@ -316,8 +345,7 @@ import { docHref } from "../../data/docs";
     </div>
     <p>
       The upkeep pass runs 60 seconds after launch and every 6 hours after that. It also returns free space in the database to your disk. A database made by an older version, which can't return free space bit by bit, is rebuilt once at
-      startup if at least 64 MiB and a quarter of the file are free space, the disk has room for the rebuild, and no rebuild failed in the last 3 days. The window then says
-      <strong>Tidying up saved history. This happens once and can take a minute.</strong>
+      startup if at least 64 MiB and a quarter of the file are free space, the disk has room for the rebuild, and no rebuild failed in the last 3 days. The window then says <strong>Tidying up saved history. This happens once and can take a minute.</strong>
     </p>
     <p class="docs-source">Source: <code>packages/core/src/services/ledger-upkeep.ts</code>, <code>provider-log.ts</code>, <code>packages/db/src/maintenance.ts</code></p>
   </section>
@@ -328,10 +356,11 @@ import { docHref } from "../../data/docs";
     <p>Choose <strong>Delete thread</strong> in a thread's menu, then confirm. OpenOrc closes the thread's agent and removes:</p>
     <ul>
       <li>Its runs, events, run summaries, message log, plans, checkpoints, queued messages, and review comments, plus the refs that kept its checkpoints in Git.</li>
+      <li>The threads of its subagents.</li>
       <li>Its worktree, unless another thread still uses it, as forks and threads it started do. Uncommitted changes are committed to the worktree's branch first, and the branch stays. A pull request copy's changes are discarded instead.</li>
     </ul>
     <p>These stay: tasks the thread created, threads it started, its attachments and memories, audit log entries, its lines in the provider log until they expire, and the agents' own session files.</p>
-    <p>An Orcling's own conversation goes only with the Orcling.</p>
+    <p>An Orcling's own conversation goes only with the Orcling. A subagent's thread can be deleted once it has finished, and takes the subagents under it along. Its parent thread stays.</p>
     <h3>A task</h3>
     <p>
       <strong>Delete task</strong> is at the bottom of a task's page. It removes the task, its discussion, its own runs, and its own worktree unless a thread uses it. Uncommitted changes in that
@@ -339,7 +368,7 @@ import { docHref } from "../../data/docs";
     </p>
     <h3>A project</h3>
     <p>
-      Right-click a project's name in the sidebar and choose <strong>Remove project…</strong>. This takes it off the Projects list and deletes nothing: files, worktrees, and history stay, and running work and schedules continue. Add the
+      On the New thread page, click the project's name, right-click the project in the list, and choose <strong>Remove project…</strong>. This takes it off the Projects list and deletes nothing: files, worktrees, and history stay, and running work and schedules continue. Add the
       folder again to bring it back.
     </p>
     <h3>An Orcling</h3>
@@ -349,8 +378,7 @@ import { docHref } from "../../data/docs";
       touched.
     </Callout>
     <p class="docs-source">
-      Source: <code>packages/core/src/services/threads.ts</code> (<code>delete</code>), <code>workspace.ts</code>, <code>orclings.ts</code>, <code>projects.ts</code>, <code>packages/core/src/handlers/thread-workspace.ts</code>,
-      <code>task-delete.ts</code>
+      Source: <code>packages/core/src/services/threads.ts</code> (<code>delete</code>), <code>workspace.ts</code>, <code>orclings.ts</code>, <code>projects.ts</code>, <code>packages/core/src/handlers/thread-workspace.ts</code>, <code>task-delete.ts</code>
     </p>
   </section>
 

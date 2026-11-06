@@ -7,8 +7,8 @@ import { docHref } from "../../data/docs";
 
 <DocsLayout slug="settings">
   <p>
-    Open <strong>Settings</strong> at the bottom of the sidebar, or choose <strong>Settings</strong> in the command palette (<kbd>⌘K</kbd>). The sections are listed down the side. With a section name focused, the left and right arrow keys move
-    between them.
+    Open <strong>Settings</strong> at the end of the sidebar's footer, or choose <strong>Settings</strong> in the command palette (<kbd>⌘K</kbd>). The sidebar then lists the sections, under <strong>Back to app</strong>. The section's title at
+    the top of the page is also a menu of every section.
   </p>
   <p>
     Most choices save as soon as you make them, and the page shows <strong>Saving…</strong> and then <strong>Saved</strong>. If a save fails, the page says <strong>Could not save. Your change is still here.</strong> and offers <strong
@@ -19,7 +19,8 @@ import { docHref } from "../../data/docs";
   <section aria-labelledby="usage">
     <h2 id="usage">Usage</h2>
     <p>
-      Usage shows the allowances that each agent's account reports: Codex, Claude Code, and OpenCode. An <strong>Anthropic API</strong> report joins them when you choose or save an Anthropic API key under Memory &amp; models.
+      Usage shows a card for each account's allowances: Codex, OpenCode, and each Claude account you use, named such as <strong>Claude · Work</strong>. An <strong>Anthropic API</strong> card joins them when you choose or save an Anthropic API
+      key under Memory &amp; models. The sidebar's footer shows the same numbers for the account your next message would use.
     </p>
     <div class="docs-table">
       <table>
@@ -36,7 +37,7 @@ import { docHref } from "../../data/docs";
           </tr>
           <tr>
             <td>Limits</td>
-            <td>Each limit the provider reports, as a percentage remaining or used, with its reset time.</td>
+            <td>Each limit the provider reports, as the percentage left, with its reset time.</td>
           </tr>
           <tr>
             <td>Refresh button</td>
@@ -47,15 +48,12 @@ import { docHref } from "../../data/docs";
             <td>Opens the provider's usage page in your browser. The Anthropic API report has <strong>Open Console</strong> instead.</td>
           </tr>
           <tr>
-            <td><strong>Report details</strong></td>
-            <td>Where the report came from, when it arrived, and how many runs this device has made with the agent.</td>
+            <td><strong>Details</strong></td>
+            <td>Turns the card over to show where the report came from, when it arrived, how many runs this device has made with the agent, and any resets the account has.</td>
           </tr>
           <tr>
             <td>Resets</td>
-            <td>
-              For Codex, the resets your account has. <strong>Use reset</strong> asks you to confirm, then spends one. For Claude Code, <strong>Reset options</strong> says where to use a free reset: Claude's usage settings on the web
-              or in Claude Desktop.
-            </td>
+            <td>For Codex, how many resets your account has. <strong>Use reset</strong> asks you to confirm, then spends one.</td>
           </tr>
         </tbody>
       </table>
@@ -66,7 +64,7 @@ import { docHref } from "../../data/docs";
 
   <section aria-labelledby="connections">
     <h2 id="connections">Connections</h2>
-    <p>Connections lists the coding agents and GitHub tools OpenOrc found on this computer. <strong>Refresh connections</strong> checks each agent again, so it picks up an agent you just installed or signed in to.</p>
+    <p>Connections lists the coding agents, your Claude accounts, and the GitHub tools OpenOrc found on this computer. <strong>Refresh connections</strong> checks each agent again, so it picks up an agent you just installed or signed in to.</p>
     <h3>Coding agents</h3>
     <div class="docs-table">
       <table>
@@ -108,6 +106,11 @@ import { docHref } from "../../data/docs";
       </table>
     </div>
     <p>Updates start only when agent work has finished. Idle agents close for the update and reconnect with your next message.</p>
+    <h3>Claude accounts</h3>
+    <p>
+      Each Claude account has a card with its name, email, status, and buttons such as <strong>Make default</strong>, <strong>Sign in again</strong>, and <strong>Disable</strong>. Your existing Claude Code login is listed as <strong>Existing CLI login</strong>. To add one, type a name
+      and click <strong>Add account and sign in</strong>. The default account is the one new threads start with. <strong>Refresh accounts</strong> checks each sign-in again. See <a href={docHref("agents") + "#claude-accounts"}>Use several Claude accounts</a>.
+    </p>
     <h3>GitHub</h3>
     <div class="docs-table">
       <table>
@@ -182,6 +185,39 @@ import { docHref } from "../../data/docs";
     <Callout>Slack requests reach your agents only while OpenOrc is open and your computer is awake. After OpenOrc restarts, open this section and connect again.</Callout>
   </section>
 
+  <section aria-labelledby="phone">
+    <h2 id="phone">Phone</h2>
+    <p>Phone lets the OpenOrc iPhone app reach this computer. See <a href={docHref("phone")}>Phone app</a>.</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Setting</th>
+            <th scope="col">What it does</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Allow paired phones</strong></td>
+            <td>Off by default. While it is on, this computer listens for paired phones on your local network and tailnet. <strong>Addresses</strong> lists where, marked <strong>Same network</strong> or <strong>Tailscale</strong>.</td>
+          </tr>
+          <tr>
+            <td><strong>Pair a phone</strong></td>
+            <td>Shows a pairing code to scan with the phone, valid for five minutes. <strong>Copy link</strong> copies the same code as a link.</td>
+          </tr>
+          <tr>
+            <td><strong>Paired phones</strong></td>
+            <td>Each phone with <strong>Connected</strong> or when it was last seen. <strong>Remove</strong> unpairs it.</td>
+          </tr>
+          <tr>
+            <td><strong>Apple push key</strong>, under <strong>Notifications</strong></td>
+            <td>The key this computer signs phone notifications with. Phones get notifications only from a computer that has one.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
   <section aria-labelledby="skills">
     <h2 id="skills">Skills</h2>
     <p>Skills lists the skills each agent can use in a project. It only reads them; nothing here changes or runs a skill.</p>
@@ -192,6 +228,39 @@ import { docHref } from "../../data/docs";
       <li><strong>Search skills</strong> filters by name, description, or path. <strong>Refresh skills</strong> reads the folders again.</li>
     </ul>
     <p>To use a skill, type <code>$name</code> in a Codex message or <code>/name</code> in a Claude Code message. OpenCode loads skills with its own skill tool, so ask it to use one by name. See <a href={docHref("skills")}>Skills</a>.</p>
+  </section>
+
+  <section aria-labelledby="devices">
+    <h2 id="devices">Devices</h2>
+    <p>Devices sets up iOS simulators and Android emulators in the side panel. See <a href={docHref("devices")}>Simulators and emulators</a>.</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Setting</th>
+            <th scope="col">What it does</th>
+            <th scope="col">Default</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Device support</strong></td>
+            <td>Installs and starts the tools that run devices in the <strong>Device</strong> tab. When something is missing, such as Node.js 22.12 or Xcode, the switch says what. Turning it off stops the tools and leaves running devices on.</td>
+            <td>Off</td>
+          </tr>
+          <tr>
+            <td><strong>Agents can use devices</strong></td>
+            <td>Lets agents list, open, and drive devices.</td>
+            <td>On</td>
+          </tr>
+          <tr>
+            <td><strong>Installed tools</strong></td>
+            <td>The installed version of each tool, and the version it updates to.</td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </section>
 
   <section aria-labelledby="appearance">
@@ -336,8 +405,7 @@ import { docHref } from "../../data/docs";
           <tr>
             <td><strong>Harness</strong>, under <strong>Text generation</strong></td>
             <td>
-              Which agent names new threads. <strong>Automatic · per conversation</strong> uses a small model from the thread's own agent; choosing <strong>Codex</strong>, <strong>Claude Code</strong>, or <strong>OpenCode</strong> names every
-              thread with that agent; <strong>Off · use opening message</strong> keeps the first line of your message.
+              Which agent names new threads and <a href={docHref("files") + "#explain"}>explains code</a>. <strong>Automatic · per conversation</strong> uses a small model from the conversation's own agent; choosing <strong>Codex</strong>, <strong>Claude Code</strong>, or <strong>OpenCode</strong> uses that agent every time; <strong>Off · use opening message</strong> keeps the first line of your message and turns explanations off.
             </td>
             <td>Automatic · per conversation</td>
           </tr>
@@ -373,7 +441,7 @@ import { docHref } from "../../data/docs";
         </thead>
         <tbody>
           <tr>
-            <td>General (except updates), Memory &amp; models (except the API key), automatic agent update checks, the reviewer app and <strong>Let it approve</strong>, the Workspace entrypoint</td>
+            <td>General (except updates), Memory &amp; models (except the API key), automatic agent update checks, the reviewer app and <strong>Let it approve</strong>, the Workspace entrypoint, Claude accounts, phone access and paired phones, Devices</td>
             <td>The <code>settings</code> table of <code>openorc.sqlite</code>, in the data folder</td>
           </tr>
           <tr>
@@ -393,8 +461,16 @@ import { docHref } from "../../data/docs";
             <td><code>github-reviewer-app.enc</code>, encrypted</td>
           </tr>
           <tr>
+            <td>This computer's key for phone connections</td>
+            <td><code>remote-access-key.enc</code>, encrypted</td>
+          </tr>
+          <tr>
+            <td>The Apple push key</td>
+            <td><code>apns-key.enc</code>, encrypted</td>
+          </tr>
+          <tr>
             <td>Appearance</td>
-            <td>The app window's local storage, under keys such as <code>openorc.theme</code> and <code>openorc.palette</code></td>
+            <td>The app window's local storage, under keys such as <code>openorc.theme</code> and <code>openorc.palette</code>. The palette and colors are also copied to the <code>settings</code> table, so a paired phone uses the same look.</td>
           </tr>
         </tbody>
       </table>
@@ -405,6 +481,6 @@ import { docHref } from "../../data/docs";
 
   <section aria-labelledby="next-steps">
     <h2 id="next-steps">Next steps</h2>
-    <LinkCards cards={[{ slug: "storage" }, { slug: "agents" }, { slug: "slack" }, { slug: "troubleshooting" }]} />
+    <LinkCards cards={[{ slug: "storage" }, { slug: "agents" }, { slug: "phone" }, { slug: "troubleshooting" }]} />
   </section>
 </DocsLayout>

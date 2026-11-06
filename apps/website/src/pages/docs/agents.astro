@@ -169,9 +169,26 @@ import { docHref } from "../../data/docs";
     </Callout>
   </section>
 
+  <section aria-labelledby="claude-accounts">
+    <h2 id="claude-accounts">Use several Claude accounts</h2>
+    <p>OpenOrc can run Claude Code on more than one Claude account, such as a work account and a personal one. Your existing Claude Code login is the first account. Each account you add keeps its own Claude Code login, settings, sessions, and usage. It shares the personal skills, plugins, and memories of your existing login.</p>
+    <ol class="docs-steps">
+      <li>Open Settings → <strong>Connections</strong> and find <strong>Claude accounts</strong>.</li>
+      <li>Type a name, such as <strong>Work</strong>, and click <strong>Add account and sign in</strong>.</li>
+      <li>Sign in to that Claude account in the browser window that opens. On macOS and Linux, when Chrome is installed, the sign-in opens in a Chrome Incognito window, so your browser's own Claude login stays as it is.</li>
+    </ol>
+    <p>Each account's card has <strong>Make default</strong>, <strong>Sign in again</strong>, and <strong>Disable</strong>. The default account is the one new threads start with. Changing it doesn't move existing threads.</p>
+    <ul>
+      <li>To start a thread on another account, pick it at the end of the line under the New thread composer. The choice appears for Claude models.</li>
+      <li>To move a thread to another account, click the account's name in the thread's header and choose one. The switch waits until the current turn ends. Your next message continues the same conversation on the new account.</li>
+      <li>When a turn stops on a usage limit, the thread offers your other signed-in accounts. Choosing one sends <strong>Continue where you left off.</strong> from that account.</li>
+      <li>Schedules and <a href={docHref("orclings")}>Orclings</a> each keep the account you choose for them.</li>
+    </ul>
+  </section>
+
   <section aria-labelledby="usage">
     <h2 id="usage">Usage and allowances</h2>
-    <p>Settings → <strong>Usage</strong> shows each account's limits as the agents report them, read through their own CLIs.</p>
+    <p>The sidebar's footer shows how much of this week's allowance is left on the account your next message would use: the open thread's account, or the one the New thread page has chosen. Click it for a table of every account's 5-hour and weekly limits. Settings → <strong>Usage</strong> shows each account's limits in full, as the agents report them through their own CLIs.</p>
     <ul>
       <li>For Codex and Claude Code, each allowance window, such as <strong>5-hour window</strong> or <strong>7-day window</strong>, shows how much is used or remaining and when it resets. <strong>Open usage</strong> opens the account's own page.</li>
       <li>Codex also shows any usage resets you have. When Codex allows it, <strong>Use reset</strong> spends one after you confirm.</li>

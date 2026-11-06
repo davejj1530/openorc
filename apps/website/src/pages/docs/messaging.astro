@@ -8,7 +8,7 @@ const notice = `Message from the thread "API work" (id …):`;
 ---
 
 <DocsLayout slug="messaging">
-  <p>Agents in different threads of a project can talk to each other. One agent can ask another what it knows, tell it something its work depends on, or start a helper thread to take on part of the job. You ask for this in the conversation, and the agents do it with OpenOrc's thread tools.</p>
+  <p>Agents in different threads of a project can talk to each other. One agent can ask another what it knows, tell it something its work depends on, or start a helper thread to take on part of the job. You ask for this in the conversation, and the agents do it with OpenOrc's thread tools. When an agent runs subagents of its own, each one gets a thread too.</p>
 
   <section aria-labelledby="how-it-works">
     <h2 id="how-it-works">How it works</h2>
@@ -58,7 +58,7 @@ const notice = `Message from the thread "API work" (id …):`;
 
   <section aria-labelledby="helper-threads">
     <h2 id="helper-threads">Helper threads</h2>
-    <p>A helper thread is a regular thread in the project, and it shows in the sidebar like any other. It starts with these settings from the thread that started it:</p>
+    <p>A helper thread is a regular thread in the project. In the sidebar it sits under the thread that started it. It starts with these settings from that thread:</p>
     <dl class="docs-terms">
       <div>
         <dt>Folder</dt>
@@ -76,7 +76,7 @@ const notice = `Message from the thread "API work" (id …):`;
     <p>The helper's first message is a notice saying which thread started it and how to reach that thread. Click <strong>Show details</strong> under the notice to read the task it was given. In the thread that started it, a card shows the helper's title, whether it's <strong>Working</strong>, <strong>Needs you</strong> or <strong>Idle</strong>, and its project. Click the card to open the helper.</p>
     <p>The two threads keep in touch with messages. The helper is told to message the thread that started it when it has results or needs something.</p>
     <ul>
-      <li>A thread can have up to three helpers working at once. Helpers that are idle or archived don't count.</li>
+      <li>A thread can have up to three helpers working at once. Idle helpers don't count.</li>
       <li>A helper can't start helpers of its own. OpenOrc tells it to ask the thread that started it instead.</li>
       <li>A thread in Plan can't start helpers until you switch it to another mode.</li>
       <li>Starting a helper doesn't ask for your approval.</li>
@@ -93,6 +93,18 @@ const notice = `Message from the thread "API work" (id …):`;
     <pre><code set:text={notice} /></pre>
     <p>Click <strong>Show details</strong> to read the message. In the sending thread, the agent's work shows a <strong>Sent message</strong> row.</p>
     <p>The receiving agent acts on a message with its own thread's permissions, which can be more than the sender has. So a message to a thread in the same or a stricter mode goes straight through. A message to a more permissive thread, such as from Review everything to Autonomous, asks you first. From Plan, an agent can message only threads that are also in Plan. See <a href={docHref("permissions") + "#openorc-tools"}>Modes and permissions</a>.</p>
+  </section>
+
+  <section aria-labelledby="subagents">
+    <h2 id="subagents">Subagents</h2>
+    <p>Each agent can hand part of a turn to subagents of its own: Claude Code's agents and workflows, Codex's collaboration agents, and OpenCode's child sessions. OpenOrc gives every subagent a thread, so you can watch it work.</p>
+    <p>Claude Code runs subagents only in Autonomous, because its subagents follow permission rules of their own rather than the thread's mode. Codex runs none in Plan.</p>
+    <ul>
+      <li>In the parent's conversation, the turn shows a card with a row for each subagent: its title, kind, model, and how long it ran. Under the title is what the subagent is doing now or the first sentence of what it found. Click the chevron to read what it was <strong>Asked</strong> and what it <strong>Reported</strong>.</li>
+      <li>Click a row to open the subagent's thread. Its conversation reads like any other, but a status bar takes the composer's place. The bar shows the model, the status, such as <strong>Working</strong>, <strong>Done</strong>, or <strong>Failed</strong>, and how long it ran. While the subagent works, <strong>Stop</strong> ends it when its agent allows that.</li>
+      <li>In the sidebar, subagents sit under their parent thread, newest first.</li>
+    </ul>
+    <p>You can't write to a subagent's thread. Once a subagent has finished, <strong>Delete thread</strong> in its menu removes it. Subagents don't count toward the three helpers a thread may have working.</p>
   </section>
 
   <section aria-labelledby="limits">

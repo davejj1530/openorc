@@ -10,10 +10,13 @@ import { docHref } from "../../data/docs";
     <h2 id="open">Open a terminal</h2>
     <p>Every conversation has a terminal of its own in the side panel. Use it to run commands yourself in the folder the agent works in, such as your tests or a dev server.</p>
     <ol class="docs-steps">
-      <li>Open a conversation and press <kbd>⌘J</kbd>, or click <strong>Changes</strong> at the top of the conversation, to show the side panel.</li>
-      <li>Click <strong>+</strong> next to the panel's tabs and choose <strong>Terminal</strong>.</li>
+      <li>Open a conversation and press <kbd>⌘J</kbd>, or click <strong>Show panel</strong> in its header, to show the side panel.</li>
+      <li>Click <strong>New tab</strong> (+) and choose <strong>Terminal</strong>.</li>
     </ol>
-    <p>The <strong>Terminal</strong> tab then stays in that conversation's panel. A task's side panel has a terminal too.</p>
+    <p>
+      The <strong>Terminal</strong> tab then stays in that conversation's panel. A task's side panel has a terminal too. Each further Terminal tab opens a shell of its own, named <strong>Terminal 2</strong>, <strong>Terminal 3</strong>, and so
+      on, which ends when you close its tab. The first keeps the conversation's own shell.
+    </p>
     <p>If an agent signs out while you work, the transcript offers <strong>Sign in</strong>. It opens this terminal and runs the agent's sign-in command, such as <code>claude auth login</code>.</p>
   </section>
 
@@ -24,10 +27,9 @@ import { docHref } from "../../data/docs";
       path.
     </p>
     <p>
-      The shell is the one set for your user account, usually zsh on macOS. It starts as an interactive, non-login shell, so zsh reads <code>~/.zshrc</code> but not <code>~/.zprofile</code>. Its <code>PATH</code> is the one
-      OpenOrc found by asking your login shell, the same one agents get, so tools resolve the way they do in your own terminal. OpenOrc also sets <code>TERM=xterm-256color</code>, <code>COLORTERM=truecolor</code>, and <code
-        >TERM_PROGRAM=OpenOrc</code
-      >.
+      The shell is the one set for your user account, usually zsh on macOS. On macOS it starts as a login shell from the system's <code>PATH</code>, as Terminal does, so zsh reads <code>~/.zprofile</code> and <code>~/.zshrc</code> and
+      builds the rest itself. On Linux it starts as an interactive, non-login shell, with the <code>PATH</code> OpenOrc found by asking your login shell, the same one agents get. On Windows it is the shell <code>COMSPEC</code> names, or
+      PowerShell. OpenOrc also sets <code>TERM=xterm-256color</code>, <code>COLORTERM=truecolor</code>, and <code>TERM_PROGRAM=OpenOrc</code>.
     </p>
     <p>When a command you typed finishes, the <strong>Changes</strong> tab refreshes, so edits you make by hand show up next to the agent's.</p>
   </section>

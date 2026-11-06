@@ -19,7 +19,7 @@ export interface DocSection {
 }
 
 /** When these pages were last checked against the source. Update it when a page is revised. */
-export const docsReviewed = { date: "October 5, 2026" };
+export const docsReviewed = { date: "November 6, 2026" };
 
 /** The sidebar, in reading order. Groups are named after parts of the app. */
 export const docGroups: DocGroup[] = [
@@ -94,6 +94,7 @@ export const docGroups: DocGroup[] = [
           { id: "choose", title: "Choose the agent and model" },
           { id: "effort", title: "Effort and Fast mode" },
           { id: "switch", title: "Switch agents in a thread" },
+          { id: "claude-accounts", title: "Use several Claude accounts" },
           { id: "usage", title: "Usage and allowances" },
           { id: "updates", title: "Update the agents" },
           { id: "next-steps", title: "Next steps" },
@@ -129,12 +130,13 @@ export const docGroups: DocGroup[] = [
       {
         slug: "messaging",
         title: "Threads working together",
-        description: "Let threads message each other and start helper threads, so separate pieces of work stay in step.",
+        description: "Let threads message each other and start helper threads, and follow the subagents an agent runs.",
         sections: [
           { id: "how-it-works", title: "How it works" },
           { id: "ask", title: "Ask in plain words" },
           { id: "helper-threads", title: "Helper threads" },
           { id: "messages", title: "Messages between threads" },
+          { id: "subagents", title: "Subagents" },
           { id: "limits", title: "How exchanges end" },
           { id: "next-steps", title: "Next steps" },
         ],
@@ -220,6 +222,17 @@ export const docGroups: DocGroup[] = [
         ],
       },
       {
+        slug: "files",
+        title: "Files and the editor",
+        description: "Open a conversation's files beside it, edit and save them, and have a model explain a file in plain words.",
+        sections: [
+          { id: "open", title: "Open a file" },
+          { id: "edit", title: "Edit and save" },
+          { id: "explain", title: "Explain a file" },
+          { id: "next-steps", title: "Next steps" },
+        ],
+      },
+      {
         slug: "git",
         title: "Git and worktrees",
         description: "Work in your checkout or give a thread its own worktree and branch, and see what OpenOrc adds to your repository.",
@@ -301,6 +314,18 @@ export const docGroups: DocGroup[] = [
     title: "Integrations",
     pages: [
       {
+        slug: "phone",
+        title: "Phone app",
+        description: "Pair your iPhone with OpenOrc on your computer, then follow, answer, and start threads from your phone.",
+        sections: [
+          { id: "pair", title: "Pair your phone" },
+          { id: "connection", title: "How the phone reaches your computer" },
+          { id: "use", title: "What you can do from the phone" },
+          { id: "remove", title: "Remove a phone" },
+          { id: "next-steps", title: "Next steps" },
+        ],
+      },
+      {
         slug: "slack",
         title: "Slack",
         description: "Mention your personal bot in Slack and let an agent on your computer reply in the thread.",
@@ -325,6 +350,18 @@ export const docGroups: DocGroup[] = [
           { id: "approval", title: "What needs approval" },
           { id: "sign-ins", title: "Sign-ins" },
           { id: "limits", title: "Limits" },
+          { id: "next-steps", title: "Next steps" },
+        ],
+      },
+      {
+        slug: "devices",
+        title: "Simulators and emulators",
+        label: "Devices",
+        description: "Run iOS simulators and Android emulators beside the conversation, for you and your agents.",
+        sections: [
+          { id: "set-up", title: "Turn on device support" },
+          { id: "open", title: "Open a device" },
+          { id: "agents", title: "How agents use devices" },
           { id: "next-steps", title: "Next steps" },
         ],
       },
@@ -354,7 +391,9 @@ export const docGroups: DocGroup[] = [
           { id: "usage", title: "Usage" },
           { id: "connections", title: "Connections" },
           { id: "slack", title: "Slack" },
+          { id: "phone", title: "Phone" },
           { id: "skills", title: "Skills" },
+          { id: "devices", title: "Devices" },
           { id: "appearance", title: "Appearance" },
           { id: "general", title: "General" },
           { id: "memory", title: "Memory & models" },
@@ -450,6 +489,7 @@ export const docGroups: DocGroup[] = [
           { id: "stuck", title: "A thread seems stuck" },
           { id: "approvals", title: "Approvals don't appear" },
           { id: "slack", title: "Slack doesn't reply" },
+          { id: "phone", title: "The phone can't reach your computer" },
           { id: "git", title: "Worktree and Git errors" },
           { id: "updates", title: "Updates won't install" },
           { id: "next-steps", title: "Next steps" },

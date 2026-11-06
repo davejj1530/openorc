@@ -56,13 +56,13 @@ function show() {
 it("lists each sandbox with its conversation, whether it is awake, its size and its cost, and the total", async () => {
   show();
   await screen.findByText("Add a footer");
-  expect(screen.getByText("Awake for 12 min · 8 vCPUs · 16 GB")).toBeTruthy();
-  expect(screen.getByText("Asleep, awake 1 h 5 min in all · 2 vCPUs · 4 GB")).toBeTruthy();
+  expect(screen.getByText("Awake for 12 min · 8 vCPUs · 16 GB · On Vercel")).toBeTruthy();
+  expect(screen.getByText("Asleep, awake 1 h 5 min in all · 2 vCPUs · 4 GB · On Vercel")).toBeTruthy();
   expect(screen.getByText("openorc-check-1a2b")).toBeTruthy();
-  expect(screen.getByText("Asleep · 2 vCPUs · 4 GB · No conversation")).toBeTruthy();
+  expect(screen.getByText("Asleep · 2 vCPUs · 4 GB · On Vercel · No conversation")).toBeTruthy();
   expect(screen.getByText("$0.35")).toBeTruthy();
   expect(screen.getByText("under $0.01")).toBeTruthy();
-  expect(screen.getByText("About $0.36 so far, at Vercel's list prices.")).toBeTruthy();
+  expect(screen.getByText("Vercel about $0.36 at list prices")).toBeTruthy();
 });
 
 it("removes a sandbox, but not one whose agent is at work", async () => {
@@ -72,4 +72,23 @@ it("removes a sandbox, but not one whose agent is at work", async () => {
   expect(removes.map((button) => button.disabled)).toEqual([true, false, false]);
   fireEvent.click(removes[1]!);
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.sandboxes.remove", { name: "openorc-b" }));
+});
+
+it("names each sandbox's service and totals each service apart, never calling Agent37's spend Vercel's prices", async () => {
+  const mixed: CloudSandbox[] = [
+    sandboxes[1]!,
+    { ...sandboxes[1]!, name: "openorc-c", provider: "agent37", thread: { id: "c", title: "Fix the build" }, costUsd: 0.12 },
+    { ...sandboxes[1]!, name: "openorc-d", provider: "local", thread: { id: "d", title: "Greeting" }, vcpus: null, costUsd: null },
+  ];
+  vi.mocked(core.call).mockImplementation(async (method: string) => (method === "cloud.sandboxes" ? mixed : null) as never);
+  render(
+    <QueryClientProvider client={queryClient}>
+      <CloudSandboxesSection active />
+    </QueryClientProvider>,
+  );
+  await screen.findByText("Fix the build");
+  expect(screen.getByText("Asleep, awake 1 h 5 min in all · 2 vCPUs · 4 GB · On Agent37")).toBeTruthy();
+  expect(screen.getByText("Asleep, awake 1 h 5 min in all · Simulated on this Mac")).toBeTruthy();
+  expect(screen.getByText("Vercel under $0.01 at list prices · Agent37 $0.12")).toBeTruthy();
+  expect(screen.queryByText(/Vercel's list prices/)).toBeNull();
 });

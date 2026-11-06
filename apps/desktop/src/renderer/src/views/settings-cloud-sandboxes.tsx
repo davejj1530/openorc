@@ -34,10 +34,10 @@ function usd(amount: number): string {
   return amount > 0 && amount < 0.01 ? "under $0.01" : `$${amount.toFixed(2)}`;
 }
 
-/** Where a sandbox runs, said when it is not Vercel. */
-const places: Record<CloudSandbox["provider"], string | null> = { local: "Simulated on this Mac", agent37: "On Agent37", vercel: null };
+/** Where a sandbox runs, so a row from one connected service is never taken for the other's. */
+const places: Record<CloudSandbox["provider"], string> = { local: "Simulated on this Mac", agent37: "On Agent37", vercel: "On Vercel" };
 
-/** Awake now and for how long, or asleep and how long it ran in all; then its size, and where it runs when not on Vercel. */
+/** Awake now and for how long, or asleep and how long it ran in all; then its size, and where it runs. */
 function details(sandbox: CloudSandbox, now: number): string {
   const awake = sandbox.awakeSince === null ? null : `Awake for ${duration(now - sandbox.awakeSince)}`;
   const resting = sandbox.state === "running" ? "Awake" : stateLabels[sandbox.state];
@@ -70,23 +70,38 @@ function SandboxRow({ sandbox, now }: { sandbox: CloudSandbox; now: number }) {
   );
 }
 
-function summary(sandboxes: CloudSandbox[]): string | undefined {
-  const priced = sandboxes.filter((sandbox) => sandbox.costUsd !== null);
-  if (priced.length === 0) return undefined;
-  return `About ${usd(priced.reduce((sum, sandbox) => sum + (sandbox.costUsd ?? 0), 0))} so far, at Vercel's list prices.`;
+/** How each service's total is counted: Vercel's estimated at its list prices, Agent37's as Agent37 counts it. */
+const COUNTED: Partial<Record<CloudSandbox["provider"], (amount: number) => string>> = {
+  vercel: (amount) => `Vercel ${amount > 0 && amount < 0.01 ? "under $0.01" : `about ${usd(amount)}`} at list prices`,
+  agent37: (amount) => `Agent37 ${usd(amount)}`,
+};
+
+/** What the sandboxes cost so far, each service on its own; nothing while none is priced. */
+function spent(sandboxes: CloudSandbox[]): string | null {
+  const parts = (Object.keys(COUNTED) as CloudSandbox["provider"][]).flatMap((provider) => {
+    const priced = sandboxes.filter((sandbox) => sandbox.provider === provider && sandbox.costUsd !== null);
+    return priced.length ? [COUNTED[provider]!(priced.reduce((sum, sandbox) => sum + (sandbox.costUsd ?? 0), 0))] : [];
+  });
+  return parts.length ? parts.join(" · ") : null;
 }
 
-/** OpenOrc's sandboxes: whether each is awake, what it has cost, and removing it. A conversation's next message makes a new one. */
+/** OpenOrc's sandboxes: whether each is awake, where, what it has cost, and removing it. A conversation's next message makes a new one. */
 export function CloudSandboxesSection({ active }: { active: boolean }) {
   const sandboxes = useRpc("cloud.sandboxes", {}, { enabled: active, refetchInterval: active ? REFRESH_MS : false });
   const now = useNow(REFRESH_MS);
   const list = sandboxes.data ?? [];
+  const total = spent(list);
   return (
-    <Section title="Sandboxes" description={summary(list)}>
+    <Section title="Sandboxes" description="One per cloud thread. Remove deletes its files, and the thread's next message makes a new one.">
       {list.map((sandbox) => (
         <SandboxRow key={`${sandbox.provider}:${sandbox.name}`} sandbox={sandbox} now={now} />
       ))}
       {sandboxes.data && list.length === 0 ? <p className="settings-hint py-2">No sandboxes.</p> : null}
+      {total ? (
+        <SettingRow label="So far">
+          <span className="text-ink-2 tabular-nums">{total}</span>
+        </SettingRow>
+      ) : null}
       {sandboxes.error ? (
         <p role="alert" className="text-bad mt-2">
           {sandboxes.error.message}

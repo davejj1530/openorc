@@ -58,7 +58,7 @@ describe("lossless team tree transfer", () => {
     expect((await git(root, ["cat-file", "-t", captured.treeRef])).stdout.trim()).toBe("tree");
     expect((await git(root, ["rev-list", "--count", "HEAD"])).stdout.trim()).toBe("1");
     const copy = await worker(captured);
-    expect(await readFile(path.join(copy, odd))).toEqual(binary);
+    expect((await readFile(path.join(copy, odd))).equals(binary)).toBe(true);
     expect(await readFile(path.join(copy, "document.txt"), "utf8")).toBe("Different working content\r\n");
     expect(await readlink(path.join(copy, "link"))).toBe(odd);
     expect(await readlink(path.join(copy, "raw-link"), { encoding: "buffer" })).toEqual(rawLink);
@@ -69,7 +69,7 @@ describe("lossless team tree transfer", () => {
     expect((await snapshot(copy, captured.treeSha)).treeSha).toBe(captured.treeSha);
     await git(root, ["gc", "--prune=now"]);
     const blob = (await listTree(root, captured.treeSha)).find((entry) => entry.path === odd)!;
-    expect(await readBlob(root, blob.oid)).toEqual(binary);
+    expect((await readBlob(root, blob.oid)).equals(binary)).toBe(true);
     expect(await identity()).toEqual(before);
   });
 
@@ -117,7 +117,7 @@ describe("lossless team tree transfer", () => {
     if (merged.status !== "clean") throw new Error("Expected clean merge");
     expect(await readFile(path.join(merged.worktreePath, "document.txt"), "utf8")).toBe("destination one\ntwo\nthree\nfour\nfive\nworker six\n");
     expect(await readFile(path.join(merged.worktreePath, "parent-only.txt"), "utf8")).toBe("Keep this edit\n");
-    expect(await readFile(path.join(merged.worktreePath, "new.bin"))).toEqual(binary);
+    expect((await readFile(path.join(merged.worktreePath, "new.bin"))).equals(binary)).toBe(true);
     expect(await readlink(path.join(merged.worktreePath, "new-link"))).toBe(renamed);
     const entries = await listTree(root, merged.treeSha);
     expect(entries.find((entry) => entry.path === renamed)?.mode).toBe("100755");

@@ -97,7 +97,7 @@ beforeEach(() => {
   fixture.resolvedCount = undefined;
   localStorage.clear();
   useWindow.setState({ fullscreen: false });
-  useLayout.setState({ collapsed: [], projectId: null, sidebarOpen: true, pinnedOnly: false, hiddenProjects: [] });
+  useLayout.setState({ collapsed: [], projectId: null, sidebarOpen: true, pinnedOnly: false });
   useRouter.setState({ route: { view: "newthread" }, history: [], future: [], threadIds: [] });
 });
 
@@ -606,116 +606,6 @@ it("keeps snoozed threads in one shared section", async () => {
   await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["recent", "running"]));
   fireEvent.click(screen.getByRole("button", { name: "Snoozed 1" }));
   expect(useUi.getState().threadOrder).toEqual(["recent", "running", "snoozed"]);
-});
-
-async function editProjects() {
-  fireEvent.click(screen.getByRole("button", { name: /^Filter threads/ }));
-  fireEvent.click(await screen.findByRole("menuitem", { name: "Edit projects" }));
-  return screen.findByRole("dialog", { name: "Edit projects" });
-}
-
-async function closeProjects(dialog: HTMLElement) {
-  fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
-  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Edit projects" })).toBeNull());
-}
-
-it("shows and hides projects, keeping the open conversation and scope", async () => {
-  projectThreads();
-  useLayout.setState({ projectId: "one" });
-  useRouter.setState({ route: { view: "thread", threadId: "regular" } });
-  mountSidebar();
-  await screen.findByRole("button", { name: /Regular notes/ });
-  const dialog = await editProjects();
-  expect(
-    within(dialog)
-      .getAllByRole<HTMLInputElement>("switch")
-      .map((toggle) => toggle.checked),
-  ).toEqual([true, true, true]);
-  fireEvent.click(within(dialog).getByRole("switch", { name: "First project" }));
-  await closeProjects(dialog);
-  await waitFor(() => expect(useUi.getState().threadOrder).toEqual(["other"]));
-  expect(screen.queryByRole("button", { name: /Regular notes|Pinned notes|Snoozed notes/ })).toBeNull();
-  expect(useRouter.getState().route).toEqual({ view: "thread", threadId: "regular" });
-  expect(useLayout.getState().projectId).toBe("one");
-  expect(JSON.parse(localStorage.getItem("openorc.layout") ?? "{}").hiddenProjects).toEqual(["one"]);
-  const reopened = await editProjects();
-  expect(within(reopened).getByRole<HTMLInputElement>("switch", { name: "First project" }).checked).toBe(false);
-  fireEvent.click(within(reopened).getByRole("switch", { name: "First project" }));
-  await closeProjects(reopened);
-  expect(await screen.findByRole("button", { name: /Regular notes/ })).toBeTruthy();
-  expect(useLayout.getState().hiddenProjects).toEqual([]);
-});
-
-it("keeps hidden projects out of pinned and resolved threads", async () => {
-  projectThreads();
-  fixture.threads[3]!.pinnedAt = 1;
-  const base = fixture.threads[0]!;
-  fixture.threads.push({ ...base, id: "archived-one", title: "Hidden archived notes", archivedAt: 1 }, { ...base, id: "archived-two", title: "Other archived notes", projectId: "two", archivedAt: 1 });
-  useLayout.setState({ hiddenProjects: ["one"] });
-  mountSidebar();
-  await screen.findByRole("button", { name: /Other notes/ });
-  for (const filter of ["Pinned threads", "All threads"]) {
-    fireEvent.click(screen.getByRole("button", { name: /^Filter threads/ }));
-    fireEvent.click(await screen.findByRole("menuitem", { name: filter }));
-    await screen.findByRole("button", { name: /Other notes/ });
-    expect(screen.queryByRole("button", { name: /Regular notes|Pinned notes|Snoozed notes/ })).toBeNull();
-  }
-  fireEvent.click(screen.getByRole("button", { name: "Resolved" }));
-  await screen.findByRole("button", { name: /Other archived notes/ });
-  expect(screen.queryByRole("button", { name: /Hidden archived notes/ })).toBeNull();
-  expect(useLayout.getState().hiddenProjects).toEqual(["one"]);
-});
-
-it("can hide every project including Workspace, then show one again", async () => {
-  projectThreads();
-  useLayout.setState({ hiddenProjects: [WORKSPACE_ID, "one", "two"] });
-  mountSidebar();
-  expect(await screen.findByText("All projects are hidden.")).toBeTruthy();
-  expect(useUi.getState().threadOrder).toEqual([]);
-  const dialog = await editProjects();
-  expect(
-    within(dialog)
-      .getAllByRole<HTMLInputElement>("switch")
-      .map((toggle) => toggle.checked),
-  ).toEqual([false, false, false]);
-  fireEvent.click(within(dialog).getByRole("switch", { name: "Second project" }));
-  await closeProjects(dialog);
-  expect(await screen.findByRole("button", { name: /Other notes/ })).toBeTruthy();
-  expect(screen.queryByText("All projects are hidden.")).toBeNull();
-  expect(useLayout.getState().hiddenProjects).toEqual([WORKSPACE_ID, "one"]);
-});
-
-it("finds projects, focuses one with Only, and changes visibility in bulk", async () => {
-  projectThreads();
-  mountSidebar();
-  const dialog = await editProjects();
-  expect(within(dialog).getByText("3 of 3 shown")).toBeTruthy();
-  fireEvent.click(within(dialog).getByRole("button", { name: "Show only First project" }));
-  expect(
-    within(dialog)
-      .getAllByRole<HTMLInputElement>("switch")
-      .map((toggle) => toggle.checked),
-  ).toEqual([false, true, false]);
-  expect(useLayout.getState().projectId).toBeNull();
-  fireEvent.click(within(dialog).getByRole("button", { name: "Show all" }));
-  expect(useLayout.getState().hiddenProjects).toEqual([]);
-  fireEvent.click(within(dialog).getByRole("button", { name: "Hide all" }));
-  expect(within(dialog).getByText("0 of 3 shown")).toBeTruthy();
-  const search = within(dialog).getByRole("textbox", { name: "Find a project" });
-  fireEvent.change(search, { target: { value: "/projects/two" } });
-  expect(within(dialog).getAllByRole("switch")).toHaveLength(1);
-  expect(within(dialog).getByRole<HTMLInputElement>("switch", { name: "Second project" }).checked).toBe(false);
-  fireEvent.click(within(dialog).getByRole("button", { name: "Show only Second project" }));
-  expect(useLayout.getState().hiddenProjects).toEqual([WORKSPACE_ID, "one"]);
-  fireEvent.click(within(dialog).getByRole("button", { name: "Clear project search" }));
-  expect(within(dialog).getAllByRole("switch")).toHaveLength(3);
-  fireEvent.change(search, { target: { value: "no such project" } });
-  expect(within(dialog).getByText("No projects found.")).toBeTruthy();
-  fireEvent.click(within(dialog).getByRole("button", { name: "Done" }));
-  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Edit projects" })).toBeNull());
-  const reopened = await editProjects();
-  expect(within(reopened).getByRole<HTMLInputElement>("textbox", { name: "Find a project" }).value).toBe("");
-  expect(within(reopened).getByRole<HTMLInputElement>("switch", { name: "Second project" }).checked).toBe(true);
 });
 
 it("prunes deleted thread folds while keeping live and project folds", async () => {

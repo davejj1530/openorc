@@ -45,8 +45,6 @@ interface LayoutState {
   openThreadPanel: (id: string, tab: PanelTab) => void;
   /** Only the pinned threads. Never persisted: a relaunch lists them all again. */
   pinnedOnly: boolean;
-  /** Projects omitted from the sidebar's thread lists, independently of the thread filter. */
-  hiddenProjects: string[];
   /** Sidebar sections the user folded: namespaced project/pinned keys, plus opt-in snoozed-open keys. */
   collapsed: string[];
   revealThreads: (ancestors: readonly string[]) => void;
@@ -66,9 +64,6 @@ interface LayoutState {
   togglePanelSide: () => void;
   setProject: (id: string | null) => void;
   setPinnedOnly: (pinnedOnly: boolean) => void;
-  setProjectShown: (id: string, shown: boolean) => void;
-  setProjectsShown: (ids: readonly string[], shown: boolean) => void;
-  showOnlyProject: (id: string, listedIds: readonly string[]) => void;
   toggleCollapsed: (key: string) => void;
   toggleThreadChildren: (id: string, expanded: boolean) => void;
   rememberPreviewUrl: (key: string, url: string) => void;
@@ -82,7 +77,7 @@ export const limits = {
 
 const KEY = "openorc.layout";
 
-function read(): Partial<Pick<LayoutState, "sidebarOpen" | "sidebarWidth" | "panelOpen" | "panelWidth" | "panelSide" | "projectId" | "hiddenProjects" | "collapsed" | "previewUrls">> {
+function read(): Partial<Pick<LayoutState, "sidebarOpen" | "sidebarWidth" | "panelOpen" | "panelWidth" | "panelSide" | "projectId" | "collapsed" | "previewUrls">> {
   try {
     return JSON.parse(localStorage.getItem(KEY) ?? "{}") as Partial<LayoutState>;
   } catch {
@@ -101,7 +96,6 @@ function persist(s: LayoutState): void {
         panelWidth: s.panelWidth,
         panelSide: s.panelSide,
         projectId: s.projectId,
-        hiddenProjects: s.hiddenProjects,
         collapsed: s.collapsed,
         previewUrls: s.previewUrls,
       }),
@@ -119,16 +113,6 @@ export function applyWidths(sidebar: number, panel: number): void {
 }
 
 const clamp = (v: number, { min, max }: { min: number; max: number }) => Math.min(max, Math.max(min, v));
-
-function withProjectsShown(hidden: readonly string[], ids: readonly string[], shown: boolean): string[] {
-  const others = hidden.filter((id) => !ids.includes(id));
-  return shown ? others : [...others, ...new Set(ids)];
-}
-
-function withOnlyProject(hidden: readonly string[], id: string, listedIds: readonly string[]): string[] {
-  const others = hidden.filter((hiddenId) => !listedIds.includes(hiddenId) && hiddenId !== id);
-  return [...others, ...listedIds.filter((listed) => listed !== id)];
-}
 
 /** The three-column frame: sidebar, main, and an optional panel on either side of main. Sizes and the panel's side persist across launches. */
 function threadFoldActions(get: () => LayoutState, commit: (patch: Partial<LayoutState>) => void): Pick<LayoutState, "revealThreads" | "pruneThreadFolds"> {
@@ -160,7 +144,6 @@ export const useLayout = create<LayoutState>((set, get) => {
     projectId: saved.projectId === undefined ? WORKSPACE_ID : saved.projectId,
     panelThreadId: null,
     pinnedOnly: false,
-    hiddenProjects: saved.hiddenProjects ?? [],
     collapsed: (saved.collapsed ?? []).filter(liveSidebarFold),
     previewUrls: saved.previewUrls ?? {},
     panelExpanded: false,
@@ -216,9 +199,6 @@ export const useLayout = create<LayoutState>((set, get) => {
       commit({ panelThreadId: id, panelOpen: open, ...(open ? {} : { panelExpanded: false }) });
     },
     setPinnedOnly: (pinnedOnly) => commit({ pinnedOnly }),
-    setProjectShown: (id, shown) => commit({ hiddenProjects: withProjectsShown(get().hiddenProjects, [id], shown) }),
-    setProjectsShown: (ids, shown) => commit({ hiddenProjects: withProjectsShown(get().hiddenProjects, ids, shown) }),
-    showOnlyProject: (id, listedIds) => commit({ hiddenProjects: withOnlyProject(get().hiddenProjects, id, listedIds) }),
     toggleCollapsed: (key) => commit({ collapsed: toggleSidebarFold(get().collapsed, key) }),
     toggleThreadChildren: (id, expanded) => commit({ collapsed: toggleThreadTree(get().collapsed, id, expanded) }),
     ...threadFoldActions(get, commit),

@@ -30,8 +30,7 @@ import { useOrclings } from "../lib/orclings";
 import { useRpc, useRpcs } from "../lib/client";
 import { useRouter } from "../lib/router";
 import { useUi } from "../lib/ui";
-import { Check, ChevronRight, Funnel, Pin, SlidersHorizontal } from "./icons";
-import { SidebarProjectVisibility } from "./SidebarProjectVisibility";
+import { Check, ChevronRight, Funnel, Pin } from "./icons";
 import { ResolvedDrawer, useResolveThread, useThreadDrop } from "./SidebarResolved";
 import type { RowProject } from "./ThreadLibraryRow";
 import { ThreadTreeList } from "./ThreadTreeList";
@@ -46,14 +45,12 @@ function emptyMessage(pinned: boolean): string {
 
 function useSidebarProjects() {
   const projects = useRpc("projects.list", {});
-  const hidden = useLayout((s) => s.hiddenProjects);
-  const visible = [{ id: WORKSPACE_ID, name: "Workspace", rootPath: undefined }, ...(projects.data ?? [])].filter((project) => !hidden.includes(project.id));
   useEffect(() => {
     if (!projects.data) return;
     const { projectId, setProject } = useLayout.getState();
     if (projectId && projectId !== WORKSPACE_ID && !projects.data.some((p) => p.id === projectId)) setProject(WORKSPACE_ID);
   }, [projects.data]);
-  return { query: projects, visible, allHidden: Boolean(projects.data) && visible.length === 0 };
+  return { query: projects, ids: [WORKSPACE_ID, ...(projects.data ?? []).map((project) => project.id)].sort() };
 }
 
 /** Loading an off-page selection must not replace the list's stable page query. */
@@ -98,7 +95,7 @@ export function SidebarThreadBrowser() {
 }
 
 /**
- * One list across the shown projects, newest work first, read a page at a time. Pinned threads come from their own
+ * One list across every project, newest work first, read a page at a time. Pinned threads come from their own
  * read so an old pin still leads the list, and so do the threads that need you, so a folded day can still show them.
  */
 function useThreadList(children: ChildPages) {
@@ -107,8 +104,7 @@ function useThreadList(children: ChildPages) {
   const resolvedOpen = useLayout((s) => sidebarSectionOpen(s.collapsed, "resolved", SIDEBAR_LIST));
   const [limit, setLimit] = useState(THREAD_PAGE);
   const [resolvedLimit, setResolvedLimit] = useState(THREAD_PAGE);
-  const { query: projects, visible, allHidden } = useSidebarProjects();
-  const projectIds = visible.map((project) => project.id).sort();
+  const { query: projects, ids: projectIds } = useSidebarProjects();
   const homes = new Set(useOrclings().map((orcling) => orcling.threadId));
   const activeId = useRouter((s) => (s.route.view === "thread" ? s.route.threadId : null));
   const active = useRpc("threads.get", { id: activeId ?? "" }, { enabled: Boolean(activeId) });
@@ -140,7 +136,6 @@ function useThreadList(children: ChildPages) {
     resolvedPage: putRows && page(putRows, "archived", resolvedLimit),
     activeId,
     pinnedOnly,
-    allHidden,
     pending: queries.some((query) => query.isPending),
     resolvedPending,
     resolvedCount: resolvedCount.data,
@@ -157,9 +152,8 @@ function useThreadList(children: ChildPages) {
 type ThreadList = ReturnType<typeof useThreadList>;
 
 function ListFeedback({ state, shown, snoozed }: { state: ThreadList; shown: number; snoozed: number }) {
-  const { projects, queries, pages, pinnedOnly, allHidden, pending } = state;
+  const { projects, queries, pages, pinnedOnly, pending } = state;
   if (projects.isError) return null;
-  if (allHidden) return <p className="browser-empty">All projects are hidden.</p>;
   const hasMore = pages.some((page) => page.hasMore);
   const failed = queries.filter((query) => query.isError);
   if (failed.length)
@@ -307,53 +301,34 @@ function Section({ label, count, open, onToggle, children }: { label: string; co
   );
 }
 
-/** The thread list's filter: every thread or the pinned ones, which projects show, and importing terminal sessions. */
+/** The thread list's filter: every thread or the pinned ones, and importing terminal sessions. */
 export function ThreadFilter() {
   const pinned = useLayout((s) => s.pinnedOnly);
   const setPinnedOnly = useLayout((s) => s.setPinnedOnly);
   const projectId = useLayout((s) => s.projectId);
-  const hiddenProjects = useLayout((s) => s.hiddenProjects);
-  const [editingProjects, setEditingProjects] = useState(false);
-  const narrowed = pinned || hiddenProjects.length > 0;
   return (
-    <>
-      <Menu.Root>
-        <Menu.Trigger
-          render={
-            <IconButton
-              aria-label={`Filter threads${pinned ? ": Pinned threads" : ""}${hiddenProjects.length ? ": projects filtered" : ""}`}
-              size="lg"
-              className={cn("no-drag", narrowed && "text-accent-ink")}
-            />
-          }
-        >
-          {/* Pins show their own mark, so the pinned list never looks like the whole one. */}
-          {pinned ? <Pin size={16} /> : <Funnel size={16} />}
-        </Menu.Trigger>
-        <Menu.Portal>
-          <CoversPreview />
-          <Menu.Positioner sideOffset={6} align="end" className="z-40" collisionPadding={8}>
-            <Menu.Popup ref={floatingGround} className={menuPopup}>
-              {[false, true].map((value) => (
-                <Menu.Item key={String(value)} className={menuItem} onClick={() => setPinnedOnly(value)}>
-                  <Check size={13} className={pinned === value ? "text-accent-ink" : "text-transparent"} />
-                  {value ? "Pinned threads" : "All threads"}
-                </Menu.Item>
-              ))}
-              <Menu.Separator className={menuSeparator} />
-              <Menu.Item className={menuItem} onClick={() => setEditingProjects(true)}>
-                <SlidersHorizontal size={13} className="text-ink-4" />
-                Edit projects
+    <Menu.Root>
+      <Menu.Trigger render={<IconButton aria-label={`Filter threads${pinned ? ": Pinned threads" : ""}`} size="lg" className={cn("no-drag", pinned && "text-accent-ink")} />}>
+        {/* Pins show their own mark, so the pinned list never looks like the whole one. */}
+        {pinned ? <Pin size={16} /> : <Funnel size={16} />}
+      </Menu.Trigger>
+      <Menu.Portal>
+        <CoversPreview />
+        <Menu.Positioner sideOffset={6} align="end" className="z-40" collisionPadding={8}>
+          <Menu.Popup ref={floatingGround} className={menuPopup}>
+            {[false, true].map((value) => (
+              <Menu.Item key={String(value)} className={menuItem} onClick={() => setPinnedOnly(value)}>
+                <Check size={13} className={pinned === value ? "text-accent-ink" : "text-transparent"} />
+                {value ? "Pinned threads" : "All threads"}
               </Menu.Item>
-              <Menu.Separator className={menuSeparator} />
-              <Menu.Item className={menuItem} onClick={() => useUi.getState().setImportSessions(true, projectId ?? undefined)}>
-                Import terminal sessions…
-              </Menu.Item>
-            </Menu.Popup>
-          </Menu.Positioner>
-        </Menu.Portal>
-      </Menu.Root>
-      <SidebarProjectVisibility open={editingProjects} onOpenChange={setEditingProjects} />
-    </>
+            ))}
+            <Menu.Separator className={menuSeparator} />
+            <Menu.Item className={menuItem} onClick={() => useUi.getState().setImportSessions(true, projectId ?? undefined)}>
+              Import terminal sessions…
+            </Menu.Item>
+          </Menu.Popup>
+        </Menu.Positioner>
+      </Menu.Portal>
+    </Menu.Root>
   );
 }

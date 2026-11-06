@@ -10,7 +10,7 @@ export function useRowHeadline(thread: ThreadSummary): ThreadHeadline | null {
   return useMemo(() => threadHeadline(thread, run), [thread, run]);
 }
 
-/** A thread row's second line, with `trailing` at its end: the spinner of a thread at work. Idle rows stay one line. */
+/** A thread row's second line, with `trailing` at its end: the row's mark, such as a working thread's spinner. */
 export function ThreadRowHeadline({ headline, trailing }: { headline: ThreadHeadline; trailing?: ReactNode }) {
   return (
     <span className="thread-preview-headline-line">

@@ -176,27 +176,24 @@ function RowTitle({ title, working }: { title: string; working: boolean }) {
 }
 
 /**
- * A thread's visible lines: its title, swept while it works, with what it needs from you at the end; what its agent is
- * doing; then its project and pull request. A working thread's spinner sits at the end of the line under the title,
- * under a parent's chevron, so the two keep their own places.
+ * A thread's visible lines: its title, swept while it works; what its agent is doing; then its project and pull
+ * request. Its mark (the spinner, what it needs from you, a failure or an unread dot) sits at the end of the line under
+ * the title, in one column under a parent's chevron. A row with no line under its title keeps the mark at its end.
  */
 function ThreadLines({ thread, project }: { thread: ThreadSummary; project?: RowProject }) {
   const working = threadStatus(thread)?.kind === "running";
   const headline = useRowHeadline(thread);
-  const below = working && Boolean(headline || project);
-  const spinner = below ? (
-    <span className="thread-preview-working">
-      <ThreadStatusIndicator thread={thread} />
-    </span>
-  ) : null;
+  const mark = <SidebarThreadMark thread={thread} pull={!project} />;
+  const below = Boolean(headline || project);
+  const trailing = below ? <span className="thread-preview-mark">{mark}</span> : null;
   return (
     <>
       <span className="thread-preview-heading">
         <RowTitle title={thread.title} working={working} />
-        <span className="thread-preview-status">{below ? null : <SidebarThreadMark thread={thread} pull={!project} />}</span>
+        <span className="thread-preview-status">{below ? null : mark}</span>
       </span>
-      {headline ? <ThreadRowHeadline headline={headline} trailing={spinner} /> : null}
-      {project ? <ProjectLine thread={thread} project={project} trailing={headline ? null : spinner} /> : null}
+      {headline ? <ThreadRowHeadline headline={headline} trailing={trailing} /> : null}
+      {project ? <ProjectLine thread={thread} project={project} trailing={headline ? null : trailing} /> : null}
     </>
   );
 }

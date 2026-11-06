@@ -476,10 +476,20 @@ it("sweeps a working thread's title and puts its spinner under the title line, w
   expect(row.querySelector(".thread-preview-title")?.hasAttribute("data-working")).toBe(true);
   expect(row.querySelector(".thread-preview-heading [aria-label='Working']")).toBeNull();
   // The line right under the title: what its agent is doing when there is a headline, else its project.
-  expect(row.querySelector(".thread-preview-heading")?.nextElementSibling?.querySelector(".thread-preview-working [aria-label='Working']")).not.toBeNull();
+  expect(row.querySelector(".thread-preview-heading")?.nextElementSibling?.querySelector(".thread-preview-mark [aria-label='Working']")).not.toBeNull();
   const idle = await screen.findByRole("button", { name: /Yesterday's notes/ });
   expect(idle.querySelector(".thread-preview-title")?.hasAttribute("data-working")).toBe(false);
-  expect(idle.querySelector(".thread-preview-working")).toBeNull();
+  expect(idle.querySelector(".thread-preview-mark > *")).toBeNull();
+});
+
+it("puts what a thread needs from you where the spinner goes, under the title line", async () => {
+  dayThreads();
+  fixture.threads[0] = { ...fixture.threads[0]!, activity: "waiting" };
+  useLayout.setState({ collapsed: ["day-open:yesterday"] });
+  mountSidebar();
+  const row = await screen.findByRole("button", { name: /Recent notes/ });
+  expect(row.querySelector(".thread-preview-heading [aria-label='Needs you']")).toBeNull();
+  expect(row.querySelector(".thread-preview-heading")?.nextElementSibling?.querySelector(".thread-preview-mark [aria-label='Needs you']")).not.toBeNull();
 });
 
 it("reads on by itself until an open day is whole, then pages Resolved when asked", async () => {

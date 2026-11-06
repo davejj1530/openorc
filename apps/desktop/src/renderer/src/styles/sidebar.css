@@ -348,15 +348,19 @@ button.sidebar-nav-row:hover {
     -webkit-text-fill-color: currentColor;
   }
 }
-/* A working thread's spinner, at the end of the line under its title: under a parent's chevron. */
-.thread-preview-working {
+/* A row's mark (spinner, question, failure, unread dot), at the end of the line under its title: every row's
+   marks share one column, under a parent's chevron. */
+.thread-preview-mark {
   display: flex;
   flex-shrink: 0;
   width: 16px;
   justify-content: center;
   margin-left: auto;
 }
-.thread-preview-pull + .thread-preview-working {
+.thread-preview-mark:empty {
+  display: none;
+}
+.thread-preview-pull + .thread-preview-mark {
   margin-left: 0;
 }
 .thread-status-spinner {

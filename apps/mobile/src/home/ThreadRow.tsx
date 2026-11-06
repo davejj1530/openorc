@@ -35,8 +35,7 @@ import { macAsleep, MAC_ASLEEP } from "./out-of-reach";
 import { STILL, type RowMotion } from "./fold-motion";
 import { ACTION_INSET, ACTION_RESERVE, ROW_INSET } from "./grid";
 import { ThreadTreeFrame, treeIndent, TreeToggle } from "./ThreadBranch";
-import { leadReach, ThreadRowHeading } from "./ThreadRowHeading";
-import { Spinner } from "./ThreadStatusMark";
+import { leadReach, RowStatus, showsStatus, ThreadRowHeading } from "./ThreadRowHeading";
 
 const pullIcons: Record<PrState, ComponentType<IconProps>> = { open: GitPullRequest, merged: GitMerge, closed: GitPullRequestClosed };
 // The desktop's pull request tones.
@@ -53,28 +52,38 @@ function rowFacts(thread: ThreadSummary, where: string): string[] {
   return [where, isHarnessId(thread.agent) ? harnessShortName(thread.agent) : thread.agent, relativeTime(thread.lastActivityAt)];
 }
 
-/** The live headline under the title while there is something to say, in its tone. */
-function HeadlineLine({ headline, onMid }: { headline: ThreadHeadline | null; onMid: (mid: number) => void }) {
-  if (!headline) return null;
+/** How far a root row's mark reaches past its line's end, so its 28 pt box centers on the action column. */
+const MARK_PULL = ACTION_INSET - ROW_INSET - 14 - ACTION_RESERVE;
+
+/**
+ * A root row's mark at the end of the line under its title, out in the action column: a spinner, a question, a failure,
+ * an unread dot or a finished sub thread's outcome all sit in this one place, under a parent's chevron.
+ */
+function RowMark({ thread, mark }: { thread: ThreadSummary; mark: ThreadMark | null }) {
+  if (!showsStatus(thread, mark)) return null;
   return (
-    <Text numberOfLines={1} className={cn("text-detail", headlineTones[headline.tone])} onLayout={(event) => onMid(event.nativeEvent.layout.y + event.nativeEvent.layout.height / 2)}>
-      {headline.text}
-    </Text>
+    <View pointerEvents="none" style={{ marginRight: MARK_PULL }}>
+      <RowStatus thread={thread} mark={mark} />
+    </View>
   );
 }
 
-/** A working root row's spinner, in the action column on the line under its title: under a parent's chevron. */
-function WorkingMark({ mid }: { mid: number }) {
+/** The live headline under the title while there is something to say, in its tone, with the row's mark at its end. */
+function HeadlineLine({ headline, trailing }: { headline: ThreadHeadline | null; trailing: ReactNode }) {
+  if (!headline) return null;
   return (
-    <View pointerEvents="none" className="absolute size-4 items-center justify-center" style={{ right: ACTION_INSET - ROW_INSET - 8, top: mid - 8 }}>
-      <Spinner />
+    <View className="flex-row items-center gap-3">
+      <Text numberOfLines={1} className={cn("flex-1 text-detail", headlineTones[headline.tone])}>
+        {headline.text}
+      </Text>
+      {trailing}
     </View>
   );
 }
 
 /**
- * A root row's lines: the title, lighting up while its agent works, with what it needs from you at the end; the live
- * headline; the project line. While it works, its spinner sits in the action column on the line under the title.
+ * A root row's lines: the title, lighting up while its agent works; the live headline; the project line. The row's
+ * mark ends the line under the title: the headline while there is one, else the project line.
  */
 function RootLines({
   thread,
@@ -93,47 +102,36 @@ function RootLines({
   working: boolean;
   onNode: (mid: number) => void;
 }) {
-  const [nodeMid, setNodeMid] = useState(NODE_MID);
-  const [headlineMid, setHeadlineMid] = useState(NODE_MID);
+  const trailing = <RowMark thread={thread} mark={mark} />;
   return (
     <>
-      <ThreadRowHeading thread={thread} compact={false} mark={mark} working={working} />
-      <HeadlineLine headline={headline} onMid={setHeadlineMid} />
-      <ProjectLine
-        thread={thread}
-        project={project}
-        host={host}
-        onNode={(mid) => {
-          setNodeMid(mid);
-          onNode(mid);
-        }}
-      />
-      {working ? <WorkingMark mid={headline ? headlineMid : nodeMid} /> : null}
+      <ThreadRowHeading thread={thread} compact={false} mark={null} working={working} />
+      <HeadlineLine headline={headline} trailing={trailing} />
+      <ProjectLine thread={thread} project={project} host={host} trailing={headline ? null : trailing} onNode={onNode} />
     </>
   );
 }
 
-/** What a row says of its thread's state: a root row's pull request has its own place, and a working one's spinner sits under its title. */
+/** What a row says of its thread's state: a root row's pull request has its own place on the project line. */
 function rowMarks(thread: ThreadSummary, compact: boolean, asleep: boolean) {
   const status = threadStatus(thread);
   const working = !compact && !asleep && status?.kind === "running";
-  if (compact) return { status, working, mark: threadMark(thread) };
-  return { status, working, mark: working ? null : status };
+  return { status, working, mark: compact ? threadMark(thread) : status };
 }
 
 /**
  * A root row's last line: its project's glyph at the margin, where the tree's line leaves for its sub threads, the
  * project's name, where in it the thread works (and its host's state, while that is another), then its pull request
- * at the end, in the state's own glyph and tone, with its number.
+ * at the end, in the state's own glyph and tone, with its number; the row's mark follows when no headline holds it.
  */
-function ProjectLine({ thread, project, host, onNode }: { thread: ThreadSummary; project: string | null; host: string | null; onNode: (mid: number) => void }) {
+function ProjectLine({ thread, project, host, trailing, onNode }: { thread: ThreadSummary; project: string | null; host: string | null; trailing: ReactNode; onNode: (mid: number) => void }) {
   const pull = pullRequestMark(thread);
   const Glyph = thread.projectId === WORKSPACE_ID ? Globe : Folder;
   const PullIcon = pull ? pullIcons[pull.state] : null;
   return (
     <View className="flex-row items-center gap-1.5" onLayout={(event) => onNode(event.nativeEvent.layout.y + event.nativeEvent.layout.height / 2)}>
       <Glyph size={16} className="text-ink-4" />
-      <Text numberOfLines={1} className="shrink text-detail text-ink-4">
+      <Text numberOfLines={1} className="flex-1 text-detail text-ink-4">
         {/* The cloud is named as where it works; the host's other states follow it. */}
         {[project, workspaceLabel(thread), host === "Cloud" ? null : host].filter(Boolean).join(" · ")}
       </Text>
@@ -143,6 +141,7 @@ function ProjectLine({ thread, project, host, onNode }: { thread: ThreadSummary;
           <Text className={cn("text-detail tabular-nums", pullTones[pull.state])}>#{pullRequestNumber(thread.prUrl)}</Text>
         </View>
       ) : null}
+      {trailing}
     </View>
   );
 }

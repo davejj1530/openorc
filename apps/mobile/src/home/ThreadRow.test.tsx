@@ -69,6 +69,14 @@ it("marks missing subagent updates with a neutral dashed circle", () => {
   expect(view.getByLabelText("No updates").contains(view.getByLabelText("Neutral status mark"))).toBe(true);
 });
 
+it("puts what a root row needs from you where its spinner goes: the end of the line under its title", () => {
+  const plan = fixtureThreads.find((thread) => thread.id === "t-plan")!;
+  const view = render(<ThreadRow thread={{ ...plan, activity: "waiting" }} project="openorc" arriving={false} />);
+  const question = view.getByLabelText("Needs you");
+  expect(view.getByText(plan.title).parentElement?.contains(question)).toBe(false);
+  expect(view.getByText("Needs you").parentElement?.contains(question)).toBe(true);
+});
+
 it("lights up a working thread's title and still says it works, while an idle title stays plain", () => {
   const paging = fixtureThreads.find((thread) => thread.id === "t-paging")!;
   const working = render(<ThreadRow thread={paging} project="openorc" arriving={false} />);

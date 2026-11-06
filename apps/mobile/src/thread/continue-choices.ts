@@ -1,5 +1,5 @@
-import { allowanceState, percentLeft } from "@openorc/client";
-import type { ClaudeAccountConnection, PlanLimits } from "@openorc/protocol";
+import { allowanceState } from "@openorc/client";
+import { percentLeft, type ClaudeAccountConnection, type PlanLimits } from "@openorc/protocol";
 
 /** An account a stopped turn could go on with, and how much of its plan is left, as far as the last report says. */
 export interface ContinueChoice {

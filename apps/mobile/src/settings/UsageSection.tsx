@@ -1,5 +1,5 @@
-import { allowanceState, percentLeft, usageResetLabel } from "@openorc/client";
-import type { AllowanceWindow, PlanLimits } from "@openorc/protocol";
+import { allowanceState, usageResetLabel } from "@openorc/client";
+import { percentLeft, type AllowanceWindow, type PlanLimits } from "@openorc/protocol";
 import { Fragment } from "react";
 import { View } from "react-native";
 import { RefreshCw } from "../generated/icons";

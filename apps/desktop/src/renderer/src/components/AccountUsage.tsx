@@ -1,6 +1,6 @@
 import { Popover } from "@base-ui/react/popover";
-import { DEFAULT_CLAUDE_ACCOUNT, harnessCatalog, isHarnessId, type AllowanceWindow, type PlanLimits, type ProviderUsage } from "@openorc/protocol";
-import { allowanceState, formatUsageTime, percentLeft, sessionWindow, usageResetLabel, weeklyWindow } from "@openorc/client";
+import { DEFAULT_CLAUDE_ACCOUNT, harnessCatalog, isHarnessId, percentLeft, sessionWindow, weeklyWindow, type AllowanceWindow, type PlanLimits, type ProviderUsage } from "@openorc/protocol";
+import { allowanceState, formatUsageTime, usageResetLabel } from "@openorc/client";
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { CoversPreview } from "../lib/browser-preview";
 import { cn } from "../lib/cn";

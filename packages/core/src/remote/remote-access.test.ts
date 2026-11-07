@@ -270,6 +270,25 @@ describe("phone access", () => {
     await rm(folder, { recursive: true, force: true });
   });
 
+  it("lists a thread's skills to a phone by name, never by the Mac's path", async () => {
+    const folder = path.join(dataDir, "skills-from-phone");
+    await mkdir(path.join(folder, ".claude", "skills", "deploy"), { recursive: true });
+    await writeFile(path.join(folder, ".claude", "skills", "deploy", "SKILL.md"), "---\nname: deploy\ndescription: Ship it.\n---\n");
+    // Personal skills resolve here, never in the real home.
+    vi.stubEnv("CLAUDE_CONFIG_DIR", path.join(folder, "claude-config"));
+    const project = projects.insert(core.db, { name: "Skills", rootPath: folder, gitRemote: null, defaultBranch: "main", settings: {} });
+    const thread = threads.insert(core.db, { projectId: project.id, title: "Ship", agent: "claude", model: null, mode: "act", permissionMode: "trusted" });
+    const phone = await pairPhone();
+
+    const listed = await phone.call("skills.list", { scope: { kind: "thread", id: thread.id }, agent: "claude" });
+    expect(listed.filter((skill) => skill.source === "project")).toEqual([{ name: "deploy", description: "Ship it.", source: "project", path: "" }]);
+    expect(JSON.stringify(listed)).not.toContain(folder);
+    await expect(phone.call("skills.list", { scope: { kind: "project", id: project.id, workingDirectory: folder }, agent: "claude" })).rejects.toThrow(
+      "Choose a folder for this conversation on your Mac.",
+    );
+    vi.unstubAllEnvs();
+  });
+
   it("keeps each phone's push registration under its own device, counts it, and forgets it on null or removal", async () => {
     const [first, second] = [await pairPhone("First"), await pairPhone("Second")];
     const before = (await core.remote.status()).push.phones;

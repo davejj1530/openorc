@@ -1,7 +1,7 @@
 import type { ClientPush } from "@openorc/client";
 import { LinkCloseCode, type PhoneMessage } from "@openorc/link";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DROPPED, OLDER_MAC_IMAGE } from "./link-connection";
+import { DROPPED, OLDER_MAC_IMAGE, OLDER_MAC_SKILLS } from "./link-connection";
 import { ConnectionManager } from "./manager";
 import { effectsFor, FakeMac, lan, pairedWith } from "./test-fixtures/fake-mac";
 
@@ -37,7 +37,7 @@ describe("calls over the link", () => {
     const { connection } = connect(mac);
     await advance(10);
     const declaration = mac.heard.find((message) => message.t !== "ping");
-    expect(declaration).toMatchObject({ t: "rpc", method: "session.negotiate", params: { capabilities: ["subagent-threads", "reply-images"] } });
+    expect(declaration).toMatchObject({ t: "rpc", method: "session.negotiate", params: { capabilities: ["subagent-threads", "reply-images", "skill-lists"] } });
     if (declaration?.t !== "rpc") throw new Error("no capability declaration");
     mac.send({ t: "rpc.error", id: declaration.id, message: "This is not available from a phone." });
     mac.answer = (method) => (method === "projects.list" ? [] : undefined);
@@ -70,6 +70,32 @@ describe("calls over the link", () => {
     void second.connection.asset(ref).catch(() => undefined);
     await advance(10);
     expect(current.heard).toContainEqual(expect.objectContaining({ t: "asset", ref }));
+  });
+
+  it("asks for a conversation's skills only from a Mac that said it lists them, and says to update an older one", async () => {
+    const params = { scope: { kind: "thread", id: "t1" }, agent: "claude" } as const;
+    const negotiate = (mac: FakeMac) => {
+      const declaration = mac.heard.find((message) => message.t === "rpc" && message.method === "session.negotiate");
+      if (declaration?.t !== "rpc") throw new Error("no capability declaration");
+      return declaration.id;
+    };
+    const older = new FakeMac();
+    older.behave(lan, { kind: "answer" });
+    const first = connect(older);
+    await advance(10);
+    older.send({ t: "rpc.result", id: negotiate(older), result: { capabilities: ["subagent-threads", "reply-images"] } });
+    await expect(first.connection.call("skills.list", params)).rejects.toThrow(OLDER_MAC_SKILLS);
+    expect(wire(older)).not.toContain("rpc skills.list");
+
+    const current = new FakeMac();
+    current.behave(lan, { kind: "answer" });
+    current.answer = (method) => (method === "skills.list" ? [{ name: "deploy", description: "Ship it.", source: "project", path: "" }] : undefined);
+    const second = connect(current);
+    await advance(10);
+    current.send({ t: "rpc.result", id: negotiate(current), result: { capabilities: ["subagent-threads", "reply-images", "skill-lists"] } });
+    const listed = second.connection.call("skills.list", params);
+    await advance(10);
+    expect((await listed).map((skill) => skill.name)).toEqual(["deploy"]);
   });
 
   it("drops and logs a failed frame application at the link boundary, then handles the next frame", async () => {

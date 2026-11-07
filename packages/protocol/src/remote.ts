@@ -22,6 +22,8 @@ export const REMOTE_METHODS = [
   "inbox.list",
   "agents.models",
   "agents.availability",
+  // The skills a conversation's agent offers, for the composer's picker: names and descriptions, never the Mac's paths.
+  "skills.list",
   // Names and whether each can run, for a new thread's account choice; no email, organization or CLI text.
   "claude.accounts.list",
   "providers.limits",

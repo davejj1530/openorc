@@ -26,6 +26,29 @@ describe("phone policy", () => {
     expect(admitRemoteRequest("threads.switchClaudeAccount", { id: "t", claudeAccountId: "work" }, context)).toEqual({ ok: true });
   });
 
+  it("lists a conversation's skills for the picker, without the Mac's paths or a token in a description", () => {
+    expect(admitRemoteRequest("skills.list", { scope: { kind: "thread", id: "solo" }, agent: "claude", claudeAccountId: "work" }, context)).toEqual({ ok: true });
+    expect(admitRemoteRequest("skills.list", { scope: { kind: "project", id: "p" }, agent: "codex" }, context)).toEqual({ ok: true });
+    expect(admitRemoteRequest("skills.list", { scope: { kind: "project", id: "p", workingDirectory: "/etc" }, agent: "claude" }, context)).toEqual({
+      ok: false,
+      message: "Choose a folder for this conversation on your Mac.",
+    });
+    const listed = remoteReply(
+      "skills.list",
+      [
+        { name: "deploy", description: `Ships with ${TOKEN}.`, source: "project", path: "/Users/someone/code/app/.claude/skills/deploy/SKILL.md" },
+        { name: "review", description: "Review the changes.", source: "system", path: "", aliases: ["rv"] },
+      ],
+      { words: (text: string) => text, roots: () => ({ home: "/Users/me", dataDir: "/Users/me/.openorc", projects: [] }) },
+    );
+    expect(JSON.stringify(listed)).not.toContain("/Users/someone");
+    expect(JSON.stringify(listed)).not.toContain(TOKEN);
+    expect(listed.map((skill) => [skill.name, skill.path, skill.source, skill.aliases ?? []])).toEqual([
+      ["deploy", "", "project", []],
+      ["review", "", "system", ["rv"]],
+    ]);
+  });
+
   it("lets only the brain's own Mac name a new thread's id", () => {
     const named = { id: "5b0e7a52-1c3f-4d8e-9a6b-2f4c8e1d7a90", projectId: "p", agent: "claude", mode: "act", permissionMode: "autonomous", cloud: true, prompt: "x" };
     expect(admitRemoteRequest("threads.start", named, context)).toEqual({ ok: false, message: "This is not available from a phone." });

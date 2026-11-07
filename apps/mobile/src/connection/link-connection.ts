@@ -2,7 +2,7 @@ import type { ClientPush, CoreConnection } from "@openorc/client";
 import type { MacMessage, PhoneSession } from "@openorc/link";
 import type { AssetRef, DeviceMethod, DeviceParams, DeviceRpcResults, RemotePush, RpcMethod, RpcParams, RpcResults, SessionMethod, SessionParams, SessionRpcResults } from "@openorc/protocol";
 import type { Clock } from "./route-race";
-import { PHONE_CAPABILITIES, supportsReplyImages } from "@openorc/protocol";
+import { PHONE_CAPABILITIES, supportsReplyImages, supportsSkillLists } from "@openorc/protocol";
 
 /** A watched Preview's newest state, or the end of the watch, which only its screen hears. */
 export type PreviewPush = Extract<RemotePush, { type: "preview" | "preview.ended" }>;
@@ -44,6 +44,7 @@ export const DROPPED = "The connection to your Mac dropped before it answered.";
 const NO_ANSWER = "Your Mac did not answer in time.";
 const NO_MAC = "This phone is not connected to a Mac.";
 export const OLDER_MAC_IMAGE = "Update OpenOrc on your Mac to see this image here.";
+export const OLDER_MAC_SKILLS = "Update OpenOrc on your Mac to pick its skills here.";
 
 /** The capabilities a Mac shares in its answer to `session.negotiate`; an older Mac refuses the call and shares none. */
 const shared = (result: unknown): readonly string[] => {
@@ -99,7 +100,12 @@ export class LinkConnection implements CoreConnection {
   ) {}
 
   call<M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> {
-    return this.rpc(method, params) as Promise<RpcResults[M]>;
+    if (method !== "skills.list") return this.rpc(method, params) as Promise<RpcResults[M]>;
+    // An older Mac refuses the method as not available from a phone; this says what would make it available.
+    return this.withSession(async (session) => {
+      if (!supportsSkillLists(await this.capabilities.get(session))) throw new Error(OLDER_MAC_SKILLS);
+      return this.ask(session, method, params) as Promise<RpcResults[M]>;
+    });
   }
 
   /** A method about this phone itself, which the Mac's session answers for this phone alone. */
@@ -220,14 +226,15 @@ export class LinkConnection implements CoreConnection {
   }
 
   private rpc(method: string, params: unknown): Promise<unknown> {
-    return this.withSession(
-      (session) =>
-        new Promise((resolve, reject) => {
-          const id = this.id();
-          this.pending.set(id, { session, resolve, reject });
-          session.send({ t: "rpc", id, method, params });
-        }),
-    );
+    return this.withSession((session) => this.ask(session, method, params));
+  }
+
+  private ask(session: PhoneLine, method: string, params: unknown): Promise<unknown> {
+    return new Promise((resolve, reject) => {
+      const id = this.id();
+      this.pending.set(id, { session, resolve, reject });
+      session.send({ t: "rpc", id, method, params });
+    });
   }
 
   private withSession<T>(send: (session: PhoneLine) => Promise<T>): Promise<T> {

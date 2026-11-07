@@ -119,6 +119,8 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   "inbox.list": allow,
   "agents.models": allow,
   "agents.availability": allow,
+  // A conversation's folder, or a project's; only the Mac chooses a folder by its path.
+  "skills.list": ({ scope }) => (scope.kind === "project" && scope.workingDirectory !== undefined ? "Choose a folder for this conversation on your Mac." : null),
   // The cached list only: a refresh asks every account's CLI again, which is the Mac's Settings' to do.
   "claude.accounts.list": ({ refresh }) => (refresh ? NOT_FROM_PHONE : null),
   // Takes nothing and answers the shares and plans alone, shaped by the core: no email, token, path or CLI text.
@@ -201,6 +203,8 @@ export const remoteReplies: { [M in RemoteMethod]: Reply<M> } = {
   }),
   "agents.models": same,
   "agents.availability": same,
+  // Where each skill's file lives on the Mac stays there; a description is the skill author's text and may hold a token.
+  "skills.list": (skills) => skills.map((skill) => ({ ...skill, path: "", description: redact(skill.description).text })),
   // A sign-in's email and organization, and the CLI's own words, stay on the Mac.
   "claude.accounts.list": ({ accounts, defaultId }) => ({ defaultId, accounts: accounts.map((account) => ({ ...account, email: null, organization: null, message: null })) }),
   "providers.limits": same,

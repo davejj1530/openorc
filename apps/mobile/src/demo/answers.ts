@@ -89,6 +89,11 @@ const answers: Answers = {
   "inbox.list": (core) => ({ items: inbox(core) }),
   "agents.models": (_core, { agent }) => demoModels.filter((model) => !agent || model.agent === agent),
   "agents.availability": () => demoAvailability,
+  // What the picker offers on the demo Mac: the project's own skill first, then one built into the agent.
+  "skills.list": () => [
+    { name: "release-notes", description: "Write release notes from the commits since the last tag.", source: "project", path: "" },
+    { name: "code-review", description: "Review the changes on this branch for bugs.", source: "system", path: "" },
+  ],
   "claude.accounts.list": (core) => demoAccounts(core.started),
   "providers.limits": (core) => demoLimits(core.clock.now()),
   "app.settings.get": () => demoSettings,

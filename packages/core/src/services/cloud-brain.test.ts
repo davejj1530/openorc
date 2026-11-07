@@ -42,6 +42,9 @@ import type { BrainDoors } from "./cloud-brain-door.js";
 import { CloudBrain } from "./cloud-brain.js";
 import type { BrainMachineLike } from "./cloud-brain-machine.js";
 
+/** CI machines run these flows several times slower than a laptop, so a wait gives up after 10 s, not vitest's 1 s. */
+const waitFor = <T>(check: () => T | Promise<T>, options: { timeout?: number; interval?: number } = {}) => vi.waitFor(check, { timeout: 10_000, ...options });
+
 const VERCEL_TOKEN = "vcp_fixture-vercel-token-0123456789";
 const PERSONAL = "sk-ant-oat01-personal-fixture-token-0123456789";
 const WORK = "sk-ant-oat01-work-fixture-token-0123456789";
@@ -247,7 +250,7 @@ async function open(options: Partial<OpenOrcOptions> = {}): Promise<void> {
 const status = () => rpc("cloud.brain.status", {});
 async function setUp(): Promise<void> {
   expect((await rpc("cloud.brain.create", { region: "sin1" })).state).toBe("setting-up");
-  await vi.waitFor(async () => expect((await status()).state).toBe("ready"), { timeout: 5000 });
+  await waitFor(async () => expect((await status()).state).toBe("ready"), { timeout: 5000 });
 }
 /** What this Mac asked of the brain's machine, less the read of what the brain holds that follows each wake in the background. */
 const asked = () => brain.calls.filter((call) => call !== "control sign-ins");
@@ -369,14 +372,14 @@ describe("the cloud brain from the Mac", () => {
     invalidated = [];
     const work = core.claudeAccounts.add("Work");
     await core.claudeCloudTokens.save(work.id, WORK);
-    await vi.waitFor(() => expect(brain.handovers).toHaveLength(2));
+    await waitFor(() => expect(brain.handovers).toHaveLength(2));
     expect(brain.handovers[1]!.map((account) => account.id)).toEqual([DEFAULT_CLAUDE_ACCOUNT, work.id]);
     expect(brain.state).toBe("running");
     expect(invalidated).toContain("cloud-brain");
     await core.claudeCloudTokens.remove(DEFAULT_CLAUDE_ACCOUNT);
-    await vi.waitFor(() => expect(brain.handovers).toHaveLength(3));
+    await waitFor(() => expect(brain.handovers).toHaveLength(3));
     expect(brain.handovers[2]).toEqual([{ id: work.id, name: "Work", default: false, token: WORK }]);
-    await vi.waitFor(async () => expect(await status()).toMatchObject({ claude: ["Work"], behind: false, working: null }));
+    await waitFor(async () => expect(await status()).toMatchObject({ claude: ["Work"], behind: false, working: null }));
   });
 
   it("pairs a phone through the brain, waking it first", async () => {
@@ -414,7 +417,7 @@ describe("the cloud brain from the Mac", () => {
 
     invalidated = [];
     expect((await rpc("cloud.brain.create", { region: "cpt1" })).state).toBe("setting-up");
-    await vi.waitFor(async () => expect((await status()).state).toBe("ready"));
+    await waitFor(async () => expect((await status()).state).toBe("ready"));
     expect(invalidated).toContain("cloud");
     expect(await threads()).toBe("cpt1");
 
@@ -466,7 +469,7 @@ describe("the cloud brain from the Mac", () => {
   it("says why the brain did not start, without the Vercel token or the brain's key", async () => {
     brain.wakes = { state: "failed", detail: `Exited: token ${VERCEL_TOKEN}` };
     await rpc("cloud.brain.create", { region: "fra1" });
-    await vi.waitFor(async () => expect((await status()).state).toBe("incomplete"));
+    await waitFor(async () => expect((await status()).state).toBe("incomplete"));
     const shown = await status();
     expect(shown).toMatchObject({ state: "incomplete", region: "fra1" });
     expect(JSON.stringify(shown)).toContain("The cloud brain did not start.");
@@ -590,10 +593,10 @@ describe("the cloud brain from the Mac", () => {
         if (brain.calls.filter((call) => call === "wake").length === 2) await new Promise<void>((resolve) => (restart = resolve));
       };
       await rpc("cloud.brain.create", { region: "sin1" });
-      await vi.waitFor(() => expect(restart).toBeDefined());
+      await waitFor(() => expect(restart).toBeDefined());
       expect(await status()).toEqual({ state: "setting-up", service: "vercel", region: "sin1", step: "start" });
       restart!();
-      await vi.waitFor(async () => expect((await status()).state).toBe("ready"));
+      await waitFor(async () => expect((await status()).state).toBe("ready"));
       expect(asked().filter((call) => call !== "status")).toEqual([`provision ${NEW} archive sin1`, "wake", "control stop-for-update", "wake", "control handover"]);
       expect(brain.running).toBe(NEW);
     });
@@ -604,9 +607,9 @@ describe("the cloud brain from the Mac", () => {
       brain.refusesUpdate = "The brain's control request is not valid: op is missing or wrong.";
       const work = core.claudeAccounts.add("Work");
       await core.claudeCloudTokens.save(work.id, WORK);
-      await vi.waitFor(() => expect(brain.handovers).toHaveLength(2));
+      await waitFor(() => expect(brain.handovers).toHaveLength(2));
       expect(brain.running).toBe(OLD);
-      await vi.waitFor(async () => expect(await status()).toMatchObject({ claude: ["Existing CLI login", "Work"], behind: false, working: null, error: null }));
+      await waitFor(async () => expect(await status()).toMatchObject({ claude: ["Existing CLI login", "Work"], behind: false, working: null, error: null }));
     });
 
     it("shows it updating while it installs, without the status waking the brain", async () => {
@@ -614,7 +617,7 @@ describe("the cloud brain from the Mac", () => {
       let uploaded!: () => void;
       brain.upload = () => new Promise((resolve) => (uploaded = resolve));
       const woken = rpc("cloud.brain.wake", {});
-      await vi.waitFor(async () => expect(await status()).toMatchObject({ working: "updating" }));
+      await waitFor(async () => expect(await status()).toMatchObject({ working: "updating" }));
       expect(brain.calls).not.toContain("wake");
       uploaded();
       expect(await woken).toMatchObject({ machine: "awake", working: null, error: null });
@@ -673,7 +676,7 @@ describe("the cloud brain from the Mac", () => {
       const project = await macProject(name);
       await setUp();
       await choose(project.id, true);
-      await vi.waitFor(() => expect(records()).toEqual([expect.objectContaining({ id: project.id, sent: git(project.folder, "rev-parse", "main") })]));
+      await waitFor(() => expect(records()).toEqual([expect.objectContaining({ id: project.id, sent: git(project.folder, "rev-parse", "main") })]));
       brain.state = "stopped";
       brain.calls = [];
       return project;
@@ -722,7 +725,7 @@ describe("the cloud brain from the Mac", () => {
       brain.calls = [];
       await choose(app.id, true);
       const head = git(app.folder, "rev-parse", "main");
-      await vi.waitFor(() => expect(records()).toEqual([{ id: app.id, brainId: `brain-${app.id}`, branch: "main", sent: head, head, threads: 0, error: null, settings: expect.any(String) }]));
+      await waitFor(() => expect(records()).toEqual([{ id: app.id, brainId: `brain-${app.id}`, branch: "main", sent: head, head, threads: 0, error: null, settings: expect.any(String) }]));
       expect(asked().filter((call) => call !== "status")).toEqual(["wake", "control projects", "import app whole", "control project-settings"]);
       const copy = brain.copy(app.id, "app");
       expect(git(copy, "rev-parse", "main")).toBe(head);
@@ -767,7 +770,7 @@ describe("the cloud brain from the Mac", () => {
       const next = commit(app.folder, "b.txt", "b1\n");
       brain.state = "stopped";
       await wake();
-      await vi.waitFor(() => expect(records()).toEqual([expect.objectContaining({ sent: next, head: next })]));
+      await waitFor(() => expect(records()).toEqual([expect.objectContaining({ sent: next, head: next })]));
       expect(git(copy, "rev-parse", "main")).toBe(next);
       expect(imports()).toEqual(["import app incremental"]);
     });
@@ -794,7 +797,7 @@ describe("the cloud brain from the Mac", () => {
       const app = await macProject("app", { branch: "master", origin: "https://github.com/example/app.git" });
       await setUp();
       await choose(app.id, true);
-      await vi.waitFor(() => expect(records()).toEqual([expect.objectContaining({ branch: "master", sent: git(app.folder, "rev-parse", "master") })]));
+      await waitFor(() => expect(records()).toEqual([expect.objectContaining({ branch: "master", sent: git(app.folder, "rev-parse", "master") })]));
       // Origin's default became main: the Mac has main from origin, and origin no longer has master.
       git(app.folder, "switch", "-q", "-c", "main");
       const next = commit(app.folder, "b.txt", "b1\n");
@@ -845,15 +848,15 @@ describe("the cloud brain from the Mac", () => {
       let answer!: () => void;
       brain.beforeProjects = () => new Promise((resolve) => (answer = resolve));
       expect((await rpc("cloud.brain.pair", {})).url).toBe("openorc://pair#v1.fixture");
-      await vi.waitFor(() => expect(answer).toBeDefined());
+      await waitFor(() => expect(answer).toBeDefined());
       brain.beforeProjects = async () => undefined;
       answer();
-      await vi.waitFor(() => expect(records()).toEqual([expect.objectContaining({ sent: paired })]));
+      await waitFor(() => expect(records()).toEqual([expect.objectContaining({ sent: paired })]));
 
       brain.state = "stopped";
       const handed = commit(app.folder, "c.txt", "c1\n");
       await core.claudeCloudTokens.save(DEFAULT_CLAUDE_ACCOUNT, PERSONAL);
-      await vi.waitFor(() => expect(records()).toEqual([expect.objectContaining({ sent: handed })]));
+      await waitFor(() => expect(records()).toEqual([expect.objectContaining({ sent: handed })]));
       expect(brain.handovers.at(-1)?.map((account) => account.token)).toEqual([PERSONAL]);
       expect(imports()).toEqual(["import app incremental", "import app incremental"]);
     });
@@ -864,7 +867,7 @@ describe("the cloud brain from the Mac", () => {
       const own = commit(copy, "brain.txt", "made on the brain\n");
       const next = commit(app.folder, "b.txt", "b1\n");
       await wake();
-      await vi.waitFor(() => expect(records()).toEqual([expect.objectContaining({ sent: next, head: own, error: null })]));
+      await waitFor(() => expect(records()).toEqual([expect.objectContaining({ sent: next, head: own, error: null })]));
       expect(imports()).toEqual(["import app incremental"]);
       expect(git(copy, "rev-parse", "main")).toBe(own);
       expect((await projects())[0]).toMatchObject({ on: true, kept: true, error: null });
@@ -877,13 +880,13 @@ describe("the cloud brain from the Mac", () => {
       const head = git(app.folder, "rev-parse", "main");
       await rm(path.join(brain.copies, app.id), { recursive: true });
       await wake();
-      await vi.waitFor(() => expect(git(copy, "rev-parse", "main")).toBe(head));
+      await waitFor(() => expect(git(copy, "rev-parse", "main")).toBe(head));
       expect(imports()).toEqual(["import app whole"]);
 
       brain.lacksBase = true;
       const next = commit(app.folder, "b.txt", "b1\n");
       await wake();
-      await vi.waitFor(() => expect(records()).toEqual([expect.objectContaining({ sent: next, head: next, error: null })]));
+      await waitFor(() => expect(records()).toEqual([expect.objectContaining({ sent: next, head: next, error: null })]));
       expect(imports()).toEqual(["import app whole", "import app incremental", "import app whole"]);
       expect(git(copy, "rev-parse", "main")).toBe(next);
     });
@@ -893,7 +896,7 @@ describe("the cloud brain from the Mac", () => {
       brain.refusesImport = "git merge --ff-only failed: Your local changes would be overwritten.";
       commit(app.folder, "b.txt", "b1\n");
       await wake();
-      await vi.waitFor(async () => expect((await projects())[0]).toMatchObject({ on: true, error: brain.refusesImport }));
+      await waitFor(async () => expect((await projects())[0]).toMatchObject({ on: true, error: brain.refusesImport }));
       expect(imports()).toEqual(["import app incremental"]);
       expect((await projects())[0]).toMatchObject({ kept: false });
     });
@@ -920,7 +923,7 @@ describe("the cloud brain from the Mac", () => {
       brain.stopTimesOut = false;
       const next = git(app.folder, "rev-parse", "main");
       await wake();
-      await vi.waitFor(() => expect(records()).toEqual([expect.objectContaining({ sent: next })]));
+      await waitFor(() => expect(records()).toEqual([expect.objectContaining({ sent: next })]));
       expect(brain.importedOn.at(-1)).toBe(carried);
     });
 
@@ -928,10 +931,10 @@ describe("the cloud brain from the Mac", () => {
       const app = await sent();
       brain.refusesProjects = "The brain's control request is not valid: op is missing or wrong.";
       await wake();
-      await vi.waitFor(async () => expect((await projects())[0]).toMatchObject({ on: true, error: brain.refusesProjects }));
+      await waitFor(async () => expect((await projects())[0]).toMatchObject({ on: true, error: brain.refusesProjects }));
       brain.refusesProjects = null;
       await wake();
-      await vi.waitFor(async () => expect((await projects())[0]).toMatchObject({ on: true, error: null }));
+      await waitFor(async () => expect((await projects())[0]).toMatchObject({ on: true, error: null }));
       expect(imports()).toEqual([]);
       expect(records()).toEqual([expect.objectContaining({ id: app.id, sent: git(app.folder, "rev-parse", "main"), error: null })]);
     });
@@ -943,7 +946,7 @@ describe("the cloud brain from the Mac", () => {
       expect(brain.calls.filter((call) => call !== "status").slice(0, 2)).toEqual(["wake", "control remove-project"]);
       expect((await projects())[0]).toMatchObject({ on: true, blocked: HAS_THREADS });
       expect(records()).toEqual([expect.objectContaining({ id: app.id, threads: 1 })]);
-      await vi.waitFor(() => expect(brain.calls).toContain("control copies-current"));
+      await waitFor(() => expect(brain.calls).toContain("control copies-current"));
 
       brain.calls = [];
       await choose(app.id, false);
@@ -951,7 +954,7 @@ describe("the cloud brain from the Mac", () => {
 
       brain.threads.set(app.id, 0);
       await wake();
-      await vi.waitFor(async () => expect((await projects())[0]).toMatchObject({ on: true, blocked: null }));
+      await waitFor(async () => expect((await projects())[0]).toMatchObject({ on: true, blocked: null }));
       await choose(app.id, false);
       expect((await projects())[0]).toMatchObject({ on: false, blocked: null });
       expect(records()).toEqual([]);
@@ -977,12 +980,12 @@ describe("the cloud brain from the Mac", () => {
       const head = git(app.folder, "rev-parse", "main");
       brain.confirmed = [];
       await wake();
-      await vi.waitFor(() => expect(brain.confirmed).toEqual([{ source: app.id, macHead: head }]));
+      await waitFor(() => expect(brain.confirmed).toEqual([{ source: app.id, macHead: head }]));
       expect(imports()).toEqual([]);
       brain.confirmed = [];
       commit(app.folder, "b.txt", "b1\n");
       await wake();
-      await vi.waitFor(() => expect(imports()).toEqual(["import app incremental"]));
+      await waitFor(() => expect(imports()).toEqual(["import app incremental"]));
       expect(brain.confirmed).toEqual([]);
     });
 
@@ -992,7 +995,7 @@ describe("the cloud brain from the Mac", () => {
       const next = commit(app.folder, "b.txt", "b1\n");
       carried = "20261102120000-bbbbbbbbbbbb";
       await wake();
-      await vi.waitFor(() => expect(records()).toEqual([expect.objectContaining({ sent: next })]));
+      await waitFor(() => expect(records()).toEqual([expect.objectContaining({ sent: next })]));
       expect(imports()).toEqual(["import app incremental"]);
       const at = (call: string) => brain.calls.indexOf(call);
       expect(at(`provision ${carried} archive sin1`)).toBeGreaterThanOrEqual(0);
@@ -1068,7 +1071,7 @@ describe("the cloud brain's door", () => {
 
   it("opens after setup with the Mac's own wake, in the brain's team, and says it is open", async () => {
     await setUp();
-    await vi.waitFor(async () => expect((await status()).state === "ready" && (await status())).toMatchObject({ door: { state: "open" } }));
+    await waitFor(async () => expect((await status()).state === "ready" && (await status())).toMatchObject({ door: { state: "open" } }));
     expect(doors.opens).toEqual([
       {
         access: { token: VERCEL_TOKEN, teamId: "team_fixture" },
@@ -1082,16 +1085,16 @@ describe("the cloud brain's door", () => {
 
   it("looks again when this Mac starts and after each wake it makes, asking only the door once it is current", async () => {
     await setUp();
-    await vi.waitFor(() => expect(doors.opens).toHaveLength(1));
+    await waitFor(() => expect(doors.opens).toHaveLength(1));
     await core.close();
     brain.calls = [];
     await open({ cloudBrainBundle: withDoor, cloudBrainDoors: doors });
-    await vi.waitFor(() => expect(doors.opens).toHaveLength(2));
+    await waitFor(() => expect(doors.opens).toHaveLength(2));
     expect(doors.opens[1]!.tidied).toBeNull();
     expect(brain.calls).not.toContain("wake");
     brain.state = "stopped";
     await rpc("cloud.brain.wake", {});
-    await vi.waitFor(() => expect(doors.opens).toHaveLength(3));
+    await waitFor(() => expect(doors.opens).toHaveLength(3));
     expect(doors.opens[2]!.tidied).toBe(doors.served);
   });
 
@@ -1099,12 +1102,12 @@ describe("the cloud brain's door", () => {
     let deployed: () => void = () => undefined;
     doors.hold = new Promise((resolve) => (deployed = resolve));
     await setUp();
-    await vi.waitFor(async () => expect(await status()).toMatchObject({ state: "ready", door: { state: "opening" } }));
+    await waitFor(async () => expect(await status()).toMatchObject({ state: "ready", door: { state: "opening" } }));
     deployed();
-    await vi.waitFor(async () => expect(await status()).toMatchObject({ door: { state: "open" } }));
+    await waitFor(async () => expect(await status()).toMatchObject({ door: { state: "open" } }));
     doors.fails = new Error(`Vercel refused vercel-token ${VERCEL_TOKEN}`);
     await rpc("cloud.brain.wake", {});
-    await vi.waitFor(async () => expect(await status()).toMatchObject({ state: "ready", error: null, door: { state: "failed" } }));
+    await waitFor(async () => expect(await status()).toMatchObject({ state: "ready", error: null, door: { state: "failed" } }));
     const shown = await status();
     expect(JSON.stringify(shown)).not.toContain(VERCEL_TOKEN);
     expect(shown).toMatchObject({ door: { error: "Vercel refused vercel-token [redacted]" } });
@@ -1114,9 +1117,9 @@ describe("the cloud brain's door", () => {
     await core.close();
     await open({ cloudBrainBundle: withDoor, cloudBrainDoors: doors, cloudCredentials: undefined, cloudSecrets: vercelSettings() });
     await setUp();
-    await vi.waitFor(() => expect(doors.opens).toHaveLength(1));
+    await waitFor(() => expect(doors.opens).toHaveLength(1));
     await rpc("cloud.vercel.size", { vcpus: 4 });
-    await vi.waitFor(() => expect(doors.opens).toHaveLength(2));
+    await waitFor(() => expect(doors.opens).toHaveLength(2));
     expect(doors.opens[1]!.opening.threadVcpus).toBe(4);
   });
 
@@ -1157,8 +1160,8 @@ describe("the cloud brain's door", () => {
     const tablet = { id: randomUUID(), name: "Tablet", createdAt: 2_000, lastSeenAt: null, connected: false };
     brain.phones = [pocket, tablet];
     await setUp();
-    await vi.waitFor(async () => expect(await rpc("cloud.brain.phones", {})).toEqual([pocket, tablet]));
-    await vi.waitFor(() => expect(doors.opens).toHaveLength(1));
+    await waitFor(async () => expect(await rpc("cloud.brain.phones", {})).toEqual([pocket, tablet]));
+    await waitFor(() => expect(doors.opens).toHaveLength(1));
     expect(doors.opens[0]!.opening.revoked).toEqual([]);
 
     brain.state = "stopped";
@@ -1168,7 +1171,7 @@ describe("the cloud brain's door", () => {
     expect(await rpc("cloud.brain.phones.remove", { id: pocket.id })).toEqual([tablet]);
     expect(brain.calls.slice(0, 2)).toEqual(["wake", "control remove-phone"]);
     expect(brain.phones).toEqual([tablet]);
-    await vi.waitFor(() => expect(doors.opens.at(-1)!.opening.revoked).toEqual([pocket.id]));
+    await waitFor(() => expect(doors.opens.at(-1)!.opening.revoked).toEqual([pocket.id]));
 
     brain.state = "stopped";
     brain.wakes = { state: "failed", detail: "Exited." };
@@ -1182,14 +1185,14 @@ describe("the cloud brain's door", () => {
   it("shows a phone paired with the brain's code within seconds while the code is out", async () => {
     await setUp();
     await rpc("cloud.brain.phones", {});
-    await vi.waitFor(() => expect(brain.calls).toContain("control phones"));
+    await waitFor(() => expect(brain.calls).toContain("control phones"));
     await rpc("cloud.brain.pair", {});
     const pocket = { id: randomUUID(), name: "Pocket", createdAt: Date.now(), lastSeenAt: Date.now(), connected: true };
     brain.phones = [pocket];
     vi.useFakeTimers({ toFake: ["Date"], now: Date.now() + 11_000 });
     try {
       await rpc("cloud.brain.phones", {});
-      await vi.waitFor(async () => expect(await rpc("cloud.brain.phones", {})).toEqual([{ ...pocket, lastSeenAt: expect.any(Number) }]));
+      await waitFor(async () => expect(await rpc("cloud.brain.phones", {})).toEqual([{ ...pocket, lastSeenAt: expect.any(Number) }]));
     } finally {
       vi.useRealTimers();
     }
@@ -1222,7 +1225,7 @@ describe("the cloud brain's door", () => {
       projects: { brain: "openorc-brain-qa", door: "openorc-door-qa" },
     });
     await service.create("sin1");
-    await vi.waitFor(() => expect(doors.opens).toHaveLength(1));
+    await waitFor(() => expect(doors.opens).toHaveLength(1));
     expect(new Set(access.map((given) => given.service === "vercel" && given.project))).toEqual(new Set(["openorc-brain-qa"]));
     expect(doors.opens[0]).toMatchObject({ access: { project: "openorc-door-qa" }, opening: { vercel: { project: "openorc-brain-qa" } } });
   });
@@ -1264,7 +1267,7 @@ describe("the cloud brain on Agent37", () => {
 
   it("sets up where new cloud machines go, with no region and no door, its threads in the size Settings chose", async () => {
     expect((await rpc("cloud.brain.create", {})).state).toBe("setting-up");
-    await vi.waitFor(async () => expect((await status()).state).toBe("ready"));
+    await waitFor(async () => expect((await status()).state).toBe("ready"));
     expect(brain.access[0]).toEqual({ service: "agent37", key: AGENT37.key });
     expect(brain.calls[0]).toBe("provision v1 archive undefined");
     expect(brain.wakeInputs[0]).toEqual({ key: brain.key, name: "Cloud", threadSize: { cpu: 4, memory: 16 } });
@@ -1281,7 +1284,7 @@ describe("the cloud brain on Agent37", () => {
   it("says why the brain did not start without the Agent37 key", async () => {
     brain.wakes = { state: "failed", detail: `Exited: key ${AGENT37.key}` };
     await rpc("cloud.brain.create", {});
-    await vi.waitFor(async () => expect((await status()).state).toBe("incomplete"));
+    await waitFor(async () => expect((await status()).state).toBe("incomplete"));
     const shown = await status();
     expect(shown).toMatchObject({ state: "incomplete", service: "agent37", region: null, error: expect.stringContaining("[redacted]") });
     expect(JSON.stringify(shown)).not.toContain(AGENT37.key);
@@ -1291,7 +1294,7 @@ describe("the cloud brain on Agent37", () => {
     let service: CloudService = "vercel";
     const { cloud, access } = cloudBrain(() => service);
     await cloud.create("sin1");
-    await vi.waitFor(async () => expect((await cloud.status()).state).toBe("ready"));
+    await waitFor(async () => expect((await cloud.status()).state).toBe("ready"));
     service = "agent37";
     await cloud.wake();
     expect(await cloud.status()).toMatchObject({ state: "ready", service: "vercel", region: "sin1" });
@@ -1302,7 +1305,7 @@ describe("the cloud brain on Agent37", () => {
   it("is dialed only while its machine runs, since any request to its address wakes it; a Vercel brain's dial never needs a look", async () => {
     const { cloud } = cloudBrain(() => "agent37");
     await cloud.create();
-    await vi.waitFor(async () => expect((await cloud.status()).state).toBe("ready"));
+    await waitFor(async () => expect((await cloud.status()).state).toBe("ready"));
     expect(await cloud.dialable()).toBe(true);
     brain.state = "stopped";
     expect(await cloud.dialable()).toBe(false);
@@ -1310,7 +1313,7 @@ describe("the cloud brain on Agent37", () => {
     brain.state = "missing";
     const vercel = cloudBrain(() => "vercel").cloud;
     await vercel.create("sin1");
-    await vi.waitFor(async () => expect((await vercel.status()).state).toBe("ready"));
+    await waitFor(async () => expect((await vercel.status()).state).toBe("ready"));
     brain.state = "stopped";
     const looks = brain.calls.length;
     expect(await vercel.dialable()).toBe(true);
@@ -1321,7 +1324,7 @@ describe("the cloud brain on Agent37", () => {
     await core.close();
     await open({ cloudAgent37: async () => AGENT37, cloudService: async () => "vercel" as const, cloudBrainBundle: bundle, cloudBrainDoors: doors });
     expect((await rpc("cloud.brain.create", { service: "agent37" })).state).toBe("setting-up");
-    await vi.waitFor(async () => expect((await status()).state).toBe("ready"));
+    await waitFor(async () => expect((await status()).state).toBe("ready"));
     expect(new Set(brain.access.map((given) => given.service))).toEqual(new Set(["agent37"]));
     expect(await status()).toMatchObject({ state: "ready", service: "agent37", region: null });
     expect(stored()).toMatchObject({ service: "agent37" });

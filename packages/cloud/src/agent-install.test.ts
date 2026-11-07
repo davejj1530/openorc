@@ -69,7 +69,10 @@ it("takes the command's name over from the image's own copy of the CLI, which np
 
 it("passes on an install that fails for another reason, without forcing it", async () => {
   const { box, runs } = sandbox(new Map());
-  box.exec = async (cmd, args) => (runs.push({ cmd, args, sudo: true }), cmd === "sh" ? { code: 1, stdout: Buffer.alloc(0), stderr: "" } : { code: 1, stdout: Buffer.alloc(0), stderr: "npm error 404 Not Found" });
+  box.exec = async (cmd, args) => (
+    runs.push({ cmd, args, sudo: true }),
+    cmd === "sh" ? { code: 1, stdout: Buffer.alloc(0), stderr: "" } : { code: 1, stdout: Buffer.alloc(0), stderr: "npm error 404 Not Found" }
+  );
   await expect(ensureAgent(box, opencode, pinned("2.0.11"))).rejects.toThrow("OpenCode could not be installed in the cloud workspace: npm error 404 Not Found");
   expect(runs.filter((run) => run.cmd === "npm")).toHaveLength(1);
 });

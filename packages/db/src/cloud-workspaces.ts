@@ -91,7 +91,8 @@ export const cloudWorkspaces = {
   },
   /** A new conversation takes a sandbox made ahead for it, before the sandbox has its code. */
   adopt(db: Db, threadId: string, sandbox: string, at = Date.now()): CloudWorkspaceRecord {
-    const row = db.stmt(`UPDATE cloud_workspaces SET sandbox = ?, updated_at = ? WHERE thread_id = ? AND state = 'preparing' RETURNING ${columns}`).get(sandbox, at, threadId) as unknown as Row | undefined;
+    const row = db.stmt(`UPDATE cloud_workspaces SET sandbox = ?, updated_at = ? WHERE thread_id = ? AND state = 'preparing' RETURNING ${columns}`).get(sandbox, at, threadId) as unknown as
+      Row | undefined;
     if (!row) throw new Error(`No cloud workspace being prepared for thread ${threadId}`);
     return record(row);
   },

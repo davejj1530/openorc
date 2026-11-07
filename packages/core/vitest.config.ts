@@ -12,6 +12,13 @@ export default defineConfig({
       OPENORC_CODEX_BIN: fileURLToPath(new URL("./test-fixtures/codex-not-installed", import.meta.url)),
       OPENORC_CLAUDE_BIN: fileURLToPath(new URL("./test-fixtures/claude-not-installed", import.meta.url)),
       OPENORC_OPENCODE_BIN: fileURLToPath(new URL("./test-fixtures/opencode-not-installed", import.meta.url)),
+      // CI's git runs `git maintenance run --auto` in the background after fetches and commits, which keeps writing into a
+      // test repository while its folder is deleted (ENOTEMPTY). No test needs it.
+      GIT_CONFIG_COUNT: "2",
+      GIT_CONFIG_KEY_0: "maintenance.auto",
+      GIT_CONFIG_VALUE_0: "false",
+      GIT_CONFIG_KEY_1: "gc.auto",
+      GIT_CONFIG_VALUE_1: "0",
     },
   },
 });

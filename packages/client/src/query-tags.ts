@@ -55,6 +55,8 @@ function scopedTask(p: Params): string[] {
 /** Reads whose tags never depend on their parameters. */
 const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "claude.accounts.list": ["claude-accounts"],
+  "connectors.list": ["connectors"],
+  "connectors.spec": ["connectors"],
   "workspace.get": ["workspace"],
   "slack.status": ["slack"],
   "cloud.status": ["cloud"],
@@ -177,6 +179,13 @@ const fixedInvalidations: Partial<Record<RpcMethod, readonly string[]>> = {
   "claude.accounts.update": ["claude-accounts", "system", "models", "provider-usage"],
   "claude.accounts.login": ["claude-accounts"],
   "claude.accounts.cancelLogin": ["claude-accounts"],
+  "connectors.list": ["connectors"],
+  "connectors.save": ["connectors"],
+  "connectors.remove": ["connectors"],
+  "connectors.setOn": ["connectors"],
+  "connectors.signIn": ["connectors"],
+  "connectors.cancelSignIn": ["connectors"],
+  "connectors.signOut": ["connectors"],
   "providers.codex.reset": ["provider-usage"],
   "agents.models.refresh": ["models"],
   "workspace.configure": ["workspace", "projects"],

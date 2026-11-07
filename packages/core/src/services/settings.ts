@@ -13,6 +13,7 @@ const defaults: AppSettings = {
   look: null,
   idleProcessMinutes: 10,
   claudeUserMcpServers: true,
+  claudeConnectorsOff: [],
   claudeAccountAutoSwitch: false,
 };
 

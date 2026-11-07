@@ -16,6 +16,7 @@ import { withAttachedFiles } from "../attachments.js";
 import type { AgentLaunchEnvironment } from "../launch-environment.js";
 import { definedEnv, launchPlace, type LaunchPlace } from "../agent-host.js";
 import { stripAnsi } from "../jsonrpc.js";
+import { connectorsOffSettings, sharedServersForRun } from "./shared-mcp.js";
 
 export interface ClaudeAdapterOptions {
   /** Path or name of the Claude Code binary. Never modified, never bundled. */
@@ -180,6 +181,7 @@ function prepareClaudeLaunch(spec: RunSpec, launch: AgentLaunchEnvironment, opti
       "--settings",
       JSON.stringify({
         fastMode: Boolean(spec.fastMode),
+        ...connectorsOffSettings(spec.connectorsOff),
         ...launchPermissionSettings(spec, plans, connection, place),
       }),
       "--permission-mode",
@@ -190,7 +192,8 @@ function prepareClaudeLaunch(spec: RunSpec, launch: AgentLaunchEnvironment, opti
     // Native subagents have independent policies; use OpenOrc's inherited-policy delegation instead.
     // Skill stays: the ask and deny rules still bind a skill's allowed-tools, its !`command` lines and its forked agent.
     if (restricted) args.push("--tools", "Read,Grep,Glob,Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,AskUserQuestion,ExitPlanMode,Skill");
-    args.push(...isolationArgs(spec, restricted, Boolean(connection) && (spec.strictMcp ?? options.strictMcp) === true));
+    const strictMcp = Boolean(connection) && (spec.strictMcp ?? options.strictMcp) === true;
+    args.push(...isolationArgs(spec, restricted, strictMcp));
     args.push(...sharedPluginArgs(shared));
     if (spec.model) args.push("--model", spec.model);
     if (spec.effort) args.push("--effort", spec.effort);
@@ -214,7 +217,8 @@ function prepareClaudeLaunch(spec: RunSpec, launch: AgentLaunchEnvironment, opti
       );
     if (connection) {
       const configFile = path.join(connection.dir, "mcp.json");
-      place.write(configFile, JSON.stringify({ mcpServers: { [serverName]: { type: "http", url: connection.mcpUrl } } }));
+      const sharedServers = sharedServersForRun({ restricted, strictMcp, untrusted: spec.untrustedCheckout === true, onAnotherMachine: place.host !== null }, shared);
+      place.write(configFile, JSON.stringify({ mcpServers: { ...sharedServers, [serverName]: { type: "http", url: connection.mcpUrl } } }));
       args.push("--mcp-config", configFile);
       // --mcp-config makes the first turn wait for all of the user's MCP servers, slow remote connectors included.
       // Claude Code still waits for the server behind --permission-prompt-tool, so ours is ready; the rest connect in the background.

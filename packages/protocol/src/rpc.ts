@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { AgentUpdates } from "./agent-updates.js";
 import { ClaudeAccountId, claudeAccountRpcParams, type ClaudeAccountRpcResults } from "./claude-accounts.js";
+import { connectorRpcParams, type ConnectorRpcResults } from "./connectors.js";
 import { cloudRpcParams, type CloudRpcResults } from "./cloud.js";
 import { codeExplanationRpcParams, type CodeExplanationRpcResults } from "./code-explanations.js";
 import { editorRpcParams, type EditorRpcResults } from "./code-intelligence.js";
@@ -67,6 +68,7 @@ const REVIEW_SCOPE_REQUIRED = "Review comments need a conversation or a task.";
 
 export const rpcParams = {
   ...claudeAccountRpcParams,
+  ...connectorRpcParams,
   ...slackRpcParams,
   ...pullRequestRpcParams,
   ...orclingRpcParams,
@@ -435,6 +437,7 @@ const SECRET_PARAMS: ReadonlySet<RpcMethod> = new Set<RpcMethod>([
   "cloud.env.set",
   "cloud.brain.codex.apiKey",
   "providers.codex.reset",
+  "connectors.save",
 ]);
 
 export const secretParams = (method: string): boolean => method.startsWith("slack.") || SECRET_PARAMS.has(method as RpcMethod);
@@ -525,6 +528,7 @@ export interface RpcResults
     EditorRpcResults,
     CodeExplanationRpcResults,
     ClaudeAccountRpcResults,
+    ConnectorRpcResults,
     RemoteRpcResults,
     DevicePanelRpcResults,
     PreviewRpcResults,

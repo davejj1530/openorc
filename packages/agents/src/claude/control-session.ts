@@ -21,6 +21,8 @@ export interface ClaudeControlSessionOptions {
   settingSources?: "user" | "all";
   /** More arguments, such as the plugin folders an added account runs with. */
   args?: string[];
+  /** Connect the MCP servers a run would, rather than none. */
+  userMcp?: boolean;
 }
 
 interface Waiting {
@@ -50,9 +52,7 @@ export async function withClaudeControlSession<T>(
     ...((options.settingSources ?? "user") === "user" ? ["--setting-sources", "user"] : []),
     "--tools",
     "",
-    "--strict-mcp-config",
-    "--mcp-config",
-    JSON.stringify({ mcpServers: {} }),
+    ...(options.userMcp ? [] : ["--strict-mcp-config", "--mcp-config", JSON.stringify({ mcpServers: {} })]),
     "--settings",
     JSON.stringify({ disableAllHooks: true, ...options.settings }),
     ...(options.args ?? []),

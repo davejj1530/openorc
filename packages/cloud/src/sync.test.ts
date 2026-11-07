@@ -107,6 +107,20 @@ describe("cloud workspace sync", () => {
     expect(git(mirror, "show", `${pulled.keptLocalEdits}:mac-only.txt`)).toBe("new on the Mac");
   });
 
+  it("keeps committed files that match an ignore rule, so a pull never deletes them from the mirror", async () => {
+    file(mirror, ".gitignore", "node_modules/\n.impeccable/\n");
+    file(mirror, ".impeccable/design.json", "{}\n");
+    git(mirror, "add", "-f", ".gitignore", ".impeccable/design.json");
+    git(mirror, "commit", "-q", "-m", "commit an ignored file");
+    const state = await seedFromCommit(location, { source: mirror, commit: git(mirror, "rev-parse", "HEAD"), branch: "openorc/new-thread" });
+
+    const pulled = await pullWorkspace(location, state);
+    expect(pulled.state.tree).toBe(state.tree);
+    expect(pulled.changed).toBe(false);
+    expect(file(mirror, ".impeccable/design.json")).toBe("{}\n");
+    expect(await pushWorkspace(location, pulled.state)).toMatchObject({ pushed: false });
+  });
+
   it("sends only what the Mac lacks on later pulls", async () => {
     let state = await seedWorkspace(location, "main");
     file(location.repo, "big.txt", "x".repeat(200_000));
@@ -156,6 +170,20 @@ describe("sending the Mac's changes to the sandbox", () => {
     const pulled = await pullWorkspace(location, pushed.state);
     expect(pulled).toMatchObject({ changed: false, keptLocalEdits: null, keptLocalCommit: null });
     expect(await pushWorkspace(location, pulled.state)).toMatchObject({ pushed: false });
+  });
+
+  it("sends an edit when the checkout holds committed files that match an ignore rule", async () => {
+    file(mirror, ".gitignore", "node_modules/\n.impeccable/\n");
+    file(mirror, ".impeccable/design.json", "{}\n");
+    git(mirror, "add", "-f", ".gitignore", ".impeccable/design.json");
+    git(mirror, "commit", "-q", "-m", "commit an ignored file");
+    const seeded = await seedWorkspace(location, "main");
+    file(mirror, "a.txt", "edited on the Mac\n");
+
+    const pushed = await pushWorkspace(location, seeded);
+    expect(pushed.pushed).toBe(true);
+    expect(file(location.repo, "a.txt")).toBe("edited on the Mac\n");
+    expect(file(location.repo, ".impeccable/design.json")).toBe("{}\n");
   });
 
   it("sends nothing when the sandbox changed since the Mac last saw it", async () => {

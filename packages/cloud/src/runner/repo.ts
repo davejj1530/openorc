@@ -191,11 +191,25 @@ export interface ApplyRequest {
   expectTree: string;
 }
 
+/** A private index that persists between syncs, so unchanged files are not hashed again. */
+const syncIndex = (state: string) => ({ GIT_INDEX_FILE: path.join(state, "sync.index") });
+
+/**
+ * The working tree's files as a tree, untracked files included and ignored ones left out, held in the private index.
+ * The index starts from HEAD, so a committed file stays in when an ignore rule matches it, as it does for Git and for
+ * the Mac's own copy. Entries that still match HEAD keep their cached stats.
+ */
+function workingTree(repo: string, state: string, head: string | null): string {
+  const index = syncIndex(state);
+  git(repo, head ? ["read-tree", "--reset", head] : ["read-tree", "--empty"], index);
+  git(repo, ["add", "-A"], index);
+  return git(repo, ["write-tree"], index);
+}
+
 /** Moves the checkout to the Mac's commit and files: commits, undos and edits made there between turns. */
 export function apply(repo: string, state: string, request: ApplyRequest): { applied: boolean; tree: string } {
-  const index = { GIT_INDEX_FILE: path.join(state, "sync.index") };
-  git(repo, ["add", "-A"], index);
-  const current = git(repo, ["write-tree"], index);
+  const index = syncIndex(state);
+  const current = workingTree(repo, state, maybeGit(repo, ["rev-parse", "-q", "--verify", "HEAD"]));
   if (current !== request.expectTree) return { applied: false, tree: current };
   git(repo, ["fetch", "-q", "--no-tags", request.bundle, `+${request.ref}:${INCOMING_REF}`]);
   const tree = git(repo, ["rev-parse", `${INCOMING_REF}^{tree}`]);
@@ -210,11 +224,8 @@ export function apply(repo: string, state: string, request: ApplyRequest): { app
  * bundle holds what the Mac lacks: everything reachable from the snapshot except the commits it says it has.
  */
 export function snapshot(repo: string, state: string, known: string[]): SnapshotResult {
-  // A private index that persists between snapshots, so unchanged files are not hashed again.
-  const index = { GIT_INDEX_FILE: path.join(state, "sync.index") };
-  git(repo, ["add", "-A"], index);
-  const tree = git(repo, ["write-tree"], index);
   const head = maybeGit(repo, ["rev-parse", "-q", "--verify", "HEAD"]);
+  const tree = workingTree(repo, state, head);
   const branch = maybeGit(repo, ["symbolic-ref", "-q", "--short", "HEAD"]);
   const commit = git(repo, ["commit-tree", tree, ...(head ? ["-p", head] : []), "-m", "OpenOrc cloud snapshot"], SNAPSHOT_IDENTITY);
   git(repo, ["update-ref", SNAPSHOT_REF, commit]);

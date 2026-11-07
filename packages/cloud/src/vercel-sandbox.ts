@@ -227,8 +227,16 @@ export class VercelSandbox implements Sandbox {
     // has nowhere to go, as on Agent37: failing the write would throw from a stream nobody listens to, and the runner
     // sends again what its command never acknowledged once it connects again.
     const input = new Writable({
-      write: (chunk: Buffer, _encoding, done) => void command.writeStdin(chunk).then(() => done(), () => done()),
-      final: (done) => void command.closeStdin().then(() => done(), () => done()),
+      write: (chunk: Buffer, _encoding, done) =>
+        void command.writeStdin(chunk).then(
+          () => done(),
+          () => done(),
+        ),
+      final: (done) =>
+        void command.closeStdin().then(
+          () => done(),
+          () => done(),
+        ),
     });
     return { input, output, ended, close: () => void command.kill("SIGKILL").catch(() => undefined) };
   }

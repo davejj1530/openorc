@@ -107,7 +107,10 @@ describe("a sandbox on Vercel", () => {
     const command = new FakeCommand();
     command.writeStdin = async () => Promise.reject(new Error("Not found: command not found or has exited"));
     command.closeStdin = async () => Promise.reject(new Error("Not found: command not found or has exited"));
-    const stream = await new VercelSandbox("s", fakeVm(() => command)).stream("node", ["runner.ts", "bridge"]);
+    const stream = await new VercelSandbox(
+      "s",
+      fakeVm(() => command),
+    ).stream("node", ["runner.ts", "bridge"]);
     const errors: unknown[] = [];
     process.once("uncaughtException", (error) => errors.push(error));
     stream.input.write("frame\n");
@@ -316,7 +319,13 @@ describe("the Vercel sandbox provider", () => {
   });
 
   it("makes a new sandbox from a base's snapshot, and saves a base as a snapshot that outlives the sandbox that made it", async () => {
-    const { fake, calls, vm } = api(() => true, [{ name: "openorc-base-1", status: "running", createdAt: 1 }, { name: "openorc-a", status: "running", createdAt: 1 }]);
+    const { fake, calls, vm } = api(
+      () => true,
+      [
+        { name: "openorc-base-1", status: "running", createdAt: 1 },
+        { name: "openorc-a", status: "running", createdAt: 1 },
+      ],
+    );
     const removals: unknown[] = [];
     const snapshots: unknown[] = [];
     fake.remove = async (params) => void removals.push(params);

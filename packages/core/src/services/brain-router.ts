@@ -23,6 +23,7 @@ import type { Logger, RpcReply, Transport } from "../transport.js";
 import { BrainOutOfReach, type BrainLink, type BrainPush, type ProjectMapping } from "./brain-link.js";
 import type { BrainMirrors } from "./brain-mirrors.js";
 import { BrainStarts } from "./brain-starts.js";
+import { projectAccountPolicy, startingAccount } from "./project-claude-accounts.js";
 
 const PAGES = "brain.pages";
 const MAX_PAGES = 40;
@@ -261,7 +262,25 @@ export class BrainRouter {
     if (held) return error(request.id, held);
     if (!(await this.deps.mapping()).toCloud(project)) return error(request.id, NOT_ON_BRAIN);
     const place = { provider: (await this.deps.service()) ?? "vercel", setup: Boolean(projects.get(this.deps.db, project)?.settings.setupScript) };
-    return { type: "rpc.result", id: request.id, result: { thread: this.starts.begin(params as RpcParams<"threads.start">, place), run: null } };
+    let start = params as RpcParams<"threads.start">;
+    try {
+      start = this.withProjectAccount(project, start);
+    } catch (refused) {
+      return error(request.id, refused instanceof Error ? refused.message : String(refused));
+    }
+    return { type: "rpc.result", id: request.id, result: { thread: this.starts.begin(start, place), run: null } };
+  }
+
+  /**
+   * A project that uses only some Claude accounts settles a cloud start's account here, as a start on this Mac would, so
+   * the brain is told the account and needs none of the project's settings: its copy carries none, since the brain's
+   * strict wire takes no new fields. Any other project's start goes as it came. Threads the brain then starts or moves
+   * on its own, such as switching at usage limits, follow the brain's own settings.
+   */
+  private withProjectAccount(project: string, params: RpcParams<"threads.start">): RpcParams<"threads.start"> {
+    if (!projectAccountPolicy(this.deps.db, project, { claudeAccountAutoSwitch: false }).restricted) return params;
+    const agent = (params.executionTarget?.kind === "model" ? params.executionTarget.settings.agent : params.agent) ?? "claude";
+    return { ...params, claudeAccountId: startingAccount(this.deps.db, project, params.claudeAccountId, agent === "claude" ? "chosen" : "unused") };
   }
 
   /** Readies the brain for a new cloud thread in a project it has a copy of, waking it while the first message is written. */

@@ -68,3 +68,16 @@ it("deletes a sandbox and its files, stopping what runs there", async () => {
   expect(alive(pid)).toBe(false);
   expect(existsSync(sandbox.root)).toBe(false);
 });
+
+it("lets a write under way land before deleting, then refuses what work still under way asks, as a deleted VM does", async () => {
+  const sandbox = await provider.open("doomed");
+  const writing = sandbox.writeFile(path.join(sandbox.root, "state", "history.bundle"), Buffer.alloc(32 * 1024 * 1024));
+  await provider.remove("doomed");
+  await writing;
+  expect(existsSync(sandbox.root)).toBe(false);
+
+  await expect(sandbox.exec("true", [])).rejects.toThrow("The sandbox doomed was deleted.");
+  await expect(sandbox.writeFile(path.join(sandbox.root, "late"), Buffer.from("x"))).rejects.toThrow("The sandbox doomed was deleted.");
+  expect(existsSync(sandbox.root)).toBe(false);
+  expect((await provider.open("doomed")).root).toBe(sandbox.root);
+});

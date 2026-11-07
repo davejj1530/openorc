@@ -37,6 +37,9 @@ export class LocalSandbox implements Sandbox {
   private session: { timer: ReturnType<typeof setTimeout>; startedAt: number; endsAt: number } | null = null;
   /** How long it ran in the sessions that ended since the app started. */
   private pastMs = 0;
+  /** Deleted, or its app closed: work still under way, such as a history going up, must not bring it back. */
+  private gone = false;
+  private readonly writing = new Set<Promise<void>>();
 
   constructor(
     readonly name: string,
@@ -47,6 +50,7 @@ export class LocalSandbox implements Sandbox {
 
   /** Starts a session when none runs. */
   private wake(): void {
+    if (this.gone) throw new Error(`The sandbox ${this.name} was deleted.`);
     if (!this.session) this.endSessionIn(this.awayMs);
   }
 
@@ -110,8 +114,13 @@ export class LocalSandbox implements Sandbox {
 
   async writeFile(file: string, content: Buffer): Promise<void> {
     this.wake();
-    await mkdir(path.dirname(file), { recursive: true });
-    await writeFile(file, content);
+    const write = mkdir(path.dirname(file), { recursive: true }).then(() => writeFile(file, content));
+    this.writing.add(write);
+    try {
+      await write;
+    } finally {
+      this.writing.delete(write);
+    }
   }
 
   async readFile(file: string): Promise<Buffer | null> {
@@ -142,6 +151,13 @@ export class LocalSandbox implements Sandbox {
     await Promise.all(closed);
     clearTimeout(timer);
   }
+
+  /** Takes no more work, then stops and lets the writes under way land, so its folder can go as a deleted VM's disk does. */
+  async retire(): Promise<void> {
+    this.gone = true;
+    await this.stop();
+    await Promise.allSettled([...this.writing]);
+  }
 }
 
 export class LocalSandboxProvider implements SandboxProvider {
@@ -155,9 +171,11 @@ export class LocalSandboxProvider implements SandboxProvider {
     private readonly awayMs = SANDBOX_AWAY_MS,
   ) {}
 
-  /** Its sandboxes are processes on this Mac, so they stop with the app that started them. */
+  /** Its sandboxes are processes on this Mac, so they stop with the app that started them, and the next open starts afresh. */
   async close(): Promise<void> {
-    await Promise.all([...this.sandboxes.values()].map((sandbox) => sandbox.stop()));
+    const sandboxes = [...this.sandboxes.values()];
+    this.sandboxes.clear();
+    await Promise.all(sandboxes.map((sandbox) => sandbox.retire()));
   }
 
   async open(name: string, needs: SandboxNeeds = {}): Promise<LocalSandbox> {
@@ -194,8 +212,9 @@ export class LocalSandboxProvider implements SandboxProvider {
   }
 
   async remove(name: string): Promise<void> {
-    await this.sandboxes.get(name)?.stop();
+    const sandbox = this.sandboxes.get(name);
     this.sandboxes.delete(name);
+    await sandbox?.retire();
     await rm(path.join(this.base, name), { recursive: true, force: true });
   }
 
@@ -207,8 +226,8 @@ export class LocalSandboxProvider implements SandboxProvider {
   readonly bases: SandboxBases = {
     save: async (sandbox) => {
       if (!(sandbox instanceof LocalSandbox)) throw new Error("Only a sandbox this service made can become its base.");
-      await sandbox.stop();
       this.sandboxes.delete(sandbox.name);
+      await sandbox.retire();
       const id = randomUUID();
       await mkdir(path.join(this.base, ".bases"), { recursive: true });
       await rename(sandbox.root, this.baseDir(id));

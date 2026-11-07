@@ -271,7 +271,8 @@ function commandDescription(text: string): string {
 /**
  * Custom commands: every Markdown file under `commands/`, named by its path and not its header, because that is the
  * name the CLI answers to. A subfolder is a namespace, so `ops/deploy.md` is "/ops:deploy". Its header is optional.
- * A folder holding a SKILL.md is one command named after the folder, and the rest of it is that command's own files.
+ * A folder holding a SKILL.md is one command named after the folder, whose sibling files are its own. A plugin's
+ * folder ends there; in project and personal folders the CLI still reads the subfolders.
  */
 async function readCommandDir(root: SkillRoot): Promise<AgentSkill[]> {
   const out: AgentSkill[] = [];
@@ -291,11 +292,14 @@ async function readCommandDir(root: SkillRoot): Promise<AgentSkill[]> {
     if (real === null || ancestors.includes(real)) return;
     const entries = await treeEntries(dir);
     const skill = entries.find((entry) => entry.regular && /^skill\.md$/i.test(entry.name));
-    if (skill) return add(skill.file, names.length > 0 ? names : [path.basename(dir)]);
+    if (skill) {
+      await add(skill.file, names.length > 0 ? names : [path.basename(dir)]);
+      if (root.plugin) return;
+    }
     for (const entry of entries) {
       if (out.length >= MAX_ENTRIES) break;
       if (entry.directory) await visit(entry.file, [...names, entry.name], [...ancestors, real]);
-      else if (entry.regular && entry.name.endsWith(".md")) await add(entry.file, [...names, path.basename(entry.name, ".md")]);
+      else if (!skill && entry.regular && entry.name.endsWith(".md")) await add(entry.file, [...names, path.basename(entry.name, ".md")]);
     }
   };
   await visit(root.dir, [], []);

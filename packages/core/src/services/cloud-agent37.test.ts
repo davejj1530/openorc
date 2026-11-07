@@ -60,7 +60,10 @@ beforeEach(async () => {
   const provider = new Agent37SandboxProvider({ credentials: async () => ({ key: fake.key, cpu: 2, memory: 4 }), files: runnerFiles(), api: (key) => agent37Api(key, fake.endpoints) });
   let saved: string | null = null;
   const tokenStore = { load: async () => saved, save: async (value: string) => void (saved = value) };
-  core = await OpenOrc.create({ dataDir: path.join(root, "data"), ephemeral: true, transport: { push: () => {} }, cloudSandboxes: provider, claudeCloudSecrets: tokenStore });
+  // This host's Claude is the instance's own stand-in, so its version is the one wanted there: an instance here runs
+  // its commands on this machine, where a version of its own would install a real Claude.
+  const shellProbe = async () => ({ path: process.env["PATH"] ?? "", binaries: { claude: path.join(bin, "claude"), codex: null, opencode: null } });
+  core = await OpenOrc.create({ dataDir: path.join(root, "data"), ephemeral: true, transport: { push: () => {} }, cloudSandboxes: provider, claudeCloudSecrets: tokenStore, shellProbe });
   settings.set(core.db, "extraction.provider", "off");
   vi.spyOn(core.textGeneration, "title").mockResolvedValue(null);
   vi.spyOn(core.runs, "models").mockResolvedValue([{ id: "fixture", label: "Fixture", agent: "claude", isDefault: true, efforts: ["high"], defaultEffort: "high", fastMode: { supported: false } }]);

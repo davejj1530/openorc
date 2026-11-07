@@ -55,3 +55,21 @@ it("never installs on a sandbox simulated on a Mac, whose CLI is the Mac's", asy
   expect(local.npm()).toEqual([]);
   await expect(ensureAgent(sandbox(new Map()).box, opencode, { ...pinned("2.0.11"), mayInstall: false })).rejects.toThrow("OpenCode is not installed on this Mac, where this sandbox is simulated.");
 });
+
+it("takes the command's name over from the image's own copy of the CLI, which npm otherwise refuses to replace", async () => {
+  const installed = new Map([["opencode", "1.0.0"]]);
+  const { box, runs } = sandbox(installed);
+  const exec = box.exec.bind(box);
+  box.exec = async (cmd, args, options) =>
+    cmd === "npm" && !args.includes("--force") ? { code: 1, stdout: Buffer.alloc(0), stderr: "npm error code EEXIST\nnpm error File exists: /usr/local/bin/opencode" } : exec(cmd, args, options);
+  await ensureAgent(box, opencode, pinned("2.0.11"));
+  expect(runs.filter((run) => run.cmd === "npm").map((run) => run.args)).toEqual([["install", "-g", "--force", "@opencode/cli@2.0.11"]]);
+  expect(installed.get("opencode")).toBe("2.0.11");
+});
+
+it("passes on an install that fails for another reason, without forcing it", async () => {
+  const { box, runs } = sandbox(new Map());
+  box.exec = async (cmd, args) => (runs.push({ cmd, args, sudo: true }), cmd === "sh" ? { code: 1, stdout: Buffer.alloc(0), stderr: "" } : { code: 1, stdout: Buffer.alloc(0), stderr: "npm error 404 Not Found" });
+  await expect(ensureAgent(box, opencode, pinned("2.0.11"))).rejects.toThrow("OpenCode could not be installed in the cloud workspace: npm error 404 Not Found");
+  expect(runs.filter((run) => run.cmd === "npm")).toHaveLength(1);
+});

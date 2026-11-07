@@ -28,6 +28,8 @@ export async function ensureAgent(sandbox: Sandbox, cli: HarnessCatalogEntry["cl
   const current = await has();
   if (current && (install.version === null || current === install.version)) return;
   const wanted = install.version ? `${cli.npm}@${install.version}` : cli.npm;
-  const installed = await sandbox.exec("npm", ["install", "-g", wanted], { sudo: true });
+  let installed = await sandbox.exec("npm", ["install", "-g", wanted], { sudo: true });
+  // The image's own copy of the CLI, from another package, holds the command's name: this host's version takes it over.
+  if (installed.code !== 0 && /\bEEXIST\b/.test(installed.stderr)) installed = await sandbox.exec("npm", ["install", "-g", "--force", wanted], { sudo: true });
   if (installed.code !== 0) throw new Error(`${install.name} could not be installed in the cloud workspace: ${installed.stderr.trim().slice(-500)}`);
 }

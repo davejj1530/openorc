@@ -31,9 +31,11 @@ function projectFromRow(r: ProjectRow): Project {
 }
 
 export const projects = {
+  /** Last active first, by each project's newest thread; projects without threads follow, last edited first. */
   list(db: Db, options: { includeRemoved?: boolean } = {}): Project[] {
-    const visible = options.includeRemoved ? "" : " AND removed_at IS NULL";
-    return (db.stmt(`SELECT * FROM projects WHERE id != ?${visible} ORDER BY updated_at DESC`).all(WORKSPACE_ID) as unknown as ProjectRow[]).map(projectFromRow);
+    const visible = options.includeRemoved ? "" : " AND p.removed_at IS NULL";
+    const active = "(SELECT MAX(t.last_activity_at) FROM threads t WHERE t.project_id = p.id)";
+    return (db.stmt(`SELECT p.* FROM projects p WHERE p.id != ?${visible} ORDER BY ${active} DESC NULLS LAST, p.updated_at DESC`).all(WORKSPACE_ID) as unknown as ProjectRow[]).map(projectFromRow);
   },
   get(db: Db, id: string): Project | null {
     const r = db.stmt("SELECT * FROM projects WHERE id = ?").get(id) as unknown as ProjectRow | undefined;

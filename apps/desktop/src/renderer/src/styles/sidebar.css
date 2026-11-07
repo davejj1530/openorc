@@ -1,5 +1,5 @@
-/* The sidebar: its column, window corner, workspace rail, list head, day sections, Orclings and the
-   footer dock. It sits on the tile with no fill of its own, a hairline seam at its edge. Rows have a
+/* The sidebar: its column, window corner, rail of screens, list head, day sections, Orclings and the
+   usage at the list's foot. It sits on the tile with no fill of its own, a hairline seam at its edge. Rows have a
    10px corner; the current row takes --current-row-fill and keeps --navigation-ink. */
 
 .app-shell .workspace-navigation {
@@ -10,15 +10,23 @@
   overflow: hidden;
   background: none;
 }
+/* Hidden, the column keeps its rail and the seam's turn beside it: the list folds away behind the
+   curve, which now meets the work column's top bar. Settings hides it whole, since it takes the
+   column over. */
 .app-shell .workspace-navigation[data-open="false"] {
+  width: calc(var(--width-rail) + var(--radius-lg));
+}
+.app-shell .workspace-navigation[data-open="false"][data-settings] {
   width: 0;
 }
+.workspace-navigation[data-open="false"] :is(.sidebar-header, .sidebar-workspace) > * {
+  visibility: hidden;
+}
 /* The column slides; its parts keep the full width so nothing reflows while it moves. The window
-   corner, Settings' sections and the dock span the rail and the list; the list keeps its own width. */
+   corner and Settings' sections span the rail and the list; the list keeps its own width. */
 .sidebar-header,
 .sidebar-columns,
-.settings-destinations,
-.sidebar-footer {
+.settings-destinations {
   width: var(--width-navigation);
   flex-shrink: 0;
 }
@@ -30,6 +38,7 @@
 /* The window's corner: traffic lights where the OS draws them, the wordmark, then Inbox and the
    sidebar toggle at the right. */
 .sidebar-header {
+  position: relative;
   display: flex;
   align-items: center;
   padding: 0 10px 0 16px;
@@ -57,129 +66,111 @@
   flex: 1;
   min-height: 0;
 }
+/* One hairline in the seam's line runs up between the rail and the list, then turns with a 12px
+   corner and runs across the top of the list to the sidebar's edge: the list reads as a sheet the
+   rail holds. The list starts 6px under it, so the project filter's hover fill never meets it. */
 .sidebar-workspace {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  padding-top: 6px;
+}
+/* It starts a hairline higher, on the row where the work column's top bar draws its own foot. */
+.sidebar-workspace::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--hairline)) 0 0;
+  border-top: var(--hairline) solid var(--line);
+  border-left: var(--hairline) solid var(--line);
+  border-top-left-radius: var(--radius-lg);
+  pointer-events: none;
 }
 /* Settings takes the column over; the app's navigation waits underneath it. */
 .sidebar-columns[hidden] {
   display: none;
 }
 
-/* The workspace rail: All, each project by its initials, then Add project at its foot. It paints
-   nothing; a hairline in the seam's line runs down its right edge. A tile is a 36px r10 square:
-   the chosen one on the current-row fill in navigation ink, the rest drawn by an inset hairline
-   with muted initials, the row hover fill under the pointer. */
-.workspace-rail {
+/* The rail: the app's screens as 36px round buttons with 18px glyphs under the window corner, the
+   first centered on the list's first row, and Settings at its foot in line with the usage. It never
+   scrolls sideways. It paints nothing; the
+   list's edge draws the line beside it. One knob carries the current screen's fill and slides
+   between them. */
+.sidebar-rail {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  width: var(--width-workspace-rail);
-  flex-shrink: 0;
-  min-height: 0;
-  padding: 4px 0 8px;
-}
-.workspace-rail::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: var(--hairline);
-  background: var(--line);
-  pointer-events: none;
-}
-.workspace-rail-list {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  min-height: 0;
-  /* Room for a corner mark and the focus fill at the scroll's edges. */
-  padding-top: 3px;
-  overflow-y: auto;
-  scrollbar-width: none;
-}
-.workspace-rail-item {
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  width: 68px;
-  color: var(--ink-3);
+  width: var(--width-rail);
+  flex-shrink: 0;
+  min-height: 0;
+  padding: 6px 0 8px;
+  overflow: hidden;
 }
-.workspace-rail-tile {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-md);
-  transition:
-    background-color var(--duration-leave) var(--ease-out),
-    color var(--duration-leave) var(--ease-out);
+.sidebar-rail-gap {
+  flex: 1;
 }
-.workspace-rail-initials {
-  font-size: var(--text-base);
-  line-height: 16px;
-  letter-spacing: 0.02em;
+/* A short hairline between the screens and Projects. */
+.sidebar-rail-divider {
+  flex-shrink: 0;
+  width: 20px;
+  height: var(--hairline);
+  margin: 6px 0;
+  background: var(--line);
 }
-.workspace-rail-item:has(.workspace-rail-initials):not([data-selected]) .workspace-rail-tile {
-  box-shadow: inset 0 0 0 1px var(--line);
-}
-.workspace-rail-item:hover .workspace-rail-tile {
-  background-color: var(--surface-2);
+.sidebar-dock-button[data-open] {
   color: var(--ink);
 }
-.workspace-rail-item[data-selected] .workspace-rail-tile {
+/* The projects under Projects, in a pill-shaped plane of their own: round tiles of each project's
+   icon, the chosen one on the plane's current-row fill, its most pressing thread's mark in the
+   corner. Five show at once and the rest scroll, up and down only; a short window shrinks it first
+   so Settings stays at the rail's foot. Add project sits under it. */
+.sidebar-rail-projects {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 1;
+  min-height: 44px;
+  max-height: calc(5 * 36px + 4 * 4px + 8px);
+  margin: 2px 0;
+  padding: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--plane-fill);
+}
+.sidebar-rail-projects-list {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+}
+.sidebar-rail-project {
+  position: relative;
+}
+.sidebar-rail-project[data-selected],
+.sidebar-rail-project[data-selected]:hover {
   background-color: var(--current-row-fill);
   color: var(--navigation-ink);
 }
-/* Keyboard focus takes the tile, not the whole button: the strong fill and full ink. */
-.app-shell .workspace-rail-item:focus-visible {
-  background-color: transparent;
-}
-.app-shell .workspace-rail-item:focus-visible .workspace-rail-tile {
-  background-color: var(--surface-3);
-  color: var(--ink);
-}
-.workspace-rail-label {
-  display: block;
-  max-width: 52px;
-  overflow: hidden;
-  font-size: var(--text-xs);
-  line-height: 16px;
-  text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.workspace-rail-item[data-selected] .workspace-rail-label {
-  color: var(--ink);
-}
-/* The corner mark: the thread rows' own glyph on a disc of the tile ground, cut into the tile's corner. */
-.workspace-rail-mark {
+/* The 16px status on a disc of the well's own fill, inside the round tile's empty corner so the list
+   never grows wider than its tiles. */
+.sidebar-rail-mark {
   position: absolute;
-  top: -3px;
-  right: -3px;
+  top: 0;
+  right: 0;
   display: grid;
   place-items: center;
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
   border-radius: var(--radius-pill);
-  background: var(--bg);
-}
-.workspace-rail-add {
-  flex-shrink: 0;
-  color: var(--ink-3);
+  background: var(--plane-fill);
 }
 
-/* The list's first row names the workspace the rail chose: the project's 14px icon at 60% until
-   hovered, its name at 14px, and a chevron opening its actions. All has no actions. */
+/* The list's first row names whose threads it lists: the project's 14px icon at 60% until hovered,
+   its name at 14px, and a chevron opening the choice of All projects or one project. */
 .sidebar-workspace-name {
   display: flex;
   align-items: center;
@@ -196,6 +187,35 @@
 button.sidebar-workspace-name:hover,
 button.sidebar-workspace-name[data-popup-open] {
   background-color: var(--surface-2);
+}
+/* A screen's title led by its project while the sidebar is hidden: the name opens the project filter. */
+.scope-crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.scope-crumb-project {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 28px;
+  margin-left: -8px;
+  padding: 0 8px;
+  border-radius: var(--radius-md);
+  color: var(--ink-2);
+  transition:
+    background-color var(--duration-leave) var(--ease-out),
+    color var(--duration-leave) var(--ease-out);
+}
+.scope-crumb-project:hover,
+.scope-crumb-project[data-popup-open] {
+  background-color: var(--surface-2);
+  color: var(--ink);
+}
+.scope-crumb-divider {
+  color: var(--ink-4);
 }
 .sidebar-workspace-name-icon {
   display: inline-flex;
@@ -226,6 +246,50 @@ button.sidebar-workspace-name:is(:hover, [data-popup-open]) .sidebar-workspace-n
 .sidebar-workspace-name-chevron {
   flex-shrink: 0;
   color: var(--ink-3);
+}
+/* Its menu: a check on the chosen one, each project's icon and name, and its most pressing thread's
+   mark at the row's end. The actions after them start in the icons' column. Long lists scroll inside
+   the menu. */
+.sidebar-scope-menu {
+  min-width: 220px;
+}
+/* The projects scroll on their own past eight and a half 36px rows, the half row showing there is
+   more, so the chosen project's actions and Add project stay in reach under them. In a short
+   window the list gives way first, down to two rows. */
+.sidebar-scope-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: calc(2 * 36px + 2px);
+  max-height: calc(8.5 * 36px + 8 * 2px);
+}
+.sidebar-scope-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 13px;
+  height: 13px;
+  align-items: center;
+  justify-content: center;
+}
+.sidebar-scope-icon > * {
+  width: 13px;
+  height: 13px;
+}
+.sidebar-scope-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar-scope-mark {
+  display: inline-flex;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+/* The check's 13px and the row's 10px gap. */
+.sidebar-scope-menu .sidebar-scope-action {
+  padding-left: 33px;
 }
 
 /* Settings' sections, in place of the app's navigation. */
@@ -635,15 +699,12 @@ button.browser-empty:hover,
   margin-top: 2px;
 }
 
-/* Footer: one row, the next message's weekly usage first, then the dock at the row's end: the app's
-   screens and Orclings as round buttons, Settings last. One knob carries the current one's fill and
-   slides between them. The row never wraps: the usage slot takes what the dock leaves, and the chip
-   picks the fullest look that fits it, down to a round button the dock's size. */
+/* The list's foot: the next message's weekly usage, its chip in the fullest look that fits, in line
+   with Settings at the rail's foot. The rail's round buttons and their knob follow. */
 .sidebar-footer {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 4px;
+  flex-shrink: 0;
   padding: 6px 10px 10px;
 }
 .sidebar-usage {
@@ -653,13 +714,6 @@ button.browser-empty:hover,
 }
 .sidebar-usage:empty {
   display: none;
-}
-.sidebar-dock {
-  position: relative;
-  isolation: isolate;
-  display: flex;
-  align-items: center;
-  gap: 2px;
 }
 .sidebar-dock-knob {
   position: absolute;
@@ -675,9 +729,10 @@ button.browser-empty:hover,
 }
 .sidebar-dock-button {
   display: grid;
+  flex-shrink: 0;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border-radius: var(--radius-pill);
   color: var(--ink-3);
   transition:
@@ -891,17 +946,38 @@ button.browser-empty:hover,
   left: -0.5px;
   width: 4px;
 }
-/* A hairline seam between the sidebar and the work column, the window's full height. The floating
-   sidebar at 900px and narrower leans on its shadow instead. */
-.app-shell .sidebar-shell::after {
+/* A hairline seam between the sidebar and the work column, from under the window corner, where the
+   list's top edge meets it, to the window's foot. In the corner a divider of its own stands at the
+   same edge, 60% of the corner's height. The floating sidebar at 900px and narrower leans on its
+   shadow instead. */
+.app-shell .sidebar-shell::after,
+.app-shell .sidebar-header::after {
   content: "";
   position: absolute;
-  top: 0;
   right: 0;
-  bottom: 0;
   width: var(--hairline);
   background: var(--line);
   pointer-events: none;
+}
+.app-shell .sidebar-shell::after {
+  top: calc(var(--height-topbar) - var(--hairline));
+  bottom: 0;
+}
+.app-shell .sidebar-header::after {
+  top: 20%;
+  bottom: 20%;
+}
+/* Folded to its rail, the column's seam is the list's curve alone. */
+.app-shell .sidebar-shell[data-open="false"]::after,
+.app-shell .sidebar-shell[data-open="false"] .sidebar-header::after {
+  display: none;
+}
+/* Settings keeps the seam the window's full height beside its one sheet, with no title bar line. */
+.app-shell .sidebar-shell[data-settings]::after {
+  top: 0;
+}
+.app-shell .sidebar-shell[data-settings] .sidebar-header::after {
+  display: none;
 }
 
 /* At 900px and narrower the sidebar floats over the work column: an opaque tile with the one
@@ -913,7 +989,8 @@ button.browser-empty:hover,
   .app-shell .resize-handle[data-edge="sidebar"] {
     display: none;
   }
-  .app-shell .sidebar-shell::after {
+  .app-shell .sidebar-shell::after,
+  .app-shell .sidebar-header::after {
     display: none;
   }
   .app-shell .workspace-navigation,
@@ -946,8 +1023,7 @@ button.browser-empty:hover,
   }
   .sidebar-nav-row[aria-current="page"],
   .sidebar-dock-button[data-current],
-  .orcling-contact[aria-current="page"],
-  .workspace-rail-item[data-selected] .workspace-rail-tile {
+  .orcling-contact[aria-current="page"] {
     outline: 1px solid Highlight;
   }
 }

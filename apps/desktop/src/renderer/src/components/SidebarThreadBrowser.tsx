@@ -3,7 +3,7 @@ import { Menu } from "@base-ui/react/menu";
 import { useQueryClient } from "@tanstack/react-query";
 import { isSubagentThread, WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 import { CoversPreview } from "../lib/browser-preview";
-import { ALL_WORKSPACES, useLayout } from "../lib/layout";
+import { ALL_WORKSPACES, focusedProject, useLayout } from "../lib/layout";
 import {
   type SidebarDayList,
   type SidebarFilter,
@@ -49,9 +49,8 @@ export function useSidebarProjects() {
   const workspace = useLayout((s) => s.workspace);
   useEffect(() => {
     if (!projects.data) return;
-    const { projectId, setProject, workspace: chosen, setWorkspace } = useLayout.getState();
-    if (projectId && projectId !== WORKSPACE_ID && !projects.data.some((p) => p.id === projectId)) setProject(WORKSPACE_ID);
-    // A removed project's threads are gone from the list; the rail goes back to All.
+    const { workspace: chosen, setWorkspace } = useLayout.getState();
+    // A removed project's threads are gone from the list; the filter goes back to All projects.
     if (chosen !== ALL_WORKSPACES && !projects.data.some((p) => p.id === chosen)) setWorkspace(ALL_WORKSPACES);
   }, [projects.data]);
   const all = [WORKSPACE_ID, ...(projects.data ?? []).map((project) => project.id)].sort();
@@ -62,7 +61,8 @@ export function useSidebarProjects() {
 type ChildPages = ReturnType<typeof useChildThreadPages>;
 
 function useSelectedFamily(selected: ThreadSummary | null | undefined, filter: SidebarFilter, pages: readonly (readonly ThreadSummary[] | undefined)[], children: ChildPages) {
-  return useRpc(
+  const offPage = Boolean(selected && !pages.some((page) => page?.some((thread) => thread.id === selected.id)));
+  const family = useRpc(
     "threads.list",
     {
       projectId: selected?.projectId,
@@ -72,10 +72,10 @@ function useSelectedFamily(selected: ThreadSummary | null | undefined, filter: S
       selectedId: selected?.id,
       ...children.params(selected?.projectId),
     },
-    {
-      enabled: Boolean(selected && !pages.some((page) => page?.some((thread) => thread.id === selected.id))),
-    },
+    { enabled: offPage },
   ).data;
+  // Once the pages hold the selection this read stops refreshing but keeps its last answer, which would cover their newer rows.
+  return offPage ? family : undefined;
 }
 
 function withFamily(page: ThreadSummary[] | undefined, family: ThreadSummary[] | undefined, projectIds: readonly string[]): ThreadSummary[] | undefined {
@@ -310,7 +310,7 @@ function Section({ label, count, open, onToggle, children }: { label: string; co
 export function ThreadFilter() {
   const pinned = useLayout((s) => s.pinnedOnly);
   const setPinnedOnly = useLayout((s) => s.setPinnedOnly);
-  const projectId = useLayout((s) => s.projectId);
+  const projectId = useLayout(focusedProject);
   return (
     <Menu.Root>
       <Menu.Trigger render={<IconButton aria-label={`Filter threads${pinned ? ": Pinned threads" : ""}`} size="lg" className={cn("no-drag", pinned && "text-accent-ink")} />}>

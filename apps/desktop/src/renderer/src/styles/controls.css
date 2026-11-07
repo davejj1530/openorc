@@ -273,3 +273,33 @@ label:has(input:is([type="checkbox"], [type="radio"]):focus-visible) {
 .chip[aria-pressed="true"] .chip-count {
   color: color-mix(in srgb, currentColor 60%, transparent);
 }
+
+/* A list that scrolls on its own, with no scrollbar: rows scrolled past an end fade into it over
+   16px. useScrollEdges marks the ends that have more. */
+.scroll-edges {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.scroll-edges::-webkit-scrollbar {
+  display: none;
+}
+.scroll-edges[data-more-start] {
+  mask-image: linear-gradient(to bottom, transparent, #000 16px);
+}
+.scroll-edges[data-more-end] {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
+}
+.scroll-edges[data-more-start][data-more-end] {
+  mask-image: linear-gradient(to bottom, transparent, #000 16px, #000 calc(100% - 16px), transparent);
+}
+/* The same across, for a strip that scrolls sideways. */
+.scroll-edges-x[data-more-start] {
+  mask-image: linear-gradient(to right, transparent, #000 16px);
+}
+.scroll-edges-x[data-more-end] {
+  mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent);
+}
+.scroll-edges-x[data-more-start][data-more-end] {
+  mask-image: linear-gradient(to right, transparent, #000 16px, #000 calc(100% - 16px), transparent);
+}

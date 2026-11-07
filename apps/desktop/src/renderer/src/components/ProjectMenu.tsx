@@ -1,8 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { ContextMenu } from "@base-ui/react/context-menu";
-import { WORKSPACE_ID } from "@openorc/protocol";
 import { CoversPreview } from "../lib/browser-preview";
-import { useLayout } from "../lib/layout";
 import { useRpcMutation } from "../lib/client";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { X } from "./icons";
@@ -77,11 +75,8 @@ export function RemoveProjectDialog({ project, onClose }: { project: { id: strin
             remove.mutate(
               { id: project.id },
               {
-                onSuccess: () => {
-                  const layout = useLayout.getState();
-                  if (layout.projectId === project.id) layout.setProject(WORKSPACE_ID);
-                  onClose();
-                },
+                // The sidebar's filter lets go of a removed project on its own.
+                onSuccess: onClose,
               },
             )
           }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ThreadSummary } from "@openorc/protocol";
 import { threadStatus } from "@openorc/client";
-import { markThread, projectInitials, workspaceMarks, workspaceSummary } from "./workspace-rail";
+import { markThread, workspaceMarks, workspaceSummary } from "./workspace-rail";
 
 const now = Date.now();
 const thread = (id: string, projectId: string, patch: Partial<ThreadSummary> = {}) =>
@@ -21,20 +21,6 @@ const thread = (id: string, projectId: string, patch: Partial<ThreadSummary> = {
     lastActivityAt: now,
     ...patch,
   }) as ThreadSummary;
-
-describe("projectInitials", () => {
-  it.each([
-    ["block8-workspace", "BW"],
-    ["sma-2-mobile", "SM"],
-    ["gradekit", "GR"],
-    ["openorc", "OP"],
-    ["my_cool.app", "MA"],
-    ["two words", "TW"],
-    ["  -leading-and-trailing-  ", "LT"],
-    ["x", "X"],
-    ["", ""],
-  ])("names %j %j", (name, initials) => expect(projectInitials(name)).toBe(initials));
-});
 
 describe("workspaceMarks", () => {
   it("shows a project's most pressing state: needs you, then a failure, then work, then a result waiting", () => {

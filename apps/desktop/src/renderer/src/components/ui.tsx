@@ -277,14 +277,14 @@ export function TooltipProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/** Names a control on hover. Outside a TooltipProvider it keeps its own 400ms delay. */
-export function Tooltip({ label, children }: { label: ReactNode; children: ReactNode }) {
+/** Names a control on hover, above it unless `side` says otherwise. Outside a TooltipProvider it keeps its own 400ms delay. */
+export function Tooltip({ label, side, children }: { label: ReactNode; side?: "top" | "right" | "bottom" | "left"; children: ReactNode }) {
   const grouped = useContext(TooltipGroup);
   const tooltip = (
     <BaseTooltip.Root>
       <BaseTooltip.Trigger render={<span className="inline-flex" />}>{children}</BaseTooltip.Trigger>
       <BaseTooltip.Portal>
-        <BaseTooltip.Positioner sideOffset={6}>
+        <BaseTooltip.Positioner sideOffset={6} {...(side ? { side } : {})}>
           <BaseTooltip.Popup ref={floatingGround} className="tooltip-popup">
             {label}
           </BaseTooltip.Popup>

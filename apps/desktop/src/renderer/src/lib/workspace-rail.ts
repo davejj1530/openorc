@@ -4,25 +4,13 @@ import { isSubagentThread, WORKSPACE_ID, type ThreadSummary } from "@openorc/pro
 type StatusKind = ThreadStatus["kind"];
 
 /**
- * The rail's marks from most to least pressing: a thread that needs you, a failure, work under way, a result waiting,
+ * A project's marks in the filter, from most to least pressing: a thread that needs you, a failure, work under way, a result waiting,
  * then commands an agent left running after its turn.
  */
 const PRIORITY: readonly StatusKind[] = ["waiting", "failed", "running", "unread", "background"];
 
-/** How the tooltip counts each kind of thread. */
+/** How a project's description counts each kind of thread. */
 const SUMMARY: Record<StatusKind, string> = { waiting: "needs you", failed: "failed", running: "working", unread: "unread", background: "with commands running" };
-
-/**
- * A project's two letters on the rail: the first letters of its name's first and last parts (block8-workspace is BW),
- * or the first two letters of a name in one part (gradekit is GR).
- */
-export function projectInitials(name: string): string {
-  const parts = name.split(/[-_.\s]+/).filter(Boolean);
-  const first = parts[0] ?? "";
-  const last = parts.at(-1) ?? "";
-  const initials = parts.length > 1 ? `${[...first][0] ?? ""}${[...last][0] ?? ""}` : [...first].slice(0, 2).join("");
-  return initials.toUpperCase();
-}
 
 /** What a project's threads have to say: how many of each kind, and the most pressing kind the corner shows. */
 export type WorkspaceMark = { kind: StatusKind; counts: Partial<Record<StatusKind, number>> };

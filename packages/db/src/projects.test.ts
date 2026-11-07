@@ -1,6 +1,6 @@
 import { afterEach, expect, it } from "vitest";
 import { Db } from "./database.js";
-import { projects } from "./repos.js";
+import { projects, threads } from "./repos.js";
 
 const opened: Db[] = [];
 afterEach(() => {
@@ -45,4 +45,24 @@ it("leaves a project's place in the list when only its Claude accounts change, a
   expect(order()).toEqual(["Second", "First"]);
   projects.updateSettings(db, first.id, { branchPrefix: "feature" });
   expect(order()).toEqual(["First", "Second"]);
+});
+
+it("orders projects by their threads' last activity, and puts projects without threads after them", () => {
+  const db = fixture();
+  const insert = (name: string) => projects.insert(db, { name, rootPath: `/tmp/${name}-project`, gitRemote: null, defaultBranch: "main", settings: {} });
+  const older = insert("Older");
+  const newer = insert("Newer");
+  const empty = insert("Empty");
+  const active = (projectId: string, at: number) => {
+    const thread = threads.insert(db, { projectId, title: "Work", agent: "claude", model: null, mode: "act", permissionMode: "trusted", workspaceMode: "current" });
+    db.stmt("UPDATE threads SET last_activity_at = ? WHERE id = ?").run(at, thread.id);
+  };
+  active(older.id, 1);
+  active(newer.id, 2);
+  // Edited after every thread's activity, still behind the projects that have threads.
+  db.stmt("UPDATE projects SET updated_at = ? WHERE id = ?").run(10, empty.id);
+  const order = () => projects.list(db).map((project) => project.name);
+  expect(order()).toEqual(["Newer", "Older", "Empty"]);
+  active(older.id, 3);
+  expect(order()).toEqual(["Older", "Newer", "Empty"]);
 });

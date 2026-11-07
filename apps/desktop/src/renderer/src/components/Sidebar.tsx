@@ -1,7 +1,8 @@
 import { useContext } from "react";
-import { ALL_WORKSPACES, useLayout } from "../lib/layout";
+import { focusedProject, useLayout } from "../lib/layout";
 import { newThread, useRouter } from "../lib/router";
 import { useTrafficLights } from "../lib/window";
+import { useNavigationGone } from "../lib/navigation-column";
 import { useProjectIconChanges } from "../lib/project-icons";
 import { OrclingsRailContext, useOrclingsRail } from "../lib/orclings-rail";
 import { useOrclings } from "../lib/orclings";
@@ -13,42 +14,50 @@ import { SidebarListHead, Wordmark } from "./SidebarListHead";
 import { NewOrclingButton, SidebarOrclings } from "./SidebarOrclings";
 import { SidebarSettings } from "./SidebarSettings";
 import { SidebarThreadBrowser, ThreadFilter } from "./SidebarThreadBrowser";
-import { WorkspaceName, WorkspaceRail } from "./SidebarWorkspaces";
+import { SidebarRail } from "./SidebarRail";
+import { ProjectFilter } from "./SidebarWorkspaces";
 import { IconButton, Tooltip } from "./ui";
 import { WindowCorner } from "./WindowCorner";
 
 /**
- * One navigation column shared by every destination and every project: the window corner and the dock span it, and
- * between them the workspace rail sits beside the thread list it scopes.
+ * One navigation column shared by every destination and every project: the window corner spans it, and under it the
+ * rail of the app's screens sits beside the thread list, which names whose threads it lists and ends in the usage.
+ * Hiding the sidebar folds the list and the corner away and keeps the rail.
  */
 export function Sidebar() {
   useProjectIconChanges();
   const route = useRouter((s) => s.route);
   const open = useLayout((s) => s.sidebarOpen);
-  const projectId = useLayout((s) => s.projectId);
-  const workspace = useLayout((s) => s.workspace);
+  const gone = useNavigationGone();
+  // A new thread starts in the project the list shows; on All projects, in the one last chosen for a new thread.
+  const projectId = useLayout(focusedProject);
   const trafficLights = useTrafficLights();
   const nativeOrclings = useOrclingsRail(route, useOrclings());
   const orclings = useContext(OrclingsRailContext) ?? nativeOrclings;
-  // A new thread starts in the workspace the rail shows, or on All in the app's current project.
-  const newThreadProject = workspace === ALL_WORKSPACES ? projectId : workspace;
-  const openThreads = (project = newThreadProject) => nativeOrclings.openThreads(() => newThread(project ?? undefined));
+  const openThreads = (project = projectId) => nativeOrclings.openThreads(() => newThread(project ?? undefined));
   const toggleOrclings = () => (orclings.active ? openThreads() : orclings.open());
   const chooseWorkspace = (id: string) => {
     useLayout.getState().setWorkspace(id);
-    // Choosing a workspace shows its threads, in place of the Orclings: a new thread there, not in the one it left.
-    if (orclings.active) openThreads(id === ALL_WORKSPACES ? projectId : id);
+    // Choosing a project shows its threads, in place of the Orclings: a new thread there, not in the one it left.
+    if (orclings.active) openThreads(focusedProject({ workspace: id }));
   };
   return (
     <>
-      <aside className="sidebar-shell workspace-navigation h-full shrink-0" data-open={open} data-traffic-lights={trafficLights} aria-hidden={!open} inert={!open}>
+      <aside
+        className="sidebar-shell workspace-navigation h-full shrink-0"
+        data-open={open}
+        data-settings={route.view === "settings" || undefined}
+        data-traffic-lights={trafficLights}
+        aria-hidden={gone}
+        inert={gone}
+      >
         <SidebarHeader />
         {route.view === "settings" ? <SidebarSettings route={route} /> : null}
         {/* Settings takes the column over; the app's navigation keeps its pages, filters and scroll for the way back. */}
         <div className="sidebar-columns" hidden={route.view === "settings"}>
-          <WorkspaceRail onSelect={chooseWorkspace} />
+          <SidebarRail route={route} orclings={{ active: orclings.active, toggle: toggleOrclings }} onProject={chooseWorkspace} />
           <div className="sidebar-workspace">
-            {orclings.active ? null : <WorkspaceName />}
+            {orclings.active ? null : <ProjectFilter onSelect={chooseWorkspace} />}
             <SidebarListHead
               tools={
                 orclings.active ? (
@@ -56,7 +65,7 @@ export function Sidebar() {
                 ) : (
                   <>
                     <ThreadFilter />
-                    <NewThreadButton projectId={newThreadProject} />
+                    <NewThreadButton projectId={projectId} />
                   </>
                 )
               }
@@ -66,9 +75,9 @@ export function Sidebar() {
               <SidebarThreadBrowser />
             </div>
             {orclings.active ? <SidebarOrclings route={route} /> : null}
+            <SidebarFooter />
           </div>
         </div>
-        <SidebarFooter route={route} projectId={projectId} orclings={{ active: orclings.active, toggle: toggleOrclings }} />
       </aside>
       {open ? <ResizeHandle edge="sidebar" /> : null}
     </>

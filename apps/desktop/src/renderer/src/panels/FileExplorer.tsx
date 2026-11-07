@@ -1,13 +1,14 @@
-import { useDeferredValue, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import type { FileEntry, FileScope, FolderPath } from "@openorc/protocol";
 import { FileGlyph } from "../components/FileGlyph";
 import { ChevronRight, Folder, Search } from "../components/icons";
 import { Input } from "../components/ui";
 import { ROOT_FOLDERS, relativeFilePath, useFileExplorer } from "../lib/file-explorer";
-import { filesKey, useFilesFocus } from "../lib/files-tool";
+import { EMPTY_SEARCH, filesKey, useFilesFocus, useFilesToolState, type FilesTool } from "../lib/files-tool";
 import { useLayout } from "../lib/layout";
 import { useRpc } from "../lib/client";
 import { FileExplorerToolbar } from "./FileExplorerToolbar";
+import { bestResult, FileSearchResults, firstResult } from "./FileSearch";
 
 interface ExplorerProps {
   scope: FileScope;
@@ -138,34 +139,11 @@ function TreeEntry({ entry, level, tree }: { entry: FileEntry; level: number; tr
   );
 }
 
-function FilteredFiles({ scope, query }: { scope: FileScope; query: string }) {
-  const deferred = useDeferredValue(query);
-  const files = useRpc("files.search", { scope, query: deferred, limit: 50 });
-  return (
-    <div className="file-tree-results">
-      {files.isLoading ? (
-        <p role="status" className="file-tree-notice">
-          Searching…
-        </p>
-      ) : null}
-      {files.error ? (
-        <p role="alert" className="file-tree-notice">
-          {files.error.message}
-        </p>
-      ) : null}
-      {files.data?.length === 0 ? <p className="file-tree-notice">No files found.</p> : null}
-      {files.data?.map((path) => (
-        <button key={path} className="file-tree-result" title={path} onClick={() => useLayout.getState().openFile({ path, scope })}>
-          <FileGlyph path={path} size={14} />
-          <span className="min-w-0">
-            <span className="block truncate">{path.split("/").at(-1)}</span>
-            <span className="block truncate text-xs text-ink-3">{path}</span>
-          </span>
-        </button>
-      ))}
-      {files.data?.length === 50 ? <p className="file-tree-notice">First 50 matches. Keep typing to narrow the results.</p> : null}
-    </div>
-  );
+/** The Files tool's search is the conversation's, kept between showings and set by ⌘P; the tree beside an open file keeps its own. */
+function useExplorerSearch(scope: FileScope, beside: boolean): [FilesTool, (change: Partial<FilesTool>) => void] {
+  const shared = useFilesToolState(scope);
+  const [own, setOwn] = useState(EMPTY_SEARCH);
+  return beside ? [own, (change) => setOwn((current) => ({ ...current, ...change }))] : shared;
 }
 
 export function FileExplorer({ scope, directory, selected = "" }: ExplorerProps) {
@@ -175,8 +153,10 @@ export function FileExplorer({ scope, directory, selected = "" }: ExplorerProps)
   const path = relativeFilePath(selected, root);
   const expanded = useFileExplorer((state) => state.folders[key]) ?? ROOT_FOLDERS;
   const [focused, focus] = useState("");
-  const [filter, setFilter] = useState("");
+  const [search, update] = useExplorerSearch(scope, Boolean(selected));
   const input = useRef<HTMLInputElement>(null);
+  const results = useRef<HTMLDivElement>(null);
+  const rootName = root.split(/[\\/]/).filter(Boolean).at(-1) ?? "Workspace";
   useFilesFocus(input, !selected);
   useEffect(() => {
     if (path) useFileExplorer.getState().reveal(key, path);
@@ -200,24 +180,28 @@ export function FileExplorer({ scope, directory, selected = "" }: ExplorerProps)
           <Search size={13} />
           <Input
             ref={input}
-            aria-label="Filter files"
-            placeholder="Filter files…"
-            value={filter}
+            aria-label="Search files"
+            placeholder="Search files…"
+            value={search.query}
             maxLength={500}
-            onChange={(event) => setFilter(event.target.value)}
+            onChange={(event) => update({ query: event.target.value })}
             onKeyDown={(event) => {
-              if (event.key === "Escape") setFilter("");
+              if (event.key === "Escape" && search.query) update({ query: "" });
+              else if (event.key === "Enter" && !event.nativeEvent.isComposing) bestResult(results.current)?.click();
+              else if (event.key === "ArrowDown") firstResult(results.current)?.focus();
+              else return;
+              event.preventDefault();
             }}
           />
         </div>
         <div className="file-explorer-scroll">
-          {filter.trim() ? (
-            <FilteredFiles scope={scope} query={filter} />
+          {search.query.trim() ? (
+            <FileSearchResults ref={results} scope={scope} root={rootName} folders={expanded} tool={search} update={update} onBack={() => input.current?.focus()} />
           ) : (
             <div role="tree" aria-label="Project files" onKeyDown={(event) => treeKey(event, tree)}>
               <div
                 role="treeitem"
-                aria-label={root.split(/[\\/]/).filter(Boolean).at(-1) ?? "Workspace"}
+                aria-label={rootName}
                 aria-level={1}
                 aria-expanded={expanded.includes("")}
                 data-path=""
@@ -235,7 +219,7 @@ export function FileExplorer({ scope, directory, selected = "" }: ExplorerProps)
                 <div className="file-tree-row file-tree-root" title={root}>
                   <ChevronRight size={12} className={expanded.includes("") ? "rotate-90" : ""} />
                   <Folder size={14} className="file-tree-folder" />
-                  <span className="truncate">{root.split(/[\\/]/).filter(Boolean).at(-1) ?? "Workspace"}</span>
+                  <span className="truncate">{rootName}</span>
                 </div>
                 {expanded.includes("") ? (
                   <div role="group">

@@ -197,21 +197,53 @@
   color: var(--ink-3);
   overflow-wrap: anywhere;
 }
-.file-tree-result {
+/* Search narrows the tree in place: its folders hold open and do nothing, its files open. */
+.file-search-branch {
+  pointer-events: none;
+}
+.file-search-file {
+  width: 100%;
+  text-align: left;
+  outline: none;
+}
+.file-search-file:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.file-search-hit {
+  color: var(--mention-ink);
+}
+.file-search-section {
+  margin-top: 10px;
+}
+.file-search-heading {
   display: flex;
   align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 6px 8px;
-  text-align: left;
-  border-radius: var(--radius-md);
-  font-size: var(--text-sm);
+  gap: 6px;
+  height: 28px;
+  padding: 0 4px 0 8px;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
 }
-.file-tree-result > svg {
-  flex-shrink: 0;
+.file-search-toggles {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
 }
-.file-tree-result:hover {
-  background: var(--surface-2);
+.file-search-section > .file-search-file {
+  padding-left: 8px;
+}
+.file-search-folder {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+.file-search-lines {
+  padding: 0 8px;
 }
 .file-explorer-resize {
   grid-area: 1 / 2 / 3 / 3;

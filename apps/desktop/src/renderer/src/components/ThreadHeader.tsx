@@ -106,7 +106,7 @@ export function ThreadHeader({
         <span className="thread-header-project" title={p.rootPath}>
           {p.name}
         </span>
-        {t.agent === "claude" && !isSubagentThread(t) ? <ThreadClaudeAccount thread={t} /> : null}
+        {t.agent === "claude" && !isSubagentThread(t) ? <ThreadClaudeAccount thread={t} project={p} /> : null}
         <ThreadFacts thread={t} />
       </span>
     </TopBar>

@@ -75,7 +75,7 @@ function AutoSwitch() {
     <div className="settings-group">
       <Toggle
         label="Switch accounts at usage limits"
-        hint="When a thread's account reaches its usage limit, the thread continues on the account with the most 5-hour usage left."
+        hint="When a thread's account reaches its usage limit, the thread continues on the account with the most 5-hour usage left. Projects with their own accounts use their own setting."
         checked={preference.value.claudeAccountAutoSwitch ?? false}
         disabled={preference.disabled}
         onChange={(claudeAccountAutoSwitch) => void preference.commit({ claudeAccountAutoSwitch })}

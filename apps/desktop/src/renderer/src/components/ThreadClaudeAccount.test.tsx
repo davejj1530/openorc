@@ -71,3 +71,31 @@ it("waits for the turn to end, and stays a plain name with one account or for an
   show();
   expect([screen.queryByRole("button", { name: /Claude account/ }), screen.getByTitle("Claude account: Work").textContent]).toEqual([null, "Work"]);
 });
+
+it("offers only the accounts a project uses, keeps the thread's own apart when it is not one, and opens the project's accounts", async () => {
+  const { useRouter } = await import("../lib/router");
+  accounts.list = [account("work", "Work"), account("personal", "Personal"), account("client", "Client")];
+  const project = {
+    id: "p1",
+    name: "block8-workspace",
+    settings: {
+      setupScript: null,
+      worktreeInclude: [],
+      branchPrefix: "openorc",
+      detectedConfigs: [],
+      claudeAccounts: { only: true, accountIds: ["personal", "client"], defaultId: "personal", autoSwitch: false },
+    },
+  };
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <ClaudeAccountScope id="work">
+        <ThreadClaudeAccount thread={{ id: "thread", agent: "claude", activity: "idle", claudeAccountId: "work" } as ThreadSummary} project={project} />
+      </ClaudeAccountScope>
+    </QueryClientProvider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Claude account: Work" }));
+  await screen.findByText("block8-workspace uses 2 accounts");
+  expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual(["Personal", "Client", "Worknot in this project", "Project accounts", "Manage accounts"]);
+  fireEvent.click(screen.getByRole("menuitem", { name: "Project accounts" }));
+  expect(useRouter.getState().route).toEqual({ view: "project", projectId: "p1", tab: "settings" });
+});

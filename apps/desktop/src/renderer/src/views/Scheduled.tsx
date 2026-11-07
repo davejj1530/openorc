@@ -196,7 +196,7 @@ function ScheduleDialog({
               </Select>
             </Field>
           )}
-          {usesClaude ? <ClaudeAccountPicker accounts={accounts.data} value={claudeAccountId} onChange={setAccount} disabled={pending} /> : null}
+          {usesClaude ? <ClaudeAccountPicker accounts={accounts} value={claudeAccountId} onChange={setAccount} disabled={pending} /> : null}
           <Field label="Name">
             <Input autoFocus value={title} disabled={pending} onChange={(event) => setTitle(event.target.value)} placeholder="Nightly dependency check" />
           </Field>

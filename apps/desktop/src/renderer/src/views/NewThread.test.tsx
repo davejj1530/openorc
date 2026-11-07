@@ -315,6 +315,32 @@ it("keeps a chosen third Claude account in the draft and sends it when starting"
   await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ agent: "claude", claudeAccountId: "client", prompt: "Use the client account" })));
 });
 
+it("offers only the Claude accounts its project uses, starting on the project's default when the draft's is not one of them", async () => {
+  models = [{ id: "claude-fixture", label: "Claude", agent: "claude", isDefault: true, efforts: [], defaultEffort: null }];
+  system.harnesses = system.harnesses.map((row) => ({ ...row, state: "ready" }));
+  projects[0]!.settings.claudeAccounts = { only: true, accountIds: ["personal", "client"], defaultId: "client", autoSwitch: false };
+  // Chosen before the project narrowed its accounts.
+  writeNewThreadDraft({
+    ...readNewThreadDraft("p1"),
+    claudeAccountId: "work",
+    prompt: "Use the project's account",
+    target: { kind: "model", choice: { agent: "claude", model: "claude-fixture", effort: null } },
+  });
+  render(<NewThread projectId="p1" />);
+  const picker = screen.getByRole<HTMLSelectElement>("combobox", { name: "Claude account" });
+  expect(picker.value).toBe("client");
+  expect([...picker.options].map((option) => option.value)).toEqual(["personal", "client"]);
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ claudeAccountId: "client", prompt: "Use the project's account" })));
+  cleanup();
+  start.mockClear();
+
+  // A draft's account the project uses stays chosen.
+  writeNewThreadDraft({ ...readNewThreadDraft("p1"), claudeAccountId: "personal", prompt: "Use personal" });
+  render(<NewThread projectId="p1" />);
+  expect(screen.getByRole<HTMLSelectElement>("combobox", { name: "Claude account" }).value).toBe("personal");
+});
+
 it.each([
   { name: "the core's default harness", defaultHarness: "claude", onboarding: null, agent: "claude" },
   { name: "the first signed-in harness without one", defaultHarness: null, onboarding: null, agent: "codex" },

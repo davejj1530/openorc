@@ -172,6 +172,32 @@ it("offers the other signed-in Claude accounts after a usage limit, and goes on 
   );
 });
 
+it("offers only the accounts the thread's project uses after a usage limit, and says when every one of them is at its limit", async () => {
+  const { useRouter } = await import("../lib/router");
+  const account = (id: string, name: string, status: string) => ({ id, name, kind: "managed", enabled: true, createdAt: 1, status, email: null, organization: null, message: null });
+  const accounts = (client: string) => ({ defaultId: "work", accounts: [account("work", "Work", "ready"), account("personal", "Personal", "ready"), account("client", "Client", client)] });
+  const claudeAccounts = { only: true, accountIds: ["work", "client"], defaultId: "work", autoSwitch: false };
+  queries.set("projects.get", { ...project, settings: { setupScript: null, worktreeInclude: [], branchPrefix: "openorc", detectedConfigs: [], claudeAccounts } });
+  const session = { status: "error", message: "You've hit your 5-hour limit", recovery: { kind: "usage", provider: "claude" } } as const;
+  try {
+    queries.set("claude.accounts.list", accounts("ready"));
+    await open({ thread: { agent: "claude", model: "opus", claudeAccountId: "work", session }, runs: [{ id: "A", agent: "claude", live: false }] });
+    expect(screen.getByRole("button", { name: "Continue with Client" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Personal/ })).toBeNull();
+    expect(screen.queryByText(/Every account this project uses/)).toBeNull();
+    cleanup();
+
+    queries.set("claude.accounts.list", accounts("signed_out"));
+    await open({ thread: { agent: "claude", model: "opus", claudeAccountId: "work", session }, runs: [{ id: "A", agent: "claude", live: false }] });
+    expect(screen.queryByRole("button", { name: /Continue with/ })).toBeNull();
+    expect(screen.getByText(/Every account this project uses is at its limit\./)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Project accounts" }));
+    expect(useRouter.getState().route).toEqual({ view: "project", projectId: "project", tab: "settings" });
+  } finally {
+    queries.delete("projects.get");
+  }
+});
+
 it("holds a cloud turn whose sign-in the cloud lacks, offers that sign-in in place, and sends once it is ready", async () => {
   const cloud = { provider: "vercel", state: "ready", step: null, setup: false, error: null } as const;
   const codex = { kind: "codex", label: "Codex", way: "browser", error: null } as const;

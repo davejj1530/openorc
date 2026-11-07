@@ -1,5 +1,15 @@
-import { newThreadChoice, newThreadWorkspaceMode, targetModel, type CloudTurnWho, type ModelChoice as Choice, type NewThreadDraft, type NewThreadPlace } from "@openorc/client";
-import { WORKSPACE_ID, type Project } from "@openorc/protocol";
+import {
+  newThreadChoice,
+  newThreadWorkspaceMode,
+  offeredAccount,
+  projectAccountChoice,
+  targetModel,
+  type CloudTurnWho,
+  type ModelChoice as Choice,
+  type NewThreadDraft,
+  type NewThreadPlace,
+} from "@openorc/client";
+import { WORKSPACE_ID, type ClaudeAccounts, type Project } from "@openorc/protocol";
 import { useEffect, useRef, useState } from "react";
 import { ClaudeAccountPicker } from "../components/ClaudeAccountPicker";
 import { useCloudSignInGate } from "../components/CloudSignInOffer";
@@ -81,6 +91,18 @@ export function NewThread({ projectId }: { projectId?: string }) {
   );
 }
 
+/**
+ * The Claude accounts a new thread in the project can choose, the app's or the project's own, and the one it starts on:
+ * an Orcling's own, else the draft's while the project uses it, else the project's default.
+ */
+function useNewThreadAccount(projects: Project[] | undefined, projectId: string, drafted: string | undefined, orcling: string | undefined) {
+  const list = useRpc("claude.accounts.list", {});
+  const project = projects?.find((each) => each.id === projectId);
+  const choice = list.data ? projectAccountChoice(project, list.data) : undefined;
+  const choices: ClaudeAccounts | undefined = choice && { accounts: choice.accounts, defaultId: choice.defaultId };
+  return { list, choices, claudeAccountId: orcling ?? offeredAccount(choice, drafted) ?? choice?.defaultId ?? "claude-cli" };
+}
+
 /** Who a new cloud thread's first turn signs in as; null for one that starts on this Mac. */
 function newCloudTurn(mode: NewThreadPlace, choice: Choice | null, claudeAccountId: string, cloud: NewThreadCloud): CloudTurnWho | null {
   return mode === "cloud" && choice ? { agent: choice.agent, claudeAccountId, model: choice.model, brain: cloud.brain, local: cloud.local } : null;
@@ -111,11 +133,10 @@ function NewThreadProject({
   const isWorkspace = projectId === WORKSPACE_ID;
   const git = useProjectGit(projectId);
   const [draft, setDraft] = useState(() => readNewThreadDraft(projectId));
-  const accounts = useRpc("claude.accounts.list", {});
   const orclings = useOrclings();
   // An Orcling runs on its own account; the account chosen here is for models.
   const orcling = orclingById(orclings, draft.target.kind === "orcling" ? draft.target.orclingId : null);
-  const claudeAccountId = orcling?.claudeAccountId ?? draft.claudeAccountId ?? accounts.data?.defaultId ?? "claude-cli";
+  const { list: accounts, choices: accountChoices, claudeAccountId } = useNewThreadAccount(projects, projectId, draft.claudeAccountId, orcling?.claudeAccountId);
   const info = useRpc("system.info", { claudeAccountId });
   const models = useRpc("agents.models", { claudeAccountId }, { staleTime: 5 * 60_000 });
   const settings = useRpc("app.settings.get", {});
@@ -271,7 +292,7 @@ function NewThreadProject({
                   onMode={(workspace) => changeDraft({ workspace })}
                   account={
                     usesClaude && !orcling ? (
-                      <ClaudeAccountPicker compact accounts={accounts.data} value={claudeAccountId} onChange={(claudeAccountId) => changeDraft({ claudeAccountId })} disabled={start.isPending} />
+                      <ClaudeAccountPicker compact accounts={accountChoices} value={claudeAccountId} onChange={(claudeAccountId) => changeDraft({ claudeAccountId })} disabled={start.isPending} />
                     ) : null
                   }
                 />

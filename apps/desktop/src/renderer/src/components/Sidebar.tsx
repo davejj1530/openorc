@@ -55,7 +55,7 @@ export function Sidebar() {
         {route.view === "settings" ? <SidebarSettings route={route} /> : null}
         {/* Settings takes the column over; the app's navigation keeps its pages, filters and scroll for the way back. */}
         <div className="sidebar-columns" hidden={route.view === "settings"}>
-          <SidebarRail route={route} orclings={{ active: orclings.active, toggle: toggleOrclings }} onProject={chooseWorkspace} />
+          <SidebarRail route={route} orclings={{ active: orclings.active, toggle: toggleOrclings }} onProject={chooseWorkspace} folded={!open} projectId={projectId} />
           <div className="sidebar-workspace">
             {orclings.active ? null : <ProjectFilter onSelect={chooseWorkspace} />}
             <SidebarListHead

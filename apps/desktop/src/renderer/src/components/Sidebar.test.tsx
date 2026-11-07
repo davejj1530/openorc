@@ -744,3 +744,23 @@ it("prunes deleted thread folds while keeping live and project folds", async () 
   expect(useLayout.getState().collapsed).toContain(`thread-closed:${kept}`);
   expect(useLayout.getState().collapsed).toContain("project:kept");
 });
+
+it("keeps the rail while the sidebar is hidden, with New thread at its top for the focused project", () => {
+  fixture.projects = [{ id: "notes", name: "notes", rootPath: "/projects/notes" }];
+  useLayout.setState({ sidebarOpen: false, workspace: "notes" });
+  useRouter.setState({ route: { view: "tasks" }, history: [], future: [], threadIds: [] });
+  mountSidebar();
+  const rail = screen.getByRole("navigation", { name: "Screens" });
+  expect(rail.closest("[inert]")).toBeNull();
+  const buttons = within(rail)
+    .getAllByRole("button")
+    .map((button) => button.getAttribute("aria-label"));
+  expect(buttons.slice(0, 2)).toEqual(["New thread", "Tasks"]);
+  fireEvent.click(within(rail).getByRole("button", { name: "New thread" }));
+  expect(useRouter.getState().route).toMatchObject({ view: "newthread", projectId: "notes" });
+});
+
+it("leaves New thread to the list's head while the sidebar shows", () => {
+  mountSidebar();
+  expect(within(screen.getByRole("navigation", { name: "Screens" })).queryByRole("button", { name: "New thread" })).toBeNull();
+});

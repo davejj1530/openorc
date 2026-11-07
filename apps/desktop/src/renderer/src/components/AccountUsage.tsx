@@ -9,6 +9,7 @@ import { savedComposerAccount, useComposerAccount, type ComposerAccount } from "
 import { useRouter } from "../lib/router";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { HarnessLogo } from "./HarnessLogo";
+import { Tooltip } from "./ui";
 
 type UsageAccount = { provider: ProviderUsage["provider"]; claudeAccountId?: string; name: string };
 
@@ -163,11 +164,11 @@ const LOOKS = ["full", "short", "icon"] as const;
  * The fullest look of the chip its slot has room for: "64% left", then "64%" with its ring, then the ring alone as a
  * round button like the dock's. Each look is measured as the chip draws it, so any font and any share fits exactly.
  */
-function useChipLook(chip: RefObject<HTMLButtonElement | null>, content: string): void {
+function useChipLook(chip: RefObject<HTMLButtonElement | null>, content: string, enabled: boolean): void {
   useLayoutEffect(() => {
     const node = chip.current;
     const slot = node?.parentElement;
-    if (!node || !slot) return;
+    if (!enabled || !node || !slot) return;
     const fit = () => {
       const room = slot.getBoundingClientRect().width;
       for (const look of LOOKS) {
@@ -181,15 +182,40 @@ function useChipLook(chip: RefObject<HTMLButtonElement | null>, content: string)
     // The interface font can arrive after the first measure.
     void document.fonts?.ready.then(fit);
     return () => observer.disconnect();
-  }, [chip, content]);
+  }, [chip, content, enabled]);
+}
+
+/** Where the table opens: above the footer's chip, or beside the rail's ring. */
+const CHIP_PLACE = { side: "top", align: "start", sideOffset: 6 } as const;
+const RAIL_PLACE = { side: "right", align: "end", sideOffset: 10 } as const;
+
+/** What opens the table: the footer's chip in the look that fits, or the ring alone as one of the rail's buttons. */
+function UsageTrigger({ chip, rail, left, shown, name }: { chip: RefObject<HTMLButtonElement | null>; rail: boolean; left: number; shown: number; name: string }) {
+  const label = `${name}: ${shown}% left this week`;
+  if (rail)
+    return (
+      <Tooltip label={`${shown}% left this week`} side="right">
+        <Popover.Trigger ref={chip} className="sidebar-dock-button account-usage-rail no-drag" data-low={shown <= 10 || undefined} aria-label={label}>
+          <LeftRing left={left} />
+        </Popover.Trigger>
+      </Tooltip>
+    );
+  return (
+    <Popover.Trigger ref={chip} className="account-usage-chip no-drag" data-low={shown <= 10 || undefined} aria-label={label}>
+      <LeftRing left={left} />
+      <span className="account-usage-value tabular">{shown}%</span>
+      <span className="account-usage-label">left</span>
+    </Popover.Trigger>
+  );
 }
 
 /**
  * What is left this week of the account the next message would spend, first in the sidebar's footer row. It opens a
  * table of every account's limits out of the chip, the way the composer's pickers open out of theirs. Accounts
- * without a weekly limit show nothing.
+ * without a weekly limit show nothing. On the `rail`, while the list is folded away, it is the ring alone as one of
+ * the rail's buttons, and the table opens beside the rail.
  */
-export function AccountUsage() {
+export function AccountUsage({ rail = false }: { rail?: boolean }) {
   const account = useUsageAccount();
   const chip = useRef<HTMLButtonElement>(null);
   const usage = useRpc(
@@ -200,18 +226,14 @@ export function AccountUsage() {
   const week = account && usage.data ? weeklyWindow(usage.data.windows) : null;
   const left = week ? percentLeft(week) : null;
   const shown = left === null ? null : Math.round(left);
-  useChipLook(chip, `${account?.name}:${shown}`);
+  useChipLook(chip, `${account?.name}:${shown}`, !rail);
   if (!account || left === null || shown === null) return null;
   return (
     <Popover.Root>
-      <Popover.Trigger ref={chip} className="account-usage-chip no-drag" data-low={shown <= 10 || undefined} aria-label={`${account.name}: ${shown}% left this week`}>
-        <LeftRing left={left} />
-        <span className="account-usage-value tabular">{shown}%</span>
-        <span className="account-usage-label">left</span>
-      </Popover.Trigger>
+      <UsageTrigger chip={chip} rail={rail} left={left} shown={shown} name={account.name} />
       <Popover.Portal>
         <CoversPreview />
-        <Popover.Positioner side="top" align="start" sideOffset={6} collisionPadding={8} className="z-50">
+        <Popover.Positioner {...(rail ? RAIL_PLACE : CHIP_PLACE)} collisionPadding={8} className="z-50">
           <Popover.Popup ref={floatingGround} className="floating-popover account-usage-popup" aria-label="Usage">
             <UsageTable current={limitsId(account)} />
           </Popover.Popup>

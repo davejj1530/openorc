@@ -817,6 +817,14 @@ button.browser-empty:hover,
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
+/* On the folded rail the ring alone is a rail button, at the rail's glyph size; a low week turns it. */
+.account-usage-rail .account-usage-ring {
+  width: 18px;
+  height: 18px;
+}
+.account-usage-rail[data-low] .account-usage-fill {
+  stroke: var(--attention);
+}
 .account-usage-ring {
   flex-shrink: 0;
   width: 16px;
@@ -920,7 +928,15 @@ button.browser-empty:hover,
   align-items: center;
   column-gap: 8px;
 }
-.usage-table-limit .account-usage-ring {
+.usage-table-limit /* On the folded rail the ring alone is a rail button, at the rail's glyph size; a low week turns it. */
+.account-usage-rail .account-usage-ring {
+  width: 18px;
+  height: 18px;
+}
+.account-usage-rail[data-low] .account-usage-fill {
+  stroke: var(--attention);
+}
+.account-usage-ring {
   grid-row: span 2;
 }
 .usage-table-value {

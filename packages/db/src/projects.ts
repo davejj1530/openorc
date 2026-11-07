@@ -15,7 +15,7 @@ interface ProjectRow {
   updated_at: number;
 }
 
-const defaultSettings: ProjectSettings = { setupScript: null, worktreeInclude: [".env", ".env.*"], branchPrefix: "openorc", detectedConfigs: [] };
+const defaultSettings: ProjectSettings = { setupScript: null, worktreeInclude: [".env", ".env.*"], branchPrefix: "openorc", detectedConfigs: [], claudeAccounts: null };
 
 function projectFromRow(r: ProjectRow): Project {
   return {
@@ -74,10 +74,15 @@ export const projects = {
   updateGit(db: Db, id: string, git: { gitRemote: string | null; defaultBranch: string | null }): void {
     db.stmt("UPDATE projects SET git_remote = ?, default_branch = ? WHERE id = ?").run(git.gitRemote, git.defaultBranch, id);
   },
+  /**
+   * A shallow merge: keys the patch leaves out, such as ones an older client does not know, keep their values. Choosing
+   * the project's own Claude accounts alone leaves updated_at, which orders the project list, as it was.
+   */
   updateSettings(db: Db, id: string, patch: Partial<ProjectSettings>): Project {
     const current = projects.get(db, id);
     if (!current) throw new Error(`project ${id} not found`);
-    db.stmt("UPDATE projects SET settings = ?, updated_at = ? WHERE id = ?").run(JSON.stringify({ ...current.settings, ...patch }), now(), id);
+    const touched = Object.keys(patch).some((key) => key !== "claudeAccounts");
+    db.stmt("UPDATE projects SET settings = ?, updated_at = ? WHERE id = ?").run(JSON.stringify({ ...current.settings, ...patch }), touched ? now() : current.updatedAt, id);
     return projects.get(db, id) as Project;
   },
 };

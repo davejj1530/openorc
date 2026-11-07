@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ClaudeAccountId } from "./claude-accounts.js";
 import { CloudThreadState } from "./cloud.js";
 import { ActivityRecovery, AgentKind, BackgroundCommand, SubagentStatus, Usage } from "./events.js";
 import { ExecutionTarget } from "./execution-target.js";
@@ -19,6 +20,21 @@ export type PermissionPreset = z.infer<typeof PermissionPreset>;
 export const RunMode = z.enum(["plan", "act"]);
 export type RunMode = z.infer<typeof RunMode>;
 
+/**
+ * The Claude accounts a project's threads may use. While `only` is off the project follows the app's accounts, and
+ * the selection is kept so turning it back on restores it.
+ */
+export const ProjectClaudeAccounts = z.object({
+  /** Use only the selected accounts. */
+  only: z.boolean(),
+  accountIds: z.array(ClaudeAccountId).max(50),
+  /** New threads' account, one of accountIds. */
+  defaultId: ClaudeAccountId.nullable(),
+  /** Switch accounts at usage limits, in place of AppSettings.claudeAccountAutoSwitch while `only` is on. */
+  autoSwitch: z.boolean(),
+});
+export type ProjectClaudeAccounts = z.infer<typeof ProjectClaudeAccounts>;
+
 export const ProjectSettings = z.object({
   /** Shell script run in a new worktree before the agent starts. */
   setupScript: z.string().nullable(),
@@ -27,6 +43,8 @@ export const ProjectSettings = z.object({
   branchPrefix: z.string(),
   /** Config files from other tools found in the repo, for the user's information. */
   detectedConfigs: z.array(z.string()),
+  /** The project's own Claude accounts. Missing or null, as on rows saved before it existed, follows the app's. */
+  claudeAccounts: ProjectClaudeAccounts.nullable().optional(),
 });
 export type ProjectSettings = z.infer<typeof ProjectSettings>;
 

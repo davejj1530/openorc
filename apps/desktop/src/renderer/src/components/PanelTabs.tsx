@@ -4,6 +4,7 @@ import { currentPage, type PanelPage, type PanelSession, type WorkTab } from "..
 import { useUnsavedFile } from "../lib/use-file-buffer";
 import { pageIcon, tabLabel } from "./panel-tools";
 import { X } from "./icons";
+import { cn } from "../lib/cn";
 
 function nextTab(session: PanelSession, index: number, key: string): WorkTab | undefined {
   if (key === "Home") return session.tabs[0];
@@ -22,17 +23,15 @@ interface TabProps {
   onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
 }
 
-/**
- * One tab at its natural width. Its mark (the tool's glyph, or a dot while a file has unsaved
- * edits) turns into the close control under the pointer or keyboard focus.
- */
+/** One tab, drawn like the work column's: the tool's glyph, or a dot while a file has unsaved edits, then its name and close. */
 function PanelTab({ tab, page, active, unsaved, onSelect, onClose, onKeyDown }: TabProps & { unsaved: boolean }) {
   const label = tabLabel(page);
   const Icon = pageIcon(page);
   return (
-    <div role="presentation" className="panel-tab" data-active={active}>
+    <div role="presentation" className={cn("work-tab", active && "work-tab-current")}>
       <button
         role="tab"
+        className="work-tab-face"
         id={`panel-tab-${tab.id}`}
         aria-controls="panel-tab-content"
         aria-label={unsaved ? `${label}, unsaved changes` : label}
@@ -48,12 +47,12 @@ function PanelTab({ tab, page, active, unsaved, onSelect, onClose, onKeyDown }: 
         }}
         onKeyDown={onKeyDown}
       >
-        <span className="panel-tab-mark" aria-hidden="true">
+        <span className="work-tab-icon" aria-hidden="true">
           {unsaved ? <span className="panel-tab-dot" /> : <Icon size={14} />}
         </span>
-        <span className="panel-tab-label">{label}</span>
+        <span className="work-tab-title">{label}</span>
       </button>
-      <button className="panel-tab-close" aria-label={`Close ${label}`} title={`Close ${label}`} onClick={() => onClose(tab.id)}>
+      <button className="work-tab-close" aria-label={`Close ${label}`} title={`Close ${label}`} onClick={() => onClose(tab.id)}>
         <X size={12} />
       </button>
     </div>
@@ -74,15 +73,15 @@ function useSettled(): boolean {
   return settled;
 }
 
-/** The panel's tabs as plain labels. The strip scrolls sideways when they outgrow it, keeping the open tab in view. */
+/** The panel's tabs. The strip scrolls sideways when they outgrow it, keeping the open tab in view. */
 export function PanelTabs({ session, onSelect, onClose }: { session: PanelSession; onSelect: (id: string) => void; onClose: (id: string) => void }) {
   const strip = useRef<HTMLDivElement>(null);
   const settled = useSettled();
   useEffect(() => {
-    strip.current?.querySelector('[aria-selected="true"]')?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+    strip.current?.querySelector('[aria-selected="true"]')?.closest(".work-tab")?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
   }, [session.activeId]);
   return (
-    <div ref={strip} role="tablist" aria-label="Panel tabs" className="panel-tabs no-drag" data-settled={settled || undefined}>
+    <div ref={strip} role="tablist" aria-label="Panel tabs" className="panel-tabs work-tabs no-drag" data-settled={settled || undefined}>
       {session.tabs.map((tab, index) => {
         const page = currentPage(tab);
         const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {

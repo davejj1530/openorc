@@ -18,17 +18,12 @@
 .app-shell .well:has(.app-topbar)::before {
   top: var(--height-topbar);
 }
+/* Its foot is the hairline the sidebar's list starts under, carried across the window to its edge. */
 .app-shell .app-topbar {
   background:
     var(--surface-gradient) fixed,
     var(--bg);
-  border-bottom: 0;
-}
-.app-shell .header-chip {
-  background: transparent;
-  box-shadow: none;
-  border-color: transparent;
-  color: var(--ink-3);
+  border-bottom: var(--hairline) solid var(--line);
 }
 .agent-presence-mark {
   color: var(--ink-3);
@@ -110,8 +105,9 @@
 .thread-header-facts > * {
   flex-shrink: 0;
 }
-.thread-header-facts > .thread-header-project {
-  flex-shrink: 1;
+/* Thread actions sit on a narrow pill: the vertical dots need no more width than themselves. */
+.thread-more {
+  width: 20px;
 }
 .thread-header-project {
   min-width: 0;
@@ -167,12 +163,48 @@
 .app-shell .prose-chat h3 {
   font-size: 18px;
 }
-/* The panel is one opaque plane, header included; the open tab's page takes its surface as the ground. */
-.app-shell .panel-pane {
-  background: var(--surface);
+/* The panel sits on the window's ground with the sidebar and the conversation, apart from the
+   conversation by the sidebar's seam: a hairline from the title bar's line down, and 60% of the
+   title bar's height beside its tabs. Floating over a narrow work row or covering it expanded,
+   it takes an opaque ground, and floating the overlay shadow the sidebar takes there. */
+.app-shell .panel-pane,
+.app-shell .panel-header {
+  position: relative;
+}
+.app-shell .panel-pane::before,
+.app-shell .panel-header::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  width: var(--hairline);
+  background: var(--line);
+  pointer-events: none;
+}
+.app-shell .panel-pane::before {
+  top: calc(var(--height-topbar) - var(--hairline));
+  bottom: 0;
+}
+.app-shell .panel-header::before {
+  top: 20%;
+  bottom: 20%;
+}
+.app-shell .panel-shell[data-side="left"] :is(.panel-pane, .panel-header)::before {
+  left: auto;
+  right: 0;
+}
+.app-shell .panel-shell[data-expanded="true"] .panel-pane {
+  background: var(--bg);
+}
+.app-shell .panel-shell[data-expanded="true"] :is(.panel-pane, .panel-header)::before {
+  display: none;
+}
+@container work-row (max-width: 788px) {
+  .app-shell .panel-shell[data-open="true"]:not([data-expanded="true"]) .panel-pane {
+    background: var(--bg);
+    box-shadow: var(--shadow-overlay);
+  }
 }
 .app-shell .panel-content {
-  --bg: var(--surface);
   overflow: hidden;
 }
 .app-shell .document-title {

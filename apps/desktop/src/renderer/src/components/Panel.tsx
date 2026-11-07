@@ -3,6 +3,7 @@ import { ResizeHandle } from "./ResizeHandle";
 import { PANE_MS } from "../lib/motion";
 import { requestFilesFocus, useFilesHost } from "../lib/files-tool";
 import { useLayout } from "../lib/layout";
+import { useNavigationGone } from "../lib/navigation-column";
 import { usePanelSessions } from "../lib/panel-tabs";
 import { toolPage, usePanelWorkspace } from "../lib/panel-workspace";
 import { useTrafficLights, useWindowsControls } from "../lib/window";
@@ -111,7 +112,7 @@ export function Panel({ context }: { context: PanelContext }) {
     });
   };
   const closing = useFileTabClosing(session, { close: closeTab, show: (id) => usePanelSessions.getState().select(scope, id) });
-  const trafficClearance = !sidebarOpen && trafficLights;
+  const trafficClearance = useNavigationGone() && trafficLights;
   return (
     <>
       {open && !expanded ? <ResizeHandle edge="panel" /> : null}
@@ -127,7 +128,7 @@ export function Panel({ context }: { context: PanelContext }) {
           if (expanded && event.key === "Escape" && !event.defaultPrevented) useLayout.getState().setPanelExpanded(false);
         }}
       >
-        <div className="panel-pane h-full flex flex-col" data-plane>
+        <div className="panel-pane h-full flex flex-col" data-plane="tile">
           <PanelHeader
             scope={scope}
             session={session}

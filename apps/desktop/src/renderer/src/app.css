@@ -22,6 +22,7 @@
 @import "./styles/subagents.css";
 @import "./styles/composer.css";
 @import "./styles/new-thread.css";
+@import "./styles/work-tabs.css";
 @import "./components/MessageQueue.css";
 @import "./components/TaskComments.css";
 @source "../../../node_modules/streamdown/dist/*.js";
@@ -106,10 +107,10 @@
     --hairline: 0.5px;
   }
 }
-/* Planes (the panel, sheets, menus, popovers, dialogs, the composer) restate the contextual fills
+/* Planes (sheets, menus, popovers, dialogs, the composer) restate the contextual fills
    one step off their own fill. A tile card inside a plane steps them back to the plane. Mark new
    planes with data-plane and tile cards with data-plane="tile" rather than growing these lists. */
-:where([data-plane], .panel-content, .menu-popup, .floating-popover, .project-picker-popup, .composer-context-popup, .model-picker-popup, .composer-effort-popup, .composer-shell, [role="dialog"]) {
+:where([data-plane], .menu-popup, .floating-popover, .project-picker-popup, .composer-context-popup, .model-picker-popup, .composer-effort-popup, .composer-shell, [role="dialog"]) {
   --current-row-fill: var(--surface-2);
   --control-fill: var(--surface-2);
 }
@@ -354,8 +355,8 @@
   /* Layout measures, so no screen hardcodes a pixel width. The resizable ones are set on :root by the layout store. */
   --width-sidebar: var(--layout-sidebar, 272px);
   /* The workspace rail sits beside the thread list; the sidebar is both, and only the list resizes. */
-  --width-workspace-rail: 72px;
-  --width-navigation: calc(var(--width-workspace-rail) + var(--width-sidebar));
+  --width-rail: 60px;
+  --width-navigation: calc(var(--width-rail) + var(--width-sidebar));
   --width-panel: var(--layout-panel, 640px);
   /* The floors the work row keeps: the conversation's, then the panel's. The panel floor is
      limits.panel.min in lib/layout.ts. */
@@ -710,7 +711,7 @@ body[data-resizing] .panel-shell {
   transition: width var(--duration-arrive) var(--ease-out);
 }
 .sidebar-shell[data-open="false"] {
-  width: 0;
+  width: calc(var(--width-rail) + var(--radius-lg));
 }
 body[data-resizing] .sidebar-shell {
   transition: none;
@@ -801,29 +802,6 @@ body[data-resizing] .sidebar-shell {
   min-height: 44px;
   padding: 0 24px;
   flex-shrink: 0;
-}
-
-/* The header keeps project switching beside the title on every screen. */
-.header-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: var(--control-badge);
-  padding: 0 8px;
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  color: var(--ink-3);
-  font-size: var(--text-sm);
-  max-width: 40%;
-  min-width: 0;
-  transition:
-    background-color 120ms ease,
-    color 120ms ease;
-}
-.header-chip:hover,
-.header-chip[data-popup-open] {
-  background: var(--surface-3);
-  color: var(--ink-2);
 }
 
 /* CONTENT. Depth is a fill step, never a shadow. The surfaces a thread grows for a task, a turn's
@@ -1122,6 +1100,7 @@ span.property-chip {
 }
 .app-shell .settings-sheet .settings-sheet-bar {
   background: transparent;
+  border-bottom: 0;
 }
 .settings-shell {
   --settings-content-width: 860px;
@@ -1606,11 +1585,5 @@ body:has(.sidebar-shell[data-open="false"]) .thread-pane:first-child > .well {
   }
   .resize-handle[data-edge="panel"] {
     display: none;
-  }
-}
-@container (max-width: 480px) {
-  .thread-pane .header-chip {
-    flex: 0 1 auto;
-    max-width: 88px;
   }
 }

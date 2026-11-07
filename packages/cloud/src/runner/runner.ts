@@ -3,8 +3,9 @@
  *
  *   daemon    keeps agent processes and relays alive between connections
  *   bridge    joins this command's stdin and stdout to the daemon, one connection from the Mac
- *   seed      makes the checkout from a bundle the Mac sent
+ *   seed      makes the checkout from a bundle the Mac sent, or from one commit's pack
  *   seed-over moves a base's checkout to a new workspace's commit, keeping what its setup installed
+ *   history   says which commits end a checkout's history, or fills it in from a bundle
  *   snapshot  records the working tree and bundles what the Mac lacks
  *   apply     moves the checkout to a commit and files the Mac sent
  */
@@ -13,7 +14,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { startDaemon } from "./daemon.ts";
-import { apply, seed, seedOver, snapshot } from "./repo.ts";
+import { apply, history, seed, seedOver, snapshot } from "./repo.ts";
 
 function parse(args: string[]): Map<string, string[]> {
   const options = new Map<string, string[]>();
@@ -68,12 +69,14 @@ const print = (value: unknown) => process.stdout.write(`${JSON.stringify(value)}
 if (command === "daemon") await startDaemon(state, socketPath);
 else if (command === "bridge") await bridge(socketPath);
 else if (command === "seed") {
-  const [workRef, origin, ref] = ["work-ref", "origin", "ref"].map((name) => options.get(name)?.[0]);
-  print(seed({ repo: one("repo"), bundle: one("bundle"), branch: one("branch"), ...(workRef ? { workRef } : {}), ...(origin ? { origin } : {}), ...(ref ? { ref } : {}) }));
+  const [workRef, origin, ref, pack] = ["work-ref", "origin", "ref", "pack"].map((name) => options.get(name)?.[0]);
+  const target = { repo: one("repo"), branch: one("branch"), ...(origin ? { origin } : {}) };
+  print(seed(pack ? { ...target, pack, commit: one("commit") } : { ...target, bundle: one("bundle"), ...(workRef ? { workRef } : {}), ...(ref ? { ref } : {}) }));
 } else if (command === "seed-over") {
-  const [bundle, ref, origin] = ["bundle", "ref", "origin"].map((name) => options.get(name)?.[0]);
-  print(seedOver({ repo: one("repo"), branch: one("branch"), commit: one("commit"), ...(bundle && ref ? { bundle, ref } : {}), ...(origin ? { origin } : {}) }));
-} else if (command === "snapshot") print(snapshot(one("repo"), state, options.get("known") ?? []));
+  const [bundle, ref, pack, origin] = ["bundle", "ref", "pack", "origin"].map((name) => options.get(name)?.[0]);
+  print(seedOver({ repo: one("repo"), branch: one("branch"), commit: one("commit"), ...(bundle && ref ? { bundle, ref } : {}), ...(pack ? { pack } : {}), ...(origin ? { origin } : {}) }));
+} else if (command === "history") print(history(one("repo"), options.get("bundle")?.[0]));
+else if (command === "snapshot") print(snapshot(one("repo"), state, options.get("known") ?? []));
 else if (command === "apply") print(apply(one("repo"), state, { bundle: one("bundle"), ref: one("ref"), expectTree: one("expect-tree") }));
 else {
   process.stderr.write(`Unknown runner command: ${command}\n`);

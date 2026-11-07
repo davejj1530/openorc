@@ -126,6 +126,9 @@ export interface SandboxProvider {
   list(): Promise<SandboxInfo[]>;
   /** Called as OpenOrc closes. A cloud VM keeps running and sleeps on its own; a sandbox on this Mac stops here. */
   close?(): Promise<void>;
-  /** Where the service can keep a sandbox for new ones to start from. */
+  /**
+   * Where the service can keep a sandbox for new ones to start from. Only where that is the faster start: Agent37 copies
+   * a base's whole disk, over a minute where a new instance takes a second, so it keeps none.
+   */
   readonly bases?: SandboxBases;
 }

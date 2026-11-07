@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { SANDBOX_PREFIX, type RunnerClient, type SandboxProvider } from "@openorc/cloud";
+import { SANDBOX_PREFIX, seedFromCommit, writeBaseMarker, type RunnerClient, type SandboxProvider } from "@openorc/cloud";
 import { settings, type CloudProviderId, type Db } from "@openorc/db";
-import { git } from "@openorc/git";
+import { git, originUrl } from "@openorc/git";
 import type { HarnessId, Project } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
-import type { CloudBase, CloudBases } from "./cloud-bases.js";
+import { runSetupScript, setupHash, type CloudBase, type CloudBases } from "./cloud-bases.js";
+import type { CloudHistory } from "./cloud-history.js";
 import type { CloudLocation } from "./cloud-workspaces.js";
 import { usesDocker } from "./uses-docker.js";
 
@@ -133,3 +134,32 @@ export class CloudWarm {
 }
 
 const words = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+export interface PrepareAheadDeps {
+  history: CloudHistory;
+  dockerUp: (location: CloudLocation) => Promise<void>;
+  projectEnv: (projectId: string) => Promise<Record<string, string>>;
+}
+
+/**
+ * A sandbox made ahead without a base gets what a base would hold: the project's checked-out branch, its commit first
+ * and its history after, and its setup, marked as a base's are, so the conversation that takes it brings only what
+ * changed since.
+ */
+export async function prepareAhead(location: CloudLocation, project: Project, deps: PrepareAheadDeps): Promise<CloudLocation> {
+  const source = project.rootPath;
+  const branch = (await git(source, ["symbolic-ref", "-q", "--short", "HEAD"], { okCodes: [0, 1] })).stdout.trim();
+  if (!branch) return location;
+  const commit = (await git(source, ["rev-parse", `refs/heads/${branch}^{commit}`])).stdout.trim();
+  const origin = (await originUrl(source)) ?? undefined;
+  await seedFromCommit(location, { source, commit, branch, ...(origin ? { origin } : {}) });
+  deps.history.fill(location, source);
+  const script = project.settings.setupScript;
+  if (script) {
+    await deps.dockerUp(location);
+    await runSetupScript(location, script, project.name, await deps.projectEnv(project.id));
+  }
+  const base = { commit, branch, setup: setupHash(script), agents: {}, shallow: true };
+  await writeBaseMarker(location.install, base);
+  return { ...location, base };
+}

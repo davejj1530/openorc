@@ -328,11 +328,17 @@ describe("Docker in a cloud workspace", () => {
         if (!docker) return sandbox;
         const stop = sandbox.stop.bind(sandbox);
         const mark = path.join(sandbox.root, "docker-up");
+        // As a VM's: a start already under way is shared, and a daemon that answers is left running.
+        let starting: Promise<void> | null = null;
         return Object.assign(sandbox, {
-          startDocker: async () => {
-            daemon.starts++;
-            daemon.running = true;
-            await writeFile(mark, "");
+          startDocker: () => {
+            if (daemon.running) return Promise.resolve();
+            starting ??= (async () => {
+              daemon.starts++;
+              await writeFile(mark, "");
+              daemon.running = true;
+            })().finally(() => (starting = null));
+            return starting;
           },
           stop: async () => {
             daemon.running = false;

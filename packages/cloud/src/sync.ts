@@ -68,53 +68,115 @@ export async function seedWorkspace(location: WorkspaceLocation, branch: string,
   return { snapshot: null, tree, head, known: work ? [work] : [head] };
 }
 
-/**
- * Makes the VM's checkout for a new conversation from the commit its worktree starts at, without waiting for the
- * worktree: a new worktree holds exactly that commit's files. `source` is the repository the worktree belongs to.
- */
-export async function seedFromCommit(location: WorkspaceLocation, start: { source: string; commit: string; branch: string; origin?: string }): Promise<MirrorState> {
-  const { install, refPrefix, repo } = location;
-  const ref = `${refPrefix}start`;
-  await pinObject(start.source, ref, start.commit);
+/** Times each step of a seed, as a cloud start's log line names them. */
+export interface SeedSteps {
+  time<T>(name: string, work: () => Promise<T>): Promise<T>;
+}
+
+const UNTIMED: SeedSteps = { time: (_name, work) => work() };
+
+async function inTemp<T>(work: (dir: string) => Promise<T>): Promise<T> {
   const dir = await mkdtemp(path.join(os.tmpdir(), "openorc-seed-"));
   try {
-    const bundle = path.join(dir, "seed.bundle");
-    await git(start.source, ["bundle", "create", "-q", bundle, ref]);
-    const remoteBundle = path.posix.join(install.state, "seed.bundle");
-    await install.sandbox.writeFile(remoteBundle, await readFile(bundle));
-    await runRunner(install, "seed", ["--repo", repo, "--bundle", remoteBundle, "--branch", start.branch, "--ref", ref, ...(start.origin ? ["--origin", start.origin] : [])]);
+    return await work(dir);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+}
+
+/** Puts a file from this host in the sandbox's state folder, and says where. */
+async function send(install: RunnerInstall, file: string, name: string): Promise<string> {
+  const remote = path.posix.join(install.state, name);
+  await install.sandbox.writeFile(remote, await readFile(file));
+  return remote;
+}
+
+/** A pack in `dir` of the commit and its files, none of its history: what a checkout starts from before its history. */
+async function tipPack(source: string, commit: string, dir: string): Promise<string> {
+  const objects = (await git(source, ["rev-list", "--objects", "--no-object-names", "--max-count=1", commit])).stdout;
+  const hash = (await git(source, ["pack-objects", "-q", path.join(dir, "tip")], { input: objects })).stdout.trim();
+  return path.join(dir, `tip-${hash}.pack`);
+}
+
+/**
+ * Makes the VM's checkout for a new conversation from the commit its worktree starts at, without waiting for the
+ * worktree: a new worktree holds exactly that commit's files. `source` is the repository the worktree belongs to. Only
+ * the commit and its files go up, so the agent can start; `fillHistory` brings the history after.
+ */
+export async function seedFromCommit(location: WorkspaceLocation, start: { source: string; commit: string; branch: string; origin?: string }, steps = UNTIMED): Promise<MirrorState> {
+  const { install, repo } = location;
+  await inTemp(async (dir) => {
+    const pack = await steps.time("pack", () => tipPack(start.source, start.commit, dir));
+    const remote = await steps.time("upload", () => send(install, pack, "seed.pack"));
+    const args = ["--repo", repo, "--pack", remote, "--commit", start.commit, "--branch", start.branch, ...(start.origin ? ["--origin", start.origin] : [])];
+    await steps.time("checkout", () => runRunner(install, "seed", args));
+  });
   const tree = (await git(start.source, ["rev-parse", `${start.commit}^{tree}`])).stdout.trim();
   return { snapshot: null, tree, head: start.commit, known: [start.commit] };
 }
 
 /**
+ * Fills in the history of a checkout seeded from single commits: the sandbox says which commits still end its history
+ * there, and the history of each that `source` has goes up in one bundle. True when there was any to send.
+ */
+export async function fillHistory(location: WorkspaceLocation, source: string): Promise<boolean> {
+  const { install, refPrefix, repo } = location;
+  const { shallow } = await runRunner<{ shallow: string[] }>(install, "history", ["--repo", repo]);
+  const isCommit = async (commit: string) => (await git(source, ["cat-file", "-e", `${commit}^{commit}`], { okCodes: [0, 1, 128] })).code === 0;
+  const ends = (await Promise.all(shallow.map(async (commit) => ((await isCommit(commit)) ? commit : null)))).filter((commit) => commit !== null);
+  if (!ends.length) return false;
+  const refs = ends.map((_commit, index) => `${refPrefix}history/${index}`);
+  try {
+    await Promise.all(ends.map((commit, index) => pinObject(source, refs[index]!, commit)));
+    await inTemp(async (dir) => {
+      const bundle = path.join(dir, "history.bundle");
+      await git(source, ["bundle", "create", "-q", bundle, ...refs]);
+      await runRunner(install, "history", ["--repo", repo, "--bundle", await send(install, bundle, "history.bundle")]);
+    });
+  } finally {
+    await Promise.all(refs.map((ref) => git(source, ["update-ref", "-d", ref], { okCodes: [0, 1, 128] })));
+  }
+  return true;
+}
+
+/** How a new conversation's commit gets over a base's checkout. */
+type OverBase = "nothing" | "commits" | "history" | "files";
+
+async function overBase(source: string, commit: string, base: string, shallow: boolean): Promise<OverBase> {
+  if (commit === base) return "nothing";
+  const known = (await git(source, ["cat-file", "-e", `${base}^{commit}`], { okCodes: [0, 1, 128] })).code === 0;
+  if (!shallow) {
+    // A commit the base's own checkout already has needs nothing sent; all of the branch's history only when this
+    // repository no longer has the base's commit, as after a force push.
+    if (!known) return "history";
+    return (await git(source, ["merge-base", "--is-ancestor", commit, base], { okCodes: [0, 1, 128] })).code === 0 ? "nothing" : "commits";
+  }
+  // A base without its history has only its own commit, so commits go up only when everything they need is that one.
+  if (!known) return "files";
+  const listed = (await git(source, ["rev-list", "--boundary", commit, `^${base}`])).stdout.split("\n").filter(Boolean);
+  const needs = listed.filter((line) => line.startsWith("-")).map((line) => line.slice(1));
+  return listed.length > needs.length && needs.every((each) => each === base) ? "commits" : "files";
+}
+
+/**
  * Makes a new conversation's checkout over a base's, which holds the project's default branch with its setup done: only
  * the commits the base lacks go up, none when the conversation starts at the base's own commit. What the base's setup
- * installed in files Git ignores stays.
+ * installed in files Git ignores stays. A base made without its history takes the commit's files instead when its own
+ * commit cannot carry the commits up.
  */
-export async function seedOverBase(location: WorkspaceLocation, start: { source: string; commit: string; branch: string; base: string; origin?: string }): Promise<MirrorState> {
+export async function seedOverBase(location: WorkspaceLocation, start: { source: string; commit: string; branch: string; base: string; shallow?: boolean; origin?: string }): Promise<MirrorState> {
   const { install, refPrefix, repo } = location;
   const args = ["--repo", repo, "--branch", start.branch, "--commit", start.commit, ...(start.origin ? ["--origin", start.origin] : [])];
-  const known = async (commit: string) => (await git(start.source, ["cat-file", "-e", `${commit}^{commit}`], { okCodes: [0, 1, 128] })).code === 0;
-  const has = async (older: string, newer: string) => (await git(start.source, ["merge-base", "--is-ancestor", older, newer], { okCodes: [0, 1, 128] })).code === 0;
-  // A commit the base's own checkout already has needs nothing sent.
-  if (start.commit !== start.base && !(await has(start.commit, start.base))) {
+  const how = await overBase(start.source, start.commit, start.base, start.shallow === true);
+  if (how !== "nothing") {
     const ref = `${refPrefix}start`;
     await pinObject(start.source, ref, start.commit);
-    const dir = await mkdtemp(path.join(os.tmpdir(), "openorc-seed-"));
-    try {
+    await inTemp(async (dir) => {
+      if (how === "files") return void args.push("--pack", await send(install, await tipPack(start.source, start.commit, dir), "seed.pack"));
       const bundle = path.join(dir, "seed.bundle");
-      // All of the branch's history only when this repository no longer has the base's commit, as after a force push.
-      await git(start.source, ["bundle", "create", "-q", bundle, ref, ...((await known(start.base)) ? [`^${start.base}`] : [])]);
-      const remoteBundle = path.posix.join(install.state, "seed.bundle");
-      await install.sandbox.writeFile(remoteBundle, await readFile(bundle));
-      args.push("--bundle", remoteBundle, "--ref", ref);
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
+      await git(start.source, ["bundle", "create", "-q", bundle, ref, ...(how === "commits" ? [`^${start.base}`] : [])]);
+      args.push("--bundle", await send(install, bundle, "seed.bundle"), "--ref", ref);
+    });
   }
   await runRunner(install, "seed-over", args);
   const tree = (await git(start.source, ["rev-parse", `${start.commit}^{tree}`])).stdout.trim();
@@ -130,6 +192,8 @@ export interface BaseMarker {
   setup: string;
   /** Each agent CLI installed, by version. */
   agents: Partial<Record<HarnessId, string>>;
+  /** Seeded with its commit alone, its history still coming or lost on the way. */
+  shallow?: boolean;
 }
 
 const baseMarkerPath = (install: RunnerInstall) => path.posix.join(install.state, "base.json");
@@ -144,7 +208,9 @@ export async function readBaseMarker(install: RunnerInstall): Promise<BaseMarker
   if (!bytes?.length) return null;
   try {
     const marker = JSON.parse(bytes.toString("utf8")) as Partial<BaseMarker>;
-    return typeof marker.commit === "string" && typeof marker.branch === "string" && typeof marker.setup === "string" ? { commit: marker.commit, branch: marker.branch, setup: marker.setup, agents: marker.agents ?? {} } : null;
+    return typeof marker.commit === "string" && typeof marker.branch === "string" && typeof marker.setup === "string"
+      ? { commit: marker.commit, branch: marker.branch, setup: marker.setup, agents: marker.agents ?? {}, ...(marker.shallow ? { shallow: true } : {}) }
+      : null;
   } catch {
     return null;
   }

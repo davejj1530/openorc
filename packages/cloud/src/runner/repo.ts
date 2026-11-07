@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, renameSync, rmSync } from "node:fs";
+import { closeSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeSync } from "node:fs";
 import path from "node:path";
 
 /** Snapshot commits carry fixed metadata, so the same files on the same commit always make the same snapshot. */
@@ -33,29 +33,86 @@ function maybeGit(repo: string, args: string[]): string | null {
   }
 }
 
-export interface SeedRequest {
+interface SeedTarget {
   repo: string;
-  bundle: string;
   branch: string;
+  origin?: string;
+}
+
+/** The branch with its history, and the Mac's uncommitted work when there is some. */
+interface SeedFromBundle extends SeedTarget {
+  bundle: string;
   /** The bundle's ref for the branch, when it is not the branch itself. */
   ref?: string;
   /** A commit whose files are the Mac's uncommitted work, on top of the branch. */
   workRef?: string;
-  origin?: string;
+}
+
+/** One commit and its files, none of its history: `history` brings that after. */
+interface SeedFromPack extends SeedTarget {
+  pack: string;
+  commit: string;
+}
+
+export type SeedRequest = SeedFromBundle | SeedFromPack;
+
+/** Stores the objects of a pack the Mac sent, then deletes the file. */
+function takePack(repo: string, pack: string): void {
+  const input = openSync(pack, "r");
+  try {
+    execFileSync("git", ["index-pack", "--stdin"], { cwd: repo, stdio: [input, "ignore", "pipe"] });
+  } finally {
+    closeSync(input);
+  }
+  rmSync(pack, { force: true });
+}
+
+const shallowFile = (repo: string) => path.resolve(repo, git(repo, ["rev-parse", "--git-path", "shallow"]));
+
+function shallowCommits(repo: string): string[] {
+  try {
+    return readFileSync(shallowFile(repo), "utf8").split("\n").filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+/** Rewrites the commits whose parents this checkout lacks, under Git's own lock for that file. */
+function changeShallow(repo: string, change: (commits: string[]) => string[]): string[] {
+  const file = shallowFile(repo);
+  const lock = `${file}.lock`;
+  const held = openSync(lock, "wx");
+  try {
+    const next = change(shallowCommits(repo));
+    writeSync(held, next.map((commit) => `${commit}\n`).join(""));
+    if (next.length) renameSync(lock, file);
+    else rmSync(file, { force: true });
+    return next;
+  } finally {
+    closeSync(held);
+    rmSync(lock, { force: true });
+  }
 }
 
 /**
- * Makes the workspace's checkout from a bundle the Mac sent. Only a workspace that never became ready is seeded, so no
+ * Makes the workspace's checkout from what the Mac sent. Only a workspace that never became ready is seeded, so no
  * agent has worked in a checkout already here: a seed that is tried again replaces it.
  */
 export function seed(request: SeedRequest): { seeded: true } {
-  const { repo, bundle, branch, workRef, origin } = request;
+  const { repo, branch, origin } = request;
+  const workRef = "bundle" in request ? request.workRef : undefined;
   const building = `${repo}.seeding`;
   rmSync(building, { recursive: true, force: true });
   mkdirSync(building, { recursive: true });
   git(building, ["init", "-q"]);
-  // The new repository's unborn HEAD may already name the branch, as it does wherever Git starts on that name.
-  git(building, ["fetch", "-q", "--update-head-ok", bundle, `${request.ref ?? `refs/heads/${branch}`}:refs/heads/${branch}`, ...(workRef ? [`${workRef}:${SEED_REF}`] : [])]);
+  if ("pack" in request) {
+    takePack(building, request.pack);
+    changeShallow(building, () => [request.commit]);
+    git(building, ["update-ref", `refs/heads/${branch}`, request.commit]);
+  } else {
+    // The new repository's unborn HEAD may already name the branch, as it does wherever Git starts on that name.
+    git(building, ["fetch", "-q", "--update-head-ok", request.bundle, `${request.ref ?? `refs/heads/${branch}`}:refs/heads/${branch}`, ...(workRef ? [`${workRef}:${SEED_REF}`] : [])]);
+  }
   git(building, ["symbolic-ref", "HEAD", `refs/heads/${branch}`]);
   git(building, ["read-tree", "-u", "--reset", workRef ? SEED_REF : "HEAD"]);
   // The index goes back to the branch, so the Mac's uncommitted work stays uncommitted here too.
@@ -74,6 +131,8 @@ export interface SeedOverRequest {
   /** Brings the commits the base lacks, under `ref`; none when it has the commit already. */
   bundle?: string;
   ref?: string;
+  /** The commit and its files alone, when the base holds too little history for `bundle` to reach it. */
+  pack?: string;
   origin?: string;
 }
 
@@ -84,12 +143,35 @@ const START_REF = "refs/openorc/sync/start";
  * files Git ignores, such as installed dependencies, stays; tracked files become the commit's exactly.
  */
 export function seedOver(request: SeedOverRequest): { seeded: true } {
-  const { repo, branch, commit, bundle, ref, origin } = request;
+  const { repo, branch, commit, bundle, ref, pack, origin } = request;
+  if (pack) {
+    takePack(repo, pack);
+    changeShallow(repo, (commits) => [...new Set([...commits, commit])]);
+  }
   if (bundle && ref) git(repo, ["fetch", "-q", bundle, `${ref}:${START_REF}`]);
   git(repo, ["checkout", "-q", "-f", "-B", branch, commit]);
   if (bundle && ref) git(repo, ["update-ref", "-d", START_REF]);
   if (origin) git(repo, git(repo, ["remote"]).split("\n").includes("origin") ? ["remote", "set-url", "origin", origin] : ["remote", "add", "origin", origin]);
   return { seeded: true };
+}
+
+/**
+ * The history a checkout seeded from single commits lacks. Without a bundle, says which commits still end its history
+ * here; with one, takes the bundle's objects and lets go of each such commit whose parents are all here now.
+ */
+export function history(repo: string, bundle?: string): { shallow: string[] } {
+  if (!bundle) return { shallow: shallowCommits(repo) };
+  git(repo, ["bundle", "unbundle", bundle]);
+  rmSync(bundle, { force: true });
+  // The commit object itself names its parents; the shallow list only hides them.
+  const parents = (commit: string) =>
+    git(repo, ["cat-file", "commit", commit])
+      .split("\n\n")[0]!
+      .split("\n")
+      .filter((line) => line.startsWith("parent "))
+      .map((line) => line.slice(7));
+  const whole = (commit: string) => parents(commit).every((parent) => maybeGit(repo, ["cat-file", "-e", `${parent}^{commit}`]) !== null);
+  return { shallow: changeShallow(repo, (commits) => commits.filter((commit) => !whole(commit))) };
 }
 
 export interface SnapshotResult {

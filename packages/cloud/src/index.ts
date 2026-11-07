@@ -53,6 +53,7 @@ export type { Takeover, TakeoverStarted } from "./runner/wire.js";
 export { RunnerClient, installRunner, runRunner, runnerFiles, type RunnerConnectionState, type RunnerFile, type RunnerInstall } from "./runner-client.js";
 export { CHECK_STEPS, checkSandbox, type CheckProgress, type CheckStep } from "./check.js";
 export {
+  fillHistory,
   pullWorkspace,
   pushWorkspace,
   readBaseMarker,
@@ -63,6 +64,7 @@ export {
   type BaseMarker,
   type MirrorState,
   type PullResult,
+  type SeedSteps,
   type WorkspaceLocation,
 } from "./sync.js";
 export { VercelRefusal, ensureVercelProject, vercelDenied, type VercelProject, type VercelRequest } from "./vercel-projects.js";

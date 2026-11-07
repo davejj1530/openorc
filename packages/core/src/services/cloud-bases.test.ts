@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readdir, realpath, rm, writeFile } from "node:fs/promis
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LocalSandboxProvider, runnerFiles } from "@openorc/cloud";
+import { LocalSandboxProvider, runnerFiles, type SandboxProvider } from "@openorc/cloud";
 import { cloudWorkspaces, Db, projects, settings, threads } from "@openorc/db";
 import { git } from "@openorc/git";
 import type { Project, Thread } from "@openorc/protocol";
@@ -73,7 +73,10 @@ async function started(): Promise<Thread> {
 }
 
 const repo = (thread: Thread) => path.join(directory, "sandboxes", cloudWorkspaces.get(db, thread.id)!.sandbox, "repo");
-const runs = (thread: Thread) => readFileSync(path.join(repo(thread), "node_modules", ".setup-runs"), "utf8").split("\n").filter(Boolean).length;
+const runs = (thread: Thread) =>
+  readFileSync(path.join(repo(thread), "node_modules", ".setup-runs"), "utf8")
+    .split("\n")
+    .filter(Boolean).length;
 const head = (thread: Thread) => execFileSync("git", ["rev-parse", "HEAD"], { cwd: repo(thread), encoding: "utf8" }).trim();
 const branchOf = (thread: Thread) => execFileSync("git", ["symbolic-ref", "--short", "HEAD"], { cwd: repo(thread), encoding: "utf8" }).trim();
 const status = (thread: Thread) => execFileSync("git", ["status", "--porcelain"], { cwd: repo(thread), encoding: "utf8" }).trim();
@@ -178,6 +181,29 @@ describe("a sandbox made ahead", () => {
     expect(runs(thread)).toBe(1);
     expect(branchOf(thread)).toBe(thread.branch);
     expect(JSON.parse(settings.get(db, "cloud.warm") ?? "[]")).toEqual([]);
+  });
+
+  it("on a service that keeps no bases, holds the branch's commit alone, and the conversation that takes it gets the whole history after", async () => {
+    const plain: SandboxProvider = { id: "local", open: (name, needs) => sandboxes.open(name, needs), remove: (name) => sandboxes.remove(name), list: () => sandboxes.list() };
+    const log = { info: (text: string) => void lines.push(text), warn: (text: string) => void lines.push(`warn: ${text}`), error() {} };
+    const noBases = new CloudBases({ db, provider: () => plain, files: runnerFiles, projectEnv: async () => ({}), log });
+    cloud = new CloudWorkspaceService(db, { providers: [plain], bases: noBases }, log);
+    await service.shutdown();
+    service = new WorkspaceService(db, { dataDir: path.join(directory, "data-plain"), cloud }, log, new WorkspaceWriters());
+    await cloud.warm(project, "claude");
+    const name = madeAhead()!;
+    await vi.waitFor(() => expect(connected(name)).toBe(true), { timeout: 10_000 });
+    const later = await commit("later.txt", "after the warm-up\n");
+
+    const thread = await started();
+    expect(cloudWorkspaces.get(db, thread.id)!.sandbox).toBe(name);
+    expect(head(thread)).toBe(later);
+    expect(status(thread)).toBe("");
+    expect(runs(thread)).toBe(1);
+    await vi.waitFor(() => expect(lines.some((line) => line.startsWith(`cloud workspace ${name} got its history`))).toBe(true), { timeout: 10_000 });
+    const count = (cwd: string) => execFileSync("git", ["rev-list", "--count", later], { cwd, encoding: "utf8" }).trim();
+    expect(count(repo(thread))).toBe(count(root));
+    expect(execFileSync("git", ["rev-parse", "--is-shallow-repository"], { cwd: repo(thread), encoding: "utf8" }).trim()).toBe("false");
   });
 
   it("is one per project while typing goes on, and is deleted when OpenOrc closes without a conversation taking it", async () => {

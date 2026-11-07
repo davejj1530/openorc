@@ -13,7 +13,6 @@ import {
   seedFromCommit,
   seedOverBase,
   seedWorkspace,
-  writeBaseMarker,
   VercelSandboxProvider,
   type RunnerFile,
   type Sandbox,
@@ -22,10 +21,11 @@ import {
   type Agent37Connection,
   type VercelConnection,
   type BaseMarker,
+  type SeedSteps,
   type WorkspaceLocation,
 } from "@openorc/cloud";
 import { cloudWorkspaces, threads, type CloudMirrorState, type CloudProviderId, type CloudWorkspaceRecord, type Db } from "@openorc/db";
-import { git, originUrl } from "@openorc/git";
+import { originUrl } from "@openorc/git";
 import { releaseOf, slotFor } from "@openorc/agents";
 import { harnessCatalog, isHarnessId, WORKSPACE_ID, type CloudService, type CloudStep, type CloudThreadState, type HarnessId, type Project, type Thread } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
@@ -39,8 +39,9 @@ import { OpenCodeCloudKeys, OpenCodeCloudSignIn } from "./cloud-opencode.js";
 import { sandboxHome } from "./agent-homes.js";
 import { SandboxSkills, type CloudSkillSource } from "./cloud-skills.js";
 import { Phases } from "./cloud-phases.js";
-import { runSetupScript, seedBranch, setupHash, setupInputsChanged, type CloudBase, type CloudBases } from "./cloud-bases.js";
-import { CloudWarm, type Warmed } from "./cloud-warm.js";
+import { runSetupScript, setupHash, setupInputsChanged, type CloudBase, type CloudBases } from "./cloud-bases.js";
+import { CloudHistory } from "./cloud-history.js";
+import { CloudWarm, prepareAhead, type Warmed } from "./cloud-warm.js";
 import { CloudBroker } from "./cloud-broker.js";
 import type { StartThreadInput } from "./thread-inputs.js";
 import { usesDocker } from "./uses-docker.js";
@@ -75,7 +76,7 @@ export interface CloudWorkspaceOptions {
 interface Seeding {
   /** The project's base the sandbox is made from. */
   from?: CloudBase | undefined;
-  seed(location: CloudLocation, origin: string | undefined): Promise<CloudMirrorState>;
+  seed(location: CloudLocation, origin: string | undefined, steps: SeedSteps): Promise<CloudMirrorState>;
   setup(location: CloudLocation): Promise<boolean>;
 }
 
@@ -201,6 +202,7 @@ export class CloudWorkspaceService {
   private readonly agentsReady = new WeakMap<Sandbox, Map<HarnessId, string | null>>();
   private readonly warmer: CloudWarm;
   private readonly skills: SandboxSkills;
+  private readonly history: CloudHistory;
 
   constructor(
     private readonly db: Db,
@@ -212,32 +214,18 @@ export class CloudWorkspaceService {
     this.agents = options.agents ?? cloudAgents({ claude: SANDBOX_OWN, codex: new CodexCloudSignIn(undefined), opencode: new OpenCodeCloudSignIn(new OpenCodeCloudKeys(undefined)) });
     this.skills = new SandboxSkills(options.skills, (message) => log.warn(message));
     this.broker = new CloudBroker(log);
+    this.history = new CloudHistory(log);
     this.warmer = new CloudWarm({
       db,
       provider: () => this.forNewThreads(),
       bases: options.bases,
       open: (name, provider, mirror, from) => this.location({ threadId: `warm-${name}`, provider, sandbox: name }, mirror, { folder: mirror }, from),
       agent: (agent, location, provider) => this.installAgent(agent, location, provider),
-      prepare: (location, project) => this.prepareAhead(location, project),
+      prepare: (location, project) => prepareAhead(location, project, { history: this.history, dockerUp: (at) => this.dockerUp(at), projectEnv: (id) => this.projectEnv(id) }),
       connect: (name, location) => RunnerClient.open(location.install, (state) => this.log.info(`cloud workspace ${name} ${state}`)),
       remove: (provider, name) => this.provider(provider).remove(name),
       log,
     });
-  }
-
-  /**
-   * A sandbox made ahead without a base gets what a base would hold: the project's checked-out branch and its setup,
-   * marked as a base's are, so the conversation that takes it brings only what changed since.
-   */
-  private async prepareAhead(location: CloudLocation, project: Project): Promise<CloudLocation> {
-    const branch = (await git(project.rootPath, ["symbolic-ref", "-q", "--short", "HEAD"], { okCodes: [0, 1] })).stdout.trim();
-    if (!branch) return location;
-    const commit = await seedBranch(location, project.rootPath, branch);
-    const script = project.settings.setupScript;
-    if (script) await runSetupScript(location, script, project.name, await this.projectEnv(project.id));
-    const base: BaseMarker = { commit, branch, setup: setupHash(script), agents: {} };
-    await writeBaseMarker(location.install, base);
-    return { ...location, base };
   }
 
   /** Makes a sandbox ahead for the next cloud conversation in `project`, while its first message is being written. */
@@ -333,6 +321,8 @@ export class CloudWorkspaceService {
       });
       const sandbox = await phases.time("vm", () => this.open(record, docker, from));
       if (docker && !sandbox.startDocker) this.log.info(`cloud workspace ${record.sandbox} has no Docker of its own, though its project uses Docker`);
+      // Docker starts while the runner, the agent and the code go in; a failure here is reported where it is waited for.
+      if (docker) sandbox.startDocker?.().catch(() => undefined);
       this.files ??= runnerFiles();
       const files = this.files;
       const install = await phases.time("runner", () => installRunner(sandbox, files, this.options.node));
@@ -489,9 +479,12 @@ export class CloudWorkspaceService {
     if (warmed) this.takeWarmed(threadId, warmed, start.mirror, { folder: source, commit }, from ?? undefined);
     const seeding: Seeding = {
       from: from ?? undefined,
-      seed: (location, origin) => {
+      seed: async (location, origin, steps) => {
         const at = { source, commit, branch, ...(origin ? { origin } : {}) };
-        return location.base ? seedOverBase(location, { ...at, base: location.base.commit }) : seedFromCommit(location, at);
+        const { base } = location;
+        const state = base ? await seedOverBase(location, { ...at, base: base.commit, ...(base.shallow ? { shallow: true } : {}) }) : await seedFromCommit(location, at, steps);
+        if (!base || base.shallow) this.history.fill(location, source);
+        return state;
       },
       // Over a base, the setup runs again only when it, or what it installs from, changed since.
       setup: async ({ base }) => !base || base.setup !== setupHash(project.settings.setupScript) || (await setupInputsChanged(source, base.commit, commit)),
@@ -501,13 +494,7 @@ export class CloudWorkspaceService {
   }
 
   /** Opens the sandbox, gives it the code with `seed` and runs the project's setup there, reporting each step as it starts. */
-  private async build(
-    threadId: string,
-    project: Project,
-    mirror: string,
-    seeding: Seeding,
-    code?: CodeSource,
-  ): Promise<CloudMirrorState> {
+  private async build(threadId: string, project: Project, mirror: string, seeding: Seeding, code?: CodeSource): Promise<CloudMirrorState> {
     const record = cloudWorkspaces.get(this.db, threadId);
     if (!record) throw new Error(`Thread ${threadId} has no cloud workspace.`);
     const script = project.settings.setupScript;
@@ -522,17 +509,22 @@ export class CloudWorkspaceService {
       // One that fails is installed again at that turn, which says why.
       const agent = threads.get(this.db, threadId)?.agent;
       const agentReady = isHarnessId(agent)
-        ? phases.time("agent", () => this.installAgent(agent, location, record.provider)).catch((error: unknown) => this.log.warn(`could not install the agent of thread ${threadId} ahead of its turn: ${error instanceof Error ? error.message : String(error)}`))
+        ? phases
+            .time("agent", () => this.installAgent(agent, location, record.provider))
+            .catch((error: unknown) => this.log.warn(`could not install the agent of thread ${threadId} ahead of its turn: ${error instanceof Error ? error.message : String(error)}`))
         : Promise.resolve();
-      await phases.time("docker", () => this.dockerUp(location));
+      const dockerReady = phases.time("docker", () => this.dockerUp(location));
+      dockerReady.catch(() => undefined);
       this.step(threadId, { step: "code", setup: Boolean(script) });
       const origin = (await originUrl(project.rootPath)) ?? undefined;
-      const state = await phases.time("code", () => seeding.seed(location, origin));
+      const state = await phases.time("code", () => seeding.seed(location, origin, phases));
       if (script && (await seeding.setup(location))) {
         this.step(threadId, { step: "setup", setup: true });
+        // A setup script may start the project's containers.
+        await dockerReady;
         await phases.time("setup", async () => runSetupScript(location, script, path.basename(mirror), await this.projectEnv(project.id)));
       }
-      await agentReady;
+      await Promise.all([agentReady, dockerReady]);
       this.log.info(phases.line(`cloud workspace for thread ${threadId} built`));
       return state;
     } catch (error) {
@@ -584,6 +576,7 @@ export class CloudWorkspaceService {
     const mirror = thread.worktreePath;
     const placed = await phases.time("sandbox", () => this.location(record, mirror));
     const { sandbox } = placed.install;
+    this.history.again(placed);
     // The VM stays awake from here until the agent's process has started, then for as long as each process runs.
     const launching = this.awake.hold(thread.id, sandbox);
     const unused = setTimeout(launching, LAUNCH_HOLD_MS);

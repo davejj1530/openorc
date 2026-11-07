@@ -6,7 +6,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { LocalSandboxProvider, type LocalSandbox } from "./local-sandbox.js";
 import { installRunner, runnerFiles } from "./runner-client.js";
-import { pullWorkspace, pushWorkspace, seedFromCommit, seedWorkspace, type WorkspaceLocation } from "./sync.js";
+import { fillHistory, pullWorkspace, pushWorkspace, seedFromCommit, seedOverBase, seedWorkspace, type WorkspaceLocation } from "./sync.js";
 
 const IDENTITY = { GIT_AUTHOR_NAME: "Test", GIT_AUTHOR_EMAIL: "test@example.com", GIT_COMMITTER_NAME: "Test", GIT_COMMITTER_EMAIL: "test@example.com" };
 
@@ -185,5 +185,64 @@ describe("seeding a new conversation from the commit its worktree starts at", ()
     expect(file(location.repo, "a.txt")).toBe("a1\n");
     expect(file(location.repo, "left-by-a-failed-setup.txt")).toBeNull();
     expect(git(location.repo, "remote", "get-url", "origin")).toBe("https://github.com/example/repo.git");
+  });
+});
+
+describe("a checkout seeded with its commit alone", () => {
+  const commitOnMac = (name: string, content: string) => {
+    file(mirror, name, content);
+    git(mirror, "add", name);
+    git(mirror, "commit", "-q", "-m", name);
+    return git(mirror, "rev-parse", "HEAD");
+  };
+  const history = (repo: string, ref = "HEAD") => git(repo, "rev-list", "--count", ref);
+  const shallow = (repo: string) => git(repo, "rev-parse", "--is-shallow-repository") === "true";
+
+  it("has no history until it is filled in, syncs both ways meanwhile, and is filled once", async () => {
+    commitOnMac("c.txt", "c1\n");
+    const head = commitOnMac("d.txt", "d1\n");
+    const state = await seedFromCommit(location, { source: mirror, commit: head, branch: "openorc/new-thread" });
+    expect(shallow(location.repo)).toBe(true);
+    expect(history(location.repo)).toBe("1");
+    expect(git(location.repo, "status", "--porcelain")).toBe("");
+    expect(file(location.repo, "c.txt")).toBe("c1\n");
+
+    git(mirror, "checkout", "-q", "-b", "openorc/new-thread");
+    file(location.repo, "e.txt", "from the cloud\n");
+    const pulled = await pullWorkspace(location, state);
+    expect(file(mirror, "e.txt")).toBe("from the cloud\n");
+    file(mirror, "a.txt", "edited on the Mac\n");
+    expect(await pushWorkspace(location, pulled.state)).toMatchObject({ pushed: true });
+    expect(file(location.repo, "a.txt")).toBe("edited on the Mac\n");
+
+    expect(await fillHistory(location, mirror)).toBe(true);
+    expect(shallow(location.repo)).toBe(false);
+    expect(history(location.repo, head)).toBe(history(mirror, head));
+    git(location.repo, "fsck", "--connectivity-only");
+    expect(await fillHistory(location, mirror)).toBe(false);
+  });
+
+  it("takes a later commit over it as commits, and one its commit cannot reach as files, and both get their history", async () => {
+    const root = git(mirror, "rev-parse", "HEAD");
+    const base = commitOnMac("c.txt", "c1\n");
+    await seedFromCommit(location, { source: mirror, commit: base, branch: "main" });
+    const later = commitOnMac("d.txt", "d1\n");
+
+    await seedOverBase(location, { source: mirror, commit: later, branch: "openorc/later", base, shallow: true });
+    expect(git(location.repo, "rev-parse", "HEAD")).toBe(later);
+    expect(history(location.repo)).toBe("2");
+
+    git(mirror, "checkout", "-q", "-b", "elsewhere", root);
+    const elsewhere = commitOnMac("f.txt", "f1\n");
+    await seedOverBase(location, { source: mirror, commit: elsewhere, branch: "openorc/elsewhere", base, shallow: true });
+    expect(git(location.repo, "rev-parse", "HEAD")).toBe(elsewhere);
+    expect(git(location.repo, "status", "--porcelain")).toBe("");
+    expect(file(location.repo, "c.txt")).toBeNull();
+    expect(file(location.repo, "f.txt")).toBe("f1\n");
+
+    expect(await fillHistory(location, mirror)).toBe(true);
+    expect(shallow(location.repo)).toBe(false);
+    expect(history(location.repo, elsewhere)).toBe("2");
+    expect(history(location.repo, later)).toBe("3");
   });
 });

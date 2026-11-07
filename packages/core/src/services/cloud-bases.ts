@@ -15,7 +15,7 @@ export interface CloudBase {
   project: string;
   provider: CloudProviderId;
   docker: boolean;
-  /** The service's id for it: a Vercel snapshot, an Agent37 instance, a folder on this Mac. */
+  /** The service's id for it: a Vercel snapshot, a folder on this Mac. */
   image: string;
   /** The default branch's commit its checkout holds. */
   commit: string;
@@ -246,10 +246,11 @@ export class CloudBases {
   private async prune(provider: CloudProviderId): Promise<void> {
     const service = this.deps.provider(provider).bases;
     if (!service) return;
-    const remove = (image: string) => service.remove(image).then(
-      () => true,
-      (error: unknown) => (this.deps.log.warn(`a cloud base on ${provider} could not be deleted: ${words(error)}`), false),
-    );
+    const remove = (image: string) =>
+      service.remove(image).then(
+        () => true,
+        (error: unknown) => (this.deps.log.warn(`a cloud base on ${provider} could not be deleted: ${words(error)}`), false),
+      );
     const now = Date.now();
     for (const [id, base] of Object.entries(this.read()).filter(([, each]) => each.provider === provider)) {
       if (!projects.get(this.deps.db, base.project)) {

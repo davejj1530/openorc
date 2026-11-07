@@ -7,8 +7,8 @@ export interface SkillSegment {
 /**
  * The parts of a message that name a skill.
  *
- * Only a name the project actually has counts, so a stray slash, a path, or a
- * command the app owns stays plain. A skill token also has to start a word,
+ * Only a name the project actually has counts, so a stray slash, a path such as
+ * `/build/output`, or a command the app owns stays plain. A skill token also has to start a word,
  * because `http://x/formatting` contains one of these names and means nothing
  * by it. Plugin skills carry a colon, which is why the set is matched against
  * rather than a character class.
@@ -22,7 +22,7 @@ export function skillSegments(text: string, names: ReadonlySet<string>, prefix: 
   // also exists. Escaped because a skill name is a directory name, not a pattern.
   const alternatives = [...names].sort((a, b) => b.length - a.length).map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   const marker = prefix === "$" ? "\\$" : "/";
-  const pattern = new RegExp(`(^|\\s)(${marker}(?:${alternatives.join("|")}))(?![\\w:-])`, "g");
+  const pattern = new RegExp(`(^|\\s)(${marker}(?:${alternatives.join("|")}))(?![\\w:/-])`, "g");
   const segments: SkillSegment[] = [];
   let at = 0;
   for (const match of text.matchAll(pattern)) {

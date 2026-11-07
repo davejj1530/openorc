@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import os from "node:os";
 import path from "node:path";
@@ -107,6 +107,92 @@ describe("listSkills", () => {
       "wrapped",
     ]);
     expect(found.find((skill) => skill.name === "shared")?.source).toBe("user");
+  });
+
+  it("lists Claude's custom commands by path, namespacing subfolders and letting a skill win a shared name", async () => {
+    const root = await temp("openorc-skills-commands-");
+    const configDir = await temp("openorc-skills-commands-config-");
+    const commands = path.join(root, ".claude", "commands");
+    await mkdir(path.join(commands, "ops"), { recursive: true });
+    await writeFile(path.join(commands, "fix-bug.md"), "---\nname: ignored-header\ndescription: >-\n  Fix a bug\n  with a test.\n---\n\nBody.\n");
+    await writeFile(path.join(commands, "CHEATSHEET.md"), "# No header at all\n");
+    await writeFile(path.join(commands, "notes.txt"), "Not a command.\n");
+    await writeFile(path.join(commands, "ops", "deploy.md"), "Deploy it.\n");
+    await writeFile(path.join(commands, "both.md"), "---\ndescription: The command.\n---\n");
+    await skill(path.join(root, ".claude", "skills"), "both", "---\nname: both\ndescription: The skill.\n---\n");
+    await mkdir(path.join(configDir, "commands"));
+    await writeFile(path.join(configDir, "commands", "mine.md"), "Mine.\n");
+    const plugin = path.join(configDir, "cache", "demo");
+    await mkdir(path.join(plugin, "commands"), { recursive: true });
+    await writeFile(path.join(plugin, "commands", "ship.md"), "---\ndescription: Ship it.\n---\n");
+    await mkdir(path.join(configDir, "plugins"));
+    await writeFile(path.join(configDir, "plugins", "installed_plugins.json"), JSON.stringify({ plugins: { "demo@market": [{ installPath: plugin }] } }));
+
+    const found = await listSkills({ projectRoot: root, home, agent: "claude", env: { CLAUDE_CONFIG_DIR: configDir } });
+
+    expect(found.map((s) => `${s.source}:${s.name}`).sort()).toEqual(["plugin:demo:ship", "project:CHEATSHEET", "project:both", "project:fix-bug", "project:ops:deploy", "user:mine"].sort());
+    expect(found.find((s) => s.name === "fix-bug")?.description).toBe("Fix a bug with a test.");
+    expect(found.find((s) => s.name === "both")?.description).toBe("The skill.");
+    expect(found.find((s) => s.name === "CHEATSHEET")?.description).toBe("No header at all");
+    expect(found.find((s) => s.name === "ops:deploy")?.description).toBe("Deploy it.");
+  });
+
+  it("lists a command folder holding a SKILL.md as one command and its subfolders after it, as the CLI does, and leaves out names it could not run", async () => {
+    const root = await temp("openorc-skills-command-skill-");
+    const configDir = await temp("openorc-skills-command-skill-config-");
+    const commands = path.join(root, ".claude", "commands");
+    await skill(commands, "review", "---\ndescription: Review it.\n---\n");
+    await writeFile(path.join(commands, "review", "checklist.md"), "Not its own command.\n");
+    await mkdir(path.join(commands, "review", "refs"));
+    await writeFile(path.join(commands, "review", "refs", "more.md"), "A command of its own.\n");
+    await skill(path.join(commands, "ops"), "deep", "---\ndescription: Nested.\n---\n");
+    await writeFile(path.join(commands, ".md"), "No name.\n");
+    await writeFile(path.join(commands, "my notes.md"), "Reads as /my with an argument.\n");
+    await writeFile(path.join(commands, "unclosed.md"), "---\nname: unclosed\n");
+    const plugin = path.join(configDir, "cache", "demo");
+    await skill(path.join(plugin, "commands"), "audit", "---\ndescription: From a plugin.\n---\n");
+    await writeFile(path.join(plugin, "commands", "audit", "notes.md"), "Not its own command.\n");
+    // A plugin's folder ends at its SKILL.md, subfolders and all.
+    await mkdir(path.join(plugin, "commands", "audit", "deeper"));
+    await writeFile(path.join(plugin, "commands", "audit", "deeper", "more.md"), "Not listed.\n");
+    await mkdir(path.join(configDir, "plugins"));
+    await writeFile(path.join(configDir, "plugins", "installed_plugins.json"), JSON.stringify({ plugins: { "demo@market": [{ installPath: plugin }] } }));
+
+    const found = await listSkills({ projectRoot: root, home, agent: "claude", env: { CLAUDE_CONFIG_DIR: configDir } });
+
+    expect(found.map((s) => s.name)).toEqual(["demo:audit", "ops:deep", "review", "review:refs:more", "unclosed"]);
+    expect(found.find((s) => s.name === "review")?.description).toBe("Review it.");
+    expect(found.find((s) => s.name === "unclosed")?.description).toBe("");
+  });
+
+  it("keeps a project's subfolder commands past a stray skill.md at the top of its commands, as the CLI does", async () => {
+    const root = await temp("openorc-skills-command-stray-");
+    const commands = path.join(root, ".claude", "commands");
+    await mkdir(path.join(commands, "ops"), { recursive: true });
+    await writeFile(path.join(commands, "skill.md"), "A stray one.\n");
+    await writeFile(path.join(commands, "top.md"), "Beside the stray one, so its own file.\n");
+    await writeFile(path.join(commands, "ops", "deploy.md"), "Deploy it.\n");
+
+    const found = await listSkills({ projectRoot: root, home, agent: "claude", env: { CLAUDE_CONFIG_DIR: await temp("openorc-skills-command-stray-config-") } });
+
+    expect(found.map((s) => s.name)).toEqual(["commands", "ops:deploy"]);
+  });
+
+  posixIt("does not list a command folder again through a link back up the tree", async () => {
+    const root = await temp("openorc-skills-command-cycle-");
+    const commands = path.join(root, ".claude", "commands");
+    await mkdir(path.join(commands, "ops"), { recursive: true });
+    await writeFile(path.join(commands, "ops", "deploy.md"), "Deploy it.\n");
+    await writeFile(path.join(commands, "plain.md"), "Plain.\n");
+    await symlink(commands, path.join(commands, "self"));
+    await symlink(commands, path.join(commands, "ops", "back"));
+    await mkdir(path.join(root, "elsewhere"));
+    await writeFile(path.join(root, "elsewhere", "linked.md"), "Through a link.\n");
+    await symlink(path.join(root, "elsewhere"), path.join(commands, "shared"));
+
+    const found = await listSkills({ projectRoot: root, home, agent: "claude", env: { CLAUDE_CONFIG_DIR: await temp("openorc-skills-command-cycle-config-") } });
+
+    expect(found.map((s) => s.name)).toEqual(["ops:deploy", "plain", "shared:linked"]);
   });
 
   it("gives an added account its own skills and the plugins the CLI login turns on", async () => {

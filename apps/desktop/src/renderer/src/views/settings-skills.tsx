@@ -99,7 +99,8 @@ function SkillGroup({ group, agent }: { group: (typeof sources)[number] & { item
         {group.items.map((skill) => {
           const description = readableDescription(skill.description);
           return (
-            <li key={skill.path}>
+            // A built-in has no file, so its name is what tells it apart.
+            <li key={`${skill.source}:${skill.name}`}>
               <details className="skills-item">
                 <summary className="skills-item-summary">
                   <span className="skills-command">
@@ -111,7 +112,7 @@ function SkillGroup({ group, agent }: { group: (typeof sources)[number] & { item
                 </summary>
                 <div className="skills-item-detail">
                   <span className="text-ink-3">Location</span>
-                  <code>{skill.path}</code>
+                  {skill.path ? <code>{skill.path}</code> : <span className="text-ink-2">Built into {harnesses.find((harness) => harness.id === agent)?.label ?? "the harness"}</span>}
                 </div>
               </details>
             </li>

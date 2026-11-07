@@ -42,6 +42,17 @@ it("keeps a project's conversations on the project's skills", async () => {
   expect(rpc.call).toHaveBeenCalledWith("skills.list", { projectId: "project", agent: "claude" });
 });
 
+it("offers the project's own skills ahead of personal and plugin ones", async () => {
+  rpc.call.mockResolvedValue([
+    { ...humanizer, name: "anatomy" },
+    { ...humanizer, name: "brag:brag", source: "plugin" },
+    { ...humanizer, name: "fix-bug", source: "project" },
+    { ...humanizer, name: "terraform", source: "project" },
+  ]);
+  const { result } = renderHook(() => useSkillCommands("project", "claude"), { wrapper });
+  await waitFor(() => expect(result.current.map((command) => command.name)).toEqual(["fix-bug", "terraform", "anatomy", "brag:brag"]));
+});
+
 it("leaves OpenCode to its own skill tool", () => {
   const { result } = renderHook(() => useSkillCommands(WORKSPACE_ID, "opencode", desk), { wrapper });
   expect(result.current).toEqual([]);

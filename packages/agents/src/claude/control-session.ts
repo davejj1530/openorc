@@ -15,6 +15,12 @@ export interface ClaudeControlSessionOptions {
   /** Added to the CLI's `--settings`; hooks are always disabled. */
   settings?: Record<string, unknown>;
   timeoutMs?: number;
+  /** Where the CLI starts, which decides the project it reads; the home folder by default. */
+  cwd?: string;
+  /** The settings files it reads: the user's own by default, every source with `all`, as a run reads them. */
+  settingSources?: "user" | "all";
+  /** More arguments, such as the plugin folders an added account runs with. */
+  args?: string[];
 }
 
 interface Waiting {
@@ -41,8 +47,7 @@ export async function withClaudeControlSession<T>(
     "stream-json",
     "--verbose",
     "--no-session-persistence",
-    "--setting-sources",
-    "user",
+    ...((options.settingSources ?? "user") === "user" ? ["--setting-sources", "user"] : []),
     "--tools",
     "",
     "--strict-mcp-config",
@@ -50,8 +55,9 @@ export async function withClaudeControlSession<T>(
     JSON.stringify({ mcpServers: {} }),
     "--settings",
     JSON.stringify({ disableAllHooks: true, ...options.settings }),
+    ...(options.args ?? []),
   ]);
-  const proc = spawn(command.file, command.args, { ...command.options, cwd: os.homedir(), env, stdio: ["pipe", "pipe", "pipe"], detached: process.platform !== "win32" });
+  const proc = spawn(command.file, command.args, { ...command.options, cwd: options.cwd ?? os.homedir(), env, stdio: ["pipe", "pipe", "pipe"], detached: process.platform !== "win32" });
   const closed = new Promise<void>((resolve) => proc.once("close", () => resolve()));
   const output = readline.createInterface({ input: proc.stdout, crlfDelay: Infinity });
   proc.stderr.resume();

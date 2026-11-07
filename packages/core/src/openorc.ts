@@ -656,7 +656,12 @@ export class OpenOrc {
       createReviewThreadHandlers({ review: this.review, db: this.db, invalidate }),
       createReviewCommentsHandlers({ review: this.review, invalidate }),
       createReviewWorkspaceHandlers({ review: this.review, db: this.db, taskCheckout: this.taskCheckout, invalidate }),
-      createFilesHandlers({ db: this.db, files: this.files, claudeEnvironment: (id) => this.claudeAccounts.environment(this.environment.current(), id).env }),
+      createFilesHandlers({
+        db: this.db,
+        files: this.files,
+        claudeEnvironment: (id) => this.claudeAccounts.environment(this.environment.current(), id).env,
+        claudeLaunch: (id) => captureLaunchEnvironment("claude", this.claudeAccounts.environment(this.environment.current(), id)),
+      }),
       createCodeExplanationHandlers({ db: this.db, files: this.files, textGeneration: this.textGeneration, settings: this.settings, dataDir: this.options.dataDir }),
       createInstructionsHandlers({ db: this.db, files: this.files, claudeEnvironment: (id) => this.claudeAccounts.environment(this.environment.current(), id).env }),
       createSettingsHandlers({ settings: this.settings, textGeneration: this.textGeneration, invalidate }),

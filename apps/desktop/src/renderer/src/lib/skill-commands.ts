@@ -1,8 +1,11 @@
 import { useClaudeAccountId } from "./claude-account";
 import { useMemo } from "react";
-import { WORKSPACE_ID, type AgentKind } from "@openorc/protocol";
+import { WORKSPACE_ID, type AgentKind, type AgentSkill } from "@openorc/protocol";
 import type { SlashCommand } from "../components/Composer";
 import { useRpc } from "./client";
+
+/** What this project brought comes first: a personal or plugin skill reaches every project, so it says less about this one. */
+const SOURCE_ORDER: Record<AgentSkill["source"], number> = { project: 0, user: 1, plugin: 2, system: 3 };
 
 /**
  * The selected harness's explicit skills, for every composer rather than one.
@@ -32,7 +35,17 @@ export function useSkillCommands(projectId: string | null | undefined, selectedA
   const found = skills.data;
   return useMemo(
     () =>
-      agent === "opencode" ? [] : (found ?? []).map((skill) => ({ name: skill.name, hint: skill.description, insert: true as const, prefix: agent === "codex" ? ("$" as const) : ("/" as const) })),
+      agent === "opencode"
+        ? []
+        : [...(found ?? [])]
+            .sort((a, b) => SOURCE_ORDER[a.source] - SOURCE_ORDER[b.source])
+            .map((skill) => ({
+              name: skill.name,
+              hint: skill.description,
+              insert: true as const,
+              prefix: agent === "codex" ? ("$" as const) : ("/" as const),
+              ...(skill.aliases?.length ? { aliases: skill.aliases } : {}),
+            })),
     [agent, found],
   );
 }

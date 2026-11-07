@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { AgentEvent } from "@openorc/protocol";
 import { ClaudeStreamParser } from "./stream-json.js";
 import fixture from "./test-fixtures/subagents.json";
@@ -270,4 +270,60 @@ it("does not reopen a turnless child on a late task start after Stop, but accept
   expect(parser.subagentTaskId("a")).toBeNull();
   expect(parse(parser, { ...started, run_id: "resumed" })).toContainEqual(expect.objectContaining({ subagentId: "a", status: "running" }));
   expect(parser.subagentTaskId("a")).toBe("task");
+});
+
+describe("a command typed into the message and run forked, as /code-review", () => {
+  // As Claude Code 2.1.318 streams it: the task only as housekeeping, the agent's messages under `forked-command-<name>`.
+  const started = {
+    type: "system",
+    subtype: "task_started",
+    task_id: "task-1",
+    run_id: "run-1",
+    description: "/code-review",
+    subagent_type: "general-purpose",
+    task_type: "local_agent",
+    prompt: "Review the diff.",
+    ambient: true,
+    skip_transcript: true,
+  };
+  const ended = (status: string) => ({ type: "system", subtype: "task_notification", task_id: "task-1", run_id: "run-1", status, summary: "/code-review", ambient: true, skip_transcript: true });
+  const prompt = {
+    type: "user",
+    parent_tool_use_id: "forked-command-code-review",
+    agent_id: "task-1",
+    uuid: "prompt-1",
+    message: { role: "user", content: [{ type: "text", text: "Review the diff." }] },
+  };
+  const reply = {
+    type: "assistant",
+    parent_tool_use_id: "forked-command-code-review",
+    agent_id: "task-1",
+    uuid: "reply-1",
+    message: { id: "reply-1", role: "assistant", content: [{ type: "text", text: "No findings." }] },
+  };
+  const result = (isError = false) => ({ type: "result", subtype: "success", is_error: isError, result: "Done", duration_ms: 1 });
+  const lifecycle = (events: AgentEvent[]) =>
+    events.flatMap((event) => {
+      if (event.type === "subagent.started") return [`started ${event.title}`];
+      return event.type === "subagent.updated" && event.status ? [event.status] : [];
+    });
+
+  it("is one titled agent that ends with its task, even when the task ended before the agent's first message", () => {
+    const parser = new ClaudeStreamParser("host");
+    const events = [started, ended("failed"), prompt, result()].flatMap((line) => parse(parser, line));
+    expect(lifecycle(events)).toEqual(["started /code-review", "failed"]);
+  });
+
+  it("ends with its task in the order a run that reached the model streams", () => {
+    const parser = new ClaudeStreamParser("host");
+    const events = [started, prompt, reply, ended("completed"), result()].flatMap((line) => parse(parser, line));
+    expect(lifecycle(events)).toEqual(["started /code-review", "completed"]);
+    expect(events.find((event) => event.type === "message.completed" && event.role === "assistant")).toMatchObject({ subagentId: "forked-command-code-review" });
+  });
+
+  it("ends with the turn when no end of its task arrives", () => {
+    const parser = new ClaudeStreamParser("host");
+    const events = [prompt, reply, result(true)].flatMap((line) => parse(parser, line));
+    expect(lifecycle(events)).toEqual(["started /code-review", "failed"]);
+  });
 });

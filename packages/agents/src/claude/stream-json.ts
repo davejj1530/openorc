@@ -190,6 +190,7 @@ export class ClaudeStreamParser {
     const rawParent = str(msg["parent_tool_use_id"]);
     const parent = rawParent ? this.subagents.identity(rawParent) : null;
     if (parent) {
+      this.subagents.forkedCommand(parent, str(msg["agent_id"]), now, out);
       if (msg["type"] === "tool_progress" && !this.subagents.known(parent)) return null;
       if (!this.subagents.accepts(parent, msg)) return out;
       msg = { ...msg, parent_tool_use_id: parent };
@@ -447,6 +448,7 @@ export class ClaudeStreamParser {
     this.finishThinking(now, out);
     const subtype = str(msg["subtype"]) ?? "success";
     const isError = msg["is_error"] === true;
+    this.subagents.turnEnded(isError, now, out);
     const usage = readUsage(msg["usage"], { costUsd: num(msg["total_cost_usd"]), context: false });
     const contextWindow = readContextWindow(msg["modelUsage"], this.model);
     if (usage && contextWindow !== undefined) usage.contextWindow = contextWindow;

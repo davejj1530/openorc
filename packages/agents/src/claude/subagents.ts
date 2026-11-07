@@ -20,6 +20,9 @@ interface Launch {
   stopRequested?: boolean;
 }
 
+/** A command typed into the message and run forked, as `/code-review`, names its agent's messages with this parent. */
+const FORKED_COMMAND = "forked-command-";
+
 export class ClaudeSubagents {
   private readonly launches = new Map<string, Launch>();
   private readonly taskAgents = new Map<string, string>();
@@ -27,6 +30,8 @@ export class ClaudeSubagents {
   private readonly skills = new Set<string>();
   private readonly aliases = new Map<string, string>();
   private readonly pendingTasks = new Map<string, { msg: Record<string, unknown>; ts: number }[]>();
+  /** Housekeeping tasks by task id, for a typed forked command whose messages name its task only afterwards. */
+  private readonly ambient = new Map<string, { started?: Record<string, unknown>; ended?: { msg: Record<string, unknown>; ts: number } }>();
 
   constructor(private readonly runId: string) {}
 
@@ -108,7 +113,7 @@ export class ClaudeSubagents {
   task(msg: Record<string, unknown>, ts: number, out: AgentEvent[], tailing = false): boolean {
     const subtype = str(msg["subtype"]);
     if (!subtype || !["task_started", "task_progress", "task_notification", "task_updated"].includes(subtype)) return false;
-    if (this.housekeeping(msg, subtype)) return true;
+    if (this.housekeeping(msg, subtype, ts)) return true;
     const found = this.findTask(msg, ts, out);
     if (!found) return this.holdTask(msg, ts, tailing);
     if (found.launch.dormant && subtype !== "task_started") return true;
@@ -122,11 +127,47 @@ export class ClaudeSubagents {
 
   /**
    * Claude Code asks hosts to leave ambient and transcript-skipping tasks out. A forked skill's agent is one, yet its work
-   * streams like any agent's: its start makes it one, and the Skill call's result ends it.
+   * streams like any agent's: its start makes it one, and the Skill call's result ends it. A typed forked command's agent
+   * is one too, whose task is kept until its messages name it, and whose end then ends the agent.
    */
-  private housekeeping(msg: Record<string, unknown>, subtype: string): boolean {
+  private housekeeping(msg: Record<string, unknown>, subtype: string, ts: number): boolean {
     if (msg["skip_transcript"] !== true && msg["ambient"] !== true) return false;
-    return !(subtype === "task_started" && this.skills.has(str(msg["tool_use_id"]) ?? ""));
+    if (subtype === "task_started" && this.skills.has(str(msg["tool_use_id"]) ?? "")) return false;
+    const taskId = str(msg["task_id"]);
+    if (!taskId) return true;
+    // A forked skill's agent ends with its Skill call's result, which carries what it found; a command's has no call.
+    if (this.taskAgents.get(taskId)?.startsWith(FORKED_COMMAND)) return false;
+    const noted = this.ambient.get(taskId) ?? {};
+    if (subtype === "task_started") noted.started = msg;
+    else if (subtype === "task_notification") noted.ended = { msg, ts };
+    this.ambient.set(taskId, noted);
+    if (this.ambient.size > 64) this.ambient.delete(this.ambient.keys().next().value!);
+    return true;
+  }
+
+  /**
+   * The agent of a typed command run forked: Claude Code names it only through its messages' parent and task id, and its
+   * task, housekeeping by then, may have ended already, as when the command could not reach the model.
+   */
+  forkedCommand(parent: string, taskId: string | null, ts: number, out: AgentEvent[]): void {
+    if (!parent.startsWith(FORKED_COMMAND) || this.launches.has(parent)) return;
+    const noted = taskId ? this.ambient.get(taskId) : undefined;
+    const task = noted?.started ?? {};
+    this.launch(parent, { description: task["description"] ?? `/${parent.slice(FORKED_COMMAND.length)}`, prompt: task["prompt"], subagent_type: task["subagent_type"] }, null, ts, out);
+    if (!taskId) return;
+    this.launches.get(parent)!.taskId = taskId;
+    this.taskAgents.set(taskId, parent);
+    this.ambient.delete(taskId);
+    if (noted?.ended) this.task(noted.ended.msg, noted.ended.ts, out);
+  }
+
+  /** The turn is over, and with it a typed forked command's agent, which runs inside the turn. */
+  turnEnded(isError: boolean, ts: number, out: AgentEvent[]): void {
+    for (const [id, launch] of this.launches) {
+      if (!id.startsWith(FORKED_COMMAND) || launch.status !== "running") continue;
+      launch.status = isError ? "failed" : "completed";
+      out.push({ type: "subagent.updated", runId: this.runId, ts, subagentId: id, status: launch.status });
+    }
   }
 
   private holdTask(msg: Record<string, unknown>, ts: number, tailing: boolean): boolean {

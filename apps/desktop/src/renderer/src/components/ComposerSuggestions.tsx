@@ -10,6 +10,7 @@ export function ComposerSuggestions({
   side,
   members,
   cursor,
+  count,
   onDismiss,
   children,
 }: {
@@ -17,13 +18,15 @@ export function ComposerSuggestions({
   side: "top" | "bottom";
   members: boolean;
   cursor: number;
+  /** How many rows are offered: when that changes, the list may have moved out from under the selected row. */
+  count: number;
   onDismiss: () => void;
   children: ReactNode;
 }) {
   const popup = useRef<HTMLDivElement>(null);
   useEffect(() => {
     popup.current?.querySelector<HTMLElement>('[role="option"][aria-selected="true"]')?.scrollIntoView?.({ block: "nearest" });
-  }, [cursor]);
+  }, [cursor, count]);
   return (
     <Popover.Root
       open
@@ -51,6 +54,8 @@ export function ComposerSuggestions({
             }}
             initialFocus={false}
             finalFocus={false}
+            // Pressing the scrollbar or the padding must not blur the textarea, which would close the list.
+            onMouseDown={(e) => e.preventDefault()}
             className={cn("composer-suggestions floating-popover", members && "min-w-56 max-w-full")}
             style={{ maxHeight: "min(320px, var(--available-height))" }}
           >

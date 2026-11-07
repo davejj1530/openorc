@@ -329,3 +329,41 @@ it("starts a brain found down in its running machine once, and leaves a machine 
   expect(warnings).toContain("the cloud brain's machine runs with no brain behind its address: starting the brain");
   link.close();
 });
+
+it("stays live, and says so, when a wake runs while the brain is already linked, as a cloud thread's start does", async () => {
+  const brainKeys = nodeCrypto.generateKeyPair();
+  const dial = async () => {
+    const { phone, mac } = socketPair();
+    void acceptLink({ socket: mac, crypto: nodeCrypto, local: brainKeys, admit: () => ({ ok: true, value: null, hello: { mac: { name: "Cloud" }, deviceId: "owner", routes: [] } }) }).then(
+      (accepted) => {
+        accepted?.session.onMessage((message) => {
+          if (message.t === "rpc") accepted.session.send({ t: "rpc.result", id: message.id, result: null });
+        });
+      },
+    );
+    return phone;
+  };
+  let woke: () => void = () => undefined;
+  const link = new BrainLink({
+    endpoint: {
+      ready: async () => true,
+      locate: async () => ({ url: "ws://brain/link", brainKey: brainKeys.publicKey, ownerKeys: nodeCrypto.generateKeyPair() }),
+      wake: () => new Promise<void>((resolve) => (woke = resolve)),
+      projects: async () => ({ toCloud: () => null, toMac: () => null }),
+    },
+    log: { info: () => {}, warn: () => {}, error: () => {} } as never,
+    dial,
+  });
+  link.start();
+  await vi.waitFor(() => expect(link.reach).toBe("live"));
+  const reaches: string[] = [];
+  link.onReach((reach) => reaches.push(reach));
+  const up = link.bringUp();
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  expect(link.reach).toBe("live");
+  woke();
+  await up;
+  expect(link.reach).toBe("live");
+  expect(reaches).toEqual([]);
+  link.close();
+});

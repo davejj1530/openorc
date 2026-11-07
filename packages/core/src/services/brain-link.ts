@@ -238,14 +238,21 @@ export class BrainLink {
     if (!this.waking) this.set(reach);
   }
 
+  /**
+   * A brain already linked is up: a wake then, as a cloud start's that may install an update, changes nothing the
+   * windows show, and once it ends the link says live again, since no new session will.
+   */
   private wake(): Promise<void> {
     if (this.waking) return this.waking;
-    this.set("waking");
+    if (!this.session) this.set("waking");
     this.waking = this.deps.endpoint.wake().then(
-      () => void (this.waking = null),
+      () => {
+        this.waking = null;
+        if (this.session) this.set("live");
+      },
       (error: unknown) => {
         this.waking = null;
-        this.set("asleep");
+        if (!this.session) this.set("asleep");
         throw error;
       },
     );

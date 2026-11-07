@@ -1,4 +1,4 @@
-import { listSkills } from "@openorc/agents";
+import { listSkills, type AgentLaunchEnvironment } from "@openorc/agents";
 import { audit, Db } from "@openorc/db";
 import type { FileScope } from "@openorc/protocol";
 import { conversationFolder } from "../services/conversation-folder.js";
@@ -8,6 +8,8 @@ import type { Handlers } from "./types.js";
 type Dependencies = {
   db: Db;
   claudeEnvironment?: (id?: string) => NodeJS.ProcessEnv;
+  /** How a Claude run of that account starts, so the CLI itself can say which commands it has. */
+  claudeLaunch?: (id?: string) => AgentLaunchEnvironment;
   files: Pick<FileService, "search" | "read" | "write" | "find" | "format" | "intelligence">;
 };
 
@@ -18,6 +20,7 @@ export function createFilesHandlers({
   db,
   files,
   claudeEnvironment,
+  claudeLaunch,
 }: Dependencies): Pick<Handlers, "skills.list" | "files.list" | "files.search" | "files.read" | "files.write" | "files.find" | "files.format" | "editor.query"> {
   return {
     "editor.query": async ({ scope, expectedRoot, ...input }) => {
@@ -25,12 +28,16 @@ export function createFilesHandlers({
       if (folder.root !== expectedRoot) return { kind: "unavailable", reason: "This conversation changed workspace. Reopen the file to analyze its new workspace." };
       return files.intelligence.query(folder, input);
     },
-    "skills.list": async ({ projectId, workingDirectory, agent, claudeAccountId }) =>
-      listSkills({
-        projectRoot: (await conversationFolder(db, { kind: "project", id: projectId, workingDirectory })).root,
-        agent,
-        ...(agent === "claude" && claudeEnvironment ? { env: claudeEnvironment(claudeAccountId) } : {}),
-      }),
+    "skills.list": async ({ projectId, workingDirectory, agent, claudeAccountId }) => {
+      const projectRoot = (await conversationFolder(db, { kind: "project", id: projectId, workingDirectory })).root;
+      if (agent !== "claude" || !claudeLaunch) return listSkills({ projectRoot, agent });
+      // Without the CLI installed, the folders are all there is to read.
+      const launch = await Promise.resolve()
+        .then(() => claudeLaunch(claudeAccountId))
+        .catch(() => null);
+      if (launch) return listSkills({ projectRoot, agent, env: launch.env, launch });
+      return listSkills({ projectRoot, agent, ...(claudeEnvironment ? { env: claudeEnvironment(claudeAccountId) } : {}) });
+    },
     "files.list": async ({ scope, path }) => listDirectory((await conversationFolder(db, scope)).root, path),
     "files.search": async ({ scope, query, limit }) => files.search(await conversationFolder(db, scope), query, limit),
     "files.read": async ({ scope, path }) => files.read(await conversationFolder(db, scope), path),

@@ -13,7 +13,9 @@ import type { AgentSkill } from "@openorc/protocol";
 import type { HarnessId } from "@openorc/protocol";
 import { parse } from "jsonc-parser";
 import { SHARED_CLAUDE_CONFIG_DIR, claudeConfigDir } from "./claude/config-dir.js";
+import { claudeCommandRows, listClaudeCommands } from "./claude/commands.js";
 import { installedClaudePlugins, type InstalledClaudePlugin } from "./claude/plugins.js";
+import type { AgentLaunchEnvironment } from "./launch-environment.js";
 import { listCodexSkills } from "./codex/skills.js";
 import { listNativeOpenCodeSkills, openCodeSkillRows } from "./opencode/skills.js";
 
@@ -501,19 +503,25 @@ async function listOpenCodeSkills(projectRoot: string, home: string, env: NodeJS
   return [...found.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** The skills a selected harness offers in one project. */
+/**
+ * The skills a selected harness offers in one project. With `launch`, Claude's are the commands Claude Code itself lists
+ * there, built-ins included, and its folders only say where each comes from; without it, or when Claude Code cannot be
+ * asked, the folders alone.
+ */
 export async function listSkills({
   projectRoot,
   agent,
   home = os.homedir(),
   env = process.env,
   nativeDiscovery = true,
+  launch,
 }: {
   projectRoot: string;
   agent: HarnessId;
   home?: string;
   env?: NodeJS.ProcessEnv;
   nativeDiscovery?: boolean;
+  launch?: Pick<AgentLaunchEnvironment, "binary" | "env"> | undefined;
 }): Promise<AgentSkill[]> {
   if (agent === "codex") return listCodexSkills(projectRoot);
   if (agent === "opencode") {
@@ -521,5 +529,7 @@ export async function listSkills({
     if (!native) return disk;
     return openCodeSkillRows(native, new Map(disk.map((skill) => [skill.path, skill.source])), home);
   }
-  return listClaudeSkills(projectRoot, home, env);
+  if (!launch) return listClaudeSkills(projectRoot, home, env);
+  const [listed, read] = await Promise.all([listClaudeCommands(launch, projectRoot).catch(() => null), listClaudeSkills(projectRoot, home, launch.env)]);
+  return listed ? claudeCommandRows(listed, read) : read;
 }

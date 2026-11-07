@@ -25,7 +25,9 @@ beforeEach(async () => {
   // Personal skills resolve here, never in the real home.
   vi.stubEnv("CLAUDE_CONFIG_DIR", path.join(root, "claude"));
   await skill(path.join(root, "claude", "skills"), "humanizer");
-  core = await OpenOrc.create({ dataDir: path.join(root, "data"), ephemeral: true, transport: { push: () => {} } });
+  // No Claude CLI here, so the list is read from the folders these tests set up, whatever this machine has installed.
+  const shellProbe = async () => ({ path: process.env["PATH"] ?? "", binaries: { claude: null, codex: null, opencode: null } });
+  core = await OpenOrc.create({ dataDir: path.join(root, "data"), ephemeral: true, transport: { push: () => {} }, shellProbe });
 });
 
 afterEach(async () => {

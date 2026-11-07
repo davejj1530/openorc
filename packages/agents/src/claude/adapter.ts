@@ -10,7 +10,7 @@ import { ClaudeStreamParser } from "./stream-json.js";
 import { ClaudeTranscriptFiles } from "./transcript-files.js";
 import { claudeTaskControls } from "./task-controls.js";
 import { SHARED_CLAUDE_CONFIG_DIR, claudeConfigDir } from "./config-dir.js";
-import { installedClaudePlugins } from "./plugins.js";
+import { sharedPluginArgs } from "./plugins.js";
 import { RunHandle, type RunControls } from "../run-handle.js";
 import { withAttachedFiles } from "../attachments.js";
 import type { AgentLaunchEnvironment } from "../launch-environment.js";
@@ -146,11 +146,6 @@ export class ClaudeAdapter {
 function isolationArgs(spec: RunSpec, restricted: boolean, strictMcp: boolean): string[] {
   const untrusted = spec.untrustedCheckout === true;
   return [...(untrusted ? ["--setting-sources", "user"] : []), ...(restricted || strictMcp || untrusted ? ["--strict-mcp-config"] : [])];
-}
-
-/** An added account runs the plugins the CLI login turns on, loaded for this process rather than installed into its folder. */
-function sharedPluginArgs(shared: string | undefined): string[] {
-  return shared ? installedClaudePlugins(shared).flatMap((plugin) => (plugin.enabled ? ["--plugin-dir", plugin.dir] : [])) : [];
 }
 
 /** Prepare the exact CLI launch and private MCP file before a process owns them. */

@@ -43,3 +43,8 @@ export function installedClaudePlugins(configDir: string): InstalledClaudePlugin
   }
   return found.sort((a, b) => a.dir.localeCompare(b.dir));
 }
+
+/** An added account runs the plugins the CLI login turns on, loaded for its process rather than installed into its folder. */
+export function sharedPluginArgs(shared: string | undefined): string[] {
+  return shared ? installedClaudePlugins(shared).flatMap((plugin) => (plugin.enabled ? ["--plugin-dir", plugin.dir] : [])) : [];
+}

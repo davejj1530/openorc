@@ -596,7 +596,10 @@ export const AgentSkill = z.object({
   name: z.string(),
   description: z.string(),
   source: z.enum(["project", "user", "plugin", "system"]),
+  /** Its file; empty for one built into the harness. */
   path: z.string(),
+  /** Other names it answers to, as a plugin command's short name. */
+  aliases: z.array(z.string()).optional(),
 });
 export type AgentSkill = z.infer<typeof AgentSkill>;
 

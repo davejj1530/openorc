@@ -15,6 +15,7 @@ import { CodexSubagents } from "../../../agents/src/codex/subagents.js";
 import codexFixture from "../../../agents/src/codex/test-fixtures/subagents.json";
 import { ClaudeStreamParser } from "../../../agents/src/claude/stream-json.js";
 import workflowFixture from "../../../agents/src/claude/test-fixtures/workflows.json";
+import forkedSkill from "../../../agents/src/claude/test-fixtures/forked-skill.json";
 import { RunApprovals } from "./run-approvals.js";
 
 const quiet = { info() {}, warn() {}, error() {} };
@@ -519,6 +520,19 @@ it("parent Stop survives a child's interrupt error and settles children without 
   expect(stop.mock.calls.map(([id]) => id)).toEqual(["broken", "sibling"]);
   expect(subagents.byThread(db, turnless.threadId)?.status).toBe("stopped");
   expect(subagents.byThread(db, broken.threadId)).toMatchObject({ status: "failed", result: "Could not stop: Transport gone" });
+});
+
+it("a forked skill's agent ends with its skill, so a thread that hit its usage limit takes the next message", async () => {
+  const { emit, host, service, parent, hooks, start, db } = fixture;
+  const parser = new ClaudeStreamParser(host.id);
+  for (const line of forkedSkill) for (const event of parser.parseLine(JSON.stringify(line))) emit(event);
+  emit({ type: "turn.completed", runId: host.id, ts: Date.now(), turnId: "root", status: "error", resultText: "You've hit your 5-hour limit", durationMs: 1 });
+  await vi.waitFor(() => expect(hooks.onTurnSettled).toHaveBeenCalledOnce());
+  expect(subagents.byNative(db, parent.id, "skill-1")).toMatchObject({ status: "completed", taskId: "task-1" });
+  expect(threads.get(db, subagents.byNative(db, parent.id, "skill-1")!.threadId)?.title).toBe("/list-files");
+  expect(service.threadActivity(parent.id)).toBe("idle");
+  await service.send(host.id, "Carry on");
+  expect(start).toHaveBeenCalledTimes(2);
 });
 
 it("startup recovery preserves the parent's and child's activity order", () => {

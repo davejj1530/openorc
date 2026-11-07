@@ -2,6 +2,7 @@ import { expect, it } from "vitest";
 import { AgentEvent } from "@openorc/protocol";
 import { ClaudeStreamParser } from "./stream-json.js";
 import fixture from "./test-fixtures/subagents.json";
+import forkedSkill from "./test-fixtures/forked-skill.json";
 
 const parse = (parser: ClaudeStreamParser, line: unknown) => parser.parseLine(JSON.stringify(line), 1000).filter((event) => event.type !== "raw");
 const agent = (id: string, background = false) => ({
@@ -52,6 +53,19 @@ it("settles foreground results and leaves a background acknowledgment running un
   ]);
   expect(parser.subagentTaskId("background")).toBeNull();
   expect(parse(parser, { type: "system", subtype: "task_progress", task_id: "task-b", tool_use_id: "background", description: "Late" })).toEqual([]);
+});
+
+it("follows a forked skill's agent from its Skill call to the call's result, stoppable while it works", () => {
+  const parser = new ClaudeStreamParser("host");
+  const handBack = forkedSkill.findIndex((line) => line.type === "user" && !("parent_tool_use_id" in line && line.parent_tool_use_id));
+  const working = forkedSkill.slice(0, handBack).flatMap((line) => parse(parser, line));
+  expect(working).toContainEqual(expect.objectContaining({ type: "subagent.started", subagentId: "skill-1", title: "/list-files", prompt: expect.stringContaining("Run `ls`") }));
+  expect(working).toContainEqual(expect.objectContaining({ type: "tool.started", toolCallId: "bash-1", subagentId: "skill-1" }));
+  expect(parser.subagentTaskId("skill-1")).toBe("task-1");
+  expect(parse(parser, forkedSkill[handBack])).toContainEqual(
+    expect.objectContaining({ type: "subagent.updated", subagentId: "skill-1", status: "completed", result: 'Skill "list-files" completed (forked execution).\n\nResult:\nDONE' }),
+  );
+  expect(parser.subagentTaskId("skill-1")).toBeNull();
 });
 
 it.each(["stopped", "failed"])("maps task notification %s without a parent completion", (status) => {

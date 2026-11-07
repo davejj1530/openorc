@@ -357,6 +357,7 @@ export class ClaudeStreamParser {
         if (this.toolsStarted.has(b["id"])) out.push({ type: "tool.updated", runId: this.runId, ts: now, toolCallId: b["id"], input: b["input"] });
         else out.push({ type: "tool.started", runId: this.runId, ts: now, toolCallId: b["id"], name: b["name"], input: b["input"], parentToolCallId: parent ?? null });
         if (b["name"] === "Agent" || b["name"] === "Task") this.subagents.launch(b["id"], b["input"], parent, now, out);
+        if (b["name"] === "Skill") this.subagents.skill(b["id"]);
         if (b["name"] === "Workflow") this.workflows.launch(b["id"], b["input"], parent, now, out);
       }
     }

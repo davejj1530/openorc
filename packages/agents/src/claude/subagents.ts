@@ -24,6 +24,7 @@ export class ClaudeSubagents {
   private readonly launches = new Map<string, Launch>();
   private readonly taskAgents = new Map<string, string>();
   private readonly observed = new Set<string>();
+  private readonly skills = new Set<string>();
   private readonly aliases = new Map<string, string>();
   private readonly pendingTasks = new Map<string, { msg: Record<string, unknown>; ts: number }[]>();
 
@@ -76,6 +77,11 @@ export class ClaudeSubagents {
     if (launch) launch.inline = true;
   }
 
+  /** A Skill call. A skill that runs forked starts an agent of its own, and only that agent's task says so. */
+  skill(id: string): void {
+    this.skills.add(id);
+  }
+
   launch(id: string, rawInput: unknown, parent: string | null, ts: number, out: AgentEvent[]): void {
     const input = isRecord(rawInput) ? rawInput : {};
     const start: Started = {
@@ -102,7 +108,7 @@ export class ClaudeSubagents {
   task(msg: Record<string, unknown>, ts: number, out: AgentEvent[], tailing = false): boolean {
     const subtype = str(msg["subtype"]);
     if (!subtype || !["task_started", "task_progress", "task_notification", "task_updated"].includes(subtype)) return false;
-    if (msg["skip_transcript"] === true || msg["ambient"] === true) return true;
+    if (this.housekeeping(msg, subtype)) return true;
     const found = this.findTask(msg, ts, out);
     if (!found) return this.holdTask(msg, ts, tailing);
     if (found.launch.dormant && subtype !== "task_started") return true;
@@ -112,6 +118,15 @@ export class ClaudeSubagents {
     if (found.launch.stopRequested && subtype !== "task_started") return true;
     this.updateTask(found, subtype, msg, ts, out);
     return true;
+  }
+
+  /**
+   * Claude Code asks hosts to leave ambient and transcript-skipping tasks out. A forked skill's agent is one, yet its work
+   * streams like any agent's: its start makes it one, and the Skill call's result ends it.
+   */
+  private housekeeping(msg: Record<string, unknown>, subtype: string): boolean {
+    if (msg["skip_transcript"] !== true && msg["ambient"] !== true) return false;
+    return !(subtype === "task_started" && this.skills.has(str(msg["tool_use_id"]) ?? ""));
   }
 
   private holdTask(msg: Record<string, unknown>, ts: number, tailing: boolean): boolean {
@@ -140,7 +155,7 @@ export class ClaudeSubagents {
   private discoverTask(nativeId: string, msg: Record<string, unknown>, ts: number, out: AgentEvent[]): void {
     const parentTaskId = str(msg["parent_task_id"]);
     const parent = parentTaskId ? this.taskAgents.get(parentTaskId) : undefined;
-    if (!this.observed.has(nativeId) && !(parent && msg["task_type"] === "local_agent")) return;
+    if (!this.observed.has(nativeId) && !((parent || this.skills.has(nativeId)) && msg["task_type"] === "local_agent")) return;
     this.launch(nativeId, { description: msg["description"], prompt: msg["prompt"], subagent_type: msg["subagent_type"], run_in_background: msg["is_backgrounded"] }, parent ?? null, ts, out);
   }
 
@@ -209,6 +224,8 @@ export class ClaudeSubagents {
         .filter(isRecord)
         .map((part) => str(part["text"]) ?? "")
         .join("\n");
+    // Claude Code heads a hand-back with the tools the agent used; the agent's own words follow.
+    result = result?.replace(/<tools-used-before-summary>[^<]*<\/tools-used-before-summary>\s*/g, "").trim();
     out.push({ type: "subagent.updated", runId: this.runId, ts, subagentId: id, status: launch.status, result });
   }
 

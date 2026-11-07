@@ -751,6 +751,22 @@
   grid-column: 1 / -1;
   max-width: 100%;
 }
+/* Said in place of the rows while the skill list is read or when it could not be; why, on hover. */
+.composer-suggestions-notice {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 10px;
+  color: var(--ink-3);
+  font-size: var(--text-base);
+  letter-spacing: var(--text-base--letter-spacing);
+}
+.composer-suggestions [role="listbox"][hidden] {
+  display: none;
+}
+.composer-suggestions [role="listbox"]:not([hidden]) + .composer-suggestions-notice {
+  margin-top: 2px;
+}
 .composer-suggestion-hint {
   min-width: 0;
   overflow: hidden;

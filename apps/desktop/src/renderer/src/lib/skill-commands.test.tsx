@@ -86,3 +86,28 @@ it("reads the list again when the picker opens, not on a timer, and not twice in
   expect(rpc.call).toHaveBeenCalledTimes(2);
   expect(result.current.commands.map((command) => command.name)).toEqual(["humanizer"]);
 });
+
+it("says while there are no skills yet that they are loading or why they could not be, and keeps offering a list read before when reading it again fails", async () => {
+  rpc.call.mockRejectedValue(new Error("/code/project is missing. It may have been moved or deleted."));
+  const failing = renderHook(() => useSkillCommands(projectScope("project"), "codex"), { wrapper });
+  expect(failing.result.current.commandsNotice).toEqual({ prefix: "$", text: "Loading skills…" });
+  await waitFor(() => expect(failing.result.current.commandsNotice).toEqual({ prefix: "$", text: "Couldn’t load skills", reason: "/code/project is missing. It may have been moved or deleted." }), {
+    timeout: 5_000,
+  });
+  act(() => failing.result.current.onCommandsWanted());
+  await waitFor(() => expect(failing.result.current.commandsNotice).toEqual({ prefix: "$", text: "Loading skills…" }));
+  failing.unmount();
+  queryClient.clear();
+  rpc.call.mockReset();
+
+  vi.useFakeTimers();
+  rpc.call.mockResolvedValueOnce([humanizer]).mockRejectedValue(new Error("gone"));
+  const { result } = renderHook(() => useSkillCommands(projectScope("project"), "claude"), { wrapper });
+  await act(() => vi.advanceTimersByTimeAsync(1_000));
+  await act(() => vi.advanceTimersByTimeAsync(60_000));
+  act(() => result.current.onCommandsWanted());
+  await act(() => vi.advanceTimersByTimeAsync(10_000));
+  expect(rpc.call).toHaveBeenCalledTimes(3);
+  expect(result.current.commands.map((command) => command.name)).toEqual(["humanizer"]);
+  expect(result.current.commandsNotice).toBeNull();
+});

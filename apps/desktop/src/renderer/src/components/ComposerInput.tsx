@@ -1,11 +1,11 @@
 import type { FileScope } from "@openorc/protocol";
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
 import { useRpc } from "../lib/client";
 import { cn } from "../lib/cn";
 import { filterMentions, insertMention, mentionQueryAt, type MentionEntry } from "../lib/composer-mentions";
 import { skillSegments } from "../lib/skill-tokens";
-import type { SlashCommand } from "./Composer";
-import { commandRows, matchingCommands, suggestionKey, type SuggestionRow } from "./composer-commands";
+import type { CommandsNotice, SlashCommand } from "./Composer";
+import { commandRows, matchingCommands, suggestionKey, useCommandWord, type SuggestionRow } from "./composer-commands";
 import { ComposerSuggestions } from "./ComposerSuggestions";
 
 interface ComposerInputProps {
@@ -20,6 +20,7 @@ interface ComposerInputProps {
   mentions?: MentionEntry[];
   commands?: SlashCommand[];
   onCommandsWanted?: () => void;
+  commandsNotice?: CommandsNotice | null;
   suggestionAnchor: RefObject<HTMLDivElement | null>;
   suggestionSide: "top" | "bottom";
 }
@@ -56,6 +57,7 @@ export function ComposerInput(props: ComposerInputProps) {
   const [suggestionsActive, setSuggestionsActive] = useState(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mirrorRef = useRef<HTMLDivElement>(null);
+  const listId = useId();
   useEffect(() => {
     if (autoFocus) textareaRef.current?.focus();
   }, [autoFocus]);
@@ -65,14 +67,7 @@ export function ComposerInput(props: ComposerInputProps) {
   const mentionQuery = token?.token.startsWith("@") && fileSearch && !memberMatches.length ? token.token.slice(1) : null;
   const commandPrefix = token?.token[0];
   const commandQuery = commandQueryAt(token, commands);
-  // Once per word, and even when the list is empty: a skill installed since it was read is what the picker should show.
-  // The callback changes as its read starts and ends, so only the word may ask again, or a failing read would loop.
-  const commandWordStart = commandPrefix === "/" || commandPrefix === "$" ? token?.start : undefined;
-  const wantCommands = useRef(onCommandsWanted);
-  wantCommands.current = onCommandsWanted;
-  useEffect(() => {
-    if (commandWordStart !== undefined) wantCommands.current?.();
-  }, [commandWordStart]);
+  const unavailable = useCommandWord(token, onCommandsWanted, props.commandsNotice);
   const files = useRpc("files.search", { scope: fileSearch ?? NO_SEARCH, query: mentionQuery ?? "", limit: 8 }, { enabled: mentionQuery !== null, staleTime: 10_000 });
   // Skills insert into the prompt; actions clear it, so only offer actions at the start.
   const commandMatches = useMemo(() => matchingCommands(commands, commandQuery, commandPrefix, token?.start), [commandPrefix, commandQuery, commands, token?.start]);
@@ -134,16 +129,21 @@ export function ComposerInput(props: ComposerInputProps) {
     setChosen(false);
   }, [suggestions.length, memberQuery?.query, mentionQuery, commandQuery]);
   const memberList = suggestions.length > 0 && Boolean(suggestions[0]?.mention);
-  const suggestionsOpen = suggestionsActive && suggestions.length > 0;
+  const listOpen = suggestionsActive && suggestions.length > 0;
+  const suggestionsOpen = listOpen || (suggestionsActive && unavailable !== null);
+  // Focus stays in the message while the arrows move through the list, so a screen reader follows the row this names.
+  const listAria = listOpen ? { "aria-controls": listId, "aria-activedescendant": `${listId}-${cursor}` } : {};
 
   return (
     <>
       {suggestionsOpen ? (
         <ComposerSuggestions anchor={props.suggestionAnchor} side={props.suggestionSide} members={memberList} cursor={cursor} count={suggestions.length} onDismiss={() => setSuggestionsActive(false)}>
-          <div role="listbox" aria-label={suggestionLabel(memberList, mentionQuery !== null)} data-agent-mention-list={memberList || undefined}>
+          <div id={listId} role="listbox" hidden={suggestions.length === 0} aria-label={suggestionLabel(memberList, mentionQuery !== null)} data-agent-mention-list={memberList || undefined}>
             {suggestions.map((suggestion, index) => (
               <button
                 key={suggestion.key}
+                id={`${listId}-${index}`}
+                tabIndex={-1}
                 role="option"
                 aria-selected={index === cursor}
                 data-agent-mention={suggestion.mention}
@@ -166,6 +166,11 @@ export function ComposerInput(props: ComposerInputProps) {
               </button>
             ))}
           </div>
+          {unavailable ? (
+            <div role="status" title={unavailable.reason} className="composer-suggestions-notice">
+              {unavailable.text}
+            </div>
+          ) : null}
         </ComposerSuggestions>
       ) : null}
       <div className="composer-input-shell">
@@ -190,6 +195,8 @@ export function ComposerInput(props: ComposerInputProps) {
           }}
           rows={1}
           aria-label="Message"
+          aria-autocomplete="list"
+          {...listAria}
           disabled={disabled}
           value={value}
           onFocus={() => setSuggestionsActive(true)}

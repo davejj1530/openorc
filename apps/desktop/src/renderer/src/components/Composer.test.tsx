@@ -104,6 +104,42 @@ describe("slash suggestions", () => {
     expect(wanted).toHaveBeenCalledTimes(1);
   });
 
+  it("says the skills could not be loaded when their prefix starts a word, and still sends on Enter", async () => {
+    const submitted = vi.fn(async () => {});
+    mount({ commands: [], commandsNotice: { prefix: "/", text: "Couldn’t load skills", reason: "repo is missing." }, onSubmit: submitted, value: "" });
+    fireEvent.change(message(), { target: { value: "costs $5", selectionStart: 8 } });
+    expect(screen.queryByRole("status")).toBeNull();
+    fireEvent.change(message(), { target: { value: "/review", selectionStart: 7 } });
+    expect(screen.getByRole("status").textContent).toBe("Couldn’t load skills");
+    expect(screen.getByRole("status").getAttribute("title")).toBe("repo is missing.");
+    fireEvent.keyDown(message(), { key: "Enter" });
+    await waitFor(() => expect(submitted).toHaveBeenCalledWith("/review", [], false));
+  });
+
+  it("keeps the thread's own commands beside the notice", () => {
+    mount({ commands: [{ name: "compact", hint: "Summarize", run: vi.fn() }], commandsNotice: { prefix: "/", text: "Couldn’t load skills", reason: "repo is missing." }, value: "" });
+    fireEvent.change(message(), { target: { value: "/", selectionStart: 1 } });
+    expect(screen.getByRole("option", { name: "/compact Summarize" })).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toBe("Couldn’t load skills");
+    fireEvent.keyDown(message(), { key: "Escape" });
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("tells a screen reader which list it controls and which row the arrows chose, with focus kept in the message", () => {
+    mount({ commands, value: "" });
+    expect(message().getAttribute("aria-activedescendant")).toBeNull();
+    fireEvent.change(message(), { target: { value: "/", selectionStart: 1 } });
+    const [first, second] = screen.getAllByRole("option");
+    expect(message().getAttribute("aria-controls")).toBe(screen.getByRole("listbox").id);
+    expect(message().getAttribute("aria-activedescendant")).toBe(first!.id);
+    fireEvent.keyDown(message(), { key: "ArrowDown" });
+    expect(message().getAttribute("aria-activedescendant")).toBe(second!.id);
+    expect(second!.getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(message(), { key: "Escape" });
+    expect(message().getAttribute("aria-activedescendant")).toBeNull();
+    expect(message().getAttribute("aria-controls")).toBeNull();
+  });
+
   it("offers every skill rather than stopping at a page, matching names in any case", () => {
     const many: ComposerProps["commands"] = [...Array.from({ length: 30 }, (_, index) => `skill-${index}`), "COMMAND_CHEATSHEET"].map((name) => ({ name, hint: "A skill", insert: true, prefix: "/" }));
     mount({ commands: many, value: "" });

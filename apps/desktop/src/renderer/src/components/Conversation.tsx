@@ -267,6 +267,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
             fileSearch={conversation}
             commands={commands}
             onCommandsWanted={skills.onCommandsWanted}
+            commandsNotice={skills.commandsNotice}
             error={(submitter.error ?? sendQueued.error ?? stopCommand.error ?? compact.error ?? unqueue.error ?? fork.error ?? settings.error ?? draftError)?.message ?? permissionError}
           >
             {firstTaskRun && scope.kind === "task" ? (

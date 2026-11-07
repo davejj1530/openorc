@@ -1,4 +1,5 @@
-import type { SlashCommand } from "./Composer";
+import { useEffect, useRef } from "react";
+import type { CommandsNotice, SlashCommand } from "./Composer";
 
 /** One row of the composer's suggestions: a mention, a file, a skill or an app action. */
 export interface SuggestionRow {
@@ -85,6 +86,9 @@ interface KeyPress {
   isComposing: boolean;
 }
 
+/** Keys that mean the same on every row. */
+const ROW_KEYS: Partial<Record<string, SuggestionKey>> = { ArrowDown: "down", ArrowUp: "up", Tab: "pick" };
+
 /**
  * Tab picks the selected row and Enter does too, with exceptions where Enter keeps its own meaning: with Shift, Cmd or
  * Ctrl; on a skill typed in full; and on a slash word that ends a message after other words, such as a path, unless the
@@ -92,10 +96,28 @@ interface KeyPress {
  */
 export function suggestionKey(press: KeyPress, row: SuggestionRow | undefined, { chosen, endsMessage }: { chosen: boolean; endsMessage: boolean }): SuggestionKey {
   if (press.isComposing) return "pass";
-  if (press.key === "ArrowDown") return "down";
-  if (press.key === "ArrowUp") return "up";
   if (press.key === "Escape") return "close";
-  if (press.key === "Tab") return "pick";
+  // A notice alone has no row to move to or pick: the message keeps its keys.
+  if (!row) return "pass";
+  const plain = ROW_KEYS[press.key];
+  if (plain) return plain;
   if (press.key !== "Enter" || press.shiftKey || press.metaKey || press.ctrlKey || press.altKey) return "pass";
   return row?.insert === true && (row.complete === true || (!chosen && endsMessage)) ? "send" : "pick";
+}
+
+/**
+ * A `/` or `$` word at the caret asks for the command list again, once per word and even when the list is empty, since
+ * a skill installed since it was read is what the picker should show. Only a new word asks: the callback changes as its
+ * read starts and ends, and asking on that would loop on a failing read. Answers the notice the picker shows while there
+ * are no skills to offer, when the word starts with their prefix.
+ */
+export function useCommandWord(token: { start: number; token: string } | null, onCommandsWanted: (() => void) | undefined, unavailable: CommandsNotice | null | undefined): CommandsNotice | null {
+  const prefix = token?.token[0];
+  const start = prefix === "/" || prefix === "$" ? token?.start : undefined;
+  const want = useRef(onCommandsWanted);
+  want.current = onCommandsWanted;
+  useEffect(() => {
+    if (start !== undefined) want.current?.();
+  }, [start]);
+  return unavailable && start !== undefined && prefix === unavailable.prefix ? unavailable : null;
 }

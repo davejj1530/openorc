@@ -57,6 +57,14 @@ function composerDestination(props: ComposerProps): ReactNode {
 export type SlashCommand =
   { name: string; hint: string; run: () => void; insert?: never; prefix?: never; aliases?: never } | { name: string; hint: string; insert: true; prefix: "/" | "$"; run?: never; aliases?: string[] };
 
+/** Said in the picker while there are no skills to offer yet, when a word starts with the agent's prefix for them. */
+export interface CommandsNotice {
+  prefix: "/" | "$";
+  text: string;
+  /** Why, on hover, when reading them failed. */
+  reason?: string;
+}
+
 export interface ComposerChanges {
   projectName: string;
   files: number;
@@ -131,6 +139,7 @@ export interface ComposerProps {
   commands?: SlashCommand[];
   /** Called as a `/` or `$` word starts, so a list read a while ago can be read again before it is used. */
   onCommandsWanted?: () => void;
+  commandsNotice?: CommandsNotice | null;
   autoFocus?: boolean;
   size?: "md" | "lg";
   /** The landing screen draws the roomier composer and shows where the thread works below it, not in a footer. */
@@ -155,6 +164,15 @@ function useSentGhost(text: string | null) {
  * bar under the text with the context ring and send at its end; the working
  * folder and Git context share the footer. @ mentions a file, / runs a command.
  */
+/** The system's file chooser, as the attach button opens it. */
+function chooseFiles(add: (files: File[]) => void): void {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.multiple = true;
+  input.onchange = () => add(Array.from(input.files ?? []));
+  input.click();
+}
+
 export function Composer(props: ComposerProps) {
   const isNewThread = props.presentation === "new-thread";
   const shell = useRef<HTMLDivElement>(null);
@@ -200,13 +218,7 @@ export function Composer(props: ComposerProps) {
     });
   };
 
-  const pickFiles = () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.multiple = true;
-    input.onchange = () => void addFiles(Array.from(input.files ?? []));
-    input.click();
-  };
+  const pickFiles = () => chooseFiles((chosen) => void addFiles(chosen));
 
   const stopInsteadOfSend = actions.primary === "stop";
   const stopping = props.stopAction?.pending ?? interrupt.isPending;
@@ -280,6 +292,7 @@ export function Composer(props: ComposerProps) {
             mentions={props.mentions}
             commands={props.commands}
             onCommandsWanted={props.onCommandsWanted}
+            commandsNotice={props.commandsNotice}
             suggestionAnchor={shell}
             suggestionSide={isNewThread ? "bottom" : "top"}
           />

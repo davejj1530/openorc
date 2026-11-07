@@ -1,7 +1,7 @@
 import { useClaudeAccountId } from "./claude-account";
 import { useCallback, useMemo } from "react";
 import { WORKSPACE_ID, type AgentKind, type AgentSkill, type FileScope } from "@openorc/protocol";
-import type { SlashCommand } from "../components/Composer";
+import type { CommandsNotice, SlashCommand } from "../components/Composer";
 import { useRpc } from "./client";
 
 /** A list this recent is used as it is when the picker opens. */
@@ -14,6 +14,12 @@ const NO_SCOPE: FileScope = { kind: "project", id: "" };
 export function projectScope(projectId: string | null | undefined, folder?: string | null): FileScope | null {
   if (!projectId) return null;
   return projectId === WORKSPACE_ID && folder ? { kind: "project", id: projectId, workingDirectory: folder } : { kind: "project", id: projectId };
+}
+
+/** Reading a list with nothing yet clears its last error, so a read under way says so rather than nothing. */
+function listNotice(prefix: "/" | "$", reading: boolean, error: Error | null): CommandsNotice | null {
+  if (reading) return { prefix, text: "Loading skills…" };
+  return error ? { prefix, text: "Couldn’t load skills", reason: error.message } : null;
 }
 
 /** What this project brought comes first: a personal or plugin skill reaches every project, so it says less about this one. */
@@ -36,7 +42,11 @@ const SOURCE_ORDER: Record<AgentSkill["source"], number> = { project: 0, user: 1
  * installed while a conversation is open shows up the next time the picker
  * opens, not on a timer.
  */
-export function useSkillCommands(scope: FileScope | null, selectedAgent: AgentKind | null | undefined, selectedAccountId?: string): { commands: SlashCommand[]; onCommandsWanted: () => void } {
+export function useSkillCommands(
+  scope: FileScope | null,
+  selectedAgent: AgentKind | null | undefined,
+  selectedAccountId?: string,
+): { commands: SlashCommand[]; onCommandsWanted: () => void; commandsNotice: CommandsNotice | null } {
   const scopedAccountId = useClaudeAccountId();
   const claudeAccountId = selectedAccountId ?? scopedAccountId;
   const agent = selectedAgent === "acp" ? "opencode" : selectedAgent;
@@ -44,6 +54,7 @@ export function useSkillCommands(scope: FileScope | null, selectedAgent: AgentKi
   const skills = useRpc("skills.list", { ...(agent === "claude" && claudeAccountId ? { claudeAccountId } : {}), scope: scope ?? NO_SCOPE, agent: agent ?? "claude" }, { enabled, staleTime: FRESH_MS });
   const found = skills.data;
   const { dataUpdatedAt, isFetching, refetch } = skills;
+  const prefix: "/" | "$" = agent === "codex" ? "$" : "/";
   // By the clock, not `isStale`: a list going stale renders nothing, so the flag can still say fresh.
   const onCommandsWanted = useCallback(() => {
     if (enabled && !isFetching && Date.now() - dataUpdatedAt > FRESH_MS) void refetch();
@@ -58,10 +69,12 @@ export function useSkillCommands(scope: FileScope | null, selectedAgent: AgentKi
               name: skill.name,
               hint: skill.description,
               insert: true as const,
-              prefix: agent === "codex" ? ("$" as const) : ("/" as const),
+              prefix,
               ...(skill.aliases?.length ? { aliases: skill.aliases } : {}),
             })),
-    [agent, found],
+    [agent, found, prefix],
   );
-  return { commands, onCommandsWanted };
+  // A list read before keeps being offered while it is read again, and when that fails.
+  const commandsNotice = enabled && !found ? listNotice(prefix, skills.isFetching, skills.error) : null;
+  return { commands, onCommandsWanted, commandsNotice };
 }

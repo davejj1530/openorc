@@ -326,4 +326,17 @@ describe("a command typed into the message and run forked, as /code-review", () 
     const events = [prompt, reply, result(true)].flatMap((line) => parse(parser, line));
     expect(lifecycle(events)).toEqual(["started /code-review", "failed"]);
   });
+
+  it("ends with its task when typed after other turns of a long-lived session, as the app runs it", () => {
+    // As Claude Code 2.1.319 streams it there: the task starts and ends as housekeeping, then the turn's init, the
+    // agent's lines replayed under the command, and the command's output as the host's reply.
+    const init = { type: "system", subtype: "init", session_id: "session", model: "claude-fixture" };
+    const hostReply = (text: string) => ({ type: "assistant", parent_tool_use_id: null, uuid: `host-${text}`, message: { id: `host-${text}`, role: "assistant", content: [{ type: "text", text }] } });
+    const parser = new ClaudeStreamParser("host");
+    const earlier = [init, hostReply("Hello"), result()].flatMap((line) => parse(parser, line));
+    expect(lifecycle(earlier)).toEqual([]);
+    const events = [started, ended("completed"), init, prompt, reply, hostReply("14 findings"), result()].flatMap((line) => parse(parser, line));
+    expect(lifecycle(events)).toEqual(["started /code-review", "completed"]);
+    expect(events.filter((event) => event.type === "turn.completed")).toHaveLength(1);
+  });
 });

@@ -31,6 +31,7 @@ export { conversationActivity, conversationCanSteer, conversationPlaceholder, co
 export type { SavedThreadSettings } from "./conversation-settings.js";
 export { composerActions, messageBody, planSubmit, processFit, type ComposerActionsInput, type SubmitInput, type SubmitPlan, type SubmitRequest, type SubmitTarget } from "./conversation-submit.js";
 export { accountsToContinueWith, canContinueWithAnother, CONTINUE_PROMPT, RESTART_PROMPT } from "./session-recovery.js";
+export { offeredAccount, projectAccountChoice, type AccountsProject, type ProjectAccountChoice } from "./project-claude-accounts.js";
 export {
   commandWordAt,
   insertSkill,

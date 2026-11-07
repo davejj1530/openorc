@@ -14,6 +14,18 @@ export interface ConnectorRow {
   error?: string;
   /** Images the server offers, most preferred first. */
   icons: string[];
+  /** The host a URL server lives at, from its saved address; absent for a command or an address the agent keeps to itself. */
+  site?: string;
+}
+
+/** The host of a saved URL server, for finding its maker's image when the server sends none. */
+export function siteOf(spec: ConnectorSpec | null): { site?: string } {
+  if (spec?.kind !== "url") return {};
+  try {
+    return { site: new URL(spec.url).hostname };
+  } catch {
+    return {};
+  }
 }
 
 /**

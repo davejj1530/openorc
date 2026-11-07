@@ -1,8 +1,18 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 import type { ConnectorDriver, ConnectorRow } from "@openorc/agents";
 import type { AppSettings, ConnectorSpec } from "@openorc/protocol";
 import { ConnectorService, type ConnectorDrivers } from "./connectors.js";
 import type { AppSettingsService } from "./settings.js";
+
+/** Where each host resolves; any other name is not found. */
+const resolved = vi.hoisted(() => new Map<string, string>());
+vi.mock("node:dns/promises", () => ({
+  lookup: async (host: string) => {
+    const address = resolved.get(host);
+    if (!address) throw Object.assign(new Error(`getaddrinfo ENOTFOUND ${host}`), { code: "ENOTFOUND" });
+    return [{ address, family: 4 }];
+  },
+}));
 
 const row = (name: string, status: ConnectorRow["status"], extra: Partial<ConnectorRow> = {}): ConnectorRow => ({ name, title: name, source: "user", kind: "url", status, icons: [], ...extra });
 
@@ -20,7 +30,25 @@ function fakeDriver(rows: ConnectorRow[], calls: string[], label: string): Conne
   };
 }
 
-function setup(options: { claude?: Record<string, ConnectorRow[]>; codex?: ConnectorRow[]; settings?: Partial<AppSettings> } = {}) {
+/** The makers' sites, as tests give them: the images each source finds, and every look asked for. */
+function fakeSiteLogos(images: Record<string, string> = {}) {
+  const looked: string[] = [];
+  const key = (source: { site: string } | { icon: string } | null) => {
+    if (!source) return "";
+    return "site" in source ? source.site : source.icon;
+  };
+  return {
+    looked,
+    get: (source: { site: string } | { icon: string } | null) => images[key(source)] ?? null,
+    look: async (sources: readonly ({ site: string } | { icon: string })[]) => {
+      looked.push(...sources.map(key));
+      return sources.some((source) => images[key(source)]);
+    },
+  };
+}
+
+function setup(options: { claude?: Record<string, ConnectorRow[]>; codex?: ConnectorRow[]; settings?: Partial<AppSettings>; siteImages?: Record<string, string> } = {}) {
+  const siteLogos = fakeSiteLogos(options.siteImages);
   const calls: string[] = [];
   const opened: string[] = [];
   let settings = { claudeUserMcpServers: true, claudeConnectorsOff: [] as string[], ...options.settings } as AppSettings;
@@ -58,8 +86,9 @@ function setup(options: { claude?: Record<string, ConnectorRow[]>; codex?: Conne
     changed,
     (url) => opened.push(url),
     drivers,
+    siteLogos,
   );
-  return { service, calls, opened, changed, settings: () => settings };
+  return { service, calls, opened, changed, siteLogos, settings: () => settings };
 }
 
 const spec: ConnectorSpec = { kind: "url", url: "https://paper.example/mcp", headers: {} };
@@ -144,6 +173,49 @@ describe("connectors", () => {
     expect(list.connectors.map((connector) => [connector.name, connector.logo])).toEqual([
       ["figma", image],
       ["odd", null],
+    ]);
+  });
+
+  it("ask for the image a server names only on the public web", async () => {
+    const png = new Uint8Array([137, 80, 78, 71]);
+    const asked: string[] = [];
+    vi.stubGlobal("fetch", async (url: URL) => {
+      asked.push(url.href);
+      return new Response(png, { headers: { "content-type": "image/png" } });
+    });
+    onTestFinished(() => void vi.unstubAllGlobals());
+    resolved.set("cdn.example.com", "93.184.216.34").set("rebound.example.com", "10.0.0.5");
+    const { service } = setup({
+      claude: {
+        main: [
+          row("lan", "connected", { icons: ["https://192.168.1.2/logo.png"] }),
+          row("rebound", "connected", { icons: ["https://rebound.example.com/logo.png"] }),
+          row("cdn", "connected", { icons: ["https://cdn.example.com/logo.png"] }),
+        ],
+      },
+    });
+    const list = await service.list();
+    expect(asked).toEqual(["https://cdn.example.com/logo.png"]);
+    expect(list.connectors.map((connector) => [connector.name, connector.logo])).toEqual([
+      ["cdn", `data:image/png;base64,${Buffer.from(png).toString("base64")}`],
+      ["lan", null],
+      ["rebound", null],
+    ]);
+  });
+
+  it("look for an image on the maker's site of a server that sends none, from its address or a known name, and show it once found", async () => {
+    const image = "data:image/svg+xml;base64,PHN2Zy8+";
+    const { service, siteLogos, changed } = setup({
+      claude: { main: [row("linear", "connected", { site: "mcp.linear.app" }), row("claude.ai Gmail", "connected", { title: "Gmail", kind: null }), row("local", "connected", { site: "127.0.0.1" })] },
+      siteImages: { "linear.app": image },
+    });
+    await service.list();
+    await vi.waitFor(() => expect(changed).toHaveBeenCalled());
+    expect(siteLogos.looked).toEqual(["https://ssl.gstatic.com/images/branding/product/2x/gmail_2020q4_32dp.png", "linear.app"]);
+    expect((await service.list()).connectors.map((connector) => [connector.name, connector.logo])).toEqual([
+      ["claude.ai Gmail", null],
+      ["linear", image],
+      ["local", null],
     ]);
   });
 

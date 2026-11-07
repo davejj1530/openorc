@@ -1,5 +1,5 @@
 import type { ConnectorSpec } from "@openorc/protocol";
-import { CONNECTOR_SIGN_IN_MS, iconSources, readableConnectorError, runAgentCommand, whenAborted, type ConnectorDriver, type ConnectorRow } from "../connectors.js";
+import { CONNECTOR_SIGN_IN_MS, iconSources, readableConnectorError, runAgentCommand, siteOf, whenAborted, type ConnectorDriver, type ConnectorRow } from "../connectors.js";
 import type { AgentLaunchEnvironment } from "../launch-environment.js";
 import type { StdioJsonRpc } from "../jsonrpc.js";
 import { withCodexConnection } from "./connection.js";
@@ -45,9 +45,9 @@ export function codexConnectorRows(read: ConfigRead, servers: StatusPage["data"]
     .filter((server) => !INTERNAL.has(server.name))
     .map((server): ConnectorRow => {
       const saved = read.config.mcp_servers?.[server.name];
-      const kind = savedAsSpec(saved)?.kind ?? null;
+      const spec = savedAsSpec(saved);
       const icons = iconSources(server.serverInfo?.icons);
-      const base = { name: server.name, title: server.name, source: sourceOf(server.name, user, project), kind, icons };
+      const base = { name: server.name, title: server.name, source: sourceOf(server.name, user, project), kind: spec?.kind ?? null, icons, ...siteOf(spec) };
       if (saved?.["enabled"] === false) return { ...base, status: "off" };
       if (server.authStatus === "notLoggedIn") return { ...base, status: "needs-sign-in" };
       if (server.toolsError) return { ...base, status: "failed", error: readableConnectorError(server.toolsError) };

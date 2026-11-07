@@ -2,7 +2,18 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { ConnectorSpec, ConnectorStatus } from "@openorc/protocol";
-import { CONNECTOR_READ_WAIT_MS, CONNECTOR_SIGN_IN_MS, delay, iconSources, readableConnectorError, runAgentCommand, whenAborted, type ConnectorDriver, type ConnectorRow } from "../connectors.js";
+import {
+  CONNECTOR_READ_WAIT_MS,
+  CONNECTOR_SIGN_IN_MS,
+  delay,
+  iconSources,
+  readableConnectorError,
+  runAgentCommand,
+  siteOf,
+  whenAborted,
+  type ConnectorDriver,
+  type ConnectorRow,
+} from "../connectors.js";
 import type { AgentLaunchEnvironment } from "../launch-environment.js";
 import { claudeConfigDir, SHARED_CLAUDE_CONFIG_DIR } from "./config-dir.js";
 import { withClaudeControlSession, type ClaudeControlAsk, type ClaudeControlSessionOptions } from "./control-session.js";
@@ -52,7 +63,7 @@ function kindOf(transport: unknown): ConnectorRow["kind"] {
   return transport === "stdio" ? "command" : "url";
 }
 
-function rowOf(server: StatusRow): ConnectorRow {
+function rowOf(server: StatusRow, saved: Record<string, unknown>): ConnectorRow {
   const error = typeof server.error === "string" && server.error ? { error: readableConnectorError(server.error) } : {};
   return {
     name: server.name,
@@ -62,6 +73,7 @@ function rowOf(server: StatusRow): ConnectorRow {
     status: STATUS[server.status] ?? "failed",
     ...error,
     icons: iconSources(server.serverInfo?.icons),
+    ...siteOf(savedAsSpec(saved[server.name])),
   };
 }
 
@@ -112,8 +124,11 @@ export function claudeConnectorDriver(launch: Pick<AgentLaunchEnvironment, "bina
     async read(folder) {
       // Read with every server on, so one turned off in OpenOrc is still listed, as off, for as long as Claude has it.
       const turnedOff = new Set(off());
-      const rows = (await session(folder, "reading connectors", 25_000, settledStatus)).map(rowOf);
-      return rows.map((row) => (turnedOff.has(row.name) ? { name: row.name, title: row.title, source: row.source, kind: row.kind, status: "off" as const, icons: row.icons } : row));
+      const servers = saved();
+      const rows = (await session(folder, "reading connectors", 25_000, settledStatus)).map((server) => rowOf(server, servers));
+      return rows.map((row) =>
+        turnedOff.has(row.name) ? { name: row.name, title: row.title, source: row.source, kind: row.kind, status: "off" as const, icons: row.icons, ...(row.site ? { site: row.site } : {}) } : row,
+      );
     },
     spec: async (name) => savedAsSpec(saved()[name]),
     async save(name, spec) {

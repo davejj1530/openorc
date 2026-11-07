@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import os from "node:os";
 import { claudeConnectorDriver, codexConnectorDriver, openCodeConnectorDriver, readableConnectorError, type AgentLaunchEnvironment, type ConnectorDriver, type ConnectorRow } from "@openorc/agents";
 import { harnessIds, type AgentConnector, type Connector, type ConnectorList, type ConnectorSignIn, type ConnectorSpec, type HarnessId } from "@openorc/protocol";
+import { iconImage, LOGO_BYTES, logoSource, SiteLogos } from "./connector-logos.js";
 import type { AppSettingsService } from "./settings.js";
 
 type Launch = Pick<AgentLaunchEnvironment, "binary" | "env">;
@@ -44,28 +45,10 @@ interface SignInRun {
   abort: AbortController;
 }
 
-const LOGO_BYTES = 64 * 1024;
 const DATA_IMAGE = /^data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/]+=*$/i;
 
 /** What hands an address to the default browser, before the address itself. */
 const BROWSER_OPENERS: Partial<Record<NodeJS.Platform, string[]>> = { darwin: ["open"], win32: ["rundll32", "url.dll,FileProtocolHandler"] };
-
-/** The body, or null once it runs past `limit` bytes, which stops reading there. */
-async function boundedBody(answer: Response, limit: number): Promise<Buffer | null> {
-  const reader = answer.body?.getReader();
-  if (!reader) return null;
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  for (let next = await reader.read(); !next.done; next = await reader.read()) {
-    size += next.value.byteLength;
-    if (size > limit) {
-      await reader.cancel();
-      return null;
-    }
-    chunks.push(next.value);
-  }
-  return Buffer.concat(chunks);
-}
 
 /** Hands an address to the browser the user signs in with. */
 export function openInBrowser(url: string): void {
@@ -74,6 +57,13 @@ export function openInBrowser(url: string): void {
   spawn(file!, [...args, url], { detached: true, stdio: "ignore" })
     .on("error", () => undefined)
     .unref();
+}
+
+/** The hosts each connector's servers live at, by connector name. */
+function connectorSites(readings: Reading["rows"]): Map<string, string[]> {
+  const sites = new Map<string, string[]>();
+  for (const { rows } of readings) for (const row of rows) if (row.site) sites.set(row.name, [...(sites.get(row.name) ?? []), row.site]);
+  return sites;
 }
 
 /** Groups what every place said by connector name, so one row stands for the same server everywhere. */
@@ -122,6 +112,8 @@ export class ConnectorService {
     private readonly changed: () => void,
     private readonly open: (url: string) => void = openInBrowser,
     private readonly drivers: ConnectorDrivers = realDrivers,
+    /** Images from the makers' sites, for servers that send none. */
+    private readonly siteLogos: Pick<SiteLogos, "get" | "look"> = new SiteLogos(),
   ) {}
 
   get hasPendingWork(): boolean {
@@ -234,9 +226,11 @@ export class ConnectorService {
 
   private answer(folder: string): ConnectorList {
     const reading = this.readings.get(folder);
+    const sites = connectorSites(reading?.value?.rows ?? []);
     const connectors = mergeConnectors(reading?.value?.rows ?? [], this.logos).map((connector) => {
-      if (connector.logo) this.logoByName.set(connector.name, connector.logo);
-      return connector.logo ? connector : { ...connector, logo: this.logoByName.get(connector.name) ?? null };
+      const logo = connector.logo ?? this.siteLogos.get(logoSource(connector.title, sites.get(connector.name) ?? []));
+      if (logo) this.logoByName.set(connector.name, logo);
+      return { ...connector, logo: logo ?? this.logoByName.get(connector.name) ?? null };
     });
     return {
       connectors,
@@ -296,6 +290,7 @@ export class ConnectorService {
     );
     this.retireLegacySwitch(rows);
     await this.fetchLogos(rows.flatMap((entry) => entry.rows.flatMap((row) => row.icons.slice(0, 1))));
+    this.lookForSiteLogos(rows);
     rows.sort((a, b) => places.indexOf(a.place) - places.indexOf(b.place));
     return { at: Date.now(), rows, unavailable };
   }
@@ -351,6 +346,16 @@ export class ConnectorService {
     this.changed();
   }
 
+  /** For servers that send no image, looks on their makers' sites behind the list, and shows what it finds. */
+  private lookForSiteLogos(rows: Reading["rows"]): void {
+    const sites = connectorSites(rows);
+    const sources = mergeConnectors(rows, this.logos).flatMap((connector) => {
+      const source = connector.logo ? null : logoSource(connector.title, sites.get(connector.name) ?? []);
+      return source ? [source] : [];
+    });
+    void this.siteLogos.look(sources).then((found) => found && this.changed());
+  }
+
   private async fetchLogos(sources: string[]): Promise<void> {
     await Promise.all(
       [...new Set(sources)].map((src) => {
@@ -359,16 +364,11 @@ export class ConnectorService {
           if (src.length <= LOGO_BYTES * 1.4) this.logos.set(src, src);
           return undefined;
         }
-        if (!src.startsWith("https://")) return undefined;
         const pending =
           this.fetchingLogos.get(src) ??
-          // A redirect could lead anywhere, this Mac's own services included, so only the address the server gave is asked.
-          fetch(src, { signal: AbortSignal.timeout(3000), redirect: "error" })
-            .then(async (answer) => {
-              const type = answer.headers.get("content-type")?.split(";")[0]?.trim() ?? "";
-              if (!answer.ok || !/^image\/[a-z0-9.+-]+$/i.test(type) || Number(answer.headers.get("content-length") ?? 0) > LOGO_BYTES) return;
-              const bytes = await boundedBody(answer, LOGO_BYTES);
-              if (bytes) this.logos.set(src, `data:${type};base64,${bytes.toString("base64")}`);
+          iconImage(src)
+            .then((image) => {
+              if (image) this.logos.set(src, image);
             })
             .catch(() => undefined)
             .finally(() => this.fetchingLogos.delete(src));

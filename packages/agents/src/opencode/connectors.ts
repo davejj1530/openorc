@@ -8,7 +8,7 @@ import readline from "node:readline";
 import { applyEdits, modify, parse, type ParseError } from "jsonc-parser";
 import type { ConnectorSpec, ConnectorStatus } from "@openorc/protocol";
 import { launchCommand } from "../command-launch.js";
-import { CONNECTOR_READ_WAIT_MS, delay, readableConnectorError, whenAborted, type ConnectorDriver, type ConnectorRow } from "../connectors.js";
+import { CONNECTOR_READ_WAIT_MS, delay, readableConnectorError, siteOf, whenAborted, type ConnectorDriver, type ConnectorRow } from "../connectors.js";
 import { inFolder, type AgentLaunchEnvironment } from "../launch-environment.js";
 import { stopProcess, waitForProcessGroup } from "../process-lifetime.js";
 
@@ -156,21 +156,28 @@ function sourceOf(entry: ConfigEntry, userFile: string): ConnectorRow["source"] 
 }
 
 export function openCodeConnectorRows(entries: ConfigEntry[], servers: ServiceServer[], userFile: string): ConnectorRow[] {
-  const known = new Map<string, Pick<ConnectorRow, "source" | "kind">>();
+  const known = new Map<string, Pick<ConnectorRow, "source" | "kind" | "site">>();
   for (const entry of entries) {
     if (entry.type !== "document") continue;
     const source = sourceOf(entry, userFile);
-    for (const [name, { server }] of savedOpenCodeServers(entry.info?.mcp)) known.set(name, { source, kind: savedAsSpec(server)?.kind ?? null });
+    for (const [name, { server }] of savedOpenCodeServers(entry.info?.mcp)) {
+      const spec = savedAsSpec(server);
+      known.set(name, { source, kind: spec?.kind ?? null, ...siteOf(spec) });
+    }
   }
-  return servers.map((server) => ({
-    name: server.name,
-    title: server.title || server.name,
-    source: known.get(server.name)?.source ?? (server.integrationID ? "account" : "user"),
-    kind: known.get(server.name)?.kind ?? null,
-    status: STATUS[server.status.status] ?? "failed",
-    ...(server.status.status === "failed" && server.status.error ? { error: readableConnectorError(server.status.error) } : {}),
-    icons: [],
-  }));
+  return servers.map((server) => {
+    const saved = known.get(server.name);
+    return {
+      name: server.name,
+      title: server.title || server.name,
+      source: saved?.source ?? (server.integrationID ? "account" : "user"),
+      kind: saved?.kind ?? null,
+      status: STATUS[server.status.status] ?? "failed",
+      ...(server.status.status === "failed" && server.status.error ? { error: readableConnectorError(server.status.error) } : {}),
+      icons: [],
+      ...(saved?.site ? { site: saved.site } : {}),
+    };
+  });
 }
 
 /** OpenCode's connectors: its own service answers and signs in, and its configuration file holds what the user saved. */

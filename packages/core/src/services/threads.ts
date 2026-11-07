@@ -1,4 +1,4 @@
-import { audit, checkpoints, claudeAccounts, messages, plans, retiredTeams, runs as runRepo, settings, tasks, threadQueue, threads, type CloudProviderId, type Db } from "@openorc/db";
+import { audit, checkpoints, messages, plans, retiredTeams, runs as runRepo, settings, tasks, threadQueue, threads, type CloudProviderId, type Db } from "@openorc/db";
 import { diffStat, git, pinObject, switchFiles, treeHash, workspaceTransfer } from "@openorc/git";
 import {
   THREAD_EXISTS,
@@ -28,7 +28,7 @@ import { executionFolder } from "./conversation-folder.js";
 import { inUnvettedCopy } from "./review-copies.js";
 import type { RunService } from "./runs.js";
 import { ThreadAgentTools } from "./thread-agent-tools.js";
-import { titleFromPrompt, type StartThreadInput, type ThreadPatch, type ThreadTitler } from "./thread-inputs.js";
+import { startAccount, titleFromPrompt, type StartThreadInput, type ThreadPatch, type ThreadTitler } from "./thread-inputs.js";
 import { ThreadMessageQueue } from "./thread-message-queue.js";
 import { ThreadMoves, fileChanges } from "./thread-moves.js";
 import { assertMutableThread } from "./thread-mutations.js";
@@ -143,7 +143,7 @@ export class ThreadService {
   /** A cloud thread returns at once with no run: its first message waits in the queue while its sandbox gets ready. */
   async start(input: StartThreadInput, internal?: ThreadAdmission): Promise<{ thread: Thread; run: Run | null }> {
     assertStaying(this.db);
-    input = { ...normalizeModelSettings(input), claudeAccountId: input.claudeAccountId ?? claudeAccounts.defaultId(this.db) };
+    input = { ...normalizeModelSettings(input), claudeAccountId: startAccount(this.db, input) };
     await this.runs.validateFastMode(input.agent, input.model, input.fastMode, undefined, undefined, input.claudeAccountId);
     internal?.assertCanAdmit();
     if (input.workingDirectory && input.projectId !== WORKSPACE_ID) throw new Error("Only Workspace conversations can choose a working folder.");
@@ -541,7 +541,7 @@ export class ThreadService {
       projectId: parent.projectId,
       title: `${parent.title} (fork)`,
       agent: parent.agent,
-      claudeAccountId: parent.claudeAccountId,
+      claudeAccountId: startAccount(this.db, { projectId: parent.projectId, claudeAccountId: parent.claudeAccountId ?? undefined, claudeAccountFrom: "inherited", agent: parent.agent }),
       model: parent.model,
       effort: parent.effort,
       fastMode: parent.fastMode,

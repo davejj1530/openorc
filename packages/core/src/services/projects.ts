@@ -5,6 +5,7 @@ import { defaultBranch, isGitRepo, originUrl, repoInfo } from "@openorc/git";
 import type { Project, ProjectGit, ProjectSettings } from "@openorc/protocol";
 import { projectGit } from "./project-git.js";
 import { checkoutBranch } from "./checkout-branch.js";
+import { assertProjectAccounts } from "./project-claude-accounts.js";
 import { directory } from "./workspace-home.js";
 
 /** Config files from other tools that tell us how this repo likes its worktrees. */
@@ -95,6 +96,9 @@ export class ProjectService {
   }
 
   updateSettings(id: string, patch: Partial<ProjectSettings>): Project {
+    assertProjectAccounts(this.db, id, patch.claudeAccounts);
+    const own = patch.claudeAccounts;
+    if (own) patch = { ...patch, claudeAccounts: { ...own, accountIds: [...new Set(own.accountIds)] } };
     const p = projects.updateSettings(this.db, id, patch);
     audit.record(this.db, { actor: "user", action: "project.settings", resourceType: "project", resourceId: id, metadata: patch });
     return p;

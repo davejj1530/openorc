@@ -333,6 +333,7 @@ export class ThreadAgentTools {
         ...childFolder(parent),
         ...settings,
         claudeAccountId: parent.claudeAccountId ?? undefined,
+        claudeAccountFrom: "inherited",
         mode: run.mode,
         permissionMode: run.permissionMode,
         prompt: `${opener(parent)}\n\n${input.prompt.trim()}`,
@@ -364,8 +365,9 @@ export class ThreadAgentTools {
     const parent = threads.get(this.db, parentId);
     if (!parent || retiredTeams.isHidden(this.db, parent.id)) throw new Error("Thread not found.");
     this.runs.subagents.assertExecutable({ threadId: parent.id });
+    // It goes on with its parent's account, which gives way to the project's default when the project does not use it.
     return this.context.start(
-      { ...input, projectId: parent.projectId, ...childFolder(parent) },
+      { ...input, claudeAccountFrom: "inherited", projectId: parent.projectId, ...childFolder(parent) },
       { assertCanAdmit: () => undefined, onAdmitted: (child) => threads.update(this.db, child.id, { parentThreadId: parent.id }) },
     );
   }

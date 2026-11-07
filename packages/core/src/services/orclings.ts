@@ -207,7 +207,9 @@ export class OrclingService {
     return this.deps.threads().start(
       {
         ...input,
+        // An Orcling works on its own account, in a project that uses only some accounts too.
         claudeAccountId: orcling.claudeAccountId,
+        claudeAccountFrom: "own",
         agent,
         model,
         effort: effort ?? undefined,
@@ -232,7 +234,8 @@ export class OrclingService {
     if (current && current.orclingId !== id) throw new Error(`This task already has a conversation, "${current.title}". Message it with orcling_thread_send instead.`);
     const ceiling = orclingExecution(orcling);
     const { agent, model, effort, fastMode } = orcling.settings;
-    const thread = this.deps.threads().taskThreadForStart(taskId, { agent, model, effort });
+    // On its own account, in a project that uses only some accounts too.
+    const thread = this.deps.threads().taskThreadForStart(taskId, { agent, model, effort }, orcling.claudeAccountId);
     if (thread.orclingId !== id || thread.claudeAccountId !== orcling.claudeAccountId) threads.update(db, thread.id, { orclingId: id, claudeAccountId: orcling.claudeAccountId });
     const images = await new AttachmentService(this.deps.dataDir).forTask(task.spec ?? "");
     return this.deps.threads().startTaskInThread(taskId, undefined, images, {

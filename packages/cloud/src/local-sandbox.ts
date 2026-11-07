@@ -160,6 +160,12 @@ export class LocalSandbox implements Sandbox {
   }
 }
 
+/**
+ * A process just stopped can still be finishing a file operation as its folder goes, which leaves the folder not
+ * empty; asking again a moment later finds it settled. Node retries only on errors of that kind.
+ */
+export const SETTLING_RM = { recursive: true, force: true, maxRetries: 10, retryDelay: 100 } as const;
+
 export class LocalSandboxProvider implements SandboxProvider {
   readonly id = "local";
   private readonly sandboxes = new Map<string, LocalSandbox>();
@@ -215,7 +221,7 @@ export class LocalSandboxProvider implements SandboxProvider {
     const sandbox = this.sandboxes.get(name);
     this.sandboxes.delete(name);
     await sandbox?.retire();
-    await rm(path.join(this.base, name), { recursive: true, force: true });
+    await rm(path.join(this.base, name), SETTLING_RM);
   }
 
   private baseDir(id: string): string {
@@ -234,7 +240,7 @@ export class LocalSandboxProvider implements SandboxProvider {
       return id;
     },
     remove: async (id) => {
-      await rm(this.baseDir(id), { recursive: true, force: true });
+      await rm(this.baseDir(id), SETTLING_RM);
     },
   };
 }

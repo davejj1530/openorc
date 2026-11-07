@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readdir, realpath, rm, writeFile } from "node:fs/promis
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LocalSandboxProvider, runnerFiles, type SandboxProvider } from "@openorc/cloud";
+import { LocalSandboxProvider, runnerFiles, SETTLING_RM, type SandboxProvider } from "@openorc/cloud";
 import { cloudWorkspaces, Db, projects, settings, threads } from "@openorc/db";
 import { git } from "@openorc/git";
 import type { Project, Thread } from "@openorc/protocol";
@@ -60,7 +60,7 @@ afterEach(async () => {
   await bases.settled();
   await service.shutdown();
   db.close();
-  await rm(directory, { recursive: true, force: true });
+  await rm(directory, SETTLING_RM);
 });
 
 async function started(): Promise<Thread> {

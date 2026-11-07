@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { BrokeringUnavailable, LocalSandboxProvider, type BrokeredHeader, type Sandbox, type SandboxNeeds, type SandboxProvider } from "@openorc/cloud";
+import { BrokeringUnavailable, LocalSandboxProvider, SETTLING_RM, type BrokeredHeader, type Sandbox, type SandboxNeeds, type SandboxProvider } from "@openorc/cloud";
 import { cloudWorkspaces, Db, projects, threads } from "@openorc/db";
 import { git } from "@openorc/git";
 import type { Project, Thread } from "@openorc/protocol";
@@ -51,7 +51,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await service.shutdown();
   db.close();
-  await rm(directory, { recursive: true, force: true });
+  await rm(directory, SETTLING_RM);
 });
 
 function cloudThread(): Thread {

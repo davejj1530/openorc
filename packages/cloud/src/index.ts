@@ -13,7 +13,7 @@ export {
   type SandboxProvider,
   type SandboxStream,
 } from "./sandbox.js";
-export { LocalSandbox, LocalSandboxProvider } from "./local-sandbox.js";
+export { LocalSandbox, LocalSandboxProvider, SETTLING_RM } from "./local-sandbox.js";
 export { ensureAgent } from "./agent-install.js";
 export {
   brokeringPolicy,

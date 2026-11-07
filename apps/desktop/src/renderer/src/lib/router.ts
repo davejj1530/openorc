@@ -2,6 +2,8 @@ import { create } from "zustand";
 import { useLayout } from "./layout";
 
 export type TaskTab = "chat" | "spec" | "files" | "commits" | "memory";
+/** A project's page: its tasks, or its settings. */
+export type ProjectTab = "tasks" | "settings";
 
 /** A message to bring into view: its run, the turn of that run it falls in, and its id. */
 export type MessageTarget = { runId: string; turn: number; messageId: string };
@@ -23,7 +25,8 @@ export type Route =
   | { view: "tasks" }
   | { view: "pulls" }
   | { view: "pull"; projectId: string; number: number }
-  | { view: "project"; projectId: string }
+  /** A project's page, on its tasks unless a tab is named. */
+  | { view: "project"; projectId: string; tab?: ProjectTab }
   | { view: "task"; taskId: string; tab: TaskTab; message?: MessageTarget }
   | { view: "memory" }
   | { view: "scheduled" }
@@ -123,6 +126,11 @@ export function openTask(taskId: string, tab: TaskTab = "spec", message?: Messag
   useRouter.getState().navigate({ view: "task", taskId, tab, ...(message ? { message } : {}) });
 }
 
+/** A project's page, on the named tab: Settings is where its worktree setup and Claude accounts are. */
+export function openProject(projectId: string, tab: ProjectTab = "tasks"): void {
+  useRouter.getState().navigate({ view: "project", projectId, ...(tab === "tasks" ? {} : { tab }) });
+}
+
 export function openPullRequest(projectId: string, number: number): void {
   useRouter.getState().navigate({ view: "pull", projectId, number });
 }
@@ -139,10 +147,10 @@ function isPlainView(view: string | undefined): view is PlainView {
   return view !== undefined && plainViews.has(view);
 }
 
-/** Screens a spec names by one id. */
-const idViews: Readonly<Record<string, (id: string) => Route>> = {
+/** Screens a spec names by one id, and a project by its tab after it too. */
+const idViews: Readonly<Record<string, (id: string, tab: string | undefined) => Route>> = {
   thread: (threadId) => ({ view: "thread", threadId }),
-  project: (projectId) => ({ view: "project", projectId }),
+  project: (projectId, tab) => ({ view: "project", projectId, ...(tab === "settings" ? { tab } : {}) }),
   newsubthread: (parentId) => ({ view: "newsubthread", parentId }),
 };
 
@@ -155,7 +163,7 @@ export function routeFromSpec(spec: string): Route | null {
       ...(id === "recovery" ? { mode: "recovery" as const } : {}),
       ...(id === "preview" || tab === "preview" ? { preview: true } : {}),
     };
-  if (view && id && Object.hasOwn(idViews, view)) return idViews[view]!(id);
+  if (view && id && Object.hasOwn(idViews, view)) return idViews[view]!(id, tab);
   if (view === "newtask") return { view: "newtask", ...(id ? { projectId: id } : {}) };
   if (view === "task" && id)
     return {
@@ -201,7 +209,7 @@ export function specFromRoute(route: Route): string {
     case "task":
       return `task:${route.taskId}:${route.tab}`;
     case "project":
-      return `project:${route.projectId}`;
+      return `project:${route.projectId}${route.tab === "settings" ? ":settings" : ""}`;
     case "pull":
       return `pull:${route.projectId}:${route.number}`;
     case "newtask":

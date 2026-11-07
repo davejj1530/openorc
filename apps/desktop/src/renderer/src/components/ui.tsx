@@ -1,7 +1,7 @@
 import { createContext, forwardRef, useContext, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import { Tooltip as BaseTooltip } from "@base-ui/react/tooltip";
 import { Dialog as BaseDialog } from "@base-ui/react/dialog";
-import { X } from "./icons";
+import { Check, X } from "./icons";
 import selectChevron from "./icons-select.svg?url";
 import { cn } from "../lib/cn";
 import { CoversPreview } from "../lib/browser-preview";
@@ -249,6 +249,16 @@ export const Switch = forwardRef<HTMLInputElement, Omit<InputHTMLAttributes<HTML
     <span className={cn("settings-switch", className)} data-size={size}>
       <input ref={ref} type="checkbox" role="switch" {...props} />
       <span className="settings-switch-knob" aria-hidden="true" />
+    </span>
+  );
+});
+
+/** A box that is ticked or not, drawn like the switch: a fill when clear, an ink fill with the plane's check when ticked. */
+export const Checkbox = forwardRef<HTMLInputElement, Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "size">>(function Checkbox({ className, ...props }, ref) {
+  return (
+    <span className={cn("settings-checkbox", className)}>
+      <input ref={ref} type="checkbox" {...props} />
+      <Check size={12} className="settings-checkbox-mark" />
     </span>
   );
 });

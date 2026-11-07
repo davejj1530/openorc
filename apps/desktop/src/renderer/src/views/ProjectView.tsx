@@ -1,9 +1,8 @@
 import { Plus } from "../components/icons";
-import { useState } from "react";
 import { TopBar } from "../components/TopBar";
 import { Button, Empty, Segmented } from "../components/ui";
 import { useRpc } from "../lib/client";
-import { newThread, useRouter } from "../lib/router";
+import { newThread, openProject, type ProjectTab } from "../lib/router";
 import { WORKSPACE_ID } from "@openorc/protocol";
 import { TaskRows } from "./TaskList";
 import { ProjectSettings } from "./project-settings";
@@ -13,10 +12,10 @@ const projectTabs = [
   { value: "settings", label: "Settings" },
 ] as const;
 
-export function ProjectView({ projectId, onNewTask }: { projectId: string; onNewTask: () => void }) {
+/** A project's tasks or its settings; the tab is part of the route, so other screens can open either. */
+export function ProjectView({ projectId, tab, onNewTask }: { projectId: string; tab: ProjectTab; onNewTask: () => void }) {
   const project = useRpc("projects.get", { id: projectId });
   const tasks = useRpc("tasks.list", { projectId });
-  const [tab, setTab] = useState<"tasks" | "settings">("tasks");
   const p = project.data;
   if (!p) return null;
   const taskContent =
@@ -39,12 +38,12 @@ export function ProjectView({ projectId, onNewTask }: { projectId: string; onNew
         projectId={p.id}
         projectName={p.name}
         onProjectChange={(id) => {
-          if (id && id !== WORKSPACE_ID) useRouter.getState().navigate({ view: "project", projectId: id });
+          if (id && id !== WORKSPACE_ID) openProject(id, tab);
           else newThread(id ?? undefined);
         }}
         actions={
           <span className="flex items-center gap-2">
-            <Segmented label="Project section" size="sm" value={tab} onChange={setTab} options={projectTabs} />
+            <Segmented label="Project section" size="sm" value={tab} onChange={(next) => openProject(p.id, next)} options={projectTabs} />
             <Button size="lg" onClick={onNewTask}>
               <Plus size={14} className="text-ink-3" /> New task
             </Button>

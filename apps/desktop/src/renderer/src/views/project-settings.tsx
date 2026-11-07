@@ -1,7 +1,9 @@
 import { useState } from "react";
-import type { Project } from "@openorc/protocol";
-import { Button, Field, Input, Textarea } from "../components/ui";
-import { useRpc, useRpcMutation } from "../lib/client";
+import type { ClaudeAccountConnection, ClaudeAccounts, Project, ProjectClaudeAccounts } from "@openorc/protocol";
+import { Button, Checkbox, Field, Input, Textarea, TextButton } from "../components/ui";
+import { queryClient, useRpc, useRpcMutation } from "../lib/client";
+import { accountMeta, connectionLabels } from "./settings-claude-accounts";
+import { Status, Toggle } from "./settings-shared";
 
 /** What the repository already says about itself: its default branch, remote and other tools' config files. */
 function ProjectFacts({ project: p }: { project: Project }) {
@@ -84,7 +86,151 @@ export function ProjectSettings({ projectId }: { projectId: string }) {
           </div>
           {update.error ? <p className="mt-2 text-sm text-bad">{update.error.message}</p> : null}
         </section>
+        <ProjectClaudeAccountsSection project={p} />
       </div>
     </div>
+  );
+}
+
+/**
+ * Turning the project's own accounts on: the selection it kept while they were off, less accounts removed since, or
+ * else the app's default account; its switch at usage limits as kept, or else as the app's is now.
+ */
+function turnedOn(saved: ProjectClaudeAccounts | null | undefined, list: ClaudeAccounts, appAutoSwitch: boolean): ProjectClaudeAccounts {
+  const known = new Set(list.accounts.map((account) => account.id));
+  const kept = (saved?.accountIds ?? []).filter((id) => known.has(id));
+  const fallback = known.has(list.defaultId) ? list.defaultId : list.accounts.find((account) => account.enabled)?.id;
+  const accountIds = kept.length ? kept : [fallback].filter((id) => id !== undefined);
+  return { only: true, accountIds, defaultId: defaultAmong(accountIds, saved?.defaultId), autoSwitch: saved ? saved.autoSwitch : appAutoSwitch };
+}
+
+/** The default while it is one of the accounts, else the first of them. */
+function defaultAmong(accountIds: readonly string[], defaultId: string | null | undefined): string | null {
+  return defaultId && accountIds.includes(defaultId) ? defaultId : (accountIds[0] ?? null);
+}
+
+/** The selection less accounts removed since, which the host would refuse in any change; the default moves with them. */
+function withoutRemoved(own: ProjectClaudeAccounts, accounts: readonly ClaudeAccountConnection[]): ProjectClaudeAccounts {
+  const known = new Set(accounts.map((account) => account.id));
+  const accountIds = own.accountIds.filter((id) => known.has(id));
+  return { ...own, accountIds, defaultId: defaultAmong(accountIds, own.defaultId) };
+}
+
+/** One account in or out of the selection; the default moves to the first one left when it goes. */
+function withAccount(own: ProjectClaudeAccounts, id: string, chosen: boolean): ProjectClaudeAccounts {
+  const accountIds = chosen ? [...new Set([...own.accountIds, id])] : own.accountIds.filter((each) => each !== id);
+  return { ...own, accountIds, defaultId: defaultAmong(accountIds, own.defaultId) };
+}
+
+/** Saves each change at once, showing it before the host answers; a refused change goes back, saying why. */
+function useProjectAccountsSave(project: Project) {
+  const update = useRpcMutation("projects.updateSettings");
+  const [draft, setDraft] = useState<ProjectClaudeAccounts | null>(null);
+  const save = (next: ProjectClaudeAccounts) => {
+    setDraft(next);
+    update.mutate(
+      { id: project.id, settings: { claudeAccounts: next } },
+      {
+        onSuccess: (saved) => {
+          queryClient.setQueryData(["projects.get", { id: project.id }], saved);
+          setDraft(null);
+        },
+        onError: () => setDraft(null),
+      },
+    );
+  };
+  return { value: draft ?? project.settings.claudeAccounts ?? null, save, pending: update.isPending, error: update.error };
+}
+
+/** Which Claude accounts the project's threads use: the app's, or only those chosen here, with their own default and switch. */
+function ProjectClaudeAccountsSection({ project }: { project: Project }) {
+  const list = useRpc("claude.accounts.list", {});
+  const appAutoSwitch = useRpc("app.settings.get", {}).data?.claudeAccountAutoSwitch ?? false;
+  const { value, save, pending, error } = useProjectAccountsSave(project);
+  const only = Boolean(value?.only);
+  const appSetting = appAutoSwitch ? "On" : "Off";
+  return (
+    <section className="settings-section project-accounts" aria-labelledby="project-accounts-title">
+      <header className="settings-section-intro">
+        <h2 id="project-accounts-title">Claude accounts</h2>
+        <p>Choose which accounts threads in this project can use. Other projects keep the app&apos;s accounts.</p>
+      </header>
+      <div className="settings-section-body settings-group">
+        <Toggle
+          label="Use only selected accounts"
+          hint={
+            only
+              ? `Threads in ${project.name} start, switch and continue on these accounts only.`
+              : `Off. Threads use any enabled account, and switching at usage limits follows the app setting (${appSetting}).`
+          }
+          checked={only}
+          disabled={pending || !list.data}
+          onChange={(on) => list.data && save(on ? turnedOn(value, list.data, appAutoSwitch) : { ...value!, only: false })}
+        />
+        {only && value && list.data ? <ChosenAccounts own={withoutRemoved(value, list.data.accounts)} accounts={list.data.accounts} appSetting={appSetting} pending={pending} onChange={save} /> : null}
+      </div>
+      {error ? (
+        <p role="alert" className="mt-2 text-sm text-bad">
+          {error.message}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function ChosenAccounts({
+  own,
+  accounts,
+  appSetting,
+  pending,
+  onChange,
+}: {
+  own: ProjectClaudeAccounts;
+  accounts: ClaudeAccountConnection[];
+  appSetting: string;
+  pending: boolean;
+  onChange: (next: ProjectClaudeAccounts) => void;
+}) {
+  // A disabled account stays listed while it is chosen, so it can be taken out.
+  const shown = accounts.filter((account) => account.enabled || own.accountIds.includes(account.id));
+  const usable = accounts.filter((account) => account.enabled && own.accountIds.includes(account.id)).length;
+  return (
+    <>
+      {shown.map((account) => {
+        const chosen = own.accountIds.includes(account.id);
+        return (
+          <div key={account.id} className="settings-field project-account">
+            <label className="project-account-choice">
+              {/* The last account chosen stays chosen: a project that uses only some accounts needs one. */}
+              <Checkbox checked={chosen} disabled={pending || (chosen && own.accountIds.length === 1)} onChange={(event) => onChange(withAccount(own, account.id, event.target.checked))} />
+              <span className="project-account-name">
+                <span>{account.name}</span>
+                <span className="settings-hint">{accountMeta(account)}</span>
+              </span>
+            </label>
+            <div className="project-account-state">
+              {chosen && account.enabled && own.defaultId === account.id ? <span className="settings-card-tag">Default</span> : null}
+              {chosen && account.enabled && own.defaultId !== account.id ? (
+                <TextButton tone="muted" className="text-xs" disabled={pending} onClick={() => onChange({ ...own, defaultId: account.id })}>
+                  Make default
+                </TextButton>
+              ) : null}
+              <Status ok={account.status === "ready"}>{connectionLabels[account.status]}</Status>
+            </div>
+          </div>
+        );
+      })}
+      <Toggle
+        label="Switch accounts at usage limits"
+        hint={
+          usable < 2
+            ? "Select two or more accounts to switch"
+            : `When a thread's account reaches its limit, it continues on the selected account with the most 5-hour usage left. Overrides the app setting (${appSetting}).`
+        }
+        checked={own.autoSwitch}
+        disabled={pending || usable < 2}
+        onChange={(autoSwitch) => onChange({ ...own, autoSwitch })}
+      />
+    </>
   );
 }

@@ -160,6 +160,49 @@ label:has(input:is([type="checkbox"], [type="radio"]):focus-visible) {
 .settings-switch input:checked + .settings-switch-knob {
   transform: translateX(calc(var(--switch-width) - var(--switch-knob) - 6px));
 }
+/* A checkbox takes the switch's fills: --surface-3 clear, --ink ticked with the plane's check, the
+   2px ring on keyboard focus, and --surface-2 when it cannot change. */
+.settings-checkbox {
+  position: relative;
+  display: inline-grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+}
+.settings-checkbox input {
+  appearance: none;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  transition: background-color var(--duration-quick) var(--ease-out);
+}
+.settings-checkbox input:checked {
+  background: var(--ink);
+}
+.settings-checkbox input:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.settings-checkbox input:disabled {
+  pointer-events: none;
+  background: var(--surface-2);
+}
+.settings-checkbox input:checked:disabled {
+  background: var(--ink-4);
+}
+.settings-checkbox-mark {
+  position: absolute;
+  color: var(--surface);
+  opacity: 0;
+  pointer-events: none;
+}
+.settings-checkbox input:checked + .settings-checkbox-mark {
+  opacity: 1;
+}
 /* appearance:none plus an aria-hidden knob renders invisible in Windows High Contrast
    without this; it ships in the same commit as the control, never later. */
 @media (forced-colors: active) {
@@ -174,6 +217,17 @@ label:has(input:is([type="checkbox"], [type="radio"]):focus-visible) {
   .settings-switch-knob {
     background: ButtonFace;
     outline: 1px solid ButtonBorder;
+  }
+  .settings-checkbox input {
+    border: 1px solid ButtonBorder;
+    background: ButtonFace;
+  }
+  .settings-checkbox input:checked {
+    background: Highlight;
+    border-color: Highlight;
+  }
+  .settings-checkbox-mark {
+    color: HighlightText;
   }
 }
 

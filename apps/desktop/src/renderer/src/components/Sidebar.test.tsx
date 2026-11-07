@@ -350,6 +350,15 @@ it("lists only the chosen workspace's threads, remembers the choice, starts new 
   await screen.findByRole("button", { name: /Regular notes/ });
 });
 
+it("opens the chosen project's settings from the menu under its name", () => {
+  projectThreads();
+  useLayout.setState({ workspace: "two" });
+  mountSidebar();
+  fireEvent.click(screen.getByRole("button", { name: "Second project, project actions" }));
+  fireEvent.click(screen.getByRole("menuitem", { name: "Project settings" }));
+  expect(useRouter.getState().route).toEqual({ view: "project", projectId: "two", tab: "settings" });
+});
+
 it("goes back to All when the chosen project is no longer listed", async () => {
   projectThreads();
   useLayout.setState({ workspace: "gone" });

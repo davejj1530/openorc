@@ -202,7 +202,7 @@ function MainScreen({ route, currentProject }: { route: Route; currentProject: s
       screen = <PullRequestView key={`${route.projectId}:${route.number}`} projectId={route.projectId} number={route.number} />;
       break;
     case "project":
-      screen = <ProjectView projectId={route.projectId} onNewTask={() => openNewTask(route.projectId)} />;
+      screen = <ProjectView projectId={route.projectId} tab={route.tab ?? "tasks"} onNewTask={() => openNewTask(route.projectId)} />;
       break;
     case "memory":
       screen = <Memory />;

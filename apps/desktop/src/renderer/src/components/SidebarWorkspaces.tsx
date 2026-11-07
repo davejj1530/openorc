@@ -6,7 +6,7 @@ import { CoversPreview } from "../lib/browser-preview";
 import { useRpc } from "../lib/client";
 import { ALL_WORKSPACES, useLayout } from "../lib/layout";
 import { useOrclings } from "../lib/orclings";
-import { useRouter } from "../lib/router";
+import { openProject } from "../lib/router";
 import { useUi } from "../lib/ui";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { markThread, projectInitials, workspaceMarks, workspaceSummary, type WorkspaceMark } from "../lib/workspace-rail";
@@ -126,7 +126,7 @@ function ProjectActions({ project }: { project: Pick<Project, "id" | "name" | "r
           <CoversPreview />
           <Menu.Positioner sideOffset={6} align="start" className="z-40" collisionPadding={8}>
             <Menu.Popup ref={floatingGround} className={menuPopup}>
-              <Menu.Item className={menuItem} onClick={() => useRouter.getState().navigate({ view: "project", projectId: project.id })}>
+              <Menu.Item className={menuItem} onClick={() => openProject(project.id, "settings")}>
                 <Settings size={13} /> Project settings
               </Menu.Item>
               <Menu.Item className={menuItem} onClick={() => useUi.getState().openNewTask(project.id)}>

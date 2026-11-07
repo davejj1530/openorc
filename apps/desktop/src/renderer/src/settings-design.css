@@ -641,3 +641,31 @@
   opacity: 0.08;
   filter: blur(var(--arrive-blur));
 }
+
+/* A project's own Claude accounts, under its worktree card on the tile: a plane card with the
+   settings rows, outside the settings sheet, so it sets the sheet's measures itself. */
+.project-accounts {
+  --settings-card-fill: var(--surface);
+  --settings-control-width: 240px;
+  margin-top: 32px;
+}
+.project-accounts .settings-group {
+  --current-row-fill: var(--surface-2);
+  --control-fill: var(--surface-2);
+}
+.project-account-choice {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  min-width: 150px;
+}
+.project-account-name {
+  min-width: 0;
+}
+.project-account-state {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 12px;
+}

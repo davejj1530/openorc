@@ -24,6 +24,7 @@ import { Field, LoadError, Section, SettingRow, Status, Toggle } from "./setting
 import { CodexCloudSection } from "./settings-cloud-codex";
 import { OpenCodeCloudSection } from "./settings-cloud-opencode";
 import { Failure, StillWorks, TokenField } from "./settings-secret-field";
+import { useRouter } from "../lib/router";
 
 const TOKENS_URL = "https://vercel.com/account/tokens";
 /** Why a token scoped to one team, said on hover. */
@@ -284,7 +285,9 @@ function SignInsStep({ status, signIns, brain, active }: { status: CloudStatus; 
 
 /** The step a person opened or closed; the others follow `nextStep`, and one worked in stays open. */
 function useOpenSteps(next: CloudStepId | null) {
-  const [chosen, setChosen] = useState<Partial<Record<CloudStepId, boolean>>>({});
+  // Asked to add a project to the cloud brain, as from a new thread's Cloud choice: its step opens.
+  const adding = useRouter((s) => (s.route.view === "settings" ? s.route.project : undefined));
+  const [chosen, setChosen] = useState<Partial<Record<CloudStepId, boolean>>>(() => (adding ? { brain: true } : {}));
   const open = (id: CloudStepId) => chosen[id] ?? id === next;
   return {
     open,

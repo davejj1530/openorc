@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CloudBrainCopy, CloudBrainProject, CloudEnv, RpcParams } from "@openorc/protocol";
 import { GitBranch } from "../components/icons";
 import { Button, Dialog, Select, TextButton, Tooltip } from "../components/ui";
 import { queryClient, useRpc, useRpcMutation } from "../lib/client";
+import { useRouter } from "../lib/router";
 import { CloudEnvButton, ENV_NOTE, EnvEditor, useEnvDraft } from "./settings-cloud-env";
 import { Failure } from "./settings-secret-field";
 import { Section, SettingRow, Status } from "./settings-shared";
@@ -125,10 +126,26 @@ function AddSheet({
   );
 }
 
+/**
+ * Asked to add a project, as from a new thread's Cloud choice: its sheet opens once, in view. One that cannot go is
+ * left to the picker, which names why.
+ */
+function useAskedToAdd(projects: CloudBrainProject[], open: (project: CloudBrainProject) => void): void {
+  const asked = useRouter((s) => (s.route.view === "settings" ? s.route.project : undefined));
+  const opened = useRef<string | null>(null);
+  useEffect(() => {
+    const project = projects.find((each) => each.id === asked && !each.blocked);
+    if (!project || opened.current === project.id) return;
+    opened.current = project.id;
+    open(project);
+  }, [asked, projects, open]);
+}
+
 /** The rest of this Mac's projects in one picker; one that cannot go names why beside its name. Add opens its sheet. */
 function AddProject({ projects, first, choose }: { projects: CloudBrainProject[]; first: boolean; choose: Choose }) {
   const [picked, setPicked] = useState("");
   const [adding, setAdding] = useState<CloudBrainProject | null>(null);
+  useAskedToAdd(projects, setAdding);
   const env = useRpc("cloud.env", { projectId: adding?.id ?? "" }, { enabled: adding !== null });
   const copy = useRpc("cloud.brain.copy", { projectId: adding?.id ?? "" }, { enabled: adding !== null });
   const open = projects.filter((project) => !project.blocked);

@@ -1,4 +1,4 @@
-import type { ComponentType, ReactNode } from "react";
+import { Fragment, type ComponentType, type ReactNode } from "react";
 import { Menu } from "@base-ui/react/menu";
 import { ChevronDown } from "./icons";
 import { cn } from "../lib/cn";
@@ -13,8 +13,10 @@ export interface ComposerChoiceOption<T extends string> {
   icon?: ComponentType<{ size?: number }>;
   /** A hidden option can still be the current value; the menu just doesn't offer it. */
   hidden?: boolean;
-  /** Why the option can't be chosen now; the menu offers it disabled, the reason on hover. */
+  /** Why the option can't be chosen now; the menu offers it disabled, the reason in place of its hint. */
   blocked?: string | null;
+  /** For a blocked option: where to go to make it possible, offered under it. */
+  fix?: { label: string; run: () => void } | undefined;
 }
 
 /**
@@ -79,17 +81,17 @@ export function ComposerChoice<T extends string>({
             {options
               .filter((o) => !o.hidden)
               .map((o) => (
-                <Menu.Item
-                  key={o.value}
-                  className={cn(menuItemDetail, "composer-choice-item")}
-                  data-current={value === o.value || undefined}
-                  disabled={Boolean(o.blocked)}
-                  title={o.blocked ?? undefined}
-                  onClick={() => onChange(o.value)}
-                >
-                  <span className={cn(value === o.value ? "text-ink" : "text-ink-2")}>{o.label}</span>
-                  {o.hint ? <span className="text-sm text-ink-4">{o.hint}</span> : null}
-                </Menu.Item>
+                <Fragment key={o.value}>
+                  <Menu.Item className={cn(menuItemDetail, "composer-choice-item")} data-current={value === o.value || undefined} disabled={Boolean(o.blocked)} onClick={() => onChange(o.value)}>
+                    <span className={cn(value === o.value ? "text-ink" : "text-ink-2")}>{o.label}</span>
+                    {o.blocked || o.hint ? <span className="text-sm text-ink-4">{o.blocked ?? o.hint}</span> : null}
+                  </Menu.Item>
+                  {o.blocked && o.fix ? (
+                    <Menu.Item className={cn(menuItemDetail, "composer-choice-fix")} onClick={o.fix.run}>
+                      <span className="text-sm text-accent">{o.fix.label}</span>
+                    </Menu.Item>
+                  ) : null}
+                </Fragment>
               ))}
           </Menu.Popup>
         </Menu.Positioner>

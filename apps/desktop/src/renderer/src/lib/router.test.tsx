@@ -97,6 +97,8 @@ it("round-trips every Settings section and what a link points at there, while ke
     const route = { view: "settings" as const, section: "usage" as const, provider };
     expect(routeFromSpec(specFromRoute(route))).toEqual(route);
   }
+  const adding = { view: "settings" as const, section: "cloud" as const, project: "p1" };
+  expect(routeFromSpec(specFromRoute(adding))).toEqual(adding);
   expect(routeFromSpec("settings:general:team-execution")).toEqual({ view: "settings", section: "general" });
   expect(routeFromSpec("settings:usage:unknown")).toEqual({ view: "settings", section: "usage" });
   expect(routeFromSpec("settings:general:codex")).toEqual({ view: "settings", section: "general" });

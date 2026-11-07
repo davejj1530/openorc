@@ -29,8 +29,8 @@ export type Route =
   | { view: "scheduled" }
   /** The Orcling designer: a new Orcling, or one being changed. */
   | { view: "orcling"; orclingId?: string }
-  /** A section, optionally with what to bring into view there: a provider's usage. */
-  | { view: "settings"; section?: SettingsSection; provider?: "codex" | "claude" }
+  /** A section, optionally with what to bring into view there: a provider's usage, or a project to add to the cloud brain. */
+  | { view: "settings"; section?: SettingsSection; provider?: "codex" | "claude"; project?: string }
   | { view: "diagnostics" };
 
 interface RouterState {
@@ -174,15 +174,16 @@ function isSettingsSection(value: string | undefined): value is SettingsSection 
   return value !== undefined && settingsSections.has(value);
 }
 
-/** "settings:<section>", with a provider after usage. */
+/** "settings:<section>", with a provider after usage or a project after cloud. */
 function settingsFromSpec(section: string | undefined, detail: string | undefined): Route {
   if (!isSettingsSection(section)) return { view: "settings" };
   if (section === "usage" && (detail === "codex" || detail === "claude")) return { view: "settings", section, provider: detail };
+  if (section === "cloud" && detail) return { view: "settings", section, project: detail };
   return { view: "settings", section };
 }
 
 function settingsSpec(route: Extract<Route, { view: "settings" }>): string {
-  return route.section ? ["settings", route.section, route.provider].filter(Boolean).join(":") : "settings";
+  return route.section ? ["settings", route.section, route.provider ?? route.project].filter(Boolean).join(":") : "settings";
 }
 
 function onboardingSpec(route: Extract<Route, { view: "onboarding" }>): string {

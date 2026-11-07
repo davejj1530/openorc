@@ -45,7 +45,7 @@ export type OwnerRoute<M extends RpcMethod> =
 
 export const BRING_FIRST = "Bring it to this Mac first.";
 /** Why a project's conversations cannot start or move in the cloud while the brain has no copy of it. */
-export const NOT_ON_BRAIN = "Switch this project on for the cloud brain in Settings > Cloud first.";
+export const NOT_ON_BRAIN = "Add this project to the cloud brain in Settings > Cloud on the Mac first.";
 /** Why no conversation can start or move in the cloud: no cloud service is connected to run it on. */
 export const NO_CLOUD_SERVICE = "Connect Vercel or Agent37 in Settings > Cloud first.";
 const IN_CLOUD = "This conversation is already in the cloud.";

@@ -6,6 +6,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { CloudBrain } from "./settings-cloud-brain";
 import { queryClient } from "../lib/client";
 import { core } from "../lib/rpc";
+import { useRouter } from "../lib/router";
 
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
 vi.mock("../components/ui", async (importOriginal) => ({
@@ -16,6 +17,7 @@ afterEach(() => {
   cleanup();
   queryClient.clear();
   vi.resetAllMocks();
+  useRouter.setState({ route: { view: "settings", section: "cloud" } });
 });
 
 const ready: CloudBrainStatus = { state: "ready", service: "vercel", region: "sin1", machine: "awake", claude: [], behind: false, working: null, door: null, threads: 0, error: null };
@@ -142,6 +144,17 @@ it("offers one it cannot move only as a disabled choice that names why, and keep
   expect([remove("app").disabled, reason("app")]).toEqual([true, "It has threads on the cloud brain."]);
   fireEvent.click(remove("app"));
   expect(core.call).not.toHaveBeenCalledWith("cloud.brain.project", expect.anything());
+});
+
+it("opens the sheet for the project a new thread's Cloud choice asked to add, once", async () => {
+  dotEnv = { files: [], entries: [] };
+  useRouter.setState({ route: { view: "settings", section: "cloud", project: "p3" } });
+  show([project("p1", "app"), project("p2", "site", { on: true }), project("p3", "docs")]);
+  expect(await screen.findByRole("heading", { name: "Add docs to the cloud brain" })).toBeTruthy();
+  fireEvent.click(within(sheet()).getByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(screen.queryByRole("dialog")).toBeNull();
 });
 
 it("asks for the first project with what it is for", async () => {

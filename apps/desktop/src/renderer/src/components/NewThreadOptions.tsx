@@ -1,13 +1,23 @@
 import type { ReactNode } from "react";
 import type { NewThreadPlace } from "@openorc/client";
-import { WORKSPACE_ID } from "@openorc/protocol";
+import { NOT_ON_BRAIN, WORKSPACE_ID } from "@openorc/protocol";
 import type { ComposerProps } from "./Composer";
 import { ComposerChoice } from "./ComposerChoice";
 import { Cloud, Folder, GitBranch, Laptop } from "./icons";
 import { Button } from "./ui";
 import type { NewThreadCloud } from "../lib/cloud-offered";
+import { useRouter } from "../lib/router";
 
-const workspaceOptions = (cloud: NewThreadCloud) => [
+/** Why Cloud can't be chosen, as the menu says it, and the way to Settings that makes it possible. */
+function cloudBlock(cloud: NewThreadCloud, projectId: string) {
+  if (!cloud.blocked) return { blocked: null, fix: undefined };
+  const settings = (project?: string) => useRouter.getState().navigate({ view: "settings", section: "cloud", ...(project ? { project } : {}) });
+  return cloud.blocked === NOT_ON_BRAIN
+    ? { blocked: "Not on your cloud brain yet", fix: { label: "Add this project", run: () => settings(projectId) } }
+    : { blocked: cloud.blocked, fix: { label: "Open Cloud settings", run: () => settings() } };
+}
+
+const workspaceOptions = (cloud: NewThreadCloud, projectId: string) => [
   { value: "current" as const, label: "Local checkout", hint: "The repository as it is checked out now", icon: Laptop },
   { value: "worktree" as const, label: "Worktree", hint: "A branch and folder of its own, so other threads never collide with it", icon: GitBranch },
   {
@@ -16,7 +26,7 @@ const workspaceOptions = (cloud: NewThreadCloud) => [
     hint: cloud.brain ? "On your cloud brain, in a sandbox of its own" : "A sandbox of its own; its changes arrive in a worktree here",
     icon: Cloud,
     hidden: !cloud.shown,
-    blocked: cloud.blocked,
+    ...cloudBlock(cloud, projectId),
   },
 ];
 
@@ -62,7 +72,7 @@ export function NewThreadOptions(props: {
             ariaLabel="Where the thread works"
             look="text"
             value={props.mode}
-            options={workspaceOptions(props.cloud)}
+            options={workspaceOptions(props.cloud, props.projectId)}
             trigger={
               <>
                 {props.mode === "cloud" ? <Cloud size={14} /> : <GitBranch size={14} />}

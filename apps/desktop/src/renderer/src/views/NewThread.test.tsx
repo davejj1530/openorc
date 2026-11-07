@@ -1,4 +1,4 @@
-import { NOT_ON_BRAIN, WORKSPACE_ID, harnessIds, type CloudSignIns, type Project, type RpcResults } from "@openorc/protocol";
+import { NO_CLOUD_SERVICE, WORKSPACE_ID, harnessIds, type CloudSignIns, type Project, type RpcResults } from "@openorc/protocol";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readNewThreadDraft, writeNewThreadDraft } from "../lib/new-thread-draft";
@@ -234,17 +234,33 @@ describe("NewThread", () => {
     await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ projectId: "p1", workspaceMode: "worktree", cloud: true })));
   });
 
-  it("offers Cloud with its reason on demand, and starts in a worktree, for a project the cloud brain has no copy of", async () => {
+  it("offers Cloud disabled with why, and starts in a worktree, for a project the cloud brain has no copy of", async () => {
     offer = { offered: true, provider: "vercel", brain: { host: "brain-key", projects: [{ mac: "p2", cloud: "brain-p2" }] } };
     writeNewThreadDraft({ ...saveModelDraft("p1", "Run this in the cloud"), workspace: "cloud" });
     render(<NewThread projectId="p1" />);
     fireEvent.click(screen.getByRole("button", { name: "Where the thread works: Worktree" }));
-    const cloud = await screen.findByRole("menuitem", { name: /^Cloud / });
+    const cloud = await screen.findByRole("menuitem", { name: "Cloud Not on your cloud brain yet" });
     expect(cloud.getAttribute("aria-disabled")).toBe("true");
-    expect(cloud.getAttribute("title")).toBe(NOT_ON_BRAIN);
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => expect(start).toHaveBeenCalledWith(expect.not.objectContaining({ cloud: true })));
     expect(start).toHaveBeenCalledWith(expect.objectContaining({ workspaceMode: "worktree" }));
+  });
+
+  it("offers to add a project the cloud brain has no copy of, in Cloud settings with its sheet open", async () => {
+    offer = { offered: true, provider: "vercel", brain: { host: "brain-key", projects: [{ mac: "p2", cloud: "brain-p2" }] } };
+    render(<NewThread projectId="p1" />);
+    fireEvent.click(screen.getByRole("button", { name: /^Where the thread works/ }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Add this project" }));
+    expect(useRouter.getState().route).toEqual({ view: "settings", section: "cloud", project: "p1" });
+  });
+
+  it("points to Cloud settings when no cloud service is connected", async () => {
+    offer = { offered: true, provider: null, brain: null };
+    render(<NewThread projectId="p1" />);
+    fireEvent.click(screen.getByRole("button", { name: /^Where the thread works/ }));
+    expect(await screen.findByRole("menuitem", { name: `Cloud ${NO_CLOUD_SERVICE}` })).toBeTruthy();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Open Cloud settings" }));
+    expect(useRouter.getState().route).toEqual({ view: "settings", section: "cloud" });
   });
 
   it("keeps the recovered prompt when its saved solo model is unavailable", () => {

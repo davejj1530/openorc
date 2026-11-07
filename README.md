@@ -39,7 +39,7 @@ Memory is optional. Turn it off or configure automatic extraction in Settings.
 
 Capture an idea as a task, ask multiple models for input, then start implementation when you're ready. Work in your local checkout or an isolated worktree, and review changes beside the conversation. The same panel opens the project's files to read, edit, or have explained in plain English, along with a terminal, a browser preview, and iOS Simulators or Android Emulators that you and your agents can drive.
 
-![OpenOrc with threads listed by day, the Resolved drawer, and weekly usage in the sidebar, a Codex conversation ending in the OpenOrc cube, and a source diff in the Changes panel](docs/images/readme/workspace.png)
+![OpenOrc with the project rail and threads listed by day in the sidebar, two conversations open in tabs, a Codex reply ending in the OpenOrc cube, and a source diff in the Changes panel beside Files and Terminal tabs](docs/images/readme/workspace.png)
 
 _Screenshots use sample projects and conversations._
 

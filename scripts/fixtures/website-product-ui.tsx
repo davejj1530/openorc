@@ -326,6 +326,7 @@ async function main() {
   else if (mode === "orclings") useRouter.getState().navigate({ view: "thread", threadId: "orcling-rini" });
   else if (mode === "document") useRouter.getState().navigate({ view: "task", taskId: "welcome", tab: "spec" });
   else useRouter.getState().navigate({ view: "thread", threadId: "onboarding" });
+  if (query.get("tabs")) await openThreadTabs(query.get("tabs")!);
   if (mode === "review") useLayout.getState().openWorkspaceChanges({ kind: "thread", id: "onboarding" });
   if (query.get("panel")) await openPanelTabs(query.get("panel")!, mode === "orclings" ? "thread:orcling-rini" : "thread:onboarding");
   const { App } = await import("../../apps/desktop/src/renderer/src/App");
@@ -739,6 +740,20 @@ function panelBridges() {
       kill: noop,
     },
   };
+}
+
+/**
+ * ?tabs=<thread>[,<thread>...]: those threads in tabs of their own ahead of the view's, which stays selected. Thread ids
+ * are the sample threads' (search, tokens, welcome, perf, ...).
+ */
+async function openThreadTabs(spec: string) {
+  const { useThreadTabs } = await import("../../apps/desktop/src/renderer/src/lib/thread-tabs");
+  const tabs = useThreadTabs.getState();
+  const current = useRouter.getState().route;
+  useThreadTabs.setState({ tabs: [], active: null });
+  for (const threadId of spec.split(",")) tabs.openThread(threadId);
+  if (current.view === "thread") tabs.openThread(current.threadId);
+  else useRouter.getState().navigate(current);
 }
 
 /**

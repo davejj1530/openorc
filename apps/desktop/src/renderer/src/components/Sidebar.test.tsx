@@ -305,7 +305,7 @@ it("lists Settings' sections in place of the app's navigation, then goes back to
     within(sections)
       .getAllByRole("button")
       .map((row) => row.textContent),
-  ).toEqual(["Usage", "Connections", "Cloud", "Slack", "Phone", "Skills", "Devices", "Appearance", "General", "Memory & models", "Data"]);
+  ).toEqual(["Usage", "Connections", "Cloud", "Slack", "Phone", "Skills", "Connectors", "Devices", "Appearance", "General", "Memory & models", "Data"]);
   expect(within(sections).getByRole("button", { name: "Slack" }).getAttribute("aria-current")).toBe("page");
   expect(screen.queryByRole("button", { name: "New thread" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Add project" })).toBeNull();

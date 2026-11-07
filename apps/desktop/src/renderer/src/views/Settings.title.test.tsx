@@ -28,6 +28,7 @@ it("names the open section, and lists the others from the title while the sideba
     "Slack",
     "Phone",
     "Skills",
+    "Connectors",
     "Devices",
     "Appearance",
     "General",

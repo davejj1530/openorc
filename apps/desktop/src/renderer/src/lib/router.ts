@@ -7,7 +7,7 @@ export type TaskTab = "chat" | "spec" | "files" | "commits" | "memory";
 export type MessageTarget = { runId: string; turn: number; messageId: string };
 
 /** The sections Settings is divided into, in the order it lists them. */
-export const SETTINGS_SECTIONS = ["usage", "connections", "cloud", "slack", "phone", "skills", "devices", "appearance", "general", "memory", "data"] as const;
+export const SETTINGS_SECTIONS = ["usage", "connections", "cloud", "slack", "phone", "skills", "connectors", "devices", "appearance", "general", "memory", "data"] as const;
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
 const settingsSections: ReadonlySet<string> = new Set<SettingsSection>(SETTINGS_SECTIONS);
 

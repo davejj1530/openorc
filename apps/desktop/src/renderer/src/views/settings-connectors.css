@@ -1,0 +1,177 @@
+/* Connectors: one row per server, its agents on demand. */
+.connector-list {
+  display: grid;
+}
+.connector-list > .connector-row + .connector-row {
+  border-top: var(--hairline) solid var(--line);
+}
+.connector-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+}
+.connector-toggle {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 52px;
+  text-align: left;
+}
+.connector-toggle:focus-visible {
+  outline: 2px solid var(--line-strong);
+  outline-offset: -2px;
+  border-radius: var(--radius-md);
+}
+.connector-name {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  color: var(--ink);
+  font-size: var(--text-base);
+}
+.connector-name > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.connector-agents {
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+.connector-chevron {
+  flex-shrink: 0;
+  color: var(--ink-3);
+  transition: transform 160ms;
+}
+.connector-row[data-open] .connector-chevron {
+  transform: rotate(180deg);
+}
+.connector-problem {
+  margin: -6px 0 12px 32px;
+  font-size: var(--text-sm);
+}
+.connector-detail {
+  display: grid;
+  gap: 2px;
+  padding: 0 0 12px 32px;
+}
+.connector-agent {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 32px;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+.connector-agent-name {
+  color: var(--ink);
+}
+.connector-agent-status {
+  min-width: 0;
+  color: var(--ink-3);
+}
+.connector-logo {
+  flex-shrink: 0;
+  border-radius: 5px;
+  object-fit: contain;
+}
+.connector-logo-letter {
+  display: inline-grid;
+  place-items: center;
+  background: var(--surface-3);
+  color: var(--ink-2);
+  line-height: 1;
+}
+.connector-progress {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 10px 12px 10px 16px;
+  border-radius: var(--radius-xl);
+  background: var(--settings-card-fill);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+.connector-dormant .connector-list {
+  margin-top: 4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .connector-chevron {
+    transition: none;
+  }
+}
+
+/* The add and edit form. */
+.connector-form {
+  display: grid;
+  gap: 14px;
+}
+.connector-form-field {
+  display: grid;
+  gap: 6px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+.connector-form-kinds {
+  display: flex;
+  gap: 4px;
+}
+.connector-form-kinds > button {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+.connector-form-kinds > button:hover {
+  background: var(--surface-2);
+}
+.connector-form-kinds > button[aria-pressed="true"] {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.connector-form-pairs,
+.connector-form-agents {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+.connector-form-pairs > legend,
+.connector-form-agents > legend {
+  margin-bottom: 6px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+.connector-form-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.connector-form-agents {
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: 16px;
+}
+.connector-form-agents > legend {
+  grid-column: 1 / -1;
+}
+.connector-form-agents > label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+  font-size: var(--text-sm);
+}
+.connector-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

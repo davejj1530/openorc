@@ -472,6 +472,7 @@ export const Bold = icon("Bold", <path strokeWidth="2.25" d="M6 4h7a4 4 0 0 1 0 
 export const Heading2 = icon("Heading2", <path d="M4 5v14 M13 5v14 M4 12h9 M17 15a2 2 0 0 1 4 0c0 2-4 2.5-4 5h4" />);
 export const Italic = icon("Italic", <path d="M10 4h9 M5 20h9 M15 4 9 20" />);
 export const Strikethrough = icon("Strikethrough", <path d="M18 6c-1-2-3-3-6-3-4 0-6 2-6 4 0 3 4 4 6 5 M6 18c1 2 3 3 6 3 4 0 6-2 6-4 0-2-2-3-4-4 M3 12h18" />);
+export const Plug = icon("Plug", <path d="M9 3v4.5 M15 3v4.5 M6.5 7.5h11v3.5a5.5 5.5 0 0 1-11 0z M12 16.5V21" />);
 export const Link2 = icon("Link2", <path d="m9 15 6-6 M8 16l-1 1a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0 M16 8l1-1a4 4 0 0 1 6 6l-4 4a4 4 0 0 1-6 0" transform="translate(2 0) scale(.84 1)" />);
 export const Text = icon("Text", <path d="M4 5h16 M12 5v15 M8 20h8 M4 5v3 M20 5v3" />);
 export const Quote = icon("Quote", <path d="M4 7h6v7H5c0 3 1 4 3 5 M14 7h6v7h-5c0 3 1 4 3 5" />);

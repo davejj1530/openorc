@@ -8,6 +8,7 @@ import { projects, settings, type CloudProviderId, type Db } from "@openorc/db";
 import { defaultBranch, git, originUrl } from "@openorc/git";
 import { harnessCatalog, harnessIds, type HarnessId, type Project } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
+import { cloudSetup, installDependencies, setupText } from "./cloud-deps.js";
 import { Phases } from "./cloud-phases.js";
 
 /** A project's base on one service: a saved sandbox new conversations start from, its code there and its setup done. */
@@ -207,12 +208,16 @@ export class CloudBases {
       const location: WorkspaceLocation = { install, repo: path.posix.join(sandbox.root, "repo"), mirror: project.rootPath, refPrefix: "refs/openorc/base/" };
       if (docker) await phases.time("docker", async () => sandbox.startDocker?.());
       const commit = await phases.time("code", () => seedBranch(location, project.rootPath, branch));
-      const script = project.settings.setupScript;
-      if (script) await phases.time("setup", async () => runSetupScript(location, script, project.name, await this.deps.projectEnv(project.id)));
+      const setup = await cloudSetup(project, project.rootPath, commit);
+      const env = await this.deps.projectEnv(project.id);
+      if (setup?.kind === "script") await phases.time("setup", () => runSetupScript(location, setup.script, project.name, env));
+      // Dependencies that would not install are installed by each conversation instead, which says why.
+      const installed = setup?.kind === "dependencies" ? await phases.time("dependencies", () => installDependencies(install, location.repo, setup.command, env, true)) : true;
+      if (!installed) this.deps.log.warn(`the dependencies of project ${project.name} would not install in its cloud base`);
       // A sandbox on this Mac runs the Mac's own CLIs.
       const agents = provider === "local" ? {} : await phases.time("agents", () => this.installAgents(sandbox));
       await sandbox.exec("rm", ["-f", path.posix.join(install.state, "seed.bundle")]);
-      await writeBaseMarker(install, { commit, branch, setup: setupHash(script), agents });
+      await writeBaseMarker(install, { commit, branch, setup: setupHash(installed ? setupText(setup) : null), agents });
       const image = await phases.time("save", () => bases.save(sandbox));
       const id = at(project.id, provider, docker);
       const previous = this.read()[id];

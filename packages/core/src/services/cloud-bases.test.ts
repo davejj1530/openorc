@@ -149,6 +149,31 @@ describe("a project's cloud base", () => {
   });
 });
 
+describe("a project with a lockfile and no setup script", () => {
+  it("installs its dependencies while its first cloud conversation starts, and once more only in its base", async () => {
+    // Takes a moment, as an install does, and counts its runs where the checkout keeps them.
+    const pnpm = '#!/bin/sh\nif [ "$1" = install ]; then sleep 1; mkdir -p node_modules; echo run >> node_modules/.installs; fi\n';
+    await writeFile(path.join(directory, "bin", "pnpm"), pnpm, { mode: 0o755 });
+    await commit("pnpm-lock.yaml", "lockfileVersion: '9.0'\n");
+    project = projects.updateSettings(db, project.id, { setupScript: null });
+    const installs = (thread: Thread) =>
+      readFileSync(path.join(repo(thread), "node_modules", ".installs"), "utf8")
+        .split("\n")
+        .filter(Boolean).length;
+    const installed = (thread: Thread) => vi.waitFor(() => expect(existsSync(path.join(repo(thread), "..", ".openorc", "deps.exit"))).toBe(true), { timeout: 10_000 });
+
+    const first = await started();
+    expect(existsSync(path.join(repo(first), "node_modules", ".installs"))).toBe(false);
+    await installed(first);
+    expect(installs(first)).toBe(1);
+
+    await bases.settled();
+    const second = await started();
+    expect(lines.some((line) => /opened from its project's base/.test(line))).toBe(true);
+    expect(installs(second)).toBe(1);
+  });
+});
+
 describe("what a project's setup installs from", () => {
   it("changed when a manifest or lockfile did, anywhere in the tree, and not for other files", async () => {
     const before = (await git(root, ["rev-parse", "HEAD"])).stdout.trim();

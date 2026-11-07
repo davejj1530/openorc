@@ -49,7 +49,7 @@ export { Agent37Sandbox, Agent37SandboxProvider, agent37Connection, type Agent37
 export { startFakeAgent37, type FakeAgent37, type FakeAgent37Options } from "./agent37-fake.js";
 export { INSTANCE_SERVER_PORT, InstancePort, type InstanceProcess, type ProcessSpec } from "./instance-port.js";
 export { RemoteProcess, type RemoteCommand } from "./remote-process.js";
-export type { Takeover, TakeoverStarted } from "./runner/wire.js";
+export { RUNNER_BIN, type Takeover, type TakeoverStarted } from "./runner/wire.js";
 export { RunnerClient, installRunner, runRunner, runnerFiles, type RunnerConnectionState, type RunnerFile, type RunnerInstall } from "./runner-client.js";
 export { CHECK_STEPS, checkSandbox, type CheckProgress, type CheckStep } from "./check.js";
 export {

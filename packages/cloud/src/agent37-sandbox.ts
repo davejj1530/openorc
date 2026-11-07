@@ -105,6 +105,14 @@ function commandWords(cmd: string, args: string[], env: Record<string, string> =
   return ["env", ...Object.entries(env).map(([name, value]) => `${name}=${value}`), cmd, ...args].map(shellQuote).join(" ");
 }
 
+/**
+ * A command's variables. Root gets a home of its own, so an install as root, such as OpenCode's, leaves no root-owned
+ * cache in the default user's home that the agent's own tools, as Corepack, then could not write.
+ */
+function environment(options: SandboxCommandOptions): Record<string, string> | undefined {
+  return options.sudo ? { HOME: "/root", ...options.env } : options.env;
+}
+
 /** A VM instance, as Agent37 reports it or, should it not, as OpenOrc marked it when making it. */
 function agent37Vm(instance: Agent37Instance): boolean {
   return instance.type === "vm" || instance.metadata?.type === "vm";
@@ -180,7 +188,7 @@ export class Agent37Sandbox implements Sandbox {
 
   async exec(cmd: string, args: string[], options: SandboxCommandOptions = {}): Promise<SandboxExecResult> {
     await this.awake();
-    const line = `cd ${shellQuote(options.cwd ?? this.root)} && exec ${commandWords(cmd, args, options.env)}`;
+    const line = `cd ${shellQuote(options.cwd ?? this.root)} && exec ${commandWords(cmd, args, environment(options))}`;
     const result = await this.api.exec(this.id, line, options.sudo ? { root: true } : {});
     if (result.truncated) throw new Error(`${cmd} printed more than Agent37 returns from one command, so its output was cut off.`);
     return { code: result.exit_code, stdout: Buffer.from(result.stdout, "utf8"), stderr: result.stderr };
@@ -189,7 +197,7 @@ export class Agent37Sandbox implements Sandbox {
   async launch(cmd: string, args: string[], options: SandboxCommandOptions = {}): Promise<void> {
     await this.awake();
     // Agent37 waits for a command's output to close, so this one hands it to /dev/null and returns while it runs on.
-    const line = `cd ${shellQuote(options.cwd ?? this.root)} && (nohup ${commandWords(cmd, args, options.env)} </dev/null >/dev/null 2>&1 &)`;
+    const line = `cd ${shellQuote(options.cwd ?? this.root)} && (nohup ${commandWords(cmd, args, environment(options))} </dev/null >/dev/null 2>&1 &)`;
     const result = await this.api.exec(this.id, line, options.sudo ? { root: true } : {});
     if (result.exit_code !== 0) throw new Error(`Could not start ${cmd} in the Agent37 instance. ${result.stderr.trim()}`.trim());
   }

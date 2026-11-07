@@ -6,7 +6,19 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { fileBoundaryAnswer } from "./file-boundary.ts";
-import { encodeFrame, frameReader, RUNNER_VERSION, type ClientFrame, type OutputStream, type ProcessExit, type ProcessState, type RunnerFrame, type Takeover, type TakeoverStarted } from "./wire.ts";
+import {
+  encodeFrame,
+  frameReader,
+  RUNNER_BIN,
+  RUNNER_VERSION,
+  type ClientFrame,
+  type OutputStream,
+  type ProcessExit,
+  type ProcessState,
+  type RunnerFrame,
+  type Takeover,
+  type TakeoverStarted,
+} from "./wire.ts";
 
 const STREAMS: OutputStream[] = ["stdout", "stderr"];
 const REPLAY_CHUNK = 64 * 1024;
@@ -207,9 +219,12 @@ export class RunnerDaemon {
         mkdirSync(path.dirname(file.path), { recursive: true, mode: 0o700 });
         writeFileSync(file.path, file.content, { mode: 0o600 });
       }
-      // Its own process group, so a signal reaches whatever the agent started too.
       // PWD follows cwd: some CLIs (OpenCode) read their folder from it, and the daemon's own would be wrong.
-      child = spawn(frame.cmd, frame.args, { cwd: frame.cwd, env: { ...process.env, ...frame.env, ...(frame.cwd ? { PWD: frame.cwd } : {}) }, stdio: "pipe", detached: true });
+      const env: NodeJS.ProcessEnv = { ...process.env, ...frame.env, ...(frame.cwd ? { PWD: frame.cwd } : {}) };
+      // OpenOrc's own commands come first, as the package managers that wait for its dependency install.
+      env["PATH"] = [path.join(this.state, RUNNER_BIN), env["PATH"]].filter(Boolean).join(":");
+      // Its own process group, so a signal reaches whatever the agent started too.
+      child = spawn(frame.cmd, frame.args, { cwd: frame.cwd, env, stdio: "pipe", detached: true });
     } catch (error) {
       this.finish(managed, { code: null, signal: null, error: error instanceof Error ? error.message : String(error) });
       return;

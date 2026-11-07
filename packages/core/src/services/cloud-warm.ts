@@ -5,6 +5,7 @@ import { git, originUrl } from "@openorc/git";
 import type { HarnessId, Project } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
 import { runSetupScript, setupHash, type CloudBase, type CloudBases } from "./cloud-bases.js";
+import { cloudSetup, installDependencies, setupText } from "./cloud-deps.js";
 import type { CloudHistory } from "./cloud-history.js";
 import type { CloudLocation } from "./cloud-workspaces.js";
 import { usesDocker } from "./uses-docker.js";
@@ -154,12 +155,12 @@ export async function prepareAhead(location: CloudLocation, project: Project, de
   const origin = (await originUrl(source)) ?? undefined;
   await seedFromCommit(location, { source, commit, branch, ...(origin ? { origin } : {}) });
   deps.history.fill(location, source);
-  const script = project.settings.setupScript;
-  if (script) {
+  const setup = await cloudSetup(project, source, commit);
+  if (setup?.kind === "script") {
     await deps.dockerUp(location);
-    await runSetupScript(location, script, project.name, await deps.projectEnv(project.id));
-  }
-  const base = { commit, branch, setup: setupHash(script), agents: {}, shallow: true };
+    await runSetupScript(location, setup.script, project.name, await deps.projectEnv(project.id));
+  } else if (setup) await installDependencies(location.install, location.repo, setup.command, await deps.projectEnv(project.id), false);
+  const base = { commit, branch, setup: setupHash(setupText(setup)), agents: {}, shallow: true };
   await writeBaseMarker(location.install, base);
   return { ...location, base };
 }

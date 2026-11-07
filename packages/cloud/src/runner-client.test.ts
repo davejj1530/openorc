@@ -59,6 +59,14 @@ describe("RunnerClient", () => {
     expect(out.text()).toBe("echo:hello\n");
   });
 
+  it("puts the runner's own commands first on a process's PATH, before the sandbox's and the caller's", async () => {
+    const install = await installRunner(sandbox, runnerFiles());
+    const proc = client!.spawn("path", { ...node(`process.stdout.write(process.env.PATH)`), cmd: process.execPath, env: { PATH: "/caller/bin" } });
+    const out = collect(proc);
+    expect(await out.closed).toEqual([0, null]);
+    expect(out.text()).toBe(`${path.join(install.state, "bin")}:/caller/bin`);
+  });
+
   it("starts a process in its folder with PWD naming that folder, whatever PWD the runner or the caller had", async () => {
     const folder = path.join(sandbox.root, "checkout");
     await mkdir(folder, { recursive: true });

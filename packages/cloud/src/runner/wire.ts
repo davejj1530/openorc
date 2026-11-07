@@ -4,6 +4,8 @@
  */
 
 export const RUNNER_VERSION = 1;
+/** The folder in the runner's state whose commands come first on its processes' PATH. */
+export const RUNNER_BIN = "bin";
 
 export type OutputStream = "stdout" | "stderr";
 

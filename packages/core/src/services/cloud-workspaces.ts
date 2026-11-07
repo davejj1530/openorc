@@ -41,6 +41,7 @@ import { SandboxSkills, type CloudSkillSource } from "./cloud-skills.js";
 import { Phases } from "./cloud-phases.js";
 import { runSetupScript, setupHash, setupInputsChanged, type CloudBase, type CloudBases } from "./cloud-bases.js";
 import { CloudHistory } from "./cloud-history.js";
+import { cloudSetup, installDependencies } from "./cloud-deps.js";
 import { CloudWarm, prepareAhead, type Warmed } from "./cloud-warm.js";
 import { CloudBroker } from "./cloud-broker.js";
 import type { StartThreadInput } from "./thread-inputs.js";
@@ -77,7 +78,8 @@ interface Seeding {
   /** The project's base the sandbox is made from. */
   from?: CloudBase | undefined;
   seed(location: CloudLocation, origin: string | undefined, steps: SeedSteps): Promise<CloudMirrorState>;
-  setup(location: CloudLocation): Promise<boolean>;
+  /** Whether the setup, named by what it runs, runs in this sandbox. */
+  setup(location: CloudLocation, setup: string | null): Promise<boolean>;
 }
 
 export const LOCAL_LAUNCH_REFUSED = "This machine runs agents only in cloud sandboxes.";
@@ -487,7 +489,7 @@ export class CloudWorkspaceService {
         return state;
       },
       // Over a base, the setup runs again only when it, or what it installs from, changed since.
-      setup: async ({ base }) => !base || base.setup !== setupHash(project.settings.setupScript) || (await setupInputsChanged(source, base.commit, commit)),
+      setup: async ({ base }, setup) => !base || base.setup !== setupHash(setup) || (await setupInputsChanged(source, base.commit, commit)),
     };
     // The worktree is still being made, so what the sandbox needs is read from the commit it starts at.
     return this.build(threadId, project, start.mirror, seeding, { folder: source, commit });
@@ -497,12 +499,13 @@ export class CloudWorkspaceService {
   private async build(threadId: string, project: Project, mirror: string, seeding: Seeding, code?: CodeSource): Promise<CloudMirrorState> {
     const record = cloudWorkspaces.get(this.db, threadId);
     if (!record) throw new Error(`Thread ${threadId} has no cloud workspace.`);
-    const script = project.settings.setupScript;
     cloudWorkspaces.preparing(this.db, threadId);
     let release: () => void = () => undefined;
     const phases = new Phases();
     try {
-      this.step(threadId, { step: "sandbox", setup: Boolean(script) });
+      const setup = await cloudSetup(project, code?.folder ?? mirror, code?.commit ?? "HEAD");
+      const script = setup?.kind === "script";
+      this.step(threadId, { step: "sandbox", setup: script });
       const location = await phases.time("sandbox", () => this.location(record, mirror, code, seeding.from));
       release = this.awake.hold(threadId, location.install.sandbox);
       // The conversation's agent installs while the code goes up and the setup runs, so its first turn finds it there.
@@ -515,15 +518,18 @@ export class CloudWorkspaceService {
         : Promise.resolve();
       const dockerReady = phases.time("docker", () => this.dockerUp(location));
       dockerReady.catch(() => undefined);
-      this.step(threadId, { step: "code", setup: Boolean(script) });
+      this.step(threadId, { step: "code", setup: script });
       const origin = (await originUrl(project.rootPath)) ?? undefined;
       const state = await phases.time("code", () => seeding.seed(location, origin, phases));
-      if (script && (await seeding.setup(location))) {
+      if (setup?.kind === "script" && (await seeding.setup(location, setup.script))) {
         this.step(threadId, { step: "setup", setup: true });
         // A setup script may start the project's containers.
         await dockerReady;
-        await phases.time("setup", async () => runSetupScript(location, script, path.basename(mirror), await this.projectEnv(project.id)));
+        await phases.time("setup", async () => runSetupScript(location, setup.script, path.basename(mirror), await this.projectEnv(project.id)));
       }
+      // Dependencies install while the agent starts; its package managers wait for them.
+      if (setup?.kind === "dependencies" && (await seeding.setup(location, setup.command)))
+        await phases.time("dependencies", async () => installDependencies(location.install, location.repo, setup.command, await this.projectEnv(project.id), false));
       await Promise.all([agentReady, dockerReady]);
       this.log.info(phases.line(`cloud workspace for thread ${threadId} built`));
       return state;

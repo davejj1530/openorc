@@ -102,7 +102,17 @@ export const rpcParams = {
   "agents.updates.check": z.object({}),
   "agents.updates.install": z.object({ ids: z.array(HarnessId).min(1).max(3) }).strict(),
   "agents.updates.configure": z.object({ automatic: z.boolean().optional(), dismissed: z.string().max(300).optional() }).strict(),
-  "providers.usage": z.object({ provider: z.enum([...HarnessId.options, "anthropic-api"]), claudeAccountId: ClaudeAccountId.optional() }),
+  "providers.usage": z.object({
+    provider: z.enum([...HarnessId.options, "anthropic-api"]),
+    claudeAccountId: ClaudeAccountId.optional(),
+    /** A report this young, from any reader, answers at once instead of asking the CLI again; none means a live read. */
+    maxAgeMs: z
+      .number()
+      .int()
+      .positive()
+      .max(15 * 60_000)
+      .optional(),
+  }),
   /** The Mac's plan limits for a phone: Codex, then each enabled Claude account. Takes nothing, so a phone cannot force a fresh read. */
   "providers.limits": z.object({}).strict(),
   "providers.codex.reset": z.object({ attemptId: z.string().uuid(), creditId: z.string().min(1).optional(), confirmationToken: z.string().min(1) }),

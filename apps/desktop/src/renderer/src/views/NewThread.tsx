@@ -11,17 +11,19 @@ import {
 } from "@openorc/client";
 import { WORKSPACE_ID, executionMode, type ClaudeAccounts, type Project } from "@openorc/protocol";
 import { useEffect, useRef, useState } from "react";
-import { ClaudeAccountPicker } from "../components/ClaudeAccountPicker";
 import { useCloudSignInGate } from "../components/CloudSignInOffer";
 import { Composer } from "../components/Composer";
 import { ComposerCommitChip } from "../components/ComposerFooter";
 import { FolderGit2 } from "../components/icons";
+import { type PickerAccounts } from "../components/ModelPickerAccounts";
 import { ComposerModelPicker, ModelPicker, type ModelChoice, type OrclingPickerChoices } from "../components/ModelPicker";
 import { loadArrivalActivity, NewThreadRecent, useArrivalActivity } from "../components/NewThreadActivity";
 import { NewThreadOptions } from "../components/NewThreadOptions";
 import { NewThreadStarters } from "../components/NewThreadStarters";
 import { Panel } from "../components/Panel";
 import { NewThreadQuestion } from "../components/ProjectPicker";
+import { DitherBackdrop } from "../components/DitherBackdrop";
+import { ThreadTabs } from "../components/ThreadTabs";
 import { TopBar } from "../components/TopBar";
 import { Button, TextButton } from "../components/ui";
 import { ClaudeAccountScope } from "../lib/claude-account";
@@ -31,7 +33,7 @@ import { useCloudWarm } from "../lib/cloud-warm";
 import { usePublishComposerAccount } from "../lib/composer-account";
 import { useComposerChanges } from "../lib/composer-changes";
 import { useDefaultHarness } from "../lib/default-harness";
-import { useLayout } from "../lib/layout";
+import { focusedProject, useLayout } from "../lib/layout";
 import { swapInPlace } from "../lib/motion";
 import { evaluateNewThreadAvailability } from "../lib/new-thread-availability";
 import { readNewThreadDraft, readNewThreadProject, rememberNewThreadProject, writeNewThreadDraft } from "../lib/new-thread-draft";
@@ -51,20 +53,30 @@ const SWITCH_READS_MS = 250;
 export function NewThread({ projectId }: { projectId?: string }) {
   const projects = useRpc("projects.list", {});
   const home = useRpc("workspace.get", {});
-  const railProject = useLayout((s) => s.projectId);
-  const [project, setProject] = useState(() => projectId ?? railProject ?? readNewThreadProject() ?? WORKSPACE_ID);
+  // The project the screen was opened for, else the one the sidebar's filter focuses, else the last one chosen here.
+  const focused = useLayout(focusedProject);
+  const wanted = projectId ?? focused;
+  const [project, setProject] = useState(() => wanted ?? readNewThreadProject() ?? WORKSPACE_ID);
   const chooseProject = (id: string) => {
     rememberNewThreadProject(id);
     setProject(id);
   };
   useEffect(() => {
-    if (projectId) chooseProject(projectId);
-  }, [projectId]);
+    if (wanted) chooseProject(wanted);
+  }, [wanted]);
+  // Moving the sidebar's filter while the screen shows moves the question to that project too.
+  const filtered = useRef(focused);
   useEffect(() => {
-    if (!project && projects.data?.[0]) chooseProject(railProject ?? projects.data[0].id);
-  }, [project, projects.data, railProject]);
-  // Choosing a project in the question also makes it the app's current one. The screen swaps in place once
-  // the project's recent threads and git state are read, so its sections never blink out and back.
+    if (focused === filtered.current) return;
+    filtered.current = focused;
+    if (focused) chooseProject(focused);
+  }, [focused]);
+  // A remembered project that has since been removed gives way to Workspace.
+  useEffect(() => {
+    if (projects.data && project !== WORKSPACE_ID && !projects.data.some((each) => each.id === project)) chooseProject(WORKSPACE_ID);
+  }, [project, projects.data]);
+  // Choosing a project in the question brings a focused sidebar filter along. The screen swaps in place once the
+  // project's recent threads and git state are read, so its sections never blink out and back.
   const switching = useRef(0);
   useEffect(() => () => void switching.current++, []);
   const switchProject = (id: string) => {
@@ -75,7 +87,7 @@ export function NewThread({ projectId }: { projectId?: string }) {
       .then(() => {
         if (turn !== switching.current) return;
         swapInPlace("project", () => {
-          useLayout.getState().setProject(id);
+          useLayout.getState().followProject(id);
           chooseProject(id);
         });
       });
@@ -102,6 +114,11 @@ function useNewThreadAccount(projects: Project[] | undefined, projectId: string,
   const choice = list.data ? projectAccountChoice(project, list.data) : undefined;
   const choices: ClaudeAccounts | undefined = choice && { accounts: choice.accounts, defaultId: choice.defaultId };
   return { list, choices, claudeAccountId: orcling ?? offeredAccount(choice, drafted) ?? choice?.defaultId ?? "claude-cli" };
+}
+
+/** A new thread's Claude accounts for its model picker: the ones its project uses, the chosen one checked. An Orcling brings its own. */
+function newThreadAccounts(choices: ClaudeAccounts | undefined, current: string, starting: boolean, choose: (id: string) => void): PickerAccounts | undefined {
+  return choices ? { accounts: choices.accounts, current, choose, blocked: starting ? "Starting the thread…" : undefined } : undefined;
 }
 
 /** Who a new cloud thread's first turn signs in as; null for one that starts on this Mac. */
@@ -193,6 +210,7 @@ function NewThreadProject({
     system: { data: info.data, failed: info.isError },
   });
   const usesClaude = choice?.agent === "claude";
+  const pickerAccounts = orcling ? undefined : newThreadAccounts(accountChoices, claudeAccountId, start.isPending, (id) => changeDraft({ claudeAccountId: id }));
   const disabledReason = usesClaude && !accounts.data ? (accounts.error?.message ?? "Loading Claude accounts…") : targetDisabledReason;
   const location = useNewThreadLocation(projectId, selected, workspaceMode, draft.workingDirectory);
   const chooseModel = (model: ModelChoice) => changeDraft({ target: { kind: "model", choice: model } });
@@ -202,7 +220,7 @@ function NewThreadProject({
     void info.refetch();
     onRetryProjects();
   };
-  const pickerOrclings = orclingChoices(orclings, target, (next) => changeDraft({ target: next }));
+  const pickerOrclings = isWorkspace ? undefined : orclingChoices(orclings, target, (next) => changeDraft({ target: next }));
 
   const submit = async (text: string, attachments: string[]) => {
     if (disabledReason) throw new Error(disabledReason);
@@ -229,10 +247,11 @@ function NewThreadProject({
   return (
     <ClaudeAccountScope id={claudeAccountId}>
       <main className="workspace-main well flex flex-1 flex-col min-w-0 min-h-0">
-        <TopBar showProject={false} panel={Boolean(panelContext)}>
-          {null}
+        <TopBar tabs panel={Boolean(panelContext)}>
+          <ThreadTabs />
         </TopBar>
         <div className="new-thread-body flex-1 min-h-0 overflow-y-auto">
+          <DitherBackdrop />
           <div ref={composer} className="new-thread-column">
             {projects?.length === 0 ? (
               <div className="new-thread-empty">
@@ -264,9 +283,9 @@ function NewThreadProject({
                     onModel={chooseModel}
                     modelControl={
                       target.kind === "unavailable" ? (
-                        <ModelPicker value={null} onChange={chooseModel} orclings={isWorkspace ? undefined : pickerOrclings} disabled={start.isPending} />
+                        <ModelPicker value={null} onChange={chooseModel} orclings={pickerOrclings} disabled={start.isPending} />
                       ) : (
-                        <ComposerModelPicker value={choice} onChange={chooseModel} onSelectModel={chooseModel} orclings={isWorkspace ? undefined : pickerOrclings} disabled={start.isPending} />
+                        <ComposerModelPicker value={choice} onChange={chooseModel} onSelectModel={chooseModel} orclings={pickerOrclings} accounts={pickerAccounts} disabled={start.isPending} />
                       )
                     }
                     mode={draft.mode}
@@ -291,11 +310,6 @@ function NewThreadProject({
                   disabled={start.isPending}
                   onFolder={(workingDirectory) => changeDraft({ workingDirectory })}
                   onMode={(workspace) => changeDraft({ workspace })}
-                  account={
-                    usesClaude && !orcling ? (
-                      <ClaudeAccountPicker compact accounts={accountChoices} value={claudeAccountId} onChange={(claudeAccountId) => changeDraft({ claudeAccountId })} disabled={start.isPending} />
-                    ) : null
-                  }
                 />
                 {targetIssue || projectIssue ? (
                   <p role="status" className="text-xs text-warn mt-2 break-words">

@@ -18,6 +18,7 @@ import {
 import { useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { CoversPreview } from "../lib/browser-preview";
 import { useClaudeAccountId } from "../lib/claude-account";
+import { PickerAccountRows, warmAccountUsage, type PickerAccounts } from "./ModelPickerAccounts";
 import { useRpc } from "../lib/client";
 import { cn } from "../lib/cn";
 import { useRouter } from "../lib/router";
@@ -98,12 +99,24 @@ function usePickerPopup() {
 const SECTION_LABELS: Record<"orclings", string> = { orclings: "Orclings" };
 const sectionLabel = (section: PickerSection) => (isHarnessId(section) ? `${harnessName(section)} models` : SECTION_LABELS[section]);
 
+/** Arrow keys move between the picker's enabled rows; up from the first goes back to the search field. */
+function moveRowFocusIn(event: KeyboardEvent<HTMLButtonElement>, results: HTMLElement | null, search: HTMLInputElement | null): void {
+  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+  event.preventDefault();
+  const rows = [...(results?.querySelectorAll<HTMLButtonElement>("[data-picker-row]:not(:disabled)") ?? [])];
+  const index = rows.indexOf(event.currentTarget);
+  if (event.key === "ArrowDown") rows[index + 1]?.focus();
+  else if (index > 0) rows[index - 1]?.focus();
+  else search?.focus();
+}
+
 /** Search and effort stay fixed while the provider's model list scrolls. */
 function ModelBrowser({
   value,
   onChange,
   onSelectModel = onChange,
   orclings,
+  accounts,
   showEffort,
   showFast,
   disabled,
@@ -114,6 +127,8 @@ function ModelBrowser({
   onChange: (choice: ModelChoice) => void;
   onSelectModel?: (choice: ModelChoice) => void;
   orclings?: OrclingPickerChoices;
+  /** The Claude accounts to offer above Claude's models, with what each has left. */
+  accounts?: PickerAccounts | undefined;
   showEffort: boolean;
   showFast: boolean;
   disabled?: boolean;
@@ -146,12 +161,7 @@ function ModelBrowser({
     fastAvailable,
     fastBlocked,
     fastHint,
-  } = pickerSettings({
-    model: current,
-    value,
-    loading: models.isPending,
-    failed: models.isError,
-  });
+  } = pickerSettings({ model: current, value, loading: models.isPending, failed: models.isError });
 
   const switchSection = (next: PickerSection) => {
     setSection(next);
@@ -163,15 +173,7 @@ function ModelBrowser({
     onSelectModel(modelChoiceFor(model, value));
     if (closeOnSelect) close();
   };
-  const moveRowFocus = (event: KeyboardEvent<HTMLButtonElement>) => {
-    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-    event.preventDefault();
-    const rows = [...(results.current?.querySelectorAll<HTMLButtonElement>("[data-picker-row]:not(:disabled)") ?? [])];
-    const index = rows.indexOf(event.currentTarget);
-    if (event.key === "ArrowDown") rows[index + 1]?.focus();
-    else if (index > 0) rows[index - 1]?.focus();
-    else search.current?.focus();
-  };
+  const moveRowFocus = (event: KeyboardEvent<HTMLButtonElement>) => moveRowFocusIn(event, results.current, search.current);
   const modelRow = (model: ModelOption, showProvider: boolean) => {
     const selected = !orclings?.selectedId && value?.agent === model.agent && value.model === model.id;
     return (
@@ -295,6 +297,7 @@ function ModelBrowser({
                   {provider && harnessInstalled(provider) ? `Sign in to ${harnessName(harness)} to use its models.` : `Install ${harnessName(harness)} to use its models.`}
                 </p>
               ) : null}
+              <PickerAccountRows section={harness} searching={searching} accounts={accounts} disabled={disabled} moveRowFocus={moveRowFocus} />
               {searching
                 ? visible.map((model) => modelRow(model, true))
                 : providerGroups(visible, harness).map(([label, group]) => (
@@ -435,6 +438,7 @@ export function ComposerModelPicker({
   onChange,
   onSelectModel,
   orclings,
+  accounts,
   modelSelector,
   disabled,
   settingsDisabled = false,
@@ -443,6 +447,8 @@ export function ComposerModelPicker({
   onChange: (choice: ModelChoice) => void;
   onSelectModel?: (choice: ModelChoice) => void;
   orclings?: OrclingPickerChoices;
+  /** The Claude accounts the conversation can run on; the picker shows them with their usage and switches between them. */
+  accounts?: PickerAccounts | undefined;
   modelSelector?: ReactNode;
   disabled?: boolean;
   settingsDisabled?: boolean;
@@ -460,12 +466,7 @@ export function ComposerModelPicker({
     fastAvailable,
     fastBlocked,
     fastHint,
-  } = pickerSettings({
-    model: current,
-    value,
-    loading: models.isPending,
-    failed: models.isError,
-  });
+  } = pickerSettings({ model: current, value, loading: models.isPending, failed: models.isError });
   const label = effort ? effortLabel(effort) : "Default";
   const hint = effortHint(effort);
   const title = `${modelTitle(current, value?.model) ?? "Choose a model"} · ${label}`;
@@ -482,6 +483,7 @@ export function ComposerModelPicker({
         disabled={disabled}
         className="composer-model-trigger"
         aria-label="Model and effort"
+        {...warmAccountUsage(accounts)}
         title={fast && fastBlocked ? `${title} · ${fastStatus(fast, fastBlocked)}${fastHint}` : title}
       >
         <ComposerTriggerIcon orcling={chosenOrcling(orclings)} value={value} />
@@ -524,6 +526,7 @@ export function ComposerModelPicker({
                 onChange={onChange}
                 onSelectModel={onSelectModel}
                 orclings={orclings}
+                accounts={accounts}
                 showEffort
                 showFast
                 disabled={settingsDisabled}

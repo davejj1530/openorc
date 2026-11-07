@@ -7,6 +7,7 @@ import { OrclingPreview } from "./OrclingPreview";
 import { Empty } from "./ui";
 import { useRpcMutation } from "../lib/client";
 import { ComposerModelPicker, type ModelChoice } from "./ModelPicker";
+import type { PickerAccounts } from "./ModelPickerAccounts";
 
 interface OrclingConversation {
   /** Orclings a message here can ask with `@`. */
@@ -35,11 +36,14 @@ export function useOrclingConversation({
   runs,
   choice,
   onModel,
+  accounts,
 }: {
   thread: ThreadSummary | null;
   runs: readonly Run[];
   choice: ModelChoice | null;
   onModel: (choice: ModelChoice) => void;
+  /** The conversation's Claude accounts, offered while no Orcling works in it; an Orcling brings its own. */
+  accounts?: PickerAccounts | undefined;
 }): OrclingConversation {
   const orclings = useOrclings();
   const own = thread?.orclingId ?? null;
@@ -73,6 +77,7 @@ export function useOrclingConversation({
             onModel(next);
           }}
           orclings={{ options: orclings, selectedId: thread.orclingId ?? null, onSelect: (orcling) => assign.mutate({ threadId: thread.id, orclingId: orcling.id }) }}
+          accounts={thread.orclingId ? undefined : accounts}
         />
       ) : undefined,
     async ask(text, attachments) {

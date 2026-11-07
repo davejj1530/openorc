@@ -381,6 +381,8 @@
   --spacing-well: 8px;
   --spacing-traffic: var(--window-controls-left, calc(86px / var(--window-zoom, 1)));
   --spacing-controls: var(--window-controls-right, calc(140px / var(--window-zoom, 1)));
+  /* What the folded rail's wordmark takes of the first header in a corner no traffic lights hold (sidebar.css). */
+  --spacing-wordmark: 48px;
 }
 
 @layer base {

@@ -22,6 +22,26 @@
 .workspace-navigation[data-open="false"] :is(.sidebar-header, .sidebar-workspace) > * {
   visibility: hidden;
 }
+/* The list's curve stays at the rail; its top line goes no further than the turn. */
+.workspace-navigation[data-open="false"] .sidebar-workspace::before {
+  right: auto;
+  width: var(--radius-lg);
+}
+/* With no traffic lights in the corner (full screen, and off macOS), the folded column keeps the
+   wordmark where the open one has it. It overhangs the first header, which leaves it room
+   (--spacing-wordmark), and the corner passes the pointer through to that header. Narrow windows
+   float the sidebar instead and keep no rail. */
+@media (min-width: 901px) {
+  .app-shell .workspace-navigation[data-open="false"]:not([data-traffic-lights="true"], [data-settings]) {
+    overflow: visible;
+  }
+  .workspace-navigation[data-open="false"]:not([data-traffic-lights="true"], [data-settings]) .sidebar-wordmark {
+    visibility: visible;
+  }
+  .workspace-navigation[data-open="false"] .sidebar-header {
+    pointer-events: none;
+  }
+}
 /* The column slides; its parts keep the full width so nothing reflows while it moves. The window
    corner and Settings' sections span the rail and the list; the list keeps its own width. */
 .sidebar-header,

@@ -20,7 +20,7 @@ export function PanelHeader({
   side,
   expanded,
   sidebarOpen,
-  trafficClearance,
+  corner,
   windowsControls,
   onClose,
 }: {
@@ -29,7 +29,8 @@ export function PanelHeader({
   side: PanelSide;
   expanded: boolean;
   sidebarOpen: boolean;
-  trafficClearance: boolean;
+  /** What holds the window's corner beside the panel's header when it comes first: see useWindowCorner. */
+  corner: "lights" | "wordmark" | null;
   windowsControls: boolean;
   onClose: (id: string) => void;
 }) {
@@ -38,9 +39,14 @@ export function PanelHeader({
   const outerRight = !left || expanded;
   return (
     <header
-      data-traffic-clearance={trafficClearance || undefined}
-      // The tabs line up with the page under them, and step past the traffic lights or the Windows controls at the window's edges.
-      className={cn("panel-header drag-region px-2.5", outerLeft && trafficClearance && "pl-traffic", outerRight && windowsControls && "pr-controls")}
+      data-traffic-clearance={corner === "lights" || undefined}
+      // The tabs line up with the page under them, and step past the traffic lights, the wordmark or the Windows controls at the window's edges.
+      className={cn(
+        "panel-header drag-region px-2.5",
+        outerLeft && corner === "lights" && "pl-traffic",
+        outerLeft && corner === "wordmark" && "pl-wordmark",
+        outerRight && windowsControls && "pr-controls",
+      )}
     >
       {left ? (
         <span className="workspace-window-nav flex items-center" data-sidebar-open={sidebarOpen}>

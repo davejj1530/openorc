@@ -4,7 +4,7 @@ import { PanelIcon } from "./icons";
 import { cn } from "../lib/cn";
 import { useLayout, type PanelSide } from "../lib/layout";
 import { WindowNav } from "./Sidebar";
-import { useNavigationGone } from "../lib/navigation-column";
+import { useWindowCorner } from "../lib/navigation-column";
 import { IconButton, Tooltip } from "./ui";
 import { useTrafficLights, useWindowsControls } from "../lib/window";
 
@@ -12,11 +12,11 @@ import { useTrafficLights, useWindowsControls } from "../lib/window";
  * The header's side padding. The window's outermost headers clear the native controls; tabs start 8px in, a thread's
  * header otherwise sits 20px in with its round tools 8px from the edge, and page headers keep 12px on both sides.
  */
-function headerInset({ leftmost, rightmost, besideColumn, thread, tabs }: { leftmost: boolean; rightmost: boolean; besideColumn: boolean; thread?: boolean; tabs?: boolean }): string {
+function headerInset({ corner, rightmost, besideColumn, thread, tabs }: { corner: "lights" | "wordmark" | null; rightmost: boolean; besideColumn: boolean; thread?: boolean; tabs?: boolean }): string {
   const left = cn(tabs && "pl-2", !tabs && thread && "pl-5", !tabs && !thread && "pl-3");
   // A thread header keeps 8px at the window's edge, and 12px from the panel or pane beside it.
   const right = thread && !besideColumn ? "pr-2" : "pr-3";
-  return cn(leftmost ? "pl-traffic" : left, rightmost ? "pr-controls" : right);
+  return cn(corner === "lights" && "pl-traffic", corner === "wordmark" && "pl-wordmark", !corner && left, rightmost ? "pr-controls" : right);
 }
 
 /**
@@ -64,8 +64,9 @@ export function TopBar({
   const trafficLights = useTrafficLights();
   const windowsControls = useWindowsControls();
   const { first, last: rightmost } = headerEnds({ inSplit, panelShown: Boolean(panel && panelOpen), panelSide, rightmost: isRightmost });
-  // Only the window's leftmost header clears the traffic lights, and only its rightmost clears the Windows controls.
-  const leftmost = useNavigationGone() && first;
+  // Only the window's first header clears what holds the corner, and only its rightmost clears the Windows controls.
+  const windowCorner = useWindowCorner();
+  const corner = first ? windowCorner : null;
   const panelLabel = panelOpen ? "Hide panel" : "Show panel";
   return (
     <header
@@ -74,7 +75,7 @@ export function TopBar({
       className={cn(
         "drag-region app-topbar h-topbar shrink-0 flex items-center justify-between",
         windowDragSurface ? "thread-header" : "gap-2",
-        headerInset({ leftmost: leftmost && trafficLights, rightmost: rightmost && windowsControls, besideColumn: !rightmost, thread: windowDragSurface, tabs }),
+        headerInset({ corner, rightmost: rightmost && windowsControls, besideColumn: !rightmost, thread: windowDragSurface, tabs }),
         className,
       )}
     >

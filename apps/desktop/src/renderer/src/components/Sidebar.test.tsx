@@ -12,6 +12,8 @@ const fixture: {
     Partial<Pick<ThreadSummary, "createdAt" | "archivedAt" | "parentThreadId" | "parentRelation" | "subagent" | "prUrl" | "prState" | "workspaceMode" | "branch" | "owner">>)[];
   /** What the host says Resolved holds, when it says. */
   resolvedCount?: number;
+  /** What Resolved holds in each project, when the count depends on the projects asked about. */
+  resolvedByProject?: Record<string, number>;
 } = vi.hoisted(() => ({ projects: [], threads: [] }));
 
 /** The core's answer to a thread list, as the fixture's threads read. */
@@ -46,7 +48,11 @@ vi.mock("../lib/client", async (original) => {
         }
       );
     if (method === "threads.list") return listThreads(params as RpcParams<"threads.list">);
-    if (method === "threads.resolvedCount") return fixture.resolvedCount;
+    if (method === "threads.resolvedCount") {
+      const counts = fixture.resolvedByProject;
+      if (!counts) return fixture.resolvedCount;
+      return ((params as RpcParams<"threads.resolvedCount">).projectIds ?? []).reduce((sum, id) => sum + (counts[id] ?? 0), 0);
+    }
     return undefined;
   };
   return {
@@ -72,7 +78,7 @@ vi.mock("./ui", async (importOriginal) => ({
   Tooltip: ({ children }: { children: ReactNode }) => children,
 }));
 
-import { useLayout } from "../lib/layout";
+import { ALL_WORKSPACES, useLayout } from "../lib/layout";
 import { useRouter } from "../lib/router";
 import { useUi } from "../lib/ui";
 import { useWindow } from "../lib/window";
@@ -95,9 +101,10 @@ beforeEach(() => {
   fixture.projects = [];
   fixture.threads = [];
   fixture.resolvedCount = undefined;
+  fixture.resolvedByProject = undefined;
   localStorage.clear();
   useWindow.setState({ fullscreen: false });
-  useLayout.setState({ collapsed: [], projectId: null, sidebarOpen: true, pinnedOnly: false });
+  useLayout.setState({ collapsed: [], projectId: null, workspace: ALL_WORKSPACES, sidebarOpen: true, pinnedOnly: false });
   useRouter.setState({ route: { view: "newthread" }, history: [], future: [], threadIds: [] });
 });
 
@@ -290,11 +297,104 @@ it("reaches the app's screens from the footer, marking the open one as current",
   expect(screen.queryByRole("button", { name: "More" })).toBeNull();
 });
 
-it("starts a new thread from the list head, leaving Add project to the new thread's question", () => {
+it("starts a new thread from the list head, and adds a project from the rail's foot", () => {
   open("notes");
   fireEvent.click(screen.getByRole("button", { name: "New thread" }));
   expect(useRouter.getState().route).toMatchObject({ view: "newthread" });
-  expect(screen.queryByRole("button", { name: "Add project" })).toBeNull();
+  const rail = screen.getByRole("navigation", { name: "Workspaces" });
+  expect(within(rail).getAllByRole("button").at(-1)?.getAttribute("aria-label")).toBe("Add project");
+  fireEvent.click(within(rail).getByRole("button", { name: "Add project" }));
+  expect(useUi.getState().importProject).toBe(true);
+  act(() => useUi.getState().setImportProject(false));
+});
+
+const rail = () => screen.getByRole("navigation", { name: "Workspaces" });
+const railItem = (name: string) => within(rail()).getByRole("button", { name });
+
+it("leads the rail with All, then each project by its initials in the order projects come, with All chosen at first", () => {
+  fixture.projects = [
+    { id: "b8", name: "block8-workspace", rootPath: "/projects/b8" },
+    { id: "gk", name: "gradekit", rootPath: "/projects/gk" },
+    { id: "sma", name: "sma-2-mobile", rootPath: "/projects/sma" },
+  ];
+  mountSidebar();
+  const items = within(rail())
+    .getAllByRole("listitem")
+    .map((item) => within(item).getByRole("button"));
+  expect(items.map((item) => item.getAttribute("aria-label"))).toEqual(["All workspaces", "block8-workspace", "gradekit", "sma-2-mobile"]);
+  expect(items.map((item) => item.querySelector(".workspace-rail-initials")?.textContent ?? null)).toEqual([null, "BW", "GR", "SM"]);
+  expect(items.map((item) => item.getAttribute("aria-current"))).toEqual(["true", null, null, null]);
+  expect(screen.getByText("All workspaces", { selector: ".sidebar-workspace-name-label" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /project actions/ })).toBeNull();
+});
+
+it("lists only the chosen workspace's threads, remembers the choice, starts new threads there, and counts its own Resolved", async () => {
+  projectThreads();
+  fixture.resolvedByProject = { one: 4, two: 2 };
+  mountSidebar();
+  await screen.findByRole("button", { name: /Other notes/ });
+  expect(screen.getByRole("button", { name: "Resolved, 6" })).toBeTruthy();
+  fireEvent.click(railItem("Second project"));
+  expect(useLayout.getState()).toMatchObject({ workspace: "two", projectId: "two" });
+  expect(JSON.parse(localStorage.getItem("openorc.layout") ?? "{}")).toMatchObject({ workspace: "two" });
+  expect(railItem("Second project").getAttribute("aria-current")).toBe("true");
+  expect(railItem("All workspaces").getAttribute("aria-current")).toBeNull();
+  await waitFor(() => expect(screen.queryByRole("button", { name: /Regular notes/ })).toBeNull());
+  expect(screen.getByRole("button", { name: /Other notes/ })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Resolved, 2" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Second project, project actions" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "New thread" }));
+  expect(useRouter.getState().route).toEqual({ view: "newthread", projectId: "two" });
+  fireEvent.click(railItem("All workspaces"));
+  expect(useLayout.getState()).toMatchObject({ workspace: ALL_WORKSPACES, projectId: "two" });
+  await screen.findByRole("button", { name: /Regular notes/ });
+});
+
+it("goes back to All when the chosen project is no longer listed", async () => {
+  projectThreads();
+  useLayout.setState({ workspace: "gone" });
+  mountSidebar();
+  await waitFor(() => expect(useLayout.getState().workspace).toBe(ALL_WORKSPACES));
+});
+
+it("marks each project's tile with its most pressing open thread, sub threads included, and says what is there", async () => {
+  fixture.projects = ["one", "two", "three", "four", "five"].map((id) => ({ id, name: `${id}-project`, rootPath: `/projects/${id}` }));
+  const base = { agent: "codex", activity: "idle", unread: false, session: { status: "idle", message: null }, pinnedAt: null, snoozedUntil: null, lastActivityAt: Date.now() } as const;
+  const failed = { status: "error", message: "Boom" } as const;
+  fixture.threads = [
+    { ...base, id: "one-unread", title: "One unread", projectId: "one", unread: true },
+    { ...base, id: "one-parent", title: "One parent", projectId: "one", activity: "running" as const },
+    { ...base, id: "one-child", title: "One child", projectId: "one", activity: "waiting" as const, parentThreadId: "one-parent", parentRelation: "started" as const },
+    { ...base, id: "two-failed", title: "Two failed", projectId: "two", unread: true, session: failed },
+    { ...base, id: "two-running", title: "Two running", projectId: "two", activity: "running" as const },
+    { ...base, id: "three-running", title: "Three running", projectId: "three", activity: "running" as const },
+    { ...base, id: "three-unread", title: "Three unread", projectId: "three", unread: true },
+    { ...base, id: "four-unread", title: "Four unread", projectId: "four", unread: true },
+    // Quiet since before yesterday: Resolved holds it, so its project stays unmarked.
+    { ...base, id: "five-old", title: "Five old", projectId: "five", unread: true, lastActivityAt: ago(5) },
+  ];
+  mountSidebar();
+  const mark = (name: string) => railItem(name).querySelector(".workspace-rail-mark [role=img]")?.getAttribute("aria-label") ?? null;
+  await waitFor(() => expect(mark("one-project")).toBe("Needs you"));
+  expect(["two-project", "three-project", "four-project", "five-project"].map(mark)).toEqual(["Failed", "Working", "Unread", null]);
+  expect(railItem("All workspaces").querySelector(".workspace-rail-mark")).toBeNull();
+  expect(railItem("one-project").getAttribute("aria-description")).toBe("1 needs you · 1 working · 1 unread");
+  expect(railItem("two-project").getAttribute("aria-description")).toBe("1 failed · 1 working");
+  expect(railItem("five-project").getAttribute("aria-description")).toBeNull();
+});
+
+it("moves between workspaces with the arrow keys", () => {
+  projectThreads();
+  mountSidebar();
+  const list = within(rail()).getByRole("list");
+  railItem("All workspaces").focus();
+  fireEvent.keyDown(list, { key: "ArrowDown" });
+  expect(document.activeElement).toBe(railItem("First project"));
+  fireEvent.keyDown(list, { key: "ArrowDown" });
+  fireEvent.keyDown(list, { key: "ArrowDown" });
+  expect(document.activeElement).toBe(railItem("Second project"));
+  fireEvent.keyDown(list, { key: "ArrowUp" });
+  expect(document.activeElement).toBe(railItem("First project"));
 });
 
 it("lists Settings' sections in place of the app's navigation, then goes back to the screen Settings was opened from", () => {

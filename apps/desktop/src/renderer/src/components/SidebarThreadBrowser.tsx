@@ -3,7 +3,7 @@ import { Menu } from "@base-ui/react/menu";
 import { useQueryClient } from "@tanstack/react-query";
 import { isSubagentThread, WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 import { CoversPreview } from "../lib/browser-preview";
-import { useLayout } from "../lib/layout";
+import { ALL_WORKSPACES, useLayout } from "../lib/layout";
 import {
   type SidebarDayList,
   type SidebarFilter,
@@ -43,14 +43,19 @@ function emptyMessage(pinned: boolean): string {
   return pinned ? "No pinned threads." : "No threads yet.";
 }
 
-function useSidebarProjects() {
+/** Every project's id, the Workspace's too, and the ones the list shows: all of them, or the rail's choice. */
+export function useSidebarProjects() {
   const projects = useRpc("projects.list", {});
+  const workspace = useLayout((s) => s.workspace);
   useEffect(() => {
     if (!projects.data) return;
-    const { projectId, setProject } = useLayout.getState();
+    const { projectId, setProject, workspace: chosen, setWorkspace } = useLayout.getState();
     if (projectId && projectId !== WORKSPACE_ID && !projects.data.some((p) => p.id === projectId)) setProject(WORKSPACE_ID);
+    // A removed project's threads are gone from the list; the rail goes back to All.
+    if (chosen !== ALL_WORKSPACES && !projects.data.some((p) => p.id === chosen)) setWorkspace(ALL_WORKSPACES);
   }, [projects.data]);
-  return { query: projects, ids: [WORKSPACE_ID, ...(projects.data ?? []).map((project) => project.id)].sort() };
+  const all = [WORKSPACE_ID, ...(projects.data ?? []).map((project) => project.id)].sort();
+  return { query: projects, all, ids: workspace === ALL_WORKSPACES ? all : [workspace] };
 }
 
 /** Loading an off-page selection must not replace the list's stable page query. */
@@ -95,7 +100,7 @@ export function SidebarThreadBrowser() {
 }
 
 /**
- * One list across every project, newest work first, read a page at a time. Pinned threads come from their own
+ * One list across every project, or the one the rail chose, newest work first, read a page at a time. Pinned threads come from their own
  * read so an old pin still leads the list, and so do the threads that need you, so a folded day can still show them.
  */
 function useThreadList(children: ChildPages) {

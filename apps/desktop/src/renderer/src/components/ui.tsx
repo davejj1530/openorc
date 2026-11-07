@@ -268,7 +268,7 @@ export function TooltipProvider({ children }: { children: ReactNode }) {
 }
 
 /** Names a control on hover. Outside a TooltipProvider it keeps its own 400ms delay. */
-export function Tooltip({ label, children }: { label: string; children: ReactNode }) {
+export function Tooltip({ label, children }: { label: ReactNode; children: ReactNode }) {
   const grouped = useContext(TooltipGroup);
   const tooltip = (
     <BaseTooltip.Root>

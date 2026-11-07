@@ -1,23 +1,28 @@
-/* The sidebar: its column, window corner, list head, day sections, Orclings and the footer dock.
-   It sits on the tile with no fill of its own, a hairline seam at its edge. Rows have a 10px
-   corner; the current row takes --current-row-fill and keeps --navigation-ink. */
+/* The sidebar: its column, window corner, workspace rail, list head, day sections, Orclings and the
+   footer dock. It sits on the tile with no fill of its own, a hairline seam at its edge. Rows have a
+   10px corner; the current row takes --current-row-fill and keeps --navigation-ink. */
 
 .app-shell .workspace-navigation {
   position: relative;
   display: flex;
   flex-direction: column;
-  width: var(--width-sidebar);
+  width: var(--width-navigation);
   overflow: hidden;
   background: none;
 }
 .app-shell .workspace-navigation[data-open="false"] {
   width: 0;
 }
-/* The column slides; its parts keep the full width so nothing reflows while it moves. */
+/* The column slides; its parts keep the full width so nothing reflows while it moves. The window
+   corner, Settings' sections and the dock span the rail and the list; the list keeps its own width. */
 .sidebar-header,
-.sidebar-workspace,
+.sidebar-columns,
 .settings-destinations,
 .sidebar-footer {
+  width: var(--width-navigation);
+  flex-shrink: 0;
+}
+.sidebar-workspace {
   width: var(--width-sidebar);
   flex-shrink: 0;
 }
@@ -47,15 +52,180 @@
   display: none;
 }
 
-.sidebar-workspace {
+.sidebar-columns {
   display: flex;
   flex: 1;
+  min-height: 0;
+}
+.sidebar-workspace {
+  display: flex;
   flex-direction: column;
   min-height: 0;
 }
 /* Settings takes the column over; the app's navigation waits underneath it. */
-.sidebar-workspace[hidden] {
+.sidebar-columns[hidden] {
   display: none;
+}
+
+/* The workspace rail: All, each project by its initials, then Add project at its foot. It paints
+   nothing; a hairline in the seam's line runs down its right edge. A tile is a 36px r10 square:
+   the chosen one on the current-row fill in navigation ink, the rest drawn by an inset hairline
+   with muted initials, the row hover fill under the pointer. */
+.workspace-rail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: var(--width-workspace-rail);
+  flex-shrink: 0;
+  min-height: 0;
+  padding: 4px 0 8px;
+}
+.workspace-rail::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--hairline);
+  background: var(--line);
+  pointer-events: none;
+}
+.workspace-rail-list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 0;
+  /* Room for a corner mark and the focus fill at the scroll's edges. */
+  padding-top: 3px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.workspace-rail-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 68px;
+  color: var(--ink-3);
+}
+.workspace-rail-tile {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  transition:
+    background-color var(--duration-leave) var(--ease-out),
+    color var(--duration-leave) var(--ease-out);
+}
+.workspace-rail-initials {
+  font-size: var(--text-base);
+  line-height: 16px;
+  letter-spacing: 0.02em;
+}
+.workspace-rail-item:has(.workspace-rail-initials):not([data-selected]) .workspace-rail-tile {
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.workspace-rail-item:hover .workspace-rail-tile {
+  background-color: var(--surface-2);
+  color: var(--ink);
+}
+.workspace-rail-item[data-selected] .workspace-rail-tile {
+  background-color: var(--current-row-fill);
+  color: var(--navigation-ink);
+}
+/* Keyboard focus takes the tile, not the whole button: the strong fill and full ink. */
+.app-shell .workspace-rail-item:focus-visible {
+  background-color: transparent;
+}
+.app-shell .workspace-rail-item:focus-visible .workspace-rail-tile {
+  background-color: var(--surface-3);
+  color: var(--ink);
+}
+.workspace-rail-label {
+  display: block;
+  max-width: 52px;
+  overflow: hidden;
+  font-size: var(--text-xs);
+  line-height: 16px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workspace-rail-item[data-selected] .workspace-rail-label {
+  color: var(--ink);
+}
+/* The corner mark: the thread rows' own glyph on a disc of the tile ground, cut into the tile's corner. */
+.workspace-rail-mark {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-pill);
+  background: var(--bg);
+}
+.workspace-rail-add {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+
+/* The list's first row names the workspace the rail chose: the project's 14px icon at 60% until
+   hovered, its name at 14px, and a chevron opening its actions. All has no actions. */
+.sidebar-workspace-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  margin: 0 10px;
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  text-align: left;
+  flex-shrink: 0;
+  transition: background-color var(--duration-leave) var(--ease-out);
+}
+button.sidebar-workspace-name:hover,
+button.sidebar-workspace-name[data-popup-open] {
+  background-color: var(--surface-2);
+}
+.sidebar-workspace-name-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  justify-content: center;
+  align-items: center;
+  opacity: 0.6;
+  transition: opacity var(--duration-leave) var(--ease-out);
+}
+.sidebar-workspace-name-icon > * {
+  width: 14px;
+  height: 14px;
+}
+button.sidebar-workspace-name:is(:hover, [data-popup-open]) .sidebar-workspace-name-icon {
+  opacity: 1;
+}
+.sidebar-workspace-name-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--text-md);
+  line-height: 22px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar-workspace-name-chevron {
+  flex-shrink: 0;
+  color: var(--ink-3);
 }
 
 /* Settings' sections, in place of the app's navigation. */
@@ -776,7 +946,8 @@ button.browser-empty:hover,
   }
   .sidebar-nav-row[aria-current="page"],
   .sidebar-dock-button[data-current],
-  .orcling-contact[aria-current="page"] {
+  .orcling-contact[aria-current="page"],
+  .workspace-rail-item[data-selected] .workspace-rail-tile {
     outline: 1px solid Highlight;
   }
 }

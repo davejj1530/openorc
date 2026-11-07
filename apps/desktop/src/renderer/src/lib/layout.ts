@@ -19,6 +19,9 @@ export type PanelSide = "left" | "right";
 /** A screen the sidebar's footer reaches. Inbox sits in the window's header instead. */
 export type SidebarScreen = "tasks" | "pulls" | "scheduled";
 
+/** The rail's All: the sidebar lists every project's threads. A project's id lists only its own. */
+export const ALL_WORKSPACES = "all";
+
 interface LayoutState {
   sidebarOpen: boolean;
   sidebarWidth: number;
@@ -39,6 +42,8 @@ interface LayoutState {
   openFiles: (threadId?: string) => void;
   /** The navigation scope for tasks, memory, and new threads. Null selects all projects. */
   projectId: string | null;
+  /** Whose threads the sidebar lists, chosen on its rail: one project's, or every project's under ALL_WORKSPACES. */
+  workspace: string;
   /** The visible thread whose controls last opened the shared panel. */
   panelThreadId: string | null;
   toggleThreadPanel: (id: string) => void;
@@ -63,6 +68,8 @@ interface LayoutState {
   setPanelWidth: (px: number) => void;
   togglePanelSide: () => void;
   setProject: (id: string | null) => void;
+  /** Choosing a project on the rail also makes it the app's current one; All leaves that as it was. */
+  setWorkspace: (id: string) => void;
   setPinnedOnly: (pinnedOnly: boolean) => void;
   toggleCollapsed: (key: string) => void;
   toggleThreadChildren: (id: string, expanded: boolean) => void;
@@ -77,7 +84,7 @@ export const limits = {
 
 const KEY = "openorc.layout";
 
-function read(): Partial<Pick<LayoutState, "sidebarOpen" | "sidebarWidth" | "panelOpen" | "panelWidth" | "panelSide" | "projectId" | "collapsed" | "previewUrls">> {
+function read(): Partial<Pick<LayoutState, "sidebarOpen" | "sidebarWidth" | "panelOpen" | "panelWidth" | "panelSide" | "projectId" | "workspace" | "collapsed" | "previewUrls">> {
   try {
     return JSON.parse(localStorage.getItem(KEY) ?? "{}") as Partial<LayoutState>;
   } catch {
@@ -96,6 +103,7 @@ function persist(s: LayoutState): void {
         panelWidth: s.panelWidth,
         panelSide: s.panelSide,
         projectId: s.projectId,
+        workspace: s.workspace,
         collapsed: s.collapsed,
         previewUrls: s.previewUrls,
       }),
@@ -142,6 +150,8 @@ export const useLayout = create<LayoutState>((set, get) => {
     selectedChanges: null,
     workspaceChanges: null,
     projectId: saved.projectId === undefined ? WORKSPACE_ID : saved.projectId,
+    // Layouts saved before the rail list every project, as the sidebar did then.
+    workspace: typeof saved.workspace === "string" && saved.workspace ? saved.workspace : ALL_WORKSPACES,
     panelThreadId: null,
     pinnedOnly: false,
     collapsed: (saved.collapsed ?? []).filter(liveSidebarFold),
@@ -193,6 +203,7 @@ export const useLayout = create<LayoutState>((set, get) => {
     setPanelWidth: (px) => commit({ panelWidth: clamp(px, limits.panel) }),
     togglePanelSide: () => commit({ panelSide: get().panelSide === "left" ? "right" : "left" }),
     setProject: (projectId) => commit({ projectId }),
+    setWorkspace: (workspace) => commit({ workspace, ...(workspace === ALL_WORKSPACES ? {} : { projectId: workspace }) }),
     openThreadPanel: (id, tab) => commit({ panelThreadId: id, panelOpen: true, panelTab: tab, panelRequest: { tab } }),
     toggleThreadPanel: (id) => {
       const open = get().panelThreadId !== id || !get().panelOpen;

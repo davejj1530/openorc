@@ -46,7 +46,8 @@ export function ProjectMenu({ project, children }: { project: { id: string; name
   );
 }
 
-function RemoveProjectDialog({ project, onClose }: { project: { id: string; name: string }; onClose: () => void }) {
+/** Asks before taking a project off the list; files, worktrees and history stay. */
+export function RemoveProjectDialog({ project, onClose }: { project: { id: string; name: string }; onClose: () => void }) {
   const remove = useRpcMutation("projects.remove");
   return (
     <Dialog

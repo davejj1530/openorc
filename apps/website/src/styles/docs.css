@@ -435,7 +435,7 @@ kbd {
   }
   .docs-visual .mock-window:has(.hs-mock-worktree) {
     width: 900px;
-    transform: translateX(calc(-1 * min(246px, max(0px, 900px - 100cqi))));
+    transform: translateX(calc(-1 * min(299px, max(0px, 900px - 100cqi))));
   }
 }
 

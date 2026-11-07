@@ -1,14 +1,15 @@
 ---
 /**
- * A file's mark as the app's FileGlyph picks it: TypeScript and React files show their language's mark, anything
- * else the outline code file. The marks are drawn here at chip size rather than copied from the app's icon set.
+ * A file's mark as the app's FileGlyph picks it: TypeScript and React files show their language's mark, prose the
+ * outline text file, anything else the outline code file. The marks are drawn here at chip size rather than copied
+ * from the app's icon set.
  */
 interface Props {
   path: string;
 }
 const { path } = Astro.props;
 const extension = /\.([a-z0-9]+)$/i.exec(path)?.[1]?.toLowerCase() ?? "";
-const kind = /^(ts|mts|cts)$/.test(extension) ? "typescript" : /^(tsx|jsx)$/.test(extension) ? "react" : "code";
+const kind = /^(ts|mts|cts)$/.test(extension) ? "typescript" : /^(tsx|jsx)$/.test(extension) ? "react" : /^(md|mdx|txt|rst)$/.test(extension) ? "text" : "code";
 ---
 
 {kind === "typescript" ? (
@@ -27,6 +28,7 @@ const kind = /^(ts|mts|cts)$/.test(extension) ? "typescript" : /^(tsx|jsx)$/.tes
   </svg>
 ) : (
   <svg class="hs-file-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    <path d="M14 3.5H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9Z M14 3.5v6h6" /><path d="m9 12-3 3 3 3 M15 12l3 3-3 3" />
+    <path d="M14 3.5H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9Z M14 3.5v6h6" />
+    <path d={kind === "text" ? "M8 13h8 M8 17h6" : "m9 12-3 3 3 3 M15 12l3 3-3 3"} />
   </svg>
 )}

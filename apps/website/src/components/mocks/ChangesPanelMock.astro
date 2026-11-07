@@ -1,11 +1,11 @@
 ---
-/** The work panel's Changes page, still: the panel's plane with its text tabs over the page's content. */
+/** The work panel's Changes page, still: the panel's tabs on the top line over the page's content. */
 import ChangesDiff from "../hero/ChangesDiff.astro";
 import PanelHeader from "../hero/PanelHeader.astro";
 import "../../styles/hero-scene.css";
 ---
 
 <div class="hs-mock hs-mock-changes">
-  <PanelHeader tabs={[{ label: "Changes", selected: true }]} />
+  <PanelHeader tabs={[{ label: "Changes", icon: "fileDiff", current: true }]} />
   <ChangesDiff />
 </div>

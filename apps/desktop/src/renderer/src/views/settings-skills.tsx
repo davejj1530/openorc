@@ -154,9 +154,9 @@ export function SkillsSettings({ active }: { active: boolean }) {
   // All three catalogs load together so the counts remain visible when switching harnesses.
   // Settings keeps its other panels mounted, so discovery only runs while this panel is active.
   const enabled = active && Boolean(projectId);
-  const codex = useRpc("skills.list", { projectId, agent: "codex" }, { enabled, staleTime: 60_000 });
-  const claude = useRpc("skills.list", { projectId, agent: "claude" }, { enabled, staleTime: 60_000 });
-  const opencode = useRpc("skills.list", { projectId, agent: "opencode" }, { enabled, staleTime: 60_000 });
+  const codex = useRpc("skills.list", { scope: { kind: "project", id: projectId }, agent: "codex" }, { enabled, staleTime: 60_000 });
+  const claude = useRpc("skills.list", { scope: { kind: "project", id: projectId }, agent: "claude" }, { enabled, staleTime: 60_000 });
+  const opencode = useRpc("skills.list", { scope: { kind: "project", id: projectId }, agent: "opencode" }, { enabled, staleTime: 60_000 });
   const catalogs = { codex, claude, opencode };
   const skills = catalogs[agent];
   const found = skills.data ?? [];

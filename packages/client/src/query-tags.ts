@@ -110,7 +110,11 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
 
 /** Reads tagged by the ids in their parameters. */
 const idReadTags: MethodRules = {
-  "skills.list": (p) => ["skills", `project:${String(p["projectId"] ?? "")}`],
+  // Never a conversation's own tag: that changes with each event of a turn, and every read starts the agent's CLI.
+  "skills.list": (p) => {
+    const scope = p["scope"] as { kind?: unknown; id?: unknown } | undefined;
+    return ["skills", ...(scope?.kind === "project" ? [`project:${String(scope.id)}`] : [])];
+  },
   "tasks.executionThread": (p) => ["tasks", "threads", `task:${String(p["taskId"])}`],
   "projects.get": (p) => ["projects", `project:${String(p["id"])}`],
   // Git can appear in a turn, a commit, the terminal or outside the app; focus and settled commands refresh workspace-diff.

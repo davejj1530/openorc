@@ -44,7 +44,7 @@ describe("skills through RPC", () => {
     const folder = threads.get(core.db, rini.threadId)!.workingDirectory!;
     await skill(path.join(folder, ".claude", "skills"), "desk-notes");
 
-    expect(found(await call("skills.list", { projectId: WORKSPACE_ID, workingDirectory: folder, agent: "claude" }))).toEqual(["project:desk-notes", "user:humanizer"]);
+    expect(found(await call("skills.list", { scope: { kind: "project", id: WORKSPACE_ID, workingDirectory: folder }, agent: "claude" }))).toEqual(["project:desk-notes", "user:humanizer"]);
   });
 
   it("lists a Workspace conversation with no folder of its own from the Workspace's folder", async () => {
@@ -52,7 +52,7 @@ describe("skills through RPC", () => {
     await skill(path.join(entrypoint, ".claude", "skills"), "entry-notes");
     await call("workspace.configure", { entrypoint });
 
-    expect(found(await call("skills.list", { projectId: WORKSPACE_ID, agent: "claude" }))).toEqual(["project:entry-notes", "user:humanizer"]);
+    expect(found(await call("skills.list", { scope: { kind: "project", id: WORKSPACE_ID }, agent: "claude" }))).toEqual(["project:entry-notes", "user:humanizer"]);
   });
 
   it("lists a project's skills from its root, and gives no project another folder", async () => {
@@ -60,7 +60,21 @@ describe("skills through RPC", () => {
     await skill(path.join(repo, ".claude", "skills"), "repo-notes");
     const project = projects.insert(core.db, { name: "Repo", rootPath: repo, gitRemote: null, defaultBranch: null, settings: {} });
 
-    expect(found(await call("skills.list", { projectId: project.id, agent: "claude" }))).toEqual(["user:humanizer", "project:repo-notes"]);
-    await expect(call("skills.list", { projectId: project.id, workingDirectory: root, agent: "claude" })).rejects.toThrow("Only Workspace conversations can choose a working folder.");
+    expect(found(await call("skills.list", { scope: { kind: "project", id: project.id }, agent: "claude" }))).toEqual(["user:humanizer", "project:repo-notes"]);
+    await expect(call("skills.list", { scope: { kind: "project", id: project.id, workingDirectory: root }, agent: "claude" })).rejects.toThrow(
+      "Only Workspace conversations can choose a working folder.",
+    );
+  });
+
+  it("lists a worktree thread's skills from its own branch, not the project's checkout", async () => {
+    const repo = path.join(root, "repo");
+    const worktree = path.join(root, "worktrees", "feature");
+    await skill(path.join(repo, ".claude", "skills"), "repo-notes");
+    await skill(path.join(worktree, ".claude", "skills"), "branch-notes");
+    const project = projects.insert(core.db, { name: "Repo", rootPath: repo, gitRemote: null, defaultBranch: null, settings: {} });
+    const thread = threads.insert(core.db, { projectId: project.id, title: "Feature", agent: "claude", model: null, mode: "act", permissionMode: "trusted" });
+    threads.update(core.db, thread.id, { worktreePath: worktree, branch: "feature" });
+
+    expect(found(await call("skills.list", { scope: { kind: "thread", id: thread.id }, agent: "claude" }))).toEqual(["project:branch-notes", "user:humanizer"]);
   });
 });

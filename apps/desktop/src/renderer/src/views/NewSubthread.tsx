@@ -43,7 +43,7 @@ function SubthreadComposer({ parent }: { parent: Thread }) {
   const [permission, setPermission] = useState(parent.permissionMode);
   const start = useRpcMutation("threads.start");
   const claudeAccountId = parent.claudeAccountId ?? undefined;
-  const skills = useSkillCommands(parent.projectId, choice?.agent, parent.workingDirectory ?? undefined, claudeAccountId);
+  const skills = useSkillCommands({ kind: "thread", id: parent.id }, choice?.agent, claudeAccountId);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;

@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { WORKSPACE_ID, type AgentSkill } from "@openorc/protocol";
 import { queryClient } from "./client";
-import { useSkillCommands } from "./skill-commands";
+import { projectScope, useSkillCommands } from "./skill-commands";
 
 const rpc = vi.hoisted(() => ({ call: vi.fn() }));
 vi.mock("./rpc", () => ({ core: { call: rpc.call, onReady: () => {}, onPush: () => () => {} } }));
@@ -23,23 +23,30 @@ afterEach(() => {
 
 it("offers an Orcling's skills from the folder its conversation works in, as /name on Claude", async () => {
   rpc.call.mockResolvedValue([humanizer]);
-  const { result } = renderHook(() => useSkillCommands(WORKSPACE_ID, "claude", desk), { wrapper });
+  const { result } = renderHook(() => useSkillCommands(projectScope(WORKSPACE_ID, desk), "claude"), { wrapper });
   await waitFor(() => expect(result.current.commands).toEqual([{ name: "humanizer", hint: "Rewrite AI-sounding text.", insert: true, prefix: "/" }]));
-  expect(rpc.call).toHaveBeenCalledWith("skills.list", { projectId: WORKSPACE_ID, workingDirectory: desk, agent: "claude" });
+  expect(rpc.call).toHaveBeenCalledWith("skills.list", { scope: { kind: "project", id: WORKSPACE_ID, workingDirectory: desk }, agent: "claude" });
 });
 
 it("offers them as $name on Codex", async () => {
   rpc.call.mockResolvedValue([{ ...humanizer, name: "humanizer:humanizer" }]);
-  const { result } = renderHook(() => useSkillCommands(WORKSPACE_ID, "codex", desk), { wrapper });
+  const { result } = renderHook(() => useSkillCommands(projectScope(WORKSPACE_ID, desk), "codex"), { wrapper });
   await waitFor(() => expect(result.current.commands).toEqual([{ name: "humanizer:humanizer", hint: "Rewrite AI-sounding text.", insert: true, prefix: "$" }]));
-  expect(rpc.call).toHaveBeenCalledWith("skills.list", { projectId: WORKSPACE_ID, workingDirectory: desk, agent: "codex" });
+  expect(rpc.call).toHaveBeenCalledWith("skills.list", { scope: { kind: "project", id: WORKSPACE_ID, workingDirectory: desk }, agent: "codex" });
 });
 
 it("keeps a project's conversations on the project's skills", async () => {
   rpc.call.mockResolvedValue([humanizer]);
-  const { result } = renderHook(() => useSkillCommands("project", "claude", "/somewhere/else"), { wrapper });
+  const { result } = renderHook(() => useSkillCommands(projectScope("project", "/somewhere/else"), "claude"), { wrapper });
   await waitFor(() => expect(result.current.commands).toHaveLength(1));
-  expect(rpc.call).toHaveBeenCalledWith("skills.list", { projectId: "project", agent: "claude" });
+  expect(rpc.call).toHaveBeenCalledWith("skills.list", { scope: { kind: "project", id: "project" }, agent: "claude" });
+});
+
+it("reads a conversation's skills from the folder it works in, a worktree's own branch included", async () => {
+  rpc.call.mockResolvedValue([humanizer]);
+  const { result } = renderHook(() => useSkillCommands({ kind: "thread", id: "t1" }, "claude"), { wrapper });
+  await waitFor(() => expect(result.current.commands).toHaveLength(1));
+  expect(rpc.call).toHaveBeenCalledWith("skills.list", { scope: { kind: "thread", id: "t1" }, agent: "claude" });
 });
 
 it("offers the project's own skills ahead of personal and plugin ones", async () => {
@@ -49,12 +56,12 @@ it("offers the project's own skills ahead of personal and plugin ones", async ()
     { ...humanizer, name: "fix-bug", source: "project" },
     { ...humanizer, name: "terraform", source: "project" },
   ]);
-  const { result } = renderHook(() => useSkillCommands("project", "claude"), { wrapper });
+  const { result } = renderHook(() => useSkillCommands(projectScope("project"), "claude"), { wrapper });
   await waitFor(() => expect(result.current.commands.map((command) => command.name)).toEqual(["fix-bug", "terraform", "anatomy", "brag:brag"]));
 });
 
 it("leaves OpenCode to its own skill tool", () => {
-  const { result } = renderHook(() => useSkillCommands(WORKSPACE_ID, "opencode", desk), { wrapper });
+  const { result } = renderHook(() => useSkillCommands(projectScope(WORKSPACE_ID, desk), "opencode"), { wrapper });
   expect(result.current.commands).toEqual([]);
   expect(rpc.call).not.toHaveBeenCalled();
 });
@@ -62,7 +69,7 @@ it("leaves OpenCode to its own skill tool", () => {
 it("reads the list again when the picker opens, not on a timer, and not twice in a few seconds", async () => {
   vi.useFakeTimers();
   rpc.call.mockResolvedValueOnce([]).mockResolvedValue([humanizer]);
-  const { result } = renderHook(() => useSkillCommands(WORKSPACE_ID, "claude", desk), { wrapper });
+  const { result } = renderHook(() => useSkillCommands(projectScope(WORKSPACE_ID, desk), "claude"), { wrapper });
   await act(() => vi.advanceTimersByTimeAsync(1_000));
   expect(result.current.commands).toEqual([]);
 

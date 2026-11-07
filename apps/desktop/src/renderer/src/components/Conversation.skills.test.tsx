@@ -33,12 +33,10 @@ const conversation = (thread: Partial<ThreadSummary>, project: Project) =>
     </QueryClientProvider>,
   );
 
-it("asks for an Orcling's skills in the folder its own conversation works in", () => {
+it("asks for a conversation's skills where it works, which the core finds: an Orcling's folder or a worktree's branch", () => {
   conversation({ projectId: WORKSPACE_ID, orclingId: "rini", workingDirectory: "/data/orclings/rini" }, workspace);
-  expect(skills.useSkillCommands).toHaveBeenLastCalledWith(WORKSPACE_ID, "claude", "/data/orclings/rini");
-});
-
-it("asks for a project conversation's skills from the project", () => {
-  conversation({ projectId: "project", workspaceMode: "current" }, { id: "project", name: "Project", rootPath: "/code/project" } as Project);
-  expect(skills.useSkillCommands).toHaveBeenLastCalledWith("project", "claude", undefined);
+  expect(skills.useSkillCommands).toHaveBeenLastCalledWith({ kind: "thread", id: "thread" }, "claude");
+  cleanup();
+  conversation({ projectId: "project", workspaceMode: "worktree", worktreePath: "/worktrees/feature" }, { id: "project", name: "Project", rootPath: "/code/project" } as Project);
+  expect(skills.useSkillCommands).toHaveBeenLastCalledWith({ kind: "thread", id: "thread" }, "claude");
 });

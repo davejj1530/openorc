@@ -28,8 +28,8 @@ export function createFilesHandlers({
       if (folder.root !== expectedRoot) return { kind: "unavailable", reason: "This conversation changed workspace. Reopen the file to analyze its new workspace." };
       return files.intelligence.query(folder, input);
     },
-    "skills.list": async ({ projectId, workingDirectory, agent, claudeAccountId }) => {
-      const projectRoot = (await conversationFolder(db, { kind: "project", id: projectId, workingDirectory })).root;
+    "skills.list": async ({ scope, agent, claudeAccountId }) => {
+      const projectRoot = (await conversationFolder(db, scope)).root;
       if (agent !== "claude" || !claudeLaunch) return listSkills({ projectRoot, agent });
       // Without the CLI installed, the folders are all there is to read.
       const launch = await Promise.resolve()

@@ -40,7 +40,7 @@ import {
 } from "./domain.js";
 import { AgentEvent, AgentKind, ApprovalDecision, Frame } from "./events.js";
 import type { ConversationPlan } from "./execution-mode.js";
-import { fileRpcParams, type FileRpcResults } from "./files.js";
+import { FileScope, fileRpcParams, type FileRpcResults } from "./files.js";
 import { type HarnessAvailability, HarnessId, type HarnessInfo } from "./harness.js";
 import type { McpAppOpenResult } from "./mcp-apps.js";
 import { ExecutionTarget } from "./execution-target.js";
@@ -367,11 +367,10 @@ export const rpcParams = {
   "agents.modelCatalog": z.object({ agent: HarnessId.optional(), claudeAccountId: ClaudeAccountId.optional() }),
   "agents.models.refresh": z.object({ agent: HarnessId.optional(), claudeAccountId: ClaudeAccountId.optional() }),
   /**
-   * The selected harness's skills where a conversation works, including personal, plugin, and built-in sources.
-   * A project's are found from its root. A Workspace conversation, an Orcling's own included, works in its own
-   * folder, given as `workingDirectory`; without one, the Workspace's folder.
+   * The selected harness's skills where a conversation works, including personal, plugin, and built-in sources:
+   * a conversation's own folder, its worktree included, or before it exists the project's, as `files.list` finds them.
    */
-  "skills.list": z.object({ claudeAccountId: ClaudeAccountId.optional(), projectId: z.string(), workingDirectory: z.string().min(1).max(4096).optional(), agent: HarnessId }),
+  "skills.list": z.object({ claudeAccountId: ClaudeAccountId.optional(), scope: FileScope, agent: HarnessId }),
   /** Stores an image the user pasted or dropped, returning where it lives. */
   "attachments.save": z.object({ name: z.string(), mime: z.string(), dataBase64: z.string() }),
   /** Stores any other file the user attached. Kept apart from images because only an image is ever served back over the asset protocol. */

@@ -164,7 +164,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const restart = () => submitter.submit({ ...request, now: false, restart: true }, { text: RESTART_PROMPT, attachments: [] }).then(clearDraft);
   const continueWith = (claudeAccountId: string) => submitter.submit({ ...request, now: false, claudeAccountId }, { text: CONTINUE_PROMPT, attachments: [] }).then(clearDraft);
 
-  const skills = useSkillCommands(project.id, choice?.agent, thread?.workingDirectory);
+  const skills = useSkillCommands(conversation, choice?.agent);
   const commands: SlashCommand[] = [
     ...(thread ? threadCommands({ working, compact: () => compact.mutate({ id: thread.id }), selectMode: settings.selectMode, fork: forkConversation }) : []),
     ...skills.commands,

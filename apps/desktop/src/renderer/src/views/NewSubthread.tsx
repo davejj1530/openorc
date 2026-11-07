@@ -43,7 +43,7 @@ function SubthreadComposer({ parent }: { parent: Thread }) {
   const [permission, setPermission] = useState(parent.permissionMode);
   const start = useRpcMutation("threads.start");
   const claudeAccountId = parent.claudeAccountId ?? undefined;
-  const commands = useSkillCommands(parent.projectId, choice?.agent, parent.workingDirectory ?? undefined, claudeAccountId);
+  const skills = useSkillCommands(parent.projectId, choice?.agent, parent.workingDirectory ?? undefined, claudeAccountId);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -117,7 +117,7 @@ function SubthreadComposer({ parent }: { parent: Thread }) {
               settingsDisabled={start.isPending}
               location={{ label: null, branch: parent.branch, directory: parent.worktreePath ?? parent.workingDirectory ?? undefined }}
               fileSearch={{ kind: "thread", id: parent.id }}
-              commands={commands}
+              {...skills}
               busy={start.isPending}
               disabledReason={choice ? null : "Choose a model first."}
               error={start.error?.message ?? null}

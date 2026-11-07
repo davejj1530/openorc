@@ -45,7 +45,7 @@ vi.mock("../lib/client", async (original) => ({
   usePermissionSelection: () => ({ permission: "review", ready: true, select: vi.fn(), error: null }),
 }));
 vi.mock("../lib/rpc", () => ({ core: { call: async (method: string) => (method === "cloud.signIns" ? signIns : null), onReady: () => () => {}, onPush: () => () => {} } }));
-vi.mock("../lib/skill-commands", () => ({ useSkillCommands: () => [] }));
+vi.mock("../lib/skill-commands", () => ({ useSkillCommands: () => ({ commands: [], onCommandsWanted: () => {} }) }));
 vi.mock("../lib/composer-changes", () => ({ useComposerChanges: () => null }));
 vi.mock("../components/NewThreadActivity", () => ({
   useArrivalActivity: () => ({ any: false }),

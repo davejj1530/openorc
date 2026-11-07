@@ -4,7 +4,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import { WORKSPACE_ID, type Project, type ThreadSummary } from "@openorc/protocol";
 import { Conversation } from "./Conversation";
 
-const skills = vi.hoisted(() => ({ useSkillCommands: vi.fn(() => []) }));
+const skills = vi.hoisted(() => ({ useSkillCommands: vi.fn(() => ({ commands: [], onCommandsWanted: () => {} })) }));
 vi.mock("../lib/skill-commands", () => skills);
 vi.mock("../lib/rpc", () => ({
   core: new Proxy({ call: vi.fn() } as Record<string, unknown>, { get: (target, key: string) => (key in target ? target[key] : () => () => undefined) }),

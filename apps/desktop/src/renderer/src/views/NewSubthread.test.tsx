@@ -27,7 +27,7 @@ vi.mock("../lib/client", async (original) => ({
   useRpcMutation: () => ({ mutateAsync: start, reset: vi.fn(), isPending: false, error: null }),
 }));
 vi.mock("../lib/rpc", () => ({ core: { call: async () => null, onReady: () => () => {}, onPush: () => () => {} } }));
-vi.mock("../lib/skill-commands", () => ({ useSkillCommands: () => [] }));
+vi.mock("../lib/skill-commands", () => ({ useSkillCommands: () => ({ commands: [], onCommandsWanted: () => {} }) }));
 vi.mock("../components/TopBar", () => ({ TopBar: ({ children }: { children: React.ReactNode }) => <header>{children}</header> }));
 vi.mock("../components/ModelPicker", () => ({
   ModelPicker: () => <button type="button">Choose model</button>,

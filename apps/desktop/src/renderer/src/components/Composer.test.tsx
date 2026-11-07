@@ -10,21 +10,22 @@ import { isPreviewCovered } from "../lib/browser-preview";
 afterEach(cleanup);
 
 /** Only what the composer reads on mount. Nothing here reaches the core or a provider. */
+const BASE: ComposerProps = {
+  value: "say something",
+  onChange: () => {},
+  onSubmit: async () => {},
+  placeholder: "Message",
+  model: null,
+  onModel: () => {},
+  mode: "act",
+  onMode: () => {},
+  permission: "trusted",
+  onPermission: () => {},
+  location: { label: null, branch: null },
+};
+
 function mount(overrides: Partial<ComposerProps> = {}) {
-  const props: ComposerProps = {
-    value: "say something",
-    onChange: () => {},
-    onSubmit: async () => {},
-    placeholder: "Message",
-    model: null,
-    onModel: () => {},
-    mode: "act",
-    onMode: () => {},
-    permission: "trusted",
-    onPermission: () => {},
-    location: { label: null, branch: null },
-    ...overrides,
-  };
+  const props: ComposerProps = { ...BASE, ...overrides };
   function ControlledComposer() {
     const [value, setValue] = useState(props.value);
     return (
@@ -67,6 +68,40 @@ describe("slash suggestions", () => {
     fireEvent.change(message(), { target: { value, selectionStart: value.length } });
     expect(screen.getByRole("option", { name: "/code-review Review code" })).toBeTruthy();
     expect(screen.queryByRole("option", { name: "/compact Summarize" })).toBeNull();
+  });
+
+  it("asks for the list again once as each command word starts, even with no skills to offer yet", () => {
+    const wanted = vi.fn();
+    mount({ commands: [], onCommandsWanted: wanted, value: "" });
+    fireEvent.change(message(), { target: { value: "/", selectionStart: 1 } });
+    fireEvent.change(message(), { target: { value: "/co", selectionStart: 3 } });
+    expect(wanted).toHaveBeenCalledTimes(1);
+    fireEvent.change(message(), { target: { value: "/co and", selectionStart: 7 } });
+    fireEvent.change(message(), { target: { value: "/co and $", selectionStart: 9 } });
+    expect(wanted).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not ask again when only the callback changes, as it does when a read starts, ends or fails", () => {
+    const wanted = vi.fn();
+    function Changing() {
+      const [value, setValue] = useState("");
+      const [reads, setReads] = useState(0);
+      return (
+        <>
+          <button onClick={() => setReads((count) => count + 1)}>Read ended</button>
+          <Composer {...BASE} value={value} onChange={setValue} commands={[]} onCommandsWanted={() => wanted(reads)} />
+        </>
+      );
+    }
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <Changing />
+      </QueryClientProvider>,
+    );
+    fireEvent.change(message(), { target: { value: "/", selectionStart: 1 } });
+    fireEvent.click(screen.getByText("Read ended"));
+    fireEvent.click(screen.getByText("Read ended"));
+    expect(wanted).toHaveBeenCalledTimes(1);
   });
 
   it("offers every skill rather than stopping at a page, matching names in any case", () => {

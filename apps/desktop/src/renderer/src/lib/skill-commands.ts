@@ -1,8 +1,11 @@
 import { useClaudeAccountId } from "./claude-account";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { WORKSPACE_ID, type AgentKind, type AgentSkill } from "@openorc/protocol";
 import type { SlashCommand } from "../components/Composer";
 import { useRpc } from "./client";
+
+/** A list this recent is used as it is when the picker opens. */
+const FRESH_MS = 10_000;
 
 /** What this project brought comes first: a personal or plugin skill reaches every project, so it says less about this one. */
 const SOURCE_ORDER: Record<AgentSkill["source"], number> = { project: 0, user: 1, plugin: 2, system: 3 };
@@ -19,21 +22,34 @@ const SOURCE_ORDER: Record<AgentSkill["source"], number> = { project: 0, user: 1
  *
  * A project's conversations share the project's skills. A Workspace
  * conversation, an Orcling's own included, works in its own folder, so
- * `folder` says which; elsewhere it is ignored. The list is read again every
- * minute, so a skill installed while a conversation is open shows up in it.
+ * `folder` says which; elsewhere it is ignored. Reading the list starts the
+ * agent's CLI, so it is read when a composer opens and again when the composer
+ * asks, as a `/` or `$` word starts: a skill installed while a conversation is
+ * open shows up the next time the picker opens, not on a timer.
  */
-export function useSkillCommands(projectId: string | null | undefined, selectedAgent: AgentKind | null | undefined, folder?: string | null, selectedAccountId?: string): SlashCommand[] {
+export function useSkillCommands(
+  projectId: string | null | undefined,
+  selectedAgent: AgentKind | null | undefined,
+  folder?: string | null,
+  selectedAccountId?: string,
+): { commands: SlashCommand[]; onCommandsWanted: () => void } {
   const scopedAccountId = useClaudeAccountId();
   const claudeAccountId = selectedAccountId ?? scopedAccountId;
   const agent = selectedAgent === "acp" ? "opencode" : selectedAgent;
   const workingDirectory = projectId === WORKSPACE_ID ? folder : null;
+  const enabled = Boolean(projectId && agent && agent !== "opencode");
   const skills = useRpc(
     "skills.list",
     { ...(agent === "claude" && claudeAccountId ? { claudeAccountId } : {}), projectId: projectId ?? "", ...(workingDirectory ? { workingDirectory } : {}), agent: agent ?? "claude" },
-    { enabled: Boolean(projectId && agent && agent !== "opencode"), staleTime: 60_000, refetchInterval: 60_000 },
+    { enabled, staleTime: FRESH_MS },
   );
   const found = skills.data;
-  return useMemo(
+  const { dataUpdatedAt, isFetching, refetch } = skills;
+  // By the clock, not `isStale`: a list going stale renders nothing, so the flag can still say fresh.
+  const onCommandsWanted = useCallback(() => {
+    if (enabled && !isFetching && Date.now() - dataUpdatedAt > FRESH_MS) void refetch();
+  }, [enabled, isFetching, dataUpdatedAt, refetch]);
+  const commands = useMemo(
     () =>
       agent === "opencode"
         ? []
@@ -48,4 +64,5 @@ export function useSkillCommands(projectId: string | null | undefined, selectedA
             })),
     [agent, found],
   );
+  return { commands, onCommandsWanted };
 }

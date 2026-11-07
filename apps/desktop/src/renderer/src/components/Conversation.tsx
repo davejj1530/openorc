@@ -167,7 +167,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const skills = useSkillCommands(project.id, choice?.agent, thread?.workingDirectory);
   const commands: SlashCommand[] = [
     ...(thread ? threadCommands({ working, compact: () => compact.mutate({ id: thread.id }), selectMode: settings.selectMode, fork: forkConversation }) : []),
-    ...skills,
+    ...skills.commands,
   ];
 
   const location = conversationLocation({ scope, project, mode: workspaceMode, basePath: links ?? project.rootPath, checkoutBranch: checkout.data?.branch, plainFolder: git.state === "none" });
@@ -266,6 +266,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
             compactDisabledReason={working ? "Available after this turn finishes." : undefined}
             fileSearch={conversation}
             commands={commands}
+            onCommandsWanted={skills.onCommandsWanted}
             error={(submitter.error ?? sendQueued.error ?? stopCommand.error ?? compact.error ?? unqueue.error ?? fork.error ?? settings.error ?? draftError)?.message ?? permissionError}
           >
             {firstTaskRun && scope.kind === "task" ? (

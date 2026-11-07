@@ -24,21 +24,21 @@ afterEach(() => {
 it("offers an Orcling's skills from the folder its conversation works in, as /name on Claude", async () => {
   rpc.call.mockResolvedValue([humanizer]);
   const { result } = renderHook(() => useSkillCommands(WORKSPACE_ID, "claude", desk), { wrapper });
-  await waitFor(() => expect(result.current).toEqual([{ name: "humanizer", hint: "Rewrite AI-sounding text.", insert: true, prefix: "/" }]));
+  await waitFor(() => expect(result.current.commands).toEqual([{ name: "humanizer", hint: "Rewrite AI-sounding text.", insert: true, prefix: "/" }]));
   expect(rpc.call).toHaveBeenCalledWith("skills.list", { projectId: WORKSPACE_ID, workingDirectory: desk, agent: "claude" });
 });
 
 it("offers them as $name on Codex", async () => {
   rpc.call.mockResolvedValue([{ ...humanizer, name: "humanizer:humanizer" }]);
   const { result } = renderHook(() => useSkillCommands(WORKSPACE_ID, "codex", desk), { wrapper });
-  await waitFor(() => expect(result.current).toEqual([{ name: "humanizer:humanizer", hint: "Rewrite AI-sounding text.", insert: true, prefix: "$" }]));
+  await waitFor(() => expect(result.current.commands).toEqual([{ name: "humanizer:humanizer", hint: "Rewrite AI-sounding text.", insert: true, prefix: "$" }]));
   expect(rpc.call).toHaveBeenCalledWith("skills.list", { projectId: WORKSPACE_ID, workingDirectory: desk, agent: "codex" });
 });
 
 it("keeps a project's conversations on the project's skills", async () => {
   rpc.call.mockResolvedValue([humanizer]);
   const { result } = renderHook(() => useSkillCommands("project", "claude", "/somewhere/else"), { wrapper });
-  await waitFor(() => expect(result.current).toHaveLength(1));
+  await waitFor(() => expect(result.current.commands).toHaveLength(1));
   expect(rpc.call).toHaveBeenCalledWith("skills.list", { projectId: "project", agent: "claude" });
 });
 
@@ -50,22 +50,32 @@ it("offers the project's own skills ahead of personal and plugin ones", async ()
     { ...humanizer, name: "terraform", source: "project" },
   ]);
   const { result } = renderHook(() => useSkillCommands("project", "claude"), { wrapper });
-  await waitFor(() => expect(result.current.map((command) => command.name)).toEqual(["fix-bug", "terraform", "anatomy", "brag:brag"]));
+  await waitFor(() => expect(result.current.commands.map((command) => command.name)).toEqual(["fix-bug", "terraform", "anatomy", "brag:brag"]));
 });
 
 it("leaves OpenCode to its own skill tool", () => {
   const { result } = renderHook(() => useSkillCommands(WORKSPACE_ID, "opencode", desk), { wrapper });
-  expect(result.current).toEqual([]);
+  expect(result.current.commands).toEqual([]);
   expect(rpc.call).not.toHaveBeenCalled();
 });
 
-it("shows a skill installed while the conversation is open within a minute", async () => {
+it("reads the list again when the picker opens, not on a timer, and not twice in a few seconds", async () => {
   vi.useFakeTimers();
   rpc.call.mockResolvedValueOnce([]).mockResolvedValue([humanizer]);
   const { result } = renderHook(() => useSkillCommands(WORKSPACE_ID, "claude", desk), { wrapper });
   await act(() => vi.advanceTimersByTimeAsync(1_000));
-  expect(result.current).toEqual([]);
+  expect(result.current.commands).toEqual([]);
 
-  await act(() => vi.advanceTimersByTimeAsync(60_000));
-  expect(result.current.map((command) => command.name)).toEqual(["humanizer"]);
+  act(() => result.current.onCommandsWanted());
+  await act(() => vi.advanceTimersByTimeAsync(1_000));
+  expect(rpc.call).toHaveBeenCalledTimes(1);
+
+  await act(() => vi.advanceTimersByTimeAsync(10 * 60_000));
+  expect(rpc.call).toHaveBeenCalledTimes(1);
+  expect(result.current.commands).toEqual([]);
+
+  act(() => result.current.onCommandsWanted());
+  await act(() => vi.advanceTimersByTimeAsync(1_000));
+  expect(rpc.call).toHaveBeenCalledTimes(2);
+  expect(result.current.commands.map((command) => command.name)).toEqual(["humanizer"]);
 });

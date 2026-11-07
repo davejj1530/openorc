@@ -19,6 +19,7 @@ interface ComposerInputProps {
   fileSearch?: FileScope;
   mentions?: MentionEntry[];
   commands?: SlashCommand[];
+  onCommandsWanted?: () => void;
   suggestionAnchor: RefObject<HTMLDivElement | null>;
   suggestionSide: "top" | "bottom";
 }
@@ -49,7 +50,7 @@ function suggestionLabel(members: boolean, files: boolean): string {
 
 /** Owns text interaction: suggestions, selection, focus and the highlight mirror. */
 export function ComposerInput(props: ComposerInputProps) {
-  const { value, onChange, onSubmit, onFiles, disabled, placeholder, autoFocus, fileSearch, mentions, commands } = props;
+  const { value, onChange, onSubmit, onFiles, disabled, placeholder, autoFocus, fileSearch, mentions, commands, onCommandsWanted } = props;
   const [caret, setCaret] = useState(0);
   const [cursor, setCursor] = useState(0);
   const [suggestionsActive, setSuggestionsActive] = useState(true);
@@ -64,6 +65,14 @@ export function ComposerInput(props: ComposerInputProps) {
   const mentionQuery = token?.token.startsWith("@") && fileSearch && !memberMatches.length ? token.token.slice(1) : null;
   const commandPrefix = token?.token[0];
   const commandQuery = commandQueryAt(token, commands);
+  // Once per word, and even when the list is empty: a skill installed since it was read is what the picker should show.
+  // The callback changes as its read starts and ends, so only the word may ask again, or a failing read would loop.
+  const commandWordStart = commandPrefix === "/" || commandPrefix === "$" ? token?.start : undefined;
+  const wantCommands = useRef(onCommandsWanted);
+  wantCommands.current = onCommandsWanted;
+  useEffect(() => {
+    if (commandWordStart !== undefined) wantCommands.current?.();
+  }, [commandWordStart]);
   const files = useRpc("files.search", { scope: fileSearch ?? NO_SEARCH, query: mentionQuery ?? "", limit: 8 }, { enabled: mentionQuery !== null, staleTime: 10_000 });
   // Skills insert into the prompt; actions clear it, so only offer actions at the start.
   const commandMatches = useMemo(() => matchingCommands(commands, commandQuery, commandPrefix, token?.start), [commandPrefix, commandQuery, commands, token?.start]);

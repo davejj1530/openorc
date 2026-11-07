@@ -254,7 +254,7 @@ function NewThreadProject({
                     settingsDisabled={start.isPending}
                     location={location}
                     fileSearch={isWorkspace || !projectId ? undefined : { kind: "project", id: projectId }}
-                    commands={skillCommands}
+                    {...skillCommands}
                     busy={start.isPending}
                     disabledReason={disabledReason}
                     error={start.error?.message ?? permissionError ?? storageError}

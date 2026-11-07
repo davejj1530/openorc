@@ -129,6 +129,8 @@ export interface ComposerProps {
   /** Orclings `@` can address; they take the popover before file matches. */
   mentions?: MentionEntry[];
   commands?: SlashCommand[];
+  /** Called as a `/` or `$` word starts, so a list read a while ago can be read again before it is used. */
+  onCommandsWanted?: () => void;
   autoFocus?: boolean;
   size?: "md" | "lg";
   /** The landing screen draws the roomier composer and shows where the thread works below it, not in a footer. */
@@ -277,6 +279,7 @@ export function Composer(props: ComposerProps) {
             fileSearch={props.fileSearch}
             mentions={props.mentions}
             commands={props.commands}
+            onCommandsWanted={props.onCommandsWanted}
             suggestionAnchor={shell}
             suggestionSide={isNewThread ? "bottom" : "top"}
           />

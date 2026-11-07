@@ -1,5 +1,5 @@
 import { captureLaunchEnvironment, claudeConfigDir, recoverAgentProcesses } from "@openorc/agents";
-import { Db, LedgerWriter, plans, redact, settings as storedSettings } from "@openorc/db";
+import { claudeAccounts as storedClaudeAccounts, Db, LedgerWriter, plans, redact, settings as storedSettings } from "@openorc/db";
 import { startMcpServer, type OpenOrcMcpServer } from "@openorc/mcp";
 import { harnessAvailability, harnessInfo, harnessLoggedIn, rpcParams, type HarnessId, type RpcMethod, type RpcRequest } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
@@ -13,6 +13,8 @@ import { createAttachmentsHandlers } from "./handlers/attachments.js";
 import { createBenchHandlers } from "./handlers/bench.js";
 import { createCatalogHandlers } from "./handlers/catalog.js";
 import { createClaudeAccountHandlers } from "./handlers/claude-accounts.js";
+import { createConnectorHandlers } from "./handlers/connectors.js";
+import { ConnectorService, type ConnectorPlaces } from "./services/connectors.js";
 import { createBrainSyncHandlers } from "./handlers/brain-sync.js";
 import { createCloudHandlers } from "./handlers/cloud.js";
 import { createCloudCarryHandlers } from "./handlers/cloud-carry.js";
@@ -97,7 +99,7 @@ import { ReviewerAppService } from "./services/reviewer-app.js";
 import { RunService, type Notification, type RunHooks } from "./services/runs.js";
 import { ScheduleService } from "./services/schedules.js";
 import { AppSettingsService } from "./services/settings.js";
-import { ShellEnvironment, inheritedProbe } from "./services/shell-environment.js";
+import { ShellEnvironment, inheritedProbe, type EnvSnapshot } from "./services/shell-environment.js";
 import { SlackService } from "./services/slack/service.js";
 import { SystemService } from "./services/system.js";
 import { TaskCheckoutService } from "./services/task-checkout.js";
@@ -115,6 +117,30 @@ import { transportLogger, type Logger, type RpcReply } from "./transport.js";
  * The renderer talks to it only through `handle`, so every capability is a
  * validated method and every push is a typed message.
  */
+/** Where each agent answers about connectors: Codex, OpenCode and every enabled Claude account. A cloud-only host has none. */
+function connectorPlaces(db: Db, cloudOnly: boolean, environment: () => EnvSnapshot, accounts: ClaudeAccountService): ConnectorPlaces {
+  const onTheMac = <T>(read: () => T): T => {
+    if (cloudOnly) throw new Error("Connectors are set up on your Mac.");
+    return read();
+  };
+  return {
+    claudeAccounts: () =>
+      onTheMac(() =>
+        storedClaudeAccounts.list(db).flatMap((account) => {
+          if (!account.enabled) return [];
+          try {
+            return [{ id: account.id, name: account.name, launch: captureLaunchEnvironment("claude", accounts.environment(environment(), account.id)) }];
+          } catch {
+            return [];
+          }
+        }),
+      ),
+    claudeLogin: () => onTheMac(() => captureLaunchEnvironment("claude", environment())),
+    codex: () => onTheMac(() => captureLaunchEnvironment("codex", environment())),
+    opencode: () => onTheMac(() => captureLaunchEnvironment("opencode", environment())),
+  };
+}
+
 export class OpenOrc {
   readonly slack: SlackService;
   readonly db: Db;
@@ -144,6 +170,7 @@ export class OpenOrc {
   readonly agentUpdates: AgentUpdateService;
   /** The environment agents launch with. Runs capture `current()` at admission; Rescan calls `refresh()`. */
   readonly claudeAccounts: ClaudeAccountService;
+  private connectorService: ConnectorService | null = null;
   readonly environment: ShellEnvironment;
   readonly providerUsage: ProviderUsageService;
   private readonly claudeAccountSwitch: ClaudeAccountSwitch;
@@ -225,7 +252,7 @@ export class OpenOrc {
       info: (refresh) => this.system.info(refresh),
       environment: () => this.environment.current(),
       reserve: async () => {
-        if (this.claudeAccounts.hasPendingWork || this.memory.hasPendingWork || this.textGeneration.hasPendingWork || this.schedules.hasPendingWork) {
+        if (this.claudeAccounts.hasPendingWork || this.connectorService?.hasPendingWork || this.memory.hasPendingWork || this.textGeneration.hasPendingWork || this.schedules.hasPendingWork) {
           throw new Error("Finish agent work and background processing before updating. Your conversations will be kept.");
         }
         return this.runs.reserveAgentUpdate();
@@ -401,6 +428,7 @@ export class OpenOrc {
         return thread && this.cloud.get(thread.id) ? Math.min(setting ?? CLOUD_IDLE_PROCESS_MS, CLOUD_IDLE_PROCESS_MS) : setting;
       },
       claudeUserMcpServers: () => this.settings.get().claudeUserMcpServers,
+      claudeConnectorsOff: () => this.settings.get().claudeConnectorsOff,
       orclings: this.orclings.runHooks,
       taskImages: (spec) => new AttachmentService(options.dataDir).forTask(spec),
       inlineToolImages: (output) => this.toolImages.inline(output),
@@ -495,6 +523,16 @@ export class OpenOrc {
     void core.memory.backfillVectors().catch(() => undefined);
     return core;
   }
+  /** Every agent's connectors, made on first use: reading them starts the agents' servers. */
+  get connectors(): ConnectorService {
+    this.connectorService ??= new ConnectorService(
+      connectorPlaces(this.db, this.options.cloudOnly ?? false, () => this.environment.current(), this.claudeAccounts),
+      this.settings,
+      () => this.options.transport.push({ type: "invalidate", keys: ["connectors"] }),
+    );
+    return this.connectorService;
+  }
+
   async mcpServer(): Promise<OpenOrcMcpServer> {
     if (!this.mcp) {
       const { assertRunAvailable, taskFor, projectFor } = createContextHost({ db: this.db });
@@ -623,6 +661,7 @@ export class OpenOrc {
       }),
       createCloudCarryHandlers({ db: this.db, env: this.cloudParts.env, skills: this.cloudParts.skills, cloud: this.cloudParts.cloud }),
       createClaudeAccountHandlers(this.claudeAccounts),
+      createConnectorHandlers({ db: this.db, connectors: this.connectors }),
       createBrainSyncHandlers({ db: this.db, memory: this.memory, textGeneration: this.textGeneration, cloudOnly: this.options.cloudOnly ?? false, invalidate }),
       createSystemHandlers({
         system: this.system,

@@ -424,8 +424,10 @@ export const AppSettings = z.object({
   look: AppLook.nullable().catch(null),
   /** Minutes a provider process may sit idle between turns before it is closed; the session resumes on the next message. Null keeps processes running. */
   idleProcessMinutes: z.number().int().positive().nullable(),
-  /** Whether Claude Code connects the MCP servers from the user's own Claude configuration in threads. Off, only OpenOrc's tools load and the CLI starts about two seconds sooner. */
+  /** False from before Connectors had a switch per server: only OpenOrc's tools load until Connectors next reads Claude's servers and turns each off. */
   claudeUserMcpServers: z.boolean(),
+  /** Claude's MCP servers turned off in Connectors. Claude has no setting of its own for this, so each run is told. */
+  claudeConnectorsOff: z.array(z.string()),
   /** Whether a conversation stopped by its Claude account's usage limit goes on with the enabled account that has the most 5-hour usage left. */
   claudeAccountAutoSwitch: z.boolean(),
 });

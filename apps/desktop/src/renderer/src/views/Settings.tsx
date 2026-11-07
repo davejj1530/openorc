@@ -17,6 +17,7 @@ import { floatingGround } from "../lib/use-anchor-ground";
 import { AgentConnections } from "./settings-agent-updates";
 import { AppearanceSettings } from "./settings-appearance";
 import { ClaudeAccountSettings } from "./settings-claude-accounts";
+import { ConnectorSettings } from "./settings-connectors";
 import { CloudSettings } from "./settings-cloud";
 import { DeviceSettings } from "./settings-devices";
 import { GitHubSettings } from "./settings-github";
@@ -133,6 +134,8 @@ function SectionSettings({ id, active, info }: { id: SettingsSection; active: bo
       return <PhoneSettings active={active} />;
     case "skills":
       return <SkillsSettings active={active} />;
+    case "connectors":
+      return <ConnectorSettings active={active} />;
     case "devices":
       return <DeviceSettings active={active} />;
     case "appearance":
@@ -195,13 +198,6 @@ function GeneralSettings() {
             ))}
           </Select>
         </Field>
-        <Toggle
-          label="Your Claude Code MCP servers"
-          hint="Connect the MCP servers from your own Claude Code configuration in Act threads set to Autonomous. Other modes give Claude only OpenOrc's own tools. Servers finish connecting after Claude starts, so a slow one can miss the first message."
-          checked={v.claudeUserMcpServers ?? true}
-          disabled={s.disabled}
-          onChange={(claudeUserMcpServers) => void s.commit({ claudeUserMcpServers })}
-        />
       </Section>
       <SaveStatus status={s.status} retry={() => void s.retry()} />
     </>

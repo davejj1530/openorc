@@ -636,3 +636,32 @@ describe("mode pill", () => {
     expect(onExecutionMode).toHaveBeenCalledExactlyOnceWith({ mode: "plan", permissionMode: "review" });
   });
 });
+
+describe("connector mentions", () => {
+  const connectors: ComposerProps["connectors"] = [{ name: "paper", title: "Paper", logo: null }];
+  const message = () => screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" });
+  const typeAt = (text: string) => {
+    fireEvent.change(message(), { target: { value: text, selectionStart: text.length, selectionEnd: text.length } });
+    fireEvent.select(message());
+  };
+
+  it("offers a connector for an @ word and Enter picks it, even at the end of the message", () => {
+    const onSubmit = vi.fn(async () => {});
+    const onConnectorsWanted = vi.fn();
+    const { container } = mount({ value: "", connectors, onConnectorsWanted, onSubmit });
+    typeAt("do you see @pa");
+    expect(onConnectorsWanted).toHaveBeenCalled();
+    expect(screen.getByRole("option", { name: "@paper Paper" })).toBeTruthy();
+    fireEvent.keyDown(message(), { key: "Enter" });
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(message().value).toBe("do you see @paper ");
+    const mark = container.querySelector(".composer-input-mirror mark.connector-token");
+    expect(mark?.textContent).toBe("@paper");
+    expect(mark?.querySelector(".connector-token-at")?.getAttribute("data-letter")).toBe("P");
+  });
+
+  it("leaves an @ word that names no connector unmarked", () => {
+    const { container } = mount({ value: "mail me@paper.com or @papers", connectors });
+    expect(container.querySelector(".composer-input-mirror mark.connector-token")).toBeNull();
+  });
+});

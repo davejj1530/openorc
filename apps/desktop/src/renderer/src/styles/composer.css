@@ -747,6 +747,11 @@
   font-size: var(--text-sm);
   letter-spacing: 0;
 }
+.composer-suggestion-label > .connector-logo {
+  display: inline-grid;
+  margin-right: 8px;
+  vertical-align: -3px;
+}
 .composer-suggestion-label:only-child {
   grid-column: 1 / -1;
   max-width: 100%;
@@ -784,6 +789,38 @@
 .composer-suggestions .skill-token {
   color: inherit;
   -webkit-text-stroke: 0;
+}
+/* A connector named in the message: its image takes the place of the @, at the @'s own width so
+   the letters stay where the textarea has them. */
+.connector-token {
+  background: none;
+  color: var(--mention-ink);
+  -webkit-text-stroke: 0.04em currentColor;
+}
+.connector-token-at {
+  position: relative;
+  color: transparent;
+  -webkit-text-stroke: 0;
+  background-position: center;
+  background-size: 0.78em;
+  background-repeat: no-repeat;
+}
+.connector-token-at[data-letter]::before {
+  content: attr(data-letter);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 0.78em;
+  height: 0.78em;
+  border-radius: 0.2em;
+  background: var(--surface-3);
+  color: var(--ink-2);
+  font-size: 1em;
+  line-height: 1;
+  transform: translate(-50%, -50%) scale(0.62);
+  transform-origin: center;
 }
 
 /* Composer popups open out of the control that was touched, clear of the composer surface: they

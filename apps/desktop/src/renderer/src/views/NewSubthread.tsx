@@ -1,5 +1,5 @@
 import type { ModelChoice } from "@openorc/client";
-import type { Thread } from "@openorc/protocol";
+import { executionMode, type Thread } from "@openorc/protocol";
 import { useEffect, useRef, useState } from "react";
 import { Composer } from "../components/Composer";
 import { ComposerModelPicker, ModelPicker } from "../components/ModelPicker";
@@ -9,7 +9,7 @@ import { ClaudeAccountScope } from "../lib/claude-account";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { readDraft, writeDraft } from "../lib/drafts";
 import { openThread, useRouter } from "../lib/router";
-import { useSkillCommands } from "../lib/skill-commands";
+import { useComposerSuggestions } from "../lib/connector-mentions";
 
 const draftKey = (parentId: string) => `subthread.${parentId}`;
 
@@ -43,7 +43,7 @@ function SubthreadComposer({ parent }: { parent: Thread }) {
   const [permission, setPermission] = useState(parent.permissionMode);
   const start = useRpcMutation("threads.start");
   const claudeAccountId = parent.claudeAccountId ?? undefined;
-  const skills = useSkillCommands({ kind: "thread", id: parent.id }, choice?.agent, claudeAccountId);
+  const suggestions = useComposerSuggestions({ kind: "thread", id: parent.id }, choice?.agent, executionMode(mode, permission), claudeAccountId);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
@@ -117,7 +117,7 @@ function SubthreadComposer({ parent }: { parent: Thread }) {
               settingsDisabled={start.isPending}
               location={{ label: null, branch: parent.branch, directory: parent.worktreePath ?? parent.workingDirectory ?? undefined }}
               fileSearch={{ kind: "thread", id: parent.id }}
-              {...skills}
+              {...suggestions}
               busy={start.isPending}
               disabledReason={choice ? null : "Choose a model first."}
               error={start.error?.message ?? null}

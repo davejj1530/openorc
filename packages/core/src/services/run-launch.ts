@@ -61,7 +61,7 @@ interface RunLaunchDependencies {
   writers: WorkspaceWriters;
   turnStarts: Pick<TurnStartCapture, "capture">;
   adapters: RunAdapterRegistry;
-  hooks: Pick<RunHooks, "taskImages" | "browserAvailable" | "claudeUserMcpServers" | "processRegistry" | "untrustedCheckout" | "orclings" | "cloudHost" | "syncCloud">;
+  hooks: Pick<RunHooks, "taskImages" | "browserAvailable" | "claudeUserMcpServers" | "claudeConnectorsOff" | "processRegistry" | "untrustedCheckout" | "orclings" | "cloudHost" | "syncCloud">;
   log: Logger;
   isClosing: () => boolean;
   live: ReadonlyMap<string, LiveRun>;
@@ -306,6 +306,7 @@ export class RunLaunch {
       resumedSubagents: this.resumedSubagents(prepared),
       ...(forkSession ? { forkSession: true } : {}),
       ...(input.agent === "claude" && this.deps.hooks.claudeUserMcpServers?.() === false ? { strictMcp: true } : {}),
+      ...(input.agent === "claude" && this.deps.hooks.claudeConnectorsOff?.().length ? { connectorsOff: this.deps.hooks.claudeConnectorsOff() } : {}),
       // Decided by the conversation, not its mode, so switching a review to Act keeps it.
       ...(input.scope.thread && this.deps.hooks.untrustedCheckout?.(input.scope.thread) ? { untrustedCheckout: true } : {}),
     };

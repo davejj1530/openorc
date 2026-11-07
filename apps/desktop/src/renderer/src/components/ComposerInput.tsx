@@ -1,12 +1,14 @@
 import { commandWordAt, skillNames as namesOf, skillSegments, useCommandWord, type SkillListNotice } from "@openorc/client";
-import type { FileScope } from "@openorc/protocol";
+import type { FileScope, UsableConnector } from "@openorc/protocol";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
 import { useRpc } from "../lib/client";
 import { cn } from "../lib/cn";
+import { connectorSpans } from "../lib/connector-mentions";
 import { filterMentions, insertMention, mentionQueryAt, type MentionEntry } from "../lib/composer-mentions";
 import type { SlashCommand } from "./Composer";
-import { commandRows, matchingCommands, suggestionKey, type SuggestionRow } from "./composer-commands";
+import { commandRows, connectorRows, fileRows, matchingCommands, matchingConnectors, suggestionKey, useConnectorWord, type SuggestionRow } from "./composer-commands";
 import { ComposerSuggestions } from "./ComposerSuggestions";
+import { ConnectorLogo } from "./ConnectorLogo";
 
 interface ComposerInputProps {
   value: string;
@@ -21,6 +23,8 @@ interface ComposerInputProps {
   commands?: SlashCommand[];
   onCommandsWanted?: () => void;
   commandsNotice?: SkillListNotice | null;
+  connectors?: UsableConnector[];
+  onConnectorsWanted?: () => void;
   suggestionAnchor: RefObject<HTMLDivElement | null>;
   suggestionSide: "top" | "bottom";
 }
@@ -43,15 +47,35 @@ function commandQueryAt(token: { token: string } | null, commands: SlashCommand[
   return prefix === "/" || prefix === "$" ? token.token.slice(1) : null;
 }
 
-function suggestionLabel(members: boolean, files: boolean): string {
+function suggestionLabel(members: boolean, mention: boolean): string {
   if (members) return "Mention an Orcling";
-  if (files) return "Mention a file";
+  if (mention) return "Mention a connector or file";
   return "Commands";
+}
+
+/** A message's text as the highlight layer draws it: skills marked, and a connector's `@` drawn as its image, at the width of the `@`. */
+function MirrorText({ text, connectors }: { text: string; connectors: UsableConnector[] | undefined }) {
+  return connectorSpans(text, connectors ?? []).map((span, index) =>
+    span.connector ? (
+      <mark key={index} className="connector-token">
+        <span
+          className="connector-token-at"
+          style={span.connector.logo ? { backgroundImage: `url("${span.connector.logo}")` } : undefined}
+          data-letter={span.connector.logo ? undefined : span.connector.title.slice(0, 1).toUpperCase()}
+        >
+          @
+        </span>
+        {span.text.slice(1)}
+      </mark>
+    ) : (
+      <span key={index}>{span.text}</span>
+    ),
+  );
 }
 
 /** Owns text interaction: suggestions, selection, focus and the highlight mirror. */
 export function ComposerInput(props: ComposerInputProps) {
-  const { value, onChange, onSubmit, onFiles, disabled, placeholder, autoFocus, fileSearch, mentions, commands, onCommandsWanted } = props;
+  const { value, onChange, onSubmit, onFiles, disabled, placeholder, autoFocus, fileSearch, mentions, commands, onCommandsWanted, connectors, onConnectorsWanted } = props;
   const [caret, setCaret] = useState(0);
   const [cursor, setCursor] = useState(0);
   const [suggestionsActive, setSuggestionsActive] = useState(true);
@@ -64,7 +88,10 @@ export function ComposerInput(props: ComposerInputProps) {
   const token = useMemo(() => tokenAtCaret(value, caret), [value, caret]);
   const memberQuery = useMemo(() => (mentions?.length ? mentionQueryAt(value, caret) : null), [mentions, value, caret]);
   const memberMatches = useMemo(() => (memberQuery ? filterMentions(mentions ?? [], memberQuery.query) : []), [memberQuery, mentions]);
-  const mentionQuery = token?.token.startsWith("@") && fileSearch && !memberMatches.length ? token.token.slice(1) : null;
+  const atQuery = token?.token.startsWith("@") && !memberMatches.length ? token.token.slice(1) : null;
+  const mentionQuery = fileSearch ? atQuery : null;
+  const connectorMatches = useMemo(() => matchingConnectors(connectors, atQuery), [connectors, atQuery]);
+  useConnectorWord(token, atQuery, onConnectorsWanted);
   const commandPrefix = token?.token[0];
   const commandQuery = commandQueryAt(token, commands);
   const notice = useCommandWord(commandWordAt(value, caret), onCommandsWanted, props.commandsNotice);
@@ -103,20 +130,12 @@ export function ComposerInput(props: ComposerInputProps) {
         },
       }));
     }
-    if (mentionQuery !== null) {
-      return (files.data ?? []).map((filePath) => ({
-        key: filePath,
-        label: filePath,
-        pick: () => {
-          if (!token) return;
-          const next = `${value.slice(0, token.start)}${filePath} ${value.slice(caret)}`;
-          onChange(next);
-          placeCaret(token.start + filePath.length + 1);
-        },
-      }));
+    if (atQuery !== null) {
+      const draft = { token, caret, value, onChange, placeCaret };
+      return [...connectorRows(connectorMatches, draft), ...fileRows(mentionQuery !== null ? (files.data ?? []) : [], draft)];
     }
     return commandRows(commandMatches, { query: commandQuery, token, caret, value, onChange, placeCaret });
-  }, [memberQuery, memberMatches, mentionQuery, files.data, commandMatches, commandQuery, token, caret, value, onChange, placeCaret]);
+  }, [memberQuery, memberMatches, atQuery, connectorMatches, mentionQuery, files.data, commandMatches, commandQuery, token, caret, value, onChange, placeCaret]);
   // Only a name this project actually has is a token, which is why the set
   // comes from the same commands the popover offers rather than from a shape.
   const skillNames = useMemo(() => namesOf(commands ?? []), [commands]);
@@ -127,7 +146,7 @@ export function ComposerInput(props: ComposerInputProps) {
   useEffect(() => {
     setCursor(0);
     setChosen(false);
-  }, [suggestions.length, memberQuery?.query, mentionQuery, commandQuery]);
+  }, [suggestions.length, memberQuery?.query, atQuery, commandQuery]);
   const memberList = suggestions.length > 0 && Boolean(suggestions[0]?.mention);
   const listOpen = suggestionsActive && suggestions.length > 0;
   const suggestionsOpen = listOpen || (suggestionsActive && notice !== null);
@@ -138,7 +157,7 @@ export function ComposerInput(props: ComposerInputProps) {
     <>
       {suggestionsOpen ? (
         <ComposerSuggestions anchor={props.suggestionAnchor} side={props.suggestionSide} members={memberList} cursor={cursor} count={suggestions.length} onDismiss={() => setSuggestionsActive(false)}>
-          <div id={listId} role="listbox" hidden={suggestions.length === 0} aria-label={suggestionLabel(memberList, mentionQuery !== null)} data-agent-mention-list={memberList || undefined}>
+          <div id={listId} role="listbox" hidden={suggestions.length === 0} aria-label={suggestionLabel(memberList, atQuery !== null)} data-agent-mention-list={memberList || undefined}>
             {suggestions.map((suggestion, index) => (
               <button
                 key={suggestion.key}
@@ -159,7 +178,8 @@ export function ComposerInput(props: ComposerInputProps) {
                     skill's description runs to a paragraph and would otherwise squeeze the
                     name it belongs to down to nothing. Half the row is the ceiling, so a
                     long file path still truncates rather than crowding out its own hint. */}
-                <span className={cn("composer-suggestion-label", suggestion.insert && "skill-token")} data-mono={memberList ? undefined : true}>
+                <span className={cn("composer-suggestion-label", (suggestion.insert || suggestion.logo) && "skill-token")} data-mono={memberList ? undefined : true}>
+                  {suggestion.logo ? <ConnectorLogo title={suggestion.logo.title} logo={suggestion.logo.logo} size={16} /> : null}
                   {suggestion.label}
                 </span>
                 {suggestion.hint ? <span className="composer-suggestion-hint">{suggestion.hint}</span> : null}
@@ -181,7 +201,7 @@ export function ComposerInput(props: ComposerInputProps) {
                 {segment.text}
               </mark>
             ) : (
-              <span key={index}>{segment.text}</span>
+              <MirrorText key={index} text={segment.text} connectors={connectors} />
             ),
           )}
           {/* A trailing newline collapses without something after it, and the

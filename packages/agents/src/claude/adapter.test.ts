@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, wri
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { fileBoundaryUrl, type AgentEvent } from "@openorc/protocol";
+import { fileBoundaryUrl, type AgentEvent, type RunSpec } from "@openorc/protocol";
 import { ClaudeAdapter, ultracodeFallbackNotice } from "./adapter.js";
 import { SHARED_CLAUDE_CONFIG_DIR } from "./config-dir.js";
 import type { AgentHost } from "../agent-host.js";
@@ -820,6 +820,57 @@ describe("unvetted checkouts", () => {
 });
 
 describe("added Claude accounts", () => {
+  describe("share the CLI login's MCP servers", () => {
+    const shared = () => {
+      const folder = mkdtempSync(path.join(tmpdir(), "openorc-claude-shared-"));
+      const paper = { type: "stdio", command: "paper-mcp" };
+      writeFileSync(path.join(folder, ".claude.json"), JSON.stringify({ mcpServers: { paper }, oauthAccount: { emailAddress: "not-read" } }));
+      return { folder, paper };
+    };
+    const started = async (folder: string, spec: Partial<RunSpec> = {}, env: NodeJS.ProcessEnv = { [SHARED_CLAUDE_CONFIG_DIR]: folder }) => {
+      mockProcess();
+      const handle = new ClaudeAdapter().start(
+        { runId: "shared-servers", agent: "claude", cwd: process.cwd(), prompt: "Fixture only", permissionMode: "autonomous", mcpUrl: "http://127.0.0.1:9/mcp", ...spec },
+        { ...launch, env: { ...process.env, ...env } },
+      );
+      const args = vi.mocked(spawn).mock.lastCall![1] as string[];
+      const servers = (JSON.parse(readFileSync(args[args.indexOf("--mcp-config") + 1]!, "utf8")) as { mcpServers: Record<string, unknown> }).mcpServers;
+      const settings = JSON.parse(args[args.indexOf("--settings") + 1]!) as Record<string, unknown>;
+      handle.close();
+      await handle.wait();
+      return { servers, settings };
+    };
+
+    it("in an Autonomous thread, as the login wrote them", async () => {
+      const { folder, paper } = shared();
+      expect((await started(folder)).servers).toMatchObject({ paper });
+      rmSync(folder, { recursive: true, force: true });
+    });
+
+    it.each<[string, Partial<RunSpec>]>([
+      ["a thread that asks before acting", { permissionMode: "review" }],
+      ["Plan", { mode: "plan" }],
+      ["a thread limited to OpenOrc's tools", { strictMcp: true }],
+      ["an unvetted checkout", { untrustedCheckout: true }],
+    ])("but not in %s", async (_name, spec) => {
+      const { folder } = shared();
+      expect((await started(folder, spec)).servers).not.toHaveProperty("paper");
+      rmSync(folder, { recursive: true, force: true });
+    });
+
+    it("but not on the CLI login itself, which already has them", async () => {
+      const { folder } = shared();
+      expect((await started(folder, {}, {})).servers).not.toHaveProperty("paper");
+      rmSync(folder, { recursive: true, force: true });
+    });
+
+    it("and a server turned off stays off", async () => {
+      const { folder } = shared();
+      expect((await started(folder, { connectorsOff: ["paper"] })).settings["deniedMcpServers"]).toEqual([{ serverName: "paper" }]);
+      rmSync(folder, { recursive: true, force: true });
+    });
+  });
+
   it("load the plugins the CLI login turns on, and the marker stays out of Claude's environment", async () => {
     const shared = mkdtempSync(path.join(tmpdir(), "openorc-claude-shared-"));
     try {

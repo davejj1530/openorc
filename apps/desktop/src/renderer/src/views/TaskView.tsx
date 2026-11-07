@@ -7,7 +7,7 @@ import { TopBar } from "../components/TopBar";
 import { Button, Empty, TextButton } from "../components/ui";
 import { useRpc } from "../lib/client";
 import { useLayout } from "../lib/layout";
-import { newThread, openTask, useRouter, type TaskTab } from "../lib/router";
+import { openTask, useRouter, type TaskTab } from "../lib/router";
 import { TaskDraftProvider } from "../lib/task-draft-context";
 import { TaskDocument, type TaskDocumentHandle } from "./TaskDocument";
 
@@ -40,7 +40,7 @@ export function TaskView({ taskId, tab }: { taskId: string; tab: TaskTab }) {
   const owner = useRpc("tasks.executionThread", { taskId }, { enabled: Boolean(task.data) });
   const project = useRpc("projects.get", { id: task.data?.projectId ?? "" }, { enabled: Boolean(task.data) });
   const setPanel = useLayout((s) => s.setPanel);
-  const setProject = useLayout((s) => s.setProject);
+  const followProject = useLayout((s) => s.followProject);
   const t = task.data?.retiredTeam ? undefined : task.data;
   const p = project.data;
   const document = tab === "spec";
@@ -57,8 +57,8 @@ export function TaskView({ taskId, tab }: { taskId: string; tab: TaskTab }) {
     }
   };
   useEffect(() => {
-    if (t) setProject(t.projectId);
-  }, [t?.projectId, setProject]);
+    if (t) followProject(t.projectId);
+  }, [t?.projectId, followProject]);
   useEffect(() => {
     if (tab === "files") setPanel(true, "changes");
     else if (tab === "commits") setPanel(true, "commits");
@@ -72,7 +72,7 @@ export function TaskView({ taskId, tab }: { taskId: string; tab: TaskTab }) {
   return (
     <TaskDraftProvider key={taskId} taskId={taskId}>
       <main className="task-workspace workspace-main well flex-1 min-w-0 flex flex-col">
-        <TopBar projectId={t?.projectId} projectName={p?.name} onProjectChange={(id) => newThread(id ?? undefined)} panel={!document && Boolean(context)}>
+        <TopBar panel={!document && Boolean(context)}>
           <TextButton onClick={() => useRouter.getState().navigate({ view: "tasks" })} tone="muted">
             Tasks
           </TextButton>

@@ -55,7 +55,7 @@ beforeEach(() => {
   schedule = null;
   paused = [];
   saveFailure = false;
-  useLayout.setState({ projectId: null });
+  useLayout.setState({ workspace: "all" });
   vi.mocked(core.call).mockImplementation(async (method, _input) => {
     if (method === "projects.list")
       return [

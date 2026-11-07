@@ -16,7 +16,6 @@ import { harnessShortName, isHarnessId, type ThreadSummary } from "@openorc/prot
 import { useMemo, type ReactNode } from "react";
 import { CoversPreview } from "../lib/browser-preview";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
-import { useLayout } from "../lib/layout";
 import { orclingById, useOrclings } from "../lib/orclings";
 import { useRouter } from "../lib/router";
 import { endThreadDrag, startThreadDrag } from "../lib/thread-drag";
@@ -103,7 +102,6 @@ export function ThreadRow({ thread, active, project, compact = false }: { thread
             onClick={(e) => {
               if (e.metaKey || e.ctrlKey) addPane(thread.id);
               else {
-                if (useLayout.getState().projectId !== null) useLayout.getState().setProject(thread.projectId);
                 dismissCompactNavigation();
                 navigate({ view: "thread", threadId: thread.id });
               }

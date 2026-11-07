@@ -2,8 +2,6 @@ import { create } from "zustand";
 import { useLayout } from "./layout";
 
 export type TaskTab = "chat" | "spec" | "files" | "commits" | "memory";
-/** A project's page: its tasks, or its settings. */
-export type ProjectTab = "tasks" | "settings";
 
 /** A message to bring into view: its run, the turn of that run it falls in, and its id. */
 export type MessageTarget = { runId: string; turn: number; messageId: string };
@@ -25,8 +23,8 @@ export type Route =
   | { view: "tasks" }
   | { view: "pulls" }
   | { view: "pull"; projectId: string; number: number }
-  /** A project's page, on its tasks unless a tab is named. */
-  | { view: "project"; projectId: string; tab?: ProjectTab }
+  /** A project's settings. */
+  | { view: "project"; projectId: string }
   | { view: "task"; taskId: string; tab: TaskTab; message?: MessageTarget }
   | { view: "memory" }
   | { view: "scheduled" }
@@ -47,6 +45,8 @@ interface RouterState {
   history: Route[];
   future: Route[];
   navigate: (route: Route) => void;
+  /** A route alone in the window with no history entry: switching tabs is not a step to go back over. */
+  show: (route: Route) => void;
   back: () => void;
   forward: () => void;
 }
@@ -82,6 +82,11 @@ export const useRouter = create<RouterState>((set, get) => {
     history: [],
     future: [],
     navigate: (route) => set({ ...applyRoute(route), history: [...get().history.slice(-49), get().route], future: [] }),
+    show: (route) => {
+      const threadIds = route.view === "thread" ? [route.threadId] : [];
+      if (get().route.view === "thread" || route.view === "thread") reconcilePanel(threadIds, route.view === "thread" ? route.threadId : null);
+      set({ route, threadIds });
+    },
     back: () => {
       const { history: h, future, route } = get();
       const prev = h[h.length - 1];
@@ -126,9 +131,9 @@ export function openTask(taskId: string, tab: TaskTab = "spec", message?: Messag
   useRouter.getState().navigate({ view: "task", taskId, tab, ...(message ? { message } : {}) });
 }
 
-/** A project's page, on the named tab: Settings is where its worktree setup and Claude accounts are. */
-export function openProject(projectId: string, tab: ProjectTab = "tasks"): void {
-  useRouter.getState().navigate({ view: "project", projectId, ...(tab === "tasks" ? {} : { tab }) });
+/** A project's settings: its worktree setup, Claude accounts and the rest. Its tasks are the Tasks screen's, under the sidebar's filter. */
+export function openProject(projectId: string): void {
+  useRouter.getState().navigate({ view: "project", projectId });
 }
 
 export function openPullRequest(projectId: string, number: number): void {
@@ -147,10 +152,10 @@ function isPlainView(view: string | undefined): view is PlainView {
   return view !== undefined && plainViews.has(view);
 }
 
-/** Screens a spec names by one id, and a project by its tab after it too. */
+/** Screens a spec names by one id. */
 const idViews: Readonly<Record<string, (id: string, tab: string | undefined) => Route>> = {
   thread: (threadId) => ({ view: "thread", threadId }),
-  project: (projectId, tab) => ({ view: "project", projectId, ...(tab === "settings" ? { tab } : {}) }),
+  project: (projectId) => ({ view: "project", projectId }),
   newsubthread: (parentId) => ({ view: "newsubthread", parentId }),
 };
 
@@ -209,7 +214,7 @@ export function specFromRoute(route: Route): string {
     case "task":
       return `task:${route.taskId}:${route.tab}`;
     case "project":
-      return `project:${route.projectId}${route.tab === "settings" ? ":settings" : ""}`;
+      return `project:${route.projectId}`;
     case "pull":
       return `pull:${route.projectId}:${route.number}`;
     case "newtask":

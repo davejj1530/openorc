@@ -4,9 +4,9 @@ import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { TaskView } from "./TaskView";
 
-const mocks = vi.hoisted(() => ({ call: vi.fn(), panel: vi.fn(), setPanel: vi.fn(), setProject: vi.fn() }));
+const mocks = vi.hoisted(() => ({ call: vi.fn(), panel: vi.fn(), setPanel: vi.fn(), followProject: vi.fn() }));
 vi.mock("../lib/rpc", () => ({ core: { call: mocks.call, onReady: () => {}, onPush: () => () => {} } }));
-vi.mock("../lib/layout", () => ({ useLayout: (select: (state: unknown) => unknown) => select({ setPanel: mocks.setPanel, setProject: mocks.setProject }) }));
+vi.mock("../lib/layout", () => ({ useLayout: (select: (state: unknown) => unknown) => select({ setPanel: mocks.setPanel, followProject: mocks.followProject }) }));
 vi.mock("../components/Panel", () => ({
   Panel: (props: unknown) => {
     mocks.panel(props);

@@ -13,7 +13,7 @@ import { NewFileDialog } from "./dialogs/NewFileDialog";
 import { useAppShortcuts } from "./lib/app-shortcuts";
 import { useRpc } from "./lib/client";
 import { useOnboardingDefaultHarness } from "./lib/default-harness";
-import { useLayout } from "./lib/layout";
+import { focusedProject, useLayout } from "./lib/layout";
 import { useLookHandover } from "./lib/mac-look";
 import { readOnboardingState, resolveOnboarding, writeOnboardingState, type PersistedOnboardingState } from "./lib/onboarding";
 import { useRouter, type Route } from "./lib/router";
@@ -57,7 +57,7 @@ export function App() {
   const trafficLights = useTrafficLights();
   const route = useRouter((s) => s.route);
   const ui = useUi();
-  const projectId = useLayout((s) => s.projectId);
+  const projectId = useLayout(focusedProject);
   const system = useRpc("system.info", { refresh: false });
   const projects = useRpc("projects.list", {});
   const [onboardingState, setOnboardingState] = useState(readOnboardingState);
@@ -202,7 +202,7 @@ function MainScreen({ route, currentProject }: { route: Route; currentProject: s
       screen = <PullRequestView key={`${route.projectId}:${route.number}`} projectId={route.projectId} number={route.number} />;
       break;
     case "project":
-      screen = <ProjectView projectId={route.projectId} tab={route.tab ?? "tasks"} onNewTask={() => openNewTask(route.projectId)} />;
+      screen = <ProjectView projectId={route.projectId} />;
       break;
     case "memory":
       screen = <Memory />;

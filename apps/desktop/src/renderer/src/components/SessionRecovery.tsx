@@ -34,7 +34,7 @@ export function SessionRecovery({ thread, disabled, onRestart, onContinueWith }:
           {exhausted ? (
             <div className="text-xs text-ink-2">
               Every account this project uses is at its limit.{" "}
-              <TextButton underline tone="strong" onClick={() => openProject(thread.projectId, "settings")}>
+              <TextButton underline tone="strong" onClick={() => openProject(thread.projectId)}>
                 Project accounts
               </TextButton>
             </div>

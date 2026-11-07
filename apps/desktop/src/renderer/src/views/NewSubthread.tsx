@@ -19,7 +19,7 @@ export function NewSubthread({ parentId }: { parentId: string }) {
   if (parent.error) {
     return (
       <main className="workspace-main well flex flex-1 flex-col min-w-0 min-h-0">
-        <TopBar showProject={false}>{null}</TopBar>
+        <TopBar>{null}</TopBar>
         <div className="new-thread-body flex-1 min-h-0">
           <div className="new-thread-column">
             <p role="alert" className="text-sm text-bad">
@@ -82,7 +82,7 @@ function SubthreadComposer({ parent }: { parent: Thread }) {
   return (
     <ClaudeAccountScope id={claudeAccountId ?? "claude-cli"}>
       <main className="workspace-main well flex flex-1 flex-col min-w-0 min-h-0">
-        <TopBar showProject={false}>{null}</TopBar>
+        <TopBar>{null}</TopBar>
         <div className="new-thread-body flex-1 min-h-0 overflow-y-auto">
           <div className="new-thread-column">
             <h1 className="new-thread-question">

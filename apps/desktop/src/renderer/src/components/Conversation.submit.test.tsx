@@ -192,7 +192,7 @@ it("offers only the accounts the thread's project uses after a usage limit, and 
     expect(screen.queryByRole("button", { name: /Continue with/ })).toBeNull();
     expect(screen.getByText(/Every account this project uses is at its limit\./)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Project accounts" }));
-    expect(useRouter.getState().route).toEqual({ view: "project", projectId: "project", tab: "settings" });
+    expect(useRouter.getState().route).toEqual({ view: "project", projectId: "project" });
   } finally {
     queries.delete("projects.get");
   }

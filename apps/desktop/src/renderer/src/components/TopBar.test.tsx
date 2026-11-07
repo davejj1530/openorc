@@ -17,11 +17,7 @@ afterEach(cleanup);
 
 it("keeps the panel's toggle in the header both ways, so an open panel can be hidden from here", () => {
   useLayout.getState().setPanel(true);
-  render(
-    <TopBar showProject={false} panel>
-      {null}
-    </TopBar>,
-  );
+  render(<TopBar panel>{null}</TopBar>);
   const toggle = screen.getByRole("button", { name: "Hide panel" });
   expect(toggle.getAttribute("aria-pressed")).toBe("true");
   fireEvent.click(toggle);

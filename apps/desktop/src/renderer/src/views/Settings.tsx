@@ -45,9 +45,7 @@ export function Settings({ route }: { route: SettingsRoute }) {
   const info = useRpc("system.info", { refresh: true });
   return (
     <div className="settings-sheet" data-plane>
-      <TopBar showProject={false} className="settings-sheet-bar">
-        {null}
-      </TopBar>
+      <TopBar className="settings-sheet-bar">{null}</TopBar>
       <div className="settings-shell">
         <div ref={content} className="settings-content">
           <header className="settings-page-head">

@@ -115,15 +115,13 @@ it("round-trips pull request routes and rejects a pull request without a number"
   expect(routeFromSpec("pull:p1:none")).toBeNull();
 });
 
-it("opens a project on its tasks, or on its settings by name, and keeps old project routes valid", async () => {
+it("opens a project's settings, and reads older project routes that named a tab as the same page", async () => {
   const { openProject, routeFromSpec, specFromRoute, useRouter } = await import("./router");
-  expect(routeFromSpec("project:p1")).toEqual({ view: "project", projectId: "p1" });
-  expect(routeFromSpec("project:p1:unknown")).toEqual({ view: "project", projectId: "p1" });
-  const settings = { view: "project" as const, projectId: "p1", tab: "settings" as const };
-  expect(specFromRoute(settings)).toBe("project:p1:settings");
-  expect(routeFromSpec(specFromRoute(settings))).toEqual(settings);
-  openProject("p1", "settings");
-  expect(useRouter.getState().route).toEqual(settings);
+  const page = { view: "project" as const, projectId: "p1" };
+  expect(routeFromSpec("project:p1")).toEqual(page);
+  expect(routeFromSpec("project:p1:settings")).toEqual(page);
+  expect(routeFromSpec("project:p1:tasks")).toEqual(page);
+  expect(specFromRoute(page)).toBe("project:p1");
   openProject("p1");
-  expect(useRouter.getState().route).toEqual({ view: "project", projectId: "p1" });
+  expect(useRouter.getState().route).toEqual(page);
 });

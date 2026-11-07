@@ -40,7 +40,7 @@ afterEach(cleanup);
 
 it("keeps the new-thread panel outside the conversation's rounded frame", () => {
   useRouter.setState({ route: { view: "newthread", projectId: "project" }, history: [], future: [] });
-  useLayout.setState({ projectId: "project", panelOpen: true, panelTab: "changes" });
+  useLayout.setState({ workspace: "project", panelOpen: true, panelTab: "changes" });
   render(
     <QueryClientProvider client={new QueryClient()}>
       <App />

@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { create } from "zustand";
 import { targetModel } from "@openorc/client";
 import { WORKSPACE_ID } from "@openorc/protocol";
-import { useLayout } from "./layout";
+import { focusedProject, useLayout } from "./layout";
 import { readNewThreadDraft, readNewThreadProject } from "./new-thread-draft";
 
 /** The agent a new thread would start on, and for Claude the account it would use. */
@@ -28,7 +28,7 @@ export function usePublishComposerAccount(agent: string | undefined, claudeAccou
 
 /** Before the composer has opened, the setup its saved draft holds for the project the sidebar is on. */
 export function savedComposerAccount(): ComposerAccount | null {
-  const draft = readNewThreadDraft(useLayout.getState().projectId ?? readNewThreadProject() ?? WORKSPACE_ID);
+  const draft = readNewThreadDraft(focusedProject(useLayout.getState()) ?? readNewThreadProject() ?? WORKSPACE_ID);
   const choice = targetModel(draft.target);
   return choice ? { agent: choice.agent, ...(draft.claudeAccountId ? { claudeAccountId: draft.claudeAccountId } : {}) } : null;
 }

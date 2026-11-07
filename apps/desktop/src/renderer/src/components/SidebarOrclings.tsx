@@ -1,6 +1,5 @@
 import type { Orcling } from "@openorc/protocol";
 import { cn } from "../lib/cn";
-import { useLayout } from "../lib/layout";
 import { messagePreview } from "../lib/message-preview";
 import { useOrclings } from "../lib/orclings";
 import { useRpc } from "../lib/client";
@@ -49,7 +48,6 @@ function OrclingRow({ orcling, active }: { orcling: Orcling; active: boolean }) 
     <button
       type="button"
       onClick={() => {
-        useLayout.getState().setProject(thread.data?.projectId ?? null);
         useRouter.getState().navigate({ view: "thread", threadId: orcling.threadId });
         dismissCompactNavigation();
       }}

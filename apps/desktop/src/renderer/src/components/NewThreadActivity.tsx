@@ -6,7 +6,7 @@ import { LoaderCircle } from "./icons";
 import { StatusDot } from "./ui";
 import { StatusIcon, statusLabel } from "./status";
 import { cn } from "../lib/cn";
-import { useLayout } from "../lib/layout";
+import { focusedProject, useLayout } from "../lib/layout";
 import { ensureRpc, useRpc, useRpcs } from "../lib/client";
 import { relativeTime, threadListParams } from "@openorc/client";
 import { openThread, useRouter } from "../lib/router";
@@ -15,7 +15,7 @@ import { openThread, useRouter } from "../lib/router";
  * Recent conversations that accept messages, alongside task activity. Native children belong in their parent's tree.
  */
 export function useArrivalActivity(): ArrivalActivity {
-  const projectId = useLayout((s) => s.projectId);
+  const projectId = useLayout(focusedProject);
   const projects = useRpc("projects.list", {}, { enabled: !projectId });
   const scopes = projectId ? [projectId] : [WORKSPACE_ID, ...(projects.data ?? []).map((project) => project.id)];
   const threads = useRpcs(

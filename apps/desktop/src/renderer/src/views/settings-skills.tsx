@@ -4,7 +4,7 @@ import type { AgentSkill, HarnessId, Project } from "@openorc/protocol";
 import { ChevronDown, RefreshCw, Search } from "../components/icons";
 import { Button, Input, Select } from "../components/ui";
 import { cn } from "../lib/cn";
-import { useLayout } from "../lib/layout";
+import { focusedProject, useLayout } from "../lib/layout";
 import { useRpc } from "../lib/client";
 import { LoadError } from "./settings-shared";
 
@@ -143,7 +143,7 @@ export function SkillsSettings({ active }: { active: boolean }) {
   // Settings is a global surface and the rail can be on every project at once,
   // so the rail seeds this choice rather than being it. Only the project tier
   // depends on which project it is, and picking it here says which one that was.
-  const railProject = useLayout((s) => s.projectId);
+  const railProject = useLayout(focusedProject);
   const [projectId, setProjectId] = useState(railProject ?? "");
   const [agent, setAgent] = useState<HarnessId>("codex");
   const [search, setSearch] = useState("");

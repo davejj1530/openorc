@@ -1,4 +1,4 @@
-import { composerActions, composerActivity, composerSendHint } from "@openorc/client";
+import { composerActions, composerActivity, composerSendHint, type SkillCommand, type SkillListNotice } from "@openorc/client";
 import {
   ExecutionMode,
   executionMode,
@@ -54,16 +54,7 @@ function composerDestination(props: ComposerProps): ReactNode {
  * an entry carrying neither, or both, fails to typecheck rather than picking
  * silently doing nothing.
  */
-export type SlashCommand =
-  { name: string; hint: string; run: () => void; insert?: never; prefix?: never; aliases?: never } | { name: string; hint: string; insert: true; prefix: "/" | "$"; run?: never; aliases?: string[] };
-
-/** Said in the picker while there are no skills to offer yet, when a word starts with the agent's prefix for them. */
-export interface CommandsNotice {
-  prefix: "/" | "$";
-  text: string;
-  /** Why, on hover, when reading them failed. */
-  reason?: string;
-}
+export type SlashCommand = { name: string; hint: string; run: () => void; insert?: never; prefix?: never; aliases?: never } | (SkillCommand & { run?: never });
 
 export interface ComposerChanges {
   projectName: string;
@@ -139,7 +130,7 @@ export interface ComposerProps {
   commands?: SlashCommand[];
   /** Called as a `/` or `$` word starts, so a list read a while ago can be read again before it is used. */
   onCommandsWanted?: () => void;
-  commandsNotice?: CommandsNotice | null;
+  commandsNotice?: SkillListNotice | null;
   autoFocus?: boolean;
   size?: "md" | "lg";
   /** The landing screen draws the roomier composer and shows where the thread works below it, not in a footer. */

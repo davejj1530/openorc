@@ -1,11 +1,11 @@
+import { commandWordAt, skillNames as namesOf, skillSegments, useCommandWord, type SkillListNotice } from "@openorc/client";
 import type { FileScope } from "@openorc/protocol";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
 import { useRpc } from "../lib/client";
 import { cn } from "../lib/cn";
 import { filterMentions, insertMention, mentionQueryAt, type MentionEntry } from "../lib/composer-mentions";
-import { skillSegments } from "../lib/skill-tokens";
-import type { CommandsNotice, SlashCommand } from "./Composer";
-import { commandRows, matchingCommands, suggestionKey, useCommandWord, type SuggestionRow } from "./composer-commands";
+import type { SlashCommand } from "./Composer";
+import { commandRows, matchingCommands, suggestionKey, type SuggestionRow } from "./composer-commands";
 import { ComposerSuggestions } from "./ComposerSuggestions";
 
 interface ComposerInputProps {
@@ -20,7 +20,7 @@ interface ComposerInputProps {
   mentions?: MentionEntry[];
   commands?: SlashCommand[];
   onCommandsWanted?: () => void;
-  commandsNotice?: CommandsNotice | null;
+  commandsNotice?: SkillListNotice | null;
   suggestionAnchor: RefObject<HTMLDivElement | null>;
   suggestionSide: "top" | "bottom";
 }
@@ -67,7 +67,7 @@ export function ComposerInput(props: ComposerInputProps) {
   const mentionQuery = token?.token.startsWith("@") && fileSearch && !memberMatches.length ? token.token.slice(1) : null;
   const commandPrefix = token?.token[0];
   const commandQuery = commandQueryAt(token, commands);
-  const unavailable = useCommandWord(token, onCommandsWanted, props.commandsNotice);
+  const notice = useCommandWord(commandWordAt(value, caret), onCommandsWanted, props.commandsNotice);
   const files = useRpc("files.search", { scope: fileSearch ?? NO_SEARCH, query: mentionQuery ?? "", limit: 8 }, { enabled: mentionQuery !== null, staleTime: 10_000 });
   // Skills insert into the prompt; actions clear it, so only offer actions at the start.
   const commandMatches = useMemo(() => matchingCommands(commands, commandQuery, commandPrefix, token?.start), [commandPrefix, commandQuery, commands, token?.start]);
@@ -119,7 +119,7 @@ export function ComposerInput(props: ComposerInputProps) {
   }, [memberQuery, memberMatches, mentionQuery, files.data, commandMatches, commandQuery, token, caret, value, onChange, placeCaret]);
   // Only a name this project actually has is a token, which is why the set
   // comes from the same commands the popover offers rather than from a shape.
-  const skillNames = useMemo(() => new Set((commands ?? []).flatMap((command) => (command.insert ? [command.name, ...(command.aliases ?? [])] : []))), [commands]);
+  const skillNames = useMemo(() => namesOf(commands ?? []), [commands]);
   const skillPrefix = commands?.find((command) => command.insert)?.prefix ?? "/";
   const skillSpans = useMemo(() => skillSegments(value, skillNames, skillPrefix), [value, skillNames, skillPrefix]);
   // Whether the arrow keys chose the row, which is what lets Enter pick one in the middle of a message.
@@ -130,7 +130,7 @@ export function ComposerInput(props: ComposerInputProps) {
   }, [suggestions.length, memberQuery?.query, mentionQuery, commandQuery]);
   const memberList = suggestions.length > 0 && Boolean(suggestions[0]?.mention);
   const listOpen = suggestionsActive && suggestions.length > 0;
-  const suggestionsOpen = listOpen || (suggestionsActive && unavailable !== null);
+  const suggestionsOpen = listOpen || (suggestionsActive && notice !== null);
   // Focus stays in the message while the arrows move through the list, so a screen reader follows the row this names.
   const listAria = listOpen ? { "aria-controls": listId, "aria-activedescendant": `${listId}-${cursor}` } : {};
 
@@ -166,9 +166,9 @@ export function ComposerInput(props: ComposerInputProps) {
               </button>
             ))}
           </div>
-          {unavailable ? (
-            <div role="status" title={unavailable.reason} className="composer-suggestions-notice">
-              {unavailable.text}
+          {notice ? (
+            <div role="status" title={notice.reason} className="composer-suggestions-notice">
+              {notice.text}
             </div>
           ) : null}
         </ComposerSuggestions>

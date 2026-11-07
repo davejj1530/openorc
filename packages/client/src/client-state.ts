@@ -1,4 +1,4 @@
-import type { Frame, Run } from "@openorc/protocol";
+import type { AgentKind, FileScope, Frame, Run } from "@openorc/protocol";
 import type { ClientPush, CoreConnection, Notice } from "./connection.js";
 import { useConversationSettingsWith, type SavedThreadSettings } from "./conversation-settings.js";
 import { useSubmitWith } from "./conversation-submit.js";
@@ -6,6 +6,7 @@ import { useConversationTranscriptWith, type ConversationTarget } from "./conver
 import { createPermissionDefault } from "./permission-default.js";
 import { createQueries } from "./query.js";
 import { createRunStore } from "./run-store.js";
+import { useSkillCommandsWith } from "./skill-commands.js";
 
 export interface ClientStateOptions {
   /** Runs a callback before the next paint, which is as often as a view can use an update. */
@@ -52,6 +53,7 @@ export function createClientState(connection: CoreConnection, options: ClientSta
     useSubmit: () => useSubmitWith(queries.useRpcMutation, options.randomId),
     useConversationTranscript: (input: { runs: Run[]; threadId: string | null; target?: ConversationTarget | undefined }) => useConversationTranscriptWith(queries, store, input),
     useConversationSettings: (input: { thread: SavedThreadSettings | null; activeRun: Run | undefined }) => useConversationSettingsWith(queries, permissions, input),
+    useSkillCommands: (scope: FileScope | null, agent: AgentKind | null | undefined, claudeAccountId?: string) => useSkillCommandsWith(queries, scope, agent, claudeAccountId),
     onNotify(listener: (notice: Notice) => void): () => void {
       notices.add(listener);
       return () => notices.delete(listener);

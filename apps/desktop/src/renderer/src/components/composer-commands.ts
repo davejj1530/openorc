@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import type { CommandsNotice, SlashCommand } from "./Composer";
+import { insertSkill, rankCommands } from "@openorc/client";
+import type { SlashCommand } from "./Composer";
 
 /** One row of the composer's suggestions: a mention, a file, a skill or an app action. */
 export interface SuggestionRow {
@@ -13,28 +13,11 @@ export interface SuggestionRow {
   pick: () => void;
 }
 
-/** How well a command answers what was typed: its name in full, its name's start, else an alias or the name after a plugin's colon. */
-function matchRank(command: SlashCommand, query: string): number | null {
-  const typed = query.toLowerCase();
-  const name = command.name.toLowerCase();
-  const aliases = (command.insert ? (command.aliases ?? []) : []).map((alias) => alias.toLowerCase());
-  if (name === typed || aliases.includes(typed)) return 0;
-  if (name.startsWith(typed)) return 1;
-  return [...aliases, ...name.split(":").slice(1)].some((part) => part.startsWith(typed)) ? 2 : null;
-}
-
 export function matchingCommands(commands: SlashCommand[] | undefined, query: string | null, prefix: string | undefined, start: number | undefined): SlashCommand[] {
   if (query === null) return [];
   // Slash opens the skill picker for either harness; selection still inserts its native prefix.
   const offered = (commands ?? []).filter((command) => (command.insert ? prefix === "/" || command.prefix === prefix : prefix === "/" && start === 0));
-  // A name typed in full comes first, so a longer name or a plugin's of the same name never takes its place.
-  return offered
-    .flatMap((command, index) => {
-      const rank = matchRank(command, query);
-      return rank === null ? [] : [{ command, rank, index }];
-    })
-    .sort((a, b) => a.rank - b.rank || a.index - b.index)
-    .map((match) => match.command);
+  return rankCommands(offered, query);
 }
 
 interface Draft {
@@ -58,13 +41,10 @@ export function commandRows(matches: SlashCommand[], { query, token, caret, valu
     pick: () => {
       const rest = value.slice(caret);
       if (command.insert) {
-        // Preserve the harness's invocation prefix when inserting the skill.
         if (!token) return;
-        // One space after the name: the one already there, or a new one. The caret goes past it either way.
-        const spaced = /^\s/.test(rest);
-        const text = `${command.prefix}${command.name}${spaced ? "" : " "}`;
-        onChange(`${value.slice(0, token.start)}${text}${rest}`);
-        placeCaret(token.start + text.length + (spaced ? 1 : 0));
+        const next = insertSkill(value, token, caret, command);
+        onChange(next.text);
+        placeCaret(next.caret);
         return;
       }
       // An action starts the message, and what was written after it stays for the next one.
@@ -103,21 +83,4 @@ export function suggestionKey(press: KeyPress, row: SuggestionRow | undefined, {
   if (plain) return plain;
   if (press.key !== "Enter" || press.shiftKey || press.metaKey || press.ctrlKey || press.altKey) return "pass";
   return row?.insert === true && (row.complete === true || (!chosen && endsMessage)) ? "send" : "pick";
-}
-
-/**
- * A `/` or `$` word at the caret asks for the command list again, once per word and even when the list is empty, since
- * a skill installed since it was read is what the picker should show. Only a new word asks: the callback changes as its
- * read starts and ends, and asking on that would loop on a failing read. Answers the notice the picker shows while there
- * are no skills to offer, when the word starts with their prefix.
- */
-export function useCommandWord(token: { start: number; token: string } | null, onCommandsWanted: (() => void) | undefined, unavailable: CommandsNotice | null | undefined): CommandsNotice | null {
-  const prefix = token?.token[0];
-  const start = prefix === "/" || prefix === "$" ? token?.start : undefined;
-  const want = useRef(onCommandsWanted);
-  want.current = onCommandsWanted;
-  useEffect(() => {
-    if (start !== undefined) want.current?.();
-  }, [start]);
-  return unavailable && start !== undefined && prefix === unavailable.prefix ? unavailable : null;
 }

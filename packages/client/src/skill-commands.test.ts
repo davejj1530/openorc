@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { skillSegments } from "./skill-tokens";
+import { commandWordAt, insertSkill, rankCommands, skillSegments } from "./skill-commands.js";
 
 const names = new Set(["formatting", "code-review", "figma", "figma:figma-use"]);
 const marked = (text: string): string[] =>
@@ -61,5 +61,32 @@ describe("skill tokens", () => {
   it("returns the whole message unmarked when the project has no skills", () => {
     expect(skillSegments("/formatting", new Set())).toEqual([{ text: "/formatting", skill: false }]);
     expect(skillSegments("", names)).toEqual([]);
+  });
+});
+
+describe("the command word at the caret", () => {
+  it("is the / or $ word that ends at the caret, at the start or after a space", () => {
+    expect(commandWordAt("/co", 3)).toEqual({ start: 0, prefix: "/", query: "co" });
+    expect(commandWordAt("please $re", 10)).toEqual({ start: 7, prefix: "$", query: "re" });
+    expect(commandWordAt("see /src/a.ts later", 4)).toBeNull();
+    expect(commandWordAt("http://x", 8)).toBeNull();
+    expect(commandWordAt("costs 5", 7)).toBeNull();
+  });
+});
+
+describe("ranking what was typed", () => {
+  const commands = [{ name: "code-review:code-review" }, { name: "code-review" }, { name: "review", aliases: ["rv"] }, { name: "figma:figma-use" }];
+  it("puts a name typed in full first, then names that start with it, then aliases and plugin names", () => {
+    expect(rankCommands(commands, "code-review").map((c) => c.name)).toEqual(["code-review", "code-review:code-review"]);
+    expect(rankCommands(commands, "rv").map((c) => c.name)).toEqual(["review"]);
+    expect(rankCommands(commands, "FIGMA-U").map((c) => c.name)).toEqual(["figma:figma-use"]);
+    expect(rankCommands(commands, "").length).toBe(4);
+  });
+});
+
+describe("inserting a skill", () => {
+  it("replaces the word with the skill and one space, keeping one already there, and puts the caret past it", () => {
+    expect(insertSkill("please /co", { start: 7 }, 10, { prefix: "/", name: "code-review" })).toEqual({ text: "please /code-review ", caret: 20 });
+    expect(insertSkill("/co the diff", { start: 0 }, 3, { prefix: "$", name: "code-review" })).toEqual({ text: "$code-review the diff", caret: 13 });
   });
 });

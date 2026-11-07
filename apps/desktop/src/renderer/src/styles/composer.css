@@ -773,20 +773,17 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* A "/name" the provider will resolve, marked in the message. The wash reaches a fifth of the font
-   size past the word while the negative margin keeps every letter where the textarea has it. */
+/* A "/name" the provider will resolve, marked in the message in blue and semibold. The weight is a
+   stroke around the regular letters, not a bolder face: a bolder face is wider, and every letter
+   after the mark would slide away from where the textarea keeps the caret. */
 .skill-token {
-  margin: 0 -0.2em;
-  padding: 2px 0.2em;
-  border-radius: 5px;
-  background: var(--mention-soft);
+  background: none;
   color: var(--mention-ink);
+  -webkit-text-stroke: 0.04em currentColor;
 }
 .composer-suggestions .skill-token {
-  margin: 0;
-  padding: 0;
-  background: none;
   color: inherit;
+  -webkit-text-stroke: 0;
 }
 
 /* Composer popups open out of the control that was touched, clear of the composer surface: they

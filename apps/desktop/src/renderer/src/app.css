@@ -62,7 +62,6 @@
   --content-soft: var(--accent-soft);
   /* A skill named in a message: one blue in every palette, deepened in light mode to read at 4.5:1 on its wash. */
   --mention-ink: #1f6bd6;
-  --mention-soft: color-mix(in srgb, #3f88eb 10%, transparent);
   --ok: #157447;
   --warn: #8b5c0a;
   --review: #4f65b5;
@@ -122,7 +121,6 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --mention-ink: #6aa9f7;
-    --mention-soft: color-mix(in srgb, #3f88eb 18%, transparent);
     --bg: #181818;
     --surface: #151515;
     --surface-2: #1e1e1e;
@@ -153,7 +151,6 @@
 
 :root[data-theme="dark"] {
   --mention-ink: #6aa9f7;
-  --mention-soft: color-mix(in srgb, #3f88eb 18%, transparent);
   --bg: #181818;
   --surface: #151515;
   --surface-2: #1e1e1e;

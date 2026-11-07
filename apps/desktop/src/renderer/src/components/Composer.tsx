@@ -10,6 +10,7 @@ import {
   type FileScope,
   type PermissionPreset,
   type RunMode,
+  type UsableConnector,
 } from "@openorc/protocol";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRpcMutation } from "../lib/client";
@@ -131,6 +132,9 @@ export interface ComposerProps {
   /** Called as a `/` or `$` word starts, so a list read a while ago can be read again before it is used. */
   onCommandsWanted?: () => void;
   commandsNotice?: SkillListNotice | null;
+  /** Connectors `@` can name, and the call that reads them as an `@` word starts. */
+  connectors?: UsableConnector[];
+  onConnectorsWanted?: () => void;
   autoFocus?: boolean;
   size?: "md" | "lg";
   /** The landing screen draws the roomier composer and shows where the thread works below it, not in a footer. */
@@ -284,6 +288,8 @@ export function Composer(props: ComposerProps) {
             commands={props.commands}
             onCommandsWanted={props.onCommandsWanted}
             commandsNotice={props.commandsNotice}
+            connectors={props.connectors}
+            onConnectorsWanted={props.onConnectorsWanted}
             suggestionAnchor={shell}
             suggestionSide={isNewThread ? "bottom" : "top"}
           />

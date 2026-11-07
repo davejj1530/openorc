@@ -1,4 +1,7 @@
 import { insertSkill, rankCommands } from "@openorc/client";
+import type { UsableConnector } from "@openorc/protocol";
+import { useEffect, useRef } from "react";
+import { insertMention } from "../lib/composer-mentions";
 import type { SlashCommand } from "./Composer";
 
 /** One row of the composer's suggestions: a mention, a file, a skill or an app action. */
@@ -10,6 +13,8 @@ export interface SuggestionRow {
   insert?: boolean;
   /** A skill typed in full, by its name or one it also answers to: there is nothing to put in its place. */
   complete?: boolean;
+  /** A connector's image, drawn before its name. */
+  logo?: { title: string; logo: string | null };
   pick: () => void;
 }
 
@@ -52,6 +57,52 @@ export function commandRows(matches: SlashCommand[], { query, token, caret, valu
       command.run();
     },
   }));
+}
+
+/** Connectors whose name, or what people call them, starts with the `@` word, case-insensitive. */
+export function matchingConnectors(connectors: UsableConnector[] | undefined, query: string | null): UsableConnector[] {
+  if (query === null) return [];
+  const needle = query.toLowerCase();
+  return (connectors ?? []).filter((connector) => [connector.name, connector.title].some((name) => name.toLowerCase().startsWith(needle)));
+}
+
+/** The rows for the connectors that match: picking one puts `@name ` in place of the word. */
+export function connectorRows(matches: UsableConnector[], { token, caret, value, onChange, placeCaret }: Omit<Draft, "query">): SuggestionRow[] {
+  return matches.map((connector) => ({
+    key: `connector:${connector.name}`,
+    label: `@${connector.name}`,
+    ...(connector.title !== connector.name ? { hint: connector.title } : {}),
+    logo: { title: connector.title, logo: connector.logo },
+    pick: () => {
+      if (!token) return;
+      const next = insertMention(value, token.start, caret, connector.name);
+      onChange(next.text);
+      placeCaret(next.caret);
+    },
+  }));
+}
+
+/** The rows for files whose path matches the `@` word: picking one puts the path in its place. */
+export function fileRows(paths: string[], { token, caret, value, onChange, placeCaret }: Omit<Draft, "query">): SuggestionRow[] {
+  return paths.map((filePath) => ({
+    key: filePath,
+    label: filePath,
+    pick: () => {
+      if (!token) return;
+      onChange(`${value.slice(0, token.start)}${filePath} ${value.slice(caret)}`);
+      placeCaret(token.start + filePath.length + 1);
+    },
+  }));
+}
+
+/** Asks for the connector list once per `@` word, as the skill list is asked for once per `/` word. */
+export function useConnectorWord(token: { start: number } | null, atQuery: string | null, onConnectorsWanted: (() => void) | undefined): void {
+  const start = atQuery !== null ? token?.start : undefined;
+  const want = useRef(onConnectorsWanted);
+  want.current = onConnectorsWanted;
+  useEffect(() => {
+    if (start !== undefined) want.current?.();
+  }, [start]);
 }
 
 /** What a key does while the suggestions are open. `send` closes them and lets Enter send. */

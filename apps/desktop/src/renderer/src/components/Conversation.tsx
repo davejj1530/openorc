@@ -13,7 +13,7 @@ import {
   RESTART_PROMPT,
   type SubmitRequest,
 } from "@openorc/client";
-import { WORKSPACE_ID, defaultHarnessId, harnessShortName, isSubagentThread, type Project, type Run, type Task, type ThreadSummary, type WorkspaceMode } from "@openorc/protocol";
+import { WORKSPACE_ID, defaultHarnessId, executionMode, harnessShortName, isSubagentThread, type Project, type Run, type Task, type ThreadSummary, type WorkspaceMode } from "@openorc/protocol";
 import { useCallback, useState } from "react";
 import { useConversationSettings, useConversationTranscript, useRpc, useRpcMutation, useSubmit } from "../lib/client";
 import { useConversationDraft } from "../lib/conversation-draft";
@@ -27,6 +27,7 @@ import {
   workspaceDestination,
 } from "../lib/conversation-status-presentation";
 import { openThread, useRouter, type MessageTarget } from "../lib/router";
+import { useConnectorMentions } from "../lib/connector-mentions";
 import { useSkillCommands } from "../lib/skill-commands";
 import { ConversationVoice, useRunVoices } from "../lib/turn-authors";
 import { useTurnFooters } from "../lib/turn-footers";
@@ -160,6 +161,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const continueWith = (claudeAccountId: string) => submitter.submit({ ...request, now: false, claudeAccountId }, { text: CONTINUE_PROMPT, attachments: [] }).then(clearDraft);
 
   const skills = useSkillCommands(conversation, choice?.agent);
+  const connectorMentions = useConnectorMentions(conversation, choice?.agent, executionMode(mode, permission));
   const commands: SlashCommand[] = [...(thread ? threadCommands({ working, compact: () => compact.mutate({ id: thread.id }), fork: forkConversation }) : []), ...skills.commands];
 
   const location = conversationLocation({ scope, project, mode: workspaceMode, basePath: links ?? project.rootPath, checkoutBranch: checkout.data?.branch, plainFolder: git.state === "none" });
@@ -260,6 +262,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
             commands={commands}
             onCommandsWanted={skills.onCommandsWanted}
             commandsNotice={skills.commandsNotice}
+            {...connectorMentions}
             error={(submitter.error ?? sendQueued.error ?? stopCommand.error ?? compact.error ?? unqueue.error ?? fork.error ?? settings.error ?? draftError)?.message ?? permissionError}
           >
             {firstTaskRun && scope.kind === "task" ? (

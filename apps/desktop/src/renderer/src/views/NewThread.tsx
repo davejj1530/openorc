@@ -1,5 +1,5 @@
 import { newThreadChoice, newThreadWorkspaceMode, targetModel, type CloudTurnWho, type ModelChoice as Choice, type NewThreadDraft, type NewThreadPlace } from "@openorc/client";
-import { WORKSPACE_ID, type Project } from "@openorc/protocol";
+import { WORKSPACE_ID, executionMode, type Project } from "@openorc/protocol";
 import { useEffect, useRef, useState } from "react";
 import { ClaudeAccountPicker } from "../components/ClaudeAccountPicker";
 import { useCloudSignInGate } from "../components/CloudSignInOffer";
@@ -29,7 +29,8 @@ import { useNewThreadLocation } from "../lib/new-thread-location";
 import { orclingById, useOrclings } from "../lib/orclings";
 import { branchingReason, loadProjectGit, useProjectGit } from "../lib/project-git";
 import { openThread, useRouter } from "../lib/router";
-import { projectScope, useSkillCommands } from "../lib/skill-commands";
+import { useComposerSuggestions } from "../lib/connector-mentions";
+import { projectScope } from "../lib/skill-commands";
 import { useUi } from "../lib/ui";
 import { startNewThread } from "./new-thread-start";
 
@@ -142,7 +143,7 @@ function NewThreadProject({
   const target = draft.target;
   // The landing composer has no thread, so no thread action applies to it. The
   // skills do: they belong to the project, or the Workspace folder, chosen on this screen.
-  const skillCommands = useSkillCommands(projectScope(projectId, draft.workingDirectory), choice?.agent, claudeAccountId);
+  const suggestions = useComposerSuggestions(projectScope(projectId, draft.workingDirectory), choice?.agent, executionMode(draft.mode, permission), claudeAccountId);
   const cloud = useNewThreadCloud(target, projectId);
   const workspaceMode = newThreadWorkspaceMode({ canBranch: !isWorkspace && !git.cannotBranch, canCloud: cloud.can, chosen: draft.workspace, preferred: settings.data?.defaultWorkspaceMode });
   const signIn = useCloudSignInGate(newCloudTurn(workspaceMode, choice, claudeAccountId, cloud));
@@ -254,7 +255,7 @@ function NewThreadProject({
                     settingsDisabled={start.isPending}
                     location={location}
                     fileSearch={isWorkspace || !projectId ? undefined : { kind: "project", id: projectId }}
-                    {...skillCommands}
+                    {...suggestions}
                     busy={start.isPending}
                     disabledReason={disabledReason}
                     error={start.error?.message ?? permissionError ?? storageError}

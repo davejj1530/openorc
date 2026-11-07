@@ -429,3 +429,62 @@ it("moves a thread only to accounts its project uses, by hand or with its next m
   expect(threads.get(db, thread.id)?.claudeAccountId).toBe(work);
   expect((await conversations.switchClaudeAccount(thread.id, personal)).claudeAccountId).toBe(personal);
 });
+
+/** The turn on this run stops at its Claude account's 5-hour limit. */
+function stopAtLimit(handle: RunHandle, runId: string) {
+  const ts = Date.now();
+  handle.emit("event", { type: "activity.updated", runId, ts, activityId: "rate-limit", label: "Rate limit reached", status: "error", recovery: { kind: "usage", provider: "claude" } });
+  handle.emit("event", { type: "turn.completed", runId, ts, turnId: "fixture", status: "error", resultText: "You've hit your 5-hour limit", durationMs: 1 });
+}
+
+it("switches a project's threads among its own accounts by its own setting, with the app's off", async () => {
+  const [work, personal, client] = ["Work", "Personal", "Client"].map((name) => accounts.add(name).id) as [string, string, string];
+  // Client has the most left, but the project does not use it.
+  const reports: Record<string, ProviderUsage> = { [personal]: fiveHourReport(70), [client]: fiveHourReport(10) };
+  const recent = vi.fn(async (_provider: string, id: string | undefined) => reports[id!] ?? signedOut());
+  const switcher = new ClaudeAccountSwitch({ db, settings: { get: () => ({ claudeAccountAutoSwitch: false }) }, usage: { recent }, runs: service, threads: conversations, log: quiet });
+  turnSettled = (run, scope, _project, outcome) => switcher.settled(run, scope, outcome);
+  onlyUse([work, personal], work, true);
+  const { thread, run } = await conversations.start({ ...input, projectId: project.id });
+  stopAtLimit(start.mock.results[0]!.value, run!.id);
+  await vi.waitFor(() => expect(start).toHaveBeenCalledTimes(2));
+  expect(recent.mock.calls.map(([, id]) => id)).toEqual([personal]);
+  expect(threads.get(db, thread.id)?.claudeAccountId).toBe(personal);
+  expect(start.mock.lastCall![0].prompt.split("\n")[0]).toBe("Moved to the Claude account Personal after Work reached its usage limit. Continue where you left off.");
+});
+
+it("leaves a project's threads where they stopped when its own setting is off, or turns off while usage is read, with the app's on", async () => {
+  const [work, personal] = ["Work", "Personal"].map((name) => accounts.add(name).id) as [string, string];
+  const recent = vi.fn(async (_provider: string, id: string | undefined) => (id === personal ? fiveHourReport(10) : signedOut()));
+  const switcher = new ClaudeAccountSwitch({ db, settings: { get: () => ({ claudeAccountAutoSwitch: true }) }, usage: { recent }, runs: service, threads: conversations, log: quiet });
+  turnSettled = (run, scope, _project, outcome) => switcher.settled(run, scope, outcome);
+  onlyUse([work, personal], work, false);
+  const { thread, run } = await conversations.start({ ...input, projectId: project.id });
+  stopAtLimit(start.mock.results[0]!.value, run!.id);
+  await vi.waitFor(() => expect(service.threadSession(thread.id).recovery?.kind).toBe("usage"));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect([recent.mock.calls.length, start.mock.calls.length, threads.get(db, thread.id)?.claudeAccountId]).toEqual([0, 1, work]);
+
+  // On when the limit is reached, off by the time Personal's usage is read: it stays.
+  onlyUse([work, personal], work, true);
+  recent.mockImplementation(async (_provider, id) => {
+    onlyUse([work, personal], work, false);
+    return id === personal ? fiveHourReport(10) : signedOut();
+  });
+  switcher.settled(runs.get(db, run!.id)!, { task: null, thread: threads.get(db, thread.id)! }, { status: "error", snapshotId: null, error: "You've hit your 5-hour limit" });
+  await vi.waitFor(() => expect(recent).toHaveBeenCalledTimes(1));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect([start.mock.calls.length, threads.get(db, thread.id)?.claudeAccountId]).toEqual([1, work]);
+});
+
+it("switches a project that follows the app's accounts by the app's setting, as before", async () => {
+  const [work, personal] = ["Work", "Personal"].map((name) => accounts.add(name).id) as [string, string];
+  const recent = vi.fn(async (_provider: string, id: string | undefined) => (id === personal ? fiveHourReport(10) : signedOut()));
+  const switcher = new ClaudeAccountSwitch({ db, settings: { get: () => ({ claudeAccountAutoSwitch: true }) }, usage: { recent }, runs: service, threads: conversations, log: quiet });
+  turnSettled = (run, scope, _project, outcome) => switcher.settled(run, scope, outcome);
+  // Turned off, the project's own switch no longer counts.
+  projects.updateSettings(db, project.id, { claudeAccounts: { only: false, accountIds: [work], defaultId: work, autoSwitch: false } });
+  const { thread, run } = await conversations.start({ ...input, projectId: project.id, claudeAccountId: work });
+  stopAtLimit(start.mock.results[0]!.value, run!.id);
+  await vi.waitFor(() => expect(threads.get(db, thread.id)?.claudeAccountId).toBe(personal));
+});

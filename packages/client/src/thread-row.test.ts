@@ -17,13 +17,19 @@ describe("pullRequestNumber", () => {
 });
 
 describe("threadMark", () => {
-  it("ranks live activity over session health, health over unread, and unread over a pull request", () => {
+  it("ranks live activity over session health, health over unread, unread over commands left running, and those over a pull request", () => {
     const failed = { status: "error", message: "exit 1" } as const;
     expect(threadMark({ ...resting, activity: "waiting", session: failed, unread: true })).toEqual({ kind: "waiting", label: "Needs you" });
     expect(threadMark({ ...resting, activity: "running", session: failed })).toEqual({ kind: "running", label: "Working" });
     expect(threadMark({ ...resting, session: failed, unread: true })).toEqual({ kind: "failed", label: "Failed: exit 1" });
     expect(threadMark({ ...resting, session: { status: "lost", message: null } })).toEqual({ kind: "failed", label: "Session lost" });
     expect(threadMark({ ...resting, unread: true, prUrl: pr })).toEqual({ kind: "unread", label: "Unread" });
+    const server = { id: "b1", description: "pnpm dev" };
+    expect(threadMark({ ...resting, unread: true, backgroundCommands: [server] })).toEqual({ kind: "unread", label: "Unread" });
+    expect(threadMark({ ...resting, activity: "running", backgroundCommands: [server] })).toEqual({ kind: "running", label: "Working" });
+    expect(threadMark({ ...resting, prUrl: pr, backgroundCommands: [server] })).toEqual({ kind: "background", label: "A background command is running" });
+    expect(threadMark({ ...resting, backgroundCommands: [server, { id: "b2", description: "Metro" }] })).toEqual({ kind: "background", label: "2 background commands are running" });
+    expect(threadMark({ ...resting, backgroundCommands: [] })).toBeNull();
     expect(threadMark({ ...resting, prUrl: pr, prState: "merged" })).toEqual({ kind: "pull", label: "Pull request #482, merged", state: "merged" });
     expect(threadMark({ ...resting, prUrl: pr })).toEqual({ kind: "pull", label: "Pull request #482, open", state: "open" });
     expect(threadMark(resting)).toBeNull();

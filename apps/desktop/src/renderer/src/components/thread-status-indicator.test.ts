@@ -4,7 +4,7 @@ import type { ThreadSummary } from "@openorc/protocol";
 import { describe, expect, it } from "vitest";
 import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
 
-type StatusFields = Pick<ThreadSummary, "activity" | "session" | "unread" | "doneAt">;
+type StatusFields = Pick<ThreadSummary, "activity" | "session" | "unread" | "doneAt" | "backgroundCommands">;
 const idle: StatusFields = {
   activity: "idle",
   session: { status: "idle", message: null },
@@ -42,6 +42,19 @@ describe("sidebar thread status", () => {
     expect(html).toContain('aria-label="Unread"');
     expect(html).toContain('title="Unread"');
     expect(html).not.toContain('data-icon="Check"');
+  });
+
+  it("marks a resting thread whose agent left commands running, such as a dev server", () => {
+    const html = render({
+      backgroundCommands: [
+        { id: "b1", description: "pnpm dev" },
+        { id: "b2", description: "Metro" },
+      ],
+    });
+    expect(html).toContain('aria-label="2 background commands are running"');
+    expect(html).toContain('title="2 background commands are running"');
+    expect(html).toContain('data-icon="Terminal"');
+    expect(render({ backgroundCommands: [{ id: "b1", description: "pnpm dev" }], unread: true })).toContain('aria-label="Unread"');
   });
 
   it.each(["live"] as const)("leaves a read, idle thread without an indicator when its session is %s", (status) => {

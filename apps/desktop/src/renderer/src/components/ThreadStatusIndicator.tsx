@@ -2,9 +2,9 @@ import type { ReactNode } from "react";
 import { threadStatus, type ThreadStatus } from "@openorc/client";
 import type { ThreadSummary } from "@openorc/protocol";
 import { cn } from "../lib/cn";
-import { AlertCircle, CircleHelp, LoaderCircle } from "./icons";
+import { AlertCircle, CircleHelp, LoaderCircle, Terminal } from "./icons";
 
-type StatusFields = Pick<ThreadSummary, "activity" | "session" | "unread" | "doneAt">;
+type StatusFields = Pick<ThreadSummary, "activity" | "session" | "unread" | "doneAt" | "backgroundCommands">;
 
 const indicators: Record<ThreadStatus["kind"], ReactNode> = {
   waiting: <CircleHelp size={14} className="text-attention" />,
@@ -15,12 +15,14 @@ const indicators: Record<ThreadStatus["kind"], ReactNode> = {
   ),
   failed: <AlertCircle size={14} className="text-bad" />,
   unread: <span className="thread-status-dot size-1.75 rounded-full bg-attention" />,
+  background: <Terminal size={14} className="thread-status-spinner" />,
 };
 
 /**
  * A thread's mark in its row's 16px lead, by the shared row rule: an amber question while it needs you, a faint
- * spinner while it works (muted on the open row), red on failure, and a 7px attention dot that settles with one
- * overshoot when a result waits. With nothing to report, `idle` shows.
+ * spinner while it works (muted on the open row), red on failure, a 7px attention dot that settles with one overshoot
+ * when a result waits, and a faint terminal while commands the agent left running go on. With nothing to report,
+ * `idle` shows.
  */
 export function ThreadStatusIndicator({ thread, idle = null, className }: { thread: StatusFields; idle?: ReactNode; className?: string }) {
   const status = threadStatus(thread);

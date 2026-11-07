@@ -1,7 +1,7 @@
 import { WORKSPACE_ID, type PrState, type ThreadSummary } from "@openorc/protocol";
 
 /** What a thread row's lead reports while there is something to say, most urgent first. */
-export type ThreadStatus = { kind: "waiting" | "running" | "failed" | "unread"; label: string };
+export type ThreadStatus = { kind: "waiting" | "running" | "failed" | "unread" | "background"; label: string };
 
 /** A row's lead: its status, else the state of the thread's pull request. */
 export type ThreadMark = ThreadStatus | { kind: "pull"; label: string; state: PrState };
@@ -14,15 +14,20 @@ export function pullRequestNumber(url: string | null): number | null {
   return match ? Number(match[1]) : null;
 }
 
-/** Live activity first, then session health, then an unread result. Null when the thread has nothing to report. */
-export function threadStatus(thread: Pick<ThreadSummary, "activity" | "session" | "unread">): ThreadStatus | null {
+/**
+ * Live activity first, then session health, then an unread result, then commands the agent left running after its
+ * turn, such as a dev server. Null when the thread has nothing to report.
+ */
+export function threadStatus(thread: Pick<ThreadSummary, "activity" | "session" | "unread" | "backgroundCommands">): ThreadStatus | null {
   if (thread.activity === "waiting") return { kind: "waiting", label: "Needs you" };
   if (thread.activity === "running") return { kind: "running", label: "Working" };
   if (thread.session.status === "lost" || thread.session.status === "error") {
     const status = thread.session.status === "lost" ? "Session lost" : "Failed";
     return { kind: "failed", label: thread.session.message ? `${status}: ${thread.session.message}` : status };
   }
-  return thread.unread ? { kind: "unread", label: "Unread" } : null;
+  if (thread.unread) return { kind: "unread", label: "Unread" };
+  const commands = thread.backgroundCommands?.length ?? 0;
+  return commands ? { kind: "background", label: commands === 1 ? "A background command is running" : `${commands} background commands are running` } : null;
 }
 
 /** A resting thread's pull request, if it has one. */
@@ -33,7 +38,7 @@ export function pullRequestMark(thread: Pick<ThreadSummary, "prUrl" | "prState">
   return { kind: "pull", label: `Pull request #${pull}, ${state}`, state };
 }
 
-export function threadMark(thread: Pick<ThreadSummary, "activity" | "session" | "unread" | "prUrl" | "prState">): ThreadMark | null {
+export function threadMark(thread: Pick<ThreadSummary, "activity" | "session" | "unread" | "backgroundCommands" | "prUrl" | "prState">): ThreadMark | null {
   return threadStatus(thread) ?? pullRequestMark(thread);
 }
 

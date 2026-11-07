@@ -39,7 +39,13 @@ export function useSkillCommands(projectId: string | null | undefined, selectedA
         ? []
         : [...(found ?? [])]
             .sort((a, b) => SOURCE_ORDER[a.source] - SOURCE_ORDER[b.source])
-            .map((skill) => ({ name: skill.name, hint: skill.description, insert: true as const, prefix: agent === "codex" ? ("$" as const) : ("/" as const) })),
+            .map((skill) => ({
+              name: skill.name,
+              hint: skill.description,
+              insert: true as const,
+              prefix: agent === "codex" ? ("$" as const) : ("/" as const),
+              ...(skill.aliases?.length ? { aliases: skill.aliases } : {}),
+            })),
     [agent, found],
   );
 }

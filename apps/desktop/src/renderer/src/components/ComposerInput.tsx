@@ -5,6 +5,7 @@ import { cn } from "../lib/cn";
 import { filterMentions, insertMention, mentionQueryAt, type MentionEntry } from "../lib/composer-mentions";
 import { skillSegments } from "../lib/skill-tokens";
 import type { SlashCommand } from "./Composer";
+import { commandRows, matchingCommands, suggestionKey, type SuggestionRow } from "./composer-commands";
 import { ComposerSuggestions } from "./ComposerSuggestions";
 
 interface ComposerInputProps {
@@ -32,14 +33,6 @@ function tokenAtCaret(text: string, caret: number): { start: number; token: stri
   if (!match) return null;
   const token = match[1] ?? "";
   return { start: caret - token.length, token };
-}
-
-function matchingCommands(commands: SlashCommand[] | undefined, query: string | null, prefix: string | undefined, start: number | undefined): SlashCommand[] {
-  if (query === null) return [];
-  // Slash opens the skill picker for either harness; selection still inserts its native prefix.
-  return (commands ?? []).filter(
-    (command) => (command.insert ? prefix === "/" || command.prefix === prefix : prefix === "/" && start === 0) && command.name.toLowerCase().startsWith(query.toLowerCase()),
-  );
 }
 
 function commandQueryAt(token: { token: string } | null, commands: SlashCommand[] | undefined): string | null {
@@ -92,7 +85,7 @@ export function ComposerInput(props: ComposerInputProps) {
     },
     [],
   );
-  const suggestions: { key: string; label: string; hint?: string; mention?: string; insert?: boolean; pick: () => void }[] = useMemo(() => {
+  const suggestions: SuggestionRow[] = useMemo(() => {
     if (memberQuery && memberMatches.length) {
       return memberMatches.map((entry) => ({
         key: `mention:${entry.key}`,
@@ -118,32 +111,19 @@ export function ComposerInput(props: ComposerInputProps) {
         },
       }));
     }
-    return commandMatches.map((command) => ({
-      // A project may have a command named like one of the app's own actions, and both are offered.
-      key: `${command.insert ? `skill:${command.prefix}` : "action:/"}${command.name}`,
-      label: `${command.insert ? command.prefix : "/"}${command.name}`,
-      hint: command.hint,
-      insert: command.insert === true,
-      pick: () => {
-        if (command.insert) {
-          // Preserve the harness's invocation prefix when inserting the skill.
-          if (!token) return;
-          const text = `${command.prefix}${command.name} `;
-          onChange(`${value.slice(0, token.start)}${text}${value.slice(caret)}`);
-          placeCaret(token.start + text.length);
-          return;
-        }
-        onChange("");
-        command.run();
-      },
-    }));
-  }, [memberQuery, memberMatches, mentionQuery, files.data, commandMatches, token, caret, value, onChange, placeCaret]);
+    return commandRows(commandMatches, { query: commandQuery, token, caret, value, onChange, placeCaret });
+  }, [memberQuery, memberMatches, mentionQuery, files.data, commandMatches, commandQuery, token, caret, value, onChange, placeCaret]);
   // Only a name this project actually has is a token, which is why the set
   // comes from the same commands the popover offers rather than from a shape.
-  const skillNames = useMemo(() => new Set((commands ?? []).filter((command) => command.insert).map((command) => command.name)), [commands]);
+  const skillNames = useMemo(() => new Set((commands ?? []).flatMap((command) => (command.insert ? [command.name, ...(command.aliases ?? [])] : []))), [commands]);
   const skillPrefix = commands?.find((command) => command.insert)?.prefix ?? "/";
   const skillSpans = useMemo(() => skillSegments(value, skillNames, skillPrefix), [value, skillNames, skillPrefix]);
-  useEffect(() => setCursor(0), [suggestions.length, memberQuery?.query, mentionQuery, commandQuery]);
+  // Whether the arrow keys chose the row, which is what lets Enter pick one in the middle of a message.
+  const [chosen, setChosen] = useState(false);
+  useEffect(() => {
+    setCursor(0);
+    setChosen(false);
+  }, [suggestions.length, memberQuery?.query, mentionQuery, commandQuery]);
   const memberList = suggestions.length > 0 && Boolean(suggestions[0]?.mention);
   const suggestionsOpen = suggestionsActive && suggestions.length > 0;
 
@@ -219,28 +199,21 @@ export function ComposerInput(props: ComposerInputProps) {
             }
           }}
           onKeyDown={(e) => {
-            if (suggestionsOpen) {
-              if (e.key === "ArrowDown") {
-                e.preventDefault();
-                setCursor((current) => Math.min(suggestions.length - 1, current + 1));
-                return;
-              }
-              if (e.key === "ArrowUp") {
-                e.preventDefault();
-                setCursor((current) => Math.max(0, current - 1));
-                return;
-              }
-              if (e.key === "Enter" || e.key === "Tab") {
-                e.preventDefault();
-                suggestions[cursor]?.pick();
-                return;
-              }
-              if (e.key === "Escape") {
-                e.preventDefault();
-                onChange(value.slice(0, memberQuery?.start ?? token?.start ?? 0) + value.slice(caret));
-                return;
-              }
+            const endsMessage = (token?.start ?? 0) > 0 && value.slice(caret).trim() === "";
+            const action = suggestionsOpen ? suggestionKey({ ...e, isComposing: e.nativeEvent.isComposing }, suggestions[cursor], { chosen, endsMessage }) : "pass";
+            if (action === "down" || action === "up") {
+              e.preventDefault();
+              setChosen(true);
+              setCursor((current) => (action === "down" ? Math.min(suggestions.length - 1, current + 1) : Math.max(0, current - 1)));
+              return;
             }
+            if (action === "pick" || action === "close") {
+              e.preventDefault();
+              if (action === "pick") suggestions[cursor]?.pick();
+              else setSuggestionsActive(false);
+              return;
+            }
+            if (action === "send") setSuggestionsActive(false);
             if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
               onSubmit(e.metaKey || e.ctrlKey);

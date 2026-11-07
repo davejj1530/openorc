@@ -114,6 +114,75 @@ describe("slash suggestions", () => {
     }
   });
 
+  describe("Enter, Esc and what a name typed in full means", () => {
+    const skill = (name: string, aliases?: string[]): NonNullable<ComposerProps["commands"]>[number] => ({ name, hint: "A skill", insert: true, prefix: "/", ...(aliases ? { aliases } : {}) });
+    const offered = () => screen.queryAllByRole("option").map((option) => option.querySelector(".composer-suggestion-label")?.textContent);
+
+    it("sends a name typed in full as it is, so a plugin's or a longer name never takes its place", async () => {
+      const onSubmit = vi.fn(async () => {});
+      mount({ commands: [skill("code-review:code-review"), skill("review-strict"), skill("code-review", ["review"])], value: "/code-review", onSubmit });
+      selectAt("/code-review".length);
+      expect(offered()).toEqual(["/code-review", "/code-review:code-review"]);
+      fireEvent.change(message(), { target: { value: "/review", selectionStart: 7 } });
+      expect(offered()?.[0]).toBe("/code-review");
+      fireEvent.change(message(), { target: { value: "/code-review", selectionStart: 12 } });
+      fireEvent.keyDown(message(), { key: "Enter" });
+      await waitFor(() => expect(onSubmit).toHaveBeenCalledWith("/code-review", [], false));
+    });
+
+    it("finds a plugin's command by the name after its colon and by its short name", () => {
+      mount({ commands: [skill("pstack:how", ["how"]), skill("pstack:why", ["why"])], value: "/ho" });
+      selectAt(3);
+      expect(offered()).toEqual(["/pstack:how"]);
+    });
+
+    it("sends a path that ends the message as it is", async () => {
+      const onSubmit = vi.fn(async () => {});
+      mount({ commands: [skill("test-all")], value: "see /test", onSubmit });
+      selectAt("see /test".length);
+      fireEvent.keyDown(message(), { key: "Enter" });
+      await waitFor(() => expect(onSubmit).toHaveBeenCalledWith("see /test", [], false));
+    });
+
+    it("picks a row at the end of a message once the arrow keys chose it", () => {
+      const onSubmit = vi.fn(async () => {});
+      mount({ commands: [skill("test-all")], value: "see /test", onSubmit });
+      selectAt("see /test".length);
+      fireEvent.keyDown(message(), { key: "ArrowDown" });
+      fireEvent.keyDown(message(), { key: "Enter" });
+      expect(message().value).toBe("see /test-all ");
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it("closes the list on Esc and keeps what was typed", () => {
+      mount({ commands: [skill("test-all")], value: "look at /te" });
+      selectAt("look at /te".length);
+      fireEvent.keyDown(message(), { key: "Escape" });
+      expect(message().value).toBe("look at /te");
+      expect(screen.queryByRole("listbox")).toBeNull();
+    });
+
+    it("runs an action and keeps the rest of the draft for the next message", () => {
+      const run = vi.fn();
+      mount({ commands: [{ name: "compact", hint: "Summarize", run }], value: "/comp keep this long draft" });
+      selectAt(5);
+      fireEvent.keyDown(message(), { key: "Enter" });
+      expect(run).toHaveBeenCalledOnce();
+      expect(message().value).toBe("keep this long draft");
+    });
+
+    it("leaves Shift+Enter and Cmd+Enter their own meaning while the list is open", async () => {
+      const onSubmit = vi.fn(async () => {});
+      mount({ commands: [skill("test-all")], value: "/te", onSubmit });
+      selectAt(3);
+      expect(fireEvent.keyDown(message(), { key: "Enter", shiftKey: true })).toBe(true);
+      expect(message().value).toBe("/te");
+      expect(onSubmit).not.toHaveBeenCalled();
+      fireEvent.keyDown(message(), { key: "Enter", metaKey: true });
+      await waitFor(() => expect(onSubmit).toHaveBeenCalledWith("/te", [], true));
+    });
+  });
+
   it("updates action availability when the caret moves between identical slash queries", () => {
     mount({ commands, value: "/ /" });
     selectAt(1);
@@ -135,7 +204,7 @@ describe("slash suggestions", () => {
       fireEvent.mouseDown(option);
       fireEvent.mouseUp(message());
     } else fireEvent.keyDown(message(), { key: method });
-    expect(message().value).toBe("please /code-review  afterward");
+    expect(message().value).toBe("please /code-review afterward");
     expect(container.querySelector(".composer-input-mirror mark")?.textContent).toBe("/code-review");
     await waitFor(() => {
       expect(message().selectionStart).toBe("please /code-review ".length);
@@ -187,7 +256,7 @@ describe("slash suggestions", () => {
     fireEvent.change(message(), { target: { value: "Please /co afterward", selectionStart: "Please /co".length } });
     if (method === "mouse") fireEvent.mouseDown(screen.getByRole("option", { name: "$code-review Review code" }));
     else fireEvent.keyDown(message(), { key: method });
-    expect(message().value).toBe("Please $code-review  afterward");
+    expect(message().value).toBe("Please $code-review afterward");
     expect(container.querySelector(".composer-input-mirror mark")?.textContent).toBe("$code-review");
     await waitFor(() => expect(message().selectionStart).toBe("Please $code-review ".length));
     expect(onSubmit).not.toHaveBeenCalled();

@@ -66,6 +66,32 @@ export function seed(request: SeedRequest): { seeded: true } {
   return { seeded: true };
 }
 
+export interface SeedOverRequest {
+  repo: string;
+  branch: string;
+  /** The commit the new workspace starts at. */
+  commit: string;
+  /** Brings the commits the base lacks, under `ref`; none when it has the commit already. */
+  bundle?: string;
+  ref?: string;
+  origin?: string;
+}
+
+const START_REF = "refs/openorc/sync/start";
+
+/**
+ * Moves a base's checkout to the commit a new workspace starts at, on its own branch. What the base's setup left in
+ * files Git ignores, such as installed dependencies, stays; tracked files become the commit's exactly.
+ */
+export function seedOver(request: SeedOverRequest): { seeded: true } {
+  const { repo, branch, commit, bundle, ref, origin } = request;
+  if (bundle && ref) git(repo, ["fetch", "-q", bundle, `${ref}:${START_REF}`]);
+  git(repo, ["checkout", "-q", "-f", "-B", branch, commit]);
+  if (bundle && ref) git(repo, ["update-ref", "-d", START_REF]);
+  if (origin) git(repo, git(repo, ["remote"]).split("\n").includes("origin") ? ["remote", "set-url", "origin", origin] : ["remote", "add", "origin", origin]);
+  return { seeded: true };
+}
+
 export interface SnapshotResult {
   snapshot: string;
   tree: string;

@@ -183,3 +183,18 @@ describe("RunnerClient", () => {
     }
   });
 });
+
+describe("installing the runner", () => {
+  it("writes its files only when the sandbox does not hold this runner already, as one made from a base does", async () => {
+    const writes: string[] = [];
+    const counted = new Proxy(sandbox, {
+      get: (target, key) => (key === "writeFile" ? (file: string, bytes: Buffer) => (writes.push(file), target.writeFile(file, bytes)) : Reflect.get(target, key, target)),
+    });
+    await installRunner(counted, runnerFiles());
+    expect(writes).toEqual([]);
+    const changed = runnerFiles().map((file, index) => (index === 0 ? { ...file, content: Buffer.concat([file.content, Buffer.from("\n")]) } : file));
+    await installRunner(counted, changed);
+    expect(writes).toHaveLength(changed.length + 2);
+    expect(writes.at(-1)).toMatch(/\.installed$/);
+  });
+});

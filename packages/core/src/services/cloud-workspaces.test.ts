@@ -252,6 +252,25 @@ describe("an agent in a sandbox for a turn", () => {
     expect(await cloud.turnEnv({ agent: "opencode", model: "opencode/free" }, location, "vercel")).toEqual({ XDG_DATA_HOME: path.join(state, "opencode") });
   });
 
+  it("asks a sandbox for its agent's version once, and again only when this host's version changes", async () => {
+    const runs: string[] = [];
+    const sandbox = {
+      exec: async (cmd: string) => {
+        runs.push(cmd);
+        return cmd === "sh" ? { code: 0, stdout: Buffer.from("opencode v2.0.10\n"), stderr: "" } : { code: 0, stdout: Buffer.alloc(0), stderr: "" };
+      },
+    };
+    const location = { install: { sandbox, state: "/sandbox/.openorc" }, repo: "/sandbox/repo" } as never;
+    let version = "2.0.10";
+    const cloud = new CloudWorkspaceService(db, { providers: [sandboxes], versions: async () => version }, quiet);
+    await cloud.turnEnv({ agent: "opencode", model: "opencode/free" }, location, "vercel");
+    await cloud.turnEnv({ agent: "opencode", model: "opencode/free" }, location, "vercel");
+    expect(runs.filter((cmd) => cmd === "sh")).toHaveLength(1);
+    version = "2.0.11";
+    await cloud.turnEnv({ agent: "opencode", model: "opencode/free" }, location, "vercel");
+    expect(runs.filter((cmd) => cmd === "npm")).toHaveLength(1);
+  });
+
   describe("with its sign-in kept outside the sandbox", () => {
     const keys = { load: async () => JSON.stringify({ openrouter: { key: "sk-or-real", createdAt: 1 } }), save: async () => undefined };
     const agents = cloudAgents({ claude: SANDBOX_OWN, codex: new CodexCloudSignIn(undefined), opencode: new OpenCodeCloudSignIn(new OpenCodeCloudKeys(keys)) });

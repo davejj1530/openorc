@@ -17,6 +17,7 @@ import { Button, TextButton } from "../components/ui";
 import { ClaudeAccountScope } from "../lib/claude-account";
 import { usePermissionSelection, useRpc, useRpcMutation } from "../lib/client";
 import { useNewThreadCloud, type NewThreadCloud } from "../lib/cloud-offered";
+import { useCloudWarm } from "../lib/cloud-warm";
 import { usePublishComposerAccount } from "../lib/composer-account";
 import { useComposerChanges } from "../lib/composer-changes";
 import { useDefaultHarness } from "../lib/default-harness";
@@ -145,6 +146,7 @@ function NewThreadProject({
   const cloud = useNewThreadCloud(target, projectId);
   const workspaceMode = newThreadWorkspaceMode({ canBranch: !isWorkspace && !git.cannotBranch, canCloud: cloud.can, chosen: draft.workspace, preferred: settings.data?.defaultWorkspaceMode });
   const signIn = useCloudSignInGate(newCloudTurn(workspaceMode, choice, claudeAccountId, cloud));
+  useCloudWarm(workspaceMode === "cloud" && cloud.can ? projectId : null, choice?.agent, draft.prompt);
 
   useEffect(() => {
     if (target.kind !== "model" || target.choice || !models.data || !info.data || defaultHarness === undefined) return;
@@ -172,7 +174,6 @@ function NewThreadProject({
   const disabledReason = usesClaude && !accounts.data ? (accounts.error?.message ?? "Loading Claude accounts…") : targetDisabledReason;
   const location = useNewThreadLocation(projectId, selected, workspaceMode, draft.workingDirectory);
   const chooseModel = (model: ModelChoice) => changeDraft({ target: { kind: "model", choice: model } });
-  const changeSettings = chooseModel;
   const retry = () => {
     void accounts.refetch();
     void models.refetch();
@@ -238,12 +239,12 @@ function NewThreadProject({
                     size="lg"
                     presentation="new-thread"
                     model={choice}
-                    onModel={changeSettings}
+                    onModel={chooseModel}
                     modelControl={
                       target.kind === "unavailable" ? (
                         <ModelPicker value={null} onChange={chooseModel} orclings={isWorkspace ? undefined : pickerOrclings} disabled={start.isPending} />
                       ) : (
-                        <ComposerModelPicker value={choice} onChange={changeSettings} onSelectModel={chooseModel} orclings={isWorkspace ? undefined : pickerOrclings} disabled={start.isPending} />
+                        <ComposerModelPicker value={choice} onChange={chooseModel} onSelectModel={chooseModel} orclings={isWorkspace ? undefined : pickerOrclings} disabled={start.isPending} />
                       )
                     }
                     mode={draft.mode}

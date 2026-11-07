@@ -621,7 +621,7 @@ export class OpenOrc {
         invalidate,
         removed: (linkKey) => this.brainRemoved(linkKey),
       }),
-      createCloudCarryHandlers({ db: this.db, env: this.cloudParts.env, skills: this.cloudParts.skills }),
+      createCloudCarryHandlers({ db: this.db, env: this.cloudParts.env, skills: this.cloudParts.skills, cloud: this.cloudParts.cloud }),
       createClaudeAccountHandlers(this.claudeAccounts),
       createBrainSyncHandlers({ db: this.db, memory: this.memory, textGeneration: this.textGeneration, cloudOnly: this.options.cloudOnly ?? false, invalidate }),
       createSystemHandlers({

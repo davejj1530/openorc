@@ -53,6 +53,11 @@ export const cloudCarryRpcParams = {
     .strict(),
   /** What the project's .env files hold, to fill its cloud environment from. Saves nothing. */
   "cloud.env.fromFile": z.object({ projectId: ProjectId }).strict(),
+  /**
+   * A new cloud conversation's first message is being written in the project: a sandbox gets ready for it ahead, with
+   * `agent`. Asked again while typing goes on, it keeps the one made waiting.
+   */
+  "cloud.warm": z.object({ projectId: ProjectId, agent: HarnessId }).strict(),
   /** The branch and commit a copy of the project on the cloud brain would take now. */
   "cloud.brain.copy": z.object({ projectId: ProjectId }).strict(),
 };
@@ -64,4 +69,5 @@ export interface CloudCarryRpcResults {
   "cloud.env.set": CloudEnv;
   "cloud.env.fromFile": CloudEnvFile;
   "cloud.brain.copy": CloudBrainCopy;
+  "cloud.warm": null;
 }

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,11 +34,23 @@ export function runnerFiles(): RunnerFile[] {
     .map((name) => ({ name, content: readFileSync(path.join(dir, name)) }));
 }
 
+/**
+ * Puts the runner in the sandbox, unless it holds this one already, as a sandbox made from a base or opened again does:
+ * a marker names what is there, written last so an install cut short is done again.
+ */
 export async function installRunner(sandbox: Sandbox, files: RunnerFile[], node = "node"): Promise<RunnerInstall> {
   const state = path.posix.join(sandbox.root, ".openorc");
   const dir = path.posix.join(state, "runner");
-  for (const file of files) await sandbox.writeFile(path.posix.join(dir, file.name), file.content);
-  await sandbox.writeFile(path.posix.join(dir, "package.json"), Buffer.from(`{"type":"module"}\n`));
+  const hash = createHash("sha256");
+  for (const file of [...files].sort((a, b) => (a.name < b.name ? -1 : 1))) hash.update(`${file.name}\0`).update(file.content).update("\0");
+  const digest = hash.digest("hex");
+  const marker = path.posix.join(dir, ".installed");
+  const installed = (await sandbox.readFile(marker).catch(() => null))?.toString("utf8");
+  if (installed !== digest) {
+    for (const file of files) await sandbox.writeFile(path.posix.join(dir, file.name), file.content);
+    await sandbox.writeFile(path.posix.join(dir, "package.json"), Buffer.from(`{"type":"module"}\n`));
+    await sandbox.writeFile(marker, Buffer.from(digest));
+  }
   return { sandbox, node, script: path.posix.join(dir, "runner.ts"), state };
 }
 

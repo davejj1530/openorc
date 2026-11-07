@@ -1,8 +1,20 @@
 import { spawn, type ChildProcess, type StdioOptions } from "node:child_process";
 import { once } from "node:events";
-import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { cp, mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { SANDBOX_AWAY_MS, type Sandbox, type SandboxCommandOptions, type SandboxExecResult, type SandboxInfo, type SandboxProvider, type SandboxStream } from "./sandbox.js";
+import {
+  BASE_PREFIX,
+  SANDBOX_AWAY_MS,
+  type Sandbox,
+  type SandboxBases,
+  type SandboxCommandOptions,
+  type SandboxExecResult,
+  type SandboxInfo,
+  type SandboxNeeds,
+  type SandboxProvider,
+  type SandboxStream,
+} from "./sandbox.js";
 
 function signalGroup(child: ChildProcess, signal: NodeJS.Signals): void {
   if (!child.pid) return;
@@ -148,10 +160,11 @@ export class LocalSandboxProvider implements SandboxProvider {
     await Promise.all([...this.sandboxes.values()].map((sandbox) => sandbox.stop()));
   }
 
-  async open(name: string): Promise<LocalSandbox> {
+  async open(name: string, needs: SandboxNeeds = {}): Promise<LocalSandbox> {
     const existing = this.sandboxes.get(name);
     if (existing) return existing;
     const root = path.join(this.base, name);
+    if (needs.from && !(await stat(root).catch(() => null))) await cp(this.baseDir(needs.from), root, { recursive: true });
     await mkdir(root, { recursive: true });
     const sandbox = new LocalSandbox(name, root, this.env, this.awayMs);
     this.sandboxes.set(name, sandbox);
@@ -160,7 +173,8 @@ export class LocalSandboxProvider implements SandboxProvider {
 
   /** Its sandboxes' folders; how long each ran is known only for this app's lifetime, and a simulated one costs nothing. */
   async list(): Promise<SandboxInfo[]> {
-    const names = await readdir(this.base).catch(() => [] as string[]);
+    // Bases, and a sandbox being made into one, belong to no conversation.
+    const names = (await readdir(this.base).catch(() => [] as string[])).filter((name) => !name.startsWith(".") && !name.startsWith(BASE_PREFIX));
     return Promise.all(
       names.map(async (name) => {
         const awake = this.sandboxes.get(name)?.awake() ?? { since: null, ms: 0 };
@@ -184,4 +198,24 @@ export class LocalSandboxProvider implements SandboxProvider {
     this.sandboxes.delete(name);
     await rm(path.join(this.base, name), { recursive: true, force: true });
   }
+
+  private baseDir(id: string): string {
+    return path.join(this.base, ".bases", id);
+  }
+
+  /** A base is the sandbox's folder, kept aside; a sandbox made from it starts with a copy. */
+  readonly bases: SandboxBases = {
+    save: async (sandbox) => {
+      if (!(sandbox instanceof LocalSandbox)) throw new Error("Only a sandbox this service made can become its base.");
+      await sandbox.stop();
+      this.sandboxes.delete(sandbox.name);
+      const id = randomUUID();
+      await mkdir(path.join(this.base, ".bases"), { recursive: true });
+      await rename(sandbox.root, this.baseDir(id));
+      return id;
+    },
+    remove: async (id) => {
+      await rm(this.baseDir(id), { recursive: true, force: true });
+    },
+  };
 }

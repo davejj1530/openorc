@@ -78,6 +78,7 @@ function fakeVm(answer: (run: Run) => FakeCommand, files: Record<string, Buffer>
     update: async ({ networkPolicy }) => {
       policies.push(networkPolicy);
     },
+    snapshot: async () => ({ snapshotId: "snap_base" }),
     expiresAt: undefined,
     async extendTimeout(duration) {
       extended.push(duration);
@@ -102,6 +103,20 @@ const finished = (code: number, output: { stdout?: string; stderr?: string } = {
 };
 
 describe("a sandbox on Vercel", () => {
+  it("drops input for a command that has exited instead of throwing from a stream nobody listens to", async () => {
+    const command = new FakeCommand();
+    command.writeStdin = async () => Promise.reject(new Error("Not found: command not found or has exited"));
+    command.closeStdin = async () => Promise.reject(new Error("Not found: command not found or has exited"));
+    const stream = await new VercelSandbox("s", fakeVm(() => command)).stream("node", ["runner.ts", "bridge"]);
+    const errors: unknown[] = [];
+    process.once("uncaughtException", (error) => errors.push(error));
+    stream.input.write("frame\n");
+    await new Promise<void>((resolve) => stream.input.end(resolve));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(errors).toEqual([]);
+    expect(stream.input.errored).toBeNull();
+  });
+
   it("streams a command's input in order and its stdout out, and ends when it exits", async () => {
     const command = new FakeCommand();
     const vm = fakeVm(() => command);
@@ -217,6 +232,7 @@ describe("the Vercel sandbox provider", () => {
     const prefixes: string[] = [];
     const fake: VercelApi = {
       remove: async ({ name }) => void removed.push(name),
+      removeSnapshot: async () => undefined,
       list: async ({ prefix }) => {
         prefixes.push(prefix);
         return listed;
@@ -297,6 +313,28 @@ describe("the Vercel sandbox provider", () => {
       costUsd: expect.closeTo(0.1 * 0.128 + 16 * 0.0212, 6),
     });
     expect(sandboxes[1]).toMatchObject({ state: "stopping", awakeSince: null, awakeMs: 0, costUsd: 0 });
+  });
+
+  it("makes a new sandbox from a base's snapshot, and saves a base as a snapshot that outlives the sandbox that made it", async () => {
+    const { fake, calls, vm } = api(() => true, [{ name: "openorc-base-1", status: "running", createdAt: 1 }, { name: "openorc-a", status: "running", createdAt: 1 }]);
+    const removals: unknown[] = [];
+    const snapshots: unknown[] = [];
+    fake.remove = async (params) => void removals.push(params);
+    fake.removeSnapshot = async (params) => void removals.push(params);
+    vm.snapshot = async (opts) => (snapshots.push(opts), { snapshotId: "snap_base" });
+    const provider = new VercelSandboxProvider({ ...settings, api: fake });
+    await provider.open("openorc-a", { from: "snap_base" });
+    expect(calls[0]).toMatchObject({ name: "openorc-a", persistent: true, source: { type: "snapshot", snapshotId: "snap_base" } });
+    await provider.open("openorc-b");
+    expect(calls[1]).not.toHaveProperty("source");
+
+    const made = await provider.open("openorc-base-1");
+    expect(await provider.bases.save(made)).toBe("snap_base");
+    expect(snapshots).toEqual([{ expiration: 14 * 24 * 60 * 60 * 1000 }]);
+    expect(removals).toEqual([{ name: "openorc-base-1", token: "tok", teamId: "team", projectId: "proj", keepSnapshots: true }]);
+    await provider.bases.remove("snap_base");
+    expect(removals.at(-1)).toEqual({ snapshotId: "snap_base", token: "tok", teamId: "team", projectId: "proj" });
+    expect((await provider.list()).map((each) => each.name)).toEqual(["openorc-a"]);
   });
 
   it("deletes a sandbox with the account's credentials", async () => {

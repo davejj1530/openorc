@@ -13,6 +13,9 @@ export function assertTaskNotMoving(db: Db, task: Pick<Task, "threadId" | "execu
   if (owner) assertNotMoving(db, owner);
 }
 
+/** Routes that name no thread a move could have frozen: this host's own, and readying or starting a new one. */
+const UNFENCED: ReadonlySet<string> = new Set(["here", "start", "ahead"]);
+
 /** Marking a thread seen changes nothing a move carries, so a moving thread is read as before. */
 const marksSeen = (method: RpcMethod, params: Record<string, unknown>) => method === "threads.update" && Object.keys((params["patch"] as object | undefined) ?? {}).every((key) => key === "seen");
 
@@ -22,7 +25,7 @@ const marksSeen = (method: RpcMethod, params: Record<string, unknown>) => method
  */
 export function assertRouteNotMoving(db: Db, method: RpcMethod, params: Record<string, unknown>): void {
   const route = ownerRoute(method);
-  if (!route || route.by === "here" || route.by === "start" || ROUTED_READS.has(method) || marksSeen(method, params)) return;
+  if (!route || UNFENCED.has(route.by) || ROUTED_READS.has(method) || marksSeen(method, params)) return;
   const name = (key: string) => (typeof params[key] === "string" ? (params[key] as string) : null);
   const threadId = name("threadId") ?? (method.startsWith("threads.") ? name("id") : null);
   if (threadId) assertNotMoving(db, threadId);

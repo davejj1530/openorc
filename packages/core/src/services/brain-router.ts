@@ -181,16 +181,22 @@ export class BrainRouter {
       case "task":
         return this.task(request, method, params, route.task(params));
       case "run":
-        // A run's reads follow its thread's, which wake the brain when a person opens it; they wait for that wake.
-        return runs.get(this.deps.db, route.run(params)) ? this.deps.local(request) : this.forward(request, method, params, this.wakes(request, method, false), true);
+        return this.ofRun(request, method, params, route.run(params));
       case "owner":
       case "owner-only":
         return this.owned(request, method, params, route.thread(params), route.by === "owner-only" ? route.words : null);
       case "start":
         return this.start(request, params, route.cloud(params));
+      case "ahead":
+        return this.ahead(request, method, params, route.cloud(params));
       default:
         return this.deps.local(request);
     }
+  }
+
+  /** A run's reads follow its thread's, which wake the brain when a person opens it; they wait for that wake. */
+  private ofRun(request: RpcRequest, method: RpcMethod, params: Record<string, unknown>, id: string): Promise<RpcReply> {
+    return runs.get(this.deps.db, id) ? this.deps.local(request) : this.forward(request, method, params, this.wakes(request, method, false), true);
   }
 
   /** A call about one thread: this Mac's own answers it; a cloud thread's goes to the brain, unless only its owner may. */
@@ -256,6 +262,12 @@ export class BrainRouter {
     if (!(await this.deps.mapping()).toCloud(project)) return error(request.id, NOT_ON_BRAIN);
     const place = { provider: (await this.deps.service()) ?? "vercel", setup: Boolean(projects.get(this.deps.db, project)?.settings.setupScript) };
     return { type: "rpc.result", id: request.id, result: { thread: this.starts.begin(params as RpcParams<"threads.start">, place), run: null } };
+  }
+
+  /** Readies the brain for a new cloud thread in a project it has a copy of, waking it while the first message is written. */
+  private async ahead(request: RpcRequest, method: RpcMethod, params: Record<string, unknown>, project: string | undefined): Promise<RpcReply> {
+    if (!project || !(await this.deps.mapping()).toCloud(project)) return this.deps.local(request);
+    return this.forward(request, method, params, true, true);
   }
 
   /**

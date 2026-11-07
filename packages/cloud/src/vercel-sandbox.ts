@@ -1,21 +1,26 @@
 import { PassThrough, Writable } from "node:stream";
-import { APIError, Sandbox as SdkSandbox, type NetworkPolicy, type NetworkPolicyRule } from "@vercel/sandbox";
+import { APIError, Sandbox as SdkSandbox, Snapshot as SdkSnapshot, type NetworkPolicy, type NetworkPolicyRule } from "@vercel/sandbox";
 import { ensureDocker } from "./docker.js";
 import {
   BrokeringUnavailable,
   SANDBOX_AWAY_MS,
   SANDBOX_PREFIX,
+  BASE_PREFIX,
   type BrokeredHeader,
   type Sandbox,
+  type SandboxBases,
   type SandboxCommandOptions,
   type SandboxExecResult,
   type SandboxInfo,
+  type SandboxNeeds,
   type SandboxProvider,
   type SandboxStream,
 } from "./sandbox.js";
 
 /** After the command exits, how long its remaining output gets to arrive before the stream ends anyway. */
 const LOG_DRAIN_MS = 2000;
+/** How long a base's snapshot lasts unless replaced sooner. */
+const BASE_EXPIRATION_MS = 14 * 24 * 60 * 60 * 1000;
 
 export interface VercelCredentials {
   token: string;
@@ -98,6 +103,8 @@ export interface VercelVm {
   readonly expiresAt: Date | undefined;
   /** Moves the running session's timeout later by `duration`, up to the plan's longest session. */
   extendTimeout(duration: number): Promise<void>;
+  /** Saves the files for new sandboxes to start from; the sandbox stops. An expiration of 0 keeps it for good. */
+  snapshot(opts: { expiration: number }): Promise<{ snapshotId: string }>;
   /** Replaces the sandbox's network policy, on the running session first, then for later ones. */
   update(params: { networkPolicy: NetworkPolicy }): Promise<unknown>;
   stop(): Promise<unknown>;
@@ -110,28 +117,41 @@ export interface VercelOpenParams extends VercelCredentials {
   resources?: { vcpus: number };
   region?: string;
   env?: Record<string, string>;
+  /** Where a sandbox being made starts: a base's snapshot. One that exists keeps its own files. */
+  source?: { type: "snapshot"; snapshotId: string };
 }
 
 /** How the provider reaches Vercel. Tests pass a stand-in; the app passes the SDK. */
 export interface VercelApi {
   getOrCreate(params: VercelOpenParams): Promise<VercelVm>;
-  /** Deletes the sandbox, its files and the snapshots only it used. */
-  remove(params: VercelCredentials & { name: string }): Promise<void>;
+  /** Deletes the sandbox, its files and, unless `keepSnapshots`, the snapshots only it used. */
+  remove(params: VercelCredentials & { name: string; keepSnapshots?: boolean }): Promise<void>;
+  /** Deletes a snapshot; one already gone changes nothing. */
+  removeSnapshot(params: VercelCredentials & { snapshotId: string }): Promise<void>;
   /** The project's sandboxes whose names start with `prefix`. */
   list(params: VercelCredentials & { prefix: string }): Promise<VercelListed[]>;
 }
 
 const sdk: VercelApi = {
-  getOrCreate: async (params) => {
-    const vm: VercelVm = await SdkSandbox.getOrCreate({ ...params, onCreate: async () => undefined });
+  getOrCreate: async ({ source, ...params }) => {
+    const onCreate = async () => undefined;
+    const vm: VercelVm = source ? await SdkSandbox.getOrCreate({ ...params, source, onCreate }) : await SdkSandbox.getOrCreate({ ...params, onCreate });
     return vm;
   },
-  remove: async ({ name, token, teamId, projectId }) => {
+  remove: async ({ name, token, teamId, projectId, keepSnapshots }) => {
     try {
       const sandbox = await SdkSandbox.get({ name, token, teamId, projectId });
-      await sandbox.delete({ deleteOrphanSnapshots: true });
+      await sandbox.delete({ deleteOrphanSnapshots: !keepSnapshots });
     } catch (error) {
       // Already gone, or never made: either way there is nothing left to delete.
+      if (error instanceof APIError && error.response.status === 404) return;
+      throw error;
+    }
+  },
+  removeSnapshot: async ({ snapshotId, token, teamId, projectId }) => {
+    try {
+      await (await SdkSnapshot.get({ snapshotId, token, teamId, projectId })).delete();
+    } catch (error) {
       if (error instanceof APIError && error.response.status === 404) return;
       throw error;
     }
@@ -178,7 +198,7 @@ export class VercelSandbox implements Sandbox {
 
   constructor(
     readonly name: string,
-    private readonly vm: VercelVm,
+    readonly vm: VercelVm,
   ) {
     this.root = vm.cwd;
   }
@@ -203,10 +223,12 @@ export class VercelSandbox implements Sandbox {
       .then(() => {
         output.end();
       });
-    // Writable calls write once at a time, so input reaches the command in order.
+    // Writable calls write once at a time, so input reaches the command in order. Input for a command that has exited
+    // has nowhere to go, as on Agent37: failing the write would throw from a stream nobody listens to, and the runner
+    // sends again what its command never acknowledged once it connects again.
     const input = new Writable({
-      write: (chunk: Buffer, _encoding, done) => void command.writeStdin(chunk).then(() => done(), done),
-      final: (done) => void command.closeStdin().then(() => done(), done),
+      write: (chunk: Buffer, _encoding, done) => void command.writeStdin(chunk).then(() => done(), () => done()),
+      final: (done) => void command.closeStdin().then(() => done(), () => done()),
     });
     return { input, output, ended, close: () => void command.kill("SIGKILL").catch(() => undefined) };
   }
@@ -273,14 +295,16 @@ export class VercelSandboxProvider implements SandboxProvider {
     const access = await this.options.credentials();
     if (!access) return [];
     const { token, teamId, projectId } = access;
-    return (await this.api.list({ token, teamId, projectId, prefix: SANDBOX_PREFIX })).map(info);
+    // A base being made belongs to no conversation and goes once saved.
+    return (await this.api.list({ token, teamId, projectId, prefix: SANDBOX_PREFIX })).filter((listed) => !listed.name.startsWith(BASE_PREFIX)).map(info);
   }
 
-  async open(name: string): Promise<VercelSandbox> {
+  async open(name: string, needs: SandboxNeeds = {}): Promise<VercelSandbox> {
     const access = await this.access();
     const vm = await this.api.getOrCreate({
       name,
       persistent: true,
+      ...(needs.from ? { source: { type: "snapshot" as const, snapshotId: needs.from } } : {}),
       // Apply when the sandbox is made; one that exists keeps the size and region it was made with.
       ...(access.vcpus ? { resources: { vcpus: access.vcpus } } : {}),
       ...(access.region ? { region: access.region } : {}),
@@ -295,4 +319,22 @@ export class VercelSandboxProvider implements SandboxProvider {
 
   /** VMs keep running when OpenOrc closes and sleep on their own. */
   async close(): Promise<void> {}
+
+  /**
+   * A base is a snapshot: the VM that made it is deleted once it is saved, and the snapshot kept. It lasts a fortnight
+   * unless OpenOrc replaces it sooner, so one a project no longer uses goes on its own.
+   */
+  readonly bases: SandboxBases = {
+    save: async (sandbox) => {
+      if (!(sandbox instanceof VercelSandbox)) throw new Error("Only a sandbox this service made can become its base.");
+      const { snapshotId } = await sandbox.vm.snapshot({ expiration: BASE_EXPIRATION_MS });
+      const { token, teamId, projectId } = await this.access();
+      await this.api.remove({ name: sandbox.name, token, teamId, projectId, keepSnapshots: true });
+      return snapshotId;
+    },
+    remove: async (snapshotId) => {
+      const { token, teamId, projectId } = await this.access();
+      await this.api.removeSnapshot({ snapshotId, token, teamId, projectId });
+    },
+  };
 }

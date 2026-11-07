@@ -1,4 +1,4 @@
-import type { Agent37Connection, AgentVersions, VercelConnection } from "@openorc/cloud";
+import { runnerFiles, type Agent37Connection, type AgentVersions, type SandboxProvider, type VercelConnection } from "@openorc/cloud";
 import type { CloudService, HarnessId } from "@openorc/protocol";
 import { claudeAccounts, projects, type Db, type LedgerWriter } from "@openorc/db";
 import type { OpenOrcOptions } from "../options.js";
@@ -20,6 +20,7 @@ import { CloudChecks } from "./cloud-check.js";
 import { CodexCloudSignIn } from "./cloud-codex.js";
 import { OpenCodeCloudKeys, OpenCodeCloudSignIn } from "./cloud-opencode.js";
 import { CloudProjectEnv } from "./cloud-env.js";
+import { CloudBases } from "./cloud-bases.js";
 import { CloudSkills, StoredCloudSkills, skillsPayload, type CloudSkillSource } from "./cloud-skills.js";
 import { CloudHandoff } from "./cloud-handoff.js";
 import { CodexBrowserSignIn, CodexCloudLogin } from "./codex-cloud-login.js";
@@ -234,11 +235,9 @@ export function createCloud(input: CloudInput): CloudParts {
   });
   const { sessions, versions } = agentParts(input, agents);
   const changed = (id: string) => invalidate(["threads", `thread:${id}`]);
-  const cloud = new CloudWorkspaceService(
-    db,
-    { ...sandboxes, agents, sessions, versions, changed, skills, projectEnv, cloudOnly: options.cloudOnly, ...(options.cloudRunnerFiles ? { files: options.cloudRunnerFiles } : {}) },
-    log,
-  );
+  const files = options.cloudRunnerFiles ?? runnerFiles();
+  const bases = new CloudBases({ db, provider: (id) => providerOf(sandboxes.providers, id), files: () => files, versions, projectEnv, log });
+  const cloud = new CloudWorkspaceService(db, { ...sandboxes, agents, sessions, versions, changed, skills, projectEnv, bases, cloudOnly: options.cloudOnly, files }, log);
   const checks = new CloudChecks(
     () => cloud.checkTarget(),
     () => invalidate(["cloud"]),
@@ -271,6 +270,12 @@ export function createCloud(input: CloudInput): CloudParts {
   const flow = new CloudSignInsFlow({ db, tokens, codex: codexLogin, opencode, brain, mac: macSignIns(environment), changed: () => invalidate(["cloud-sign-ins"]) });
   const move = brainMove(input, { brain, beside, coordinator, connections: sources });
   return { settings, tokens, codex: codexLogin, opencode, env, skills: chosen, cloud, checks, sandboxes: list, handoff, standby, brain, signIns: flow, relocations, coordinator, move };
+}
+
+function providerOf(providers: SandboxProvider[], id: SandboxProvider["id"]): SandboxProvider {
+  const found = providers.find((provider) => provider.id === id);
+  if (!found) throw new Error(`Cloud threads on ${id} are not set up in this app.`);
+  return found;
 }
 
 /** The cloud brain's sandboxes, asked only while it is awake and linked: Settings never wakes it to list them. */

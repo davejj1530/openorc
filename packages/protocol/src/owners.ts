@@ -36,7 +36,12 @@ export type OwnerRoute<M extends RpcMethod> =
   /** Refused for a thread another host owns, in these words. */
   | { by: "owner-only"; thread: (params: RpcParams<M>) => string | undefined; words: string }
   /** A new thread asked for the cloud starts on the brain, on its copy of the Mac project `cloud` names; any other, here. */
-  | { by: "start"; cloud: (params: RpcParams<M>) => string | undefined };
+  | { by: "start"; cloud: (params: RpcParams<M>) => string | undefined }
+  /**
+   * Readies the place a new cloud thread in the Mac project `cloud` names will start: the brain, woken for it, when it has
+   * a copy of the project; else here.
+   */
+  | { by: "ahead"; cloud: (params: RpcParams<M>) => string | undefined };
 
 export const BRING_FIRST = "Bring it to this Mac first.";
 /** Why a project's conversations cannot start or move in the cloud while the brain has no copy of it. */
@@ -59,6 +64,7 @@ const here = { by: "here" } as const;
  */
 export const OWNER_ROUTES: { [M in RoutedMethod]: OwnerRoute<M> } & { [M in Exclude<RpcMethod, RoutedMethod>]?: OwnerRoute<M> } = {
   "threads.start": { by: "start", cloud: (p) => (p.cloud ? p.projectId : undefined) },
+  "cloud.warm": { by: "ahead", cloud: (p) => p.projectId },
   "threads.list": { by: "merge" },
   "threads.resolvedCount": { by: "merge" },
   "inbox.list": { by: "merge" },

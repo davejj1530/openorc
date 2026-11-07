@@ -2,11 +2,13 @@ export {
   BrokeringUnavailable,
   SANDBOX_AWAY_MS,
   SANDBOX_PREFIX,
+  BASE_PREFIX,
   type BrokeredHeader,
   type Sandbox,
   type SandboxCommandOptions,
   type SandboxExecResult,
   type SandboxInfo,
+  type SandboxBases,
   type SandboxNeeds,
   type SandboxProvider,
   type SandboxStream,
@@ -50,7 +52,19 @@ export { RemoteProcess, type RemoteCommand } from "./remote-process.js";
 export type { Takeover, TakeoverStarted } from "./runner/wire.js";
 export { RunnerClient, installRunner, runRunner, runnerFiles, type RunnerConnectionState, type RunnerFile, type RunnerInstall } from "./runner-client.js";
 export { CHECK_STEPS, checkSandbox, type CheckProgress, type CheckStep } from "./check.js";
-export { pullWorkspace, pushWorkspace, seedFromCommit, seedWorkspace, type MirrorState, type PullResult, type WorkspaceLocation } from "./sync.js";
+export {
+  pullWorkspace,
+  pushWorkspace,
+  readBaseMarker,
+  seedFromCommit,
+  seedOverBase,
+  seedWorkspace,
+  writeBaseMarker,
+  type BaseMarker,
+  type MirrorState,
+  type PullResult,
+  type WorkspaceLocation,
+} from "./sync.js";
 export { VercelRefusal, ensureVercelProject, vercelDenied, type VercelProject, type VercelRequest } from "./vercel-projects.js";
 export { BRAIN_AWAY_MS, BRAIN_EXIT, BRAIN_IDLE_MS, BRAIN_PORT, BRAIN_PROJECT, BRAIN_READY, BRAIN_SANDBOX, brainLayout, type BrainLayout } from "./brain/layout.js";
 export {

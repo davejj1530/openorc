@@ -4,6 +4,7 @@ import path from "node:path";
 import { git, pinObject, switchFiles, treeHash } from "@openorc/git";
 import { runRunner, type RunnerInstall } from "./runner-client.js";
 import { SNAPSHOT_REF, type SnapshotResult } from "./runner/repo.js";
+import type { HarnessId } from "@openorc/protocol";
 
 const WORK_IDENTITY = {
   GIT_AUTHOR_NAME: "OpenOrc",
@@ -87,6 +88,66 @@ export async function seedFromCommit(location: WorkspaceLocation, start: { sourc
   }
   const tree = (await git(start.source, ["rev-parse", `${start.commit}^{tree}`])).stdout.trim();
   return { snapshot: null, tree, head: start.commit, known: [start.commit] };
+}
+
+/**
+ * Makes a new conversation's checkout over a base's, which holds the project's default branch with its setup done: only
+ * the commits the base lacks go up, none when the conversation starts at the base's own commit. What the base's setup
+ * installed in files Git ignores stays.
+ */
+export async function seedOverBase(location: WorkspaceLocation, start: { source: string; commit: string; branch: string; base: string; origin?: string }): Promise<MirrorState> {
+  const { install, refPrefix, repo } = location;
+  const args = ["--repo", repo, "--branch", start.branch, "--commit", start.commit, ...(start.origin ? ["--origin", start.origin] : [])];
+  const known = async (commit: string) => (await git(start.source, ["cat-file", "-e", `${commit}^{commit}`], { okCodes: [0, 1, 128] })).code === 0;
+  const has = async (older: string, newer: string) => (await git(start.source, ["merge-base", "--is-ancestor", older, newer], { okCodes: [0, 1, 128] })).code === 0;
+  // A commit the base's own checkout already has needs nothing sent.
+  if (start.commit !== start.base && !(await has(start.commit, start.base))) {
+    const ref = `${refPrefix}start`;
+    await pinObject(start.source, ref, start.commit);
+    const dir = await mkdtemp(path.join(os.tmpdir(), "openorc-seed-"));
+    try {
+      const bundle = path.join(dir, "seed.bundle");
+      // All of the branch's history only when this repository no longer has the base's commit, as after a force push.
+      await git(start.source, ["bundle", "create", "-q", bundle, ref, ...((await known(start.base)) ? [`^${start.base}`] : [])]);
+      const remoteBundle = path.posix.join(install.state, "seed.bundle");
+      await install.sandbox.writeFile(remoteBundle, await readFile(bundle));
+      args.push("--bundle", remoteBundle, "--ref", ref);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  }
+  await runRunner(install, "seed-over", args);
+  const tree = (await git(start.source, ["rev-parse", `${start.commit}^{tree}`])).stdout.trim();
+  return { snapshot: null, tree, head: start.commit, known: [start.commit] };
+}
+
+/** What a base's sandbox holds, as written when the base was made: a sandbox made from it reads it to know. */
+export interface BaseMarker {
+  /** The default branch's commit its checkout holds, with the project's setup done there. */
+  commit: string;
+  branch: string;
+  /** The setup script it ran, by hash; empty for none. */
+  setup: string;
+  /** Each agent CLI installed, by version. */
+  agents: Partial<Record<HarnessId, string>>;
+}
+
+const baseMarkerPath = (install: RunnerInstall) => path.posix.join(install.state, "base.json");
+
+export async function writeBaseMarker(install: RunnerInstall, marker: BaseMarker): Promise<void> {
+  await install.sandbox.writeFile(baseMarkerPath(install), Buffer.from(JSON.stringify(marker)));
+}
+
+/** The marker of the base this sandbox was made from; null for one made empty. */
+export async function readBaseMarker(install: RunnerInstall): Promise<BaseMarker | null> {
+  const bytes = await install.sandbox.readFile(baseMarkerPath(install)).catch(() => null);
+  if (!bytes?.length) return null;
+  try {
+    const marker = JSON.parse(bytes.toString("utf8")) as Partial<BaseMarker>;
+    return typeof marker.commit === "string" && typeof marker.branch === "string" && typeof marker.setup === "string" ? { commit: marker.commit, branch: marker.branch, setup: marker.setup, agents: marker.agents ?? {} } : null;
+  } catch {
+    return null;
+  }
 }
 
 export interface PullResult {

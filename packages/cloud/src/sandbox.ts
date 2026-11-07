@@ -81,10 +81,25 @@ export interface Sandbox {
 export interface SandboxNeeds {
   /** Its project runs Docker, such as Compose services or Testcontainers in its tests. */
   docker?: boolean;
+  /**
+   * A base this service saved, which a sandbox it makes starts from: its files, not its processes. A sandbox that
+   * exists already keeps its own.
+   */
+  from?: string;
 }
 
 /** Every sandbox OpenOrc makes is named with this, so a list leaves out a team's other sandboxes. */
 export const SANDBOX_PREFIX = "openorc-";
+/** A sandbox made to become a project's base, which no conversation has; lists leave it out. */
+export const BASE_PREFIX = "openorc-base-";
+
+/** Sandboxes a service keeps for new ones to start from: a project's code, its setup done and its agents installed. */
+export interface SandboxBases {
+  /** Saves `sandbox`, which this service made, as a base, and returns the base's id. The sandbox stops; it may be gone. */
+  save(sandbox: Sandbox): Promise<string>;
+  /** Deletes a base; one already gone changes nothing. */
+  remove(base: string): Promise<void>;
+}
 
 /** What a sandbox service reports about one of OpenOrc's sandboxes. */
 export interface SandboxInfo {
@@ -111,4 +126,6 @@ export interface SandboxProvider {
   list(): Promise<SandboxInfo[]>;
   /** Called as OpenOrc closes. A cloud VM keeps running and sleeps on its own; a sandbox on this Mac stops here. */
   close?(): Promise<void>;
+  /** Where the service can keep a sandbox for new ones to start from. */
+  readonly bases?: SandboxBases;
 }

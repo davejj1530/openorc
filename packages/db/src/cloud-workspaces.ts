@@ -89,6 +89,12 @@ export const cloudWorkspaces = {
   preparing(db: Db, threadId: string, at = Date.now()): void {
     db.stmt("UPDATE cloud_workspaces SET state = 'preparing', error = NULL, updated_at = ? WHERE thread_id = ? AND state IN ('failed', 'removed')").run(at, threadId);
   },
+  /** A new conversation takes a sandbox made ahead for it, before the sandbox has its code. */
+  adopt(db: Db, threadId: string, sandbox: string, at = Date.now()): CloudWorkspaceRecord {
+    const row = db.stmt(`UPDATE cloud_workspaces SET sandbox = ?, updated_at = ? WHERE thread_id = ? AND state = 'preparing' RETURNING ${columns}`).get(sandbox, at, threadId) as unknown as Row | undefined;
+    if (!row) throw new Error(`No cloud workspace being prepared for thread ${threadId}`);
+    return record(row);
+  },
   /** A conversation whose sandbox was deleted, moved to another service before its next sandbox is made there. */
   moveRemoved(db: Db, threadId: string, provider: CloudProviderId, at = Date.now()): void {
     db.stmt("UPDATE cloud_workspaces SET provider = ?, updated_at = ? WHERE thread_id = ? AND state = 'removed'").run(provider, at, threadId);

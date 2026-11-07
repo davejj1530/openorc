@@ -62,6 +62,20 @@ function answerCode(text: string): string {
   return words.replace(/\s+/g, " ").trim().slice(0, 80);
 }
 
+/**
+ * Asks once more when the connection closed before any answer, as one kept open between calls does when the other side
+ * closes it just as it is reused. Only for calls that do the same when made twice.
+ */
+async function again(call: () => Promise<Response>): Promise<Response> {
+  try {
+    return await call();
+  } catch (error) {
+    const cause = error instanceof TypeError ? (error.cause as { code?: unknown } | undefined) : undefined;
+    if (cause?.code !== "UND_ERR_SOCKET") throw error;
+    return call();
+  }
+}
+
 /** The Mac's client for OpenOrc's server in an instance (runner/instance-server.ts), through the service's port address. */
 export class InstancePort {
   /** `build` names the server this client speaks to; another answering at the address reads as not there. */
@@ -112,13 +126,13 @@ export class InstancePort {
   }
 
   private async put(url: string, body: Buffer): Promise<void> {
-    const response = await fetch(url, { method: "PUT", headers: this.address.headers, body: new Uint8Array(body) });
+    const response = await again(() => fetch(url, { method: "PUT", headers: this.address.headers, body: new Uint8Array(body) }));
     if (!response.ok) throw new Error(`Could not send a file to the cloud instance (${refusal(response.status, await response.text())}).`);
   }
 
   /** Null when the file does not exist. */
   async getFile(file: string): Promise<Buffer | null> {
-    const response = await fetch(this.url("/openorc/file", file), { headers: this.address.headers });
+    const response = await again(() => fetch(this.url("/openorc/file", file), { headers: this.address.headers }));
     if (response.status === 404) return null;
     if (!response.ok) throw new Error(`Could not read a file from the cloud instance (${refusal(response.status, await response.text())}).`);
     return Buffer.from(await response.arrayBuffer());

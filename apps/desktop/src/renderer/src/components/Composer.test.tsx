@@ -95,6 +95,25 @@ describe("slash suggestions", () => {
     fireEvent.mouseUp(screen.getByRole("listbox"));
   });
 
+  it("brings the first row back into view when typing narrows a list scrolled away from it", () => {
+    const scrolled = vi.fn();
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = scrolled;
+    try {
+      const many: ComposerProps["commands"] = Array.from({ length: 30 }, (_, index) => ({ name: `skill-${index}`, hint: "A skill", insert: true, prefix: "/" }));
+      mount({ commands: many, value: "" });
+      fireEvent.change(message(), { target: { value: "/", selectionStart: 1 } });
+      // The pointer scrolls the list; the first row stays selected, so only the narrower list can bring it back.
+      scrolled.mockClear();
+      fireEvent.change(message(), { target: { value: "/skill-2", selectionStart: 8 } });
+      const [first] = screen.getAllByRole("option");
+      expect(first?.getAttribute("aria-selected")).toBe("true");
+      expect(scrolled.mock.contexts).toContain(first);
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
+  });
+
   it("updates action availability when the caret moves between identical slash queries", () => {
     mount({ commands, value: "/ /" });
     selectAt(1);

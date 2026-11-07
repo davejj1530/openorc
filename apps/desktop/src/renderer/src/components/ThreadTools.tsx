@@ -1,5 +1,5 @@
 import { useLayout } from "../lib/layout";
-import { ArrowLeftRight, ListTodo, PanelIcon } from "./icons";
+import { ArrowLeftRight, PanelIcon } from "./icons";
 import { IconButton, Tooltip } from "./ui";
 
 export function ThreadTools({ threadId }: { threadId: string }) {
@@ -9,19 +9,6 @@ export function ThreadTools({ threadId }: { threadId: string }) {
   const swapLabel = side === "left" ? "Move panel right" : "Move panel left";
   return (
     <div className="thread-rail-tools" role="group" aria-label="Thread tools">
-      <Tooltip label="Tasks">
-        <IconButton
-          aria-label="Tasks"
-          aria-pressed={activeTab === "tasks"}
-          onClick={() => {
-            const layout = useLayout.getState();
-            if (activeTab === "tasks") layout.toggleThreadPanel(threadId);
-            else layout.openThreadPanel(threadId, "tasks");
-          }}
-        >
-          <ListTodo size={16} />
-        </IconButton>
-      </Tooltip>
       {activeTab ? (
         <Tooltip label={swapLabel}>
           <IconButton aria-label={swapLabel} onClick={() => useLayout.getState().togglePanelSide()}>

@@ -1,0 +1,118 @@
+/* Tabs on the window's chrome line, the work column's and the panel's alike: 30px tabs up to
+   220px wide that share their row, down to 136px (room for a name to read) before the strip
+   scrolls sideways. The current tab is raised on the surface; the rest are bare until the pointer
+   fills them. A tab's close shows on the current one and under the pointer. */
+.work-tabs-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.work-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.work-tabs::-webkit-scrollbar {
+  display: none;
+}
+.work-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 1 220px;
+  min-width: 136px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-3);
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out),
+    opacity var(--duration-arrive) var(--ease-out);
+}
+/* A tab added after the strip settled fades in; tabs restored with the strip appear in place. */
+@starting-style {
+  .work-tabs[data-settled] .work-tab {
+    opacity: 0;
+  }
+}
+.work-tab:hover {
+  background-color: var(--surface-2);
+  color: var(--ink-2);
+}
+.work-tab-current,
+.work-tab-current:hover {
+  background-color: var(--surface-3);
+  color: var(--ink);
+}
+.work-tab-face {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 28px 0 10px;
+  border-radius: inherit;
+  font-size: var(--text-base);
+  text-align: left;
+}
+/* Only the current tab keeps room for its close; another tab's name runs to its end, and its close
+   fades in over the last letters under the pointer. */
+.work-tab:not(.work-tab-current) .work-tab-face {
+  padding-right: 10px;
+}
+.work-tab:not(.work-tab-current):hover .work-tab-title {
+  mask-image: linear-gradient(to left, transparent 14px, #000 30px);
+}
+.work-tab-face:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.work-tab-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+}
+.work-tab-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.work-tab-close {
+  position: absolute;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-pill);
+  color: var(--ink-3);
+  opacity: 0;
+  transition:
+    opacity var(--duration-quick) var(--ease-out),
+    background-color var(--duration-quick) var(--ease-out);
+}
+/* The thread header lifts its controls above the window's drag plane with position: relative; a tab's close keeps
+   its place over the tab's end rather than taking room from the name. */
+.thread-header .work-tab .work-tab-close {
+  position: absolute;
+}
+.work-tab:is(:hover, .work-tab-current) .work-tab-close,
+.work-tab-close:focus-visible {
+  opacity: 1;
+}
+.work-tab-close:hover {
+  background-color: var(--surface-2);
+  color: var(--ink);
+}
+.work-tabs-new {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}

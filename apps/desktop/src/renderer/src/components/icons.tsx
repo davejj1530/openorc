@@ -133,6 +133,14 @@ export const MoreHorizontal = icon(
     <circle cx="19" cy="12" r=".8" />
   </>,
 );
+export const MoreVertical = icon(
+  "MoreVertical",
+  <>
+    <circle cx="12" cy="5" r=".8" />
+    <circle cx="12" cy="12" r=".8" />
+    <circle cx="12" cy="19" r=".8" />
+  </>,
+);
 export const Play = icon("Play", <path d="M7 4.5 20 12 7 19.5Z" />);
 export const Pause = icon("Pause", <path d="M8 5v14 M16 5v14" />);
 export const Square = icon("Square", frame);

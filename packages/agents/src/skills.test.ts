@@ -137,6 +137,24 @@ describe("listSkills", () => {
     expect(found.find((s) => s.name === "ops:deploy")?.description).toBe("Deploy it.");
   });
 
+  it("lists the skills and commands of every folder up to the repository's root, the nearest copy of a name winning, as the CLI does", async () => {
+    const outside = await temp("openorc-skills-nested-");
+    const repo = path.join(outside, "repo");
+    const web = path.join(repo, "apps", "web");
+    await skill(path.join(outside, ".claude", "skills"), "above", "---\nname: above\ndescription: Outside the repository.\n---\n");
+    await mkdir(path.join(repo, ".git"), { recursive: true });
+    await skill(path.join(repo, ".claude", "skills"), "dup", "---\nname: dup\ndescription: The root copy.\n---\n");
+    await skill(path.join(repo, ".claude", "skills"), "root-only", "---\nname: root-only\ndescription: Only at the root.\n---\n");
+    await mkdir(path.join(repo, ".claude", "commands"), { recursive: true });
+    await writeFile(path.join(repo, ".claude", "commands", "root-command.md"), "A root command.\n");
+    await skill(path.join(web, ".claude", "skills"), "dup", "---\nname: dup\ndescription: The web copy.\n---\n");
+    const configDir = await temp("openorc-skills-nested-config-");
+
+    const found = await listSkills({ projectRoot: web, home, agent: "claude", env: { CLAUDE_CONFIG_DIR: configDir } });
+
+    expect(found.map((s) => `${s.source}:${s.name}:${s.description}`)).toEqual(["project:dup:The web copy.", "project:root-command:A root command.", "project:root-only:Only at the root."]);
+  });
+
   it("lists a command folder holding a SKILL.md as one command and its subfolders after it, as the CLI does, and leaves out names it could not run", async () => {
     const root = await temp("openorc-skills-command-skill-");
     const configDir = await temp("openorc-skills-command-skill-config-");

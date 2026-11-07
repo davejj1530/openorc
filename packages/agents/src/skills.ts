@@ -327,9 +327,11 @@ async function listClaudeSkills(projectRoot: string, home: string, env: NodeJS.P
   // An added account also runs the plugins the CLI login turns on; its personal skills are already linked into the account.
   const shared = env[SHARED_CLAUDE_CONFIG_DIR];
   const plugins = [...installedClaudePlugins(configDir), ...(shared ? installedClaudePlugins(shared).filter((plugin) => plugin.enabled) : [])];
+  // The CLI also reads every folder above up to the repository's root, and the nearest copy of a name wins.
+  const projects = (await projectDirectories(projectRoot)).reverse();
   const roots = (folder: "skills" | "commands"): SkillRoot[] => [
     { dir: path.join(configDir, folder), source: "user" },
-    { dir: path.join(projectRoot, ".claude", folder), source: "project" },
+    ...projects.map((dir): SkillRoot => ({ dir: path.join(dir, ".claude", folder), source: "project" })),
     ...pluginRoots(plugins, folder),
   ];
   // Read together but merged in this order, since the first of a name is the one the CLI resolves.

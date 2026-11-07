@@ -14,6 +14,7 @@ const mac = vi.hoisted(() => ({
   starts: [] as Record<string, unknown>[],
   refuse: null as string | null,
   calls: [] as string[],
+  projects: [] as unknown[],
 }));
 
 vi.mock("../client", async () => {
@@ -22,6 +23,7 @@ vi.mock("../client", async () => {
     mac.calls.push(method);
     if (method === "claude.accounts.list") return Promise.resolve({ accounts: mac.accounts, defaultId: "claude-cli" });
     if (method === "providers.limits") return Promise.resolve(mac.limits);
+    if (method === "projects.list") return Promise.resolve(mac.projects);
     if (method !== "runs.start") return Promise.reject(new Error(`no ${method}`));
     if (mac.refuse) return Promise.reject(new Error(mac.refuse));
     mac.starts.push(params as Record<string, unknown>);
@@ -85,6 +87,7 @@ beforeEach(() => {
   mac.starts = [];
   mac.refuse = null;
   mac.calls = [];
+  mac.projects = [];
   felt.length = 0;
 });
 afterEach(() => {
@@ -210,4 +213,10 @@ it("draws nothing and asks nothing while the session is well", () => {
     unmount();
   }
   expect(mac.calls).toEqual([]);
+});
+
+it("offers only the accounts the thread's project uses, when it uses only some", async () => {
+  mac.projects = [{ id: "p1", name: "block8", settings: { claudeAccounts: { only: true, accountIds: ["secondary", "rainy"], defaultId: "rainy", autoSwitch: false } } }];
+  show(limited, { over: { projectId: "p1" } });
+  await waitFor(() => expect(offered()).toEqual(["Continue with Rainy"]));
 });

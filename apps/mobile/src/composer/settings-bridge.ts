@@ -15,9 +15,10 @@ export type ComposerSettings = Pick<ReturnType<ClientState["useConversationSetti
   claudeAccountId?: string;
   /**
    * The account chosen here, undefined until one is: then the Mac's default runs. `held` says why it cannot change
-   * now, and `failed` why the last change did not go through.
+   * now, and `failed` why the last change did not go through. `projectId` narrows the choice to the accounts that
+   * project uses, when it uses only some.
    */
-  claudeAccount?: { chosen: string | undefined; select: (id: string) => void; held?: string | null; failed?: string | null };
+  claudeAccount?: { chosen: string | undefined; select: (id: string) => void; held?: string | null; failed?: string | null; projectId?: string };
   place?: { chosen: ThreadPlace; provider: CloudProvider; select: (place: ThreadPlace) => void };
 };
 

@@ -10,9 +10,10 @@ export const OWNER_DEVICE = "owner";
 /**
  * What the brain's owner asks as bookkeeping, never a reason to stay up: every read of a thread, run or task, since a
  * window reads those again on timers and after each change on the Mac (a wake for a person's own read counts as use
- * itself), and the memory, open tasks and text generation choice the Mac sends while both are awake.
+ * itself); the memory, open tasks and text generation choice the Mac sends while both are awake; and the list of its
+ * sandboxes, which Settings reads every 30 seconds while it is open and would otherwise keep the brain up for good.
  */
-const OWNER_BOOKKEEPING = new Set<string>([...ROUTED_READS, "brain.memory.exchange", "brain.backlog", "brain.textGeneration"]);
+const OWNER_BOOKKEEPING = new Set<string>([...ROUTED_READS, "brain.memory.exchange", "brain.backlog", "brain.textGeneration", "cloud.sandboxes"]);
 
 /** Whether a request is someone using this host, which keeps a cloud brain awake. */
 export function usesHost(method: string, origin: RequestOrigin | undefined): boolean {

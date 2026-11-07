@@ -9,6 +9,10 @@ it("counts phones and the Mac's own actions as use of the brain, never the Mac r
   expect(usesHost("brain.memory.exchange", mac)).toBe(false);
   expect(usesHost("brain.backlog", mac)).toBe(false);
   expect(usesHost("brain.textGeneration", mac)).toBe(false);
+  // Settings lists the brain's sandboxes every 30 seconds while it is open: that alone must never keep the brain awake.
+  expect(usesHost("cloud.sandboxes", mac)).toBe(false);
+  expect(usesHost("cloud.sandboxes.remove", mac)).toBe(true);
+  expect(usesHost("cloud.sandboxes", { kind: "phone", deviceId: "phone-1" })).toBe(true);
   // Polled and read again after every change on the Mac, so reading never keeps the brain up.
   for (const read of ["events.page", "threads.get", "threads.messages", "runs.listForThread", "git.threadLog", "git.threadPushState", "tasks.comments.list"]) expect(usesHost(read, mac)).toBe(false);
   for (const action of ["threads.send", "runs.start", "approvals.resolve", "threads.snapshot"]) expect(usesHost(action, mac)).toBe(true);

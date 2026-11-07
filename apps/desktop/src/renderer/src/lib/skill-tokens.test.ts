@@ -35,6 +35,11 @@ describe("skill tokens", () => {
     expect(marked("/code-review.")).toEqual(["/code-review"]);
   });
 
+  it("leaves a path that starts with a name plain", () => {
+    expect(marked("see /formatting/output")).toEqual([]);
+    expect(marked("/code-review/notes.md")).toEqual([]);
+  });
+
   it("marks every occurrence, across lines", () => {
     expect(marked("/formatting then\n/code-review")).toEqual(["/formatting", "/code-review"]);
   });

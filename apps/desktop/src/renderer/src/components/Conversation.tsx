@@ -87,13 +87,8 @@ function useMessageTarget(scope: ConversationScope): MessageTarget | undefined {
 }
 
 /** A thread's own `/` commands; compacting waits for the turn to finish. */
-function threadCommands({ working, compact, selectMode, fork }: { working: boolean; compact: () => void; selectMode: (mode: "plan" | "act") => void; fork: () => void }): SlashCommand[] {
-  return [
-    ...(!working ? [{ name: "compact", hint: "Fold the conversation so far into a summary", run: compact }] : []),
-    { name: "plan", hint: "Switch this thread to plan mode", run: () => selectMode("plan") },
-    { name: "act", hint: "Switch this thread to act mode", run: () => selectMode("act") },
-    { name: "fork", hint: "Continue in a new thread from here", run: fork },
-  ];
+function threadCommands({ working, compact, fork }: { working: boolean; compact: () => void; fork: () => void }): SlashCommand[] {
+  return [...(!working ? [{ name: "compact", hint: "Fold the conversation so far into a summary", run: compact }] : []), { name: "fork", hint: "Continue in a new thread from here", run: fork }];
 }
 
 function IndividualConversation({ scope, project }: { scope: ConversationScope; project: Project }) {
@@ -165,10 +160,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const continueWith = (claudeAccountId: string) => submitter.submit({ ...request, now: false, claudeAccountId }, { text: CONTINUE_PROMPT, attachments: [] }).then(clearDraft);
 
   const skills = useSkillCommands(conversation, choice?.agent);
-  const commands: SlashCommand[] = [
-    ...(thread ? threadCommands({ working, compact: () => compact.mutate({ id: thread.id }), selectMode: settings.selectMode, fork: forkConversation }) : []),
-    ...skills.commands,
-  ];
+  const commands: SlashCommand[] = [...(thread ? threadCommands({ working, compact: () => compact.mutate({ id: thread.id }), fork: forkConversation }) : []), ...skills.commands];
 
   const location = conversationLocation({ scope, project, mode: workspaceMode, basePath: links ?? project.rootPath, checkoutBranch: checkout.data?.branch, plainFolder: git.state === "none" });
   const emptyHint = conversationEmptyHint({ task: scope.kind === "task", workspace: project.id === WORKSPACE_ID });

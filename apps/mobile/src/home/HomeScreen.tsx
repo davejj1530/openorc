@@ -27,6 +27,7 @@ import { refreshHome } from "./refresh";
 import { ThreadRow } from "./ThreadRow";
 import { Unpaired } from "./Unpaired";
 import { useHomeItems } from "./use-home-items";
+import { UpdateReady } from "./UpdateReady";
 
 type Paired = Exclude<LinkState, { kind: "unpaired" }>;
 type Home = ReturnType<typeof useHomeItems>;
@@ -163,6 +164,7 @@ function PairedHome({ state }: { state: Paired }) {
     <View className="flex-1 bg-bg" onMagicTap={newThread} onTouchStart={swipes.touched}>
       <View pointerEvents="box-none" className="absolute inset-x-0 bottom-0 z-10 items-center" style={{ paddingBottom: insets.bottom }}>
         <FootFade height={insets.bottom + PILL_ROOM} />
+        <UpdateReady />
         <Pressable accessibilityRole="button" onPress={newThread} className="mb-2 h-12 flex-row items-center gap-2 rounded-full bg-accent pl-5 pr-6 active:opacity-80">
           <Plus size={18} className="text-accent-fg" />
           <Text className="text-lg text-accent-fg">New thread</Text>

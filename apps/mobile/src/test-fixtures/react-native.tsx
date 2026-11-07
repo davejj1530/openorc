@@ -80,7 +80,12 @@ export const Image = Object.assign(host("img"), {
   getSize: (_uri: string, success: (width: number, height: number) => void) => success(1600, 900),
 });
 export const Modal = host("div");
-export const TextInput = host("input");
+const PlainInput = host("input");
+const RunsInput = host("div");
+/** A text box with a value, or one that draws its text from runs as children, as a styled prompt does. */
+export const TextInput = forwardRef(function TextInput(props: NativeProps, ref: Ref<unknown>) {
+  return createElement(props.children === undefined ? PlainInput : RunsInput, { ...props, ref });
+});
 
 /** iOS's switch, keeping its checked state and refusing changes while disabled. */
 export function Switch({ value, disabled, onValueChange, accessibilityLabel }: { value?: boolean; disabled?: boolean; onValueChange?: (value: boolean) => void; accessibilityLabel?: string }) {

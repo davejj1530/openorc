@@ -115,13 +115,6 @@ export const Copy = icon(
     <Path d="M15 4H6a2 2 0 0 0-2 2v9" />
   </>,
 );
-export const Crosshair = icon(
-  "Crosshair",
-  <>
-    <Circle cx="12" cy="12" r="6.5" />
-    <Path d="M12 3v4.5 M12 16.5V21 M3 12h4.5 M16.5 12H21" />
-  </>,
-);
 export const Download = icon("Download", <Path d="M4 15v4a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 20 19v-4 M12 3.5v12m-5-5 5 5 5-5" />);
 export const Expand = icon("Expand", <Path d="M4 9V6.5A2.5 2.5 0 0 1 6.5 4H9 M15 4h2.5A2.5 2.5 0 0 1 20 6.5V9 M20 15v2.5a2.5 2.5 0 0 1-2.5 2.5H15 M9 20H6.5A2.5 2.5 0 0 1 4 17.5V15" />);
 export const ExternalLink = icon("ExternalLink", <Path d="M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6 M15 3h6v6 M11 13 21 3" />);

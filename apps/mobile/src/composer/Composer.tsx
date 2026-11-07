@@ -83,6 +83,7 @@ export function Composer({ thread, queued, preparing, settings, generatingImage,
         ) : null}
         <ComposerPlane
           composerId={thread.id}
+          skillScope={{ kind: "thread", id: thread.id }}
           settings={settings}
           draft={composer.draft}
           uploading={composer.uploading}

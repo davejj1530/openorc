@@ -66,6 +66,7 @@ function NewThreadForm({ projectId, choices, onProject, copy }: FormProps) {
             ) : null}
             <ComposerPlane
               composerId={COMPOSER_ID}
+              skillScope={{ kind: "project", id: projectId }}
               settings={form.settings}
               draft={{ text: form.draft.prompt, images: form.draft.images }}
               uploading={form.uploading}

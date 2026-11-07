@@ -147,3 +147,28 @@ it("says why Start is dim when it is tapped, and starts nothing", async () => {
   expect((await screen.findByRole("alert")).textContent).toBe("Choose a model");
   expect(mac.start).not.toHaveBeenCalled();
 });
+
+it("offers the project's skills as a / word is typed, and puts the one tapped into the prompt in the Bold face", async () => {
+  mac.reads["skills.list"] = [
+    { name: "release-notes", description: "Write release notes.", source: "project", path: "" },
+    { name: "code-review", description: "Review the changes.", source: "system", path: "" },
+  ];
+  onTestFinished(() => void delete mac.reads["skills.list"]);
+  render(<NewThreadScreen />, { wrapper: mac.phone!.wrapper });
+  await waitFor(() => expect(project("notes")).toBeTruthy());
+  const prompt = () => nativeProps.get(screen.getByLabelText("Message"))!;
+  const write = (text: string) =>
+    act(() => {
+      (prompt().onChangeText as (text: string) => void)(text);
+      (prompt().onSelectionChange as (event: unknown) => void)({ nativeEvent: { selection: { start: text.length, end: text.length } } });
+    });
+  write("please /co");
+  // The Codex model is chosen, so a pick writes Codex's own prefix.
+  await waitFor(() => expect(button("$code-review")).toBeTruthy());
+  expect(screen.queryByRole("button", { name: "$release-notes" })).toBeNull();
+  await act(async () => fireEvent.click(button("$code-review")));
+  expect(screen.getByLabelText("Message").textContent).toBe("please $code-review ");
+  const marked = Array.from(screen.getByLabelText("Message").querySelectorAll("span")).find((run) => run.textContent === "$code-review")!;
+  expect(nativeProps.get(marked)?.style).toEqual({ fontFamily: "ImmaculateGothic-Bold" });
+  expect(screen.queryByRole("button", { name: "$code-review" })).toBeNull();
+});

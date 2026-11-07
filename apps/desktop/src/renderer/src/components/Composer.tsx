@@ -26,6 +26,7 @@ import { ComposerInput } from "./ComposerInput";
 import { ComposerSendButton } from "./ComposerSendButton";
 import { ContextUsage } from "./ContextUsage";
 import { Cloud, FileText, Laptop, Lightbulb, Pencil, Plus, ShieldCheck, Square, Wand, X } from "./icons";
+import { type PickerAccounts } from "./ModelPickerAccounts";
 import { ComposerModelPicker, type ModelChoice } from "./ModelPicker";
 import { Button, Tooltip } from "./ui";
 
@@ -80,6 +81,8 @@ export interface ComposerProps {
   onModel: (choice: ModelChoice) => void;
   /** A saved identity can supply its model controls in the toolbar. */
   modelControl?: ReactNode;
+  /** The Claude accounts the conversation can run on, offered in the model picker with their usage. */
+  accounts?: PickerAccounts | undefined;
   mode: RunMode;
   onMode: (mode: RunMode) => void;
   permission: PermissionPreset;
@@ -134,6 +137,8 @@ export interface ComposerProps {
   commandsNotice?: SkillListNotice | null;
   /** Connectors `@` can name, and the call that reads them as an `@` word starts. */
   connectors?: UsableConnector[];
+  connectorsAside?: { connectors: UsableConnector[]; reason: string } | undefined;
+  connectorsLoading?: boolean | undefined;
   onConnectorsWanted?: () => void;
   autoFocus?: boolean;
   size?: "md" | "lg";
@@ -289,6 +294,8 @@ export function Composer(props: ComposerProps) {
             onCommandsWanted={props.onCommandsWanted}
             commandsNotice={props.commandsNotice}
             connectors={props.connectors}
+            connectorsAside={props.connectorsAside}
+            connectorsLoading={props.connectorsLoading}
             onConnectorsWanted={props.onConnectorsWanted}
             suggestionAnchor={shell}
             suggestionSide={isNewThread ? "bottom" : "top"}
@@ -375,7 +382,7 @@ function composerModelControl(props: ComposerProps): ReactNode {
   const unavailable = props.model ? executionModeUnavailable(props.model.agent, executionMode(props.mode, props.permission)) : null;
   return (
     <>
-      {props.modelControl ?? <ComposerModelPicker value={props.model} onChange={props.onModel} />}
+      {props.modelControl ?? <ComposerModelPicker value={props.model} onChange={props.onModel} accounts={props.accounts} />}
       {unavailable ? (
         <Tooltip label={unavailable}>
           <span className="composer-activity" role="status">

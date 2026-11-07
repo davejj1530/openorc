@@ -1,14 +1,14 @@
-import { commandWordAt, skillNames as namesOf, skillSegments, useCommandWord, type SkillListNotice } from "@openorc/client";
+import { commandWordAt, useCommandWord, type SkillListNotice } from "@openorc/client";
 import type { FileScope, UsableConnector } from "@openorc/protocol";
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
+import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
 import { useRpc } from "../lib/client";
 import { cn } from "../lib/cn";
-import { connectorSpans } from "../lib/connector-mentions";
 import { filterMentions, insertMention, mentionQueryAt, type MentionEntry } from "../lib/composer-mentions";
 import type { SlashCommand } from "./Composer";
-import { commandRows, connectorRows, fileRows, matchingCommands, matchingConnectors, suggestionKey, useConnectorWord, type SuggestionRow } from "./composer-commands";
+import { asideMatching, commandRows, firstPickable, matchingCommands, matchingConnectors, mentionRows, nextPickable, suggestionKey, useConnectorWord, type SuggestionRow } from "./composer-commands";
 import { ComposerSuggestions } from "./ComposerSuggestions";
 import { ConnectorLogo } from "./ConnectorLogo";
+import { MarkedText, SkillHoverCard, useSkillHover } from "./MarkedText";
 
 interface ComposerInputProps {
   value: string;
@@ -24,9 +24,16 @@ interface ComposerInputProps {
   onCommandsWanted?: () => void;
   commandsNotice?: SkillListNotice | null;
   connectors?: UsableConnector[];
+  connectorsAside?: { connectors: UsableConnector[]; reason: string } | undefined;
+  connectorsLoading?: boolean | undefined;
   onConnectorsWanted?: () => void;
   suggestionAnchor: RefObject<HTMLDivElement | null>;
   suggestionSide: "top" | "bottom";
+}
+
+/** What `@` says while the connector list is read for the first time, which starts the agents' servers. */
+function connectorsNotice(atQuery: string | null, loading: boolean | undefined): Pick<SkillListNotice, "text" | "reason"> | null {
+  return atQuery !== null && loading ? { text: "Loading connectors…" } : null;
 }
 
 /** Stands in while there is no scope; the search is disabled then, so it is never sent. */
@@ -53,26 +60,6 @@ function suggestionLabel(members: boolean, mention: boolean): string {
   return "Commands";
 }
 
-/** A message's text as the highlight layer draws it: skills marked, and a connector's `@` drawn as its image, at the width of the `@`. */
-function MirrorText({ text, connectors }: { text: string; connectors: UsableConnector[] | undefined }) {
-  return connectorSpans(text, connectors ?? []).map((span, index) =>
-    span.connector ? (
-      <mark key={index} className="connector-token">
-        <span
-          className="connector-token-at"
-          style={span.connector.logo ? { backgroundImage: `url("${span.connector.logo}")` } : undefined}
-          data-letter={span.connector.logo ? undefined : span.connector.title.slice(0, 1).toUpperCase()}
-        >
-          @
-        </span>
-        {span.text.slice(1)}
-      </mark>
-    ) : (
-      <span key={index}>{span.text}</span>
-    ),
-  );
-}
-
 /** Owns text interaction: suggestions, selection, focus and the highlight mirror. */
 export function ComposerInput(props: ComposerInputProps) {
   const { value, onChange, onSubmit, onFiles, disabled, placeholder, autoFocus, fileSearch, mentions, commands, onCommandsWanted, connectors, onConnectorsWanted } = props;
@@ -91,10 +78,11 @@ export function ComposerInput(props: ComposerInputProps) {
   const atQuery = token?.token.startsWith("@") && !memberMatches.length ? token.token.slice(1) : null;
   const mentionQuery = fileSearch ? atQuery : null;
   const connectorMatches = useMemo(() => matchingConnectors(connectors, atQuery), [connectors, atQuery]);
+  const asideMatches = useMemo(() => asideMatching(props.connectorsAside, atQuery), [props.connectorsAside, atQuery]);
   useConnectorWord(token, atQuery, onConnectorsWanted);
   const commandPrefix = token?.token[0];
   const commandQuery = commandQueryAt(token, commands);
-  const notice = useCommandWord(commandWordAt(value, caret), onCommandsWanted, props.commandsNotice);
+  const notice = useCommandWord(commandWordAt(value, caret), onCommandsWanted, props.commandsNotice) ?? connectorsNotice(atQuery, props.connectorsLoading);
   const files = useRpc("files.search", { scope: fileSearch ?? NO_SEARCH, query: mentionQuery ?? "", limit: 8 }, { enabled: mentionQuery !== null, staleTime: 10_000 });
   // Skills insert into the prompt; actions clear it, so only offer actions at the start.
   const commandMatches = useMemo(() => matchingCommands(commands, commandQuery, commandPrefix, token?.start), [commandPrefix, commandQuery, commands, token?.start]);
@@ -132,19 +120,19 @@ export function ComposerInput(props: ComposerInputProps) {
     }
     if (atQuery !== null) {
       const draft = { token, caret, value, onChange, placeCaret };
-      return [...connectorRows(connectorMatches, draft), ...fileRows(mentionQuery !== null ? (files.data ?? []) : [], draft)];
+      return mentionRows({ usable: connectorMatches, aside: asideMatches, files: mentionQuery !== null ? (files.data ?? []) : [] }, draft);
     }
     return commandRows(commandMatches, { query: commandQuery, token, caret, value, onChange, placeCaret });
-  }, [memberQuery, memberMatches, atQuery, connectorMatches, mentionQuery, files.data, commandMatches, commandQuery, token, caret, value, onChange, placeCaret]);
-  // Only a name this project actually has is a token, which is why the set
-  // comes from the same commands the popover offers rather than from a shape.
-  const skillNames = useMemo(() => namesOf(commands ?? []), [commands]);
-  const skillPrefix = commands?.find((command) => command.insert)?.prefix ?? "/";
-  const skillSpans = useMemo(() => skillSegments(value, skillNames, skillPrefix), [value, skillNames, skillPrefix]);
+  }, [memberQuery, memberMatches, atQuery, connectorMatches, asideMatches, mentionQuery, files.data, commandMatches, commandQuery, token, caret, value, onChange, placeCaret]);
+  // The skill under the pointer says what it is for; the marks sit under the textarea, so they are found by place.
+  const skillHover = useSkillHover(mirrorRef);
   // Whether the arrow keys chose the row, which is what lets Enter pick one in the middle of a message.
   const [chosen, setChosen] = useState(false);
+  // The list as it now stands, for the reset below, which runs only when a new list opens.
+  const rows = useRef(suggestions);
+  rows.current = suggestions;
   useEffect(() => {
-    setCursor(0);
+    setCursor(firstPickable(rows.current));
     setChosen(false);
   }, [suggestions.length, memberQuery?.query, atQuery, commandQuery]);
   const memberList = suggestions.length > 0 && Boolean(suggestions[0]?.mention);
@@ -159,31 +147,39 @@ export function ComposerInput(props: ComposerInputProps) {
         <ComposerSuggestions anchor={props.suggestionAnchor} side={props.suggestionSide} members={memberList} cursor={cursor} count={suggestions.length} onDismiss={() => setSuggestionsActive(false)}>
           <div id={listId} role="listbox" hidden={suggestions.length === 0} aria-label={suggestionLabel(memberList, atQuery !== null)} data-agent-mention-list={memberList || undefined}>
             {suggestions.map((suggestion, index) => (
-              <button
-                key={suggestion.key}
-                id={`${listId}-${index}`}
-                tabIndex={-1}
-                role="option"
-                aria-selected={index === cursor}
-                data-agent-mention={suggestion.mention}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  suggestion.pick();
-                }}
-                // A move, not an enter: a row scrolling under a still pointer must not take the selection from the arrow keys.
-                onMouseMove={() => setCursor(index)}
-                className="composer-suggestion"
-              >
-                {/* The label is the thing being inserted, so the hint gives way first. A
+              <Fragment key={suggestion.key}>
+                {suggestion.group && suggestion.group !== suggestions[index - 1]?.group ? (
+                  <div aria-hidden="true" className="composer-suggestion-group">
+                    {suggestion.group}
+                  </div>
+                ) : null}
+                <button
+                  id={`${listId}-${index}`}
+                  tabIndex={-1}
+                  role="option"
+                  aria-selected={index === cursor}
+                  aria-disabled={suggestion.unavailable ? true : undefined}
+                  title={suggestion.unavailable}
+                  data-agent-mention={suggestion.mention}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    suggestion.pick();
+                  }}
+                  // A move, not an enter: a row scrolling under a still pointer must not take the selection from the arrow keys.
+                  onMouseMove={() => setCursor(index)}
+                  className="composer-suggestion"
+                >
+                  {/* The label is the thing being inserted, so the hint gives way first. A
                     skill's description runs to a paragraph and would otherwise squeeze the
                     name it belongs to down to nothing. Half the row is the ceiling, so a
                     long file path still truncates rather than crowding out its own hint. */}
-                <span className={cn("composer-suggestion-label", (suggestion.insert || suggestion.logo) && "skill-token")} data-mono={memberList ? undefined : true}>
-                  {suggestion.logo ? <ConnectorLogo title={suggestion.logo.title} logo={suggestion.logo.logo} size={16} /> : null}
-                  {suggestion.label}
-                </span>
-                {suggestion.hint ? <span className="composer-suggestion-hint">{suggestion.hint}</span> : null}
-              </button>
+                  <span className={cn("composer-suggestion-label", (suggestion.insert || suggestion.logo) && "skill-token")} data-mono={memberList ? undefined : true}>
+                    {suggestion.logo ? <ConnectorLogo title={suggestion.logo.title} logo={suggestion.logo.logo} size={16} /> : null}
+                    {suggestion.label}
+                  </span>
+                  {suggestion.hint ? <span className="composer-suggestion-hint">{suggestion.hint}</span> : null}
+                </button>
+              </Fragment>
             ))}
           </div>
           {notice ? (
@@ -193,17 +189,11 @@ export function ComposerInput(props: ComposerInputProps) {
           ) : null}
         </ComposerSuggestions>
       ) : null}
+      <SkillHoverCard mark={skillHover.hovered} commands={commands} />
       <div className="composer-input-shell">
         <div ref={mirrorRef} aria-hidden="true" className="composer-input-mirror">
-          {skillSpans.map((segment, index) =>
-            segment.skill ? (
-              <mark key={index} className="skill-token">
-                {segment.text}
-              </mark>
-            ) : (
-              <MirrorText key={index} text={segment.text} connectors={connectors} />
-            ),
-          )}
+          {/* Only a name this project actually has is marked, from the same commands the popover offers. */}
+          <MarkedText text={value} commands={commands} connectors={connectors} />
           {/* A trailing newline collapses without something after it, and the
               mirror would then scroll a line short of the textarea. */}
           {"\n"}
@@ -214,6 +204,8 @@ export function ComposerInput(props: ComposerInputProps) {
             if (mirrorRef.current) mirrorRef.current.scrollTop = e.currentTarget.scrollTop;
           }}
           rows={1}
+          onPointerMove={skillHover.onPointerMove}
+          onPointerLeave={skillHover.onPointerLeave}
           aria-label="Message"
           aria-autocomplete="list"
           {...listAria}
@@ -240,7 +232,7 @@ export function ComposerInput(props: ComposerInputProps) {
             if (action === "down" || action === "up") {
               e.preventDefault();
               setChosen(true);
-              setCursor((current) => (action === "down" ? Math.min(suggestions.length - 1, current + 1) : Math.max(0, current - 1)));
+              setCursor((current) => nextPickable(suggestions, current, action === "down" ? 1 : -1));
               return;
             }
             if (action === "pick" || action === "close") {

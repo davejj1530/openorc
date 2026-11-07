@@ -528,3 +528,16 @@
 .command-palette-item[data-selected="true"] .command-palette-icon {
   color: var(--ink-3);
 }
+
+/* A skill under the pointer in a message: its name in the mark's blue, then what it is for. */
+.tooltip-popup.skill-hover {
+  display: grid;
+  gap: 2px;
+  max-width: 320px;
+}
+.skill-hover-name {
+  color: var(--mention-ink);
+}
+.skill-hover-hint {
+  color: var(--ink-2);
+}

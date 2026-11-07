@@ -646,6 +646,8 @@ export class RunService {
     if (entry) entry.questionsInterrupted = true;
     this.approvals.denyApprovals(runId, null);
     await Promise.all([this.subagents.interruptHost(runId), this.live.get(runId)?.handle.interrupt()]);
+    const live = this.live.get(runId);
+    if (live) this.events.countSubagents(live);
   }
 
   /** Persist first so a report survives parent-provider failure or Plan mode. */

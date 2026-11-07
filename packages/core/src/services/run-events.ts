@@ -81,13 +81,18 @@ export class RunEvents {
     if (!thread) return true;
     this.deps.subagents.route({ run: entry.run, thread }, event);
     entry.lastAgentEventAt = Date.now();
+    this.countSubagents(entry, wasWorking);
+    return true;
+  }
+
+  /** The host's running children may have changed, as when a Stop settles ones its agent can't stop itself. */
+  countSubagents(entry: LiveRun, wasWorking = working(entry)): void {
     entry.subagentCount = this.deps.subagents.running(entry.run.id);
     if (!wasWorking && working(entry)) this.deps.disarmIdle(entry.run.id);
     if (wasWorking && !working(entry) && !entry.exiting && !entry.closingRequested) {
       this.deps.armIdle(entry);
       if (entry.scope.thread) this.deps.hooks.onThreadIdle?.(entry.scope.thread);
     }
-    return true;
   }
 
   async onEvent(entry: LiveRun, project: Project, ev: AgentEvent): Promise<void> {

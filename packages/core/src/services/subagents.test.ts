@@ -522,6 +522,18 @@ it("parent Stop survives a child's interrupt error and settles children without 
   expect(subagents.byThread(db, broken.threadId)).toMatchObject({ status: "failed", result: "Could not stop: Transport gone" });
 });
 
+it("parent Stop settles a child its agent can't stop, so a thread that hit its usage limit takes the next message", async () => {
+  const { emit, host, service, parent, handles, hooks, start } = fixture;
+  emit({ type: "message.completed", runId: host.id, ts: Date.now(), subagentId: "unannounced", messageId: "child-text", role: "assistant", text: "Working" });
+  vi.spyOn(handles.get(host.id)!, "canStopSubagent").mockReturnValue(false);
+  emit({ type: "turn.completed", runId: host.id, ts: Date.now(), turnId: "root", status: "error", resultText: "You've hit your 5-hour limit", durationMs: 1 });
+  await vi.waitFor(() => expect(hooks.onTurnSettled).toHaveBeenCalledOnce());
+  await service.interrupt(host.id);
+  expect(service.threadActivity(parent.id)).toBe("idle");
+  await service.send(host.id, "Carry on");
+  expect(start).toHaveBeenCalledTimes(2);
+});
+
 it("a forked skill's agent ends with its skill, so a thread that hit its usage limit takes the next message", async () => {
   const { emit, host, service, parent, hooks, start, db } = fixture;
   const parser = new ClaudeStreamParser(host.id);

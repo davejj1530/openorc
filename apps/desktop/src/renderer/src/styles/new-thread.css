@@ -24,12 +24,104 @@
   letter-spacing: var(--text-title--letter-spacing);
   overflow-wrap: anywhere;
 }
+/* The project in the question is the switch: a word of the sentence with a 1px underline, faint at
+   rest and in ink on hover or while its list is open. */
+.new-thread-question-project {
+  display: inline;
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  text-align: inherit;
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 6px;
+  text-decoration-color: color-mix(in srgb, currentColor 30%, transparent);
+  transition: text-decoration-color var(--duration-quick) var(--ease-out);
+}
+.new-thread-question-project:is(:hover, [data-popup-open]):not(:disabled) {
+  text-decoration-color: currentColor;
+}
+.new-thread-question-project:disabled {
+  cursor: default;
+}
+/* The project and its question mark, one unit that wraps whole and swaps whole. */
+.new-thread-question-name {
+  display: inline-block;
+  max-width: 100%;
+}
+
+/* Switching projects swaps the screen in place (swapInPlace in lib/motion.ts). The parts carry names only
+   while the switch runs, so they hold no stacking context the rest of the time. */
+:root:active-view-transition-type(project) .new-thread-question-name {
+  view-transition-name: new-thread-project;
+}
+:root:active-view-transition-type(project) .new-thread-changes {
+  view-transition-name: new-thread-changes;
+}
+:root:active-view-transition-type(project) .composer-new-thread {
+  view-transition-name: new-thread-composer;
+}
+:root:active-view-transition-type(project) .new-thread-options {
+  view-transition-name: new-thread-options;
+}
+:root:active-view-transition-type(project) .thread-starters {
+  view-transition-name: new-thread-starters;
+}
+:root:active-view-transition-type(project) .new-thread-recent {
+  view-transition-name: new-thread-recent;
+}
+:root:active-view-transition-type(project) .panel-shell {
+  view-transition-name: new-thread-panel;
+}
+:root:active-view-transition-type(project) .project-picker-popup {
+  view-transition-name: new-thread-picker;
+}
+/* The name trades places with the old one, which leaves upward as the new one rises in. Both keep their
+   own width, anchored at the start, so neither stretches while the slot changes size. */
+:root:active-view-transition-type(project)::view-transition-old(new-thread-project),
+:root:active-view-transition-type(project)::view-transition-new(new-thread-project) {
+  inline-size: auto;
+  block-size: auto;
+}
+:root:active-view-transition-type(project)::view-transition-old(new-thread-project) {
+  animation-name: swap-leave, project-name-leave;
+  animation-duration: var(--duration-leave);
+}
+:root:active-view-transition-type(project)::view-transition-new(new-thread-project) {
+  animation-name: swap-arrive;
+}
+@keyframes project-name-leave {
+  to {
+    translate: 0 calc(var(--arrive-rise) * -1);
+  }
+}
+/* The list's rows swap apart from its heading, so the heading holds still. Another project's threads never
+   share a line with the last one's: the old rows leave, and the new ones, which arrive by themselves, start
+   as the old ones are nearly gone. */
+:root:active-view-transition-type(project) .new-thread-recent > .motion-stagger {
+  view-transition-name: new-thread-recent-rows;
+  --stagger-from: calc(var(--duration-leave) / 2);
+}
+:root:active-view-transition-type(project)::view-transition-old(new-thread-recent-rows) {
+  animation-name: swap-leave;
+  animation-duration: var(--duration-leave);
+}
+:root:active-view-transition-type(project)::view-transition-new(new-thread-recent-rows),
+:root:active-view-transition-type(project)::view-transition-new(new-thread-recent-rows):only-child {
+  animation: none;
+}
 .new-thread-empty {
   padding: 18px 20px;
   border-radius: var(--radius-3xl);
   background: var(--surface);
   color: var(--ink-2);
   font-size: var(--text-base);
+}
+
+/* Uncommitted changes sit right over the composer, on its left edge. */
+.new-thread-changes {
+  display: flex;
+  margin-bottom: 10px;
 }
 
 /* The composer: r24 on the writing-area role, a 15px prompt and one bar with a 34px send. */
@@ -68,7 +160,7 @@
   height: var(--control-send-hero);
 }
 
-/* Under the composer: where the thread works, the Claude account and uncommitted changes. */
+/* Under the composer: where the thread works, then the Claude account at the row's end. */
 .new-thread-options {
   display: flex;
   align-items: center;
@@ -130,7 +222,7 @@
   outline-offset: 2px;
 }
 
-/* "Pick up where you left off": a flat list of 42px rows with a status lead. */
+/* "Pick up where you left off": a flat list of 42px rows, the title flush left and the status beside the time. */
 .new-thread-recent {
   display: flex;
   flex-direction: column;
@@ -161,14 +253,6 @@
 .new-thread-recent-row:hover {
   background: var(--surface-2);
 }
-.new-thread-recent-lead {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  color: var(--ink-4);
-}
 .new-thread-recent-title {
   flex: 1;
   min-width: 0;
@@ -180,7 +264,10 @@
   letter-spacing: var(--text-base--letter-spacing);
 }
 .new-thread-recent-meta {
+  display: flex;
   flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
   color: var(--ink-4);
   font-size: var(--text-sm);
   line-height: var(--text-sm--line-height);

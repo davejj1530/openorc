@@ -120,10 +120,11 @@ export function inheritedProbe(env: NodeJS.ProcessEnv = process.env): ShellProbe
 }
 
 /**
- * Windows has no login shell to ask, and the environment it starts the app with is already the user's. So PATH is
- * kept as it is and each harness is looked up on it, unless whatever launched the app named that harness's binary.
+ * A probe that asks no shell: PATH is kept as it is and each harness is looked up on it, unless whatever launched the
+ * app named that harness's binary. Windows has no login shell to ask, and the environment it starts the app with is
+ * already the user's; the cloud brain decides its PATH itself, since nobody's dotfiles live there.
  */
-export function windowsProbe(env: NodeJS.ProcessEnv = process.env): ShellProbe {
+export function pathProbe(env: NodeJS.ProcessEnv = process.env): ShellProbe {
   const named = harnessBinaries((id) => env[harnessBinaryVariable(id)] || null);
   return async () => {
     const envPath = env["PATH"] ?? "";
@@ -186,7 +187,7 @@ export class ShellEnvironment {
 
   constructor(options: ShellEnvironmentOptions = {}) {
     this.env = options.env ?? process.env;
-    this.probe = options.probe ?? (process.platform === "win32" ? windowsProbe(this.env) : probeLoginShell);
+    this.probe = options.probe ?? (process.platform === "win32" ? pathProbe(this.env) : probeLoginShell);
     this.shell = options.shell ?? (() => loginShell(this.env));
     this.launcherPath = this.env["PATH"] ?? "";
     this.snapshot = freezeSnapshot(0, this.shell(), this.env);

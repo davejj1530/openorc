@@ -1,7 +1,7 @@
 import { mkdtemp, rm, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { Commit, FileChange, ProjectGit } from "@openorc/protocol";
+import type { Commit, CommitRange, FileChange, ProjectGit } from "@openorc/protocol";
 import { git, GitError } from "./exec.js";
 
 export interface RepoInfo {
@@ -68,21 +68,23 @@ export async function repoInfo(dir: string): Promise<RepoInfo> {
   return { root, remoteUrl: await originUrl(root), defaultBranch: await defaultBranch(root), headSha, branch };
 }
 
-/** origin/HEAD if it is set, else the first of main or master that exists, else the current branch. */
-export async function defaultBranch(root: string): Promise<string | null> {
+/**
+ * The branch work starts from: origin/HEAD if it is set; else `recorded`, the one known before, while origin has it;
+ * else main or master on origin; else `recorded` while it is still here; else main or master here; else the current
+ * branch. Origin's branches as last fetched settle it without the network, so a default that moved, as from master to
+ * main, is found once origin no longer has the old one.
+ */
+export async function defaultBranch(root: string, recorded: string | null = null): Promise<string | null> {
   try {
     const ref = (await git(root, ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"])).stdout.trim();
     if (ref.startsWith("origin/")) return ref.slice("origin/".length);
   } catch {
     // no origin/HEAD
   }
-  for (const candidate of ["main", "master"]) {
-    try {
-      await git(root, ["show-ref", "--verify", "--quiet", `refs/heads/${candidate}`]);
-      return candidate;
-    } catch {
-      // not this one
-    }
+  const has = async (ref: string) => (await git(root, ["show-ref", "--verify", "--quiet", ref], { okCodes: [0, 1] })).code === 0;
+  for (const where of ["refs/remotes/origin", "refs/heads"]) {
+    if (recorded && (await has(`${where}/${recorded}`))) return recorded;
+    for (const candidate of ["main", "master"]) if (await has(`${where}/${candidate}`)) return candidate;
   }
   try {
     const b = (await git(root, ["rev-parse", "--abbrev-ref", "HEAD"])).stdout.trim();
@@ -211,6 +213,50 @@ export async function log(cwd: string, range: string | null, limit = 50): Promis
       const [sha = "", author = "", at = "0", subject = ""] = line.split("\x1f");
       return { sha, author, at: Number(at) * 1000, subject };
     });
+}
+
+async function mergeBase(cwd: string, base: string | null, to: string): Promise<string | null> {
+  if (!base) return null;
+  return (await git(cwd, ["merge-base", base, to], { okCodes: [0, 1] })).stdout.trim() || null;
+}
+
+async function firstCommit(cwd: string, refs: string[]): Promise<string | null> {
+  for (const ref of refs) {
+    try {
+      return await revParse(cwd, ref);
+    } catch {
+      // not this one
+    }
+  }
+  return null;
+}
+
+/**
+ * The commits between `from` and `to`, or when `from` is null, the ones `to` has that `base` lacks, read from
+ * origin's copy of the base first. Null when `to` is not in this repository.
+ */
+export async function commitRange(cwd: string, request: { from: string | null; to: string; base: string | null; limit?: number }): Promise<CommitRange | null> {
+  const limit = request.limit ?? 12;
+  const to = await firstCommit(cwd, [request.to]);
+  if (!to) return null;
+  const base = request.base ?? (await defaultBranch(cwd));
+  const baseSha = base ? await firstCommit(cwd, [`refs/remotes/origin/${base}`, `refs/heads/${base}`, base]) : null;
+  const from = request.from ? await firstCommit(cwd, [request.from]) : await mergeBase(cwd, baseSha, to);
+  if (!from) return { commits: await log(cwd, to, limit), more: 0, start: null, base: null, stat: null };
+  const [listed, count, start, shortstat] = await Promise.all([
+    log(cwd, `${from}..${to}`, limit),
+    git(cwd, ["rev-list", "--count", `${from}..${to}`]),
+    log(cwd, from, 1),
+    git(cwd, ["diff", "--shortstat", from, to], { okCodes: [0, 1] }),
+  ]);
+  const out = shortstat.stdout;
+  return {
+    commits: listed,
+    more: Math.max(0, Number(count.stdout.trim()) - listed.length),
+    start: start[0] ?? null,
+    base: request.from ? null : base,
+    stat: { files: Number(/(\d+) files? changed/.exec(out)?.[1] ?? 0), added: Number(/(\d+) insertions?/.exec(out)?.[1] ?? 0), removed: Number(/(\d+) deletions?/.exec(out)?.[1] ?? 0) },
+  };
 }
 
 export async function isDirty(cwd: string): Promise<boolean> {

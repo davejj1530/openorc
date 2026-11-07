@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { relativeTime, untilTime } from "@openorc/client";
 import { harnessName, type Schedule } from "@openorc/protocol";
+import { useEffect, useRef, useState } from "react";
 import { ArrowUpRight, CalendarClock, RefreshCw, Trash2, Zap } from "../components/icons";
 import { IconButton, Switch, Tooltip } from "../components/ui";
-import { cn } from "../lib/cn";
 import { useRpcMutation } from "../lib/client";
+import { cn } from "../lib/cn";
 import { openThread, useRouter } from "../lib/router";
-import { relativeTime, untilTime } from "@openorc/client";
 import { beginScheduleTrigger, finishScheduleTrigger, readScheduleTrigger } from "../lib/schedule-draft";
 import "./schedules.css";
 
@@ -20,10 +20,6 @@ export const intervalLabel = (m: number) => intervals.find((i) => i.minutes === 
 
 function scheduleTargetLabel(schedule: Schedule): string {
   const target = schedule.executionTarget;
-  if (target?.kind === "team") {
-    if (schedule.team) return `${schedule.team.revision.name} · Version ${schedule.team.revision.number}`;
-    return "Saved team · pinned version";
-  }
   if (target?.kind === "model") return target.settings.model;
   return schedule.model ?? `${harnessName(schedule.agent)} default model`;
 }
@@ -94,7 +90,7 @@ function useRunNow(id: string) {
  * one line for the other.
  */
 function ScheduleWhen({ schedule: s, projectName }: { schedule: Schedule; projectName?: string | undefined }) {
-  const details = [scheduleTargetLabel(s), projectName, s.lastRunAt ? `last ${relativeTime(s.lastRunAt)}` : "never run", s.team?.archived ? "archived team, saved version kept" : null];
+  const details = [scheduleTargetLabel(s), projectName, s.lastRunAt ? `last ${relativeTime(s.lastRunAt)}` : "never run"];
   return (
     <span className="schedule-when">
       <span className="motion-swap shrink-0">
@@ -107,7 +103,7 @@ function ScheduleWhen({ schedule: s, projectName }: { schedule: Schedule; projec
 }
 
 /** Open the last thread, run now (or retry a saved run request) and delete. They show on hover. */
-function ScheduleTools({ threadId, run, busy, onDelete }: { threadId: string | null | undefined; run: ReturnType<typeof useRunNow>; busy: boolean; onDelete: () => void }) {
+function ScheduleTools({ threadId, run, busy, retired, onDelete }: { threadId: string | null | undefined; run: ReturnType<typeof useRunNow>; busy: boolean; retired: boolean; onDelete: () => void }) {
   const retryLabel = run.pendingKey ? "Retry run request" : "Run now";
   return (
     <div className={cn("schedule-tools", run.pendingKey && "schedule-tools-shown")}>
@@ -120,7 +116,7 @@ function ScheduleTools({ threadId, run, busy, onDelete }: { threadId: string | n
       ) : null}
       <Tooltip label={retryLabel}>
         <IconButton
-          disabled={busy}
+          disabled={busy || retired}
           onClick={() => void run.runNow()}
           aria-label={retryLabel}
           aria-description={run.pendingKey ? "Confirms the saved run request without starting duplicate work" : undefined}
@@ -185,6 +181,7 @@ export function ScheduleRow({ schedule: s, projectName, onEdit }: { schedule: Sc
           threadId={s.lastFire?.threadId ?? s.lastThreadId}
           run={run}
           busy={busy}
+          retired={Boolean(s.retiredTeam)}
           onDelete={() => {
             run.setError(null);
             remove.mutate({ id: s.id });
@@ -193,7 +190,7 @@ export function ScheduleRow({ schedule: s, projectName, onEdit }: { schedule: Sc
         <Switch
           aria-label={s.enabled ? "Pause schedule" : "Resume schedule"}
           checked={s.enabled}
-          disabled={busy}
+          disabled={busy || Boolean(s.retiredTeam)}
           onChange={() => {
             run.setError(null);
             update.mutate({ id: s.id, patch: { enabled: !s.enabled, expectedVersion: s.version } });

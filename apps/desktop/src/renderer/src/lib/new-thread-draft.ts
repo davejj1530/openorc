@@ -1,5 +1,4 @@
 import { decodeNewThreadDraft, type NewThreadDraft } from "@openorc/client";
-import type { TeamRevision } from "@openorc/protocol";
 import { readDraft, writeDraft } from "./drafts";
 
 const key = (projectId: string) => `newthread.${projectId}.execution`;
@@ -20,10 +19,6 @@ export function writeNewThreadDraft(draft: NewThreadDraft): boolean {
   return writeDraft(key(draft.projectId), draft);
 }
 
-export function teamLaunchRequest(previous: NewThreadDraft["launchRequest"], fingerprint: string): NonNullable<NewThreadDraft["launchRequest"]> {
-  return previous?.fingerprint === fingerprint ? previous : { key: crypto.randomUUID(), fingerprint };
-}
-
 export function rememberNewThreadProject(projectId: string): void {
   try {
     localStorage.setItem("openorc.newthread.project", projectId);
@@ -38,24 +33,4 @@ export function readNewThreadProject(): string | null {
   } catch {
     return null;
   }
-}
-
-export function teamDepth(revision: TeamRevision): number {
-  const members = new Map(revision.members.map((member) => [member.key, member]));
-  return Math.max(
-    ...revision.members.map((member) => {
-      const seen = new Set<string>();
-      let current = member,
-        depth = 1;
-      while (current.managerKey) {
-        if (seen.has(current.key)) return Infinity;
-        seen.add(current.key);
-        const manager = members.get(current.managerKey);
-        if (!manager) return Infinity;
-        depth += 1;
-        current = manager;
-      }
-      return depth;
-    }),
-  );
 }

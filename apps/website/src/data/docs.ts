@@ -19,7 +19,7 @@ export interface DocSection {
 }
 
 /** When these pages were last checked against the source. Update it when a page is revised. */
-export const docsReviewed = { date: "October 5, 2026" };
+export const docsReviewed = { date: "November 6, 2026" };
 
 /** The sidebar, in reading order. Groups are named after parts of the app. */
 export const docGroups: DocGroup[] = [
@@ -58,7 +58,7 @@ export const docGroups: DocGroup[] = [
           { id: "where", title: "Where agents work" },
           { id: "conversations", title: "Conversations" },
           { id: "planning", title: "Planning and context" },
-          { id: "companions", title: "Orclings and teams" },
+          { id: "companions", title: "Orclings" },
           { id: "next-steps", title: "Next steps" },
         ],
       },
@@ -94,6 +94,7 @@ export const docGroups: DocGroup[] = [
           { id: "choose", title: "Choose the agent and model" },
           { id: "effort", title: "Effort and Fast mode" },
           { id: "switch", title: "Switch agents in a thread" },
+          { id: "claude-accounts", title: "Use several Claude accounts" },
           { id: "usage", title: "Usage and allowances" },
           { id: "updates", title: "Update the agents" },
           { id: "next-steps", title: "Next steps" },
@@ -129,13 +130,31 @@ export const docGroups: DocGroup[] = [
       {
         slug: "messaging",
         title: "Threads working together",
-        description: "Let threads message each other and start helper threads, so separate pieces of work stay in step.",
+        description: "Let threads message each other and start helper threads, and follow the subagents an agent runs.",
         sections: [
           { id: "how-it-works", title: "How it works" },
           { id: "ask", title: "Ask in plain words" },
           { id: "helper-threads", title: "Helper threads" },
           { id: "messages", title: "Messages between threads" },
+          { id: "subagents", title: "Subagents" },
           { id: "limits", title: "How exchanges end" },
+          { id: "next-steps", title: "Next steps" },
+        ],
+      },
+      {
+        slug: "cloud",
+        title: "Cloud threads",
+        description: "Run a thread in a sandbox on your own Vercel or Agent37 account, and let a cloud brain keep your threads going while your computer sleeps.",
+        sections: [
+          { id: "how", title: "How cloud threads work" },
+          { id: "connect", title: "Connect a cloud service" },
+          { id: "sign-ins", title: "How agents sign in there" },
+          { id: "start", title: "Start a thread in the cloud" },
+          { id: "move", title: "Move a thread to the cloud and back" },
+          { id: "sleep", title: "When your computer sleeps" },
+          { id: "brain", title: "The cloud brain" },
+          { id: "costs", title: "Costs and limits" },
+          { id: "remove", title: "Remove cloud resources" },
           { id: "next-steps", title: "Next steps" },
         ],
       },
@@ -220,6 +239,17 @@ export const docGroups: DocGroup[] = [
         ],
       },
       {
+        slug: "files",
+        title: "Files and the editor",
+        description: "Open a conversation's files beside it, edit and save them, and have a model explain a file in plain words.",
+        sections: [
+          { id: "open", title: "Open a file" },
+          { id: "edit", title: "Edit and save" },
+          { id: "explain", title: "Explain a file" },
+          { id: "next-steps", title: "Next steps" },
+        ],
+      },
+      {
         slug: "git",
         title: "Git and worktrees",
         description: "Work in your checkout or give a thread its own worktree and branch, and see what OpenOrc adds to your repository.",
@@ -298,31 +328,21 @@ export const docGroups: DocGroup[] = [
     ],
   },
   {
-    title: "Teams",
+    title: "Integrations",
     pages: [
       {
-        slug: "teams",
-        title: "Agent teams",
-        label: "Agent teams (Beta)",
-        description: "Put several agents in one conversation: a lead that plans and hands out work, and members that report to it. Team execution is in Beta.",
+        slug: "phone",
+        title: "Phone app",
+        description: "Pair your iPhone with OpenOrc on your computer, then follow, answer, and start threads from your phone.",
         sections: [
-          { id: "what-a-team-is", title: "What a team is" },
-          { id: "turn-on", title: "Turn on team execution" },
-          { id: "create", title: "Create a team" },
-          { id: "start", title: "Start a team conversation" },
-          { id: "talk", title: "Talk to the team" },
-          { id: "members", title: "How members work together" },
-          { id: "changes", title: "Review and combine changes" },
-          { id: "needs-you", title: "When the team needs you" },
-          { id: "limits", title: "Limits" },
+          { id: "pair", title: "Pair your phone" },
+          { id: "connection", title: "How the phone reaches your computer" },
+          { id: "use", title: "What you can do from the phone" },
+          { id: "cloud-brain", title: "Reach the cloud brain" },
+          { id: "remove", title: "Remove a phone" },
           { id: "next-steps", title: "Next steps" },
         ],
       },
-    ],
-  },
-  {
-    title: "Integrations",
-    pages: [
       {
         slug: "slack",
         title: "Slack",
@@ -352,6 +372,18 @@ export const docGroups: DocGroup[] = [
         ],
       },
       {
+        slug: "devices",
+        title: "Simulators and emulators",
+        label: "Devices",
+        description: "Run iOS simulators and Android emulators beside the conversation, for you and your agents.",
+        sections: [
+          { id: "set-up", title: "Turn on device support" },
+          { id: "open", title: "Open a device" },
+          { id: "agents", title: "How agents use devices" },
+          { id: "next-steps", title: "Next steps" },
+        ],
+      },
+      {
         slug: "terminal",
         title: "Terminal and processes",
         description: "A terminal in every thread, and the long-running processes, like dev servers, that agents start.",
@@ -376,8 +408,11 @@ export const docGroups: DocGroup[] = [
         sections: [
           { id: "usage", title: "Usage" },
           { id: "connections", title: "Connections" },
+          { id: "cloud", title: "Cloud" },
           { id: "slack", title: "Slack" },
+          { id: "phone", title: "Phone" },
           { id: "skills", title: "Skills" },
+          { id: "devices", title: "Devices" },
           { id: "appearance", title: "Appearance" },
           { id: "general", title: "General" },
           { id: "memory", title: "Memory & models" },
@@ -412,6 +447,7 @@ export const docGroups: DocGroup[] = [
           { id: "ledger", title: "Agent events" },
           { id: "redaction", title: "Redaction" },
           { id: "secrets", title: "Settings and secrets" },
+          { id: "cloud", title: "In the cloud" },
           { id: "window", title: "Window storage" },
           { id: "retention", title: "How long things stay" },
           { id: "deleting", title: "What deleting removes" },
@@ -429,6 +465,7 @@ export const docGroups: DocGroup[] = [
           { id: "downloads", title: "Downloads and update checks" },
           { id: "git", title: "Git and GitHub" },
           { id: "local", title: "Local servers" },
+          { id: "cloud", title: "Cloud threads and the brain" },
           { id: "never", title: "What OpenOrc does not send" },
           { id: "next-steps", title: "Next steps" },
         ],
@@ -443,6 +480,7 @@ export const docGroups: DocGroup[] = [
           { id: "window", title: "The app window and the Preview" },
           { id: "agents", title: "What agents can do through OpenOrc" },
           { id: "package", title: "The installed app" },
+          { id: "cloud", title: "Cloud sandboxes and the brain" },
           { id: "secrets", title: "Secrets and your data" },
           { id: "limits", title: "What OpenOrc cannot protect against" },
           { id: "report", title: "Reporting a vulnerability" },
@@ -473,6 +511,7 @@ export const docGroups: DocGroup[] = [
           { id: "stuck", title: "A thread seems stuck" },
           { id: "approvals", title: "Approvals don't appear" },
           { id: "slack", title: "Slack doesn't reply" },
+          { id: "phone", title: "The phone can't reach your computer" },
           { id: "git", title: "Worktree and Git errors" },
           { id: "updates", title: "Updates won't install" },
           { id: "next-steps", title: "Next steps" },
@@ -490,7 +529,6 @@ export const docGroups: DocGroup[] = [
           { id: "storage", title: "Storage" },
           { id: "memory", title: "Memory" },
           { id: "slack", title: "Slack" },
-          { id: "teams", title: "Agent teams (Beta)" },
           { id: "windows-os", title: "Windows" },
           { id: "linux", title: "Linux" },
           { id: "next-steps", title: "Next steps" },

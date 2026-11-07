@@ -15,7 +15,12 @@ export interface RunLabel {
   done: string;
   /** What it ran on, shown faint beside the label: a test file, a package. */
   detail?: string;
+  /** What the work view draws it as, when it has its own drawing: a test run, or a step of publishing a branch. */
+  domain?: RunDomain;
 }
+
+/** `branch` is a look at the branch (status, history, a diff) that a publishing step draws as part of the branch. */
+export type RunDomain = "tests" | "commit" | "push" | "pull-request" | "branch";
 
 /** Each verb as a label says it, while it runs, and once done. */
 const VERBS = {
@@ -65,6 +70,8 @@ export function said(verb: Verb, object: string, detail?: string): RunLabel {
  * Labels as one: "Run the tests, the typecheck and lint", "Format files and run a.cjs". A verb the label before
  * already said is not said again; past three, the rest are counted.
  */
+const testsRun = (detail?: string): RunLabel => ({ ...said("Ran", "the tests", detail), domain: "tests" });
+
 export function joinLabels(labels: string[]): string {
   const shown = labels.length > 3 ? labels.slice(0, 2) : labels;
   const lead = (label: string | undefined) => label?.split(" ")[0];
@@ -117,7 +124,7 @@ export function unwrapWords(words: string[]): string[] {
 
 /** What a package script is for, by its name: `typecheck`, `test:unit`, `dev`. */
 function scriptLabel(script: string, detail?: string): RunLabel {
-  if (/^test/.test(script)) return said("Ran", "the tests", detail);
+  if (/^test/.test(script)) return testsRun(detail);
   if (/typecheck|type-check|^tsc/.test(script)) return said("Ran", "the typecheck", detail);
   if (/^lint/.test(script)) return said("Ran", "lint", detail);
   if (/^build/.test(script)) return said("Ran", "the build", detail);
@@ -218,8 +225,8 @@ function scriptRun(language: string, args: string[], input: string | null): RunL
   if (own.includes("-") || (at < 0 && input !== null)) return said("Ran", language, scriptSubject(input ?? undefined));
   const file = args[at];
   if (!file) return null;
-  if (own.includes("--test")) return said("Ran", "the tests", testTarget(args.slice(at)));
-  if (own.at(-1) === "-m") return /^(pytest|unittest)$/.test(file) ? said("Ran", "the tests", testTarget(args.slice(at + 1))) : said("Ran", file);
+  if (own.includes("--test")) return testsRun(testTarget(args.slice(at)));
+  if (own.at(-1) === "-m") return /^(pytest|unittest)$/.test(file) ? testsRun(testTarget(args.slice(at + 1))) : said("Ran", file);
   return own.includes("--check") ? said("Checked", basename(file)) : said("Ran", basename(file));
 }
 
@@ -252,11 +259,11 @@ const subcommand =
 const PROGRAMS: Record<string, Labeler> = {
   git: (args, input) => gitLabel(args, input),
   gh: (args) => ghLabel(args),
-  vitest: (args) => said("Ran", "the tests", testTarget(args)),
-  jest: (args) => said("Ran", "the tests", testTarget(args)),
-  mocha: (args) => said("Ran", "the tests", testTarget(args)),
-  pytest: (args) => said("Ran", "the tests", testTarget(args)),
-  playwright: (args) => (args[0] === "test" ? said("Ran", "the tests", testTarget(args)) : null),
+  vitest: (args) => testsRun(testTarget(args)),
+  jest: (args) => testsRun(testTarget(args)),
+  mocha: (args) => testsRun(testTarget(args)),
+  pytest: (args) => testsRun(testTarget(args)),
+  playwright: (args) => (args[0] === "test" ? testsRun(testTarget(args)) : null),
   tsc: (args) => said("Ran", "the typecheck", option(args, "-p", "--project")),
   "vue-tsc": () => said("Ran", "the typecheck"),
   mypy: () => said("Ran", "the typecheck"),
@@ -270,8 +277,8 @@ const PROGRAMS: Record<string, Labeler> = {
   next: subcommand({ build: () => said("Ran", "the build"), dev: () => said("Started", "the dev server") }),
   astro: subcommand({ build: () => said("Ran", "the build"), dev: () => said("Started", "the dev server") }),
   "electron-vite": (args) => (args[0] === "build" ? said("Ran", "the build") : said("Started", "the dev server")),
-  go: subcommand({ test: () => said("Ran", "the tests"), build: () => said("Ran", "the build") }),
-  cargo: subcommand({ test: () => said("Ran", "the tests"), build: () => said("Ran", "the build") }),
+  go: subcommand({ test: () => testsRun(), build: () => said("Ran", "the build") }),
+  cargo: subcommand({ test: () => testsRun(), build: () => said("Ran", "the build") }),
   docker: (args) => (args[0] === "build" ? said("Ran", "the build") : null),
   electron: (args) => {
     const file = operands(args)[0];
@@ -382,9 +389,12 @@ const STASH: Record<string, () => RunLabel> = {
 };
 
 const GIT: Record<string, (args: string[], files: string[], input: string | null) => RunLabel | null> = {
-  status: () => said("Checked", "git status"),
-  diff: (args, files) => (args.includes("--check") ? said("Checked", "the diff for whitespace") : said("Viewed", "the diff", diffPaths(files).length ? names(diffPaths(files)) : undefined)),
-  log: () => said("Viewed", "git history"),
+  status: () => ({ ...said("Checked", "git status"), domain: "branch" }),
+  diff: (args, files) => ({
+    ...(args.includes("--check") ? said("Checked", "the diff for whitespace") : said("Viewed", "the diff", diffPaths(files).length ? names(diffPaths(files)) : undefined)),
+    domain: "branch",
+  }),
+  log: () => ({ ...said("Viewed", "git history"), domain: "branch" }),
   show: (_, [target]) => {
     const [revision = "HEAD", file] = (target ?? "HEAD").split(":");
     if (file) return said("Viewed", `${basename(file)} at ${revision.slice(0, 7)}`);
@@ -394,7 +404,7 @@ const GIT: Record<string, (args: string[], files: string[], input: string | null
   add: (args, files) => said("Staged", args.some((word) => /^(-A|--all|\.)$/.test(word)) ? "all changes" : names(files)),
   commit: (args, _, input) => {
     const subject = commitSubject(args, input);
-    return subject ? said("Committed", `“${subject}”`) : said("Committed", "");
+    return { ...(subject ? said("Committed", `“${subject}”`) : said("Committed", "")), domain: "commit" };
   },
   branch: branchLabel,
   checkout: (args, files) => {
@@ -409,7 +419,7 @@ const GIT: Record<string, (args: string[], files: string[], input: string | null
     return files[0] ? said("Switched", `to ${files[0]}`) : null;
   },
   restore: (_, files) => (files.length ? said("Restored", names(files)) : null),
-  push: (_, files) => said("Pushed", files[1] ?? ""),
+  push: (_, files) => ({ ...said("Pushed", files[1] ?? ""), domain: "push" }),
   pull: () => said("Pulled", "changes"),
   fetch: () => said("Fetched", "updates"),
   clone: (_, files) => {
@@ -427,7 +437,7 @@ const GIT: Record<string, (args: string[], files: string[], input: string | null
 /** The GitHub CLI by what it looked at. */
 function ghLabel([area, action, target]: string[]): RunLabel | null {
   if (area === "pr" && action === "view") return said("Viewed", target && /^\d+$/.test(target) ? `PR #${target}` : "the pull request");
-  if (area === "pr" && action === "create") return said("Opened", "a pull request");
+  if (area === "pr" && action === "create") return { ...said("Opened", "a pull request"), domain: "pull-request" };
   if (area === "pr" && action === "checks") return said("Checked", "the PR's checks");
   if (area === "run" && action === "view") return said("Viewed", "a CI run");
   if (area === "run" && action === "list") return said("Listed", "CI runs");

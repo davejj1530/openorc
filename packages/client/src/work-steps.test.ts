@@ -190,6 +190,13 @@ it("names the one thing happening now, wherever it sits", () => {
   expect(head([])).toMatchObject({ label: "Working", entryId: null });
   // A streaming reply below the work speaks for itself.
   expect(head([tool("t1", "Read", { file_path: "a.ts" })], [tool("t1", "Read", { file_path: "a.ts" }), narration("reply", "Done", true)])).toBeNull();
+  // Once it has finished and the turn goes on, it names the step it announced; the work above it stays done.
+  const note = narration("note", "The spacing is fixed and Preview shows it. Next I'll build the site to make sure nothing else used those rules.");
+  expect(head([tool("t1", "Read", { file_path: "a.ts" })], [tool("t1", "Read", { file_path: "a.ts" }), note])).toEqual({
+    label: "Build the site to make sure nothing else used those rules",
+    since: 800,
+    entryId: null,
+  });
 });
 
 it("sums up a finished turn by the files it changed and the last check it ran", () => {

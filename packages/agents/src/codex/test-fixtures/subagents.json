@@ -1,0 +1,1430 @@
+{
+  "rootThreadId": "root",
+  "notifications": [
+    {
+      "method": "thread/started",
+      "params": {
+        "thread": {
+          "id": "root",
+          "environments": [
+            {
+              "environmentId": "local",
+              "runtimeWorkspaceRoots": ["/fixture"]
+            }
+          ],
+          "extra": null,
+          "sessionId": "provider-ref-1",
+          "forkedFromId": null,
+          "parentThreadId": null,
+          "preview": "",
+          "ephemeral": false,
+          "section": null,
+          "sectionEnteredAt": null,
+          "projectId": null,
+          "historyMode": "paginated",
+          "modelProvider": "openai",
+          "model": "gpt-6-luna",
+          "reasoningEffort": "low",
+          "createdAt": 1793649921,
+          "updatedAt": 1793649921,
+          "recencyAt": 1793649921,
+          "status": {
+            "type": "idle"
+          },
+          "cliVersion": "0.166.0",
+          "originator": "openorc_fixture",
+          "source": "vscode",
+          "canAcceptDirectInput": true,
+          "threadSource": null,
+          "agentNickname": null,
+          "agentRole": null,
+          "name": null,
+          "daybreakEnabled": null,
+          "turns": []
+        }
+      }
+    },
+    {
+      "method": "turn/started",
+      "params": {
+        "threadId": "root",
+        "turn": {
+          "id": "id-1",
+          "items": [],
+          "itemsView": "notLoaded",
+          "status": "inProgress",
+          "error": null,
+          "startedAt": 1793649921,
+          "completedAt": null,
+          "durationMs": null
+        }
+      }
+    },
+    {
+      "method": "item/started",
+      "params": {
+        "item": {
+          "type": "userMessage",
+          "id": "id-2",
+          "clientId": null,
+          "content": [
+            {
+              "type": "text",
+              "text": "Spawn two native subagents now, in parallel. Both must use gpt-6-luna with low effort. Child alpha should run only the shell command sleep 8; printf alpha and then reply alpha. Child beta should run only sleep 5; printf beta and then reply beta. Do not execute their commands yourself. Wait for both child agents to finish, then report both statuses in one sentence. The host may interrupt one child to test isolated stopping.",
+              "text_elements": []
+            }
+          ],
+          "startedAtMs": 1793649922723,
+          "completedAtMs": null
+        },
+        "threadId": "root",
+        "turnId": "id-1",
+        "startedAtMs": 1793649922723
+      }
+    },
+    {
+      "method": "item/completed",
+      "params": {
+        "item": {
+          "type": "userMessage",
+          "id": "id-2",
+          "clientId": null,
+          "content": [
+            {
+              "type": "text",
+              "text": "Spawn two native subagents now, in parallel. Both must use gpt-6-luna with low effort. Child alpha should run only the shell command sleep 8; printf alpha and then reply alpha. Child beta should run only sleep 5; printf beta and then reply beta. Do not execute their commands yourself. Wait for both child agents to finish, then report both statuses in one sentence. The host may interrupt one child to test isolated stopping.",
+              "text_elements": []
+            }
+          ],
+          "startedAtMs": 1793649922723,
+          "completedAtMs": 1793649922723
+        },
+        "threadId": "root",
+        "turnId": "id-1",
+        "completedAtMs": 1793649922723
+      }
+    },
+    {
+      "method": "item/started",
+      "params": {
+        "item": {
+          "type": "agentMessage",
+          "id": "id-3",
+          "text": "",
+          "phase": "commentary",
+          "memoryCitation": null,
+          "delivery": null,
+          "questions": null,
+          "startedAtMs": 1793649923548,
+          "completedAtMs": null
+        },
+        "threadId": "root",
+        "turnId": "id-1",
+        "startedAtMs": 1793649923548
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-3",
+        "delta": "I"
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-3",
+        "delta": "\u2019ll"
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-3",
+        "delta": " launch"
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-3",
+        "delta": " both"
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-3",
+        "delta": " children"
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-3",
+        "delta": " in"
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-3",
+        "delta": " parallel"
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-3",
+        "delta": " with"
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-3",
+        "delta": " fresh"
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-3",
+        "delta": " contexts"
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-3",
+        "delta": ","
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-3",
+        "delta": " then"
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-3",
+        "delta": " wait"
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-3",
+        "delta": " for"
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-3",
+        "delta": " their"
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-3",
+        "delta": " completion"
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-3",
+        "delta": " statuses"
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-3",
+        "delta": "."
+      }
+    },
+    {
+      "method": "item/completed",
+      "params": {
+        "item": {
+          "type": "agentMessage",
+          "id": "id-3",
+          "text": "I\u2019ll launch both children in parallel with fresh contexts, then wait for their completion statuses.",
+          "phase": "commentary",
+          "memoryCitation": null,
+          "delivery": null,
+          "questions": null,
+          "startedAtMs": 1793649923548,
+          "completedAtMs": 1793649923767
+        },
+        "threadId": "root",
+        "turnId": "id-1",
+        "completedAtMs": 1793649923767
+      }
+    },
+    {
+      "method": "item/started",
+      "params": {
+        "item": {
+          "type": "subAgentActivity",
+          "model": "gpt-6-luna",
+          "reasoningEffort": "low",
+          "id": "id-4",
+          "kind": "started",
+          "agentThreadId": "thread-5",
+          "agentPath": "/root/alpha",
+          "startedAtMs": 1793649924131,
+          "completedAtMs": null
+        },
+        "threadId": "root",
+        "turnId": "id-1",
+        "startedAtMs": 1793649924131
+      }
+    },
+    {
+      "method": "item/completed",
+      "params": {
+        "item": {
+          "type": "subAgentActivity",
+          "model": "gpt-6-luna",
+          "reasoningEffort": "low",
+          "id": "id-4",
+          "kind": "started",
+          "agentThreadId": "thread-5",
+          "agentPath": "/root/alpha",
+          "startedAtMs": 1793649924131,
+          "completedAtMs": 1793649924131
+        },
+        "threadId": "root",
+        "turnId": "id-1",
+        "completedAtMs": 1793649924131
+      }
+    },
+    {
+      "method": "turn/started",
+      "params": {
+        "threadId": "thread-5",
+        "turn": {
+          "id": "id-6",
+          "items": [],
+          "itemsView": "notLoaded",
+          "status": "inProgress",
+          "error": null,
+          "startedAt": 1793649924,
+          "completedAt": null,
+          "durationMs": null
+        }
+      }
+    },
+    {
+      "method": "thread/tokenUsage/updated",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "tokenUsage": {
+          "total": {
+            "totalTokens": 17212,
+            "inputTokens": 17111,
+            "cachedInputTokens": 11392,
+            "cacheWriteInputTokens": 0,
+            "outputTokens": 101,
+            "reasoningOutputTokens": 0
+          },
+          "last": {
+            "totalTokens": 17212,
+            "inputTokens": 17111,
+            "cachedInputTokens": 11392,
+            "cacheWriteInputTokens": 0,
+            "outputTokens": 101,
+            "reasoningOutputTokens": 0
+          },
+          "modelContextWindow": 258400
+        }
+      }
+    },
+    {
+      "method": "item/started",
+      "params": {
+        "item": {
+          "type": "subAgentActivity",
+          "model": "gpt-6-luna",
+          "reasoningEffort": "low",
+          "id": "id-7",
+          "kind": "started",
+          "agentThreadId": "thread-8",
+          "agentPath": "/root/beta",
+          "startedAtMs": 1793649925361,
+          "completedAtMs": null
+        },
+        "threadId": "root",
+        "turnId": "id-1",
+        "startedAtMs": 1793649925361
+      }
+    },
+    {
+      "method": "item/completed",
+      "params": {
+        "item": {
+          "type": "subAgentActivity",
+          "model": "gpt-6-luna",
+          "reasoningEffort": "low",
+          "id": "id-7",
+          "kind": "started",
+          "agentThreadId": "thread-8",
+          "agentPath": "/root/beta",
+          "startedAtMs": 1793649925361,
+          "completedAtMs": 1793649925361
+        },
+        "threadId": "root",
+        "turnId": "id-1",
+        "completedAtMs": 1793649925361
+      }
+    },
+    {
+      "method": "turn/started",
+      "params": {
+        "threadId": "thread-8",
+        "turn": {
+          "id": "id-9",
+          "items": [],
+          "itemsView": "notLoaded",
+          "status": "inProgress",
+          "error": null,
+          "startedAt": 1793649925,
+          "completedAt": null,
+          "durationMs": null
+        }
+      }
+    },
+    {
+      "method": "thread/tokenUsage/updated",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "tokenUsage": {
+          "total": {
+            "totalTokens": 34521,
+            "inputTokens": 34344,
+            "cachedInputTokens": 28288,
+            "cacheWriteInputTokens": 0,
+            "outputTokens": 177,
+            "reasoningOutputTokens": 0
+          },
+          "last": {
+            "totalTokens": 17309,
+            "inputTokens": 17233,
+            "cachedInputTokens": 16896,
+            "cacheWriteInputTokens": 0,
+            "outputTokens": 76,
+            "reasoningOutputTokens": 0
+          },
+          "modelContextWindow": 258400
+        }
+      }
+    },
+    {
+      "method": "item/started",
+      "params": {
+        "item": {
+          "type": "collabAgentToolCall",
+          "id": "id-10",
+          "tool": "wait",
+          "status": "inProgress",
+          "senderThreadId": "root",
+          "receiverThreadIds": [],
+          "prompt": null,
+          "model": null,
+          "reasoningEffort": null,
+          "agentsStates": {},
+          "startedAtMs": 1793649926273,
+          "completedAtMs": null
+        },
+        "threadId": "root",
+        "turnId": "id-1",
+        "startedAtMs": 1793649926273
+      }
+    },
+    {
+      "method": "item/started",
+      "params": {
+        "item": {
+          "type": "commandExecution",
+          "id": "id-11",
+          "pluginId": null,
+          "scriptPath": null,
+          "command": "/bin/zsh -lc 'sleep 8; printf alpha'",
+          "processId": "50697",
+          "source": "unifiedExecStartup",
+          "status": "inProgress",
+          "commandActions": [
+            {
+              "type": "unknown",
+              "command": "sleep 8; printf alpha"
+            }
+          ],
+          "aggregatedOutput": null,
+          "exitCode": null,
+          "durationMs": null,
+          "startedAtMs": 1793649926685,
+          "completedAtMs": null
+        },
+        "threadId": "thread-5",
+        "turnId": "id-6",
+        "startedAtMs": 1793649926685
+      }
+    },
+    {
+      "method": "thread/tokenUsage/updated",
+      "params": {
+        "threadId": "thread-5",
+        "turnId": "id-6",
+        "tokenUsage": {
+          "total": {
+            "totalTokens": 16889,
+            "inputTokens": 16851,
+            "cachedInputTokens": 0,
+            "cacheWriteInputTokens": 0,
+            "outputTokens": 38,
+            "reasoningOutputTokens": 0
+          },
+          "last": {
+            "totalTokens": 16889,
+            "inputTokens": 16851,
+            "cachedInputTokens": 0,
+            "cacheWriteInputTokens": 0,
+            "outputTokens": 38,
+            "reasoningOutputTokens": 0
+          },
+          "modelContextWindow": 258400
+        }
+      }
+    },
+    {
+      "method": "turn/completed",
+      "params": {
+        "threadId": "thread-5",
+        "turn": {
+          "id": "id-6",
+          "items": [],
+          "itemsView": "notLoaded",
+          "status": "interrupted",
+          "error": null,
+          "startedAt": 1793649924,
+          "completedAt": 1793649926,
+          "durationMs": 2561
+        }
+      }
+    },
+    {
+      "method": "item/started",
+      "params": {
+        "item": {
+          "type": "commandExecution",
+          "id": "id-12",
+          "pluginId": null,
+          "scriptPath": null,
+          "command": "/bin/zsh -c 'sleep 5; printf beta'",
+          "processId": "19991",
+          "source": "unifiedExecStartup",
+          "status": "inProgress",
+          "commandActions": [
+            {
+              "type": "unknown",
+              "command": "sleep 5; printf beta"
+            }
+          ],
+          "aggregatedOutput": null,
+          "exitCode": null,
+          "durationMs": null,
+          "startedAtMs": 1793649927475,
+          "completedAtMs": null
+        },
+        "threadId": "thread-8",
+        "turnId": "id-9",
+        "startedAtMs": 1793649927475
+      }
+    },
+    {
+      "method": "item/commandExecution/outputDelta",
+      "params": {
+        "threadId": "thread-8",
+        "turnId": "id-9",
+        "itemId": "id-12",
+        "delta": "beta"
+      }
+    },
+    {
+      "method": "item/completed",
+      "params": {
+        "item": {
+          "type": "commandExecution",
+          "id": "id-12",
+          "pluginId": null,
+          "scriptPath": null,
+          "command": "/bin/zsh -c 'sleep 5; printf beta'",
+          "processId": "19991",
+          "source": "unifiedExecStartup",
+          "status": "completed",
+          "commandActions": [
+            {
+              "type": "unknown",
+              "command": "sleep 5; printf beta"
+            }
+          ],
+          "aggregatedOutput": "beta",
+          "exitCode": 0,
+          "durationMs": 4871,
+          "startedAtMs": 1793649927475,
+          "completedAtMs": 1793649932346
+        },
+        "threadId": "thread-8",
+        "turnId": "id-9",
+        "completedAtMs": 1793649932346
+      }
+    },
+    {
+      "method": "thread/tokenUsage/updated",
+      "params": {
+        "threadId": "thread-8",
+        "turnId": "id-9",
+        "tokenUsage": {
+          "total": {
+            "totalTokens": 16885,
+            "inputTokens": 16851,
+            "cachedInputTokens": 16640,
+            "cacheWriteInputTokens": 0,
+            "outputTokens": 34,
+            "reasoningOutputTokens": 0
+          },
+          "last": {
+            "totalTokens": 16885,
+            "inputTokens": 16851,
+            "cachedInputTokens": 16640,
+            "cacheWriteInputTokens": 0,
+            "outputTokens": 34,
+            "reasoningOutputTokens": 0
+          },
+          "modelContextWindow": 258400
+        }
+      }
+    },
+    {
+      "method": "item/started",
+      "params": {
+        "item": {
+          "type": "agentMessage",
+          "id": "id-13",
+          "text": "",
+          "phase": "final_answer",
+          "memoryCitation": null,
+          "delivery": null,
+          "questions": null,
+          "startedAtMs": 1793649933044,
+          "completedAtMs": null
+        },
+        "threadId": "thread-8",
+        "turnId": "id-9",
+        "startedAtMs": 1793649933044
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "thread-8",
+        "turnId": "id-9",
+        "itemId": "id-13",
+        "delta": "beta"
+      }
+    },
+    {
+      "method": "item/completed",
+      "params": {
+        "item": {
+          "type": "agentMessage",
+          "id": "id-13",
+          "text": "beta",
+          "phase": "final_answer",
+          "memoryCitation": null,
+          "delivery": null,
+          "questions": null,
+          "startedAtMs": 1793649933044,
+          "completedAtMs": 1793649933153
+        },
+        "threadId": "thread-8",
+        "turnId": "id-9",
+        "completedAtMs": 1793649933153
+      }
+    },
+    {
+      "method": "thread/tokenUsage/updated",
+      "params": {
+        "threadId": "thread-8",
+        "turnId": "id-9",
+        "tokenUsage": {
+          "total": {
+            "totalTokens": 33799,
+            "inputTokens": 33760,
+            "cachedInputTokens": 33280,
+            "cacheWriteInputTokens": 0,
+            "outputTokens": 39,
+            "reasoningOutputTokens": 0
+          },
+          "last": {
+            "totalTokens": 16914,
+            "inputTokens": 16909,
+            "cachedInputTokens": 16640,
+            "cacheWriteInputTokens": 0,
+            "outputTokens": 5,
+            "reasoningOutputTokens": 0
+          },
+          "modelContextWindow": 258400
+        }
+      }
+    },
+    {
+      "method": "item/started",
+      "params": {
+        "item": {
+          "type": "subAgentActivity",
+          "model": null,
+          "reasoningEffort": null,
+          "id": "id-14",
+          "kind": "completed",
+          "agentThreadId": "thread-8",
+          "agentPath": "/root/beta",
+          "startedAtMs": 1793649933175,
+          "completedAtMs": null
+        },
+        "threadId": "root",
+        "turnId": "id-1",
+        "startedAtMs": 1793649933175
+      }
+    },
+    {
+      "method": "turn/completed",
+      "params": {
+        "threadId": "thread-8",
+        "turn": {
+          "id": "id-9",
+          "items": [
+            {
+              "type": "agentMessage",
+              "id": "id-13",
+              "text": "beta",
+              "phase": "final_answer",
+              "memoryCitation": null,
+              "delivery": null,
+              "questions": null,
+              "startedAtMs": 1793649933044,
+              "completedAtMs": 1793649933153
+            }
+          ],
+          "itemsView": "summary",
+          "status": "completed",
+          "error": null,
+          "startedAt": 1793649925,
+          "completedAt": 1793649933,
+          "durationMs": 7812
+        }
+      }
+    },
+    {
+      "method": "item/completed",
+      "params": {
+        "item": {
+          "type": "subAgentActivity",
+          "model": null,
+          "reasoningEffort": null,
+          "id": "id-14",
+          "kind": "completed",
+          "agentThreadId": "thread-8",
+          "agentPath": "/root/beta",
+          "startedAtMs": 1793649933175,
+          "completedAtMs": 1793649933175
+        },
+        "threadId": "root",
+        "turnId": "id-1",
+        "completedAtMs": 1793649933175
+      }
+    },
+    {
+      "method": "item/completed",
+      "params": {
+        "item": {
+          "type": "collabAgentToolCall",
+          "id": "id-10",
+          "tool": "wait",
+          "status": "completed",
+          "senderThreadId": "root",
+          "receiverThreadIds": [],
+          "prompt": null,
+          "model": null,
+          "reasoningEffort": null,
+          "agentsStates": {},
+          "startedAtMs": 1793649926273,
+          "completedAtMs": 1793649933176
+        },
+        "threadId": "root",
+        "turnId": "id-1",
+        "completedAtMs": 1793649933176
+      }
+    },
+    {
+      "method": "thread/tokenUsage/updated",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "tokenUsage": {
+          "total": {
+            "totalTokens": 51872,
+            "inputTokens": 51674,
+            "cachedInputTokens": 45312,
+            "cacheWriteInputTokens": 0,
+            "outputTokens": 198,
+            "reasoningOutputTokens": 0
+          },
+          "last": {
+            "totalTokens": 17351,
+            "inputTokens": 17330,
+            "cachedInputTokens": 17024,
+            "cacheWriteInputTokens": 0,
+            "outputTokens": 21,
+            "reasoningOutputTokens": 0
+          },
+          "modelContextWindow": 258400
+        }
+      }
+    },
+    {
+      "method": "item/started",
+      "params": {
+        "item": {
+          "type": "collabAgentToolCall",
+          "id": "id-15",
+          "tool": "wait",
+          "status": "inProgress",
+          "senderThreadId": "root",
+          "receiverThreadIds": [],
+          "prompt": null,
+          "model": null,
+          "reasoningEffort": null,
+          "agentsStates": {},
+          "startedAtMs": 1793649933866,
+          "completedAtMs": null
+        },
+        "threadId": "root",
+        "turnId": "id-1",
+        "startedAtMs": 1793649933866
+      }
+    },
+    {
+      "method": "item/commandExecution/outputDelta",
+      "params": {
+        "threadId": "thread-5",
+        "turnId": "id-6",
+        "itemId": "id-11",
+        "delta": "alpha"
+      }
+    },
+    {
+      "method": "item/completed",
+      "params": {
+        "item": {
+          "type": "commandExecution",
+          "id": "id-11",
+          "pluginId": null,
+          "scriptPath": null,
+          "command": "/bin/zsh -lc 'sleep 8; printf alpha'",
+          "processId": "50697",
+          "source": "unifiedExecStartup",
+          "status": "completed",
+          "commandActions": [
+            {
+              "type": "unknown",
+              "command": "sleep 8; printf alpha"
+            }
+          ],
+          "aggregatedOutput": "alpha",
+          "exitCode": 0,
+          "durationMs": 7884,
+          "startedAtMs": 1793649926685,
+          "completedAtMs": 1793649934569
+        },
+        "threadId": "thread-5",
+        "turnId": "id-6",
+        "completedAtMs": 1793649934569
+      }
+    },
+    {
+      "method": "item/completed",
+      "params": {
+        "item": {
+          "type": "collabAgentToolCall",
+          "id": "id-15",
+          "tool": "wait",
+          "status": "completed",
+          "senderThreadId": "root",
+          "receiverThreadIds": [],
+          "prompt": null,
+          "model": null,
+          "reasoningEffort": null,
+          "agentsStates": {},
+          "startedAtMs": 1793649933866,
+          "completedAtMs": 1793650053869
+        },
+        "threadId": "root",
+        "turnId": "id-1",
+        "completedAtMs": 1793650053869
+      }
+    },
+    {
+      "method": "thread/tokenUsage/updated",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "tokenUsage": {
+          "total": {
+            "totalTokens": 69304,
+            "inputTokens": 69085,
+            "cachedInputTokens": 62464,
+            "cacheWriteInputTokens": 0,
+            "outputTokens": 219,
+            "reasoningOutputTokens": 0
+          },
+          "last": {
+            "totalTokens": 17432,
+            "inputTokens": 17411,
+            "cachedInputTokens": 17152,
+            "cacheWriteInputTokens": 0,
+            "outputTokens": 21,
+            "reasoningOutputTokens": 0
+          },
+          "modelContextWindow": 258400
+        }
+      }
+    },
+    {
+      "method": "item/started",
+      "params": {
+        "item": {
+          "type": "reasoning",
+          "id": "id-16",
+          "summary": [],
+          "content": [],
+          "startedAtMs": 1793650055133,
+          "completedAtMs": null
+        },
+        "threadId": "root",
+        "turnId": "id-1",
+        "startedAtMs": 1793650055133
+      }
+    },
+    {
+      "method": "item/reasoning/summaryTextDelta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-16",
+        "delta": "**Waiting on test status**",
+        "summaryIndex": 0
+      }
+    },
+    {
+      "method": "item/completed",
+      "params": {
+        "item": {
+          "type": "reasoning",
+          "id": "id-16",
+          "summary": ["**Waiting on test status**"],
+          "content": [],
+          "startedAtMs": 1793650055133,
+          "completedAtMs": 1793650058351
+        },
+        "threadId": "root",
+        "turnId": "id-1",
+        "completedAtMs": 1793650058351
+      }
+    },
+    {
+      "method": "thread/tokenUsage/updated",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "tokenUsage": {
+          "total": {
+            "totalTokens": 86792,
+            "inputTokens": 86542,
+            "cachedInputTokens": 79744,
+            "cacheWriteInputTokens": 0,
+            "outputTokens": 250,
+            "reasoningOutputTokens": 14
+          },
+          "last": {
+            "totalTokens": 17488,
+            "inputTokens": 17457,
+            "cachedInputTokens": 17280,
+            "cacheWriteInputTokens": 0,
+            "outputTokens": 31,
+            "reasoningOutputTokens": 14
+          },
+          "modelContextWindow": 258400
+        }
+      }
+    },
+    {
+      "method": "item/started",
+      "params": {
+        "item": {
+          "type": "agentMessage",
+          "id": "id-17",
+          "text": "",
+          "phase": "final_answer",
+          "memoryCitation": null,
+          "delivery": null,
+          "questions": null,
+          "startedAtMs": 1793650059218,
+          "completedAtMs": null
+        },
+        "threadId": "root",
+        "turnId": "id-1",
+        "startedAtMs": 1793650059218
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-17",
+        "delta": "Beta"
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-17",
+        "delta": " completed"
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-17",
+        "delta": " and"
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-17",
+        "delta": " replied"
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-17",
+        "delta": " `"
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-17",
+        "delta": "beta"
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-17",
+        "delta": "`;"
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-17",
+        "delta": " alpha"
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-17",
+        "delta": " was"
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-17",
+        "delta": " interrupted"
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-17",
+        "delta": " before"
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-17",
+        "delta": " completing"
+      }
+    },
+    {
+      "method": "item/agentMessage/delta",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "itemId": "id-17",
+        "delta": "."
+      }
+    },
+    {
+      "method": "item/completed",
+      "params": {
+        "item": {
+          "type": "agentMessage",
+          "id": "id-17",
+          "text": "Beta completed and replied `beta`; alpha was interrupted before completing.",
+          "phase": "final_answer",
+          "memoryCitation": null,
+          "delivery": null,
+          "questions": null,
+          "startedAtMs": 1793650059218,
+          "completedAtMs": 1793650059395
+        },
+        "threadId": "root",
+        "turnId": "id-1",
+        "completedAtMs": 1793650059395
+      }
+    },
+    {
+      "method": "thread/tokenUsage/updated",
+      "params": {
+        "threadId": "root",
+        "turnId": "id-1",
+        "tokenUsage": {
+          "total": {
+            "totalTokens": 104354,
+            "inputTokens": 104087,
+            "cachedInputTokens": 97024,
+            "cacheWriteInputTokens": 0,
+            "outputTokens": 267,
+            "reasoningOutputTokens": 14
+          },
+          "last": {
+            "totalTokens": 17562,
+            "inputTokens": 17545,
+            "cachedInputTokens": 17280,
+            "cacheWriteInputTokens": 0,
+            "outputTokens": 17,
+            "reasoningOutputTokens": 0
+          },
+          "modelContextWindow": 258400
+        }
+      }
+    },
+    {
+      "method": "turn/completed",
+      "params": {
+        "threadId": "root",
+        "turn": {
+          "id": "id-1",
+          "items": [
+            {
+              "type": "agentMessage",
+              "id": "id-17",
+              "text": "Beta completed and replied `beta`; alpha was interrupted before completing.",
+              "phase": "final_answer",
+              "memoryCitation": null,
+              "delivery": null,
+              "questions": null,
+              "startedAtMs": 1793650059218,
+              "completedAtMs": 1793650059395
+            }
+          ],
+          "itemsView": "summary",
+          "status": "completed",
+          "error": null,
+          "startedAt": 1793649921,
+          "completedAt": 1793650059,
+          "durationMs": 137958
+        }
+      }
+    }
+  ],
+  "reads": [
+    {
+      "method": "thread/read",
+      "threadId": "thread-5",
+      "result": {
+        "thread": {
+          "id": "thread-5",
+          "preview": "",
+          "model": "gpt-6-luna",
+          "source": {
+            "subAgent": {
+              "thread_spawn": {
+                "parent_thread_id": "root",
+                "depth": 1,
+                "agent_path": "/root/alpha",
+                "agent_nickname": "Maxwell",
+                "agent_role": null
+              }
+            }
+          },
+          "agentNickname": "Maxwell",
+          "agentRole": null
+        }
+      }
+    },
+    {
+      "method": "thread/items/list",
+      "threadId": "thread-5",
+      "result": {
+        "data": [],
+        "nextCursor": null,
+        "backwardsCursor": null
+      }
+    },
+    {
+      "method": "thread/read",
+      "threadId": "thread-8",
+      "result": {
+        "thread": {
+          "id": "thread-8",
+          "preview": "",
+          "model": "gpt-6-luna",
+          "source": {
+            "subAgent": {
+              "thread_spawn": {
+                "parent_thread_id": "root",
+                "depth": 1,
+                "agent_path": "/root/beta",
+                "agent_nickname": "Descartes",
+                "agent_role": null
+              }
+            }
+          },
+          "agentNickname": "Descartes",
+          "agentRole": null
+        }
+      }
+    },
+    {
+      "method": "thread/items/list",
+      "threadId": "thread-8",
+      "result": {
+        "data": [],
+        "nextCursor": null,
+        "backwardsCursor": null
+      }
+    },
+    {
+      "method": "thread/read",
+      "threadId": "thread-5",
+      "result": {
+        "thread": {
+          "id": "thread-5",
+          "preview": "",
+          "model": "gpt-6-luna",
+          "source": {
+            "subAgent": {
+              "thread_spawn": {
+                "parent_thread_id": "root",
+                "depth": 1,
+                "agent_path": "/root/alpha",
+                "agent_nickname": "Maxwell",
+                "agent_role": null
+              }
+            }
+          },
+          "agentNickname": "Maxwell",
+          "agentRole": null
+        }
+      }
+    },
+    {
+      "method": "thread/items/list",
+      "threadId": "thread-5",
+      "result": {
+        "data": [
+          {
+            "turnId": "id-6",
+            "item": {
+              "type": "commandExecution",
+              "id": "id-11",
+              "pluginId": null,
+              "scriptPath": null,
+              "command": "/bin/zsh -lc 'sleep 8; printf alpha'",
+              "processId": "50697",
+              "source": "unifiedExecStartup",
+              "status": "completed",
+              "commandActions": [
+                {
+                  "type": "unknown",
+                  "command": "sleep 8; printf alpha"
+                }
+              ],
+              "aggregatedOutput": "alpha",
+              "exitCode": 0,
+              "durationMs": 7884,
+              "startedAtMs": 1793649926685,
+              "completedAtMs": 1793649934569
+            },
+            "startedAtMs": 1793649926685,
+            "completedAtMs": 1793649934569
+          }
+        ],
+        "nextCursor": null,
+        "backwardsCursor": "{\"requestedThreadId\":\"provider-ref-2\",\"rolloutOrdinal\":19,\"includeAnchor\":true,\"scope\":{\"kind\":\"itemsByCreatedAtOrdinal\"}}"
+      }
+    },
+    {
+      "method": "thread/read",
+      "threadId": "thread-8",
+      "result": {
+        "thread": {
+          "id": "thread-8",
+          "preview": "",
+          "model": "gpt-6-luna",
+          "source": {
+            "subAgent": {
+              "thread_spawn": {
+                "parent_thread_id": "root",
+                "depth": 1,
+                "agent_path": "/root/beta",
+                "agent_nickname": "Descartes",
+                "agent_role": null
+              }
+            }
+          },
+          "agentNickname": "Descartes",
+          "agentRole": null
+        }
+      }
+    },
+    {
+      "method": "thread/items/list",
+      "threadId": "thread-8",
+      "result": {
+        "data": [
+          {
+            "turnId": "id-9",
+            "item": {
+              "type": "commandExecution",
+              "id": "id-12",
+              "pluginId": null,
+              "scriptPath": null,
+              "command": "/bin/zsh -c 'sleep 5; printf beta'",
+              "processId": "19991",
+              "source": "unifiedExecStartup",
+              "status": "completed",
+              "commandActions": [
+                {
+                  "type": "unknown",
+                  "command": "sleep 5; printf beta"
+                }
+              ],
+              "aggregatedOutput": "beta",
+              "exitCode": 0,
+              "durationMs": 4871,
+              "startedAtMs": 1793649927475,
+              "completedAtMs": 1793649932346
+            },
+            "startedAtMs": 1793649927475,
+            "completedAtMs": 1793649932346
+          },
+          {
+            "turnId": "id-9",
+            "item": {
+              "type": "agentMessage",
+              "id": "id-13",
+              "text": "beta",
+              "phase": "final_answer",
+              "memoryCitation": null,
+              "delivery": null,
+              "questions": null,
+              "startedAtMs": 1793649933044,
+              "completedAtMs": 1793649933153
+            },
+            "startedAtMs": 1793649933044,
+            "completedAtMs": 1793649933153
+          }
+        ],
+        "nextCursor": null,
+        "backwardsCursor": "{\"requestedThreadId\":\"provider-ref-3\",\"rolloutOrdinal\":15,\"includeAnchor\":true,\"scope\":{\"kind\":\"itemsByCreatedAtOrdinal\"}}"
+      }
+    }
+  ]
+}

@@ -15,7 +15,7 @@ import { docHref } from "../../data/docs";
   <section aria-labelledby="create">
     <h2 id="create">Create a schedule</h2>
     <ol class="docs-steps">
-      <li>Open <strong>Schedules</strong> in the sidebar.</li>
+      <li>Click <strong>Schedules</strong> in the sidebar's footer.</li>
       <li>Choose <strong>New schedule</strong>, the <strong>+</strong> button in the header.</li>
       <li>Fill in the fields below and choose <strong>Create</strong>.</li>
     </ol>
@@ -33,6 +33,10 @@ import { docHref } from "../../data/docs";
             <td>Where the runs work. You can't change it after saving.</td>
           </tr>
           <tr>
+            <td><strong>Claude account</strong></td>
+            <td>For a Claude model, the account the runs use.</td>
+          </tr>
+          <tr>
             <td><strong>Name</strong></td>
             <td>The schedule's name. Each run's thread is titled with it.</td>
           </tr>
@@ -45,8 +49,8 @@ import { docHref } from "../../data/docs";
             <td><strong>Every 30 minutes</strong>, <strong>Every hour</strong>, <strong>Every 6 hours</strong>, <strong>Every day</strong> or <strong>Every week</strong>. New schedules start at Every day.</td>
           </tr>
           <tr>
-            <td><strong>Model or team</strong></td>
-            <td>The model and effort that run the prompt, or a saved <a href={docHref("teams")}>agent team</a> (Beta).</td>
+            <td><strong>Model</strong></td>
+            <td>The model and effort that run the prompt.</td>
           </tr>
           <tr>
             <td><strong>Mode</strong></td>
@@ -54,7 +58,7 @@ import { docHref } from "../../data/docs";
           </tr>
           <tr>
             <td><strong>Works in</strong></td>
-            <td><strong>A fresh worktree</strong> for each run, the default, or <strong>The checkout</strong>. A project without Git or without a first commit can only use the checkout. Team schedules always give the team its own workspaces.</td>
+            <td><strong>A fresh worktree</strong> for each run, the default, or <strong>The checkout</strong>. A project without Git or without a first commit can only use the checkout.</td>
           </tr>
         </tbody>
       </table>
@@ -110,7 +114,6 @@ import { docHref } from "../../data/docs";
       <li>The first run comes one interval after you create the schedule. Use <strong>Run now</strong> to try a schedule straight away.</li>
       <li>If a run came due while OpenOrc was closed or the computer was asleep, it runs once at the next check. Missed runs don't pile up.</li>
       <li>On macOS, OpenOrc keeps running after you close its window, until you quit it. On Windows and Linux, closing the last window quits it.</li>
-      <li>A team schedule skips a run while the team from its previous run still has unfinished work.</li>
     </ul>
     <Callout>The mode decides what a run does while you are away. In a mode that asks before commands or edits, the run stops at the first request and waits in its thread until you answer.</Callout>
   </section>

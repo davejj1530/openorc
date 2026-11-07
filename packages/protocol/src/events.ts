@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { HarnessId } from "./harness.js";
 import { McpToolSource } from "./mcp-apps.js";
+import { ToolDigest } from "./tool-digest.js";
 
 /**
  * The internal event model. Every adapter (Claude Code, Codex, ACP) maps its
@@ -54,7 +55,11 @@ const base = {
   eventId: z.string().optional(),
   runId: z.string(),
   ts: z.number(),
+  subagentId: z.string().optional(),
 };
+
+export const SubagentStatus = z.enum(["running", "completed", "failed", "stopped", "no_updates"]);
+export type SubagentStatus = z.infer<typeof SubagentStatus>;
 
 export const ActivityStatus = z.enum(["running", "success", "error", "cancelled", "disconnected"]);
 export type ActivityStatus = z.infer<typeof ActivityStatus>;
@@ -67,7 +72,38 @@ export type ActivityRecovery = z.infer<typeof ActivityRecovery>;
 export const BackgroundCommand = z.object({ id: z.string(), description: z.string() });
 export type BackgroundCommand = z.infer<typeof BackgroundCommand>;
 
+/** An agent's session id as hosts keep it: it names the session's file on the host, so it is never a path. */
+export const SESSION_ID = /^[A-Za-z0-9_-]{1,100}$/;
+
 export const AgentEvent = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("subagent.started"),
+    ...base,
+    subagentId: z.string(),
+    parentSubagentId: z.string().optional(),
+    threadId: z.string().optional(),
+    toolCallId: z.string().optional(),
+    title: z.string(),
+    prompt: z.string().optional(),
+    agentType: z.string().optional(),
+    /** A named phase or group within the parent transcript. */
+    group: z.string().optional(),
+    model: z.string().optional(),
+    effort: z.string().optional(),
+    background: z.boolean().optional(),
+  }),
+  z.object({
+    type: z.literal("subagent.updated"),
+    ...base,
+    subagentId: z.string(),
+    threadId: z.string().optional(),
+    status: SubagentStatus.optional(),
+    taskId: z.string().optional(),
+    notice: z.string().optional(),
+    progress: z.string().optional(),
+    result: z.string().optional(),
+    error: z.string().optional(),
+  }),
   z.object({ type: z.literal("plan.updated"), ...base, documentId: z.string(), text: z.string(), delta: z.boolean().optional(), complete: z.boolean().optional() }),
   z.object({
     type: z.literal("session.started"),
@@ -167,6 +203,8 @@ export const AgentEvent = z.discriminatedUnion("type", [
     input: z.unknown().optional(),
     /** Set on transcript pages, which leave large outputs out; the row loads its output when opened. */
     outputOmitted: z.boolean().optional(),
+    /** What a large output came to, saved by the core so a page that leaves the output out still says it. */
+    digest: ToolDigest.optional(),
   }),
   z.object({
     type: z.literal("file.changed"),
@@ -218,6 +256,8 @@ export const AgentEvent = z.discriminatedUnion("type", [
     turnId: z.string(),
     status: RunStatus,
     resultText: z.string().optional(),
+    /** A hosted child's updates ended without an observed completion or a user Stop. */
+    observationEnded: z.literal(true).optional(),
     usage: Usage.optional(),
     durationMs: z.number().nonnegative(),
     /** For a turn that asked for Fast, whether the provider served it, with its code for why not. */
@@ -290,6 +330,8 @@ export const RunSpec = z.object({
   /** Absolute paths of images to hand the agent with the prompt. */
   attachments: z.array(z.string()).optional(),
   resumeSessionId: z.string().optional(),
+  /** Native Claude task aliases retained when a provider process resumes the parent session. */
+  resumedSubagents: z.array(z.object({ nativeId: z.string(), taskId: z.string(), title: z.string(), parentSubagentId: z.string().optional(), endedAt: z.number() })).optional(),
   /** With resumeSessionId: continue as a new session that branches off the old one instead of appending to it. */
   forkSession: z.boolean().optional(),
   permissionMode: z.enum(["review", "trusted", "autonomous"]).default("trusted"),

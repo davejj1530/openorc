@@ -12,21 +12,21 @@ describe("a thread's menu on the phone", () => {
     expect(outline(threadMenu(thread("t-plan"), "row", wednesday))).toEqual([
       ["Pin", "Snooze ▸ In 1 hour, In 3 hours, This evening, Tomorrow morning, Next week", "Mark as Unread"],
       ["Rename…"],
-      ["Archive"],
+      ["Resolve"],
     ]);
   });
 
-  it("turns each action around for a pinned, unread, snoozed or archived thread, with the pull request beside Rename", () => {
+  it("turns each action around for a pinned, unread, snoozed or resolved thread, with the pull request beside Rename", () => {
     const notes = { ...thread("t-headline"), unread: true, snoozedUntil: wednesday.getTime() + 60_000, archivedAt: 1 };
     expect(outline(threadMenu(notes, "row", wednesday))).toEqual([
       ["Unpin", "Snoozed ▸ In 1 hour, In 3 hours, This evening, Tomorrow morning, Next week, Wake Now", "Mark as Read"],
       ["Rename…", "Open Pull Request"],
-      ["Unarchive"],
+      ["Reopen"],
     ]);
   });
 
   it("leads with Rename in the thread's header", () => {
-    expect(outline(threadMenu(thread("t-settings"), "header", wednesday)).map((section) => section[0])).toEqual(["Rename…", "Pin", "Open Pull Request", "Archive"]);
+    expect(outline(threadMenu(thread("t-settings"), "header", wednesday)).map((section) => section[0])).toEqual(["Rename…", "Pin", "Open Pull Request", "Resolve"]);
   });
 
   it("puts Changes first in the header of a thread with Git, the uncommitted files beneath it, and keeps the rest in order", () => {
@@ -66,17 +66,58 @@ describe("a thread's menu on the phone", () => {
     expect(row).not.toContain("Preview");
   });
 
-  it("leaves a team thread's snooze and archive to the team on the Mac", () => {
+  it("offers Move to Cloud in the header after the pull request when the thread can move there, and never on a Home row", () => {
+    const menu = outline(threadMenu(thread("t-settings"), "header", wednesday, { uncommitted: null, preview: null, toCloud: true }));
+    expect(menu[2]).toEqual(["Open Pull Request", "Move to Cloud"]);
+    const move = { kind: "screen", label: "Move to Cloud", icon: "icloud.and.arrow.up", pathname: "/move-to-cloud" };
+    expect(threadMenu(thread("t-plan"), "header", wednesday, { uncommitted: null, preview: null, toCloud: true }).flat()).toContainEqual(move);
+    expect(outline(threadMenu(thread("t-settings"), "header", wednesday)).flat()).not.toContain("Move to Cloud");
+    expect(outline(threadMenu(thread("t-settings"), "row", wednesday, { uncommitted: null, preview: null, toCloud: true })).flat()).not.toContain("Move to Cloud");
+  });
+
+  it("brings an idle cloud brain thread to the Mac from the header, and offers to keep a thread where it is while it moves", () => {
+    const onBrain = { uncommitted: null, preview: null, moves: { mac: "mac-1", onBrain: true } };
+    const idle = { ...thread("t-settings"), activity: "idle" as const };
+    expect(threadMenu(idle, "header", wednesday, onBrain).flat()).toContainEqual({
+      kind: "move",
+      label: "Bring to Mac",
+      icon: "laptopcomputer.and.arrow.down",
+      method: "cloud.bringToMac",
+      mac: "mac-1",
+    });
+    expect(outline(threadMenu({ ...idle, activity: "running" }, "header", wednesday, onBrain)).flat()).not.toContain("Bring to Mac");
+    expect(outline(threadMenu(idle, "header", wednesday, { ...onBrain, moves: { mac: "mac-1", onBrain: false } })).flat()).not.toContain("Bring to Mac");
+    const coming = { ...idle, moving: { to: "mac" as const, since: 1 } };
+    expect(threadMenu(coming, "header", wednesday, onBrain).flat()).toContainEqual({ kind: "move", label: "Keep in Cloud", icon: "icloud", method: "cloud.keep", mac: "mac-1" });
+    const leaving = { ...idle, moving: { to: "cloud" as const, since: 1 } };
+    expect(outline(threadMenu(leaving, "header", wednesday, { ...onBrain, moves: { mac: "mac-1", onBrain: false } })).flat()).toContain("Keep on Mac");
+    expect(outline(threadMenu(coming, "header", wednesday)).flat()).not.toContain("Keep in Cloud");
+    expect(outline(threadMenu(idle, "row", wednesday, onBrain)).flat()).not.toContain("Bring to Mac");
+  });
+
+  it("leaves a team thread's snooze and resolving to the team on the Mac", () => {
     expect(outline(threadMenu({ ...thread("t-plan"), teamInstanceId: "team-1" }, "row", wednesday))).toEqual([["Pin", "Mark as Unread"], ["Rename…"]]);
   });
 
   it("saves each change as the patch the phone may send", () => {
-    const [organize, , archive] = threadMenu(thread("t-plan"), "row", wednesday);
+    const [organize, , resolve] = threadMenu(thread("t-plan"), "row", wednesday);
     const snooze = organize![1]!;
     expect(organize![0]).toMatchObject({ patch: { pinned: true } });
     const inAnHour = snooze.kind === "menu" ? snooze.actions[0] : undefined;
     expect(inAnHour?.kind === "snooze" && inAnHour.until(wednesday)).toBe(wednesday.getTime() + 3_600_000);
     expect(organize![2]).toMatchObject({ patch: { seen: false } });
-    expect(archive![0]).toMatchObject({ patch: { archived: true } });
+    expect(resolve![0]).toMatchObject({ patch: { archived: true } });
   });
+});
+
+it("offers only parent navigation for a hosted child even when Git, cloud, and preview exist", () => {
+  const child = { ...thread("t-settings"), parentThreadId: "parent", parentRelation: "subagent" as const };
+  for (const place of ["row", "header"] as const) {
+    expect(outline(threadMenu(child, place, wednesday, { uncommitted: 3, preview: { page: "Docs" }, toCloud: true }))).toEqual([["Open parent"]]);
+  }
+  expect(
+    threadMenu({ ...child, parentRelation: "started" }, "header", wednesday)
+      .flat()
+      .some((item) => item.kind === "rename"),
+  ).toBe(true);
 });

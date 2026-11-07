@@ -67,5 +67,5 @@ export async function configureWorkspace(db: Db, entrypoint: string): Promise<Pr
 /** Forks share their parent's worktree; it goes only with the last thread that uses it. */
 export function worktreeShared(db: Db, thread: Thread): boolean {
   if (!thread.worktreePath) return false;
-  return threads.list(db, { projectId: thread.projectId, filter: "all" }).some((t) => t.id !== thread.id && t.worktreePath === thread.worktreePath);
+  return threads.list(db, { projectId: thread.projectId, filter: "all" }).some((t) => t.id !== thread.id && t.parentRelation !== "subagent" && t.worktreePath === thread.worktreePath);
 }

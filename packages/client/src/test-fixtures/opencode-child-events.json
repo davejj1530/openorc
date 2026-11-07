@@ -1,0 +1,57 @@
+[
+  {
+    "type": "message.completed",
+    "runId": "child",
+    "ts": 1793686662286,
+    "messageId": "subagent-prompt:6960ba3e-c30e-4178-9851-7179c9ed6cfc",
+    "role": "user",
+    "text": "Read README.md twice, then summarize."
+  },
+  {
+    "type": "turn.started",
+    "runId": "child",
+    "ts": 1793686662286,
+    "turnId": "subagent:ses_e5ff193adffe2QzpxIyERapcZA"
+  },
+  {
+    "type": "message.delta",
+    "runId": "child",
+    "ts": 1793686663814,
+    "messageId": "msg_1a00e6c89001UBcFkVl3mYKNxs",
+    "role": "assistant",
+    "text": "I'll follow the steps in order.\n\n"
+  },
+  {
+    "type": "message.completed",
+    "runId": "child",
+    "ts": 1793686688441,
+    "messageId": "msg_1a00e6c89001UBcFkVl3mYKNxs",
+    "role": "assistant",
+    "text": "I'll follow the steps in order.\n\n"
+  },
+  {
+    "type": "message.delta",
+    "runId": "child",
+    "ts": 1793686688441,
+    "messageId": "msg_1a00eccf6001NCAhIzccDMDK52",
+    "role": "assistant",
+    "text": "The README, titled \"Retry queue,\" states that a retry drains one item per frame and that the caller waits for the frame before reading the result, and its content was unchanged after the 20-second wait."
+  },
+  {
+    "type": "message.completed",
+    "runId": "child",
+    "ts": 1793686688458,
+    "messageId": "msg_1a00eccf6001NCAhIzccDMDK52",
+    "role": "assistant",
+    "text": "The README, titled \"Retry queue,\" states that a retry drains one item per frame and that the caller waits for the frame before reading the result, and its content was unchanged after the 20-second wait."
+  },
+  {
+    "type": "turn.completed",
+    "runId": "child",
+    "ts": 1793686688458,
+    "turnId": "subagent:ses_e5ff193adffe2QzpxIyERapcZA",
+    "status": "success",
+    "resultText": "I'll follow the steps in order.\n\n\n\nThe README, titled \"Retry queue,\" states that a retry drains one item per frame and that the caller waits for the frame before reading the result, and its content was unchanged after the 20-second wait.",
+    "durationMs": 26172
+  }
+]

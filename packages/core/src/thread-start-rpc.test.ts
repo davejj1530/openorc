@@ -2,12 +2,12 @@ import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { CodexAdapter, RunHandle } from "@openorc/agents";
-import { projects, settings, threads } from "@openorc/db";
+import { ClaudeAdapter, CodexAdapter, RunHandle } from "@openorc/agents";
+import { projects, runs, settings, threads } from "@openorc/db";
 import { commitAll, git } from "@openorc/git";
-import type { ModelOption, Project, RpcParams, RunSpec } from "@openorc/protocol";
+import { THREAD_EXISTS, type ModelOption, type Project, type RpcParams, type RunSpec } from "@openorc/protocol";
 import { OpenOrc } from "./openorc.js";
-import { MAX_WORKING_CHILDREN, pickModel } from "./services/thread-agent-tools.js";
+import { pickModel } from "./services/thread-agent-tools.js";
 import { rpcClient } from "./rpc-test-client.js";
 
 let core: OpenOrc;
@@ -15,31 +15,42 @@ let folder: string;
 let project: Project;
 let turns: Map<string, { spec: RunSpec; handle: RunHandle }>;
 
-const model = (id: string, label: string): ModelOption => ({ id, label, agent: "codex", isDefault: false, efforts: ["high"], defaultEffort: "high", fastMode: { supported: false } });
+const model = (id: string, label: string, fast = false): ModelOption => ({
+  id,
+  label,
+  agent: "codex",
+  isDefault: false,
+  efforts: ["high", "max"],
+  defaultEffort: "high",
+  fastMode: { supported: fast },
+});
+
+/** A provider that answers only when the test says so. */
+function scripted(spec: RunSpec): RunHandle {
+  let close!: (code: number) => void;
+  const done = new Promise<number>((resolve) => {
+    close = resolve;
+  });
+  let closed = false;
+  const handle = new RunHandle(spec.runId, {
+    done,
+    send: async () => undefined,
+    interrupt() {},
+    close() {
+      if (closed) return;
+      closed = true;
+      handle.emit("exit", 0);
+      close(0);
+    },
+  });
+  turns.set(spec.runId, { spec, handle });
+  return handle;
+}
 
 beforeEach(async () => {
   folder = await mkdtemp(path.join(os.tmpdir(), "openorc-thread-start-"));
   turns = new Map();
-  vi.spyOn(CodexAdapter.prototype, "start").mockImplementation((spec) => {
-    let close!: (code: number) => void;
-    const done = new Promise<number>((resolve) => {
-      close = resolve;
-    });
-    let closed = false;
-    const handle = new RunHandle(spec.runId, {
-      done,
-      send: async () => undefined,
-      interrupt() {},
-      close() {
-        if (closed) return;
-        closed = true;
-        handle.emit("exit", 0);
-        close(0);
-      },
-    });
-    turns.set(spec.runId, { spec, handle });
-    return handle;
-  });
+  vi.spyOn(CodexAdapter.prototype, "start").mockImplementation(scripted);
   core = await OpenOrc.create({ dataDir: path.join(folder, "data"), ephemeral: true, transport: { push: () => {} } });
   settings.set(core.db, "extraction.provider", "off");
   const root = path.join(folder, "repository");
@@ -50,7 +61,12 @@ beforeEach(async () => {
   await writeFile(path.join(root, "README.md"), "# Fixture\n");
   await commitAll(root, "Fixture baseline");
   project = projects.insert(core.db, { name: "Fixture", rootPath: root, defaultBranch: "main", gitRemote: null, settings: {} });
-  vi.spyOn(core.runs, "models").mockResolvedValue([model("fixture-codex", "Scripted provider"), model("gpt-6.1-sol", "GPT-6.1 Sol"), model("gpt-6.1-mini", "GPT-6.1 Mini")]);
+  vi.spyOn(core.runs, "models").mockResolvedValue([
+    model("fixture-codex", "Scripted provider"),
+    model("gpt-6.1-sol", "GPT-6.1 Sol"),
+    model("gpt-6.1-mini", "GPT-6.1 Mini"),
+    model("gpt-6-astra", "GPT-6 Astra", true),
+  ]);
   // An ended turn names its thread; a real titler would still be running when the core closes.
   vi.spyOn(core.textGeneration, "title").mockResolvedValue(null);
 });
@@ -115,6 +131,14 @@ function endTurn(runId: string) {
   handle.emit("event", { type: "turn.completed", runId, turnId: `turn-${runId}`, status: "success", durationMs: 1, ts: Date.now() });
 }
 
+it("starts a thread under the id its owner chose, and refuses that id once it is taken", async () => {
+  const named = { id: "5b0e7a52-1c3f-4d8e-9a6b-2f4c8e1d7a90", projectId: project.id, agent: "codex", model: "fixture-codex", mode: "act", permissionMode: "autonomous", prompt: "Named" } as const;
+  const { thread } = await call("threads.start", named);
+  expect(thread.id).toBe(named.id);
+  await expect(call("threads.start", { ...named, prompt: "Again" })).rejects.toThrow(THREAD_EXISTS);
+  expect(threads.list(core.db, { projectId: project.id }).filter((each) => each.id === named.id)).toHaveLength(1);
+});
+
 it("starts a thread beside its parent, in its checkout with its settings, and tells it who to talk to", async () => {
   const { thread: home, runId } = await parent();
   const started = await startThread(runId, { prompt: "Generate the hero assets", title: "Hero assets" });
@@ -132,7 +156,7 @@ it("joins the parent's worktree and leaves it standing when the started thread g
   const worktree = threads.get(core.db, home.id)!.worktreePath!;
   expect(worktree).toBeTruthy();
   const started = await startThread(runId, { prompt: "Write the copy" });
-  expect(threads.get(core.db, started.thread.id)).toMatchObject({ workspaceMode: "worktree", worktreePath: worktree });
+  expect(threads.get(core.db, started.thread.id)).toMatchObject({ workspaceMode: "worktree", worktreePath: worktree, branch: threads.get(core.db, home.id)!.branch });
   expect(started.thread.title).toBe("Write the copy");
   expect((await firstSpec(started.thread.id)).cwd).toBe((await firstSpec(home.id)).cwd);
   // Like any shared folder, it can't be cleared away while the parent is mid-turn in it.
@@ -153,16 +177,112 @@ it("finds a model by the name the user gave it, and answers a name it can't plac
   await expect(startThread(runId, { prompt: "Generate assets", model: "7.0 ultra" })).rejects.toThrow(/Choose one of/);
 });
 
-it(`keeps ${MAX_WORKING_CHILDREN} started threads working at once, none of their own, and none from Plan mode`, async () => {
+it("starts a thread on another agent with the model last used there that can still run", async () => {
+  vi.spyOn(ClaudeAdapter.prototype, "start").mockImplementation(scripted);
+  const claude = (id: string, unavailable?: string): ModelOption => ({ ...model(id, id), agent: "claude", ...(unavailable ? { unavailable } : {}) });
+  const codexModels = await core.runs.models("codex");
+  vi.spyOn(core.runs, "models").mockImplementation(async (agent) =>
+    agent === "claude" ? [claude("claude-trial"), claude("claude-steady"), claude("claude-retired", "Not on this plan")] : codexModels,
+  );
+  const earlier = threads.insert(core.db, { projectId: project.id, title: "Earlier", agent: "claude", model: null, mode: "act", permissionMode: "trusted" });
+  const ran = (id: string, model: string, startedAt: number) => {
+    runs.insert(core.db, { id, taskId: null, threadId: earlier.id, agent: "claude", model, mode: "act", permissionMode: "trusted" });
+    core.db.stmt("UPDATE runs SET started_at = ? WHERE id = ?").run(startedAt, id);
+  };
+  ran("earlier-steady", "claude-steady", 1_000);
+  ran("earlier-retired", "claude-retired", 2_000);
+  const { runId } = await parent();
+  const started = await startThread(runId, { prompt: "Draft the copy", agent: "claude" });
+  expect(started.model).toBe("claude-steady");
+  expect(threads.get(core.db, started.thread.id)?.model).toBe("claude-steady");
+});
+
+it("starts a thread in Fast mode when asked, and refuses it on a model without Fast", async () => {
+  const { runId } = await parent();
+  const started = await startThread(runId, { prompt: "Build it", model: "6 astra", effort: "max", fast: true });
+  expect(threads.get(core.db, started.thread.id)).toMatchObject({ model: "gpt-6-astra", effort: "max", fastMode: true });
+  expect((await firstSpec(started.thread.id)).fastMode).toBe(true);
+  await expect(startThread(runId, { prompt: "Build it", model: "6.1 sol", fast: true })).rejects.toThrow(/Fast mode is unavailable/);
+});
+
+it("starts as many threads working at once as it asks for, none of their own, and none from Plan mode", async () => {
   const { runId } = await parent();
   const children: Started[] = [];
-  for (let index = 0; index < MAX_WORKING_CHILDREN; index++) children.push(await startThread(runId, { prompt: `Part ${index + 1}` }));
-  await expect(startThread(runId, { prompt: "One more" })).rejects.toThrow(/still working/);
+  for (let index = 0; index < 6; index++) children.push(await startThread(runId, { prompt: `Part ${index + 1}` }));
+  for (const child of children) expect(core.runs.threadActivity(child.thread.id)).not.toBe("idle");
   const first = await firstSpec(children[0]!.thread.id);
   await expect(startThread(first.runId, { prompt: "A grandchild" })).rejects.toThrow(/can't start its own/);
-  endTurn(first.runId);
-  await vi.waitFor(() => expect(core.runs.threadActivity(children[0]!.thread.id)).toBe("idle"));
-  await expect(startThread(runId, { prompt: "One more" })).resolves.toMatchObject({ thread: { title: "One more" } });
   const planning = await parent({ mode: "plan", prompt: "Think it through" });
   await expect(startThread(planning.runId, { prompt: "Do it" })).rejects.toThrow(/Plan mode/);
+});
+
+it("rejects Git, cloud and workspace mutations of a subagent before any side effects", async () => {
+  const { runId, thread: home } = await parent();
+  turns.get(runId)!.handle.emit("event", { type: "subagent.started", runId, ts: Date.now(), subagentId: "child", title: "Explore" });
+  const child = threads.children(core.db, home.id)[0]!;
+  await expect(call("review.commitThread", { threadId: child.id, message: "Forbidden" })).rejects.toThrow(/read-only/);
+  await expect(call("review.pushThread", { threadId: child.id })).rejects.toThrow(/read-only/);
+  await expect(call("review.createThreadPr", { threadId: child.id, title: "Forbidden", body: "", base: "main" })).rejects.toThrow(/read-only/);
+  await expect(call("cloud.move", { threadId: child.id })).rejects.toThrow(/read-only/);
+  await expect(call("threads.moveWorkspace", { id: child.id, to: "current" })).rejects.toThrow(/read-only/);
+});
+
+it("lists messageable conversations before applying the agent's 30-thread limit", async () => {
+  const { thread: home, runId } = await parent();
+  const started = threads.insert(core.db, { projectId: project.id, title: "Started conversation", agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
+  threads.update(core.db, started.id, { parentThreadId: home.id, parentRelation: "started" });
+  for (let i = 0; i < 35; i++) {
+    const child = threads.insert(core.db, { projectId: project.id, title: `Child ${i}`, agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
+    threads.update(core.db, child.id, { parentThreadId: home.id, parentRelation: "subagent" });
+  }
+  expect((await core.threads.toolThreadList(runId)).map((thread) => thread.id).sort()).toEqual([home.id, started.id].sort());
+  expect((await call("threads.list", { projectId: project.id, excludeSubagents: true, limit: 1 })).length).toBe(1);
+  expect((await call("threads.list", { projectId: project.id, excludeSubagents: true })).map((thread) => thread.id).sort()).toEqual([home.id, started.id].sort());
+});
+
+/** A thread a person starts under `parentThreadId` from OpenOrc. */
+const subthread = (parentThreadId: string, input: Partial<RpcParams<"threads.start">> = {}) =>
+  call("threads.start", { projectId: project.id, parentThreadId, agent: "codex", model: "fixture-codex", mode: "act", permissionMode: "trusted", prompt: "Look into the flaky test", ...input });
+
+it("starts as many subthreads as a person asks for, in the parent's worktree", async () => {
+  const { thread: home, runId } = await parent({ workspaceMode: "worktree" });
+  const worktree = threads.get(core.db, home.id)!.worktreePath!;
+  const mine = [];
+  for (let index = 0; index < 4; index++) mine.push((await subthread(home.id, { prompt: `Part ${index + 1}` })).thread);
+  for (const each of mine) {
+    expect(threads.get(core.db, each.id)).toMatchObject({
+      parentThreadId: home.id,
+      parentRelation: "started",
+      startedByAgent: false,
+      workspaceMode: "worktree",
+      worktreePath: worktree,
+      branch: threads.get(core.db, home.id)!.branch,
+    });
+    expect(core.runs.threadActivity(each.id)).not.toBe("idle");
+  }
+  const spec = await firstSpec(mine[0]!.id);
+  expect(spec.cwd).toBe((await firstSpec(home.id)).cwd);
+  expect(spec.prompt).not.toContain("started this thread");
+  const helper = await startThread(runId, { prompt: "Agent helper" });
+  expect(threads.get(core.db, helper.thread.id)).toMatchObject({ parentThreadId: home.id, startedByAgent: true });
+});
+
+it("lets a person's subthreads nest and their agents start threads, which a thread an agent started can't", async () => {
+  const { thread: home } = await parent();
+  const mine = (await subthread(home.id)).thread;
+  const deeper = (await subthread(mine.id, { prompt: "Go deeper" })).thread;
+  expect(threads.get(core.db, deeper.id)?.parentThreadId).toBe(mine.id);
+  const helper = await startThread((await firstSpec(mine.id)).runId, { prompt: "Helper" });
+  expect(threads.get(core.db, helper.thread.id)).toMatchObject({ parentThreadId: mine.id, startedByAgent: true });
+  await expect(startThread((await firstSpec(helper.thread.id)).runId, { prompt: "Grandchild" })).rejects.toThrow(/can't start its own/);
+});
+
+it("refuses a subthread under a subagent, under a missing thread, or in a place of its own", async () => {
+  const { thread: home, runId } = await parent();
+  turns.get(runId)!.handle.emit("event", { type: "subagent.started", runId, ts: Date.now(), subagentId: "child", title: "Explore" });
+  const child = threads.children(core.db, home.id)[0]!;
+  await expect(subthread(child.id)).rejects.toThrow(/read-only/);
+  await expect(subthread("missing")).rejects.toThrow(/not found/);
+  await expect(subthread(home.id, { workspaceMode: "worktree" })).rejects.toThrow(/works in its folder/);
+  expect(threads.children(core.db, home.id).map((each) => each.id)).toEqual([child.id]);
 });

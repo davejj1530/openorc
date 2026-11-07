@@ -1,13 +1,12 @@
+import { comments, Db, projects, tasks, threadQueue, threads } from "@openorc/db";
+import { type ReviewComment, type Task, type Thread } from "@openorc/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { comments, Db, projects, runs, snapshots, tasks, threadQueue, threads } from "@openorc/db";
-import { teamReviewComment, type ReviewComment, type Task, type Thread } from "@openorc/protocol";
 import { ReviewService, type ReviewConversations } from "./review.js";
 
 let db: Db;
 let review: ReviewService;
 let task: Task;
 let sibling: Task;
-let foreign: Task;
 
 beforeEach(() => {
   db = Db.memory();
@@ -18,7 +17,6 @@ beforeEach(() => {
   const local = project("local");
   task = makeTask(local.id, "Selected review");
   sibling = makeTask(local.id, "Another task");
-  foreign = makeTask(project("foreign").id, "Another project");
 });
 
 afterEach(() => {
@@ -40,79 +38,6 @@ function add(owner = task, patch: Partial<Pick<ReviewComment, "snapshotId" | "pa
     ...patch,
   });
 }
-
-function snapshot(owner = task) {
-  return snapshots.insert(db, { taskId: owner.id, runId: null, turn: 1, treeSha: `tree-${owner.id}`, diffStat: { files: 1, insertions: 1, deletions: 0, untracked: 0 } });
-}
-
-describe("selected review composition", () => {
-  it("rejects empty selections and duplicate IDs instead of silently changing the requested batch", () => {
-    const comment = add();
-    expect(() => review.composeSelectedComments(task.id, [])).toThrow(/select|empty|at least/i);
-    expect(() => review.composeSelectedComments(task.id, [comment.id, comment.id])).toThrow(/distinct|duplicate/i);
-    expect(comments.listForTask(db, task.id)).toEqual([comment]);
-  });
-
-  it("rejects comments from a sibling task or another project", () => {
-    const own = add();
-    for (const owner of [sibling, foreign]) {
-      const other = add(owner);
-      expect(() => review.composeSelectedComments(task.id, [own.id, other.id])).toThrow(/comment.*(found|belong|available)/i);
-      expect(comments.listForTask(db, owner.id)).toEqual([other]);
-    }
-    expect(comments.listForTask(db, task.id)).toEqual([own]);
-  });
-
-  it("rejects an already sent comment even when other selected comments remain unsent", () => {
-    const pending = add();
-    const sent = add(task, { body: "Already delivered." });
-    const run = runs.insert(db, { id: "earlier-review", taskId: task.id, threadId: null, agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
-    comments.markSent(db, [sent.id], run.id);
-    expect(() => review.composeSelectedComments(task.id, [pending.id, sent.id])).toThrow(/already.*sent|already.*deliver/i);
-    expect(comments.listForTask(db, task.id)).toEqual([pending, { ...sent, sentInRunId: run.id }]);
-  });
-
-  it("checks snapshot ownership independently of comment ownership", () => {
-    for (const owner of [sibling, foreign]) {
-      const otherSnapshot = snapshot(owner);
-      const comment = add(task, { snapshotId: otherSnapshot.id });
-      expect(() => review.composeSelectedComments(task.id, [comment.id])).toThrow(/snapshot.*(found|belong|available)/i);
-    }
-  });
-
-  it("rejects a dangling snapshot reference and accepts an explicitly unanchored comment", () => {
-    const source = snapshot();
-    const comment = add(task, { snapshotId: source.id });
-    db.raw.exec("PRAGMA foreign_keys = OFF");
-    db.stmt("DELETE FROM snapshots WHERE id = ?").run(source.id);
-    db.raw.exec("PRAGMA foreign_keys = ON");
-    expect(() => review.composeSelectedComments(task.id, [comment.id])).toThrow(/snapshot.*(found|belong|available)/i);
-    db.stmt("UPDATE review_comments SET snapshot_id = NULL WHERE id = ?").run(comment.id);
-    expect(review.composeSelectedComments(task.id, [comment.id]).comments).toEqual([teamReviewComment({ ...comment, snapshotId: null })]);
-  });
-
-  it("rejects an absent task before composing any selection", () => {
-    const comment = add();
-    expect(() => review.composeSelectedComments("deleted-task", [comment.id])).toThrow(/task.*not found/i);
-  });
-
-  it("keeps a conversation comment out of team review even when it carries the task", () => {
-    const thread = threads.insert(db, { projectId: task.projectId, title: "Conversation", agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
-    const labeled = comments.insert(db, {
-      threadId: thread.id,
-      taskId: task.id,
-      snapshotId: null,
-      path: "src/export.ts",
-      startLine: null,
-      startSide: null,
-      line: 3,
-      side: "new",
-      lineText: "export {}",
-      body: "Conversation note.",
-    });
-    expect(() => review.composeSelectedComments(task.id, [labeled.id])).toThrow(/not found on this task/i);
-  });
-});
 
 describe("conversation review comments", () => {
   let conversation: Thread;
@@ -136,7 +61,7 @@ describe("conversation review comments", () => {
         return { messageId: threadQueue.enqueue(db, { ...input, attachments: [] }).id };
       }),
     };
-    review = new ReviewService(db, undefined, undefined, { conversations });
+    review = new ReviewService(db, undefined, { conversations });
   });
 
   const note = (scope: { threadId?: string; taskId?: string }, body = "Rename this.", line = 4) =>
@@ -152,7 +77,7 @@ describe("conversation review comments", () => {
     expect(labeled).toMatchObject({ threadId: conversation.id, taskId: task.id, lineText: "line 4", snapshotId: null });
     expect(() => note({ threadId: other.id, taskId: task.id })).toThrow(/another conversation/i);
     expect(() => note({ threadId: conversation.id, taskId: sibling.id })).toThrow(/hasn't started/i);
-    expect(() => note({ taskId: sibling.id })).toThrow(/team review/i);
+    expect(() => note({ taskId: sibling.id })).toThrow(/hasn't started in a conversation/i);
     expect(() => review.removeComment({ threadId: other.id }, plain.id)).toThrow(/not found in this review/i);
 
     review.removeComment({ threadId: conversation.id }, plain.id);
@@ -254,7 +179,7 @@ describe("conversation review comments", () => {
   it("keeps a task-only review away from conversation comments that carry the task", () => {
     const labeled = note({ threadId: conversation.id, taskId: task.id });
     expect(review.comments({ taskId: task.id })).toEqual([]);
-    expect(() => review.removeComment({ taskId: task.id }, labeled.id)).toThrow(/team review/i);
+    expect(() => review.removeComment({ taskId: task.id }, labeled.id)).toThrow(/hasn't started in a conversation/i);
     expect(review.comments({ threadId: conversation.id })).toEqual([labeled]);
   });
 });

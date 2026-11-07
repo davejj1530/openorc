@@ -1,9 +1,11 @@
-import { allowanceState, percentLeft, usageResetLabel } from "@openorc/client";
-import type { AllowanceWindow, PlanLimits } from "@openorc/protocol";
+import { allowanceState, usageResetLabel } from "@openorc/client";
+import { percentLeft, type AllowanceWindow, type PlanLimits } from "@openorc/protocol";
 import { Fragment } from "react";
 import { View } from "react-native";
+import { RefreshCw } from "../generated/icons";
 import { cn } from "../ui/cn";
 import { HarnessLogo } from "../ui/HarnessLogo";
+import { ListPressable } from "../ui/ListPressable";
 import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
 import { Card, Divider, RowLines, rowClass, Section } from "./parts";
@@ -15,7 +17,7 @@ const time = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-di
 const emptyWords: Record<PlanLimits["status"], string> = {
   available: "No limits reported",
   unavailable: "No limits reported",
-  disconnected: "Not signed in on this Mac",
+  disconnected: "Not signed in",
   error: "Couldn’t read usage",
 };
 
@@ -66,7 +68,18 @@ function AccountCard({ limits, now, dim }: { limits: PlanLimits; now: number; di
   );
 }
 
-/** What stands in for the cards: a read on its way, none answered, or a Mac with no limits at all. */
+/** A read that failed with nothing to show, and a way to ask again. */
+function ReadFailed({ retry }: { retry: () => void }) {
+  return (
+    <Card>
+      <ListPressable accessibilityRole="button" onPress={retry} className={cn(rowClass, "active:bg-surface-2")}>
+        <RowLines lead={<RefreshCw size={16} className="text-ink-4" />} label="Couldn’t read usage" labelClassName="text-ink-3" detail="Try again" />
+      </ListPressable>
+    </Card>
+  );
+}
+
+/** What stands in for the cards: a read on its way, the host it waits for, or a host with no limits at all. */
 function NoCards({ words, reading }: { words: string; reading: boolean }) {
   return (
     <Card>
@@ -77,18 +90,18 @@ function NoCards({ words, reading }: { words: string; reading: boolean }) {
   );
 }
 
-function noCardsWords({ state, live }: Pick<Usage, "state" | "live">): string {
+function noCardsWords({ state, live, hostName }: Pick<Usage, "state" | "live" | "hostName">): string {
   if (state === "ready") return "No limits reported";
-  if (state === "failed") return "Couldn’t read usage";
-  return live ? "Reading usage" : "Not read yet";
+  return live ? "Reading usage" : `Waiting for ${hostName}`;
 }
 
 /**
- * The Mac's Claude and Codex limits, read only, as the desktop's Settings > Usage shows them. While the phone is not
- * connected the last read stays, dimmed and held still, with the time it was read under the label.
+ * The Claude and Codex limits of the shown host's group, read only, as the desktop's Settings > Usage shows them. While
+ * neither host is connected the last read stays, dimmed and held still, with the time it was read under the label.
  */
 export function UsageSection() {
-  const { accounts, state, live, readAt, now } = useUsage();
+  const { accounts, state, live, readAt, now, hostName, retry } = useUsage();
+  const none = state === "failed" && live ? <ReadFailed retry={retry} /> : <NoCards words={noCardsWords({ state, live, hostName })} reading={state === "loading" && live} />;
   return (
     <Section title="Usage" note={live || readAt === null ? null : `Last read at ${time.format(readAt)}`}>
       {accounts.length > 0 ? (
@@ -98,7 +111,7 @@ export function UsageSection() {
           ))}
         </View>
       ) : (
-        <NoCards words={noCardsWords({ state, live })} reading={state === "loading" && live} />
+        none
       )}
     </Section>
   );

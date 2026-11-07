@@ -1,0 +1,194 @@
+Determining test suites to run...[?2026h[999D[K
+
+Test Suites: 0 of 3 total
+Tests:       0 total
+Snapshots:   0 total
+Time:        0 s, estimated 3 s
+████████████████████████████████████████[?2026l[?2026h
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A
+ RUNS  ./mailer.test.js
+ RUNS  ./queue.test.js
+ RUNS  ./cart.test.js
+
+Test Suites: 0 of 3 total
+Tests:       0 total
+Snapshots:   0 total
+Time:        0 s, estimated 3 s
+████████████████████████████████████████[?2026l[?2026h
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1APASS ./cart.test.js
+
+ RUNS  ./mailer.test.js
+ RUNS  ./queue.test.js
+ RUNS  ./cart.test.js
+
+Test Suites: 0 of 3 total
+Tests:       0 total
+Snapshots:   0 total
+Time:        0 s, estimated 3 s
+████████████████████████████████████████[?2026l[?2026h
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A
+ RUNS  ./mailer.test.js
+ RUNS  ./queue.test.js
+ RUNS  ./cart.test.js
+
+Test Suites: 0 of 3 total
+Tests:       0 total
+Snapshots:   0 total
+Time:        0 s, estimated 3 s
+████████████████████████████████████████[?2026l[?2026h
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1AFAIL ./mailer.test.js
+
+ RUNS  ./mailer.test.js
+ RUNS  ./queue.test.js
+ RUNS  ./cart.test.js
+
+Test Suites: 0 of 3 total
+Tests:       0 total
+Snapshots:   0 total
+Time:        0 s, estimated 3 s
+████████████████████████████████████████[?2026l[?2026h
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A  ● mailer › retries › sends once
+
+    expect(send).toHaveBeenCalledTimes(expected)
+
+    Expected number of calls: 1
+    Received number of calls: 2
+
+       5 |       send();
+       6 |       send();
+    >  7 |       expect(send).toHaveBeenCalledTimes(1);
+         |                    ^
+       8 |     });
+       9 |     it("gives up after three tries", () => expect(3).toBe(3));
+      10 |   });
+
+      at Object.toHaveBeenCalledTimes (mailer.test.js:7:20)
+
+  ● mailer › loads the template
+
+    template missing: welcome.html
+
+      11 |   it("formats the subject", () => expect("Hi".toUpperCase()).toBe("HI"));
+      12 |   it("loads the template", () => {
+    > 13 |     throw new Error("template missing: welcome.html");
+         |           ^
+      14 |   });
+      15 | });
+      16 |
+
+      at Object.<anonymous> (mailer.test.js:13:11)
+
+
+ RUNS  ./mailer.test.js
+ RUNS  ./queue.test.js
+ RUNS  ./cart.test.js
+
+Test Suites: 0 of 3 total
+Tests:       0 total
+Snapshots:   0 total
+Time:        0 s, estimated 3 s
+████████████████████████████████████████[?2026l[?2026h
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A
+[K
+[1A
+ RUNS  ./queue.test.js
+
+Test Suites: 1 failed, 1 passed, 2 of 3 total
+Tests:       2 failed, 1 skipped, 5 passed, 8 total
+Snapshots:   0 total
+Time:        0 s, estimated 3 s
+████████████████████████████████████████

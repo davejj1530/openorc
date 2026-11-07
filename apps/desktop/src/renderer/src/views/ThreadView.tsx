@@ -1,26 +1,27 @@
-import { ClaudeAccountScope } from "../lib/claude-account";
+import { isSubagentThread } from "@openorc/protocol";
 import { useEffect, useRef, useState } from "react";
 import { Conversation } from "../components/Conversation";
 import { ThreadHeader, ThreadHeaderPlaceholder } from "../components/ThreadHeader";
-import { useLayout } from "../lib/layout";
+import { ClaudeAccountScope } from "../lib/claude-account";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { useConversationPlans } from "../lib/conversation-plans";
+import { useLayout } from "../lib/layout";
 import { useRouter } from "../lib/router";
 
 /**
  * A stable, thread-scoped conversation. The workspace owns the shared panel.
  */
+/** `first` and `last` say whether this pane's header starts or ends the work row, past any panel docked beside it. */
 export function ThreadView({ threadId, first, last, focused, onClose }: { threadId: string; first: boolean; last: boolean; focused: boolean; onClose?: () => void }) {
   const thread = useRpc("threads.get", { id: threadId });
   const project = useRpc("projects.get", { id: thread.data?.projectId ?? "" }, { enabled: Boolean(thread.data) });
   const update = useRpcMutation("threads.update");
   const setProject = useLayout((s) => s.setProject);
   const [renaming, setRenaming] = useState(false);
-  const [teamToolbar, setTeamToolbar] = useState<HTMLSpanElement | null>(null);
   const activate = () => {
     if (!focused) useRouter.getState().focusThreadPane(threadId);
   };
-  const t = thread.data;
+  const t = thread.data?.teamInstanceId ? null : thread.data;
   const p = project.data;
 
   // Opening a thread selects its project in the rail, unless the rail shows every project.
@@ -54,7 +55,7 @@ export function ThreadView({ threadId, first, last, focused, onClose }: { thread
 
   return (
     <ClaudeAccountScope id={t.claudeAccountId ?? "claude-cli"}>
-      <RevealEmittedPlan key={threadId} threadId={threadId} focused={focused} team={Boolean(t.teamInstanceId)} />
+      {!isSubagentThread(t) ? <RevealEmittedPlan key={threadId} threadId={threadId} focused={focused} /> : null}
       <main className="workspace-main well flex-1 min-w-0 flex flex-col">
         <ThreadHeader
           thread={t}
@@ -62,14 +63,13 @@ export function ThreadView({ threadId, first, last, focused, onClose }: { thread
           renaming={renaming}
           onRenamingChange={setRenaming}
           onRename={(title) => update.mutate({ id: t.id, patch: { title } })}
-          onTeamToolbar={setTeamToolbar}
           first={first}
           last={last}
           onClose={onClose}
         />
         {/* Header controls own their thread explicitly; only conversation interaction activates a pane. */}
         <div className="thread-pane-content flex-1 min-h-0" onPointerDownCapture={activate} onFocusCapture={activate}>
-          <Conversation key={t.id} scope={{ kind: "thread", thread: t }} project={p} toolbarTarget={teamToolbar} />
+          <Conversation key={t.id} scope={{ kind: "thread", thread: t }} project={p} />
         </div>
       </main>
     </ClaudeAccountScope>
@@ -77,8 +77,8 @@ export function ThreadView({ threadId, first, last, focused, onClose }: { thread
 }
 
 /** Observe plan arrivals separately so streamed text doesn't rerender the conversation. */
-function RevealEmittedPlan({ threadId, focused, team }: { threadId: string; focused: boolean; team: boolean }) {
-  const { plans, isSuccess } = useConversationPlans(threadId, team);
+function RevealEmittedPlan({ threadId, focused }: { threadId: string; focused: boolean }) {
+  const { plans, isSuccess } = useConversationPlans(threadId);
   const latest = plans.find((plan) => plan.text.trim());
   const planId = latest?.id ?? null;
   const observed = useRef<string | null | undefined>(undefined);

@@ -3,6 +3,8 @@ import type { AgentKind, PermissionPreset, RunMode, TaskPriority, WorkspaceMode 
 import { leadingText } from "./notice-text.js";
 
 export interface StartThreadInput {
+  /** The id its owner chose, as the cloud brain's Mac does; a new one unless given. */
+  id?: string;
   claudeAccountId?: string;
   projectId: string;
   workingDirectory?: string;
@@ -19,8 +21,10 @@ export interface StartThreadInput {
   title: string | undefined;
   /** How the first message shows: what the user typed, or a system notice such as a scheduled prompt. */
   promptRole?: "user" | "system";
-  /** A worktree prepared elsewhere that the conversation adopts, such as a pull request checked out detached. */
-  checkout?: { path: string; baseSha: string };
+  /** A worktree prepared elsewhere that the conversation adopts: a pull request checked out detached, or its parent's on its branch. */
+  checkout?: { path: string; baseSha: string; branch?: string };
+  /** Runs the agent in a cloud sandbox; the conversation's worktree on the Mac mirrors it. */
+  cloud?: boolean;
 }
 
 /** Names a thread from its first exchange; null when no model is available. */

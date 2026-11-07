@@ -47,6 +47,43 @@ describe("link messages", () => {
     expect(parseMacHello({ t: "hello", version: 1, mac: { name: "Mac" }, deviceId: "d", routes: [{ kind: "lan", host: "mac.local", port: 47820 }] })).toBeTruthy();
   });
 
+  describe("a Mac hello's routes", () => {
+    const hello = (routes: unknown) => ({ t: "hello", version: 1, mac: { name: "Mac" }, deviceId: "d", routes });
+    const lan = { kind: "lan", host: "mac.local", port: 47820 };
+    const tailnet = { kind: "tailnet", host: "100.64.0.7", port: 47820 };
+    const cloud = { kind: "public", host: "sb-abc.vercel.run", port: 443 };
+
+    it.each([
+      ["lan and tailnet, as before", [lan, tailnet]],
+      ["a cloud host's public route", [cloud]],
+      ["none, which a Mac may send", []],
+    ])("read %s", (_case, routes) => {
+      expect(parseMacHello(hello(routes))).toEqual(hello(routes));
+    });
+
+    it("drop routes of kinds this build does not know, down to none", () => {
+      const relay = { kind: "relay", host: "relay.example.com", port: 1, path: "/r" };
+      expect(parseMacHello(hello([relay, tailnet, { kind: "pigeon" }]))).toEqual(hello([tailnet]));
+      expect(parseMacHello(hello([relay]))).toEqual(hello([]));
+    });
+
+    it.each([
+      ["a known route with an extra field", [{ ...lan, path: "/" }]],
+      ["a known route on no port", [{ ...cloud, port: 0 }]],
+      ["a route without a kind", [lan, { host: "x", port: 1 }]],
+      ["a route that is not an object", [lan, "mac.local"]],
+      ["routes that are not a list", { lan }],
+      ["more than 32 routes", Array.from({ length: 33 }, () => lan)],
+    ])("refuse %s", (_case, routes) => {
+      expect(() => parseMacHello(hello(routes))).toThrow("not a Mac hello");
+    });
+
+    it("refuse a hello without routes", () => {
+      const { routes: _routes, ...bare } = hello([lan]);
+      expect(() => parseMacHello(bare)).toThrow("not a Mac hello");
+    });
+  });
+
   it("check the envelope of Mac messages and leave push bodies to the authenticated Mac", () => {
     expect(parseMacMessage({ t: "push", push: { type: "frame", frame: { runId: "r", seq: 1, events: [] } } })).toBeTruthy();
     expect(parseMacMessage({ t: "closing", reason: "removed" })).toBeTruthy();

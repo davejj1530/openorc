@@ -4,7 +4,9 @@
     "slug": "openorc",
     "owner": "david1530",
     "scheme": "openorc",
-    "version": "1.0.0",
+    "version": "1.1.0",
+    "runtimeVersion": { "policy": "fingerprint" },
+    "updates": { "url": "https://u.expo.dev/ea45e9f0-4deb-4a44-b2fb-c81b5951200c" },
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "ios": {

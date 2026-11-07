@@ -1,7 +1,7 @@
-import { act, cleanup, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { AgentEvent, AgentKind, PermissionPreset, Project, Run, RunMode, ThreadSummary } from "@openorc/protocol";
+import type { AgentEvent, AgentKind, CloudSignIns, PermissionPreset, Project, Run, RunMode, ThreadSummary } from "@openorc/protocol";
 import { runs as runStore } from "../lib/client";
 import { core } from "../lib/rpc";
 import type { ComposerProps } from "./Composer";
@@ -39,7 +39,7 @@ type RunSpec = { id: string; agent: AgentKind; live: boolean; mode?: RunMode; pe
 const live = new Map<string, boolean>();
 const project = { id: "project", name: "project", rootPath: "/tmp/project" } as Project;
 const run = ({ id, agent, mode = "act", permissionMode = "trusted" }: RunSpec, index: number) =>
-  ({ id, threadId: "thread", taskId: null, agent, model: "m", mode, permissionMode, state: "running", startedAt: 1000 + index }) as unknown as Run;
+  ({ id, threadId: "thread", taskId: null, agent, model: "m", mode, permissionMode, state: "running", startedAt: 1000 + index, endedAt: null }) as unknown as Run;
 const thread = (overrides: Partial<ThreadSummary>) =>
   ({
     id: "thread",
@@ -57,18 +57,27 @@ const thread = (overrides: Partial<ThreadSummary>) =>
     ...overrides,
   }) as unknown as ThreadSummary;
 
-/** Opens the conversation over the given runs and submits through the composer the way a person would. */
-async function submit(options: { thread?: Partial<ThreadSummary>; runs?: RunSpec[]; text?: string; attachments?: string[]; now?: boolean }) {
+/** Opens the conversation over the given runs, settled. */
+async function open(options: { thread?: Partial<ThreadSummary>; runs?: RunSpec[] }) {
   const runs = options.runs ?? [];
   for (const spec of runs) live.set(spec.id, spec.live);
   queries.set("runs.listForThread", runs.map(run));
-  render(
-    <QueryClientProvider client={new QueryClient()}>
+  const client = new QueryClient();
+  const tree = () => (
+    <QueryClientProvider client={client}>
       <Conversation scope={{ kind: "thread", thread: thread(options.thread ?? {}) }} project={project} />
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+  const view = render(tree());
   for (let i = 0; i < 6; i++) await act(async () => void (await new Promise((resolve) => setTimeout(resolve, 0))));
   act(() => runStore.flush());
+  /** Renders again with what the queries hold now, as a push about them would. */
+  return { heard: () => view.rerender(tree()) };
+}
+
+/** Opens the conversation over the given runs and submits through the composer the way a person would. */
+async function submit(options: { thread?: Partial<ThreadSummary>; runs?: RunSpec[]; text?: string; attachments?: string[]; now?: boolean }) {
+  await open(options);
   try {
     await act(async () => composer.props!.onSubmit(options.text ?? "hello", options.attachments ?? [], options.now ?? false));
   } catch (error) {
@@ -149,4 +158,51 @@ it.each([
   { name: "refuses to send without a model", thread: { model: null }, expected: { error: "Choose a model first." } },
 ] as Array<{ name: string; thread?: Partial<ThreadSummary>; runs?: RunSpec[]; text?: string; attachments?: string[]; now?: boolean; expected: unknown }>)("$name", async ({ expected, ...options }) => {
   expect(await submit(options)).toEqual(expected);
+});
+
+it("offers the other signed-in Claude accounts after a usage limit, and goes on with the one chosen", async () => {
+  const account = (id: string, name: string, status: string) => ({ id, name, kind: "managed", enabled: true, createdAt: 1, status, email: null, organization: null, message: null });
+  queries.set("claude.accounts.list", { defaultId: "work", accounts: [account("work", "Work", "ready"), account("personal", "Personal", "ready"), account("old", "Old", "signed_out")] });
+  const session = { status: "error", message: "You've hit your 5-hour limit", recovery: { kind: "usage", provider: "claude" } } as const;
+  await open({ thread: { agent: "claude", model: "opus", claudeAccountId: "work", session }, runs: [{ id: "A", agent: "claude", live: false }] });
+  expect(screen.queryByRole("button", { name: /Old/ })).toBeNull();
+  await act(async () => void fireEvent.click(screen.getByRole("button", { name: "Continue with Personal" })));
+  expect(vi.mocked(core.call).mock.calls.filter(([method]) => sends.has(method))).toEqual(
+    start(true, { agent: "claude", model: "opus", prompt: "Continue where you left off.", claudeAccountId: "personal" }),
+  );
+});
+
+it("holds a cloud turn whose sign-in the cloud lacks, offers that sign-in in place, and sends once it is ready", async () => {
+  const cloud = { provider: "vercel", state: "ready", step: null, setup: false, error: null } as const;
+  const codex = { kind: "codex", label: "Codex", way: "browser", error: null } as const;
+  let signIns: CloudSignIns = { rows: [{ ...codex, state: "missing" }], bringing: false };
+  const base = vi.mocked(core.call).getMockImplementation()!;
+  vi.mocked(core.call).mockImplementation((async (method: string, params: never) => (method === "cloud.signIns" ? signIns : base(method as never, params))) as never);
+  queries.set("cloud.signIns", signIns);
+  const { heard } = await open({ thread: { cloud }, runs: [{ id: "A", agent: "codex", live: false }] });
+  const sending = composer.props!.onSubmit("hello", [], false);
+  expect(await screen.findByText("Codex has no sign-in for the cloud.")).toBeTruthy();
+  const sent = () => vi.mocked(core.call).mock.calls.filter(([method]) => sends.has(method));
+  expect(sent()).toEqual([]);
+  signIns = { rows: [{ ...codex, state: "ready" }], bringing: false };
+  queries.set("cloud.signIns", signIns);
+  await act(async () => void fireEvent.click(screen.getByRole("button", { name: "Sign in" })));
+  expect(vi.mocked(core.call)).toHaveBeenCalledWith("cloud.signIns.bring", { target: { kind: "codex" } });
+  expect(sent()).toEqual([]);
+  act(heard);
+  await act(() => sending);
+  await waitFor(() => expect(sent()).toEqual(start(true)));
+  expect(screen.queryByText("Codex has no sign-in for the cloud.")).toBeNull();
+});
+
+it("sends a cloud turn at once when the cloud has its sign-in, and never asks for a turn on this Mac", async () => {
+  const signIns: CloudSignIns = { rows: [{ kind: "codex", label: "Codex", way: "browser", error: null, state: "ready" }], bringing: false };
+  const base = vi.mocked(core.call).getMockImplementation()!;
+  vi.mocked(core.call).mockImplementation((async (method: string, params: never) => (method === "cloud.signIns" ? signIns : base(method as never, params))) as never);
+  const cloud = { provider: "vercel", state: "ready", step: null, setup: false, error: null } as const;
+  expect(await submit({ thread: { cloud }, runs: [{ id: "A", agent: "codex", live: false }] })).toEqual(start(true));
+  cleanup();
+  vi.mocked(core.call).mockClear();
+  await submit({ runs: [{ id: "A", agent: "codex", live: false }] });
+  expect(vi.mocked(core.call).mock.calls.some(([method]) => method === "cloud.signIns")).toBe(false);
 });

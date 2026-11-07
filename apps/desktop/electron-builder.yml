@@ -38,6 +38,12 @@ extraResources:
     to: licenses/electron/LICENSE
   - from: node_modules/electron/dist/LICENSES.chromium.html
     to: licenses/electron/LICENSES.chromium.html
+  # The cloud brain the app installs on a person's Vercel sandbox or Agent37 instance, and the door it deploys for it.
+  - from: ../brain/dist
+    to: brain
+    filter:
+      - "brain-*.tgz"
+      - "door-*.mjs"
 asar: true
 asarUnpack:
   # Two files inside node-pty cannot be read from an archive: the .node binding

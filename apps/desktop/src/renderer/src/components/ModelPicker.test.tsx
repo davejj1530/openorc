@@ -1,8 +1,8 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState } from "react";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ModelOption, SystemInfo } from "@openorc/protocol";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ComposerModelPicker, defaultChoice, ModelPicker, type ModelChoice } from "./ModelPicker";
 
 const mocks = vi.hoisted(() => ({ call: vi.fn(), navigate: vi.fn() }));
@@ -185,33 +185,6 @@ describe("ModelPicker", () => {
     expect(slider.getAttribute("aria-valuetext")).toBe("Ultra");
     expect(screen.getByTestId("effort-galaxy")).toBeTruthy();
     expect(slider.closest(".composer-effort-slider")?.getAttribute("data-max")).toBe("true");
-  });
-  it("keeps saved teams and models in the same panel", async () => {
-    const selectTeam = vi.fn();
-    mocks.call.mockImplementation(async (method) => (method === "agents.modelCatalog" ? { models, providers: [] } : info));
-    render(
-      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-        <ComposerModelPicker
-          value={{ agent: "codex", model: "gpt", effort: "low" }}
-          onChange={vi.fn()}
-          team={{ name: "Review team", revision: 2, leadName: "Lead" }}
-          teams={{
-            options: [{ teamId: "team-1", revisionId: "revision-2", name: "Review team", revision: 2, memberCount: 3 }],
-            selectedRevisionId: "revision-2",
-            selectedLabel: "Review team",
-            onSelect: selectTeam,
-          }}
-        />
-      </QueryClientProvider>,
-    );
-    fireEvent.click(screen.getByRole("button", { name: "Team and lead effort" }));
-    expect(screen.getByRole("button", { name: "Project teams" }).getAttribute("aria-pressed")).toBe("true");
-    fireEvent.click(screen.getByRole("button", { name: /Review team 3 agents/ }));
-    expect(selectTeam).toHaveBeenCalledWith("revision-2");
-    expect(screen.getByRole("dialog", { name: "Model and effort" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Codex" }));
-    expect(await screen.findByRole("button", { name: /GPT default/ })).toBeTruthy();
-    expect(document.querySelectorAll(".menu-popup")).toHaveLength(0);
   });
   it("uses one provider panel, scopes search to the selected provider, and closes after selection", async () => {
     const onChange = vi.fn();

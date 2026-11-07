@@ -1,10 +1,10 @@
+import { projects, retiredTeams, threads } from "@openorc/db";
+import { commitAll, git } from "@openorc/git";
+import { WORKSPACE_ID, type FolderPath, type Project } from "@openorc/protocol";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { projects, teamDeletedThreads, threads } from "@openorc/db";
-import { commitAll, git } from "@openorc/git";
-import { WORKSPACE_ID, type FolderPath, type Project } from "@openorc/protocol";
 import { OpenOrc } from "./openorc.js";
 import { rpcClient } from "./rpc-test-client.js";
 
@@ -85,13 +85,13 @@ it("reads one changed file's diff, and refuses a path with no changes", async ()
   await expect(call("review.threadFileDiff", { threadId: checkout.id, path: at("/etc/hosts") })).rejects.toThrow(/invalid params for review.threadFileDiff/);
 });
 
-it("keeps Workspace conversations and deleted team conversations out of both reads", async () => {
+it("keeps Workspace conversations and retired conversations out of both reads", async () => {
   const workspace = threads.insert(core.db, { projectId: WORKSPACE_ID, title: "Folder", agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
   await expect(call("review.threadChanges", { threadId: workspace.id })).rejects.toThrow("Git review is available in project conversations. Workspace uses ordinary folders.");
   const deleted = threads.insert(core.db, { projectId: project.id, title: "Deleted", agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
-  const hidden = vi.spyOn(teamDeletedThreads, "has").mockImplementation((_db, id) => id === deleted.id);
+  const hidden = vi.spyOn(retiredTeams, "isHidden").mockImplementation((_db, id) => id === deleted.id);
   for (const read of [() => call("review.threadChanges", { threadId: deleted.id }), () => call("review.threadFileDiff", { threadId: deleted.id, path: at("README.md") })]) {
-    await expect(read()).rejects.toThrow("This conversation was deleted. Its saved tasks keep their team activity and controls.");
+    await expect(read()).rejects.toThrow(/not found/);
   }
   hidden.mockRestore();
 });

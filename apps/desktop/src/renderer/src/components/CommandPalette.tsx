@@ -1,11 +1,12 @@
 import { Command } from "cmdk";
-import { FolderGit2, MessageSquare, Search } from "./icons";
-import { useEffect, useState } from "react";
-import { paletteActions } from "../lib/palette-actions";
+import { useEffect, useState, type ReactNode } from "react";
+import { CoversPreview } from "../lib/browser-preview";
 import { useRpc } from "../lib/client";
+import { useOrclings } from "../lib/orclings";
+import { paletteActions } from "../lib/palette-actions";
 import { openTask, openThread, useRouter } from "../lib/router";
 import { useUi } from "../lib/ui";
-import { CoversPreview } from "../lib/browser-preview";
+import { FolderGit2, MessageSquare, Orclings, Search } from "./icons";
 import { StatusIcon } from "./status";
 
 function emptySearchMessage(query: string, messageMode: boolean, fetching: boolean): string {
@@ -38,12 +39,8 @@ function usePaletteKeys(open: boolean, onOpenChange: (open: boolean) => void): v
 export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const mode = useUi((s) => s.paletteMode);
   const [query, setQuery] = useState("");
-  const tasks = useRpc("tasks.list", {}, { enabled: open && mode === "all" });
-  const threads = useRpc("threads.list", { limit: 40 }, { enabled: open && mode === "all" });
-  const projects = useRpc("projects.list", {}, { enabled: open && mode === "all" });
   // Messages match by prefix from two characters on, across every thread's conversation.
   const hits = useRpc("threads.search", { query, limit: 20 }, { enabled: open && query.trim().length >= 2, staleTime: 5_000 });
-  const navigate = useRouter((s) => s.navigate);
   useEffect(() => {
     if (!open) setQuery("");
   }, [open]);
@@ -87,7 +84,6 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
                     </span>
                     <span className="pl-6 text-sm text-ink-4 truncate">
                       {messageSender(h.role, h.member)} in {h.taskTitle ?? h.threadTitle}
-                      {h.member && h.taskTitle ? ` (team: ${h.threadTitle})` : ""}
                     </span>
                   </Command.Item>
                 ))}
@@ -104,33 +100,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
                   ))}
               </Command.Group>
             )}
-            {mode === "all" && (threads.data ?? []).length > 0 ? (
-              <Command.Group heading="Threads" className="command-palette-group">
-                {(threads.data ?? []).map((t) => (
-                  <Item key={t.id} value={`thread ${t.title}`} onSelect={() => go(() => openThread(t.id))} icon={<MessageSquare size={14} />}>
-                    {t.title}
-                  </Item>
-                ))}
-              </Command.Group>
-            ) : null}
-            {mode === "all" && (tasks.data ?? []).length > 0 ? (
-              <Command.Group heading="Tasks" className="command-palette-group">
-                {(tasks.data ?? []).map((t) => (
-                  <Item key={t.id} value={`task ${t.title}`} onSelect={() => go(() => openTask(t.id))} icon={<StatusIcon status={t.status} />}>
-                    {t.title}
-                  </Item>
-                ))}
-              </Command.Group>
-            ) : null}
-            {mode === "all" && (projects.data ?? []).length > 0 ? (
-              <Command.Group heading="Projects" className="command-palette-group">
-                {(projects.data ?? []).map((p) => (
-                  <Item key={p.id} value={`project ${p.name}`} onSelect={() => go(() => navigate({ view: "project", projectId: p.id }))} icon={<FolderGit2 size={14} />}>
-                    {p.name}
-                  </Item>
-                ))}
-              </Command.Group>
-            ) : null}
+            {mode === "all" ? <PlaceGroups go={go} /> : null}
           </Command.List>
         </Command>
       </div>
@@ -138,7 +108,52 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
   );
 }
 
-function Item({ children, icon, onSelect, value }: { children: React.ReactNode; icon: React.ReactNode; onSelect: () => void; value?: string }) {
+type Place = { key: string; value: string; label: string; icon: ReactNode; open: () => void };
+
+function PlaceGroup({ heading, places, go }: { heading: string; places: Place[]; go: (fn: () => void) => void }) {
+  if (!places.length) return null;
+  return (
+    <Command.Group heading={heading} className="command-palette-group">
+      {places.map((place) => (
+        <Item key={place.key} value={place.value} onSelect={() => go(place.open)} icon={place.icon}>
+          {place.label}
+        </Item>
+      ))}
+    </Command.Group>
+  );
+}
+
+/** Threads, Orclings, tasks and projects by name. An Orcling's own conversation is listed under its name, as the sidebar lists it. */
+function PlaceGroups({ go }: { go: (fn: () => void) => void }) {
+  const tasks = useRpc("tasks.list", {}).data ?? [];
+  const threads = useRpc("threads.list", { limit: 40, excludeSubagents: true }).data ?? [];
+  const projects = useRpc("projects.list", {}).data ?? [];
+  const orclings = useOrclings();
+  const navigate = useRouter((s) => s.navigate);
+  const homes = new Set(orclings.map((orcling) => orcling.threadId));
+  return (
+    <>
+      <PlaceGroup
+        heading="Threads"
+        go={go}
+        places={threads.filter((t) => !homes.has(t.id)).map((t) => ({ key: t.id, value: `thread ${t.title}`, label: t.title, icon: <MessageSquare size={14} />, open: () => openThread(t.id) }))}
+      />
+      <PlaceGroup
+        heading="Orclings"
+        go={go}
+        places={orclings.map((o) => ({ key: o.id, value: `orcling ${o.name}`, label: o.name, icon: <Orclings size={14} />, open: () => openThread(o.threadId) }))}
+      />
+      <PlaceGroup heading="Tasks" go={go} places={tasks.map((t) => ({ key: t.id, value: `task ${t.title}`, label: t.title, icon: <StatusIcon status={t.status} />, open: () => openTask(t.id) }))} />
+      <PlaceGroup
+        heading="Projects"
+        go={go}
+        places={projects.map((p) => ({ key: p.id, value: `project ${p.name}`, label: p.name, icon: <FolderGit2 size={14} />, open: () => navigate({ view: "project", projectId: p.id }) }))}
+      />
+    </>
+  );
+}
+
+function Item({ children, icon, onSelect, value }: { children: ReactNode; icon: ReactNode; onSelect: () => void; value?: string }) {
   return (
     <Command.Item value={value} onSelect={onSelect} className="command-palette-item">
       <span className="command-palette-icon">{icon}</span>

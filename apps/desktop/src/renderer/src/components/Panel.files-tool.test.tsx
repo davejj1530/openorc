@@ -9,6 +9,7 @@ import { useAppShortcuts } from "../lib/app-shortcuts";
 import { useDrafts } from "../lib/file-drafts";
 import { useFilesTool } from "../lib/files-tool";
 import { useFileExplorer } from "../lib/file-explorer";
+import { useWordWrap } from "../lib/word-wrap";
 import { useLayout } from "../lib/layout";
 import { usePanelSessions } from "../lib/panel-tabs";
 import { queryClient } from "../lib/client";
@@ -19,7 +20,10 @@ import { Panel } from "./Panel";
 
 vi.mock("../lib/window", () => ({ useTrafficLights: () => false, useWindowsControls: () => false }));
 vi.mock("./code-editor", () => ({
-  CodeEditor: ({ text, readOnly, onChange }: CodeEditorProps) => <textarea aria-label="Editor" readOnly={readOnly} value={text} onChange={(event) => onChange(event.target.value)} />,
+  CodeEditor: ({ text, readOnly, lineWrapping, onChange }: CodeEditorProps) => (
+    <textarea aria-label="Editor" data-wrap={lineWrapping} readOnly={readOnly} value={text} onChange={(event) => onChange(event.target.value)} />
+  ),
+  CodeExcerpt: ({ start, end }: { start: number; end: number }) => <pre>{`lines ${start}-${end}`}</pre>,
   closeEditorSession: () => {},
 }));
 
@@ -39,6 +43,7 @@ const scope = { kind: "thread", id: thread.id } as const;
 let disk: ReturnType<typeof fakeFileDisk>;
 const searches: RpcParams<"files.search">[] = [];
 const finds: RpcParams<"files.find">[] = [];
+const explains: RpcParams<"code.explain">[] = [];
 
 /** The core's find over the fake disk: lines holding the text in either case, grouped by file. */
 function findOnDisk({ query }: RpcParams<"files.find">): FindResult {
@@ -71,11 +76,16 @@ beforeEach(() => {
       finds.push(params as RpcParams<"files.find">);
       return answerFind(params as RpcParams<"files.find">) as RpcResults[M];
     }
+    if (method === "code.explain") {
+      explains.push(params as RpcParams<"code.explain">);
+      const notes = [{ lines: { start: 1, end: 1 }, text: "Holds the cart's total." }];
+      return { kind: "explained", explanation: { view: "english", notes }, model: { provider: "claude", label: "Claude Haiku 4.5" }, createdAt: 1 } as RpcResults[M];
+    }
     return [] as unknown as RpcResults[M];
   });
   usePanelSessions.setState({ sessions: {} });
   useFilesTool.setState({ host: null, focus: null, tools: {} });
-  useFileExplorer.setState({ visible: true, showIgnored: false, width: 240, folders: {} });
+  useFileExplorer.setState({ visible: true, width: 240, folders: {} });
   useRouter.setState({ route: { view: "thread", threadId: thread.id }, threadIds: [thread.id] });
   useLayout.setState({ panelOpen: false, panelTab: "newtab", panelRequest: null, panelThreadId: thread.id, selectedFile: null, selectedChanges: null, panelExpanded: false, previewUrls: {} });
 });
@@ -83,6 +93,7 @@ afterEach(() => {
   cleanup();
   searches.length = 0;
   finds.length = 0;
+  explains.length = 0;
   answerFind = findOnDisk;
   queryClient.clear();
   vi.restoreAllMocks();
@@ -401,6 +412,60 @@ it("starts with a folder tree and keeps it beside file tabs without browser cont
   expect(screen.getByRole("menuitem", { name: "Copy path" })).toBeTruthy();
 });
 
+it("offers a code file's views in its menu, not on screen, and explains it once one is chosen", async () => {
+  disk.set("README.md", "# Shop\n");
+  useLayout.setState({ panelOpen: true });
+  render(<Window />);
+  fireEvent.click(screen.getByRole("button", { name: "Files" }));
+  fireEvent.click(await screen.findByRole("treeitem", { name: "src" }));
+  fireEvent.click(await screen.findByRole("treeitem", { name: "cart.ts" }));
+  await editor();
+  expect(screen.queryByRole("radiogroup", { name: "File view" })).toBeNull();
+  const views = async () => {
+    fireEvent.click(screen.getByRole("button", { name: "File actions" }));
+    return within(await screen.findByRole("group", { name: "File view" }));
+  };
+  const menu = await views();
+  expect(menu.getAllByRole("menuitemradio").map((item) => item.textContent)).toEqual(["Code", "Plain English", "Walkthrough", "Diagram"]);
+  expect(menu.getByRole("menuitemradio", { name: "Code" }).getAttribute("aria-checked")).toBe("true");
+  expect(explains).toEqual([]);
+  fireEvent.click(menu.getByRole("menuitemradio", { name: "Plain English" }));
+  expect(await screen.findByText("Holds the cart's total.")).toBeTruthy();
+  expect(explains).toEqual([{ scope, path: "src/cart.ts", view: "english", text: "export const total = 1;\n" }]);
+  expect(screen.queryByRole("textbox", { name: "Editor" })).toBeNull();
+  await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+  fireEvent.click((await views()).getByRole("menuitemradio", { name: "Code" }));
+  expect(await editor()).toBeTruthy();
+
+  fireEvent.click(await screen.findByRole("treeitem", { name: "README.md" }));
+  await waitFor(() =>
+    expect(
+      within(screen.getByRole("radiogroup", { name: "File view" }))
+        .getAllByRole("radio")
+        .map((radio) => radio.textContent),
+    ).toEqual(["Preview", "Source"]),
+  );
+});
+
+it("wraps code by default and turns it off from the file's Word wrap, for every file after", async () => {
+  useWordWrap.setState({ wrap: true });
+  useLayout.setState({ panelOpen: true });
+  render(<Window />);
+  fireEvent.click(screen.getByRole("button", { name: "Files" }));
+  fireEvent.click(await screen.findByRole("treeitem", { name: "src" }));
+  fireEvent.click(await screen.findByRole("treeitem", { name: "cart.ts" }));
+  expect((await editor()).dataset.wrap).toBe("true");
+  fireEvent.click(screen.getByRole("button", { name: "File actions" }));
+  const item = await screen.findByRole("menuitemcheckbox", { name: "Word wrap" });
+  expect(item.getAttribute("aria-checked")).toBe("true");
+  fireEvent.click(item);
+  await waitFor(() => expect(screen.getByRole("textbox", { name: "Editor" }).dataset.wrap).toBe("false"));
+  expect(localStorage.getItem("openorc.word-wrap")).toBe("off");
+  fireEvent.click(await screen.findByRole("treeitem", { name: "checkout.ts" }));
+  await waitFor(() => expect(screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Editor" }).value).toBe("export {};\n"));
+  expect(screen.getByRole("textbox", { name: "Editor" }).dataset.wrap).toBe("false");
+});
+
 it("navigates and collapses directories with the keyboard, then opens the selected file", async () => {
   useLayout.setState({ panelOpen: true });
   render(<Window />);
@@ -444,28 +509,15 @@ it("remembers the tree width and visibility, refreshes directory entries, and fi
   expect(await screen.findByRole("treeitem", { name: "cart.ts" })).toBeTruthy();
 });
 
-it("hides ignored entries until requested, remembers the choice, and keeps a directly opened file visible", async () => {
-  for (const path of [".git/HEAD", "node_modules/library/index.js", ".DS_Store", "output/result.txt", ".github/workflows/ci.yml"]) disk.set(path, "fixture\n");
-  for (const path of [".git", "node_modules", ".DS_Store", "output"]) disk.ignored.add(path);
+it("shows ignored entries dimmed, beside the rest", async () => {
+  for (const path of ["node_modules/library/index.js", "output/result.txt", ".env", ".github/workflows/ci.yml"]) disk.set(path, "fixture\n");
+  for (const path of ["node_modules", "output", ".env"]) disk.ignored.add(path);
   render(<Window />);
   act(() => useLayout.getState().openFile({ path: "src/cart.ts", scope }));
   await editor();
-  expect(await screen.findByRole("treeitem", { name: ".github" })).toBeTruthy();
-  for (const name of disk.ignored) expect(screen.queryByRole("treeitem", { name })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Explorer options" }));
-  const toggle = await screen.findByRole("menuitemcheckbox", { name: "Show ignored files" });
-  expect(toggle.getAttribute("aria-checked")).toBe("false");
-  fireEvent.click(toggle);
-  expect(toggle.getAttribute("aria-checked")).toBe("true");
-  fireEvent.keyDown(toggle, { key: "Escape" });
-  for (const name of disk.ignored) expect(await screen.findByRole("treeitem", { name })).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Hide file explorer" }));
-  fireEvent.click(screen.getByRole("button", { name: "Show file explorer" }));
-  expect(await screen.findByRole("treeitem", { name: "node_modules" })).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Explorer options" }));
-  fireEvent.click(await screen.findByRole("menuitemcheckbox", { name: "Show ignored files" }));
-  fireEvent.keyDown(screen.getByRole("menuitemcheckbox"), { key: "Escape" });
-  act(() => useLayout.getState().openFile({ path: "output/result.txt", scope }));
-  expect(await screen.findByRole("treeitem", { name: "result.txt" })).toBeTruthy();
-  expect(screen.queryByRole("treeitem", { name: "node_modules" })).toBeNull();
+  const row = async (name: string) => (await screen.findByRole("treeitem", { name })).querySelector(".file-tree-row")!;
+  for (const name of disk.ignored) expect((await row(name)).classList.contains("file-tree-ignored")).toBe(true);
+  expect((await row(".github")).classList.contains("file-tree-ignored")).toBe(false);
+  fireEvent.click(await screen.findByRole("treeitem", { name: ".env" }));
+  expect(await screen.findByRole("treeitem", { name: ".env", selected: true })).toBeTruthy();
 });

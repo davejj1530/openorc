@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { deviceRpcParams, isRemoteMethod, REMOTE_ATTACHMENT_BYTES, REMOTE_METHODS, remoteRpcParams, rpcParams, type FileDiff } from "@openorc/protocol";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { remoteError, type MacRoots } from "./phone-words.js";
 import { admitRemoteRequest, remotePush, remoteReplies, remoteReply, type GuardContext } from "./policy.js";
 
@@ -23,6 +23,23 @@ describe("phone policy", () => {
     expect(admitRemoteRequest("agents.availability", {}, context)).toEqual({ ok: true });
     expect(admitRemoteRequest("projects.git", { id: "p" }, context)).toEqual({ ok: true });
     expect(admitRemoteRequest("providers.limits", {}, context)).toEqual({ ok: true });
+    expect(admitRemoteRequest("threads.switchClaudeAccount", { id: "t", claudeAccountId: "work" }, context)).toEqual({ ok: true });
+  });
+
+  it("lets only the brain's own Mac name a new thread's id", () => {
+    const named = { id: "5b0e7a52-1c3f-4d8e-9a6b-2f4c8e1d7a90", projectId: "p", agent: "claude", mode: "act", permissionMode: "autonomous", cloud: true, prompt: "x" };
+    expect(admitRemoteRequest("threads.start", named, context)).toEqual({ ok: false, message: "This is not available from a phone." });
+    expect(admitRemoteRequest("threads.start", named, context, "owner")).toEqual({ ok: true });
+  });
+
+  it("lets only the brain's own Mac list and delete the brain's sandboxes", () => {
+    for (const [method, params] of [
+      ["cloud.sandboxes", {}],
+      ["cloud.sandboxes.remove", { name: "openorc-t1" }],
+    ] as const) {
+      expect(admitRemoteRequest(method, params, context)).toEqual({ ok: false, message: "This is not available from a phone." });
+      expect(admitRemoteRequest(method, params, context, "owner")).toEqual({ ok: true });
+    }
   });
 
   it("keeps phone access and its push key out of a phone's reach", () => {
@@ -102,7 +119,6 @@ describe("phone policy", () => {
     ["a draft, which stays on the device that wrote it", "threads.update", { id: "t", patch: { draft: "half a thought" } }],
     ["a pull request link", "threads.update", { id: "t", patch: { pinned: true, prUrl: "https://github.com/me/repo/pull/1" } }],
     ["marking a thread done", "threads.update", { id: "t", patch: { done: true } }],
-    ["a change through a saved task", "threads.update", { id: "t", taskId: "task", patch: { seen: true } }],
     ["an image over the phone limit", "attachments.save", { name: "a.png", mime: "image/png", dataBase64: "A".repeat(Math.ceil(REMOTE_ATTACHMENT_BYTES / 3) * 4 + 4) }],
     ["a snooze that already passed", "threads.update", { id: "t", patch: { snoozedUntil: now - hour } }],
     ["a snooze more than a year away", "threads.update", { id: "t", patch: { snoozedUntil: now + 400 * 24 * hour } }],
@@ -168,7 +184,7 @@ describe("phone policy", () => {
       ["review.pushThread", { threadId: "team" }],
       ["review.createThreadPr", { threadId: "team", title: "Team work", body: "", base: "main" }],
     ] as const) {
-      expect(admitRemoteRequest(method, params, context), method).toEqual({ ok: false, message: "Publish a team's work on your Mac." });
+      expect(admitRemoteRequest(method, params, context), method).toEqual({ ok: false, message: "This item is no longer available." });
     }
   });
 

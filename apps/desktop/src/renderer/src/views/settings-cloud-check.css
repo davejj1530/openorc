@@ -1,0 +1,52 @@
+/* The cloud check's steps under its row: plan items' marks, details and times in the quiet grays. */
+.cloud-check-steps {
+  display: grid;
+  padding: 4px 0 8px;
+}
+.cloud-check-steps > li {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  align-items: start;
+  gap: 10px;
+  min-height: 30px;
+  font-size: var(--text-base);
+  line-height: 16px;
+  color: var(--ink-3);
+  transition: color var(--duration-arrive) var(--ease-out);
+}
+.cloud-check-steps > li[data-state="running"],
+.cloud-check-steps > li[data-state="failed"] {
+  color: var(--ink);
+}
+.cloud-check-steps > li[data-state="done"] {
+  color: var(--ink-2);
+}
+.cloud-check-steps .step-mark {
+  height: 16px;
+  margin-top: 7px;
+}
+.cloud-check-step {
+  display: grid;
+  gap: 2px;
+  padding: 7px 0;
+  min-width: 0;
+}
+.cloud-check-detail {
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+}
+.cloud-check-error {
+  font-size: var(--text-sm);
+  line-height: 16px;
+  color: var(--bad);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 10rem;
+  overflow: auto;
+}
+.cloud-check-time {
+  padding: 7px 0;
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}

@@ -12,6 +12,7 @@ import { useMacLook } from "../look/use-mac-look";
 import { leaveOnMacChange } from "../navigation";
 import { useNoticeTaps } from "../notifications/use-notice-taps";
 import { useColors, useMode } from "../ui/mode";
+import { HostScope, screenHost } from "../connection/HostScope";
 
 // A pairing link opens the Pair screen over Home, so leaving it lands on Home.
 export const unstable_settings = { anchor: "index" };
@@ -52,7 +53,18 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <MacLook />
           <StatusBar style="auto" />
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+          <Stack
+            screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}
+            screenLayout={({ route, navigation, children }) => {
+              const host = screenHost(navigation.getState()?.routes ?? [], route);
+              // Keyed, so a screen whose host resolves after its first render starts again on that host's client.
+              return (
+                <HostScope key={host ?? "shown"} host={host} opened>
+                  {children}
+                </HostScope>
+              );
+            }}
+          >
             {/* The back button's long-press menu and VoiceOver name Home by this title. */}
             <Stack.Screen name="index" options={{ title: "Threads" }} />
             <Stack.Screen name="thread/[id]" dangerouslySingular={onePerThread} options={pushed} />
@@ -60,12 +72,15 @@ export default function RootLayout() {
             <Stack.Screen name="preview" dangerouslySingular={onePerPanel} options={pushed} />
             <Stack.Screen name="diff" options={pushed} />
             <Stack.Screen name="new" dangerouslySingular options={pushed} />
+            <Stack.Screen name="tasks" dangerouslySingular options={pushed} />
             <Stack.Screen name="pair" dangerouslySingular options={{ presentation: "modal" }} />
             <Stack.Screen name="settings" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [1] }} />
             <Stack.Screen name="filter" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: "fitToContents" }} />
             <Stack.Screen name="tool" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [0.6, 1] }} />
             <Stack.Screen name="model" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [0.6, 1] }} />
             <Stack.Screen name="mode" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: "fitToContents" }} />
+            <Stack.Screen name="place" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: "fitToContents" }} />
+            <Stack.Screen name="move-to-cloud" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: "fitToContents" }} />
             <Stack.Screen name="commit" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: "fitToContents" }} />
             <Stack.Screen name="pull-request" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [1] }} />
             <Stack.Screen name="branch" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [0.6, 1] }} />

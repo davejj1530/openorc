@@ -8,7 +8,7 @@ On the repository page, open the **Security and quality** tab and click **Report
 
 Do not post vulnerability details, credentials, private conversations, or application databases in an issue or pull request.
 
-Include the affected OpenOrc version or commit, operating system, minimal reproduction with synthetic data, expected boundary, and observed impact. Relevant areas include provider permissions, local MCP tools, embedded content, credential storage, and file access. Share only the information needed to reproduce the problem; replace real credentials and private project data with placeholders.
+Include the affected OpenOrc version or commit, operating system, minimal reproduction with synthetic data, expected boundary, and observed impact. For the iPhone app, include its version and your iOS version. Relevant areas include provider permissions, local MCP tools, embedded content, credential storage, file access, phone pairing and the encrypted phone link, and cloud sandboxes, sign-ins, and the cloud brain. Share only the information needed to reproduce the problem; replace real credentials and private project data with placeholders.
 
 ## Supported versions and response
 

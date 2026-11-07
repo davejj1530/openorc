@@ -58,7 +58,7 @@ import { docHref } from "../../data/docs";
     </div>
     <p>OpenCode offers only <strong>Plan</strong> and <strong>Autonomous</strong>, because OpenOrc can't make it ask before every command. If an OpenCode thread is set to another mode, the composer shows <strong>Mode unavailable</strong> until you pick one of those two.</p>
     <Callout title="Limits">
-      Outside Autonomous, Claude Code runs with a fixed set of tools: reading, searching, edits, commands, web fetch and search, and questions. Its own subagents and the MCP servers from your Claude Code configuration are off, and OpenOrc's tools stay on. Your MCP servers connect in Autonomous when <strong>Your Claude Code MCP servers</strong> is on in <a href={docHref("settings")}>Settings</a>. In Plan, Codex turns off your own MCP servers too. On Windows, Claude Code can't run in Plan or Accept edits.
+      Outside Autonomous, Claude Code runs with a fixed set of tools: reading, searching, edits, commands, web fetch and search, questions, and skills. Its own subagents and the MCP servers from your Claude Code configuration are off, and OpenOrc's tools stay on. Your MCP servers connect in Autonomous when <strong>Your Claude Code MCP servers</strong> is on in <a href={docHref("settings")}>Settings</a>. In Plan, Codex turns off your own MCP servers too. On Windows, Claude Code can't run in Plan or Accept edits.
     </Callout>
   </section>
 
@@ -112,7 +112,7 @@ import { docHref } from "../../data/docs";
 
   <section aria-labelledby="openorc-tools">
     <h2 id="openorc-tools">OpenOrc's tools</h2>
-    <p>Besides its own tools, every agent gets OpenOrc's: the shared Preview browser, project memory, tasks, and the other threads of the project. OpenOrc applies the thread's mode to these tools itself, the same way for every agent.</p>
+    <p>Besides its own tools, every agent gets OpenOrc's: the shared Preview browser, project memory, tasks, the other threads of the project, visualizations, and, with device support on, simulators and emulators. OpenOrc applies the thread's mode to these tools itself, the same way for every agent.</p>
     <div class="docs-table">
       <table>
         <thead>
@@ -126,7 +126,7 @@ import { docHref } from "../../data/docs";
         </thead>
         <tbody>
           <tr>
-            <td>Read tasks, threads and project memory. Open, read, scroll or screenshot a page in the Preview.</td>
+            <td>Read tasks, threads and project memory. Open, read, scroll or screenshot a page in the Preview. List devices or screenshot one. Draw a visualization in the conversation (<code>visualize</code>).</td>
             <td>Runs</td>
             <td>Runs</td>
             <td>Runs</td>
@@ -141,6 +141,13 @@ import { docHref } from "../../data/docs";
           </tr>
           <tr>
             <td>Start a task in this thread, or start a helper thread</td>
+            <td>Blocked</td>
+            <td>Runs</td>
+            <td>Runs</td>
+            <td>Runs</td>
+          </tr>
+          <tr>
+            <td>Open or close a simulator or emulator in the Device tab (<code>device open</code>, <code>device close</code>)</td>
             <td>Blocked</td>
             <td>Runs</td>
             <td>Runs</td>
@@ -176,6 +183,6 @@ import { docHref } from "../../data/docs";
 
   <section aria-labelledby="next-steps">
     <h2 id="next-steps">Next steps</h2>
-    <LinkCards cards={[{ slug: "work" }, { slug: "messaging" }, { slug: "browser" }, { slug: "memory" }]} />
+    <LinkCards cards={[{ slug: "work" }, { slug: "messaging" }, { slug: "browser" }, { slug: "devices" }]} />
   </section>
 </DocsLayout>

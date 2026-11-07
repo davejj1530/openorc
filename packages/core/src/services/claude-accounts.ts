@@ -125,6 +125,11 @@ export class ClaudeAccountService {
     private readonly changed: (credentialsChanged?: string) => void,
     private readonly busy: (id: string) => boolean,
     private readonly retireIdle: (id: string) => Promise<void> = async () => {},
+    /**
+     * On a cloud-only host, an account's cloud token, which is how it signs in there: every Claude process for the account
+     * here, the sign-in check, model list and background text generation, runs with it.
+     */
+    private readonly cloudToken?: (id: string) => string | null,
   ) {}
 
   get hasPendingWork(): boolean {
@@ -157,7 +162,14 @@ export class ClaudeAccountService {
       linkSharedSkills(shared, env["CLAUDE_CONFIG_DIR"]);
       moveAccountMemory(shared, env["CLAUDE_CONFIG_DIR"]);
     }
+    const token = this.cloudToken?.(id);
+    if (token) env["CLAUDE_CODE_OAUTH_TOKEN"] = token;
     return { ...snapshot, env: Object.freeze(env), claudeAccountId: id, scope: `${id}:${this.generations.get(id) ?? 0}` };
+  }
+
+  /** A cloud token was saved or removed. Where it is the account's sign-in, everything read about the account is read again. */
+  cloudTokenChanged(id: string): void {
+    if (this.cloudToken) this.invalidate(id, true);
   }
 
   /** An unavailable Claude account must not hide the other installed providers. */
@@ -185,6 +197,13 @@ export class ClaudeAccountService {
     return account;
   }
 
+  /** The account under the id the Mac gave it, made or renamed and enabled. */
+  put(input: { id: string; name: string }): ClaudeAccount {
+    const account = claudeAccounts.put(this.db, input);
+    this.invalidate(input.id);
+    return account;
+  }
+
   update(input: { id: string; name?: string; enabled?: boolean; makeDefault?: true }): ClaudeAccount {
     if (input.enabled === false && (this.busy(input.id) || this.signingIn(input.id))) throw new Error("Finish this account's active sessions and sign-in before disabling it.");
     const account = claudeAccounts.update(this.db, input);
@@ -203,20 +222,27 @@ export class ClaudeAccountService {
     return starting;
   }
 
+  /**
+   * The account's CLI, environment and Claude folder for a browser sign-in, as `claude auth login` and `claude setup-token`
+   * use them. An added account signs in from a private browser window, so the browser's own Claude login stays put.
+   */
+  signInLaunch(id: string): { binary: string; env: NodeJS.ProcessEnv; directory: string } {
+    const account = this.require(id);
+    const launch = captureLaunchEnvironment("claude", this.environment(this.snapshot(), id));
+    const directory = launch.env["CLAUDE_CONFIG_DIR"] || path.join(os.homedir(), ".claude");
+    return { binary: launch.binary, env: { ...launch.env, ...(account.kind === "managed" ? this.privateBrowser() : {}) }, directory };
+  }
+
   private async startLogin(id: string): Promise<{ started: boolean }> {
     if (this.closing) throw new Error("OpenOrc is closing.");
-    const account = this.require(id);
-    const snapshot = this.environment(this.snapshot(), id);
-    const launch = captureLaunchEnvironment("claude", snapshot);
-    const directory = snapshot.env["CLAUDE_CONFIG_DIR"] || path.join(os.homedir(), ".claude");
+    const { binary, env, directory } = this.signInLaunch(id);
     await this.retireIdle(id);
     if (this.closing) throw new Error("OpenOrc is closing.");
     this.require(id);
     if (this.busy(id)) throw new Error("Finish this account's active sessions before signing in again.");
     mkdirSync(directory, { recursive: true, mode: 0o700 });
-    const command = launchCommand(launch.binary, ["--setting-sources", "user", "auth", "login", "--claudeai"]);
-    const browser = account.kind === "managed" ? this.privateBrowser() : {};
-    const process = spawn(command.file, command.args, { ...command.options, env: { ...launch.env, ...browser }, cwd: directory, stdio: "ignore", detached: globalThis.process.platform !== "win32" });
+    const command = launchCommand(binary, ["--setting-sources", "user", "auth", "login", "--claudeai"]);
+    const process = spawn(command.file, command.args, { ...command.options, env, cwd: directory, stdio: "ignore", detached: globalThis.process.platform !== "win32" });
     this.errors.delete(id);
     const timer = setTimeout(() => stopProcess(process), 5 * 60_000);
     const done = new Promise<void>((resolve) => {
@@ -253,8 +279,14 @@ export class ClaudeAccountService {
     const chrome = globalThis.process.platform === "win32" ? null : chromeExecutable();
     if (!chrome) return {};
     const script = path.join(this.dataDir, "claude-accounts", "open-chrome-incognito");
+    mkdirSync(path.dirname(script), { recursive: true, mode: 0o700 });
     writeFileSync(script, `#!/bin/sh\nexec "$OPENORC_CHROME" ${chromeIncognitoFlags.join(" ")} "$1"\n`, { mode: 0o700 });
     return { BROWSER: script, OPENORC_CHROME: chrome };
+  }
+
+  /** The account's Claude folder on this Mac, where Claude Code keeps its login, settings and sessions. */
+  configDirectory(id: string): string {
+    return this.directory(claudeAccounts.get(this.db, id));
   }
 
   private directory(account: ClaudeAccount): string {

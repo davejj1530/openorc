@@ -68,6 +68,8 @@ const answers: Answers = {
   "projects.get": (core, { id }) => core.projects.find((project) => project.id === id) ?? null,
   "projects.git": () => "ready",
   "threads.list": listed,
+  "threads.resolvedCount": (core, { quietBefore }) =>
+    [...core.threads.values()].filter((thread) => !thread.parentThreadId && (thread.archivedAt !== null || (!thread.pinnedAt && thread.lastActivityAt < quietBefore))).length,
   "threads.get": (core, { id }) => core.threads.get(id) ?? null,
   // Messages said outside any run, as other threads leave them; the demo's threads have none, and its runs say the rest.
   "threads.messages": (core, { id }) => {
@@ -90,6 +92,23 @@ const answers: Answers = {
   "claude.accounts.list": (core) => demoAccounts(core.started),
   "providers.limits": (core) => demoLimits(core.clock.now()),
   "app.settings.get": () => demoSettings,
+  // The demo Mac runs every thread itself, so the phone never offers the cloud.
+  "cloud.offer": () => ({ offered: false, provider: null }),
+  "cloud.move": () => {
+    throw new Error("Cloud threads are not available on this Mac.");
+  },
+  "threads.movePreview": () => ({ files: [], blocked: null }),
+  "cloud.bringToMac": () => {
+    throw new Error("Cloud threads are not available on this Mac.");
+  },
+  "cloud.keep": () => null,
+  // Only a brain's own Mac lists or deletes its sandboxes; a phone is refused, as by a real Mac.
+  "cloud.sandboxes": () => {
+    throw new Error("This is not available from a phone.");
+  },
+  "cloud.sandboxes.remove": () => {
+    throw new Error("This is not available from a phone.");
+  },
   "threads.start": (core, params) => {
     const id = core.id("demo-thread");
     const title = params.title ?? params.prompt.split("\n")[0]!.slice(0, 60);
@@ -99,6 +118,7 @@ const answers: Answers = {
     return { thread: core.thread(id), run };
   },
   "threads.update": patch,
+  "threads.switchClaudeAccount": (core, { id, claudeAccountId }) => core.update(id, { claudeAccountId }),
   "runs.start": (core, { threadId, prompt, attachments }) => {
     if (!threadId) throw new Error("Start a run from its thread.");
     return core.startRun(threadId, prompt, attachments);
@@ -109,6 +129,13 @@ const answers: Answers = {
   },
   "runs.interrupt": (core, { runId }) => {
     core.demoRun(runId).player.interrupt();
+    return null;
+  },
+  "subagents.stop": (core, { threadId }) => {
+    const thread = core.thread(threadId);
+    if (!thread.subagent?.stoppable) throw new Error("This subagent cannot be stopped.");
+    core.liveRun(threadId)?.player.interrupt();
+    core.update(threadId, { subagent: { ...thread.subagent, status: "stopped", endedAt: core.clock.now(), stoppable: false }, activity: "idle" });
     return null;
   },
   "threads.queue": (core, { id, text, attachments }) => core.queue(id, text, attachments),
@@ -139,6 +166,7 @@ const answers: Answers = {
     return workspace.fileDiff(comparison ?? "base", path);
   },
   "git.threadLog": (core, { threadId, limit }) => core.workspaces.get(threadId)?.commits(limit ?? 50) ?? [],
+  "git.commitRange": () => null,
   "git.threadPushState": (core, { threadId }) =>
     core.workspaces.get(threadId)?.pushState() ?? { branch: null, blocked: "This thread works in the project's checkout.", published: false, unpushedCount: 0, unpushed: [], busy: false },
   "review.threadPrTemplate": () => ({ body: null }),
@@ -169,6 +197,7 @@ export function answerDemo<M extends RemoteMethod>(core: DemoCore, method: M, pa
 /** Preview's session methods: the one page the demo shows, which input never changes. */
 export function answerSession<M extends SessionMethod>(core: DemoCore, method: M, params: SessionParams<M>): SessionRpcResults[M] {
   const results: { [K in SessionMethod]: (params: SessionParams<K>) => SessionRpcResults[K] } = {
+    "session.negotiate": () => ({ capabilities: ["subagent-threads"] }),
     "preview.watch": ({ threadId }) => core.previews.get(threadId) ?? { open: false },
     "preview.unwatch": () => null,
     "preview.input": () => ({ focus: null }),

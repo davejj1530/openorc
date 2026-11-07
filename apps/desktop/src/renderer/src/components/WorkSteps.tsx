@@ -1,4 +1,4 @@
-import { Fragment, memo, useId, useMemo, useState, type ReactNode } from "react";
+import { memo, useId, useMemo, useState } from "react";
 import {
   type Block,
   workDuration,
@@ -15,16 +15,20 @@ import {
   type WorkPhase,
   type WorkSection,
   useTicking,
+  objectsTitle,
+  phaseOutcome,
+  workObjects,
+  type WorkObject,
 } from "@openorc/client";
 import { cn } from "../lib/cn";
-import { Brain, Check, ChevronRight, Folder, Globe, Hammer, Loader2, Search, Terminal, WorkDelegate } from "./icons";
+import { Brain, Check, ChevronRight, Folder, Globe, Hammer, Loader2, Search, Terminal, WorkDelegate, X } from "./icons";
 import { FileGlyph } from "./FileGlyph";
 import { useVisited } from "../lib/use-visited";
 import { ThreadLink } from "./ThreadImages";
+import { ObjectGroup } from "./WorkObjects";
+import { fileHref } from "./WorkRead";
+import { OpenedCall, type RenderBlocks } from "./WorkMarks";
 import "./WorkSteps.css";
-
-/** How raw blocks render: the transcript's own rows, so the work list never needs to know them. `open` starts calls open. */
-type RenderBlocks = (blocks: Block[], open?: boolean) => ReactNode;
 
 const CHIP_LIMIT = 6;
 
@@ -58,7 +62,7 @@ export function WorkSteps({
       <StepsHead entries={entries} />
       <ol className="work-rail">
         {entries.map((entry) => (
-          <EntryView key={entryId(entry)} entry={entry} headline={headline} live={live} reveal={reveal} renderBlocks={renderBlocks} />
+          <EntryView key={entryId(entry)} entry={entry} turn={turn} headline={headline} live={live} reveal={reveal} renderBlocks={renderBlocks} />
         ))}
         {headline && !headline.entryId ? (
           <li className="work-rail-item" data-state="running">
@@ -120,11 +124,36 @@ function entryId(entry: WorkEntry): string {
   return entry.kind === "phase" ? entry.phase.id : entry.id;
 }
 
-function EntryView({ entry, headline, live, reveal, renderBlocks }: { entry: WorkEntry; headline: LiveHeadline | null; live: boolean; reveal: string | undefined; renderBlocks: RenderBlocks }) {
+function EntryView({
+  entry,
+  turn,
+  headline,
+  live,
+  reveal,
+  renderBlocks,
+}: {
+  entry: WorkEntry;
+  turn: Block[];
+  headline: LiveHeadline | null;
+  live: boolean;
+  reveal: string | undefined;
+  renderBlocks: RenderBlocks;
+}) {
   if (entry.kind === "phase") {
     const current = headline?.entryId === entry.phase.id ? headline : null;
     const message = entry.phase.origin === "narration" ? entry.phase.source?.id : undefined;
-    return <PhaseView phase={entry.phase} headline={current} message={message} revealed={message !== undefined && message === reveal} renderBlocks={renderBlocks} />;
+    // Only the live phase reads the rest of the turn (a test run's earlier count), so finished phases hold still while it streams.
+    return (
+      <PhaseView
+        phase={entry.phase}
+        headline={current}
+        earlier={current ? turn : undefined}
+        settled={!live}
+        message={message}
+        revealed={message !== undefined && message === reveal}
+        renderBlocks={renderBlocks}
+      />
+    );
   }
   if (entry.kind === "plan") return <PlanView items={entry.items} live={live} />;
   return (
@@ -156,16 +185,24 @@ function LiveWords({ headline, elapsed = false }: { headline: LiveHeadline; elap
   );
 }
 
-type StepState = "pending" | "running" | "done";
+export type StepState = "pending" | "running" | "done" | "failed";
 
-/** A step's mark: an empty ring, a loader while it runs, an ink check once done. The check lands with one overshoot. */
-function StepMark({ state }: { state: StepState }) {
+/**
+ * A step's mark: an empty ring, a loader while it runs, an ink check once done, a cross once it failed. Checks and
+ * crosses land with one overshoot.
+ */
+export function StepMark({ state }: { state: StepState }) {
   return (
     <span className="step-mark" data-state={state} aria-hidden="true">
       {state === "running" ? <Loader2 size={16} className="tool-row-live" /> : null}
       {state === "done" ? (
         <span className="step-check">
           <Check size={11} strokeWidth={2.25} />
+        </span>
+      ) : null}
+      {state === "failed" ? (
+        <span className="step-check" data-failed="">
+          <X size={11} strokeWidth={2.25} />
         </span>
       ) : null}
       {state === "pending" ? <span className="step-ring" /> : null}
@@ -185,7 +222,17 @@ function phaseMeta(phase: WorkPhase): string {
 }
 
 /** `message` is the narration the phase is named after; `revealed`, that it was asked for. */
-type PhaseProps = { phase: WorkPhase; headline: LiveHeadline | null; message?: string | undefined; revealed?: boolean; renderBlocks: RenderBlocks };
+type PhaseProps = {
+  phase: WorkPhase;
+  headline: LiveHeadline | null;
+  /** The turn's blocks, for the live phase only. */
+  earlier: Block[] | undefined;
+  /** The turn has ended, so a call still open stopped with it. */
+  settled: boolean;
+  message?: string | undefined;
+  revealed?: boolean;
+  renderBlocks: RenderBlocks;
+};
 
 /** A finished phase whose blocks are all the same objects has nothing new to show while another streams. */
 const samePhase = (a: PhaseProps, b: PhaseProps) =>
@@ -194,6 +241,8 @@ const samePhase = (a: PhaseProps, b: PhaseProps) =>
   a.headline?.label === b.headline?.label &&
   a.headline?.since === b.headline?.since &&
   a.revealed === b.revealed &&
+  a.earlier === b.earlier &&
+  a.settled === b.settled &&
   a.phase.blocks.length === b.phase.blocks.length &&
   a.phase.blocks.every((block, i) => block === b.phase.blocks[i]);
 
@@ -207,8 +256,9 @@ function usePhaseOpen(live: boolean, revealed: boolean) {
   return { open: choice ?? live, setChoice };
 }
 
-const PhaseView = memo(function PhaseView({ phase, headline, message, revealed = false, renderBlocks }: PhaseProps) {
+const PhaseView = memo(function PhaseView({ phase, headline, earlier, settled, message, revealed = false, renderBlocks }: PhaseProps) {
   const live = headline !== null;
+  const objects = useMemo(() => workObjects(phase.blocks, earlier ?? phase.blocks, !settled), [phase.blocks, earlier, settled]);
   const { open, setChoice } = usePhaseOpen(live, revealed);
   const visited = useVisited(open);
   const bodyId = useId();
@@ -224,38 +274,52 @@ const PhaseView = memo(function PhaseView({ phase, headline, message, revealed =
         aria-controls={expandable ? bodyId : undefined}
         onClick={() => setChoice(!open)}
       >
-        <PhaseWords phase={phase} headline={headline} open={open} />
+        <PhaseWords phase={phase} objects={objects} headline={headline} open={open} />
         {expandable ? <ChevronRight size={12} className={cn("work-chevron", open && "rotate-90")} /> : null}
       </button>
       {expandable ? (
         <div id={bodyId} hidden={!open} className="work-phase-body motion-collapse">
-          {visited ? <PhaseBody phase={phase} live={live} renderBlocks={renderBlocks} /> : null}
+          {visited ? <PhaseBody phase={phase} objects={objects} live={live} renderBlocks={renderBlocks} /> : null}
         </div>
       ) : null}
     </li>
   );
 }, samePhase);
 
-/** The live words while the phase runs; otherwise its title, and when folded a hint of what is inside. */
-function PhaseWords({ phase, headline, open }: { phase: WorkPhase; headline: LiveHeadline | null; open: boolean }) {
+/**
+ * The live words while the phase runs; otherwise its title, and when folded what it came to ("Opened #218",
+ * "1 failed" in red) or else a hint of what is inside.
+ */
+function PhaseWords({ phase, objects, headline, open }: { phase: WorkPhase; objects: WorkObject[]; headline: LiveHeadline | null; open: boolean }) {
   if (headline) return <LiveWords headline={headline} />;
-  const meta = !open && phase.origin !== "summary" ? phaseMeta(phase) : "";
+  const named = phase.origin === "summary" ? objectsTitle(objects) : null;
+  const title = named ?? phase.title;
+  // A title that already names the branch's outcome leaves the rest of the phase to the meta.
+  const outcome = open ? null : phaseOutcome(named ? objects.filter((object) => object.kind !== "git") : objects);
+  const meta = outcome?.text ?? (!open && phase.origin !== "summary" ? phaseMeta(phase) : "");
   return (
     <>
-      <span className="work-line-text" title={phase.title}>
-        {phase.title}
+      <span className="work-line-text" title={title}>
+        {title}
       </span>
-      {meta ? <span className="work-phase-meta">{meta}</span> : null}
+      {meta ? (
+        <span className="work-phase-meta" data-tone={outcome?.failed ? "bad" : undefined}>
+          {meta}
+        </span>
+      ) : null}
     </>
   );
 }
 
-function PhaseBody({ phase, live, renderBlocks }: { phase: WorkPhase; live: boolean; renderBlocks: RenderBlocks }) {
-  // A phase named after its one call ("Run the desktop tests") opens straight to that call. A command's card
-  // already shows the command and its last line, so it stays closed rather than repeat them.
+function PhaseBody({ phase, objects, live, renderBlocks }: { phase: WorkPhase; objects: WorkObject[]; live: boolean; renderBlocks: RenderBlocks }) {
+  // A phase named after its one plain command ("Run the build") opens straight to its call: the card already shows
+  // the command and its last line, so it stays closed rather than repeat them.
   const section = phase.sections.length === 1 ? phase.sections[0]! : null;
   const only = section?.chips.length === 1 ? section.chips[0]! : null;
-  if (only && chipTitle(only) === phase.title && !phase.extras.length) return <div className="work-group-calls">{renderBlocks(only.blocks, section?.label !== "Ran")}</div>;
+  if (only && chipTitle(only) === phase.title && !phase.extras.length && objects.every((object) => object.kind === "command"))
+    return <div className="work-group-calls">{renderBlocks(only.blocks, section?.label !== "Ran")}</div>;
+  // Activities with nothing to list keep their own rows.
+  const activities = phase.sections.flatMap((group) => (group.chips.length ? [] : group.blocks.filter((block) => block.kind === "activity")));
   return (
     <>
       {phase.detail ? <p className="work-phase-detail">{phase.detail}</p> : null}
@@ -269,9 +333,10 @@ function PhaseBody({ phase, live, renderBlocks }: { phase: WorkPhase; live: bool
           ))}
         </ol>
       ) : null}
-      {phase.sections.map((section) => (
-        <GroupView key={section.id} section={section} live={live} renderBlocks={renderBlocks} />
-      ))}
+      {objects.length
+        ? objects.map((object) => <ObjectGroup key={object.id} object={object} renderBlocks={renderBlocks} />)
+        : phase.sections.map((group) => <GroupView key={group.id} section={group} live={live} renderBlocks={renderBlocks} />)}
+      {objects.length && activities.length ? <div className="work-group-blocks">{renderBlocks(activities)}</div> : null}
       {phase.extras.length ? <div className="work-phase-extras">{renderBlocks(phase.extras)}</div> : null}
     </>
   );
@@ -290,7 +355,7 @@ function GroupView({ section, live, renderBlocks }: { section: WorkSection; live
 function ChipGroup({ section, live, renderBlocks }: { section: WorkSection; live: boolean; renderBlocks: RenderBlocks }) {
   const [all, setAll] = useState(false);
   const [calls, setCalls] = useState(false);
-  // A chip the reader picked shows its own call, already open, under the chips.
+  // A chip the reader picked grows into its own call.
   const [picked, setPicked] = useState<string | null>(null);
   const pick = section.chips.find((chip) => chip.key === picked);
   const [visited, setVisited] = useState(false);
@@ -318,10 +383,9 @@ function ChipGroup({ section, live, renderBlocks }: { section: WorkSection; live
       </button>
       <div className="work-chips">
         {shown.map((chip) => (
-          <Fragment key={chip.key}>
+          <OpenedCall key={chip.key} open={chip === pick} calls={chipCalls(chip)} renderBlocks={renderBlocks}>
             <ChipView chip={chip} live={live && chip.blocks.some(isLive)} picked={chip.key === picked} onPick={() => setPicked((key) => (key === chip.key ? null : chip.key))} />
-            {chip === pick ? <div className="work-group-calls">{renderBlocks(chipCalls(pick), true)}</div> : null}
-          </Fragment>
+          </OpenedCall>
         ))}
         {section.chips.length > shown.length ? (
           <button type="button" className="work-more" onClick={() => setAll(true)}>
@@ -367,7 +431,7 @@ function ChipView({ chip, live, picked, onPick }: { chip: WorkChip; live: boolea
   if (chip.kind === "file" && chip.path)
     return (
       <span className="work-chip" data-kind={chip.kind} data-live={live || undefined} title={chip.title}>
-        <ThreadLink href={chip.path}>{content}</ThreadLink>
+        <ThreadLink href={fileHref(chip)}>{content}</ThreadLink>
       </span>
     );
   return (

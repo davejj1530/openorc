@@ -1,23 +1,11 @@
-/* The panel is one r20 card on the window's tile under its header row, holding the open tab's page.
-   It carries data-plane, so controls inside it take the plane's fill step. */
-.panel-card {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  margin: 0 8px 8px 0;
-  border-radius: var(--radius-3xl);
-  background: var(--surface);
-  overflow: hidden;
-}
-.panel-shell[data-expanded="true"] .panel-card {
-  margin-left: 8px;
-}
-/* The header shares the window's chrome line with the thread header, on the tile above the card. */
+/* The panel is one plane from the window's top edge to its bottom: the header row and the open
+   tab's page share its surface with nothing between them. The pane carries data-plane, so
+   controls anywhere in it take the plane's fill step. The header shares the window's chrome line
+   with the thread header beside it. */
 .panel-header {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 2px;
   height: var(--height-topbar);
   min-width: 0;
   flex-shrink: 0;
@@ -31,63 +19,43 @@
   display: inline-flex;
 }
 
-/* The tabs: a fill track at its natural width with a surface knob under the open tab, like the
-   segmented control. Tabs keep their full names; the track scrolls sideways when they outgrow
-   the header, and the knob, an absolute child of the track, scrolls with it. */
+/* The tabs: plain labels at their natural width, the open one in full ink and the rest faint.
+   Tabs keep their full names; the strip scrolls sideways when they outgrow the header. */
 .panel-tabs {
-  position: relative;
-  isolation: isolate;
   display: flex;
   align-items: center;
+  gap: 2px;
   flex: 0 1 auto;
   width: fit-content;
   min-width: 0;
-  padding: 3px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-2);
   overflow-x: auto;
   scrollbar-width: none;
 }
 .panel-tabs::-webkit-scrollbar {
   display: none;
 }
-.panel-tabs-knob {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: -1;
-  border-radius: var(--radius-pill);
-  background: var(--surface);
-  pointer-events: none;
-}
-.panel-tabs-knob[data-placed] {
-  transition:
-    transform var(--duration-swap) var(--ease-out),
-    width var(--duration-swap) var(--ease-out);
-}
 .panel-tab {
   position: relative;
   display: flex;
   flex-shrink: 0;
-  height: 30px;
+  height: 28px;
   overflow: hidden;
-  border-radius: var(--radius-pill);
-  color: var(--ink-3);
+  border-radius: var(--radius-md);
+  color: var(--ink-4);
   transition:
     color var(--duration-arrive) var(--ease-out),
     width var(--duration-swap) var(--ease-out),
     opacity var(--duration-arrive) var(--ease-out);
 }
-/* A tab added after the track settled widens from nothing while the knob slides to it. The track
-   remounts per conversation, so restored tabs never animate. */
+/* A tab added after the strip settled widens from nothing. The strip remounts per conversation,
+   so restored tabs never animate. */
 @starting-style {
-  .panel-tabs[data-placed] .panel-tab {
+  .panel-tabs[data-settled] .panel-tab {
     width: 0;
     opacity: 0;
   }
 }
-.panel-tab:hover,
-.panel-tab[data-active="true"] {
+.panel-tab:hover {
   color: var(--ink);
 }
 .panel-tab[data-active="true"] {
@@ -98,7 +66,7 @@
   align-items: center;
   gap: 6px;
   height: 100%;
-  padding: 0 14px 0 12px;
+  padding: 0 10px 0 8px;
   border-radius: inherit;
   font-size: var(--text-base);
   line-height: 16px;
@@ -126,7 +94,7 @@
 .panel-tab-close {
   position: absolute;
   top: 50%;
-  left: 9px;
+  left: 5px;
   display: grid;
   place-items: center;
   width: 20px;
@@ -281,8 +249,9 @@
   .panel-shell {
     --panel-traffic-overlap: max(0px, calc(var(--spacing-traffic) - (100cqw - var(--panel-pane) - var(--spacing-well))));
   }
-  .panel-header[data-traffic-clearance="true"] {
-    padding-left: var(--panel-traffic-overlap);
+  /* Docked on the left, the header already starts past the traffic lights. */
+  .panel-shell:not([data-side="left"]) .panel-header[data-traffic-clearance="true"] {
+    padding-left: max(10px, var(--panel-traffic-overlap));
   }
   .panel-header > :has(> .panel-hide) {
     display: inline-flex;

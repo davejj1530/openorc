@@ -26,7 +26,14 @@ vi.mock("expo-router", () => ({
 
 const studio = { id: "studio", name: "Studio", routes: [], lastRoute: null };
 const laptop = { id: "laptop", name: "Laptop", routes: [], lastRoute: null };
-const phone = vi.hoisted(() => ({ state: null as LinkState | null, listeners: new Set<() => void>(), retried: 0, forgot: [] as string[] }));
+const phone = vi.hoisted(() => ({
+  state: null as LinkState | null,
+  partner: null as string | null,
+  partnerState: null as LinkState | null,
+  listeners: new Set<() => void>(),
+  retried: 0,
+  forgot: [] as string[],
+}));
 vi.mock("../client", () => {
   const link = {
     getState: () => phone.state!,
@@ -42,7 +49,14 @@ vi.mock("../client", () => {
   };
   // Alerts stop that Mac's notices, then forget it through the link.
   const alerts = { forget: async (id: string) => link.forget(id) };
-  return { link, alerts, useLinkState: () => phone.state, useSavedMacs: () => [studio, laptop] };
+  return {
+    link,
+    alerts,
+    useLinkState: () => phone.state,
+    useSavedMacs: () => [studio, laptop],
+    useHostGroup: () => ({ primary: "studio", partner: phone.partner }),
+    usePartnerLinkState: () => phone.partnerState,
+  };
 });
 
 const connected: LinkState = { kind: "connected", mac: studio, route: { kind: "lan", host: "studio.local", port: 1 }, serial: 1 };
@@ -108,6 +122,16 @@ it("offers Forget on every Mac's row to VoiceOver, as its swipe does, and forget
 
 it("pairs another Mac over Settings", () => {
   render(<MacSection state={connected} />);
-  act(() => screen.getByRole("button", { name: "Pair another Mac" }).click());
+  act(() => screen.getByRole("button", { name: "Pair a Mac or cloud brain" }).click());
   expect(nav.stack).toEqual(["/", "/settings", "/pair"]);
+});
+
+it("says whether the paired host answers, so a dead one beside a live one reads as just that", () => {
+  phone.state = { kind: "waiting", mac: { ...studio, kind: "brain" }, why: "silent", retryAt: null };
+  phone.partner = "laptop";
+  phone.partnerState = { kind: "connected", mac: laptop, route: { kind: "lan", host: "laptop.local", port: 1 }, serial: 1 };
+  render(<MacSection state={phone.state} />);
+  expect(screen.getByRole("button", { name: "Laptop, Connected over Wi-Fi" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: /^Studio, / }).textContent).toContain("This cloud brain isn’t answering.");
+  phone.partner = null;
 });

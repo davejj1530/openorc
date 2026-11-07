@@ -1,0 +1,294 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+import { docHref } from "../../data/docs";
+---
+
+<DocsLayout slug="cloud">
+  <section aria-labelledby="how">
+    <h2 id="how">How cloud threads work</h2>
+    <p>
+      A cloud thread runs its agent in a sandbox of its own, a Linux machine on your own Vercel or Agent37 account. OpenOrc has no cloud of its own. You connect your account, and that service bills you for what its sandboxes use.
+      Cloud threads work the same way for Claude Code, Codex, and OpenCode.
+    </p>
+    <p>
+      The conversation stays in OpenOrc on your computer, which keeps a worktree for the thread on a branch of its own. The Changes panel, commits, pushes, and pull requests all work from that worktree, as they do for any thread. Code
+      moves between the worktree and the sandbox as Git bundles:
+    </p>
+    <ul>
+      <li>When a turn starts, OpenOrc sends the sandbox what changed in the worktree since the last turn, such as a commit, an undo, or an edit you made.</li>
+      <li>While the agent works, OpenOrc brings its changes to the worktree every 8 seconds, and once more when the turn ends.</li>
+      <li>If you edit the worktree while a turn runs, OpenOrc keeps your edits under a Git ref of the thread's own before the sandbox's files replace them. They are never discarded.</li>
+      <li>Files that Git ignores, such as dependencies and most <code>.env</code> files, stay where they are on each side. Nothing is pushed anywhere, and the sandbox needs no Git credentials.</li>
+    </ul>
+    <p>
+      Before the first turn, OpenOrc installs the thread's agent in the sandbox, at the version installed on your computer, and runs the project's setup script there instead of on your computer. The script gets
+      <code>OPENORC_CLOUD=1</code>. If the project uses Docker, as a Compose file or a <code>docker compose</code> script shows, OpenOrc installs Docker in the sandbox and starts it. Agents there still have OpenOrc's tools.
+    </p>
+    <Callout>Until you connect Vercel or Agent37, <strong>Cloud</strong> can't be chosen for a new thread, and <strong>Move to cloud</strong> is off, on your computer and on your phone. Each says what to connect: <em>Connect Vercel or Agent37 in Settings &gt; Cloud first.</em></Callout>
+    <p class="docs-source">Source: <code>packages/cloud/src/sync.ts</code>, <code>packages/core/src/services/cloud-workspaces.ts</code>, <code>packages/protocol/src/owners.ts</code>, <code>uses-docker.ts</code>, <code>packages/cloud/src/agent-install.ts</code></p>
+  </section>
+
+  <section aria-labelledby="connect">
+    <h2 id="connect">Connect a cloud service</h2>
+    <p>Open <strong>Settings</strong> → <strong>Cloud</strong>. Connect Vercel, Agent37, or both.</p>
+    <h3>Vercel</h3>
+    <ol class="docs-steps">
+      <li>In your Vercel account, create an access token. Under Scope, choose one team, then All Projects. Whoever holds the token can change everything it reaches, so keep it to one team.</li>
+      <li>Under <strong>Vercel</strong>, paste the token into <strong>Access token</strong> and click <strong>Connect</strong>.</li>
+      <li>Choose the <strong>Team</strong>. Its sandboxes belong to a project named <code>openorc-sandboxes</code>, which OpenOrc creates there.</li>
+      <li>Choose the <strong>Sandbox size</strong> and the <strong>Sandbox region</strong>. Both apply to new sandboxes. The size starts at 2 vCPUs and 4 GB. The region starts where your cloud brain runs, or else nearest your time zone.</li>
+    </ol>
+    <p>If the token reaches more than the team you chose, the <strong>Account</strong> row says so. Disconnect, then connect a token scoped to that team alone.</p>
+    <h3>Agent37</h3>
+    <ol class="docs-steps">
+      <li>Create an API key in your Agent37 workspace.</li>
+      <li>Under <strong>Agent37</strong>, paste it into <strong>API key</strong> and click <strong>Connect</strong>.</li>
+      <li>Choose the <strong>Instance size</strong> for new cloud threads. It starts at 2 vCPUs and 4 GB.</li>
+    </ol>
+    <p>With both connected, <strong>New cloud threads</strong> → <strong>Run on</strong> picks where new cloud threads go. Threads already in the cloud stay where they are.</p>
+    <h3>Check the setup</h3>
+    <p>
+      Under <strong>Check</strong>, click <strong>Run check</strong>. OpenOrc makes a throwaway sandbox where new cloud threads run and tries each thing a cloud thread needs: starting the sandbox, finding Node, Git, and Claude Code there, running a
+      process, reaching your computer, keeping sign-ins outside the sandbox, and syncing a change both ways. Then it deletes the sandbox, whatever failed. A failed step shows why.
+    </p>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/views/settings-cloud.tsx</code>, <code>settings-cloud-agent37.tsx</code>, <code>settings-cloud-check.tsx</code>, <code>packages/cloud/src/check.ts</code></p>
+  </section>
+
+  <section aria-labelledby="sign-ins">
+    <h2 id="sign-ins">How agents sign in there</h2>
+    <p>
+      An agent in a sandbox can't use the sign-in on your computer, so each agent gets one for the cloud. OpenOrc keeps these sign-ins in your system's protected storage, encrypted, and gives a sandbox only the one its turn needs. The
+      first section of Settings → Cloud, <strong>Sign-ins for the cloud</strong>, lists every sign-in the cloud can use and whether it is ready. <strong>Bring them</strong> brings the missing ones, one at a time.
+    </p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Agent</th>
+            <th scope="col">Signs in with</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Claude Code</td>
+            <td>
+              A token for each Claude account, under <strong>Claude accounts</strong>. <strong>Create token</strong> runs <code>claude setup-token</code> with that account's sign-in, in your browser for your Claude Code login or in a
+              private window for an added account. <strong>Paste token</strong> takes one you made with <code>claude setup-token</code>. Turns use that account's subscription.
+            </td>
+          </tr>
+          <tr>
+            <td>Codex</td>
+            <td>
+              Under <strong>Codex</strong>, <strong>Sign in with ChatGPT</strong> makes a sign-in for the cloud alone, separate from your computer's <code>codex login</code>. Or <strong>Use an API key</strong>, billed by the token.
+              OpenOrc refreshes a day-old ChatGPT sign-in on your computer before a sandbox gets it, and keeps the newer one if a sandbox had to refresh it.
+            </td>
+          </tr>
+          <tr>
+            <td>OpenCode</td>
+            <td>
+              A key for each provider, under <strong>OpenCode</strong> → <strong>Add a key</strong>. A turn gets only the key of its model's provider. OpenCode's free models need no key. A provider your OpenCode signs in to with an account
+              needs a key typed in.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      If Codex on your computer uses an OpenAI API key, or OpenCode keeps provider keys, <strong>Bring them</strong> offers to copy them. To find them, OpenOrc reads Codex's <code>auth.json</code> and the credentials OpenCode keeps. It
+      saves a copy only after you approve it with <strong>Copy</strong>. Your Claude Code login and a ChatGPT sign-in are never copied, because two machines renewing one sign-in sign each other out.
+    </p>
+    <p>
+      If you send a message to a cloud thread whose agent has no sign-in for the cloud, the message waits. A card in the thread offers that one sign-in, and the message goes once it is ready. <strong>Cancel</strong> keeps the message
+      in the composer.
+    </p>
+    <h3>Sign-ins kept outside the sandbox</h3>
+    <p>
+      On Vercel, when your plan allows it, the sandbox's firewall adds the real sign-in to the agent's requests on their way out. The sandbox holds only a stand-in that works nowhere, so nothing running there can read the sign-in.
+      This covers Claude Code's requests to <code>api.anthropic.com</code> and <code>mcp-proxy.anthropic.com</code>, Codex's to <code>chatgpt.com</code> or <code>api.openai.com</code>, and OpenCode's to Anthropic, OpenAI, OpenRouter,
+      Google, Groq, Mistral, xAI, and DeepSeek.
+    </p>
+    <p>
+      Otherwise the sign-in sits in the sandbox, where the agent and the commands it runs can read it. That happens on a Vercel plan that refuses the firewall rule, on Agent37, and for any other OpenCode provider. The check's
+      <strong>Keep sign-ins outside the sandbox</strong> step tells you whether the firewall does this for you.
+    </p>
+    <p class="docs-source">Source: <code>packages/core/src/services/cloud-sign-ins.ts</code>, <code>cloud-agent-env.ts</code>, <code>cloud-codex.ts</code>, <code>cloud-opencode.ts</code>, <code>mac-agent-keys.ts</code>, <code>codex-cloud-login.ts</code></p>
+  </section>
+
+  <section aria-labelledby="start">
+    <h2 id="start">Start a thread in the cloud</h2>
+    <ol class="docs-steps">
+      <li>On the New thread page, pick a project. Cloud threads need a Git project, so the Workspace has no cloud.</li>
+      <li>Click the line under the composer that says where the thread works, and choose <strong>Cloud</strong>. The line then reads <strong>Runs in the cloud on a new branch</strong>.</li>
+      <li>Choose the agent and model, type your request, and press <kbd>Enter</kbd>.</li>
+    </ol>
+    <p>
+      The thread opens at once. While the sandbox gets ready, a card shows its steps, such as <strong>Starting a Vercel sandbox</strong>, <strong>Sending your code</strong>, <strong>Running the setup script</strong>, and
+      <strong>Starting Claude</strong>, with your message below. When it is ready, the message goes to the agent. If a step fails, the card says <strong>The cloud workspace did not start</strong>, with the reason and
+      <strong>Try again</strong>.
+    </p>
+    <p>The thread's header names where it runs: <strong>Vercel</strong> or <strong>Agent37</strong>. In the sidebar its row says <strong>cloud</strong>.</p>
+    <h3>When a sandbox runs</h3>
+    <ul>
+      <li>A sandbox stays awake while it is set up and while its agent runs. About a minute after both end, OpenOrc puts it to sleep. Its files stay, and the next message wakes it.</li>
+      <li>An agent with nothing to do closes after 10 minutes, so an idle sandbox sleeps about 11 minutes after the last turn.</li>
+      <li>If your computer sleeps or goes offline during a turn, the sandbox keeps going for up to 30 minutes, so the turn can finish. OpenOrc shows what the agent did when it connects again.</li>
+    </ul>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/components/NewThreadOptions.tsx</code>, <code>CloudStart.tsx</code>, <code>CloudSignInOffer.tsx</code>, <code>packages/core/src/services/cloud-awake.ts</code></p>
+  </section>
+
+  <section aria-labelledby="move">
+    <h2 id="move">Move a thread to the cloud and back</h2>
+    <p>
+      Between turns, open a project thread's menu and choose <strong>Move to cloud</strong>. The dialog says what will move. A thread in the local checkout first takes every uncommitted change in the checkout, including other threads',
+      into a new worktree on its own branch, and the dialog lists those files.
+    </p>
+    <p>Where the thread goes depends on whether you set up a <a href="#brain">cloud brain</a>:</p>
+    <ul>
+      <li>
+        <strong>Without a cloud brain</strong>, the worktree, its uncommitted changes, and the agent's session go to a sandbox of its own, where the next message runs. The worktree stays on your computer and follows the sandbox. The
+        thread then stays in the cloud, and can't move back to your computer or into the checkout.
+      </li>
+      <li>
+        <strong>With a cloud brain</strong>, the brain takes the thread, with its history, the agent's session, its branch, and its uncommitted changes. The worktree leaves your computer, and the brain runs the thread in a sandbox of its own. The card on the thread shows <strong
+          >Packing the conversation</strong
+        >, <strong>Waking the cloud brain</strong>, and <strong>Sending it to the cloud</strong>.
+      </li>
+    </ul>
+    <p>A thread on the cloud brain has these choices in its menu:</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Action</th>
+            <th scope="col">What it does</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Bring to Mac</strong></td>
+            <td>Hands the thread back to your computer between turns, with its history, session, branch, and uncommitted changes.</td>
+          </tr>
+          <tr>
+            <td><strong>Open on Mac</strong></td>
+            <td>Copies the thread's code into a read-only folder on your computer, refreshed from the brain while both are awake. <strong>Close on Mac</strong> removes it. Edits you make there never go to the cloud, and closing keeps them under a Git ref.</td>
+          </tr>
+          <tr>
+            <td><strong>Keep on this Mac</strong> or <strong>Keep in the cloud</strong></td>
+            <td>Calls off a move that hasn't finished, leaving the thread where it was.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      If the brain refuses a move, the thread shows <strong>Didn't move</strong> with the reason and a way to try again. A conversation outside a project, an Orcling's conversation, a pull request's review copy, and a subagent's thread
+      stay where they are. To move a subagent, move the thread that started it.
+    </p>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/components/ThreadActions.tsx</code>, <code>CloudMoveDialog.tsx</code>, <code>packages/core/src/services/cloud-handoff.ts</code>, <code>relocations.ts</code>, <code>relocation-rules.ts</code>, <code>thread-moves.ts</code></p>
+  </section>
+
+  <section aria-labelledby="sleep">
+    <h2 id="sleep">When your computer sleeps</h2>
+    <p>
+      Settings → Cloud → <strong>When this Mac sleeps</strong> → <strong>Carry working threads on in the cloud</strong> lets a turn continue in the cloud when your computer goes to sleep in the middle of it. It is off by default. Connect a
+      service and bring the agents' sign-ins before you turn it on.
+    </p>
+    <ul>
+      <li>While it is on, each turn of a worktree thread on your computer gets a sandbox of its own beside it. During the turn, OpenOrc keeps that sandbox up to date with the worktree's files and the agent's session.</li>
+      <li>When your computer goes to sleep, the turn here stops, and the sandbox carries it on for up to two hours. If your computer drops off during a turn without going to sleep, the sandbox takes over after two minutes.</li>
+      <li>
+        While your computer sleeps, the agent can't reach OpenOrc's tools or ask you for an approval. When the computer wakes, the thread becomes a cloud thread, says <strong
+          >This Mac went to sleep, so the turn carried on in the cloud.</strong
+        >, and shows the sandbox's work as a turn.
+      </li>
+    </ul>
+    <p>Threads in the local checkout stay on your computer. Quitting OpenOrc ends its turns, and no sandbox takes them over.</p>
+    <p class="docs-source">Source: <code>packages/core/src/services/cloud-standby.ts</code></p>
+  </section>
+
+  <section aria-labelledby="brain">
+    <h2 id="brain">The cloud brain</h2>
+    <p>
+      The cloud brain is a copy of OpenOrc that runs without a window on your Vercel team or Agent37 account. It holds threads of its own and runs each in a sandbox of its own, so they keep going while your computer sleeps, and your
+      phone can follow and start them. Each thread has one owner, your computer or the brain. Your computer's sidebar lists both, and what you do in a brain thread goes to the brain. The brain sleeps when it has been idle for five
+      minutes, and wakes when you open one of its threads or a phone reaches for it.
+    </p>
+    <h3>Set it up</h3>
+    <ol class="docs-steps">
+      <li>Connect Vercel or Agent37. The <strong>Cloud brain</strong> section appears in Settings → Cloud.</li>
+      <li>If sign-ins are missing, bring them first with <strong>Sign-ins for the cloud</strong> → <strong>Bring them</strong>, so the brain starts with them.</li>
+      <li>With both services connected, choose where it <strong>Runs on</strong>. On Vercel, choose the <strong>Region</strong>, which is fixed once it is set up.</li>
+      <li>Click <strong>Set up</strong>. OpenOrc makes the brain's machine and installs the brain that comes with the app, starts it, and sends it the sign-ins.</li>
+    </ol>
+    <h3>Choose its projects</h3>
+    <p>
+      Under <strong>Projects</strong>, switch on each project the brain should work in. OpenOrc sends the brain a copy of the project's default branch as Git bundles, and again when the branch changes while both are awake. If the
+      brain's copy has commits your computer doesn't, it isn't updated, and the row says so. New cloud threads start on the brain only in a project that is switched on. While both are awake, the brain and your computer merge those
+      projects' memory both ways, and the brain keeps a read-only copy of your open tasks for your phone.
+    </p>
+    <h3>What it signs in with</h3>
+    <ul>
+      <li><strong>Claude accounts</strong> lists the accounts whose cloud tokens the brain holds. <strong>Send</strong> appears when it is behind.</li>
+      <li><strong>Codex</strong> is the brain's own login, separate from the one your computer's sandboxes use. <strong>Sign in</strong> makes a ChatGPT sign-in for it, or <strong>Use an API key</strong>.</li>
+      <li>
+        <strong>GitHub</strong> is off by default. Switched on, the brain gets your computer's GitHub sign-in for its own <code>git</code> and <code>gh</code>, to commit, push, and open pull requests. No agent and no sandbox gets it.
+      </li>
+      <li><strong>Notifications</strong> and <strong>Anthropic API key</strong> appear once the brain holds a copy of your Apple push key or of memory's Anthropic API key.</li>
+    </ul>
+    <h3>Phones and the brain</h3>
+    <p>
+      Click <strong>Pair phone</strong> and scan the code with OpenOrc on your iPhone. Phones paired with the brain are listed under it, each with <strong>Remove</strong>. The phone then reaches the brain over the internet, while your
+      computer sleeps or is off. On Vercel, a small function in your team, the <strong>Door</strong>, wakes a sleeping brain for a paired phone. On Agent37, a request to the brain's address wakes it. See <a href={docHref("phone") + "#cloud-brain"}
+        >Phone app</a
+      >.
+    </p>
+    <p>
+      The brain's row shows whether it is awake, with <strong>Wake</strong> while it sleeps. <strong>Move to Agent37</strong> or <strong>Move to Vercel</strong> appears once the other service is connected. A move brings the brain's
+      threads to your computer, sets up a new brain on the other service, and sends them there. Phones need pairing again, and the brain's Codex sign-in stays behind.
+    </p>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/views/settings-cloud-brain.tsx</code>, <code>settings-cloud-brain-projects.tsx</code>, <code>settings-cloud-brain-signins.tsx</code>, <code>packages/core/src/services/cloud-brain.ts</code>, <code>brain-sync.ts</code>, <code>apps/brain/src/awake.ts</code></p>
+  </section>
+
+  <section aria-labelledby="costs">
+    <h2 id="costs">Costs and limits</h2>
+    <p>Vercel and Agent37 bill your account for the sandboxes and the brain, under their own prices and plans. OpenOrc charges nothing.</p>
+    <ul>
+      <li><strong>Sandboxes</strong> in Settings → Cloud lists each sandbox, whether it is awake, how long it ran, its size, and on Vercel what it has cost so far at Vercel's list prices.</li>
+      <li>The cloud brain's <strong>This month</strong> counts the brain and the sandboxes it made. On Vercel it uses list prices and includes their snapshots, before your plan's credit. On Agent37 it shows what Agent37 counts.</li>
+      <li>With <strong>Carry working threads on in the cloud</strong> on, every turn of a worktree thread keeps a sandbox awake beside it.</li>
+      <li>Each agent's use goes to its own account, such as the Claude account's subscription, your ChatGPT plan or OpenAI API key, and each OpenCode provider's key.</li>
+    </ul>
+    <p>
+      Your Vercel plan sets the largest sandbox, how long one session can last, and whether the firewall can keep sign-ins outside the sandbox. A turn that outlasts the session ends when Vercel stops the sandbox. On Agent37, a project
+      that uses Docker gets a VM instance, which Agent37 bills at a higher rate.
+    </p>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/views/settings-cloud-sandboxes.tsx</code>, <code>packages/cloud/src/vercel-sandbox.ts</code>, <code>agent37-sandbox.ts</code></p>
+  </section>
+
+  <section aria-labelledby="remove">
+    <h2 id="remove">Remove cloud resources</h2>
+    <ul>
+      <li><strong>Remove</strong> beside a sandbox under <strong>Sandboxes</strong> deletes it, except while its agent works. The thread stays, and its next message makes a new sandbox from the worktree.</li>
+      <li>Deleting a cloud thread deletes its sandbox.</li>
+      <li>
+        <strong>Remove</strong> on the cloud brain deletes it from your account, with its disk, the sandboxes it made, and the conversations on it. Bring to Mac any conversation you want to keep first. Paired phones can no longer reach
+        it.
+      </li>
+      <li>
+        <strong>Disconnect</strong> forgets the Vercel token or Agent37 key on your computer. It doesn't delete sandboxes or the brain, so remove them first. On Vercel, OpenOrc first closes the brain's door, which deletes the door's
+        copy of your token.
+      </li>
+    </ul>
+    <Callout>
+      Removing a sign-in from OpenOrc doesn't revoke it. A Claude token keeps working until you revoke it in your Claude settings, under Claude Code. A ChatGPT sign-in stays signed in until you log out its session in ChatGPT, under
+      Settings → Security. Delete an OpenAI or OpenCode provider key at the provider.
+    </Callout>
+    <p class="docs-source">Source: <code>packages/core/src/handlers/cloud.ts</code>, <code>packages/core/src/services/cloud-brain.ts</code>, <code>apps/desktop/src/renderer/src/views/settings-secret-field.tsx</code></p>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "phone" }, { slug: "network" }, { slug: "security" }]} columns={3} />
+  </section>
+</DocsLayout>

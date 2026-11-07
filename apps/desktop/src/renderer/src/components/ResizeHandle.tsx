@@ -6,6 +6,9 @@ export function ResizeHandle({ edge }: { edge: "sidebar" | "panel" }) {
   const [dragging, setDragging] = useState(false);
   const start = useRef<{ x: number; width: number } | null>(null);
   const width = useLayout((s) => (edge === "sidebar" ? s.sidebarWidth : s.panelWidth));
+  const side = useLayout((s) => (edge === "panel" ? s.panelSide : undefined));
+  // Moving right widens whatever sits to the left of its grip: the sidebar, or a panel docked on the left.
+  const growsRight = edge === "sidebar" || side === "left";
   const commit = (value: number) => {
     const s = useLayout.getState();
     if (edge === "sidebar") s.setSidebarWidth(value);
@@ -27,7 +30,7 @@ export function ResizeHandle({ edge }: { edge: "sidebar" | "panel" }) {
   );
   const widthAt = (clientX: number): number => {
     const st = start.current!;
-    const delta = edge === "sidebar" ? clientX - st.x : st.x - clientX;
+    const delta = growsRight ? clientX - st.x : st.x - clientX;
     return Math.min(limits[edge].max, Math.max(limits[edge].min, st.width + delta));
   };
   const cancel = () => {
@@ -48,6 +51,7 @@ export function ResizeHandle({ edge }: { edge: "sidebar" | "panel" }) {
       tabIndex={0}
       className="resize-handle no-drag"
       data-edge={edge}
+      data-side={side}
       data-dragging={dragging}
       onPointerDown={(event) => {
         if (event.button !== 0) return;
@@ -80,7 +84,7 @@ export function ResizeHandle({ edge }: { edge: "sidebar" | "panel" }) {
         }
         if (!["ArrowLeft", "ArrowRight", "Home", "End", "Enter"].includes(event.key)) return;
         event.preventDefault();
-        const direction = (event.key === "ArrowRight" ? 1 : -1) * (edge === "sidebar" ? 1 : -1);
+        const direction = (event.key === "ArrowRight" ? 1 : -1) * (growsRight ? 1 : -1);
         let target = width + direction * (event.shiftKey ? 32 : 8);
         if (event.key === "Home") target = limits[edge].min;
         else if (event.key === "End") target = limits[edge].max;

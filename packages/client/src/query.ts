@@ -46,9 +46,11 @@ function invalidateTags(q: QueryState, keys: string[], options: { immediate?: bo
 }
 
 function rpcQuery<M extends RpcMethod>(q: QueryState, method: M, params: RpcParams<M>, options: RpcQueryOptions<M>): UseQueryOptions<RpcResults[M]> {
+  const queryKey = [method, params];
   return {
-    queryKey: [method, params],
-    queryFn: () => q.connection.call(method, params),
+    queryKey,
+    // A read that already holds data is a poll or a refresh after a change, so the core knows no person asked for it.
+    queryFn: () => (q.client.getQueryData(queryKey) === undefined ? q.connection.call(method, params) : q.connection.call(method, params, { refresh: true })),
     meta: { tags: tagsFor(method, params) },
     ...options,
   };
@@ -85,6 +87,8 @@ export function createQueries(connection: CoreConnection, invalidationBatchMs: n
     useRpc: <M extends RpcMethod>(method: M, params: RpcParams<M>, options?: RpcQueryOptions<M>) => useRpcOf(q, method, params, options),
     useRpcs: <M extends RpcMethod>(method: M, paramsList: readonly RpcParams<M>[], options?: RpcQueryOptions<M>) => useRpcsOf(q, method, paramsList, options),
     useRpcMutation: <M extends RpcMethod>(method: M) => useRpcMutationOf(q, method),
+    /** A read as useRpc would hold it: from the cache when there, otherwise loaded into it. */
+    ensureRpc: <M extends RpcMethod>(method: M, params: RpcParams<M>) => q.client.ensureQueryData<RpcResults[M]>(rpcQuery(q, method, params, {})),
   };
 }
 

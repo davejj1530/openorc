@@ -9,7 +9,7 @@ import { docHref } from "../../data/docs";
   <section aria-labelledby="open">
     <h2 id="open">Open pull requests</h2>
     <p><strong>Pull requests</strong> lists your projects' pull requests on GitHub and lets you review them without leaving OpenOrc. It reads everything through your own GitHub CLI, <code>gh</code>. Your review stays a draft in OpenOrc, and nothing reaches GitHub until you submit it.</p>
-    <p>At first the sidebar keeps <strong>Pull requests</strong> under <strong>More</strong>. Open <strong>More</strong>, then <strong>Pull requests</strong>. To keep it in the sidebar, choose <strong>Edit sidebar…</strong> under More and switch it on.</p>
+    <p>Click <strong>Pull requests</strong> in the sidebar's footer.</p>
   </section>
 
   <section aria-labelledby="browse">
@@ -70,7 +70,7 @@ import { docHref } from "../../data/docs";
       <li>Choose <strong>Start review</strong>.</li>
     </ol>
     <p>The model reviews in a thread of its own, named <code>Review #&lt;number&gt;: &lt;title&gt;</code>, in Plan mode. It works on a separate copy of the pull request on no branch, so your checkout isn't touched. It records each finding as a draft comment on the changed line and finishes with a summary. Its comments join your draft, labeled with the model's name. A link beside <strong>Reviewer</strong> opens the review thread. It says the model is reviewing while it works, and reads <strong>Review conversation</strong> once it is done.</p>
-    <p>After the author pushes again, choose <strong>Review again</strong>. The same thread continues on the new commits, checks whether its earlier findings were addressed and comments only on what is left or new. A draft with comments on the older commits has to be posted or discarded first. If you archived the review thread, the next review starts a fresh one.</p>
+    <p>After the author pushes again, choose <strong>Review again</strong>. The same thread continues on the new commits, checks whether its earlier findings were addressed and comments only on what is left or new. A draft with comments on the older commits has to be posted or discarded first. If you resolved the review thread, the next review starts a fresh one.</p>
     <p>The model can't post, push or change files. You edit or remove its comments and decide what to submit.</p>
   </section>
 

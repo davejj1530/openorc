@@ -73,8 +73,8 @@ function phone(options: { permission?: Permission; grant?: Permission; answer?: 
     order,
     asked,
     saved,
-    connect(serial: number, mac = studio) {
-      state = { kind: "connected", mac, route, serial };
+    connect(serial: number, mac = studio, via: Extract<LinkState, { kind: "connected" }>["route"] = route) {
+      state = { kind: "connected", mac, route: via, serial };
       emit();
     },
     drop() {
@@ -271,6 +271,24 @@ describe("asking iOS", () => {
 });
 
 describe("what the Mac said", () => {
+  it("registers with a cloud brain over its public route as with any Mac, and keeps each host's answer apart", async () => {
+    const iphone = phone({ answer: "ready" });
+    iphone.connect(1);
+    await settle();
+    iphone.answerWith("no-key");
+    iphone.drop();
+    iphone.connect(2, { id: "cloud", name: "Cloud" }, { kind: "public", host: "sb-brain.vercel.run", port: 443 });
+    await settle();
+    expect(iphone.sent).toEqual([
+      { macId: "studio", registration: registration() },
+      { macId: "cloud", registration: registration() },
+    ]);
+    expect([...iphone.alerts.getState().senders]).toEqual([
+      ["studio", "ready"],
+      ["cloud", "no-key"],
+    ]);
+  });
+
   it("keeps each Mac's answer, and reads a Mac without phone alerts as one to update", async () => {
     const iphone = phone({ answer: "no-key" });
     iphone.connect(1);

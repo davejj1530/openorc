@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { FileScope } from "@openorc/protocol";
-import type { SlashCommand } from "./Composer";
-import { ComposerSuggestions } from "./ComposerSuggestions";
-import { cn } from "../lib/cn";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useRpc } from "../lib/client";
+import { cn } from "../lib/cn";
 import { filterMentions, insertMention, mentionQueryAt, type MentionEntry } from "../lib/composer-mentions";
 import { skillSegments } from "../lib/skill-tokens";
+import type { SlashCommand } from "./Composer";
+import { ComposerSuggestions } from "./ComposerSuggestions";
 
 interface ComposerInputProps {
   value: string;
@@ -49,7 +49,7 @@ function commandQueryAt(token: { token: string } | null, commands: SlashCommand[
 }
 
 function suggestionLabel(members: boolean, files: boolean): string {
-  if (members) return "Mention a member";
+  if (members) return "Mention an Orcling";
   if (files) return "Mention a file";
   return "Commands";
 }
@@ -151,13 +151,13 @@ export function ComposerInput(props: ComposerInputProps) {
     <>
       {suggestionsOpen ? (
         <ComposerSuggestions anchor={props.suggestionAnchor} side={props.suggestionSide} members={memberList} cursor={cursor} count={suggestions.length} onDismiss={() => setSuggestionsActive(false)}>
-          <div role="listbox" aria-label={suggestionLabel(memberList, mentionQuery !== null)} data-team-mention-list={memberList || undefined}>
+          <div role="listbox" aria-label={suggestionLabel(memberList, mentionQuery !== null)} data-agent-mention-list={memberList || undefined}>
             {suggestions.map((suggestion, index) => (
               <button
                 key={suggestion.key}
                 role="option"
                 aria-selected={index === cursor}
-                data-team-mention={suggestion.mention}
+                data-agent-mention={suggestion.mention}
                 onMouseDown={(e) => {
                   e.preventDefault();
                   suggestion.pick();

@@ -102,6 +102,7 @@ export const ArrowRight = icon("ArrowRight", <path d="M4 12h16m-6-6 6 6-6 6" />)
 export const ArrowLeft = icon("ArrowLeft", <path d="M20 12H4m6-6-6 6 6 6" />);
 export const ArrowUp = icon("ArrowUp", <path d="M12 20V4m-6 6 6-6 6 6" />);
 export const ArrowDown = icon("ArrowDown", <path d="M12 4v16m-6-6 6 6 6-6" />);
+export const ArrowLeftRight = icon("ArrowLeftRight", <path d="M4 8h16m-4-4 4 4-4 4 M20 16H4m4-4-4 4 4 4" />);
 export const ArrowUpRight = icon("ArrowUpRight", <path d="M6 18 18 6 M7 6h11v11" />);
 export const ExternalLink = icon(
   "ExternalLink",
@@ -191,6 +192,7 @@ export const Home = icon("Home", <path d="m3 10 9-7 9 7 M5 8.5v10a2 2 0 0 0 2 2h
 export const Orclings = icon("Orclings", <path d="M12 3.5c7 0 8.5 1.5 8.5 8.5s-1.5 8.5-8.5 8.5-8.5-1.5-8.5-8.5S5 3.5 12 3.5Z M9 10v4 M15 10v4" />);
 export const FolderGit2 = icon("FolderGit2", folder);
 export const Folder = icon("Folder", folder);
+export const FolderPlus = icon("FolderPlus", <path d="M3 8V5.5a2 2 0 0 1 2-2h4.5L13 7h6a2 2 0 0 1 2 2v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z M12 10.5v6 M9 13.5h6" />);
 export const Zap = icon("Zap", <path d="m14 2-11 12h8l-1 8 11-12h-8Z" />);
 export const FolderOpen = icon("FolderOpen", <path d="M3 18V5.5a2 2 0 0 1 2-2h4l3.5 3.5H18a2 2 0 0 1 2 2v1 M3 19l3-8h15l-3 9H5a2 2 0 0 1-2-1Z" />);
 export const Inbox = icon("Inbox", <path d="m3 12 4-8h10l4 8v7a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 19Z M3 12h5l2 3h4l2-3h5" />);
@@ -228,6 +230,24 @@ export const GitPullRequest = icon(
     <path d="M6 8v8 M18 16V9a3 3 0 0 0-3-3h-2 M16 3l-3 3 3 3" />
   </>,
 );
+export const GitMerge = icon(
+  "GitMerge",
+  <>
+    <circle cx="6" cy="5.5" r="2.5" />
+    <circle cx="6" cy="18.5" r="2.5" />
+    <circle cx="18" cy="12" r="2.5" />
+    <path d="M6 8v8 M6 8c0 2.5 2.5 4 5 4h4.5" />
+  </>,
+);
+export const GitPullRequestClosed = icon(
+  "GitPullRequestClosed",
+  <>
+    <circle cx="6" cy="5.5" r="2.5" />
+    <circle cx="6" cy="18.5" r="2.5" />
+    <circle cx="18" cy="18.5" r="2.5" />
+    <path d="M6 8v8 M18 16v-4.5 M15.5 3.5l5 5 M20.5 3.5l-5 5" />
+  </>,
+);
 export const GitCommitHorizontal = icon(
   "GitCommitHorizontal",
   <>
@@ -258,6 +278,10 @@ export const PanelRight = icon(
     <path d="M15 3.5v17" />
   </>,
 );
+/** The panel toggle's mark, drawn on the side the panel docks. */
+export function PanelIcon({ side, ...props }: IconProps & { side: "left" | "right" }) {
+  return side === "left" ? <PanelLeft {...props} /> : <PanelRight {...props} />;
+}
 export const PanelRightClose = icon(
   "PanelRightClose",
   <>
@@ -281,6 +305,7 @@ export const Monitor = icon(
   </>,
 );
 export const Laptop = icon("Laptop", <path d="M5 16V5.5A1.5 1.5 0 0 1 6.5 4h11A1.5 1.5 0 0 1 19 5.5V16 M5 16h14l3 4H2Z" />);
+export const Cloud = icon("Cloud", <path d="M7.5 19h10a4.5 4.5 0 0 0 .5-8.97A6.5 6.5 0 0 0 5.6 11.3 4 4 0 0 0 7.5 19Z" />);
 export const Smartphone = icon(
   "Smartphone",
   <>

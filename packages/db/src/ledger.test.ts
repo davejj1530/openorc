@@ -3,7 +3,7 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type { AgentEvent } from "@openorc/protocol";
+import type { AgentEvent, Thread } from "@openorc/protocol";
 import { Db } from "./database.js";
 import { activityImagePath, LedgerWriter, listEvents } from "./ledger.js";
 import { checkpoints } from "./checkpoints.js";
@@ -90,6 +90,43 @@ describe("migrations", () => {
 });
 
 describe("threads", () => {
+  it("pages threads across chosen projects by latest activity, independently of pins and creation dates", () => {
+    const { db, project } = fixture();
+    const other = projects.insert(db, { name: "Other", rootPath: "/tmp/other", gitRemote: null, defaultBranch: null, settings: {} });
+    const base = { agent: "codex", model: null, mode: "act", permissionMode: "trusted" } satisfies Pick<Thread, "agent" | "model" | "mode" | "permissionMode">;
+    const oldest = threads.insert(db, { ...base, projectId: project.id, title: "Old resumed thread", createdAt: 1 });
+    const newest = threads.insert(db, { ...base, projectId: other.id, title: "New thread", createdAt: 3 });
+    const pinned = threads.insert(db, { ...base, projectId: project.id, title: "Older pinned thread", createdAt: 2 });
+    threads.update(db, pinned.id, { pinnedAt: 10 });
+    db.stmt("UPDATE threads SET last_activity_at = ? WHERE id = ?").run(30, oldest.id);
+    const query = { projectIds: [project.id, other.id], orderBy: "activity", limit: 2 } satisfies NonNullable<Parameters<typeof threads.list>[1]>;
+    expect(threads.list(db, query).map((thread) => thread.title)).toEqual(["Old resumed thread", "New thread"]);
+    expect(threads.list(db, { ...query, offset: 2 }).map((thread) => thread.title)).toEqual(["Older pinned thread"]);
+    expect(threads.list(db, { ...query, pinnedOnly: true }).map((thread) => thread.title)).toEqual(["Older pinned thread"]);
+    expect(threads.list(db, { projectIds: [other.id], orderBy: "activity" }).map((thread) => thread.title)).toEqual(["New thread"]);
+    db.stmt("UPDATE threads SET last_activity_at = ? WHERE id = ?").run(40, newest.id);
+    expect(threads.list(db, query).map((thread) => thread.title)).toEqual(["New thread", "Old resumed thread"]);
+    expect(threads.list(db, { projectIds: [] })).toEqual([]);
+    db.close();
+  });
+
+  it("lists only the threads that need you: unread, or working or waiting on you", () => {
+    const { db, project } = fixture();
+    const base = { projectId: project.id, agent: "codex" as const, model: null, mode: "act" as const, permissionMode: "trusted" as const };
+    const read = threads.insert(db, { ...base, title: "Read" });
+    const unread = threads.insert(db, { ...base, title: "Unread" });
+    const working = threads.insert(db, { ...base, title: "Working" });
+    const archived = threads.insert(db, { ...base, title: "Archived unread" });
+    db.stmt("UPDATE threads SET last_activity_at = seen_at + 5 WHERE id IN (?, ?)").run(unread.id, archived.id);
+    threads.update(db, archived.id, { archivedAt: 1 });
+    const query = { projectIds: [project.id], filter: "active", orderBy: "activity", needsYou: true, attentionIds: [working.id] } satisfies NonNullable<Parameters<typeof threads.list>[1]>;
+    expect(threads.list(db, query).map((thread) => thread.title)).toEqual(["Unread", "Working"]);
+    expect(threads.list(db, { ...query, includeChildren: true }).map((thread) => thread.title)).toEqual(["Unread", "Working"]);
+    expect(threads.list(db, { ...query, attentionIds: [] }).map((thread) => thread.id)).toEqual([unread.id]);
+    expect(threads.list(db, { projectIds: [project.id], filter: "active" }).map((thread) => thread.id)).toContain(read.id);
+    db.close();
+  });
+
   it("includes legacy done threads in the active list, with pinned threads first", () => {
     const { db, project } = fixture();
     const base = { projectId: project.id, agent: "codex" as const, model: null, mode: "act" as const, permissionMode: "trusted" as const };

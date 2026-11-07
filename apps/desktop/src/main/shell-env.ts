@@ -4,7 +4,8 @@
  * The core asks the shell, because the core is what launches agents and Ready
  * has to mean launchable there. Main only hosts the Terminal panels, so it
  * keeps a copy of every snapshot the core accepts and hands the PATH to each
- * shell a panel spawns. A Rescan in the app reaches here a moment after the
+ * shell a panel spawns outside macOS, where that shell is not a login shell
+ * that builds its own. A Rescan in the app reaches here a moment after the
  * core has adopted it; a panel opened inside that moment inherits the previous
  * PATH, which is a documented limit rather than a guarantee.
  *

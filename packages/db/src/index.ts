@@ -1,47 +1,55 @@
-export { taskComments } from "./task-comments.js";
+export { checkpoints } from "./checkpoints.js";
 export { claudeAccounts } from "./claude-accounts.js";
 export { Db } from "./database.js";
-export { LedgerWriter, listEvents, countEvents, completedToolCall, activityImagePath, type LedgerOptions, type ListEventsOptions } from "./ledger.js";
-export { ledgerMaintenance, type LedgerSpace } from "./maintenance.js";
-export { OMIT_OUTPUT_CHARS, pagedEvent, transcriptPage, type TranscriptPage } from "./transcript-page.js";
 export { lastThreadMessage } from "./last-message.js";
-export { redact, redactValue, redactJson, type RedactResult, type RedactValueResult } from "./redact.js";
-export { projects, tasks, threads, runs, snapshots, comments, audit, type ReviewCommentScope, type TaskPatch, type ThreadPatch, type ThreadInsert, type ThreadListFilter } from "./repos.js";
-export { threadQueue, type ThreadQueueEntry } from "./thread-queue.js";
+export { LedgerWriter, activityImagePath, completedToolCall, countEvents, listEvents, type LedgerOptions, type ListEventsOptions } from "./ledger.js";
+export { ledgerMaintenance, type LedgerSpace } from "./maintenance.js";
+export { extractionJobs, ftsQuery, memories, settings, summaries, vectors, type MemoryFilter, type MemoryInput } from "./memories.js";
+export { memoryChangesSince, mergeMemories, type MemoryChanges, type MemoryMerge, type MemoryTombstone } from "./memory-merge.js";
+export { redact, redactJson, redactValue, type RedactResult, type RedactValueResult } from "./redact.js";
+export { audit, comments, projects, runs, snapshots, tasks, threads, type ReviewCommentScope, type TaskPatch, type ThreadInsert, type ThreadListFilter, type ThreadPatch } from "./repos.js";
 export { runCosts } from "./run-costs.js";
-export { checkpoints } from "./checkpoints.js";
+export { scheduleFirings, schedules, type SchedulePatch } from "./schedules.js";
 export { messages } from "./search.js";
-export { schedules, scheduleFirings, type SchedulePatch } from "./schedules.js";
-export { teamNotifications } from "./team-notifications.js";
-export { orchestration, type SaveTeamInput, type ArchiveTeamInput, type CreateTeamInstanceInput } from "./orchestration.js";
-export { teamRuntime, MAX_TEAM_ATTEMPTS, MAX_TEAM_MESSAGES, MAX_TEAM_MAILBOX_BYTES } from "./team-runtime.js";
-export { teamWorkspaces } from "./team-workspaces.js";
-export { teamContexts, type CreateTeamContextInput } from "./team-context.js";
-export { teamRoom, type AppendRoomEventInput } from "./team-room.js";
-export { teamContextParts, storedReferences, type TeamContextPart, type TeamContextReference } from "./team-context-parts.js";
-export { teamOrigins, type TeamOrigin, type CreateTeamOriginInput } from "./team-origins.js";
-export { teamForks, type TeamForkRecord, type CreateTeamForkInput, type TeamForkThread } from "./team-forks.js";
-export { teamRestores, type TeamRestoreRecord, type CreateTeamRestoreInput } from "./team-restores.js";
-export { teamMoves, type TeamMoveRecord, type CreateTeamMoveInput } from "./team-moves.js";
-export {
-  teamDeletions,
-  teamDeletedThreads,
-  type TeamDeletionRecord,
-  type CreateTeamDeletionInput,
-  type TeamDeletionGitInventory,
-  type TeamDeletedThread,
-  type TeamDeletionRejection,
-  type TeamCleanupEntry,
-  type TeamCleanupPhase,
-} from "./team-deletions.js";
-export { teamTasks } from "./team-tasks.js";
-export { teamTaskCompletions } from "./team-task-completions.js";
-export { memories, vectors, summaries, extractionJobs, settings, ftsQuery, type MemoryInput, type MemoryFilter } from "./memories.js";
+export { subagents, type SubagentRecord } from "./subagents.js";
+export { taskComments } from "./task-comments.js";
+export { threadQueue, type ThreadQueueEntry } from "./thread-queue.js";
+export { digestedEvent, messageText, OMIT_OUTPUT_CHARS, pagedEvent, transcriptPage, type TranscriptPage } from "./transcript-page.js";
 
-export { taskForwardings } from "./task-forwardings.js";
-
-export { plans } from "./plans.js";
+export { cloudWorkspaces, type CloudMirrorState, type CloudProviderId, type CloudWorkspaceRecord, type CloudWorkspaceState, type SessionBase } from "./cloud-workspaces.js";
 export { orclings, type OrclingInsert } from "./orclings.js";
+export { plans } from "./plans.js";
+export { pullReviews, type DraftCommentInsert, type PullReviewKey, type PullReviewPatch } from "./pull-reviews.js";
 export { remoteDevices, type RemoteDeviceRecord } from "./remote-devices.js";
 export { remotePushTargets, type PushRecipient } from "./remote-push-targets.js";
-export { pullReviews, type PullReviewKey, type PullReviewPatch, type DraftCommentInsert } from "./pull-reviews.js";
+
+export { retiredTeams } from "./retired-teams.js";
+export {
+  deleteThreadRows,
+  HOST_TABLE_PREFIXES,
+  HOST_TABLES,
+  readThreadRows,
+  taskTies,
+  THREAD_TABLES,
+  threadTaskIds,
+  unclassifiedTables,
+  writeThreadRows,
+  type RowRewrite,
+  type ThreadRows,
+  type ThreadTable,
+} from "./thread-rows.js";
+export {
+  FROZEN,
+  GONE_WORDS,
+  frozenMoving,
+  incomingMove,
+  nextPhase,
+  refusedMove,
+  refusedMoves,
+  relocations,
+  settled,
+  type CoordinatorRelocation,
+  type Relocation,
+  type RelocationKind,
+  type StepOutcome,
+} from "./relocations.js";

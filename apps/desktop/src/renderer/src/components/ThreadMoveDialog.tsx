@@ -1,14 +1,17 @@
-import { useRef, useState, type ReactNode } from "react";
 import type { WorkspaceMode } from "@openorc/protocol";
-import { FileRows } from "../panels/FileRows";
-import { Button, Dialog } from "./ui";
-import { useUi } from "../lib/ui";
+import { useRef, useState, type ReactNode } from "react";
 import { useRpc, useRpcMutation } from "../lib/client";
+import { useUi } from "../lib/ui";
+import { FileRows } from "../panels/FileRows";
+import { CloudMoveDialog } from "./CloudMoveDialog";
+import { Button, Dialog } from "./ui";
 
-/** One confirm for moving a conversation, listing the files that go with it. Team conversations use TeamMoveDialog. */
+/** One confirm for moving a conversation, listing the files that go with it. */
 export function ThreadMoveDialog() {
   const id = useUi((state) => state.moveThreadId);
-  return id ? <MoveDialog key={id} threadId={id} /> : null;
+  const toCloud = useUi((state) => state.moveThreadToCloud);
+  if (!id) return null;
+  return toCloud ? <CloudMoveDialog key={`cloud:${id}`} threadId={id} /> : <MoveDialog key={id} threadId={id} />;
 }
 
 function MoveDialog({ threadId }: { threadId: string }) {
@@ -27,9 +30,8 @@ function MoveDialog({ threadId }: { threadId: string }) {
     if (!to || move.isPending) return;
     setError(null);
     try {
-      const result = await move.mutateAsync({ id: threadId, to });
-      if ("rejected" in result) setError(result.rejected);
-      else useUi.getState().setMoveThread(null);
+      await move.mutateAsync({ id: threadId, to });
+      useUi.getState().setMoveThread(null);
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : String(failure));
     } finally {

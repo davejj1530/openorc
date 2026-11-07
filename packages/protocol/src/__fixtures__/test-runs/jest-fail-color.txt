@@ -1,0 +1,40 @@
+[0m[7m[1m[31m FAIL [39m[22m[27m[0m [2m./[22m[1mmailer.test.js[22m
+[1m[31m  [1m● [22m[1mmailer › retries › sends once[39m[22m
+
+    [2mexpect([22m[31msend[39m[2m).[22mtoHaveBeenCalledTimes[2m([22m[32mexpected[39m[2m)[22m
+
+    Expected number of calls: [32m1[39m
+    Received number of calls: [31m2[39m
+
+[2m    [0m [90m  5 |[39m       send()[33m;[39m[22m
+[2m     [90m  6 |[39m       send()[33m;[39m[22m
+[2m    [31m[1m>[22m[2m[39m[90m  7 |[39m       expect(send)[33m.[39mtoHaveBeenCalledTimes([35m1[39m)[33m;[39m[22m
+[2m     [90m    |[39m                    [31m[1m^[22m[2m[39m[22m
+[2m     [90m  8 |[39m     })[33m;[39m[22m
+[2m     [90m  9 |[39m     it([32m"gives up after three tries"[39m[33m,[39m () [33m=>[39m expect([35m3[39m)[33m.[39mtoBe([35m3[39m))[33m;[39m[22m
+[2m     [90m 10 |[39m   })[33m;[39m[0m[22m
+
+[2m      [2mat Object.toHaveBeenCalledTimes ([22m[2m[0m[36mmailer.test.js[39m[0m[2m:7:20)[22m[2m[22m
+
+[1m[31m  [1m● [22m[1mmailer › loads the template[39m[22m
+
+    template missing: welcome.html
+
+[2m    [0m [90m 11 |[39m   it([32m"formats the subject"[39m[33m,[39m () [33m=>[39m expect([32m"Hi"[39m[33m.[39mtoUpperCase())[33m.[39mtoBe([32m"HI"[39m))[33m;[39m[22m
+[2m     [90m 12 |[39m   it([32m"loads the template"[39m[33m,[39m () [33m=>[39m {[22m
+[2m    [31m[1m>[22m[2m[39m[90m 13 |[39m     [36mthrow[39m [36mnew[39m [33mError[39m([32m"template missing: welcome.html"[39m)[33m;[39m[22m
+[2m     [90m    |[39m           [31m[1m^[22m[2m[39m[22m
+[2m     [90m 14 |[39m   })[33m;[39m[22m
+[2m     [90m 15 |[39m })[33m;[39m[22m
+[2m     [90m 16 |[39m[0m[22m
+
+[2m      [2mat Object.<anonymous> ([22m[2m[0m[36mmailer.test.js[39m[0m[2m:13:11)[22m[2m[22m
+
+[0m[7m[1m[32m PASS [39m[22m[27m[0m [2m./[22m[1mqueue.test.js[22m
+[0m[7m[1m[32m PASS [39m[22m[27m[0m [2m./[22m[1mcart.test.js[22m
+
+[1mTest Suites: [22m[1m[31m1 failed[39m[22m, [1m[32m2 passed[39m[22m, 3 total
+[1mTests:       [22m[1m[31m2 failed[39m[22m, [1m[33m1 skipped[39m[22m, [1m[32m7 passed[39m[22m, 10 total
+[1mSnapshots:   [22m0 total
+[1mTime:[22m        0.955 s, estimated 1 s
+[2mRan all test suites[22m[2m.[22m

@@ -1,0 +1,9 @@
+ok  	example.com/shop/cart	0.190s
+--- FAIL: TestSendsOnce (0.00s)
+    mailer_test.go:11: send called 2 times, want 1
+--- FAIL: TestRetries (0.00s)
+    --- FAIL: TestRetries/backs_off (0.00s)
+        mailer_test.go:22: backoff was 100ms, want 200ms
+FAIL
+FAIL	example.com/shop/mailer	0.402s
+FAIL

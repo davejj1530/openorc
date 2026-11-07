@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { FileVersion } from "@openorc/protocol";
+import { FileVersion, FolderPath } from "@openorc/protocol";
 
 /**
  * Unsaved editor text, kept on this device so it survives tab switches, a closed panel, navigation and a restart.
@@ -15,6 +15,18 @@ export type FileKey = string & { readonly __brand: "FileKey" };
 
 export function fileKey(file: { root: string; path: string }): FileKey {
   return JSON.stringify([file.root, file.path]) as FileKey;
+}
+
+/** Draft keys can outlive the file-read cache, including across app restarts. */
+export function fileIdentity(key: FileKey): { root: string; path: FolderPath } | null {
+  try {
+    const value: unknown = JSON.parse(key);
+    if (!Array.isArray(value) || value.length !== 2 || typeof value[0] !== "string") return null;
+    const path = FolderPath.safeParse(value[1]);
+    return path.success ? { root: value[0], path: path.data } : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Unsaved text, and the version of the file it was typed on. */

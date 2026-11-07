@@ -1,14 +1,14 @@
-import { EventEmitter } from "node:events";
-import { PassThrough } from "node:stream";
+import { memories, plans, runs, settings, tasks, threads } from "@openorc/db";
+import { commitAll, git } from "@openorc/git";
+import { internalToolNames } from "@openorc/mcp";
+import { type BrowserCommand, type CorePush, type PermissionPreset, type Project, type RunMode } from "@openorc/protocol";
 import { spawn, type ChildProcess } from "node:child_process";
+import { EventEmitter } from "node:events";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { PassThrough } from "node:stream";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { commitAll, git } from "@openorc/git";
-import { memories, plans, orchestration, settings, threads, runs, tasks } from "@openorc/db";
-import { internalToolNames } from "@openorc/mcp";
-import { DEFAULT_TEAM_LIMITS, type BrowserCommand, type Project, type CorePush, type PermissionPreset, type RunMode } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
 import { MAX_AGENT_HOPS } from "./thread-agent-tools.js";
 
@@ -451,61 +451,6 @@ describe("Codex consent through the core", () => {
     } finally {
       if (core.runs.pending().some((a) => a.runId === run.id)) core.runs.resolveApproval(run.id, "900", "deny");
       core.runs.close(run.id);
-    }
-  });
-});
-
-describe("native team permission ceiling", () => {
-  it.each(["codex", "claude"] as const)("keeps %s native bypass visible while tightening the shared gate, then releases a parked request when Autonomous returns", async (agent) => {
-    const thread = threads.insert(core.db, { projectId: project.id, title: "Native permission ceiling", agent, model: "fixture", mode: "act", permissionMode: "autonomous" });
-    const p = provider();
-    const run = await core.runs.start({
-      scope: { thread, task: null },
-      project,
-      agent,
-      model: "fixture",
-      mode: "act",
-      permissionMode: "autonomous",
-      prompt: "Hold this native process",
-      resume: false,
-    });
-    const team = orchestration.save(core.db, {
-      projectId: project.id,
-      expectedRevisionId: null,
-      draft: {
-        name: "Native ceiling",
-        limits: DEFAULT_TEAM_LIMITS,
-        discussion: { ambientRounds: 0, peerFollowUps: 0, mentionOnly: [] },
-        members: [{ key: "lead", name: "Lead", managerKey: null, responsibility: "Coordinate", settings: { agent, model: "fixture", effort: null, fastMode: false } }],
-      },
-    });
-    orchestration.createInstance(core.db, { threadId: thread.id, teamRevisionId: team.revision.id });
-    let response: Promise<unknown> | undefined;
-    try {
-      if (agent === "codex") await vi.waitFor(() => expect(p.ready()).toBe(true));
-      const args = vi.mocked(spawn).mock.lastCall![1] as string[];
-      if (agent === "claude") expect(args[args.indexOf("--permission-mode") + 1]).toBe("bypassPermissions");
-      core.threads.update(thread.id, { permissionMode: "review" });
-      expect(core.runs.threadPermissions(thread.id)).toMatchObject({ requested: "review", effective: "autonomous", pendingRestart: true });
-      if (agent === "codex") p.request("item/commandExecution/requestApproval", { command: "fixture external command" }, 777);
-      else response = core.runs.requestApproval(run.id, "777", "Bash", {});
-      await vi.waitFor(() =>
-        expect(
-          core.runs
-            .pending()
-            .filter((item) => item.runId === run.id)
-            .map((item) => item.approvalId),
-        ).toEqual(["777"]),
-      );
-      expect(runs.get(core.db, run.id)?.permissionMode).toBe("autonomous");
-      core.threads.update(thread.id, { permissionMode: "autonomous" });
-      if (agent === "codex") await vi.waitFor(() => expect(p.responses.get(777)).toMatchObject({ result: { decision: "accept" } }));
-      else expect(await response).toMatchObject({ decision: "allow" });
-      expect(core.runs.pending().filter((item) => item.runId === run.id)).toEqual([]);
-      expect(core.runs.threadPermissions(thread.id).pendingRestart).toBe(false);
-    } finally {
-      for (const approval of core.runs.pending().filter((item) => item.runId === run.id)) core.runs.resolveApproval(run.id, approval.approvalId, "deny");
-      await core.runs.closeAndWait(run.id);
     }
   });
 });

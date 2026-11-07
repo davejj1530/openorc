@@ -25,6 +25,11 @@ export interface TextGeneratorOptions {
   timeoutMs?: number;
   /** Limit reasoning on small background jobs without changing distillation. */
   effort?: "low";
+  /**
+   * Claude only: replaces Claude Code's agent prompt for a job whose whole input is the prompt. With no tools and no
+   * extended thinking the answer comes straight back; offered tools, a model reaches for a file it already has.
+   */
+  system?: string;
 }
 
 interface SpawnInput {
@@ -46,6 +51,11 @@ export class TextGenerator {
     return raw ? parseTitle(raw) : null;
   }
 
+  /** A one-shot answer to a prompt that asks for JSON. Codex is held to `schema`; the others follow the prompt. Null when the model cannot be reached. */
+  complete(prompt: string, schema: object): Promise<string | null> {
+    return this.ask(prompt, schema);
+  }
+
   /** Each harness needs its own one-shot invocation; a harness without one cannot generate text. */
   protected ask(prompt: string, schema: object): Promise<string | null> {
     const runners: Record<HarnessId, () => Promise<string | null>> = {
@@ -61,26 +71,12 @@ export class TextGenerator {
     const binary = this.options.binary ?? agentBinary("claude");
     const model = this.options.model ?? "claude-haiku-4-5-20251001";
     // Only the user's own settings: project settings come from the working folder, which is not the user's project here.
-    const args = [
-      "-p",
-      "--model",
-      model,
-      "--output-format",
-      "json",
-      "--max-turns",
-      "1",
-      "--setting-sources",
-      "user",
-      "--strict-mcp-config",
-      "--disallowed-tools",
-      "Bash",
-      "Edit",
-      "Write",
-      "WebFetch",
-      "WebSearch",
-    ];
+    const { system } = this.options;
+    const tools = system === undefined ? ["--disallowed-tools", "Bash", "Edit", "Write", "WebFetch", "WebSearch"] : ["--tools", "", "--system-prompt", system];
+    const args = ["-p", "--model", model, "--output-format", "json", "--max-turns", "1", "--setting-sources", "user", "--strict-mcp-config", ...tools];
     const env: NodeJS.ProcessEnv = { ...(this.options.env ?? process.env) };
     delete env["CLAUDECODE"];
+    if (system !== undefined) env["MAX_THINKING_TOKENS"] = "0";
     if (this.options.apiKey) env["ANTHROPIC_API_KEY"] = this.options.apiKey;
     return this.spawn({
       binary,

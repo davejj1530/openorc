@@ -12,29 +12,28 @@ import { IconButton, Tooltip } from "./ui";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
 
 /** The Orclings destination replaces the project thread list in the same sidebar. */
-export function SidebarOrclings({ route, search }: { route: Route; search: string }) {
+export function SidebarOrclings({ route }: { route: Route }) {
   const orclings = useOrclings();
   const activeId = route.view === "thread" ? route.threadId : null;
-  const filtered = orclings.filter((orcling) => orcling.name.toLowerCase().includes(search.toLowerCase()));
   return (
     <section className="conversation-browser orcling-browser" aria-label="Orclings">
       <div className="browser-threads">
-        {filtered.map((orcling) => (
+        {orclings.map((orcling) => (
           <OrclingRow key={orcling.id} orcling={orcling} active={activeId === orcling.threadId} />
         ))}
-        {!filtered.length ? <p className="browser-empty">{search ? "No matching Orclings." : "Create an Orcling to start a conversation."}</p> : null}
+        {!orclings.length ? <p className="browser-empty">Create an Orcling to start a conversation.</p> : null}
       </div>
       <p className="browser-hint">Each Orcling keeps its own instructions and memory.</p>
     </section>
   );
 }
 
-/** Starts a new Orcling; it sits where the thread list keeps its filter. */
+/** Starts a new Orcling; it sits where the thread list keeps its tools. */
 export function NewOrclingButton() {
   return (
     <Tooltip label="New Orcling">
-      <IconButton onClick={() => useRouter.getState().navigate({ view: "orcling" })} aria-label="New Orcling" size="xs" className="no-drag text-ink-4">
-        <Plus size={14} />
+      <IconButton onClick={() => useRouter.getState().navigate({ view: "orcling" })} aria-label="New Orcling" size="lg" className="no-drag">
+        <Plus size={16} />
       </IconButton>
     </Tooltip>
   );

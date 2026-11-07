@@ -11,7 +11,7 @@ interface RunProcessDependencies {
   finalizations: Set<Promise<void>>;
   denyApprovals: (runId: string) => void;
   watchDiffs: (entry: LiveRun, project: Project) => void;
-  publishProviderEvent: (entry: LiveRun, event: AgentEvent) => AgentEvent;
+  publishProviderEvent: (entry: LiveRun, event: AgentEvent) => AgentEvent | null;
   onEvent: (entry: LiveRun, project: Project, event: AgentEvent) => Promise<void>;
   onExit: (entry: LiveRun, project: Project) => Promise<void>;
 }
@@ -19,7 +19,7 @@ interface RunProcessDependencies {
 export class RunProcess {
   constructor(private readonly deps: RunProcessDependencies) {}
 
-  bindLiveProcess({ run, input, handle, workspaceLease, internalMcp, providerPermissionMode, permissionGate, orclingCeiling }: LiveProcessBinding): void {
+  bindLiveProcess({ run, input, handle, workspaceLease, internalMcp, providerPermissionMode, orclingCeiling }: LiveProcessBinding): void {
     const runId = run.id;
     const { scope, project } = input;
     let finishFinalization!: () => void;
@@ -34,7 +34,6 @@ export class RunProcess {
       run,
       internalMcp,
       providerPermissionMode,
-      ...(permissionGate ? { permissionGate } : {}),
       ...(orclingCeiling ? { orclingCeiling } : {}),
       scope,
       handle,
@@ -49,7 +48,6 @@ export class RunProcess {
       prompt: input.promptRole === "system" ? null : input.prompt,
       reply: null,
       started: false,
-      team: Boolean(input.teamAttemptId),
       stderr: [],
       failed: null,
       events: Promise.resolve(),
@@ -65,7 +63,7 @@ export class RunProcess {
       if (entry.exiting) return;
       // Progress reads and renderer frames observe provider events immediately.
       // Only state transitions and asynchronous capture belong behind the barrier.
-      let published: AgentEvent;
+      let published: AgentEvent | null;
       try {
         published = this.deps.publishProviderEvent(entry, ev);
       } catch (error) {
@@ -74,6 +72,7 @@ export class RunProcess {
         this.deps.log.error(`run ${runId} event publication failed: ${entry.failed}`);
         return;
       }
+      if (!published) return;
       entry.events = entry.events
         .then(() => this.deps.onEvent(entry, project, published))
         .catch((error) => {

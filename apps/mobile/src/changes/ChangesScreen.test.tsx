@@ -171,7 +171,7 @@ it("pushes at once, then holds what Git said: success until new commits, a refus
 it("leaves a team's publishing to the Mac, and says when the workspace could not be read", async () => {
   world({ thread: thread({ teamInstanceId: "team-1" }) });
   open();
-  await waitFor(() => expect(screen.getByText("Publish a team's work on your Mac.")).toBeTruthy());
+  await waitFor(() => expect(screen.getByText("This item is no longer available.")).toBeTruthy());
   expect(screen.queryByRole("button", { name: "Commit" })).toBeNull();
   cleanup();
   mac.phone!.module.queryClient.clear();

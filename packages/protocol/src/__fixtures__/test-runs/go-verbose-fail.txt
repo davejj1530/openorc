@@ -1,0 +1,24 @@
+=== RUN   TestAddsItems
+--- PASS: TestAddsItems (0.00s)
+=== RUN   TestRemovesItems
+--- PASS: TestRemovesItems (0.00s)
+=== RUN   TestAppliesCoupons
+    cart_test.go:14: coupons are not built yet
+--- SKIP: TestAppliesCoupons (0.00s)
+PASS
+ok  	example.com/shop/cart	0.352s
+=== RUN   TestSendsOnce
+    mailer_test.go:11: send called 2 times, want 1
+--- FAIL: TestSendsOnce (0.00s)
+=== RUN   TestFormatsSubject
+--- PASS: TestFormatsSubject (0.05s)
+=== RUN   TestRetries
+=== RUN   TestRetries/gives_up_after_three
+=== RUN   TestRetries/backs_off
+    mailer_test.go:22: backoff was 100ms, want 200ms
+--- FAIL: TestRetries (0.00s)
+    --- PASS: TestRetries/gives_up_after_three (0.00s)
+    --- FAIL: TestRetries/backs_off (0.00s)
+FAIL
+FAIL	example.com/shop/mailer	0.248s
+FAIL

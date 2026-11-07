@@ -1,0 +1,597 @@
+/* What a phase worked on, each drawn as itself in the step's second column. Rows share the chips' 28px rhythm and
+   their 8px reach past the column, so an object lines up with the rows around it. Class names stay under work-:
+   app.css owns .work-row, which draws a window drag region. */
+/* One column that may shrink: an opened call's long command or code line scrolls or truncates inside it rather
+   than widening the step past the thread. */
+.work-object-body {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+/* While the turn runs, a verb that changes ("Testing" to "Tested") and a receipt item that appears arrive afresh. */
+.work-object-verb,
+.turn-receipt-item {
+  transition:
+    opacity var(--duration-arrive) var(--ease-out),
+    filter var(--duration-arrive) var(--ease-out);
+}
+@starting-style {
+  [data-arrivals] .work-object-verb,
+  [data-arrivals] .turn-receipt-item {
+    opacity: 0;
+    filter: blur(var(--arrive-blur));
+  }
+}
+.work-object-body .work-chips {
+  grid-column: auto;
+}
+.work-object > .work-group-calls {
+  grid-column: 2;
+  padding: 2px 0 6px;
+}
+.work-object-mark {
+  flex-shrink: 0;
+  color: var(--ink);
+}
+.work-rail [data-tone="bad"] {
+  color: var(--bad);
+}
+.work-mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+.work-ink-3 {
+  color: var(--ink-3);
+}
+.work-align-end {
+  text-align: right;
+}
+.work-phase-meta[data-tone="bad"] {
+  color: var(--bad);
+}
+
+/* Size: +N −M, then five blocks filled by how big the change is. */
+.work-size-stat {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 6px;
+}
+.work-size-blocks {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 2px;
+}
+.work-size-blocks > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--surface-3);
+}
+.work-size-blocks > [data-tone="ok"] {
+  background: var(--ok);
+}
+.work-size-blocks > [data-tone="bad"] {
+  background: var(--bad);
+}
+
+/* Edits: the lines themselves, each on its own soft fill, under the file. */
+.work-edit-lines {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 2px 0 6px 22px;
+}
+.work-edit-line {
+  justify-self: start;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 1px 8px 1px 6px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 18px;
+  color: var(--ink-2);
+  text-overflow: ellipsis;
+  white-space: pre;
+}
+.work-edit-line[data-sign="+"] {
+  background: var(--ok-soft);
+}
+.work-edit-line[data-sign="-"] {
+  background: var(--bad-soft);
+}
+.work-edit-sign {
+  display: inline-block;
+  width: 14px;
+  color: var(--ink-4);
+  user-select: none;
+}
+
+/* Search: the first hits as file:line, the term marked; web results as host and title. */
+.work-hits,
+.work-results {
+  display: grid;
+  min-width: 0;
+  padding: 0 0 6px 22px;
+}
+.work-hits > a,
+.work-results > a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  height: 22px;
+  margin: 0 -6px;
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
+  color: inherit;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.work-hits > a:hover,
+.work-results > a:hover {
+  background: var(--surface-2);
+}
+.work-hits > a {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+.work-hit-where {
+  flex-shrink: 0;
+  width: min(200px, 38%);
+  overflow: hidden;
+  color: var(--ink-4);
+  text-overflow: ellipsis;
+}
+.work-hit-text,
+.work-result-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.work-hit-term {
+  padding: 0 2px;
+  border-radius: 3px;
+  background: var(--surface-3);
+  color: var(--ink);
+}
+.work-results > a {
+  height: 24px;
+  font-size: var(--text-base);
+  color: var(--ink-2);
+}
+.work-result-host {
+  flex-shrink: 0;
+  width: min(120px, 30%);
+  overflow: hidden;
+  font-size: var(--text-xs);
+  color: var(--ink-4);
+  text-overflow: ellipsis;
+}
+.work-quote {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  padding: 0 0 6px 22px;
+  font-size: var(--text-base);
+  line-height: 20px;
+  color: var(--ink-3);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* Commands: the newest lines while one runs or once it failed, the oldest fading at the top. */
+.work-tail {
+  display: grid;
+  overflow: hidden;
+  padding: 0 0 6px 22px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 18px;
+  color: var(--ink-3);
+  white-space: pre;
+}
+.work-tail[data-live] {
+  mask: linear-gradient(transparent, #000 14px);
+}
+.work-tail > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition:
+    opacity var(--duration-arrive) var(--ease-out),
+    filter var(--duration-arrive) var(--ease-out);
+}
+.work-tail > span:last-child {
+  color: var(--ink-2);
+}
+.work-tail[data-tone="bad"] > span:last-child {
+  color: var(--bad);
+}
+@starting-style {
+  .work-tail[data-live] > span:last-child {
+    opacity: 0;
+    filter: blur(2px);
+  }
+}
+
+/* Tests: one cell per case, green, red, or empty while still to come; the failure named under them. */
+.work-tests-count {
+  flex-shrink: 0;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.work-tests-cells {
+  display: inline-flex;
+  flex: 0 1 auto;
+  gap: 2px;
+  min-width: 0;
+  overflow: hidden;
+}
+.work-tests-cells > span {
+  flex-shrink: 0;
+  width: 4px;
+  height: 12px;
+  border-radius: 1.5px;
+  background: var(--surface-3);
+  transition:
+    background-color var(--duration-confirm) var(--ease-out),
+    scale var(--duration-confirm) var(--ease-overshoot);
+}
+.work-tests-cells > [data-state="passed"],
+.work-tests-track > [data-state="passed"] {
+  background: var(--ok);
+}
+.work-tests-cells > [data-state="failed"],
+.work-tests-track > [data-state="failed"] {
+  background: var(--bad);
+}
+.work-tests-cells > [data-state="skipped"],
+.work-tests-track > [data-state="skipped"] {
+  background: var(--ink-4);
+}
+.work-tests[data-state="running"] .work-tests-cells > [data-state="pending"] {
+  animation: work-cell-wait 1.6s var(--ease-out) infinite alternate;
+}
+@keyframes work-cell-wait {
+  to {
+    opacity: 0.45;
+  }
+}
+/* A case that lands while the run streams grows in with one overshoot; cells already there stay put. */
+@starting-style {
+  [data-arrivals] .work-tests-cells > [data-state="passed"],
+  [data-arrivals] .work-tests-cells > [data-state="failed"] {
+    scale: 1 0.3;
+  }
+}
+.work-tests-track {
+  display: flex;
+  width: 160px;
+  height: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+}
+.work-tests-track > span {
+  transition: inline-size var(--duration-resize) var(--ease-out);
+}
+.work-failures {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 0 6px 22px;
+}
+.work-failure {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.work-failure-name {
+  font-size: var(--text-base);
+  line-height: 20px;
+  color: var(--ink);
+}
+.work-failure-message {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 18px;
+  color: var(--bad);
+  overflow-wrap: anywhere;
+}
+
+/* Git: a branch's commits on a lane off its base, the push filling the lane up to origin, the pull request above. */
+.work-git {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  padding-left: 30px;
+}
+.work-git-lanes {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+}
+.work-lane,
+.work-lane-base,
+.work-lane-sent {
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+.work-lane {
+  stroke: var(--line-strong);
+}
+.work-lane-base {
+  stroke: var(--line);
+  mask: linear-gradient(#000, transparent);
+}
+.work-lane-sent {
+  stroke: var(--ink-3);
+  stroke-dasharray: 1 1;
+  transition: stroke-dashoffset var(--duration-resize) var(--ease-out);
+}
+.work-lane-dot {
+  fill: var(--surface);
+  stroke: var(--ink-3);
+  stroke-width: 1.5;
+  transition: fill var(--duration-confirm) var(--ease-out);
+}
+.work-lane-dot[data-sent] {
+  fill: var(--ink-3);
+}
+.work-lane-dot[data-base] {
+  fill: var(--ink-4);
+  stroke: var(--ink-4);
+}
+.work-git-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 28px;
+  font-size: var(--text-base);
+  line-height: 16px;
+  color: var(--ink-2);
+}
+.work-git-row > a {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 100%;
+  color: inherit;
+  text-decoration: none;
+}
+.work-git-pull > a:hover .work-git-number {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+/* The mark sits on the branch lane, in the column the lanes draw in. */
+.work-git-mark {
+  position: absolute;
+  left: -30px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  color: var(--ink-3);
+}
+.work-git-open {
+  color: var(--ok);
+}
+.work-git-number {
+  flex-shrink: 0;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.work-git-subject,
+.work-git-words {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.work-git-words {
+  color: var(--ink-3);
+}
+.work-git-origin[data-state="running"] .work-git-words {
+  color: var(--ink);
+}
+.work-git-origin[data-state="failed"] .work-git-words {
+  color: var(--bad);
+}
+.work-git-commit[data-fresh] .work-git-subject {
+  color: var(--ink);
+}
+.work-git-commit[data-base] {
+  color: var(--ink-3);
+}
+.work-git-more {
+  font-size: var(--text-xs);
+  color: var(--ink-4);
+}
+.work-git-spacer {
+  flex: 1 1 0;
+  min-width: 8px;
+}
+.work-branch {
+  flex-shrink: 0;
+  max-width: 45%;
+  height: 20px;
+  overflow: hidden;
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 20px;
+  color: var(--ink-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.work-git-sha {
+  flex-shrink: 0;
+  width: 60px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-4);
+}
+.work-git-who {
+  min-width: 72px;
+  text-align: right;
+}
+.work-git-percent {
+  min-width: 3ch;
+  text-align: right;
+}
+/* A narrow column keeps the subject and drops who and when. */
+@container (max-width: 480px) {
+  .work-git-who,
+  .work-git-sha {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .work-tests[data-state="running"] .work-tests-cells > [data-state="pending"] {
+    animation: none;
+  }
+}
+
+/* A read's peek: the lines the agent saw, on one floating card. The code sits on the card itself, without a box of
+   its own; the head names the file and the lines, and the body scrolls under a short fade. */
+.floating-popover.read-peek {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(560px, calc(100vw - 48px));
+  max-height: min(360px, var(--available-height));
+  overflow: hidden;
+  padding: 0;
+}
+.read-peek-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px 16px 6px;
+  font-size: var(--text-base);
+  line-height: 20px;
+  color: var(--ink);
+}
+.read-peek-name {
+  flex-shrink: 0;
+}
+.read-peek-folder {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-3);
+}
+.read-peek-note {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.read-peek-body {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 16px 12px 10px;
+  scrollbar-width: none;
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 16px), transparent);
+}
+.read-peek-body.tool-view {
+  padding-top: 0;
+}
+.read-peek-quiet {
+  padding-left: 6px;
+  color: var(--ink-3);
+}
+.read-peek-body [data-streamdown="code-block"] {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.read-peek-body [data-streamdown="code-block-header"],
+.read-peek-body [data-streamdown="code-block"] > :has(> [data-streamdown="code-block-actions"]) {
+  display: none;
+}
+.read-peek-body [data-streamdown="code-block-body"] {
+  padding: 0;
+  background: transparent;
+  font-size: var(--text-xs);
+}
+.read-peek-body pre {
+  font-size: inherit;
+  line-height: 18px;
+}
+/* A peek grows out of its row from a slight blur, and leaves faster than it came. */
+.floating-popover.read-peek {
+  transition:
+    opacity var(--duration-leave) var(--ease-out),
+    transform var(--duration-arrive) var(--ease-out),
+    filter var(--duration-arrive) var(--ease-out);
+}
+.floating-popover.read-peek:is([data-starting-style], [data-ending-style]) {
+  filter: blur(4px);
+}
+
+/* A listed folder grown out of its row: its entries as the panel lists them, each file opening there, each folder
+   opening in place one step in. */
+.work-tree {
+  display: grid;
+  min-width: 0;
+  margin: 0;
+  padding: 2px 0 8px;
+  list-style: none;
+}
+.work-tree .work-tree {
+  padding: 0 0 0 18px;
+}
+.work-tree-entry {
+  display: grid;
+  min-width: 0;
+}
+.work-tree-entry > a,
+.work-tree-entry > button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 28px;
+  margin-left: -8px;
+  padding: 0 8px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+  color: var(--ink-2);
+  text-align: left;
+  text-decoration: none;
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
+}
+.work-tree-entry > a:hover,
+.work-tree-entry > button:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.work-tree-entry > :is(a, button):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+/* A file's row lines its mark up under the folders' marks, past their chevrons. */
+.work-tree-entry > a {
+  padding-left: 28px;
+}
+.work-tree-entry[data-ignored] > :is(a, button) {
+  color: var(--ink-4);
+}

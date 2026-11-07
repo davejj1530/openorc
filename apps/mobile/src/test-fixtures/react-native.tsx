@@ -75,9 +75,17 @@ export const View = host("div");
 export const Text = host("span");
 export const Pressable = host("button");
 export const ScrollView = host("div");
-export const Image = host("img");
+/** An image view whose files measure as 16:9, as a phone reads a loaded image's size. */
+export const Image = Object.assign(host("img"), {
+  getSize: (_uri: string, success: (width: number, height: number) => void) => success(1600, 900),
+});
 export const Modal = host("div");
 export const TextInput = host("input");
+
+/** iOS's switch, keeping its checked state and refusing changes while disabled. */
+export function Switch({ value, disabled, onValueChange, accessibilityLabel }: { value?: boolean; disabled?: boolean; onValueChange?: (value: boolean) => void; accessibilityLabel?: string }) {
+  return createElement("button", { role: "switch", "aria-label": accessibilityLabel, "aria-checked": Boolean(value), disabled, onClick: () => onValueChange?.(!value) });
+}
 
 type AlertButton = { text?: string; style?: string; onPress?: (value?: string) => void };
 /** Alerts and prompts the app showed, newest last; a test presses their buttons. */
@@ -111,6 +119,7 @@ export const Dimensions = { get: () => screen };
 export const keyboard = { up: false };
 export const Keyboard = { dismiss: () => void (keyboard.up = false) };
 export const useWindowDimensions = () => screen;
+export const PixelRatio = { get: () => screen.scale };
 export const StyleSheet = { create: <T,>(styles: T) => styles, hairlineWidth: 1 / 3, absoluteFill: {} };
 /** The app's state as iOS reports it: a test calls `appState.set` to move the app in or out of the front. */
 export const appState = {

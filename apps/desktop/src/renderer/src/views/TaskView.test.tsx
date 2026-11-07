@@ -22,13 +22,12 @@ afterEach(() => {
 });
 
 function show(owner: { id: string; teamInstanceId: string | null } | null, retainedTeam = false) {
-  const task = { id: "task", projectId: "project", title: "Task B", status: "backlog", threadId: "creator", executionThreadId: owner?.id ?? null, baseSha: "viewed-diff" };
+  const task = { id: "task", projectId: "project", title: "Task B", status: "backlog", threadId: "creator", executionThreadId: owner?.id ?? null, baseSha: "viewed-diff", retiredTeam: retainedTeam };
   const project = { id: "project", name: "Project" };
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
   client.setQueryData(["tasks.get", { id: task.id }], task);
   client.setQueryData(["projects.get", { id: project.id }], project);
   client.setQueryData(["tasks.executionThread", { taskId: task.id }], owner);
-  client.setQueryData(["orchestration.taskState", { taskId: task.id }], retainedTeam ? { ownerDeletedAt: 1 } : null);
   render(
     <QueryClientProvider client={client}>
       <TaskView taskId={task.id} tab="files" />
@@ -51,8 +50,9 @@ it.each(["creator", "executor"])("routes the panel to the assigned %s conversati
   expect(mocks.call).not.toHaveBeenCalled();
 });
 
-it("keeps retained team reviews accessible after their conversation is deleted", () => {
-  const { task, project } = show(null, true);
-  expect(mocks.panel).toHaveBeenCalledWith({ context: { kind: "task", task, project } });
+it("hides an old task even when a cached query still contains it", () => {
+  show(null, true);
+  expect(screen.getByText("Task not found")).toBeTruthy();
+  expect(mocks.panel).not.toHaveBeenCalled();
   expect(mocks.call).not.toHaveBeenCalled();
 });

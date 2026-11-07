@@ -22,7 +22,7 @@ import LinkCards from "../../components/docs/LinkCards.astro";
         <tbody>
           <tr>
             <td><kbd>⌘K</kbd></td>
-            <td>Open or close the command palette: threads, tasks, projects, messages, and actions such as <strong>New task</strong> and <strong>Settings</strong></td>
+            <td>Open or close the command palette: threads, Orclings, tasks, projects, messages, and actions such as <strong>New task</strong> and <strong>Settings</strong>. <strong>Search</strong> in the sidebar opens it too.</td>
           </tr>
           <tr>
             <td><kbd>⌘F</kbd></td>
@@ -54,7 +54,7 @@ import LinkCards from "../../components/docs/LinkCards.astro";
           </tr>
           <tr>
             <td><kbd>⌘[</kbd> and <kbd>⌘]</kbd></td>
-            <td>Go back or forward, like the arrows in the sidebar</td>
+            <td>Go back or forward through the screens you visited</td>
           </tr>
           <tr>
             <td><kbd>Esc</kbd></td>
@@ -99,15 +99,11 @@ import LinkCards from "../../components/docs/LinkCards.astro";
           </tr>
           <tr>
             <td><kbd>⌘⇧A</kbd></td>
-            <td>Archive or unarchive the thread</td>
+            <td>Resolve the thread, or reopen a resolved one</td>
           </tr>
           <tr>
             <td><kbd>⌘⇧U</kbd></td>
             <td>Mark the thread as read or unread</td>
-          </tr>
-          <tr>
-            <td><kbd>⌘⇧O</kbd></td>
-            <td>Turn orcmode on or off. Orcmode lists only threads that are working, need you, are unread or pinned, or saw work in the last day.</td>
           </tr>
           <tr>
             <td><kbd>↵</kbd> or <kbd>Esc</kbd> while renaming</td>
@@ -139,7 +135,7 @@ import LinkCards from "../../components/docs/LinkCards.astro";
           </tr>
           <tr>
             <td><kbd>@</kbd></td>
-            <td>Mention a file in the project, an Orcling, or a member in a team conversation</td>
+            <td>Mention a file in the project or an Orcling</td>
           </tr>
           <tr>
             <td><kbd>/</kbd></td>
@@ -288,10 +284,41 @@ import LinkCards from "../../components/docs/LinkCards.astro";
             <td>Find or replace text in the file, instead of searching threads</td>
           </tr>
           <tr>
-            <td><kbd>⌘S</kbd></td>
-            <td>The team editor</td>
-            <td><strong>Save team</strong></td>
+            <td><kbd>⇧⌥F</kbd></td>
+            <td>A file open in the panel</td>
+            <td>Format the file</td>
           </tr>
+          <tr>
+            <td><kbd>⌥Z</kbd></td>
+            <td>A file open in the panel</td>
+            <td>Turn word wrap on or off</td>
+          </tr>
+          <tr>
+            <td><kbd>F12</kbd>, or <kbd>⌘</kbd>-click a name</td>
+            <td>A TypeScript or JavaScript file</td>
+            <td>Go to the definition</td>
+          </tr>
+          <tr>
+            <td><kbd>⇧F12</kbd></td>
+            <td>A TypeScript or JavaScript file</td>
+            <td>Find references</td>
+          </tr>
+          <tr>
+            <td><kbd>⌘.</kbd></td>
+            <td>A TypeScript or JavaScript file</td>
+            <td>Show quick fixes</td>
+          </tr>
+          <tr>
+            <td><kbd>⌘⇧M</kbd></td>
+            <td>A TypeScript or JavaScript file</td>
+            <td>List problems</td>
+          </tr>
+          <tr>
+            <td><kbd>⌥←</kbd> and <kbd>⌥→</kbd></td>
+            <td>A TypeScript or JavaScript file</td>
+            <td>Go back or forward between places you jumped to</td>
+          </tr>
+
           <tr>
             <td><kbd>↵</kbd></td>
             <td>A typed answer to an agent's question</td>
@@ -330,8 +357,8 @@ import LinkCards from "../../components/docs/LinkCards.astro";
       </table>
     </div>
     <p>
-      In Settings, <kbd>←</kbd> and <kbd>→</kbd> move between sections, and <kbd>Home</kbd> and <kbd>End</kbd> jump to the first and last. On a project's name in the sidebar, <kbd>⇧F10</kbd> or the Menu key opens its menu, the same as a
-      right-click.
+      In the side panel's tabs, <kbd>←</kbd> and <kbd>→</kbd> move between tabs, <kbd>Home</kbd> and <kbd>End</kbd> jump to the first and last, and <kbd>Delete</kbd> closes the focused tab. In the Files explorer, the arrow keys move
+      through the tree and open or close folders, and <kbd>↵</kbd> opens the focused file. In the New thread page's list of projects, <kbd>⇧F10</kbd> or the Menu key on a project opens its menu, the same as a right-click.
     </p>
   </section>
 
@@ -374,7 +401,7 @@ import LinkCards from "../../components/docs/LinkCards.astro";
         </tbody>
       </table>
     </div>
-    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/lib/app-shortcuts.ts</code>, <code>components/CommandPalette.tsx</code>, <code>components/ComposerInput.tsx</code>, <code>components/code-editor/extensions.ts</code>, <code>apps/desktop/src/main/view-menu.ts</code></p>
+    <p class="docs-source">Source: <code>apps/desktop/src/renderer/src/lib/app-shortcuts.ts</code>, <code>components/CommandPalette.tsx</code>, <code>components/ComposerInput.tsx</code>, <code>components/code-editor/extensions.ts</code>, <code>components/code-editor/intelligence.ts</code>, <code>components/PanelTabs.tsx</code>, <code>panels/FileExplorer.tsx</code>, <code>apps/desktop/src/main/view-menu.ts</code></p>
   </section>
 
   <section aria-labelledby="next-steps">

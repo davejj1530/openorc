@@ -16,14 +16,15 @@ afterEach(cleanup);
 
 const call = (name: string, input: unknown, extra: Partial<Extract<Block, { kind: "tool" }>> = {}): Extract<Block, { kind: "tool" }> => ({ id: "t", kind: "tool", name, input, done: true, ...extra });
 
-it("shows a command as a command and a printed file as numbered, highlighted code", () => {
+it("shows a command as its step in plain words and a printed file as numbered, highlighted code", () => {
   const { container } = render(
     <ToolDetail
       block={call("Bash", { command: "cd /repo/apps/desktop/src && sed -n 60,61p components/Transcript.tsx", description: "Read it" })}
       output={"  run: RunTranscript;\n  scrollKey?: string;"}
     />,
   );
-  expect(container.querySelector(".tool-view-command code")?.textContent).toBe("$sed -n 60,61p components/Transcript.tsx");
+  expect(container.querySelector(".tool-view-step-label")?.textContent).toBe("Read Transcript.tsxlines 60–61");
+  expect(container.querySelector(".tool-view-step-command")?.textContent).toBe("sed -n 60,61p components/Transcript.tsx");
   expect(screen.getByTitle("/repo/apps/desktop/src").textContent).toBe("…/desktop/src");
   const code = screen.getByTestId("rich");
   expect(code.textContent).toBe("```tsx startLine=60\n  run: RunTranscript;\n  scrollKey?: string;\n```");
@@ -31,17 +32,25 @@ it("shows a command as a command and a printed file as numbered, highlighted cod
   expect(screen.queryByText(/"command"/)).toBeNull();
 });
 
-it("tallies a test run and opens the output only when something failed", () => {
-  const output = " FAIL  src/a.test.ts\n      Tests  2 failed | 1015 passed (1017)";
-  render(<ToolDetail block={call("Bash", { command: "pnpm test" }, { isError: true })} output={output} />);
-  expect(screen.getByText("2 failed")).toBeTruthy();
-  expect(screen.getByText("1015 passed")).toBeTruthy();
-  expect(screen.getByText(/FAIL\s+src\/a.test.ts/)).toBeTruthy();
+it("reads what a command printed: the exit code apart, failures in their tone, files it names as links", () => {
+  const output = "Exit code 1\n FAIL  src/a.test.ts\nsrc/a.ts:12:5 expected 2\n      Tests  2 failed | 1015 passed (1017)";
+  const { container } = render(<ToolDetail block={call("Bash", { command: "cd /repo && pnpm test" }, { isError: true })} output={output} />);
+  expect(container.querySelector(".tool-view-exit")?.textContent).toBe(" Exit code 1");
+  const lines = [...container.querySelectorAll(".tool-view-printed-lines > div")];
+  expect(lines.map((line) => line.getAttribute("data-tone"))).toEqual(["bad", null, "bad"]);
+  expect(lines[1]!.querySelector("a")?.getAttribute("data-href")).toBe("/repo/src/a.ts:12");
+  expect(screen.queryByRole("button", { name: "Output" })).toBeNull();
+});
+
+it("folds a long output to its first lines, and says when a command printed nothing", () => {
+  const output = Array.from({ length: 30 }, (_, index) => `line ${index + 1}`).join("\n");
+  const { container } = render(<ToolDetail block={call("Bash", { command: "node build.mjs" })} output={output} />);
+  expect(container.querySelectorAll(".tool-view-printed-lines > div")).toHaveLength(14);
+  fireEvent.click(screen.getByRole("button", { name: "Show all 30 lines" }));
+  expect(container.querySelectorAll(".tool-view-printed-lines > div")).toHaveLength(30);
   cleanup();
-  render(<ToolDetail block={call("Bash", { command: "pnpm test" })} output={"      Tests  48 passed (48)"} />);
-  expect(screen.queryByText(/Tests\s+48 passed/)).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Output" }));
-  expect(screen.getByText(/Tests\s+48 passed/)).toBeTruthy();
+  render(<ToolDetail block={call("Bash", { command: "mkdir -p out" })} output="(Bash completed with no output)" />);
+  expect(screen.getByText("No output")).toBeTruthy();
 });
 
 it("groups search matches by file with the pattern marked, and opens each where it matched", () => {
@@ -57,11 +66,12 @@ it("marks a pattern that has its own groups without repeating any of the line", 
   expect([...container.querySelectorAll("mark")].map((mark) => mark.textContent)).toEqual(["agentQuiet", "teamQuiet"]);
 });
 
-it("shows each step at its prompt with the script it feeds in highlighted below", () => {
+it("shows each step in plain words, a comment as a note, and the script it feeds in highlighted below", () => {
   const command = "cd /repo && # check the ledger\npython3 - <<'PY'\nimport sqlite3\nprint(1)\nPY";
   const { container } = render(<ToolDetail block={call("Bash", { command })} output="1" />);
-  expect([...container.querySelectorAll(".tool-view-step > code")].map((line) => line.textContent)).toEqual(["# check the ledger", "$python3 -"]);
-  expect(container.querySelector(".tool-view-step > code[data-comment]")?.textContent).toBe("# check the ledger");
+  expect(container.querySelector(".tool-view-note-step")?.textContent).toBe("check the ledger");
+  expect(container.querySelector(".tool-view-step-label")?.textContent).toBe("Run a Python script");
+  expect(container.querySelector(".tool-view-step-command")?.textContent).toBe("python3 -");
   expect(container.querySelector("[data-script] [data-testid=rich]")?.textContent).toBe("```py\nimport sqlite3\nprint(1)\n```");
 });
 

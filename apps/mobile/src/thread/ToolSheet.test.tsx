@@ -4,10 +4,11 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { FakeLink } from "../test-fixtures/fake-link";
 import { flatStyle, nativeProps, placed, screen } from "../test-fixtures/react-native";
 import type { Draft, runStore } from "./test-fixtures/run-store";
+import { HostContext } from "../connection/host-context";
 import { ToolSheet } from "./ToolSheet";
 
-/** The sheet's route, the run store its call comes from, the link, and the Mac's answers to reading an output. */
-const sheet = vi.hoisted(() => ({ store: null as ReturnType<typeof runStore> | null, link: null as FakeLink | null, read: vi.fn() }));
+/** The sheet's route, the run store its call comes from, the link, and each host's answers to reading an output. */
+const sheet = vi.hoisted(() => ({ store: null as ReturnType<typeof runStore> | null, link: null as FakeLink | null, read: vi.fn(), partnerRead: vi.fn() }));
 
 vi.mock("expo-router", () => ({ useLocalSearchParams: () => ({ runId: "r", id: "seq" }), router: { push: () => undefined } }));
 vi.mock("../client", async () => {
@@ -15,7 +16,9 @@ vi.mock("../client", async () => {
   const { fakeLink } = await import("../test-fixtures/fake-link");
   sheet.store = runStore();
   sheet.link = fakeLink();
-  return { useRun: sheet.store.client.useRun, useLinkRead: sheet.link.useLinkRead, link: { connection: { call: sheet.read } }, assetUri: () => new Promise(() => undefined) };
+  // The cloud brain is the partner host; any other scope is the shown Mac.
+  const hostLink = (host: string | null) => ({ connection: { call: host === "brain" ? sheet.partnerRead : sheet.read } });
+  return { useRun: sheet.store.client.useRun, useLinkRead: sheet.link.useLinkRead, hostLink, assetUri: () => new Promise(() => undefined) };
 });
 
 const numbered = (count: number) => Array.from({ length: count }, (_, i) => `line ${i + 1}`).join("\n");
@@ -54,6 +57,8 @@ afterEach(() => {
   cleanup();
   screen.fontScale = 1;
   sheet.store!.client.runs.reset();
+  sheet.read.mockReset();
+  sheet.partnerRead.mockReset();
 });
 
 it("draws only the lines near the screen once all of a long output shows, and follows the reader down", () => {
@@ -96,6 +101,20 @@ it("reads an output the page left out again once the link is back, loading meanw
   expect(shown.queryByText("Could not load the output")).toBeNull();
   await act(async () => answers[1]!.resolve({ output: numbered(3) }));
   expect(drawnLines()).toEqual(["line 1", "line 2", "line 3"]);
+});
+
+it("reads a cloud thread's left-out output from the brain that holds it, not the shown Mac", async () => {
+  sheet.partnerRead.mockResolvedValue({ output: numbered(2) });
+  sheet.store!.frame(...call({ output: null, outputOmitted: true }));
+  render(
+    <HostContext.Provider value="brain">
+      <ToolSheet />
+    </HostContext.Provider>,
+  );
+  await act(async () => undefined);
+  expect(sheet.partnerRead).toHaveBeenCalledWith("events.toolOutput", { runId: "r", toolCallId: "seq" });
+  expect(sheet.read).not.toHaveBeenCalled();
+  expect(drawnLines()).toEqual(["line 1", "line 2"]);
 });
 
 it("copies the whole output as written, not the lines one piece of it draws", async () => {

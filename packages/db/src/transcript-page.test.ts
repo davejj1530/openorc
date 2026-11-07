@@ -3,7 +3,7 @@ import type { AgentEvent } from "@openorc/protocol";
 import { Db } from "./database.js";
 import { LedgerWriter } from "./ledger.js";
 import { projects, runs, threads } from "./repos.js";
-import { pagedEvent, transcriptPage } from "./transcript-page.js";
+import { digestedEvent, pagedEvent, transcriptPage } from "./transcript-page.js";
 
 function fixture(events: (runId: string) => AgentEvent[]) {
   const db = Db.memory();
@@ -41,4 +41,13 @@ it("leaves the same tool results out of a live event as out of its stored row", 
   const stored = completed(transcriptPage(db, runId, {}).events);
   expect(live.map((ev) => "outputOmitted" in ev && ev.outputOmitted === true)).toEqual([true, false, false]);
   expect(stored.map((ev) => ({ ...ev, eventId: undefined }))).toEqual(live.map((ev) => ({ ...ev, eventId: undefined })));
+});
+
+it("keeps what a large result came to once a page leaves its output out", () => {
+  const vitest = ` ✓ src/a.test.ts (11 tests) 40ms\n${"noise\n".repeat(900)} FAIL  src/b.test.ts > queue > sends the head once\nAssertionError: expected "send" to be called 1 time, but got 2 times\n\n Test Files  1 failed | 1 passed (2)\n      Tests  1 failed | 11 passed (12)\n   Duration  912ms (transform 61ms, setup 0ms)\n`;
+  const { db, runId } = fixture((id) => [...turn(id, 1, vitest).map(digestedEvent), ...turn(id, 2, "small").map(digestedEvent)]);
+  const [large, small] = transcriptPage(db, runId, {}).events.filter((ev) => ev.type === "tool.completed");
+  expect(large).toMatchObject({ outputOmitted: true, digest: { tests: { passed: 11, failed: 1, finished: true, failures: [{ name: "sends the head once" }] } } });
+  expect(small).toMatchObject({ output: "small" });
+  expect(small).not.toHaveProperty("digest");
 });

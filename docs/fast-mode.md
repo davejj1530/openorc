@@ -6,7 +6,9 @@ Fast asks a provider for its faster service tier, at a higher usage cost. It is 
 
 - New conversations start on Standard. The setting applies only to the agent processes OpenOrc starts; it does not change your global CLI preferences.
 - The conversation stores the setting for its next turn, and each run records what it actually requested. Changing model, effort or Fast between turns does not restart the agent: the next message applies the change to the open session and posts a notice in the conversation. Fast is checked against the account and model first. If the provider refuses the change, or effort is reset to the default, OpenOrc resumes the session with the new settings instead.
-- Forks and tasks started from a conversation keep its Fast setting. Switching to another provider, or to a model without Fast, turns Fast off; choosing that model again does not turn it back on.
+- Forks and tasks started from a conversation keep its Fast setting. A helper thread from `thread_start` keeps it only on the caller's own model, unless the agent sets `fast`. Switching to another provider, or to a model without Fast, turns Fast off; choosing that model again does not turn it back on.
+- Moving a Claude conversation to another account checks Fast against that account first.
+- The phone's model picker has the same Fast switch.
 - Changing or resetting effort leaves Fast unchanged, and changing Fast does not lower effort.
 - OpenOrc checks eligibility again before replacing a session or starting a turn. A refused queued message stays available to retry.
 

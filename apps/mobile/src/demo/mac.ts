@@ -19,7 +19,6 @@ export const demoAccounts = (createdAt: number): ClaudeAccounts => ({
 });
 
 export const demoSettings: AppSettings = {
-  experimentalTeamExecution: true,
   notifications: true,
   sound: false,
   autoDoneDays: 3,
@@ -31,6 +30,7 @@ export const demoSettings: AppSettings = {
   look: null,
   idleProcessMinutes: 10,
   claudeUserMcpServers: true,
+  claudeAccountAutoSwitch: false,
 };
 
 const MINUTE = 60_000;

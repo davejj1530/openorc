@@ -26,7 +26,8 @@ vi.mock("expo-router", () => ({ useNavigation: () => home.navigation, useIsFocus
 vi.mock("../client", async () => {
   const { runStore } = await import("../thread/test-fixtures/run-store");
   home.store = runStore("interest");
-  return { client: home.store.client };
+  const client = home.store.client;
+  return { useHostClient: () => client };
 });
 
 afterEach(() => {

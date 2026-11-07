@@ -1,20 +1,3 @@
-type Member = { key: string; name: string; managerKey: string | null };
-
-/** Resolve against the pinned roster, never another conversation's current team. */
-export function teamMentionNames(members: readonly Member[], identities: readonly { id: string; memberKey: string }[] = []): ReadonlyMap<string, string> {
-  const names = new Map<string, string>();
-  for (const member of members) {
-    names.set(member.key, member.name);
-    names.set(`member:${member.key}`, member.name);
-    if (member.managerKey === null) names.set("lead", member.name);
-  }
-  for (const identity of identities) {
-    const name = names.get(identity.memberKey);
-    if (name) names.set(identity.id, name);
-  }
-  return names;
-}
-
 const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** Only complete mention tokens match; email addresses and longer IDs stay literal. */

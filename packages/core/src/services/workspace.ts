@@ -1,20 +1,26 @@
+import { stopProcess, waitForProcessGroup } from "@openorc/agents";
+import { catchUpWithOrigin } from "@openorc/cloud";
+import { audit, retiredTeams, tasks, threads, type CloudMirrorState, type CloudProviderId, type Db } from "@openorc/db";
+import { diskUsage, emptyTree, fetch, git, repoInfo, revParse, worktree } from "@openorc/git";
+import { WORKSPACE_ID, type BranchLoss, type CloudThreadState, type Project, type RemovalImpact, type Task, type Thread, type WorkspaceMode } from "@openorc/protocol";
 import { spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { access, copyFile, glob, lstat, mkdir } from "node:fs/promises";
 import path from "node:path";
-import { audit, taskForwardings, tasks, threads, type Db } from "@openorc/db";
-import { stopProcess, waitForProcessGroup } from "@openorc/agents";
-import { diskUsage, emptyTree, fetch, git, repoInfo, revParse, worktree } from "@openorc/git";
-import { WORKSPACE_ID, type BranchLoss, type Project, type RemovalImpact, type Task, type Thread, type WorkspaceMode } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
+import { checkoutBranch } from "./checkout-branch.js";
+import type { CloudWorkspaceService } from "./cloud-workspaces.js";
 import { assertCanBranch, projectGit } from "./project-git.js";
 import { inUnvettedCopy } from "./review-copies.js";
 import { assertSafeParentPath } from "./safe-parent-path.js";
+import type { StartThreadInput } from "./thread-inputs.js";
 import { workspaceWriters, type WorkspaceLease, type WorkspaceWriters } from "./workspace-writers.js";
 
 export interface WorkspaceOptions {
   /** Where worktrees live: `<dataDir>/worktrees/<project>/<task>`. Outside the repo on purpose. */
   dataDir: string;
+  /** Sandboxes for cloud conversations. Without it, conversations run only on this Mac. */
+  cloud?: CloudWorkspaceService;
 }
 
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
@@ -84,6 +90,7 @@ export class WorkspaceService {
   private readonly preparingThreads = new Map<string, Promise<Thread>>();
   private readonly operations = new Set<Promise<unknown>>();
   private readonly setups = new Map<ChildProcess, Promise<void>>();
+  private readonly catchingUp = new Map<string, Promise<void>>();
   private closing = false;
 
   constructor(
@@ -156,6 +163,7 @@ export class WorkspaceService {
 
   async prepare(task: Task, project: Project, lease?: WorkspaceLease): Promise<Task> {
     this.assertOpen();
+    if (retiredTeams.hasTask(this.db, task.id)) throw new Error("This item is no longer available.");
     // Review panels can request diffs and history together before either has
     // created the workspace. Share preparation through setup completion.
     const pending = this.preparingTasks.get(task.id);
@@ -167,7 +175,6 @@ export class WorkspaceService {
 
   private async prepareTask(task: Task, project: Project, inherited?: WorkspaceLease): Promise<Task> {
     this.assertOpen();
-    if (taskForwardings.target(this.db, task.id)?.state === "preparing") throw new Error("Finish this task’s saved handoff before preparing its workspace.");
     // A caller can retain the old row after an earlier preparation finishes.
     task = tasks.get(this.db, task.id) ?? task;
     if (project.id === WORKSPACE_ID) {
@@ -235,9 +242,37 @@ export class WorkspaceService {
     if (!adoptsCheckout) await assertCanBranch(project);
   }
 
+  /** Every conversation here runs in a cloud sandbox, whatever its start asked for. */
+  get cloudOnly(): boolean {
+    return this.options.cloud?.cloudOnly ?? false;
+  }
+
+  /** Checks a new cloud conversation and picks where it runs, before it is admitted. */
+  placeCloud(input: Pick<StartThreadInput, "agent" | "checkout" | "claudeAccountId">, project: Project): Promise<CloudProviderId> {
+    if (!this.options.cloud) throw new Error("Cloud workspaces are not available.");
+    return this.options.cloud.place(input, project);
+  }
+
+  /** Deletes a cloud conversation's sandbox for good; nothing for a conversation on this Mac. */
+  async removeCloud(threadId: string): Promise<void> {
+    await this.options.cloud?.remove(threadId);
+  }
+
+  /** Where a cloud thread's sandbox stands; null for a thread on this Mac. */
+  cloudState(threadId: string): CloudThreadState | null {
+    return this.options.cloud?.state(threadId) ?? null;
+  }
+
+  /** Marks a conversation being admitted as one that runs in a cloud sandbox. Call inside the admitting transaction. */
+  admitCloud(threadId: string, provider: CloudProviderId): void {
+    if (!this.options.cloud) throw new Error("Cloud workspaces are not available.");
+    this.options.cloud.admit(threadId, provider);
+  }
+
   /**
    * A worktree of a thread's own, so two threads on one project never step
    * on each other. Same recipe as a task's: fresh base, includes, setup.
+   * A cloud conversation's worktree is the Mac's copy of its sandbox, which gets the code and runs the setup instead.
    */
   async prepareThread(thread: Thread, project: Project, baseRef?: string, lease?: WorkspaceLease): Promise<Thread> {
     this.assertOpen();
@@ -248,15 +283,23 @@ export class WorkspaceService {
     return this.track(preparation);
   }
 
+  /** A thread in the checkout works on whatever branch the checkout is on now, so each turn records that branch, not the one it started on. */
+  private async followCheckout(thread: Thread, project: Project): Promise<Thread> {
+    const branch = (await projectGit(project)) === "none" ? null : await checkoutBranch(project.rootPath);
+    this.assertOpen();
+    return branch === thread.branch ? thread : threads.update(this.db, thread.id, { branch });
+  }
+
   private async prepareThreadWorkspace(thread: Thread, project: Project, baseRef?: string, inherited?: WorkspaceLease): Promise<Thread> {
     this.assertOpen();
     if (project.id === WORKSPACE_ID) {
       if (thread.workspaceMode !== "current") throw new Error("Workspace conversations use their selected folder.");
       return thread;
     }
-    if (thread.workspaceMode === "current" && thread.baseSha) return thread;
+    if (thread.workspaceMode === "current" && thread.baseSha) return this.followCheckout(thread, project);
     if (thread.workspaceMode === "worktree" && thread.worktreePath && (await exists(thread.worktreePath))) {
       this.assertOpen();
+      await this.options.cloud?.prepare(thread, project);
       return thread;
     }
     // Only reviewing again rebuilds a pull request's copy, on no branch. An ordinary worktree here would take a branch
@@ -278,27 +321,75 @@ export class WorkspaceService {
         await mkdir(path.dirname(worktreePath), { recursive: true });
         this.assertOpen();
         const base = baseRef ?? project.defaultBranch ?? "HEAD";
-        const startPoint = await this.resolveStartPoint(project, base);
+        const startPoint = this.cloudOnly && base === project.defaultBranch ? await this.copyStart(project, base) : await this.resolveStartPoint(project, base);
         this.assertOpen();
         this.log.info(`worktree for thread "${thread.title}" at ${worktreePath} on ${branch} from ${base} (${startPoint.slice(0, 8)})`);
-        await worktree.add(project.rootPath, { path: worktreePath, branch, startPoint });
-        this.assertOpen();
-        await this.copyIncludes(project, worktreePath);
-        this.assertOpen();
-        await this.initSubmodules(worktreePath);
-        this.assertOpen();
-        await this.warnAboutHusky(worktreePath, project);
-        this.assertOpen();
+        // A cloud conversation's sandbox gets the same commit while the worktree is made.
+        const seeding = this.seedCloud(thread.id, project, { mirror: worktreePath, branch, commit: startPoint });
+        await this.makeWorktree(project, worktreePath, branch, startPoint).catch(async (error: unknown) => {
+          await seeding?.catch(() => undefined);
+          throw error;
+        });
         const baseBranch = thread.baseBranch ?? (await this.startBranch(project, base));
         this.assertOpen();
         const updated = threads.update(this.db, thread.id, { worktreePath, branch, baseSha: thread.baseSha ?? startPoint, baseBranch, workspaceMode: "worktree" });
         audit.record(this.db, { actor: "openorc", action: "workspace.create", resourceType: "thread", resourceId: thread.id, metadata: { worktreePath, branch, baseSha: startPoint } });
-        if (project.settings.setupScript) await this.runSetup(project, { worktreePath, id: thread.id });
+        if (seeding) this.options.cloud?.ready(thread.id, await seeding);
+        else if (project.settings.setupScript) await this.runSetup(project, { worktreePath, id: thread.id });
         this.assertOpen();
         return updated;
       },
       inherited,
     );
+  }
+
+  /**
+   * On the cloud brain a project is the Mac's copy, which GitHub may have moved past since: a thread starts from the
+   * copy's branch once it caught up with GitHub's, or from the copy as it is when it holds commits GitHub lacks, such as
+   * the Mac's unpushed work. Never origin's branch over the copy's.
+   */
+  private async copyStart(project: Project, branch: string): Promise<string> {
+    await assertCanBranch(project);
+    await this.catchUp(project, branch);
+    this.assertOpen();
+    return revParse(project.rootPath, branch);
+  }
+
+  /** One look at a time per copy, cut off after a few seconds. */
+  private catchUp(project: Project, branch: string): Promise<void> {
+    const running = this.catchingUp.get(project.rootPath);
+    if (running) return running;
+    const look = catchUpWithOrigin(project.rootPath, branch)
+      .then((outcome) => {
+        if (outcome === "updated") this.log.info(`${project.name}'s copy caught up with its origin's ${branch}`);
+        if (outcome === "kept") this.log.info(`${project.name}'s copy keeps commits its origin's ${branch} lacks`);
+      })
+      .catch((error: unknown) => this.log.warn(`${project.name}'s copy was not compared with its origin: ${error instanceof Error ? error.message : String(error)}`))
+      .finally(() => this.catchingUp.delete(project.rootPath));
+    this.catchingUp.set(project.rootPath, look);
+    return look;
+  }
+
+  /** A new worktree with the project's included files, submodules and a hooks check. */
+  private async makeWorktree(project: Project, worktreePath: string, branch: string, startPoint: string): Promise<void> {
+    await worktree.add(project.rootPath, { path: worktreePath, branch, startPoint });
+    this.assertOpen();
+    await this.copyIncludes(project, worktreePath);
+    this.assertOpen();
+    await this.initSubmodules(worktreePath);
+    this.assertOpen();
+    await this.warnAboutHusky(worktreePath, project);
+    this.assertOpen();
+  }
+
+  /** Starts seeding a cloud conversation's sandbox; null for a conversation that runs on this Mac. */
+  private seedCloud(threadId: string, project: Project, start: { mirror: string; branch: string; commit: string }): Promise<CloudMirrorState> | null {
+    const cloud = this.options.cloud;
+    if (!cloud?.get(threadId)) return null;
+    const seeding = cloud.seedFresh(threadId, project, start);
+    // Awaited later; a failure before then must not go unhandled.
+    void seeding.catch(() => undefined);
+    return seeding;
   }
 
   /**
@@ -353,11 +444,10 @@ export class WorkspaceService {
 
   async cleanup(task: Task, project: Project, options: { deleteBranch?: boolean; force?: boolean; acceptLoss?: BranchLoss } = {}, inherited?: WorkspaceLease): Promise<Task> {
     this.assertOpen();
+    if (retiredTeams.hasTask(this.db, task.id)) throw new Error("This item is no longer available.");
     if (!(await ownsRepository(project))) return task;
     // Deleting/archiving a task record must not remove a conversation's workspace.
     if (task.worktreePath && threads.list(this.db, { projectId: project.id, filter: "all" }).some((thread) => thread.worktreePath === task.worktreePath)) return task;
-    if ((taskForwardings.target(this.db, task.id) ?? taskForwardings.source(this.db, task.id))?.state === "preparing")
-      throw new Error("Finish this task’s saved handoff before removing its workspace.");
     return this.track(
       this.writers.withLease(
         this.taskPath(task, project),
@@ -434,7 +524,7 @@ export class WorkspaceService {
     return (await git(project.rootPath, ["symbolic-ref", "--short", "-q", "HEAD"], { okCodes: [0, 1] })).stdout.trim() || null;
   }
 
-  /** Fetches the base from origin when it is a branch there, so tasks start from what the team sees. */
+  /** Fetches the base from origin when it is a branch there, so tasks start from the remote branch. */
   private async resolveStartPoint(project: Project, baseRef: string): Promise<string> {
     this.assertOpen();
     await assertCanBranch(project);

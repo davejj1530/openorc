@@ -1,0 +1,5 @@
+# example.com/shop/broken [example.com/shop/broken.test]
+broken/broken_test.go:6:5: undefined: total
+FAIL	example.com/shop/broken [build failed]
+ok  	example.com/shop/cart	0.416s
+FAIL

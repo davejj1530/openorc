@@ -29,8 +29,8 @@ interface Props {
 const { label } = Astro.props;
 const { a, b } = threads;
 const rows = [
-  { id: "a", title: a.title, providers: [{ harness: a.harness, label: a.agent }], busy: busy.a, headline: a.headline },
-  { id: "b", title: b.title, branch: branches.plansThread, providers: [{ harness: b.harness, label: b.agent }], busy: busy.b, headline: b.headline },
+  { id: "a", title: a.title, busy: busy.a, headline: a.headline },
+  { id: "b", title: b.title, branch: branches.plansThread, busy: busy.b, headline: b.headline },
 ];
 const at = (windows: string) => timed(handoff, windows);
 const head = { journey: handoff };
@@ -107,7 +107,13 @@ const head = { journey: handoff };
           </span>
         </div>
         <TurnHead {...head} grow {...at(">aWork")} harness={a.harness} agent={a.agent} model={a.label} clock={{ from: "aWork", writing: "aResultStart", to: "aFinish" }} />
-        <Receipt {...head} grow {...at(">aWork")} steps="1 step" />
+        <Receipt
+          {...head}
+          grow
+          {...at(">aWork")}
+          steps={[{ text: "1 step", show: "<aEdited" }]}
+          changes={[{ text: `+${a.change.added} in 1 file`, show: ">aEdited" }]}
+        />
         <ol class="hs-steps" data-grow {...at("aWork~aFinish")}>
           <Step {...head} title={a.phases.build} live="<aEdited" done=">aEdited" meta={{ text: "1 file", show: ">aEdited" }} open="<aEdited">
             <FileChips label="Editing" files={[a.change]} live={a.change.path} />
@@ -127,10 +133,9 @@ const head = { journey: handoff };
         <Receipt
           {...head}
           thought="Thought 6s"
-          steps={[
-            { text: "2 steps", show: "<bWork" },
-            { text: "3 steps", show: "bWork~bDone" },
-            { text: "4 steps", show: ">bDone" },
+          changes={[
+            { text: "+30 −17 in 2 files", show: "<aSent" },
+            { text: `+${b.change.added} −${b.change.removed} in 3 files`, show: ">aSent" },
           ]}
         />
         <ol class="hs-steps">

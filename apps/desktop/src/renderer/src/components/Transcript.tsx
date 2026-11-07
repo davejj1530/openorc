@@ -18,17 +18,19 @@ import {
   isImageView,
   isUnifiedDiff,
   useTurnModel,
+  subagentGroups,
 } from "@openorc/client";
 import { cn } from "../lib/cn";
-import type { FileSelection } from "../lib/layout";
 import { QuestionCard } from "./QuestionCard";
 import { AgentPresence } from "./AgentPresence";
 import { toolIcons } from "./tool-icons";
 import { WorkNow, WorkSteps } from "./WorkSteps";
 import { TurnHead } from "./TurnHead";
 import { TurnReceipt } from "./TurnReceipt";
+import { useTurnSize } from "./TurnFooter";
 import { useTurnAuthor } from "../lib/turn-authors";
 import { ToolRow } from "./ToolRow";
+import { SubagentCards } from "./SubagentCards";
 import { ApprovalCard, pretty } from "./ApprovalCard";
 export { AgentPresence } from "./AgentPresence";
 import { StartedThreadCard } from "./StartedThreadCard";
@@ -37,7 +39,7 @@ import { UsageRecovery } from "./UsageRecovery";
 import { SignInRecovery } from "./SignInRecovery";
 import { TranscriptErrorCard } from "./TranscriptErrorCard";
 import { IconButton, TextButton } from "./ui";
-import { ImageGenerationRow, ImageViewRow, ThreadImage, ThreadMedia, ThreadRichText } from "./ThreadImages";
+import { ImageGenerationRow, ImageViewRow, ThreadImage, ThreadMedia, ThreadRichText, type MediaScope } from "./ThreadImages";
 import { isImagePath } from "../../../shared/image-paths";
 import { CopyMessage, MessageTime, TurnActions } from "./MessageActions";
 import { useMessageReveal, type Reveal } from "../lib/message-reveal";
@@ -60,8 +62,7 @@ export function Transcript({
   scrollKey = run.runId,
   onFork,
   trailing,
-  basePath,
-  fileScope,
+  media,
   mentionNames,
   children,
   working = false,
@@ -70,8 +71,7 @@ export function Transcript({
   followKey,
   reveal,
 }: {
-  basePath?: string;
-  fileScope?: FileSelection["scope"];
+  media?: MediaScope;
   mentionNames?: ReadonlyMap<string, string>;
   run: RunTranscript;
   scrollKey?: string;
@@ -205,7 +205,7 @@ export function Transcript({
   const arrivals = useArrivals(waiting, scrollKey) && (working || run.live);
 
   return (
-    <ThreadMedia scopeKey={scrollKey} basePath={basePath} fileScope={fileScope} mentionNames={mentionNames}>
+    <ThreadMedia scopeKey={scrollKey} {...media} mentionNames={mentionNames}>
       <div ref={parentRef} data-transcript data-arrivals={arrivals || undefined} className={cn("h-full overflow-y-auto", waiting && "invisible")}>
         <div ref={contentRef} className="max-w-chat mx-auto px-6 py-5">
           {hasOlder ? <div ref={olderRef} aria-hidden /> : null}
@@ -372,14 +372,14 @@ type WorkTranscriptProps = ComponentProps<typeof TranscriptContents> & {
   ambient?: boolean;
   author?: string | undefined;
   showActivity?: boolean;
-  /** Each turn opens with its head: the agent, its model and where it stands. Team turns carry their own author line. */
+  /** Each turn opens with its head: the agent, its model and where it stands. */
   head?: boolean;
   /** A message to bring into view; the turn that holds it opens its work when the message is there. */
   reveal?: Reveal | undefined;
 };
 type WorkTurnProps = WorkTranscriptProps & { id?: string; latest?: boolean };
 
-/** The same disclosure hierarchy serves solo turns, warm sessions, and team members. */
+/** The disclosure hierarchy stays consistent across turns and warm sessions. */
 export function WorkTranscript({ blocks, live = false, onFork, reveal, ...props }: WorkTranscriptProps) {
   const turns = useSteadyTurns(blocks);
   // A fork carries the whole conversation and the agent's latest session, so it is offered only at the latest message.
@@ -455,7 +455,8 @@ const WorkTurn = memo(function WorkTurn({
   ...props
 }: WorkTurnProps) {
   props = { ...props, runId: blocks.find((b) => b.runId)?.runId ?? props.runId };
-  const turn = useTurnModel(blocks, live, props.taskCards, ambient, props.replyAction?.blockId);
+  const size = useTurnSize(blocks);
+  const turn = useTurnModel(blocks, live, props.taskCards, ambient, props.replyAction?.blockId, size);
   const { before, work, after } = turn.parts;
   const revealWork = reveal && work.some((block) => block.id === reveal.messageId) ? reveal : undefined;
   const { open, visited, choose } = useWorkOpen(showActivity, turn.live, revealWork);
@@ -492,7 +493,7 @@ const WorkTurn = memo(function WorkTurn({
                 taskCards={props.taskCards}
                 pinned={props.replyAction?.blockId}
                 reveal={revealWork?.messageId}
-                renderBlocks={(items, openTools) => <TranscriptContents {...props} blocks={items} groupTools={false} openTools={openTools} />}
+                renderBlocks={(items, details) => <TranscriptContents {...props} blocks={items} groupTools={false} toolDetails={details} />}
               />
             ) : null}
           </div>
@@ -506,7 +507,7 @@ const WorkTurn = memo(function WorkTurn({
   );
 });
 
-/** A team turn has its own author line; a failed or stopped one still says so. */
+/** A failed or stopped turn retains its author and outcome. */
 function TurnOutcome({ named, runId, failed }: { named: string | undefined; runId: string; failed: boolean }) {
   const author = useTurnAuthor(named, runId);
   return (
@@ -527,7 +528,7 @@ export function TranscriptContents({
   taskCards = true,
   groupTools = true,
   pendingApproval,
-  openTools = false,
+  toolDetails = false,
   replyActions = true,
 }: {
   runId: string;
@@ -538,17 +539,25 @@ export function TranscriptContents({
   taskCards?: boolean;
   groupTools?: boolean;
   pendingApproval?: ((block: Extract<Block, { kind: "approval" }>) => ReactNode) | undefined;
-  /** Tool calls start open, for a call the reader picked from the work list. */
-  openTools?: boolean;
+  /** Tool calls as their details alone, for a call opened from its chip in the work list. */
+  toolDetails?: boolean;
   /** Replies carry their own copy and time; a turn that ends in its actions row passes false. */
   replyActions?: boolean;
 }) {
   const items: Item[] = useMemo(() => groupBlocks(blocks, taskCards, replyAction?.blockId, groupTools), [blocks, taskCards, replyAction?.blockId, groupTools]);
+  const agents = subagentGroups(blocks);
   const compact = (item: Item | undefined) => Boolean(item && (item.kind === "group" || isCompact(item.block)));
   return (
     <>
-      {items.map((item, i) =>
-        item.kind === "group" ? (
+      {items.map((item, i) => {
+        if (item.kind === "block" && item.block.kind === "tool" && item.block.subagent) {
+          return agents.has(item.block.id) ? (
+            <div key={item.block.id} className="transcript-block mt-3">
+              <SubagentCards blocks={agents.get(item.block.id)!} />
+            </div>
+          ) : null;
+        }
+        return item.kind === "group" ? (
           <div key={item.id} className={cn("transcript-block", compact(items[i - 1]) ? "mt-0" : "mt-3")}>
             <GroupRow id={item.id} blocks={item.blocks} runId={runId} taskCards={taskCards} />
             {trailing?.(item.blocks)}
@@ -562,13 +571,13 @@ export function TranscriptContents({
             {item.block.kind === "approval" && !item.block.decision && pendingApproval ? (
               pendingApproval(item.block)
             ) : (
-              <BlockView block={item.block} runId={runId} onFork={onFork} taskCards={taskCards} openTools={openTools} actions={replyActions} />
+              <BlockView block={item.block} runId={runId} onFork={onFork} taskCards={taskCards} toolDetails={toolDetails} actions={replyActions} />
             )}
             {replyAction?.blockId === item.block.id ? replyAction.content : null}
             {trailing?.([item.block])}
           </div>
-        ),
-      )}
+        );
+      })}
     </>
   );
 }
@@ -611,19 +620,19 @@ const BlockView = memo(function BlockView({
   runId,
   onFork,
   taskCards,
-  openTools = false,
+  toolDetails = false,
   actions = true,
 }: {
   block: Block;
   runId: string;
   onFork?: (() => void) | undefined;
   taskCards: boolean;
-  openTools?: boolean;
+  toolDetails?: boolean;
   actions?: boolean;
 }) {
   switch (block.kind) {
     case "message":
-      if (block.role === "user") return <UserMessage text={block.text} at={block.at} attachments={block.attachments} onFork={onFork} />;
+      if (block.role === "user") return block.text || block.attachments?.length ? <UserMessage text={block.text} at={block.at} attachments={block.attachments} onFork={onFork} /> : null;
       if (block.role === "system")
         return (
           <div>
@@ -641,7 +650,7 @@ const BlockView = memo(function BlockView({
     case "thinking":
       return <ThinkingRow block={block} />;
     case "tool":
-      return <ToolBlock block={block} cards={taskCards} open={openTools} />;
+      return <ToolBlock block={block} cards={taskCards} details={toolDetails} />;
     case "approval":
       return block.approvalKind === "user_input" ? (
         <QuestionCard runId={runId} approvalId={block.approvalId} input={block.input} decided={block.decision} answers={block.answers} />
@@ -649,6 +658,7 @@ const BlockView = memo(function BlockView({
         <ApprovalCard block={block} runId={runId} />
       );
     case "status":
+      if (block.notice) return <div className="text-sm text-ink-4">{block.text}</div>;
       // "turn error" and "session error" restate the error card above them.
       return block.tone === "bad" && !/^(turn|session) /.test(block.text) ? <TranscriptErrorCard text={block.text} /> : null;
   }
@@ -701,11 +711,11 @@ function AttachedFile({ path }: { path: string }) {
 }
 
 /** A tool call that saved or started work shows that work as a live card; any other call is a row. */
-function ToolBlock({ block, cards, open = false }: { block: Extract<Block, { kind: "tool" }>; cards: boolean; open?: boolean }) {
+function ToolBlock({ block, cards, details = false }: { block: Extract<Block, { kind: "tool" }>; cards: boolean; details?: boolean }) {
   const taskId = cards ? taskIdFromTool(block) : null;
   if (taskId) return <TaskCard taskId={taskId} />;
   const started = cards ? startedWorkFromTool(block) : null;
-  return started ? <StartedThreadCard threadId={started.threadId} /> : <ToolRow block={block} defaultOpen={open} />;
+  return started ? <StartedThreadCard threadId={started.threadId} /> : <ToolRow block={block} details={details} />;
 }
 
 function activityStatus(block: Extract<Block, { kind: "activity" }>, live: boolean): ReactNode {

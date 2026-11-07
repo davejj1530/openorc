@@ -1,0 +1,397 @@
+{
+  "source": "Live isolated OpenOrc QA, Claude Code 2.1.314, haiku, 2026-11-03. Complete workflow task lifecycle; ids and paths scrubbed. Progress arrays were full snapshots (including queued agents without agentId).",
+  "lines": [
+    {
+      "type": "system",
+      "subtype": "task_started",
+      "description": "Two haiku agents read README.md and queue.ts, pause 45s, then re-read and report one sentence each",
+      "task_type": "local_workflow",
+      "workflow_name": "inspect-retry-queue",
+      "task_id": "task-w",
+      "tool_use_id": "workflow",
+      "session_id": "observed-session",
+      "uuid": "stream-0"
+    },
+    {
+      "type": "system",
+      "subtype": "task_progress",
+      "description": "Inspect: Read the docs",
+      "usage": {
+        "total_tokens": 0,
+        "tool_uses": 0,
+        "duration_ms": 48
+      },
+      "last_tool_name": "Read the docs",
+      "summary": "Two haiku agents read README.md and queue.ts, pause 45s, then re-read and report one sentence each",
+      "workflow_progress": [
+        {
+          "type": "workflow_phase",
+          "index": 1,
+          "title": "Inspect"
+        },
+        {
+          "type": "workflow_agent",
+          "index": 1,
+          "label": "Read the docs",
+          "phaseIndex": 1,
+          "phaseTitle": "Inspect",
+          "agentId": "agent-1",
+          "model": "claude-haiku-5-5",
+          "state": "start",
+          "startedAt": 1793677718386,
+          "queuedAt": 1793677718382,
+          "attempt": 1,
+          "promptPreview": "Read README.md. Then run the Bash command \"sleep 45\". Then read README.md again. Report exactly one sentence describing it. Your final text is the return value.",
+          "promptFramed": true,
+          "lastProgressAt": 1793677718387
+        },
+        {
+          "type": "workflow_agent",
+          "index": 2,
+          "label": "Trace the queue",
+          "phaseIndex": 1,
+          "phaseTitle": "Inspect",
+          "model": "haiku",
+          "state": "start",
+          "queuedAt": 1793677718383,
+          "promptPreview": "Read queue.ts. Then run the Bash command \"sleep 45\". Then read queue.ts again. Report exactly one sentence describing it. Your final text is the return value.",
+          "lastProgressAt": 1793677718383
+        }
+      ],
+      "task_id": "task-w",
+      "tool_use_id": "workflow",
+      "session_id": "observed-session",
+      "uuid": "stream-1"
+    },
+    {
+      "type": "system",
+      "subtype": "task_progress",
+      "description": "Inspect: Trace the queue",
+      "usage": {
+        "total_tokens": 0,
+        "tool_uses": 0,
+        "duration_ms": 1708
+      },
+      "last_tool_name": "Trace the queue",
+      "summary": "Two haiku agents read README.md and queue.ts, pause 45s, then re-read and report one sentence each",
+      "workflow_progress": [
+        {
+          "type": "workflow_phase",
+          "index": 1,
+          "title": "Inspect"
+        },
+        {
+          "type": "workflow_agent",
+          "index": 1,
+          "label": "Read the docs",
+          "phaseIndex": 1,
+          "phaseTitle": "Inspect",
+          "agentId": "agent-1",
+          "model": "claude-haiku-5-5",
+          "state": "start",
+          "startedAt": 1793677718386,
+          "queuedAt": 1793677718382,
+          "attempt": 1,
+          "promptPreview": "Read README.md. Then run the Bash command \"sleep 45\". Then read README.md again. Report exactly one sentence describing it. Your final text is the return value.",
+          "promptFramed": true,
+          "lastProgressAt": 1793677718387
+        },
+        {
+          "type": "workflow_agent",
+          "index": 2,
+          "label": "Trace the queue",
+          "phaseIndex": 1,
+          "phaseTitle": "Inspect",
+          "agentId": "agent-2",
+          "model": "claude-haiku-5-5",
+          "state": "start",
+          "startedAt": 1793677718387,
+          "queuedAt": 1793677718383,
+          "attempt": 1,
+          "promptPreview": "Read queue.ts. Then run the Bash command \"sleep 45\". Then read queue.ts again. Report exactly one sentence describing it. Your final text is the return value.",
+          "promptFramed": true,
+          "lastProgressAt": 1793677720049
+        }
+      ],
+      "task_id": "task-w",
+      "tool_use_id": "workflow",
+      "session_id": "observed-session",
+      "uuid": "stream-2"
+    },
+    {
+      "type": "system",
+      "subtype": "task_progress",
+      "description": "Inspect: Read the docs",
+      "usage": {
+        "total_tokens": 56905,
+        "tool_uses": 8,
+        "duration_ms": 12057
+      },
+      "last_tool_name": "Read the docs",
+      "summary": "Two haiku agents read README.md and queue.ts, pause 45s, then re-read and report one sentence each",
+      "workflow_progress": [
+        {
+          "type": "workflow_phase",
+          "index": 1,
+          "title": "Inspect"
+        },
+        {
+          "type": "workflow_agent",
+          "index": 1,
+          "label": "Read the docs",
+          "phaseIndex": 1,
+          "phaseTitle": "Inspect",
+          "agentId": "agent-1",
+          "model": "claude-haiku-5-5",
+          "state": "progress",
+          "startedAt": 1793677718386,
+          "queuedAt": 1793677718382,
+          "attempt": 1,
+          "lastToolName": "Monitor",
+          "lastToolSummary": "until ! pgrep -x sleep >/dev/null 2>&1; do sleep 2; done; e\u2026",
+          "promptPreview": "Read README.md. Then run the Bash command \"sleep 45\". Then read README.md again. Report exactly one sentence describing it. Your final text is the return value.",
+          "promptFramed": true,
+          "lastProgressAt": 1793677730393,
+          "tokens": 30397,
+          "toolCalls": 5
+        },
+        {
+          "type": "workflow_agent",
+          "index": 2,
+          "label": "Trace the queue",
+          "phaseIndex": 1,
+          "phaseTitle": "Inspect",
+          "agentId": "agent-2",
+          "model": "claude-haiku-5-5",
+          "state": "progress",
+          "startedAt": 1793677718387,
+          "queuedAt": 1793677718383,
+          "attempt": 1,
+          "lastToolName": "Bash",
+          "lastToolSummary": "sleep 45",
+          "promptPreview": "Read queue.ts. Then run the Bash command \"sleep 45\". Then read queue.ts again. Report exactly one sentence describing it. Your final text is the return value.",
+          "promptFramed": true,
+          "lastProgressAt": 1793677727188,
+          "tokens": 26508,
+          "toolCalls": 3
+        }
+      ],
+      "task_id": "task-w",
+      "tool_use_id": "workflow",
+      "session_id": "observed-session",
+      "uuid": "stream-3"
+    },
+    {
+      "type": "system",
+      "subtype": "task_progress",
+      "description": "Inspect: Trace the queue",
+      "usage": {
+        "total_tokens": 58574,
+        "tool_uses": 10,
+        "duration_ms": 14738
+      },
+      "last_tool_name": "Trace the queue",
+      "summary": "Two haiku agents read README.md and queue.ts, pause 45s, then re-read and report one sentence each",
+      "workflow_progress": [
+        {
+          "type": "workflow_phase",
+          "index": 1,
+          "title": "Inspect"
+        },
+        {
+          "type": "workflow_agent",
+          "index": 1,
+          "label": "Read the docs",
+          "phaseIndex": 1,
+          "phaseTitle": "Inspect",
+          "agentId": "agent-1",
+          "model": "claude-haiku-5-5",
+          "state": "progress",
+          "startedAt": 1793677718386,
+          "queuedAt": 1793677718382,
+          "attempt": 1,
+          "lastToolName": "Bash",
+          "lastToolSummary": "sleep 0; echo waiting",
+          "promptPreview": "Read README.md. Then run the Bash command \"sleep 45\". Then read README.md again. Report exactly one sentence describing it. Your final text is the return value.",
+          "promptFramed": true,
+          "lastProgressAt": 1793677731764,
+          "tokens": 31056,
+          "toolCalls": 6
+        },
+        {
+          "type": "workflow_agent",
+          "index": 2,
+          "label": "Trace the queue",
+          "phaseIndex": 1,
+          "phaseTitle": "Inspect",
+          "agentId": "agent-2",
+          "model": "claude-haiku-5-5",
+          "state": "done",
+          "startedAt": 1793677718387,
+          "queuedAt": 1793677718383,
+          "attempt": 1,
+          "lastToolName": "Read",
+          "lastToolSummary": "/private/var/folders/kc/vr16qctd5q7ftr9f0rq0vv740000gn/T/op\u2026",
+          "promptPreview": "Read queue.ts. Then run the Bash command \"sleep 45\". Then read queue.ts again. Report exactly one sentence describing it. Your final text is the return value.",
+          "promptFramed": true,
+          "lastProgressAt": 1793677733097,
+          "tokens": 27518,
+          "toolCalls": 4,
+          "durationMs": 13048,
+          "resultPreview": "`queue.ts` exports `nextFrame`, a function that returns a Promise resolving after a 16 ms `setTimeout` (the `sleep 45` command was blocked by the sandbox, so the second read happened without that delay)."
+        }
+      ],
+      "task_id": "task-w",
+      "tool_use_id": "workflow",
+      "session_id": "observed-session",
+      "uuid": "stream-4"
+    },
+    {
+      "type": "system",
+      "subtype": "task_progress",
+      "description": "Inspect: Read the docs",
+      "usage": {
+        "total_tokens": 60019,
+        "tool_uses": 15,
+        "duration_ms": 25262
+      },
+      "last_tool_name": "Read the docs",
+      "summary": "Two haiku agents read README.md and queue.ts, pause 45s, then re-read and report one sentence each",
+      "workflow_progress": [
+        {
+          "type": "workflow_phase",
+          "index": 1,
+          "title": "Inspect"
+        },
+        {
+          "type": "workflow_agent",
+          "index": 1,
+          "label": "Read the docs",
+          "phaseIndex": 1,
+          "phaseTitle": "Inspect",
+          "agentId": "agent-1",
+          "model": "claude-haiku-5-5",
+          "state": "progress",
+          "startedAt": 1793677718386,
+          "queuedAt": 1793677718382,
+          "attempt": 1,
+          "lastToolName": "Bash",
+          "lastToolSummary": "pgrep -x sleep >/dev/null && echo running || echo finished",
+          "promptPreview": "Read README.md. Then run the Bash command \"sleep 45\". Then read README.md again. Report exactly one sentence describing it. Your final text is the return value.",
+          "promptFramed": true,
+          "lastProgressAt": 1793677743605,
+          "tokens": 32501,
+          "toolCalls": 11
+        },
+        {
+          "type": "workflow_agent",
+          "index": 2,
+          "label": "Trace the queue",
+          "phaseIndex": 1,
+          "phaseTitle": "Inspect",
+          "agentId": "agent-2",
+          "model": "claude-haiku-5-5",
+          "state": "done",
+          "startedAt": 1793677718387,
+          "queuedAt": 1793677718383,
+          "attempt": 1,
+          "lastToolName": "Read",
+          "lastToolSummary": "/private/var/folders/kc/vr16qctd5q7ftr9f0rq0vv740000gn/T/op\u2026",
+          "promptPreview": "Read queue.ts. Then run the Bash command \"sleep 45\". Then read queue.ts again. Report exactly one sentence describing it. Your final text is the return value.",
+          "promptFramed": true,
+          "lastProgressAt": 1793677733097,
+          "tokens": 27518,
+          "toolCalls": 4,
+          "durationMs": 13048,
+          "resultPreview": "`queue.ts` exports `nextFrame`, a function that returns a Promise resolving after a 16 ms `setTimeout` (the `sleep 45` command was blocked by the sandbox, so the second read happened without that delay)."
+        }
+      ],
+      "task_id": "task-w",
+      "tool_use_id": "workflow",
+      "session_id": "observed-session",
+      "uuid": "stream-5"
+    },
+    {
+      "type": "system",
+      "subtype": "task_progress",
+      "description": "Inspect: Read the docs",
+      "usage": {
+        "total_tokens": 60698,
+        "tool_uses": 17,
+        "duration_ms": 29811
+      },
+      "last_tool_name": "Read the docs",
+      "summary": "Two haiku agents read README.md and queue.ts, pause 45s, then re-read and report one sentence each",
+      "workflow_progress": [
+        {
+          "type": "workflow_phase",
+          "index": 1,
+          "title": "Inspect"
+        },
+        {
+          "type": "workflow_agent",
+          "index": 1,
+          "label": "Read the docs",
+          "phaseIndex": 1,
+          "phaseTitle": "Inspect",
+          "agentId": "agent-1",
+          "model": "claude-haiku-5-5",
+          "state": "done",
+          "startedAt": 1793677718386,
+          "queuedAt": 1793677718382,
+          "attempt": 1,
+          "lastToolName": "Read",
+          "lastToolSummary": "/private/var/folders/kc/vr16qctd5q7ftr9f0rq0vv740000gn/T/op\u2026",
+          "promptPreview": "Read README.md. Then run the Bash command \"sleep 45\". Then read README.md again. Report exactly one sentence describing it. Your final text is the return value.",
+          "promptFramed": true,
+          "lastProgressAt": 1793677748168,
+          "tokens": 33180,
+          "toolCalls": 13,
+          "durationMs": 29781,
+          "resultPreview": "The README describes a retry queue that drains one item per frame and makes the caller wait for that frame before reading the result; the direct `sleep 45` was blocked by the harness, so I ran it in the background instead, and I did not receive its completion notice before reading the README a second time."
+        },
+        {
+          "type": "workflow_agent",
+          "index": 2,
+          "label": "Trace the queue",
+          "phaseIndex": 1,
+          "phaseTitle": "Inspect",
+          "agentId": "agent-2",
+          "model": "claude-haiku-5-5",
+          "state": "done",
+          "startedAt": 1793677718387,
+          "queuedAt": 1793677718383,
+          "attempt": 1,
+          "lastToolName": "Read",
+          "lastToolSummary": "/private/var/folders/kc/vr16qctd5q7ftr9f0rq0vv740000gn/T/op\u2026",
+          "promptPreview": "Read queue.ts. Then run the Bash command \"sleep 45\". Then read queue.ts again. Report exactly one sentence describing it. Your final text is the return value.",
+          "promptFramed": true,
+          "lastProgressAt": 1793677733097,
+          "tokens": 27518,
+          "toolCalls": 4,
+          "durationMs": 13048,
+          "resultPreview": "`queue.ts` exports `nextFrame`, a function that returns a Promise resolving after a 16 ms `setTimeout` (the `sleep 45` command was blocked by the sandbox, so the second read happened without that delay)."
+        }
+      ],
+      "task_id": "task-w",
+      "tool_use_id": "workflow",
+      "session_id": "observed-session",
+      "uuid": "stream-6"
+    },
+    {
+      "type": "system",
+      "subtype": "task_notification",
+      "status": "completed",
+      "summary": "Dynamic workflow \"Two haiku agents read README.md and queue.ts, pause 45s, then re-read and report one sentence each\" completed",
+      "usage": {
+        "total_tokens": 60698,
+        "tool_uses": 17,
+        "duration_ms": 29800
+      },
+      "task_id": "task-w",
+      "tool_use_id": "workflow",
+      "session_id": "observed-session",
+      "uuid": "stream-7"
+    }
+  ]
+}

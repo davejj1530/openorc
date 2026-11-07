@@ -2,7 +2,6 @@ import { projects, threads, type Db } from "@openorc/db";
 import { run } from "@openorc/git";
 import type { PrState } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
-import type { ThreadService } from "./threads.js";
 
 /** Snoozes end and PR badges refresh; conversations never complete automatically. */
 export class LifecycleService {
@@ -11,7 +10,6 @@ export class LifecycleService {
 
   constructor(
     private readonly db: Db,
-    private readonly threads: ThreadService,
     private readonly invalidate: (keys: string[]) => void,
     private readonly log: Logger,
   ) {}
@@ -39,7 +37,6 @@ export class LifecycleService {
 
   private wakeSnoozed(): void {
     for (const t of threads.dueFromSnooze(this.db, Date.now())) {
-      if (this.threads.teamQuiescenceReason(t.id)) continue;
       threads.update(this.db, t.id, { snoozedUntil: null });
       this.invalidate(["threads", `thread:${t.id}`]);
     }

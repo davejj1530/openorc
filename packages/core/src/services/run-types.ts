@@ -1,6 +1,7 @@
 import type { AgentLaunchEnvironment, RunHandle } from "@openorc/agents";
-import type { AgentEvent, AgentKind, BackgroundCommand, CorePush, HarnessId, PermissionPreset, Project, Run, RunMode, RunSpec, Task, TeamPermissionState, Thread, Usage } from "@openorc/protocol";
+import type { AgentEvent, AgentKind, BackgroundCommand, CorePush, HarnessId, PermissionPreset, Project, Run, RunMode, RunSpec, Task, Thread, Usage } from "@openorc/protocol";
 import type { AppAction } from "./app-actions.js";
+import type { CloudRunHost } from "./cloud-workspaces.js";
 import type { EnvSnapshot } from "./shell-environment.js";
 import type { WorkspaceLease } from "./workspace-writers.js";
 
@@ -15,8 +16,6 @@ export interface SendOptions {
   role?: "user" | "system";
   attachments?: string[];
   recordPrompt?: boolean;
-  /** A team turn the coordinator reserved. Sends to a team run are refused without one. */
-  teamAttemptId?: string;
   /** Called once the provider has taken the input, with the run and the process's turn index. Throwing closes the process. */
   onAccepted?: (run: Run, processTurn: number) => void;
 }
@@ -92,12 +91,8 @@ export interface StartRunInput {
   systemPromptAppendix?: string;
   /** Captured coordinator attachments can replace live task-document image discovery. */
   collectTaskImages?: boolean;
-  /** Internal coordination identity; never accepted from a renderer/model request. */
-  teamAttemptId?: string;
   /** Internal setup-to-run handoff, never supplied by a renderer or provider. */
   workspaceLease?: WorkspaceLease;
-  /** A team member talking in the conversation: runs beside the thread's other live members in a shared workspace lease. */
-  shared?: { key: string };
   /** The Orcling who speaks in this run; without it, the thread's own Orcling if it has one. */
   orclingId?: string;
 }
@@ -124,8 +119,6 @@ export interface LiveRun {
   internalMcp: NonNullable<RunSpec["internalMcp"]>;
   /** Native permissions remain fixed until resume; OpenOrc can allow requests immediately. */
   providerPermissionMode: PermissionPreset;
-  /** A stricter team request immediately closes the app gate, even if native bypass needs restart. */
-  permissionGate?: PermissionPreset;
   /** The loosest permission the Orcling speaking in this run may have, whatever its conversation allows. */
   orclingCeiling?: PermissionPreset;
   /** App actions the user allowed for the rest of this run. */
@@ -141,6 +134,7 @@ export interface LiveRun {
   busy: boolean;
   /** Background work the agent started, such as a subagent or workflow. It outlives turns and reports back in a turn of its own. */
   background: number;
+  subagentCount?: number;
   /** Commands the agent left running in the background, such as a dev server. They run until they end or are stopped. */
   commands: BackgroundCommand[];
   /** Last advertised native control state, independent of transcript output. */
@@ -152,8 +146,6 @@ export interface LiveRun {
   reply: string | null;
   /** The provider announced its session. Without it, a run that exits early never had one. */
   started: boolean;
-  /** The coordinator owns a team attempt's process lifetime and workspace lease. */
-  team: boolean;
   stderr: string[];
   failed: string | null;
   events: Promise<void>;
@@ -182,13 +174,12 @@ export interface LiveProcessBinding {
   workspaceLease: WorkspaceLease;
   internalMcp: NonNullable<RunSpec["internalMcp"]>;
   providerPermissionMode: PermissionPreset;
-  permissionGate?: PermissionPreset;
   orclingCeiling?: PermissionPreset;
 }
 
 /** A turn in flight, or background work that will report back: the agent is at work. */
 export function working(entry: LiveRun): boolean {
-  return entry.busy || entry.background > 0;
+  return entry.busy || entry.background > 0 || (entry.subagentCount ?? 0) > 0;
 }
 
 /** The agent is at work, or a command it left running in the background still runs. Closing the process would end them. */
@@ -198,13 +189,20 @@ export function occupied(entry: LiveRun): boolean {
 
 export interface PendingApproval {
   runId: string;
+  subagentId?: string;
   taskId: string | null;
   threadId: string | null;
   approvalId: string;
   detail: string;
 }
 
-export type ThreadPermissionState = TeamPermissionState;
+export interface ThreadPermissionState {
+  mode?: { requested: RunMode; effective: RunMode | null; pending: boolean };
+  requested: PermissionPreset;
+  effective: PermissionPreset | null;
+  pendingRestart: boolean;
+  runs: { runId: string; mode: RunMode; requested: PermissionPreset; effective: PermissionPreset; providerPermissionMode: PermissionPreset; pendingRestart: boolean }[];
+}
 export type Notification = Extract<CorePush, { type: "notify" }>;
 
 export interface RunHooks {
@@ -216,10 +214,6 @@ export interface RunHooks {
   onEvent?(event: AgentEvent): void;
   /** The environment a run is admitted with, captured synchronously at admission. Required: there is no other source. */
   environment(): EnvSnapshot;
-  /** Team checkpoints preserve retained inherited paths even after ignore rules change. */
-  captureTeamTree?(runId: string, cwd: string, lease: WorkspaceLease): Promise<string | null>;
-  assertStart?(input: StartRunInput): void;
-  assertSend?(runId: string, teamAttemptId: string | undefined): void;
   taskImages?(spec: string): Promise<string[]>;
   /** A tool output from the ledger with its stored images inlined again. */
   inlineToolImages?(output: unknown): unknown;
@@ -234,6 +228,16 @@ export interface RunHooks {
   threadContext?(thread: Thread): string | null;
   /** Whether a conversation works in a checkout of code the user hasn't vetted, such as a pull request it reviews. */
   untrustedCheckout?(thread: Thread): boolean;
+  /**
+   * Where a run's agent runs, or null when it runs on this Mac; asked for runs without a conversation too, which a
+   * cloud-only host refuses. MCP requests from there reach `mcpOrigin`.
+   */
+  cloudHost?(thread: Thread | null, mcpOrigin: string, run: { agent: string; claudeAccountId?: string | null | undefined }): Promise<CloudRunHost | null>;
+  /**
+   * Brings a cloud conversation's changes to its worktree on the Mac, after sending the worktree's own changes up when
+   * `push` is set; false when nothing changed or it runs on the Mac. Never rejects.
+   */
+  syncCloud?(thread: Thread, options?: { push?: boolean; turnEnded?: boolean }): Promise<boolean>;
   memoryEnabled?(): boolean;
   onRunFinished(run: Run, scope: RunScope, project: Project): void;
   /** Synchronous notification after capture; consumers queue follow-up work instead of awaiting it here. */
@@ -246,8 +250,8 @@ export interface RunHooks {
   notify(n: Omit<Notification, "type">): void;
   /** The installed Claude Code version string, or null when it is missing. */
   claudeVersion(environment?: EnvSnapshot, env?: Readonly<NodeJS.ProcessEnv>): Promise<string | null>;
-  /** How long a thread process may wait idle between turns before it is closed; null keeps it. Read when a turn ends. */
-  idleTimeoutMs?(): number | null;
+  /** How long a thread's process may wait idle between turns before it is closed; null keeps it. Read when a turn ends. */
+  idleTimeoutMs?(thread: Thread | null): number | null;
   /** Whether Claude Code should also connect the user's own MCP servers; each one adds to its start-up time. */
   claudeUserMcpServers?(): boolean;
   orclings?: OrclingRunHooks;

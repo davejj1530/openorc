@@ -172,6 +172,12 @@ it("asks for frames twice as wide once a pinch settles past 1.75 times, and pace
   );
 });
 
+it("paces a cloud host's public route as leanly as a tailnet one", async () => {
+  mac.link = { ...lan, route: { kind: "public", host: "sb-abc.vercel.run", port: 443 } };
+  await watch();
+  await waitFor(() => expect(watches()).toEqual([{ threadId: "t1", width: 780, pace: "tailnet" }]));
+});
+
 it("drops the frame when the page closes, and hears no other thread", async () => {
   mac.answer = () => Promise.resolve(page(1));
   const { result } = await watch();

@@ -1,18 +1,25 @@
-import { ClaudeAccountPicker } from "../components/ClaudeAccountPicker";
-import { ClaudeAccountScope } from "../lib/claude-account";
-import { ExecutionMode, executionMode, executionModeAvailable, executionModeNote, executionModeSettings, executionModePresentation } from "@openorc/protocol";
+import {
+  ExecutionMode,
+  executionMode,
+  executionModeAvailable,
+  executionModeNote,
+  executionModePresentation,
+  executionModeSettings,
+  harnessName,
+  type Schedule,
+  type WorkspaceMode,
+} from "@openorc/protocol";
 import { useState, type ReactNode } from "react";
-import { harnessName, type Schedule, type WorkspaceMode } from "@openorc/protocol";
+import { ClaudeAccountPicker } from "../components/ClaudeAccountPicker";
 import { Plus } from "../components/icons";
 import { ComposerModelPicker, ModelPicker } from "../components/ModelPicker";
 import { PageFilters, PageSearch } from "../components/PageFilters";
 import { TopBar } from "../components/TopBar";
 import { Button, Dialog, Empty, Field, Input, Segmented, Select, Textarea } from "../components/ui";
-import { useLayout } from "../lib/layout";
-import { useOrclings } from "../lib/orclings";
+import { ClaudeAccountScope } from "../lib/claude-account";
 import { useRpc } from "../lib/client";
+import { useLayout } from "../lib/layout";
 import { useScheduleEditor } from "../lib/use-schedule-editor";
-import { pickerTeam } from "../lib/team-settings";
 import { intervalLabel, intervals, ScheduleRow } from "./schedule-row";
 
 function scheduleSubmitLabel(pending: boolean, existing: boolean): string {
@@ -55,7 +62,7 @@ function scheduleListBody(input: {
   );
 }
 
-/** Prompts that start a thread on a timer with a saved model or pinned team. */
+/** Prompts that start a thread on a timer with a saved model. */
 export function Scheduled() {
   const projectId = useLayout((s) => s.projectId);
   const projects = useRpc("projects.list", {});
@@ -63,7 +70,7 @@ export function Scheduled() {
   const [editing, setEditing] = useState<Schedule | "new" | null>(null);
   const [shelf, setShelf] = useState<ScheduleShelf>("active");
   const [query, setQuery] = useState("");
-  const items = list.data ?? [];
+  const items = (list.data ?? []).filter((schedule) => !schedule.retiredTeam);
   const shown = items.filter((schedule) => schedule.enabled === (shelf === "active") && schedule.title.toLowerCase().includes(query.toLowerCase()));
   const canCreate = (projects.data?.length ?? 0) > 0;
   const projectName = (schedule: Schedule) => (projectId ? undefined : projects.data?.find((project) => project.id === schedule.projectId)?.name);
@@ -152,13 +159,12 @@ function ScheduleDialog({
 }) {
   const {
     fields: { claudeAccountId, project, title, prompt, minutes, mode, permission, workspace, worktreeBlocked },
-    target: { usesClaude, selection: target, choice, revision, lead, currentTeam, archived, teamTarget, retainedTeam, pickerTeams, offlineMember, previewReason },
-    resources: { accounts, projects, models, info, teams, availability },
+    target: { usesClaude, selection: target, choice },
+    resources: { accounts, projects },
     status: { pending, conflict, projectIssue, targetIssue, error, permissionReady },
-    actions: { setAccount, setProject, setTitle, setPrompt, setMinutes, setMode, setPermission, setWorkspace, chooseTeam, chooseModel, changeSettings, retryChecks, submit },
+    actions: { setAccount, setProject, setTitle, setPrompt, setMinutes, setMode, setPermission, setWorkspace, chooseModel, changeSettings, submit },
   } = useScheduleEditor(schedule, latest, projectId, onClose);
-  const orclings = useOrclings();
-  const picker = <ModelPicker value={choice} onChange={chooseModel} showEffort={false} teams={pickerTeams} disabled={pending} />;
+  const picker = <ModelPicker value={choice} onChange={chooseModel} showEffort={false} disabled={pending} />;
 
   return (
     <ClaudeAccountScope id={claudeAccountId}>
@@ -215,20 +221,8 @@ function ScheduleDialog({
               </Select>
             </Field>
             <div className="min-w-0 mb-3">
-              <p className="text-sm text-ink-3 mb-1.5">Model or team</p>
-              {choice ? (
-                <ComposerModelPicker
-                  value={choice}
-                  onChange={changeSettings}
-                  onSelectModel={chooseModel}
-                  teams={pickerTeams}
-                  disabled={pending}
-                  settingsDisabled={pending}
-                  {...(revision ? { team: pickerTeam(revision, orclings) } : {})}
-                />
-              ) : (
-                picker
-              )}
+              <p className="text-sm text-ink-3 mb-1.5">Model</p>
+              {choice ? <ComposerModelPicker value={choice} onChange={changeSettings} onSelectModel={chooseModel} disabled={pending} settingsDisabled={pending} /> : picker}
               {target.kind === "legacy" && target.model === null ? <p className="text-xs text-ink-3 mt-1">{harnessName(target.agent)} provider default is saved.</p> : null}
             </div>
             <Field label="Mode">
@@ -249,38 +243,9 @@ function ScheduleDialog({
               </Select>
               <p className="mt-2 text-xs text-ink-3">{executionModeNote(choice?.agent, executionMode(mode, permission))}</p>
             </Field>
-            {!teamTarget ? <ScheduleWorkspaceField value={workspace} worktreeBlocked={worktreeBlocked} disabled={pending} onChange={setWorkspace} /> : null}
+            <ScheduleWorkspaceField value={workspace} worktreeBlocked={worktreeBlocked} disabled={pending} onChange={setWorkspace} />
           </div>
-          {target.kind === "team" ? (
-            <div className="text-xs text-ink-3 mb-3 space-y-2" data-schedule-team={target.target.teamRevisionId}>
-              <p>
-                {revision ? `${revision.name} · Version ${revision.number}.` : "The exact saved team version is kept."}{" "}
-                {lead && choice
-                  ? `${lead.name}: ${choice.model}${choice.effort ? ` · ${choice.effort}` : ""} · ${choice.fastMode ? "Fast" : "Standard"}.`
-                  : "Reload team details to inspect the lead settings."}
-              </p>
-              <p>Each run uses isolated team workspaces. If this schedule’s previous team run still has unfinished work, the next run is skipped.</p>
-              {archived && retainedTeam ? <p>This team is archived. This schedule keeps the saved version it was given.</p> : null}
-              {revision && currentTeam && !archived && currentTeam.revision.id !== revision.id ? (
-                <p>
-                  A newer revision is available.{" "}
-                  <Button size="sm" variant="ghost" disabled={pending} onClick={() => chooseTeam(currentTeam.revision)}>
-                    Use revision {currentTeam.revision.number}
-                  </Button>
-                </p>
-              ) : null}
-              {previewReason ? <p role="status">{previewReason} Runs check availability before starting.</p> : null}
-              {offlineMember ? <p role="status">{offlineMember.name}’s provider or saved model is unavailable. The saved target is kept; readiness is checked when the schedule runs.</p> : null}
-              {teams.error || models.error || info.error || availability.error ? (
-                <p role="status">
-                  Some availability details could not refresh.{" "}
-                  <Button size="sm" variant="ghost" onClick={retryChecks}>
-                    Retry checks
-                  </Button>
-                </p>
-              ) : null}
-            </div>
-          ) : null}
+
           {projectIssue || targetIssue ? (
             <p className="text-sm text-warn mb-3" role="status">
               {projectIssue ?? targetIssue}

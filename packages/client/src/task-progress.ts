@@ -27,7 +27,7 @@ export function taskIdFromTool(block: ToolBlock): string | null {
 
 /** Whether a tool call shows as a live card rather than a step: a task it saved or started, or a thread it started. */
 export function toolShowsCard(block: ToolBlock): boolean {
-  return Boolean(taskIdFromTool(block) ?? startedWorkFromTool(block));
+  return Boolean(block.subagent || taskIdFromTool(block) || startedWorkFromTool(block));
 }
 
 /** The thread an agent started elsewhere with a thread_start tool, and the saved task it took up, if any. */

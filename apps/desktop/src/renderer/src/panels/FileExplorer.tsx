@@ -19,7 +19,6 @@ interface TreeState {
   scope: FileScope;
   expanded: string[];
   selected: string;
-  showIgnored: boolean;
   focused: string;
   focus: (path: string) => void;
   toggle: (path: string) => void;
@@ -90,8 +89,8 @@ function DirectoryChildren({ path, level, tree }: { path: "" | FolderPath; level
         </button>
       </div>
     );
-  const entries = listing.data?.entries.filter((entry) => tree.showIgnored || !entry.ignored || tree.selected === entry.path || tree.selected.startsWith(`${entry.path}/`));
-  if (entries?.length === 0) return <p className="file-tree-notice">{listing.data?.entries.length ? "No visible files" : "Empty folder"}</p>;
+  const entries = listing.data?.entries;
+  if (entries?.length === 0) return <p className="file-tree-notice">Empty folder</p>;
   return entries?.map((entry) => <TreeEntry key={entry.path} entry={entry} level={level} tree={tree} />);
 }
 
@@ -124,7 +123,7 @@ function TreeEntry({ entry, level, tree }: { entry: FileEntry; level: number; tr
         else useLayout.getState().openFile({ path: entry.path, scope: tree.scope });
       }}
     >
-      <div className="file-tree-row" title={entry.path} style={{ paddingLeft: 8 + (level - 1) * 14 }}>
+      <div className={entry.ignored ? "file-tree-row file-tree-ignored" : "file-tree-row"} title={entry.path} style={{ paddingLeft: 8 + (level - 1) * 14 }}>
         {folder ? <ChevronRight size={12} className={expanded ? "rotate-90" : ""} /> : <span className="w-3 shrink-0" />}
         {folder ? <Folder size={14} className="file-tree-folder" /> : <FileGlyph path={entry.path} size={14} />}
         <span className="truncate">{entry.name}</span>
@@ -175,7 +174,6 @@ export function FileExplorer({ scope, directory, selected = "" }: ExplorerProps)
   const root = listing.data?.root ?? directory;
   const path = relativeFilePath(selected, root);
   const expanded = useFileExplorer((state) => state.folders[key]) ?? ROOT_FOLDERS;
-  const showIgnored = useFileExplorer((state) => state.showIgnored);
   const [focused, focus] = useState("");
   const [filter, setFilter] = useState("");
   const input = useRef<HTMLInputElement>(null);
@@ -187,7 +185,6 @@ export function FileExplorer({ scope, directory, selected = "" }: ExplorerProps)
     scope,
     expanded,
     selected: path,
-    showIgnored,
     focused,
     focus,
     toggle: (folder) => {
@@ -197,14 +194,7 @@ export function FileExplorer({ scope, directory, selected = "" }: ExplorerProps)
   };
   return (
     <section aria-label="File explorer" className="file-explorer">
-      <FileExplorerToolbar
-        scope={scope}
-        showIgnored={showIgnored}
-        onShowIgnored={(show) => {
-          useFileExplorer.getState().setShowIgnored(show);
-          focus("");
-        }}
-      />
+      <FileExplorerToolbar scope={scope} />
       <div className="file-explorer-body">
         <div className="file-explorer-filter">
           <Search size={13} />

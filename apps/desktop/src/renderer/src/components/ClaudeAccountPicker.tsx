@@ -1,8 +1,6 @@
 import type { ClaudeAccounts } from "@openorc/protocol";
 import { Select, TextButton } from "./ui";
 import { useRouter } from "../lib/router";
-import { useRpc } from "../lib/client";
-import { useClaudeAccountId } from "../lib/claude-account";
 
 /** The Claude account a run uses. The compact chip drops the visible label; its select keeps the name. */
 export function ClaudeAccountPicker({
@@ -43,16 +41,5 @@ export function ClaudeAccountOptions({ accounts, value }: { accounts: ClaudeAcco
         </option>
       ))}
     </>
-  );
-}
-
-export function ThreadClaudeAccount() {
-  const id = useClaudeAccountId();
-  const { data } = useRpc("claude.accounts.list", {});
-  const account = data?.accounts.find((entry) => entry.id === id);
-  return (
-    <span className="text-sm text-ink-4 truncate max-w-40" title={`Claude account: ${account?.name ?? "Existing CLI login"}`}>
-      {account?.name ?? "Existing CLI login"}
-    </span>
   );
 }

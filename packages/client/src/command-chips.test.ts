@@ -91,8 +91,15 @@ it("gives no count when other steps printed, or when the shell or the search com
   expect(rows(bash(`rg -n 'foo' src`, { output: "a\nb\nShell cwd was reset to /Users/me/dev/gallery" }))).toEqual(["Searched: “foo” · in src · 2 matches"]);
 });
 
-it("opens a shell read's own call, and links a read Codex resolved to its file", () => {
-  expect(callParts(bash("sed -n 70,100p components/Sidebar.tsx"))[0]?.chip?.path).toBeUndefined();
+it("links every read to its file at the lines it printed, where the command ran, and a read Codex resolved as it is", () => {
+  expect(callParts(bash("sed -n 70,100p components/Sidebar.tsx"))[0]?.chip).toMatchObject({ path: "components/Sidebar.tsx", lines: { line: 70, endLine: 100 }, note: "lines 70–100" });
+  expect(callParts(bash("cd /repo/harness && head -30 restart.sh"))[0]?.chip).toMatchObject({ path: "/repo/harness/restart.sh", lines: { line: 1, endLine: 30 } });
+  expect(callParts(bash("tail -n 20 notes.md"))[0]?.chip?.lines).toBeUndefined();
+  const fromCodex: Block = { id: "c0", kind: "tool", name: "shell", input: { command: "/bin/zsh -lc 'cat src/a.ts'", cwd: "/repo/apps" }, done: true, at: 1000 };
+  expect(callParts(fromCodex)[0]?.chip?.path).toBe("/repo/apps/src/a.ts");
+  expect(callParts(bash("cd /repo/build && ls harness"))[0]?.chip).toMatchObject({ kind: "folder", path: "/repo/build/harness" });
+  const read: Block = { id: "r", kind: "tool", name: "Read", input: { file_path: "/repo/a.ts", offset: 395, limit: 16 }, done: true, at: 1000 };
+  expect(callParts(read)[0]?.chip).toMatchObject({ path: "/repo/a.ts", note: "lines 395–410", lines: { line: 395, endLine: 410 } });
   const codex: Block = {
     id: "c1",
     kind: "tool",

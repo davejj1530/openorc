@@ -48,86 +48,6 @@
       "sha256": "1a30952352377c1095549250a2e009ec59b6cc2ab4e35d34036e373a2b02203b"
     },
     {
-      "group": "team-avatars",
-      "path": "apps/desktop/src/renderer/src/assets/team-avatars/avatar-01-facet.png",
-      "sha256": "ba3b954aff2459b46d7bb93091b7bef307492c8535e0964045f780bea5a72772"
-    },
-    {
-      "group": "team-avatars",
-      "path": "apps/desktop/src/renderer/src/assets/team-avatars/avatar-02-ripple.png",
-      "sha256": "ed5186e9fbe3ffe8c43da04afedace9a05226d6e337978430e23d0a7adc672ae"
-    },
-    {
-      "group": "team-avatars",
-      "path": "apps/desktop/src/renderer/src/assets/team-avatars/avatar-03-helix.png",
-      "sha256": "7d21f9c0eba0e9985d27ae309c65aacd49fc40d2ce24d2a8a771ce9542d7fe6a"
-    },
-    {
-      "group": "team-avatars",
-      "path": "apps/website/src/assets/team-avatars/avatar-01-facet.png",
-      "sha256": "ba3b954aff2459b46d7bb93091b7bef307492c8535e0964045f780bea5a72772"
-    },
-    {
-      "group": "team-avatars",
-      "path": "apps/website/src/assets/team-avatars/avatar-02-ripple.png",
-      "sha256": "ed5186e9fbe3ffe8c43da04afedace9a05226d6e337978430e23d0a7adc672ae"
-    },
-    {
-      "group": "team-avatars",
-      "path": "apps/website/src/assets/team-avatars/avatar-03-helix.png",
-      "sha256": "7d21f9c0eba0e9985d27ae309c65aacd49fc40d2ce24d2a8a771ce9542d7fe6a"
-    },
-    {
-      "group": "team-avatars",
-      "path": "apps/website/src/assets/team-avatars/avatar-04-portal.png",
-      "sha256": "135a3ddaf793cc97ae7a6da872241d3487cf5f6709b07dcd9850fc773bbb26db"
-    },
-    {
-      "group": "team-avatars",
-      "path": "apps/desktop/src/renderer/src/assets/team-avatars/avatar-04-portal.png",
-      "sha256": "135a3ddaf793cc97ae7a6da872241d3487cf5f6709b07dcd9850fc773bbb26db"
-    },
-    {
-      "group": "team-avatars",
-      "path": "apps/desktop/src/renderer/src/assets/team-avatars/avatar-05-strata.png",
-      "sha256": "a56d602c8d1594837a7a7550274937f3e38d15244c7546aeead35ccc5f26f750"
-    },
-    {
-      "group": "team-avatars",
-      "path": "apps/desktop/src/renderer/src/assets/team-avatars/avatar-06-knot.png",
-      "sha256": "fc7384d0b89acbe2dfd8a333911c868b29ad38cfe0057f3005782c75c2e03248"
-    },
-    {
-      "group": "team-avatars",
-      "path": "apps/desktop/src/renderer/src/assets/team-avatars/avatar-07-split.png",
-      "sha256": "cc3af7c702c06fdd0b0a54ee416b1a6a16f9db8e31cf09050b8d43c02c1673d6"
-    },
-    {
-      "group": "team-avatars",
-      "path": "apps/desktop/src/renderer/src/assets/team-avatars/avatar-08-bloom.png",
-      "sha256": "956f38958777fa95322401ec805d158c604085a879208e505bdcf49f185a2ddc"
-    },
-    {
-      "group": "team-avatars",
-      "path": "apps/desktop/src/renderer/src/assets/team-avatars/avatar-09-orbit.png",
-      "sha256": "41efc2d47ecc1fb70e82f058d8c21c1cce4f204c8c063fdc9d60e05707d6917e"
-    },
-    {
-      "group": "team-avatars",
-      "path": "apps/desktop/src/renderer/src/assets/team-avatars/avatar-10-fold.png",
-      "sha256": "2f226af5bfedd3d7e1eb0bf7941668198904a784241d7ca82b419929e38628f7"
-    },
-    {
-      "group": "team-avatars",
-      "path": "apps/desktop/src/renderer/src/assets/team-avatars/avatar-11-lens.png",
-      "sha256": "db1639863f3cfb1858fbcb3e8445ec20eef5c91c0e1374bfb6a1d1eaa9625d8d"
-    },
-    {
-      "group": "team-avatars",
-      "path": "apps/desktop/src/renderer/src/assets/team-avatars/avatar-12-axis.png",
-      "sha256": "25a2df7b3be58cb8e6e35f9a1f58a96dceedb0ad476fd1e5d2b80093909e7b55"
-    },
-    {
       "group": "fast-mode",
       "path": "assets/fast-mode/fast-mode-rocket.riv",
       "sha256": "b24421b8dc48c4b13b62ed373045d041b7b1d9fc70a255afb989c8be455d73c4"
@@ -170,17 +90,12 @@
     {
       "group": "readme-product",
       "path": "docs/images/readme/workspace.png",
-      "sha256": "b612c4d6ebef99f2b6949a1ab525c853e3bcbd87c6e1351ec8ff03f61b79fb4d"
-    },
-    {
-      "group": "readme-product",
-      "path": "docs/images/readme/teams.png",
-      "sha256": "f923bc5ddc374e807cf8cc73601f2b6321bfcdcdb301f030df86ee03bdc19738"
+      "sha256": "4112d040bc868aa3dff2ed0636016a8ac2d48d02b36654c96b4a6ac5077dda4a"
     },
     {
       "group": "readme-product",
       "path": "docs/images/readme/discussion.png",
-      "sha256": "83ac7103b586b6a5000de26d999ae0ac3bd073305180e0eccca0343085902dc0"
+      "sha256": "119791071feeafaa166cd05840ed7a7d8f22e93e0b54c74464b58e2b2cd8b779"
     },
     {
       "group": "project-stack-logos",

@@ -1,13 +1,24 @@
 import type { ClientState } from "@openorc/client";
+import type { CloudProvider } from "@openorc/protocol";
 import { useEffect, useSyncExternalStore } from "react";
 
+/** Where a new thread runs: on the Mac, as threads started there do, or in a sandbox of its own. */
+export type ThreadPlace = "mac" | "cloud";
+
 /**
- * What the model, mode and account sheets read and change: an open thread's settings, or a new thread's choices. Only a
- * new thread has `claudeAccount`: a thread keeps the account it started on.
+ * What the model, mode, account and place sheets read and change: an open thread's settings, or a new thread's
+ * choices. `claudeAccount` is there for a new thread and for an open Claude thread, which can go on with another
+ * account between turns. Only a new thread has `place`, while the Mac offers cloud threads and the chosen agent runs there.
  */
 export type ComposerSettings = Pick<ReturnType<ClientState["useConversationSettings"]>, "choice" | "mode" | "permission" | "selectModel" | "selectExecutionMode"> & {
-  /** The account chosen here, undefined until one is: then the Mac's default runs. */
-  claudeAccount?: { chosen: string | undefined; select: (id: string) => void };
+  /** An existing thread's account, used for its model capabilities without offering an account change. */
+  claudeAccountId?: string;
+  /**
+   * The account chosen here, undefined until one is: then the Mac's default runs. `held` says why it cannot change
+   * now, and `failed` why the last change did not go through.
+   */
+  claudeAccount?: { chosen: string | undefined; select: (id: string) => void; held?: string | null; failed?: string | null };
+  place?: { chosen: ThreadPlace; provider: CloudProvider; select: (place: ThreadPlace) => void };
 };
 
 /**

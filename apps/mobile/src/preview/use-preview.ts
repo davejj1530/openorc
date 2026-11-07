@@ -5,6 +5,7 @@ import { AppState, useWindowDimensions } from "react-native";
 import { fromByteArray } from "react-native-quick-base64";
 import { link, useLinkState } from "../client";
 import { DROPPED } from "../connection/link-connection";
+import type { LinkRoute } from "../connection/manager";
 import { timeConvert } from "./preview-perf";
 
 /** A frame the phone holds, in memory only, and the tab it shows. */
@@ -119,6 +120,9 @@ class FrameFetcher {
   }
 }
 
+// The demo's frames come from inside the app, as fast as the same network's.
+const routePace: Record<LinkRoute["kind"], PreviewPace> = { lan: "lan", demo: "lan", tailnet: "tailnet", public: "tailnet" };
+
 /**
  * A thread's Preview as the Mac shows it, watched while the screen is in front, the app is active and the link is up,
  * and again on every new session. Frames are never cached: the screen holds the newest in memory and drops it on blur
@@ -129,8 +133,7 @@ export function usePreview(threadId: string) {
   const active = useForeground();
   const linkState = useLinkState();
   const serial = linkState.kind === "connected" ? linkState.serial : null;
-  // The demo's frames come from inside the app, as fast as the same network's.
-  const pace: PreviewPace = linkState.kind === "connected" && linkState.route.kind === "tailnet" ? "tailnet" : "lan";
+  const pace: PreviewPace = linkState.kind === "connected" ? routePace[linkState.route.kind] : "lan";
   const { width: points } = useWindowDimensions();
   const [deep, setDeep] = useState(false);
   const width = watchWidth(points, deep);

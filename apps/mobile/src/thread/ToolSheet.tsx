@@ -1,10 +1,11 @@
 import { liveVerb, stateLabel, toolCallPresentation, toolInputView, toolOutputView, toolResult, type InputView, type OutputView } from "@openorc/client";
 import { TOOL_IMAGE_URL } from "@openorc/protocol";
 import { router, useLocalSearchParams } from "expo-router";
-import { memo, useMemo, useState, type ReactNode } from "react";
+import { memo, useContext, useMemo, useState, type ReactNode } from "react";
 import { ScrollView, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { link, useLinkRead, useRun } from "../client";
+import { hostLink, useLinkRead, useRun } from "../client";
+import { HostContext } from "../connection/host-context";
 import type { LinkRead } from "../connection/link-hooks";
 import { Mono } from "../ui/Mono";
 import { Spinner } from "../ui/Spinner";
@@ -14,12 +15,16 @@ import { matchLines } from "./mono-lines";
 import { createSheetWindow, SheetWindowContext } from "./sheet-window";
 import { toolIcons, toolState, type ToolBlock } from "./tools";
 
-/** Reads a call's output from the ledger; `key` names the run and the call. */
-const readToolOutput = (key: string) => link.connection.call("events.toolOutput", JSON.parse(key) as { runId: string; toolCallId: string });
+/** Reads a call's output from its host's ledger; `key` names the host, the run and the call. */
+const readToolOutput = (key: string) => {
+  const { host, ...call } = JSON.parse(key) as { host: string | null; runId: string; toolCallId: string };
+  return hostLink(host).connection.call("events.toolOutput", call);
+};
 
 /** A page leaves large outputs out; the sheet reads the call's output from the ledger when it opens. */
 function useToolOutput(block: ToolBlock | undefined): { output: unknown; state: LinkRead<unknown>["state"] } {
-  const omitted = block?.outputOmitted && block.runId ? JSON.stringify({ runId: block.runId, toolCallId: block.id }) : null;
+  const host = useContext(HostContext);
+  const omitted = block?.outputOmitted && block.runId ? JSON.stringify({ host, runId: block.runId, toolCallId: block.id }) : null;
   const read = useLinkRead(omitted, readToolOutput);
   if (!omitted) return { output: block?.output, state: "ready" };
   return { output: read.state === "ready" ? (read.value.output ?? undefined) : undefined, state: read.state };

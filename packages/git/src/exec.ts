@@ -38,6 +38,17 @@ export interface ExecResult {
 /** Keeps Git from running any hook. */
 export const WITHOUT_HOOKS = ["-c", "core.hooksPath=/dev/null"];
 
+let signIn: () => Record<string, string> = () => ({});
+
+/**
+ * What every git and gh this process runs gets beside its own environment, asked at each run: the cloud brain's GitHub
+ * sign-in. It stays out of process.env, so no other program the process starts inherits it, and it goes the moment
+ * `environment` stops naming it.
+ */
+export function useGitHubSignIn(environment: () => Record<string, string>): void {
+  signIn = environment;
+}
+
 /** Runs the user's own git. Nothing here reads credentials, and no hook runs unless `hooks` asks for them. */
 export function git(cwd: string, args: string[], options: ExecOptions = {}): Promise<ExecResult> {
   return execute("git", cwd, args, options, options.hooks ? [] : WITHOUT_HOOKS);
@@ -58,7 +69,7 @@ function execute(bin: string, cwd: string, args: string[], options: ExecOptions,
         cwd,
         timeout: options.timeoutMs ?? 60_000,
         maxBuffer: options.maxBuffer ?? 64 * 1024 * 1024,
-        env: { ...process.env, GIT_TERMINAL_PROMPT: "0", LC_ALL: "C", ...options.env },
+        env: { ...process.env, GIT_TERMINAL_PROMPT: "0", LC_ALL: "C", ...(bin === "git" || bin === "gh" ? signIn() : {}), ...options.env },
       },
       (error, stdout, stderr) => {
         const code = commandExitCode(error);

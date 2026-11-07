@@ -7,13 +7,15 @@ export type TaskTab = "chat" | "spec" | "files" | "commits" | "memory";
 export type MessageTarget = { runId: string; turn: number; messageId: string };
 
 /** The sections Settings is divided into, in the order it lists them. */
-export const SETTINGS_SECTIONS = ["usage", "connections", "slack", "phone", "skills", "devices", "appearance", "general", "memory", "data"] as const;
+export const SETTINGS_SECTIONS = ["usage", "connections", "cloud", "slack", "phone", "skills", "devices", "appearance", "general", "memory", "data"] as const;
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
 const settingsSections: ReadonlySet<string> = new Set<SettingsSection>(SETTINGS_SECTIONS);
 
 export type Route =
   | { view: "onboarding"; mode?: "first_run" | "recovery"; preview?: boolean }
   | { view: "newthread"; projectId?: string }
+  /** A new thread under `parentId`, working in its folder. */
+  | { view: "newsubthread"; parentId: string }
   | { view: "newtask"; projectId?: string; threadId?: string }
   /** A conversation, optionally with a message to bring into view there, such as a search result. */
   | { view: "thread"; threadId: string; message?: MessageTarget }
@@ -25,11 +27,10 @@ export type Route =
   | { view: "task"; taskId: string; tab: TaskTab; message?: MessageTarget }
   | { view: "memory" }
   | { view: "scheduled" }
-  | { view: "orchestration"; projectId?: string; teamId?: string }
   /** The Orcling designer: a new Orcling, or one being changed. */
   | { view: "orcling"; orclingId?: string }
-  /** A section, optionally with what to bring into view there: a provider's usage, or team execution. */
-  | { view: "settings"; section?: SettingsSection; provider?: "codex" | "claude"; setting?: "team-execution" }
+  /** A section, optionally with what to bring into view there: a provider's usage, or a project to add to the cloud brain. */
+  | { view: "settings"; section?: SettingsSection; provider?: "codex" | "claude"; project?: string }
   | { view: "diagnostics" };
 
 interface RouterState {
@@ -138,6 +139,13 @@ function isPlainView(view: string | undefined): view is PlainView {
   return view !== undefined && plainViews.has(view);
 }
 
+/** Screens a spec names by one id. */
+const idViews: Readonly<Record<string, (id: string) => Route>> = {
+  thread: (threadId) => ({ view: "thread", threadId }),
+  project: (projectId) => ({ view: "project", projectId }),
+  newsubthread: (parentId) => ({ view: "newsubthread", parentId }),
+};
+
 /** "thread:<id>", "task:<id>:<tab>", "pull:<project>:<number>", or a plain screen name, as windows and autorun pass them. */
 export function routeFromSpec(spec: string): Route | null {
   const [view, id, tab] = spec.split(":");
@@ -147,7 +155,7 @@ export function routeFromSpec(spec: string): Route | null {
       ...(id === "recovery" ? { mode: "recovery" as const } : {}),
       ...(id === "preview" || tab === "preview" ? { preview: true } : {}),
     };
-  if (view === "thread" && id) return { view: "thread", threadId: id };
+  if (view && id && Object.hasOwn(idViews, view)) return idViews[view]!(id);
   if (view === "newtask") return { view: "newtask", ...(id ? { projectId: id } : {}) };
   if (view === "task" && id)
     return {
@@ -155,14 +163,8 @@ export function routeFromSpec(spec: string): Route | null {
       taskId: id,
       tab: (tab as TaskTab | undefined) ?? "spec",
     };
-  if (view === "project" && id) return { view: "project", projectId: id };
   if (view === "pull" && id && Number(tab) > 0) return { view: "pull", projectId: id, number: Number(tab) };
-  if (view === "orchestration")
-    return {
-      view,
-      ...(id ? { projectId: id } : {}),
-      ...(tab ? { teamId: tab } : {}),
-    };
+
   if (view === "settings") return settingsFromSpec(id, tab);
   if (isPlainView(view)) return { view };
   return null;
@@ -172,16 +174,16 @@ function isSettingsSection(value: string | undefined): value is SettingsSection 
   return value !== undefined && settingsSections.has(value);
 }
 
-/** "settings:<section>", with a provider after usage or a setting after general. */
+/** "settings:<section>", with a provider after usage or a project after cloud. */
 function settingsFromSpec(section: string | undefined, detail: string | undefined): Route {
   if (!isSettingsSection(section)) return { view: "settings" };
   if (section === "usage" && (detail === "codex" || detail === "claude")) return { view: "settings", section, provider: detail };
-  if (section === "general" && detail === "team-execution") return { view: "settings", section, setting: detail };
+  if (section === "cloud" && detail) return { view: "settings", section, project: detail };
   return { view: "settings", section };
 }
 
 function settingsSpec(route: Extract<Route, { view: "settings" }>): string {
-  return route.section ? ["settings", route.section, route.provider ?? route.setting].filter(Boolean).join(":") : "settings";
+  return route.section ? ["settings", route.section, route.provider ?? route.project].filter(Boolean).join(":") : "settings";
 }
 
 function onboardingSpec(route: Extract<Route, { view: "onboarding" }>): string {
@@ -204,11 +206,15 @@ export function specFromRoute(route: Route): string {
       return `pull:${route.projectId}:${route.number}`;
     case "newtask":
       return `newtask${route.projectId ? `:${route.projectId}` : ""}`;
-    case "orchestration":
-      return `orchestration${route.projectId ? `:${route.projectId}${route.teamId ? `:${route.teamId}` : ""}` : ""}`;
+    case "newsubthread":
+      return `newsubthread:${route.parentId}`;
     default:
       return route.view;
   }
+}
+
+export function newSubthread(parentId: string): void {
+  useRouter.getState().navigate({ view: "newsubthread", parentId });
 }
 
 export function newThread(projectId?: string): void {

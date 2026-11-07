@@ -4,7 +4,7 @@ import { text } from "../generated/tokens";
 
 // The desktop's type steps (md, prose, title-sm...) and the phone's own (global.css) are font sizes; without them
 // tailwind-merge reads text-title-sm as a color and drops it next to text-ink.
-const merge = extendTailwindMerge({ extend: { theme: { text: [...Object.keys(text), "wordmark"] } } });
+const merge = extendTailwindMerge({ extend: { theme: { text: [...Object.keys(text), "wordmark", "detail"] } } });
 
 export function cn(...inputs: ClassValue[]): string {
   return merge(clsx(inputs));

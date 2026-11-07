@@ -82,7 +82,7 @@ The openorc MCP server also offers memory_search, task_context, and memory_recor
     <h2 id="edit">Edit them in OpenOrc</h2>
     <ol class="docs-steps">
       <li>Open a conversation and press <kbd>⌘J</kbd> to show the side panel.</li>
-      <li>Click <strong>+</strong> next to the panel's tabs and choose <strong>Instructions</strong>.</li>
+      <li>Click <strong>New tab</strong> (+) and choose <strong>Instructions</strong>.</li>
       <li>Pick a file at the top of the tab, edit it, and click <strong>Save</strong> or press <kbd>⌘S</kbd>.</li>
     </ol>
     <p>The tab lists the files the conversation's current agent reads in the folder it works in:</p>
@@ -166,6 +166,10 @@ The openorc MCP server also offers memory_search, task_context, and memory_recor
     <ul>
       <li>An Orcling's profile, instructions, and memory come first when an Orcling works in the conversation.</li>
       <li>Instructions for the <a href={docHref("browser")}>Preview</a> come before the brief.</li>
+      <li>
+        So do instructions for the <code>visualize</code> tool, which draws a diagram, chart, or small interactive explanation in the conversation, and for showing an image: to let you see one, the agent puts it in its reply as a Markdown
+        image with the file's full path.
+      </li>
       <li>Review instructions follow the first line in a conversation that reviews a pull request.</li>
       <li>
         A recap of the conversation, with your last few requests and the previous agent's last reply, follows the brief when a conversation with earlier turns starts a fresh session. That happens, for example, when you switch to
@@ -173,7 +177,7 @@ The openorc MCP server also offers memory_search, task_context, and memory_recor
       </li>
       <li>In Plan mode, Claude Code and OpenCode get a note on how to hand over their plan.</li>
     </ul>
-    <p>Team assignments get a brief written for their task and the team's rules. A model answering a task discussion gets a short note that the discussion is read-only.</p>
+    <p>A model answering a task discussion gets a short note that the discussion is read-only.</p>
   </section>
 
   <section aria-labelledby="delivery">

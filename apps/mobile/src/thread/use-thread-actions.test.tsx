@@ -11,19 +11,37 @@ import { threadMenu, threadSwipes, type ThreadAction } from "./thread-actions";
 import { useThreadActions } from "./use-thread-actions";
 
 vi.mock("expo-router", () => ({ router: { push: vi.fn() } }));
-const mac = vi.hoisted(() => ({ phone: null as FakeMac | null, updates: [] as RpcParams<"threads.update">[], refuse: null as string | null }));
+const mac = vi.hoisted(() => ({
+  phone: null as FakeMac | null,
+  updates: [] as RpcParams<"threads.update">[],
+  refuse: null as string | null,
+  moves: [] as { host: string | null; method: string; params: unknown }[],
+  asked: null as string | null,
+}));
 vi.mock("../client", async () => {
   const { fakeMac } = await import("../test-fixtures/fake-mac");
   mac.phone = fakeMac((method: RpcMethod, params) => {
+    if (method.startsWith("cloud.")) {
+      mac.moves.push({ host: mac.asked, method, params });
+      return mac.refuse ? Promise.reject(new Error(mac.refuse)) : Promise.resolve(null);
+    }
     if (method !== "threads.update") return Promise.resolve(null);
     mac.updates.push(params as RpcParams<"threads.update">);
     return mac.refuse ? Promise.reject(new Error(mac.refuse)) : Promise.resolve(null);
   });
-  return mac.phone.module;
+  const { hostLink } = mac.phone.module;
+  return {
+    ...mac.phone.module,
+    hostLink: (host: string | null) => {
+      mac.asked = host;
+      return hostLink();
+    },
+  };
 });
 
 beforeEach(() => {
   mac.updates.length = 0;
+  mac.moves.length = 0;
   mac.refuse = null;
   alerts.length = 0;
   opened.length = 0;
@@ -32,6 +50,8 @@ beforeEach(() => {
 afterEach(cleanup);
 
 const plan = fixtureThreads.find((thread) => thread.id === "t-plan")!;
+/** The fixtures' own clock, so their threads are as recent as they were written. */
+const fixtureNow = Date.UTC(2026, 9, 23, 12);
 const settings = fixtureThreads.find((thread) => thread.id === "t-settings")!;
 const find = (sections: ThreadAction[][], label: string) => sections.flat().find((action) => action.label === label)!;
 const snoozeItem = (sections: ThreadAction[][], label: string) => {
@@ -42,8 +62,8 @@ const snoozeItem = (sections: ThreadAction[][], label: string) => {
 it("sends each menu change to the Mac as the thread's patch", async () => {
   const onUnread = vi.fn();
   const { result } = renderHook(() => useThreadActions(plan, { onUnread }), { wrapper: mac.phone!.wrapper });
-  const menu = threadMenu(plan, "header", new Date());
-  for (const label of ["Pin", "Archive", "Mark as Unread"]) act(() => result.current.run(find(menu, label)));
+  const menu = threadMenu(plan, "header", new Date(fixtureNow));
+  for (const label of ["Pin", "Resolve", "Mark as Unread"]) act(() => result.current.run(find(menu, label)));
   act(() => result.current.run(snoozeItem(menu, "In 1 hour")));
   await waitFor(() => expect(mac.updates).toHaveLength(4));
   expect(mac.updates.map((update) => update.patch)).toEqual([{ pinned: true }, { archived: true }, { seen: false }, { snoozedUntil: expect.any(Number) }]);
@@ -116,17 +136,31 @@ it("opens the thread's Changes and Preview from the header's menu", () => {
   expect(mac.updates).toEqual([]);
 });
 
+it("asks the group's Mac to bring a cloud brain thread home, and says why when it cannot", async () => {
+  const onBrain = { ...settings, activity: "idle" as const };
+  const { result } = renderHook(() => useThreadActions(onBrain), { wrapper: mac.phone!.wrapper });
+  const bring = find(threadMenu(onBrain, "header", new Date(), { uncommitted: null, preview: null, moves: { mac: "mac-1", onBrain: true } }), "Bring to Mac");
+  act(() => result.current.run(bring));
+  await waitFor(() => expect(mac.moves).toEqual([{ host: "mac-1", method: "cloud.bringToMac", params: { threadId: "t-settings" } }]));
+  mac.refuse = "This conversation is already moving.";
+  act(() => result.current.run(bring));
+  await waitFor(() => expect(alerts.at(-1)).toMatchObject({ title: "Couldn’t move this thread", message: "This conversation is already moving." }));
+  expect(mac.updates).toEqual([]);
+});
+
 it("says why when the Mac refuses a change", async () => {
   mac.refuse = "The team is still working.";
   const { result } = renderHook(() => useThreadActions(plan), { wrapper: mac.phone!.wrapper });
-  act(() => result.current.save(threadSwipes(plan).trailing!.patch));
+  act(() => result.current.save(threadSwipes(plan, fixtureNow).trailing!.patch));
   await waitFor(() => expect(alerts).toHaveLength(1));
   expect(alerts[0]).toMatchObject({ title: "Couldn’t change this thread", message: "The team is still working." });
 });
 
-it("swipes mark read or unread and archive, and leave a team thread's archive to the Mac", () => {
-  expect(threadSwipes(plan)).toEqual({ leading: { label: "Unread", patch: { seen: false } }, trailing: { label: "Archive", patch: { archived: true } } });
+it("swipes mark read or unread and resolve or reopen, and leave a team thread's to the Mac", () => {
+  expect(threadSwipes(plan, fixtureNow)).toEqual({ leading: { label: "Unread", patch: { seen: false } }, trailing: { label: "Resolve", patch: { archived: true } } });
+  // Quiet for over a week, a thread is resolved by its age.
+  expect(threadSwipes(plan, fixtureNow + 10 * 86_400_000).trailing).toEqual({ label: "Reopen", patch: { archived: false } });
   const slack = fixtureThreads.find((thread) => thread.id === "t-slack")!;
-  expect(threadSwipes({ ...slack, archivedAt: 1 })).toEqual({ leading: { label: "Read", patch: { seen: true } }, trailing: { label: "Unarchive", patch: { archived: false } } });
+  expect(threadSwipes({ ...slack, archivedAt: 1 }, fixtureNow)).toEqual({ leading: { label: "Read", patch: { seen: true } }, trailing: { label: "Reopen", patch: { archived: false } } });
   expect(threadSwipes({ ...plan, teamInstanceId: "team" }).trailing).toBeNull();
 });

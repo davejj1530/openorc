@@ -86,7 +86,6 @@ rounded:
   pill: "999px"
 spacing:
   chrome: "44px"
-  panel-margin: "8px"
   reading-gutter: "32px"
   composer-gutter: "24px"
   narrow-gutter: "12px"
@@ -160,7 +159,6 @@ components:
     size: "32px"
   work-panel:
     backgroundColor: "{colors.plane-light}"
-    rounded: "{rounded.3xl}"
   settings-card:
     backgroundColor: "{colors.tile-light}"
     rounded: "{rounded.2xl}"
@@ -219,11 +217,11 @@ The window has one navigation column, a conversation or destination, and an opti
 
 The conversation column is at most 800px with 32px reading gutters; the composer uses 24px. Both shrink to 12px at 520px and below and in narrow panes. Each column owns its scrolling. Split conversations keep their own header and panel ownership.
 
-The sidebar paints nothing and has no seam. Its header holds Inbox (with its count), Search, and the sidebar toggle as 32px round buttons by the window controls. New thread, Tasks, Schedules, and More sit above the Threads/Orclings track; Add project and a round Settings button sit in the footer. While Settings is open, the sidebar lists its sections under Back to app.
+The sidebar paints nothing; a hairline in `--line` runs the window's full height between it and the work column, and goes while the sidebar floats at 900px and narrower. Its header leads with the OpenOrc wordmark, after the traffic lights where the OS draws them, then Inbox (with its count) and the sidebar toggle as 32px round buttons. Under it, the list head holds Search, then the filter and New thread (or New Orcling) as 32px round buttons at the row's end. The footer is one row: the usage chip, then a dock of 32px round buttons kept together at the row's end: Tasks, Pull requests, Schedules, and Orclings, with Settings last. Memory is reached from the right panel and the palette. While Settings is open, the sidebar lists its sections under Back to app.
 
 Responsive rules:
 
-- At 900px and narrower, the sidebar floats over the page as an opaque tile with `--shadow-overlay`, the only shadow left. Opening a destination dismisses it; switching Threads/Orclings keeps it open.
+- At 900px and narrower, the sidebar floats over the page as an opaque tile with `--shadow-overlay`, the only shadow left. Opening a destination dismisses it; switching between Threads and Orclings keeps it open.
 - At work-row widths of 788px or less, an open panel overlays the work area.
 - New thread centers a 640px column; its composer bar wraps when the column narrows.
 
@@ -245,7 +243,7 @@ Corner radius is set per component:
 - 14: the browser viewport.
 - 16: drop menus, command, schedule, and toast cards, code blocks.
 - 18: popovers, the inbox, the palette, prompt bubbles, permission, task, and MCP cards, settings cards.
-- 20: the work panel, sheets, dialogs, grown menus (model, branch, context, slash), steps and question cards, the conversation composer.
+- 20: sheets, dialogs, grown menus (model, branch, context, slash), steps and question cards, the conversation composer.
 - 22: the commit sheet and usage account cards.
 - 24: the New thread composer.
 - Full: buttons, chips, tracks, and send.
@@ -268,7 +266,7 @@ Menus are r16 with 36px r10 rows, muted glyphs, and hairline separators. Grown m
 
 ### Sidebar
 
-Threads/Orclings is a segmented track at natural width. A round search button grows into a capsule over the tabs, and the list's tool (filter, or New Orcling) follows it. More opens inline; Edit sidebar shows every screen with an eye switch. Project headings are 34px with a faint folder that opens while its threads show, and a faint meta ("Needs you", "2 running", "12 threads") that swaps with the plus on hover. Thread rows are 34px with muted titles; the open row takes `--current-row-fill` and `--navigation-ink`. A 16px status lead shows a question for needs you, a spinner, a failure, a 7px attention dot for unread, or the pull request mark. Running threads keep their faint second line.
+The wordmark is a 16px cube and "OpenOrc" in ink at 15px in Immaculate Gothic, whatever the interface font. It sits right after the traffic lights; where there are none (fullscreen, Windows) its cube's visible edge is on the project icons' line. It never truncates: short of room the name wraps onto a line the box clips, and the cube stays. The list head's Search is a pill with the glyph in the status column and the word where titles start; it opens the palette, the app's one search, which also finds Orclings. The list's tools (filter and New thread, or New Orcling) sit at the row's other end. The filter button wears the funnel, or a pin for pinned threads; the cube belongs to the wordmark and agent presence only. The footer dock reaches every screen in one row; the current one sits on a knob that slides between buttons, and Orclings is a toggle that swaps the list between project threads and Orclings. Open tasks and switched-on schedules appear in their buttons' names. The usage chip reports on the open thread's account, or off a thread on the agent and account the new-thread composer has chosen (its saved draft before the composer has opened). It is 32px tall like the dock's buttons, and the row never wraps: the chip measures its looks and takes the fullest that fits, ring, share and "left", then ring and share, then the ring alone as a 32px round button. It opens a table of every account: the 5-hour and weekly share left with their resets, the thread's account first on the current-row fill, hairlines between the rest. Threads are one list across every project, newest work first: Pinned leads (under the pinned filter, every pin), then Recent (the last three hours, across midnight) and Today open and Yesterday folded, an empty one hidden, each under a 28px heading in the titles' column whose chevron follows the word. A folded day still shows the open thread and the threads that need you (unread, waiting on you, or with an agent on them), which come from their own read so one past the loaded pages still shows. The list reads further pages by itself until an open day is whole. Resolved sits at the list's foot right above the dock, with no rule: threads put there, and every thread quiet since before yesterday that no pin or snooze keeps out. Its heading is a quiet row, "Resolved" in the day headings' ink with the host's count and a chevron at its end (it still holds the open thread when that one is resolved). Open, it rises over the list to its rows' height, at most 62% of the column, its rows arriving a stagger step apart, and folds with them; it pages on request. While a thread it would take is dragged, the heading grows to 44px and draws a dashed ring with a check in place of the chevron; held over it, the ring turns solid accent on the current-row fill and the count rolls one up. Dropping a resolved row on the list reopens it, the list ringed while it is held there. Resolve and Reopen are in the thread menu and on ⇧⌘A. A reopen counts as activity, so the thread comes back at the top, and a message to a resolved thread reopens it. The filter menu offers All threads and Pinned threads. Thread rows have muted titles. Every row's mark sits in one column at the end of the line under the title, under a parent's chevron: a spinner while an agent works, a question for needs you, a failure, a 7px attention dot for unread. While an agent works the title lights up left to right; there is a faint second line while it runs (only a call for you takes color), then the project's 14px icon, at 60% until the row is hovered or open, and name with its pull request at the end: its own icon for open, merged and closed, faint, green or red, then the number. The open row takes `--current-row-fill` and `--navigation-ink`. A parent's chevron sits at the end of its title line, pointing down while its sub threads are folded and up while they show; its hairline branch leaves from under the project icon, and sub threads step in 24px with their marks ahead of their titles. The new thread's question names its project, and the name opens every project with its icon chooser, removal on right-click, a filter from eight projects, and Add project.
 
 ### Conversation
 
@@ -280,17 +278,17 @@ User prompts are r18 plane bubbles, aligned right, capped at 88% of the column o
 
 The conversation composer is one r20 surface on `--composer-input` with no inner well. One bar holds attach, the project or destination chip, model, and mode on the left, and activity, the context ring, and send on the right. Send, Queue, and Stop are layers of one 32px ink pill. The mode pill grows a small menu of the levels the agent offers; it does not step. Clicking the context ring opens its details; only Compact compacts. Below, one footer shows the working folder on the left and the branch chip and the Commit chip (Commit plus its +N −M totals) on the right. Queued messages stack as a pile that fans out on click.
 
-New thread keeps the tile ground. Its toolbar holds only the panel toggle; the 28/34 question is the page title; the r24 white composer has a 15/24 prompt and a 34px send. The location sentence (Local checkout or Worktree) sits under it, starter pills below for an empty project draft, then "Pick up where you left off" rows.
+New thread keeps the tile ground. Its toolbar holds only the panel toggle, which shows and hides the panel; the 28/34 question is the page title; when the checkout has changes, the Commit chip sits right over the composer on its left edge; the r24 white composer has a 15/24 prompt and a 34px send. The location sentence (Local checkout or Worktree) sits under it with the Claude account at the row's end, starter pills below for an empty project draft, then "Pick up where you left off" rows.
 
 ### Work panel
 
-The panel is one r20 plane card with an 8px margin on the tile, holding a 52px header and the open tab's page. Tabs sit on a fill track at natural width with a sliding knob; a tab's glyph becomes its close button on hover. Changes is always the first tab. The round plus opens the New tab page with tool and recent page rows. Each tool page starts with a 48px bar (title, faint meta, actions); Commit is that page's ink pill and grows into the r22 commit sheet. Diffs have 40px r12 fill file heads, 22px rows of 12px mono, `--ok` and `--bad` runs on soft fills with r6 ends, and no syntax colors. Web pages get a 44px bar with their own Back/Forward, an address pill, and an r14 inset viewport.
+The panel is one opaque plane from the window's top edge to its bottom, beside the conversation's tile, with no margin, card, or seam between its header and the open tab's page. The header shares the 44px chrome line. Tabs are plain labels at natural width, faint at rest and full ink when open, with no track or knob; a tab's glyph becomes its close button on hover. The plus, expand, and hide are bare round buttons. Changes is always the first tab. The round plus opens the New tab page with tool and recent page rows. Each tool page starts with a 48px bar (title, faint meta, actions); Commit is that page's ink pill and grows into the r22 commit sheet. Diffs have 40px r12 fill file heads, 22px rows of 12px mono, `--ok` and `--bad` runs on soft fills with r6 ends, and no syntax colors. Web pages get a 44px bar with their own Back/Forward, an address pill, and an r14 inset viewport.
 
 ### Pages, tasks, and settings
 
-Tasks, Pull requests, Schedules, Teams, and Memory share one header: the toolbar holds the page name, a round search that grows into a field, a filter menu, and the page's lg secondary create pill. Lists group under quiet headings (13px name, faint count, chevron on hover) in a 1120px column. Task rows are 44px r12, bare, with a fill hover, title in ink (muted for backlog and proposed), and a priority glyph in a fixed trailing slot. Schedules are r16 plane cards with a switch for Pause/Resume. The Inbox page keeps its route with 52px rows.
+Tasks, Pull requests, Schedules, and Memory share one header: the toolbar holds the page name, a round search that grows into a field, a filter menu, and the page's lg secondary create pill. Lists group under quiet headings (13px name, faint count, chevron on hover) in a 1120px column. Task rows are 44px r12, bare, with a fill hover, title in ink (muted for backlog and proposed), and a priority glyph in a fixed trailing slot. Schedules are r16 plane cards with a switch for Pause/Resume. The Inbox page keeps its route with 52px rows.
 
-Settings is an r20 plane sheet beside the sidebar, which lists its sections. Each page has a 28/34 title and one faint line of context in a left-aligned 860px column. Groups and cards are tile cards on the sheet (r18, 20px inset), with hairlines between rows. Usage is a grid of r22 account cards; each limit is a 48px ring with the share used as a stat numeral, the label muted and the reset faint. Appearance tiles are fill-only with a navigation ring on the current choice.
+Settings is a plane sheet beside the sidebar, which lists its sections. Like the work panel, it runs flush to the window edges with its toolbar inside it. Each page has a 28/34 title and one faint line of context in a left-aligned 860px column. Groups and cards are tile cards on the sheet (r18, 20px inset), with hairlines between rows. Usage is a grid of r22 account cards; each limit is a 48px ring with the share used as a stat numeral, the label muted and the reset faint. Appearance tiles are fill-only with a navigation ring on the current choice.
 
 **The Save Feedback Rule.** Announce actual saves and errors in place (Save becomes Saved with a check); leave the idle state empty.
 

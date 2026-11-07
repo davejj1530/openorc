@@ -55,10 +55,11 @@ it("keeps different task IDs with the same title visible", () => {
 it("keeps failed task actions available in the work history", () => {
   render(<WorkTranscript runId="run" blocks={[created, { ...started, isError: true, status: "error", output: "Could not start task" }]} live />);
   expect(screen.getAllByText(`Task ${taskId}`)).toHaveLength(1);
-  // The newest phase of a live turn stays open, so its chip is right there.
-  fireEvent.click(screen.getByRole("button", { name: taskId }));
-  expect(screen.getByRole("button", { name: /Started task.*Failed/ }).getAttribute("aria-expanded")).toBe("true");
-  expect(screen.getByText("Could not start task")).toBeTruthy();
+  // The newest phase of a live turn stays open, so its chip is right there; it grows into the failed call.
+  const chip = screen.getByRole("button", { name: taskId });
+  fireEvent.click(chip);
+  expect(chip.getAttribute("aria-pressed")).toBe("true");
+  expect(chip.closest(".work-call")?.textContent).toContain("Could not start task");
 });
 
 it("coalesces cards even when tool grouping is disabled", () => {

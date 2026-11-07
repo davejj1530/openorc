@@ -1,7 +1,18 @@
-import os from "node:os";
-import path from "node:path";
-import { orchestration, projects, remoteDevices, remotePushTargets, settings, threads, type Db, type LedgerWriter, type RemoteDeviceRecord } from "@openorc/db";
-import { acceptLink, encodePairingUrl, fromBase64Url, LinkCloseCode, toBase64Url, type Admission, type ClosingReason, type KeyPair, type LinkSocket, type PhoneHello } from "@openorc/link";
+import { projects, refusedMoves, remoteDevices, remotePushTargets, retiredTeams, settings, threads, type Db, type LedgerWriter, type RemoteDeviceRecord } from "@openorc/db";
+import {
+  acceptLink,
+  encodePairingUrl,
+  equalBytes,
+  fromBase64Url,
+  LinkCloseCode,
+  linkPath,
+  toBase64Url,
+  type Admission,
+  type ClosingReason,
+  type KeyPair,
+  type LinkSocket,
+  type PhoneHello,
+} from "@openorc/link";
 import { nodeCrypto } from "@openorc/link/node";
 import {
   PUSH_SENDER_TAG,
@@ -9,9 +20,10 @@ import {
   type DeviceMethod,
   type DeviceParams,
   type DeviceRpcResults,
+  type DoorKey,
   type PairingOfferView,
-  type PushEnvironment,
   type PreviewHost,
+  type PushEnvironment,
   type PushSenderState,
   type RemoteListener,
   type RemotePushStatus,
@@ -19,18 +31,23 @@ import {
   type RemoteStatus,
   type Route,
 } from "@openorc/protocol";
+import os from "node:os";
+import path from "node:path";
+import { taskBoard } from "../handlers/brain-sync.js";
 import type { ProtectedSecretStore } from "../services/extraction-credentials.js";
 import { PREVIEW_THREAD_GONE, previewThreadLive } from "../services/preview.js";
 import type { Broadcast, Logger } from "../transport.js";
+import { OWNER_DEVICE } from "../request-origin.js";
 import { readRemoteAsset } from "./assets.js";
+import { removedBrains } from "./removed-brains.js";
 import { listen, type Listener } from "./listener.js";
 import { PairingOffers } from "./offers.js";
+import { remoteError, type MacRoots } from "./phone-words.js";
 import { remotePush } from "./policy.js";
+import { PreviewCasters } from "./preview-casters.js";
 import { PushKeys } from "./push/keys.js";
 import { PushSender } from "./push/sender.js";
 import { currentRoutes, machineProbe, type MachineProbe } from "./routes.js";
-import { remoteError, type MacRoots } from "./phone-words.js";
-import { PreviewCasters } from "./preview-casters.js";
 import { RemoteSession, type Answer } from "./session.js";
 import { RemoteFrameShaper } from "./shaper.js";
 
@@ -44,6 +61,16 @@ const SENDER_CHANGED = ["remote", PUSH_SENDER_TAG];
 export interface RemoteNetwork {
   port: number;
   machine: MachineProbe;
+  /**
+   * The name a TLS proxy answers for this host on 443, such as a cloud sandbox's address. A host with one is reached only
+   * there: phones hear one public route, and the listener sits behind the proxy on exactly `port`, the one the proxy
+   * forwards to, which is neither read from nor saved to the database. A Mac has none.
+   */
+  publicAddress?: string;
+  /** A host that sleeps hands each of its phones a key to its door, for the asking phone's own device id. A Mac has none. */
+  door?: (deviceId: string) => DoorKey;
+  /** The one key admitted without pairing, as this brain's owner: the Mac that set it up. A Mac has none. */
+  owner?: Uint8Array;
   apns?: Record<PushEnvironment, string>;
 }
 
@@ -108,7 +135,8 @@ export class RemoteAccess {
     const { db, log } = options;
     this.pushKeys = new PushKeys({ db, secrets: options.pushSecrets, log, ...(this.network.apns ? { origins: this.network.apns } : {}) });
     const presence = options.presence ?? (async () => false);
-    this.push = new PushSender({ db, log, presence, route: () => this.pushKeys.current(), changed: (what) => options.invalidate(what === "sender" ? SENDER_CHANGED : ["remote"]) });
+    const host = this.network.publicAddress ? "cloud" : "mac";
+    this.push = new PushSender({ db, log, presence, host, route: () => this.pushKeys.current(), changed: (what) => options.invalidate(what === "sender" ? SENDER_CHANGED : ["remote"]) });
     this.previews = options.preview ? new PreviewCasters({ host: options.preview, words: (message) => remoteError(message, this.macRoots()), roots: () => this.macRoots() }) : null;
   }
 
@@ -127,6 +155,19 @@ export class RemoteAccess {
   attach(answer: Answer): Promise<void> {
     this.answer ??= answer;
     return this.converge();
+  }
+
+  /** This host's static link key, base64url: what a client that knows the host dials it by. */
+  async linkKey(): Promise<string> {
+    return toBase64Url((await this.loadKeys()).publicKey);
+  }
+
+  /**
+   * A phone is connected, as Settings counts one: someone is looking at this host. The owner's quiet session, kept for
+   * its lists, counts only while it watches a run: someone at the Mac has a cloud conversation open.
+   */
+  get busy(): boolean {
+    return [...this.sessions].some((session) => session.live && (session.deviceId !== OWNER_DEVICE || session.watching));
   }
 
   async status(): Promise<RemoteStatus> {
@@ -178,6 +219,17 @@ export class RemoteAccess {
         this.options.invalidate(["remote"]);
         return { sandbox: this.senderState("sandbox"), production: this.senderState("production") };
       }
+      case "door.key":
+        // The owner wakes the brain through Vercel, never through the door.
+        return deviceId === OWNER_DEVICE ? null : (this.network.door?.(deviceId) ?? null);
+      case "host.kind":
+        return this.network.publicAddress ? "brain" : "mac";
+      case "brains.removed":
+        return removedBrains(this.options.db);
+      case "tasks.board":
+        return taskBoard(this.options.db, Boolean(this.network.publicAddress));
+      case "moves.refused":
+        return refusedMoves(this.options.db);
     }
   }
 
@@ -255,15 +307,24 @@ export class RemoteAccess {
   private async start(): Promise<void> {
     try {
       const keys = await this.loadKeys();
-      const setting = readSetting(this.options.db);
-      const listener = await listen({ port: setting.port ?? this.network.port, handshake: (socket) => this.handshake(socket) });
-      if (listener.port !== setting.port) settings.set(this.options.db, SETTING, JSON.stringify({ ...setting, port: listener.port }));
+      const listener = await this.openListener(keys);
       this.state = { state: "on", listener, keys };
       await this.routes();
     } catch (error) {
       this.state = { state: "failed", reason: error instanceof Error ? error.message : String(error) };
     }
     this.options.invalidate(["remote"]);
+  }
+
+  /** A Mac listens on the port it saved, or on one it then saves; a host behind a proxy on exactly the one it forwards to. */
+  private async openListener(keys: KeyPair): Promise<Listener> {
+    const handshake = (socket: LinkSocket) => this.handshake(socket);
+    const { port, publicAddress } = this.network;
+    if (publicAddress) return listen({ port, exposure: { kind: "proxied", path: linkPath("public", keys.publicKey, nodeCrypto) }, handshake });
+    const setting = readSetting(this.options.db);
+    const listener = await listen({ port: setting.port ?? port, handshake });
+    if (listener.port !== setting.port) settings.set(this.options.db, SETTING, JSON.stringify({ ...setting, port: listener.port }));
+    return listener;
   }
 
   private async stop(reason: ClosingReason): Promise<void> {
@@ -320,7 +381,7 @@ export class RemoteAccess {
 
   private async routes(): Promise<Route[]> {
     if (this.state.state !== "on") return [];
-    this.knownRoutes = await currentRoutes(this.network.machine, this.state.listener.port);
+    this.knownRoutes = await currentRoutes(this.network.machine, this.state.listener.port, this.network.publicAddress);
     return this.knownRoutes;
   }
 
@@ -338,17 +399,25 @@ export class RemoteAccess {
       return;
     }
     const { dataDir, db, ledger } = this.options;
+    const role = accepted.value.id;
     const session = new RemoteSession(accepted.value.id, accepted.session, {
       answer,
-      guard: { attachmentsDir: path.join(dataDir, "attachments"), thread: (id) => (threads.get(db, id) ? { team: Boolean(orchestration.getInstance(db, id)) } : null) },
+      guard: {
+        attachmentsDir: path.join(dataDir, "attachments"),
+        thread: (id) => {
+          const thread = threads.get(db, id);
+          return thread ? { team: retiredTeams.isHidden(db, id), parentRelation: thread.parentRelation } : null;
+        },
+      },
       roots: () => this.macRoots(),
       readAsset: (ref) => readRemoteAsset(ref, { dataDir, db, ledger }),
       device: (deviceId, method, params) => this.device(deviceId, method, params),
       preview: this.previews,
       watchable: (id) => previewThreadLive(db, id),
+      owner: role === OWNER_DEVICE,
     });
     // Removing a phone ends the sessions it finds, and this one may have been admitted just before.
-    if (remoteDevices.byKey(db, accepted.session.remoteStatic)?.id !== session.deviceId) {
+    if (session.deviceId !== OWNER_DEVICE && remoteDevices.byKey(db, accepted.session.remoteStatic)?.id !== session.deviceId) {
       session.close("removed");
       return;
     }
@@ -365,6 +434,10 @@ export class RemoteAccess {
     if (this.sessions.size >= MAX_SESSIONS) return { ok: false, reason: "busy" };
     const { db } = this.options;
     const now = Date.now();
+    if (this.network.owner && equalBytes(publicKey, this.network.owner)) {
+      const owner = { id: OWNER_DEVICE, name: hello.device.name, publicKey, createdAt: now, lastSeenAt: now };
+      return { ok: true, value: owner, hello: this.hello(OWNER_DEVICE) };
+    }
     let device = remoteDevices.byKey(db, publicKey);
     if (!device && hello.pair) {
       if (!this.offers.redeem(hello.pair.offerId, secretOf(hello.pair.secret), now)) return { ok: false, reason: "offer-invalid" };
@@ -373,7 +446,12 @@ export class RemoteAccess {
     if (!device) return { ok: false, reason: "unpaired" };
     remoteDevices.touch(db, device.id, now);
     void this.routes();
-    return { ok: true, value: device, hello: { mac: { name: this.network.machine.name() }, deviceId: device.id, routes: this.knownRoutes } };
+    return { ok: true, value: device, hello: this.hello(device.id) };
+  }
+
+  /** What this host tells a device it admitted. Nothing new goes here: phones already installed refuse a key they do not know. */
+  private hello(deviceId: string): Extract<Admission<RemoteDeviceRecord>, { ok: true }>["hello"] {
+    return { mac: { name: this.network.machine.name() }, deviceId, routes: this.knownRoutes };
   }
 }
 

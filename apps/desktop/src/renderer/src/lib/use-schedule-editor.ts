@@ -1,23 +1,14 @@
+import { type RunMode, type Schedule, type WorkspaceMode } from "@openorc/protocol";
 import { useEffect, useState } from "react";
-import { harnessInfo, harnessLoggedIn, isHarnessId, type RunMode, type Schedule, type TeamRevision, type WorkspaceMode } from "@openorc/protocol";
 import { defaultChoice, type ModelChoice } from "../components/ModelPicker";
-import { branchingReason, useProjectGit } from "./project-git";
 import { usePermissionSelection, useRpc, useRpcMutation } from "./client";
-import {
-  scheduleDraftIssue,
-  scheduleModelTarget,
-  scheduleTarget,
-  scheduleTargetChoice,
-  scheduleTargetPayload,
-  scheduleTargetSettings,
-  scheduleTeamChoices,
-  scheduleTeamTarget,
-} from "./schedule-draft";
+import { useProjectGit } from "./project-git";
+import { scheduleDraftIssue, scheduleModelTarget, scheduleTarget, scheduleTargetChoice, scheduleTargetPayload } from "./schedule-draft";
 
 /** What the chosen project's git allows: until it can branch, a schedule works in the project folder. */
 function useScheduleGit(project: string, chosen: WorkspaceMode) {
-  const { state, cannotBranch } = useProjectGit(project);
-  return { cannotBranch, workspace: cannotBranch ? ("current" as const) : chosen, teamReason: branchingReason(state, "Teams") };
+  const { cannotBranch } = useProjectGit(project);
+  return { cannotBranch, workspace: cannotBranch ? ("current" as const) : chosen };
 }
 
 function useScheduleAccount(initial?: string) {
@@ -31,12 +22,9 @@ export function useScheduleEditor(schedule: Schedule | null, latest: Schedule | 
   const projects = useRpc("projects.list", {});
   const { accounts, setAccount, claudeAccountId } = useScheduleAccount(schedule?.claudeAccountId);
   const models = useRpc("agents.models", { claudeAccountId }, { staleTime: 5 * 60_000 });
-  const info = useRpc("system.info", { claudeAccountId });
-  const availability = useRpc("orchestration.availability", {});
   const create = useRpcMutation("schedules.create");
   const update = useRpcMutation("schedules.update");
   const [project, setProject] = useState(schedule?.projectId ?? projectId);
-  const teams = useRpc("orchestration.list", { projectId: project, includeArchived: true }, { enabled: Boolean(project) });
   const [title, setTitle] = useState(schedule?.title ?? "");
   const [prompt, setPrompt] = useState(schedule?.prompt ?? "");
   const [minutes, setMinutes] = useState(schedule?.everyMinutes ?? 1440);
@@ -48,23 +36,14 @@ export function useScheduleEditor(schedule: Schedule | null, latest: Schedule | 
   const [target, setTarget] = useState(() => scheduleTarget(schedule));
   const [localError, setLocalError] = useState<string | null>(null);
   const choice = scheduleTargetChoice(target);
-  const revision = target.kind === "team" ? target.revision : null;
-  const lead = revision?.members.find((member) => member.managerKey === null);
-  const currentTeam = revision ? teams.data?.find((item) => item.team.id === revision.teamId) : undefined;
-  const archived = currentTeam ? currentTeam.team.archivedAt !== null : target.kind === "team" && target.archived;
-  const usesClaude = choice?.agent === "claude" || revision?.members.some((member) => member.settings.agent === "claude");
+  const usesClaude = choice?.agent === "claude";
   const accountReady = !usesClaude || Boolean(accounts.data);
-  const teamTarget = target.kind === "team";
-  const retainedTeam = teamTarget && schedule?.executionTarget?.kind === "team" && schedule.executionTarget.teamRevisionId === target.target.teamRevisionId;
   const pending = create.isPending || update.isPending;
   const conflict = Boolean(schedule && latest && latest.version !== schedule.version);
   const { projectIssue, targetIssue } = scheduleDraftIssue(
     project,
     projects.data?.map((item) => item.id),
     target,
-    archived,
-    retainedTeam,
-    git.teamReason,
   );
   const error = localError ?? create.error?.message ?? update.error?.message ?? permissionError;
 
@@ -74,36 +53,11 @@ export function useScheduleEditor(schedule: Schedule | null, latest: Schedule | 
     if (initial) setTarget(scheduleModelTarget(initial));
   }, [target.kind, models.data]);
 
-  const chooseTeam = (selected: TeamRevision) => {
-    setTarget(scheduleTeamTarget(selected));
-    setLocalError(null);
-  };
   const chooseModel = (selected: ModelChoice) => {
     setTarget(scheduleModelTarget(selected));
     setLocalError(null);
   };
-  const changeSettings = (selected: ModelChoice) => {
-    setTarget(scheduleTargetSettings(target, selected));
-    if (target.kind !== "team") setLocalError(null);
-  };
-  const retryChecks = () => {
-    void teams.refetch();
-    void availability.refetch();
-    void models.refetch();
-    void info.refetch();
-    void projects.refetch();
-  };
-  const pickerTeams = scheduleTeamChoices({ teams, target, teamBlocker: git.teamReason, onSelect: chooseTeam, retry: retryChecks });
-  const effectiveMembers = revision?.members.map((member) => (member.managerKey === null && choice ? { ...member, settings: choice } : member)) ?? [];
-  const offlineMember = effectiveMembers.find((member) => {
-    const model = models.data?.find((item) => item.agent === member.settings.agent && item.id === member.settings.model);
-    const agent = member.settings.agent;
-    return (info.data && (!isHarnessId(agent) || !harnessLoggedIn(harnessInfo(info.data, agent)))) || (models.data && (!model || model.unavailable));
-  });
-  let previewReason: string | null = null;
-  if (availability.isError) previewReason = "Team availability could not load. The schedule can still be saved.";
-  else if (availability.data && !availability.data.enabled) previewReason = availability.data.reason ?? "Team execution is disabled in Settings.";
-
+  const changeSettings = chooseModel;
   const submit = () => {
     if (pending || !accountReady || !permissionReady || projectIssue || targetIssue || !title.trim() || !prompt.trim()) return;
     setLocalError(null);
@@ -116,7 +70,7 @@ export function useScheduleEditor(schedule: Schedule | null, latest: Schedule | 
         permissionMode: permission,
         workspaceMode: workspace,
         everyMinutes: minutes,
-        ...scheduleTargetPayload(target, project),
+        ...scheduleTargetPayload(target),
       };
       if (schedule) update.mutate({ id: schedule.id, patch: { ...base, expectedVersion: schedule.version } }, { onSuccess: onClose });
       else create.mutate({ projectId: project, ...base }, { onSuccess: onClose });
@@ -127,9 +81,9 @@ export function useScheduleEditor(schedule: Schedule | null, latest: Schedule | 
 
   return {
     fields: { claudeAccountId, project, title, prompt, minutes, mode, permission, workspace, worktreeBlocked: git.cannotBranch },
-    target: { usesClaude, selection: target, choice, revision, lead, currentTeam, archived, teamTarget, retainedTeam, pickerTeams, offlineMember, previewReason },
-    resources: { accounts, projects, models, info, teams, availability },
+    target: { usesClaude, selection: target, choice },
+    resources: { accounts, projects, models },
     status: { pending, conflict, projectIssue, targetIssue, error, permissionReady: permissionReady && accountReady },
-    actions: { setAccount, setProject, setTitle, setPrompt, setMinutes, setMode, setPermission, setWorkspace, chooseTeam, chooseModel, changeSettings, retryChecks, submit },
+    actions: { setAccount, setProject, setTitle, setPrompt, setMinutes, setMode, setPermission, setWorkspace, chooseModel, changeSettings, submit },
   };
 }

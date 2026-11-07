@@ -12,7 +12,8 @@ const probe = vi.hoisted(() => ({ store: null as ReturnType<typeof runStore> | n
 vi.mock("../client", async () => {
   const { runStore } = await import("./test-fixtures/run-store");
   probe.store = runStore();
-  return { client: probe.store.client };
+  const client = probe.store.client;
+  return { useHostClient: () => client };
 });
 vi.mock("./Markdown", () => ({
   Markdown: function Markdown({ text, streaming }: { text: string; streaming: boolean }) {
@@ -21,6 +22,17 @@ vi.mock("./Markdown", () => ({
     }, []);
     probe.renders.push({ text, streaming });
     return <div>{text}</div>;
+  },
+}));
+
+/** Every image tile a reply drew, by the reference it asked the Mac for. */
+const tiles = vi.hoisted(() => [] as { asset: unknown; label: string }[]);
+vi.mock("./images", () => ({
+  attachmentRef: (path: string) => ({ kind: "attachment", name: path }),
+  isImagePath: () => false,
+  ImageTile: function ImageTile({ asset, label }: { asset: unknown; label: string }) {
+    tiles.push({ asset, label });
+    return <div>{label}</div>;
   },
 }));
 
@@ -64,4 +76,12 @@ it("keeps one Markdown view for a piece from its first words through finishing, 
   view.rerender(reply(second!));
   expect(probe.mounts).toBe(1);
   expect(probe.renders.at(-1)).toMatchObject({ streaming: true, text: expect.stringMatching(/more $/) });
+});
+
+it("draws an image of a file on the Mac as a tile asked for by its message, and the words around it as Markdown", () => {
+  probe.renders.length = 0;
+  tiles.length = 0;
+  render(<Reply text={"Fixed:\n\n![Agent details, dark](/Users/me/dark.png)\n\nDone."} streaming={false} source={{ runId: "r", blockId: "m1", index: 0 }} />);
+  expect(tiles).toEqual([{ asset: { kind: "reply-image", runId: "r", messageId: "m1", path: "/Users/me/dark.png" }, label: "Agent details, dark" }]);
+  expect(probe.renders.map((drawn) => drawn.text)).toEqual(["Fixed:", "Done."]);
 });

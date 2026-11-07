@@ -1,0 +1,13 @@
+
+ RUN  v4.1.11 /private/tmp/test-run-fixtures/vitest
+
+ ✓ src/cart.test.ts (4 tests | 1 skipped) 2ms
+ ✓ src/queue.test.ts (2 tests) 806ms
+   ✓ drains in order  402ms
+   ✓ drops duplicates  402ms
+
+ Test Files  2 passed (2)
+      Tests  5 passed | 1 skipped (6)
+   Start at  12:13:50
+   Duration  889ms (transform 18ms, setup 0ms, import 28ms, tests 807ms, environment 0ms)
+

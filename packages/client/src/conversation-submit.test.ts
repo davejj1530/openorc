@@ -38,6 +38,11 @@ describe("planSubmit", () => {
     { name: "needs a model", input: { choice: null }, plan: { kind: "blocked", reason: "Choose a model first." } },
     { name: "restarts fresh even beside a warm process", input: { restart: true, live: true, activeRun: warm, agentsUsed: ["codex"] }, plan: { kind: "start", choice: codex, resume: false } },
     { name: "restarts only once permissions are known", input: { restart: true, permissionReady: false, choice: null }, plan: { kind: "blocked", reason: "Wait for your saved permissions to load." } },
+    {
+      name: "goes on with another Claude account in a new process that resumes there",
+      input: { claudeAccountId: "personal", live: true, activeRun: { ...warm, agent: "claude" }, agentsUsed: ["claude"], choice: { ...codex, agent: "claude" } },
+      plan: { kind: "start", choice: { ...codex, agent: "claude" }, resume: true },
+    },
   ] as Array<{ name: string; input: Partial<SubmitInput>; plan: unknown }>)("$name", ({ input, plan }) => {
     expect(planSubmit({ ...base, ...input })).toEqual(plan);
   });
@@ -108,6 +113,12 @@ describe("sendMessage", () => {
         },
       ],
     ]);
+  });
+
+  it("names the Claude account a conversation goes on with", async () => {
+    const { calls, submit } = submitter();
+    await submit({ ...base, claudeAccountId: "personal", waitForSave: async () => undefined }, { text: "Continue.", attachments: [] });
+    expect(calls).toEqual([["runs.start", expect.objectContaining({ threadId: "thread", prompt: "Continue.", resume: true, claudeAccountId: "personal" })]]);
   });
 
   it("fails with the reason when nothing can be sent", async () => {

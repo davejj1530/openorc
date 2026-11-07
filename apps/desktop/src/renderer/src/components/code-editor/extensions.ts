@@ -1,6 +1,8 @@
 import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
-import { bracketMatching, indentOnInput, LanguageDescription, type LanguageSupport } from "@codemirror/language";
+import { bracketMatching, codeFolding, foldGutter, foldKeymap, indentOnInput, LanguageDescription, type LanguageSupport } from "@codemirror/language";
+import { lintGutter, lintKeymap } from "@codemirror/lint";
+import { editorLanguage } from "@openorc/protocol";
 import { languages } from "@codemirror/language-data";
 import { highlightSelectionMatches, search, searchKeymap } from "@codemirror/search";
 import { Compartment, EditorState } from "@codemirror/state";
@@ -20,8 +22,9 @@ import {
 import { lineSeparatorOf } from "./replacement";
 import { appearance } from "./theme";
 import type { CodeEditorProps } from "./types";
+import { intelligenceExtensions } from "./intelligence";
 
-type CallerKeys = Pick<CodeEditorProps, "onSave" | "onFormat">;
+type CallerKeys = Pick<CodeEditorProps, "onSave" | "onFormat" | "lineWrapping" | "onLineWrappingChange">;
 
 /** A session's state outlives the editor that made it, so its key bindings find the mounted editor's callbacks here. */
 const callers = new WeakMap<EditorView, () => CallerKeys>();
@@ -48,14 +51,25 @@ const callerKeys: KeyBinding[] = [
       return Boolean(format);
     },
   },
+  {
+    // VS Code's Toggle Word Wrap. On a Mac, Option+Z arrives as "Ω"; CodeMirror matches it by key code.
+    key: "Alt-z",
+    run: (view) => {
+      const keys = callers.get(view)?.();
+      keys?.onLineWrappingChange?.(!keys.lineWrapping);
+      return Boolean(keys?.onLineWrappingChange);
+    },
+  },
 ];
 
 const language = new Compartment();
 const editability = new Compartment();
+const wrapping = new Compartment();
 const prose = /\.(md|markdown|mdx|txt)$/i;
+const wrapped = (wrap: boolean) => (wrap ? EditorView.lineWrapping : []);
 const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
 
-export function createState(text: string, path: string, readOnly: boolean): EditorState {
+export function createState(text: string, path: string, readOnly: boolean, lineWrapping: boolean): EditorState {
   return EditorState.create({
     doc: text,
     extensions: [
@@ -70,14 +84,17 @@ export function createState(text: string, path: string, readOnly: boolean): Edit
       EditorState.allowMultipleSelections.of(true),
       indentOnInput(),
       bracketMatching(),
+      codeFolding(),
+      prose.test(path) ? [] : foldGutter(),
+      editorLanguage(path) ? [lintGutter(), intelligenceExtensions] : [],
       closeBrackets(),
       rectangularSelection(),
       crosshairCursor(),
       highlightActiveLine(),
       highlightSelectionMatches(),
       search({ top: true }),
-      prose.test(path) ? EditorView.lineWrapping : [],
-      keymap.of([...callerKeys, ...closeBracketsKeymap, ...defaultKeymap, ...searchKeymap, ...historyKeymap, indentWithTab]),
+      wrapping.of(wrapped(lineWrapping)),
+      keymap.of([...callerKeys, ...closeBracketsKeymap, ...defaultKeymap, ...searchKeymap, ...historyKeymap, ...foldKeymap, ...lintKeymap, indentWithTab]),
       language.of([]),
       editability.of(EditorState.readOnly.of(readOnly)),
       appearance,
@@ -87,6 +104,12 @@ export function createState(text: string, path: string, readOnly: boolean): Edit
 
 export function setReadOnly(view: EditorView, readOnly: boolean): void {
   if (view.state.readOnly !== readOnly) view.dispatch({ effects: editability.reconfigure(EditorState.readOnly.of(readOnly)) });
+}
+
+/** Keeps the line at the top of the view where it is while every line above it rewraps. */
+export function setLineWrapping(view: EditorView, wrap: boolean): void {
+  if ((wrapping.get(view.state) === EditorView.lineWrapping) === wrap) return;
+  view.dispatch({ effects: [wrapping.reconfigure(wrapped(wrap)), view.scrollSnapshot()] });
 }
 
 /** Highlights the document once its language's chunk has loaded. A file type with no grammar stays plain text. */

@@ -1,9 +1,9 @@
+import { projects, retiredTeams, threads } from "@openorc/db";
+import type { CorePush, PreviewHost, PreviewHostPage } from "@openorc/protocol";
 import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { projects, teamDeletedThreads, threads } from "@openorc/db";
-import type { CorePush, PreviewHost, PreviewHostPage } from "@openorc/protocol";
 import { OpenOrc } from "./openorc.js";
 import { rpcClient } from "./rpc-test-client.js";
 
@@ -80,10 +80,10 @@ it("reads the Mac's page as a state with no frame, its phase from loading, failu
   expect(await call("preview.state", { threadId: thread.id })).toMatchObject({ phase: "stopped" });
 });
 
-it("answers closed for a missing or team-deleted thread without asking main", async () => {
+it("answers closed for a missing or retired thread without asking main", async () => {
   const thread = await start(host);
   pages.set(thread.id, page());
-  vi.spyOn(teamDeletedThreads, "has").mockImplementation((_db, id) => id === thread.id);
+  vi.spyOn(retiredTeams, "isHidden").mockImplementation((_db, id) => id === thread.id);
   expect(await call("preview.state", { threadId: thread.id })).toEqual({ open: false });
   expect(await call("preview.state", { threadId: "no-such-thread" })).toEqual({ open: false });
   expect(host.query).not.toHaveBeenCalled();

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { acceptsLiveInput, conversationActivity, conversationCanSteer, conversationPlaceholder, conversationSteerReason } from "./conversation-presentation.js";
+import { acceptsLiveInput, conversationActivity, conversationCanSteer, conversationPlaceholder, conversationSendDisabledReason, conversationSteerReason } from "./conversation-presentation.js";
 import { emptyRun, type Block } from "./transcript.js";
 
 describe("sending during a turn", () => {
@@ -18,6 +18,13 @@ describe("sending during a turn", () => {
   });
 });
 
+it("holds the composer while a conversation moves, in the words for where it goes", () => {
+  const ready = { permissionReady: true, historyLoading: false, historyFailed: false, hasModel: true };
+  expect(conversationSendDisabledReason(ready)).toBeNull();
+  expect(conversationSendDisabledReason({ ...ready, thread: { moving: { to: "cloud", since: 1 } } })).toBe("This conversation is moving to the cloud.");
+  expect(conversationSendDisabledReason({ ...ready, permissionReady: false, thread: { moving: { to: "mac", since: 1 } } })).toBe("This conversation is moving to your Mac.");
+});
+
 it("puts first task direction before active-turn placeholder states", () => {
   expect(conversationPlaceholder({ firstTaskRun: true, working: true, canSteer: true, agent: undefined })).toBe("Add direction, or send to start this task…");
   expect(conversationPlaceholder({ firstTaskRun: false, working: true, canSteer: false, agent: undefined })).toBe("Queue a message for when it finishes…");
@@ -25,7 +32,7 @@ it("puts first task direction before active-turn placeholder states", () => {
 });
 
 describe("conversationActivity", () => {
-  const run = { id: "r", agent: "codex", model: null } as unknown as Parameters<typeof conversationActivity>[0]["activeRun"];
+  const run = { id: "r", agent: "codex", model: null, endedAt: null } as unknown as NonNullable<Parameters<typeof conversationActivity>[0]["activeRun"]>;
   const live = (blocks: Block[]) => ({ ...emptyRun("r"), live: true, blocks });
   const replying: Block = { id: "m", kind: "message", role: "assistant", text: "Hi", streaming: true };
   const making: Block = { id: "img", kind: "activity", label: "Image", status: "running", text: "", activityKind: "image_generation" };
@@ -33,6 +40,10 @@ describe("conversationActivity", () => {
   it("takes a thread's own word for whether it is busy", () => {
     expect(conversationActivity({ thread: { activity: "running" }, activeRun: run, liveTranscript: live([]), compacting: false })).toEqual({ live: true, working: true, generatingImage: false });
     expect(conversationActivity({ thread: { activity: "idle" }, activeRun: run, liveTranscript: live([replying]), compacting: false }).working).toBe(false);
+  });
+
+  it("never calls a run live once it ended, even when its transcript missed the end", () => {
+    expect(conversationActivity({ thread: { activity: "idle" }, activeRun: { ...run, endedAt: 5 }, liveTranscript: live([]), compacting: false }).live).toBe(false);
   });
 
   it("counts an image being made and a compaction as busy, and a task's conversation while its reply streams", () => {

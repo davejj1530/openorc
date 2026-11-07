@@ -40,3 +40,17 @@ it("connects now instead of reading, when the phone is not connected, and settle
   await refreshing;
   expect(done).toBe(true);
 });
+
+it("reads the partner host's lists again too while it is connected, and never dials it", async () => {
+  const shownCache = new QueryClient();
+  const partnerCache = new QueryClient();
+  const mine = shown(shownCache, ["threads.list", { projectId: "p" }]);
+  const theirs = shown(partnerCache, ["threads.list", { projectId: "c" }]);
+  await vi.waitFor(() => expect(mine.loaded() && theirs.loaded()).toBe(true));
+  const link = { getState: () => connected, retry: vi.fn(() => Promise.resolve()) };
+  await refreshHome(link, shownCache, { link: { getState: () => connected }, queryClient: partnerCache });
+  expect([mine.read.mock.calls.length, theirs.read.mock.calls.length]).toEqual([2, 2]);
+  await refreshHome(link, shownCache, { link: { getState: () => ({ kind: "waiting", mac, why: "unreachable", retryAt: 9 }) }, queryClient: partnerCache });
+  expect([mine.read.mock.calls.length, theirs.read.mock.calls.length]).toEqual([3, 2]);
+  [mine, theirs].forEach((list) => list.stop());
+});

@@ -18,7 +18,7 @@ Windows, custom launchers, Homebrew formulas and taps, and other package manager
 
 ## While an update runs
 
-An update waits for agent turns, approvals, teams, model discovery, and background generation to finish. Once it starts, OpenOrc holds new turns, closes idle agent processes, and lets scheduled runs wait until the update is done. Conversations stay saved and resume on a new process. Agent sessions in other applications are not affected by this.
+An update waits for agent turns, approvals, model discovery, and background generation to finish. Once it starts, OpenOrc holds new turns, closes idle agent processes, and lets scheduled runs wait until the update is done. Conversations stay saved and resume on a new process. Agent sessions in other applications are not affected by this.
 
 Update commands run without a shell or administrator rights, with limited output and a three-minute timeout. On macOS and Linux, a failure or timeout stops the updater and any processes it started. Raw package-manager output is not shown in the app because it can contain registry credentials. OpenOrc checks the installation again just before updating and checks the version afterwards. Failed checks and updates stay visible with steps to recover. OpenOrc cannot undo changes a failed package manager made.
 

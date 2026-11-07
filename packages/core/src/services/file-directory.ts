@@ -3,7 +3,8 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { git } from "@openorc/git";
 import { FolderPath, type FileDirectory, type FileEntry } from "@openorc/protocol";
 
-const HIDDEN_ENTRIES = new Set([".git", "node_modules", ".DS_Store"]);
+/** Repository and OS metadata nobody opens from a file tree. */
+const UNLISTED = new Set([".git", ".DS_Store"]);
 
 async function ignoredNames(directory: string, names: string[]): Promise<Set<string>> {
   if (!names.length) return new Set();
@@ -22,9 +23,9 @@ export async function listDirectory(root: string, path: "" | FolderPath): Promis
   if (!inside(root, requested)) throw new Error("This folder is outside the conversation's workspace.");
   const directory = await realpath(requested);
   if (!inside(root, directory)) throw new Error("This folder is outside the conversation's workspace.");
-  const children = await readdir(directory, { withFileTypes: true });
+  const children = (await readdir(directory, { withFileTypes: true })).filter((child) => !UNLISTED.has(child.name));
   const ignored = new Set([
-    ...HIDDEN_ENTRIES,
+    "node_modules",
     ...(await ignoredNames(
       directory,
       children.map((child) => child.name),

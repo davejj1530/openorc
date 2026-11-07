@@ -21,6 +21,16 @@ it("only accepts the preload's window message when connecting the privileged cor
   foreign.remove();
 });
 
+it("marks a read the window asks again as a refresh on the wire, and no other", () => {
+  Object.defineProperty(window, "openorc", { configurable: true, value: { connectBridge: vi.fn() } });
+  core.connect();
+  const port = { start: vi.fn(), postMessage: vi.fn(), onmessage: null as ((event: MessageEvent) => void) | null };
+  window.dispatchEvent(new MessageEvent("message", { data: "openorc:port", source: window, ports: [port as unknown as MessagePort] }));
+  void core.call("git.threadLog", { threadId: "t" }, { refresh: true });
+  void core.call("git.threadLog", { threadId: "t" });
+  expect(port.postMessage.mock.calls.map(([message]) => (message as { refresh?: true }).refresh)).toEqual([true, undefined]);
+});
+
 it("tells the client what the port pushes, with a core that starts again as a resumed session", () => {
   Object.defineProperty(window, "openorc", { configurable: true, value: { connectBridge: vi.fn() } });
   core.connect();

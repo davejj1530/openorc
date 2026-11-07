@@ -2,18 +2,19 @@ import { spawnAgentProcess } from "../process-recovery.js";
 import { fileBoundaryHook } from "./file-boundary.js";
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { stopProcess, waitForProcessGroup } from "../process-lifetime.js";
 import readline from "node:readline";
 import { ULTRACODE_EFFORT, type AgentEvent, type FileBoundary, type RunSpec } from "@openorc/protocol";
 import { ClaudeStreamParser } from "./stream-json.js";
+import { ClaudeTranscriptFiles } from "./transcript-files.js";
+import { claudeTaskControls } from "./task-controls.js";
 import { SHARED_CLAUDE_CONFIG_DIR, claudeConfigDir } from "./config-dir.js";
 import { installedClaudePlugins } from "./plugins.js";
 import { RunHandle, type RunControls } from "../run-handle.js";
 import { withAttachedFiles } from "../attachments.js";
 import type { AgentLaunchEnvironment } from "../launch-environment.js";
+import { definedEnv, launchPlace, type LaunchPlace } from "../agent-host.js";
 import { stripAnsi } from "../jsonrpc.js";
 
 export interface ClaudeAdapterOptions {
@@ -56,8 +57,8 @@ export function ultracodeFallbackNotice(spec: Pick<RunSpec, "effort" | "mode" | 
 }
 
 /** Where the CLI keeps plan files when no project-relative plansDirectory is configured. */
-function claudePlansDirectory(env: NodeJS.ProcessEnv): string {
-  return path.join(claudeConfigDir(os.homedir(), env), "plans");
+function claudePlansDirectory(home: string, env: NodeJS.ProcessEnv): string {
+  return path.join(claudeConfigDir(home, env), "plans");
 }
 
 const permissionModeFor: Record<RunSpec["permissionMode"], string> = {
@@ -65,6 +66,11 @@ const permissionModeFor: Record<RunSpec["permissionMode"], string> = {
   trusted: "acceptEdits",
   autonomous: "bypassPermissions",
 };
+
+/** Claude Code's `--permission-mode` for a run's mode and permissions. */
+export function claudePermissionMode(spec: Pick<RunSpec, "mode" | "permissionMode">): string {
+  return spec.mode === "plan" ? "plan" : permissionModeFor[spec.permissionMode];
+}
 
 /** How long an idle process gets to exit on its own after its input closes before it is stopped. */
 const IDLE_EXIT_GRACE_MS = 2000;
@@ -94,9 +100,9 @@ function controlFailure(response: Record<string, unknown> | undefined): Error | 
 }
 
 /** Plan restrictions take precedence over the session's ordinary permission mode. */
-function launchPermissionSettings(spec: RunSpec, plans: string | null, connection: { mcpUrl: string; dir: string } | null) {
+function launchPermissionSettings(spec: RunSpec, plans: string | null, connection: { mcpUrl: string; dir: string } | null, place: LaunchPlace) {
   const boundaryHook = (matcher: string, boundary: FileBoundary) => ({
-    PreToolUse: [{ matcher, hooks: [{ type: "command", command: fileBoundaryHook(boundary, connection) }] }],
+    PreToolUse: [{ matcher, hooks: [{ type: "command", command: fileBoundaryHook(boundary, connection, place.write) }] }],
   });
   if (plans) {
     return {
@@ -152,6 +158,7 @@ function prepareClaudeLaunch(spec: RunSpec, launch: AgentLaunchEnvironment, opti
   if (process.platform === "win32" && (spec.mode === "plan" || spec.permissionMode === "trusted"))
     throw new Error("This mode requires a file-boundary hook that is not yet supported on Windows. Choose Review everything.");
   const binary = launch.binary;
+  const place = launchPlace(launch.host);
   const env: NodeJS.ProcessEnv = { ...launch.env, ...options.env };
   // Claude Code refuses to nest inside itself; the app is not a Claude session.
   delete env["CLAUDECODE"];
@@ -159,12 +166,12 @@ function prepareClaudeLaunch(spec: RunSpec, launch: AgentLaunchEnvironment, opti
   delete env[SHARED_CLAUDE_CONFIG_DIR];
   // Claude keeps plan files in its own plans directory, as in its desktop app. The
   // CLI ignores a plansDirectory outside the project, so the boundary follows it instead.
-  const plans = spec.mode === "plan" ? claudePlansDirectory(env) : null;
-  if (plans) mkdirSync(plans, { recursive: true });
+  const plans = spec.mode === "plan" ? claudePlansDirectory(place.home, env) : null;
+  if (plans) place.mkdir(plans);
   const serverName = spec.internalMcp?.serverName ?? options.mcpServerName ?? "openorc";
   const mcpUrl = spec.internalMcp?.url ?? spec.mcpUrl;
   // OpenOrc's address carries a secret, so it reaches the CLI in files only this user can read, never in argv.
-  const connection = mcpUrl ? { mcpUrl, dir: mkdtempSync(path.join(os.tmpdir(), "openorc-claude-")) } : null;
+  const connection = mcpUrl ? { mcpUrl: place.url(mcpUrl), dir: place.privateDir(spec.runId) } : null;
   try {
     const args = [
       "-p",
@@ -178,10 +185,10 @@ function prepareClaudeLaunch(spec: RunSpec, launch: AgentLaunchEnvironment, opti
       "--settings",
       JSON.stringify({
         fastMode: Boolean(spec.fastMode),
-        ...launchPermissionSettings(spec, plans, connection),
+        ...launchPermissionSettings(spec, plans, connection, place),
       }),
       "--permission-mode",
-      spec.mode === "plan" ? "plan" : permissionModeFor[spec.permissionMode],
+      claudePermissionMode(spec),
     ];
     const restricted = spec.mode === "plan" || spec.permissionMode !== "autonomous";
     // Restrict mutation entry points to the tools covered by our explicit rules.
@@ -212,7 +219,7 @@ function prepareClaudeLaunch(spec: RunSpec, launch: AgentLaunchEnvironment, opti
       );
     if (connection) {
       const configFile = path.join(connection.dir, "mcp.json");
-      writeFileSync(configFile, JSON.stringify({ mcpServers: { [serverName]: { type: "http", url: connection.mcpUrl } } }), { mode: 0o600 });
+      place.write(configFile, JSON.stringify({ mcpServers: { [serverName]: { type: "http", url: connection.mcpUrl } } }));
       args.push("--mcp-config", configFile);
       // --mcp-config makes the first turn wait for all of the user's MCP servers, slow remote connectors included.
       // Claude Code still waits for the server behind --permission-prompt-tool, so ours is ready; the rest connect in the background.
@@ -222,10 +229,10 @@ function prepareClaudeLaunch(spec: RunSpec, launch: AgentLaunchEnvironment, opti
       if (spec.internalMcp) args.push("--allowedTools", ...spec.internalMcp.toolNames.map((name) => `mcp__${serverName}__${name}`));
     }
 
-    return { binary, env, args, connection, registry: launch.processRegistry };
+    return { binary, env, args, connection, place, registry: launch.processRegistry };
   } catch (error) {
     // Preparation owns the private directory until the process lifetime takes it over.
-    if (connection) rmSync(connection.dir, { recursive: true, force: true });
+    if (connection) place.remove(connection.dir);
     throw error;
   }
 }
@@ -274,17 +281,20 @@ class BackgroundSettling {
 
 /** One session owns the child, pending writers and controls until the close barrier settles. */
 function startClaudeSession(spec: RunSpec, prepared: ReturnType<typeof prepareClaudeLaunch>, options: ClaudeAdapterOptions): RunHandle {
-  const { binary, env, args, connection, registry } = prepared;
+  const { binary, env, args, connection, place, registry } = prepared;
   const startedAt = Date.now();
   let handle: RunHandle;
   let proc: ChildProcessWithoutNullStreams;
   try {
-    proc = spawnAgentProcess(binary, args, { cwd: spec.cwd, env, registry });
+    proc = place.host
+      ? place.host.spawn(binary, args, { runId: spec.runId, cwd: spec.cwd, env: definedEnv(env), files: place.files, dirs: place.dirs })
+      : spawnAgentProcess(binary, args, { cwd: spec.cwd, env, registry });
   } catch (error) {
-    if (connection) rmSync(connection.dir, { recursive: true, force: true });
+    if (connection) place.remove(connection.dir);
     throw error;
   }
-  const parser = new ClaudeStreamParser(spec.runId, { fastMode: spec.fastMode });
+  const parser = new ClaudeStreamParser(spec.runId, { fastMode: spec.fastMode, resumedSubagents: spec.resumedSubagents });
+  const transcriptFiles = place.host ? null : new ClaudeTranscriptFiles(parser, path.resolve(spec.cwd, claudeConfigDir(place.home, env)), (event) => handle.emit("event", event));
   /** A user message was written and its result has not arrived. Queued input starts turns too, so init lines set it as well. */
   let activeTurn = false;
   /** The next result ends a turn the user stopped, not one that failed. */
@@ -313,10 +323,13 @@ function startClaudeSession(spec: RunSpec, prepared: ReturnType<typeof prepareCl
       }
       proc.stdin.write(`${line}\n`, (error) => (error ? reject(error) : resolve()));
     });
+  const stopTask = (taskId: string) => write(controlRequest({ subtype: "stop_task", task_id: taskId }));
+  /** Attachments are files on this Mac; a host gets copies, and the line names those. */
+  const userLine = async (text: string, attachments?: string[]): Promise<string> => userMessageLine(text, place.host && attachments?.length ? await place.host.upload(attachments) : attachments);
   /** One user line, remembered as mid-turn input when a turn is running. */
   const writeUser = async (text: string, attachments?: string[]): Promise<void> => {
     const midTurn = activeTurn;
-    await write(userMessageLine(text, attachments));
+    await write(await userLine(text, attachments));
     if (midTurn) midTurnWrites += 1;
   };
   const completeTurn = (ev: Extract<AgentEvent, { type: "turn.completed" }>): void => {
@@ -365,7 +378,8 @@ function startClaudeSession(spec: RunSpec, prepared: ReturnType<typeof prepareCl
   /** Close all child resources before reporting the final session event. */
   const finalizeProcess = async (code: number | null): Promise<void> => {
     await waitForProcessGroup(proc);
-    if (connection) rmSync(connection.dir, { recursive: true, force: true });
+    await transcriptFiles?.close();
+    if (connection) place.remove(connection.dir);
     releaseHeld();
     // The process is gone, and its background work with it.
     background.drop();
@@ -407,10 +421,11 @@ function startClaudeSession(spec: RunSpec, prepared: ReturnType<typeof prepareCl
         return;
       }
       if (exited()) return;
+      for (const event of parser.stoppedSubagents()) routeEvent(event);
       if (!activeTurn) {
         // Between turns, what still works is background work the agent started. Stopping it starts no turn. Commands,
         // such as a dev server, are not the agent at work; each has its own stop.
-        for (const taskId of parser.backgroundWork) void write(controlRequest({ subtype: "stop_task", task_id: taskId })).catch(() => undefined);
+        for (const taskId of parser.backgroundWork) void stopTask(taskId).catch(() => undefined);
         return;
       }
       interrupting = true;
@@ -439,11 +454,12 @@ function startClaudeSession(spec: RunSpec, prepared: ReturnType<typeof prepareCl
       await writeUser(text, attachments);
       activeTurn = true;
     },
-    stopCommand: async (commandId) => {
-      // One that already ended has nothing to stop. A stop the user asked for starts no turn.
-      if (exited() || !parser.backgroundCommands.some((command) => command.id === commandId)) return;
-      await write(controlRequest({ subtype: "stop_task", task_id: commandId }));
-    },
+    ...claudeTaskControls(
+      parser,
+      () => !exited() && !ending,
+      stopTask,
+      (event) => routeEvent(event),
+    ),
     // set_model and the effortLevel and fastMode flags take effect on the next turn of the same session; the flags land in
     // the layer --settings filled at launch. The CLI answers each request.
     applySettings: async ({ model, effort, fastMode }) => {
@@ -492,6 +508,10 @@ function startClaudeSession(spec: RunSpec, prepared: ReturnType<typeof prepareCl
 
   /** Stream events settle controls and turn/background windows before emission. */
   const routeEvent = (ev: AgentEvent): void => {
+    if (ev.subagentId) {
+      handle.emit("event", ev);
+      return;
+    }
     if (ev.type === "raw") controlResponse(ev.payload as Record<string, unknown>);
     if (ev.type === "activity.updated" && ev.activityId.startsWith("compaction-") && ev.status !== "running" && compaction) {
       const pending = compaction;
@@ -537,14 +557,7 @@ function startClaudeSession(spec: RunSpec, prepared: ReturnType<typeof prepareCl
     }
     handle.emit("event", ev);
   };
-  const out = readline.createInterface({ input: proc.stdout, crlfDelay: Infinity });
-  out.on("line", (line) => {
-    for (const ev of parser.parseLine(line)) routeEvent(ev);
-  });
-  const err = readline.createInterface({ input: proc.stderr, crlfDelay: Infinity });
-  err.on("line", (line) => {
-    handle.emit("event", { type: "error", runId: spec.runId, ts: Date.now(), message: stripAnsi(line), fatal: false });
-  });
+  observeClaudeOutput(proc, parser, handle, routeEvent, transcriptFiles);
   proc.on("error", (e) => {
     handle.emit("event", { type: "error", runId: spec.runId, ts: Date.now(), message: e.message, fatal: true });
     // A binary that could not be spawned never exits; end the run here so it does not stay live forever.
@@ -553,9 +566,30 @@ function startClaudeSession(spec: RunSpec, prepared: ReturnType<typeof prepareCl
 
   // The first turn is the prompt. A process that cannot take it reports through its exit.
   activeTurn = true;
-  void write(userMessageLine(spec.prompt, spec.attachments)).catch(() => {
-    activeTurn = false;
-  });
+  void userLine(spec.prompt, spec.attachments)
+    .then(write)
+    .catch(() => {
+      activeTurn = false;
+    });
 
   return handle;
+}
+
+/** Keep provider output and local workflow transcripts on the same run handle. */
+function observeClaudeOutput(
+  proc: ChildProcessWithoutNullStreams,
+  parser: ClaudeStreamParser,
+  handle: RunHandle,
+  routeEvent: (event: AgentEvent) => void,
+  transcriptFiles: ClaudeTranscriptFiles | null,
+): void {
+  const out = readline.createInterface({ input: proc.stdout, crlfDelay: Infinity });
+  out.on("line", (line) => {
+    for (const ev of parser.parseLine(line)) routeEvent(ev);
+    transcriptFiles?.sync();
+  });
+  const err = readline.createInterface({ input: proc.stderr, crlfDelay: Infinity });
+  err.on("line", (line) => {
+    handle.emit("event", { type: "error", runId: handle.runId, ts: Date.now(), message: stripAnsi(line), fatal: false });
+  });
 }

@@ -84,7 +84,8 @@ describe("the demo Mac", () => {
     manager.connection.setFrameInterest(new Set(["run-1"]));
     await expect(manager.connection.call("projects.list", {})).resolves.toBe("projects.list");
     await advance(120_000);
-    expect(heard.map((message) => message.t)).toEqual(["interest", "interest", "rpc"]);
+    expect(heard.map((message) => message.t)).toEqual(["rpc", "interest", "interest", "rpc"]);
+    expect(heard[0]).toMatchObject({ method: "session.negotiate" });
   });
 
   it("stays through the background, network changes and retries", async () => {

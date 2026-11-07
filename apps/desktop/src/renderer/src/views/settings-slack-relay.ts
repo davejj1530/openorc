@@ -1,5 +1,5 @@
-import { useState } from "react";
 import type { SlackClientConfig } from "@openorc/protocol";
+import { useState } from "react";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { core } from "../lib/rpc";
 
@@ -70,8 +70,8 @@ export function useSlackRelaySettings(active: boolean) {
       setBotToken("");
       setAppToken("");
       await core.call("slack.host.connect", {});
-    }, "Relay connected to Slack. Register your teammates below.");
-  const disconnectHost = () => act(() => core.call("slack.host.disconnect", {}), "Relay disconnected. Teammates cannot send requests until you reconnect it.");
+    }, "Relay connected to Slack. Register people below.");
+  const disconnectHost = () => act(() => core.call("slack.host.disconnect", {}), "Relay disconnected. People cannot send requests until you reconnect it.");
   const removeDevice = (id: string) => act(() => core.call("slack.device.remove", { id }), "Device removed. Its key no longer works.");
   const registerDevice = () =>
     act(async () => {

@@ -112,6 +112,16 @@
       "name": "lazy-val",
       "version": "1.0.5",
       "distribution": "desktop"
+    },
+    {
+      "name": "jsonlines",
+      "version": "0.1.1",
+      "distribution": "desktop"
+    },
+    {
+      "name": "typescript",
+      "version": "5.9.3",
+      "distribution": "desktop"
     }
   ],
   "files": [
@@ -648,6 +658,36 @@
       }
     },
     {
+      "id": "jsonlines-declaration",
+      "input": "licenses/vendor/jsonlines-0.1.1.package.json",
+      "source": {
+        "package": "jsonlines",
+        "version": "0.1.1",
+        "path": "package.json",
+        "gitHead": "61eb1a0eb68c59e1fd705985a43401c2fe8d7660",
+        "url": "https://github.com/LinusU/node-jsonlines/tree/61eb1a0eb68c59e1fd705985a43401c2fe8d7660",
+        "note": "Original published metadata only, not a substitute for the missing upstream copyright/license notice."
+      },
+      "sha256": "8d77eab2592c26387e0fff46434334543b36a51ae21ad89ef5949605fb917264",
+      "desktop": {
+        "resource": "licenses/vendor/jsonlines-0.1.1.package.json"
+      }
+    },
+    {
+      "id": "typescript-Apache",
+      "input": "apps/desktop/node_modules/typescript/LICENSE.txt",
+      "source": { "package": "typescript", "version": "5.9.3", "path": "LICENSE.txt" },
+      "sha256": "a7d00bfd54525bc694b6e32f64c7ebcf5e6b7ae3657be5cc12767bce74654a47",
+      "desktop": { "asar": "node_modules/typescript/LICENSE.txt" }
+    },
+    {
+      "id": "typescript-third-party",
+      "input": "apps/desktop/node_modules/typescript/ThirdPartyNoticeText.txt",
+      "source": { "package": "typescript", "version": "5.9.3", "path": "ThirdPartyNoticeText.txt" },
+      "sha256": "1af3c68039c57e539422da82a4faada506ce6d0ea6f90e0b699d02dbcdb7a90c",
+      "desktop": { "asar": "node_modules/typescript/ThirdPartyNoticeText.txt" }
+    },
+    {
       "id": "devicon-MIT",
       "input": "licenses/vendor/devicon-MIT.txt",
       "source": "https://raw.githubusercontent.com/devicons/devicon/54cfe13ac10eaa1ef817a343ab0a9437eb3c2e08/LICENSE",
@@ -669,6 +709,12 @@
       "version": "1.0.5",
       "evidence": "lazy-val-declaration",
       "reason": "The published metadata declares MIT and names Vladimir Krivosheev as author. The package and its npm source commit omit copyright/license text. Retain this dependency with its original metadata and disclose the omission; this exception does not supply the missing upstream notice or establish licensing clearance. Review again when upgrading."
+    },
+    {
+      "name": "jsonlines",
+      "version": "0.1.1",
+      "evidence": "jsonlines-declaration",
+      "reason": "The published metadata declares MIT and names Linus Unnebäck as author. The package and its npm source commit omit copyright/license text. Retain this dependency with its original metadata and disclose the omission; this exception does not supply the missing upstream notice or establish licensing clearance. Review again when upgrading."
     }
   ]
 }

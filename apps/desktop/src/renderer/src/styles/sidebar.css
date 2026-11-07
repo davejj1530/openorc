@@ -1,5 +1,5 @@
-/* The sidebar: its column, window corner, screens, list head, project groups, footer and Orclings.
-   It sits on the tile and paints nothing of its own: no fill, no seam. Rows are 34px with a 10px
+/* The sidebar: its column, window corner, list head, day sections, Orclings and the footer dock.
+   It sits on the tile with no fill of its own, a hairline seam at its edge. Rows have a 10px
    corner; the current row takes --current-row-fill and keeps --navigation-ink. */
 
 .app-shell .workspace-navigation {
@@ -22,7 +22,8 @@
   flex-shrink: 0;
 }
 
-/* The window's corner: traffic lights, then Inbox, Search and the sidebar toggle at the right. */
+/* The window's corner: traffic lights where the OS draws them, the wordmark, then Inbox and the
+   sidebar toggle at the right. */
 .sidebar-header {
   display: flex;
   align-items: center;
@@ -30,19 +31,6 @@
 }
 .workspace-navigation[data-traffic-lights="true"] .sidebar-header {
   padding-left: var(--spacing-traffic);
-}
-.sidebar-brand {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  flex: 1;
-  min-width: 0;
-  color: var(--ink);
-  white-space: nowrap;
-}
-.sidebar-brand .sidebar-wordmark {
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .window-corner {
   display: flex;
@@ -70,30 +58,12 @@
   display: none;
 }
 
-/* Screens. One knob carries the current row's fill and slides between rows. */
-.sidebar-nav,
+/* Settings' sections, in place of the app's navigation. */
 .settings-destinations {
-  position: relative;
-  isolation: isolate;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   padding: 0 10px;
   margin-top: 6px;
-}
-.sidebar-nav-knob {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: -1;
-  border-radius: var(--radius-md);
-  background: var(--current-row-fill);
-  pointer-events: none;
-}
-.sidebar-nav-knob[data-placed] {
-  transition:
-    transform var(--duration-swap) var(--ease-out),
-    width var(--duration-swap) var(--ease-out),
-    height var(--duration-swap) var(--ease-out);
 }
 .sidebar-nav-row {
   display: flex;
@@ -115,10 +85,6 @@ button.sidebar-nav-row:hover {
   background-color: var(--surface-2);
   color: var(--ink);
 }
-/* The current row already sits on the knob; a hover fill over it would wash it out. */
-.sidebar-nav button.sidebar-nav-row[aria-current="page"]:hover {
-  background-color: transparent;
-}
 .sidebar-nav-icon {
   display: flex;
   flex-shrink: 0;
@@ -131,20 +97,10 @@ button.sidebar-nav-row:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.sidebar-nav-count {
-  flex-shrink: 0;
-  font-size: var(--text-sm);
-  line-height: 16px;
-  color: var(--ink-4);
-}
-.sidebar-new-thread {
-  color: var(--ink);
-}
 .sidebar-nav-row[aria-current="page"],
 .sidebar-nav-row[aria-current="page"] .sidebar-nav-icon {
   color: var(--navigation-ink);
 }
-/* Settings' own list keeps the row shape without the sliding knob. */
 .settings-destinations {
   flex: 1;
   min-height: 0;
@@ -158,197 +114,70 @@ button.sidebar-nav-row:hover {
   margin-bottom: 18px;
 }
 
-/* More unfolds in place: its rows grow from nothing to 34px. */
-.sidebar-more-chevron {
-  flex-shrink: 0;
-  color: var(--ink-4);
-  transition: rotate var(--duration-arrive) var(--ease-out);
-}
-.sidebar-more-toggle[aria-expanded="true"] {
-  color: var(--ink);
-}
-.sidebar-more-toggle[aria-expanded="true"] .sidebar-more-chevron {
-  rotate: 180deg;
-}
-.sidebar-more {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows var(--duration-resize) var(--ease-out);
-}
-.sidebar-more[data-open] {
-  grid-template-rows: 1fr;
-}
-.sidebar-more-rows {
-  display: grid;
-  min-height: 0;
+/* The wordmark leads the window's corner, after the traffic lights where the OS draws them, else with
+   its cube on the project icons' line. It is always set in Immaculate Gothic, whatever the interface
+   font. Short of room it never truncates: the name wraps onto a second line the box clips, leaving
+   the cube. */
+.sidebar-wordmark {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  align-items: center;
+  gap: 16px 7px;
+  min-width: 0;
+  height: 16px;
   overflow: hidden;
-  opacity: 0;
-  transition: opacity var(--duration-quick) var(--ease-out);
+  color: var(--ink);
+  font-family: "Immaculate Gothic", var(--font-sans);
+  font-size: 15px;
+  letter-spacing: -0.02em;
+  line-height: 16px;
+  white-space: nowrap;
 }
-.sidebar-more[data-open] .sidebar-more-rows {
-  opacity: 1;
-  transition-duration: var(--duration-arrive);
-}
-.sidebar-edit-entry,
-.sidebar-edit-entry .sidebar-nav-icon {
-  color: var(--ink-4);
+.workspace-navigation:not([data-traffic-lights="true"]) .sidebar-wordmark {
+  padding-left: 2px;
 }
 
-/* The Edit sidebar dialog: each screen with its switch. */
-.sidebar-edit {
-  display: grid;
-  gap: 2px;
-}
-.sidebar-edit-row {
+/* The list head: Search, its glyph in the status column and its word where titles start, then the
+   list's tools at the row's end. */
+.sidebar-list-head {
   display: flex;
   align-items: center;
-  gap: 12px;
-  height: 40px;
-  padding: 0 10px;
-  border-radius: var(--radius-lg);
-  color: var(--ink);
-  transition: background-color var(--duration-quick) var(--ease-out);
-}
-.sidebar-edit-row:hover {
-  background-color: var(--control-fill);
-}
-
-/* The list head: Threads and Orclings at their own width, a round search button, then the list's
-   tool. While searching, the capsule grows over the tabs and the tool steps aside for Close. */
-.sidebar-list-head {
-  display: grid;
-  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
   height: var(--control-row);
-  margin: 22px 10px 0;
+  margin: 6px 10px 0;
   flex-shrink: 0;
-}
-.sidebar-list-head > * {
-  grid-area: 1 / 1;
-}
-/* The tabs leave room for search and the tool; on a narrow sidebar the track scrolls instead. */
-.sidebar-list-head .sidebar-list-tabs {
-  justify-self: start;
-  max-width: calc(100% - var(--control-row) - 34px);
-  transition:
-    opacity var(--duration-leave) var(--ease-out),
-    filter var(--duration-leave) var(--ease-out),
-    translate var(--duration-arrive) var(--ease-out);
-}
-/* 14px of side padding at the default width, easing to 7px as the sidebar nears its minimum. */
-.sidebar-list-tab {
-  height: 28px;
-  padding: 0 clamp(7px, calc((var(--width-sidebar) - 224px) / 7 + 7px), 14px);
-  font-size: var(--text-base);
-  line-height: 16px;
-}
-.sidebar-list-tab[aria-current="page"] {
-  color: var(--navigation-ink);
-}
-.sidebar-list-head[data-searching] .sidebar-list-tabs {
-  opacity: 0;
-  filter: blur(var(--arrive-blur));
-  translate: -8px 0;
 }
 .sidebar-search {
-  justify-self: end;
   display: flex;
   align-items: center;
-  width: var(--control-row);
-  height: var(--control-row);
-  margin-right: 30px;
+  gap: 8px;
+  height: 32px;
+  padding: 0 14px 0 10px;
   border-radius: var(--radius-pill);
-  background: var(--surface-2);
-  overflow: hidden;
-  transition:
-    width var(--duration-resize) var(--ease-out),
-    margin-right var(--duration-resize) var(--ease-out);
-}
-.sidebar-list-head[data-searching] .sidebar-search {
-  width: 100%;
-  margin-right: 0;
-}
-.sidebar-search-glass {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: var(--control-row);
-  height: var(--control-row);
-  border-radius: var(--radius-pill);
-  color: var(--ink-3);
-}
-.sidebar-search-glass:hover {
-  background-color: var(--surface-3);
-  color: var(--ink);
-}
-.sidebar-list-head[data-searching] .sidebar-search-glass {
-  pointer-events: none;
-}
-.sidebar-search-input {
-  flex: 1;
-  min-width: 0;
-  height: 100%;
-  margin-right: 26px;
-  padding: 0;
-  background: transparent;
   font-size: var(--text-base);
-  line-height: 16px;
-  color: var(--ink);
-  outline: none;
-  opacity: 0;
-  filter: blur(var(--arrive-blur));
-  pointer-events: none;
-  transition:
-    opacity var(--duration-leave) var(--ease-out),
-    filter var(--duration-leave) var(--ease-out);
-}
-.sidebar-search-input::placeholder {
-  color: var(--ink-4);
-  opacity: 1;
-}
-.sidebar-list-head[data-searching] .sidebar-search-input {
-  opacity: 1;
-  filter: none;
-  pointer-events: auto;
-  transition-duration: var(--duration-arrive);
-  transition-delay: 140ms;
-}
-.sidebar-search-close {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-  margin-right: 4px;
-  border-radius: var(--radius-pill);
   color: var(--ink-3);
-  opacity: 0;
-  scale: 0.8;
-  pointer-events: none;
   transition:
-    opacity var(--duration-leave) var(--ease-out),
-    scale var(--duration-arrive) var(--ease-out);
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
 }
-.sidebar-search-close:hover {
-  background-color: var(--surface-3);
+.sidebar-search:hover {
+  background-color: var(--surface-2);
   color: var(--ink);
 }
-.sidebar-list-head[data-searching] .sidebar-search-close {
-  opacity: 1;
-  scale: 1;
-  pointer-events: auto;
-  transition-delay: 200ms;
-}
-.sidebar-list-tool {
-  justify-self: end;
-  display: flex;
-  margin-right: 3px;
-  transition: translate var(--duration-resize) var(--ease-out);
-}
-.sidebar-list-head[data-searching] .sidebar-list-tool {
-  translate: -26px 0;
-}
-.sidebar-list-head[data-searching] .sidebar-list-tool button:hover {
+.sidebar-search:active {
   background-color: var(--surface-3);
+}
+.sidebar-list-tools {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+}
+.sidebar-new-thread {
+  color: var(--ink);
 }
 
 /* Lists */
@@ -373,107 +202,22 @@ button.sidebar-nav-row:hover {
   overflow-y: auto;
   padding: 14px 10px 16px;
 }
-.sidebar-project + .sidebar-project {
-  margin-top: 6px;
+/* Day sections: a 28px heading in the titles' column, its chevron after the word. The chevron shows
+   while the section is folded and on hover; it turns down as the section opens. */
+.sidebar-section + .sidebar-section {
+  margin-top: 10px;
 }
-
-/* Project headings: 34px, a 16px icon, the name in ink, and a faint meta that swaps for New thread
-   on hover and keyboard focus. */
-.app-shell .browser-group-title > * {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  height: var(--control-row);
-  padding: 0 5px 0 6px;
-  border-radius: var(--radius-md);
-  color: var(--ink-4);
-}
-.project-group-icon,
-.app-shell .browser-group-title .project-icon-trigger {
-  flex-shrink: 0;
-  color: var(--ink-4);
-}
-.project-group-icon {
-  margin-inline: 4px;
-}
-.browser-group-toggle {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  align-self: stretch;
-  min-width: 0;
-  font-size: var(--text-base);
-  line-height: 16px;
-  color: var(--ink);
-  text-align: left;
-}
-.project-group-end {
-  display: grid;
-  flex-shrink: 0;
-  align-items: center;
-  justify-items: end;
-}
-.project-group-end > * {
-  grid-area: 1 / 1;
-  transition: opacity var(--duration-leave) var(--ease-out);
-}
-.project-group-activity {
-  padding-right: 5px;
-  font-size: var(--text-sm);
-  line-height: 16px;
-  color: var(--ink-4);
-  white-space: nowrap;
-  /* It shares a cell with the New thread button and paints above it while faded out. */
-  pointer-events: none;
-}
-.project-group-activity[data-tone="attention"] {
-  color: var(--warn);
-}
-.project-group-end[data-meta] .project-group-new {
-  opacity: 0;
-}
-.browser-group-title:is(:hover, :has(:focus-visible)) .project-group-activity {
-  opacity: 0;
-}
-.browser-group-title:is(:hover, :has(:focus-visible)) .project-group-new {
-  opacity: 1;
-}
-@media (hover: none) {
-  .project-group-activity {
-    opacity: 0;
-  }
-  .project-group-end[data-meta] .project-group-new {
-    opacity: 1;
-  }
-}
-.sidebar-project-threads,
 .sidebar-thread-list {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 2px;
 }
-.sidebar-project-threads {
-  margin-top: 2px;
-}
-/* A fold the user opens grows to its height while its rows arrive one after another. */
-.sidebar-project-threads[data-animate] {
-  overflow: clip;
-  transition: height var(--duration-resize) var(--ease-out);
-}
-.sidebar-project-threads[data-animate] > * {
-  transition: opacity var(--duration-arrive) var(--ease-out) var(--motion-delay, 0ms);
-}
-@starting-style {
-  .sidebar-project-threads[data-animate] {
-    height: 0;
-  }
-  .sidebar-project-threads[data-animate] > * {
-    opacity: 0;
-  }
-}
 
-/* Thread rows: muted titles behind a 16px status lead. The open row sits on the current-row fill
-   with --navigation-ink. A second line appears only while there is something to say. */
+/* Thread rows: a muted title with what the thread needs at its end, what its agent is doing while it
+   works, then the project's icon and name with its pull request at the end. The icon's column is where
+   a parent's tree line leaves. The title leads: its taller line gives it room above the faint lines under
+   it, and the project's artwork stays held back until the row is hovered or open. The open row sits on
+   the current-row fill with --navigation-ink. */
 .app-shell .thread-preview {
   position: relative;
   display: flex;
@@ -483,7 +227,7 @@ button.sidebar-nav-row:hover {
   width: 100%;
   min-width: 0;
   min-height: var(--control-row);
-  padding: 9px 10px;
+  padding: 8px 10px;
   border-radius: var(--radius-md);
   color: var(--ink-3);
   text-align: left;
@@ -498,6 +242,60 @@ button.sidebar-nav-row:hover {
 .app-shell .sidebar-shell .thread-preview[data-open]:not(:focus-visible) {
   background-color: var(--current-row-fill);
 }
+.thread-preview-project {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--ink-4);
+}
+.thread-preview-project-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 16px;
+  justify-content: center;
+}
+.thread-preview-project-icon > * {
+  width: 14px;
+  height: 14px;
+}
+.thread-preview-project-icon > img {
+  opacity: 0.6;
+  transition: opacity var(--duration-leave) var(--ease-out);
+}
+.app-shell .thread-preview:is(:hover, [data-open]) .thread-preview-project-icon > img {
+  opacity: 1;
+}
+.thread-preview-project-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Where the thread works gives way first; the project's name keeps its width, up to most of the line. */
+.thread-preview-project-name:has(+ .thread-preview-workspace) {
+  flex-shrink: 0;
+  max-width: 60%;
+}
+.thread-preview-workspace {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.thread-preview-workspace::before {
+  content: "·" / "";
+  margin-right: 5px;
+}
+.thread-preview-pull {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+}
 .thread-preview-heading {
   display: flex;
   align-items: center;
@@ -510,17 +308,60 @@ button.sidebar-nav-row:hover {
   width: 16px;
   justify-content: center;
 }
+.thread-preview-status:empty {
+  display: none;
+}
 .thread-preview-title {
   flex: 1;
   min-width: 0;
   font-size: var(--text-base);
-  line-height: 16px;
+  line-height: 18px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 .thread-preview[data-open] .thread-preview-title {
   color: var(--navigation-ink);
+}
+/* A working title lights up left to right: a band of full ink sweeps across its muted words, on the open
+   row and under hover too, where the title is otherwise already in full ink and the band would not show. */
+.thread-preview-title[data-working] {
+  background: linear-gradient(90deg, var(--ink-3) 0% 35%, var(--ink) 50%, var(--ink-3) 65% 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: thread-title-sweep 2s linear infinite;
+}
+@keyframes thread-title-sweep {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .thread-preview-title[data-working] {
+    animation: none;
+    background: none;
+    -webkit-text-fill-color: currentColor;
+  }
+}
+/* A row's mark (spinner, question, failure, unread dot), at the end of the line under its title: every row's
+   marks share one column, under a parent's chevron. */
+.thread-preview-mark {
+  display: flex;
+  flex-shrink: 0;
+  width: 16px;
+  justify-content: center;
+  margin-left: auto;
+}
+.thread-preview-mark:empty {
+  display: none;
+}
+.thread-preview-pull + .thread-preview-mark {
+  margin-left: 0;
 }
 .thread-status-spinner {
   color: var(--ink-4);
@@ -542,16 +383,33 @@ button.sidebar-nav-row:hover {
 .sidebar-section-toggle {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   width: 100%;
   height: 28px;
-  padding: 0 10px 0 30px;
+  padding: 0 10px;
   border-radius: var(--radius-md);
   font-size: var(--text-sm);
   color: var(--ink-4);
+  transition: color var(--duration-quick) var(--ease-out);
 }
 .sidebar-section-toggle:hover {
   color: var(--ink);
+}
+.sidebar-section-chevron {
+  opacity: 0;
+  transition:
+    opacity var(--duration-quick) var(--ease-out),
+    transform var(--duration-resize) var(--ease-out);
+}
+.sidebar-section-toggle:is(:hover, :focus-visible) .sidebar-section-chevron,
+.sidebar-section:not([data-open]) .sidebar-section-chevron {
+  opacity: 1;
+}
+.sidebar-section[data-open] .sidebar-section-chevron {
+  transform: rotate(90deg);
+}
+.sidebar-section-count {
+  margin-left: auto;
 }
 /* Empty, loading and load-more rows are faint rows lined up with the titles. */
 .browser-empty,
@@ -570,6 +428,11 @@ button.sidebar-nav-row:hover {
 button.browser-empty:hover,
 .browser-load-more:hover {
   color: var(--ink);
+}
+/* The list's own notes and paging line up with root titles; a sub thread's paging keeps its lead. */
+.browser-threads > :is(.browser-empty, .browser-load-more),
+.sidebar-thread-list > .browser-load-more {
+  padding-left: 10px;
 }
 .browser-hint {
   padding: 8px 20px;
@@ -602,34 +465,89 @@ button.browser-empty:hover,
   margin-top: 2px;
 }
 
-/* Footer: Add project as a quiet row, Settings as a round button. */
+/* Footer: one row, the next message's weekly usage first, then the dock at the row's end: the app's
+   screens and Orclings as round buttons, Settings last. One knob carries the current one's fill and
+   slides between them. The row never wraps: the usage slot takes what the dock leaves, and the chip
+   picks the fullest look that fits it, down to a round button the dock's size. */
 .sidebar-footer {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
   padding: 6px 10px 10px;
 }
-/* The open thread's weekly usage, then Settings at the row's end. */
-.sidebar-account-row {
+.sidebar-usage {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 32px;
+}
+.sidebar-usage:empty {
+  display: none;
+}
+.sidebar-dock {
+  position: relative;
+  isolation: isolate;
   display: flex;
   align-items: center;
-  gap: 6px;
-  min-width: 0;
+  gap: 2px;
 }
-.sidebar-account-row > :last-child {
-  margin-left: auto;
+.sidebar-dock-knob {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  border-radius: var(--radius-pill);
+  background: var(--current-row-fill);
+  pointer-events: none;
 }
+.sidebar-dock-knob[data-placed] {
+  transition: transform var(--duration-swap) var(--ease-out);
+}
+.sidebar-dock-button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  color: var(--ink-3);
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
+}
+.sidebar-dock-button:hover {
+  background-color: var(--surface-2);
+  color: var(--ink);
+}
+.sidebar-dock-button:active {
+  background-color: var(--surface-3);
+}
+.sidebar-dock-button[data-current] {
+  color: var(--navigation-ink);
+}
+/* The current button already sits on the knob; a hover fill over it would wash it out. */
+.sidebar-dock-button[data-current]:hover {
+  background-color: transparent;
+}
+/* The chip's looks (AccountUsage measures which fits): "64% left", "64%" with its ring, or the ring
+   alone in a 32px circle. */
 .account-usage-chip {
   display: flex;
+  flex: none;
   align-items: center;
-  gap: 8px;
-  min-width: 0;
-  height: var(--control-row);
-  padding: 0 14px 0 10px;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px 0 8px;
   border-radius: var(--radius-pill);
   background: var(--control-fill);
   white-space: nowrap;
   transition: background-color var(--duration-quick) var(--ease-out);
+}
+.account-usage-chip[data-look="short"] .account-usage-label,
+.account-usage-chip[data-look="icon"] :is(.account-usage-value, .account-usage-label) {
+  display: none;
+}
+.account-usage-chip[data-look="icon"] {
+  padding: 0 8px;
 }
 .account-usage-chip:hover,
 .account-usage-chip[data-popup-open] {
@@ -663,47 +581,131 @@ button.browser-empty:hover,
   color: var(--attention);
 }
 .account-usage-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  margin-left: -2px;
   font-size: var(--text-xs);
   line-height: 16px;
   color: var(--ink-4);
 }
-/* The usage card from Settings, as the popover itself. */
+/* The chip's popover: every account's 5-hour and weekly limits in one table. Hairlines sit between
+   rows; the open thread's account sits on the current-row fill instead. */
 .account-usage-popup {
-  width: min(360px, calc(100vw - 24px));
-  padding: 0;
+  width: min(440px, calc(100vw - 24px));
+  padding: 6px;
 }
-.account-usage-popup .usage-account {
-  background: none;
+.usage-table-wrap {
+  display: grid;
+  gap: 4px;
 }
-.sidebar-add-project {
+.usage-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.usage-table :is(th, td) {
+  padding: 0 10px;
+  font-weight: 400;
+  text-align: left;
+}
+.usage-table thead th {
+  height: 30px;
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--ink-4);
+}
+.usage-table thead th:not(:first-child) {
+  width: 124px;
+}
+.usage-table tbody :is(th, td) {
+  height: 52px;
+}
+.usage-table tbody tr + tr > * {
+  border-top: var(--hairline) solid var(--line);
+}
+.usage-table tbody tr[data-current] > *,
+.usage-table tbody tr[data-current] + tr > * {
+  border-top-color: transparent;
+}
+.usage-table tbody tr[data-current] > * {
+  background: var(--current-row-fill);
+}
+.usage-table tbody tr[data-current] > :first-child {
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+}
+.usage-table tbody tr[data-current] > :last-child {
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+.usage-table-account {
   display: flex;
-  flex: 1;
   align-items: center;
   gap: 10px;
   min-width: 0;
-  height: var(--control-row);
-  padding: 0 10px;
-  border-radius: var(--radius-md);
+}
+.usage-table-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-size: var(--text-base);
+  line-height: 16px;
+  color: var(--ink);
+}
+.usage-table-plan {
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--ink-4);
+}
+.usage-table-limit {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 8px;
+}
+.usage-table-limit .account-usage-ring {
+  grid-row: span 2;
+}
+.usage-table-value {
+  font-size: var(--text-base);
+  line-height: 16px;
+  color: var(--ink);
+}
+.usage-table-reset {
+  overflow: hidden;
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--ink-4);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.usage-table-cell[data-tone] .usage-table-value {
+  color: var(--warn);
+}
+.usage-table-cell[data-empty] {
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--ink-4);
+}
+.usage-table-note {
+  padding: 12px 10px;
   font-size: var(--text-base);
   line-height: 16px;
   color: var(--ink-4);
-  transition:
-    background-color var(--duration-leave) var(--ease-out),
-    color var(--duration-leave) var(--ease-out);
 }
-.sidebar-add-project > span {
+.usage-table-more {
+  justify-self: start;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  line-height: 16px;
   color: var(--ink-3);
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
 }
-.sidebar-add-project:hover {
+.usage-table-more:hover {
   background-color: var(--surface-2);
   color: var(--ink);
 }
-.sidebar-add-project:hover > span {
-  color: var(--ink);
-}
-
 /* The resize grip rides the seam between the sidebar and the work column. */
 .app-shell .resize-handle[data-edge="sidebar"] {
   width: 0;
@@ -719,6 +721,18 @@ button.browser-empty:hover,
   left: -0.5px;
   width: 4px;
 }
+/* A hairline seam between the sidebar and the work column, the window's full height. The floating
+   sidebar at 900px and narrower leans on its shadow instead. */
+.app-shell .sidebar-shell::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--hairline);
+  background: var(--line);
+  pointer-events: none;
+}
 
 /* At 900px and narrower the sidebar floats over the work column: an opaque tile with the one
    soft shadow the app keeps, since tile over tile has no fill step to lean on. */
@@ -727,6 +741,9 @@ button.browser-empty:hover,
     display: flex;
   }
   .app-shell .resize-handle[data-edge="sidebar"] {
+    display: none;
+  }
+  .app-shell .sidebar-shell::after {
     display: none;
   }
   .app-shell .workspace-navigation,
@@ -754,15 +771,12 @@ button.browser-empty:hover,
 }
 
 @media (forced-colors: active) {
-  .sidebar-nav-knob {
+  .sidebar-dock-knob {
     display: none;
   }
   .sidebar-nav-row[aria-current="page"],
-  .sidebar-list-tab[aria-current="page"],
+  .sidebar-dock-button[data-current],
   .orcling-contact[aria-current="page"] {
     outline: 1px solid Highlight;
-  }
-  .sidebar-search {
-    outline: 1px solid ButtonBorder;
   }
 }

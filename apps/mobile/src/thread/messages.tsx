@@ -1,14 +1,15 @@
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import { Pressable, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { FileText, WorkMessage } from "../generated/icons";
 import { Text } from "../ui/Text";
 import { attachmentRef, ImageTile, isImagePath } from "./images";
-import { client } from "../client";
+import { useHostClient } from "../client";
 import { runBlock, useRunRead } from "../run-read";
 import { useOpen } from "./disclosure";
 import { messagePieces } from "./markdown-chunks";
 import { Markdown } from "./Markdown";
+import { replySegments } from "./reply-images";
 import type { MessageBlock, PieceSource } from "./rows";
 
 /** The name the person gave an attachment, after the id that keeps it unique. */
@@ -112,7 +113,7 @@ function Pending() {
  */
 function usePieceText({ runId, blockId, index }: PieceSource, text: string, streaming: boolean): string {
   return useRunRead(
-    client.runs,
+    useHostClient().runs,
     (runs) => {
       if (!streaming) return text;
       const block = runBlock(runs, runId, blockId);
@@ -128,6 +129,29 @@ function usePieceText({ runId, blockId, index }: PieceSource, text: string, stre
  */
 export const Reply = memo(function Reply({ text, streaming, source }: { text: string; streaming: boolean; source: PieceSource }) {
   const words = usePieceText(source, text, streaming);
+  const segments = useMemo(() => replySegments(words), [words]);
   if (streaming && !words) return <Pending />;
-  return <Markdown text={words} streaming={streaming} />;
+  if (!segments.some((segment) => segment.kind === "image")) return <Markdown text={words} streaming={streaming} />;
+  // The gap is a paragraph's own margin, so an image sits in the reply's rhythm.
+  return (
+    <View className="gap-3.5">
+      {segments.map((segment, index) =>
+        segment.kind === "text" ? (
+          <Markdown key={index} text={segment.text} streaming={streaming && index === segments.length - 1} />
+        ) : (
+          <ReplyImage key={index} path={segment.path} alt={segment.alt} source={source} streaming={streaming} />
+        ),
+      )}
+    </View>
+  );
 });
+
+/**
+ * An image the reply shows from a file on the Mac, fetched once the message is complete: the Mac serves it only to
+ * the message that names it.
+ */
+function ReplyImage({ path, alt, source, streaming }: { path: string; alt: string; source: PieceSource; streaming: boolean }) {
+  const label = alt || path.split(/[\\/]/).pop() || "Image";
+  if (streaming) return <View className="w-full rounded-xl bg-surface-2" style={{ aspectRatio: 16 / 9 }} />;
+  return <ImageTile asset={{ kind: "reply-image", runId: source.runId, messageId: source.blockId, path }} label={label} />;
+}

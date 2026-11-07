@@ -1,10 +1,10 @@
 import { creditBalanceLabel, usageCardState, type UsageCardState } from "./settings-presentation";
 import { ResetControls } from "./settings-resets";
-import { harnessCatalog, harnessIds, type AllowanceWindow, type ProviderUsage } from "@openorc/protocol";
+import { harnessCatalog, harnessIds, percentLeft, type AllowanceWindow, type ProviderUsage } from "@openorc/protocol";
 import { Button, IconButton, TextButton, Tooltip } from "../components/ui";
 import { HarnessLogo } from "../components/HarnessLogo";
 import { ChevronDown, ExternalLink, RefreshCw } from "../components/icons";
-import { allowanceState, formatUsageTime, percentLeft, usageResetLabel } from "@openorc/client";
+import { allowanceState, formatUsageTime, usageResetLabel } from "@openorc/client";
 import { useEffect, useId, useRef, useState } from "react";
 import { useRpc } from "../lib/client";
 import { cn } from "../lib/cn";

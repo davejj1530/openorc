@@ -4,6 +4,7 @@ import type { Project } from "@openorc/protocol";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { core } from "../lib/rpc";
 import { queryClient } from "../lib/client";
+import { useLayout } from "../lib/layout";
 import { useRouter } from "../lib/router";
 import { ImportProjectDialog } from "./ImportProjectDialog";
 
@@ -54,12 +55,13 @@ it("asks before creating a folder that does not exist, and an edited path import
   expect(screen.queryByText("This folder doesn’t exist yet.")).toBeNull();
 });
 
-it("creates and imports the missing folder on the second press, then opens the project", async () => {
+it("creates and imports the missing folder on the second press, then starts a thread in it", async () => {
   await importMissingFolder();
   fireEvent.click(screen.getByRole("button", { name: "Create and import" }));
   await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
   expect(importCalls()).toEqual([["projects.import", { rootPath: missingFolder, create: true }]]);
-  expect(useRouter.getState().route).toEqual({ view: "project", projectId: `project:${missingFolder}` });
+  expect(useRouter.getState().route).toEqual({ view: "newthread", projectId: `project:${missingFolder}` });
+  expect(useLayout.getState().projectId).toBe(`project:${missingFolder}`);
 });
 
 it("imports anyway when the folder check fails, so the import's error explains the problem", async () => {
@@ -71,6 +73,16 @@ it("imports anyway when the folder check fails, so the import's error explains t
   expect(importCalls()).toEqual([["projects.import", { rootPath: missingFolder, create: false }]]);
 });
 
+it("opens the new thread screen on a project list that already holds the import", async () => {
+  const known = { id: "project:/Users/you/dev/known", rootPath: "/Users/you/dev/known" } as Project;
+  queryClient.setQueryData(["projects.list", {}], [known]);
+  show();
+  typeFolder(existingFolder);
+  fireEvent.click(screen.getByRole("button", { name: "Import" }));
+  await waitFor(() => expect(useRouter.getState().route).toEqual({ view: "newthread", projectId: `project:${existingFolder}` }));
+  expect(queryClient.getQueryData(["projects.list", {}])).toEqual([known, { id: `project:${existingFolder}`, rootPath: existingFolder }]);
+});
+
 it("imports an existing folder at once without creating anything", async () => {
   show();
   typeFolder(` ${existingFolder} `);
@@ -78,4 +90,5 @@ it("imports an existing folder at once without creating anything", async () => {
   await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
   expect(importCalls()).toEqual([["projects.import", { rootPath: existingFolder, create: false }]]);
   expect(screen.queryByText("This folder doesn’t exist yet.")).toBeNull();
+  expect(useRouter.getState().route).toEqual({ view: "newthread", projectId: `project:${existingFolder}` });
 });

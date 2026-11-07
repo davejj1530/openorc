@@ -1,12 +1,12 @@
+import type { PermissionPreset, ConversationPlan as Plan, Project, RpcMethod, RpcParams, RpcResults, RunMode, ThreadSummary } from "@openorc/protocol";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
-import { QueryClientProvider } from "@tanstack/react-query";
-import type { ConversationPlan as Plan, RpcMethod, RpcParams, RpcResults, ThreadSummary, PermissionPreset, RunMode, Project } from "@openorc/protocol";
 import { Composer } from "../../apps/desktop/src/renderer/src/components/Composer";
 import { Panel } from "../../apps/desktop/src/renderer/src/components/Panel";
+import { queryClient } from "../../apps/desktop/src/renderer/src/lib/client";
 import { useLayout } from "../../apps/desktop/src/renderer/src/lib/layout";
 import { core } from "../../apps/desktop/src/renderer/src/lib/rpc";
-import { queryClient } from "../../apps/desktop/src/renderer/src/lib/client";
 
 import { useTheme } from "../../apps/desktop/src/renderer/src/lib/theme";
 
@@ -26,27 +26,9 @@ const docs: Plan[] = [
 const calls: unknown[] = [];
 core.call = async <M extends RpcMethod>(method: M, input: RpcParams<M>): Promise<RpcResults[M]> => {
   calls.push({ method, input });
-  if (method === "threads.plans" && (input as { id: string }).id === "team")
-    return [
-      { ...docs[0]!, id: "chat-34", source: "response", revision: 34, runId: "vice-run", text: "A chat reply the team plan panel must not show as the plan." },
-      { ...docs[0]!, id: "member-33", revision: 33, runId: "vice-run", text: "# Member proposal, not the shared plan" },
-      docs[0]!,
-    ] as RpcResults[M];
   if (method === "threads.plans")
     return ((input as { id: string }).id === "other" ? [{ ...docs[0]!, id: "other-plan", threadId: "other", revision: 1, text: "# Other conversation plan" }] : docs) as RpcResults[M];
   if (method === "threads.exportPlan") return { path: `/repo/${(input as RpcParams<"threads.exportPlan">).filename}` } as RpcResults[M];
-  if (method === "orchestration.runtime" || method === "orchestration.implementPlan")
-    return {
-      executions: [
-        {
-          state: "completed",
-          actors: [
-            { id: "lead", state: "completed", runIds: ["run"] },
-            { id: "member:vice", state: "completed", runIds: ["vice-run"] },
-          ],
-        },
-      ],
-    } as unknown as RpcResults[M];
   if (method === "threads.implementPlan") return { id: "implementation" } as RpcResults[M];
   if (method === "skills.list" || method === "threads.list" || method === "tasks.list" || method === "agents.models") return [] as RpcResults[M];
   return null as RpcResults[M];
@@ -60,7 +42,7 @@ function App() {
   const [permission, setPermission] = useState<PermissionPreset>("review");
   const [agent, setAgent] = useState<"claude" | "codex">("claude");
   const [draft, setDraft] = useState("Keep existing threads compatible");
-  const thread = { id, projectId: "project", teamInstanceId: id === "team" ? "saved-team" : null, mode, permissionMode: permission, activity: "idle", agent } as ThreadSummary;
+  const thread = { id, projectId: "project", mode, permissionMode: permission, activity: "idle", agent } as ThreadSummary;
   Object.assign(window, {
     planSmoke: {
       calls,

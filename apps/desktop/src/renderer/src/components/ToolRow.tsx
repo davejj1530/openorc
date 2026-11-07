@@ -5,6 +5,7 @@ import { type Block, visualizationFromTool, liveVerb, stateLabel, toolCallPresen
 import { ChevronRight, CircleCheck, Loader2, Terminal, X } from "./icons";
 import { toolIcons } from "./tool-icons";
 import { ToolDetail } from "./ToolDetail";
+import { SubagentCards } from "./SubagentCards";
 
 const McpAppResult = lazy(() => import("./McpAppResult"));
 const VisualizationResult = lazy(() => import("./VisualizationResult"));
@@ -32,8 +33,8 @@ function useToolOutput(block: ToolBlock, open: boolean): unknown {
 }
 
 /** Open on request, and fetching an omitted output as soon as the pointer or focus reaches the row. */
-function useToolDisclosure(block: ToolBlock, defaultOpen: boolean) {
-  const [open, setOpen] = useState(defaultOpen);
+function useToolDisclosure(block: ToolBlock) {
+  const [open, setOpen] = useState(false);
   const [near, setNear] = useState(false);
   const output = useToolOutput(block, open || near);
   const approach = block.outputOmitted ? () => setNear(true) : undefined;
@@ -45,24 +46,51 @@ function toolState(block: ToolBlock): string {
   return block.status ?? (block.isError ? "error" : "success");
 }
 
-/** A tool call: a command as its own card, anything else as one quiet row. Click either for the call itself. */
-export function ToolRow({ block, defaultOpen = false }: { block: ToolBlock; defaultOpen?: boolean }) {
+/**
+ * A tool call: a command as its own card, anything else as one quiet row. Click either for the call itself.
+ * `details` draws only what the call holds, for a call opened from the work list's chip, which stands as its head.
+ */
+export function ToolRow({ block, details = false }: { block: ToolBlock; details?: boolean }) {
+  if (block.subagent) return <SubagentCards blocks={[block]} />;
   const visualization = visualizationFromTool(block);
   const presentation = toolCallPresentation(block.name, block.input);
-  if (presentation.verb === "Ran" && !visualization) return <CommandCard block={block} command={presentation.object} defaultOpen={defaultOpen} />;
+  if (details) return <ToolCallDetails block={block} visualization={visualization} />;
+  if (presentation.verb === "Ran" && !visualization) return <CommandCard block={block} command={presentation.object} />;
   return (
     <div className="tool-row-block">
-      {visualization ? (
-        <Suspense fallback={<p className="text-sm text-ink-2">{visualization.description}</p>}>
-          <VisualizationResult visualization={visualization} />
-        </Suspense>
-      ) : null}
-      <PlainToolRow block={block} label={rowLabel(block, presentation.verb, Boolean(visualization))} object={visualization ? "" : presentation.object} defaultOpen={defaultOpen} />
-      {!visualization && block.mcp && block.done && block.runId ? (
-        <Suspense fallback={null}>
-          <McpAppResult runId={block.runId} toolCallId={block.id} />
-        </Suspense>
-      ) : null}
+      {visualization ? <Visualization visualization={visualization} /> : null}
+      <PlainToolRow block={block} label={rowLabel(block, presentation.verb, Boolean(visualization))} object={visualization ? "" : presentation.object} />
+      {!visualization ? <McpApp block={block} /> : null}
+    </div>
+  );
+}
+
+function Visualization({ visualization }: { visualization: NonNullable<ReturnType<typeof visualizationFromTool>> }) {
+  return (
+    <Suspense fallback={<p className="text-sm text-ink-2">{visualization.description}</p>}>
+      <VisualizationResult visualization={visualization} />
+    </Suspense>
+  );
+}
+
+function McpApp({ block }: { block: ToolBlock }) {
+  if (!block.mcp || !block.done || !block.runId) return null;
+  return (
+    <Suspense fallback={null}>
+      <McpAppResult runId={block.runId} toolCallId={block.id} />
+    </Suspense>
+  );
+}
+
+/** A call without a head of its own: what it shows, any progress while it runs, then what it was asked and gave. */
+function ToolCallDetails({ block, visualization }: { block: ToolBlock; visualization: ReturnType<typeof visualizationFromTool> }) {
+  const output = useToolOutput(block, true);
+  return (
+    <div className="tool-call-details">
+      {visualization ? <Visualization visualization={visualization} /> : null}
+      {block.progress ? <div className="tool-call-progress">{block.progress}</div> : null}
+      <ToolDetail block={block} output={output} />
+      {!visualization ? <McpApp block={block} /> : null}
     </div>
   );
 }
@@ -72,8 +100,8 @@ function rowLabel(block: ToolBlock, verb: string, visualization: boolean): strin
   return block.done ? verb : liveVerb(verb);
 }
 
-function PlainToolRow({ block, label, object, defaultOpen }: { block: ToolBlock; label: string; object: string; defaultOpen: boolean }) {
-  const { open, toggle, output, approach } = useToolDisclosure(block, defaultOpen);
+function PlainToolRow({ block, label, object }: { block: ToolBlock; label: string; object: string }) {
+  const { open, toggle, output, approach } = useToolDisclosure(block);
   const { icon, tone } = toolCallPresentation(block.name, block.input);
   const Icon = toolIcons[icon];
   return (
@@ -115,8 +143,8 @@ function commandLine(block: ToolBlock): string {
 }
 
 /** A command the agent ran, as a card: the command, a status that trades places with its result, and its last line. */
-function CommandCard({ block, command, defaultOpen }: { block: ToolBlock; command: string; defaultOpen: boolean }) {
-  const { open, toggle, output, approach } = useToolDisclosure(block, defaultOpen);
+function CommandCard({ block, command }: { block: ToolBlock; command: string }) {
+  const { open, toggle, output, approach } = useToolDisclosure(block);
   const state = toolState(block);
   const line = commandLine(block);
   return (

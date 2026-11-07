@@ -1,3 +1,4 @@
+import { liveHeadline, workEntries } from "@openorc/client";
 import { describe, expect, it } from "vitest";
 import { emptyRowMemo, endMark, fixedHeight, isNews, newestRow, transcriptRows, unsentRows, withWaitingApprovals, type Row } from "./rows";
 import { activity, finishedTurn, runStore, type Draft } from "./test-fixtures/run-store";
@@ -142,6 +143,26 @@ describe("transcriptRows", () => {
     expect(worded.filter((row, i) => row !== titled[i]).map((row) => row.kind)).toEqual(["work"]);
     run = frame({ type: "thinking.delta", messageId: "why", text: " two warnings." });
     expect(transcriptRows(run.blocks, activity(run), "r", memo)).toBe(worded);
+  });
+
+  it("keeps a finished step done while a note that announced the next one waits for its first call", () => {
+    const { frame } = runStore();
+    frame(...finishedTurn);
+    const run = frame(
+      { type: "turn.started", turnId: "t2" },
+      { type: "message.completed", messageId: "ask-2", role: "user", text: "Do it" },
+      { type: "tool.started", toolCallId: "page", name: "mcp__openorc__browser", input: { action: "open", url: "http://localhost:4321/" }, parentToolCallId: null },
+      { type: "tool.completed", toolCallId: "page", name: "mcp__openorc__browser", output: "Opened", isError: false },
+      { type: "message.completed", messageId: "note", role: "assistant", text: "I opened the page in Preview. Next I'll build the site to make sure nothing else used those rules." },
+    );
+    const work = transcriptRows(run.blocks, activity(run), "r", emptyRowMemo()).findLast((row) => row.kind === "work");
+    expect(work?.kind === "work" && work.live).toBe(true);
+    const now = work?.kind === "work" ? work.now : null;
+    expect(now !== null && now !== "reply" && now.kind === "message" && now.id).toBeTruthy();
+    expect(liveHeadline(workEntries(work?.kind === "work" ? work.work : []), now && now !== "reply" ? [now] : [])).toMatchObject({
+      label: "Build the site to make sure nothing else used those rules",
+      entryId: null,
+    });
   });
 
   it("changes only the work row while a step runs, and the head once the turn ends", () => {
@@ -395,4 +416,30 @@ describe("withWaitingApprovals", () => {
     const conversation = transcriptRows(run.blocks, activity(run), "r", emptyRowMemo());
     expect(withWaitingApprovals(conversation, [])).toBe(conversation);
   });
+});
+
+it("shows parallel subagent cards once without duplicating them in the work receipt", () => {
+  const { frame } = runStore();
+  let run = frame(
+    { type: "message.completed", messageId: "ask", role: "user", text: "Review the code" },
+    { type: "turn.started", turnId: "t" },
+    { type: "subagent.started", subagentId: "a", threadId: "child-a", title: "Review tests", prompt: "Check the tests" },
+    { type: "subagent.started", subagentId: "b", threadId: "child-b", title: "Review types" },
+  );
+  const memo = emptyRowMemo();
+  const rows = transcriptRows(run.blocks, activity(run), "r", memo);
+  const group = rows.find((row) => row.kind === "subagents");
+  expect(group?.blocks.map((block) => block.subagent?.threadId)).toEqual(["child-a", "child-b"]);
+  expect(rows.filter((row) => row.kind === "subagents")).toHaveLength(1);
+  expect(rows.flatMap((row) => (row.kind === "work" ? row.work.filter((block) => block.kind === "tool") : []))).toEqual([]);
+  run = frame({ type: "subagent.updated", subagentId: "a", threadId: "child-a", status: "completed", result: "Tests pass" });
+  const changed = transcriptRows(run.blocks, activity(run), "r", memo).find((row) => row.kind === "subagents");
+  expect(changed).not.toBe(group);
+  expect(changed?.blocks[0]?.subagent).toMatchObject({ status: "completed", result: "Tests pass" });
+});
+
+it("omits a hosted child's unknown assignment placeholder", () => {
+  const { frame } = runStore();
+  const run = frame({ type: "message.completed", messageId: "prompt", role: "user", text: "" }, { type: "turn.started", turnId: "child" });
+  expect(transcriptRows(run.blocks, activity(run), "r", emptyRowMemo()).some((row) => row.kind === "prompt")).toBe(false);
 });

@@ -2,11 +2,18 @@
 
 OpenOrc encrypts the credentials it saves with Electron `safeStorage`, which uses the macOS Keychain, Windows data protection, or the Linux secret service. Only the main process reads or writes them. Settings screens and usage views learn only whether a key is saved and see safe error messages, never the key itself.
 
-The data folder holds three separate encrypted files:
+The data folder holds a separate encrypted file for each kind of secret, created only when you save one. `apps/desktop/src/shared/protected-secrets.ts` lists them:
 
 - `memory-extraction-key.enc`: the optional Anthropic API key for memory extraction.
 - `slack-secrets.enc`: Slack tokens and device settings (see [Slack](slack.md)).
 - `github-reviewer-app.enc`: the private key of your pull request reviewer app (see below).
+- `remote-access-key.enc`: the desktop's key pair for phone access, which paired phones recognize it by.
+- `apns-key.enc`: the Apple push key you add in **Settings → Phone** for phone notifications.
+- `cloud-credentials.enc`: the Vercel and Agent37 connections cloud threads run on.
+- `claude-cloud-tokens.enc`: each Claude account's token for cloud sandboxes (see [multiple Claude Code accounts](claude-accounts.md#cloud-tokens)).
+- `codex-cloud-login.enc`: the Codex login or OpenAI API key cloud sandboxes use.
+- `opencode-cloud-keys.enc`: OpenCode's provider keys for the cloud.
+- `cloud-brain.enc` and `cloud-brain-move.enc`: the cloud brain's key, team, and region, and a new brain's while it moves to another service.
 
 The memory-extraction key is never written to the SQLite database. Each save writes a new owner-only file, syncs it to disk, replaces the old file, and on macOS and Linux syncs the folder before reporting success. Saves to the same file happen one at a time. Linux's `basic_text` backend, which does not encrypt, is refused. Reading a missing file needs no keychain access; saving or reading a key needs working OS protection.
 

@@ -1,14 +1,10 @@
-import { Menu } from "@base-ui/react/menu";
 import type { FileScope } from "@openorc/protocol";
-import { Check, MoreHorizontal, Plus, RefreshCw } from "../components/icons";
-import { menuItem, menuPopup } from "../components/menu";
-import { floatingGround } from "../lib/use-anchor-ground";
-import { CoversPreview } from "../lib/browser-preview";
+import { Plus, RefreshCw } from "../components/icons";
 import { IconButton, Tooltip } from "../components/ui";
 import { queryClient } from "../lib/client";
 import { useUi } from "../lib/ui";
 
-export function FileExplorerToolbar({ scope, showIgnored, onShowIgnored }: { scope: FileScope; showIgnored: boolean; onShowIgnored: (show: boolean) => void }) {
+export function FileExplorerToolbar({ scope }: { scope: FileScope }) {
   return (
     <header className="file-explorer-toolbar">
       <span className="text-xs text-ink-3 flex-1">Explorer</span>
@@ -22,22 +18,6 @@ export function FileExplorerToolbar({ scope, showIgnored, onShowIgnored }: { sco
           <Plus size={14} />
         </IconButton>
       </Tooltip>
-      <Menu.Root>
-        <Menu.Trigger render={<IconButton size="xs" aria-label="Explorer options" title="Explorer options" />}>
-          <MoreHorizontal size={14} />
-        </Menu.Trigger>
-        <Menu.Portal>
-          <CoversPreview />
-          <Menu.Positioner sideOffset={6} align="end" className="z-40" collisionPadding={8}>
-            <Menu.Popup ref={floatingGround} className={menuPopup}>
-              <Menu.CheckboxItem className={menuItem} checked={showIgnored} onCheckedChange={onShowIgnored}>
-                <Check size={14} className={showIgnored ? "" : "invisible"} />
-                Show ignored files
-              </Menu.CheckboxItem>
-            </Menu.Popup>
-          </Menu.Positioner>
-        </Menu.Portal>
-      </Menu.Root>
     </header>
   );
 }

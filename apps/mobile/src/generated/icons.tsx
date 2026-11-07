@@ -42,6 +42,7 @@ export const ArchiveRestore = icon(
 );
 export const ArrowDown = icon("ArrowDown", <Path d="M12 4v16m-6-6 6 6 6-6" />);
 export const ArrowLeft = icon("ArrowLeft", <Path d="M20 12H4m6-6-6 6 6 6" />);
+export const ArrowLeftRight = icon("ArrowLeftRight", <Path d="M4 8h16m-4-4 4 4-4 4 M20 16H4m4-4-4 4 4 4" />);
 export const ArrowRight = icon("ArrowRight", <Path d="M4 12h16m-6-6 6 6-6 6" />);
 export const ArrowUp = icon("ArrowUp", <Path d="M12 20V4m-6 6 6-6 6 6" />);
 export const ArrowUpRight = icon("ArrowUpRight", <Path d="M6 18 18 6 M7 6h11v11" />);
@@ -98,6 +99,7 @@ export const Clock = icon(
     <Path d="M12 7v5l3.5 2.5" />
   </>,
 );
+export const Cloud = icon("Cloud", <Path d="M7.5 19h10a4.5 4.5 0 0 0 .5-8.97A6.5 6.5 0 0 0 5.6 11.3 4 4 0 0 0 7.5 19Z" />);
 export const Code2 = icon("Code2", <Path d="m7 7-5 5 5 5 M17 7l5 5-5 5 M14 4l-4 16" />);
 export const Columns2 = icon(
   "Columns2",
@@ -111,6 +113,13 @@ export const Copy = icon(
   <>
     <Rect x="8" y="8" width="12" height="12" rx="2" />
     <Path d="M15 4H6a2 2 0 0 0-2 2v9" />
+  </>,
+);
+export const Crosshair = icon(
+  "Crosshair",
+  <>
+    <Circle cx="12" cy="12" r="6.5" />
+    <Path d="M12 3v4.5 M12 16.5V21 M3 12h4.5 M16.5 12H21" />
   </>,
 );
 export const Download = icon("Download", <Path d="M4 15v4a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 20 19v-4 M12 3.5v12m-5-5 5 5 5-5" />);
@@ -148,6 +157,7 @@ export const FileText = icon(
 export const Folder = icon("Folder", <Path d="M3 8V5.5a2 2 0 0 1 2-2h4.5L13 7h6a2 2 0 0 1 2 2v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8h7l2-2" />);
 export const FolderGit2 = icon("FolderGit2", <Path d="M3 8V5.5a2 2 0 0 1 2-2h4.5L13 7h6a2 2 0 0 1 2 2v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8h7l2-2" />);
 export const FolderOpen = icon("FolderOpen", <Path d="M3 18V5.5a2 2 0 0 1 2-2h4l3.5 3.5H18a2 2 0 0 1 2 2v1 M3 19l3-8h15l-3 9H5a2 2 0 0 1-2-1Z" />);
+export const FolderPlus = icon("FolderPlus", <Path d="M3 8V5.5a2 2 0 0 1 2-2h4.5L13 7h6a2 2 0 0 1 2 2v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z M12 10.5v6 M9 13.5h6" />);
 export const Funnel = icon("Funnel", <Path d="M4 5.5A1 1 0 0 1 5 4.5h14a1 1 0 0 1 .8 1.6L14.5 13v5.4a1 1 0 0 1-.55.9l-2.5 1.25a1 1 0 0 1-1.45-.9V13L4.2 6.1a1 1 0 0 1-.2-.6Z" />);
 export const GitBranch = icon(
   "GitBranch",
@@ -174,6 +184,15 @@ export const GitFork = icon(
     <Path d="M5.5 8v1c0 4 6.5 2 6.5 6v1.5 M18.5 8v1c0 4-6.5 2-6.5 6" />
   </>,
 );
+export const GitMerge = icon(
+  "GitMerge",
+  <>
+    <Circle cx="6" cy="5.5" r="2.5" />
+    <Circle cx="6" cy="18.5" r="2.5" />
+    <Circle cx="18" cy="12" r="2.5" />
+    <Path d="M6 8v8 M6 8c0 2.5 2.5 4 5 4h4.5" />
+  </>,
+);
 export const GitPullRequest = icon(
   "GitPullRequest",
   <>
@@ -181,6 +200,15 @@ export const GitPullRequest = icon(
     <Circle cx="6" cy="18.5" r="2.5" />
     <Circle cx="18" cy="18.5" r="2.5" />
     <Path d="M6 8v8 M18 16V9a3 3 0 0 0-3-3h-2 M16 3l-3 3 3 3" />
+  </>,
+);
+export const GitPullRequestClosed = icon(
+  "GitPullRequestClosed",
+  <>
+    <Circle cx="6" cy="5.5" r="2.5" />
+    <Circle cx="6" cy="18.5" r="2.5" />
+    <Circle cx="18" cy="18.5" r="2.5" />
+    <Path d="M6 8v8 M18 16v-4.5 M15.5 3.5l5 5 M20.5 3.5l-5 5" />
   </>,
 );
 export const Globe = icon(
@@ -247,6 +275,13 @@ export const MoreHorizontal = icon(
 );
 export const Orcling = icon("Orcling", <Path d="M12 4.5c5.6 0 7.5 1.9 7.5 7.5s-1.9 7.5-7.5 7.5-7.5-1.9-7.5-7.5 1.9-7.5 7.5-7.5Z M9.75 10.25v2.5 M14.25 10.25v2.5" />);
 export const Orclings = icon("Orclings", <Path d="M12 3.5c7 0 8.5 1.5 8.5 8.5s-1.5 8.5-8.5 8.5-8.5-1.5-8.5-8.5S5 3.5 12 3.5Z M9 10v4 M15 10v4" />);
+export const PanelIcon = icon(
+  "PanelIcon",
+  <>
+    <Rect x="3.5" y="3.5" width="17" height="17" rx="2.5" />
+    <Path d="M15 3.5v17" />
+  </>,
+);
 export const PanelLeft = icon(
   "PanelLeft",
   <>

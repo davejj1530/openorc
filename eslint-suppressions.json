@@ -27,11 +27,6 @@
       "count": 1
     }
   },
-  "apps/desktop/src/renderer/src/components/TeamTaskStart.tsx": {
-    "react-hooks/exhaustive-deps": {
-      "count": 1
-    }
-  },
   "apps/desktop/src/renderer/src/components/editor/document-schema.ts": {
     "@typescript-eslint/no-floating-promises": {
       "count": 1
@@ -40,26 +35,6 @@
   "apps/desktop/src/renderer/src/lib/autorun.ts": {
     "@typescript-eslint/no-misused-promises": {
       "count": 2
-    }
-  },
-  "apps/desktop/src/renderer/src/lib/use-team-delete-request.ts": {
-    "react-hooks/exhaustive-deps": {
-      "count": 1
-    }
-  },
-  "apps/desktop/src/renderer/src/lib/use-team-fork.ts": {
-    "react-hooks/exhaustive-deps": {
-      "count": 1
-    }
-  },
-  "apps/desktop/src/renderer/src/lib/use-team-move-request.ts": {
-    "react-hooks/exhaustive-deps": {
-      "count": 1
-    }
-  },
-  "apps/desktop/src/renderer/src/panels/CheckpointsPanel.tsx": {
-    "react-hooks/exhaustive-deps": {
-      "count": 1
     }
   },
   "apps/desktop/src/renderer/src/views/Diagnostics.tsx": {
@@ -87,11 +62,6 @@
   },
   "apps/desktop/src/renderer/src/views/settings-usage.tsx": {
     "react-hooks/exhaustive-deps": {
-      "count": 1
-    }
-  },
-  "packages/agents/src/acp/adapter.test.ts": {
-    "@typescript-eslint/no-floating-promises": {
       "count": 1
     }
   },
@@ -138,11 +108,6 @@
       "count": 1
     }
   },
-  "packages/core/src/services/team-workspaces.ts": {
-    "@typescript-eslint/no-misused-promises": {
-      "count": 1
-    }
-  },
   "packages/mcp/src/file-boundary.test.ts": {
     "@typescript-eslint/no-floating-promises": {
       "count": 1
@@ -150,7 +115,7 @@
   },
   "packages/mcp/src/index.test.ts": {
     "@typescript-eslint/no-floating-promises": {
-      "count": 18
+      "count": 11
     }
   },
   "packages/mcp/src/index.ts": {

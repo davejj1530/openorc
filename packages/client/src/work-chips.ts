@@ -16,6 +16,8 @@ export interface WorkChip {
   kind: ChipKind;
   /** The local file the chip is about. A read opens it; an edit shows its diff. */
   path?: string;
+  /** The lines a read printed, which the file opens to with them selected. */
+  lines?: { line: number; endLine?: number };
   added?: number;
   removed?: number;
   /** Faint words that fill the middle of the row: a file's folder, a search's scope, or its query when the agent's words are the label. */
@@ -84,34 +86,74 @@ function lineDelta(before: string, after: string): { added: number; removed: num
   return { added: b.length - start - end, removed: a.length - start - end };
 }
 
+/** A file change's kind as Codex gives it: "add", or `{ type: "add" }`. */
+export function changeKind(entry: { kind?: unknown }): string {
+  return typeof entry.kind === "string" ? entry.kind : text((entry.kind as { type?: unknown } | undefined)?.type);
+}
+
+/** What one Codex file change did: a patch's own counts, or a whole file added or deleted when it carries the text. */
+function changeStat(entry: { kind?: unknown; diff?: unknown }): { added: number; removed: number } {
+  const diff = text(entry.diff);
+  if (/^@@ |^diff --git |^--- /m.test(diff) || !diff) {
+    const { insertions, deletions } = patchStat(diff);
+    return { added: insertions, removed: deletions };
+  }
+  const kind = changeKind(entry);
+  return { added: kind === "add" ? lines(diff) : 0, removed: kind === "delete" ? lines(diff) : 0 };
+}
+
+/** Each file an apply_patch text changed, with the lines its section added and removed. */
+export function patchSections(patch: string): { path: string; created: boolean; body: string[] }[] {
+  return patch.split(/^(?=\*\*\* (?:Add|Update|Delete) File: )/m).flatMap((section) => {
+    const head = /^\*\*\* (Add|Update|Delete) File: (.+)$/m.exec(section);
+    return head ? [{ path: head[2]!.trim(), created: head[1] === "Add", body: section.split("\n").slice(1) }] : [];
+  });
+}
+
+/** Lines a replacement swapped, from Claude's old_string/new_string or OpenCode's oldString/newString. */
+function replacement(edit: Record<string, unknown> | undefined): { added: number; removed: number } | null {
+  const before = edit?.["old_string"] ?? edit?.["oldString"];
+  const after = edit?.["new_string"] ?? edit?.["newString"];
+  return typeof before === "string" && typeof after === "string" ? lineDelta(before, after) : null;
+}
+
 /** Per file, what a successful edit call changed. A failed edit changed nothing, so it has no numbers. */
 function editStats(block: ToolBlock): Map<string, { added?: number; removed?: number }> {
   const stats = new Map<string, { added?: number; removed?: number }>();
   if (block.isError) return stats;
   if (Array.isArray(block.input)) {
-    for (const entry of block.input as { path?: unknown; diff?: unknown }[])
-      if (typeof entry?.path === "string") {
-        const { insertions, deletions } = patchStat(text(entry.diff));
-        stats.set(entry.path, { added: insertions, removed: deletions });
-      }
+    for (const entry of block.input as { path?: unknown; diff?: unknown; kind?: unknown }[]) if (typeof entry?.path === "string") stats.set(entry.path, changeStat(entry));
     return stats;
   }
   const input = (block.input ?? {}) as Record<string, unknown>;
-  const path = text(input["file_path"]) || text(input["path"]);
+  const patch = text(input["patch"]) || text(input["input"]);
+  for (const section of patch ? patchSections(patch) : [])
+    stats.set(section.path, { added: section.body.filter((line) => line.startsWith("+")).length, removed: section.body.filter((line) => line.startsWith("-")).length });
+  const path = text(input["file_path"]) || text(input["path"]) || text(input["filePath"]);
   if (!path) return stats;
   const edits = Array.isArray(input["edits"]) ? (input["edits"] as Record<string, unknown>[]) : [input];
+  const swapped = edits.map(replacement);
   if (typeof input["content"] === "string") stats.set(path, { added: lines(input["content"]) });
-  else if (edits.every((edit) => typeof edit?.["old_string"] === "string" && typeof edit["new_string"] === "string")) {
-    const total = edits
-      .map((edit) => lineDelta(text(edit["old_string"]), text(edit["new_string"])))
-      .reduce((sum, d) => ({ added: sum.added + d.added, removed: sum.removed + d.removed }), { added: 0, removed: 0 });
-    stats.set(path, total);
-  }
+  else if (swapped.every((delta) => delta !== null))
+    stats.set(
+      path,
+      swapped.reduce((sum, d) => ({ added: sum.added + d!.added, removed: sum.removed + d!.removed }), { added: 0, removed: 0 }),
+    );
   return stats;
 }
 
 function fileChip(path: string, stat?: { added?: number; removed?: number }, kind: "file" | "edit" = "file"): Omit<WorkChip, "blocks"> {
   return { key: path, label: basename(path), title: path, kind, path, detail: folderOf(path), ...stat };
+}
+
+/** The lines a Read call asked for: its offset and limit, as the row's note and the range the file opens to. */
+function readLines(input: unknown): Pick<WorkChip, "note" | "lines"> {
+  const record = (input ?? {}) as Record<string, unknown>;
+  const offset = Number(record["offset"]);
+  const limit = Number(record["limit"]);
+  if (!(offset > 0)) return {};
+  if (!(limit > 0)) return { note: `from line ${offset}`, lines: { line: offset } };
+  return { note: `lines ${offset}–${offset + limit - 1}`, lines: { line: offset, endLine: offset + limit - 1 } };
 }
 
 /** The calls a chip opens. An edit opens only its own file's part of each patch, so the diff is the one its numbers count. */
@@ -142,6 +184,23 @@ function chipLabel(verb: string, kind: ChipKind | undefined, object: string): st
   return object.replace(/\s+/g, " ").trim();
 }
 
+/** The files an edit call names: Codex's list of changes, or the sections of an apply_patch text. */
+function editedFiles(input: unknown): string[] {
+  if (Array.isArray(input)) return (input as { path?: unknown }[]).flatMap((entry) => (typeof entry?.path === "string" ? [entry.path] : []));
+  const record = (input ?? {}) as Record<string, unknown>;
+  return patchSections(text(record["patch"]) || text(record["input"])).map((section) => section.path);
+}
+
+/** An edit call as a row per file it changed, each with its counts. */
+function editedParts(block: ToolBlock, object: string): CallPart[] {
+  const stats = editStats(block);
+  const listed = editedFiles(block.input);
+  // A patch that names no file reads as its count ("3 files"), which is not a path to open.
+  if (!listed.length && /^\d+ files?$/.test(object)) return [{ section: "Edited", chip: { key: object, label: object, title: object, kind: "tool" } }];
+  const paths = listed.length ? listed : [object].filter(Boolean);
+  return paths.length ? paths.map((path) => ({ section: "Edited", chip: fileChip(path, stats.get(path), "edit") })) : [{ section: "Edited", chip: null }];
+}
+
 function presentedParts(block: ToolBlock): CallPart[] {
   const { verb, object, summary } = toolCallPresentation(block.name, block.input);
   // An MCP call reads as "Used Mobbin" with the tool it called as the chip; what it asked stays in the title.
@@ -149,17 +208,10 @@ function presentedParts(block: ToolBlock): CallPart[] {
     const action = verb.replace(/^[^:]+: /, "");
     return [{ section: summary, chip: { key: action, label: action, title: object ? `${verb} · ${object}` : verb, kind: "tool" } }];
   }
-  if (verb === "Edited") {
-    const stats = editStats(block);
-    const listed = Array.isArray(block.input) ? (block.input as { path?: unknown }[]).flatMap((entry) => (typeof entry?.path === "string" ? [entry.path] : [])) : [];
-    // A patch that names no file reads as its count ("3 files"), which is not a path to open.
-    if (!listed.length && /^\d+ files?$/.test(object)) return [{ section: "Edited", chip: { key: object, label: object, title: object, kind: "tool" } }];
-    const paths = listed.length ? listed : [object].filter(Boolean);
-    return paths.length ? paths.map((path) => ({ section: "Edited", chip: fileChip(path, stats.get(path), "edit") })) : [{ section: "Edited", chip: null }];
-  }
+  if (verb === "Edited") return editedParts(block, object);
   const known = sectionFor[verb];
   if (!object) return [{ section: known?.section ?? verb, chip: null }];
-  if (known?.kind === "file") return [{ section: known.section, chip: fileChip(object) }];
+  if (known?.kind === "file") return [{ section: known.section, chip: { ...fileChip(object), ...readLines(block.input) } }];
   const label = chipLabel(verb, known?.kind, object);
   return [{ section: known?.section ?? verb, chip: { key: label, label, title: object, kind: known?.kind ?? "tool" } }];
 }

@@ -1,20 +1,22 @@
-import { snoozeWakeLabel } from "@openorc/client";
-import type { Project, ThreadSummary as Thread } from "@openorc/protocol";
 import { Menu } from "@base-ui/react/menu";
-import { AlarmClock, ArrowLeft, GitFork, GitPullRequest, MoreHorizontal, X } from "./icons";
-import { ThreadClaudeAccount } from "./ClaudeAccountPicker";
-import { ThreadMenuItems } from "./ThreadActions";
+import { snoozeWakeLabel } from "@openorc/client";
+import type { CloudThreadState, Project, ThreadSummary as Thread } from "@openorc/protocol";
+import { isSubagentThread } from "@openorc/protocol";
+import { CoversPreview } from "../lib/browser-preview";
+import { openThread, useRouter } from "../lib/router";
+import { floatingGround } from "../lib/use-anchor-ground";
 import { ThreadOrcling } from "./OrclingAvatar";
+import { ThreadParent } from "./SubagentConversation";
+import { ThreadMenuItems } from "./ThreadActions";
+import { ThreadClaudeAccount } from "./ThreadClaudeAccount";
 import { ThreadTitle } from "./ThreadTitle";
 import { ThreadTools } from "./ThreadTools";
 import { TopBar } from "./TopBar";
+import { AlarmClock, ArrowLeft, Cloud, GitFork, GitPullRequest, MoreHorizontal, X } from "./icons";
 import { menuItem, menuPopup } from "./menu";
 import { IconButton, StatusDot, Tooltip } from "./ui";
-import { CoversPreview } from "../lib/browser-preview";
-import { useLayout } from "../lib/layout";
-import { openThread, useRouter } from "../lib/router";
-import { floatingGround } from "../lib/use-anchor-ground";
 
+/** Whether the header starts or ends the work row, which decides who clears the native window controls. */
 type Placement = { first: boolean; last: boolean; onClose?: () => void };
 
 const prDot = { open: "muted", merged: "ok", closed: "bad" } as const;
@@ -33,10 +35,9 @@ function ClosePane({ onClose }: { onClose?: () => void }) {
 
 /** While a thread loads or can't be found, its header still offers the way back. */
 export function ThreadHeaderPlaceholder({ loading, first, last, onClose }: Placement & { loading: boolean }) {
-  const panelOpen = useLayout((s) => s.panelOpen);
   const back = useRouter((s) => s.back);
   return (
-    <TopBar windowDragSurface showProject={false} inSplit={!first} rightmost={last && !panelOpen} actions={<ClosePane onClose={onClose} />}>
+    <TopBar windowDragSurface showProject={false} inSplit={!first} rightmost={last} actions={<ClosePane onClose={onClose} />}>
       <Tooltip label="Back">
         <IconButton onClick={back} aria-label="Back">
           <ArrowLeft size={16} />
@@ -57,7 +58,6 @@ export function ThreadHeader({
   renaming,
   onRenamingChange,
   onRename,
-  onTeamToolbar,
   first,
   last,
   onClose,
@@ -67,18 +67,15 @@ export function ThreadHeader({
   renaming: boolean;
   onRenamingChange: (renaming: boolean) => void;
   onRename: (title: string) => void;
-  onTeamToolbar: (element: HTMLSpanElement | null) => void;
 }) {
-  const panelOpen = useLayout((s) => s.panelOpen);
   return (
     <TopBar
       windowDragSurface
       showProject={false}
       inSplit={!first}
-      rightmost={last && !panelOpen}
+      rightmost={last}
       actions={
         <>
-          {t.teamInstanceId ? <span ref={onTeamToolbar} className="thread-team-toolbar" /> : null}
           <ClosePane onClose={onClose} />
           <Menu.Root>
             <Menu.Trigger render={<IconButton aria-label="Thread actions" />}>
@@ -88,37 +85,68 @@ export function ThreadHeader({
               <CoversPreview />
               <Menu.Positioner sideOffset={6} align="end" className="z-40" collisionPadding={8}>
                 <Menu.Popup ref={floatingGround} className={menuPopup} finalFocus={renaming ? false : undefined}>
-                  <Menu.Item className={menuItem} onClick={() => onRenamingChange(true)}>
-                    Rename
-                  </Menu.Item>
+                  {!isSubagentThread(t) ? (
+                    <Menu.Item className={menuItem} onClick={() => onRenamingChange(true)}>
+                      Rename
+                    </Menu.Item>
+                  ) : null}
                   <ThreadMenuItems thread={t} parts={Menu} />
                 </Menu.Popup>
               </Menu.Positioner>
             </Menu.Portal>
           </Menu.Root>
-          <ThreadTools threadId={t.id} />
+          {!isSubagentThread(t) ? <ThreadTools threadId={t.id} /> : null}
         </>
       }
     >
-      <ForkParent parent={t.forkedFromId} />
+      {t.parentThreadId ? <ThreadParent id={t.parentThreadId} /> : <ForkParent parent={t.forkedFromId} />}
       <ThreadOrcling threadId={t.id} orclingId={t.orclingId} />
-      <ThreadTitle title={t.title} editing={renaming} onEditingChange={onRenamingChange} onSave={onRename} />
+      {isSubagentThread(t) ? <span className="truncate text-sm">{t.title}</span> : <ThreadTitle title={t.title} editing={renaming} onEditingChange={onRenamingChange} onSave={onRename} />}
       <span className="thread-header-facts">
         <span className="thread-header-project" title={p.rootPath}>
           {p.name}
         </span>
-        {t.agent === "claude" ? <ThreadClaudeAccount /> : null}
+        {t.agent === "claude" && !isSubagentThread(t) ? <ThreadClaudeAccount thread={t} /> : null}
         <ThreadFacts thread={t} />
       </span>
     </TopBar>
   );
 }
 
-/** Activity, the pull request and snooze, as faint words with small marks. */
+const cloudDot = { preparing: "live", failed: "bad", ready: null, removed: null } as const;
+
+const cloudPlaces = {
+  vercel: { label: "Vercel", tip: "Runs in Vercel Sandbox" },
+  agent37: { label: "Agent37", tip: "Runs in an Agent37 instance" },
+  local: { label: "Simulated", tip: "Runs in a sandbox simulated on this Mac" },
+} as const;
+
+function cloudTip(cloud: CloudThreadState, where: string): string {
+  if (cloud.state === "failed" && cloud.error) return cloud.error;
+  return cloud.state === "removed" ? "Its sandbox was removed; the next message sets up a new one" : where;
+}
+
+/** Where a cloud thread runs, with a dot while its sandbox is set up or after that failed. */
+function ThreadCloud({ cloud }: { cloud: CloudThreadState }) {
+  const place = cloudPlaces[cloud.provider];
+  const dot = cloudDot[cloud.state];
+  return (
+    <Tooltip label={cloudTip(cloud, place.tip)}>
+      <span className="thread-header-fact">
+        <Cloud size={12} />
+        {dot ? <StatusDot tone={dot} /> : null}
+        {place.label}
+      </span>
+    </Tooltip>
+  );
+}
+
+/** Where a cloud thread runs, activity, the pull request and snooze, as faint words with small marks. */
 function ThreadFacts({ thread: t }: { thread: Thread }) {
   const snoozed = t.snoozedUntil && t.snoozedUntil > Date.now();
   return (
     <>
+      {t.cloud ? <ThreadCloud cloud={t.cloud} /> : null}
       {!t.teamInstanceId && t.activity !== "idle" ? (
         <span className="thread-header-fact">
           <StatusDot tone={t.activity === "waiting" ? "attention" : "live"} />

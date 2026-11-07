@@ -115,7 +115,7 @@ async function smoke() {
     await until(`document.body.textContent.includes('Show branch changes')`);
     await read(`[...document.querySelectorAll('button')].find(b=>b.textContent==='Show branch changes').click()`);
     await until(`changesSmoke.calls.some(c=>c.method==='review.threadDiff' && c.input.comparison==='base')`);
-    await read(`changesSmoke.close(); changesSmoke.team(true,true)`);
+    await read(`changesSmoke.close(); changesSmoke.team(true)`);
     await until(`document.querySelector('.composer-changes-commit').disabled`);
     assert.deepEqual(errors, []);
     console.log(

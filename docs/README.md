@@ -10,16 +10,16 @@
 - [Task descriptions](task-editor.md)
 - [Permissions for OpenOrc's own tools](internal-app-permissions.md)
 - [Agent questions (`ask_user`)](opencode-questions.md)
-- [Agent access to the sidebar preview](agent-browser.md)
+- [Agent access to the Preview](agent-browser.md)
 - [Interactive MCP Apps](mcp-apps.md)
 - [Fast mode](fast-mode.md)
+- [Multiple Claude Code accounts](claude-accounts.md)
+- [Visual explanations in conversations](visualizations.md)
 - [Appearance and rich thread output](appearance-rich-output.md)
 - [Slack](slack.md)
 - [Orclings](orclings.md)
 - [Credential storage](credential-storage.md)
 - [Coding-agent updates](agent-updates.md)
-- [Team corrections during active work](team-live-steering.md) (Beta)
-- [OpenRouter in teams](openrouter-teams.md) (Beta)
 
 ## Contributing and internals
 
@@ -27,8 +27,10 @@
 - [Architecture](../ARCHITECTURE.md)
 - [Interface conventions](design-system.md)
 - [Code quality checks](code-quality.md)
+- [Desktop benchmarks](benchmarks.md)
 - [Codex live activity](codex-live-activity.md)
 - [Precision Outline icons](precision-outline-icons.md)
+- [Theme references](theme-references.md)
 - [MiniLM tokenizer compatibility](tokenizer-replacement.md)
 
 ## Releases and compliance

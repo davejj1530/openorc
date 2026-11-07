@@ -25,6 +25,16 @@ export const claudeAccounts = {
     db.stmt("INSERT INTO claude_accounts (id, name, kind, enabled, created_at) VALUES (?, ?, ?, 1, ?)").run(account.id, account.name, account.kind, account.createdAt);
     return account;
   },
+  /** The account with this id, made when missing, else renamed; enabled either way. How the cloud brain takes the Mac's accounts. */
+  put(db: Db, input: { id: string; name: string }): ClaudeAccount {
+    const name = ClaudeAccount.shape.name.parse(input.name);
+    db.stmt("INSERT INTO claude_accounts (id, name, kind, enabled, created_at) VALUES (?, ?, 'managed', 1, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name, enabled = 1").run(
+      input.id,
+      name,
+      Date.now(),
+    );
+    return claudeAccounts.get(db, input.id);
+  },
   update(db: Db, input: { id: string; name?: string; enabled?: boolean; makeDefault?: true }): ClaudeAccount {
     return db.transaction(() => {
       const account = ClaudeAccount.parse({

@@ -16,6 +16,7 @@ beforeAll(async () => {
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 fs.writeFileSync(process.env.CAPTURE_ARGS, JSON.stringify(args));
+if (process.env.CAPTURE_ENV) fs.writeFileSync(process.env.CAPTURE_ENV, JSON.stringify({ MAX_THINKING_TOKENS: process.env.MAX_THINKING_TOKENS }));
 if (process.env.CAPTURE_CWD) fs.writeFileSync(process.env.CAPTURE_CWD, JSON.stringify({ cwd: process.cwd(), mode: fs.statSync(process.cwd()).mode & 0o777 }));
 if (process.env.STALL_GENERATION) setTimeout(() => {}, 60000);
 else if (args.includes('-o')) {
@@ -87,6 +88,17 @@ describe("shared background CLI runner", () => {
     expect(cwd).not.toBe(await realpath(tmpdir()));
     if (process.platform !== "win32") expect(mode).toBe(0o700);
     await expect(access(cwd)).rejects.toThrow();
+  });
+
+  it("answers a self-contained prompt from Claude with only the given instructions: no tools and no extended thinking", async () => {
+    const capture = join(dir, "claude-complete-args.json");
+    const environment = join(dir, "claude-complete-env.json");
+    const generator = new TextGenerator({ provider: "claude", binary, system: "Explain code.", env: { CAPTURE_ARGS: capture, CAPTURE_ENV: environment, MAX_THINKING_TOKENS: "32000" } });
+    expect(await generator.complete("Explain this.", {})).toBe(JSON.stringify({ title: "CSV export filters" }));
+    const args: string[] = JSON.parse(await readFile(capture, "utf8"));
+    expect(args.slice(args.indexOf("--tools"), args.indexOf("--tools") + 4)).toEqual(["--tools", "", "--system-prompt", "Explain code."]);
+    expect(args).not.toContain("--disallowed-tools");
+    expect(JSON.parse(await readFile(environment, "utf8"))).toMatchObject({ MAX_THINKING_TOKENS: "0" });
   });
 
   it("returns null when the selected CLI is missing", async () => {

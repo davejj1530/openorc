@@ -1,0 +1,217 @@
+/* A code file explained: a quiet bar over the explanation, which fills the rest of the file's pane. */
+.explain-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.explain-bar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 36px;
+  padding: 2px 12px 2px 20px;
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--ink-3);
+}
+.explain-bar[data-stale] [role="status"] {
+  color: var(--ink-2);
+}
+.explain-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.explain-status {
+  padding: 16px 20px;
+  font-size: var(--text-sm);
+  line-height: 20px;
+  color: var(--ink-3);
+}
+.explain-status-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.explain-skeleton {
+  display: grid;
+  gap: 10px;
+  max-width: 520px;
+  margin-top: 16px;
+}
+.explain-skeleton span {
+  height: 12px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  animation: explain-waiting 1600ms ease-in-out infinite;
+}
+.explain-skeleton span:nth-child(2) {
+  width: 84%;
+  animation-delay: 160ms;
+}
+.explain-skeleton span:nth-child(3) {
+  width: 62%;
+  animation-delay: 320ms;
+}
+@keyframes explain-waiting {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .explain-skeleton span {
+    animation: none;
+  }
+}
+
+/* Plain English: the file line by line, each line's code in a soft well with what it does written under it. */
+.explain-english {
+  max-width: 760px;
+  padding: 4px 12px 32px;
+}
+.explain-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.explain-note-code {
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+.explain-note-code .code-excerpt {
+  padding: 6px 0;
+}
+.explain-note-text {
+  margin: 6px 8px 0;
+  font-size: var(--text-md);
+  line-height: var(--text-md--line-height);
+  color: var(--ink);
+}
+.explain-note-text code {
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+}
+
+/* The walkthrough: each part framed by a hairline, its explanation over its code. */
+.explain-walkthrough {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 960px;
+  padding: 4px 12px 24px;
+}
+.explain-overview {
+  margin: 0 8px 4px;
+  font-size: var(--text-sm);
+  line-height: 20px;
+  color: var(--ink-2);
+}
+.explain-block {
+  overflow: hidden;
+  border: var(--hairline) solid var(--line-strong);
+  border-radius: var(--radius-xl);
+}
+.explain-block-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px 0;
+}
+.explain-block-head h3 {
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 400;
+  line-height: 20px;
+  color: var(--ink);
+}
+.explain-block-lines {
+  flex-shrink: 0;
+  margin: -3px -8px -3px 0;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--ink-3);
+  transition:
+    background-color 150ms var(--ease-out),
+    color 150ms var(--ease-out);
+}
+.explain-block-lines:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.app-shell .explain-block-text {
+  padding: 4px 14px 0;
+  font-size: var(--text-sm);
+  line-height: 20px;
+  color: var(--ink-2);
+}
+.explain-block-used {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px 0;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+.explain-block-used > span {
+  margin-right: 2px;
+}
+.explain-usage {
+  height: 24px;
+  max-width: 100%;
+  padding: 0 10px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--control-fill);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition:
+    background-color 150ms var(--ease-out),
+    color 150ms var(--ease-out);
+}
+.explain-usage:hover {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+.explain-usage-folder {
+  color: var(--ink-4);
+}
+/* Inside a walkthrough card the steps read at the card's own size. */
+.explain-block-code {
+  margin-top: 12px;
+  padding: 0 10px 12px;
+}
+.explain-block-code .explain-notes {
+  gap: 10px;
+}
+.explain-block-code .explain-note-text {
+  margin-top: 5px;
+  font-size: var(--text-base);
+  line-height: var(--text-base--line-height);
+  color: var(--ink-2);
+}
+.explain-between {
+  margin: -4px 0;
+}

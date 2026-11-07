@@ -1,23 +1,24 @@
 ---
 /**
- * The app at rest, still: the sidebar, a finished Codex thread, and the Changes panel open beside it with its tab
- * track on the window's top line. Laid out at the 1248 × 780 window it was measured at, and scaled as one picture.
+ * The app at rest, still: the sidebar, a finished Codex thread, and the Changes panel open beside it on its own
+ * plane, from the window's top line to its foot. Laid out at a 1248 × 780 window and scaled as one picture.
  */
 import "../../styles/hero-scene.css";
 import ChangesDiff from "../hero/ChangesDiff.astro";
+import PanelHeader from "../hero/PanelHeader.astro";
 import ProductIcon from "../hero/ProductIcon.astro";
 import Prose from "../hero/Prose.astro";
 import SceneSidebar from "../hero/SceneSidebar.astro";
 import ThreadPane from "../hero/ThreadPane.astro";
 import TurnHead from "../hero/TurnHead.astro";
-import { models } from "../../data/hero/workspace";
+import { branches, models, type SidebarRow } from "../../data/hero/workspace";
 
 const title = "Make the first five minutes count";
-const rows = [
-  { title, providers: [{ harness: "codex", label: "Codex" }], current: true },
-  { title: "Build a thoughtful onboarding", providers: [{ harness: "claude", label: "Claude" }] },
-  { title: "A faster command menu", providers: [{ harness: "claude", label: "Claude" }], busy: true as const },
-  { title: "Simplify the design tokens", providers: [{ harness: "codex", label: "Codex" }] },
+const rows: SidebarRow[] = [
+  { title: "A faster command menu", busy: true, headline: "Run the desktop tests" },
+  { title, current: true },
+  { title: "Tell the product story", project: "website" },
+  { title: "Simplify the design tokens", branch: branches.tokens, day: "today", done: "1 file changed · tests passed" },
 ];
 const points = [
   ["A real welcome.", "A short introduction gives people a place to start."],
@@ -53,11 +54,7 @@ const points = [
     </div>
   </ThreadPane>
   <aside class="hs-app-panel">
-    <div class="hs-panel-header">
-      <span class="hs-track"><span data-selected><ProductIcon name="fileDiff" />Changes</span></span>
-      <span class="hs-round hs-panel-add"><ProductIcon name="plus" /></span>
-      <span class="hs-panel-tools"><span class="hs-round"><ProductIcon name="expand" /></span></span>
-    </div>
-    <div class="hs-app-panel-card"><ChangesDiff /></div>
+    <PanelHeader tabs={[{ label: "Changes", selected: true }]} />
+    <ChangesDiff />
   </aside>
 </div>

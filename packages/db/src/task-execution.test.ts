@@ -1,11 +1,12 @@
-import { insertLegacyRun } from "./fixtures/legacy-run.js";
-import { insertLegacyThread } from "./fixtures/legacy-thread.js";
+import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { expect, it } from "vitest";
 import { Db } from "./database.js";
+import { insertLegacyRun } from "./fixtures/legacy-run.js";
+import { insertLegacyThread } from "./fixtures/legacy-thread.js";
+import { audit, projects, tasks, threads } from "./repos.js";
 import { migrations } from "./schema.js";
 import { taskExecutionMigration } from "./task-execution-schema.js";
-import { audit, projects, tasks, threads } from "./repos.js";
 import { threadQueue } from "./thread-queue.js";
 
 it("migrates actual task ownership without treating a viewed diff as execution", () => {
@@ -18,26 +19,38 @@ it("migrates actual task ownership without treating a viewed diff as execution",
     }
     const project = projects.insert(db, { name: "Fixture", rootPath: "/fixture", gitRemote: null, defaultBranch: "main", settings: {} });
     const creator = insertLegacyThread(db, { projectId: project.id, title: "Creator", agent: "codex", model: "fixture", mode: "act", permissionMode: "trusted" });
-    const make = (title: string) =>
-      tasks.insert(db, { projectId: project.id, threadId: creator.id, title, spec: "Work", priority: "none", labels: [], workspaceMode: "current", baseRef: "main", parentTaskId: null });
+    const make = (title: string) => {
+      const id = randomUUID();
+      raw
+        .prepare("INSERT INTO tasks (id,project_id,thread_id,title,spec,workspace_mode,base_ref,created_at,updated_at) VALUES (?,?,?,?,?,'current','main',1,1)")
+        .run(id, project.id, creator.id, title, "Work");
+      return { id };
+    };
     const backlog = make("Viewed only");
-    tasks.update(db, backlog.id, { baseSha: "diff-base-only" });
+    raw.prepare("UPDATE tasks SET base_sha='diff-base-only' WHERE id=?").run(backlog.id);
     const active = make("Started with task_start");
-    tasks.update(db, active.id, { status: "review" });
+    raw.prepare("UPDATE tasks SET status='review' WHERE id=?").run(active.id);
     const reset = make("Returned to backlog");
     audit.record(db, { actor: "agent", action: "task.start", resourceType: "task", resourceId: reset.id, metadata: { threadId: creator.id } });
     const legacy = make("Legacy worktree");
-    tasks.update(db, legacy.id, { workspaceMode: "worktree", worktreePath: "/retained/worktree", baseSha: "base", branch: "feature" });
+    raw.prepare("UPDATE tasks SET workspace_mode='worktree',worktree_path='/retained/worktree',base_sha='base',branch='feature' WHERE id=?").run(legacy.id);
     insertLegacyRun(db, { id: "legacy", taskId: legacy.id, threadId: null, agent: "claude", model: "legacy-model", mode: "act", permissionMode: "review" });
 
     taskExecutionMigration(raw);
-    expect(tasks.get(db, backlog.id)).toMatchObject({ threadId: creator.id, executionThreadId: null, baseSha: "diff-base-only" });
-    expect(tasks.get(db, active.id)?.executionThreadId).toBe(creator.id);
-    expect(tasks.get(db, reset.id)?.executionThreadId).toBe(creator.id);
-    const moved = tasks.get(db, legacy.id)!;
-    expect(moved.threadId).toBe(creator.id);
-    expect(moved.executionThreadId).not.toBe(creator.id);
-    expect(threads.get(db, moved.executionThreadId!)).toMatchObject({ agent: "claude", model: "legacy-model", worktreePath: "/retained/worktree", branch: "feature", baseSha: "base" });
+    const readTask = (id: string) => raw.prepare("SELECT thread_id,execution_thread_id,base_sha FROM tasks WHERE id=?").get(id)!;
+    expect(readTask(backlog.id)).toMatchObject({ thread_id: creator.id, execution_thread_id: null, base_sha: "diff-base-only" });
+    expect(readTask(active.id).execution_thread_id).toBe(creator.id);
+    expect(readTask(reset.id).execution_thread_id).toBe(creator.id);
+    const moved = readTask(legacy.id);
+    expect(moved.thread_id).toBe(creator.id);
+    expect(moved.execution_thread_id).not.toBe(creator.id);
+    expect(raw.prepare("SELECT agent,model,worktree_path,branch,base_sha FROM threads WHERE id=?").get(moved.execution_thread_id!)).toMatchObject({
+      agent: "claude",
+      model: "legacy-model",
+      worktree_path: "/retained/worktree",
+      branch: "feature",
+      base_sha: "base",
+    });
     expect(raw.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   } finally {
     db.close();

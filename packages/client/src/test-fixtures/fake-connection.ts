@@ -37,7 +37,16 @@ export function fakeConnection(delivery: CoreConnection["delivery"] = "all") {
  */
 export function testClient(delivery: CoreConnection["delivery"] = "all", options: Partial<ClientStateOptions> = {}) {
   const fake = fakeConnection(delivery);
-  const client = createClientState(fake.connection, { scheduleFrame: () => undefined, invalidationBatchMs: 50, randomId: () => "request", savesDefaultPermission: true, ...options });
+  const client = createClientState(fake.connection, {
+    scheduleFrame: () => undefined,
+    invalidationBatchMs: 50,
+    randomId: () => "request",
+    savesDefaultPermission: true,
+    reportFrameError: (_frame, error) => {
+      throw error;
+    },
+    ...options,
+  });
   const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: client.queryClient }, children);
   return { ...fake, client, wrapper };
 }

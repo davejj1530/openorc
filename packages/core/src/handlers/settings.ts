@@ -16,7 +16,7 @@ export function createSettingsHandlers({
     "app.settings.get": () => settings.get(),
     "app.settings.set": (patch) => {
       const next = settings.set(patch);
-      invalidate(["settings", "orchestration"]);
+      invalidate(["settings"]);
       return next;
     },
     "textGeneration.settings.get": () => textGeneration.settings(),

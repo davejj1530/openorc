@@ -76,7 +76,8 @@ export function noticeOpener(crypto: LinkCrypto, readKey: (macId: string) => Pro
 export interface TapEffects {
   macs(): readonly { id: string }[];
   select(macId: string): void;
-  openThread(threadId: string): void;
+  /** On the host the alert came from: the shown one, or its partner. */
+  openThread(threadId: string, hostId: string): void;
   open(macId: string, envelope: PushEnvelope): Promise<PushNotice | null>;
   now(): number;
 }
@@ -92,7 +93,7 @@ const showed = (notice: PushNotice, shown: Shown) => (shown.title ?? "") === not
 export async function openTap({ route, answer, shown }: NoticeTap, effects: TapEffects): Promise<void> {
   if (!effects.macs().some((mac) => mac.id === route.macId)) return;
   effects.select(route.macId);
-  if (route.threadId) effects.openThread(route.threadId);
+  if (route.threadId) effects.openThread(route.threadId, route.macId);
   if (!answer || !route.o) return;
   const notice = await effects.open(route.macId, route.o);
   if (notice?.kind === "approval" && notice.approval && showed(notice, shown)) queueAnswer({ macId: route.macId, ...notice.approval }, answer, effects.now());

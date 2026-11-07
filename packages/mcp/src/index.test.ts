@@ -1,18 +1,18 @@
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { fileBoundaryUrl } from "@openorc/protocol";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import http from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test, type TestContext } from "node:test";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { fileBoundaryUrl } from "@openorc/protocol";
 import type { FileBoundaryAnswer } from "./file-boundary.js";
 import { internalToolNames, startMcpServer, type ApprovalRequest, type ApprovalResult, type McpHost } from "./index.js";
 
 type HostCall = { method: string; runId: string; input?: unknown };
 
-async function fixture(t: TestContext, includeTeam = true) {
+async function fixture(t: TestContext) {
   const calls: HostCall[] = [];
   const record = (method: string, runId: string, input?: unknown) => {
     const call = { method, runId, ...(input !== undefined ? { input } : {}) };
@@ -42,13 +42,6 @@ async function fixture(t: TestContext, includeTeam = true) {
         record("task.start", runId, { id, ...options });
         return { id, title: "Saved task", status: "in_progress", branch: null, current: false, resultSummary: null };
       },
-      ...(includeTeam
-        ? {
-            async complete(runId: string, input: { taskId: string; admissionId?: string; result: string }) {
-              return record("task.complete", runId, input);
-            },
-          }
-        : {}),
       async list() {
         return [];
       },
@@ -82,38 +75,6 @@ async function fixture(t: TestContext, includeTeam = true) {
         return { thread: { id: "started", title: "Assets" }, agent: "codex", model: "fixture-codex", message: "Started" };
       },
     },
-    ...(includeTeam
-      ? {
-          team: {
-            available: () => true,
-            async status(runId: string) {
-              return record("team.status", runId);
-            },
-            async message(runId: string, input: { recipientId: string; text: string; requestKey: string }) {
-              return record("team.message", runId, input);
-            },
-            async wait(runId: string, input: { assignmentIds?: string[] }) {
-              return record("team.wait", runId, input);
-            },
-            async complete(runId: string, input: { result: string }) {
-              return record("team.complete", runId, input);
-            },
-            async context(runId: string, input: { id: string }) {
-              record("team.context", runId, input);
-              return { id: input.id, bytes: 4, text: "part" };
-            },
-            async say(runId: string, input: { text: string; to?: string[]; requestKey?: string }) {
-              return record("team.say", runId, input);
-            },
-            async claim(runId: string, input: { paths: string[]; note?: string; release?: boolean }) {
-              return record("team.claim", runId, input);
-            },
-            async history(runId: string, input: { afterSeq?: number; beforeSeq?: number; limit?: number }) {
-              return record("team.history", runId, input);
-            },
-          },
-        }
-      : {}),
   };
   const server = await startMcpServer(host);
   const clients: Client[] = [];
@@ -122,7 +83,7 @@ async function fixture(t: TestContext, includeTeam = true) {
     await server.close();
   });
   async function connect(runId: string) {
-    const client = new Client({ name: "team-contract-test", version: "1.0.0" });
+    const client = new Client({ name: "mcp-contract-test", version: "1.0.0" });
     clients.push(client);
     await client.connect(new StreamableHTTPClientTransport(new URL(server.urlForRun(runId))));
     return client;
@@ -138,7 +99,7 @@ function resultText(result: Awaited<ReturnType<Client["callTool"]>>): string {
 }
 
 void test("visualize accepts a self-contained explanation without host actions or echoing its source", async (t) => {
-  const { connect, calls } = await fixture(t, false);
+  const { connect, calls } = await fixture(t);
   const client = await connect("visualization-run");
   const tool = (await client.listTools()).tools.find((tool) => tool.name === "visualize");
   assert.ok(tool);
@@ -409,55 +370,8 @@ void test("approval decisions preserve denial, answers and edited tool input acr
   );
 });
 
-test("team tools are discoverable and eligible only through the existing internal tool names", { timeout: 10000 }, async (t) => {
-  const { connect } = await fixture(t);
-  const client = await connect("lead-run");
-  const { tools } = await client.listTools();
-  const teamNames = ["team_status", "team_message", "team_say", "team_claim", "team_wait", "team_complete", "team_history", "team_context"];
-  assert.deepEqual(
-    tools.filter((tool) => tool.name.startsWith("team_")).map((tool) => tool.name),
-    teamNames,
-  );
-  for (const name of teamNames) {
-    assert.ok(internalToolNames.includes(name));
-    const schema = tools.find((tool) => tool.name === name)!.inputSchema;
-    assert.ok(!("run_id" in (schema.properties ?? {})));
-    assert.ok(!("actor" in (schema.properties ?? {})));
-  }
-  assert.ok(!internalToolNames.includes("approve"));
-  const taskCreate = tools.find((tool) => tool.name === "task_create")!;
-  for (const name of ["member_key", "request_key", "dependencies"]) assert.ok(name in (taskCreate.inputSchema.properties ?? {}));
-});
-
-test("one host advertises and accepts team and Slack tools only for their authenticated runs", async (t) => {
-  const { connect, host, calls } = await fixture(t);
-  host.team!.available = (runId) => runId === "team-run";
-  host.execution!.available = (runId) => runId === "slack-run";
-  for (const runId of ["ordinary-run", "team-run", "slack-run"]) {
-    const client = await connect(runId);
-    const names = (await client.listTools()).tools.map((tool) => tool.name);
-    assert.equal(names.includes("task_complete"), runId === "team-run");
-    assert.equal(names.filter((name) => name.startsWith("team_")).length, runId === "team-run" ? 8 : 0);
-    assert.equal(names.includes("execution_context"), runId === "slack-run");
-    assert.equal(names.includes("execution_switch"), runId === "slack-run");
-    for (const name of ["task_create", "task_start", "task_list", "task_context", "thread_read", "memory_search"]) assert.ok(names.includes(name));
-    // Knowing a tool name or supplying another run's identity cannot bypass discovery scope.
-    for (const [name, allowed] of [
-      ["team_status", runId === "team-run"],
-      ["execution_context", runId === "slack-run"],
-    ] as const) {
-      const result = await client.callTool({ name, arguments: { runId: allowed ? "ordinary-run" : "team-run" } });
-      assert.equal(Boolean(result.isError), !allowed);
-    }
-  }
-  assert.deepEqual(calls, [
-    { method: "team.status", runId: "team-run" },
-    { method: "execution.context", runId: "slack-run" },
-  ]);
-});
-
 test("disabled memory disappears from discovery without removing task context and can be re-enabled", async (t) => {
-  const { connect, host } = await fixture(t, false);
+  const { connect, host } = await fixture(t);
   let enabled = false;
   host.memoryEnabled = () => enabled;
   const client = await connect("memory-run");
@@ -471,170 +385,8 @@ test("disabled memory disappears from discovery without removing task context an
   assert.notEqual((await client.callTool({ name: "memory_search", arguments: { query: "fixture" } })).isError, true);
 });
 
-test("SDK calls preserve team parameters and the backlog default", { timeout: 10000 }, async (t) => {
-  const { connect, calls } = await fixture(t);
-  const client = await connect("assignment-run");
-  const requests = [
-    { name: "team_status", arguments: {} },
-    { name: "team_message", arguments: { recipient_id: "lead", text: "Ready for review", request_key: "message-1" } },
-    { name: "team_wait", arguments: { assignment_ids: ["assignment-a", "assignment-b"] } },
-    { name: "team_wait", arguments: {} },
-    { name: "team_wait", arguments: { assignment_ids: [] } },
-    { name: "team_complete", arguments: { result: "Implemented and verified" } },
-    { name: "team_context", arguments: { id: "ab".repeat(32) } },
-    { name: "team_say", arguments: { text: "Taking src/index.ts", to: ["melo"], request_key: "say-1" } },
-    { name: "team_claim", arguments: { paths: ["src/index.ts"], note: "routing" } },
-    {
-      name: "task_create",
-      arguments: {
-        title: "Implement validation",
-        spec: "Validate all team members",
-        execution: "delegate",
-        member_key: "reviewer",
-        request_key: "assignment-1",
-        dependencies: ["assignment-a"],
-        priority: "high",
-        labels: ["quality"],
-      },
-    },
-    { name: "task_create", arguments: { title: "Capture follow-up", spec: "Save this work for later", member_key: "reviewer", request_key: "capture-1", dependency_task_ids: ["previous-task"] } },
-    { name: "task_create", arguments: { title: "Legacy backlog", spec: "Existing task capture flow" } },
-  ];
-  for (const request of requests) {
-    const result = await client.callTool(request);
-    assert.notEqual(result.isError, true, resultText(result));
-    assert.doesNotThrow(() => JSON.parse(resultText(result)));
-  }
-  assert.deepEqual(calls, [
-    { method: "team.status", runId: "assignment-run" },
-    { method: "team.message", runId: "assignment-run", input: { recipientId: "lead", text: "Ready for review", requestKey: "message-1" } },
-    { method: "team.wait", runId: "assignment-run", input: { assignmentIds: ["assignment-a", "assignment-b"] } },
-    { method: "team.wait", runId: "assignment-run", input: {} },
-    { method: "team.wait", runId: "assignment-run", input: { assignmentIds: [] } },
-    { method: "team.complete", runId: "assignment-run", input: { result: "Implemented and verified" } },
-    { method: "team.context", runId: "assignment-run", input: { id: "ab".repeat(32) } },
-    { method: "team.say", runId: "assignment-run", input: { text: "Taking src/index.ts", to: ["melo"], requestKey: "say-1" } },
-    { method: "team.claim", runId: "assignment-run", input: { paths: ["src/index.ts"], note: "routing" } },
-    {
-      method: "task.create",
-      runId: "assignment-run",
-      input: {
-        title: "Implement validation",
-        spec: "Validate all team members",
-        execution: "delegate",
-        memberKey: "reviewer",
-        requestKey: "assignment-1",
-        dependencies: ["assignment-a"],
-        priority: "high",
-        labels: ["quality"],
-      },
-    },
-    {
-      method: "task.create",
-      runId: "assignment-run",
-      input: { title: "Capture follow-up", spec: "Save this work for later", execution: "backlog", memberKey: "reviewer", requestKey: "capture-1", dependencyTaskIds: ["previous-task"] },
-    },
-    { method: "task.create", runId: "assignment-run", input: { title: "Legacy backlog", spec: "Existing task capture flow", execution: "backlog" } },
-  ]);
-});
-
-test("team identity comes from the run URL token and cannot be selected in tool arguments", { timeout: 10000 }, async (t) => {
-  const { connect, calls, server } = await fixture(t);
-  const first = await connect("first-run");
-  const second = await connect("second-run");
-  const firstUrl = server.urlForRun("first-run");
-  assert.equal(server.urlForRun("first-run"), firstUrl);
-  assert.notEqual(server.urlForRun("second-run"), firstUrl);
-  assert.ok(!firstUrl.includes("first-run"));
-  await first.callTool({ name: "team_status", arguments: { run_id: "second-run", actor: "lead", execution_id: "foreign-execution" } });
-  await second.callTool({ name: "team_message", arguments: { recipient_id: "assignment", text: "Scoped message", request_key: "scoped-1", runId: "first-run", actor: "lead" } });
-  assert.deepEqual(calls, [
-    { method: "team.status", runId: "first-run" },
-    { method: "team.message", runId: "second-run", input: { recipientId: "assignment", text: "Scoped message", requestKey: "scoped-1" } },
-  ]);
-  const response = await fetch(`http://127.0.0.1:${server.port}/mcp/unknown-token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "team_status", arguments: {} } }),
-  });
-  assert.equal(response.status, 404);
-  assert.equal(await response.text(), "unknown run");
-  assert.equal(calls.length, 2);
-});
-
-test("hosts without teams omit their tools and reject calls while keeping ordinary tasks", { timeout: 10000 }, async (t) => {
-  const { connect, calls } = await fixture(t, false);
-  const client = await connect("legacy-run");
-  assert.ok(!(await client.listTools()).tools.some((tool) => tool.name.startsWith("team_") || tool.name === "task_complete"));
-  for (const request of [
-    { name: "team_status", arguments: {} },
-    { name: "team_message", arguments: { recipient_id: "lead", text: "Hello", request_key: "message-1" } },
-    { name: "team_wait", arguments: {} },
-    { name: "team_complete", arguments: { result: "Done" } },
-  ]) {
-    const result = await client.callTool(request);
-    assert.equal(result.isError, true);
-    assert.match(resultText(result), /not found/);
-  }
-  const legacy = await client.callTool({ name: "task_list", arguments: {} });
-  assert.notEqual(legacy.isError, true);
-  assert.deepEqual(JSON.parse(resultText(legacy)), []);
-  assert.deepEqual(calls, []);
-});
-
-test("invalid team inputs and host authorization errors fail visibly", { timeout: 10000 }, async (t) => {
-  const { connect, calls, host } = await fixture(t);
-  const client = await connect("restricted-run");
-  for (const request of [
-    { name: "team_message", arguments: { recipient_id: "lead", text: "Hello" } },
-    { name: "team_message", arguments: { recipient_id: "", text: "Hello", request_key: "message-1" } },
-    { name: "team_wait", arguments: { assignment_ids: [42] } },
-    { name: "team_complete", arguments: { result: "" } },
-    { name: "team_context", arguments: { id: "not-a-stored-id" } },
-  ]) {
-    const result = await client.callTool(request);
-    assert.equal(result.isError, true);
-  }
-  assert.deepEqual(calls, []);
-  host.team!.complete = async () => {
-    throw new Error("Assignment has unresolved children");
-  };
-  const denied = await client.callTool({ name: "team_complete", arguments: { result: "Done" } });
-  assert.equal(denied.isError, true);
-  assert.match(resultText(denied), /Assignment has unresolved children/);
-});
-
-test("saved-task tools preserve admission identity and reject invalid completion without invoking the host", { timeout: 10000 }, async (t) => {
-  const { connect, calls } = await fixture(t);
-  const client = await connect("saved-task-run");
-  const { tools } = await client.listTools();
-  assert.ok(internalToolNames.includes("task_complete"));
-  const schema = tools.find((tool) => tool.name === "task_start")!.inputSchema;
-  for (const name of ["admission_id", "member_key", "request_key"]) assert.ok(name in (schema.properties ?? {}));
-  await client.callTool({ name: "task_start", arguments: { id: "saved", admission_id: "accepted", member_key: "worker", request_key: "route-once" } });
-  await client.callTool({ name: "task_complete", arguments: { id: "saved", admission_id: "accepted", result: "Implemented" } });
-  assert.deepEqual(calls, [
-    { method: "task.start", runId: "saved-task-run", input: { id: "saved", admissionId: "accepted", memberKey: "worker", requestKey: "route-once" } },
-    { method: "task.complete", runId: "saved-task-run", input: { taskId: "saved", admissionId: "accepted", result: "Implemented" } },
-  ]);
-  const invalid = await client.callTool({ name: "task_complete", arguments: { id: "saved", result: "   " } });
-  assert.equal(invalid.isError, true);
-  assert.equal(calls.length, 2);
-});
-
-test("hosts without task completion omit the tool while preserving ordinary start", { timeout: 10000 }, async (t) => {
-  const { connect, calls } = await fixture(t, false);
-  const client = await connect("legacy-task-run");
-  const started = await client.callTool({ name: "task_start", arguments: { id: "saved" } });
-  assert.notEqual(started.isError, true);
-  const completed = await client.callTool({ name: "task_complete", arguments: { id: "saved", result: "Done" } });
-  assert.equal(completed.isError, true);
-  assert.match(resultText(completed), /not found/);
-  assert.deepEqual(calls, [{ method: "task.start", runId: "legacy-task-run", input: { id: "saved" } }]);
-});
-
 test("ordinary task workspace choices cross the MCP boundary and invalid locations never reach the host", async (t) => {
-  const { connect, calls } = await fixture(t, false);
+  const { connect, calls } = await fixture(t);
   const client = await connect("workspace-run");
   await client.callTool({ name: "task_create", arguments: { title: "Local task", spec: "Honor the checkout choice", workspace_mode: "current" } });
   await client.callTool({ name: "task_start", arguments: { id: "task", workspace_mode: "worktree" } });
@@ -711,4 +463,15 @@ test("execution_switch forwards effort-only changes including a reset to default
     assert.deepEqual(calls.at(-1), { method: "execution.switch", runId: "slack-run", input });
   }
   assert.equal((await client.callTool({ name: "execution_switch", arguments: { effort: "", instructions: "Continue" } })).isError, true);
+});
+
+test("removes Teams tools while keeping task and Slack execution tools", async (t) => {
+  const { connect } = await fixture(t);
+  const client = await connect("ordinary-run");
+  const names = (await client.listTools()).tools.map((tool) => tool.name);
+  assert.ok(names.includes("task_create"));
+  assert.ok(names.includes("execution_context"));
+  assert.ok(names.includes("execution_switch"));
+  assert.ok(!names.some((name) => name.startsWith("team_") || name === "task_complete"));
+  assert.ok(!internalToolNames.some((name) => name.startsWith("team_") || name === "task_complete"));
 });

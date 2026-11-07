@@ -1,6 +1,6 @@
 import { lazy, Suspense, type ReactNode } from "react";
-import { Button } from "../components/ui";
 import { PanelBar, PanelBarMeta } from "../components/PanelBar";
+import { Button } from "../components/ui";
 import { useRpc } from "../lib/client";
 import { useLayout, type ChangeSelection } from "../lib/layout";
 
@@ -9,16 +9,7 @@ const DiffView = lazy(() => import("../components/DiffView").then((module) => ({
 /** A card opens only its immutable saved diff; later workspace edits never leak into this review. */
 export function SavedChangesPanel({ selection }: { selection: ChangeSelection }) {
   const clear = useLayout((state) => state.clearChanges);
-  const team = selection.kind === "team";
-  const teamDiff = useRpc("orchestration.turnChanges", team ? { ...withoutKind(selection), includePatch: true } : { threadId: "", executionId: "", turnId: "", includePatch: true }, {
-    enabled: team,
-    staleTime: Infinity,
-  });
-  const threadDiff = useRpc("threads.turnChanges", !team ? { ...withoutKind(selection), includePatch: true } : { id: "", checkpointId: "", includePatch: true }, {
-    enabled: !team,
-    staleTime: Infinity,
-  });
-  const diff = team ? teamDiff : threadDiff;
+  const diff = useRpc("threads.turnChanges", { ...withoutKind(selection), includePatch: true }, { staleTime: Infinity });
   let diffContent: ReactNode;
   if (diff.isError) {
     diffContent = (
@@ -51,11 +42,7 @@ export function SavedChangesPanel({ selection }: { selection: ChangeSelection })
           All changes
         </Button>
       </PanelBar>
-      <p className="panel-notice">
-        {team
-          ? "Only files selected from this turn’s card. Shared checkpoint; concurrent edits may be included."
-          : "Only files selected from this turn’s card, as they were saved when the turn ended."}
-      </p>
+      <p className="panel-notice">Only files selected from this turn’s card, as they were saved when the turn ended.</p>
       {diffContent}
     </section>
   );

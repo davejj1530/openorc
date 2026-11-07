@@ -1,36 +1,41 @@
-import { ClaudeAccountService } from "./services/claude-accounts.js";
-import { claudeRunAccount } from "./services/claude-run-account.js";
-import { createClaudeAccountHandlers } from "./handlers/claude-accounts.js";
-import { invalidParamsMessage, resultSummary } from "./handlers/diagnostics.js";
-import { captureLaunchEnvironment, recoverAgentProcesses } from "@openorc/agents";
-import { Db, LedgerWriter, orchestration, plans, redact, settings as storedSettings, taskForwardings, tasks, teamDeletedThreads, teamRuntime, threads } from "@openorc/db";
+import { captureLaunchEnvironment, claudeConfigDir, recoverAgentProcesses } from "@openorc/agents";
+import { Db, LedgerWriter, plans, redact, settings as storedSettings } from "@openorc/db";
 import { startMcpServer, type OpenOrcMcpServer } from "@openorc/mcp";
-import { harnessAvailability, harnessInfo, harnessInstalled, harnessLoggedIn, rpcParams, type HarnessId, type RpcMethod, type RpcRequest } from "@openorc/protocol";
-import { randomBytes, randomUUID } from "node:crypto";
+import { harnessAvailability, harnessInfo, harnessLoggedIn, rpcParams, type HarnessId, type RpcMethod, type RpcRequest } from "@openorc/protocol";
+import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
+import { busyReason, fenceForUpdate, type BusyReason } from "./activity.js";
 import { BenchGenerator } from "./bench.js";
+import { DeviceService } from "./devices/service.js";
 import { FrameCoalescer } from "./frames.js";
 import { createAttachmentsHandlers } from "./handlers/attachments.js";
 import { createBenchHandlers } from "./handlers/bench.js";
-import { createRemoteHandlers } from "./handlers/remote.js";
-import { createPreviewHandlers } from "./handlers/preview.js";
-import { invalidateOnLifecycle, previewThreadLive } from "./services/preview.js";
 import { createCatalogHandlers } from "./handlers/catalog.js";
+import { createClaudeAccountHandlers } from "./handlers/claude-accounts.js";
+import { createBrainSyncHandlers } from "./handlers/brain-sync.js";
+import { createCloudHandlers } from "./handlers/cloud.js";
+import { createCloudCarryHandlers } from "./handlers/cloud-carry.js";
+import type { CloudProjectEnv } from "./services/cloud-env.js";
+import { createCodeExplanationHandlers } from "./handlers/code-explanations.js";
+import { createDeviceHandlers } from "./handlers/devices.js";
+import { invalidParamsMessage, rpcLogLine } from "./handlers/diagnostics.js";
 import { createEventsHandlers } from "./handlers/events.js";
 import { createFilesHandlers } from "./handlers/files.js";
-import { createInstructionsHandlers } from "./handlers/instructions.js";
 import { createInboxHandlers } from "./handlers/inbox.js";
+import { createInstructionsHandlers } from "./handlers/instructions.js";
 import { createMcpAppsHandlers } from "./handlers/mcp-apps.js";
 import { createMemoryHandlers } from "./handlers/memory.js";
 import { createOrclingHandlers } from "./handlers/orclings.js";
-import { createOrchestrationHandlers } from "./handlers/orchestration.js";
+import { createPreviewHandlers } from "./handlers/preview.js";
 import { createProjectsHandlers } from "./handlers/projects.js";
 import { createPullRequestHandlers } from "./handlers/pull-requests.js";
-import { createReviewerAppHandlers } from "./handlers/reviewer-app.js";
+import { createBrainThreadHandlers } from "./handlers/brain-threads.js";
+import { createRemoteHandlers } from "./handlers/remote.js";
 import { createReviewCommentsHandlers } from "./handlers/review-comments.js";
 import { createReviewThreadHandlers } from "./handlers/review-thread.js";
 import { createReviewWorkspaceHandlers } from "./handlers/review-workspace.js";
+import { createReviewerAppHandlers } from "./handlers/reviewer-app.js";
 import { createRunsHandlers } from "./handlers/runs.js";
 import { createSchedulesHandlers } from "./handlers/schedules.js";
 import { createSettingsHandlers } from "./handlers/settings.js";
@@ -46,36 +51,49 @@ import { createThreadQueriesHandlers } from "./handlers/thread-queries.js";
 import { createThreadWorkspaceHandlers } from "./handlers/thread-workspace.js";
 import { composeHandlers, type Handlers } from "./handlers/types.js";
 import { createWorkspaceHandlers } from "./handlers/workspace.js";
-import { createDeviceHandlers } from "./handlers/devices.js";
-import { DeviceService } from "./devices/service.js";
 import { createBrowserHost } from "./mcp-host/browser.js";
 import { createContextHost } from "./mcp-host/context.js";
 import { createDeviceHost } from "./mcp-host/device.js";
 import { createMemoryHost } from "./mcp-host/memory.js";
+import { createOrclingHost } from "./mcp-host/orcling.js";
 import { createRunHost } from "./mcp-host/run.js";
 import { createTaskCreateHost } from "./mcp-host/task-create.js";
 import { createTasksHost } from "./mcp-host/tasks.js";
-import { createTeamHost } from "./mcp-host/team.js";
 import { createThreadsHost } from "./mcp-host/threads.js";
-import { createOrclingHost } from "./mcp-host/orcling.js";
+import type { OpenOrcOptions } from "./options.js";
+import { RemoteAccess } from "./remote/remote-access.js";
+import { rememberRemovedBrain } from "./remote/removed-brains.js";
+import { MOVING_WORDS } from "./services/cloud-brain-move.js";
+import { requestOrigin, type RequestOrigin } from "./request-origin.js";
+import { forgetKeptSessions } from "./services/agent-sessions.js";
+import type { OpenCodeCloudKeys } from "./services/cloud-opencode.js";
 import { AgentUpdateService } from "./services/agent-updates.js";
 import { AttachmentService } from "./services/attachments.js";
-import { FileFormatter } from "./services/file-format.js";
-import { FileService } from "./services/files.js";
+import { ClaudeAccountSwitch } from "./services/claude-account-switch.js";
+import { ClaudeAccountService } from "./services/claude-accounts.js";
+import { claudeRunAccount } from "./services/claude-run-account.js";
+import { withCloudCodexLogin } from "./services/cloud-codex.js";
+import { createCloud, type ClaudeCloudTokens, type CloudChecks, type CloudHandoff, type CloudSandboxes, type CloudSettings, type CloudStandby, type CodexCloudLogin } from "./services/cloud-setup.js";
+import { CLOUD_IDLE_PROCESS_MS, type CloudWorkspaceService } from "./services/cloud-workspaces.js";
+import { createFileService } from "./services/file-service-setup.js";
+import type { FileService } from "./services/files.js";
 import { ImportService } from "./services/imports.js";
 import { LedgerUpkeep } from "./services/ledger-upkeep.js";
 import { LifecycleService } from "./services/lifecycle.js";
 import { MemoryService, type ProviderInfo } from "./services/memory.js";
 import { OrclingService } from "./services/orclings.js";
-import { OrchestrationService } from "./services/orchestration.js";
-import { inUnvettedCopy } from "./services/review-copies.js";
-import { ProjectService } from "./services/projects.js";
-import { ProviderLog } from "./services/provider-log.js";
 import { readPlanLimits } from "./services/plan-limits.js";
+import { invalidateOnLifecycle } from "./services/preview.js";
+import { ProjectService } from "./services/projects.js";
+import { assertRouteNotMoving } from "./services/relocation-fence.js";
+import type { ThreadRelocations } from "./services/relocations.js";
+import { BrainRouting } from "./services/brain-routing.js";
+import { ProviderLog } from "./services/provider-log.js";
 import { ProviderUsageService } from "./services/provider-usage.js";
 import { PullRequestService } from "./services/pull-requests.js";
-import { ReviewerAppService } from "./services/reviewer-app.js";
+import { inUnvettedCopy } from "./services/review-copies.js";
 import { ReviewService } from "./services/review.js";
+import { ReviewerAppService } from "./services/reviewer-app.js";
 import { RunService, type Notification, type RunHooks } from "./services/runs.js";
 import { ScheduleService } from "./services/schedules.js";
 import { AppSettingsService } from "./services/settings.js";
@@ -84,29 +102,12 @@ import { SlackService } from "./services/slack/service.js";
 import { SystemService } from "./services/system.js";
 import { TaskCheckoutService } from "./services/task-checkout.js";
 import { TaskCommentService } from "./services/task-comments.js";
-import { TaskForwardingService } from "./services/task-forwarding.js";
-import { TeamConversationService } from "./services/team-conversation.js";
-import { DELETED_BY_ID, DELETED_BY_THREAD, TASK_SCOPED } from "./team-request-methods.js";
-import { requestOrigin, type RequestOrigin } from "./request-origin.js";
-import { TeamCoordinator } from "./services/team-coordinator.js";
-import { TeamDeletionService } from "./services/team-deletions.js";
-import { TeamForkService } from "./services/team-forks.js";
-import { TeamMoveService } from "./services/team-moves.js";
-import { TeamNotificationService } from "./services/team-notifications.js";
-import { TeamOperationGuard } from "./services/team-operations.js";
-import { TeamRestoreService } from "./services/team-restores.js";
-import { teamActionAvailability } from "./services/team-action-availability.js";
-import { teamTaskExportAvailability } from "./services/team-task-export.js";
-import { TeamTaskService } from "./services/team-tasks.js";
-import { TeamWorkspaceService } from "./services/team-workspaces.js";
 import { TextGenerationService } from "./services/text-generation.js";
 import { ThreadService } from "./services/threads.js";
 import { ToolImageStore } from "./services/tool-images.js";
 import { ensureWorkspaceHome } from "./services/workspace-home.js";
 import { WorkspaceWriters } from "./services/workspace-writers.js";
 import { WorkspaceService } from "./services/workspace.js";
-import type { OpenOrcOptions } from "./options.js";
-import { RemoteAccess } from "./remote/remote-access.js";
 import { transportLogger, type Logger, type RpcReply } from "./transport.js";
 
 /**
@@ -124,17 +125,28 @@ export class OpenOrc {
   readonly frames: FrameCoalescer;
   readonly projects: ProjectService;
   readonly workspaces: WorkspaceService;
+  /** Cloud conversations, their sandboxes, Settings and sign-ins, moving and carrying them on: see `createCloud`. */
+  readonly cloud: CloudWorkspaceService;
+  readonly cloudSettings: CloudSettings;
+  readonly claudeCloudTokens: ClaudeCloudTokens;
+  readonly codexCloudLogin: CodexCloudLogin;
+  readonly cloudChecks: CloudChecks;
+  readonly cloudSandboxes: CloudSandboxes;
+  readonly cloudHandoff: CloudHandoff;
+  readonly cloudStandby: CloudStandby;
+  private routing: BrainRouting | null | undefined;
+  private readonly cloudParts: ReturnType<typeof createCloud>;
   readonly runs: RunService;
   readonly comments: TaskCommentService;
   readonly review: ReviewService;
   readonly taskCheckout: TaskCheckoutService;
-  readonly taskForwarding: TaskForwardingService;
   readonly system: SystemService;
   readonly agentUpdates: AgentUpdateService;
   /** The environment agents launch with. Runs capture `current()` at admission; Rescan calls `refresh()`. */
   readonly claudeAccounts: ClaudeAccountService;
   readonly environment: ShellEnvironment;
   readonly providerUsage: ProviderUsageService;
+  private readonly claudeAccountSwitch: ClaudeAccountSwitch;
   readonly memory: MemoryService;
   readonly orclings: OrclingService;
   readonly textGeneration: TextGenerationService;
@@ -146,17 +158,6 @@ export class OpenOrc {
   readonly schedules: ScheduleService;
   readonly files: FileService;
   readonly imports: ImportService;
-  readonly orchestration: OrchestrationService;
-  readonly teams: TeamCoordinator;
-  readonly teamWorkspaces: TeamWorkspaceService;
-  readonly teamConversations: TeamConversationService;
-  readonly teamTasks: TeamTaskService;
-  readonly teamNotifications: TeamNotificationService;
-  readonly teamOperations: TeamOperationGuard;
-  readonly teamForks: TeamForkService;
-  readonly teamRestores: TeamRestoreService;
-  readonly teamMoves: TeamMoveService;
-  readonly teamDeletions: TeamDeletionService;
   readonly devices: DeviceService;
   readonly workspaceWriters = new WorkspaceWriters();
   private readonly log: Logger;
@@ -164,6 +165,8 @@ export class OpenOrc {
   /** Phone access. Its listener runs once the host attaches its request path. */
   readonly remote: RemoteAccess;
   private readonly options: OpenOrcOptions;
+  /** The windows alone, before the phone tap. */
+  private readonly windows: OpenOrcOptions["transport"];
   private closingForUpdate = false;
   private mcp: Promise<OpenOrcMcpServer> | null = null;
   private readonly handlers: Handlers;
@@ -171,6 +174,7 @@ export class OpenOrc {
   private constructor(options: OpenOrcOptions, db: Db) {
     // Phones hear what the windows hear, through this one tap.
     const host = options.transport;
+    this.windows = host;
     this.options = options = {
       ...options,
       transport: {
@@ -202,7 +206,7 @@ export class OpenOrc {
       preview: options.preview,
     });
     this.settings = new AppSettingsService(db);
-    this.environment = new ShellEnvironment({ probe: options.shellProbe ?? (options.ephemeral ? inheritedProbe() : undefined) });
+    this.environment = new ShellEnvironment({ probe: options.shellProbe ?? (options.ephemeral ? inheritedProbe() : undefined), ...(options.shellEnv ? { env: options.shellEnv } : {}) });
     this.devices = new DeviceService({ db, dataDir: options.dataDir, environment: () => this.environment.current(), transport: options.transport, log: this.log, system: options.deviceSystem });
     this.system = new SystemService(options.dataDir, this.environment);
     this.claudeAccounts = new ClaudeAccountService(
@@ -215,13 +219,14 @@ export class OpenOrc {
       },
       (id) => Boolean(this.agentUpdates?.get().updating || this.memory?.hasPendingWork || this.textGeneration?.hasPendingWork || this.runs?.hasClaudeSessions(id)),
       (id) => this.runs.retireIdleClaudeSessions(id),
+      options.cloudOnly ? (id) => this.claudeCloudTokens.known(id) : undefined,
     );
     this.agentUpdates = new AgentUpdateService({
       info: (refresh) => this.system.info(refresh),
       environment: () => this.environment.current(),
       reserve: async () => {
-        if (this.claudeAccounts.hasPendingWork || this.memory.hasPendingWork || this.textGeneration.hasPendingWork || teamRuntime.openIds(this.db).length || this.schedules.hasPendingWork) {
-          throw new Error("Finish agent work, teams, and background processing before updating. Your conversations will be kept.");
+        if (this.claudeAccounts.hasPendingWork || this.memory.hasPendingWork || this.textGeneration.hasPendingWork || this.schedules.hasPendingWork) {
+          throw new Error("Finish agent work and background processing before updating. Your conversations will be kept.");
         }
         return this.runs.reserveAgentUpdate();
       },
@@ -230,15 +235,33 @@ export class OpenOrc {
       read: (key) => storedSettings.get(db, key),
       write: (key, value) => storedSettings.set(db, key, value),
     });
-    // Phones choose their own alerts, so they hear every notice; "Desktop notifications" is the windows' switch.
     // The renderer decides whether the thread is already on screen.
-    const notify = (n: Omit<Notification, "type">) => {
-      const notice: Notification = { type: "notify", ...n, id: n.id ?? randomUUID() };
-      this.remote.alert(notice);
-      if (this.settings.get().notifications) options.transport.push(notice);
-    };
+    const notify = (n: Omit<Notification, "type">) => this.notify(n);
     this.projects = new ProjectService(db);
-    this.workspaces = new WorkspaceService(db, { dataDir: options.dataDir }, this.log, this.workspaceWriters);
+    const cloud = createCloud({
+      db,
+      ledger: this.ledger,
+      options,
+      accounts: this.claudeAccounts,
+      environment: () => this.environment.current(),
+      runs: () => this.runs,
+      threads: () => this.threads,
+      workspaces: () => this.workspaces,
+      invalidate,
+      routing: () => this.brainRouting,
+      memory: () => this.memory,
+      log: this.log,
+    });
+    this.cloudParts = cloud;
+    this.cloudSettings = cloud.settings;
+    this.claudeCloudTokens = cloud.tokens;
+    this.codexCloudLogin = cloud.codex;
+    this.cloud = cloud.cloud;
+    this.cloudChecks = cloud.checks;
+    this.cloudSandboxes = cloud.sandboxes;
+    this.cloudHandoff = cloud.handoff;
+    this.cloudStandby = cloud.standby;
+    this.workspaces = new WorkspaceService(db, { dataDir: options.dataDir, cloud: this.cloud }, this.log, this.workspaceWriters);
     const backgroundProviders: ProviderInfo = {
       models: (agent, accountId) => this.runs.models(agent, undefined, undefined, accountId),
       loggedIn: (accountId) => this.claudeSystemInfo(accountId).then((info) => Object.fromEntries(info.harnesses.map((row) => [row.id, harnessLoggedIn(row)])) as Record<HarnessId, boolean>),
@@ -265,155 +288,21 @@ export class OpenOrc {
       this.log,
       (exchange, agent, accountId) => this.textGeneration.title(exchange, agent, accountId),
       this.workspaceWriters,
-      (id) => this.teams.modeChanged(id),
-      (id) => this.previewGone(id),
+      (id) => this.threadGone(id),
+      (id) => claudeConfigDir(undefined, this.claudeAccounts.environment(this.environment.current(), id).env),
     );
     this.comments = new TaskCommentService(db, this.runs, this.threads, invalidate, options.dataDir);
-    this.orchestration = new OrchestrationService(
-      db,
-      {
-        models: (agent, id) => this.runs.models(agent, undefined, undefined, id ?? undefined),
-        // An explicit readiness check should observe a login change immediately.
-        status: async (agent, refresh, id) => {
-          const info = agent === "claude" ? await this.claudeSystemInfo(id, refresh) : await this.system.info(refresh);
-          const row = harnessInfo(info, agent);
-          return { installed: harnessInstalled(row), loggedIn: harnessLoggedIn(row) };
-        },
-      },
-      invalidate,
-      { dataDir: options.dataDir },
-    );
-    this.teamWorkspaces = new TeamWorkspaceService(db, { dataDir: options.dataDir }, this.workspaceWriters);
-    this.teamNotifications = new TeamNotificationService(db, this.runs, notify);
-    const leadWorkspaces = new Map<string, Promise<unknown>>();
-    this.teams = new TeamCoordinator(db, this.runs, {
-      assertThreadAvailable: (id, options) => this.teamOperations.assertAvailable(id, undefined, options),
-      prepare: async () => {
-        throw new Error("Team workspace preparation must use its execution identity.");
-      },
-      workspace: {
-        beforeStart: async (executionId, actorId, assertActive) => {
-          const record = teamRuntime.get(db, executionId)!;
-          const actor = record.actors.find((item) => item.id === actorId)!;
-          // Participants talk in the lead's workspace; it is prepared once, on whichever member speaks first.
-          if (actor.participant) {
-            if (threads.get(db, record.threadId)?.worktreePath) return;
-            const pending = leadWorkspaces.get(executionId) ?? this.teamWorkspaces.prepare(executionId, "lead", assertActive).finally(() => leadWorkspaces.delete(executionId));
-            leadWorkspaces.set(executionId, pending);
-            await pending;
-            return;
-          }
-          if (actor.parentId) await this.teamWorkspaces.integrate(executionId, actor.parentId, assertActive);
-          await this.teamWorkspaces.prepare(executionId, actorId, assertActive);
-          await this.teamWorkspaces.integrate(executionId, actorId, assertActive);
-        },
-        captureOutput: (executionId, actorId, assertActive) => this.teamWorkspaces.captureOutput(executionId, actorId, assertActive),
-        assertStopped: (executionId) => this.teamWorkspaces.assertStopped(executionId),
-        recoveries: (executionId) => this.teamWorkspaces.pendingRecoveries(executionId),
-      },
-      validate: (settings, projectId, accountId) => this.orchestration.validateExecution(settings, projectId, accountId),
-      tasks: {
-        hasPendingWork: (record, actor) => this.teamTasks.hasPendingWork(record, actor),
-        instructions: (record, actor) => this.teamTasks.instructions(record, actor),
-        completionReason: (record, actor, attempt) => this.teamTasks.completionReason(record, actor, attempt),
-        settled: (record, actor, attempt, outcome) => this.teamTasks.settled(record, actor, attempt, outcome),
-      },
-      warn: (message) => this.log.warn(message),
-      changed: (threadId, record) => {
-        invalidate(["orchestration", "threads", "tasks", `thread:${threadId}`]);
-        if (record) {
-          try {
-            this.teamNotifications.observe(record);
-          } catch (error) {
-            this.log.warn(`Team notification failed: ${error instanceof Error ? error.message : String(error)}`);
-          }
-        }
-      },
-    });
-    this.teamOperations = new TeamOperationGuard(
-      db,
-      (id) => {
-        const reason = this.threads.teamQuiescenceReason(id);
-        if (reason) return reason;
-        try {
-          this.teams.assertQuiescent(id);
-          return null;
-        } catch (error) {
-          return error instanceof Error ? error.message : String(error);
-        }
-      },
-      (id) => invalidate(["orchestration", `thread:${id}`]),
-    );
-    const taskExport = (taskId: string) => teamTaskExportAvailability(db, { coordinator: this.teams, guard: this.teamOperations }, taskId);
     this.taskCheckout = new TaskCheckoutService(db, this.workspaceWriters, options.dataDir);
-    this.review = new ReviewService(db, this.workspaceWriters, this.teamOperations, { dataDir: options.dataDir, taskExport, conversations: this.threads });
-    this.teamForks = new TeamForkService(db, options.dataDir, this.teamOperations, this.workspaceWriters, (id) =>
-      invalidate(["workspace-diff", "orchestration", "threads", `thread:${id}`, `threaddiff:${id}`]),
-    );
-    const workspaceReplaced = (id: string) => invalidate(["workspace-diff", "orchestration", "threads", `thread:${id}`, `threaddiff:${id}`, `threadlog:${id}`, `checkpoints:${id}`]);
-    this.teamRestores = new TeamRestoreService(db, options.dataDir, this.teamOperations, this.workspaceWriters, workspaceReplaced);
-    this.teamMoves = new TeamMoveService(db, options.dataDir, this.teamOperations, this.workspaceWriters, workspaceReplaced);
-    this.teamDeletions = new TeamDeletionService(db, options.dataDir, this.teamOperations, this.workspaceWriters, (id) => {
-      invalidate(["orchestration", "threads", "tasks", "inbox", `thread:${id}`]);
-      // A cancelled or failed deletion leaves the thread as it was.
-      if (!previewThreadLive(db, id)) this.previewGone(id);
-      // What deleted runs leave outside the database goes with them.
-      void this.upkeep.forgetDeletedRuns();
-    });
-    this.teamConversations = new TeamConversationService(
-      db,
-      this.teams,
-      this.runs,
-      this.settings,
-      invalidate,
-      (id) => this.teamOperations.reason(id),
-      (id) => teamActionAvailability(this, id),
-      {
-        workspaces: this.teamWorkspaces,
-        available: (id) => {
-          try {
-            this.teamOperations.assertAvailable(id, undefined, { retainedTask: true });
-            return null;
-          } catch (error) {
-            return error instanceof Error ? error.message : String(error);
-          }
-        },
-      },
-      (id) => this.threads.update(id, { mode: "act" }),
-    );
-    this.teamTasks = new TeamTaskService(db, this.teams, invalidate, {
-      images: (spec) => new AttachmentService(options.dataDir).forTask(spec),
-      review: this.review,
-      runs: this.runs,
-      enabled: () => this.settings.get().experimentalTeamExecution,
-      exportAvailability: taskExport,
-      deleteOwner: (id) => this.teamDeletions.ownerDeletion(id),
-    });
-    this.taskForwarding = new TaskForwardingService(
-      db,
-      this.teamTasks,
-      this.teamOperations,
-      this.workspaceWriters,
-      this.taskCheckout,
-      options.dataDir,
-      () => this.settings.get().defaultWorkspaceMode,
-      invalidate,
-    );
+    this.review = new ReviewService(db, this.workspaceWriters, { dataDir: options.dataDir, conversations: this.threads });
     this.providerUsage = new ProviderUsageService(db, this.system, { apiKey: () => this.memory.credentialStatus() }, (id) =>
       id ? this.claudeAccounts.environment(this.environment.current(), id) : this.environment.current(),
     );
-    this.lifecycle = new LifecycleService(db, this.threads, invalidate, this.log);
+    this.claudeAccountSwitch = new ClaudeAccountSwitch({ db, settings: this.settings, usage: this.providerUsage, runs: this.runs, threads: this.threads, log: this.log });
+    this.lifecycle = new LifecycleService(db, invalidate, this.log);
     this.schedules = new ScheduleService(db, this.threads, invalidate, notify, this.log, {
       maintenance: () => this.agentUpdates.get().updating,
-      teams: this.teamConversations,
-      teamQuiescenceReason: (id) => this.teamOperations.reason(id),
     });
-    this.files = new FileService({
-      writers: this.workspaceWriters,
-      invalidate,
-      formatter: new FileFormatter({ bundled: options.formatter ?? null, environment: () => this.environment.current() }),
-      fileKey: options.fileKey ?? randomBytes(32).toString("hex"),
-    });
+    this.files = createFileService({ options, writers: this.workspaceWriters, invalidate, environment: () => this.environment.current() });
     this.imports = new ImportService(db, this.ledger, invalidate, this.log, this.toolImages);
     this.reviewerApp = new ReviewerAppService(db, { secrets: options.githubSecrets, invalidate });
     this.pullRequests = new PullRequestService(db, {
@@ -430,7 +319,71 @@ export class OpenOrc {
     invalidateOnLifecycle(options.preview, invalidate);
   }
 
-  /** A deleted thread's Preview goes with it: phones watching it hear so, and main closes its pages. */
+  /** Threads moving between this host and the other brain. */
+  get relocations(): ThreadRelocations {
+    return this.cloudParts.relocations;
+  }
+
+  /**
+   * A Mac's windows reaching threads its cloud brain holds; null on the brain itself. An ephemeral core keeps no
+   * profile, so it neither caches a brain's lists nor dials one. Made at its first use, once the core's parts exist.
+   */
+  get brainRouting(): BrainRouting | null {
+    if (this.routing !== undefined) return this.routing;
+    const { options } = this;
+    this.routing =
+      options.cloudOnly || options.ephemeral
+        ? null
+        : new BrainRouting({
+            db: this.db,
+            dataDir: options.dataDir,
+            brain: this.cloudParts.brain,
+            windows: this.windows,
+            local: (request) => this.dispatch(request),
+            notificationsOn: () => this.settings.get().notifications,
+            log: this.log,
+            memory: this.memory,
+            textGeneration: this.textGeneration,
+            service: () => this.cloudParts.settings.service(),
+            holding: async () => ((await this.cloudParts.move?.holding()) ? MOVING_WORDS : null),
+            endpoint: options.brainEndpoint,
+          });
+    return this.routing;
+  }
+
+  /** The cloud brain is gone: moves to or from it settle now, its kept lists and read-only copies leave this Mac, and phones hear it went. */
+  private async brainRemoved(linkKey: string | null): Promise<void> {
+    if (linkKey) rememberRemovedBrain(this.db, linkKey);
+    await this.cloudParts.coordinator?.brainRemoved();
+    await this.brainRouting?.forget();
+  }
+
+  /** Phones choose their own alerts, so they hear every notice; "Desktop notifications" is the windows' switch. */
+  private notify(n: Omit<Notification, "type">): void {
+    const notice: Notification = { type: "notify", ...n, id: n.id ?? randomUUID() };
+    this.remote.alert(notice);
+    if (this.settings.get().notifications) this.options.transport.push(notice);
+  }
+
+  /** OpenCode's provider keys for cloud turns: entered on the Mac, handed over sealed to its brain. */
+  get openCodeCloudKeys(): OpenCodeCloudKeys {
+    return this.cloudParts.opencode;
+  }
+
+  /** Each project's cloud environment: set on the Mac, handed over sealed to its brain. */
+  get cloudProjectEnv(): CloudProjectEnv {
+    return this.cloudParts.env;
+  }
+
+  /** A deleted thread's Preview goes with it, and the session copies kept aside for it. */
+  private threadGone(threadId: string): void {
+    this.previewGone(threadId);
+    void forgetKeptSessions(this.options.dataDir, threadId).catch((error: unknown) =>
+      this.log.warn(`kept sessions of thread ${threadId} stay: ${error instanceof Error ? error.message : String(error)}`),
+    );
+  }
+
+  /** Phones watching its Preview hear so, and main closes its pages. */
   private previewGone(threadId: string): void {
     this.remote.previewGone(threadId);
     this.options.preview?.threadGone(threadId);
@@ -442,12 +395,10 @@ export class OpenOrc {
     return {
       browserAvailable: Boolean(options.browser),
       processRegistry: path.join(options.dataDir, "agent-processes"),
-      captureTeamTree: (runId, cwd, lease) => this.teamWorkspaces.captureRunCheckpoint(runId, cwd, lease),
-      assertStart: (input) => this.teams.assertLaunch(input),
-      assertSend: (runId, teamAttemptId) => this.teams.assertSend(runId, teamAttemptId),
-      idleTimeoutMs: () => {
+      idleTimeoutMs: (thread) => {
         const minutes = this.settings.get().idleProcessMinutes;
-        return minutes ? minutes * 60_000 : null;
+        const setting = minutes ? minutes * 60_000 : null;
+        return thread && this.cloud.get(thread.id) ? Math.min(setting ?? CLOUD_IDLE_PROCESS_MS, CLOUD_IDLE_PROCESS_MS) : setting;
       },
       claudeUserMcpServers: () => this.settings.get().claudeUserMcpServers,
       orclings: this.orclings.runHooks,
@@ -457,37 +408,44 @@ export class OpenOrc {
       brief: (project) => this.memory.brief(project),
       threadContext: (thread) => this.pullRequests.brief(thread),
       untrustedCheckout: (thread) => inUnvettedCopy(db, thread),
+      cloudHost: (thread, mcpOrigin, run) => this.cloud.host(thread, mcpOrigin, run),
+      syncCloud: (thread, sync) => {
+        // A turn on this Mac keeps its standby sandbox current, for the cloud to take it over if the Mac sleeps.
+        this.cloudStandby.observe(thread, sync);
+        return this.cloud.sync(thread, sync).catch((error: unknown) => {
+          this.log.warn(`could not bring thread ${thread.id}'s cloud changes to the Mac: ${error instanceof Error ? error.message : String(error)}`);
+          return false;
+        });
+      },
       memoryEnabled: () => this.memory.enabled(),
       environment: () => this.devices.launchEnvironment(this.environment.current()),
       claudeEnvironment: (snapshot, id) => this.claudeAccounts.environment(snapshot, id),
       claudeAccountFor: (input) => claudeRunAccount(this.db, input),
       claudeVersion: (snapshot, env) => (snapshot ? this.system.infoFor(snapshot, env) : this.system.info()).then((info) => harnessInfo(info, "claude").version),
       editorSaves: (root, since) => this.files.savedSince(root, since),
-      onSteerable: (runId) => this.teams.providerReady(runId),
       onProviderEvent: (event) => this.providerUsage.observe(event),
       onEvent: (event) => {
         this.slack?.observe(event);
         this.comments?.observe(event);
       },
-      onApprovalRequested: (event) => this.teamNotifications.approval(event),
       onRunFinished: (run, scope, project) => {
         this.memory.onRunFinished(run, { task: scope.task, thread: scope.thread ?? this.threads.scopeThreadFor(scope) }, project);
-        if (scope.task && !this.teams.binding(run.id)) void this.threads.onTaskRunFinished(run, scope.task);
+        if (scope.task) void this.threads.onTaskRunFinished(run, scope.task);
       },
-      onTurnSettled: (run, scope, project, outcome) => {
+      onTurnSettled: (run, scope, _project, outcome) => {
         this.comments?.settled(run, outcome);
         if (scope.comment) return;
-        this.teams.onTurnSettled(run, scope, project, outcome);
+        this.claudeAccountSwitch.settled(run, scope, outcome);
         this.slack?.settled(run.id, outcome);
       },
       onThreadTurn: (thread, exchange) => {
-        if (!orchestration.getInstance(db, thread.id)) void this.threads.onTurnCompleted(thread, exchange);
+        void this.threads.onTurnCompleted(thread, exchange);
       },
       onThreadIdle: (thread) => {
-        if (!orchestration.getInstance(db, thread.id)) this.threads.onIdle(thread);
+        this.threads.onIdle(thread);
       },
       notify: (event) => {
-        if (!event.threadId || !orchestration.getInstance(db, event.threadId)) notify(event);
+        notify(event);
       },
     };
   }
@@ -513,21 +471,24 @@ export class OpenOrc {
     core.runs.recoverInterrupted();
     core.comments.recover();
     plans.recover(db);
-    core.teams.recover();
-    // Interrupted deletions fence their exact paths before any workspace recovery can touch them.
-    await core.teamDeletions.recover();
-    await core.teamMoves.recover();
-    await core.teamWorkspaces.recover();
-    core.teamNotifications.baselineAfterRecovery();
     // Ready means launchable: nothing may be admitted before the login shell has answered once.
     const shell = await core.environment.refresh();
     if (!shell.ok) core.log.warn(`could not read the login shell environment, launching with the app's own: ${shell.error}`);
+    if (options.cloudOnly) await core.claudeCloudTokens.load();
     const mcp = await core.mcpServer();
     options.transport.push({ type: "ready", pid: process.pid, mcpPort: mcp.port });
     core.lifecycle.start();
     core.schedules.start();
     core.threads.recoverQueue();
     core.upkeep.start();
+    core.cloudParts.brain.opened();
+    core.cloudParts.coordinator?.start();
+    core.cloudParts.move?.resume();
+    void core.cloudParts.relocations.cleanUpAll();
+    core.brainRouting?.link.onReach((reach) => {
+      if (reach === "live") core.cloudParts.coordinator?.reachable();
+    });
+    void core.brainRouting?.refresh();
     if (!options.ephemeral) core.agentUpdates.start();
     void core.devices.reapStale();
     // Embed any memories that predate the vector index, off the startup path.
@@ -536,14 +497,18 @@ export class OpenOrc {
   }
   async mcpServer(): Promise<OpenOrcMcpServer> {
     if (!this.mcp) {
-      const { assertTeamActor, taskFor, projectFor } = createContextHost({ teams: this.teams, db: this.db });
-      const threadsHost = createThreadsHost({ threadService: this.threads, teamConversations: this.teamConversations, db: this.db, assertTeamActor });
+      const { assertRunAvailable, taskFor, projectFor } = createContextHost({ db: this.db });
+      const threadsHost = createThreadsHost({ threadService: this.threads, db: this.db, assertRunAvailable });
       this.mcp = startMcpServer({
-        ...createRunHost({ runService: this.runs, db: this.db, comments: this.comments, assertTeamActor }),
-        ...createBrowserHost({ db: this.db, runService: this.runs, browser: this.options.browser, assertTeamActor }),
-        ...createDeviceHost({ db: this.db, runService: this.runs, devices: this.devices, assertTeamActor }),
-        ...createMemoryHost({ memoryService: this.memory, runService: this.runs, db: this.db, assertTeamActor, taskFor, projectFor }),
-        ...createTeamHost({ teams: this.teams, slack: this.slack }),
+        ...createRunHost({ runService: this.runs, db: this.db, comments: this.comments, assertRunAvailable }),
+        ...createBrowserHost({ db: this.db, runService: this.runs, browser: this.options.browser, assertRunAvailable }),
+        ...createDeviceHost({ db: this.db, runService: this.runs, devices: this.devices, assertRunAvailable }),
+        ...createMemoryHost({ memoryService: this.memory, runService: this.runs, db: this.db, assertRunAvailable, taskFor, projectFor }),
+        execution: {
+          available: (runId) => this.slack.executionAvailable(runId),
+          context: (runId) => this.slack.executionContext(runId),
+          switch: (runId, input) => (input.orclingId ? this.slack.switchToOrcling(runId, input.orclingId, input.instructions) : this.slack.switchExecution(runId, input)),
+        },
         ...threadsHost,
         ...createOrclingHost({
           db: this.db,
@@ -557,8 +522,8 @@ export class OpenOrc {
         }),
         pullReview: this.pullRequests.agentTools(),
         tasks: {
-          ...createTasksHost({ teams: this.teams, threadService: this.threads, teamTasks: this.teamTasks, dataDir: this.options.dataDir, assertTeamActor }),
-          create: createTaskCreateHost({ teams: this.teams, teamTasks: this.teamTasks, threadService: this.threads, db: this.db, assertTeamActor }),
+          ...createTasksHost({ threadService: this.threads, dataDir: this.options.dataDir, assertRunAvailable }),
+          create: createTaskCreateHost({ threadService: this.threads, assertRunAvailable }),
         },
       });
     }
@@ -571,18 +536,23 @@ export class OpenOrc {
    * request names its origin, which the handler's audit rows can read for as long as it runs.
    */
   async handle(request: RpcRequest, origin?: RequestOrigin): Promise<RpcReply> {
+    // A window's call while a cloud brain is set up may be about a thread the brain holds; a phone's never goes there.
+    if (!origin && this.brainRouting?.active) return this.brainRouting.router.handle(request);
+    return this.dispatch(request, origin);
+  }
+
+  private async dispatch(request: RpcRequest, origin?: RequestOrigin): Promise<RpcReply> {
     const { id, method } = request;
-    const privateParams = method.startsWith("slack.") || method === "memory.settings.set" || method === "remote.push.setKey";
     try {
       if (!Object.hasOwn(rpcParams, method)) return { type: "rpc.error", id, message: `unknown method ${method}` };
       const parsed = rpcParams[method as RpcMethod].safeParse(request.params ?? {});
       if (!parsed.success) return { type: "rpc.error", id, message: invalidParamsMessage(method, parsed.error.message) };
-      this.guardTeamRequest(method as RpcMethod, parsed.data);
+      assertRouteNotMoving(this.db, method as RpcMethod, parsed.data as Record<string, unknown>);
       const handler = this.handlers[method as RpcMethod] as (p: unknown) => Promise<unknown> | unknown;
       const started = Date.now();
       const result = await requestOrigin.run(origin, () => handler(parsed.data));
       if (process.env["OPENORC_RPC_LOG"] === "1") {
-        console.log(`[rpc] ${method} ${privateParams ? "[private]" : JSON.stringify(parsed.data).slice(0, 120)} -> ${resultSummary(result)} in ${Date.now() - started} ms`);
+        console.log(rpcLogLine(method, parsed.data, result, Date.now() - started));
       }
       return { type: "rpc.result", id, result: result ?? null };
     } catch (e) {
@@ -593,71 +563,26 @@ export class OpenOrc {
     }
   }
 
-  /** The proof cannot fall through a model-only lifecycle path and orphan its workers. */
-  private guardTeamRequest(method: RpcMethod, value: unknown): void {
-    const params = value as Record<string, unknown>;
-    const pinned = (id: unknown) => typeof id === "string" && Boolean(orchestration.getInstance(this.db, id));
-    const ownedTask = (id: unknown) => typeof id === "string" && Boolean(teamRuntime.assignmentForTask(this.db, id) || pinned(tasks.get(this.db, id)?.threadId));
-    const hidden = (id: unknown) => typeof id === "string" && teamDeletedThreads.has(this.db, id);
-    if ((DELETED_BY_ID.has(method) && hidden(params["id"])) || (DELETED_BY_THREAD.has(method) && hidden(params["threadId"]))) {
-      throw new Error("This conversation was deleted. Its saved tasks keep their team activity and controls.");
-    }
-    if (TASK_SCOPED.has(method)) this.teamConversations.assertTaskScope(params["threadId"] as string, params["taskId"] as string | undefined);
-    const taskId = params["taskId"] ?? params["id"];
-    const forwarding = typeof taskId === "string" ? (taskForwardings.target(this.db, taskId) ?? taskForwardings.source(this.db, taskId)) : null;
-    if (
-      forwarding?.state === "preparing" &&
-      ["tasks.delete", "tasks.update", "tasks.start", "tasks.prepareWorkspace", "workspace.cleanup", "runs.start", "review.commit", "review.push", "review.createPr"].includes(method)
-    ) {
-      throw new Error("Finish the saved handoff from the original team task before changing or starting this task.");
-    }
-    let blocked = false;
-    switch (method) {
-      case "threads.update": {
-        const patch = params["patch"] as Record<string, unknown>;
-        blocked = pinned(params["id"]) && ["agent", "model", "effort", "fastMode"].some((key) => patch[key] !== undefined);
-        break;
-      }
-      case "threads.queue":
-      case "threads.sendQueued":
-        blocked = pinned(params["id"]);
-        break;
-      case "tasks.start":
-      case "tasks.prepareWorkspace":
-      case "workspace.cleanup":
-        blocked = ownedTask(params["taskId"]);
-        break;
-      case "review.comments.send":
-        blocked = pinned(params["threadId"]) || ownedTask(params["taskId"]);
-        break;
-      case "tasks.delete":
-        blocked = ownedTask(params["id"]);
-        break;
-      case "runs.start":
-        blocked = pinned(params["threadId"]) || ownedTask(params["taskId"]);
-        break;
-    }
-    if (blocked && method === "tasks.delete" && hidden(tasks.get(this.db, params["id"] as string)?.threadId))
-      throw new Error("A deleted conversation's saved tasks are deleted together from a task's Details, which also removes the team's remaining workspaces.");
-    if (blocked) throw new Error("This team-owned operation is not available in the team execution preview. Its work and history are preserved; use team direction or Stop.");
+  /** Why closing now would cut something short, or null when nothing would. */
+  busy(): BusyReason | null {
+    return busyReason(this);
   }
 
   /** Called without yielding after the desktop has fenced incoming RPCs. A successful reservation is followed by close(). */
   prepareForUpdate(): string | null {
-    if (this.agentUpdates.get().updating) return "Wait for agent updates to finish before restarting.";
-    if (this.memory.hasPendingWork) return "Wait for memory processing to finish before restarting to update.";
-    if (teamRuntime.openIds(this.db).length) return "Finish or stop your active teams before restarting to update.";
-    if (this.schedules.hasPendingWork) return "A schedule is starting a thread. Try again when it has started.";
-    if (this.runs.backgroundCommandsRunning) return "Stop the background commands running in your conversations before restarting to update.";
-    if (!this.runs.prepareForUpdate()) return "Wait for agent work, approvals, and context maintenance to finish before restarting to update.";
-    this.schedules.stopAccepting();
-    this.closingForUpdate = true;
-    return null;
+    const refusal = fenceForUpdate(this);
+    if (refusal === null) this.closingForUpdate = true;
+    return refusal;
   }
 
   async close(): Promise<void> {
+    this.cloudParts.move?.close();
+    this.cloudParts.coordinator?.close();
+    this.brainRouting?.close();
     await this.remote.close(this.closingForUpdate ? "update" : "shutdown");
+    await this.files.intelligence.close();
     this.threads.stopAccepting();
+    await this.claudeCloudTokens.close();
     await this.claudeAccounts.close();
     await this.agentUpdates.close();
     await this.comments.close();
@@ -665,20 +590,13 @@ export class OpenOrc {
     this.lifecycle.stop();
     this.reviewerApp.shutdown();
     await this.upkeep.stop();
-    this.teamNotifications.shutdown();
     await this.schedules.shutdown();
-    await this.teamForks.shutdown();
-    await this.teamMoves.shutdown();
-    await this.teamDeletions.shutdown();
-    await this.taskForwarding.shutdown();
-    await this.teamOperations.shutdown();
-    await this.teamRestores.shutdown();
-    await this.teams.shutdown();
     await this.workspaces.shutdown();
+    this.cloudStandby.close();
     await this.runs.closeAll();
+    await this.cloud.close();
     await this.devices.close();
     await this.threads.shutdown();
-    await this.teamWorkspaces.shutdown();
     await this.memory.shutdown();
     this.bench.stop();
     this.ledger.close();
@@ -689,13 +607,23 @@ export class OpenOrc {
 
   private async claudeSystemInfo(id?: string | null, refresh = false) {
     if (refresh) await this.environment.refresh();
-    return this.system.infoFor(this.claudeAccounts.inspectionEnvironment(this.environment.current(), id ?? undefined));
+    const info = await this.system.infoFor(this.claudeAccounts.inspectionEnvironment(this.environment.current(), id ?? undefined));
+    return this.options.cloudOnly ? withCloudCodexLogin(info, await this.codexCloudLogin.has()) : info;
   }
 
   private buildHandlers(invalidate: (keys: string[]) => void): Handlers {
     return composeHandlers(
       createSlackHandlers({ slack: this.slack, invalidate }),
+      createCloudHandlers({
+        ...this.cloudParts,
+        offered: Boolean(this.options.cloudOffered && !this.options.cloudOnly),
+        simulated: this.options.cloudSimulated ?? true,
+        invalidate,
+        removed: (linkKey) => this.brainRemoved(linkKey),
+      }),
+      createCloudCarryHandlers({ db: this.db, env: this.cloudParts.env, skills: this.cloudParts.skills, cloud: this.cloudParts.cloud }),
       createClaudeAccountHandlers(this.claudeAccounts),
+      createBrainSyncHandlers({ db: this.db, memory: this.memory, textGeneration: this.textGeneration, cloudOnly: this.options.cloudOnly ?? false, invalidate }),
       createSystemHandlers({
         system: this.system,
         accountInfo: (refresh, id) => (id ? this.claudeSystemInfo(id, refresh) : this.system.info(refresh)),
@@ -705,28 +633,23 @@ export class OpenOrc {
         planLimits: () => readPlanLimits({ db: this.db, usage: this.providerUsage, availability: async () => harnessAvailability(await this.claudeSystemInfo()) }),
         invalidate,
       }),
-      createProjectsHandlers({ db: this.db, projectService: this.projects, invalidate, transport: this.options.transport }),
+      createProjectsHandlers({ db: this.db, projectService: this.projects, invalidate, transport: this.options.transport, copies: this.options.cloudOnly ?? false }),
       createPullRequestHandlers({ pullRequests: this.pullRequests }),
       createReviewerAppHandlers({ reviewerApp: this.reviewerApp }),
-      createOrchestrationHandlers({ orchestrationService: this.orchestration, teamConversations: this.teamConversations, teamTasks: this.teamTasks, db: this.db }),
       createThreadQueriesHandlers({ threadService: this.threads, db: this.db, ledger: this.ledger, imports: this.imports }),
-      createThreadLaunchHandlers({ threadService: this.threads, teamConversations: this.teamConversations, orclings: this.orclings, imports: this.imports }),
+      createThreadLaunchHandlers({ threadService: this.threads, orclings: this.orclings, imports: this.imports }),
       createThreadWorkspaceHandlers({
         db: this.db,
-        teamDeletionsService: this.teamDeletions,
         threadService: this.threads,
         upkeep: this.upkeep,
-        teamForksService: this.teamForks,
-        teamMovesService: this.teamMoves,
-        teamRestoresService: this.teamRestores,
       }),
-      createThreadMessagesHandlers({ db: this.db, teamConversations: this.teamConversations, threadService: this.threads }),
-      createTaskQueriesHandlers({ db: this.db, comments: this.comments, threadService: this.threads, taskForwarding: this.taskForwarding }),
+      createThreadMessagesHandlers({ db: this.db, threadService: this.threads }),
+      createTaskQueriesHandlers({ db: this.db, comments: this.comments, threadService: this.threads }),
       createTaskCreateHandlers({ db: this.db, settings: this.settings, threadService: this.threads, invalidate, dataDir: this.options.dataDir }),
       createTaskUpdateHandlers({ threadService: this.threads, db: this.db, runService: this.runs, workspaceWriters: this.workspaceWriters, workspaces: this.workspaces, invalidate }),
       createTaskDeleteHandlers({ workspaces: this.workspaces, comments: this.comments, runService: this.runs, db: this.db, log: this.log, upkeep: this.upkeep, invalidate }),
       createWorkspaceHandlers({ runService: this.runs, workspaces: this.workspaces, db: this.db, invalidate }),
-      createRunsHandlers({ threadService: this.threads, teams: this.teams, runService: this.runs, db: this.db, dataDir: this.options.dataDir }),
+      createRunsHandlers({ threadService: this.threads, runService: this.runs, db: this.db, dataDir: this.options.dataDir }),
       createAttachmentsHandlers({ db: this.db, dataDir: this.options.dataDir }),
       createEventsHandlers({ frames: this.frames, ledger: this.ledger, db: this.db, runService: this.runs }),
       createMcpAppsHandlers({ runService: this.runs }),
@@ -734,15 +657,17 @@ export class OpenOrc {
       createReviewCommentsHandlers({ review: this.review, invalidate }),
       createReviewWorkspaceHandlers({ review: this.review, db: this.db, taskCheckout: this.taskCheckout, invalidate }),
       createFilesHandlers({ db: this.db, files: this.files, claudeEnvironment: (id) => this.claudeAccounts.environment(this.environment.current(), id).env }),
+      createCodeExplanationHandlers({ db: this.db, files: this.files, textGeneration: this.textGeneration, settings: this.settings, dataDir: this.options.dataDir }),
       createInstructionsHandlers({ db: this.db, files: this.files, claudeEnvironment: (id) => this.claudeAccounts.environment(this.environment.current(), id).env }),
       createSettingsHandlers({ settings: this.settings, textGeneration: this.textGeneration, invalidate }),
       createSchedulesHandlers({ schedules: this.schedules }),
       createCatalogHandlers({ runService: this.runs, invalidate }),
-      createMemoryHandlers({ memory: this.memory, db: this.db, files: this.files }),
+      createMemoryHandlers({ memory: this.memory, db: this.db, files: this.files, keyChanged: () => this.cloudParts.brain.signInsChanged() }),
       createOrclingHandlers({ orclings: this.orclings }),
       createDeviceHandlers({ devices: this.devices }),
-      createInboxHandlers({ runService: this.runs, db: this.db, teams: this.teams }),
-      createRemoteHandlers({ remote: this.remote }),
+      createInboxHandlers({ runService: this.runs, db: this.db }),
+      createRemoteHandlers({ remote: this.remote, pushKeyChanged: () => this.cloudParts.brain.signInsChanged() }),
+      createBrainThreadHandlers({ db: this.db, cloud: this.cloud, mirrors: () => this.brainRouting?.mirrors ?? null }),
       createPreviewHandlers({ db: this.db, preview: this.options.preview }),
       createBenchHandlers({ frames: this.frames, bench: this.bench, db: this.db, ledger: this.ledger, transport: this.options.transport, benchmarks: Boolean(this.options.benchmarks) }),
     );

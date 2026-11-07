@@ -1,7 +1,8 @@
 import { fileCount } from "@openorc/client";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, TextInput, View } from "react-native";
+import { HostContext } from "../connection/host-context";
 import { haptic } from "../ui/haptics";
 import { SheetHeader } from "../ui/SheetHeader";
 import { useSheetBottom } from "../ui/sheet-bottom";
@@ -57,6 +58,7 @@ export function CommitSheet() {
   useEffect(() => {
     if (started.current && publishing.kind === "notice" && publishing.action === "commit" && publishing.tone === "muted") router.back();
   }, [publishing]);
+  const host = useContext(HostContext);
   const write = (text: string) => {
     setMessage(text);
     changeDrafts.setMessage(threadId, text);
@@ -68,7 +70,7 @@ export function CommitSheet() {
       return setAsked(reason);
     }
     started.current = true;
-    void commitThread(threadId, message.trim(), reads.log.data?.[0]?.sha ?? null);
+    void commitThread(host, threadId, message.trim(), reads.log.data?.[0]?.sha ?? null);
   };
   const failure = publishing.kind === "notice" && publishing.action === "commit" && publishing.tone === "bad" ? publishing : null;
   return (

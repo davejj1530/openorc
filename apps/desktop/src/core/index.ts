@@ -1,12 +1,13 @@
 import { ProtectedSecretsClient } from "./protected-secrets";
+import { newestBrainBundle } from "./brain-bundle";
 import { BrowserClient } from "./browser-client";
 import { PreviewClient } from "./preview-client";
 import { PresenceClient } from "./presence";
 import { windowPorts } from "./reply";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { Worker } from "node:worker_threads";
 import type { MessagePortMain } from "electron";
-import { OpenOrc, WorkerEmbedder, WorkerFormatter, type Broadcast, type EnvSnapshot, type RequestOrigin, type RpcReply, type Transport } from "@openorc/core";
+import { OpenOrc, WorkerEmbedder, WorkerFormatter, WorkerIntelligence, type Broadcast, type EnvSnapshot, type RequestOrigin, type RpcReply, type SpawnTerminal, type Transport } from "@openorc/core";
 import type { RpcRequest } from "@openorc/protocol";
 
 /**
@@ -39,6 +40,25 @@ const secrets = new ProtectedSecretsClient((message) => process.parentPort.postM
 const browser = new BrowserClient((message) => process.parentPort.postMessage(message));
 const preview = new PreviewClient((message) => process.parentPort.postMessage(message));
 const presence = new PresenceClient((message) => process.parentPort.postMessage(message));
+// The runner a cloud workspace runs is uploaded as source, so the bundle carries its files as text.
+const cloudRunner = import.meta.glob<string>(["../../../../packages/cloud/src/runner/*.ts", "!../../../../packages/cloud/src/runner/*.test.ts"], {
+  query: "?raw",
+  import: "default",
+  eager: true,
+});
+/**
+ * A terminal for CLIs whose sign-in screens need one, such as `claude setup-token`. Wide, so a token is never wrapped
+ * across lines. node-pty carries a native binding, so it loads on first use.
+ */
+const terminal: SpawnTerminal = async (binary, args, { cwd, env }) => {
+  const { spawn } = await import("node-pty");
+  const pty = spawn(binary, args, { name: "xterm-256color", cols: 400, rows: 40, cwd, env: env as Record<string, string> });
+  return {
+    onData: (listener) => void pty.onData(listener),
+    onExit: (listener) => void pty.onExit(({ exitCode }) => listener(exitCode)),
+    kill: () => pty.kill(),
+  };
+};
 const corePromise = OpenOrc.create({
   browser: browser.execute,
   preview: preview.host,
@@ -50,12 +70,27 @@ const corePromise = OpenOrc.create({
   githubSecrets: secrets.store("github.secrets"),
   remoteSecrets: secrets.store("remote.secrets"),
   pushSecrets: secrets.store("push.secrets"),
+  cloudSecrets: secrets.store("cloud.secrets"),
+  claudeCloudSecrets: secrets.store("claude-cloud.secrets"),
+  codexCloudSecrets: secrets.store("codex-cloud.secrets"),
+  opencodeCloudSecrets: secrets.store("opencode-cloud.secrets"),
+  cloudEnvSecrets: secrets.store("cloud-env.secrets"),
+  cloudBrainSecrets: secrets.store("cloud-brain.secrets"),
+  cloudBrainMoveSecrets: secrets.store("cloud-brain-move.secrets"),
+  terminal,
   presence: presence.inUse,
   // The embedding model runs in its own thread, so loading it and embedding memories never stall the core.
   embedder: new WorkerEmbedder(() => new Worker(join(import.meta.dirname, "embedder-worker.mjs"), { workerData: { cacheDir: dataDir } })),
   // Prettier formats in its own thread too, so a large file never stalls the core.
   formatter: new WorkerFormatter(() => new Worker(join(import.meta.dirname, "formatter-worker.mjs"))),
+  intelligence: new WorkerIntelligence(() => new Worker(join(import.meta.dirname, "intelligence-worker.mjs"), { resourceLimits: { maxOldGenerationSizeMb: 1024 } })),
   benchmarks: __OPENORC_QA__,
+  cloudOffered: true,
+  // Development and QA builds simulate sandboxes on this Mac until a service is connected; a release asks for one.
+  cloudSimulated: __OPENORC_QA__,
+  cloudRunnerFiles: Object.entries(cloudRunner).map(([file, content]) => ({ name: basename(file), content: Buffer.from(content) })),
+  // A packaged app carries the brain in its resources; a build run from the repository uses the one built beside it.
+  cloudBrainBundle: () => newestBrainBundle(process.env["OPENORC_BRAIN_DIR"] ?? join(import.meta.dirname, "../../../brain/dist")),
 });
 
 // Main hosts the Terminal panels and wants the login PATH the core adopted.
@@ -103,6 +138,23 @@ process.parentPort.on("message", (e) => {
   }
   if (e.data?.type === "shutdown") {
     void shutdown();
+    return;
+  }
+  if (e.data?.type === "power") {
+    const asleep = e.data.state === "suspend";
+    void corePromise
+      .then((core) => {
+        // Best effort before sleep: what is new on the chosen projects' branches reaches a brain that is awake.
+        if (asleep) return Promise.all([core.cloudStandby.away(), core.brainRouting?.freshen()]).then(() => undefined);
+        // Back from sleep, maybe on another network: the cloud brain is dialed again now, not at the next retry, and woken
+        // if a phone used it meanwhile, so its new threads list here.
+        if (core.brainRouting?.active) {
+          core.brainRouting.link.awoke();
+          void core.brainRouting.catchUp();
+        }
+        return core.cloudStandby.back();
+      })
+      .catch((error: unknown) => console.error("[core] cloud takeover", error));
     return;
   }
   const [port, media] = e.ports;

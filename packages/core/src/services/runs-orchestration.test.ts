@@ -1,19 +1,18 @@
-import { randomUUID } from "node:crypto";
+import { CodexAdapter, RunHandle, type AgentLaunchEnvironment, type LiveSettings } from "@openorc/agents";
+import { Db, LedgerWriter, checkpoints, projects, runs, snapshots, tasks, threads } from "@openorc/db";
+import { commitAll, git } from "@openorc/git";
+import { type AgentEvent, type PermissionPreset, type Project, type RunSpec, type Thread } from "@openorc/protocol";
 import { mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { CodexAdapter, RunHandle, type AgentLaunchEnvironment, type LiveSettings } from "@openorc/agents";
-import { Db, LedgerWriter, checkpoints, orchestration, projects, runs, snapshots, tasks, threads } from "@openorc/db";
-import { commitAll, git } from "@openorc/git";
-import { DEFAULT_TEAM_LIMITS, type AgentEvent, type PermissionPreset, type Project, type RunSpec, type Thread } from "@openorc/protocol";
 import { FrameCoalescer } from "../frames.js";
+import { checkpointRefs } from "./checkpoint-refs.js";
 import { RunService, type RunAdapterRegistry, type RunHooks, type StartRunInput } from "./runs.js";
+import { ShellEnvironment, type EnvSnapshot } from "./shell-environment.js";
+import { ThreadService } from "./threads.js";
 import { WorkspaceWriters } from "./workspace-writers.js";
 import { WorkspaceService } from "./workspace.js";
-import { ThreadService } from "./threads.js";
-import { ShellEnvironment, type EnvSnapshot } from "./shell-environment.js";
-import { checkpointRefs } from "./checkpoint-refs.js";
 
 let root: string;
 beforeAll(async () => {
@@ -316,24 +315,8 @@ describe("live settings", () => {
   });
 });
 
-function permissionTeam(permissionMode: PermissionPreset = "trusted", mode: "act" | "plan" = "act"): Thread {
-  const thread = threads.insert(db, { projectId: project.id, title: "Permission team", agent: "codex", model: "fixture", mode, permissionMode });
-  const settings = { agent: "codex" as const, model: "fixture", effort: null, fastMode: false };
-  const team = orchestration.save(db, {
-    projectId: project.id,
-    expectedRevisionId: null,
-    draft: {
-      name: "Permissions",
-      limits: DEFAULT_TEAM_LIMITS,
-      discussion: { ambientRounds: 0, peerFollowUps: 0, mentionOnly: [] },
-      members: [
-        { key: "lead", name: "Lead", managerKey: null, responsibility: "Coordinate", settings },
-        { key: "manager", name: "Manager", managerKey: "lead", responsibility: "Manage", settings: { ...settings, agent: "claude" } },
-        { key: "worker", name: "Worker", managerKey: "manager", responsibility: "Implement", settings },
-      ],
-    },
-  });
-  orchestration.createInstance(db, { threadId: thread.id, teamRevisionId: team.revision.id });
+function permissionThread(permissionMode: PermissionPreset = "trusted", mode: "act" | "plan" = "act"): Thread {
+  const thread = threads.insert(db, { projectId: project.id, title: "Permission thread", agent: "codex", model: "fixture", mode, permissionMode });
   return thread;
 }
 function permissionLead(thread: Thread): StartRunInput {
@@ -346,36 +329,6 @@ function permissionLead(thread: Thread): StartRunInput {
     permissionMode: thread.permissionMode,
     prompt: "Hold the permission test",
     resume: false,
-    teamAttemptId: randomUUID(),
-  };
-}
-async function permissionChild(thread: Thread, agent: "codex" | "claude", parentTaskId: string | null = null): Promise<StartRunInput> {
-  const folder = await mkdtemp(path.join(os.tmpdir(), "openorc-permission-writer-"));
-  permissionFolders.push(folder);
-  const destination = path.join(folder, "checkout");
-  await git(root, ["worktree", "add", "--detach", destination, "HEAD"]);
-  const task = tasks.insert(db, {
-    projectId: project.id,
-    threadId: thread.id,
-    title: "Team member",
-    spec: "Keep work isolated",
-    priority: "none",
-    labels: [],
-    workspaceMode: "worktree",
-    baseRef: "main",
-    parentTaskId,
-  });
-  return {
-    scope: { task: tasks.update(db, task.id, { worktreePath: destination }), thread: null },
-    project,
-    agent,
-    model: "fixture",
-    mode: thread.mode,
-    permissionMode: thread.permissionMode,
-    prompt: "Hold this member",
-    resume: false,
-    teamAttemptId: randomUUID(),
-    collectTaskImages: false,
   };
 }
 
@@ -408,10 +361,10 @@ describe("launch environment admission", () => {
   });
 });
 
-describe("coordinator live direction transport", () => {
+describe("live direction transport", () => {
   it.each(["codex", "claude"] as const)("announces host permission waits for %s after registration without resolving questions", async (agent) => {
     const thread = threads.insert(db, { projectId: project.id, title: "Approval fixture", agent, model: "fixture", mode: "act", permissionMode: "trusted" });
-    const run = await service.start({ ...permissionLead(thread), agent, teamAttemptId: undefined });
+    const run = await service.start({ ...permissionLead(thread), agent });
     hooks.onApprovalRequested = vi.fn((event) => {
       expect(service.pending()).toEqual(expect.arrayContaining([expect.objectContaining({ runId: event.runId, approvalId: event.approvalId })]));
     });
@@ -431,7 +384,7 @@ describe("coordinator live direction transport", () => {
   });
 
   it("does not announce automatically allowed requests", async () => {
-    const thread = permissionTeam("autonomous");
+    const thread = permissionThread("autonomous");
     const run = await service.start(permissionLead(thread));
     hooks.onApprovalRequested = vi.fn();
     await expect(service.requestApproval(run.id, "automatic", "Bash", { command: "echo check" })).resolves.toEqual({ decision: "allow" });
@@ -440,7 +393,7 @@ describe("coordinator live direction transport", () => {
   });
 
   it("refreshes controls when provider readiness changes without an assistant reply", async () => {
-    const thread = permissionTeam();
+    const thread = permissionThread();
     const run = await service.start(permissionLead(thread));
     invalidations.mockClear();
     steerable = true;
@@ -455,33 +408,8 @@ describe("coordinator live direction transport", () => {
     expect(invalidations).toHaveBeenCalledTimes(2);
   });
 
-  it("keeps delivery within its run and records one canonical transcript marker", async () => {
-    const thread = permissionTeam();
-    const run = await service.start(permissionLead(thread));
-    steerable = true;
-    threads.update(db, thread.id, { model: "next-model", effort: "high", fastMode: true });
-    hooks.assertSend = () => {
-      throw new Error("ordinary send must not bypass the mailbox");
-    };
-    const direction = { id: "retained-direction", text: "Use these constraints. ".repeat(500), attachments: ["/tmp/direction.png"] };
-    service.recordTeamDirection(run.id, direction);
-    service.recordTeamDirection(run.id, direction);
-    await expect(service.steer(run.id, direction.text, direction.attachments)).resolves.toBe("accepted");
-    expect(steerTransport).toHaveBeenCalledExactlyOnceWith(direction.text, direction.attachments);
-    expect(followupTransport).not.toHaveBeenCalled();
-    expect(adapters.codex.start).toHaveBeenCalledTimes(1);
-    expect(runs.listForThread(db, thread.id)).toHaveLength(1);
-    const markers = db
-      .stmt(
-        "SELECT COALESCE(a.content, e.payload) AS payload FROM events e LEFT JOIN artifacts a ON a.event_id = e.id AND a.kind = 'payload' WHERE e.run_id = ? AND e.kind = 'message.completed' AND json_extract(COALESCE(a.content, e.payload), '$.messageId') = ?",
-      )
-      .all(run.id, "team-direction:retained-direction") as { payload: string }[];
-    expect(markers).toHaveLength(1);
-    expect(JSON.parse(markers[0]!.payload)).toMatchObject({ role: "user", text: direction.text, attachments: direction.attachments });
-  });
-
   it("refuses updates during startup and turns, then atomically fences new work while draining an idle session", async () => {
-    const input = permissionLead(permissionTeam());
+    const input = permissionLead(permissionThread());
     const starting = service.start(input);
     expect(service.prepareForUpdate()).toBe(false);
     const run = await starting;
@@ -497,163 +425,19 @@ describe("coordinator live direction transport", () => {
     expect(service.isLive(run.id)).toBe(false);
     expect(runs.get(db, run.id)?.state).toBe("success");
   });
-});
 
-describe("live team permissions", () => {
-  it("applies the shared gate to lead, manager and grandchild, scopes duplicate approval IDs, and preserves questions and other teams", async () => {
-    const thread = permissionTeam();
-    const managerInput = await permissionChild(thread, "claude");
-    const childInput = await permissionChild(thread, "codex", managerInput.scope.task!.id);
-    const other = permissionTeam();
-    const unrelatedInput = await permissionChild(other, "claude");
-    const owned = await Promise.all([service.start(permissionLead(thread)), service.start(managerInput), service.start(childInput)]);
-    const unrelated = await service.start(unrelatedInput);
-    const answers = owned.map((run) => service.requestApproval(run.id, "same-tool-id", "Bash", {}));
-    const questions = owned.map((run) => service.requestApproval(run.id, "same-question-id", "AskUserQuestion", {}));
-    const otherAnswer = service.requestApproval(unrelated.id, "same-tool-id", "Bash", {});
-    const changed = threads.update(db, thread.id, { permissionMode: "autonomous" });
-    expect(service.applyThreadPermissions(changed)).toMatchObject({ requested: "autonomous", effective: "autonomous", pendingRestart: false });
-    await expect(Promise.all(answers)).resolves.toEqual(owned.map(() => ({ decision: "allow" })));
-    expect(service.pending().filter((item) => item.approvalId === "same-question-id")).toHaveLength(3);
-    expect(
-      service
-        .pending()
-        .filter((item) => item.approvalId === "same-tool-id")
-        .map((item) => item.runId),
-    ).toEqual([unrelated.id]);
-    expect(runs.get(db, unrelated.id)?.permissionMode).toBe("trusted");
-    expect(
-      service
-        .threadPermissions(thread.id)
-        .runs.map((item) => item.runId)
-        .sort(),
-    ).toEqual(owned.map((item) => item.id).sort());
-    for (const run of owned) service.resolveApproval(run.id, "same-question-id", "allow", { destination: [run.id] });
-    await expect(Promise.all(questions)).resolves.toEqual(owned.map((run) => ({ decision: "allow", answers: { destination: [run.id] } })));
-    service.resolveApproval(unrelated.id, "same-tool-id", "deny");
-    await expect(otherAnswer).resolves.toEqual({ decision: "deny" });
-    expect(vi.mocked(adapters.codex.start).mock.calls.length + vi.mocked(adapters.claude.start).mock.calls.length).toBe(4);
-  });
-
-  it.each(["trusted", "autonomous"] as const)("truthfully tightens the app gate against native %s and reopens pending tool requests without answering questions", async (native) => {
-    const thread = permissionTeam(native);
-    const run = await service.start(permissionLead(thread));
-    service.applyThreadPermissions(threads.update(db, thread.id, { permissionMode: "autonomous" }));
-    const tightened = service.applyThreadPermissions(threads.update(db, thread.id, { permissionMode: "review" }));
-    expect(tightened).toMatchObject({
-      requested: "review",
-      effective: native,
-      pendingRestart: true,
-      runs: [{ runId: run.id, effective: native, providerPermissionMode: native, pendingRestart: true }],
-    });
-    expect(runs.get(db, run.id)?.permissionMode).toBe(native);
-    const parked = service.requestApproval(run.id, "held", "Bash", {});
-    const question = service.requestApproval(run.id, "question", "AskUserQuestion", {});
-    expect(service.pending().map((item) => item.approvalId)).toEqual(["held", "question"]);
-    service.applyThreadPermissions(threads.update(db, thread.id, { permissionMode: "autonomous" }));
-    await expect(parked).resolves.toEqual({ decision: "allow" });
-    expect(service.pending().map((item) => item.approvalId)).toEqual(["question"]);
-    service.resolveApproval(run.id, "question", "deny");
-    await question;
-    service.applyThreadPermissions(threads.update(db, thread.id, { permissionMode: "review" }));
-    automaticExit = false;
-    await expect(service.closeAndWait(run.id, 10)).rejects.toThrow(/still closing/);
-    expect(service.threadPermissions(thread.id).pendingRestart).toBe(true);
-    scripted.get(run.id)!.finish();
-    await service.closeAndWait(run.id);
-    expect(service.threadPermissions(thread.id)).toEqual({ mode: { requested: "act", effective: "act", pending: false }, requested: "review", effective: "review", pendingRestart: false, runs: [] });
-    const restarted = await service.start(permissionLead(threads.get(db, thread.id)!));
-    expect(vi.mocked(adapters.codex.start).mock.lastCall?.[0].permissionMode).toBe("review");
-    expect(service.threadPermissions(thread.id).runs[0]).toMatchObject({ runId: restarted.id, effective: "review", pendingRestart: false });
-  });
-
-  it("reports the Plan ceiling and mixed native policies while denying forbidden Plan commands", async () => {
-    const thread = permissionTeam("autonomous", "plan");
-    const lead = await service.start(permissionLead(thread));
-    const plan = service.threadPermissions(thread.id);
-    expect(plan).toMatchObject({ requested: "autonomous", effective: "review", pendingRestart: false, runs: [{ mode: "plan", effective: "review", providerPermissionMode: "review" }] });
-    const question = service.requestApproval(lead.id, "plan-tool", "Bash", {});
-    service.applyThreadPermissions(threads.update(db, thread.id, { permissionMode: "review" }));
-    service.applyThreadPermissions(threads.update(db, thread.id, { permissionMode: "autonomous" }));
-    expect(service.pending()).toHaveLength(0);
-    await expect(question).resolves.toMatchObject({ decision: "deny" });
-    const child = await permissionChild(thread, "claude");
-    await service.start({ ...child, mode: "act" });
-    expect(service.threadPermissions(thread.id)).toMatchObject({ requested: "autonomous", effective: null, pendingRestart: true, mode: { requested: "plan", effective: null, pending: true } });
-  });
-
-  it.each([
-    ["codex", "trusted"],
-    ["codex", "autonomous"],
-    ["claude", "trusted"],
-    ["claude", "autonomous"],
-  ] as const)("holds automatic grants for requested Plan while %s retains its actual Act / %s process", async (agent, native) => {
-    const thread = permissionTeam(native);
-    const input = { ...permissionLead(thread), agent };
-    const run = await service.start(input);
-    service.applyThreadPermissions(threads.update(db, thread.id, { permissionMode: "autonomous" }));
-    const plan = service.applyThreadPermissions(threads.update(db, thread.id, { mode: "plan" }));
-    expect(plan).toMatchObject({ mode: { requested: "plan", effective: "act", pending: true }, requested: "autonomous", effective: native, pendingRestart: true });
-    expect(runs.get(db, run.id)).toMatchObject({ mode: "act", permissionMode: native });
-    const external = service.requestApproval(run.id, "after-plan", "Bash", {});
-    const question = service.requestApproval(run.id, "choose", "AskUserQuestion", {});
-    service.applyThreadPermissions(threads.get(db, thread.id)!);
-    expect(service.pending().map((item) => item.approvalId)).toEqual(["after-plan", "choose"]);
-    expect(service.applyThreadPermissions(threads.update(db, thread.id, { mode: "act" })).mode).toEqual({ requested: "act", effective: "act", pending: false });
-    await expect(external).resolves.toMatchObject({ decision: "allow" });
-    expect(service.pending().map((item) => item.approvalId)).toEqual(["choose"]);
-    service.resolveApproval(run.id, "choose", "deny");
-    await question;
-    service.applyThreadPermissions(threads.update(db, thread.id, { mode: "plan" }));
-    automaticExit = false;
-    await expect(service.closeAndWait(run.id, 10)).rejects.toThrow(/still closing/);
-    expect(service.threadPermissions(thread.id).mode?.pending).toBe(true);
-    scripted.get(run.id)!.finish();
-    await service.closeAndWait(run.id);
-    expect(service.threadPermissions(thread.id)).toMatchObject({ mode: { requested: "plan", effective: "plan", pending: false }, effective: "review", pendingRestart: false });
-    const next = await service.start({ ...permissionLead(threads.get(db, thread.id)!), agent });
-    expect(runs.get(db, next.id)?.mode).toBe("plan");
-    expect(vi.mocked(adapters[agent].start).mock.lastCall![0].permissionMode).toBe("review");
-    expect(service.applyThreadPermissions(threads.update(db, thread.id, { mode: "act" })).mode).toEqual({ requested: "act", effective: "plan", pending: true });
-    const planRequest = service.requestApproval(next.id, "still-plan", "Bash", {});
-    expect(service.pending()).toHaveLength(0);
-    await expect(planRequest).resolves.toMatchObject({ decision: "deny" });
-  });
-
-  it.each(["lead", "worker"] as const)("uses the latest requested policy for a %s whose MCP startup was already pending", async (scope) => {
-    const thread = permissionTeam("autonomous");
-    const input = scope === "lead" ? permissionLead(thread) : await permissionChild(thread, "claude");
-    let release!: () => void;
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    mcp.mockImplementationOnce(async () => {
-      await gate;
-      return { port: 0, urlForRun: () => "http://fixture.invalid", revoke: () => {}, close: async () => {} };
-    });
+  it("reads as busy from a start until its turn settles, without fencing new work", async () => {
+    const input = permissionLead(permissionThread());
     const starting = service.start(input);
-    await vi.waitFor(() => expect(mcp).toHaveBeenCalledOnce());
-    service.applyThreadPermissions(threads.update(db, thread.id, { permissionMode: "review" }));
-    release();
+    expect(service.busy).toBe(true);
     const run = await starting;
-    expect(vi.mocked(adapters[input.agent as "codex" | "claude"].start).mock.lastCall?.[0].permissionMode).toBe("review");
-    expect(runs.get(db, run.id)?.permissionMode).toBe("review");
-    expect(service.threadPermissions(thread.id)).toMatchObject({ requested: "review", effective: "review", pendingRestart: false });
-  });
-
-  it("keeps ordinary delegated task policies unchanged and rejects inconsistent team ownership", async () => {
-    const thread = threads.insert(db, { projectId: project.id, title: "Ordinary thread", agent: "codex", model: "fixture", mode: "act", permissionMode: "trusted" });
-    const input = await permissionChild(thread, "claude");
-    delete input.teamAttemptId;
-    const child = await service.start(input);
-    service.applyThreadPermissions(threads.update(db, thread.id, { permissionMode: "autonomous" }));
-    expect(runs.get(db, child.id)?.permissionMode).toBe("trusted");
-    const team = permissionTeam();
-    const teamInput = await permissionChild(team, "codex");
-    await service.start(teamInput);
-    db.stmt("UPDATE tasks SET thread_id = NULL WHERE id = ?").run(teamInput.scope.task!.id);
-    expect(() => service.assertThreadPermissions(team.id)).toThrow(/inconsistent ownership/);
-    expect(threads.get(db, team.id)?.permissionMode).toBe("trusted");
+    expect(service.busy).toBe(true);
+    emit(run.id, { type: "turn.completed", runId: run.id, ts: Date.now(), turnId: "done", durationMs: 1, status: "success" });
+    await vi.waitFor(() => expect(hooks.onTurnSettled).toHaveBeenCalled());
+    expect(service.isLive(run.id)).toBe(true);
+    expect(service.busy).toBe(false);
+    await service.send(run.id, "The next turn");
+    expect(service.busy).toBe(true);
   });
 });
 
@@ -706,7 +490,7 @@ describe("coordinator run seams", () => {
     await expect(conversations.continueThread(first.thread.id, input)).rejects.toThrow(/current turn/);
 
     // Checkpoint both overlapping sessions without closing either provider or touching the real index.
-    for (const run of [first.run, forkRun]) emit(run.id, { type: "turn.completed", runId: run.id, ts: Date.now(), turnId: "done", status: "success", durationMs: 1 });
+    for (const run of [first.run, forkRun]) emit(run!.id, { type: "turn.completed", runId: run!.id, ts: Date.now(), turnId: "done", status: "success", durationMs: 1 });
     await vi.waitFor(() => {
       expect(service.threadActivity(first.thread.id)).toBe("idle");
       expect(service.threadActivity(fork.id)).toBe("idle");
@@ -715,7 +499,7 @@ describe("coordinator run seams", () => {
     });
     const resumed = await conversations.continueThread(first.thread.id, input);
     expect(service.isLive(resumed.id)).toBe(true);
-    expect(service.isLive(second.run.id)).toBe(true);
+    expect(service.isLive(second.run!.id)).toBe(true);
     expect(service.isLive(forkRun.id)).toBe(true);
     await service.send(forkRun.id, "Continue beside the other thread");
     expect(service.threadActivity(fork.id)).toBe("running");
@@ -822,6 +606,7 @@ describe("coordinator run seams", () => {
     expect(spec.systemPromptAppendix).toContain("use OpenOrc's browser tool first");
     expect(spec.internalMcp?.toolNames).toContain("browser");
     expect(spec.systemPromptAppendix).toContain("Use OpenOrc's visualize tool");
+    expect(spec.systemPromptAppendix).toContain("To show the user an image, put it in your reply as a Markdown image");
     expect(spec.internalMcp?.toolNames).toContain("visualize");
   });
 

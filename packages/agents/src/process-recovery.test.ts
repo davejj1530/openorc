@@ -88,3 +88,16 @@ it.skipIf(process.platform === "win32")("blocks live owners, preserves malformed
     await rm(registry, { recursive: true, force: true });
   }
 });
+
+it("starts an agent with PWD naming its folder, not the folder OpenOrc was started from", async () => {
+  const folder = await mkdtemp(path.join(tmpdir(), "openorc-pwd-"));
+  try {
+    const proc = spawnAgentProcess(process.execPath, ["-e", "process.stdout.write(String(process.env.PWD))"], { cwd: folder, env: { ...process.env, PWD: "/elsewhere" } });
+    let out = "";
+    proc.stdout.on("data", (chunk: Buffer) => (out += chunk.toString("utf8")));
+    await new Promise((resolve) => proc.once("close", resolve));
+    expect(out).toBe(folder);
+  } finally {
+    await rm(folder, { recursive: true, force: true });
+  }
+});

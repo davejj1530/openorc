@@ -76,3 +76,13 @@ it("migrates existing history and schedules to the existing CLI account", () => 
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+it("takes an account under the id another host gave it, renaming and enabling it when it is there already", () => {
+  const { db } = fixture();
+  const made = claudeAccounts.put(db, { id: "4c1f0a52-7a0e-4b44-9d7e-1f0c2a6b8e11", name: "Work" });
+  expect(made).toMatchObject({ id: "4c1f0a52-7a0e-4b44-9d7e-1f0c2a6b8e11", name: "Work", kind: "managed", enabled: true });
+  claudeAccounts.update(db, { id: made.id, enabled: false });
+  expect(claudeAccounts.put(db, { id: made.id, name: "Client" })).toMatchObject({ name: "Client", enabled: true, createdAt: made.createdAt });
+  expect(claudeAccounts.put(db, { id: "claude-cli", name: "Personal" })).toMatchObject({ id: "claude-cli", name: "Personal", kind: "cli" });
+  expect(claudeAccounts.list(db).map((account) => account.id)).toEqual(["claude-cli", made.id]);
+});

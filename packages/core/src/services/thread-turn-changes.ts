@@ -1,4 +1,4 @@
-import { checkpoints, projects, threads, type Db } from "@openorc/db";
+import { checkpoints, projects, retiredTeams, threads, type Db } from "@openorc/db";
 import { git } from "@openorc/git";
 import type { TurnFileChanges } from "@openorc/protocol";
 import { treeChanges } from "./tree-changes.js";
@@ -11,7 +11,7 @@ import { treeChanges } from "./tree-changes.js";
 export async function threadTurnChanges(db: Db, input: { threadId: string; checkpointId: string; includePatch?: boolean; paths?: string[] }): Promise<TurnFileChanges> {
   const thread = threads.get(db, input.threadId);
   const checkpoint = checkpoints.get(db, input.checkpointId);
-  if (!thread || !checkpoint || checkpoint.threadId !== thread.id) throw new Error("This turn does not belong to the conversation.");
+  if (!thread || retiredTeams.isHidden(db, thread.id) || !checkpoint || checkpoint.threadId !== thread.id) throw new Error("This turn does not belong to the conversation.");
   const project = projects.get(db, thread.projectId);
   if (!project) throw new Error("The project for this checkpoint is unavailable.");
   const history = checkpoints.listForThread(db, thread.id);

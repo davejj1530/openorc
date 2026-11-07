@@ -1,3 +1,4 @@
+import { failureParts, queueHint } from "@openorc/client";
 import type { QueuedMessage } from "@openorc/protocol";
 import { useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
@@ -57,7 +58,11 @@ export function MessageQueue({
             <Animated.View key={message.id} className="min-h-touch flex-row items-center gap-2 rounded-lg bg-surface py-1.5 pl-3.5 pr-1.5" style={still ? undefined : arrive}>
               <View className="min-w-0 flex-1 gap-1">
                 <QueuedText text={message.text.trim() || "Attached images"} />
-                {message.error ? <Text className="text-sm text-bad">{message.error}</Text> : null}
+                {message.error ? (
+                  <Text numberOfLines={2} className="text-sm text-bad">
+                    {failureParts(message.error).headline}
+                  </Text>
+                ) : null}
                 {message.attachments.length ? (
                   <Text className="text-sm text-ink-4">
                     {message.attachments.length} {message.attachments.length === 1 ? "image" : "images"} attached
@@ -102,7 +107,7 @@ export function MessageQueue({
         >
           <Text className="tabular-nums">{messages.length} queued</Text>
           <Text numberOfLines={1} className="min-w-0 flex-1 text-sm text-ink-4">
-            Sends when {agentName} finishes
+            {queueHint(messages, agentName)}
           </Text>
           <View style={{ transform: [{ rotate: open ? "0deg" : "180deg" }] }}>
             <ChevronDown size={14} className="text-ink-4" />

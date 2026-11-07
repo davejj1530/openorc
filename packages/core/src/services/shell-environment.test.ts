@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ShellEnvironment, loginShell, parseShellProbe, windowsProbe, type ShellProbe, type ShellProbeResult } from "./shell-environment.js";
+import { ShellEnvironment, loginShell, parseShellProbe, pathProbe, type ShellProbe, type ShellProbeResult } from "./shell-environment.js";
 
 const platform = process.platform;
 afterEach(() => {
@@ -160,7 +160,7 @@ describe("Windows", () => {
       // npm writes a shell script beside its launcher, and only Windows Script Host runs a .js file.
       for (const file of ["codex", "codex.cmd", "opencode.js"]) await writeFile(path.join(dir, file), "", { mode: 0o755 });
       const env: NodeJS.ProcessEnv = { PATH: dir, OPENORC_CLAUDE_BIN: "C:\\Tools\\claude.exe" };
-      expect(await windowsProbe(env)("cmd.exe")).toEqual({ path: dir, binaries: { claude: "C:\\Tools\\claude.exe", codex: path.join(dir, "codex.cmd"), opencode: null } });
+      expect(await pathProbe(env)("cmd.exe")).toEqual({ path: dir, binaries: { claude: "C:\\Tools\\claude.exe", codex: path.join(dir, "codex.cmd"), opencode: null } });
 
       const shellEnv = new ShellEnvironment({ env: { PATH: dir }, shell: () => "cmd.exe" });
       await shellEnv.refresh();

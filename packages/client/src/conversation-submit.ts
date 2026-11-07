@@ -25,6 +25,8 @@ export interface SubmitInput {
   now: boolean;
   /** A new process that resumes nothing, whatever runs now: the way back from a lost session. */
   restart?: boolean;
+  /** Another Claude account to go on with, which takes a new process that resumes the conversation there. */
+  claudeAccountId?: string;
 }
 
 /** What one send does: exactly one call to the core, or the reason it cannot go yet. */
@@ -66,6 +68,7 @@ export function planSubmit(input: SubmitInput): SubmitPlan {
   if (input.restart) return restartPlan(input);
   const { activeRun, choice, target } = input;
   if (!choice) return NO_MODEL;
+  if (input.claudeAccountId) return input.permissionReady ? { kind: "start", choice, resume: true } : PERMISSIONS_LOADING;
   const { sameAgent, settingsPending, canSteer } = processFit(input);
   if (target.kind === "thread" && input.working) return input.now && canSteer && activeRun ? { kind: "steer", runId: activeRun.id } : { kind: "queue", threadId: target.threadId };
   if (input.live && sameAgent && activeRun && !settingsPending) return { kind: "continue", runId: activeRun.id };
@@ -136,6 +139,7 @@ function startParams(request: SubmitRequest, plan: Extract<SubmitPlan, { kind: "
     permissionMode: request.permission,
     prompt,
     resume: plan.resume,
+    ...(request.claudeAccountId ? { claudeAccountId: request.claudeAccountId } : {}),
   };
 }
 

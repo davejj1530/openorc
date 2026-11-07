@@ -1,30 +1,4 @@
-import type { Project, Task, TeamTaskView } from "@openorc/protocol";
-
-const PUBLICATION_REASONS = {
-  integrated: "Publish integrated team changes from the main team conversation. This assignment’s workspace is kept for review.",
-  ownershipError: "Task ownership could not be checked. Retry before changing its workspace or sending comments.",
-  ownershipPending: "Checking task ownership…",
-};
-
-/** A current export report takes precedence over a background ownership refresh. */
-export function taskPublicationBlockedReason({
-  hasOwner,
-  team,
-  isError,
-  isPending,
-}: {
-  hasOwner: boolean;
-  team: Pick<TeamTaskView, "export"> | null | undefined;
-  isError: boolean;
-  isPending: boolean;
-}): string | null {
-  if (!hasOwner) return null;
-  if (team?.export) return team.export.allowed ? null : team.export.reason;
-  if (team) return PUBLICATION_REASONS.integrated;
-  if (isError) return PUBLICATION_REASONS.ownershipError;
-  if (isPending) return PUBLICATION_REASONS.ownershipPending;
-  return null;
-}
+import type { Project, Task } from "@openorc/protocol";
 
 /** An assignment's baseRef is a commit; its pull request targets the default branch. */
 export function taskBaseLabel(task: Pick<Task, "baseRef">, project: Pick<Project, "defaultBranch">): string | null {

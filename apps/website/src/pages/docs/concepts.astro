@@ -14,7 +14,7 @@ import { docHref } from "../../data/docs";
       </div>
       <div>
         <dt>Workspace</dt>
-        <dd>The built-in place for threads that don't belong to a project. A Workspace thread works in a folder you choose, by default one inside OpenOrc's data folder, and never uses Git. It's listed first in the sidebar.</dd>
+        <dd>The built-in place for threads that don't belong to a project. A Workspace thread works in a folder you choose, by default one inside OpenOrc's data folder, and never uses Git. It's listed first among the projects on the New thread page.</dd>
       </div>
       <div>
         <dt>Local checkout</dt>
@@ -24,6 +24,10 @@ import { docHref } from "../../data/docs";
         <dt>Worktree</dt>
         <dd>A separate folder and branch for one thread, so threads working at the same time don't edit each other's files. OpenOrc creates it in its data folder and names the branch after the thread, under <code>openorc/</code> by default. See <a href={docHref("git")}>Git and worktrees</a>.</dd>
       </div>
+      <div>
+        <dt>Cloud thread</dt>
+        <dd>A thread whose agent works in a sandbox on your own Vercel or Agent37 account, while a worktree on your computer keeps its changes. The optional cloud brain is a copy of OpenOrc on that account, which keeps threads going while your computer sleeps. See <a href={docHref("cloud")}>Cloud threads</a>.</dd>
+      </div>
     </dl>
   </section>
 
@@ -32,7 +36,18 @@ import { docHref } from "../../data/docs";
     <dl class="docs-terms">
       <div>
         <dt>Thread</dt>
-        <dd>A conversation with an agent about your code. It has a current agent, model, and mode, and it never closes: you can always send another message. See <a href={docHref("threads")}>Threads</a>.</dd>
+        <dd>
+          A conversation with an agent about your code. It has a current agent, model, and mode, and it never closes: you can always send another message. When you're done with one, resolve it to move it out of the list. See <a
+            href={docHref("threads")}>Threads</a
+          >.
+        </dd>
+      </div>
+      <div>
+        <dt>Subagent</dt>
+        <dd>
+          A helper an agent runs on its own during a turn, such as one of Claude Code's agents. OpenOrc shows each subagent as a thread under the one that ran it. Helper threads that an agent starts, and subthreads you start, sit under
+          their parent too. See <a href={docHref("messaging")}>Threads working together</a>.
+        </dd>
       </div>
       <div>
         <dt>Turn</dt>
@@ -68,15 +83,11 @@ import { docHref } from "../../data/docs";
   </section>
 
   <section aria-labelledby="companions">
-    <h2 id="companions">Orclings and teams</h2>
+    <h2 id="companions">Orclings</h2>
     <dl class="docs-terms">
       <div>
         <dt>Orcling</dt>
         <dd>A personal companion with its own look, model, instructions, and private memory. Each Orcling has a conversation of its own, and you can also choose one to work in a project thread. See <a href={docHref("orclings")}>Orclings</a>.</dd>
-      </div>
-      <div>
-        <dt>Agent team</dt>
-        <dd>A saved group of up to 12 agents in a project, each with a name, a responsibility, and its own agent and model. One member leads, and the others report to the lead or to another member. The team works together in one conversation. Team execution is in Beta. See <a href={docHref("teams")}>Agent teams</a>.</dd>
       </div>
     </dl>
   </section>

@@ -1,7 +1,7 @@
 import type { ClientPush } from "@openorc/client";
 import { LinkCloseCode, type PhoneMessage } from "@openorc/link";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DROPPED } from "./link-connection";
+import { DROPPED, OLDER_MAC_IMAGE } from "./link-connection";
 import { ConnectionManager } from "./manager";
 import { effectsFor, FakeMac, lan, pairedWith } from "./test-fixtures/fake-mac";
 
@@ -31,6 +31,69 @@ const wire = (mac: FakeMac) =>
   });
 
 describe("calls over the link", () => {
+  it("declares its capabilities before interest or queued RPCs and tolerates an older Mac's refusal", async () => {
+    const mac = new FakeMac();
+    mac.behave(lan, { kind: "answer" });
+    const { connection } = connect(mac);
+    await advance(10);
+    const declaration = mac.heard.find((message) => message.t !== "ping");
+    expect(declaration).toMatchObject({ t: "rpc", method: "session.negotiate", params: { capabilities: ["subagent-threads", "reply-images"] } });
+    if (declaration?.t !== "rpc") throw new Error("no capability declaration");
+    mac.send({ t: "rpc.error", id: declaration.id, message: "This is not available from a phone." });
+    mac.answer = (method) => (method === "projects.list" ? [] : undefined);
+    const reply = connection.call("projects.list", {});
+    await advance(10);
+    expect(await reply).toEqual([]);
+  });
+
+  it("asks for a reply's image only from a Mac that said it serves them", async () => {
+    const ref = { kind: "reply-image", runId: "run-1", messageId: "m1", path: "/Users/me/shot.png" } as const;
+    const negotiate = (mac: FakeMac) => {
+      const declaration = mac.heard.find((message) => message.t === "rpc" && message.method === "session.negotiate");
+      if (declaration?.t !== "rpc") throw new Error("no capability declaration");
+      return declaration.id;
+    };
+    const older = new FakeMac();
+    older.behave(lan, { kind: "answer" });
+    const first = connect(older);
+    await advance(10);
+    // An older Mac refuses the declaration; its link would refuse the request too and drop the session.
+    older.send({ t: "rpc.error", id: negotiate(older), message: "Unknown method." });
+    await expect(first.connection.asset(ref)).rejects.toThrow(OLDER_MAC_IMAGE);
+    expect(older.heard.some((message) => message.t === "asset")).toBe(false);
+
+    const current = new FakeMac();
+    current.behave(lan, { kind: "answer" });
+    const second = connect(current);
+    await advance(10);
+    current.send({ t: "rpc.result", id: negotiate(current), result: { capabilities: ["subagent-threads", "reply-images"] } });
+    void second.connection.asset(ref).catch(() => undefined);
+    await advance(10);
+    expect(current.heard).toContainEqual(expect.objectContaining({ t: "asset", ref }));
+  });
+
+  it("drops and logs a failed frame application at the link boundary, then handles the next frame", async () => {
+    const log = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const mac = new FakeMac();
+    mac.behave(lan, { kind: "answer" });
+    const { connection } = connect(mac);
+    const applied: number[] = [];
+    connection.onPush((push) => {
+      if (push.type !== "frame") return;
+      if (push.frame.seq === 1) throw new Error("bad frame");
+      applied.push(push.frame.seq);
+    });
+    try {
+      await advance(10);
+      for (const seq of [1, 2]) mac.send({ t: "push", push: { type: "frame", frame: { runId: "run", seq, events: [] } } });
+      await advance(10);
+      expect(applied).toEqual([2]);
+      expect(log).toHaveBeenCalledOnce();
+    } finally {
+      log.mockRestore();
+    }
+  });
+
   it("holds calls made while connecting and sends them after the interest", async () => {
     const mac = new FakeMac();
     mac.behave(lan, { kind: "answer", delayMs: 1_000 });
@@ -40,7 +103,8 @@ describe("calls over the link", () => {
     const projects = connection.call("projects.list", {});
     await advance(1_010);
     expect(await projects).toEqual([]);
-    expect(wire(mac)).toEqual(["interest run-1", "rpc projects.list"]);
+    // Every session also asks what the host is, renews this phone's key to its door and hears which brains it removed.
+    expect(wire(mac)).toEqual(["rpc session.negotiate", "interest run-1", "rpc host.kind", "rpc door.key", "rpc brains.removed", "rpc projects.list"]);
   });
 
   it("gives up on a call after 8 s without a session", async () => {
@@ -75,6 +139,26 @@ describe("calls over the link", () => {
     expect(wire(mac).filter((line) => line === "rpc runs.send")).toHaveLength(1);
   });
 
+  it("sends nothing for the next host over the session of the one it leaves, and lets nothing that session owes land", async () => {
+    const mac = new FakeMac();
+    mac.behave(lan, { kind: "answer" });
+    const { connection } = connect(mac);
+    await advance(10);
+    mac.answer = (method) => (method === "threads.list" ? [{ id: "left-behind" }] : undefined);
+    const owed = connection.call("threads.list", {});
+    const dropped = expect(owed).rejects.toThrow(DROPPED);
+    // The phone now shows another host: its client starts over, and its lists are asked for at once.
+    connection.reset(false);
+    const next = connection.call("threads.list", {});
+    const waited = expect(next).rejects.toThrow();
+    await advance(10);
+    await dropped;
+    expect(wire(mac).filter((line) => line === "rpc threads.list")).toHaveLength(1);
+    await advance(9_000);
+    await waited;
+    expect(wire(mac).filter((line) => line === "rpc threads.list")).toHaveLength(1);
+  });
+
   it("tells every new session the interest, then reports it resumed", async () => {
     const mac = new FakeMac();
     mac.behave(lan, { kind: "answer" });
@@ -84,7 +168,19 @@ describe("calls over the link", () => {
     await advance(10);
     mac.live[0]!.close(LinkCloseCode.normal);
     await advance(1_000);
-    expect(wire(mac)).toEqual(["interest ", "interest run-1,run-2", "interest run-1,run-2"]);
+    expect(wire(mac)).toEqual([
+      "rpc session.negotiate",
+      "interest ",
+      "rpc host.kind",
+      "rpc door.key",
+      "rpc brains.removed",
+      "interest run-1,run-2",
+      "rpc session.negotiate",
+      "interest run-1,run-2",
+      "rpc host.kind",
+      "rpc door.key",
+      "rpc brains.removed",
+    ]);
     expect(pushes.filter((push) => push.type === "session")).toEqual([
       { type: "session", resumed: false },
       { type: "session", resumed: true },

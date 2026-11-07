@@ -29,8 +29,8 @@ const { thread, task, work } = workflow;
 const at = (windows: string) => timed(workflowJourney, windows);
 const head = { journey: workflowJourney };
 const rows = [
-  { id: "a", title: thread.title, providers: [{ harness: "codex", label: "Codex" }], busy: busy.a, waiting: "aQuestion~aPick", show: ">aSend" },
-  { id: "b", title: work.title, branch: branches.cacheThread, providers: [{ harness: "codex", label: "Codex" }], busy: busy.b, show: ">bStart" },
+  { id: "a", title: thread.title, busy: busy.a, headline: thread.headline, waiting: "aQuestion~aPick", show: ">aSend" },
+  { id: "b", title: work.title, branch: branches.cacheThread, busy: busy.b, headline: work.headline, show: ">bStart" },
 ];
 const codex = { harness: "codex", label: models.codex.label, effort: models.codex.effort };
 const starters = ["Explore this project", "Plan a change", "Review my changes"];
@@ -56,7 +56,7 @@ const comments = [
       </header>
       <div class="hs-new-body">
         <div class="hs-new-column">
-          <div class="hs-new-question">What should we work on in {project.name}?</div>
+          <div class="hs-new-question">What should we work on in <span class="hs-new-project">{project.name}</span>?</div>
           <Composer journey={workflowJourney} layout="new" placeholder="Ask OpenOrc to build, fix bugs, explore" model={codex} permission={models.codex.permission} prompt={{ text: thread.prompt, typo: thread.typo, window: "typeStart~typeEnd", typed: "typeStart~aSend" }} />
           <div class="hs-new-location"><ProductIcon name="branch" />Works in the local checkout on {project.branch}<ProductIcon name="chevronDown" /></div>
           <div class="hs-starters">{starters.map((starter) => <span class="hs-button hs-button-sm">{starter}</span>)}</div>
@@ -235,8 +235,9 @@ const comments = [
           {...head}
           steps={[
             { text: "1 step", show: "<bRead" },
-            { text: "2 steps", show: ">bRead" },
+            { text: "2 steps", show: "bRead~bEdited" },
           ]}
+          changes={[{ text: `+${added} −${removed} in ${work.change.files.length} files`, show: ">bEdited" }]}
         />
         <ol class="hs-steps" data-grow {...at("<bDone")}>
           <Step {...head} title={work.phases.read} live="<bRead" done=">bRead" meta={{ text: "4 files", show: ">bRead" }} />

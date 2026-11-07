@@ -2,7 +2,7 @@ import { router } from "expo-router";
 import { useEffect, useMemo } from "react";
 import { useFrameCallback, useSharedValue } from "react-native-reanimated";
 import { isLive } from "@openorc/client";
-import { client, link } from "../client";
+import { hostClient, link } from "../client";
 import { isChangesScenario, openChanges } from "../changes/changes-perf";
 import { isPreviewScenario } from "../preview/preview-perf";
 import { openPreview } from "../preview/open-preview";
@@ -32,7 +32,7 @@ export function usePerfAutoOpen(): void {
 
 /** Whether some run has a block still live of the kinds a scenario samples. */
 function liveIn(kinds: readonly string[]): boolean {
-  for (const run of client.runs.snapshot().values())
+  for (const run of hostClient(null).runs.snapshot().values())
     if (run.blocks.some((block) => kinds.includes(block.kind) && isLive(block) && (block.kind !== "message" || block.role === "assistant"))) return true;
   return false;
 }

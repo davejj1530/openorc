@@ -2,6 +2,7 @@ import type { ClientPush, CoreConnection } from "@openorc/client";
 import type { MacMessage, PhoneSession } from "@openorc/link";
 import type { AssetRef, DeviceMethod, DeviceParams, DeviceRpcResults, RemotePush, RpcMethod, RpcParams, RpcResults, SessionMethod, SessionParams, SessionRpcResults } from "@openorc/protocol";
 import type { Clock } from "./route-race";
+import { PHONE_CAPABILITIES, supportsReplyImages } from "@openorc/protocol";
 
 /** A watched Preview's newest state, or the end of the watch, which only its screen hears. */
 export type PreviewPush = Extract<RemotePush, { type: "preview" | "preview.ended" }>;
@@ -42,6 +43,13 @@ export const CALL_WAIT_MS = 8_000;
 export const DROPPED = "The connection to your Mac dropped before it answered.";
 const NO_ANSWER = "Your Mac did not answer in time.";
 const NO_MAC = "This phone is not connected to a Mac.";
+export const OLDER_MAC_IMAGE = "Update OpenOrc on your Mac to see this image here.";
+
+/** The capabilities a Mac shares in its answer to `session.negotiate`; an older Mac refuses the call and shares none. */
+const shared = (result: unknown): readonly string[] => {
+  const capabilities = (result as { capabilities?: unknown } | null)?.capabilities;
+  return Array.isArray(capabilities) ? capabilities.filter((capability): capability is string => typeof capability === "string") : [];
+};
 
 function clientPush(push: RemotePush): ClientPush | null {
   switch (push.type) {
@@ -65,7 +73,7 @@ function clientPush(push: RemotePush): ClientPush | null {
 /**
  * The phone's line to the core for `@openorc/client`, over whichever session is current. Calls made while the phone
  * connects wait for a session; a call in flight when its session drops fails and is never sent again, since the Mac
- * may already have acted on it. Every new session hears the phone's interest before anything else.
+ * may already have acted on it. Every new session hears capabilities, then interest, before any queued calls.
  */
 export class LinkConnection implements CoreConnection {
   readonly delivery = "interest";
@@ -79,6 +87,10 @@ export class LinkConnection implements CoreConnection {
   private readonly drains = new Map<PhoneLine, () => void>();
   private readonly listeners = new Set<(push: ClientPush) => void>();
   private readonly previews = new Set<(push: PreviewPush) => void>();
+  /** What each session's Mac said it shares, once it has answered. */
+  private readonly capabilities = new WeakMap<PhoneLine, Promise<readonly string[]>>();
+  /** Answers still due to `session.negotiate`, kept apart from calls so no handover or drain waits on them. */
+  private readonly negotiations = new Map<number, { session: PhoneLine; answer(capabilities: readonly string[]): void }>();
 
   constructor(
     private readonly clock: Clock,
@@ -100,16 +112,19 @@ export class LinkConnection implements CoreConnection {
     return this.rpc(method, params) as Promise<SessionRpcResults[M]>;
   }
 
-  /** The bytes behind an image the transcript names, or a watched Preview's frame. */
+  /**
+   * The bytes behind an image the transcript names, or a watched Preview's frame. A reply's image goes only to a Mac
+   * that said it reads them: an older Mac's link would refuse the request and drop the session.
+   */
   asset(ref: AssetRef): Promise<Asset> {
-    return this.withSession(
-      (session) =>
-        new Promise<Asset>((resolve, reject) => {
-          const id = this.id();
-          this.downloads.set(id, { session, mime: "", chunks: [], resolve, reject });
-          session.send({ t: "asset", id, ref });
-        }),
-    );
+    return this.withSession(async (session) => {
+      if (ref.kind === "reply-image" && !supportsReplyImages(await this.capabilities.get(session))) throw new Error(OLDER_MAC_IMAGE);
+      return new Promise<Asset>((resolve, reject) => {
+        const id = this.id();
+        this.downloads.set(id, { session, mime: "", chunks: [], resolve, reject });
+        session.send({ t: "asset", id, ref });
+      });
+    });
   }
 
   onPush(listener: (push: ClientPush) => void): () => void {
@@ -132,6 +147,11 @@ export class LinkConnection implements CoreConnection {
   attach(session: PhoneLine): void {
     this.current = session;
     session.onClose(() => this.lost(session));
+    // Best effort: older Macs refuse this RPC. No pending call may hold up a handover or reconnect waiting for it; only
+    // a reply's image waits for the answer.
+    const negotiate = this.id();
+    this.capabilities.set(session, new Promise((answer) => this.negotiations.set(negotiate, { session, answer })));
+    session.send({ t: "rpc", id: negotiate, method: "session.negotiate", params: { capabilities: PHONE_CAPABILITIES } });
     session.send({ t: "interest", runIds: this.interest });
     this.emit({ type: "session", resumed: this.resumable });
     this.resumable = true;
@@ -147,15 +167,18 @@ export class LinkConnection implements CoreConnection {
     this.resumable = restored;
     for (const waiter of this.waiting) waiter.fail(new Error(NO_MAC));
     this.waiting.clear();
+    // The session still open is the host being left: a call for the next one must wait for that host's session, and
+    // what the old one still owes must not land in the state just cleared for the next.
+    const leaving = this.current;
+    this.current = null;
+    if (leaving) this.dropOwed(leaving);
   }
 
   receive(session: PhoneLine, message: CallMessage): void {
     switch (message.t) {
       case "rpc.result":
-        this.settle(message.id)?.resolve(message.result);
-        return;
       case "rpc.error":
-        this.settle(message.id)?.reject(new Error(message.message));
+        this.answered(message);
         return;
       case "push": {
         if (session !== this.current) return;
@@ -229,8 +252,31 @@ export class LinkConnection implements CoreConnection {
     }).then(send);
   }
 
+  /** A call's answer, or a session's answer to `session.negotiate`, which no caller waits on. */
+  private answered(message: Extract<CallMessage, { t: "rpc.result" | "rpc.error" }>): void {
+    if (this.negotiated(message.id, message.t === "rpc.result" ? shared(message.result) : [])) return;
+    const pending = this.settle(message.id);
+    if (message.t === "rpc.result") pending?.resolve(message.result);
+    else pending?.reject(new Error(message.message));
+  }
+
+  /** Settles a session's `session.negotiate` answer; false when `id` was some other call. */
+  private negotiated(id: number, capabilities: readonly string[]): boolean {
+    const negotiation = this.negotiations.get(id);
+    if (!negotiation) return false;
+    this.negotiations.delete(id);
+    negotiation.answer(capabilities);
+    return true;
+  }
+
   private lost(session: PhoneLine): void {
     if (this.current === session) this.current = null;
+    this.dropOwed(session);
+  }
+
+  /** Fails everything asked over `session` that it has not answered yet. */
+  private dropOwed(session: PhoneLine): void {
+    for (const [id, negotiation] of this.negotiations) if (negotiation.session === session) this.negotiated(id, []);
     for (const [id, pending] of this.pending) {
       if (pending.session !== session) continue;
       this.pending.delete(id);
@@ -273,7 +319,15 @@ export class LinkConnection implements CoreConnection {
   }
 
   private emit(push: ClientPush): void {
-    for (const listener of this.listeners) listener(push);
+    for (const listener of this.listeners) {
+      try {
+        listener(push);
+      } catch (error) {
+        if (push.type !== "frame") throw error;
+        console.warn("[OpenOrc] Dropped incoming frame", { runId: push.frame?.runId, seq: push.frame?.seq, error: error instanceof Error ? error.name : "Error" });
+        return;
+      }
+    }
   }
 }
 

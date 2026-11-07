@@ -1,0 +1,738 @@
+[
+  {
+    "jsonrpc": "2.0",
+    "method": "session/update",
+    "params": {
+      "sessionId": "ses_1",
+      "update": {
+        "sessionUpdate": "available_commands_update",
+        "availableCommands": [
+          {
+            "name": "init",
+            "description": "guided AGENTS.md setup"
+          },
+          {
+            "name": "review",
+            "description": "review changes [commit|branch|pr], defaults to uncommitted"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "session/update",
+    "params": {
+      "sessionId": "ses_1",
+      "update": {
+        "sessionUpdate": "agent_message_chunk",
+        "messageId": "msg_19fab0f9f001t3mH37GoTxyVQP",
+        "content": {
+          "type": "text",
+          "text": "I'll launch that background explore subagent now.\n\n"
+        }
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "session/update",
+    "params": {
+      "sessionId": "ses_1",
+      "update": {
+        "sessionUpdate": "tool_call",
+        "toolCallId": "chatcmpl-tool-800d98c26d76058e",
+        "title": "subagent",
+        "kind": "think",
+        "status": "pending",
+        "locations": [],
+        "rawInput": {}
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "session/update",
+    "params": {
+      "sessionId": "ses_1",
+      "update": {
+        "sessionUpdate": "tool_call_update",
+        "toolCallId": "chatcmpl-tool-800d98c26d76058e",
+        "status": "in_progress",
+        "kind": "think",
+        "title": "subagent",
+        "locations": [],
+        "rawInput": {
+          "agent": "explore",
+          "description": "Background notes",
+          "background": true,
+          "prompt": "Read the files note1.txt, note2.txt, and note3.txt in the current working directory (/repo/work-D), one at a time, in that order. Each file contains a secret word. Return the secret word from each file, labeled by filename. Thoroughness: quick."
+        }
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "opencode/session/child_update",
+    "params": {
+      "rootSessionId": "ses_1",
+      "childSessionId": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+      "parentSessionId": "ses_1",
+      "depth": 1,
+      "title": "Background notes",
+      "type": "status",
+      "status": "created"
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "session/update",
+    "params": {
+      "sessionId": "ses_1",
+      "update": {
+        "sessionUpdate": "tool_call_update",
+        "toolCallId": "chatcmpl-tool-800d98c26d76058e",
+        "status": "in_progress",
+        "kind": "think",
+        "title": "subagent",
+        "locations": [],
+        "rawInput": {
+          "agent": "explore",
+          "description": "Background notes",
+          "background": true,
+          "prompt": "Read the files note1.txt, note2.txt, and note3.txt in the current working directory (/repo/work-D), one at a time, in that order. Each file contains a secret word. Return the secret word from each file, labeled by filename. Thoroughness: quick."
+        }
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "session/update",
+    "params": {
+      "sessionId": "ses_1",
+      "update": {
+        "sessionUpdate": "tool_call_update",
+        "toolCallId": "chatcmpl-tool-800d98c26d76058e",
+        "status": "completed",
+        "content": [
+          {
+            "type": "content",
+            "content": {
+              "type": "text",
+              "text": "The subagent is working in the background (sessionID: ses_e6054e5a3ffeRfPmXEzx3yU21f). You will be notified automatically when it finishes.\nDO NOT sleep, poll for progress, ask the subagent for status, or duplicate this subagent's work; avoid working with the same files or topics it is using.\nWork on non-overlapping tasks, or briefly tell the user what you launched and end your response."
+            }
+          }
+        ],
+        "rawOutput": {
+          "metadata": {
+            "sessionID": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+            "status": "running",
+            "truncated": false
+          }
+        }
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "opencode/session/child_update",
+    "params": {
+      "rootSessionId": "ses_1",
+      "childSessionId": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+      "parentSessionId": "ses_1",
+      "depth": 1,
+      "title": "Background notes",
+      "type": "status",
+      "status": "running"
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "session/update",
+    "params": {
+      "sessionId": "ses_1",
+      "update": {
+        "sessionUpdate": "agent_message_chunk",
+        "messageId": "msg_19fab1a720013I8FXgiHW5yJlJ",
+        "content": {
+          "type": "text",
+          "text": "Launched."
+        }
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "session/update",
+    "params": {
+      "sessionId": "ses_1",
+      "update": {
+        "sessionUpdate": "usage_update",
+        "used": 17422,
+        "size": 200000,
+        "cost": {
+          "amount": 0,
+          "currency": "USD"
+        }
+      }
+    }
+  },
+  {
+    "finish": {
+      "stopReason": "end_turn",
+      "usage": {
+        "inputTokens": 2953,
+        "outputTokens": 5,
+        "totalTokens": 17422,
+        "cachedReadTokens": 14464
+      },
+      "_meta": {}
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "opencode/session/child_update",
+    "params": {
+      "rootSessionId": "ses_1",
+      "childSessionId": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+      "parentSessionId": "ses_1",
+      "depth": 1,
+      "title": "Background notes",
+      "type": "update",
+      "update": {
+        "sessionUpdate": "agent_message_chunk",
+        "messageId": "msg_19fab1a82001n4D2wSUHxpWLrT",
+        "content": {
+          "type": "text",
+          "text": "I'll read the three files in order.\n\n"
+        },
+        "_meta": {
+          "opencode/child-session": {
+            "id": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+            "parentID": "ses_1",
+            "depth": 1,
+            "title": "Background notes"
+          }
+        }
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "opencode/session/child_update",
+    "params": {
+      "rootSessionId": "ses_1",
+      "childSessionId": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+      "parentSessionId": "ses_1",
+      "depth": 1,
+      "title": "Background notes",
+      "type": "update",
+      "update": {
+        "sessionUpdate": "tool_call",
+        "toolCallId": "ses_e6054e5a3ffeRfPmXEzx3yU21f:chatcmpl-tool-911ff71b1e381a5d",
+        "title": "Background notes: read",
+        "kind": "read",
+        "status": "pending",
+        "locations": [],
+        "rawInput": {},
+        "_meta": {
+          "opencode/child-session": {
+            "id": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+            "parentID": "ses_1",
+            "depth": 1,
+            "title": "Background notes"
+          }
+        }
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "opencode/session/child_update",
+    "params": {
+      "rootSessionId": "ses_1",
+      "childSessionId": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+      "parentSessionId": "ses_1",
+      "depth": 1,
+      "title": "Background notes",
+      "type": "update",
+      "update": {
+        "sessionUpdate": "tool_call_update",
+        "toolCallId": "ses_e6054e5a3ffeRfPmXEzx3yU21f:chatcmpl-tool-911ff71b1e381a5d",
+        "status": "in_progress",
+        "kind": "read",
+        "title": "Background notes: read",
+        "locations": [
+          {
+            "path": "/repo/work-D/note1.txt"
+          }
+        ],
+        "rawInput": {
+          "path": "/repo/work-D/note1.txt"
+        },
+        "_meta": {
+          "opencode/child-session": {
+            "id": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+            "parentID": "ses_1",
+            "depth": 1,
+            "title": "Background notes"
+          }
+        }
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "opencode/session/child_update",
+    "params": {
+      "rootSessionId": "ses_1",
+      "childSessionId": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+      "parentSessionId": "ses_1",
+      "depth": 1,
+      "title": "Background notes",
+      "type": "update",
+      "update": {
+        "sessionUpdate": "tool_call_update",
+        "toolCallId": "ses_e6054e5a3ffeRfPmXEzx3yU21f:chatcmpl-tool-911ff71b1e381a5d",
+        "status": "completed",
+        "content": [
+          {
+            "type": "content",
+            "content": {
+              "type": "text",
+              "text": "Read file /repo/work-D/note1.txt, lines 1-1\n1: note 1: the secret word is apple"
+            }
+          }
+        ],
+        "rawOutput": {
+          "metadata": {
+            "truncated": false
+          }
+        },
+        "_meta": {
+          "opencode/child-session": {
+            "id": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+            "parentID": "ses_1",
+            "depth": 1,
+            "title": "Background notes"
+          }
+        }
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "opencode/session/child_update",
+    "params": {
+      "rootSessionId": "ses_1",
+      "childSessionId": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+      "parentSessionId": "ses_1",
+      "depth": 1,
+      "title": "Background notes",
+      "type": "update",
+      "update": {
+        "sessionUpdate": "tool_call",
+        "toolCallId": "ses_e6054e5a3ffeRfPmXEzx3yU21f:chatcmpl-tool-bc11170eb2a2f315",
+        "title": "Background notes: read",
+        "kind": "read",
+        "status": "pending",
+        "locations": [],
+        "rawInput": {},
+        "_meta": {
+          "opencode/child-session": {
+            "id": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+            "parentID": "ses_1",
+            "depth": 1,
+            "title": "Background notes"
+          }
+        }
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "opencode/session/child_update",
+    "params": {
+      "rootSessionId": "ses_1",
+      "childSessionId": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+      "parentSessionId": "ses_1",
+      "depth": 1,
+      "title": "Background notes",
+      "type": "update",
+      "update": {
+        "sessionUpdate": "tool_call_update",
+        "toolCallId": "ses_e6054e5a3ffeRfPmXEzx3yU21f:chatcmpl-tool-bc11170eb2a2f315",
+        "status": "in_progress",
+        "kind": "read",
+        "title": "Background notes: read",
+        "locations": [
+          {
+            "path": "/repo/work-D/note2.txt"
+          }
+        ],
+        "rawInput": {
+          "path": "/repo/work-D/note2.txt"
+        },
+        "_meta": {
+          "opencode/child-session": {
+            "id": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+            "parentID": "ses_1",
+            "depth": 1,
+            "title": "Background notes"
+          }
+        }
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "opencode/session/child_update",
+    "params": {
+      "rootSessionId": "ses_1",
+      "childSessionId": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+      "parentSessionId": "ses_1",
+      "depth": 1,
+      "title": "Background notes",
+      "type": "update",
+      "update": {
+        "sessionUpdate": "tool_call_update",
+        "toolCallId": "ses_e6054e5a3ffeRfPmXEzx3yU21f:chatcmpl-tool-bc11170eb2a2f315",
+        "status": "completed",
+        "content": [
+          {
+            "type": "content",
+            "content": {
+              "type": "text",
+              "text": "Read file /repo/work-D/note2.txt, lines 1-1\n1: note 2: the secret word is birch"
+            }
+          }
+        ],
+        "rawOutput": {
+          "metadata": {
+            "truncated": false
+          }
+        },
+        "_meta": {
+          "opencode/child-session": {
+            "id": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+            "parentID": "ses_1",
+            "depth": 1,
+            "title": "Background notes"
+          }
+        }
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "opencode/session/child_update",
+    "params": {
+      "rootSessionId": "ses_1",
+      "childSessionId": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+      "parentSessionId": "ses_1",
+      "depth": 1,
+      "title": "Background notes",
+      "type": "update",
+      "update": {
+        "sessionUpdate": "tool_call",
+        "toolCallId": "ses_e6054e5a3ffeRfPmXEzx3yU21f:chatcmpl-tool-a54b38b7d6c9e658",
+        "title": "Background notes: read",
+        "kind": "read",
+        "status": "pending",
+        "locations": [],
+        "rawInput": {},
+        "_meta": {
+          "opencode/child-session": {
+            "id": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+            "parentID": "ses_1",
+            "depth": 1,
+            "title": "Background notes"
+          }
+        }
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "opencode/session/child_update",
+    "params": {
+      "rootSessionId": "ses_1",
+      "childSessionId": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+      "parentSessionId": "ses_1",
+      "depth": 1,
+      "title": "Background notes",
+      "type": "update",
+      "update": {
+        "sessionUpdate": "tool_call_update",
+        "toolCallId": "ses_e6054e5a3ffeRfPmXEzx3yU21f:chatcmpl-tool-a54b38b7d6c9e658",
+        "status": "in_progress",
+        "kind": "read",
+        "title": "Background notes: read",
+        "locations": [
+          {
+            "path": "/repo/work-D/note3.txt"
+          }
+        ],
+        "rawInput": {
+          "path": "/repo/work-D/note3.txt"
+        },
+        "_meta": {
+          "opencode/child-session": {
+            "id": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+            "parentID": "ses_1",
+            "depth": 1,
+            "title": "Background notes"
+          }
+        }
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "opencode/session/child_update",
+    "params": {
+      "rootSessionId": "ses_1",
+      "childSessionId": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+      "parentSessionId": "ses_1",
+      "depth": 1,
+      "title": "Background notes",
+      "type": "update",
+      "update": {
+        "sessionUpdate": "tool_call_update",
+        "toolCallId": "ses_e6054e5a3ffeRfPmXEzx3yU21f:chatcmpl-tool-a54b38b7d6c9e658",
+        "status": "completed",
+        "content": [
+          {
+            "type": "content",
+            "content": {
+              "type": "text",
+              "text": "Read file /repo/work-D/note3.txt, lines 1-1\n1: note 3: the secret word is cedar"
+            }
+          }
+        ],
+        "rawOutput": {
+          "metadata": {
+            "truncated": false
+          }
+        },
+        "_meta": {
+          "opencode/child-session": {
+            "id": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+            "parentID": "ses_1",
+            "depth": 1,
+            "title": "Background notes"
+          }
+        }
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "opencode/session/child_update",
+    "params": {
+      "rootSessionId": "ses_1",
+      "childSessionId": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+      "parentSessionId": "ses_1",
+      "depth": 1,
+      "title": "Background notes",
+      "type": "update",
+      "update": {
+        "sessionUpdate": "agent_message_chunk",
+        "messageId": "msg_19fab2724001Nkv5T2j55ha6zL",
+        "content": {
+          "type": "text",
+          "text": "Secret words found:\n\n- **note1.txt** (/repo/work-D/note1.txt): apple\n- **note2.txt** (/tmp/op"
+        },
+        "_meta": {
+          "opencode/child-session": {
+            "id": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+            "parentID": "ses_1",
+            "depth": 1,
+            "title": "Background notes"
+          }
+        }
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "opencode/session/child_update",
+    "params": {
+      "rootSessionId": "ses_1",
+      "childSessionId": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+      "parentSessionId": "ses_1",
+      "depth": 1,
+      "title": "Background notes",
+      "type": "update",
+      "update": {
+        "sessionUpdate": "agent_message_chunk",
+        "messageId": "msg_19fab2724001Nkv5T2j55ha6zL",
+        "content": {
+          "type": "text",
+          "text": "encode-subagent-probe/work"
+        },
+        "_meta": {
+          "opencode/child-session": {
+            "id": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+            "parentID": "ses_1",
+            "depth": 1,
+            "title": "Background notes"
+          }
+        }
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "opencode/session/child_update",
+    "params": {
+      "rootSessionId": "ses_1",
+      "childSessionId": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+      "parentSessionId": "ses_1",
+      "depth": 1,
+      "title": "Background notes",
+      "type": "update",
+      "update": {
+        "sessionUpdate": "agent_message_chunk",
+        "messageId": "msg_19fab2724001Nkv5T2j55ha6zL",
+        "content": {
+          "type": "text",
+          "text": "-D/note2.txt):"
+        },
+        "_meta": {
+          "opencode/child-session": {
+            "id": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+            "parentID": "ses_1",
+            "depth": 1,
+            "title": "Background notes"
+          }
+        }
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "opencode/session/child_update",
+    "params": {
+      "rootSessionId": "ses_1",
+      "childSessionId": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+      "parentSessionId": "ses_1",
+      "depth": 1,
+      "title": "Background notes",
+      "type": "update",
+      "update": {
+        "sessionUpdate": "agent_message_chunk",
+        "messageId": "msg_19fab2724001Nkv5T2j55ha6zL",
+        "content": {
+          "type": "text",
+          "text": " birch\n- **note3"
+        },
+        "_meta": {
+          "opencode/child-session": {
+            "id": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+            "parentID": "ses_1",
+            "depth": 1,
+            "title": "Background notes"
+          }
+        }
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "opencode/session/child_update",
+    "params": {
+      "rootSessionId": "ses_1",
+      "childSessionId": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+      "parentSessionId": "ses_1",
+      "depth": 1,
+      "title": "Background notes",
+      "type": "update",
+      "update": {
+        "sessionUpdate": "agent_message_chunk",
+        "messageId": "msg_19fab2724001Nkv5T2j55ha6zL",
+        "content": {
+          "type": "text",
+          "text": ".txt** (/tmp/op"
+        },
+        "_meta": {
+          "opencode/child-session": {
+            "id": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+            "parentID": "ses_1",
+            "depth": 1,
+            "title": "Background notes"
+          }
+        }
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "opencode/session/child_update",
+    "params": {
+      "rootSessionId": "ses_1",
+      "childSessionId": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+      "parentSessionId": "ses_1",
+      "depth": 1,
+      "title": "Background notes",
+      "type": "update",
+      "update": {
+        "sessionUpdate": "agent_message_chunk",
+        "messageId": "msg_19fab2724001Nkv5T2j55ha6zL",
+        "content": {
+          "type": "text",
+          "text": "encode-subagent-probe/work"
+        },
+        "_meta": {
+          "opencode/child-session": {
+            "id": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+            "parentID": "ses_1",
+            "depth": 1,
+            "title": "Background notes"
+          }
+        }
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "opencode/session/child_update",
+    "params": {
+      "rootSessionId": "ses_1",
+      "childSessionId": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+      "parentSessionId": "ses_1",
+      "depth": 1,
+      "title": "Background notes",
+      "type": "update",
+      "update": {
+        "sessionUpdate": "agent_message_chunk",
+        "messageId": "msg_19fab2724001Nkv5T2j55ha6zL",
+        "content": {
+          "type": "text",
+          "text": "-D/note3.txt): cedar"
+        },
+        "_meta": {
+          "opencode/child-session": {
+            "id": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+            "parentID": "ses_1",
+            "depth": 1,
+            "title": "Background notes"
+          }
+        }
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "method": "opencode/session/child_update",
+    "params": {
+      "rootSessionId": "ses_1",
+      "childSessionId": "ses_e6054e5a3ffeRfPmXEzx3yU21f",
+      "parentSessionId": "ses_1",
+      "depth": 1,
+      "title": "Background notes",
+      "type": "status",
+      "status": "completed"
+    }
+  }
+]

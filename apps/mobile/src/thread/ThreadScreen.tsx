@@ -1,30 +1,33 @@
-import type { LegendListRef } from "@legendapp/list/react-native";
 import { useKeyboardChatComposerInset } from "@legendapp/list/keyboard";
-import { conversationActivity, conversationSendDisabledReason, processFit, type SubmitRequest } from "@openorc/client";
-import type { Run, ThreadSummary } from "@openorc/protocol";
+import type { LegendListRef } from "@legendapp/list/react-native";
+import { conversationActivity, conversationSendDisabledReason, preparingCloud, processFit, queueAfterStart, startingInCloud, type SubmitRequest } from "@openorc/client";
+import { isSubagentThread, type Run, type ThreadSummary } from "@openorc/protocol";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Pressable, View } from "react-native";
 import type { SharedValue } from "react-native-reanimated";
-import { client, useLinkState, useRpc } from "../client";
-import { linkReason } from "../connection/link-reason";
+import { useHostClient, useLinkState, useRpc } from "../client";
+import { useThreadClaudeAccount } from "../composer/claude-account";
 import { Composer } from "../composer/Composer";
 import { useShareSettings } from "../composer/settings-bridge";
+import { useHeaderScope } from "../connection/HostScope";
+import { linkReason } from "../connection/link-reason";
+import type { LinkState } from "../connection/manager";
 import { useCoverHome } from "../home/home-cover";
 import { useThreadOnScreen } from "../notifications/on-screen";
 import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
-import { holdTranscriptList, perfEnabled, reportThreadOpened } from "./perf-probe";
-import { PerfProbe } from "./PerfProbe";
+import { CloudStart } from "./CloudStart";
+import { MoveRefused } from "./MoveRefused";
 import { createDisclosure, DisclosureContext } from "./disclosure";
 import { useMarkSeen } from "./mark-seen";
+import { holdTranscriptList, perfEnabled, reportThreadOpened } from "./perf-probe";
+import { PerfProbe } from "./PerfProbe";
 import { useSnoozeClock } from "./snooze-clock";
-import { threadMenu } from "./thread-actions";
+import { SubagentStatusBar } from "./SubagentStatusBar";
 import { ThreadTitle } from "./ThreadHeader";
-import { headerMenu } from "./ThreadMenu";
+import { useThreadHeaderMenu } from "./ThreadMenu";
 import { Transcript } from "./Transcript";
-import { useChangesCount } from "./use-changes-count";
-import { usePreviewPanel } from "./use-preview-panel";
 import { useThreadActions } from "./use-thread-actions";
 import { VoicesContext, type Voice } from "./voices";
 import { useWaitingApprovals } from "./waiting-approvals";
@@ -59,6 +62,20 @@ interface PaneProps {
   followKey: number;
 }
 
+/** Why the composer cannot send now: the link to the thread's host first, then the conversation's own state. */
+function sendBlocked(link: LinkState, settings: { permissionReady: boolean; choice: unknown }, runs: { isLoading: boolean; error: unknown }, thread: ThreadSummary | null): string | null {
+  return (
+    linkReason(link) ??
+    conversationSendDisabledReason({
+      permissionReady: settings.permissionReady,
+      historyLoading: runs.isLoading,
+      historyFailed: Boolean(runs.error),
+      hasModel: Boolean(settings.choice),
+      thread,
+    })
+  );
+}
+
 /** History that would not load: one quiet line and a way to ask again. */
 function LoadFailed({ retry }: { retry: () => void }) {
   return (
@@ -76,7 +93,7 @@ function LoadFailed({ retry }: { retry: () => void }) {
  * composer hear only when the conversation starts or stops being busy.
  */
 function TranscriptPane({ threadId, thread, runs, loading, failed, retry, onActivity, composerInset, listRef, followKey }: PaneProps) {
-  const { merged, liveTranscript, hasOlder, loadOlder, shown } = client.useConversationTranscript({ runs, threadId });
+  const { merged, liveTranscript, hasOlder, loadOlder, shown } = useHostClient().useConversationTranscript({ runs, threadId });
   const waiting = useWaitingApprovals(threadId, shown);
   const { live, working, generatingImage } = conversationActivity({ thread, activeRun: runs.at(-1), liveTranscript, compacting: false });
   useEffect(() => onActivity({ live, working, generatingImage }), [live, working, generatingImage, onActivity]);
@@ -85,6 +102,7 @@ function TranscriptPane({ threadId, thread, runs, loading, failed, retry, onActi
   useEffect(() => {
     if (blocks?.length) reportThreadOpened(threadId, blocks.length);
   }, [threadId, blocks?.length]);
+  if (startingInCloud(thread, runs.length)) return <CloudStart thread={thread} />;
   if (failed && !blocks?.length) return <LoadFailed retry={retry} />;
   if (!merged || !blocks?.length) return <View className="flex-1 items-center justify-center">{loading || runs.length ? <Spinner /> : <Text className="text-ink-4">Nothing yet</Text>}</View>;
   return (
@@ -115,11 +133,11 @@ function TranscriptPane({ threadId, thread, runs, loading, failed, retry, onActi
 export function ThreadScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const threadQuery = useRpc("threads.get", { id });
-  const thread = threadQuery.data ?? null;
+  const thread = threadQuery.data?.teamInstanceId ? null : (threadQuery.data ?? null);
   const runsQuery = useRpc("runs.listForThread", { threadId: id });
-  const runs = runsQuery.data ?? NO_RUNS;
+  const runs = thread ? (runsQuery.data ?? NO_RUNS) : NO_RUNS;
   const activeRun = runs.at(-1);
-  const settings = client.useConversationSettings({ thread, activeRun });
+  const settings = { ...useHostClient().useConversationSettings({ thread, activeRun }), claudeAccountId: thread?.claudeAccountId ?? undefined, claudeAccount: useThreadClaudeAccount(thread) };
   useShareSettings(id, settings);
   useMarkSeen(thread);
   useCoverHome();
@@ -128,21 +146,13 @@ export function ThreadScreen() {
   const [{ live, working, generatingImage }, setActivity] = useState(IDLE);
   const actions = useThreadActions(thread, { onUnread: goBack });
   const now = useSnoozeClock();
-  const uncommitted = useChangesCount(thread);
-  const preview = usePreviewPanel(thread);
-  const menu = useMemo(() => thread && headerMenu(threadMenu(thread, "header", now, { uncommitted, preview }), actions.run), [thread, actions.run, now, uncommitted, preview]);
+  const menu = useThreadHeaderMenu(thread, now, actions.run);
   const linkState = useLinkState();
+  const inScope = useHeaderScope();
   useThreadOnScreen(linkState.kind === "unpaired" ? null : linkState.mac.id, id);
 
   const { canSteer } = processFit({ live, activeRun, choice: settings.choice, mode: settings.mode, permission: settings.permission, compacting: false });
-  const disabledReason =
-    linkReason(linkState) ??
-    conversationSendDisabledReason({
-      permissionReady: settings.permissionReady,
-      historyLoading: runsQuery.isLoading,
-      historyFailed: Boolean(runsQuery.error),
-      hasModel: Boolean(settings.choice),
-    });
+  const disabledReason = sendBlocked(linkState, settings, runsQuery, thread);
   const request: Omit<SubmitRequest, "now"> = {
     target: { kind: "thread", threadId: id },
     working,
@@ -167,39 +177,50 @@ export function ThreadScreen() {
 
   return (
     <View className="flex-1 bg-bg">
-      <Stack.Screen options={{ headerTitle: () => <ThreadTitle thread={thread} onRename={actions.rename} /> }} />
+      <Stack.Screen options={{ headerTitle: () => inScope(<ThreadTitle thread={thread} onRename={actions.rename} />) }} />
       {menu}
       <DisclosureContext.Provider value={disclosure}>
         <VoicesContext.Provider value={voices}>
-          <TranscriptPane
-            threadId={id}
-            thread={thread}
-            runs={runs}
-            loading={runsQuery.isLoading}
-            failed={Boolean(runsQuery.error)}
-            retry={() => void runsQuery.refetch()}
-            onActivity={setActivity}
-            composerInset={contentInsetEndAdjustment}
-            listRef={listRef}
-            followKey={sends}
-          />
+          {thread ? <MoveRefused thread={thread} /> : null}
+          {thread ? (
+            <TranscriptPane
+              threadId={id}
+              thread={thread}
+              runs={runs}
+              loading={runsQuery.isLoading}
+              failed={Boolean(runsQuery.error)}
+              retry={() => void runsQuery.refetch()}
+              onActivity={setActivity}
+              composerInset={contentInsetEndAdjustment}
+              listRef={listRef}
+              followKey={sends}
+            />
+          ) : (
+            <View className="flex-1 items-center justify-center">{threadQuery.isLoading ? <Spinner /> : <Text className="text-ink-4">Thread not found</Text>}</View>
+          )}
         </VoicesContext.Provider>
       </DisclosureContext.Provider>
       {perfEnabled() ? <PerfProbe /> : null}
       {thread ? (
         <View className="absolute inset-x-0 bottom-0">
-          <Composer
-            thread={thread}
-            settings={settings}
-            request={request}
-            live={live && activeRun ? { runId: activeRun.id } : null}
-            working={working}
-            generatingImage={generatingImage}
-            canSteer={canSteer}
-            disabledReason={disabledReason}
-            onLayout={onComposerLayout}
-            onSent={follow}
-          />
+          {isSubagentThread(thread) ? (
+            <SubagentStatusBar thread={thread} onLayout={onComposerLayout} />
+          ) : (
+            <Composer
+              thread={thread}
+              queued={queueAfterStart(thread, runs.length)}
+              preparing={preparingCloud(thread, runs.length)}
+              settings={settings}
+              request={request}
+              live={live && activeRun ? { runId: activeRun.id } : null}
+              working={working}
+              generatingImage={generatingImage}
+              canSteer={canSteer}
+              disabledReason={disabledReason}
+              onLayout={onComposerLayout}
+              onSent={follow}
+            />
+          )}
         </View>
       ) : null}
     </View>

@@ -7,7 +7,7 @@ type Dependencies = {
   memoryService: Pick<MemoryService, "enabled" | "assertEnabled" | "retrieve" | "taskContext" | "record" | "feedback">;
   runService: Pick<RunService, "authorizeAppAction">;
   db: Db;
-  assertTeamActor: RunContext["assertTeamActor"];
+  assertRunAvailable: RunContext["assertRunAvailable"];
   taskFor: RunContext["taskFor"];
   projectFor: RunContext["projectFor"];
 };
@@ -15,7 +15,7 @@ export function createMemoryHost({
   memoryService,
   runService,
   db,
-  assertTeamActor,
+  assertRunAvailable,
   taskFor,
   projectFor,
 }: Dependencies): Pick<McpHost, "memoryEnabled" | "memorySearch" | "taskContext" | "memoryRecord" | "memoryFeedback"> {
@@ -36,7 +36,7 @@ export function createMemoryHost({
       }));
     },
     taskContext: async (runId) => {
-      assertTeamActor(runId);
+      assertRunAvailable(runId);
       const task = taskFor(runId);
       return task ? memoryService.taskContext(task) : "No task context.";
     },

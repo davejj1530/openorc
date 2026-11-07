@@ -104,6 +104,10 @@ describe("agent release checks", () => {
     vi.stubGlobal("fetch", fetch);
     fetch.mockResolvedValueOnce(new Response('{"version":"1.2.3"}'));
     expect(await fetchAgentRelease("https://registry.npmjs.org/@openai/codex/latest")).toBe("1.2.3");
+    fetch.mockResolvedValueOnce(new Response("2.1.314\n"));
+    expect(await fetchAgentRelease("https://downloads.claude.ai/claude-code-releases/latest")).toBe("2.1.314");
+    fetch.mockResolvedValueOnce(new Response("2.1.314; echo bad"));
+    await expect(fetchAgentRelease("fixture")).rejects.toThrow("unrecognized");
     fetch.mockResolvedValueOnce(new Response('{"version":"1.2.3; echo bad"}'));
     await expect(fetchAgentRelease("fixture")).rejects.toThrow("unrecognized");
     fetch.mockResolvedValueOnce(new Response("", { status: 503 }));

@@ -7,6 +7,7 @@ import { useLayout } from "./layout";
 import { core } from "./rpc";
 import { useRouter } from "./router";
 import { useUi } from "./ui";
+import { queryClient } from "./client";
 
 const updates: RpcParams<"threads.update">[] = [];
 const route = () => useRouter.getState().route;
@@ -14,13 +15,15 @@ const press = (chord: string, target: Window | Element = window) => fireEvent.ke
 const inbox = () => useRouter.setState({ route: { view: "inbox" } });
 
 beforeEach(() => {
+  queryClient.clear();
   vi.spyOn(core, "call").mockImplementation(async <M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> => {
     if (method === "threads.update") updates.push(params as RpcParams<"threads.update">);
-    return { id: "t10", pinnedAt: null, archivedAt: null, unread: false } as unknown as RpcResults[M];
+    return { id: "t10", pinnedAt: null, archivedAt: null, unread: false, activity: "idle", lastActivityAt: Date.now() } as unknown as RpcResults[M];
   });
   useRouter.setState({ route: { view: "thread", threadId: "t10" }, threadIds: ["t10", "t11"], history: [{ view: "inbox" }], future: [{ view: "memory" }] });
-  useUi.setState({ threadOrder: Array.from({ length: 11 }, (_, i) => `t${i + 1}`), palette: false, paletteMode: "all" });
-  useLayout.setState({ sidebarOpen: true, panelOpen: false, panelThreadId: null, panelRequest: null, sidebarFilter: "active" });
+  useUi.getState().setThreadOrder(Array.from({ length: 11 }, (_, i) => `t${i + 1}`));
+  useUi.setState({ palette: false, paletteMode: "all" });
+  useLayout.setState({ sidebarOpen: true, panelOpen: false, panelThreadId: null, panelRequest: null });
   useFilesTool.setState({ host: null, focus: null, tools: {} });
 });
 
@@ -33,7 +36,7 @@ afterEach(() => {
 const cases: { chord: string; does: string; given?: () => void; then: () => unknown }[] = [
   { chord: "n", does: "starts a thread in the current project", then: () => expect(route()).toEqual({ view: "newthread", projectId: "project" }) },
   { chord: "b", does: "hides the sidebar", then: () => expect(useLayout.getState().sidebarOpen).toBe(false) },
-  { chord: "j", does: "opens the focused thread's panel", then: () => expect(useLayout.getState()).toMatchObject({ panelThreadId: "t10", panelOpen: true }) },
+  { chord: "j", does: "opens the focused thread's panel", then: () => vi.waitFor(() => expect(useLayout.getState()).toMatchObject({ panelThreadId: "t10", panelOpen: true })) },
   { chord: "j", does: "opens the panel without a focused thread", given: inbox, then: () => expect(useLayout.getState()).toMatchObject({ panelThreadId: null, panelOpen: true }) },
   { chord: "[", does: "goes back", then: () => expect(route()).toEqual({ view: "inbox" }) },
   { chord: "]", does: "goes forward", then: () => expect(route()).toEqual({ view: "memory" }) },
@@ -70,9 +73,8 @@ const cases: { chord: string; does: string; given?: () => void; then: () => unkn
       expect(useUi.getState().palette).toBe(false);
     },
   },
-  { chord: "⇧o", does: "switches the sidebar to orcmode", then: () => expect(useLayout.getState().sidebarFilter).toBe("orc") },
   { chord: "⇧p", does: "pins the focused thread", then: () => vi.waitFor(() => expect(updates).toEqual([{ id: "t10", patch: { pinned: true } }])) },
-  { chord: "⇧a", does: "archives the focused thread", then: () => vi.waitFor(() => expect(updates).toEqual([{ id: "t10", patch: { archived: true } }])) },
+  { chord: "⇧a", does: "resolves the focused thread", then: () => vi.waitFor(() => expect(updates).toEqual([{ id: "t10", patch: { archived: true } }])) },
   { chord: "⇧u", does: "marks the focused thread unread", then: () => vi.waitFor(() => expect(updates).toEqual([{ id: "t10", patch: { seen: false } }])) },
 ];
 
@@ -81,12 +83,22 @@ for (const { chord, does, given, then } of cases) {
     given?.();
     renderHook(() => useAppShortcuts("project"));
     expect(press(chord), "the shortcut claims the key").toBe(false);
-    await then();
+    await vi.waitFor(then);
   });
 }
 
 it("has a case for every chord the window binds", () => {
   expect([...new Set(cases.map((c) => c.chord))].sort()).toEqual([...shortcuts.keys()].sort());
+});
+
+it.each(["j", "p", "⇧f", "⇧p", "⇧a"])("does not apply ⌘%s to a subagent", async (chord) => {
+  vi.mocked(core.call).mockResolvedValue({ id: "t10", parentRelation: "subagent", parentThreadId: "parent" });
+  renderHook(() => useAppShortcuts("project"));
+  press(chord);
+  await Promise.resolve();
+  expect(useLayout.getState().panelOpen).toBe(false);
+  expect(useFilesTool.getState()).toMatchObject({ focus: null, tools: {} });
+  expect(vi.mocked(core.call).mock.calls.some(([method]) => method === "threads.update")).toBe(false);
 });
 
 it("takes Ctrl as ⌘, and leaves keys without either to typing", () => {
@@ -99,7 +111,7 @@ it("takes Ctrl as ⌘, and leaves keys without either to typing", () => {
 
 it("leaves a number past the sidebar's threads, and thread actions with no focused thread, to the page", () => {
   inbox();
-  useUi.setState({ threadOrder: ["t1", "t2", "t3"] });
+  useUi.getState().setThreadOrder(["t1", "t2", "t3"]);
   renderHook(() => useAppShortcuts("project"));
   expect(press("4")).toBe(true);
   expect(press("⇧p")).toBe(true);
@@ -122,4 +134,21 @@ it("leaves a ⌘[ that something below the window already handled, so an editor'
   press("[", editor);
   expect(useRouter.getState()).toMatchObject({ route: { view: "thread", threadId: "t10" }, history: [{ view: "inbox" }] });
   editor.remove();
+});
+
+it("does not queue a file panel when a subagent path is opened", async () => {
+  vi.mocked(core.call).mockResolvedValue({ id: "t10", parentRelation: "subagent", parentThreadId: "parent" });
+  useLayout.setState({ selectedFile: null });
+  useLayout.getState().openFile({ scope: { kind: "thread", id: "t10" }, path: "src/main.ts" });
+  await Promise.resolve();
+  expect(useLayout.getState()).toMatchObject({ panelOpen: false, panelThreadId: null, selectedFile: null, panelRequest: null });
+});
+
+it("numbers and steps through the same visible rows, including subagents", () => {
+  useUi.getState().setThreadOrder(["parent", "child", "started"]);
+  renderHook(() => useAppShortcuts("project"));
+  press("2");
+  expect(route()).toEqual({ view: "thread", threadId: "child" });
+  press("⇧]");
+  expect(route()).toEqual({ view: "thread", threadId: "started" });
 });

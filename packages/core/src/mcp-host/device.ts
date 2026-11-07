@@ -8,15 +8,19 @@ import { conversationSurface } from "./surface.js";
 type Dependencies = {
   db: Db;
   runService: Pick<RunService, "isBusy" | "authorizeAppAction">;
-  devices: Pick<DeviceService, "assertAgentAccess" | "runAgentTool">;
-  assertTeamActor: RunContext["assertTeamActor"];
+  devices: Pick<DeviceService, "available" | "assertAgentAccess" | "runAgentTool">;
+  assertRunAvailable: RunContext["assertRunAvailable"];
 };
 
-/** Opening and closing put a device in front of the user and drive it, so the conversation's mode decides; looking does not. */
-export function createDeviceHost({ db, runService, devices, assertTeamActor }: Dependencies): Pick<McpHost, "device"> {
+/**
+ * Opening and closing put a device in front of the user and drive it, so the conversation's mode decides; looking does
+ * not. A machine without simulators gives agents no device tool.
+ */
+export function createDeviceHost({ db, runService, devices, assertRunAvailable }: Dependencies): Pick<McpHost, "device"> {
+  if (!devices.available) return {};
   return {
     device: async (runId, input) => {
-      assertTeamActor(runId);
+      assertRunAvailable(runId);
       const surface = conversationSurface(db, runService, runId, "Device");
       devices.assertAgentAccess();
       if (input.action === "open" || input.action === "close") {

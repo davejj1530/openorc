@@ -5,7 +5,7 @@ Mention an OpenOrc bot in Slack to start work on your desktop. Agents run on you
 **Settings → Slack** offers two connection types:
 
 - **Personal bot · no server needed** connects this desktop directly to Slack using Socket Mode. It needs no hosted service, HTTP listener, relay address, device key, or SSH tunnel. New setups use this type.
-- **Team relay · advanced** shares one Slack bot across several desktops through a relay hosted by one of them. See [Advanced: team relay](#advanced-team-relay).
+- **Shared relay · advanced** shares one Slack bot across several desktops through a relay hosted by one of them. See [Advanced: shared relay](#advanced-shared-relay).
 
 Each desktop needs a signed-in coding-agent CLI and an accessible entrypoint folder (a Git repository is optional). The integration does not need a model API key.
 
@@ -37,7 +37,7 @@ Buttons expire after ten minutes, and restarting OpenOrc or the relay invalidate
 
 ## Workspace conversations and folders
 
-The **Workspace** group at the top of the thread list, marked with a globe icon, holds direct chats and Slack conversations, separate from project threads. Choose a direct chat’s folder with **Choose folder** when you start it; configure the shared entrypoint in **Settings → Slack**. The default entrypoint is an empty folder in OpenOrc’s application data directory. Changing the entrypoint affects new conversations; existing conversations keep their own folder.
+Direct chats and Slack conversations belong to the **Workspace**, not to a project. They appear in the thread list beside project threads, by when they last worked, with a globe icon and Workspace where a project thread names its project. To start a direct chat, choose Workspace from the project name in the new thread's heading, then pick its folder with **Choose folder**; configure the shared entrypoint in **Settings → Slack**. The default entrypoint is an empty folder in OpenOrc’s application data directory. Changing the entrypoint affects new conversations; existing conversations keep their own folder.
 
 - Mentioning the bot with `hi` starts a normal conversation with the configured default model in the Workspace entrypoint.
 - `what model are you using right now?` goes directly to that model. It can inspect its actual harness and model with `execution_context`.
@@ -80,16 +80,16 @@ The setup manifest includes the `files:read` bot scope. For an existing Slack ap
 
 PNG, JPEG, GIF, and WebP images up to 20 MB and 40 megapixels use OpenOrc’s standard image validation and preview handling. Unsupported, inaccessible, or invalid files produce a notice in the desktop conversation and are reported to the model as unavailable. PDFs, other documents, external image links, and link-unfurl previews are not imported.
 
-## Advanced: team relay
+## Advanced: shared relay
 
 One Slack bot receives mentions through a relay hosted by one running OpenOrc desktop. Each teammate has a separate device key, assigned to their Slack member ID by the relay operator. The relay delivers work only to that key’s user. Local projects, agent credentials, permissions, and conversations stay on each desktop. Slack replies are visible in the shared channel.
 
-The relay is intended for a small, trusted team. The operator registers devices manually; there are no user accounts or self-service identity verification.
+The relay is intended for a small, trusted group. The operator registers devices manually; there are no user accounts or self-service identity verification.
 
 ### Set up the relay once
 
 1. In Slack, enable Socket Mode, enable **Interactivity & Shortcuts**, and subscribe to bot events `app_mention`, `message.channels`, and `message.groups`. The app token needs `connections:write`; the bot token needs `app_mentions:read`, `chat:write`, `channels:history`, `groups:history`, and `files:read`. Install or reinstall the app and invite it to the channels where you want to use it. Public and private channels work when the bot is a member; see [Slack’s app mention documentation](https://docs.slack.dev/reference/events/app_mention/).
-2. On the host computer, choose **Team relay · advanced** in **Settings → Slack** and expand **Host the Slack connection**.
+2. On the host computer, choose **Shared relay · advanced** in **Settings → Slack** and expand **Host the Slack connection**.
 3. Enter the `xoxb-…` bot token and `xapp-…` app token. Keep port **47831** unless it is already in use. There is no channel ID to configure.
 4. Click **Save and connect relay**. A connected workspace confirms bot authentication and a Socket Mode connection. Channel access is checked by the first mention and reply.
 5. Under **Teammates**, register each teammate’s Slack member ID (`U…`, copied from their Slack profile menu) and a descriptive device label. Copy the generated device key and give it privately to that teammate. The key is shown once. Removing a device invalidates its key; register again to replace it. Register the host’s own user too if the host will run requests.

@@ -1,5 +1,8 @@
 import type { AgentEvent, BackgroundCommand, Usage } from "@openorc/protocol";
 import { claudeFastModeReason } from "./fast-mode.js";
+import { ClaudeWorkflows } from "./workflows.js";
+import { ClaudeSubagents } from "./subagents.js";
+import { isRecord, num, sessionId, str } from "./stream-values.js";
 
 /**
  * Background tasks that are the agent's own work, which report back when they finish. Anything else Claude Code runs
@@ -39,12 +42,23 @@ function backgroundStatus(finished: boolean, failed: boolean): "running" | "erro
  * the parser keeps unfamiliar, well-formed events as `raw`. Malformed records
  * produce a nonfatal error so the next line can still be processed.
  */
+export interface ClaudeTranscriptTarget {
+  kind: "workflow" | "agent";
+  agentId: string;
+  subagentId: string;
+  finished: boolean;
+}
+
 export class ClaudeStreamParser {
+  private readonly childRecords = new Set<string>();
+  readonly workflows: ClaudeWorkflows;
+  private readonly subagents: ClaudeSubagents;
   private currentMessageId: string | null = null;
   private readonly toolNames = new Map<string, string>();
+  private readonly toolParents = new Map<string, string>();
   /** Tools announced from a streamed content block, before their input finished; the assistant line then updates them. */
   private readonly toolsStarted = new Set<string>();
-  private lastToolId: string | null = null;
+  private childInputs = 0;
   /** Where each task this process started shows: on a row of its own, or elsewhere (a tool row, or the call that started the subagent running it). */
   private readonly taskPlaces = new Map<string, "own" | "elsewhere">();
   /** The model the session runs on, from the init line; picks its entry out of a result's per-model usage. */
@@ -77,9 +91,12 @@ export class ClaudeStreamParser {
 
   constructor(
     private readonly runId: string,
-    options: { fastMode?: boolean } = {},
+    options: { fastMode?: boolean; resumedSubagents?: import("@openorc/protocol").RunSpec["resumedSubagents"] } = {},
   ) {
     this.fastMode = Boolean(options.fastMode);
+    this.subagents = new ClaudeSubagents(runId);
+    this.subagents.restore(options.resumedSubagents ?? []);
+    this.workflows = new ClaudeWorkflows(runId);
   }
 
   /** The session's Fast preference changed in place: the next state line is reported as the first of the new preference. */
@@ -103,11 +120,45 @@ export class ClaudeStreamParser {
     return this.background.commands;
   }
 
-  parseLine(line: string, now = Date.now()): AgentEvent[] {
+  subagentTaskId(nativeId: string): string | null {
+    return this.workflows.taskId(nativeId) ?? this.subagents.taskId(nativeId);
+  }
+
+  stoppedSubagents(nativeId?: string): AgentEvent[] {
+    return this.subagents.stopped(nativeId);
+  }
+
+  workflowMessage(agentId: string, message: Record<string, unknown>, ts: number): AgentEvent[] {
+    const out: AgentEvent[] = [];
+    const normalized = this.workflows.message(agentId, message, ts, out);
+    if (normalized) out.push(...this.parseLine(JSON.stringify(normalized), ts, "file"));
+    return out;
+  }
+
+  transcriptTargets(): ClaudeTranscriptTarget[] {
+    return [
+      ...this.workflows.targets().map((target): ClaudeTranscriptTarget => ({ ...target, kind: "workflow" })),
+      ...this.subagents.transcriptTargets().map((target): ClaudeTranscriptTarget => ({ ...target, kind: "agent" })),
+    ];
+  }
+
+  transcriptMessage(target: ClaudeTranscriptTarget, message: Record<string, unknown>, ts: number): AgentEvent[] {
+    if (target.kind === "workflow") return this.workflowMessage(target.agentId, message, ts);
+    const out: AgentEvent[] = [];
+    const normalized = this.subagents.transcriptMessage(target.agentId, message, ts, out);
+    if (normalized) out.push(...this.parseLine(JSON.stringify(normalized), ts, "file"));
+    return out;
+  }
+
+  parseLine(line: string, now = Date.now(), source: "stream" | "file" = "stream"): AgentEvent[] {
     const decoded = decodeStreamLine(line, this.runId, now);
     if (decoded.kind === "events") return decoded.events;
     const msg = decoded.message;
+    this.workflows.observeSession(msg);
     const out: AgentEvent[] = [{ type: "raw", runId: this.runId, ts: now, agent: "claude", payload: msg }];
+    if (this.heartbeat(msg, now, out)) return out;
+    const child = this.childLine(msg, now, out, source);
+    if (child) return child;
     switch (msg["type"]) {
       case "system":
         this.system(msg, now, out);
@@ -122,6 +173,9 @@ export class ClaudeStreamParser {
       case "user":
         this.user(msg, now, out);
         break;
+      case "tool_progress":
+        this.toolProgress(msg, now, out);
+        break;
       case "rate_limit_event":
         this.rateLimit(msg, now, out);
         break;
@@ -130,6 +184,51 @@ export class ClaudeStreamParser {
         break;
     }
     return out;
+  }
+
+  private childLine(msg: Record<string, unknown>, now: number, out: AgentEvent[], source: "stream" | "file"): AgentEvent[] | null {
+    const rawParent = str(msg["parent_tool_use_id"]);
+    const parent = rawParent ? this.subagents.identity(rawParent) : null;
+    if (parent) {
+      if (msg["type"] === "tool_progress" && !this.subagents.known(parent)) return null;
+      if (!this.subagents.accepts(parent, msg)) return out;
+      msg = { ...msg, parent_tool_use_id: parent };
+      if (source === "stream" && (msg["type"] === "assistant" || msg["type"] === "user")) this.subagents.observe(parent);
+      const unique = this.childRecord(parent, msg);
+      if (!unique) return out;
+      msg = unique;
+      if (msg["type"] === "assistant") this.assistant(msg, now, out);
+      else if (msg["type"] === "user") this.user(msg, now, out);
+      else if (msg["type"] === "tool_progress") this.toolProgress(msg, now, out);
+      else if (msg["type"] === "system") this.workflows.task(msg, now, out);
+      return out.map((event) => (event.type === "raw" || event.type === "subagent.started" || event.type === "subagent.updated" ? event : { ...event, subagentId: parent }));
+    }
+    return null;
+  }
+
+  private childRecord(parent: string, msg: Record<string, unknown>): Record<string, unknown> | null {
+    const uuid = str(msg["uuid"]);
+    if (!uuid || (msg["type"] !== "assistant" && msg["type"] !== "user")) return msg;
+    const id = `subagent:${parent}:${uuid}`;
+    if (this.childRecords.has(id)) return null;
+    this.childRecords.add(id);
+    return isRecord(msg["message"]) ? { ...msg, message: { ...msg["message"], id } } : msg;
+  }
+
+  private heartbeat(msg: Record<string, unknown>, now: number, out: AgentEvent[]): boolean {
+    if (msg["type"] !== "tool_progress" || msg["heartbeat"] !== true) return false;
+    const toolCallId = str(msg["parent_tool_use_id"]);
+    if (!toolCallId) return true;
+    this.toolProgress({ ...msg, tool_use_id: toolCallId }, now, out);
+    const parent = this.toolParents.get(toolCallId);
+    if (parent) for (const event of out) if (event.type !== "raw") event.subagentId = parent;
+    return true;
+  }
+
+  private toolProgress(msg: Record<string, unknown>, ts: number, out: AgentEvent[]): void {
+    const toolCallId = str(msg["tool_use_id"]);
+    const elapsed = num(msg["elapsed_time_seconds"]);
+    if (toolCallId && elapsed !== undefined) out.push({ type: "tool.updated", runId: this.runId, ts, toolCallId, progress: `Running for ${Math.floor(elapsed)}s` });
   }
 
   /** Streamed blocks announce thinking, text and tools before the full assistant message arrives. */
@@ -159,7 +258,6 @@ export class ClaudeStreamParser {
         this.finishThinking(now, out);
         this.toolNames.set(block["id"], block["name"]);
         this.toolsStarted.add(block["id"]);
-        this.lastToolId = block["id"];
         out.push({ type: "tool.started", runId: this.runId, ts: now, toolCallId: block["id"], name: block["name"], input: {}, parentToolCallId: str(msg["parent_tool_use_id"]) ?? null });
       } else this.finishThinking(now, out);
     } else if (ev["type"] === "content_block_stop") {
@@ -220,30 +318,49 @@ export class ClaudeStreamParser {
       return;
     }
     const messageId = str(message["id"]) ?? "unknown";
-    this.currentMessageId = messageId;
-    this.settleRequest(now, out);
-    const content = Array.isArray(message["content"]) ? (message["content"] as Record<string, unknown>[]) : [];
     const parent = str(msg["parent_tool_use_id"]);
+    if (!parent) {
+      this.currentMessageId = messageId;
+      this.settleRequest(now, out);
+    }
+    const content = Array.isArray(message["content"]) ? (message["content"] as Record<string, unknown>[]) : [];
+    if (parent) {
+      const thinking = content
+        .filter((block) => block["type"] === "thinking")
+        .map((block) => str(block["thinking"]) ?? "")
+        .join("\n");
+      if (thinking) {
+        out.push({ type: "thinking.started", runId: this.runId, ts: now, messageId });
+        out.push({ type: "thinking.completed", runId: this.runId, ts: now, messageId, text: thinking });
+      }
+    }
     const text = content
       .filter((b) => b["type"] === "text" && typeof b["text"] === "string")
       .map((b) => b["text"] as string)
       .join("");
     if (text.length > 0) {
-      this.finishThinking(now, out);
+      if (!parent) this.finishThinking(now, out);
       out.push({ type: "message.completed", runId: this.runId, ts: now, messageId, role: "assistant", text });
     }
+    this.assistantTools(content, parent, now, out);
+    const usage = readUsage(message["usage"], { context: true });
+    if (usage) out.push({ type: "usage.updated", runId: this.runId, ts: now, usage });
+  }
+
+  private assistantTools(content: Record<string, unknown>[], parent: string | null, now: number, out: AgentEvent[]): void {
     for (const b of content) {
       if (b["type"] === "tool_use" && typeof b["id"] === "string" && typeof b["name"] === "string") {
-        this.finishThinking(now, out);
+        if (!parent) this.finishThinking(now, out);
         this.toolNames.set(b["id"], b["name"]);
-        this.lastToolId = b["id"];
+        if (parent) this.toolParents.set(b["id"], parent);
         // A streamed block already announced the tool with an empty input; the full input arrives here.
         if (this.toolsStarted.has(b["id"])) out.push({ type: "tool.updated", runId: this.runId, ts: now, toolCallId: b["id"], input: b["input"] });
         else out.push({ type: "tool.started", runId: this.runId, ts: now, toolCallId: b["id"], name: b["name"], input: b["input"], parentToolCallId: parent ?? null });
+        if (b["name"] === "Agent" || b["name"] === "Task") this.subagents.launch(b["id"], b["input"], parent, now, out);
+        if (b["name"] === "Skill") this.subagents.skill(b["id"]);
+        if (b["name"] === "Workflow") this.workflows.launch(b["id"], b["input"], parent, now, out);
       }
     }
-    const usage = readUsage(message["usage"], { context: true });
-    if (usage) out.push({ type: "usage.updated", runId: this.runId, ts: now, usage });
   }
 
   /** Tool results arrive on user lines and retain the names from their earlier tool starts. */
@@ -258,6 +375,16 @@ export class ClaudeStreamParser {
       return;
     }
     const content = Array.isArray(message["content"]) ? (message["content"] as Record<string, unknown>[]) : [];
+    if (str(msg["parent_tool_use_id"])) {
+      const text =
+        str(message["content"]) ??
+        content
+          .filter((block) => block["type"] === "text")
+          .map((block) => str(block["text"]) ?? "")
+          .join("\n");
+      if (text && !/^\[Request interrupted by user(?: for tool use)?\]$/.test(text.trim()) && !this.subagents.duplicatePrompt(String(msg["parent_tool_use_id"]), text))
+        out.push({ type: "message.completed", runId: this.runId, ts: now, messageId: str(msg["uuid"]) ?? `child-input-${++this.childInputs}`, role: "user", text });
+    }
     for (const b of content) {
       if (b["type"] === "tool_result" && typeof b["tool_use_id"] === "string") {
         out.push({
@@ -269,6 +396,8 @@ export class ClaudeStreamParser {
           output: b["content"],
           isError: b["is_error"] === true,
         });
+        this.subagents.result(b["tool_use_id"], b["content"], b["is_error"] === true, now, out);
+        this.workflows.result(b["tool_use_id"], b["is_error"] === true, now, out);
       }
     }
   }
@@ -338,6 +467,19 @@ export class ClaudeStreamParser {
 
   /** `system` lines: the session, each turn's start, and what Claude Code is doing between model messages. */
   private system(msg: Record<string, unknown>, now: number, out: AgentEvent[]): void {
+    if (
+      this.workflows.task(msg, now, out) ||
+      this.subagents.task(
+        msg,
+        now,
+        out,
+        this.transcriptTargets().some((target) => !target.finished),
+      )
+    ) {
+      const taskId = str(msg["task_id"]);
+      if (taskId) this.taskPlaces.set(taskId, "elsewhere");
+      return;
+    }
     const subtype = msg["subtype"];
     if (subtype === "init") {
       this.model = str(msg["model"]);
@@ -349,7 +491,7 @@ export class ClaudeStreamParser {
           runId: this.runId,
           ts: now,
           agent: "claude",
-          externalSessionId: str(msg["session_id"]),
+          externalSessionId: sessionId(msg["session_id"]),
           model: str(msg["model"]),
           ...(Array.isArray(msg["capabilities"]) ? { capabilities: msg["capabilities"].filter(isString) } : {}),
           ...(Array.isArray(msg["tools"]) ? { tools: msg["tools"].filter(isString) } : {}),
@@ -416,8 +558,7 @@ export class ClaudeStreamParser {
       return;
     }
     if (subtype === "task_summary") {
-      const detail = str(msg["detail"]);
-      if (detail && this.lastToolId) out.push({ type: "tool.updated", runId: this.runId, ts: now, toolCallId: this.lastToolId, progress: detail });
+      // This describes the whole session, not the last tool or agent that happened to launch.
       return;
     }
     if (subtype === "background_tasks_changed") {
@@ -433,6 +574,10 @@ export class ClaudeStreamParser {
       const description = str(msg["description"]) ?? str(msg["summary"]) ?? "Background task";
       const finished = subtype === "task_notification";
       const failed = finished && str(msg["status"]) !== "completed";
+      if (toolCallId && this.toolParents.has(toolCallId)) {
+        if (taskId) this.taskPlaces.set(taskId, "elsewhere");
+        return;
+      }
       if (toolCallId && this.toolNames.has(toolCallId)) {
         // The task belongs to a tool call the transcript already shows; report on that row.
         if (taskId) this.taskPlaces.set(taskId, "elsewhere");
@@ -601,9 +746,6 @@ export function usageNotice(info: Record<string, unknown> | undefined, resetPhra
   return `${used}.${resetPhrase ? ` It resets ${resetPhrase}.` : ""}`;
 }
 
-function str(v: unknown): string | null {
-  return typeof v === "string" ? v : null;
-}
 /** For a turn that asked for Fast, whether it was served. Only a result line knows: init lines say on before any request has been refused. */
 function fastModeServed(msg: Record<string, unknown>, asked: boolean): Pick<Extract<AgentEvent, { type: "turn.completed" }>, "fastMode"> {
   const state = str(msg["fast_mode_state"]);
@@ -621,15 +763,8 @@ function readContextWindow(modelUsage: unknown, model: string | null): number | 
   const window = num((entry as Record<string, unknown>)["contextWindow"]);
   return window !== undefined && window > 0 ? window : undefined;
 }
-function num(v: unknown): number | undefined {
-  return typeof v === "number" && Number.isFinite(v) ? v : undefined;
-}
 function isString(v: unknown): v is string {
   return typeof v === "string";
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 function protocolError(runId: string, ts: number, message: string): AgentEvent {

@@ -8,7 +8,7 @@ import { docHref } from "../../data/docs";
 <DocsLayout slug="network">
   <section aria-labelledby="summary">
     <h2 id="summary">Every connection</h2>
-    <p>OpenOrc has no server of its own. Every connection goes straight from your computer to one of the services below. This table lists each one, when it happens, and how to stop it.</p>
+    <p>OpenOrc has no server of its own. Every connection goes straight from your computer to one of the services below. This table lists each one, when it happens, and how to stop it. Cloud threads add connections from a sandbox or the cloud brain on your own account, described under <a href="#cloud">Cloud threads and the brain</a>.</p>
     <div class="docs-table">
       <table>
         <thead>
@@ -23,7 +23,7 @@ import { docHref } from "../../data/docs";
           <tr>
             <td>Agent turns</td>
             <td>The agent's own service: Anthropic for Claude Code, OpenAI for Codex, the providers you set up in OpenCode</td>
-            <td>Each message you send, and each turn a schedule, Slack request, pull request review, team, or another thread's agent starts</td>
+            <td>Each message you send, and each turn a schedule, Slack request, pull request review, or another thread's agent starts</td>
             <td>Pause schedules, disconnect Slack</td>
           </tr>
           <tr>
@@ -31,6 +31,12 @@ import { docHref } from "../../data/docs";
             <td>The thread's own agent, or the harness you chose</td>
             <td>Once, after a new thread's first turn</td>
             <td><strong>Harness</strong> set to <strong>Off · use opening message</strong>, under Memory &amp; models</td>
+          </tr>
+          <tr>
+            <td>Code explanations</td>
+            <td>The conversation's own agent, or the harness you chose</td>
+            <td>When you choose <strong>Plain English</strong>, <strong>Walkthrough</strong>, or <strong>Diagram</strong> for a file that has no saved explanation of its current text</td>
+            <td>Don't choose those views, or set <strong>Harness</strong> to <strong>Off · use opening message</strong></td>
           </tr>
           <tr>
             <td>Run summaries</td>
@@ -41,8 +47,8 @@ import { docHref } from "../../data/docs";
           <tr>
             <td>Usage and limits</td>
             <td>Claude Code's and Codex's services, through their CLIs</td>
-            <td>While Settings shows Usage, which it opens on, and when a thread shows a Codex usage limit</td>
-            <td>Close Settings</td>
+            <td>When the usage in the sidebar's footer needs fresh numbers, at most once a minute for each account; while Settings shows Usage, which it opens on; and when a thread shows a Codex usage limit</td>
+            <td>No setting</td>
           </tr>
           <tr>
             <td>Embedding model</td>
@@ -58,7 +64,7 @@ import { docHref } from "../../data/docs";
           </tr>
           <tr>
             <td>Agent updates</td>
-            <td><code>registry.npmjs.org</code>, or <code>formulae.brew.sh</code> for Codex or Claude Code installed as a Homebrew cask</td>
+            <td><code>registry.npmjs.org</code>, <code>formulae.brew.sh</code> for Codex or Claude Code installed as a Homebrew cask, or <code>downloads.claude.ai</code> for Claude Code from its own installer</td>
             <td>30 seconds after launch, then every 6 hours</td>
             <td><strong>Check for agent updates automatically</strong>, under Connections</td>
           </tr>
@@ -82,15 +88,57 @@ import { docHref } from "../../data/docs";
           </tr>
           <tr>
             <td>Slack</td>
-            <td>Slack, or your team's relay</td>
+            <td>Slack, or your shared relay</td>
             <td>While Slack is connected</td>
-            <td><strong>Disconnect Slack</strong>, or <strong>Disconnect desktop</strong> and <strong>Disconnect relay</strong> for a team relay</td>
+            <td><strong>Disconnect Slack</strong>, or <strong>Disconnect desktop</strong> and <strong>Disconnect relay</strong> for a shared relay</td>
           </tr>
           <tr>
             <td>Browser preview</td>
             <td>The pages you or an agent open</td>
             <td>When a page loads, including pages an agent opens with no Preview on screen</td>
             <td>No setting; agents can open pages in every mode</td>
+          </tr>
+          <tr>
+            <td>Preview search</td>
+            <td><code>www.google.com</code></td>
+            <td>When you type words instead of an address in the Preview's address bar</td>
+            <td>Type an address</td>
+          </tr>
+          <tr>
+            <td>Phone access</td>
+            <td>Your paired phones, which connect to this computer over your local network or tailnet</td>
+            <td>While <strong>Allow paired phones</strong> is on, under Phone</td>
+            <td>Turn off <strong>Allow paired phones</strong>, the default</td>
+          </tr>
+          <tr>
+            <td>Phone notifications</td>
+            <td>Apple's push service, <code>api.push.apple.com</code></td>
+            <td>When a thread needs you or finishes and a paired phone has notifications on, if you added an Apple push key</td>
+            <td>Don't add a key, or turn notifications off on the phone</td>
+          </tr>
+          <tr>
+            <td>Cloud services</td>
+            <td>Vercel at <code>api.vercel.com</code> and, for sandboxes, <code>vercel.com/api</code>, or Agent37 at <code>api.agent37.com</code>, <code>sandbox.agent37.app</code>, and each instance's address on <code>agent37.app</code></td>
+            <td>Connecting a service, while Settings → Cloud is open, and while a cloud thread's sandbox starts, syncs, runs a turn, or stops</td>
+            <td><strong>Disconnect</strong> under Settings → Cloud, after removing what runs there</td>
+          </tr>
+          <tr>
+            <td>Cloud brain</td>
+            <td>The brain's address on <code>vercel.run</code> or <code>agent37.app</code>, over a link encrypted end to end</td>
+            <td>When OpenOrc starts, after your computer wakes, every 2 minutes while not connected, and when you open one of the brain's threads</td>
+            <td><strong>Remove</strong> the cloud brain</td>
+          </tr>
+          <tr>
+            <td>Cloud sign-ins</td>
+            <td>Anthropic through <code>claude setup-token</code>, and OpenAI through Codex</td>
+            <td>When you create a Claude token or sign Codex in for the cloud, and before a sandbox gets a ChatGPT sign-in that is a day old</td>
+            <td>Don't make sign-ins for the cloud</td>
+          </tr>
+          <tr>
+            <td>Device tools</td>
+            <td><code>registry.npmjs.org</code>, through your own <code>npm</code></td>
+            <td>When you turn on device support and a pinned version isn't installed yet</td>
+            <td>Leave <strong>Device support</strong> off, the default, under Devices</td>
           </tr>
           <tr>
             <td>MCP Apps</td>
@@ -136,12 +184,15 @@ import { docHref } from "../../data/docs";
         text stays with that provider. For an OpenCode thread, the small model can come from any provider you set up in OpenCode. A thread whose agent has no small model keeps its first line.
       </li>
       <li>
+        <strong>Code explanations</strong> send the file's path and its text, up to 160,000 characters. OpenOrc finds the other files that use it on your computer. The conversation's own agent answers with the model chosen under <strong>Text generation</strong>.
+      </li>
+      <li>
         <strong>Run summaries</strong> for memory send a digest of the run, up to 12,000 characters, with the thread's or task's title and a task's description. Memory is off in a new profile. Choosing a provider under Memory &amp; models
         sends every run's digest to that provider.
       </li>
     </ul>
     <p>
-      For titles and summaries, Claude Code runs with Bash, Edit, Write, WebFetch, and WebSearch turned off and without MCP servers, but can still read and search files. Codex runs in a read-only sandbox with no MCP servers, where it can
+      For titles, explanations, and summaries, Claude Code runs with Bash, Edit, Write, WebFetch, and WebSearch turned off and without MCP servers, but can still read and search files. Codex runs in a read-only sandbox with no MCP servers, where it can
       still run commands that only read. OpenCode is denied every tool.
     </p>
     <p>
@@ -166,44 +217,73 @@ import { docHref } from "../../data/docs";
     <p>The update library keeps a random ID in <code>.updaterId</code> in the data folder, meant for releasing to a share of installs first. OpenOrc doesn't release that way and sends the ID empty.</p>
     <h3>Agent updates</h3>
     <p>
-      OpenOrc asks <code>registry.npmjs.org</code> for the latest version of each agent's package, or <code>formulae.brew.sh</code> when a Homebrew cask installed Codex or Claude Code. The request carries no cookies or credentials.
+      OpenOrc asks <code>registry.npmjs.org</code> for the latest version of each agent's package, <code>formulae.brew.sh</code> when a Homebrew cask installed Codex or Claude Code, or <code>downloads.claude.ai</code> for the release
+      channel of a Claude Code that its own installer put in <code>~/.local/bin</code>. The request carries no cookies or credentials.
       Installing waits for you to press <strong>Update</strong>, and then runs the installer that put the agent there, such as <code>npm</code>, <code>brew</code>, or <code>claude update</code>.
     </p>
-    <p class="docs-source">Source: <code>packages/memory/src/model-files.ts</code>, <code>apps/desktop/src/main/app-updates.ts</code>, <code>packages/core/src/services/agent-update-installation.ts</code></p>
+    <h3>Device tools</h3>
+    <p>
+      Turning on device support installs <code>expo-device-hub</code>, and <code>agent-device</code> when agents may use devices. OpenOrc runs your own <code>npm ci</code> with each tool's lockfile, so every package comes from your npm
+      registry at a version and checksum fixed in OpenOrc's source, with install scripts turned off.
+    </p>
+    <p class="docs-source">Source: <code>packages/memory/src/model-files.ts</code>, <code>apps/desktop/src/main/app-updates.ts</code>, <code>packages/core/src/services/agent-update-installation.ts</code>, <code>packages/core/src/devices/toolchain.ts</code></p>
   </section>
 
   <section aria-labelledby="git">
     <h2 id="git">Git and GitHub</h2>
     <p>OpenOrc runs your own <code>git</code> and <code>gh</code>, so they use your credentials and configuration. Three things use the network without you pressing a Git button:</p>
     <ul>
-      <li>Creating a worktree from a branch fetches that branch from <code>origin</code> first, so the work starts from what your team sees. If the fetch fails, the local branch is used. Work in the Local checkout never fetches.</li>
+      <li>Creating a worktree from a branch fetches that branch from <code>origin</code> first, so the work starts from the remote branch. If the fetch fails, the local branch is used. Work in the Local checkout never fetches.</li>
       <li>A new worktree of a repository with submodules runs <code>git submodule update --init --recursive</code>, which can clone each submodule from its own remote.</li>
       <li>For each thread with an open pull request, OpenOrc runs <code>gh pr view &lt;url&gt; --json state</code> every 5 minutes to show when it is merged or closed.</li>
     </ul>
     <p>
       Everything else happens when you ask: pushing, creating a pull request, listing and reading pull requests on the <a href={docHref("pull-requests")}>Pull requests</a> pages, fetching a pull request to review it, and posting a review.
-      Before creating a pull request from a thread, OpenOrc checks that your branch is pushed using the remote branches Git already knows about, without going online. For a team's branch, OpenOrc asks <code>origin</code> with
-      <code>git ls-remote</code> instead.
-    </p>
+      Before creating a pull request from a thread, OpenOrc checks that your branch is pushed using the remote branches Git already knows about, without going online.</p>
     <p class="docs-source">Source: <code>packages/core/src/services/workspace.ts</code>, <code>lifecycle.ts</code>, <code>review.ts</code>, <code>packages/git/src/github.ts</code>, <code>github-app.ts</code></p>
   </section>
 
   <section aria-labelledby="local">
     <h2 id="local">Local servers</h2>
-    <p>These parts of OpenOrc listen for connections, all on <code>127.0.0.1</code>, so other computers can't reach them:</p>
+    <p>These parts of OpenOrc listen for connections on <code>127.0.0.1</code>, so other computers can't reach them:</p>
     <ul>
       <li>OpenOrc's MCP server, which gives agents OpenOrc's tools, on a random port.</li>
       <li>
-        The MCP Apps sandbox, which serves interactive tool results in isolated frames, on a random port. An app can load files from, and connect to, the <code>https</code> domains its MCP server declares, except <code>localhost</code>,
-        <code>.local</code> names, and IP addresses.
+        The MCP Apps sandbox, which serves interactive tool results in isolated frames, on a random port. An app can load files from, and connect to, the <code>https</code> domains its MCP server declares, except <code>localhost</code>, <code>.local</code> names, and IP addresses.
       </li>
-      <li>The Slack team relay, on the computer that hosts it, at the port you set (47831 by default). Teammates reach it through an SSH tunnel.</li>
+      <li>The Slack shared relay, on the computer that hosts it, at the port you set (47831 by default). Other users reach it through an SSH tunnel.</li>
       <li>The reviewer app's setup page, on a random port, only while you set the app up, for at most 15 minutes.</li>
       <li>OpenCode's own server, <code>opencode serve</code>, which OpenOrc starts briefly to list OpenCode's skills. It is protected by a password OpenCode makes up.</li>
       <li>On macOS, the update library's handoff to the system installer, on a random port behind a random password, while a downloaded update waits to install.</li>
+      <li>While device support is on, <code>expo-device-hub</code> on a random port behind a token only OpenOrc holds, and <code>agent-device</code>'s helper, which OpenOrc and agents reach on <code>127.0.0.1</code> with its token.</li>
     </ul>
+    <p>
+      One listens on your network. While <strong>Allow paired phones</strong> is on, OpenOrc accepts phone connections on port 47820, or a free port when that one is taken. It drops any connection that doesn't come from this computer, a
+      private or link-local address, or a Tailscale address before reading from it. Then only a paired phone can complete the encrypted handshake. See <a href={docHref("phone")}>Phone app</a>.
+    </p>
     <p>The app window loads only files that ship with OpenOrc. Its content security policy blocks remote scripts, styles, fonts, and images.</p>
     <p>See <a href={docHref("security") + "#servers"}>Security model</a> for what keeps web pages and other programs out of these servers.</p>
+  </section>
+
+  <section aria-labelledby="cloud">
+    <h2 id="cloud">Cloud threads and the brain</h2>
+    <p>
+      A cloud thread's sandbox and the cloud brain run on the Vercel or Agent37 account you connect in Settings → Cloud. Your computer talks to Vercel through its API, at <code>api.vercel.com</code> for your teams, projects, and costs, and at <code>vercel.com/api</code> for sandboxes. The sandbox calls
+      also carry each command's input and output, including the connection to OpenOrc's runner inside the sandbox. On Agent37, it talks to OpenOrc's own server in each instance, at the instance's address, with your Agent37 key. Code moves both ways as Git bundles over these connections, never through a Git remote.
+    </p>
+    <p>From inside a sandbox, these connections go out:</p>
+    <ul>
+      <li>The agent's own service, as on your computer. On Vercel, when your plan allows it, the sandbox's firewall adds the agent's sign-in to these requests on their way out.</li>
+      <li><code>registry.npmjs.org</code>, through <code>npm</code>, to install the thread's agent at the version on your computer.</li>
+      <li>Your system's package sources and <code>download.docker.com</code>, to install Docker for a project that uses it.</li>
+      <li>Whatever the agent and its commands open. A sandbox's internet isn't limited.</li>
+    </ul>
+    <p>
+      The cloud brain makes the connections OpenOrc makes on a computer for the work it holds: the agents' services, its own sandboxes on the same account, GitHub if you switched its GitHub sign-in on, Apple's push service if it holds your push
+      key, and Hugging Face for memory's model while memory is on. Paired phones reach the brain at its address. On Vercel they first knock on its door, a small function at <code>openorc-door-….vercel.app</code> in your team that wakes a sleeping brain.
+    </p>
+    <p>See <a href={docHref("cloud")}>Cloud threads</a> for what each service bills, and <a href={docHref("security") + "#cloud"}>Security model</a> for what the sandbox holds.</p>
+    <p class="docs-source">Source: <code>packages/cloud/src/vercel-sandbox.ts</code>, <code>agent37.ts</code>, <code>instance-port.ts</code>, <code>agent-install.ts</code>, <code>docker.ts</code>, <code>brain/door.ts</code>, <code>packages/core/src/services/brain-link.ts</code></p>
   </section>
 
   <section aria-labelledby="never">

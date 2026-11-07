@@ -5,6 +5,7 @@
   },
   "build": {
     "production": {
+      "channel": "production",
       "node": "24.20.0",
       "pnpm": "11.21.0",
       "autoIncrement": true,

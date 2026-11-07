@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import type { RpcParams, ThreadSummary } from "@openorc/protocol";
+import { threadResolved } from "@openorc/client";
+import { isSubagentThread, type RpcParams, type ThreadSummary } from "@openorc/protocol";
 import { openFilesTool } from "./files-tool";
 import { useLayout } from "./layout";
 import { core } from "./rpc";
@@ -23,7 +24,10 @@ const act =
 
 const togglePanel = act(({ focusedThreadId }) => {
   const layout = useLayout.getState();
-  if (focusedThreadId) layout.toggleThreadPanel(focusedThreadId);
+  if (focusedThreadId)
+    void core.call("threads.get", { id: focusedThreadId }).then((thread) => {
+      if (thread && !isSubagentThread(thread)) layout.toggleThreadPanel(focusedThreadId);
+    });
   else layout.setPanel(!layout.panelOpen);
 });
 
@@ -36,8 +40,8 @@ const step = (direction: 1 | -1) =>
 
 const numbered =
   (position: number): Shortcut =>
-  ({ threadOrder }) => {
-    const id = threadOrder[position - 1];
+  () => {
+    const id = useUi.getState().threadOrder[position - 1];
     if (!id) return false;
     openThread(id);
     return true;
@@ -47,7 +51,12 @@ const onFocusedThread =
   (patch: (thread: ThreadSummary) => RpcParams<"threads.update">["patch"]): Shortcut =>
   ({ focusedThreadId }) => {
     if (!focusedThreadId) return false;
-    void core.call("threads.get", { id: focusedThreadId }).then((thread) => thread && core.call("threads.update", { id: focusedThreadId, patch: patch(thread) }));
+    void core.call("threads.get", { id: focusedThreadId }).then((thread) => {
+      if (!thread) return;
+      const update = patch(thread);
+      if (isSubagentThread(thread) && Object.keys(update).some((key) => key !== "seen")) return;
+      return core.call("threads.update", { id: focusedThreadId, patch: update });
+    });
     return true;
   };
 
@@ -65,9 +74,8 @@ export const shortcuts: ReadonlyMap<string, Shortcut> = new Map([
   ["⇧]", step(1)],
   ["⇧n", act(({ projectId }) => useUi.getState().openNewTask(projectId))],
   ["⇧f", ({ focusedThreadId }) => openFilesTool("contents", focusedThreadId)],
-  ["⇧o", act(() => useLayout.getState().toggleOrcMode())],
   ["⇧p", onFocusedThread((thread) => ({ pinned: !thread.pinnedAt }))],
-  ["⇧a", onFocusedThread((thread) => ({ archived: !thread.archivedAt }))],
+  ["⇧a", onFocusedThread((thread) => ({ archived: !threadResolved(thread, Date.now()) }))],
   ["⇧u", onFocusedThread((thread) => ({ seen: thread.unread }))],
 ]);
 

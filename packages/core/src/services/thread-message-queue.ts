@@ -1,4 +1,4 @@
-import { audit, redact, threads, threadQueue, type Db } from "@openorc/db";
+import { audit, redact, threadQueue, threads, type Db } from "@openorc/db";
 import type { QueuedMessage, Run, Thread, ThreadMessage } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import type { Logger } from "../transport.js";
@@ -18,7 +18,7 @@ export class ThreadMessageQueue {
     private readonly runs: RunService,
     private readonly invalidate: (keys: string[]) => void,
     private readonly log: Logger,
-    private readonly rejectPinnedTeam: (id: string | null) => void,
+    private readonly rejectRetiredThread: (id: string | null) => void,
     private readonly continueThread: (id: string, input: ContinueThreadInput) => Promise<Run>,
     private readonly publicQueueFollowUp: ThreadService["queueFollowUp"],
     private readonly publicStopAccepting: ThreadService["stopAccepting"],
@@ -28,6 +28,11 @@ export class ThreadMessageQueue {
     const thread = threads.get(this.db, id);
     if (!thread) throw new Error(`thread ${id} not found`);
     return thread;
+  }
+
+  /** A queued message is on its way into its thread. A cloud thread's first one waits here until its sandbox is built. */
+  get delivering(): boolean {
+    return this.draining.size > 0;
   }
 
   hasTaskThreadReservation(id: string): boolean {
@@ -61,10 +66,11 @@ export class ThreadMessageQueue {
   /** Accept once, durably. Provider delivery is a separate, recoverable step. */
   queueFollowUp(input: { threadId: string; text: string; attachments?: string[]; requestKey: string }): { messageId: string } {
     if (this.closing) throw new Error("OpenOrc is closing.");
-    this.rejectPinnedTeam(input.threadId);
+    this.rejectRetiredThread(input.threadId);
     const thread = this.thread(input.threadId);
-    if (thread.archivedAt !== null) throw new Error("Unarchive this conversation before sending a message.");
     if ((!input.text.trim() && !input.attachments?.length) || !input.requestKey.trim()) throw new Error("A message and request key are required.");
+    // A message brings a resolved thread back.
+    if (thread.archivedAt !== null) threads.reopen(this.db, thread.id);
     const message = threadQueue.enqueue(this.db, { ...input, attachments: input.attachments ?? [] });
     this.invalidate(["threads", `thread:${thread.id}`]);
     // Let the caller finish linking its durable receipt before attempting delivery.
@@ -103,9 +109,9 @@ export class ThreadMessageQueue {
 
   /** Explicit send-now or recovery; a receipt stays queued until the provider accepts it. */
   async sendQueued(id: string, messageId: string): Promise<QueuedMessage[]> {
-    this.rejectPinnedTeam(id);
+    this.rejectRetiredThread(id);
     const thread = this.thread(id);
-    if (thread.archivedAt !== null) throw new Error("Unarchive this conversation before sending a message.");
+    if (thread.archivedAt !== null) threads.reopen(this.db, id);
     const item = threadQueue.list(this.db, id).find((message) => message.id === messageId);
     if (!item) throw new Error("That queued message is gone.");
     if (item.state === "delivering" || this.draining.has(id)) throw new Error("A queued message is being delivered.");
@@ -171,7 +177,7 @@ export class ThreadMessageQueue {
 
   /** Puts a message into the thread: on the live session when there is one, else on a run that resumes it. */
   async deliver(thread: Thread, text: string, role: "user" | "system", attachments: string[] = [], recordPrompt = true): Promise<void> {
-    this.rejectPinnedTeam(thread.id);
+    this.rejectRetiredThread(thread.id);
     const live = this.runs.liveRunForThread(thread.id);
     if (live && live.agent === thread.agent) {
       await this.runs.send(live.id, text, { role, attachments, recordPrompt });
@@ -192,18 +198,11 @@ export class ThreadMessageQueue {
   }
 
   /** A message into a thread from the outside: another thread, or the user relaying between them. */
-  async send(id: string, text: string, from: Thread | null, attribution?: { member: string; team: string }, options: { liveOnly?: boolean } = {}): Promise<void> {
+  async send(id: string, text: string, from: Thread | null): Promise<void> {
     const thread = this.thread(id);
-    if (thread.archivedAt) throw new Error("the thread is archived");
-    const sender = attribution ? ` sent by ${attribution.member} of team ${attribution.team}` : "";
-    const body = from ? `Message from the thread "${from.title}" (id ${from.id})${sender}:\n\n${text}` : text;
-    // A team agent may inform running work but never start a provider process outside its roster.
-    if (options.liveOnly) {
-      this.rejectPinnedTeam(thread.id);
-      const live = this.runs.liveRunForThread(thread.id);
-      if (!live || live.agent !== thread.agent) throw new Error(`"${thread.title}" is idle. A team agent cannot start work outside its roster; ask the user to continue that thread.`);
-      await this.runs.send(live.id, body, { role: "system" });
-    } else await this.deliver(thread, body, "system");
+    if (thread.archivedAt) throw new Error("the thread is resolved");
+    const body = from ? `Message from the thread "${from.title}" (id ${from.id}):\n\n${text}` : text;
+    await this.deliver(thread, body, "system");
     audit.record(this.db, { actor: from ? "agent" : "user", action: "thread.message", resourceType: "thread", resourceId: id, metadata: { from: from?.id ?? null } });
   }
 }

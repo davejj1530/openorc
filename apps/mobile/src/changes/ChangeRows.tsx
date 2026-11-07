@@ -7,7 +7,7 @@ import { ListPressable } from "../ui/ListPressable";
 import { Text } from "../ui/Text";
 import { countsText, fileTrailing, type LineCounts } from "./change-words";
 
-const tones: Record<FileMarkTone, string> = { ok: "text-ok", "ink-2": "text-ink-2", bad: "text-bad", warn: "text-warn" };
+export const markTones: Record<FileMarkTone, string> = { ok: "text-ok", "ink-2": "text-ink-2", bad: "text-bad", warn: "text-warn" };
 const statusWords: Record<FileChangeStat["status"], string> = { added: "Added", untracked: "New", modified: "Modified", deleted: "Deleted", renamed: "Renamed" };
 
 /** "+12 −3" in ok and bad, a side only when it has lines. */
@@ -32,7 +32,7 @@ export const FileRow = memo(function FileRow({ file, onOpen }: { file: FileChang
       onPress={() => onOpen(file.path)}
       className="h-touch flex-row items-center gap-3 px-5 active:bg-surface-2"
     >
-      <Text className={cn("w-2.5 font-mono text-xs", tones[mark.tone])}>{mark.letter}</Text>
+      <Text className={cn("w-2.5 font-mono text-xs", markTones[mark.tone])}>{mark.letter}</Text>
       <Text numberOfLines={1} ellipsizeMode="head" className="min-w-0 flex-1 font-mono text-xs text-ink-2">
         {file.path}
       </Text>

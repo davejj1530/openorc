@@ -139,7 +139,7 @@ export function noticeLine(input: NoticeInput): Notice | null {
   const { publishing } = input;
   if (publishing.kind === "lost") return quiet(`Lost ${input.mac} before it answered.`);
   if (input.asked) return quiet(input.asked);
-  if (input.team) return quiet("Publish a team's work on your Mac.");
+  if (input.team) return quiet("This item is no longer available.");
   if (publishing.kind === "notice" && holds(publishing, input)) return { text: publishing.text, tone: publishing.tone, details: publishing.details };
   return input.bar && input.pushBlocked ? quiet(input.pushBlocked) : null;
 }

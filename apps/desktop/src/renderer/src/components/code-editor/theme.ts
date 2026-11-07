@@ -7,14 +7,14 @@ import { tags as t } from "@lezer/highlight";
  * Syntax colors from Shiki's github-light and github-dark, the themes every diff in the app uses, so a file reads the
  * same in the editor as in its diff. Light and dark switch with the app's `.dark` root class.
  */
-const syntaxColors = {
+export const syntaxColors = {
   light: { comment: "#6a737d", keyword: "#d73a49", string: "#032f62", regexp: "#032f62", constant: "#005cc5", entity: "#6f42c1", tag: "#22863a", variable: "#e36209", invalid: "#b31d28" },
   dark: { comment: "#6a737d", keyword: "#f97583", string: "#9ecbff", regexp: "#dbedff", constant: "#79b8ff", entity: "#b392f0", tag: "#85e89d", variable: "#ffab70", invalid: "#fdaeb7" },
 };
 
-const syntaxVariables = (colors: Record<string, string>) => Object.fromEntries(Object.entries(colors).map(([name, color]) => [`--syntax-${name}`, color]));
+export const syntaxVariables = (colors: Record<string, string>) => Object.fromEntries(Object.entries(colors).map(([name, color]) => [`--syntax-${name}`, color]));
 
-const highlight = HighlightStyle.define([
+export const highlight = HighlightStyle.define([
   { tag: [t.comment, t.lineComment, t.blockComment, t.docComment], color: "var(--syntax-comment)" },
   { tag: [t.keyword, t.controlKeyword, t.operatorKeyword, t.definitionKeyword, t.moduleKeyword, t.modifier, t.operator, t.unit], color: "var(--syntax-keyword)" },
   { tag: [t.string, t.special(t.string), t.docString, t.character, t.attributeValue], color: "var(--syntax-string)" },
@@ -75,6 +75,35 @@ const theme = EditorView.theme({
   ".cm-button": { ...control, backgroundColor: "var(--surface-2)", backgroundImage: "none", color: "var(--ink-2)" },
   ".cm-button:hover": { backgroundColor: "var(--surface-3)", color: "var(--ink)" },
   ".cm-button:active": { backgroundImage: "none" },
+  ".cm-definition-link": { cursor: "pointer", textDecoration: "underline", textUnderlineOffset: "3px", color: "var(--content-ink)" },
+  ".cm-foldGutter .cm-gutterElement": { padding: "0 4px", cursor: "pointer" },
+  ".cm-foldPlaceholder": { backgroundColor: "var(--surface-2)", color: "var(--ink-3)", border: "none", borderRadius: "var(--radius-sm)", padding: "0 5px" },
+  ".cm-tooltip": {
+    border: "none",
+    borderRadius: "var(--radius-lg)",
+    boxShadow: "none",
+    backgroundColor: "var(--surface)",
+    color: "var(--ink)",
+    overflow: "hidden",
+    width: "max-content",
+    maxWidth: "min(520px, 100%)",
+  },
+  ".cm-tooltip-autocomplete > ul": { fontFamily: "var(--font-mono)", fontSize: "var(--text-sm)", maxWidth: "100%", padding: "4px" },
+  ".cm-tooltip-autocomplete > ul > li": { padding: "3px 8px", borderRadius: "var(--radius-sm)" },
+  ".cm-tooltip-autocomplete > ul > li[aria-selected]": { background: "var(--surface-2)", color: "var(--ink)" },
+  ".cm-completionDetail": { marginLeft: "12px", color: "var(--ink-4)", fontStyle: "normal" },
+  ".cm-completionMatchedText": { textDecoration: "none", color: "var(--content-ink)" },
+  ".cm-editor-information": { padding: "10px 12px", maxWidth: "100%", fontSize: "var(--text-sm)" },
+  ".cm-editor-information pre": { fontFamily: "var(--font-mono)", whiteSpace: "pre-wrap", overflowWrap: "anywhere", margin: "0" },
+  ".cm-editor-information p": { marginTop: "6px", fontFamily: "var(--font-sans)", color: "var(--ink-3)", whiteSpace: "pre-wrap" },
+  ".cm-editor-information > code": { display: "block", marginTop: "6px", color: "var(--content-ink)" },
+  ".cm-lintRange-error": { backgroundImage: "none", textDecoration: "underline wavy var(--bad)", textUnderlineOffset: "3px" },
+  ".cm-lintRange-warning": { backgroundImage: "none", textDecoration: "underline wavy var(--warn)", textUnderlineOffset: "3px" },
+  ".cm-lint-marker": { backgroundImage: "none", width: "5px", height: "5px", margin: "6px", borderRadius: "50%" },
+  ".cm-lint-marker-error": { backgroundColor: "var(--bad)" },
+  ".cm-lint-marker-warning": { backgroundColor: "var(--warn)" },
+  ".cm-diagnostic": { borderLeft: "none", padding: "10px 12px", fontFamily: "var(--font-sans)", fontSize: "var(--text-sm)" },
+  ".cm-diagnosticAction": { ...control, background: "var(--surface-2)", color: "var(--ink-2)", cursor: "pointer", marginLeft: "8px" },
   ".cm-panel.cm-search [name=close]": { top: "8px", right: "10px", width: "28px", height: "28px", borderRadius: "var(--radius-pill)", color: "var(--ink-3)", fontSize: "18px", lineHeight: "28px" },
   ".cm-panel.cm-search [name=close]:hover": { backgroundColor: "var(--surface-2)", color: "var(--ink)" },
 });

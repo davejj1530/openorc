@@ -1,12 +1,12 @@
-import { randomUUID } from "node:crypto";
 import type { AcpApprovalRequest, CodexApprovalRequest } from "@openorc/agents";
-import { audit, orchestration, runs, tasks, threads, type Db } from "@openorc/db";
+import { audit, runs, threads, type Db } from "@openorc/db";
 import { UserInput, validateUserAnswers, type UserInputResult } from "@openorc/mcp";
-import { executionMode, harnessCatalog, isHarnessId, stricterPermission, type AgentEvent, type ApprovalDecision, type ApprovalResolution } from "@openorc/protocol";
-import { appActionPolicy, blockedInPlan, type AppAction } from "./app-actions.js";
-import type { Logger } from "../transport.js";
-import type { LiveRun, PendingApproval, RunScope, ThreadPermissionState } from "./run-types.js";
 import type { ExecutionMode, Thread } from "@openorc/protocol";
+import { executionMode, harnessCatalog, isHarnessId, stricterPermission, type AgentEvent, type ApprovalDecision, type ApprovalResolution } from "@openorc/protocol";
+import { randomUUID } from "node:crypto";
+import type { Logger } from "../transport.js";
+import { appActionPolicy, blockedInPlan, type AppAction } from "./app-actions.js";
+import type { LiveRun, PendingApproval, RunScope, ThreadPermissionState } from "./run-types.js";
 
 /** Words and answer requirements for one Codex transport request. */
 function codexApprovalPresentation(
@@ -77,6 +77,7 @@ interface RunApprovalsDependencies {
 }
 
 export class RunApprovals {
+  private readonly toolOwners = new Map<string, Map<string, string>>();
   private readonly pendingApprovals = new Map<
     string,
     { resolve: (r: ApprovalResolution) => void; info: PendingApproval; needsAnswer: boolean; own?: boolean; always?: boolean; userInput?: UserInput }
@@ -96,8 +97,20 @@ export class RunApprovals {
     return this.pendingApprovals.has(this.approvalKey(runId, approvalId));
   }
 
-  handleCodexApproval({ runId, approvalId, kind, params, onceOnly }: CodexApprovalRequest): Promise<ApprovalResolution> {
-    const { detail, reason, toolName, needsAnswer, serverName } = codexApprovalPresentation(kind, params);
+  /** Claude's permission MCP sends only a tool id; the stream supplies its child owner. Either may arrive first. */
+  scopeTool(runId: string, toolCallId: string, subagentId: string): void {
+    const owners = this.toolOwners.get(runId) ?? new Map<string, string>();
+    owners.set(toolCallId, subagentId);
+    this.toolOwners.set(runId, owners);
+    const pending = this.pendingApprovals.get(this.approvalKey(runId, toolCallId));
+    if (pending) pending.info.subagentId = subagentId;
+  }
+
+  handleCodexApproval({ runId, approvalId, kind, params, onceOnly, subagentTitle, subagentId }: CodexApprovalRequest): Promise<ApprovalResolution> {
+    const presentation = codexApprovalPresentation(kind, params);
+    const { toolName, needsAnswer, serverName } = presentation;
+    const detail = subagentTitle ? `${subagentTitle}: ${presentation.detail}` : presentation.detail;
+    const reason = subagentTitle ? `${subagentTitle}${presentation.reason ? `: ${presentation.reason}` : ""}` : presentation.reason;
     // serverName is supplied by the provider transport, not the MCP tool or its input.
     const integration = this.deps.live.get(runId)?.internalMcp;
     const category = kind === "tool" && integration && serverName === integration.serverName ? "internal_app" : "external";
@@ -119,10 +132,12 @@ export class RunApprovals {
         }),
       needsAnswer,
       category,
+      undefined,
+      subagentId,
     );
   }
 
-  handleOpenCodeApproval({ runId, approvalId, kind, toolName, detail, input, onceOnly }: AcpApprovalRequest): Promise<ApprovalResolution> {
+  handleOpenCodeApproval({ runId, approvalId, kind, toolName, detail, input, onceOnly, subagentId }: AcpApprovalRequest): Promise<ApprovalResolution> {
     // OpenCode names its MCP tools `<server>_<tool>`.
     const integration = this.deps.live.get(runId)?.internalMcp;
     const category = integration && toolName.startsWith(`${integration.serverName}_`) ? "internal_app" : "external";
@@ -133,10 +148,13 @@ export class RunApprovals {
       () => this.deps.emit({ type: "approval.requested", runId, ts: Date.now(), approvalId, kind, toolName, input, ...(onceOnly ? { onceOnly } : {}) }),
       false,
       category,
+      undefined,
+      subagentId,
     );
   }
 
   async requestApproval(runId: string, approvalId: string, toolName: string, input: unknown): Promise<ApprovalResolution> {
+    const subagentId = this.toolOwners.get(runId)?.get(approvalId);
     if (toolName === "ExitPlanMode") return this.presentPlan(runId, input);
     if (toolName === "AskUserQuestion") {
       const questions = Array.isArray((input as Record<string, unknown>)?.["questions"]) ? ((input as Record<string, unknown>)["questions"] as Record<string, unknown>[]) : [];
@@ -147,6 +165,9 @@ export class RunApprovals {
         detail,
         () => this.deps.emit({ type: "approval.requested", runId, ts: Date.now(), approvalId, kind: "user_input", toolName: "question", input }),
         true,
+        "external",
+        undefined,
+        subagentId,
       );
     }
     const entry = this.deps.live.get(runId);
@@ -165,6 +186,8 @@ export class RunApprovals {
       () => this.deps.emit({ type: "approval.requested", runId, ts: Date.now(), approvalId, kind: "tool", toolName, input }),
       false,
       category,
+      undefined,
+      subagentId,
     );
     if (result.decision === "allow_for_run" && entry) (entry.toolsAllowed ??= new Set()).add(allowance);
     return result;
@@ -228,7 +251,7 @@ export class RunApprovals {
     const entry = this.deps.live.get(runId);
     const run = entry?.run ?? runs.get(this.deps.db, runId);
     if (!run) throw new Error("This run is no longer active.");
-    const decision = appActionPolicy(action, executionMode(run.mode, entry?.permissionGate ?? run.permissionMode), receiver);
+    const decision = appActionPolicy(action, executionMode(run.mode, run.permissionMode), receiver);
     if (decision === "allow" || (decision === "ask" && action !== "secret_input" && entry?.appActionsAllowed?.has(action))) return;
     if (decision === "block") {
       audit.record(this.deps.db, { actor: "openorc", action: "approval.deny", resourceType: "run", resourceId: runId, metadata: { tool: request.toolName, policy: "plan" } });
@@ -263,6 +286,7 @@ export class RunApprovals {
     /** App tools are allowed; external requests follow the mode; `confirm` asks the user, and `confirm_always` also survives a switch to Autonomous. */
     category: "internal_app" | "external" | "confirm" | "confirm_always" = "external",
     userInput?: UserInput,
+    subagentId?: string,
   ): Promise<ApprovalResolution> {
     const entry = this.deps.live.get(runId);
     if (this.deps.isClosing() || entry?.closingRequested || entry?.exiting) return Promise.resolve({ decision: "deny" });
@@ -271,7 +295,7 @@ export class RunApprovals {
       audit.record(this.deps.db, { actor: "openorc", action: "approval.deny", resourceType: "run", resourceId: runId, metadata: { approvalId, policy: "plan" } });
       return Promise.resolve({ decision: "deny" });
     }
-    const autonomous = run?.mode === "act" && (entry?.permissionGate ?? run.permissionMode) === "autonomous";
+    const autonomous = run?.mode === "act" && run.permissionMode === "autonomous";
     if (!needsAnswer && (category === "internal_app" || (category === "external" && autonomous))) {
       audit.record(this.deps.db, {
         actor: "openorc",
@@ -289,7 +313,7 @@ export class RunApprovals {
         ...(category === "confirm" || category === "confirm_always" ? { own: true } : {}),
         ...(category === "confirm_always" ? { always: true } : {}),
         ...(userInput ? { userInput } : {}),
-        info: { runId, taskId: run?.taskId ?? null, threadId: run?.threadId ?? null, approvalId, detail },
+        info: { runId, taskId: run?.taskId ?? null, threadId: run?.threadId ?? null, approvalId, detail, ...(subagentId ? { subagentId } : {}) },
       });
       announce();
       this.deps.invalidate(["inbox", "threads"]);
@@ -326,20 +350,7 @@ export class RunApprovals {
   }
 
   private permissionEntries(thread: Thread): LiveRun[] {
-    const team = Boolean(orchestration.getInstance(this.deps.db, thread.id));
-    return [...this.deps.live.values()].filter((entry) => {
-      if (entry.scope.thread?.id === thread.id) {
-        if (entry.scope.thread.projectId !== thread.projectId) throw new Error("The live lead no longer belongs to this project.");
-        return true;
-      }
-      if (!team || !entry.scope.task) return false;
-      const task = tasks.get(this.deps.db, entry.scope.task.id);
-      if (task?.threadId !== thread.id && entry.scope.task.threadId !== thread.id) return false;
-      if (!task || task.threadId !== thread.id || entry.scope.task.threadId !== thread.id || task.projectId !== thread.projectId || entry.scope.task.projectId !== thread.projectId) {
-        throw new Error("A live team assignment has inconsistent ownership. Close it before changing permissions.");
-      }
-      return true;
-    });
+    return [...this.deps.live.values()].filter((entry) => entry.scope.thread?.id === thread.id);
   }
 
   assertThreadPermissions(threadId: string): void {
@@ -376,22 +387,20 @@ export class RunApprovals {
 
   applyThreadPermissions(thread: Thread): ThreadPermissionState {
     const entries = this.permissionEntries(thread);
-    const team = Boolean(orchestration.getInstance(this.deps.db, thread.id));
-    const target = team && thread.mode === "plan" ? "review" : thread.permissionMode;
-    for (const entry of entries) this.applyEntryPermission(entry, target, team);
+    const target = thread.mode === "plan" ? "review" : thread.permissionMode;
+    for (const entry of entries) this.applyEntryPermission(entry, target);
     return this.threadPermissions(thread.id);
   }
 
-  private applyEntryPermission(entry: LiveRun, requested: Thread["permissionMode"], team: boolean): void {
+  private applyEntryPermission(entry: LiveRun, requested: Thread["permissionMode"]): void {
     const run = entry.run;
     const target = entry.orclingCeiling ? stricterPermission(requested, entry.orclingCeiling) : requested;
     if (entry.closingRequested || entry.exiting) return;
-    if (team) entry.permissionGate = target;
     if (run.mode !== "act") return;
     // Native bypass cannot be tightened. A gated process can stop app-level
     // automatic grants immediately, restoring its original native ceiling.
-    if (!team && target !== "autonomous" && target !== entry.providerPermissionMode) return;
-    const effective = team && target !== "autonomous" ? entry.providerPermissionMode : target;
+    if (target !== "autonomous" && target !== entry.providerPermissionMode) return;
+    const effective = target;
     this.updateStoredPermission(entry, effective);
     // Reopening the gate releases requests parked while a stricter policy awaited native restart.
     if (target === "autonomous") this.releaseAutomaticApprovals(run.id);
@@ -423,9 +432,11 @@ export class RunApprovals {
     return [...this.pendingApprovals.values()].map((p) => p.info);
   }
 
-  denyApprovals(runId: string): void {
+  denyApprovals(runId: string, subagentId?: string | null): void {
     for (const pending of [...this.pendingApprovals.values()]) {
-      if (pending.info.runId === runId) this.settleApproval(runId, pending.info.approvalId, { decision: "deny" }, "openorc");
+      if (pending.info.runId === runId && (subagentId === undefined || (pending.info.subagentId ?? null) === subagentId))
+        this.settleApproval(runId, pending.info.approvalId, { decision: "deny" }, "openorc");
     }
+    if (subagentId === undefined) this.toolOwners.delete(runId);
   }
 }

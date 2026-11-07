@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { expect, it, vi } from "vitest";
 
-const kept = vi.hoisted(() => new Map<string, string>([["home.filter", "orc"]]));
+const kept = vi.hoisted(() => new Map<string, string>([["home.filter", "archived"]]));
 vi.mock("../client", async () => {
   const { ScratchStore } = await import("../scratch-store");
   return { storage: new ScratchStore({ getString: (key) => kept.get(key), set: (key, value) => void kept.set(key, value), remove: (key) => void kept.delete(key) }) };
@@ -15,13 +15,15 @@ const shown = async () => {
   return filterChoice(renderHook(useHomeFilter).result.current);
 };
 
-it("forgets a filter chosen in the demo when it ends, back to the one kept", async () => {
-  expect(await shown()).toBe("orc");
+it("lists every thread at first, forgetting the archive filter Resolved replaced", async () => {
+  expect(await shown()).toBe("all");
+  expect(kept.has("home.filter")).toBe(false);
+});
+
+it("forgets the pinned filter chosen in the demo when it ends", async () => {
   storage.scratch(true);
   chooseFilter("pinned");
   expect(await shown()).toBe("pinned");
-  chooseFilter("archived");
   storage.scratch(false);
-  expect(await shown()).toBe("orc");
-  expect(kept.get("home.filter")).toBe("orc");
+  expect(await shown()).toBe("all");
 });

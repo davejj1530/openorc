@@ -5,14 +5,13 @@
  */
 import DiscussionScene from "./hero/DiscussionScene.astro";
 import HandoffScene from "./hero/HandoffScene.astro";
-import TeamScene from "./hero/TeamScene.astro";
 import WorkflowScene from "./hero/WorkflowScene.astro";
 
 const scenes = [
   {
     id: "handoff",
     label: "Across threads",
-    alt: "Sample OpenOrc project with two threads working side by side. Asked to build the billing page, Claude Code notices that the Plans migration thread is changing the plan data and messages it. Codex answers mid-migration with the new shape from its unmerged work and keeps going, and Claude Code builds the page against it.",
+    alt: "Sample OpenOrc project with two threads working side by side. Asked to build the billing page, Claude Code notices that the Plans migration thread is changing the plan data and messages it. Codex answers mid-migration with the new shape from its unmerged work and keeps going, and Claude Code builds the page against it. In the sidebar, each thread says what its agent is doing.",
     Scene: HandoffScene,
   },
   {
@@ -22,15 +21,9 @@ const scenes = [
     Scene: DiscussionScene,
   },
   {
-    id: "team",
-    label: "Agent team · Beta",
-    alt: "Agent teams are in Beta and enabled for new profiles. In this sample team conversation replacing dashboard polling with live updates, the lead sets one event contract, the server member adds a version field and tells the client member directly, and the reviewer, reading both sides, catches that the server sends seconds while the client expects milliseconds. The server fixes it and the lead hands it over for review.",
-    Scene: TeamScene,
-  },
-  {
     id: "workflow",
     label: "Plan to commit",
-    alt: "Sample OpenOrc journey. A question about app performance becomes three tasks. Inside the first task the user asks GPT-6-Astra and Opus 5.5 for their views, asks GPT-6-Astra to build it, and a new thread finishes with a change ready for review.",
+    alt: "Sample OpenOrc journey. A question about app performance becomes a table of findings. Codex asks how to take them on, the sidebar shows the thread waiting on the answer, and the answer becomes three tasks. Inside the first task the user asks GPT-6-Astra and Opus 5.5 for their views, asks GPT-6-Astra to build it, and a new thread finishes with a change ready for review.",
     Scene: WorkflowScene,
   },
 ];

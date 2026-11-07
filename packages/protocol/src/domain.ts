@@ -1,7 +1,9 @@
 import { z } from "zod";
-import { AgentKind, BackgroundCommand, Usage } from "./events.js";
+import { CloudThreadState } from "./cloud.js";
+import { ActivityRecovery, AgentKind, BackgroundCommand, SubagentStatus, Usage } from "./events.js";
+import { ExecutionTarget } from "./execution-target.js";
 import { HarnessId } from "./harness.js";
-import { ExecutionTarget, TeamRevision } from "./orchestration.js";
+import { MoveRefusal, ThreadMoving, ThreadOwner } from "./thread-owner.js";
 
 /** Domain records as the renderer sees them. Columns are nullable, not optional. */
 
@@ -40,6 +42,8 @@ export const Project = z.object({
   settings: ProjectSettings,
   createdAt: z.number(),
   updatedAt: z.number(),
+  /** On the cloud brain, a project that is the Mac's copy: when it last took the Mac's branch or heard GitHub's. */
+  copy: z.object({ syncedAt: z.number() }).optional(),
 });
 export type Project = z.infer<typeof Project>;
 
@@ -51,6 +55,8 @@ export const WorkspaceMode = z.enum(["worktree", "current"]);
 export type WorkspaceMode = z.infer<typeof WorkspaceMode>;
 
 export const Task = z.object({
+  /** Saved work from the removed teams feature; execution and workspace writes are unavailable. */
+  retiredTeam: z.boolean().optional(),
   id: z.string(),
   projectId: z.string(),
   title: z.string(),
@@ -79,6 +85,8 @@ export const Task = z.object({
   createdAt: z.number(),
   updatedAt: z.number(),
   completedAt: z.number().nullable(),
+  /** Set by the Mac's router on a task its cloud brain holds, as on threads. Never stored. */
+  owner: ThreadOwner.optional(),
 });
 export type Task = z.infer<typeof Task>;
 
@@ -131,14 +139,21 @@ export const Thread = z.object({
   importedFrom: z.string().nullable(),
   /** The Orcling who works in this conversation: its own, or one chosen to work here. */
   orclingId: z.string().nullable().optional(),
-  /** The thread that started this one with thread_start, working in the same folder. */
+  /** The thread this one sits under: a thread started in its folder, by a person or with thread_start, or a subagent of its agent. */
   parentThreadId: z.string().nullable().optional(),
+  parentRelation: z.enum(["started", "subagent"]).nullable().optional(),
+  /** Started with thread_start, so it can't start threads of its own and counts toward its parent's limit. */
+  startedByAgent: z.boolean().optional(),
   createdAt: z.number(),
   updatedAt: z.number(),
   lastActivityAt: z.number(),
   archivedAt: z.number().nullable(),
 });
 export type Thread = z.infer<typeof Thread>;
+
+export function isSubagentThread(thread: Pick<Thread, "parentRelation"> | null | undefined): boolean {
+  return thread?.parentRelation === "subagent";
+}
 
 export const ThreadActivity = z.enum(["idle", "running", "waiting"]);
 export type ThreadActivity = z.infer<typeof ThreadActivity>;
@@ -151,6 +166,8 @@ export type ThreadActivity = z.infer<typeof ThreadActivity>;
 export const ThreadSession = z.object({
   status: z.enum(["live", "idle", "lost", "error"]),
   message: z.string().nullable(),
+  /** The way back the failed run named, such as a usage limit. */
+  recovery: ActivityRecovery.optional(),
 });
 export type ThreadSession = z.infer<typeof ThreadSession>;
 
@@ -166,19 +183,33 @@ export type QueuedMessage = z.infer<typeof QueuedMessage>;
 
 /** A thread with what is happening on it right now, for lists and the sidebar. */
 /**
- * A conversation whose copy is on no branch, such as a pull request's copy under review. Outside a team, which
- * publishes through a branch of its own, nothing in it is committed, pushed or opened as a pull request.
+ * A conversation whose copy is on no branch, such as a pull request's copy under review.
+ * These copies cannot be committed, pushed or opened as a pull request.
  */
 export function isDetachedCopy(thread: Pick<Thread, "worktreePath" | "branch">): boolean {
   return thread.worktreePath !== null && thread.branch === null;
 }
 
 export const ThreadSummary = Thread.extend({
+  /** Direct children omitted from this list response, after paging and visibility exceptions. */
+  hiddenChildren: z.number().int().nonnegative().optional(),
+  /** Root ordering includes activity in children omitted from this page. */
+  treeActivityAt: z.number().optional(),
+  subagent: z
+    .object({
+      status: SubagentStatus,
+      agentType: z.string().nullable(),
+      toolCallId: z.string().nullable(),
+      startedAt: z.number(),
+      endedAt: z.number().nullable(),
+      stoppable: z.boolean(),
+    })
+    .optional(),
   /** Whether any execution has started; absent in older cached summaries. */
   hasStarted: z.boolean().optional(),
   /** Saved team ownership; absent in older cached summaries. */
   teamInstanceId: z.string().nullable().optional(),
-  /** One provider per saved team member, or the solo thread provider; absent in older summaries. */
+  /** The thread's provider; older cached summaries can include multiple saved team providers. */
   agents: z.array(AgentKind).optional(),
   activity: ThreadActivity,
   /** Commands the agent left running after its turn, such as a dev server; absent in older cached summaries. */
@@ -188,6 +219,14 @@ export const ThreadSummary = Thread.extend({
   /** Context use on the latest turn, when the agent reported it. */
   context: z.object({ used: z.number().int(), window: z.number().int().nullable() }).nullable(),
   queued: z.array(QueuedMessage),
+  /** Where a cloud thread's sandbox stands; absent for threads that run on this Mac. */
+  cloud: CloudThreadState.nullable().optional(),
+  /** Which brain owns a row another host merged in; absent when the host that answered owns it. */
+  owner: ThreadOwner.optional(),
+  /** Set while the thread relocates between brains; it refuses writes until then. */
+  moving: ThreadMoving.nullable().optional(),
+  /** The last move this Mac asked for, when it was refused; phones from before ignore it. */
+  moveRefused: MoveRefusal.nullable().optional(),
   /**
    * When the agent on this thread's active run last produced an event, epoch ms.
    * Null when no run is live, because a thread that is not running cannot stall.
@@ -204,7 +243,7 @@ export const ThreadSummary = Thread.extend({
    */
   lastAgentEventAt: z.number().nullable(),
   /**
-   * The run whose events stream for this thread now: its own live run, or a team's most recently active attempt.
+   * The run whose events stream for this thread now.
    * The renderer already holds a live run's transcript, so a row can say what the agent is doing from it.
    * Absent in older cached summaries.
    */
@@ -319,6 +358,7 @@ export const ScheduleFiringRecord = ScheduleFiringView.extend({
 export type ScheduleFiringRecord = z.infer<typeof ScheduleFiringRecord>;
 
 export const Schedule = ScheduleLaunchSnapshot.extend({
+  retiredTeam: z.boolean().optional(),
   id: z.string(),
   version: z.number().int().positive(),
   enabled: z.boolean(),
@@ -328,7 +368,6 @@ export const Schedule = ScheduleLaunchSnapshot.extend({
   createdAt: z.number(),
   updatedAt: z.number(),
   /** Read-only projections; the persisted target always pins the original revision. */
-  team: z.object({ revision: TeamRevision, archived: z.boolean() }).nullable().optional(),
   lastFire: ScheduleFiringView.nullable().optional(),
 });
 export type Schedule = z.infer<typeof Schedule>;
@@ -350,8 +389,6 @@ export type AppLook = z.infer<typeof AppLook>;
  * default would also fill every partial `app.settings.set` and reset the setting it names.
  */
 export const AppSettings = z.object({
-  /** Persisted legacy key; team execution is now Beta and enabled for new profiles. */
-  experimentalTeamExecution: z.boolean(),
   notifications: z.boolean(),
   sound: z.boolean(),
   /** Idle days before a thread is marked done on its own; null keeps threads active. */
@@ -371,6 +408,8 @@ export const AppSettings = z.object({
   idleProcessMinutes: z.number().int().positive().nullable(),
   /** Whether Claude Code connects the MCP servers from the user's own Claude configuration in threads. Off, only OpenOrc's tools load and the CLI starts about two seconds sooner. */
   claudeUserMcpServers: z.boolean(),
+  /** Whether a conversation stopped by its Claude account's usage limit goes on with the enabled account that has the most 5-hour usage left. */
+  claudeAccountAutoSwitch: z.boolean(),
 });
 export type AppSettings = z.infer<typeof AppSettings>;
 
@@ -522,6 +561,19 @@ export const Commit = z.object({
 });
 export type Commit = z.infer<typeof Commit>;
 
+/** A run of commits for the work view: from `from` (or where `to` left `base`) up to `to`. */
+export interface CommitRange {
+  /** Newest first. */
+  commits: Commit[];
+  /** Commits in the range past `limit`. */
+  more: number;
+  /** The commit the range starts after: the old tip a push moved, or the base commit the branch left. */
+  start: Commit | null;
+  /** The branch `start` is on when it is where the branch left its base: the base asked for, or the default. */
+  base: string | null;
+  stat: { files: number; added: number; removed: number } | null;
+}
+
 /** What Push would publish from a workspace, judged by what origin was last seen to have. */
 export const PushState = z.object({
   /** The branch Push publishes; null when there is none. */
@@ -538,32 +590,6 @@ export const PushState = z.object({
   busy: z.boolean(),
 });
 export type PushState = z.infer<typeof PushState>;
-
-/** A member's effective saved choice; every current member has an allocation. */
-export const TeamMemberAvatarChoice = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("default"), index: z.number().int().nonnegative() }).strict(),
-  z
-    .object({
-      kind: z.literal("custom"),
-      path: z
-        .string()
-        .min(1)
-        .max(4096)
-        .refine((value) => !value.includes("\0"), "Avatar paths cannot contain null bytes."),
-    })
-    .strict(),
-]);
-export type TeamMemberAvatarChoice = z.infer<typeof TeamMemberAvatarChoice>;
-
-export const TeamMemberAvatar = z
-  .object({
-    teamId: z.string().min(1),
-    memberKey: z.string().min(1),
-    avatar: TeamMemberAvatarChoice,
-    updatedAt: z.number().int().nonnegative(),
-  })
-  .strict();
-export type TeamMemberAvatar = z.infer<typeof TeamMemberAvatar>;
 
 /** A skill discovered for one harness in one project. Its `name` is the harness's invocation ID. */
 export const AgentSkill = z.object({

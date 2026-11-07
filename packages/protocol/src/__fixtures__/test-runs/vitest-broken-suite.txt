@@ -1,0 +1,25 @@
+
+ RUN  v4.1.11 /private/tmp/test-run-fixtures/vitest-broken
+
+ ✓ src/ok.test.ts (1 test) 1ms
+ ❯ src/broken.test.ts (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/broken.test.ts [ src/broken.test.ts ]
+Error: Cannot find module './missing-module' imported from /private/tmp/test-run-fixtures/vitest-broken/src/broken.test.ts
+ ❯ src/broken.test.ts:2:1
+      1| import { expect, it } from "vitest";
+      2| import { total } from "./missing-module";
+       | ^
+      3| it("totals", () => expect(total()).toBe(1));
+      4|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 passed (1)
+   Start at  12:14:05
+   Duration  106ms (transform 19ms, setup 0ms, import 15ms, tests 1ms, environment 0ms)
+

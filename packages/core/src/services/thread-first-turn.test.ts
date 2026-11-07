@@ -1,18 +1,18 @@
+import { RunHandle } from "@openorc/agents";
+import { Db, LedgerWriter, checkpoints, projects, threads } from "@openorc/db";
+import { commitAll, git, treeHash } from "@openorc/git";
+import { type Project, type Run, type RunSpec, type ThreadCheckpoint } from "@openorc/protocol";
 import { mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { RunHandle } from "@openorc/agents";
-import { Db, LedgerWriter, checkpoints, orchestration, projects, threads } from "@openorc/db";
-import { commitAll, git, treeHash } from "@openorc/git";
-import { DEFAULT_TEAM_LIMITS, type Project, type Run, type RunSpec, type ThreadCheckpoint } from "@openorc/protocol";
 import { FrameCoalescer } from "../frames.js";
 import { RunService, type StartRunInput } from "./runs.js";
 import { ShellEnvironment } from "./shell-environment.js";
-import { ThreadService } from "./threads.js";
 import { threadTurnChanges } from "./thread-turn-changes.js";
-import { WorkspaceService } from "./workspace.js";
+import { ThreadService } from "./threads.js";
 import { WorkspaceWriters } from "./workspace-writers.js";
+import { WorkspaceService } from "./workspace.js";
 
 let root: string;
 let dataDir: string;
@@ -191,22 +191,6 @@ it("keeps non-Git conversations usable without creating checkpoints", async () =
   await complete(run);
   expect(start).toHaveBeenCalledOnce();
   expect(checkpoints.listForThread(db, input.scope.thread!.id)).toEqual([]);
-});
-
-it("leaves team starting trees to the team lifecycle", async () => {
-  const team = orchestration.save(db, {
-    projectId: project.id,
-    expectedRevisionId: null,
-    draft: {
-      name: "Team",
-      limits: DEFAULT_TEAM_LIMITS,
-      discussion: { ambientRounds: 0, peerFollowUps: 0, mentionOnly: [] },
-      members: [{ key: "lead", name: "Lead", managerKey: null, responsibility: "Coordinate", settings: { agent: "codex", model: "fixture", effort: null, fastMode: false } }],
-    },
-  });
-  orchestration.createInstance(db, { threadId: input.scope.thread!.id, teamRevisionId: team.revision.id });
-  await service.start(input);
-  expect(seenAtLaunch[0]).toEqual([]);
 });
 
 it("captures the conversation's worktree instead of the project checkout", async () => {

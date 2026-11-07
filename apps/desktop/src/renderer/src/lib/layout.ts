@@ -1,28 +1,30 @@
-import { create } from "zustand";
-import { WORKSPACE_ID } from "@openorc/protocol";
+import { liveSidebarFold, pruneThreadFolds, toggleSidebarFold, toggleThreadTree, type PanelTool } from "@openorc/client";
 import type { RpcParams } from "@openorc/protocol";
+import { WORKSPACE_ID } from "@openorc/protocol";
+import { create } from "zustand";
 import type { FileReference } from "../../../shared/file-reference";
-import { toggleSidebarFold, type PanelTool, type SidebarFilter } from "@openorc/client";
+import { withFileScope } from "./file-scope";
 
 /** The shared panel tools, and the desktop's own Device panel. */
 export type PanelTab = PanelTool | "device";
-/** One turn's saved diff, opened from its change card: a team attempt's checkpoint or a thread turn's. */
-export type ChangeSelection = ({ kind: "team" } & Omit<RpcParams<"orchestration.turnChanges">, "includePatch">) | ({ kind: "thread" } & Omit<RpcParams<"threads.turnChanges">, "includePatch">);
-export type FileSelection = FileReference & { scope: RpcParams<"files.read">["scope"] };
+/** One turn's saved diff, opened from its change card. */
+export type ChangeSelection = { kind: "thread" } & Omit<RpcParams<"threads.turnChanges">, "includePatch">;
+export type FileSelection = FileReference & { scope: RpcParams<"files.read">["scope"]; column?: number; endColumn?: number };
 export type WorkspaceChangesTarget = { kind: "thread" | "project"; id: string };
 export type WorkspaceChangesRequest = WorkspaceChangesTarget & { comparison: "base" | "head"; commit: boolean; requestId: number };
 
-/** A screen the sidebar can list. The ones the user hides wait under More; Inbox sits in the window's header instead. */
-export type SidebarScreen = "tasks" | "pulls" | "scheduled" | "orchestration" | "memory";
+/** Which side of the conversation the shared panel docks on. */
+export type PanelSide = "left" | "right";
 
-/** Screens most people open rarely start under More, until the user lists them. */
-const DEFAULT_HIDDEN_SCREENS: SidebarScreen[] = ["pulls", "orchestration", "memory"];
+/** A screen the sidebar's footer reaches. Inbox sits in the window's header instead. */
+export type SidebarScreen = "tasks" | "pulls" | "scheduled";
 
 interface LayoutState {
   sidebarOpen: boolean;
   sidebarWidth: number;
   panelOpen: boolean;
   panelWidth: number;
+  panelSide: PanelSide;
   panelTab: PanelTab;
   panelRequest: { tab: PanelTab } | null;
   selectedChanges: ChangeSelection | null;
@@ -41,13 +43,12 @@ interface LayoutState {
   panelThreadId: string | null;
   toggleThreadPanel: (id: string) => void;
   openThreadPanel: (id: string, tab: PanelTab) => void;
-  sidebarFilter: SidebarFilter;
-  /** Only the pinned active threads. Never persisted: a relaunch lists them all again. */
+  /** Only the pinned threads. Never persisted: a relaunch lists them all again. */
   pinnedOnly: boolean;
-  /** Screens the sidebar leaves under More. */
-  hiddenScreens: SidebarScreen[];
   /** Sidebar sections the user folded: namespaced project/pinned keys, plus opt-in snoozed-open keys. */
   collapsed: string[];
+  revealThreads: (ancestors: readonly string[]) => void;
+  pruneThreadFolds: (missing: ReadonlySet<string>) => void;
   /**
    * Where each surface's preview was last pointed, keyed the way the panel
    * keys its panes. A dev server's port belongs to the project, not to us, so
@@ -60,13 +61,11 @@ interface LayoutState {
   setSidebarWidth: (px: number) => void;
   setPanel: (open: boolean, tab?: PanelTab) => void;
   setPanelWidth: (px: number) => void;
+  togglePanelSide: () => void;
   setProject: (id: string | null) => void;
-  /** Choosing a filter clears pinned-only unless it is asked for again. */
-  setSidebarFilter: (filter: SidebarFilter, pinnedOnly?: boolean) => void;
-  /** Orcmode on, or back to every active thread. */
-  toggleOrcMode: () => void;
-  setScreenShown: (screen: SidebarScreen, shown: boolean) => void;
+  setPinnedOnly: (pinnedOnly: boolean) => void;
   toggleCollapsed: (key: string) => void;
+  toggleThreadChildren: (id: string, expanded: boolean) => void;
   rememberPreviewUrl: (key: string, url: string) => void;
   setPanelExpanded: (expanded: boolean) => void;
 }
@@ -78,7 +77,7 @@ export const limits = {
 
 const KEY = "openorc.layout";
 
-function read(): Partial<Pick<LayoutState, "sidebarOpen" | "sidebarWidth" | "panelOpen" | "panelWidth" | "projectId" | "sidebarFilter" | "hiddenScreens" | "collapsed" | "previewUrls">> {
+function read(): Partial<Pick<LayoutState, "sidebarOpen" | "sidebarWidth" | "panelOpen" | "panelWidth" | "panelSide" | "projectId" | "collapsed" | "previewUrls">> {
   try {
     return JSON.parse(localStorage.getItem(KEY) ?? "{}") as Partial<LayoutState>;
   } catch {
@@ -95,9 +94,8 @@ function persist(s: LayoutState): void {
         sidebarWidth: s.sidebarWidth,
         panelOpen: s.panelOpen,
         panelWidth: s.panelWidth,
+        panelSide: s.panelSide,
         projectId: s.projectId,
-        sidebarFilter: s.sidebarFilter,
-        hiddenScreens: s.hiddenScreens,
         collapsed: s.collapsed,
         previewUrls: s.previewUrls,
       }),
@@ -116,7 +114,20 @@ export function applyWidths(sidebar: number, panel: number): void {
 
 const clamp = (v: number, { min, max }: { min: number; max: number }) => Math.min(max, Math.max(min, v));
 
-/** The three-column frame: sidebar, main, and an optional panel. Sizes persist across launches. */
+/** The three-column frame: sidebar, main, and an optional panel on either side of main. Sizes and the panel's side persist across launches. */
+function threadFoldActions(get: () => LayoutState, commit: (patch: Partial<LayoutState>) => void): Pick<LayoutState, "revealThreads" | "pruneThreadFolds"> {
+  const save = (collapsed: string[]) => {
+    if (collapsed.length !== get().collapsed.length) commit({ collapsed });
+  };
+  return {
+    revealThreads: (ancestors) => {
+      const closed = new Set(ancestors.map((id) => `thread-closed:${id}`));
+      save(get().collapsed.filter((key) => !closed.has(key)));
+    },
+    pruneThreadFolds: (missing) => save(pruneThreadFolds(get().collapsed, missing)),
+  };
+}
+
 export const useLayout = create<LayoutState>((set, get) => {
   const saved = read();
   const initial = {
@@ -124,6 +135,7 @@ export const useLayout = create<LayoutState>((set, get) => {
     sidebarWidth: clamp(saved.sidebarWidth ?? limits.sidebar.default, limits.sidebar),
     panelOpen: saved.panelOpen ?? false,
     panelWidth: clamp(saved.panelWidth ?? limits.panel.default, limits.panel),
+    panelSide: saved.panelSide === "left" ? ("left" as const) : ("right" as const),
     panelTab: "newtab" as PanelTab,
     panelRequest: null,
     selectedFile: null,
@@ -131,10 +143,8 @@ export const useLayout = create<LayoutState>((set, get) => {
     workspaceChanges: null,
     projectId: saved.projectId === undefined ? WORKSPACE_ID : saved.projectId,
     panelThreadId: null,
-    sidebarFilter: (["orc", "archived"] as const).find((filter) => filter === saved.sidebarFilter) ?? ("active" as const),
     pinnedOnly: false,
-    hiddenScreens: saved.hiddenScreens ?? DEFAULT_HIDDEN_SCREENS,
-    collapsed: saved.collapsed ?? ["snoozed"],
+    collapsed: (saved.collapsed ?? []).filter(liveSidebarFold),
     previewUrls: saved.previewUrls ?? {},
     panelExpanded: false,
   };
@@ -153,7 +163,6 @@ export const useLayout = create<LayoutState>((set, get) => {
     openChanges: (selectedChanges) => {
       let threadSelection: Partial<Pick<LayoutState, "panelThreadId">> = {};
       if (selectedChanges.kind === "thread") threadSelection = { panelThreadId: selectedChanges.id };
-      else if (!selectedChanges.taskId) threadSelection = { panelThreadId: selectedChanges.threadId };
       commit({
         selectedChanges,
         panelOpen: true,
@@ -177,22 +186,22 @@ export const useLayout = create<LayoutState>((set, get) => {
       if (request?.requestId === requestId) set({ workspaceChanges: { ...request, commit: false } });
     },
     openFile: (selectedFile) =>
-      commit({ selectedFile, panelOpen: true, panelTab: "file", panelRequest: { tab: "file" }, ...(selectedFile.scope.kind === "thread" ? { panelThreadId: selectedFile.scope.id } : {}) }),
+      withFileScope(selectedFile.scope, () =>
+        commit({ selectedFile, panelOpen: true, panelTab: "file", panelRequest: { tab: "file" }, ...(selectedFile.scope.kind === "thread" ? { panelThreadId: selectedFile.scope.id } : {}) }),
+      ),
     openFiles: (threadId) => commit({ selectedFile: null, panelOpen: true, panelTab: "file", panelRequest: { tab: "file" }, ...(threadId ? { panelThreadId: threadId } : {}) }),
     setPanelWidth: (px) => commit({ panelWidth: clamp(px, limits.panel) }),
+    togglePanelSide: () => commit({ panelSide: get().panelSide === "left" ? "right" : "left" }),
     setProject: (projectId) => commit({ projectId }),
     openThreadPanel: (id, tab) => commit({ panelThreadId: id, panelOpen: true, panelTab: tab, panelRequest: { tab } }),
     toggleThreadPanel: (id) => {
       const open = get().panelThreadId !== id || !get().panelOpen;
       commit({ panelThreadId: id, panelOpen: open, ...(open ? {} : { panelExpanded: false }) });
     },
-    setSidebarFilter: (sidebarFilter, pinnedOnly = false) => commit({ sidebarFilter, pinnedOnly }),
-    toggleOrcMode: () => commit({ sidebarFilter: get().sidebarFilter === "orc" ? "active" : "orc", pinnedOnly: false }),
-    setScreenShown: (screen, shown) => {
-      const others = get().hiddenScreens.filter((hidden) => hidden !== screen);
-      commit({ hiddenScreens: shown ? others : [...others, screen] });
-    },
+    setPinnedOnly: (pinnedOnly) => commit({ pinnedOnly }),
     toggleCollapsed: (key) => commit({ collapsed: toggleSidebarFold(get().collapsed, key) }),
+    toggleThreadChildren: (id, expanded) => commit({ collapsed: toggleThreadTree(get().collapsed, id, expanded) }),
+    ...threadFoldActions(get, commit),
     // Bounded because the key is a surface id and threads are unbounded; the
     // oldest entries are the ones whose thread the reader has stopped opening.
     rememberPreviewUrl: (key, url) => {

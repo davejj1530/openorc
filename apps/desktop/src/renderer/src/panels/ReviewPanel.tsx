@@ -1,56 +1,15 @@
-import { lazy, Suspense, useState, type ReactNode } from "react";
+import { patchStat, relativeTime } from "@openorc/client";
 import type { Project, Task } from "@openorc/protocol";
-import { Send } from "../components/icons";
-import { Button, Empty, TextButton } from "../components/ui";
+import { lazy, Suspense, useState, type ReactNode } from "react";
 import { DiffStat, PanelBar, PanelBarMeta, PanelNotice } from "../components/PanelBar";
+import { Button, Empty } from "../components/ui";
+import { useRpc, useRpcMutation } from "../lib/client";
+import { cn } from "../lib/cn";
 import { FileRows } from "./FileRows";
 import { ReviewCommentList } from "./ReviewCommentList";
-import { cn } from "../lib/cn";
-import { useRpc, useRpcMutation } from "../lib/client";
-import { patchStat, relativeTime } from "@openorc/client";
-import { taskPublicationBlockedReason } from "../lib/task-review-availability";
 import { ReviewPublication } from "./ReviewPublication";
-import { useTaskReviewComments } from "./useTaskReviewComments";
-import { TeamTaskAdmissions, TeamTaskIdentity } from "../components/TeamTaskStart";
-import { openTask, openThread } from "../lib/router";
-import { useLayout } from "../lib/layout";
 
 const DiffView = lazy(() => import("../components/DiffView").then((m) => ({ default: m.DiffView })));
-
-function blockedReviewAction(input: { team?: { ownerDeletedAt?: number | null; threadId: string } | null; taskId: string; ownershipError: boolean; retry: () => void }): ReactNode {
-  const { team, taskId, ownershipError, retry } = input;
-  if (team) {
-    return (
-      <>
-        {" "}
-        <TextButton
-          type="button"
-          underline
-          onClick={() => {
-            if (team.ownerDeletedAt) {
-              openTask(taskId, "chat");
-              return;
-            }
-            openThread(team.threadId);
-            useLayout.getState().setPanel(true, "changes");
-          }}
-        >
-          {team.ownerDeletedAt ? "Conversation deleted · open team activity" : "Open team changes"}
-        </TextButton>
-      </>
-    );
-  }
-  if (ownershipError)
-    return (
-      <>
-        {" "}
-        <TextButton type="button" underline onClick={retry}>
-          Retry
-        </TextButton>
-      </>
-    );
-  return null;
-}
 
 export { taskBaseLabel } from "../lib/task-review-availability";
 
@@ -60,40 +19,18 @@ export function ReviewPanel({ task, project }: { task: Task; project: Project })
 }
 
 function TaskReview({ task, project }: { task: Task; project: Project }) {
-  const ownership = useRpc("orchestration.taskState", { taskId: task.id }, { enabled: Boolean(task.threadId) });
-  const exportInfo = ownership.data?.export;
-  const blockedReason = taskPublicationBlockedReason({ hasOwner: Boolean(task.threadId), team: ownership.data, isError: ownership.isError, isPending: ownership.isPending });
-  const exportNote = exportInfo?.allowed
-    ? `Commit publishes this assignment’s files on its own branch, ${exportInfo.branch}, separate from the integrated team branch. Inherited uncommitted input is part of it, as shown below.`
-    : null;
+  const blockedReason = task.retiredTeam ? "This item is no longer available." : null;
   const [sinceReviewed, setSinceReviewed] = useState(false);
   const diff = useRpc("review.diff", { taskId: task.id, sinceReviewed });
   const markReviewed = useRpcMutation("review.markReviewed");
   const [notice, setNotice] = useState<string | null>(null);
-  const team = ownership.data;
-  const {
-    allComments,
-    commented,
-    draft,
-    setDraft,
-    submitDraft,
-    remove,
-    commentState,
-    selection,
-    changeSelection,
-    teamReview,
-    pendingIds,
-    error: commentError,
-  } = useTaskReviewComments({
-    taskId: task.id,
-    team,
-    ownershipUnavailable: Boolean(task.threadId && (ownership.isPending || ownership.isError)),
-    blockedReason,
-  });
+  const comments = useRpc("review.comments.list", { taskId: task.id });
+  const allComments = comments.data ?? [];
+  const commented = new Set(allComments.map((comment) => comment.path));
+  const commentError = comments.error;
   const files = diff.data?.files ?? [];
   const patch = diff.data?.patch ?? "";
   const stat = patchStat(patch);
-  const blockedAction = blockedReviewAction({ team, taskId: task.id, ownershipError: ownership.isError, retry: () => void ownership.refetch() });
   let diffContent: ReactNode = null;
   if (diff.error) diffContent = <Empty title="Could not read the diff">{diff.error.message}</Empty>;
   else if (!diff.isLoading && patch.trim().length === 0) {
@@ -108,25 +45,12 @@ function TaskReview({ task, project }: { task: Task; project: Project }) {
         {files.length > 1 || !/^@@ /m.test(patch) ? <FileRows files={files} commented={commented} /> : null}
         <div className="flex-1 min-h-0">
           <Suspense fallback={null}>
-            <DiffView
-              patch={patch}
-              comments={allComments}
-              draft={draft}
-              onRequestComment={team ? setDraft : undefined}
-              onSubmitDraft={submitDraft}
-              onCancelDraft={() => setDraft(null)}
-              onRemoveComment={remove}
-              commentState={team || (task.threadId && (ownership.isPending || ownership.isError)) ? commentState : undefined}
-            />
+            <DiffView patch={patch} comments={allComments} />
           </Suspense>
         </div>
       </>
     );
   }
-  let submitLabel = `Send ${selection.length} selected comment${selection.length === 1 ? "" : "s"}`;
-  if (teamReview.working) submitLabel = "Submitting…";
-  else if (teamReview.pending) submitLabel = "Retry review request";
-
   return (
     <div className="h-full flex flex-col min-h-0">
       <PanelBar
@@ -140,15 +64,10 @@ function TaskReview({ task, project }: { task: Task; project: Project }) {
           </>
         }
       >
-        <ReviewPublication task={task} project={project} hasChanges={files.length > 0} blockedReason={blockedReason} exportBranch={exportInfo?.branch} onNotice={setNotice} />
+        <ReviewPublication task={task} project={project} hasChanges={files.length > 0} blockedReason={blockedReason} onNotice={setNotice} />
       </PanelBar>
-      {!blockedReason && exportNote ? <PanelNotice>{exportNote}</PanelNotice> : null}
-      {blockedReason ? (
-        <PanelNotice>
-          {blockedReason}
-          {blockedAction}
-        </PanelNotice>
-      ) : null}
+
+      {blockedReason ? <PanelNotice>{blockedReason}</PanelNotice> : null}
       <div className="h-9 shrink-0 flex items-center gap-2 pl-3.5 pr-2.5 pb-1 text-sm text-ink-4">
         <Button
           size="sm"
@@ -174,47 +93,14 @@ function TaskReview({ task, project }: { task: Task; project: Project }) {
       </div>
       {notice ? <PanelNotice>{notice}</PanelNotice> : null}
       <div className="flex-1 min-h-0 flex flex-col">{diffContent}</div>
-      {allComments.length > 0 || Boolean(team && teamReview.pending) ? (
+      {allComments.length > 0 ? (
         <div className="shrink-0">
           <div className="max-h-48 overflow-y-auto">
-            <ReviewCommentList
-              comments={allComments}
-              onRemove={remove}
-              commentState={team ? commentState : undefined}
-              selectedIds={team ? selection : undefined}
-              onSelect={changeSelection}
-              selectionLocked={Boolean(teamReview.pending) || teamReview.working}
-            />
+            <ReviewCommentList comments={allComments} />
           </div>
-          {team ? (
-            <div className="px-5 pb-3 space-y-2">
-              <TeamTaskIdentity task={team} />
-              <div className="flex justify-end">
-                <Button
-                  disabled={teamReview.working || (!teamReview.pending && (!team.review.allowed || ownership.isError || selection.length === 0))}
-                  title={teamReview.pending ? undefined : (team.review.reason ?? undefined)}
-                  onClick={() => void teamReview.submit(selection)}
-                >
-                  <Send size={14} />
-                  {submitLabel}
-                </Button>
-              </div>
-              {!team.review.allowed && !teamReview.pending && team.review.reason ? <p className="text-sm text-ink-3">{team.review.reason}</p> : null}
-              {teamReview.pending ? <p className="text-xs text-ink-3">The saved request keeps these {pendingIds?.length ?? 0} comments. New comments are separate.</p> : null}
-              {teamReview.error ? (
-                <p role="alert" className="text-sm text-bad break-words">
-                  {teamReview.error}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
         </div>
       ) : null}
-      {team?.admissions.some((item) => item.kind === "review") ? (
-        <div className="shrink-0 max-h-40 overflow-y-auto px-5 py-2">
-          <TeamTaskAdmissions task={team} kind="review" />
-        </div>
-      ) : null}
+
       {commentError ? (
         <PanelNotice role="alert" tone="bad">
           {commentError.message}

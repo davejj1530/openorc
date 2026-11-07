@@ -4,7 +4,7 @@ Two harnesses exercise a packaged macOS, Windows or Linux application with dispo
 
 The shared packaging configuration filters ONNX Runtime, node-pty, and sqlite-vec binaries for each target: macOS arm64, macOS x64, Windows x64, or Linux x64. Filtering happens during copying, without deleting installed dependencies or their shared license notices, and applies to local, smoke, and release packages. On Linux, node-pty has no prebuild, so the package keeps the binding its install compiled (`build/Release/pty.node`) and none of the build's other files; it also leaves out the CUDA and TensorRT providers and spare `libonnxruntime.so.1.21.0` copy that ONNX Runtime's install script can add, because embeddings run on the CPU.
 
-The before-pack hook also avoids shipping original copies of libraries already compiled into `out/`. [Runtime dependency filtering](../scripts/packaged-runtime-dependencies.cjs) keeps electron-updater, node-pty, sqlite-vec, FastEmbed, ONNX Runtime, and their installed production/optional/peer dependencies. AJV and ajv-formats remain available for generated validation code. Other dependencies retain package metadata and license/notice files, including nested notice folders. All compiled app chunks, workers, fonts, and WASM assets stay intact.
+The before-pack hook also avoids shipping original copies of libraries already compiled into `out/`. [Runtime dependency filtering](../scripts/packaged-runtime-dependencies.cjs) keeps electron-updater, node-pty, sqlite-vec, FastEmbed, ONNX Runtime, Prettier and TypeScript, and their installed production/optional/peer dependencies. Prettier and TypeScript load at runtime in the formatting and code intelligence workers. AJV and ajv-formats remain available for generated validation code. Other dependencies retain package metadata and license/notice files, including nested notice folders. All compiled app chunks, workers, fonts, and WASM assets stay intact.
 
 Before copying, an AST audit checks imports in the compiled main, preload, and renderer files. A new uncovered external import or nonliteral `require`/dynamic import stops packaging for review. When changing runtime imports, update the runtime roots if needed and rerun the packaged checks. The copy fixtures cover scoped and nested dependencies, notice preservation, unchanged development files, and the shared native/source-map exclusions.
 
@@ -35,13 +35,13 @@ Both create a temporary HOME, profile and Git repository through [one shared fix
 
 ## Release check
 
-| Check         | Assertion                                                                                                                                                                        |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Fuses         | Running as Node, `NODE_OPTIONS` and `--inspect` are off; cookie encryption, asar integrity validation and loading only from the archive are on.                                  |
-| Native code   | No `.node`, `.dylib`, `.so`, `.dll` or `.exe` is packed inside `app.asar`. On a signed Mac package, every Mach-O file carries the app's team, which library validation requires. |
-| Native target | Dependency binaries match the runner's OS and processor. Required database, embedding, and terminal bindings/helpers are present; unused Node WebGPU bindings are absent.        |
-| Startup       | The window loads, the core opens its ledger with `sqlite-vec`, and `--inspect` is ignored.                                                                                       |
-| Take-over     | A launch with `ELECTRON_RUN_AS_NODE` runs no code, and a launch with `--remote-debugging-port` exits with an error before any window or debugging port opens.                    |
+| Check         | Assertion                                                                                                                                                                                    |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Fuses         | Running as Node, `NODE_OPTIONS` and `--inspect` are off; cookie encryption, asar integrity validation and loading only from the archive are on.                                              |
+| Native code   | No `.node`, `.dylib`, `.so`, `.dll` or `.exe` is packed inside `app.asar`. On a signed Mac package, every Mach-O file carries the app's signing identity, which library validation requires. |
+| Native target | Dependency binaries match the runner's OS and processor. Required database, embedding, and terminal bindings/helpers are present; unused Node WebGPU bindings are absent.                    |
+| Startup       | The window loads, the core opens its ledger with `sqlite-vec`, and `--inspect` is ignored.                                                                                                   |
+| Take-over     | A launch with `ELECTRON_RUN_AS_NODE` runs no code, and a launch with `--remote-debugging-port` exits with an error before any window or debugging port opens.                                |
 
 The release workflow runs it on the signed macOS app, the installed Windows app, and on Linux both the installed deb and the AppImage's contents, then builds the smoke package from the same bundles. On Windows and Linux it runs the full smoke there; on macOS it runs only the [updater checks](#updater-only).
 

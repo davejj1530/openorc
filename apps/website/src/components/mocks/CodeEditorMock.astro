@@ -4,7 +4,7 @@
  * Save for the unsaved edit, and the code in the app's editor colors (Shiki's GitHub themes) with the caret where the
  * person is typing.
  */
-import FileGlyph from "../hero/FileGlyph.astro";
+import PanelHeader from "../hero/PanelHeader.astro";
 import ProductIcon from "../hero/ProductIcon.astro";
 import "../../styles/hero-scene.css";
 
@@ -32,13 +32,12 @@ const active = 11;
 ---
 
 <div class="hs-mock hs-mock-editor">
-  <div class="hs-panel-header">
-    <span class="hs-track">
-      <span><ProductIcon name="fileDiff" />Changes</span>
-      <span data-selected><FileGlyph path="Welcome.tsx" />Welcome.tsx</span>
-    </span>
-    <span class="hs-round hs-panel-add"><ProductIcon name="plus" /></span>
-  </div>
+  <PanelHeader
+    tabs={[
+      { label: "Changes" },
+      { label: "Welcome.tsx", file: "Welcome.tsx", selected: true },
+    ]}
+  />
   <div class="hs-file-toolbar">
     <span class="hs-crumbs">
       <span>studio</span><ProductIcon name="chevronRight" /><span>src</span><ProductIcon name="chevronRight" /><span data-current>Welcome.tsx</span>

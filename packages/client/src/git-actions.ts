@@ -1,38 +1,20 @@
-import {
-  harnessName,
-  isDetachedCopy,
-  type FileChange,
-  type PrState,
-  type Project,
-  type PullRequestBranches,
-  type PushState,
-  type TeamActionAvailability,
-  type TeamConversation,
-  type ThreadSummary,
-} from "@openorc/protocol";
+import { harnessName, isDetachedCopy, type FileChange, type PrState, type Project, type PullRequestBranches, type PushState, type ThreadSummary } from "@openorc/protocol";
 
 /*
  * A thread's publish flow as both apps show it: commit, then push, then the pull request, each with its label and,
  * when it cannot run, the one reason why. Layout stays per app.
  */
 
-export type GitActions = Pick<NonNullable<TeamConversation["actions"]>, "commit" | "push" | "createPr">;
+export interface GitActionAvailability {
+  allowed: boolean;
+  reason: string | null;
+}
+export type GitActions = Record<"commit" | "push" | "createPr", GitActionAvailability>;
 
-/** Old cached projections and failed ownership checks never authorize a workspace write. */
-export function teamGitActions(team: boolean, runtime: { isPending: boolean; isError: boolean; data?: Pick<TeamConversation, "actions"> | null }): GitActions {
-  let reason: string | null = null;
-  if (team) {
-    if (runtime.isError) reason = "Could not check team Git actions. Retry before changing its workspace.";
-    else if (runtime.isPending) reason = "Checking team Git actions…";
-    else if (!runtime.data?.actions) reason = "Team Git actions are unavailable. Refresh team status.";
-  }
-  const action = (key: keyof GitActions): TeamActionAvailability => {
-    if (!team) return { allowed: true, reason: null };
-    if (reason) return { allowed: false, reason };
-    const value = runtime.data?.actions?.[key];
-    return value?.allowed ? value : { allowed: false, reason: value?.reason ?? "This action is currently unavailable for the team." };
-  };
-  return { commit: action("commit"), push: action("push"), createPr: action("createPr") };
+/** Historical team workspaces remain readable after retirement. */
+export function threadGitActions(retired: boolean): GitActions {
+  const action = { allowed: !retired, reason: retired ? "This item is no longer available." : null };
+  return { commit: action, push: action, createPr: action };
 }
 
 /** Whether origin lacks the branch or some of its commits. */

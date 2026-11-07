@@ -22,6 +22,8 @@ const address = "http://127.0.0.1:<port>/mcp/<random UUID without dashes>";
       <li>Agents do what the thread's mode allows. The rules are on <a href={docHref("permissions")}>Modes and permissions</a>.</li>
       <li>Web pages, in your browser or in the Preview, can't reach OpenOrc's local servers or the app's own interface.</li>
       <li>Other accounts on the same computer can't read the secret addresses OpenOrc gives agents.</li>
+      <li>Other devices on your network can't use OpenOrc. Only phones you paired can connect, and only while you allow them.</li>
+      <li>A cloud thread's sandbox holds only that thread's work, and its agent's sign-in stays outside it where your Vercel plan allows. See <a href="#cloud">Cloud sandboxes and the brain</a>.</li>
       <li>
         Other programs running as you can't start OpenOrc in a way that runs their code inside the app or drives its window, and release builds have no test switch that makes it start agents or approve requests on its own.
       </li>
@@ -53,11 +55,29 @@ const address = "http://127.0.0.1:<port>/mcp/<random UUID without dashes>";
       <li>
         The MCP Apps sandbox has a port of its own, so apps run apart from the app window. It serves each app at its own random path, in a sandboxed frame, and answers only <code>GET</code> requests that name its own address as the host.
       </li>
-      <li>The <a href={docHref("slack")}>Slack team relay</a> accepts only POST requests with a device key, and refuses any request with an <code>Origin</code> header. It keeps only a hash of each key.</li>
+      <li>The <a href={docHref("slack")}>Slack shared relay</a> accepts only POST requests with a device key, and refuses any request with an <code>Origin</code> header. It keeps only a hash of each key.</li>
       <li>The reviewer app's setup page runs only while you set the app up, for at most 15 minutes. It answers only requests that carry a random value from the link OpenOrc opened, and its form can post only to <code>github.com</code>.</li>
       <li>On macOS, while a downloaded update waits to install, the update library serves it to the system installer behind a random password.</li>
+      <li>While device support is on, <code>expo-device-hub</code> listens on <code>127.0.0.1</code> and answers only requests that carry a random token, which only OpenOrc's core holds. <code>agent-device</code>'s helper also needs its own token.</li>
     </ul>
-    <p class="docs-source">Source: <code>packages/mcp/src/index.ts</code>, <code>packages/agents/src/claude/file-boundary.ts</code>, <code>apps/desktop/src/main/mcp-app-sandbox.ts</code>, <code>packages/core/src/services/reviewer-app.ts</code></p>
+    <h3>Phones</h3>
+    <p>
+      While <strong>Allow paired phones</strong> is on, OpenOrc listens for phones on your network, on port 47820 or a free port when that one is taken. It is the only server that accepts connections from other devices, and it checks
+      each one in layers:
+    </p>
+    <ul>
+      <li>A connection that doesn't come from this computer, a private or link-local address, or a Tailscale address is dropped before anything is read.</li>
+      <li>
+        Each connection is encrypted with the Noise protocol (IK, X25519, AES-GCM). The pairing code carries this computer's public key and a one-time secret that expires after five minutes. A phone that pairs keeps its own key pair, and
+        afterwards only a paired phone's key completes the handshake.
+      </li>
+      <li>
+        A phone can call only the actions the phone app needs: reading projects, threads, and their work, sending messages, answering approvals, starting and organizing threads, committing, pushing, and opening pull requests, and driving the
+        thread's Preview. It can't change settings, delete threads, read files outside a thread's changes, or open a terminal. It sees your Claude accounts' names, never their email addresses.
+      </li>
+      <li>Removing a phone in Settings deletes this computer's record of its key, so it can't connect again without pairing.</li>
+    </ul>
+    <p class="docs-source">Source: <code>packages/mcp/src/index.ts</code>, <code>packages/agents/src/claude/file-boundary.ts</code>, <code>apps/desktop/src/main/mcp-app-sandbox.ts</code>, <code>packages/core/src/services/reviewer-app.ts</code>, <code>packages/core/src/remote/</code>, <code>packages/link/</code>, <code>packages/core/src/devices/hub.ts</code></p>
   </section>
 
   <section aria-labelledby="window">
@@ -67,6 +87,10 @@ const address = "http://127.0.0.1:<port>/mcp/<random UUID without dashes>";
       <li>The window loads only the files that ship with OpenOrc and never navigates away from them. Embedded <code>&lt;webview&gt;</code> tags are refused.</li>
       <li>A web link opens in the Preview or in your browser, or in Chrome Incognito if you choose that from the link's menu. Files and other schemes don't open, and only the app's own page can ask to open a link.</li>
       <li>The app's page may show notifications and copy text to the clipboard. Every other web permission, such as the camera, microphone, or location, is refused.</li>
+      <li>
+        Visualizations that agents draw, and MCP Apps, run in sandboxed frames with an opaque origin, each in a process of its own. They can't reach the network, except an MCP App's connections to the <code>https</code> domains its
+        server declares.
+      </li>
     </ul>
     <p>
       The Preview is a separate sandboxed page with a session of its own. It is refused every web permission, can't download files or open windows, and loads only <code>http</code> and <code>https</code> addresses without a user name or
@@ -81,21 +105,24 @@ const address = "http://127.0.0.1:<port>/mcp/<random UUID without dashes>";
     <p>OpenOrc's own tools let an agent reach beyond its thread. Each follows the calling thread's mode:</p>
     <ul>
       <li>
-        <strong>Messaging another thread.</strong> A message to a thread in the same or a stricter mode is delivered at once. One to a more permissive thread asks you first, and from Plan an agent can message only Plan threads. After 20
+        <strong>Messaging another thread.</strong> A message to a thread in the same or a stricter mode is delivered at once. One to a more permissive thread asks you first, and from Plan an agent can message only Plan threads. After 50
         agent messages in a row with nobody writing, sending stops until a person writes.
       </li>
       <li>
         <strong>Starting a thread.</strong> An agent in Act can start a thread with <code>thread_start</code> without asking. The new thread works in the same folder, with the same mode and permissions. An agent can start one only while
         fewer than 3 of the threads it started are working, and a started thread can't start its own.
       </li>
+      <li>
+        <strong>Subagents.</strong> An agent's own subagents follow that agent's permission rules, not OpenOrc's modes. Claude Code may run them only in Autonomous, and Codex none in Plan.
+      </li>
+      <li><strong>Devices.</strong> With device support on and <strong>Agents can use devices</strong> on, an agent may open, close, and drive your simulators and emulators in every mode except Plan.</li>
       <li><strong>Orclings</strong> can read every project, save tasks, and message any thread. Starting work in a project asks first unless the Orcling works in Autonomous, and is blocked in Plan.</li>
       <li>
         <strong>Reviewing a pull request.</strong> The review runs in a copy of the pull request, and no agent loads settings, hooks, or MCP servers from that copy. Agents only add comments to your draft; you decide what to post.
       </li>
     </ul>
     <p>
-      The reviewer app asks GitHub only for write access to pull requests and has no active webhook, and OpenOrc uses it only to post reviews. Each access token covers one repository for one hour, and approving is off until you turn on
-      <strong>Let it approve</strong>.
+      The reviewer app asks GitHub only for write access to pull requests and has no active webhook, and OpenOrc uses it only to post reviews. Each access token covers one repository for one hour, and approving is off until you turn on <strong>Let it approve</strong>.
     </p>
   </section>
 
@@ -122,20 +149,56 @@ const address = "http://127.0.0.1:<port>/mcp/<random UUID without dashes>";
     </p>
     <p>
       Before a release is published, a check runs on the signed macOS app, the installed Windows app, and the installed Linux app. It reads the fuses, looks for native code inside the archive and, on macOS, for any executable not signed by
-      the same team, then starts the app and confirms that <code>ELECTRON_RUN_AS_NODE</code>, <code>--inspect</code>, and <code>--remote-debugging-port</code> do nothing.
+      the same Apple developer account, then starts the app and confirms that <code>ELECTRON_RUN_AS_NODE</code>, <code>--inspect</code>, and <code>--remote-debugging-port</code> do nothing.
     </p>
     <p class="docs-source">Source: <code>apps/desktop/electron-builder.yml</code>, <code>apps/desktop/build/entitlements.mac.plist</code>, <code>scripts/desktop-release.cjs</code>, <code>scripts/packaged-release-check.cjs</code></p>
+  </section>
+
+  <section aria-labelledby="cloud">
+    <h2 id="cloud">Cloud sandboxes and the brain</h2>
+    <p>
+      A cloud thread runs its agent on a machine of its own on your Vercel or Agent37 account. No two threads share a sandbox. The thread's mode still decides what the agent may do, but its commands run on that machine, not on your
+      computer, and they can reach the internet without limit. Your computer reaches a sandbox only through the service, with your Vercel token, or with your Agent37 key at OpenOrc's own server in the instance. The agent reaches OpenOrc's
+      tools through the same connection, as its own run.
+    </p>
+    <h3>Sign-ins in a sandbox</h3>
+    <ul>
+      <li>
+        On Vercel, when your plan allows it, the sandbox's firewall adds the agent's sign-in to its requests on the way out. The sandbox holds a stand-in that says <code>openorc-sign-in-kept-outside-this-sandbox</code> and works nowhere, so
+        nothing running there can read or take the real one.
+      </li>
+      <li>Otherwise the sandbox holds the sign-in, and the agent and any command it runs can read it. That is always the case on Agent37. A turn gets only the sign-in it needs: its Claude account's token, the Codex login, or the key of its model's provider.</li>
+      <li>
+        Your Claude Code login and a ChatGPT sign-in are never copied to the cloud. Each agent gets a sign-in made for the cloud instead. To offer copies of an OpenAI API key or OpenCode provider keys, OpenOrc reads Codex's
+        <code>auth.json</code> and the credentials OpenCode keeps, and saves a copy only after you approve it.
+      </li>
+    </ul>
+    <h3>Your cloud account</h3>
+    <ul>
+      <li>
+        A Vercel token can do everything its scope allows. Settings → Cloud asks for one scoped to one team and says when a token reaches more. The token stays in protected storage on your computer. A cloud brain on Vercel gets it in memory when it starts,
+        never on its disk, and the brain's door keeps a copy in a sensitive environment variable so it can wake the brain.
+      </li>
+      <li>
+        The cloud brain seals its secrets under its own key, with AES-256-GCM. Your GitHub sign-in reaches it only if you switch it on, and then only its own <code>git</code> and <code>gh</code> get it. No agent and no sandbox does.
+      </li>
+      <li>
+        Phones reach the brain over the same end-to-end encrypted link they use with your computer, and only phones paired with the brain complete the handshake. When you remove a phone from the brain, the door on Vercel refuses that phone too.
+      </li>
+    </ul>
+    <p class="docs-source">Source: <code>packages/core/src/services/cloud-agents.ts</code>, <code>cloud-agent-env.ts</code>, <code>cloud-codex.ts</code>, <code>cloud-opencode.ts</code>, <code>mac-agent-keys.ts</code>, <code>packages/cloud/src/vercel-sandbox.ts</code>, <code>brain/sealed-file.ts</code>, <code>brain/wire.ts</code>, <code>apps/brain/src/github.ts</code></p>
   </section>
 
   <section aria-labelledby="secrets">
     <h2 id="secrets">Secrets and your data</h2>
     <ul>
       <li>
-        Slack tokens, the optional Anthropic API key for memory, and the reviewer app's private key are encrypted with your system's protected storage and written to files only you can read. They are never in the database. See <a
+        Slack tokens, the optional Anthropic API key for memory, the reviewer app's private key, this computer's key for phone connections, the Apple push key, and the cloud connections and sign-ins are encrypted with your system's
+        protected storage and written to files only you can read. They are never in the database. See <a
           href={docHref("storage") + "#secrets"}>Data and storage</a
         >.
       </li>
-      <li>OpenOrc never reads or stores the agents' sign-ins. Each CLI keeps its own credentials.</li>
+      <li>Each CLI keeps its own credentials, and OpenOrc doesn't store them. The only agent sign-ins OpenOrc keeps are the ones for the cloud.</li>
       <li>Text that looks like a secret is replaced before it is stored. See <a href={docHref("storage") + "#redaction"}>Redaction</a>.</li>
       <li>The database is a plain SQLite file in your data folder, and it isn't encrypted. Your threads, plans, and memories are as private as the rest of your files.</li>
       <li>Your messages reach every agent over standard input. So do background requests, such as titles and memory summaries.</li>
@@ -159,8 +222,7 @@ const address = "http://127.0.0.1:<port>/mcp/<random UUID without dashes>";
         program that changes those files changes what runs.
       </li>
       <li>
-        <strong>The environment OpenOrc starts with.</strong> At startup OpenOrc removes the variables that make shells, Node, Git, or the system loader run extra code: <code>NODE_OPTIONS</code>, <code>BASH_ENV</code>, <code>ENV</code>,
-        <code>ZDOTDIR</code>, <code>PROMPT_COMMAND</code>, <code>LD_PRELOAD</code>, <code>LD_AUDIT</code>, <code>LD_LIBRARY_PATH</code>, and every variable starting with <code>DYLD_</code> or <code>GIT_</code>. Others, such as proxy
+        <strong>The environment OpenOrc starts with.</strong> At startup OpenOrc removes the variables that make shells, Node, Git, or the system loader run extra code: <code>NODE_OPTIONS</code>, <code>BASH_ENV</code>, <code>ENV</code>, <code>ZDOTDIR</code>, <code>PROMPT_COMMAND</code>, <code>LD_PRELOAD</code>, <code>LD_AUDIT</code>, <code>LD_LIBRARY_PATH</code>, and every variable starting with <code>DYLD_</code> or <code>GIT_</code>. Others, such as proxy
         settings and extra <code>PATH</code> entries, still reach terminals and agents. <code>OPENORC_USER_DATA</code> picks the data folder in every build. <code>OPENORC_CLAUDE_BIN</code> and its siblings pick the agent programs on
         Windows, and on macOS and Linux when OpenOrc can't read your login shell.
       </li>
@@ -169,6 +231,10 @@ const address = "http://127.0.0.1:<port>/mcp/<random UUID without dashes>";
         OpenOrc; they don't stop a request that asks an agent to use that access.
       </li>
       <li><strong>What agents are allowed to do.</strong> In Autonomous, an agent's commands run without asking, with your account's access. Choose the mode for the work.</li>
+      <li>
+        <strong>Whoever controls your cloud account.</strong> Vercel or Agent37, and anyone with your token or key, can read what a sandbox or the cloud brain holds, including your code and any sign-in held inside. A sign-in removed in OpenOrc
+        keeps working until you revoke it with its provider.
+      </li>
     </ul>
   </section>
 

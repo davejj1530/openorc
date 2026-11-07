@@ -29,6 +29,7 @@ const DEFAULT_SETTINGS: DeviceSettings = { enabled: false, agentAccess: true };
 const PROBE_TTL_MS = 15_000;
 const CHANGE_DEBOUNCE_MS = 300;
 const QUITTING = "OpenOrc is quitting.";
+const NO_DEVICES = "This machine has no simulators or emulators.";
 
 /** A step of setup that overrides what the hub itself reports: an install, the agent daemon's start, or their failure. */
 type SetupStep = Extract<DeviceHelpers, { phase: "installing" | "starting" | "failed" }>;
@@ -46,8 +47,8 @@ export interface DeviceServiceOptions {
   environment(): EnvSnapshot;
   transport: Transport;
   log: Logger;
-  /** How processes run. Tests pass a fake. */
-  system?: DeviceSystem;
+  /** How processes run. Tests pass a fake. Null on a machine with no simulators or emulators. */
+  system?: DeviceSystem | null;
   /** Where the hub's own output goes: the core's console, never a window. */
   debug?: (line: string) => void;
 }
@@ -75,8 +76,14 @@ export class DeviceService {
   /** Set once the app quits: windows still open must not bring a helper back while the core shuts down. */
   private closed = false;
   private readonly request: HubRequest = (route, init) => this.hub.request(route, init);
+  /**
+   * False on a machine with no simulators or emulators: agents get no device tool, startup and quitting stop nothing,
+   * and every request is refused at the probe, which each path to a helper or device passes first.
+   */
+  readonly available: boolean;
 
   constructor(private readonly options: DeviceServiceOptions) {
+    this.available = options.system !== null;
     this.system = options.system ?? nodeSystem;
     const root = path.join(options.dataDir, "devices");
     const debug = options.debug ?? ((line: string) => console.debug(`[core:debug] device hub: ${line}`));
@@ -212,6 +219,7 @@ export class DeviceService {
 
   /** At startup: helpers a crashed core left running, and the XCTest runners its daemon started, are stopped. */
   reapStale(): Promise<void> {
+    if (!this.available) return Promise.resolve();
     return this.serial(async () => {
       await this.hub.reapStale().catch((error: unknown) => this.options.log.warn(`device hub cleanup failed: ${errorMessage(error)}`));
       await this.daemon.reapStale().catch((error: unknown) => this.options.log.warn(`agent-device cleanup failed: ${errorMessage(error)}`));
@@ -221,6 +229,7 @@ export class DeviceService {
   /** Stops the helpers without waiting for queued work such as an install. Devices keep running. */
   async close(): Promise<void> {
     this.closed = true;
+    if (!this.available) return;
     await this.hub.stop();
     await this.daemon.stop();
   }
@@ -259,6 +268,7 @@ export class DeviceService {
 
   /** Runtime and platform checks, cached briefly: they run simctl and ffmpeg. */
   private probe(fresh = false): Promise<Probe> {
+    if (!this.available) return Promise.reject(new Error(NO_DEVICES));
     const cached = this.probed;
     if (cached && !fresh) {
       return cached.then((probe) => (this.system.now() - probe.at < PROBE_TTL_MS ? probe : this.probe(true)));

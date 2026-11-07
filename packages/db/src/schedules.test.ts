@@ -1,16 +1,13 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { DatabaseSync } from "node:sqlite";
+import { ScheduleLaunchSnapshot } from "@openorc/protocol";
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { DEFAULT_TEAM_LIMITS, ScheduleLaunchSnapshot } from "@openorc/protocol";
+import { DatabaseSync } from "node:sqlite";
+import { afterEach, describe, expect, it } from "vitest";
 import { Db } from "./database.js";
-import { migrations } from "./schema.js";
 import { projects, threads } from "./repos.js";
-import { orchestration } from "./orchestration.js";
-import { schedules, scheduleFirings } from "./schedules.js";
-import { teamRuntime } from "./team-runtime.js";
-import { randomUUID } from "node:crypto";
+import { scheduleFirings, schedules } from "./schedules.js";
+import { migrations } from "./schema.js";
 
 const opened: Db[] = [];
 afterEach(() => {
@@ -47,68 +44,6 @@ function fixture() {
   return { db, project, other, input, schedule, reserve, addThread };
 }
 
-function teamFiring() {
-  const f = fixture();
-  const settings = { agent: "codex" as const, model: "fixture", effort: null, fastMode: false };
-  const saved = orchestration.save(f.db, {
-    projectId: f.project.id,
-    expectedRevisionId: null,
-    draft: {
-      name: "Scheduled team",
-      limits: DEFAULT_TEAM_LIMITS,
-      members: [{ key: "lead", name: "Lead", managerKey: null, responsibility: "Review", settings }],
-    },
-  });
-  const schedule = schedules.insert(f.db, { ...f.input, executionTarget: { kind: "team", teamRevisionId: saved.revision.id } });
-  const thread = f.addThread();
-  const instance = orchestration.createInstance(f.db, { threadId: thread.id, teamRevisionId: saved.revision.id });
-  const execution = teamRuntime.create(f.db, {
-    id: randomUUID(),
-    threadId: thread.id,
-    projectId: f.project.id,
-    instanceId: instance.id,
-    state: "active",
-    generation: 1,
-    revision: 0,
-    limits: DEFAULT_TEAM_LIMITS,
-    actors: [
-      {
-        id: "lead",
-        memberKey: "lead",
-        taskId: null,
-        parentId: null,
-        requestKey: null,
-        requestHash: null,
-        dependencies: [],
-        input: { title: "Review", spec: "Review", attachments: [], responsibility: "Review", settings },
-        state: "queued",
-        retries: 0,
-        directionVersion: 0,
-        deliveredVersion: 0,
-        disposition: null,
-        result: null,
-        snapshotId: null,
-        error: null,
-      },
-    ],
-    attempts: [],
-    messages: [],
-    error: null,
-    createdAt: 1,
-    updatedAt: 1,
-    deadlineAt: 1000,
-  });
-  const firing = scheduleFirings.reserve(f.db, {
-    scheduleId: schedule.id,
-    requestKey: "team-start",
-    scheduleVersion: schedule.version,
-    trigger: "manual",
-    scheduledFor: null,
-    snapshot: ScheduleLaunchSnapshot.parse(schedule),
-  });
-  return { ...f, schedule, thread, execution, firing };
-}
-
 describe("durable schedule launches", () => {
   it("upgrades legacy schedules with their exact provider default and cadence", () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), "openorc-schedules-migrate-"));
@@ -141,23 +76,6 @@ describe("durable schedule launches", () => {
       db.close();
       rmSync(dir, { recursive: true, force: true });
     }
-  });
-
-  it("pins an immutable revision through edits and archival and enforces project ownership", () => {
-    const { db, project, other, input } = fixture();
-    const draft = {
-      name: "Reviewers",
-      limits: DEFAULT_TEAM_LIMITS,
-      members: [{ key: "lead", name: "Lead", managerKey: null, responsibility: "Review the work", settings: { agent: "codex" as const, model: "gpt-6-astra", effort: "high", fastMode: false } }],
-    };
-    const saved = orchestration.save(db, { projectId: project.id, expectedRevisionId: null, draft });
-    const target = { kind: "team" as const, teamRevisionId: saved.revision.id, initialLeadOverrides: { effort: "medium" } };
-    const schedule = schedules.insert(db, { ...input, executionTarget: target });
-    const next = orchestration.save(db, { projectId: project.id, teamId: saved.team.id, expectedRevisionId: saved.revision.id, draft: { ...draft, name: "Changed" } });
-    orchestration.archive(db, { projectId: project.id, teamId: saved.team.id, expectedRevisionId: next.revision.id, archived: true });
-    expect(schedules.get(db, schedule.id)).toMatchObject({ executionTarget: target, team: { revision: { id: saved.revision.id, name: "Reviewers" }, archived: true } });
-    expect(() => schedules.insert(db, { ...input, projectId: other.id, executionTarget: target })).toThrow(/project/);
-    expect(() => db.stmt("UPDATE schedules SET team_revision_id=NULL WHERE id=?").run(schedule.id)).toThrow(/pin/);
   });
 
   it("versions changed configuration but keeps no-ops and launch bookkeeping stable", () => {
@@ -212,16 +130,6 @@ describe("durable schedule launches", () => {
     ).toThrow(/cancelled/);
     expect(threads.list(db)).toHaveLength(0);
     expect(scheduleFirings.get(db, firing.id)?.state).toBe("pending");
-  });
-
-  it.each(["thread", "project"] as const)("allows the actual owning %s cascade to clear both team launch foreign keys", (owner) => {
-    const { db, project, firing, thread, execution } = teamFiring();
-    scheduleFirings.settle(db, firing.id, { state: "started", threadId: thread.id, executionId: execution.id });
-    db.stmt(owner === "thread" ? "DELETE FROM threads WHERE id=?" : "DELETE FROM projects WHERE id=?").run(owner === "thread" ? thread.id : project.id);
-    expect(teamRuntime.get(db, execution.id)).toBeNull();
-    if (owner === "thread") expect(scheduleFirings.get(db, firing.id)).toMatchObject({ state: "started", threadId: null, executionId: null });
-    else expect(scheduleFirings.get(db, firing.id)).toBeNull();
-    expect(db.stmt("PRAGMA foreign_key_check").all()).toEqual([]);
   });
 
   it("keeps a deleted thread's consumed receipt and allows schedule/project cleanup", () => {

@@ -159,3 +159,13 @@ it("lists each open stage with its count and searches from the header", async ()
   expect(screen.queryByRole("button", { name: "Export rows, Backlog" })).toBeNull();
   expect(screen.getByRole("button", { name: "Review copy, Review" })).toBeTruthy();
 });
+it("marks a task the cloud brain holds as the cloud's, dimmed while the brain is out of reach", async () => {
+  saved = [
+    { ...task, owner: { brain: "cloud", reach: "asleep", heardAt: 1 } },
+    { ...task, id: "here", title: "Local copy" },
+  ];
+  await show();
+  const cloudRow = screen.getByRole("button", { name: "Export rows, Backlog" });
+  expect(within(cloudRow).getByText("Cloud").closest("span")?.className).toContain("opacity-60");
+  expect(within(screen.getByRole("button", { name: "Local copy, Backlog" })).queryByText("Cloud")).toBeNull();
+});

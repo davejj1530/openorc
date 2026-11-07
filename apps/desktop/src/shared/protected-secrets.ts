@@ -10,6 +10,19 @@ export const PROTECTED_SECRET_FILES = {
   "remote.secrets": "remote-access-key.enc",
   /** The Apple push key phone alerts are signed with, as the user added it. */
   "push.secrets": "apns-key.enc",
+  /** The Vercel connection cloud threads run on. */
+  "cloud.secrets": "cloud-credentials.enc",
+  /** Each Claude account's token for signing in to cloud sandboxes. */
+  "claude-cloud.secrets": "claude-cloud-tokens.enc",
+  "codex-cloud.secrets": "codex-cloud-login.enc",
+  /** OpenCode's provider keys entered for the cloud. */
+  "opencode-cloud.secrets": "opencode-cloud-keys.enc",
+  /** Each project's environment variables for its cloud threads. */
+  "cloud-env.secrets": "cloud-env.enc",
+  /** The cloud brain's key, team and region. */
+  "cloud-brain.secrets": "cloud-brain.enc",
+  /** A new cloud brain's, set up on the other service while the brain moves there. */
+  "cloud-brain-move.secrets": "cloud-brain-move.enc",
 } as const;
 
 export type ProtectedSecretChannel = keyof typeof PROTECTED_SECRET_FILES;

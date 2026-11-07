@@ -16,13 +16,11 @@ export async function assertRepository(project: ProjectFolder): Promise<void> {
   if ((await projectGit(project)) === "none") throw new Error(`${project.name} isn't a git repository yet, so OpenOrc can't track or review its changes.`);
 }
 
-/** Worktrees and teams branch from a commit. Null once the project has one, otherwise what it still needs. */
+/** Worktrees branch from a commit. Null once the project has one, otherwise what it still needs. */
 export async function branchingBlocker(project: ProjectFolder): Promise<string | null> {
   const state = await projectGit(project);
   if (state === "ready") return null;
-  return state === "none"
-    ? `${project.name} isn't a git repository yet. Worktrees and teams need git and a first commit.`
-    : `${project.name} has no commits yet. Worktrees and teams need a first commit.`;
+  return state === "none" ? `${project.name} isn't a git repository yet. Worktrees need git and a first commit.` : `${project.name} has no commits yet. Worktrees need a first commit.`;
 }
 
 export async function assertCanBranch(project: ProjectFolder): Promise<void> {

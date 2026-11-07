@@ -8,7 +8,9 @@ import { ClaudeAccountSettings } from "./settings-claude-accounts";
 const mocks = vi.hoisted(() => ({ call: vi.fn() }));
 vi.mock("../lib/rpc", () => ({ core: { call: mocks.call, onReady: () => {}, onPush: () => () => {} } }));
 let data: ClaudeAccounts;
+let autoSwitch: boolean;
 beforeEach(() => {
+  autoSwitch = false;
   queryClient.clear();
   data = {
     defaultId: "personal",
@@ -32,6 +34,11 @@ beforeEach(() => {
       return account;
     }
     if (method === "claude.accounts.login") return { started: true };
+    if (method === "app.settings.get") return { claudeAccountAutoSwitch: autoSwitch };
+    if (method === "app.settings.set") {
+      autoSwitch = params.claudeAccountAutoSwitch ?? autoSwitch;
+      return { claudeAccountAutoSwitch: autoSwitch };
+    }
     if (method === "claude.accounts.update") {
       if (params.makeDefault) data.defaultId = params.id;
       const account = data.accounts.find((entry) => entry.id === params.id)!;
@@ -73,4 +80,21 @@ it("changes the default and renames an account without changing its identity", a
   fireEvent.click(screen.getByRole("button", { name: "Save name" }));
   await screen.findByLabelText("Name for Company");
   expect(mocks.call).toHaveBeenCalledWith("claude.accounts.update", { id: "work", name: "Company" });
+});
+
+it("turns on switching accounts at usage limits once a second account is enabled", async () => {
+  mount();
+  const toggle = await screen.findByRole<HTMLInputElement>("switch", { name: /Switch accounts at usage limits/ });
+  await waitFor(() => expect(toggle.disabled).toBe(false));
+  expect(toggle.checked).toBe(false);
+  fireEvent.click(toggle);
+  await waitFor(() => expect(mocks.call).toHaveBeenCalledWith("app.settings.set", { claudeAccountAutoSwitch: true }));
+  await waitFor(() => expect(toggle.checked).toBe(true));
+
+  cleanup();
+  queryClient.clear();
+  data.accounts = data.accounts.map((account, index) => ({ ...account, enabled: index === 0 }));
+  mount();
+  await screen.findByLabelText("Name for Client");
+  expect(screen.queryByRole("switch", { name: /Switch accounts at usage limits/ })).toBeNull();
 });

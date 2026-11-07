@@ -1,8 +1,44 @@
+import type { EditorFix, EditorLocation, EditorQuery, EditorResult, EditorSymbol } from "@openorc/protocol";
+
 /** 1-based, inclusive lines to select and scroll into view. */
 export interface LineRange {
   start: number;
   end: number;
+  column?: number;
+  endColumn?: number;
 }
+
+export interface EditorPoint {
+  line: number;
+  column: number;
+}
+
+export interface CodeEditorActions {
+  definition: () => void;
+  references: () => void;
+  outline: () => void;
+  problems: () => void;
+  quickFixes: () => void;
+  focus: () => void;
+  refresh: () => void;
+  point: () => EditorPoint;
+}
+
+/** The host owns files, drafts and navigation. CodeMirror owns positions, interaction and presentation inside the editor. */
+export interface EditorIntelligence {
+  query: (query: EditorQuery, text: string) => Promise<EditorResult>;
+  navigate: (location: EditorLocation, origin: EditorPoint) => void;
+  locations: (title: "Definitions" | "References", locations: EditorLocation[], truncated: boolean, origin: EditorPoint) => void;
+  analysis: (result: Extract<EditorResult, { kind: "analysis" }>) => void;
+  fixes: (fixes: EditorFix[]) => void;
+  outline: () => void;
+  problems: () => void;
+  error: (message: string | null) => void;
+  back: () => boolean;
+  forward: () => boolean;
+}
+
+export type { EditorSymbol };
 
 export interface CodeEditorProps {
   /**
@@ -11,7 +47,7 @@ export interface CodeEditorProps {
    * with the caller.
    */
   sessionKey: string;
-  /** Picks the language and line wrapping. The editor never reads or writes files. */
+  /** Picks the language. The editor never reads or writes files. */
   path: string;
   /**
    * The buffer's text. A value equal to the last one this editor reported, or was given, changes nothing, so the
@@ -20,6 +56,10 @@ export interface CodeEditorProps {
    */
   text: string;
   readOnly: boolean;
+  /** Long lines wrap to the view instead of scrolling sideways. Changing it keeps the top visible line in place. */
+  lineWrapping: boolean;
+  /** Option+Z, VS Code's Toggle Word Wrap, asks for the other setting. Without it the keys pass through. */
+  onLineWrappingChange?: (wrap: boolean) => void;
   /** A new object selects and reveals its lines once per session. The same object again does nothing. */
   reveal: LineRange | null;
   /**
@@ -34,4 +74,8 @@ export interface CodeEditorProps {
   onFormat?: () => void;
   /** A new object moves keyboard focus into the editor once, as after the user answers the conflict banner. */
   focusRequest?: object | null;
+  intelligence?: EditorIntelligence;
+  /** Changes in another unsaved buffer or on disk also refresh this file's analysis. */
+  analysisKey?: unknown;
+  onReady?: (actions: CodeEditorActions | null) => void;
 }

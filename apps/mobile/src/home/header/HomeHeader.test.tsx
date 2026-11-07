@@ -15,7 +15,13 @@ vi.mock("../../client", async () => {
   return { storage: new ScratchStore({ getString: () => undefined, set: () => undefined, remove: () => undefined }), endDemo: () => void demo.ended++ };
 });
 
-afterEach(cleanup);
+const board = vi.hoisted(() => ({ available: false }));
+vi.mock("../../tasks/use-task-board", () => ({ useTaskBoard: () => ({ sections: [], available: board.available }) }));
+
+afterEach(() => {
+  cleanup();
+  board.available = false;
+});
 
 const studio = { id: "studio", name: "Studio" };
 const connected: LinkState = { kind: "connected", mac: studio, route: { kind: "lan", host: "studio.local", port: 1 }, serial: 1 };
@@ -106,4 +112,32 @@ it("names the demo Mac on the Mac line, with its dot and no route", () => {
   expect(screen.getByRole("button", { name: "Demo Mac, On this iPhone" })).toBeTruthy();
   expect(screen.getByText("Demo Mac")).toBeTruthy();
   expect(screen.queryByText(/·/)).toBeNull();
+});
+
+it("offers the task list only once a host answers with one, so a host from before shows the bar as it was", () => {
+  bar(connected, 0);
+  expect(screen.queryByRole("button", { name: "Tasks" })).toBeNull();
+  cleanup();
+  board.available = true;
+  bar(connected, 0);
+  expect(screen.getByRole("button", { name: "Tasks" })).toBeTruthy();
+});
+
+it("heads the shown host's threads with its name and how this phone reaches it while its partner is listed too", () => {
+  const cloud: LinkState = { kind: "connected", mac: { id: "cloud", name: "Cloud" }, route: { kind: "public", host: "cloud.example", port: 1 }, serial: 1 };
+  render(<MacLine state={cloud} host="brain" {...scrolled(0)} />);
+  expect(screen.getByRole("button", { name: "Cloud, Connected over Internet" })).toBeTruthy();
+  expect(screen.getByText("Cloud")).toBeTruthy();
+  expect(screen.getByText("Connected over Internet")).toBeTruthy();
+  expect(screen.queryByText(/·/)).toBeNull();
+  cleanup();
+  render(<MacLine state={{ kind: "waiting", mac: studio, why: "silent", retryAt: null }} host="mac" {...scrolled(0)} />);
+  expect(screen.getByText("Studio")).toBeTruthy();
+  expect(screen.getByText("Not reachable")).toBeTruthy();
+});
+
+it("keeps a quick connect's words back in the heading without giving up the line", () => {
+  render(<MacLine state={quickConnect} host="mac" {...scrolled(0)} />);
+  expect(screen.queryByText("Connecting")).toBeNull();
+  expect(screen.getAllByTestId("link-dot")).toHaveLength(1);
 });

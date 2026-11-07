@@ -28,6 +28,7 @@ import { installBrowserBridge } from "./browser-bridge";
 import { installPreviewBridge } from "./preview-bridge";
 import { createPreviewHost } from "./preview-host";
 import { installPresence } from "./presence-ipc";
+import { installPowerEvents } from "./power-ipc";
 import { cancelPtyUpdate, detachAllPtys, installPtyHost, killAllPtys, preparePtysForUpdate } from "./pty-host";
 
 const here = import.meta.dirname;
@@ -95,13 +96,13 @@ const mcpAppSandbox = new McpAppSandbox();
  * tool may inherit an odd one. Either way the user's terminal is the truth,
  * and the core is the process that asks it: the core launches the agents, so
  * Ready has to mean launchable there. Main hears every snapshot the core
- * adopts and keeps the PATH for the Terminal panels it hosts.
+ * adopts and keeps the PATH for the Terminal panels it hosts outside macOS.
  */
 function startCore(): UtilityProcess {
   const child = utilityProcess.fork(join(here, "core.mjs"), [], {
     serviceName: "openorc-core",
     stdio: "pipe",
-    env: { ...process.env, OPENORC_DATA_DIR: app.getPath("userData"), OPENORC_FILE_KEY: fileKey },
+    env: { ...process.env, OPENORC_DATA_DIR: app.getPath("userData"), OPENORC_FILE_KEY: fileKey, ...(app.isPackaged ? { OPENORC_BRAIN_DIR: join(process.resourcesPath, "brain") } : {}) },
   });
   // A UtilityProcess hands the listener the raw payload; only MessagePorts wrap it in an event.
   listenForShellEnv(child);
@@ -109,6 +110,7 @@ function startCore(): UtilityProcess {
   installBrowserBridge(child, executeBrowserCommand);
   installPreviewBridge(child, previewHost);
   installPresence(child);
+  installPowerEvents(child);
   child.stdout?.on("data", (d: Buffer) => process.stdout.write(`[core] ${d}`));
   child.stderr?.on("data", (d: Buffer) => process.stderr.write(`[core!] ${d}`));
   child.on("exit", (code) => {

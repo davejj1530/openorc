@@ -1,13 +1,12 @@
+import type { AllowanceWindow, PlanLimits, ProviderUsage, SlackStatus } from "@openorc/protocol";
 import { createDesignClaudeAccountsRpc } from "./design-claude-accounts";
 import { createDesignRemoteRpc } from "./design-remote";
-import type { ProviderUsage, SlackStatus } from "@openorc/protocol";
 
 /** Session-only settings for the design preview. Never reads or writes a real account. */
 export function createDesignSettingsRpc({ phone = null }: { phone?: string | null } = {}) {
   const claudeAccountsRpc = createDesignClaudeAccountsRpc();
   const remoteRpc = createDesignRemoteRpc(phone);
   const settings: Record<string, Record<string, unknown>> = {
-    "app.settings": { defaultWorkspaceMode: "current", defaultPermissionMode: "review", notifications: true, sound: false, experimentalTeamExecution: true },
     "memory.settings": { enabled: true, provider: "auto", model: null, hasApiKey: false, resolved: null, automatic: [], reason: "Finished runs use each agent’s default summary model." },
     "textGeneration.settings": { provider: "auto", model: null, resolved: null, reason: "Each conversation uses its agent’s default small model." },
   };
@@ -22,6 +21,7 @@ export function createDesignSettingsRpc({ phone = null }: { phone?: string | nul
       return settings[key];
     }
     if (method === "providers.usage") return usageReport(params.provider as ProviderUsage["provider"]);
+    if (method === "providers.limits") return planLimits();
     if (method === "slack.status") return slack;
     if (method === "reviewerApp.get") return { app: null, setupUrl: null, error: null };
     if (method === "skills.list")
@@ -88,3 +88,47 @@ const slack: SlackStatus = {
   devices: [],
   client: { configured: false, enabled: false, connected: false, config: null, userId: null, busy: false, error: null },
 };
+
+/** Every account's limits as the sidebar's usage table reads them: two Claude accounts, one signed out, and Codex. */
+function planLimits(): PlanLimits[] {
+  const now = Date.now();
+  const window = (id: string, label: string, used: number, resetsInMinutes: number): AllowanceWindow => ({
+    id,
+    label,
+    usedPercent: used,
+    remainingPercent: 100 - used,
+    resetsAt: now + resetsInMinutes * 60_000,
+    observedAt: now,
+    exhausted: used >= 100,
+  });
+  return [
+    {
+      id: "codex",
+      provider: "codex",
+      name: "Codex",
+      plan: "Pro",
+      status: "available",
+      refreshedAt: now,
+      windows: [window("codex:primary", "5-hour window", 18, 144), window("codex:secondary", "7-day window", 36, 3 * 1440)],
+    },
+    {
+      id: "claude:claude-cli",
+      provider: "claude",
+      name: "Claude · Personal",
+      plan: "Max",
+      status: "available",
+      refreshedAt: now,
+      windows: [window("five_hour", "5-hour window", 47, 52), window("seven_day", "7-day window", 72, 4 * 1440 + 300), window("seven_day_opus", "7-day window · Opus", 80, 4 * 1440 + 300)],
+    },
+    {
+      id: "claude:work",
+      provider: "claude",
+      name: "Claude · Work",
+      plan: "Team",
+      status: "available",
+      refreshedAt: now,
+      windows: [window("five_hour", "5-hour window", 96, 21), window("seven_day", "7-day window", 41, 2 * 1440)],
+    },
+    { id: "claude:client", provider: "claude", name: "Claude · Client project", plan: null, status: "disconnected", refreshedAt: null, windows: [] },
+  ];
+}

@@ -1,11 +1,11 @@
-import { useMemo, useRef, useState } from "react";
 import { commentMentionOptions, commentRecipientKey, harnessName, orclingMentionOptions, type CommentAttempt, type CommentRecipient, type ModelOption, type TaskComment } from "@openorc/protocol";
-import { useOrclings } from "../lib/orclings";
+import { useMemo, useRef, useState } from "react";
 import { useRpc, useRpcMutation } from "../lib/client";
+import { insertMention, mentionQueryAt } from "../lib/composer-mentions";
 import { modelEffortLabel } from "../lib/model-effort-label";
-import { mentionQueryAt, insertMention } from "../lib/composer-mentions";
-import { Button, TextButton } from "./ui";
+import { useOrclings } from "../lib/orclings";
 import { TaskCommentDiscussion } from "./TaskCommentDiscussion";
+import { Button, TextButton } from "./ui";
 import { useTaskCommentDraft } from "./useTaskCommentDraft";
 
 /** Everyone a comment can mention: Orclings first, then every available model and effort. */
@@ -20,7 +20,8 @@ function modelSearchMessage(pending: boolean, failed: boolean): string {
   return "No matching model and effort.";
 }
 
-export function TaskComments({ taskId, description, beforeSend }: { taskId: string; description: string; beforeSend: () => Promise<boolean> }) {
+type TaskCommentsProps = { taskId: string; description: string; beforeSend: () => Promise<boolean> };
+export function TaskComments({ taskId, description, beforeSend }: TaskCommentsProps) {
   const discussion = useRpc("tasks.comments.list", { taskId }, { refetchInterval: 5000 });
   const models = useRpc("agents.models", {}, { staleTime: 300000 });
   const retry = useRpcMutation("tasks.comments.retry");

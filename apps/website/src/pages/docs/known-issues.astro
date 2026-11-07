@@ -16,10 +16,6 @@ import { docHref } from "../../data/docs";
         <dt>Terminal output goes to the first window</dt>
         <dd>A terminal in a second window can stay blank. Opening or reloading any window also detaches every open terminal panel, so live output stops until you open the panel again. The shells keep running.</dd>
       </div>
-      <div>
-        <dt>Replies can cross between windows</dt>
-        <dd>Each window numbers its requests from 1, and the core sends every reply to every window. When two windows wait on the same number at once, one can show the other's answer. It is rare; reloading the window fixes the display.</dd>
-      </div>
     </dl>
   </section>
 
@@ -77,8 +73,8 @@ import { docHref } from "../../data/docs";
         <dd>A schedule fires only while OpenOrc runs. Firings missed while it was closed collapse into one, and the next one comes a full interval later.</dd>
       </div>
       <div>
-        <dt>Long team and task histories load at once</dt>
-        <dd>Ordinary threads load a few turns at a time. Team conversations and a task's activity load every event, which is slow for long histories.</dd>
+        <dt>Long task histories load at once</dt>
+        <dd>Ordinary threads load a few turns at a time. A task's activity loads every event, which is slow for long histories.</dd>
       </div>
     </dl>
   </section>
@@ -92,7 +88,7 @@ import { docHref } from "../../data/docs";
       </div>
       <div>
         <dt>A failed setup script is not run again</dt>
-        <dd>If a project's setup script fails, the worktree is kept, and the next start uses it without running the script. Run the missing steps in the thread's Terminal. Team assignments are the exception: they offer <strong>Retry setup</strong>.</dd>
+        <dd>If a project's setup script fails, the worktree is kept, and the next start uses it without running the script. Run the missing steps in the thread's Terminal.</dd>
       </div>
       <div>
         <dt>Terminal shells outlive their thread</dt>
@@ -163,42 +159,19 @@ import { docHref } from "../../data/docs";
       <div>
         <dt>Approval buttons expire</dt>
         <dd>
-          The <strong>Allow once</strong> and <strong>Deny</strong> buttons in Slack stop working after 10 minutes, or once the connection that posted them is closed, for example when a team relay's host disconnects. The approval still
+          The <strong>Allow once</strong> and <strong>Deny</strong> buttons in Slack stop working after 10 minutes, or once the connection that posted them is closed, for example when a shared relay's host disconnects. The approval still
           waits in OpenOrc.
         </dd>
       </div>
       <div>
         <dt>Large approvals are long</dt>
-        <dd>An approval for a large edit is posted in full, over as many Slack messages as it needs. Through a team relay, one larger than about 256 KB is refused and never reaches Slack.</dd>
+        <dd>An approval for a large edit is posted in full, over as many Slack messages as it needs. Through a shared relay, one larger than about 256 KB is refused and never reaches Slack.</dd>
       </div>
       <div>
         <dt>"Also send to channel" replies are ignored</dt>
         <dd>Slack marks these replies as a different kind of message, and OpenOrc doesn't take them as requests.</dd>
       </div>
     </dl>
-  </section>
-
-  <section aria-labelledby="teams">
-    <h2 id="teams">Agent teams (Beta)</h2>
-    <dl class="docs-terms">
-      <div>
-        <dt>Members share your checkout</dt>
-        <dd>In Local checkout, the default, several members edit your files at the same time. File claims are only advisory.</dd>
-      </div>
-      <div>
-        <dt>Stopping leaves work unmerged</dt>
-        <dd>Stopping a team, or reaching its time limit, doesn't capture or merge work in progress, and sends no notification unless the stop itself fails.</dd>
-      </div>
-      <div>
-        <dt>A restart stops running turns</dt>
-        <dd>Turns that were running when OpenOrc stopped are marked as needing attention and wait for you to press <strong>Retry assignment</strong>. Turns that hadn't started run on their own.</dd>
-      </div>
-      <div>
-        <dt>Folders and refs pile up</dt>
-        <dd>Assignment worktrees, merge folders, and checkpoint refs stay until you delete the team conversation, or its saved tasks if they outlive it.</dd>
-      </div>
-    </dl>
-    <p>More limits are listed on <a href={docHref("teams")}>Agent teams</a>.</p>
   </section>
 
   <section aria-labelledby="windows-os">

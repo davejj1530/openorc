@@ -103,8 +103,35 @@ jobs:
           require('node:fs').appendFileSync(process.env.GITHUB_OUTPUT, `platforms=${JSON.stringify(platforms)}\n`);
           NODE
 
-  build:
+  brain:
     needs: validate
+    name: Build the cloud brain
+    # Once, on Linux, which it runs on: every platform's app carries this same brain.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @openorc/brain bundle
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cloud-brain
+          if-no-files-found: error
+          retention-days: 1
+          path: |
+            apps/brain/dist/brain-*.tgz
+            apps/brain/dist/door-*.mjs
+
+  build:
+    needs: [validate, brain]
     name: Build ${{ matrix.platform }} ${{ matrix.arch }}
     strategy:
       fail-fast: false
@@ -137,6 +164,10 @@ jobs:
           sudo apt-get install -y --no-install-recommends rpm xvfb xauth dbus-daemon gnome-keyring
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v4
+        with:
+          name: cloud-brain
+          path: apps/brain/dist
       - name: Prepare Electron runtime and notice files
         run: pnpm --filter @openorc/desktop exec node -e 'require("electron")'
       - run: pnpm check:size

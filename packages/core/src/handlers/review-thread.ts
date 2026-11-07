@@ -3,7 +3,10 @@ import { ReviewService } from "../services/review.js";
 import { threadAndProject } from "./context.js";
 import type { Handlers } from "./types.js";
 type Dependencies = {
-  review: Pick<ReviewService, "threadDiff" | "threadChanges" | "threadFileDiff" | "commitThread" | "pushThread" | "createThreadPr" | "threadPrTemplate" | "threadLog" | "threadPushState">;
+  review: Pick<
+    ReviewService,
+    "threadDiff" | "threadChanges" | "threadFileDiff" | "commitThread" | "pushThread" | "createThreadPr" | "threadPrTemplate" | "threadLog" | "commitRange" | "threadPushState"
+  >;
   db: Db;
   invalidate: (keys: string[]) => void;
 };
@@ -22,6 +25,7 @@ export function createReviewThreadHandlers({
   | "review.createThreadPr"
   | "review.threadPrTemplate"
   | "git.threadLog"
+  | "git.commitRange"
   | "git.threadPushState"
 > {
   /**
@@ -54,12 +58,12 @@ export function createReviewThreadHandlers({
     },
     "review.commitThread": ({ threadId, message }) => {
       const { thread, project } = threadAndProject(db, threadId);
-      const keys = ["workspace-diff", `threaddiff:${threadId}`, `threadlog:${threadId}`, `thread:${threadId}`, "threads", "orchestration"];
+      const keys = ["workspace-diff", `threaddiff:${threadId}`, `threadlog:${threadId}`, `thread:${threadId}`, "threads"];
       return landed(threadId, keys, () => review.commitThread(thread, project, message));
     },
     "review.pushThread": ({ threadId }) => {
       const { thread, project } = threadAndProject(db, threadId);
-      return landed(threadId, [`thread:${threadId}`, "threads", "orchestration"], () => review.pushThread(thread, project));
+      return landed(threadId, [`thread:${threadId}`, "threads"], () => review.pushThread(thread, project));
     },
     "review.createThreadPr": ({ threadId, title, body, base }) => {
       const { thread, project } = threadAndProject(db, threadId);
@@ -72,6 +76,10 @@ export function createReviewThreadHandlers({
     "git.threadLog": ({ threadId, limit }) => {
       const { thread, project } = threadAndProject(db, threadId);
       return review.threadLog(thread, project, limit);
+    },
+    "git.commitRange": ({ threadId, from, to, base, limit }) => {
+      const { thread, project } = threadAndProject(db, threadId);
+      return review.commitRange(thread, project, { from, to, base, ...(limit ? { limit } : {}) });
     },
     "git.threadPushState": ({ threadId }) => {
       const { thread, project } = threadAndProject(db, threadId);

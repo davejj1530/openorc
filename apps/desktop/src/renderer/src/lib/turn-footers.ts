@@ -29,7 +29,8 @@ export function useTurnFooters({
   threadId: string | null;
   transcripts: readonly (RunTranscript | undefined)[];
   blocks: readonly Block[] | undefined;
-  basePath: string;
+  /** Null for a conversation whose agent ran elsewhere: its cards name only the files the saved diff lists. */
+  basePath: string | null;
 }): TurnFooters {
   const checkpoints = useRpc("threads.checkpoints", { id: threadId ?? "" }, { enabled: Boolean(threadId) });
   const history = threadId ? checkpoints.data : undefined;
@@ -45,7 +46,7 @@ export function useTurnFooters({
  * Each turn that saved a checkpoint gets a change card after its last block. A checkpoint's turn number is
  * one-based; a block's turn is how many had finished before it.
  */
-function turnCards(history: ThreadCheckpoint[], transcripts: readonly (RunTranscript | undefined)[], basePath: string): Map<string, TurnCard> {
+function turnCards(history: ThreadCheckpoint[], transcripts: readonly (RunTranscript | undefined)[], basePath: string | null): Map<string, TurnCard> {
   const cards = new Map<string, TurnCard>();
   for (const t of transcripts) {
     if (!t) continue;
@@ -57,7 +58,7 @@ function turnCards(history: ThreadCheckpoint[], transcripts: readonly (RunTransc
       for (const block of t.blocks) {
         if (t.turnOf.get(block.id) !== turn) continue;
         last = block.id;
-        if (block.kind === "tool") paths.push(...editedPaths(block.name, block.input, basePath));
+        if (block.kind === "tool" && basePath !== null) paths.push(...editedPaths(block.name, block.input, basePath));
       }
       if (last) cards.set(last, { checkpointId: history[index]!.id, previousCheckpointId: index > 0 ? history[index - 1]!.id : null, paths: [...new Set(paths)] });
     }

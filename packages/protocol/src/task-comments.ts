@@ -1,10 +1,9 @@
 import { z } from "zod";
-import { HarnessId } from "./harness.js";
-import type { ModelOption } from "./rpc.js";
-import { harnessName, isHarnessId } from "./harness.js";
+import { formatModelEffortLabel } from "./execution-target.js";
+import { HarnessId, harnessName, isHarnessId } from "./harness.js";
 import { effortLabel, modelEfforts } from "./model-effort.js";
-import { formatModelEffortLabel } from "./orchestration.js";
 import type { Orcling } from "./orclings.js";
+import type { ModelOption } from "./rpc.js";
 
 /** A model and effort, or an Orcling, which brings its own identity and memory to the reply. */
 export const CommentRecipient = z.object({ agent: HarnessId, model: z.string().min(1), effort: z.string().nullable(), orclingId: z.string().min(1).optional() }).strict();

@@ -3,7 +3,8 @@ import { harnessShortName, isHarnessId } from "@openorc/protocol";
 import { createContext, memo, useContext, useEffect, useRef, useState } from "react";
 import { Pressable, TextInput, useWindowDimensions, View, type FocusEvent, type HostInstance, type LayoutChangeEvent } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
-import { client, shownMacId } from "../client";
+import { hostClient, shownMacId, useRpcMutation } from "../client";
+import { HostContext } from "../connection/host-context";
 import { AlertCircle, Check, Hammer, Image as ImageIcon, Terminal, X } from "../generated/icons";
 import { takeQueued, useQueuedAnswer } from "../notifications/answers";
 import { cn } from "../ui/cn";
@@ -42,7 +43,7 @@ type Decision = "allow" | "allow_for_run" | "deny";
 
 /** Answers an agent's request once; a second tap while the answer is on its way does nothing. */
 function useResolve(runId: string, approvalId: string) {
-  const resolve = client.useRpcMutation("approvals.resolve");
+  const resolve = useRpcMutation("approvals.resolve");
   return {
     pending: resolve.isPending,
     error: resolve.error?.message ?? null,
@@ -91,9 +92,9 @@ function DeniedLine({ block }: { block: ApprovalBlock }) {
  * Whether the Mac still waits on this approval. A card on screen since before the app went away may not have heard it
  * was answered, so the run reloads first; one that does not reload leaves the Mac to answer for itself.
  */
-async function stillOpen(runId: string, approvalId: string): Promise<boolean> {
-  await client.runs.resync([runId]);
-  const block = client.runs.get(runId)?.blocks.find((item) => item.kind === "approval" && item.approvalId === approvalId);
+async function stillOpen(runs: ReturnType<typeof hostClient>["runs"], runId: string, approvalId: string): Promise<boolean> {
+  await runs.resync([runId]);
+  const block = runs.get(runId)?.blocks.find((item) => item.kind === "approval" && item.approvalId === approvalId);
   return block?.kind !== "approval" || !block.decision;
 }
 
@@ -102,7 +103,9 @@ async function stillOpen(runId: string, approvalId: string): Promise<boolean> {
  * taken in the commit that sends it: a card that leaves the screen before its effects run leaves it to the next card.
  */
 function useAlertAnswer(runId: string, block: ApprovalBlock, send: (decision: Decision) => void) {
-  const macId = shownMacId();
+  const host = useContext(HostContext);
+  // Alerts queue an answer under the host that sent them.
+  const macId = host ?? shownMacId();
   const { approvalId } = block;
   const waiting = useQueuedAnswer(macId ? { macId, runId, approvalId } : null);
   const open = !block.decision;
@@ -112,8 +115,8 @@ function useAlertAnswer(runId: string, block: ApprovalBlock, send: (decision: De
     const answer = takeQueued({ macId, runId, approvalId }, Date.now());
     if (!answer || !open || sent.current) return;
     sent.current = true;
-    void stillOpen(runId, approvalId).then((still) => still && send(answer));
-  }, [waiting, open, send, macId, runId, approvalId]);
+    void stillOpen(hostClient(host).runs, runId, approvalId).then((still) => still && send(answer));
+  }, [waiting, open, send, macId, host, runId, approvalId]);
 }
 
 /** The agent asks before it acts: what it wants to do, then Deny, Allow for this run and Allow, the one ink pill. */
@@ -393,7 +396,7 @@ export const Card = memo(function Card({ block, runId }: { block: Block; runId: 
     case "message":
       return <ErrorCard text={block.text} />;
     case "status":
-      return <ErrorCard text={block.text} />;
+      return block.notice ? <Text className="text-sm text-ink-4">{block.text}</Text> : <ErrorCard text={block.text} />;
     case "activity":
       return isImageGeneration(block) ? <ImageGeneration block={block} runId={runId} /> : <ActivityRow block={block} runId={runId} />;
     case "tool":

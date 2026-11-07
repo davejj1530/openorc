@@ -1,18 +1,19 @@
 import { composerActivity } from "@openorc/client";
 import { WORKSPACE_ID } from "@openorc/protocol";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { View } from "react-native";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRpc } from "../client";
+import { HostContext } from "../connection/host-context";
 import { ComposerPlane } from "../composer/ComposerPlane";
 import { SendButton } from "../composer/SendButton";
 import { useShareSettings } from "../composer/settings-bridge";
 import { projectChoices, type ProjectChoice } from "../projects";
 import { Text } from "../ui/Text";
 import { rememberedProject, rememberProject } from "./drafts";
-import { openingProject } from "./new-thread-state";
+import { copyAge, openingProject } from "./new-thread-state";
 import { ProjectPicker } from "./ProjectPicker";
 import { useNewThread } from "./use-new-thread";
 
@@ -23,12 +24,15 @@ interface FormProps {
   projectId: string;
   choices: ProjectChoice[];
   onProject: (id: string) => void;
+  /** How old the cloud brain's copy of the project is, said only once it is old. */
+  copy: string | null;
 }
 
-function NewThreadForm({ projectId, choices, onProject }: FormProps) {
+function NewThreadForm({ projectId, choices, onProject, copy }: FormProps) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const form = useNewThread(projectId);
+  const host = useContext(HostContext);
   useShareSettings(COMPOSER_ID, form.settings);
   // Undefined until the Mac's projects load; Workspace is always listed.
   const name = projectId === WORKSPACE_ID ? null : choices.find((choice) => choice.id === projectId)?.name;
@@ -37,7 +41,7 @@ function NewThreadForm({ projectId, choices, onProject }: FormProps) {
     const threadId = await form.submit();
     // Left, or covered by another screen, while the Mac set the thread up: the person has moved on, so stay put.
     if (!threadId || !navigation.isFocused()) return;
-    router.replace({ pathname: "/thread/[id]", params: { id: threadId } });
+    router.replace({ pathname: "/thread/[id]", params: host ? { id: threadId, host } : { id: threadId } });
   };
   return (
     <View className="flex-1 justify-end bg-bg">
@@ -48,6 +52,7 @@ function NewThreadForm({ projectId, choices, onProject }: FormProps) {
           </Text>
           {/* An image on its way belongs to this project's draft, so the project holds until it lands. */}
           <ProjectPicker choices={choices} selected={projectId} disabled={form.starting || form.uploading > 0} onSelect={onProject} />
+          {copy ? <Text className="-mt-2 px-5 text-sm text-ink-4">{copy}</Text> : null}
           <View className="gap-2 px-3">
             {form.error ? (
               <Text accessibilityRole="alert" className="px-1 text-sm text-bad">
@@ -94,5 +99,9 @@ export function NewThreadScreen() {
   const projectId = projects.data && !choices.some((choice) => choice.id === chosen) ? WORKSPACE_ID : chosen;
   useEffect(() => rememberProject(projectId), [projectId]);
   // One form for every project, so the prompt keeps the keyboard while the person switches projects.
-  return <NewThreadForm projectId={projectId} choices={choices} onProject={setChosen} />;
+  const copy = copyAge(
+    projects.data?.find((project) => project.id === projectId),
+    Date.now(),
+  );
+  return <NewThreadForm projectId={projectId} choices={choices} onProject={setChosen} copy={copy} />;
 }

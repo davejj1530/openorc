@@ -2,7 +2,7 @@
 
 Agents can use OpenOrc's `visualize` tool to explain a concept with a diagram, chart, or small interactive example. Ask things like “Show me how a queue works” or “Let me step through binary search.” The agent can also choose a visual when it would make an explanation clearer.
 
-Visualizations appear alongside the reply, including when work details are collapsed. **Hide visualization** closes the view, **Show visualization** reopens it, and **Reset** restores the initial state. **View source** exposes the original tool call. The title and plain-text explanation remain readable if the view cannot load.
+Visualizations appear alongside the reply, including when work details are collapsed. **Hide visualization** closes the view, **Show visualization** reopens it, and **Reset** restores the initial state. **View source** exposes the original tool call. The title and plain-text explanation remain readable if the view cannot load. Each view runs in a process of its own, so a stuck one cannot stall the others, and the conversation says when a view's process stops. The iPhone app shows visualizations too, in a sandboxed web view with no network access.
 
 The tool is available to agents connected to OpenOrc's internal MCP server, including Codex, Claude Code and OpenCode. It works in Plan conversations too. The HTML is saved as part of the tool input, so reopening history does not require a live provider session. Control values are local to an open view; resetting, hiding or reopening history starts from the original HTML.
 
@@ -30,7 +30,8 @@ The host supplies `--background`, `--foreground`, `--muted`, `--border`, `--acce
 
 ```sh
 pnpm --filter @openorc/mcp test
-pnpm --filter @openorc/desktop exec vitest run src/renderer/src/lib/visualization.test.ts src/renderer/src/components/VisualizationResult.test.tsx
+pnpm --filter @openorc/client exec vitest run src/visualization.test.ts src/visualization-document.test.ts
+pnpm --filter @openorc/desktop exec vitest run src/renderer/src/components/VisualizationResult.test.tsx
 node scripts/visualization-ui-smoke.cjs
 ```
 

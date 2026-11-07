@@ -1,6 +1,6 @@
 import { projectGitView, type ProjectGitView } from "@openorc/client";
 import { WORKSPACE_ID, type ProjectGit } from "@openorc/protocol";
-import { useRpc } from "./client";
+import { ensureRpc, useRpc } from "./client";
 
 /**
  * What git offers a project's folder, read live because git can be set up at any time. Until it is known, git
@@ -12,8 +12,13 @@ export function useProjectGit(projectId: string | null | undefined): ProjectGitV
   return projectGitView(query.data ?? null);
 }
 
-/** Why worktrees or teams are unavailable, for the places that already explain a disabled choice. */
-export function branchingReason(state: ProjectGit | null, feature: "Worktrees" | "Teams"): string | null {
+/** Loads what useProjectGit reads for a project; the Workspace folder has nothing to read. */
+export function loadProjectGit(projectId: string): Promise<unknown> {
+  return projectId === WORKSPACE_ID ? Promise.resolve() : ensureRpc("projects.git", { id: projectId });
+}
+
+/** Why worktrees are unavailable, for the places that already explain a disabled choice. */
+export function branchingReason(state: ProjectGit | null, feature: "Worktrees"): string | null {
   if (state === "none") return `${feature} need git and a first commit.`;
   return state === "no_commits" ? `${feature} need a first commit.` : null;
 }

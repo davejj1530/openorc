@@ -2,7 +2,6 @@ import { settings, type Db } from "@openorc/db";
 import { AppSettings } from "@openorc/protocol";
 
 const defaults: AppSettings = {
-  experimentalTeamExecution: true,
   notifications: true,
   sound: false,
   autoDoneDays: 3,
@@ -14,6 +13,7 @@ const defaults: AppSettings = {
   look: null,
   idleProcessMinutes: 10,
   claudeUserMcpServers: true,
+  claudeAccountAutoSwitch: false,
 };
 
 const KEY = "app.settings";

@@ -24,6 +24,7 @@ it("names the open section, and lists the others from the title while the sideba
   expect((await screen.findAllByRole("menuitem")).map((item) => item.textContent)).toEqual([
     "Usage",
     "Connections",
+    "Cloud",
     "Slack",
     "Phone",
     "Skills",

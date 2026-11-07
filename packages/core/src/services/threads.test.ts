@@ -1,17 +1,17 @@
+import { ClaudeAdapter, CodexAdapter, RunHandle } from "@openorc/agents";
+import { checkpoints, listEvents, projects, runs as runRepo, tasks, threads } from "@openorc/db";
+import { commitAll, git } from "@openorc/git";
+import { type Project, type Thread } from "@openorc/protocol";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { commitAll, git } from "@openorc/git";
-import { checkpoints, listEvents, orchestration, projects, teamRuntime, threads, tasks, runs as runRepo } from "@openorc/db";
-import { DEFAULT_TEAM_LIMITS, type Project, type Thread } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
-import { ThreadService, titleFromPrompt, type ThreadPatch } from "./threads.js";
+import { ReviewService } from "./review.js";
 import { threadTurnChanges } from "./thread-turn-changes.js";
-import { ClaudeAdapter, CodexAdapter, RunHandle } from "@openorc/agents";
+import { ThreadService, titleFromPrompt } from "./threads.js";
 import { WorkspaceWriters } from "./workspace-writers.js";
 import { WorkspaceService } from "./workspace.js";
-import { ReviewService } from "./review.js";
 
 let root: string;
 let dataDir: string;
@@ -756,194 +756,6 @@ describe("task tool access and team execution boundaries", () => {
       await expect(core.threads.toolUpdate(run.id, allowed.id, { status: "archived" })).resolves.toMatchObject({ id: allowed.id, status: "archived" });
     }
   });
-
-  it("rejects generic team launches and queues before workspace or thread changes", async () => {
-    const thread = threads.update(core.db, planThread().id, { workspaceMode: "worktree", snoozedUntil: Date.now() + 60000 });
-    const owned = task(thread.id);
-    const team = orchestration.save(core.db, {
-      projectId: project.id,
-      expectedRevisionId: null,
-      draft: {
-        name: "Managed execution",
-        limits: { ...DEFAULT_TEAM_LIMITS },
-        discussion: { ambientRounds: 0, peerFollowUps: 0, mentionOnly: [] },
-        members: [{ key: "lead", name: "Lead", managerKey: null, responsibility: "Coordinate", settings: { agent: "codex", model: "fixture", effort: null, fastMode: false } }],
-      },
-    });
-    orchestration.createInstance(core.db, { threadId: thread.id, teamRevisionId: team.revision.id });
-    const prepare = vi.spyOn(core.workspaces, "prepare");
-    const prepareThread = vi.spyOn(core.workspaces, "prepareThread");
-    const start = vi.spyOn(core.runs, "start");
-    const send = vi.spyOn(core.runs, "send");
-    try {
-      // The current task row decides ownership even when a caller passes an old copy.
-      await expect(core.threads.startTask({ ...owned, threadId: null }, undefined, "worktree")).rejects.toThrow(/managed by a saved team/);
-      await expect(
-        core.threads.continueThread(thread.id, { agent: "claude", model: "other", effort: "high", fastMode: false, mode: "act", permissionMode: "autonomous", prompt: "Bypass", attachments: [] }),
-      ).rejects.toThrow(/managed by a saved team/);
-      expect(() => core.threads.queue(thread.id, "Bypass queue")).toThrow(/managed by a saved team/);
-      await expect(core.threads.send(thread.id, "Bypass delivery", null)).rejects.toThrow(/managed by a saved team/);
-      expect(core.threads.get(thread.id)?.queued).toEqual([]);
-      expect(tasks.get(core.db, owned.id)).toEqual(owned);
-      expect(threads.get(core.db, thread.id)).toEqual(thread);
-      expect(prepare).not.toHaveBeenCalled();
-      expect(prepareThread).not.toHaveBeenCalled();
-      expect(start).not.toHaveBeenCalled();
-      expect(send).not.toHaveBeenCalled();
-    } finally {
-      prepare.mockRestore();
-      prepareThread.mockRestore();
-      start.mockRestore();
-      send.mockRestore();
-    }
-  });
-
-  it("rejects direct structural team updates atomically while allowing presentation edits", () => {
-    const thread = planThread();
-    const team = orchestration.save(core.db, {
-      projectId: project.id,
-      expectedRevisionId: null,
-      draft: {
-        name: "Update guard",
-        limits: { ...DEFAULT_TEAM_LIMITS },
-        discussion: { ambientRounds: 0, peerFollowUps: 0, mentionOnly: [] },
-        members: [{ key: "lead", name: "Lead", managerKey: null, responsibility: "Coordinate", settings: { agent: "codex", model: "fixture", effort: null, fastMode: false } }],
-      },
-    });
-    orchestration.createInstance(core.db, { threadId: thread.id, teamRevisionId: team.revision.id });
-    const blocked: ThreadPatch[] = [{ agent: "claude" }, { model: "different" }, { model: null }, { effort: "high" }, { effort: null }, { fastMode: true }, { fastMode: false }];
-    const applyPermissions = vi.spyOn(core.runs, "applyThreadPermissions");
-    try {
-      for (const patch of blocked) {
-        expect(() => core.threads.update(thread.id, { title: "Do not partly save", draft: "Do not partly save", ...patch })).toThrow(/managed by a saved team/);
-        expect(threads.get(core.db, thread.id)).toEqual(thread);
-      }
-      expect(applyPermissions).not.toHaveBeenCalled();
-      expect(core.threads.update(thread.id, { title: "Renamed team work", draft: "Unsaved prompt", pinned: true, seen: true })).toMatchObject({
-        title: "Renamed team work",
-        draft: "Unsaved prompt",
-        pinnedAt: expect.any(Number),
-        seenAt: expect.any(Number),
-      });
-      expect(core.threads.update(thread.id, { pinned: false }).pinnedAt).toBeNull();
-    } finally {
-      applyPermissions.mockRestore();
-    }
-  });
-
-  it("organizes a quiescent pinned team and changes its next-execution policy without starting or cleaning work", () => {
-    const thread = planThread();
-    const team = orchestration.save(core.db, {
-      projectId: project.id,
-      expectedRevisionId: null,
-      draft: {
-        name: "Quiet team",
-        limits: { ...DEFAULT_TEAM_LIMITS },
-        discussion: { ambientRounds: 0, peerFollowUps: 0, mentionOnly: [] },
-        members: [{ key: "lead", name: "Lead", managerKey: null, responsibility: "Coordinate", settings: { agent: "codex", model: "fixture", effort: null, fastMode: false } }],
-      },
-    });
-    const instance = orchestration.createInstance(core.db, { threadId: thread.id, teamRevisionId: team.revision.id });
-    const start = vi.spyOn(core.runs, "start");
-    const cleanup = vi.spyOn(core.workspaces, "cleanupThread");
-    try {
-      expect(core.threads.update(thread.id, { mode: "act", permissionMode: "autonomous", pinned: true })).toMatchObject({ mode: "act", permissionMode: "autonomous", pinnedAt: expect.any(Number) });
-      expect(core.threads.update(thread.id, { done: true })).toMatchObject({ doneAt: null, pinnedAt: expect.any(Number), snoozedUntil: null });
-      expect(core.threads.update(thread.id, { done: false }).doneAt).toBeNull();
-      expect(core.threads.update(thread.id, { archived: true }).archivedAt).not.toBeNull();
-      expect(core.threads.update(thread.id, { archived: false }).archivedAt).toBeNull();
-      const until = Date.now() + 60_000;
-      expect(core.threads.update(thread.id, { snoozedUntil: until }).snoozedUntil).toBe(until);
-      expect(core.threads.update(thread.id, { snoozedUntil: null }).snoozedUntil).toBeNull();
-      expect(orchestration.getInstance(core.db, thread.id)).toEqual(instance);
-      expect(start).not.toHaveBeenCalled();
-      expect(cleanup).not.toHaveBeenCalled();
-    } finally {
-      start.mockRestore();
-      cleanup.mockRestore();
-    }
-  });
-
-  it("changes an unfinished team's requested mode and permissions while rejecting organization patches atomically", () => {
-    const thread = planThread();
-    const settings = { agent: "codex" as const, model: "fixture", effort: null, fastMode: false };
-    const team = orchestration.save(core.db, {
-      projectId: project.id,
-      expectedRevisionId: null,
-      draft: {
-        name: "Live policy",
-        limits: DEFAULT_TEAM_LIMITS,
-        discussion: { ambientRounds: 0, peerFollowUps: 0, mentionOnly: [] },
-        members: [{ key: "lead", name: "Lead", managerKey: null, responsibility: "Coordinate", settings }],
-      },
-    });
-    const instance = orchestration.createInstance(core.db, { threadId: thread.id, teamRevisionId: team.revision.id });
-    const execution = teamRuntime.create(core.db, {
-      id: `policy-${thread.id}`,
-      instanceId: instance.id,
-      threadId: thread.id,
-      projectId: project.id,
-      state: "active",
-      generation: 1,
-      revision: 0,
-      limits: DEFAULT_TEAM_LIMITS,
-      actors: [
-        {
-          id: "lead",
-          memberKey: "lead",
-          parentId: null,
-          taskId: null,
-          requestKey: null,
-          requestHash: null,
-          dependencies: [],
-          input: { title: "Policy", spec: "Keep working", attachments: [], responsibility: "Coordinate", settings },
-          state: "queued",
-          retries: 0,
-          directionVersion: 0,
-          deliveredVersion: 0,
-          disposition: null,
-          result: null,
-          snapshotId: null,
-          error: null,
-        },
-      ],
-      attempts: [],
-      messages: [],
-      error: null,
-      createdAt: 1000,
-      updatedAt: 1000,
-      deadlineAt: 60000,
-    });
-    for (const patch of [{ archived: true }, { done: true }, { snoozedUntil: Date.now() + 60000 }]) {
-      expect(() => core.threads.update(thread.id, { ...patch, mode: "act", permissionMode: "autonomous", title: "Must not save" })).toThrow(/unfinished execution/);
-      expect(threads.get(core.db, thread.id)).toEqual(thread);
-    }
-    expect(core.threads.update(thread.id, { permissionMode: "autonomous" })).toMatchObject({ permissionMode: "autonomous", mode: "plan", title: thread.title });
-    expect(core.runs.threadPermissions(thread.id)).toEqual({
-      mode: { requested: "plan", effective: "plan", pending: false },
-      requested: "autonomous",
-      effective: "review",
-      pendingRestart: false,
-      runs: [],
-    });
-    expect(teamRuntime.get(core.db, execution.id)).toEqual(execution);
-    const changed = vi.spyOn(core.teams, "modeChanged").mockImplementation(() => {});
-    try {
-      expect(core.threads.update(thread.id, { mode: "act" }).mode).toBe("act");
-      expect(changed).toHaveBeenCalledExactlyOnceWith(thread.id);
-      core.threads.update(thread.id, { mode: "act" });
-      expect(changed).toHaveBeenCalledTimes(1);
-      expect(teamRuntime.get(core.db, execution.id)).toEqual(execution);
-    } finally {
-      changed.mockRestore();
-    }
-    expect(core.threads.get(thread.id)?.hasStarted).toBe(true);
-    teamRuntime.update(core.db, execution.id, (draft) => {
-      draft.state = "stopped";
-    });
-    expect(teamRuntime.activeForThread(core.db, thread.id)).toBeNull();
-    expect(core.threads.get(thread.id)?.hasStarted).toBe(true);
-  });
 });
 
 describe("thread creation admission", () => {
@@ -1128,6 +940,11 @@ describe("thread lifecycle", () => {
     expect(core.threads.get(t.id)?.session.status).toBe("lost");
     core.db.stmt("UPDATE runs SET error = ? WHERE id = ?").run("API Error: 500", "run-lost");
     expect(core.threads.get(t.id)?.session.status).toBe("error");
+    core.db.stmt("UPDATE runs SET error = ? WHERE id = ?").run("You've hit your 5-hour limit", "run-lost");
+    const limited = { kind: "usage", provider: "claude" } as const;
+    core.ledger.push({ type: "activity.updated", runId: "run-lost", ts: Date.now(), activityId: "rate-limit", label: "Rate limit reached", status: "error", recovery: limited });
+    core.ledger.flush();
+    expect(core.threads.get(t.id)?.session).toEqual({ status: "error", message: "You've hit your 5-hour limit", recovery: limited });
   });
 
   it("marks runs the previous instance left open as interrupted", () => {
@@ -1202,6 +1019,47 @@ describe("thread lifecycle", () => {
     core.threads.update(t.id, { archived: false });
     await vi.waitFor(() => expect(core.threads.get(t.id)?.queued).toEqual([]));
     expect(deliver).toHaveBeenCalledTimes(1);
+  });
+
+  it("counts what Resolved lists: threads put there, and families quiet since the cutoff that no pin or snooze keeps out", () => {
+    const quietBefore = Date.now() - 86_400_000;
+    const own = projects.insert(core.db, { name: "Resolved count", rootPath: path.join(os.tmpdir(), "resolved-count"), gitRemote: null, defaultBranch: "main", settings: {} });
+    const insert = (title: string) => threads.insert(core.db, { projectId: own.id, title, agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
+    const old = (title: string) => {
+      const thread = insert(title);
+      core.db.stmt("UPDATE threads SET last_activity_at = 1000 WHERE id = ?").run(thread.id);
+      return thread;
+    };
+    old("Quiet");
+    insert("Fresh");
+    core.threads.update(insert("Put there").id, { archived: true });
+    core.threads.update(old("Pinned").id, { pinned: true });
+    core.threads.update(old("Snoozed").id, { snoozedUntil: Date.now() + 60_000 });
+    // A subagent's recent work keeps its old parent out, and counts as nothing of its own.
+    const parent = old("Busy family");
+    threads.update(core.db, insert("Helper").id, { parentThreadId: parent.id, parentRelation: "subagent" });
+    expect(core.threads.resolvedCount({ projectIds: [own.id], quietBefore })).toBe(2);
+    expect(core.threads.resolvedCount({ projectIds: [], quietBefore })).toBe(0);
+  });
+
+  it("brings a resolved conversation back when it gets a message, and counts a reopen as activity that keeps it read", () => {
+    const t = insert("Resolved");
+    const r = runRepo.insert(core.db, { id: "reopen-run", taskId: null, threadId: t.id, agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
+    vi.spyOn(core.threads, "continueThread").mockResolvedValue(r);
+    core.threads.update(t.id, { archived: true });
+    core.threads.queueFollowUp({ threadId: t.id, text: "One more thing", requestKey: "reopen" });
+    expect(core.threads.get(t.id)?.archivedAt).toBeNull();
+
+    // Quiet for weeks, so resolved by its age: a reopen brings it to the top of the list without marking it unread.
+    const quiet = insert("Quiet for weeks");
+    const unread = insert("Unread for weeks");
+    core.db.stmt("UPDATE threads SET last_activity_at = 2000, seen_at = 3000 WHERE id = ?").run(quiet.id);
+    core.db.stmt("UPDATE threads SET last_activity_at = 2000, seen_at = 1000 WHERE id = ?").run(unread.id);
+    const before = Date.now();
+    core.threads.update(quiet.id, { archived: false });
+    core.threads.update(unread.id, { archived: false });
+    expect(core.threads.get(quiet.id)).toMatchObject({ archivedAt: null, unread: false, lastActivityAt: expect.toSatisfy((at: number) => at >= before) });
+    expect(core.threads.get(unread.id)).toMatchObject({ unread: true, lastActivityAt: expect.toSatisfy((at: number) => at >= before) });
   });
 
   it("handles a rejected send-now while another follow-up waits on the same delivery", async () => {

@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from "react";
+import { isSubagentThread } from "@openorc/protocol";
 import { useLayout } from "../lib/layout";
 import { useRpc } from "../lib/client";
 import { MAX_THREAD_PANES, useRouter } from "../lib/router";
@@ -14,11 +15,21 @@ function dropPreviewReason(id: string, visibleThreadIds: readonly string[]): str
   return "Drop to open beside these threads";
 }
 
+/** The shared panel's thread while it is one of these panes, and which side of them it docks on while open. */
+function useSharedPanel(ids: readonly string[]) {
+  const requested = useLayout((s) => (s.panelThreadId && ids.includes(s.panelThreadId) ? s.panelThreadId : null));
+  const thread = useRpc("threads.get", { id: requested ?? "" }, { enabled: Boolean(requested) });
+  const owner = thread.data && !isSubagentThread(thread.data) ? requested : null;
+  const open = useLayout((s) => s.panelOpen) && owner !== null;
+  const side = useLayout((s) => s.panelSide);
+  return { owner, before: open && side === "left", after: open && side === "right" };
+}
+
 /** Keyed panes keep drafts, scroll anchors and subscriptions stable across focus changes. */
 export function ThreadWorkspace() {
   const ids = useRouter((s) => s.threadIds);
   const route = useRouter((s) => s.route);
-  const owner = useLayout((s) => s.panelThreadId);
+  const panel = useSharedPanel(ids);
   const [preview, setPreview] = useState<string | null>(null);
   const [dropError, setDropError] = useState<string | null>(null);
   const [weights, setWeights] = useState<Record<string, number>>({});
@@ -87,8 +98,8 @@ export function ThreadWorkspace() {
                 <section className="thread-pane" data-thread-pane={id} data-focused={id === focused} style={{ flexGrow: weights[id] ?? 1 }}>
                   <ThreadView
                     threadId={id}
-                    first={index === 0}
-                    last={index === ids.length - 1}
+                    first={index === 0 && !panel.before}
+                    last={index === ids.length - 1 && !panel.after}
                     focused={id === focused}
                     onClose={ids.length > 1 ? () => useRouter.getState().closeThreadPane(id) : undefined}
                   />
@@ -118,7 +129,7 @@ export function ThreadWorkspace() {
           </div>
         ) : null}
       </div>
-      {owner && ids.includes(owner) ? <SharedThreadPanel key={owner} threadId={owner} /> : null}
+      {panel.owner ? <SharedThreadPanel key={panel.owner} threadId={panel.owner} /> : null}
     </>
   );
 }
@@ -126,5 +137,5 @@ export function ThreadWorkspace() {
 function SharedThreadPanel({ threadId }: { threadId: string }) {
   const thread = useRpc("threads.get", { id: threadId });
   const project = useRpc("projects.get", { id: thread.data?.projectId ?? "" }, { enabled: Boolean(thread.data) });
-  return thread.data && project.data ? <Panel context={{ kind: "thread", thread: thread.data, project: project.data }} /> : null;
+  return thread.data && !isSubagentThread(thread.data) && project.data ? <Panel context={{ kind: "thread", thread: thread.data, project: project.data }} /> : null;
 }

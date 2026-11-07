@@ -31,7 +31,7 @@ vi.mock("../client", async () => {
   return mac.phone.module;
 });
 
-const { client } = await import("../client");
+const client = (await import("../client")).hostClient(null);
 const { ApprovalCard } = await import("./cards");
 const { useWaitingApprovals, waitingRuns } = await import("./waiting-approvals");
 

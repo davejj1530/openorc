@@ -1,10 +1,11 @@
+import { Db, projects, runs, tasks, threads } from "@openorc/db";
+import { commitAll, git, workspaceTransfer } from "@openorc/git";
+import { type Project, type Task } from "@openorc/protocol";
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Db, orchestration, projects, runs, tasks, threads } from "@openorc/db";
-import { commitAll, git, teamTransfer } from "@openorc/git";
-import { DEFAULT_TEAM_LIMITS, type Project, type Task } from "@openorc/protocol";
+import { seedRetiredTeam } from "../../../db/src/fixtures/retired-team.js";
 import { TaskCheckoutService } from "./task-checkout.js";
 import { WorkspaceWriters } from "./workspace-writers.js";
 
@@ -51,7 +52,7 @@ describe("finished task checkout application", () => {
     await write(root, "tracked.txt", "one\ntwo\nTHREE\n");
     const index = await readFile(path.join(root, ".git/index"));
     const head = (await git(root, ["rev-parse", "HEAD"])).stdout;
-    const sourceBefore = await teamTransfer.capture(source, { refPrefix: "refs/openorc/test/source" });
+    const sourceBefore = await workspaceTransfer.capture(source, { refPrefix: "refs/openorc/test/source" });
     const preview = await service.prepare(task.id);
     expect(preview.state).toBe("ready");
     expect(preview.files).toBe(5);
@@ -69,7 +70,7 @@ describe("finished task checkout application", () => {
     expect(await readFile(path.join(root, ".git/index"))).toEqual(index);
     expect((await git(root, ["rev-parse", "HEAD"])).stdout).toBe(head);
     expect((await git(root, ["branch", "--show-current"])).stdout.trim()).toBe("current-branch");
-    expect((await teamTransfer.capture(source, { refPrefix: "refs/openorc/test/after" })).treeSha).toBe(sourceBefore.treeSha);
+    expect((await workspaceTransfer.capture(source, { refPrefix: "refs/openorc/test/after" })).treeSha).toBe(sourceBefore.treeSha);
     expect(tasks.get(db, task.id)?.status).toBe("review");
     expect((await service.apply(task.id, preview.id)).state).toBe("applied");
     const repeated = await service.prepare(task.id);
@@ -160,7 +161,7 @@ describe("finished task checkout application", () => {
     expect((await service.state(task.id)).preview?.id).toBe(collision.id);
   }, 15000);
 
-  it("gates both writers and active runs, and refuses team-owned tasks", async () => {
+  it("gates both writers and active runs, before applying task files", async () => {
     await write(source, "new.txt", "output\n");
     const preview = await service.prepare(task.id);
     for (const target of [source, root]) {
@@ -177,19 +178,8 @@ describe("finished task checkout application", () => {
     expect((await service.state(task.id)).reason).toContain("Finish or stop");
     db.stmt("UPDATE runs SET ended_at = ?, state = 'success' WHERE id = ?").run(Date.now(), run.id);
     const thread = threads.insert(db, { projectId: project.id, title: "Team", agent: "codex", model: null, mode: "act", permissionMode: "trusted" });
-    const team = orchestration.save(db, {
-      projectId: project.id,
-      expectedRevisionId: null,
-      draft: {
-        name: "Team",
-        limits: { ...DEFAULT_TEAM_LIMITS },
-        discussion: { ambientRounds: 0, peerFollowUps: 0, mentionOnly: [] },
-        members: [{ key: "lead", name: "Lead", managerKey: null, responsibility: "Coordinate", settings: { agent: "codex", model: "fixture", effort: "high", fastMode: false } }],
-      },
-    });
-    orchestration.createInstance(db, { threadId: thread.id, teamRevisionId: team.revision.id });
+    seedRetiredTeam(db, thread);
     db.stmt("UPDATE tasks SET thread_id = ? WHERE id = ?").run(thread.id, task.id);
-    expect((await service.state(task.id)).reason).toContain("team conversation");
-    await expect(service.apply(task.id, preview.id)).rejects.toThrow(/team conversation/);
+    expect((await service.state(task.id)).reason).toContain("This item is no longer available");
   }, 15000);
 });

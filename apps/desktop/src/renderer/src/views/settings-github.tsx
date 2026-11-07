@@ -1,21 +1,9 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import type { ReviewerAppStatus, SystemInfo } from "@openorc/protocol";
 import { Button, TextButton } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { installationLabel } from "./settings-presentation";
-import { Section, Status, Toggle } from "./settings-shared";
-
-function SettingRow({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
-  return (
-    <div className="settings-field">
-      <span>
-        <span>{label}</span>
-        {hint ? <span className="settings-hint">{hint}</span> : null}
-      </span>
-      <span className="flex shrink-0 flex-wrap items-center justify-end gap-2">{children}</span>
-    </div>
-  );
-}
+import { Section, SettingRow, Status, Toggle } from "./settings-shared";
 
 /** Choose where the app may review, let it approve, or forget it on this device. */
 function ReviewerAppControls({ app, onRemoved }: { app: NonNullable<ReviewerAppStatus["app"]>; onRemoved: (slug: string) => void }) {

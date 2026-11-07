@@ -221,6 +221,8 @@ function mapItemLifecycle({ runId, method, p, state, ts }: NotificationContext):
     if (!isRecord(item)) return [protocolError(runId, ts, method, "Expected item to be an object")];
     const id = String(item["id"]);
     const started = method === "item/started";
+    if (item["type"] === "subAgentActivity" && typeof item["agentThreadId"] === "string") return [];
+    if (item["type"] === "collabAgentToolCall" && item["tool"] === "spawnAgent") return spawnTool(runId, ts, id, item, started);
     switch (item["type"]) {
       case "reasoning": {
         if (started) out.push({ type: "thinking.started", runId, ts, messageId: id });
@@ -288,36 +290,9 @@ function mapItemLifecycle({ runId, method, p, state, ts }: NotificationContext):
         }
         break;
       }
-      case "mcpToolCall": {
-        const name = `${String(item["server"])}.${String(item["tool"])}`;
-        const app = record(item["appContext"]);
-        const mcp = {
-          ...state.mcpSources?.get(id),
-          server: String(item["server"]),
-          tool: String(item["tool"]),
-          ...(typeof app["resourceUri"] === "string" ? { resourceUri: app["resourceUri"] } : {}),
-          ...(typeof app["connectorId"] === "string" ? { connectorId: app["connectorId"] } : {}),
-        };
-        if (started) {
-          (state.mcpSources ??= new Map()).set(id, mcp);
-          out.push({ type: "tool.started", runId, ts, toolCallId: id, name, input: item["arguments"], parentToolCallId: null, mcp });
-        } else {
-          state.mcpSources?.delete(id);
-          out.push({
-            type: "tool.completed",
-            runId,
-            ts,
-            toolCallId: id,
-            name,
-            output: item["result"] ?? item["error"],
-            mcp,
-            isError: item["error"] != null || terminalStatus(item["status"]) === "error",
-            status: item["error"] != null ? "error" : terminalStatus(item["status"]),
-            input: item["arguments"],
-          });
-        }
+      case "mcpToolCall":
+        out.push(...mapMcpToolItem({ runId, state, ts }, item, started));
         break;
-      }
       case "dynamicToolCall": {
         const name = [item["namespace"], item["tool"]].filter(Boolean).join(".");
         if (started) out.push({ type: "tool.started", runId, ts, toolCallId: id, name, input: item["arguments"], parentToolCallId: null });
@@ -395,6 +370,45 @@ function mapItemLifecycle({ runId, method, p, state, ts }: NotificationContext):
     return out;
   }
   return out;
+}
+
+function mapMcpToolItem({ runId, state, ts }: Pick<NotificationContext, "runId" | "state" | "ts">, item: Record<string, unknown>, started: boolean): AgentEvent[] {
+  const out: AgentEvent[] = [];
+  const id = String(item["id"]);
+  const name = `${String(item["server"])}.${String(item["tool"])}`;
+  const app = record(item["appContext"]);
+  const mcp = {
+    ...state.mcpSources?.get(id),
+    server: String(item["server"]),
+    tool: String(item["tool"]),
+    ...(typeof app["resourceUri"] === "string" ? { resourceUri: app["resourceUri"] } : {}),
+    ...(typeof app["connectorId"] === "string" ? { connectorId: app["connectorId"] } : {}),
+  };
+  if (started) {
+    (state.mcpSources ??= new Map()).set(id, mcp);
+    out.push({ type: "tool.started", runId, ts, toolCallId: id, name, input: item["arguments"], parentToolCallId: null, mcp });
+  } else {
+    state.mcpSources?.delete(id);
+    out.push({
+      type: "tool.completed",
+      runId,
+      ts,
+      toolCallId: id,
+      name,
+      output: item["result"] ?? item["error"],
+      mcp,
+      isError: item["error"] != null || terminalStatus(item["status"]) === "error",
+      status: item["error"] != null ? "error" : terminalStatus(item["status"]),
+      input: item["arguments"],
+    });
+  }
+  return out;
+}
+
+function spawnTool(runId: string, ts: number, id: string, item: Record<string, unknown>, started: boolean): AgentEvent[] {
+  const input = { prompt: item["prompt"], model: item["model"], effort: item["reasoningEffort"] };
+  if (started) return [{ type: "tool.started", runId, ts, toolCallId: id, name: "Agent", input, parentToolCallId: null }];
+  return [{ type: "tool.completed", runId, ts, toolCallId: id, name: "Agent", input, output: item["agentsStates"], isError: item["status"] === "failed", status: terminalStatus(item["status"]) }];
 }
 
 /** A validated completion clears per-turn state and emits its final events in order. */

@@ -1,6 +1,17 @@
-import path from "node:path";
 import { redact, redactValue } from "@openorc/db";
-import { isRemoteMethod, REMOTE_ATTACHMENT_BYTES, rpcParams, type RemoteMethod, type RemotePush, type RpcParams, type RpcResults } from "@openorc/protocol";
+import {
+  isRemoteMethod,
+  phoneEvents,
+  REMOTE_ATTACHMENT_BYTES,
+  rpcParams,
+  supportsSubagents,
+  type RemoteMethod,
+  type RemotePush,
+  type RpcParams,
+  type RpcResults,
+  type Thread,
+} from "@openorc/protocol";
+import path from "node:path";
 import type { Broadcast } from "../transport.js";
 import { previewReply, type PhoneShaping } from "./phone-words.js";
 
@@ -14,7 +25,7 @@ export interface GuardContext {
   /** The only folder a phone's attachment paths may name. */
   attachmentsDir: string;
   /** A thread as the guards need it, read synchronously; null when there is no such thread. */
-  thread(id: string): { team: boolean } | null;
+  thread(id: string): { team: boolean; parentRelation?: Thread["parentRelation"] } | null;
 }
 
 /** Null admits; a string refuses with that message. Guards see params already parsed by the method's schema. */
@@ -22,6 +33,8 @@ type Guard<M extends RemoteMethod> = (params: RpcParams<M>, context: GuardContex
 
 const allow = () => null;
 const STORED_IMAGE = /^[a-f0-9-]+\.(?:png|jpg|gif|webp)$/;
+/** attachments.saveFile's names: a UUID, then the name the file was given. */
+const STORED_FILE = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}-[A-Za-z0-9._-]+$/;
 const MAX_ATTACHMENT_BASE64 = Math.ceil(REMOTE_ATTACHMENT_BYTES / 3) * 4;
 /** What the phone's own controls change: the composer's settings, and how threads are organized (read state, pins, archive, snooze, title). */
 const PHONE_THREAD_PATCH = new Set(["seen", "agent", "model", "effort", "fastMode", "mode", "permissionMode", "pinned", "archived", "snoozedUntil", "title"]);
@@ -37,10 +50,17 @@ const COMMIT_MESSAGE_MAX = 10_000;
 const PR_TITLE_MAX = 256;
 const PR_BODY_MAX = 65_536;
 
+const storedIn = (paths: readonly string[] | undefined, { attachmentsDir }: GuardContext, names: (name: string) => boolean): boolean =>
+  paths?.every((file) => path.resolve(file) === file && path.dirname(file) === attachmentsDir && names(path.basename(file))) ?? true;
+
 /** Each path must be an image this profile stored with attachments.save. */
-function storedImages(paths: readonly string[] | undefined, { attachmentsDir }: GuardContext): string | null {
-  const foreign = paths?.some((file) => path.resolve(file) !== file || path.dirname(file) !== attachmentsDir || !STORED_IMAGE.test(path.basename(file)));
-  return foreign ? "Only images attached from your phone can be sent from it." : null;
+function storedImages(paths: readonly string[] | undefined, context: GuardContext): string | null {
+  return storedIn(paths, context, (name) => STORED_IMAGE.test(name)) ? null : "Only images attached from your phone can be sent from it.";
+}
+
+/** Each path must be an image or a file this profile stored, with attachments.save or attachments.saveFile. */
+function storedFiles(paths: readonly string[] | undefined, context: GuardContext): string | null {
+  return storedIn(paths, context, (name) => STORED_IMAGE.test(name) || STORED_FILE.test(name)) ? null : "This file did not reach the cloud. Attach it again.";
 }
 
 function phoneTitle(title: string | undefined): string | null {
@@ -55,9 +75,9 @@ function phoneSnooze(until: number | null | undefined): string | null {
   return until > now && until <= now + SNOOZE_HORIZON_MS ? null : "Choose a time within the next year.";
 }
 
-/** A team's Git availability comes from its own projection, which a phone does not read, so its work is published on the Mac. */
+/** Reject mutations of retired conversations from older clients. */
 function teamWork(threadId: string, { thread }: GuardContext): string | null {
-  return thread(threadId)?.team ? "Publish a team's work on your Mac." : null;
+  return thread(threadId)?.team ? "This item is no longer available." : null;
 }
 
 function commitMessage(message: string): string | null {
@@ -74,10 +94,12 @@ function prBody(body: string): string | null {
   return [...body].length <= PR_BODY_MAX ? null : `A pull request body must be up to ${PR_BODY_MAX.toLocaleString("en-US")} characters.`;
 }
 
-function threadUpdate({ taskId, patch }: RpcParams<"threads.update">): string | null {
-  if (taskId !== undefined || !Object.keys(patch).every((key) => PHONE_THREAD_PATCH.has(key))) return "Make this change on your Mac.";
+function threadUpdate({ patch }: RpcParams<"threads.update">): string | null {
+  if (!Object.keys(patch).every((key) => PHONE_THREAD_PATCH.has(key))) return "Make this change on your Mac.";
   return phoneTitle(patch.title) ?? phoneSnooze(patch.snoozedUntil);
 }
+
+const NOT_FROM_PHONE = "This is not available from a phone.";
 
 /** Typed over REMOTE_METHODS: a method listed there without a guard here, or guarded but not listed, fails the build. */
 export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
@@ -86,6 +108,8 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   // Takes a project id and answers none, no_commits or ready: nothing of the folder's path.
   "projects.git": allow,
   "threads.list": allow,
+  // A number: how many threads Resolved holds in the projects named.
+  "threads.resolvedCount": allow,
   "threads.get": allow,
   "threads.messages": allow,
   "threads.lastMessage": allow,
@@ -96,16 +120,34 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   "agents.models": allow,
   "agents.availability": allow,
   // The cached list only: a refresh asks every account's CLI again, which is the Mac's Settings' to do.
-  "claude.accounts.list": ({ refresh }) => (refresh ? "This is not available from a phone." : null),
+  "claude.accounts.list": ({ refresh }) => (refresh ? NOT_FROM_PHONE : null),
   // Takes nothing and answers the shares and plans alone, shaped by the core: no email, token, path or CLI text.
   "providers.limits": allow,
   "app.settings.get": allow,
-  "threads.start": (params, context) =>
-    params.workingDirectory !== undefined ? "Choose a folder for this conversation on your Mac." : (phoneTitle(params.title) ?? storedImages(params.attachments, context)),
+  // Whether the Mac offers cloud threads and where they would run; nothing about its accounts or tokens.
+  "cloud.offer": allow,
+  // Moves the conversation's work to a sandbox of its own, as the Mac's thread menu does, after the phone's confirm.
+  "cloud.move": allow,
+  // The files a move from the checkout would take with it, for that confirm.
+  "threads.movePreview": allow,
+  "cloud.bringToMac": allow,
+  "cloud.keep": allow,
+  // The brain's sandboxes are for its own Mac's Settings, which the owner guards let through.
+  "cloud.sandboxes": () => NOT_FROM_PHONE,
+  "cloud.sandboxes.remove": () => NOT_FROM_PHONE,
+  "threads.start": (params, context) => {
+    if (params.workingDirectory !== undefined) return "Choose a folder for this conversation on your Mac.";
+    // Only the brain's own Mac names a thread's id, for the thread its windows show before the brain has it.
+    if (params.id !== undefined) return NOT_FROM_PHONE;
+    return phoneTitle(params.title) ?? storedImages(params.attachments, context);
+  },
   "threads.update": threadUpdate,
+  // The core checks conversation ownership, active turns and account availability, as on the Mac.
+  "threads.switchClaudeAccount": allow,
   "runs.start": (params, context) => storedImages(params.attachments, context),
   "runs.send": (params, context) => storedImages(params.attachments, context),
   "runs.interrupt": allow,
+  "subagents.stop": allow,
   "threads.queue": (params, context) => storedImages(params.attachments, context),
   "threads.unqueue": allow,
   "threads.sendQueued": allow,
@@ -116,6 +158,8 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   // The schema's FolderPath and the core's own check that the file is among the changes hold the path.
   "review.threadFileDiff": allow,
   "git.threadLog": allow,
+  // Commit ids and a branch name; reads only.
+  "git.commitRange": allow,
   "git.threadPushState": allow,
   "review.threadPrTemplate": allow,
   // Branch names; one gh call.
@@ -125,12 +169,12 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   "review.commitThread": (params, context) => teamWork(params.threadId, context) ?? commitMessage(params.message),
   "review.pushThread": (params, context) => teamWork(params.threadId, context),
   "review.createThreadPr": (params, context) => teamWork(params.threadId, context) ?? prTitle(params.title) ?? prBody(params.body),
-  // One page's state; the handler answers closed for a missing or team-deleted thread.
+  // One page's state; the handler answers closed for a missing or retired thread.
   "preview.state": allow,
 };
 
 /** What a reply's shaping needs besides the result: how an error or a reason reads on a phone, and the Mac's folders. */
-export type ReplyContext = PhoneShaping;
+export type ReplyContext = PhoneShaping & { capabilities?: readonly string[] };
 type Reply<M extends RemoteMethod> = (result: RpcResults[M], context: ReplyContext) => RpcResults[M];
 const same = <T>(result: T): T => result;
 
@@ -143,25 +187,38 @@ export const remoteReplies: { [M in RemoteMethod]: Reply<M> } = {
   "projects.list": same,
   "projects.get": same,
   "projects.git": same,
-  "threads.list": same,
-  "threads.get": same,
+  "threads.list": (rows, { capabilities }) => (supportsSubagents(capabilities) ? rows : rows.filter((row) => row.parentRelation !== "subagent")),
+  "threads.resolvedCount": same,
+  "threads.get": (row, { capabilities }) => (!supportsSubagents(capabilities) && row?.parentRelation === "subagent" ? null : row),
   "threads.messages": same,
   "threads.lastMessage": same,
   "runs.listForThread": same,
-  "events.page": same,
+  "events.page": (page, { capabilities }) => ({ ...page, events: phoneEvents(page.events, capabilities) }),
   "events.toolOutput": same,
-  "inbox.list": same,
+  "inbox.list": (inbox, { capabilities }) => ({
+    ...inbox,
+    items: supportsSubagents(capabilities) ? inbox.items : inbox.items.filter((item) => item.kind !== "thread" || item.thread.parentRelation !== "subagent"),
+  }),
   "agents.models": same,
   "agents.availability": same,
   // A sign-in's email and organization, and the CLI's own words, stay on the Mac.
   "claude.accounts.list": ({ accounts, defaultId }) => ({ defaultId, accounts: accounts.map((account) => ({ ...account, email: null, organization: null, message: null })) }),
   "providers.limits": same,
   "app.settings.get": same,
+  "cloud.offer": same,
+  "cloud.move": same,
+  "threads.movePreview": same,
+  "cloud.bringToMac": same,
+  "cloud.keep": same,
+  "cloud.sandboxes": same,
+  "cloud.sandboxes.remove": same,
   "threads.start": same,
   "threads.update": same,
+  "threads.switchClaudeAccount": same,
   "runs.start": same,
   "runs.send": same,
   "runs.interrupt": same,
+  "subagents.stop": same,
   "threads.queue": same,
   "threads.unqueue": same,
   "threads.sendQueued": same,
@@ -170,6 +227,7 @@ export const remoteReplies: { [M in RemoteMethod]: Reply<M> } = {
   "review.threadChanges": same,
   "review.threadFileDiff": (diff) => ({ ...diff, patch: redact(diff.patch).text }),
   "git.threadLog": (log) => redactValue(log).value,
+  "git.commitRange": (range) => redactValue(range).value,
   // Why Push is blocked can be Git's own error, which names the Mac's folders.
   "git.threadPushState": (state, { words }) => (state.blocked ? { ...state, blocked: words(state.blocked) } : state),
   "review.threadPrTemplate": (template) => redactValue(template).value,
@@ -186,14 +244,38 @@ export function remoteReply<M extends RemoteMethod>(method: M, result: RpcResult
   return (remoteReplies[method] as Reply<M>)(result, context);
 }
 
+/** Exclude children before pagination as well as shaping the result, so legacy pages still fill with conversations. */
+export function remoteParams(method: RemoteMethod, params: unknown, capabilities: readonly string[]): unknown {
+  if (method !== "threads.list" || supportsSubagents(capabilities)) return params;
+  const parsed = rpcParams[method].safeParse(params ?? {});
+  return parsed.success ? { ...parsed.data, excludeSubagents: true, includeChildren: false } : params;
+}
+
 export type RemoteAdmission = { ok: true } | { ok: false; message: string };
 
-/** Admits one phone request or says why not. Params a method's schema rejects pass through, so `handle` words the error. */
-export function admitRemoteRequest(method: string, params: unknown, context: GuardContext): RemoteAdmission {
-  if (!isRemoteMethod(method)) return { ok: false, message: "This is not available from a phone." };
+/**
+ * The brain's own Mac asks under a phone's guards except here, where its windows do more with the threads they forward:
+ * they keep a thread's draft, done mark and pull request, and attach any file the Mac stored on the brain first; its
+ * Settings list and delete the brain's sandboxes.
+ */
+const ownerGuards: Partial<{ [M in RemoteMethod]: Guard<M> }> = {
+  "threads.update": allow,
+  // Its Settings list the sandboxes the brain made for its threads, and delete one there.
+  "cloud.sandboxes": allow,
+  "cloud.sandboxes.remove": allow,
+  "threads.start": ({ id: _id, ...params }, context) => remoteGuards["threads.start"]({ ...params, attachments: undefined }, context) ?? storedFiles(params.attachments, context),
+  "runs.start": (params, context) => storedFiles(params.attachments, context),
+  "runs.send": (params, context) => storedFiles(params.attachments, context),
+  "threads.queue": (params, context) => storedFiles(params.attachments, context),
+};
+
+/** Admits one phone request, or one from the brain's own Mac, or says why not. Params a method's schema rejects pass through, so `handle` words the error. */
+export function admitRemoteRequest(method: string, params: unknown, context: GuardContext, from: "phone" | "owner" = "phone"): RemoteAdmission {
+  if (!isRemoteMethod(method)) return { ok: false, message: NOT_FROM_PHONE };
   const parsed = rpcParams[method].safeParse(params ?? {});
   if (!parsed.success) return { ok: true };
-  const refusal = (remoteGuards[method] as Guard<RemoteMethod>)(parsed.data as RpcParams<RemoteMethod>, context);
+  const guard = (from === "owner" ? ownerGuards[method] : undefined) ?? remoteGuards[method];
+  const refusal = (guard as Guard<RemoteMethod>)(parsed.data as RpcParams<RemoteMethod>, context);
   return refusal ? { ok: false, message: refusal } : { ok: true };
 }
 
@@ -211,6 +293,8 @@ const pushes: { [T in Broadcast["type"]]: (push: Extract<Broadcast, { type: T }>
   "bench.done": () => null,
   // The phone has no Device panel.
   "device.panel": () => null,
+  // Only for the Mac's windows: phones hear the brain themselves.
+  gap: () => null,
 };
 
 export function remotePush(push: Broadcast): RemotePush | null {

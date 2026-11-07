@@ -1,11 +1,11 @@
+import type { Commit, FileChange, Project, PushState, RpcMethod, RpcParams, RpcResults, ThreadSummary } from "@openorc/protocol";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Commit, FileChange, Project, PushState, RpcMethod, RpcParams, RpcResults, ThreadSummary } from "@openorc/protocol";
 import { ComposerCommitChip } from "../components/ComposerFooter";
-import { core } from "../lib/rpc";
 import { queryClient } from "../lib/client";
 import { useComposerChanges } from "../lib/composer-changes";
+import { core } from "../lib/rpc";
 import { ChangesPanel } from "./ChangesPanel";
 import { CommitsPanel } from "./CommitsPanel";
 
@@ -106,10 +106,6 @@ function mockCore(world: World) {
       return (world.push ?? published(0)) as RpcResults[M];
     }
     if (method === "system.info") return { gh: { installed: world.gh ?? true, path: world.gh === false ? null : "/usr/bin/gh" } } as unknown as RpcResults[M];
-    if (method === "orchestration.runtime") {
-      const action = { allowed: !world.team, reason: world.team ?? null };
-      return { actions: { commit: action, push: action, createPr: action } } as RpcResults[M];
-    }
     if (method === "review.threadPrTemplate") return { body: null } as RpcResults[M];
     if (method === "pulls.branches") return { branches: ["main"], defaultBranch: "main" } as RpcResults[M];
     if (method === "review.comments.list") return [] as unknown as RpcResults[M];

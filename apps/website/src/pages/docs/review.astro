@@ -18,9 +18,9 @@ import { docHref } from "../../data/docs";
     <h2 id="changes-panel">The Changes panel</h2>
     <p>The Changes panel sits beside a thread and shows what has changed in the thread's folder. Open it in any of these ways:</p>
     <ul>
-      <li>Choose <strong>Changes</strong> in the thread's header.</li>
-      <li>Press <kbd>⌘J</kbd> to show or hide the panel, then pick its <strong>Changes</strong> tab.</li>
-      <li>Click the line counts in the row at the bottom of the composer, beside the branch. They appear when the folder has uncommitted changes.</li>
+      <li>Press <kbd>⌘J</kbd>, or click <strong>Show panel</strong> in the thread's header, then pick the <strong>Changes</strong> tab. <strong>New tab</strong> (+) opens it when no tab shows it.</li>
+      <li>Click the line counts in the row under the composer, beside the branch. They appear when the folder has uncommitted changes.</li>
+      <li>Click <strong>Review</strong> on a turn's change card.</li>
     </ul>
     <p>What the panel compares depends on where the thread works:</p>
     <div class="docs-table">
@@ -43,13 +43,13 @@ import { docHref } from "../../data/docs";
         </tbody>
       </table>
     </div>
-    <p>The header counts the changed files and lines. When several files changed, a list above the diff marks each one A (added), U (new, not yet tracked), M (modified), D (deleted) or R (renamed), and the diff folds each file to a header row; click a header to open it. An untracked file over 1 MB shows as a one-line placeholder instead of its contents. The diff reads unified in a narrow panel and side by side once the panel is wide enough. <strong>Expand panel</strong> widens it, and <kbd>Esc</kbd> or <strong>Collapse panel</strong> docks it again.</p>
+    <p>The header counts the changed files and lines. When several files changed, a list above the diff marks each one A (added), U (new, not yet tracked), M (modified), D (deleted) or R (renamed), and the diff folds each file to a header row; click a header to open it. An untracked file over 1 MB shows as a one-line placeholder instead of its contents. The diff reads unified in a narrow panel and side by side once the panel is wide enough. <strong>Expand panel</strong> widens it, and <kbd>Esc</kbd> or <strong>Collapse panel</strong> docks it again. The panel sits on the right of the conversation. <strong>Move panel left</strong> in the thread's header docks it on the left, and the same button moves it back. Diffs follow the <strong>Word wrap</strong> choice in the <a href={docHref("files")}>Files</a> tab.</p>
     <p>The panel updates as the agent edits, when you come back to the OpenOrc window, and after a command you run in the terminal. <strong>Refresh</strong> reloads it at once.</p>
   </section>
 
   <section aria-labelledby="turn">
     <h2 id="turn">Review one turn</h2>
-    <p>When a turn edits files, a card appears under the agent's reply: <strong>Edited 3 files</strong>, with the lines added and removed and the first few file names.</p>
+    <p>When a turn edits files, a card appears under the agent's reply: <strong>Changed 3 files</strong>, with the lines added and removed. Its chevron lists the files.</p>
     <ul>
       <li><strong>Review</strong> opens that turn's changes in the Changes panel, as they were saved when the turn ended, so later edits don't mix in. <strong>All changes</strong> returns to the full view.</li>
       <li>Click a file name to see only that file's changes from the turn.</li>
@@ -66,13 +66,13 @@ import { docHref } from "../../data/docs";
       <li>Add as many comments as you need. Each shows on the diff, marked <strong>not sent yet</strong>, and in a list under it.</li>
       <li>Choose <strong>Send 2 to the conversation</strong> (the number counts your unsent comments).</li>
     </ol>
-    <p>OpenOrc sends them as one message that quotes each comment's lines and asks the agent to address every comment, or to say why one is wrong. If the agent is busy, the message waits in the queue; removing it from the queue returns the comments to the review. A comment whose lines change later is marked <strong>Outdated</strong>. Agent team conversations don't take line comments.</p>
+    <p>OpenOrc sends them as one message that quotes each comment's lines and asks the agent to address every comment, or to say why one is wrong. If the agent is busy, the message waits in the queue; removing it from the queue returns the comments to the review. A comment whose lines change later is marked <strong>Outdated</strong>.</p>
   </section>
 
   <section aria-labelledby="commit">
     <h2 id="commit">Commit</h2>
     <ol class="docs-steps">
-      <li>Choose <strong>Commit</strong> in the Changes panel, or <strong>Commit changes</strong> in the row at the bottom of the composer.</li>
+      <li>Choose <strong>Commit</strong> in the Changes panel, or <strong>Commit</strong> beside the line counts in the row under the composer.</li>
       <li>Write the message. OpenOrc doesn't write commit messages for you, so the field starts empty.</li>
       <li>Choose <strong>Commit</strong>.</li>
     </ol>
@@ -82,7 +82,7 @@ import { docHref } from "../../data/docs";
 
   <section aria-labelledby="push">
     <h2 id="push">Push and open a pull request</h2>
-    <p>The thread's commits are listed in the panel's <strong>Commits</strong> tab, which appears once there are commits to show. Commits that origin doesn't have yet are marked <strong>Not pushed</strong>.</p>
+    <p>The panel's <strong>Commits</strong> tab lists the thread's commits on one line, newest first, with each commit's subject, short hash, author, and age. A hollow dot marks a commit that <code>origin</code> doesn't have yet, and a filled dot one that it has. The list also picks up commits and pushes you make in a terminal.</p>
     <ol class="docs-steps">
       <li>Choose <strong>Publish branch</strong> the first time, and <strong>Push 2 commits</strong> (or however many) after that. OpenOrc never force-pushes. If origin has newer commits, it asks you to pull them in first.</li>
       <li>Once the branch is on origin with every commit, <strong>PR</strong> appears. Choose it.</li>
@@ -94,7 +94,6 @@ import { docHref } from "../../data/docs";
   <section aria-labelledby="tasks">
     <h2 id="tasks">Changes in a task</h2>
     <p>A task's <strong>Changes</strong> tab shows the Changes panel of the task's thread beside the task, and <strong>Commits</strong> shows that thread's commits. Line comments you write from a task are labeled with it, and sending them moves the task back to <strong>In progress</strong>.</p>
-    <p>A task that belongs to an <a href={docHref("teams")}>agent team</a> shows a review of its assignment's workspace instead. <strong>Since last review</strong> shows only what changed since you chose <strong>Mark reviewed</strong>. <strong>Export patch</strong> writes the changes to a patch file in OpenOrc's data folder and shows it in your file manager. Its <strong>Commit</strong>, <strong>Push</strong> and <strong>PR</strong> buttons work on the assignment's own branch, when the team allows it.</p>
   </section>
 
   <section aria-labelledby="requirements">

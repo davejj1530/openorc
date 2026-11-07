@@ -1,13 +1,13 @@
-import { QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { Project, ReviewDiff, RpcMethod, RpcParams, RpcResults, ThreadSummary } from "@openorc/protocol";
-import { Composer } from "./Composer";
-import { ChangesPanel } from "../panels/ChangesPanel";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { invalidateTags, queryClient } from "../lib/client";
 import { useComposerChanges } from "../lib/composer-changes";
 import { useLayout, type WorkspaceChangesTarget } from "../lib/layout";
 import { core } from "../lib/rpc";
-import { invalidateTags, queryClient } from "../lib/client";
+import { ChangesPanel } from "../panels/ChangesPanel";
+import { Composer } from "./Composer";
 
 vi.mock("./DiffView", () => ({ DiffView: () => <div>Diff viewer</div> }));
 const project: Project = {
@@ -59,7 +59,6 @@ const thread: ThreadSummary = {
   openTaskCount: 0,
 };
 let dirty: boolean;
-let blocked: boolean;
 let failCommit: boolean;
 let failRead: boolean;
 const calls: { method: string; params: unknown }[] = [];
@@ -68,12 +67,12 @@ const binary: ReviewDiff = { ...clean, files: [{ path: "image.png", status: "unt
 
 beforeEach(() => {
   dirty = true;
-  blocked = false;
   failCommit = false;
   failRead = false;
   calls.length = 0;
   queryClient.clear();
   queryClient.setDefaultOptions({ queries: { retry: false, staleTime: Infinity } });
+  queryClient.setQueryData(["threads.get", { id: "thread" }], thread);
   useLayout.setState({ panelOpen: false, panelTab: "changes", panelThreadId: null, selectedChanges: null, workspaceChanges: null });
   vi.spyOn(core, "call").mockImplementation(async <M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> => {
     calls.push({ method, params });
@@ -85,10 +84,6 @@ beforeEach(() => {
       if (failCommit) throw new Error("Commit failed; retry");
       dirty = false;
       return { sha: "1234567" } as RpcResults[M];
-    }
-    if (method === "orchestration.runtime") {
-      const action = { allowed: !blocked, reason: blocked ? "Team is working" : null };
-      return { actions: { commit: action, push: action, createPr: action } } as RpcResults[M];
     }
     if (method === "system.info") return { gh: { installed: false } } as RpcResults[M];
     const result: unknown = [];
@@ -102,7 +97,7 @@ afterEach(() => {
 });
 
 function Surface({ source, team = false }: { source: WorkspaceChangesTarget; team?: boolean }) {
-  const changes = useComposerChanges({ ...source, projectName: project.name, team });
+  const changes = useComposerChanges({ ...source, projectName: project.name, thread: source.kind === "thread" ? { ...thread, teamInstanceId: team ? "team" : null } : undefined });
   const request = useLayout((s) => s.workspaceChanges);
   const open = useLayout((s) => s.panelOpen);
   return (
@@ -169,7 +164,6 @@ it("keeps the commit message and strip on failure, then refreshes on retry", asy
 });
 
 it("blocks team commits while leaving review available", async () => {
-  blocked = true;
   mount({ kind: "thread", id: "thread" }, true);
   const commit = await screen.findByRole<HTMLButtonElement>("button", { name: "Commit changes" });
   await waitFor(() => expect(commit.disabled).toBe(true));
@@ -201,4 +195,16 @@ it("routes a split conversation request to its owner and replaces saved-turn sel
   useLayout.getState().openWorkspaceChanges({ kind: "project", id: "project" });
   useLayout.getState().consumeWorkspaceCommit(request.requestId);
   expect(useLayout.getState().workspaceChanges).toMatchObject({ kind: "project", id: "project", commit: false });
+});
+
+it("does not open a child workspace from either composer change-card action", () => {
+  queryClient.setQueryData(["threads.get", { id: "thread" }], { ...thread, parentRelation: "subagent", parentThreadId: "parent" });
+  const { result } = renderHook(() => useComposerChanges({ kind: "thread", id: "thread", projectName: "Composer" }), {
+    wrapper: ({ children }) => <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>,
+  });
+  act(() => {
+    result.current!.onReview();
+    result.current!.onCommit();
+  });
+  expect(useLayout.getState()).toMatchObject({ panelOpen: false, panelThreadId: null, workspaceChanges: null });
 });

@@ -1,0 +1,53 @@
+---
+import DocsLayout from "../../layouts/DocsLayout.astro";
+import Callout from "../../components/docs/Callout.astro";
+import LinkCards from "../../components/docs/LinkCards.astro";
+import { docHref } from "../../data/docs";
+---
+
+<DocsLayout slug="devices">
+  <p>The <strong>Device</strong> tab shows an iOS Simulator or an Android Emulator in a conversation's side panel. You can tap, scroll, and type on its screen, and the conversation's agent can open one and drive it to check its own work on a mobile app.</p>
+
+  <section aria-labelledby="set-up">
+    <h2 id="set-up">Turn on device support</h2>
+    <p>Device support is off until you turn it on. It needs these on your computer:</p>
+    <ul>
+      <li>Node.js 22.12 or later, with npm, where your login shell finds them.</li>
+      <li>For iOS, a Mac with Xcode.</li>
+      <li>For Android, the Android SDK with platform-tools, the emulator, and <code>cmdline-tools/latest</code>. Showing an emulator's screen also needs <code>ffmpeg</code> built with <code>libx264</code>.</li>
+    </ul>
+    <ol class="docs-steps">
+      <li>In a thread or a task, press <kbd>⌘J</kbd> to show the side panel, click <strong>New tab</strong> (+), and choose <strong>Device</strong>.</li>
+      <li>The tab shows which platforms this computer can run. Turn <strong>Agents can use devices</strong> off if agents shouldn't drive them.</li>
+      <li>Click <strong>Install and start</strong>.</li>
+    </ol>
+    <p>
+      OpenOrc installs two tools from npm, each at a version pinned in OpenOrc's source: <code>expo-device-hub</code>, which starts devices and streams their screens, and, when agents can use devices, <code>agent-device</code>, which lets agents tap and type. The tab
+      names both before you click. They go in the <code>devices</code> folder inside OpenOrc's data folder.
+    </p>
+    <p>Settings → <strong>Devices</strong> has the same two switches, <strong>Device support</strong> and <strong>Agents can use devices</strong>, and lists the installed versions under <strong>Installed tools</strong>.</p>
+  </section>
+
+  <section aria-labelledby="open">
+    <h2 id="open">Open a device</h2>
+    <p>With device support on, a new <strong>Device</strong> tab lists every simulator and emulator on this computer, grouped by system version. Click one to open it in the tab. A device that is shut down starts first, which can take a while.</p>
+    <ul>
+      <li>Click or drag on the screen to tap and scroll, and type when the screen has focus.</li>
+      <li>The toolbar has <strong>Home</strong> and <strong>Rotate</strong> for iOS, or <strong>Back</strong>, <strong>Home</strong>, and <strong>Recents</strong> for Android.</li>
+      <li><strong>Shut down</strong> stops the device.</li>
+    </ul>
+    <p>A device streams only while its tab is on screen. Each tab shows one device, and you can open several Device tabs.</p>
+    <Callout>Devices keep running when you close the tab, turn device support off, or quit OpenOrc. Shut them down from the tab, or from Xcode or Android Studio.</Callout>
+  </section>
+
+  <section aria-labelledby="agents">
+    <h2 id="agents">How agents use devices</h2>
+    <p>While device support and <strong>Agents can use devices</strong> are both on, agents can use OpenOrc's <code>device</code> tool to list devices, take screenshots, and open or close a device in the conversation's Device tab. They tap and type with the <code>agent-device</code> command.</p>
+    <p>Listing devices and taking screenshots work in every mode. Opening or closing a device is blocked in Plan and runs without asking in every other mode, since it acts only on your own test devices. See <a href={docHref("permissions") + "#openorc-tools"}>Modes and permissions</a>.</p>
+  </section>
+
+  <section aria-labelledby="next-steps">
+    <h2 id="next-steps">Next steps</h2>
+    <LinkCards cards={[{ slug: "browser" }, { slug: "permissions" }, { slug: "network" }]} columns={3} />
+  </section>
+</DocsLayout>

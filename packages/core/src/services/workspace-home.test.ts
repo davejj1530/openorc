@@ -81,8 +81,8 @@ it("executes non-Git folders, retains one home through folder switches and never
     expect(starts[0]!.spec.cwd).toBe(first);
     expect(thread.workingDirectory).toBe(first);
     await vi.waitFor(() => expect(core.runs.threadSession(thread.id).status).toBe("live"));
-    starts[0]!.handle.emit("event", { type: "message.completed", runId: run.id, ts: Date.now(), messageId: "reply", role: "assistant", text: "First folder contains a readme." });
-    starts[0]!.handle.emit("event", { type: "turn.completed", runId: run.id, ts: Date.now(), turnId: "turn", status: "success", durationMs: 1 });
+    starts[0]!.handle.emit("event", { type: "message.completed", runId: run!.id, ts: Date.now(), messageId: "reply", role: "assistant", text: "First folder contains a readme." });
+    starts[0]!.handle.emit("event", { type: "turn.completed", runId: run!.id, ts: Date.now(), turnId: "turn", status: "success", durationMs: 1 });
     await vi.waitFor(() => expect(core.threads.get(thread.id)?.activity).toBe("idle"));
     await configureWorkspace(core.db, second);
     // Default changes never silently move an existing conversation.
@@ -93,7 +93,7 @@ it("executes non-Git folders, retains one home through folder switches and never
     expect(starts[1]!.spec.systemPromptAppendix).toContain("First folder contains a readme");
     expect(core.threads.list({ projectId: WORKSPACE_ID })).toHaveLength(1);
     expect(core.threads.get(thread.id)?.projectId).toBe(WORKSPACE_ID);
-    expect(runs.get(core.db, run.id)?.workingDirectory).toBe(first);
+    expect(runs.get(core.db, run!.id)?.workingDirectory).toBe(first);
     expect(runs.get(core.db, starts[1]!.spec.runId)?.workingDirectory).toBe(second);
     await expect(core.threads.moveWorkspace(thread.id, "worktree")).rejects.toThrow("Workspace");
   } finally {

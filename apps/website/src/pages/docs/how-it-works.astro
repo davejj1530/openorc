@@ -65,6 +65,11 @@ const envelope = `{ "type": "rpc", "id": 42, "method": "runs.start", "params": {
             <td>One renderer per Preview, in a separate browser session. Up to six are kept alive.</td>
           </tr>
           <tr>
+            <td>Visualization and MCP App frames</td>
+            <td>The window</td>
+            <td>One sandboxed renderer per frame, so a stuck page can't hold up the others</td>
+          </tr>
+          <tr>
             <td>Core</td>
             <td>Main</td>
             <td>A Node.js process named <code>openorc-core</code>. It owns the SQLite database, starts agents, runs Git, serves OpenOrc's tools, and runs schedules, Slack, and upkeep.</td>
@@ -75,6 +80,16 @@ const envelope = `{ "type": "rpc", "id": 42, "method": "runs.start", "params": {
             <td>A thread that computes memory search vectors, so loading the model never blocks the core</td>
           </tr>
           <tr>
+            <td>Editor worker</td>
+            <td>Core, when you open a TypeScript or JavaScript file</td>
+            <td>A thread that runs TypeScript's language service for the editor. It stops after a while without use.</td>
+          </tr>
+          <tr>
+            <td>Formatter worker</td>
+            <td>Core, on first use</td>
+            <td>A thread that runs the copy of Prettier that ships with OpenOrc. A project's own formatter runs as its own process.</td>
+          </tr>
+          <tr>
             <td>Agent CLIs</td>
             <td>Core</td>
             <td><code>claude</code>, <code>codex app-server</code>, or <code>opencode acp</code>, one long-lived process per active run</td>
@@ -82,7 +97,7 @@ const envelope = `{ "type": "rpc", "id": 42, "method": "runs.start", "params": {
           <tr>
             <td>Short-lived CLIs</td>
             <td>Core</td>
-            <td>Sign-in checks, model lists, usage, skills, update checks, and background jobs such as titles and memory summaries</td>
+            <td>Sign-in checks, model lists, usage, skills, update checks, and background jobs such as titles, code explanations, and memory summaries</td>
           </tr>
           <tr>
             <td><code>git</code> and <code>gh</code></td>
@@ -102,12 +117,20 @@ const envelope = `{ "type": "rpc", "id": 42, "method": "runs.start", "params": {
           <tr>
             <td>Terminal shells</td>
             <td>Main</td>
-            <td>Your shell, one per terminal panel</td>
+            <td>Your shell as a login shell, one per Terminal tab</td>
+          </tr>
+          <tr>
+            <td>Device helpers</td>
+            <td>Core, while device support is on</td>
+            <td><code>expo-device-hub</code> and <code>agent-device</code>, on your own Node.js, to start simulators and emulators and stream their screens</td>
           </tr>
         </tbody>
       </table>
     </div>
-    <p>The core also listens on <code>127.0.0.1</code> for agents' tool calls. <a href={docHref("network") + "#local"}>Network connections</a> lists every local server.</p>
+    <p>
+      The core also listens on <code>127.0.0.1</code> for agents' tool calls, and, while you allow paired phones, on your network for the <a href={docHref("phone")}>phone app</a>. <a href={docHref("network") + "#local"}>Network
+      connections</a> lists every server.
+    </p>
     <p class="docs-source">Source: <code>apps/desktop/src/main/index.ts</code>, <code>apps/desktop/src/core/index.ts</code></p>
   </section>
 
@@ -121,11 +144,10 @@ const envelope = `{ "type": "rpc", "id": 42, "method": "runs.start", "params": {
     <pre><code set:text={envelope} /></pre>
     <ul>
       <li>
-        About 200 methods are grouped by name, such as <code>threads.*</code>, <code>runs.*</code>, <code>tasks.*</code>, <code>review.*</code>, <code>pulls.*</code>, and <code>memory.*</code>. Each has a parameter schema, and
-        <code>packages/protocol/src/rpc.ts</code> collects them all.
+        About 270 methods are grouped by name, such as <code>threads.*</code>, <code>runs.*</code>, <code>tasks.*</code>, <code>review.*</code>, <code>pulls.*</code>, and <code>memory.*</code>. Each has a parameter schema, and <code>packages/protocol/src/rpc.ts</code> collects them all.
       </li>
       <li>The core checks the envelope, then the method's parameters, and replies with a result or an error. A malformed message is dropped without a reply. Requests have no timeout.</li>
-      <li>The core posts every reply to every window, and each window keeps the ones whose number it is waiting for.</li>
+      <li>The core sends each reply only to the window that asked.</li>
     </ul>
     <p>Besides replies, the core pushes these to every window:</p>
     <div class="docs-table">
@@ -167,13 +189,11 @@ const envelope = `{ "type": "rpc", "id": 42, "method": "runs.start", "params": {
     <h2 id="agents">How OpenOrc runs each agent</h2>
     <h3>Finding the agents</h3>
     <p>
-      Apps started from the Dock or a menu don't get your terminal's <code>PATH</code>, so on macOS and Linux the core asks your login shell. It runs your shell with <code>-ilc</code> and a short script that prints <code>PATH</code> and where
-      <code>codex</code>, <code>claude</code>, and <code>opencode</code> are. The shell gets 8 seconds and a minimal environment, and only those answers are kept. On Windows there is no probe: OpenOrc looks for each agent on the
-      <code>PATH</code> it started with, trying the extensions <code>PATHEXT</code> lists, so npm's <code>.cmd</code> launchers count. <code>OPENORC_CODEX_BIN</code>, <code>OPENORC_CLAUDE_BIN</code>, or <code>OPENORC_OPENCODE_BIN</code>, set before OpenOrc starts, take precedence.
+      Apps started from the Dock or a menu don't get your terminal's <code>PATH</code>, so on macOS and Linux the core asks your login shell. It runs your shell with <code>-ilc</code> and a short script that prints <code>PATH</code> and where <code>codex</code>, <code>claude</code>, and <code>opencode</code> are. The shell gets 8 seconds and a minimal environment, and only those answers are kept. On Windows there is no probe: OpenOrc looks for each agent on the <code>PATH</code> it started with, trying the extensions <code>PATHEXT</code> lists, so npm's <code>.cmd</code> launchers count. <code>OPENORC_CODEX_BIN</code>, <code>OPENORC_CLAUDE_BIN</code>, or <code>OPENORC_OPENCODE_BIN</code>, set before OpenOrc starts, take precedence.
     </p>
     <p>
       Each agent is then checked with its own commands: <code>--version</code>, plus <code>codex login status</code>, <code>claude auth status</code>, or <code>opencode auth list</code> to see whether you are signed in. Results are cached for
-      60 seconds. OpenOrc never reads the credentials these tools store.
+      60 seconds. These checks never read the credentials the tools store. Only Settings → Cloud looks for API keys to copy, as <a href={docHref("cloud") + "#sign-ins"}>Cloud threads</a> describes.
     </p>
     <h3>Speaking to them</h3>
     <div class="docs-table">
@@ -273,8 +293,7 @@ const envelope = `{ "type": "rpc", "id": 42, "method": "runs.start", "params": {
     <Diagram diagram={turnDiagram} />
     <ol class="docs-steps">
       <li>
-        You press Send. A new thread sends <code>threads.start</code>. While the agent is working, the composer sends <code>runs.send</code> if the turn can take the message, or <code>threads.queue</code> to hold it. Between turns it sends
-        <code>runs.send</code> when the thread's process is still running and nothing that needs a restart has changed, and <code>runs.start</code> otherwise.
+        You press Send. A new thread sends <code>threads.start</code>. While the agent is working, the composer sends <code>runs.send</code> if the turn can take the message, or <code>threads.queue</code> to hold it. Between turns it sends <code>runs.send</code> when the thread's process is still running and nothing that needs a restart has changed, and <code>runs.start</code> otherwise.
       </li>
       <li>
         The core checks the request and works out the thread's folder, agent, model, and mode. It decides whether to resume the agent's last session or start fresh with a handoff, and takes a shared hold on the folder, so Git operations that
@@ -315,13 +334,20 @@ const envelope = `{ "type": "rpc", "id": 42, "method": "runs.start", "params": {
       </div>
       <div>
         <dt>Event</dt>
-        <dd>One of 23 shared types that every adapter translates into: session and turn events, text and thinking, tool calls and output, file changes, status updates, and approvals.</dd>
+        <dd>One of 26 shared types that every adapter translates into: session and turn events, text and thinking, tool calls and output, file changes, status updates, approvals, plans, and subagents.</dd>
       </div>
     </dl>
     <p>
       One agent can't continue another's session. Switching a thread to an agent that hasn't worked in it starts a fresh session with a handoff: your last 4 requests (up to 400 characters each) and the previous agent's last reply (up to
       1,500 characters), added to the new agent's brief. In a project thread, switching back to an agent that already worked there resumes its own older session. In a Workspace thread, every change of agent or folder starts fresh with a
       handoff.
+    </p>
+    <p>
+      A Claude Code session belongs to the Claude account that made it. Moving a thread to another Claude account copies its newest session into that account's folder, and the next run resumes the copy as a fork.
+    </p>
+    <p>
+      When an agent runs subagents of its own, the adapter reports each one as it starts and as it changes. The core gives each subagent a child thread under the parent, with the subagent's events in a run of its own, so its work reads
+      like any other conversation. See <a href={docHref("messaging") + "#subagents"}>Subagents</a>.
     </p>
     <p>If a provider reports that a session no longer exists, the thread offers <strong>Start a fresh session with a handoff</strong>.</p>
   </section>
@@ -335,7 +361,7 @@ const envelope = `{ "type": "rpc", "id": 42, "method": "runs.start", "params": {
       <li>It opens the database and applies any pending migrations.</li>
       <li>
         It recovers from the last session: runs that were still open are marked as failed with <strong>OpenOrc closed while this session was open. Send a message to continue where you left off.</strong> Interrupted discussion replies and
-        plans are marked as such, and team turns that were running wait for you.
+        plans are marked as such.
       </li>
       <li>On macOS and Linux, it asks your login shell for <code>PATH</code> and the agents. Then it starts the MCP server and tells every window it is ready.</li>
       <li>It starts its timers and sends messages still waiting in a thread's queue, which can start an agent right after launch.</li>

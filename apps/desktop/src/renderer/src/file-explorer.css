@@ -62,6 +62,7 @@
   margin-left: auto;
   flex-shrink: 0;
 }
+
 .file-editor {
   grid-area: 2 / 1;
   overflow: hidden;
@@ -152,6 +153,13 @@
 }
 .file-tree-folder {
   opacity: 0.65;
+}
+/* Palettes may set --ink-3 equal to --ink-2, so the dim is a mix rather than another token. */
+.file-tree-ignored {
+  color: color-mix(in srgb, var(--ink-2) 55%, transparent);
+}
+.file-tree-ignored svg {
+  opacity: 0.55;
 }
 .file-tree-root {
   padding-left: 8px;

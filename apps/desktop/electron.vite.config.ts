@@ -9,7 +9,7 @@ import typegpu from "unplugin-typegpu/vite";
 // dependencies of this app to resolve from its node_modules. Prettier loads at
 // runtime too: the bundler renders any chunk holding its TypeScript plugin empty.
 // Packaging audits the compiled imports against scripts/packaged-runtime-dependencies.cjs.
-const nodeExternals = ["electron", /^electron-updater(?:\/|$)/, "node-pty", "sqlite-vec", "fastembed", "onnxruntime-node", /^prettier(?:\/|$)/];
+const nodeExternals = ["electron", /^electron-updater(?:\/|$)/, "node-pty", "sqlite-vec", "fastembed", "onnxruntime-node", /^prettier(?:\/|$)/, "typescript"];
 
 export default defineConfig(({ mode }) => {
   // Test switches (autorun, benchmarks, screenshots) exist only in development and QA builds. OPENORC_QA_BUILD=1 keeps
@@ -26,6 +26,7 @@ export default defineConfig(({ mode }) => {
             // The core starts these as worker threads by file name.
             "embedder-worker": resolve(import.meta.dirname, "src/core/embedder-worker.ts"),
             "formatter-worker": resolve(import.meta.dirname, "src/core/formatter-worker.ts"),
+            "intelligence-worker": resolve(import.meta.dirname, "src/core/intelligence-worker.ts"),
           },
           external: nodeExternals,
         },

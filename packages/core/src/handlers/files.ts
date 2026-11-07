@@ -8,7 +8,7 @@ import type { Handlers } from "./types.js";
 type Dependencies = {
   db: Db;
   claudeEnvironment?: (id?: string) => NodeJS.ProcessEnv;
-  files: Pick<FileService, "search" | "read" | "write" | "find" | "format">;
+  files: Pick<FileService, "search" | "read" | "write" | "find" | "format" | "intelligence">;
 };
 
 /** One conversation, or one new conversation's folder, whose finds supersede each other. */
@@ -18,8 +18,13 @@ export function createFilesHandlers({
   db,
   files,
   claudeEnvironment,
-}: Dependencies): Pick<Handlers, "skills.list" | "files.list" | "files.search" | "files.read" | "files.write" | "files.find" | "files.format"> {
+}: Dependencies): Pick<Handlers, "skills.list" | "files.list" | "files.search" | "files.read" | "files.write" | "files.find" | "files.format" | "editor.query"> {
   return {
+    "editor.query": async ({ scope, expectedRoot, ...input }) => {
+      const folder = await conversationFolder(db, scope);
+      if (folder.root !== expectedRoot) return { kind: "unavailable", reason: "This conversation changed workspace. Reopen the file to analyze its new workspace." };
+      return files.intelligence.query(folder, input);
+    },
     "skills.list": async ({ projectId, workingDirectory, agent, claudeAccountId }) =>
       listSkills({
         projectRoot: (await conversationFolder(db, { kind: "project", id: projectId, workingDirectory })).root,

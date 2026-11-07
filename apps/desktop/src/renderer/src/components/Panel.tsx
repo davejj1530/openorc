@@ -35,6 +35,8 @@ type Workspace = ReturnType<typeof usePanelWorkspace>;
 function PanelBody({ context, workspace, open }: { context: PanelContext; workspace: Workspace; open: boolean }) {
   const { page, tab, scope, navigate } = workspace;
   const previewUrls = useLayout((s) => s.previewUrls);
+  // Docked on the left, the panel rides the sidebar's edge: it moves without resizing when either changes.
+  const placement = useLayout((s) => `${s.panelSide}:${s.sidebarOpen}`);
   const move = (delta: number) => {
     const next = tab.entries[tab.index + delta];
     if (next?.kind === "browser" && next.url && next.url !== previewUrls[tab.id]) window.openorc.browser.navigate(tab.id, next.url);
@@ -56,6 +58,7 @@ function PanelBody({ context, workspace, open }: { context: PanelContext; worksp
         context={scope}
         defaultUrl={page.url}
         navigation={navigation}
+        placement={placement}
         onPage={(state) => {
           if (!state.url || state.url === "about:blank") return;
           usePanelSessions.getState().reportBrowser(scope, tab.id, state.url, state.title);
@@ -90,6 +93,7 @@ export function Panel({ context }: { context: PanelContext }) {
   const open = useLayout((s) => s.panelOpen);
   const expanded = useLayout((s) => s.panelExpanded) && open;
   const sidebarOpen = useLayout((s) => s.sidebarOpen);
+  const side = useLayout((s) => s.panelSide);
   const mounted = useMountedThroughClose(open);
   const workspace = usePanelWorkspace(context);
   useFilesHost(panelFileScope(context));
@@ -114,6 +118,7 @@ export function Panel({ context }: { context: PanelContext }) {
       <aside
         className="panel-shell shrink-0 h-full"
         data-open={open}
+        data-side={side}
         data-expanded={expanded || undefined}
         data-thread-owner={context.kind === "thread" ? context.thread.id : undefined}
         aria-hidden={!open}
@@ -122,22 +127,29 @@ export function Panel({ context }: { context: PanelContext }) {
           if (expanded && event.key === "Escape" && !event.defaultPrevented) useLayout.getState().setPanelExpanded(false);
         }}
       >
-        <div className="panel-pane h-full flex flex-col">
-          <PanelHeader scope={scope} session={session} expanded={expanded} trafficClearance={trafficClearance} windowsControls={windowsControls} onClose={closing.requestClose} />
-          <div className="panel-card" data-plane>
-            <div
-              id="panel-tab-content"
-              role="tabpanel"
-              aria-labelledby={`panel-tab-${tab.id}`}
-              data-file-workspace={workspace.page.kind === "file" || undefined}
-              className="panel-content flex-1 min-h-0"
-            >
-              {mounted ? (
-                <Suspense fallback={null}>
-                  <PanelBody context={context} workspace={workspace} open={open} />
-                </Suspense>
-              ) : null}
-            </div>
+        <div className="panel-pane h-full flex flex-col" data-plane>
+          <PanelHeader
+            scope={scope}
+            session={session}
+            side={side}
+            expanded={expanded}
+            sidebarOpen={sidebarOpen}
+            trafficClearance={trafficClearance}
+            windowsControls={windowsControls}
+            onClose={closing.requestClose}
+          />
+          <div
+            id="panel-tab-content"
+            role="tabpanel"
+            aria-labelledby={`panel-tab-${tab.id}`}
+            data-file-workspace={workspace.page.kind === "file" || undefined}
+            className="panel-content flex-1 min-h-0"
+          >
+            {mounted ? (
+              <Suspense fallback={null}>
+                <PanelBody context={context} workspace={workspace} open={open} />
+              </Suspense>
+            ) : null}
           </div>
         </div>
       </aside>

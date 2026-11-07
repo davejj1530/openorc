@@ -1,13 +1,11 @@
 import { settings, type Db } from "@openorc/db";
 import { TextGenerator } from "@openorc/memory";
-import { HarnessId, harnessCatalog, isHarnessId, type AgentKind, type ModelOption, type RpcParams, type TextGenerationSettings } from "@openorc/protocol";
+import { TextGenerationChoice, harnessCatalog, harnessIds, isHarnessId, type AgentKind, type HarnessId, type ModelOption, type RpcParams, type TextGenerationSettings } from "@openorc/protocol";
 import type { ProviderInfo } from "./memory.js";
-import { z } from "zod";
 
 type Provider = HarnessId;
 const KEY = "textGeneration.preferences";
-type Preferences = { provider: TextGenerationSettings["provider"]; models: Partial<Record<Provider, string>> };
-const preferenceSchema = z.object({ provider: z.enum(["auto", ...HarnessId.options, "off"]), models: z.partialRecord(HarnessId, z.string().min(1)) });
+type Preferences = TextGenerationChoice;
 
 /** Only small models are automatic candidates. Never fall back to the conversation's flagship. */
 function defaultModel(provider: Provider, models: ModelOption[]): ModelOption | null {
@@ -29,11 +27,16 @@ function defaultModel(provider: Provider, models: ModelOption[]): ModelOption | 
   return ["nano", "luna", "mini"].flatMap((tier) => models.filter((model) => !model.unavailable && model.id.split("-").includes(tier)))[0] ?? null;
 }
 
+type Generator = { generator: TextGenerator; model: { provider: Provider; label: string } } | { reason: string };
+
+/** A one-shot answer from the text-generation model, or why none came. */
+export type Completion = { kind: "answered"; text: string; model: { provider: Provider; label: string } } | { kind: "unavailable"; reason: string } | { kind: "failed" };
+
 /** Independent preferences; shares only the CLI runner with memory distillation. */
 export class TextGenerationService {
-  private pendingTitles = 0;
+  private pending = 0;
   get hasPendingWork(): boolean {
-    return this.pendingTitles > 0;
+    return this.pending > 0;
   }
   constructor(
     private readonly db: Db,
@@ -44,7 +47,7 @@ export class TextGenerationService {
   private preferences(): Preferences {
     const raw = settings.get(this.db, KEY);
     try {
-      return preferenceSchema.parse(JSON.parse(raw ?? "null"));
+      return TextGenerationChoice.parse(JSON.parse(raw ?? "null"));
     } catch {
       return { provider: "auto", models: {} };
     }
@@ -70,6 +73,19 @@ export class TextGenerationService {
     return { resolved: { provider, model: model.id, label: model.label }, reason: null };
   }
 
+  /** The provider and models as this side has them; a Mac's cloud brain follows its Mac's. */
+  choice(): TextGenerationChoice {
+    return this.preferences();
+  }
+
+  /** The Mac's choice, taken by its cloud brain. */
+  follow(choice: TextGenerationChoice): void {
+    const prefs = this.preferences();
+    if (prefs.provider === choice.provider && harnessIds.every((id) => prefs.models[id] === choice.models[id])) return;
+    settings.set(this.db, KEY, JSON.stringify(choice));
+    this.invalidate(["text-generation"]);
+  }
+
   async updateSettings(patch: RpcParams<"textGeneration.settings.set">): Promise<TextGenerationSettings> {
     const prefs = this.preferences();
     if (patch.provider !== undefined) prefs.provider = patch.provider;
@@ -86,23 +102,38 @@ export class TextGenerationService {
 
   /** Names a conversation. Automatic uses the conversation's own agent, so its text never reaches another provider. */
   async title(exchange: { request: string; reply: string | null }, agent: AgentKind, claudeAccountId?: string): Promise<string | null> {
-    this.pendingTitles++;
+    this.pending++;
     try {
-      return await this.generateTitle(exchange, agent, claudeAccountId);
+      const made = await this.generator(agent, claudeAccountId, { effort: "low", timeoutMs: 30_000 });
+      return "generator" in made ? await made.generator.title(exchange) : null;
     } finally {
-      this.pendingTitles--;
+      this.pending--;
     }
   }
 
-  private async generateTitle(exchange: { request: string; reply: string | null }, agent: AgentKind, claudeAccountId?: string): Promise<string | null> {
+  /** Background text for a conversation, such as an explanation of a file in it, from the model that names it. */
+  async complete(request: { prompt: string; schema: object; system: string; agent: AgentKind; claudeAccountId?: string }): Promise<Completion> {
+    this.pending++;
+    try {
+      const made = await this.generator(request.agent, request.claudeAccountId, { system: request.system, timeoutMs: 180_000 });
+      if (!("generator" in made)) return { kind: "unavailable", reason: made.reason };
+      const text = await made.generator.complete(request.prompt, request.schema);
+      return text ? { kind: "answered", text, model: made.model } : { kind: "failed" };
+    } finally {
+      this.pending--;
+    }
+  }
+
+  private async generator(agent: AgentKind, claudeAccountId: string | undefined, options: { effort?: "low"; system?: string; timeoutMs: number }): Promise<Generator> {
     const prefs = this.preferences();
-    if (prefs.provider === "off") return null;
+    if (prefs.provider === "off") return { reason: "Text generation is off. Turn it on in Settings." };
     const provider = prefs.provider === "auto" ? agent : prefs.provider;
-    if (!isHarnessId(provider)) return null;
-    const { resolved } = await this.resolve(provider, prefs.provider === "auto" ? null : (prefs.models[provider] ?? null), claudeAccountId);
-    if (!resolved) return null;
+    if (!isHarnessId(provider)) return { reason: "This conversation's agent can't generate text. Choose a harness for text generation in Settings." };
+    const { resolved, reason } = await this.resolve(provider, prefs.provider === "auto" ? null : (prefs.models[provider] ?? null), claudeAccountId);
+    if (!resolved) return { reason: reason ?? `${harnessCatalog[provider].name} is unavailable. Check its connection in Settings.` };
     const launch = this.providers.launch(resolved.provider, claudeAccountId);
-    if (!launch) return null;
-    return new TextGenerator({ provider: resolved.provider, model: resolved.model, binary: launch.binary, env: launch.env, effort: "low", timeoutMs: 30_000 }).title(exchange);
+    if (!launch) return { reason: `${harnessCatalog[resolved.provider].name} is unavailable. Check its connection in Settings.` };
+    const generator = new TextGenerator({ provider: resolved.provider, model: resolved.model, binary: launch.binary, env: launch.env, ...options });
+    return { generator, model: { provider: resolved.provider, label: resolved.label } };
   }
 }

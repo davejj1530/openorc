@@ -1,4 +1,4 @@
-import type { DownReason, LinkRoute, LinkState, LostMac } from "./manager";
+import type { DownReason, LinkRoute, LinkState, LostMac, MacName } from "./manager";
 
 /** The connection dot: connected, on its way, held up by something the person may want to know, or not trying. */
 export type LinkTone = "ok" | "busy" | "attention" | "off";
@@ -13,7 +13,7 @@ export interface LinkWords {
   detail: string;
 }
 
-const routeNames: Record<Exclude<LinkRoute["kind"], "demo">, string> = { lan: "Wi-Fi", tailnet: "Tailscale" };
+const routeNames: Record<Exclude<LinkRoute["kind"], "demo">, string> = { lan: "Wi-Fi", tailnet: "Tailscale", public: "Internet" };
 
 /** The demo Mac lives in the app: its name says what it is, and Settings says where. */
 const demoWords: LinkWords = { tone: "ok", status: null, spoken: "On this iPhone", detail: "On this iPhone" };
@@ -33,7 +33,26 @@ const down: Record<DownReason, LinkWords> = {
   unreachable: { tone: "busy", status: "Reconnecting", spoken: "Reconnecting", detail: "This Mac isn’t answering. It may be asleep or on another network." },
   silent: { tone: "off", status: "Not reachable", spoken: "Not reachable", detail: "This Mac isn’t answering. It may be asleep or on another network." },
   tailnet: { tone: "attention", status: "Check Tailscale", spoken: "Not reachable over Tailscale", detail: "Tailscale is off on this iPhone, or another VPN is on." },
+  waking: { tone: "busy", status: "Waking", spoken: "Waking", detail: "Waking it up. This takes a few seconds." },
+  "wake-refused": { tone: "attention", status: "Can’t wake it", spoken: "Can’t wake it", detail: "Pair this iPhone with it again from OpenOrc on your Mac." },
+  "needs-mac": { tone: "attention", status: "Needs your Mac", spoken: "Needs your Mac", detail: "Open OpenOrc on your Mac to wake it." },
+  "wake-failed": { tone: "attention", status: "Didn’t start", spoken: "Didn’t start", detail: "It didn’t start. This iPhone tries again in a moment." },
 };
+
+/** A cloud brain has no lid and no Wi-Fi to blame, and the Mac that runs it is where to look. Other reasons read the same. */
+const brainDetails: Partial<Record<DownReason, string>> = {
+  restarting: "OpenOrc is restarting on this cloud brain.",
+  disabled: "Phone access is off on this cloud brain. Pair this iPhone with it again from OpenOrc on your Mac.",
+  busy: "This cloud brain has too many phones connected. This iPhone tries again in a moment.",
+  "no-route": "This iPhone has no way to reach this cloud brain. Pair it again from OpenOrc on your Mac.",
+  unreachable: "This cloud brain isn’t answering. Check it in OpenOrc’s Cloud settings on your Mac.",
+  silent: "This cloud brain isn’t answering. Check it in OpenOrc’s Cloud settings on your Mac.",
+};
+
+function downWords(why: DownReason, mac: MacName): LinkWords {
+  const detail = mac.kind === "brain" ? brainDetails[why] : undefined;
+  return detail ? { ...down[why], detail } : down[why];
+}
 
 export function linkWords(state: LinkState): LinkWords {
   switch (state.kind) {
@@ -45,13 +64,13 @@ export function linkWords(state: LinkState): LinkWords {
       return { tone: "ok", status: via, spoken: `Connected over ${via}`, detail: `Connected over ${via}` };
     }
     case "connecting":
-      return state.why ? down[state.why] : { tone: "busy", status: "Connecting", spoken: "Connecting", detail: "Connecting" };
+      return state.why ? downWords(state.why, state.mac) : { tone: "busy", status: "Connecting", spoken: "Connecting", detail: "Connecting" };
     case "waiting":
-      return down[state.why];
+      return downWords(state.why, state.mac);
     case "suspended":
       return { tone: "off", status: null, spoken: "Not connected", detail: "Not connected" };
     case "incompatible":
-      return { tone: "attention", status: "Needs an update", spoken: "Needs an update", detail: "Update OpenOrc on this iPhone and on this Mac." };
+      return { tone: "attention", status: "Needs an update", spoken: "Needs an update", detail: `Update OpenOrc on this iPhone and on ${state.mac.kind === "brain" ? "your" : "this"} Mac.` };
   }
 }
 

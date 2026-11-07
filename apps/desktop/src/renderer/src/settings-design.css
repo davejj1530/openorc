@@ -627,6 +627,16 @@
     opacity var(--duration-arrive) var(--ease-out),
     filter var(--duration-arrive) var(--ease-out);
 }
+/* While the code is made, which can take a while when the cloud brain wakes for it. */
+.pairing-code-loader {
+  display: grid;
+  place-items: center;
+  height: 100%;
+}
+.pairing-code-plate .pairing-code-loader svg {
+  width: 20px;
+  height: 20px;
+}
 .pairing-code-plate[data-state="expired"] svg {
   opacity: 0.08;
   filter: blur(var(--arrive-blur));

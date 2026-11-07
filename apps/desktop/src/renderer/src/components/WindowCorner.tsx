@@ -1,26 +1,20 @@
-import { Inbox, PanelLeft, Search } from "./icons";
+import { Inbox, PanelLeft } from "./icons";
 import { cn } from "../lib/cn";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
 import { useLayout } from "../lib/layout";
 import { useRpc, usePendingApprovals } from "../lib/client";
 import { useRouter } from "../lib/router";
-import { useUi } from "../lib/ui";
 import { CountBadge, IconButton, Tooltip } from "./ui";
 
 /**
- * The window's corner: Inbox, global search and the sidebar toggle. It sits in the sidebar's
- * header while the sidebar is open and in the main column's header while it is hidden. Window
- * history has no buttons; ⌘[ and ⌘] still go back and forward.
+ * The window's corner: Inbox and the sidebar toggle. It sits in the sidebar's header while the
+ * sidebar is open and in the main column's header while it is hidden. Search lives in the sidebar's
+ * list head. Window history has no buttons; ⌘[ and ⌘] still go back and forward.
  */
 export function WindowCorner({ sidebarOpen }: { sidebarOpen: boolean }) {
   return (
     <div className="window-corner" role="group" aria-label="Window">
       <InboxButton />
-      <Tooltip label="Search">
-        <IconButton size="lg" onClick={() => useUi.getState().setPalette(true)} aria-label="Search" className="no-drag">
-          <Search size={16} />
-        </IconButton>
-      </Tooltip>
       <SidebarToggle open={sidebarOpen} />
     </div>
   );

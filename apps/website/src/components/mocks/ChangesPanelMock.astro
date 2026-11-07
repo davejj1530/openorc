@@ -1,18 +1,11 @@
 ---
-/** The work panel's Changes page, still: the plane card with its tab track over the page's content. */
+/** The work panel's Changes page, still: the panel's plane with its text tabs over the page's content. */
 import ChangesDiff from "../hero/ChangesDiff.astro";
-import ProductIcon from "../hero/ProductIcon.astro";
+import PanelHeader from "../hero/PanelHeader.astro";
 import "../../styles/hero-scene.css";
 ---
 
 <div class="hs-mock hs-mock-changes">
-  <div class="hs-panel-header">
-    <span class="hs-track"><span data-selected><ProductIcon name="fileDiff" />Changes</span></span>
-    <span class="hs-round hs-panel-add"><ProductIcon name="plus" /></span>
-    <span class="hs-panel-tools">
-      <span class="hs-round"><ProductIcon name="expand" /></span>
-      <span class="hs-round"><ProductIcon name="panelRight" /></span>
-    </span>
-  </div>
+  <PanelHeader tabs={[{ label: "Changes", selected: true }]} />
   <ChangesDiff />
 </div>

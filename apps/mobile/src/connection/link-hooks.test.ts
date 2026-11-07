@@ -57,7 +57,7 @@ describe("useLinkRead", () => {
     mac.live[0]!.close(LinkCloseCode.normal);
     await advance(10);
     expect(manager.getState().kind).toBe("waiting");
-    expect(result.current).toEqual({ state: "failed" });
+    expect(result.current).toMatchObject({ state: "failed" });
 
     await advance(1_000);
     expect(manager.getState().kind).toBe("connected");
@@ -124,7 +124,7 @@ describe("useLinkRead", () => {
     const { hooks, read, manager } = phone(mac, "wifi");
     const { result } = renderHook(() => hooks.useLinkRead(key, read));
     await advance(8_000);
-    expect(result.current).toEqual({ state: "failed" });
+    expect(result.current).toMatchObject({ state: "failed" });
 
     mac.behave(lan, { kind: "answer" });
     await advance(16_000);

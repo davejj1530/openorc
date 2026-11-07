@@ -10,12 +10,13 @@ import { docHref } from "../../data/docs";
     <h2 id="start">Start a thread</h2>
     <p>Start a thread for each piece of work you hand to an agent. Every thread keeps its own agent, model, mode, and folder, so several can work at once.</p>
     <ol class="docs-steps">
-      <li>Click <strong>New thread</strong> at the top of the sidebar, or press <kbd>⌘N</kbd>. To start in a particular project, click <strong>+</strong> beside its name. (On Windows and Linux, use <kbd>Ctrl</kbd> wherever this page shows <kbd>⌘</kbd>.)</li>
-      <li>Above the composer, choose the project and where the thread works: <strong>Local checkout</strong> for the repository as it is now, or <strong>Worktree</strong> for a branch and folder of its own. In the Workspace, <strong>Choose folder</strong> picks the folder instead.</li>
-      <li>In the composer's bottom row, choose the agent and model, and the mode.</li>
+      <li>Click <strong>New thread</strong> at the right end of the row above the thread list, or press <kbd>⌘N</kbd>. (On Windows and Linux, use <kbd>Ctrl</kbd> wherever this page shows <kbd>⌘</kbd>.)</li>
+      <li>The page asks <strong>What should we work on in</strong> and names a project. Click the project's name to pick another one, or choose <strong>Add project</strong> at the bottom of the list.</li>
+      <li>Under the composer, a line says where the thread works, such as <strong>Works in the local checkout on main</strong>. Click it to choose <strong>Local checkout</strong> for the repository as it is now, <strong>Worktree</strong> for a branch and folder of its own, or <strong>Cloud</strong> for a sandbox on your cloud account. In the Workspace, <strong>Choose folder</strong> picks the folder instead. See <a href={docHref("cloud")}>Cloud threads</a>.</li>
+      <li>In the composer's bottom row, choose the agent and model, and the mode. For a Claude model, the Claude account to use is at the end of the line under the composer.</li>
       <li>Type your request and press <kbd>Enter</kbd>.</li>
     </ol>
-    <p>For a project, the New thread page shows three suggestions while the composer is empty: <strong>Explore this project</strong>, <strong>Plan a change</strong>, and <strong>Review my changes</strong>. Each writes a prompt for you and switches the mode to <strong>Plan</strong>, and nothing is sent until you press <kbd>Enter</kbd>.</p>
+    <p>For a project, the New thread page shows three suggestions while the composer is empty: <strong>Explore this project</strong>, <strong>Plan a change</strong>, and <strong>Review my changes</strong>. Each writes a prompt for you and switches the mode to <strong>Plan</strong>, and nothing is sent until you press <kbd>Enter</kbd>. Under them, <strong>Pick up where you left off</strong> lists recent threads and task activity, with the threads that need you first.</p>
     <p>After the first reply, a small model gives the thread a short title. To rename it, click the title in the thread's header.</p>
   </section>
 
@@ -99,44 +100,85 @@ import { docHref } from "../../data/docs";
 
   <section aria-labelledby="sidebar">
     <h2 id="sidebar">The sidebar</h2>
-    <p>The sidebar lists the Workspace and each project with its threads. A project shows <strong>Running</strong> or <strong>Needs you</strong> when one of its threads does. Click <strong>+</strong> beside a project to start a thread there. To take a project off the list, right-click it and choose <strong>Remove project…</strong>. Its files, worktrees, and history are kept.</p>
-    <p>Each row shows a thread's title with a status icon before it. The icon tells you the agent is working, needs you, has failed, or has a result you haven't read. A thread with nothing to report shows its pull request's state instead, if it has one. Hover a row for its branch, agent, and when it last changed. While there's something to report, an extra line appears under the title:</p>
+    <p>The sidebar lists the threads of every project in one list, newest work first. The OpenOrc wordmark sits at the top, beside the <strong>Inbox</strong> and the button that hides the sidebar. Under it, <strong>Search</strong> opens the command palette, and the filter and <strong>New thread</strong> buttons sit at the end of the same row. The footer starts with how much of this week's allowance is left on the account your next message would use. Click it for every account's limits. After it come buttons for <strong>Tasks</strong>, <strong>Pull requests</strong>, <strong>Schedules</strong>, <strong>Orclings</strong>, and <strong>Settings</strong>.</p>
+    <p>Each row shows a thread's title, its project, and where in the project it works: the branch, <strong>worktree</strong>, <strong>cloud</strong>, or the number and state of its pull request. While the agent works, the title lights up. A mark on the row tells you the thread needs you, has failed, or has a result you haven't read. Hover a row for its branch, agent, and when it last changed. While there's something to report, an extra line appears under the title:</p>
     <ul>
       <li>While the agent works, the step it's on, such as <strong>Running pnpm test</strong> or <strong>Thinking</strong>.</li>
       <li>While it waits for you, <strong>Needs approval</strong> with the command, or <strong>Has a question for you</strong>.</li>
       <li>After a turn you haven't read, what it came to, such as <strong>Done · 2 files changed · tests passed</strong>.</li>
     </ul>
-    <h3>Filter the list</h3>
-    <p>Type in <strong>Filter threads…</strong> to narrow the loaded threads by title. The filter button beside it switches the list:</p>
+    <p>Threads that an agent started, and the subagents an agent runs, sit under their parent thread. Click the chevron on the parent's row to fold or open them. See <a href={docHref("messaging")}>Threads working together</a>.</p>
+    <h3>How the list is grouped</h3>
+    <p>The list groups threads by when they last saw work. A thread with threads under it goes by the latest work anywhere among them.</p>
     <div class="docs-table">
       <table>
         <thead>
           <tr>
-            <th scope="col">Filter</th>
-            <th scope="col">Shows</th>
+            <th scope="col">Group</th>
+            <th scope="col">Holds</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td><strong>Orcmode</strong></td>
-            <td>Your working set: threads with an agent working or waiting on you, unread results, pinned threads, the open thread, and anything active in the last 24 hours. Projects with none of these are hidden, and a button at the end shows the rest. <kbd>⌘⇧O</kbd> turns it on or off.</td>
+            <td><strong>Pinned</strong></td>
+            <td>Pinned threads, always first.</td>
           </tr>
           <tr>
-            <td><strong>Active threads</strong></td>
-            <td>Every thread that isn't archived.</td>
+            <td><strong>Recent</strong></td>
+            <td>Threads with work in the last three hours.</td>
           </tr>
           <tr>
-            <td><strong>Archived threads</strong></td>
-            <td>The threads you archived.</td>
+            <td><strong>Today</strong></td>
+            <td>Threads with work earlier today.</td>
           </tr>
           <tr>
-            <td><strong>Pinned threads</strong></td>
-            <td>Only pinned threads.</td>
+            <td><strong>Yesterday</strong></td>
+            <td>Threads last worked on yesterday. This group starts folded.</td>
+          </tr>
+          <tr>
+            <td><strong>Snoozed</strong></td>
+            <td>Snoozed threads, until they wake.</td>
+          </tr>
+          <tr>
+            <td><strong>Resolved</strong></td>
+            <td>Threads you resolved, and threads with no work since before yesterday. It sits at the bottom of the sidebar.</td>
           </tr>
         </tbody>
       </table>
     </div>
-    <p>Text in the filter box reaches every loaded thread, even in orcmode. To search everything, including what was said, press <kbd>⌘K</kbd>.</p>
+    <p>Click a group's heading to fold or open it. A folded group still shows the thread you have open and the threads that need you.</p>
+    <h3>Resolve a thread</h3>
+    <p>Resolve a thread when you're done with it. Choose <strong>Resolve</strong> in its menu, press <kbd>⌘⇧A</kbd>, or drag it onto <strong>Resolved</strong> at the bottom of the sidebar. A thread that has seen no work since before yesterday moves there by itself, unless it's pinned or snoozed.</p>
+    <p>Click <strong>Resolved</strong> to open it. The number beside it counts the threads it holds. To bring a thread back, choose <strong>Reopen</strong> in its menu, press <kbd>⌘⇧A</kbd>, or drag it out of Resolved onto the list. Sending a message to a resolved thread also reopens it. A reopened thread moves to <strong>Recent</strong>.</p>
+    <h3>Filter the list</h3>
+    <p>The filter button at the end of the row above the list has these choices:</p>
+    <div class="docs-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Choice</th>
+            <th scope="col">What it does</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>All threads</strong></td>
+            <td>Lists every thread.</td>
+          </tr>
+          <tr>
+            <td><strong>Pinned threads</strong></td>
+            <td>Lists only pinned threads.</td>
+          </tr>
+          <tr>
+            <td><strong>Import terminal sessions…</strong></td>
+            <td>Continues sessions you started in a terminal. See <a href="#import">Import terminal sessions</a>.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>To find a thread that isn't in view, or anything that was said in one, click <strong>Search</strong> or press <kbd>⌘K</kbd>.</p>
+    <h3>Projects</h3>
+    <p>You switch projects from the New thread page. Click the project's name in <strong>What should we work on in</strong> to see every project. There you can pick a project, change its icon, or choose <strong>Add project</strong>. To take a project off the list, right-click it and choose <strong>Remove project…</strong>. Its files, worktrees, and history are kept.</p>
     <h3>Thread actions</h3>
     <p>Right-click a thread, or open <strong>Thread actions</strong> (⋯) in its header:</p>
     <div class="docs-table">
@@ -149,28 +191,52 @@ import { docHref } from "../../data/docs";
         </thead>
         <tbody>
           <tr>
+            <td><strong>Open beside</strong></td>
+            <td>Opens the thread in another pane. See <a href="#side-by-side">Open threads side by side</a>.</td>
+          </tr>
+          <tr>
+            <td><strong>Open in new window</strong></td>
+            <td>Gives the thread a window of its own.</td>
+          </tr>
+          <tr>
+            <td><strong>Open parent</strong></td>
+            <td>For a thread that sits under another, opens the parent.</td>
+          </tr>
+          <tr>
             <td><strong>Pin</strong></td>
-            <td>Keeps the thread in a <strong>Pinned</strong> section at the top of its project. <kbd>⌘⇧P</kbd></td>
+            <td>Keeps the thread in <strong>Pinned</strong> at the top of the list. <kbd>⌘⇧P</kbd></td>
           </tr>
           <tr>
             <td><strong>Snooze</strong></td>
-            <td>Moves the thread to a folded <strong>Snoozed</strong> section until the time you pick, from <strong>In 1 hour</strong> to <strong>Next week</strong>. A finished turn wakes it early, and so does <strong>Wake now</strong>.</td>
+            <td>Moves the thread to a folded <strong>Snoozed</strong> group until the time you pick, such as <strong>In 1 hour</strong>, <strong>Tomorrow morning</strong>, or <strong>Next week</strong>. A finished turn wakes it early, and so does <strong>Wake now</strong>.</td>
           </tr>
           <tr>
             <td><strong>Mark as unread</strong></td>
             <td>Flags the thread for later. Opening it marks it read again. <kbd>⌘⇧U</kbd></td>
           </tr>
           <tr>
+            <td><strong>New subthread</strong></td>
+            <td>Starts a thread under this one, in the same folder, with the same model and mode until you change them.</td>
+          </tr>
+          <tr>
+            <td><strong>Fork</strong></td>
+            <td>Continues the conversation in a new thread. See <a href="#fork">Fork a thread</a>.</td>
+          </tr>
+          <tr>
             <td><strong>Move to a worktree</strong></td>
             <td>Moves a project thread and its uncommitted changes into a worktree, or back with <strong>Move to the checkout</strong>. See <a href={docHref("git")}>Git and worktrees</a>.</td>
           </tr>
           <tr>
-            <td><strong>Archive</strong></td>
-            <td>Takes the thread off the active list. <kbd>⌘⇧A</kbd></td>
+            <td><strong>Move to cloud</strong></td>
+            <td>Between turns, moves the thread to a sandbox of its own, or to your cloud brain if you set one up. A thread on the cloud brain has <strong>Bring to Mac</strong> and <strong>Open on Mac</strong> instead. See <a href={docHref("cloud") + "#move"}>Cloud threads</a>.</td>
+          </tr>
+          <tr>
+            <td><strong>Resolve</strong></td>
+            <td>Moves the thread to <strong>Resolved</strong>, or back with <strong>Reopen</strong>. <kbd>⌘⇧A</kbd></td>
           </tr>
           <tr>
             <td><strong>Delete thread</strong></td>
-            <td>Removes the conversation, and its worktree if it has one. Uncommitted work in the worktree is first committed to the thread's branch, which stays. Tasks the thread created stay too.</td>
+            <td>Removes the conversation, and its worktree if it has one. Uncommitted work in the worktree is first committed to the thread's branch, which stays. Tasks the thread created stay too. A cloud thread's sandbox is deleted.</td>
           </tr>
         </tbody>
       </table>

@@ -3,7 +3,7 @@ import type { ThreadSummary } from "@openorc/protocol";
 import { router } from "expo-router";
 import { useMemo } from "react";
 import { Alert } from "react-native";
-import { useRpcMutation } from "../client";
+import { hostLink, useRpcMutation } from "../client";
 import { openInApp } from "../ui/web";
 import type { OrganizePatch, ThreadAction } from "./thread-actions";
 
@@ -29,7 +29,7 @@ function promptRename(title: string, save: (title: string) => void): void {
 }
 
 /**
- * Runs a thread's menu actions against the Mac. A change the Mac refuses (a team still working, a thread gone) says
+ * Runs a thread's menu actions against the Mac. A change the Mac refuses (a thread still working, a thread gone) says
  * why in an alert. `onUnread` hears a thread marked unread, which an open thread would read again at once.
  */
 export function useThreadActions(thread: ThreadSummary | null, { onUnread }: { onUnread?: () => void } = {}) {
@@ -49,7 +49,12 @@ export function useThreadActions(thread: ThreadSummary | null, { onUnread }: { o
       } else if (action.kind === "snooze") save({ snoozedUntil: action.until(new Date()) });
       else if (action.kind === "rename") rename();
       else if (action.kind === "open") openInApp(action.url);
+      else if (action.kind === "parent") router.push({ pathname: "/thread/[id]", params: { id: action.threadId } });
       else if (action.kind === "screen") router.push({ pathname: action.pathname, params: { threadId: thread.id } });
+      else if (action.kind === "move")
+        hostLink(action.mac)
+          .connection.call(action.method, { threadId: thread.id })
+          .catch((failure: Error) => Alert.alert("Couldn’t move this thread", failure.message));
     };
     return { run, save, rename };
   }, [thread, mutate, onUnread]);

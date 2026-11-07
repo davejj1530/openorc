@@ -1,4 +1,4 @@
-import { orclings, tasks, threads, type Db } from "@openorc/db";
+import { cloudWorkspaces, orclings, tasks, threads, type Db } from "@openorc/db";
 import { WORKSPACE_ID, type Project, type RunMode, type Task, type Thread } from "@openorc/protocol";
 import type { RunHooks } from "./run-types.js";
 
@@ -9,7 +9,7 @@ export class RunBriefs {
     private readonly hooks: Pick<RunHooks, "brief" | "memoryEnabled" | "threadContext">,
   ) {}
 
-  taskBrief(task: Task, project: Project, mode: RunMode, teamManaged = false): string {
+  taskBrief(task: Task, project: Project, mode: RunMode): string {
     const location =
       task.workspaceMode === "current"
         ? `in the project's default checkout at ${project.rootPath}. Use this checkout; do not create or attach a worktree`
@@ -21,17 +21,10 @@ export class RunBriefs {
       if (thread)
         lines.push(
           "",
-          teamManaged
-            ? `This assignment belongs to the team conversation "${thread.title}". The team coordinator routes your result to your requesting manager.`
-            : `This task was delegated from the thread "${thread.title}". When you finish, your final message is reported back there, so end with a short summary of what changed and what is left.`,
+          `This task was delegated from the thread "${thread.title}". When you finish, your final message is reported back there, so end with a short summary of what changed and what is left.`,
         );
     }
-    lines.push(
-      "",
-      teamManaged
-        ? "Stay inside this assignment. Follow the team roster and coordination rules below for delegation and reporting. task_list and task_get provide context for this team's work."
-        : "Stay inside this task. Do not create tasks; task_list and task_get show sibling tasks if you need context.",
-    );
+    lines.push("", "Stay inside this task. Do not create tasks; task_list and task_get show sibling tasks if you need context.");
     if (mode === "plan") lines.push("", "Plan mode: investigate and produce a concrete plan. Do not modify files or run commands that change state.");
     lines.push(
       "",
@@ -104,8 +97,13 @@ export class RunBriefs {
     if (project.id === WORKSPACE_ID) {
       return `You are in Workspace conversation "${thread.title}", working in ${project.rootPath}. Workspace is your personal conversation home, not a repository. This folder need not be an imported project or a Git repository. Do not import projects automatically. Respect the current permissions for every operation.`;
     }
+    const head = thread.branch ? `on branch ${thread.branch}` : "at a detached commit, on no branch";
+    // A cloud thread's agent runs in its sandbox, where the worktree's path on the machine that keeps the thread is not.
+    const cloud = cloudWorkspaces.get(this.db, thread.id);
+    if (cloud && cloud.state !== "removed") {
+      return `You are in the thread "${thread.title}" for project ${project.name}, working in this thread's cloud sandbox: your current working directory is its copy of the project, ${head}.`;
+    }
     if (thread.worktreePath) {
-      const head = thread.branch ? `on branch ${thread.branch}` : "at a detached commit, on no branch";
       return `You are in the thread "${thread.title}" for project ${project.name}, working in this thread's own worktree at ${thread.worktreePath} ${head}.`;
     }
     return `You are in the thread "${thread.title}" for project ${project.name}, working directly in the project folder at ${project.rootPath}${project.defaultBranch ? ` on ${project.defaultBranch}` : ""}.`;

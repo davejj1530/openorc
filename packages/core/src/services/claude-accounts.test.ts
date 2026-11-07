@@ -81,6 +81,26 @@ it("isolates three managed accounts while preserving the existing CLI environmen
   expect(() => service.environment(snapshot, "../../other")).toThrow(/no longer available/);
 });
 
+it("signs every account in with its own cloud token on a cloud-only host, and with nothing new elsewhere", () => {
+  const work = service.add("Work");
+  const tokens: Record<string, string> = { [work.id]: "sk-ant-oat01-work", "claude-cli": "sk-ant-oat01-cli" };
+  const cloudOnly = new ClaudeAccountService(
+    db,
+    root,
+    () => snapshot,
+    changed,
+    busy,
+    undefined,
+    (id) => tokens[id] ?? null,
+  );
+  expect(cloudOnly.environment(snapshot, work.id).env.CLAUDE_CODE_OAUTH_TOKEN).toBe("sk-ant-oat01-work");
+  expect(cloudOnly.environment(snapshot, "claude-cli").env.CLAUDE_CODE_OAUTH_TOKEN).toBe("sk-ant-oat01-cli");
+  delete tokens[work.id];
+  expect(cloudOnly.environment(snapshot, work.id).env.CLAUDE_CODE_OAUTH_TOKEN).toBeUndefined();
+  expect(service.environment(snapshot, work.id).env.CLAUDE_CODE_OAUTH_TOKEN).toBeUndefined();
+  expect(service.environment(snapshot, "claude-cli").env.CLAUDE_CODE_OAUTH_TOKEN).toBe("fixture-only");
+});
+
 it("links the CLI login's personal skills into a signed-in added account and drops them once uninstalled", async () => {
   const original = path.join(root, "original", "skills");
   for (const name of ["humanizer", "research", "synced/bucket/morning", ".hidden"]) await mkdir(path.join(original, name), { recursive: true });

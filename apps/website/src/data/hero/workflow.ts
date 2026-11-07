@@ -37,6 +37,11 @@ export const workflow = {
     phase: "Measuring where the app spends its time",
     reads: ["src/dashboard/Dashboard.tsx", "src/transcript/Row.tsx", "src/main.tsx"],
     command: "pnpm perf",
+    /** What the sidebar row says under the title while each turn works. */
+    headline: [
+      { text: "Measuring where the app spends its time", show: "aSend~aDone" },
+      { text: "Creating the three tasks", show: ">aPick" },
+    ],
   },
   tasks: [
     { title: "Cache dashboard queries", priority: "High", label: "Performance" },
@@ -83,6 +88,10 @@ export const workflow = {
     reply:
       "Dashboard queries are cached per project. Selection changes reuse the cache, thread events invalidate it, and the first paint comes from the last known state. The dashboard now makes **two requests on open** instead of one per render.",
     phases: { read: "Reading the dashboard hooks", edit: "Caching the queries per project" },
+    headline: [
+      { text: "Reading the dashboard hooks", show: "<bRead" },
+      { text: "Caching the queries per project", show: ">bRead" },
+    ],
     change: {
       files: [
         { path: "src/dashboard/useProjects.ts", added: 18, removed: 6 },

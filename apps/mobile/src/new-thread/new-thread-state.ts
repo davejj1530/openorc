@@ -1,5 +1,5 @@
 import { conversationSendDisabledReason, decodeNewThreadDraft, targetModel, type NewThreadDraft } from "@openorc/client";
-import { WORKSPACE_ID } from "@openorc/protocol";
+import { WORKSPACE_ID, type Project } from "@openorc/protocol";
 import { unsent } from "../composer/composer-state";
 import type { DraftImage } from "../composer/drafts";
 import type { ProjectChoice } from "../projects";
@@ -36,4 +36,14 @@ export function startBlocker(draft: Pick<SheetDraft, "target">, { permissionRead
 export function unstarted(taken: Pick<SheetDraft, "prompt" | "images">, since: SheetDraft): SheetDraft {
   const { text, images } = unsent({ text: taken.prompt, images: taken.images }, { text: since.prompt, images: since.images });
   return { ...since, prompt: text, images };
+}
+
+const DAY = 86_400_000;
+
+/** A project the cloud brain holds as the Mac's copy, named by its age only once that is a day or more. */
+export function copyAge(project: Pick<Project, "defaultBranch" | "copy"> | undefined, now: number): string | null {
+  const syncedAt = project?.copy?.syncedAt;
+  if (syncedAt === undefined || now - syncedAt < DAY) return null;
+  const days = Math.floor((now - syncedAt) / DAY);
+  return `From ${project?.defaultBranch ?? "its default branch"}, synced ${days} ${days === 1 ? "day" : "days"} ago`;
 }

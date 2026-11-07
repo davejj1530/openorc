@@ -1,0 +1,28 @@
+---
+/**
+ * The work panel's header as PanelHeader.tsx draws it: its pages as text tabs (the open one in ink), the round add
+ * button after them, and the panel's tools at the far end.
+ */
+import FileGlyph from "./FileGlyph.astro";
+import ProductIcon, { type IconName } from "./ProductIcon.astro";
+
+interface Props {
+  /** A page with an icon, or a file page with its glyph. */
+  tabs: { label: string; icon?: IconName; file?: string; selected?: boolean }[];
+  tools?: IconName[];
+}
+const { tabs, tools = ["expand"] } = Astro.props;
+---
+
+<div class="hs-panel-header">
+  <span class="hs-panel-tabs">
+    {tabs.map((tab) => (
+      <span class="hs-panel-tab" data-selected={tab.selected ? "" : undefined}>
+        {tab.file ? <FileGlyph path={tab.file} /> : <ProductIcon name={tab.icon ?? "fileDiff"} />}
+        {tab.label}
+      </span>
+    ))}
+  </span>
+  <span class="hs-round"><ProductIcon name="plus" /></span>
+  <span class="hs-panel-tools">{tools.map((tool) => <span class="hs-round"><ProductIcon name={tool} /></span>)}</span>
+</div>

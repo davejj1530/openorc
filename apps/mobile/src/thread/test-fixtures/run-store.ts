@@ -17,7 +17,15 @@ export function runStore(delivery: CoreConnection["delivery"] = "all") {
       interest = runIds;
     },
   };
-  const client = createClientState(connection, { scheduleFrame: () => undefined, invalidationBatchMs: 50, randomId: () => "id", savesDefaultPermission: false });
+  const client = createClientState(connection, {
+    scheduleFrame: () => undefined,
+    invalidationBatchMs: 50,
+    randomId: () => "id",
+    savesDefaultPermission: false,
+    reportFrameError: (_frame, error) => {
+      throw error;
+    },
+  });
   const { runs } = client;
   let seq = 0;
   const frame = (...drafts: Draft[]) => {

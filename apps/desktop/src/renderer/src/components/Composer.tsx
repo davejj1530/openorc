@@ -1,32 +1,32 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { composerActions, composerActivity, composerSendHint } from "@openorc/client";
 import {
   ExecutionMode,
   executionMode,
   executionModeAvailable,
-  executionModeSettings,
   executionModePresentation,
+  executionModeSettings,
   executionModeUnavailable,
   type AgentKind,
+  type FileScope,
   type PermissionPreset,
   type RunMode,
-  type FileScope,
 } from "@openorc/protocol";
-import { FileText, Laptop, Lightbulb, Pencil, Plus, ShieldCheck, Square, Wand, X } from "./icons";
-import { ComposerInput } from "./ComposerInput";
-import { ComposerChoice } from "./ComposerChoice";
-import { ComposerSendButton } from "./ComposerSendButton";
-import { ComposerFooter } from "./ComposerFooter";
-import { ComposerDropZone, useComposerDrop } from "./ComposerDropZone";
-import { ContextUsage } from "./ContextUsage";
-import { ComposerModelPicker, type ModelChoice } from "./ModelPicker";
-import { Button, Tooltip } from "./ui";
-import { cn } from "../lib/cn";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRpcMutation } from "../lib/client";
-import { composerActions, composerActivity, composerSendHint } from "@openorc/client";
-import { useComposerAttachments, removeAcceptedAttachments } from "../lib/composer-attachments";
-import { formatBytes } from "../lib/file-imports";
+import { cn } from "../lib/cn";
+import { removeAcceptedAttachments, useComposerAttachments } from "../lib/composer-attachments";
 import { type MentionEntry } from "../lib/composer-mentions";
 import { useComposerSubmission } from "../lib/composer-submission";
+import { formatBytes } from "../lib/file-imports";
+import { ComposerChoice } from "./ComposerChoice";
+import { ComposerDropZone, useComposerDrop } from "./ComposerDropZone";
+import { ComposerFooter } from "./ComposerFooter";
+import { ComposerInput } from "./ComposerInput";
+import { ComposerSendButton } from "./ComposerSendButton";
+import { ContextUsage } from "./ContextUsage";
+import { Cloud, FileText, Laptop, Lightbulb, Pencil, Plus, ShieldCheck, Square, Wand, X } from "./icons";
+import { ComposerModelPicker, type ModelChoice } from "./ModelPicker";
+import { Button, Tooltip } from "./ui";
 
 export const permissionLabel: Record<PermissionPreset, string> = { review: "Review", trusted: "Workspace access", autonomous: "Autonomous" };
 
@@ -38,7 +38,7 @@ function composerDestination(props: ComposerProps): ReactNode {
   if (!props.location.label) return null;
   return (
     <span className="composer-location">
-      <Laptop size={14} />
+      {props.location.cloud ? <Cloud size={14} /> : <Laptop size={14} />}
       <span>{props.location.label}</span>
     </span>
   );
@@ -77,7 +77,7 @@ export interface ComposerProps {
   placeholder: string;
   model: ModelChoice | null;
   onModel: (choice: ModelChoice) => void;
-  /** A saved team can supply its identity and lead settings in the same toolbar position. */
+  /** A saved identity can supply its model controls in the toolbar. */
   modelControl?: ReactNode;
   mode: RunMode;
   onMode: (mode: RunMode) => void;
@@ -95,20 +95,19 @@ export interface ComposerProps {
   attachmentsDisabledReason?: string | null;
   /** Where the agent runs: the working folder and Git context share the footer below the input. */
   /** A caller supplying its own destination control may omit the static label. */
-  location: { label: string | null; branch: string | null; directory?: string };
+  /** `cloud` when the agent works in a sandbox and `directory` is the worktree its changes arrive in. */
+  location: { label: string | null; branch: string | null; directory?: string; cloud?: boolean };
   /** Initial execution location is chosen before the conversation starts. */
   hasStarted?: boolean;
   /** Uncommitted changes and actions beside the working folder. */
   changes?: ComposerChanges | null;
-  /** The project, only when the caller lets you change it. The name alone is TopBar’s job. */
-  projectControl?: ReactNode;
   busy?: boolean;
   disabledReason?: string | null;
   /** A saved task can start from its spec without an additional message. */
   allowEmpty?: boolean;
   /** Live-run controls, when a session is open. */
   live?: { runId: string; working: boolean } | null;
-  /** Team execution can stay active after its lead provider session closes. */
+  /** Custom stop controls for a caller that owns execution. */
   stopAction?: { working: boolean; pending: boolean; onStop: () => void };
   /** Enter queues instead of sending, because the agent is mid-turn. */
   queueing?: boolean;
@@ -116,7 +115,7 @@ export interface ComposerProps {
   steerable?: boolean;
   /** Why it cannot, when it cannot. The core words these; showing one beats a control that is simply dim. */
   steerReason?: string | null;
-  /** Team chat sends live by default; ordinary solo chat keeps Enter-to-queue. */
+  /** A caller can send messages immediately while the agent is working. */
   liveByDefault?: boolean;
   /** How full the conversation is; the ring beside send. */
   context?: { used: number; window: number | null } | null;
@@ -126,7 +125,7 @@ export interface ComposerProps {
   generatingImage?: boolean;
   /** Where @ file mentions search. */
   fileSearch?: FileScope;
-  /** Team members `@` can address; they take the popover before file matches. */
+  /** Orclings `@` can address; they take the popover before file matches. */
   mentions?: MentionEntry[];
   commands?: SlashCommand[];
   autoFocus?: boolean;
@@ -290,7 +289,6 @@ export function Composer(props: ComposerProps) {
           {/* Attach, then where and how the agent works. Chips truncate before the end group moves. */}
           <div className="composer-tools">
             <ComposerAttach onAttach={pickFiles} disabledReason={props.attachmentsDisabledReason} />
-            {props.projectControl}
             {composerDestination(props)}
             {composerModelControl(props)}
             {composerModeControl(props)}

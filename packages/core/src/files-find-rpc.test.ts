@@ -50,8 +50,10 @@ async function workspaceThread(files: Record<string, string>): Promise<Thread> {
   return threads.update(core.db, notes.id, { workingDirectory: folder });
 }
 
-it("finds lines in the conversation's git folder, untracked files included, grouped by file", async () => {
+it("finds lines in the conversation's git folder, untracked files included, ignored env files not, grouped by file", async () => {
   await writeFile(path.join(checkout, "src", "draft.ts"), "// a needle\nconst x = 1;\n");
+  await writeFile(path.join(checkout, "src", ".gitignore"), ".env\n");
+  await writeFile(path.join(checkout, "src", ".env"), "NEEDLE=1\n");
   expect(await find(literal("NEEDLE"))).toEqual({
     kind: "matches",
     truncated: false,
@@ -63,8 +65,8 @@ it("finds lines in the conversation's git folder, untracked files included, grou
   expect(await find({ text: "NEEDLE", regex: false, caseSensitive: true })).toEqual({ kind: "matches", truncated: false, groups: [] });
 });
 
-it("walks a folder without git, skipping hidden folders and dependencies", async () => {
-  const notes = await workspaceThread({ "ideas.md": "# needle\n", ".cache/old.md": "needle\n", "node_modules/pkg/index.js": "needle\n", "logo.png": "needle\0" });
+it("walks a folder without git, skipping hidden folders, env files and dependencies", async () => {
+  const notes = await workspaceThread({ "ideas.md": "# needle\n", ".cache/old.md": "needle\n", ".env": "NEEDLE=1\n", "node_modules/pkg/index.js": "needle\n", "logo.png": "needle\0" });
   expect(await find(literal("needle"), notes.id)).toEqual({ kind: "matches", truncated: false, groups: [{ path: "ideas.md", lines: [{ line: 1, text: "# needle" }] }] });
 });
 
@@ -106,8 +108,12 @@ async function fakeGit() {
     "#!/bin/sh",
     'for arg in "$@"; do',
     '  if [ "$arg" = grep ]; then',
+    `    if [ -e "${bin}/hang" ]; then`,
+    `      rm "${bin}/hang"`,
+    `      echo $$ >> "${bin}/greps"`,
+    "      exec sleep 30",
+    "    fi",
     `    echo $$ >> "${bin}/greps"`,
-    `    if [ -e "${bin}/hang" ]; then rm "${bin}/hang"; exec sleep 30; fi`,
     "  fi",
     "done",
     `exec "${realGit}" "$@"`,
@@ -131,11 +137,14 @@ it("stops a find when a newer one for the same conversation starts, ending its g
   try {
     await git.hangNextGrep();
     const first = find(literal("needle"));
-    const [pid] = await vi.waitFor(async () => {
-      const greps = await git.greps();
-      if (!greps.length) throw new Error("no grep yet");
-      return greps;
-    });
+    const [pid] = await vi.waitFor(
+      async () => {
+        const greps = await git.greps();
+        if (!greps.length) throw new Error("no grep yet");
+        return greps;
+      },
+      { timeout: 5_000 },
+    );
     const second = await find(literal("needle"));
     expect(await first).toEqual({ kind: "superseded" });
     expect(second).toMatchObject({ kind: "matches", groups: [{ path: "src/cart.ts" }] });

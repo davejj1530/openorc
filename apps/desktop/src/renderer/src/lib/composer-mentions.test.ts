@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterMentions, teamMentionEntries } from "./composer-mentions";
+import { filterMentions } from "./composer-mentions";
 
 const entries = [
   { key: "everyone", name: "everyone", hint: "Whole team" },
@@ -15,18 +15,5 @@ describe("composer mentions", () => {
     expect(filterMentions(entries, "LE").map((entry) => entry.key)).toEqual(["lead"]);
     expect(filterMentions(entries, "assistant").map((entry) => entry.key)).toEqual(["lead"]);
     expect(filterMentions(entries, "zz")).toEqual([]);
-  });
-});
-
-describe("teamMentionEntries", () => {
-  it("lists everyone, the lead by name and each member with its provider", () => {
-    const revision = {
-      members: [
-        { key: "lead", name: "Assistant General", managerKey: null, settings: { agent: "codex" } },
-        { key: "mark", name: "Mark", managerKey: "lead", settings: { agent: "codex" } },
-        { key: "melo", name: "Melo", managerKey: "lead", settings: { agent: "claude" } },
-      ],
-    };
-    expect(teamMentionEntries(revision)).toEqual(entries);
   });
 });

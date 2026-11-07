@@ -1,8 +1,7 @@
-import { connectLink, decodePairingUrl, toBase64Url, type ClosingReason, type KeyPair, type MacMessage, type PhoneSession, type Refusal } from "@openorc/link";
+import { connectLink, decodePairingUrl, linkPath, linkUrl, toBase64Url, type ClosingReason, type KeyPair, type MacMessage, type PhoneSession, type Refusal } from "@openorc/link";
 import { nodeCrypto } from "@openorc/link/node";
 import type { AssetRef, DeviceMethod, DeviceParams, DeviceRpcResults, RemotePush, Route, RpcMethod, RpcParams, RpcResults, SessionMethod, SessionParams, SessionRpcResults } from "@openorc/protocol";
 import { WebSocket } from "ws";
-import { LINK_PATH } from "./listener.js";
 import { linkSocket } from "./ws-socket.js";
 
 interface Pending {
@@ -17,9 +16,10 @@ interface AssetDownload {
   reject(error: Error): void;
 }
 
-function openSocket(route: Route): Promise<WebSocket> {
-  const host = route.host.includes(":") ? `[${route.host}]` : route.host;
-  const ws = new WebSocket(`ws://${host}:${route.port}${LINK_PATH}`);
+/** Where a phone dials, or with `proxyTo`, the listener behind a public route's TLS proxy, on loopback in the proxy's place. */
+function openSocket(route: Route, macKey: Uint8Array, proxyTo: number | undefined): Promise<WebSocket> {
+  const url = route.kind === "public" && proxyTo !== undefined ? `ws://127.0.0.1:${proxyTo}${linkPath(route.kind, macKey, nodeCrypto)}` : linkUrl(route, macKey, nodeCrypto);
+  const ws = new WebSocket(url);
   return new Promise((resolve, reject) => {
     ws.once("open", () => resolve(ws));
     ws.once("error", reject);
@@ -55,11 +55,19 @@ export class RemoteTestClient {
     });
   }
 
-  static async connect(options: { route: Route; macKey: Uint8Array; device?: KeyPair; name?: string; pair?: { offerId: string; secret: Uint8Array } }): Promise<RemoteTestClient | Refusal> {
+  /** `proxyTo` is the listening port of a host behind a TLS proxy, which tests dial directly. */
+  static async connect(options: {
+    route: Route;
+    macKey: Uint8Array;
+    proxyTo?: number;
+    device?: KeyPair;
+    name?: string;
+    pair?: { offerId: string; secret: Uint8Array };
+  }): Promise<RemoteTestClient | Refusal> {
     const device = options.device ?? nodeCrypto.generateKeyPair();
     const pair = options.pair && { offerId: options.pair.offerId, secret: toBase64Url(options.pair.secret) };
     const result = await connectLink({
-      socket: linkSocket(await openSocket(options.route)),
+      socket: linkSocket(await openSocket(options.route, options.macKey, options.proxyTo)),
       crypto: nodeCrypto,
       device,
       macKey: options.macKey,
@@ -72,7 +80,7 @@ export class RemoteTestClient {
   }
 
   /** Scans a pairing code and connects over its first route. */
-  static async pair(url: string, options: { device?: KeyPair; name?: string } = {}): Promise<RemoteTestClient | Refusal> {
+  static async pair(url: string, options: { device?: KeyPair; name?: string; proxyTo?: number } = {}): Promise<RemoteTestClient | Refusal> {
     const offer = decodePairingUrl(url);
     return RemoteTestClient.connect({ ...options, route: offer.routes[0]!, macKey: offer.macKey, pair: { offerId: offer.offerId, secret: offer.secret } });
   }

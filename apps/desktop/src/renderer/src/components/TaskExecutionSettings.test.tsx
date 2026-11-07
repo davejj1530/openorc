@@ -1,7 +1,7 @@
+import type { Task } from "@openorc/protocol";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import type { Task } from "@openorc/protocol";
 import { TaskExecutionSettings, useTaskExecutionLocation } from "./TaskExecutionSettings";
 
 const mocks = vi.hoisted(() => ({ call: vi.fn(), teamMove: vi.fn() }));
@@ -86,7 +86,6 @@ it("uses the linked thread location and resolves its owner before requesting a m
     if (method === "threads.moveWorkspace") return { workspaceMode: "current" };
     if (method === "tasks.executionThread") return owner;
     if (method === "runs.listForTask") return [];
-    if (method === "orchestration.taskState") return null;
     return { forwarding: null };
   });
   renderSettings({ ...task, threadId: "creator", executionThreadId: "owner" });
@@ -98,25 +97,9 @@ it("uses the linked thread location and resolves its owner before requesting a m
   expect(mocks.call.mock.calls.some(([method]) => method === "tasks.update")).toBe(false);
 });
 
-it("blocks a running conversation and exposes the saved-team move flow", async () => {
-  const { client } = renderSettings({ ...task, threadId: "creator", executionThreadId: "owner" });
-  await act(async () => {
-    client.setQueryData(["tasks.executionThread", { taskId: task.id }], { ...owner, activity: "running" });
-  });
-  await waitFor(() => expect(screen.getByRole("combobox")).toHaveProperty("disabled", true));
-  expect(screen.getByText(/Wait for the current turn/)).toBeTruthy();
-  await act(async () => {
-    client.setQueryData(["orchestration.taskState", { taskId: task.id }], { ownerDeletedAt: null });
-  });
-  fireEvent.click(await screen.findByRole("button", { name: "Manage team workspace" }));
-  expect(mocks.teamMove).toHaveBeenCalledWith("creator");
-  expect(mocks.call).not.toHaveBeenCalled();
-});
-
 it("keeps an unstarted task editable even when its creator is busy", async () => {
   mocks.call.mockImplementation(async (method) => {
     if (method === "tasks.update") return { ...task, workspaceMode: "worktree" };
-    if (method === "tasks.executionThread" || method === "orchestration.taskState") return null;
     return method === "runs.listForTask" ? [] : { forwarding: null };
   });
   const { client } = renderSettings({ ...task, threadId: "creator", baseSha: "viewed-diff-base" });

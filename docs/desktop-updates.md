@@ -18,7 +18,7 @@ Published stable and beta releases are offered to everyone when their version is
 
 Versions through `0.1.0-beta.4` shipped with stable-only checks. Those installations need a one-time manual installation of the first beta containing this change, or an update to a newer stable release, before they can receive future beta updates.
 
-Restarting to install waits until nothing is in progress: agent turns, approvals, context maintenance, unfinished teams, pending requests, scheduled runs that are starting, memory processing, coding-agent updates, and running terminal panels. Idle agent sessions close normally. Once the app agrees, it holds new agent turns and terminals, finishes writing its data, and waits for the core process to exit cleanly before the installer starts. OpenOrc never stops a running agent to force an update. If shutdown cannot be confirmed or the installer fails, quit and reopen the app before trying again.
+Restarting to install waits until nothing is in progress: agent turns, approvals, context maintenance, pending requests, scheduled runs that are starting, memory processing, coding-agent updates, and running terminal panels. Idle agent sessions close normally. Once the app agrees, it holds new agent turns and terminals, finishes writing its data, and waits for the core process to exit cleanly before the installer starts. OpenOrc never stops a running agent to force an update. If shutdown cannot be confirmed or the installer fails, quit and reopen the app before trying again.
 
 Updates keep the app ID (`app.openorc.desktop`), the OpenOrc name, and your data folder. Uninstalling on Windows also keeps your data. Quitting after a download does not install the update.
 
@@ -98,7 +98,7 @@ These checks do not replace a real upgrade between two installed versions. Befor
 
 - Install the older release from its DMG or NSIS installer; on macOS, check Gatekeeper and notarization. For signed Windows releases, check the expected publisher; for an unsigned beta, check the notice and record how Windows security responds.
 - Publish a newer test version to a dedicated public test repository configured in test builds. Check that it is offered, that an interrupted download can be retried, and that the right architecture's installer is used.
-- Try restarting during an agent turn, a pending approval, active team work, and a running terminal. Each must keep running with a clear refusal. Finish that work and try again.
+- Try restarting during an agent turn, a pending approval, and a running terminal. Each must keep running with a clear refusal. Finish that work and try again.
 - Install from an idle state, then check the restart, version, existing conversations, settings, credentials, agent discovery, native SQLite and ONNX loading, and terminals.
 - Check that quitting after a download does not install the update, and that an unavailable feed or invalid signature leaves the previous installation usable.
 

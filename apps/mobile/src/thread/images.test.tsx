@@ -3,6 +3,7 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import type { FakeLink } from "../test-fixtures/fake-link";
 import { keyboard, nativeProps } from "../test-fixtures/react-native";
+import { HostContext } from "../connection/host-context";
 import { ImageTile } from "./images";
 
 /** The link, and the phone's cache of the Mac's images. */
@@ -31,7 +32,18 @@ it("loads an image again once the link is back, after the link dropped it", asyn
   await act(async () => answers[1]!.resolve("file:///cache/shot.png"));
   const image = screen.getByLabelText("Attached image").querySelector("img")!;
   expect(nativeProps.get(image)?.source).toEqual({ uri: "file:///cache/shot.png" });
-  expect(tile.uri).toHaveBeenLastCalledWith({ kind: "attachment", name: "shot.png" });
+  expect(tile.uri).toHaveBeenLastCalledWith({ kind: "attachment", name: "shot.png" }, null);
+});
+
+it("fetches a cloud thread's image from the brain that holds it", async () => {
+  tile.uri.mockResolvedValue("file:///cache/brain-shot.png");
+  render(
+    <HostContext.Provider value="brain">
+      <ImageTile asset={{ kind: "attachment", name: "shot.png" }} label="Attached image" compact />
+    </HostContext.Provider>,
+  );
+  await act(async () => undefined);
+  expect(tile.uri).toHaveBeenLastCalledWith({ kind: "attachment", name: "shot.png" }, "brain");
 });
 
 it("puts the keyboard away as an image opens full screen", async () => {

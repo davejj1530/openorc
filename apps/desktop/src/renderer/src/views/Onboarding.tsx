@@ -7,6 +7,7 @@ import { Button, Select, TextButton } from "../components/ui";
 import { type OnboardingStep, type PersistedOnboardingState } from "../lib/onboarding";
 import { useTheme, type ThemeChoice } from "../lib/theme";
 import { PaletteSelector } from "../components/PaletteSelector";
+import { Wordmark } from "../components/SidebarListHead";
 import { useTrafficLights, useWindowsControls } from "../lib/window";
 import { useOnboardingFlow } from "./onboarding-flow";
 import "../styles/onboarding.css";
@@ -335,7 +336,9 @@ function OnboardingFlow({ mode = "first_run", initialStep, persisted, onPersist,
     return (
       <div className="onboarding-root">
         <OnboardingChrome>
-          <span className="onboarding-brand">OpenOrc</span>
+          <span className="onboarding-brand">
+            <Wordmark />
+          </span>
           <span className="onboarding-chrome-label" />
           <TextButton className="onboarding-preview-trigger" tone="muted" onClick={closeRecovery}>
             Close
@@ -382,7 +385,9 @@ function OnboardingFlow({ mode = "first_run", initialStep, persisted, onPersist,
   return (
     <div className="onboarding-root">
       <OnboardingChrome>
-        <span className="onboarding-brand">OpenOrc</span>
+        <span className="onboarding-brand">
+          <Wordmark />
+        </span>
         <span className="onboarding-chrome-label">Set up your workspace</span>
         {import.meta.env.DEV ? (
           <TextButton className="onboarding-preview-trigger" tone="muted" onClick={onTogglePreview}>

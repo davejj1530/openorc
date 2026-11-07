@@ -1,14 +1,14 @@
+import type { Project, ReviewComment, RpcMethod, RpcParams, RpcResults, Task, TaskComment } from "@openorc/protocol";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { QueryClientProvider } from "@tanstack/react-query";
-import type { Project, ReviewComment, RpcMethod, RpcParams, RpcResults, Task, TaskComment, TeamTaskView } from "@openorc/protocol";
-import { TaskDocument, type TaskDocumentHandle } from "../../apps/desktop/src/renderer/src/views/TaskDocument";
-import { ReviewPanel } from "../../apps/desktop/src/renderer/src/panels/ReviewPanel";
-import { TaskDraftProvider } from "../../apps/desktop/src/renderer/src/lib/task-draft-context";
-import { core } from "../../apps/desktop/src/renderer/src/lib/rpc";
-import { queryClient } from "../../apps/desktop/src/renderer/src/lib/client";
-import { useTheme } from "../../apps/desktop/src/renderer/src/lib/theme";
 import "../../apps/desktop/src/renderer/src/app.css";
+import { queryClient } from "../../apps/desktop/src/renderer/src/lib/client";
+import { core } from "../../apps/desktop/src/renderer/src/lib/rpc";
+import { TaskDraftProvider } from "../../apps/desktop/src/renderer/src/lib/task-draft-context";
+import { useTheme } from "../../apps/desktop/src/renderer/src/lib/theme";
+import { ReviewPanel } from "../../apps/desktop/src/renderer/src/panels/ReviewPanel";
+import { TaskDocument, type TaskDocumentHandle } from "../../apps/desktop/src/renderer/src/views/TaskDocument";
 
 const project: Project = {
   id: "project",
@@ -42,23 +42,6 @@ let task: Task = {
   createdAt: Date.now(),
   updatedAt: 0,
   completedAt: null,
-};
-const team: TeamTaskView = {
-  taskId: task.id,
-  threadId: "thread",
-  teamName: "Fixture team",
-  members: [],
-  managerKey: "lead",
-  memberKey: null,
-  dependencyTaskIds: [],
-  policy: { requested: "trusted", effective: "trusted", pendingRestart: false, runs: [] },
-  start: { allowed: false, reason: "Already accepted" },
-  review: { allowed: true, reason: null },
-  export: { allowed: true, reason: null, branch: "assignment" },
-  admissions: [],
-  claimedCommentIds: [],
-  assignments: [],
-  working: false,
 };
 const comment: ReviewComment = {
   id: "comment",
@@ -101,12 +84,6 @@ core.call = async <M extends RpcMethod>(method: M, params: RpcParams<M>): Promis
       break;
     case "runs.listForTask":
       result = [];
-      break;
-    case "tasks.forwarding":
-      result = { forwarding: null };
-      break;
-    case "orchestration.taskState":
-      result = team;
       break;
     case "agents.models":
       result = [];

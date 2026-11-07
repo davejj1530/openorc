@@ -8,7 +8,7 @@ Use the repository's **Issues → New issue** chooser:
 - **Question** for setup or usage help.
 - **Feature request** for a concrete workflow or capability you would like supported.
 
-Search existing issues first. Include your OpenOrc version or commit, operating system, relevant provider/CLI version, and a small reproducible example. Reports are public: review screenshots and log excerpts for credentials, private conversations, project names, and local paths. Do not attach an application database or full profile.
+Search existing issues first. Include your OpenOrc version or commit, operating system, relevant provider/CLI version, and a small reproducible example. For the iPhone app, add its version and your iOS version. Reports are public: review screenshots and log excerpts for credentials, private conversations, project names, and local paths. Do not attach an application database or full profile.
 
 Use [private security reporting](SECURITY.md) for suspected vulnerabilities. Provider billing, account access, and service outages belong with the relevant provider's support channel.
 

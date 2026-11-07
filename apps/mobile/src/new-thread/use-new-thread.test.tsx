@@ -6,6 +6,8 @@ import { attachImage, pickImages } from "../composer/attachments";
 import type { DraftImage } from "../composer/drafts";
 import { KEYBOARD_LEFTOVER_MS } from "../composer/keyboard-leftover";
 import type { FakeMac } from "../test-fixtures/fake-mac";
+import type { ReactNode } from "react";
+import { HostContext } from "../connection/host-context";
 import { useNewThread } from "./use-new-thread";
 
 /**
@@ -20,17 +22,33 @@ const mac = vi.hoisted(() => {
   ];
   const reads: Partial<Record<RpcMethod, unknown>> = {};
   const git: Record<string, ProjectGit | Promise<ProjectGit>> = {};
-  return { models, reads, git, phone: null as FakeMac | null, start: vi.fn<(params: RpcParams<"threads.start">) => Promise<{ thread: { id: string } }>>() };
+  return {
+    models,
+    reads,
+    git,
+    phone: null as FakeMac | null,
+    start: vi.fn<(params: RpcParams<"threads.start">) => Promise<{ thread: { id: string } }>>(),
+    /** What the shown Mac and its cloud brain were asked about git, by project. */
+    gitAsked: { shown: [] as string[], brain: [] as string[] },
+  };
 });
 
 vi.mock("../client", async () => {
   const { fakeMac } = await import("../test-fixtures/fake-mac");
   mac.phone = fakeMac((method, params) => {
     if (method === "threads.start") return mac.start(params as RpcParams<"threads.start">);
-    if (method === "projects.git") return Promise.resolve(mac.git[(params as RpcParams<"projects.git">).id] ?? "ready");
+    if (method === "projects.git") {
+      mac.gitAsked.shown.push((params as RpcParams<"projects.git">).id);
+      return Promise.resolve(mac.git[(params as RpcParams<"projects.git">).id] ?? "ready");
+    }
     return Promise.resolve(mac.reads[method]);
   });
-  return mac.phone.module;
+  const brain = {
+    connection: {
+      call: (method: RpcMethod, params: RpcParams<"projects.git">) => (method === "projects.git" ? (mac.gitAsked.brain.push(params.id), Promise.resolve("ready")) : Promise.reject(new Error(method))),
+    },
+  };
+  return { ...mac.phone.module, hostLink: (host: string | null) => (host === "brain-1" ? brain : mac.phone!.module.link) };
 });
 vi.mock("../composer/attachments", () => ({ pickImages: vi.fn(), attachImage: vi.fn() }));
 
@@ -39,6 +57,7 @@ function macState({ signedIn = ["codex", "claude"], defaultHarness = null }: { s
   mac.reads["agents.models"] = mac.models;
   mac.reads["agents.availability"] = harnessIds.map((id) => ({ id, state: signedIn.includes(id) ? "ready" : "sign_in" }));
   mac.reads["app.settings.get"] = { defaultWorkspaceMode: "worktree", defaultPermissionMode: "review", defaultHarness };
+  mac.reads["cloud.offer"] = { offered: false, provider: null };
 }
 
 beforeEach(() => {
@@ -46,6 +65,8 @@ beforeEach(() => {
   mac.phone!.module.queryClient.clear();
   mac.start.mockReset();
   for (const id of Object.keys(mac.git)) delete mac.git[id];
+  mac.gitAsked.shown.length = 0;
+  mac.gitAsked.brain.length = 0;
   macState();
 });
 afterEach(cleanup);
@@ -126,6 +147,60 @@ it.each([
   expect(sent()).toMatchObject({ projectId: "notes", workspaceMode: "current" });
 });
 
+it("asks the git of the host its screen is on, so a start on the cloud brain never waits on the shown Mac", async () => {
+  const sheet = renderHook(() => useNewThread("cloud-openorc"), {
+    wrapper: ({ children }: { children: ReactNode }) => <HostContext.Provider value="brain-1">{mac.phone!.wrapper({ children })}</HostContext.Provider>,
+  });
+  await write(sheet, "Try the cloud");
+  mac.start.mockResolvedValue({ thread: { id: "cloud-thread-1" } });
+  expect(await submit(sheet)).toBe("cloud-thread-1");
+  expect(mac.gitAsked).toEqual({ shown: [], brain: ["cloud-openorc"] });
+});
+
+it("offers the cloud where the Mac does, for a project, and starts there when chosen", async () => {
+  mac.reads["cloud.offer"] = { offered: true, provider: "vercel" };
+  const sheet = open("openorc");
+  await write(sheet, "Fix the build");
+  await waitFor(() => expect(sheet.result.current.settings.place).toMatchObject({ chosen: "mac", provider: "vercel" }));
+  act(() => sheet.result.current.settings.place!.select("cloud"));
+  expect(sheet.result.current.settings.place?.chosen).toBe("cloud");
+  mac.start.mockResolvedValue({ thread: { id: "thread-1" } });
+  await submit(sheet);
+  expect(sent()).toMatchObject({ projectId: "openorc", workspaceMode: "worktree", cloud: true });
+
+  const workspace = open(WORKSPACE_ID);
+  await write(workspace, "Plan the week");
+  expect(workspace.result.current.settings.place).toBeUndefined();
+});
+
+it("starts on the Mac once the Mac stops offering the cloud, whatever was chosen", async () => {
+  mac.reads["cloud.offer"] = { offered: true, provider: "local" };
+  const sheet = open("openorc");
+  await write(sheet, "Fix the build");
+  await waitFor(() => expect(sheet.result.current.settings.place).toBeDefined());
+  act(() => sheet.result.current.settings.place!.select("cloud"));
+  mac.reads["cloud.offer"] = { offered: false, provider: null };
+  await act(() => mac.phone!.module.queryClient.invalidateQueries());
+  await waitFor(() => expect(sheet.result.current.settings.place).toBeUndefined());
+  mac.start.mockResolvedValue({ thread: { id: "thread-1" } });
+  await submit(sheet);
+  expect(sent()).toMatchObject({ workspaceMode: "worktree" });
+  expect(sent()).not.toHaveProperty("cloud");
+});
+
+it("says why a project with nothing to branch from cannot start in the cloud, and keeps the prompt", async () => {
+  mac.reads["cloud.offer"] = { offered: true, provider: "vercel" };
+  mac.git["notes"] = "no_commits";
+  const sheet = open("notes");
+  await write(sheet, "Tidy the notes folder");
+  await waitFor(() => expect(sheet.result.current.settings.place).toBeDefined());
+  act(() => sheet.result.current.settings.place!.select("cloud"));
+  expect(await submit(sheet)).toBeNull();
+  expect(mac.start).not.toHaveBeenCalled();
+  expect(sheet.result.current.error).toBe("A cloud thread starts on a branch of its own, and this project has no commit to branch from yet.");
+  expect(sheet.result.current.draft.prompt).toBe("Tidy the notes folder");
+});
+
 it("asks the Mac's git when Start is tapped, holding the start meanwhile, then branches where it can", async () => {
   let read!: (state: ProjectGit) => void;
   mac.git["openorc"] = new Promise((resolve) => (read = resolve));
@@ -187,10 +262,10 @@ it("keeps the draft, its mode and permission through a start the Mac refuses, an
     sheet.result.current.settings.selectModel({ agent: "codex", model: "gpt-mini", effort: "medium" });
     sheet.result.current.settings.selectExecutionMode({ mode: "act", permissionMode: "autonomous" });
   });
-  mac.start.mockRejectedValue(new Error("plain-folder isn't a git repository yet. Worktrees and teams need git and a first commit."));
+  mac.start.mockRejectedValue(new Error("plain-folder isn't a git repository yet. Worktrees need git and a first commit."));
   expect(await submit(sheet)).toBeNull();
   expect(sent()).toMatchObject({ permissionMode: "autonomous" });
-  expect(sheet.result.current.error).toBe("plain-folder isn't a git repository yet. Worktrees and teams need git and a first commit.");
+  expect(sheet.result.current.error).toBe("plain-folder isn't a git repository yet. Worktrees need git and a first commit.");
 
   // Closing the sheet and coming back finds the same draft, and Start would send the same permission.
   sheet.unmount();

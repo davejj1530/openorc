@@ -56,7 +56,7 @@ export const discussion = {
     id: "work",
     title: "Rate-limit the public API",
     branch: branches.rateLimitThread,
-    providers: [{ harness: "claude", label: "Claude" }],
+    headline: "Reading the API middleware",
     show: ">replyDone",
     busy: ">replyDone",
   } satisfies SidebarRow,

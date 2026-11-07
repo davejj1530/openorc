@@ -1,4 +1,4 @@
-import { messages, orclings, projects, runs, tasks, teamDeletedThreads, threads, type Db } from "@openorc/db";
+import { messages, orclings, projects, retiredTeams, runs, tasks, threads, type Db } from "@openorc/db";
 import type { McpHost, OrclingTools } from "@openorc/mcp";
 import { WORKSPACE_ID, type MemoryType, type Orcling, type Project, type TaskStatus } from "@openorc/protocol";
 import type { MemoryService } from "../services/memory.js";
@@ -136,7 +136,7 @@ function projectTools(deps: Dependencies, speaker: Speaker): Pick<OrclingTools, 
       const chats = new Set(orclings.list(db).map((orcling) => orcling.threadId));
       const recent = threads
         .list(db, { projectId, filter: "active", limit: 10 })
-        .filter((t) => !teamDeletedThreads.has(db, t.id) && !chats.has(t.id))
+        .filter((t) => !retiredTeams.isHidden(db, t.id) && !chats.has(t.id))
         .map((t) => ({ id: t.id, title: t.title, agent: t.agent, active: age(t.lastActivityAt) }));
       const memory = query ? (await deps.memory.retrieve(projectId, query, 8)).map(({ memory: m }) => ({ title: m.title, body: m.body })) : deps.memory.brief(found);
       return json({ project: { id: found.id, name: found.name, folder: found.rootPath }, openTasks: open, threads: recent, memory });
@@ -172,15 +172,15 @@ function projectTools(deps: Dependencies, speaker: Speaker): Pick<OrclingTools, 
       const { task, what } = workTarget(db, target, input);
       await deps.runs.authorizeAppAction(runId, "work_start", { toolName: "orcling_thread_start", reason: `${self.name} wants to start work in ${target.name}: ${what}`, input });
       const settings = startSettings(db, runId, `${self.name} started this ${task ? "task" : "thread"}.`, input.prompt);
-      const run = task
-        ? await deps.orclings.startTask(self.id, task.id, settings)
+      const threadId = task
+        ? (await deps.orclings.startTask(self.id, task.id, settings)).threadId
         : (await deps.orclings.startThread(self.id, { ...settings, projectId: target.id, title: input.title ?? what, attachments: undefined, workspaceMode: deps.settings.get().defaultWorkspaceMode }))
-            .run;
-      const thread = threads.get(db, run.threadId ?? "");
+            .thread.id;
+      const thread = threads.get(db, threadId ?? "");
       deps.invalidate(["threads", "tasks"]);
       return json({
         ...(task ? { task: { id: task.id, title: task.title } } : {}),
-        thread: { id: thread?.id ?? run.threadId, title: thread?.title ?? what },
+        thread: { id: thread?.id ?? threadId, title: thread?.title ?? what },
         project: target.name,
         workingAs: self.name,
       });

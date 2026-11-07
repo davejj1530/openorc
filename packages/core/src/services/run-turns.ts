@@ -1,7 +1,7 @@
-import { runs, threads, type Db } from "@openorc/db";
-import { randomUUID } from "node:crypto";
 import { type LiveSettings } from "@openorc/agents";
+import { runs, threads, type Db } from "@openorc/db";
 import { type AgentEvent, type AgentKind, type Run, type Thread } from "@openorc/protocol";
+import { randomUUID } from "node:crypto";
 import type { Logger } from "../transport.js";
 import { working, type ContinueSettings, type LiveRun, type RunHooks, type RunScope, type SendOptions, type StartRunInput } from "./run-types.js";
 import { withOutsideNote, type OutsideChanges, type TurnStartCapture } from "./turn-start-checkpoint.js";
@@ -25,7 +25,7 @@ interface RunTurnsDependencies {
   live: ReadonlyMap<string, LiveRun>;
   compactions: ReadonlyMap<string, Promise<void>>;
   isClosing: () => boolean;
-  hooks: Pick<RunHooks, "assertSend" | "orclings">;
+  hooks: Pick<RunHooks, "orclings" | "syncCloud">;
   turnStarts: Pick<TurnStartCapture, "capture">;
   resetAgentChain: (threadId: string) => void;
   disarmIdle: (runId: string) => void;
@@ -43,7 +43,6 @@ export class RunTurns {
 
   async sendTurn(runId: string, text: string, options: SendOptions): Promise<void> {
     const { role = "user" } = options;
-    this.deps.hooks.assertSend?.(runId, options.teamAttemptId);
     const threadId = this.deps.live.get(runId)?.scope.thread?.id;
     if (role === "user" && threadId) this.deps.resetAgentChain(threadId);
     if (this.deps.isClosing()) throw new Error("OpenOrc is closing.");
@@ -52,10 +51,8 @@ export class RunTurns {
     const entry = this.deps.live.get(runId);
     if (!entry) throw new Error(`run ${runId} is not live`);
     const thread = entry.scope.thread ? threads.get(this.deps.db, entry.scope.thread.id) : null;
-    // A team run is the coordinator's to replace: restarting here would spawn a process outside its reservation,
-    // unshared and unbound, in the conversation's workspace. A busy run takes the message as steering; its settings
-    // are read again at the next turn.
-    // Ordinary retries also need a new run after failure, even when settings match.
+    // A busy run takes the message as steering; its settings are read again at the next turn.
+    // Retries need a new run after failure, even when settings match.
     if (thread && (await this.shouldRestart(entry, thread))) {
       await this.restartTurn(entry, thread, text, options);
       return;
@@ -64,7 +61,7 @@ export class RunTurns {
   }
 
   private async shouldRestart(entry: LiveRun, thread: Thread | null): Promise<boolean> {
-    if (!thread || entry.team || entry.busy) return false;
+    if (!thread || entry.busy) return false;
     if (this.mustRestart(entry, thread)) return true;
     // Background work the agent left running ends with its process, so a message during it keeps the process and any
     // settings it can't take wait for the next turn with nothing running.
@@ -73,7 +70,7 @@ export class RunTurns {
 
   /** Whether the next message can go to this process as it is, without a new one for its mode, permissions or agent. */
   reusable(entry: LiveRun, thread: Thread): boolean {
-    return !entry.team && !this.mustRestart(entry, thread);
+    return !this.mustRestart(entry, thread);
   }
 
   private async restartTurn(entry: LiveRun, thread: Thread, text: string, options: SendOptions): Promise<void> {
@@ -133,10 +130,12 @@ export class RunTurns {
   }
 
   /** The folder as this thread's turn begins, before the provider can touch it. The transcript records the message alone. */
-  private captureTurnStart(entry: LiveRun): Promise<OutsideChanges | null> {
+  private async captureTurnStart(entry: LiveRun): Promise<OutsideChanges | null> {
     const thread = entry.scope.thread ? threads.get(this.deps.db, entry.scope.thread.id) : null;
-    if (!thread) return Promise.resolve(null);
-    return this.deps.turnStarts.capture({ thread, project: executionProject(this.deps.db, thread), cwd: entry.workspaceLease.paths[0]!, team: entry.team });
+    if (!thread) return null;
+    // A cloud conversation's worktree sends the Mac's changes up and catches up with its sandbox first.
+    await this.deps.hooks.syncCloud?.(thread, { push: true });
+    return this.deps.turnStarts.capture({ thread, project: executionProject(this.deps.db, thread), cwd: entry.workspaceLease.paths[0]! });
   }
 
   private restoreRejectedSend(entry: LiveRun, previous: { busy: boolean; prompt: string | null; reply: string | null; turns: number; questionsInterrupted?: boolean }): void {

@@ -1,18 +1,19 @@
-import { claudeAccounts } from "./claude-accounts.js";
-import { DEFAULT_CLAUDE_ACCOUNT } from "@openorc/protocol";
-import { threadListOrder } from "./thread-list-order.js";
-import { randomUUID } from "node:crypto";
-import { WORKSPACE_ID } from "@openorc/protocol";
 import type { Run, RunState, Snapshot, Task, TaskStatus, Thread, Usage } from "@openorc/protocol";
+import { DEFAULT_CLAUDE_ACCOUNT, WORKSPACE_ID } from "@openorc/protocol";
+import { randomUUID } from "node:crypto";
+import { claudeAccounts } from "./claude-accounts.js";
 import type { Db } from "./database.js";
 import { redact, redactJson } from "./redact.js";
+import { retiredTaskIds, retiredTeams, retiredThreadIds } from "./retired-teams.js";
 import { jaccard, normalizeTitle, wordSet } from "./task-similarity.js";
+import { threadListLimit, threadListOrder } from "./thread-list-order.js";
+import { threadRootCountSql, threadTreeArgs, threadTreeSql } from "./thread-list-tree.js";
 
 const now = () => Date.now();
 
 // Keep the repository exports stable while project persistence and review comments live in their own modules.
 export { projects } from "./projects.js";
-export { comments, type ReviewCommentScope, type ReviewCommentInsert } from "./review-comments.js";
+export { comments, type ReviewCommentInsert, type ReviewCommentScope } from "./review-comments.js";
 
 /* Tasks */
 
@@ -40,9 +41,10 @@ interface TaskRow {
   completed_at: number | null;
 }
 
-function taskFromRow(r: TaskRow): Task {
+function taskFromRow(db: Db, r: TaskRow): Task {
   return {
     id: r.id,
+    retiredTeam: retiredTeams.hasTask(db, r.id),
     projectId: r.project_id,
     title: r.title,
     spec: r.spec,
@@ -104,7 +106,7 @@ const taskColumns: Record<keyof TaskPatch, string> = {
 
 export const tasks = {
   list(db: Db, filter: { projectId?: string; threadId?: string; statuses?: TaskStatus[] } = {}): Task[] {
-    const where: string[] = [];
+    const where: string[] = [`id NOT IN (${retiredTaskIds})`];
     const args: unknown[] = [];
     if (filter.projectId) {
       where.push("project_id = ?");
@@ -119,11 +121,11 @@ export const tasks = {
       args.push(...filter.statuses);
     }
     const sql = `SELECT * FROM tasks ${where.length ? `WHERE ${where.join(" AND ")}` : ""} ORDER BY ${filter.threadId ? "created_at" : "updated_at DESC"}`;
-    return (db.stmt(sql).all(...(args as (string | number)[])) as unknown as TaskRow[]).map(taskFromRow);
+    return (db.stmt(sql).all(...(args as (string | number)[])) as unknown as TaskRow[]).map((row) => taskFromRow(db, row));
   },
   get(db: Db, id: string): Task | null {
     const r = db.stmt("SELECT * FROM tasks WHERE id = ?").get(id) as unknown as TaskRow | undefined;
-    return r ? taskFromRow(r) : null;
+    return r ? taskFromRow(db, r) : null;
   },
   insert(
     db: Db,
@@ -225,6 +227,8 @@ interface ThreadRow {
   imported_from: string | null;
   orcling_id?: string | null;
   parent_thread_id?: string | null;
+  parent_relation?: Thread["parentRelation"];
+  started_by_agent?: number;
   created_at: number;
   updated_at: number;
   last_activity_at: number;
@@ -261,6 +265,8 @@ function threadFromRow(r: ThreadRow): Thread {
     importedFrom: r.imported_from,
     orclingId: r.orcling_id ?? null,
     parentThreadId: r.parent_thread_id ?? null,
+    parentRelation: r.parent_relation ?? null,
+    startedByAgent: Boolean(r.started_by_agent),
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     lastActivityAt: r.last_activity_at,
@@ -293,6 +299,8 @@ export interface ThreadPatch {
   archivedAt?: number | null;
   orclingId?: string | null;
   parentThreadId?: string | null;
+  parentRelation?: Thread["parentRelation"];
+  startedByAgent?: boolean;
 }
 
 const threadColumns: Record<keyof ThreadPatch, string> = {
@@ -320,6 +328,8 @@ const threadColumns: Record<keyof ThreadPatch, string> = {
   archivedAt: "archived_at",
   orclingId: "orcling_id",
   parentThreadId: "parent_thread_id",
+  parentRelation: "parent_relation",
+  startedByAgent: "started_by_agent",
 };
 
 export type ThreadListFilter = "active" | "done" | "archived" | "all";
@@ -344,34 +354,69 @@ export interface ThreadInsert {
   createdAt?: number;
 }
 
-/** Hidden owners of retained team tasks stay readable by id and by internal inventories only. */
-const VISIBLE = "NOT EXISTS (SELECT 1 FROM team_deleted_threads hidden WHERE hidden.thread_id = threads.id)";
+/** Raw rows remain available internally; user inventories exclude retired records. */
+const VISIBLE = `id NOT IN (${retiredThreadIds})`;
 
 export const threads = {
   /**
    * Active includes every unarchived conversation, including legacy done rows.
-   * Pinned first, then most recent activity.
+   * Pinned first, then most recent activity, unless activity order is requested without pin priority.
    */
-  list(db: Db, filter: { projectId?: string; projectsOnly?: boolean; filter?: ThreadListFilter; limit?: number; offset?: number } = {}): Thread[] {
+  list(
+    db: Db,
+    filter: {
+      projectId?: string;
+      projectIds?: string[];
+      projectsOnly?: boolean;
+      filter?: ThreadListFilter;
+      orderBy?: "activity";
+      pinnedOnly?: boolean;
+      needsYou?: boolean;
+      limit?: number;
+      offset?: number;
+      includeChildren?: boolean;
+      excludeSubagents?: boolean;
+      selectedId?: string;
+      childLimits?: Record<string, number>;
+      attentionIds?: readonly string[];
+    } = {},
+  ): (Thread & { hiddenChildren?: number; treeActivityAt?: number })[] {
     const where: string[] = [];
     const args: (string | number)[] = [];
     if (filter.projectId) {
       where.push("project_id = ?");
       args.push(filter.projectId);
     }
+    if (filter.projectIds) {
+      where.push(filter.projectIds.length ? `project_id IN (${filter.projectIds.map(() => "?").join(",")})` : "0");
+      args.push(...filter.projectIds);
+    }
     if (filter.projectsOnly) {
       where.push("project_id != ?");
       args.push(WORKSPACE_ID);
     }
-    // A deleted team conversation keeps its row for its saved tasks; it is never listed, including with filter=all.
+    // Exclude hidden records before applying pagination, including archived and all views.
     where.push(VISIBLE);
+    if (filter.excludeSubagents) where.push("COALESCE(parent_relation, '') != 'subagent'");
+    if (filter.pinnedOnly) where.push("pinned_at IS NOT NULL");
+    // Unread as the thread summary reads it, or with a run that is working or waiting on you.
+    if (filter.needsYou) {
+      where.push("(seen_at IS NULL OR last_activity_at > seen_at OR id IN (SELECT value FROM json_each(?)))");
+      args.push(JSON.stringify(filter.attentionIds ?? []));
+    }
     const kind = filter.filter ?? "active";
     if (kind === "active") where.push("archived_at IS NULL");
     else if (kind === "done") where.push("archived_at IS NULL AND done_at IS NOT NULL");
     else if (kind === "archived") where.push("archived_at IS NOT NULL");
-    const limit = filter.limit ? ` LIMIT ${Math.floor(filter.limit)}${filter.offset ? ` OFFSET ${Math.floor(filter.offset)}` : ""}` : "";
-    const sql = `SELECT * FROM threads WHERE ${where.join(" AND ")} ORDER BY ${threadListOrder(kind)}${limit}`;
-    return (db.stmt(sql).all(...args) as unknown as ThreadRow[]).map(threadFromRow);
+    const limit = threadListLimit(filter);
+    const order = threadListOrder(kind, filter.orderBy);
+    const sql = filter.includeChildren ? threadTreeSql(where.join(" AND "), order, limit) : `SELECT * FROM threads WHERE ${where.join(" AND ")} ORDER BY ${order}${limit}`;
+    if (filter.includeChildren) args.unshift(...threadTreeArgs(filter));
+    return (db.stmt(sql).all(...args) as unknown as (ThreadRow & { hidden_children?: number; tree_activity?: number | null })[]).map((row) => ({
+      ...threadFromRow(row),
+      ...(row.hidden_children === undefined ? {} : { hiddenChildren: row.hidden_children }),
+      ...(row.tree_activity == null ? {} : { treeActivityAt: row.tree_activity }),
+    }));
   },
   get(db: Db, id: string): Thread | null {
     const r = db.stmt("SELECT * FROM threads WHERE id = ?").get(id) as unknown as ThreadRow | undefined;
@@ -408,6 +453,17 @@ export const threads = {
     );
     return threads.get(db, id) as Thread;
   },
+  /**
+   * How many roots Resolved lists across `projectIds`: those put there, and the unpinned, unsnoozed ones whose tree last
+   * worked before `quietBefore`. Each is counted as its own list reads it, the archive and the active threads apart.
+   */
+  resolvedCount(db: Db, { projectIds, quietBefore, now: at }: { projectIds: readonly string[]; quietBefore: number; now: number }): number {
+    const projects = projectIds.length ? `project_id IN (${projectIds.map(() => "?").join(",")})` : "0";
+    const count = (where: string, rootWhere: string, args: (string | number)[]) =>
+      Number((db.stmt(threadRootCountSql(`${VISIBLE} AND ${projects} AND ${where}`, rootWhere)).get(...projectIds, ...args) as { n: number }).n);
+    const quiet = "roots.pinned_at IS NULL AND (roots.snoozed_until IS NULL OR roots.snoozed_until <= ?) AND latest.tree_activity < ?";
+    return count("archived_at IS NOT NULL", "1", []) + count("archived_at IS NULL", quiet, [at, quietBefore]);
+  },
   /** Threads whose last activity is older than the cutoff and that are still active, for auto-done. */
   idleSince(db: Db, cutoff: number): Thread[] {
     return (db.stmt(`SELECT * FROM threads WHERE ${VISIBLE} AND archived_at IS NULL AND done_at IS NULL AND last_activity_at < ?`).all(cutoff) as unknown as ThreadRow[]).map(threadFromRow);
@@ -418,7 +474,7 @@ export const threads = {
   withOpenPr(db: Db): Thread[] {
     return (db.stmt(`SELECT * FROM threads WHERE ${VISIBLE} AND pr_url IS NOT NULL AND (pr_state IS NULL OR pr_state = 'open')`).all() as unknown as ThreadRow[]).map(threadFromRow);
   },
-  /** The unarchived threads `parentId` started with thread_start. */
+  /** The unarchived threads under `parentId`. */
   children(db: Db, parentId: string): Thread[] {
     return (db.stmt(`SELECT * FROM threads WHERE ${VISIBLE} AND parent_thread_id = ? AND archived_at IS NULL`).all(parentId) as unknown as ThreadRow[]).map(threadFromRow);
   },
@@ -427,6 +483,7 @@ export const threads = {
     return (db.stmt(`SELECT * FROM threads WHERE ${VISIBLE} AND snoozed_until IS NOT NULL AND snoozed_until <= ?`).all(at) as unknown as ThreadRow[]).map(threadFromRow);
   },
   update(db: Db, id: string, patch: ThreadPatch): Thread {
+    if (patch.parentThreadId !== undefined && patch.parentRelation === undefined) patch = { ...patch, parentRelation: patch.parentThreadId ? "started" : null };
     const sets: string[] = [];
     const args: (string | number | null)[] = [];
     for (const [key, value] of Object.entries(patch) as [keyof ThreadPatch, string | number | boolean | null | undefined][]) {
@@ -444,8 +501,18 @@ export const threads = {
   touch(db: Db, id: string): void {
     db.stmt("UPDATE threads SET last_activity_at = ?, updated_at = ? WHERE id = ?").run(now(), now(), id);
   },
+  /**
+   * Brings a thread back from Resolved. That counts as activity, so a thread resolved by its age comes back too; a read
+   * thread stays read.
+   */
+  reopen(db: Db, id: string): void {
+    const at = now();
+    db.stmt("UPDATE threads SET archived_at = NULL, seen_at = CASE WHEN seen_at >= last_activity_at THEN ? ELSE seen_at END, last_activity_at = ?, updated_at = ? WHERE id = ?").run(at, at, at, id);
+  },
   delete(db: Db, id: string): void {
     db.transaction(() => {
+      const children = db.stmt("SELECT id FROM threads WHERE parent_thread_id = ? AND parent_relation = 'subagent'").all(id);
+      for (const child of children) threads.delete(db, String(child.id));
       db.stmt("UPDATE tasks SET execution_thread_id = NULL WHERE execution_thread_id = ?").run(id);
       db.stmt("DELETE FROM threads WHERE id = ?").run(id);
     });
@@ -618,6 +685,11 @@ export const runs = {
   /** Runs the app left open when it last quit: they will never finish on their own. */
   listUnfinished(db: Db): Run[] {
     return (db.stmt("SELECT * FROM runs WHERE state IN ('starting', 'running') ORDER BY started_at").all() as unknown as RunRow[]).map(runFromRow);
+  },
+  /** The models this provider's runs used, the latest first. */
+  recentModels(db: Db, agent: Run["agent"], limit = 5): string[] {
+    const rows = db.stmt("SELECT model FROM runs WHERE agent = ? AND model IS NOT NULL GROUP BY model ORDER BY MAX(started_at) DESC LIMIT ?").all(agent, limit) as unknown as { model: string }[];
+    return rows.map((row) => row.model);
   },
   /** The thread whose run produced a provider session, so the CLI's copy is not offered for import twice. */
   threadForSession(db: Db, externalSessionId: string): string | null {

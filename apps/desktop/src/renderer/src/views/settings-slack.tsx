@@ -1,18 +1,18 @@
-import { relayClientStatus, relayHostStatus } from "./settings-presentation";
-import { useState } from "react";
 import {
-  harnessCatalog,
-  harnessIds,
   ExecutionMode,
   executionMode,
   executionModeAvailable,
   executionModeNote,
-  executionModeSettings,
   executionModePresentation,
+  executionModeSettings,
+  harnessCatalog,
+  harnessIds,
   type SlackClientConfig,
 } from "@openorc/protocol";
+import { useState } from "react";
 import { Button, Input, Select } from "../components/ui";
 import { useRpc } from "../lib/client";
+import { relayClientStatus, relayHostStatus } from "./settings-presentation";
 import { Field, LoadError, Section, Status } from "./settings-shared";
 import { DirectSlackSettings } from "./settings-slack-direct";
 import { useSlackRelaySettings } from "./settings-slack-relay";
@@ -25,10 +25,10 @@ export function SlackSettings({ active }: { active: boolean }) {
   return (
     <>
       <Section title="Connection type">
-        <Field label="Connect Slack" hint={connected ? "Disconnect and finish pending work before changing connection type." : "Use a personal bot for this computer, or an existing team relay."}>
+        <Field label="Connect Slack" hint={connected ? "Disconnect and finish pending work before changing connection type." : "Use a personal bot for this computer, or an existing shared relay."}>
           <Select value={mode} disabled={!status.data || connected} onChange={(e) => setChoice(e.target.value as "direct" | "relay")}>
             <option value="direct">Personal bot · no server needed</option>
-            <option value="relay">Team relay · advanced</option>
+            <option value="relay">Shared relay · advanced</option>
           </Select>
         </Field>
       </Section>
@@ -135,7 +135,7 @@ function RelaySlackSettings({ active }: { active: boolean }) {
       </Section>
       <details className="mt-6">
         <summary className="text-lg py-2">Host the Slack connection</summary>
-        <Section title="Slack connection" description="Set this up once on the host computer. Keep OpenOrc open and the computer awake. Teammates use device keys instead of these tokens.">
+        <Section title="Slack connection" description="Set this up once on the host computer. Keep OpenOrc open and the computer awake. Other users connect with device keys instead of these tokens.">
           <div className="flex justify-between gap-3 mb-3">
             <span>{host?.workspace ?? "Slack workspace"}</span>
             <Status ok={host?.connected}>{relayHostStatus(host)}</Status>
@@ -146,7 +146,7 @@ function RelaySlackSettings({ active }: { active: boolean }) {
           <Field label="App token" hint="App-level token with connections:write.">
             <Input type="password" autoComplete="off" spellCheck={false} placeholder="xapp-…" value={appToken} disabled={disabled || host?.enabled} onChange={(e) => setAppToken(e.target.value)} />
           </Field>
-          <Field label="Local relay port" hint="Listens only on 127.0.0.1. Use SSH forwarding for a teammate's machine.">
+          <Field label="Local relay port" hint="Listens only on 127.0.0.1. Use SSH forwarding for another person's machine.">
             <Input type="number" min={1024} max={65535} value={port ?? String(host?.port ?? 47831)} disabled={disabled || host?.enabled} onChange={(e) => setPort(e.target.value)} />
           </Field>
           {host?.error && (
@@ -163,7 +163,7 @@ function RelaySlackSettings({ active }: { active: boolean }) {
             </Button>
           </div>
         </Section>
-        <Section title="Teammates" description="Register each teammate's Slack member ID. Give the generated key only to that person, through a private channel.">
+        <Section title="People" description="Register each person's Slack member ID. Give the generated key only to that person, through a private channel.">
           {status.data?.devices.map((device) => (
             <div className="settings-field" key={device.id}>
               <div>

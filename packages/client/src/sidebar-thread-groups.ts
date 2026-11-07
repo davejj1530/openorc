@@ -1,43 +1,23 @@
 import type { ThreadSummary } from "@openorc/protocol";
+import { threadChildren, threadTreeActivity, threadTreeRoot, threadTreeRows, visibleThreadForest } from "./thread-tree.js";
 
-/** Which threads the sidebar lists: every active thread, orcmode's working set of them, or the archive. */
-export type SidebarFilter = "active" | "orc" | "archived";
-
-/** How long orcmode keeps a thread after it last saw work: a rolling day, so late nights and mornings both carry over. */
-export const ORC_MODE_WINDOW = 24 * 60 * 60 * 1000;
-
-/** Orcmode's working set: threads that need you or have an agent on them, unread results, pins, and the last day's work. */
-export function inOrcMode(thread: ThreadSummary, now: number): boolean {
-  return thread.activity !== "idle" || thread.unread || Boolean(thread.pinnedAt) || now - thread.lastActivityAt < ORC_MODE_WINDOW;
-}
-
-/** The list a filter reads from the core. Orcmode narrows the active threads, so it reads those. */
-export function listedThreads(filter: SidebarFilter): "active" | "archived" {
-  return filter === "archived" ? "archived" : "active";
-}
+/** Which threads the sidebar lists: every active thread, or the archive. */
+export type SidebarFilter = "active" | "archived";
 
 /** How many threads a project lists at first, and how many more each "Load more" adds. */
 export const THREAD_PAGE = 12;
 
 /** The `threads.list` read behind a project's list: one more than it shows, so the list knows when there are more. */
 export function threadListParams(projectId: string, filter: SidebarFilter, shown = THREAD_PAGE) {
-  return { projectId, filter: listedThreads(filter), limit: shown + 1 };
+  return { projectId, filter, limit: shown + 1, includeChildren: true };
 }
 
-type ThreadPage = { list: ThreadSummary[]; pinned: ThreadSummary[]; rest: ThreadSummary[]; snoozed: ThreadSummary[]; hasMore: boolean; leftOut: number };
-
-/** Orcmode keeps the working set and the open thread. Snoozed threads wait, and the rest are counted rather than shown. */
-function orcPage(page: ThreadPage, selected: ThreadSummary | null | undefined, now: number): ThreadPage {
-  const keep = (thread: ThreadSummary) => thread.id === selected?.id || inOrcMode(thread, now);
-  const pinned = page.pinned.filter(keep);
-  const rest = page.rest.filter(keep);
-  return { ...page, pinned, rest, snoozed: [], leftOut: page.list.length - pinned.length - rest.length };
-}
+/** One read of a list as the sidebar shows it: the whole fetched family, and its roots split into pinned, the rest and snoozed. */
+export type ThreadPage = { list: ThreadSummary[]; pinned: ThreadSummary[]; rest: ThreadSummary[]; snoozed: ThreadSummary[]; hasMore: boolean };
 
 /**
  * One project's fetched page, with the active thread kept visible even when it falls outside that page. Hidden
- * threads, such as Orclings' own conversations listed apart, are left out. In orcmode, `leftOut` counts the loaded
- * threads it does not show.
+ * threads, such as Orclings' own conversations listed apart, are left out.
  */
 export function sidebarThreadPage({
   projectId,
@@ -57,32 +37,56 @@ export function sidebarThreadPage({
   hidden?: ReadonlySet<string>;
 }): ThreadPage {
   const archived = filter === "archived";
-  const list = (fetched ?? []).filter((thread) => !hidden?.has(thread.id)).slice(0, limit);
-  if (selected && !hidden?.has(selected.id) && selected.projectId === projectId && archived === !!selected.archivedAt && !list.some((thread) => thread.id === selected.id)) list.push(selected);
-  const snoozed = archived ? [] : list.filter((thread) => thread.snoozedUntil && thread.snoozedUntil > now);
-  const pinned = archived ? [] : list.filter((thread) => thread.pinnedAt && !snoozed.includes(thread));
-  const rest = list.filter((thread) => !pinned.includes(thread) && !snoozed.includes(thread));
-  const page = { list, pinned, rest, snoozed, hasMore: (fetched?.length ?? 0) > limit, leftOut: 0 };
-  return filter === "orc" ? orcPage(page, selected, now) : page;
+  const all = visibleThreadForest(
+    (fetched ?? []).filter((thread) => !thread.teamInstanceId),
+    archived,
+    now,
+    hidden,
+  );
+  const roots = all.filter((thread) => !thread.parentThreadId);
+  if (!archived && all.some((thread) => thread.parentThreadId))
+    roots.sort((a, b) => Number(Boolean(b.pinnedAt)) - Number(Boolean(a.pinnedAt)) || threadTreeActivity(b, all) - threadTreeActivity(a, all));
+  const shown = roots.slice(0, limit);
+  if (selected && !selected.teamInstanceId && !hidden?.has(selected.id) && selected.projectId === projectId && archived === !!selected.archivedAt) {
+    const byId = new Map(all.map((thread) => [thread.id, thread]));
+    const root = threadTreeRoot(byId.get(selected.id) ?? selected, byId);
+    if (root && !shown.some((thread) => thread.id === root.id)) shown.push(root);
+  }
+  // Keep the whole fetched family here; the visible tree applies each parent's page and folds later.
+  const children = threadChildren(all);
+  const list: ThreadSummary[] = [];
+  const visited = new Set<string>();
+  const collect = (thread: ThreadSummary) => {
+    if (visited.has(thread.id)) return;
+    visited.add(thread.id);
+    list.push(thread);
+    children.get(thread.id)?.forEach(collect);
+  };
+  shown.forEach(collect);
+  const snoozed = archived ? [] : shown.filter((thread) => thread.snoozedUntil && thread.snoozedUntil > now);
+  const pinned = archived ? [] : shown.filter((thread) => thread.pinnedAt && !snoozed.includes(thread));
+  const rest = shown.filter((thread) => !pinned.includes(thread) && !snoozed.includes(thread));
+  return { list, pinned, rest, snoozed, hasMore: roots.length > limit };
 }
 
-/** A part of a project's list that folds: the project itself, its pinned threads, or its snoozed threads. */
-export type SidebarFold = "project" | "pinned" | "snoozed";
+/** A part of a project's list that folds: the project itself, its pinned threads, its snoozed threads, or its resolved ones. */
+export type SidebarFold = "project" | "pinned" | "snoozed" | "resolved";
 
 /**
- * The saved key of each fold. Projects and pins are listed while they are open, so their keys mark a fold; snoozed
- * threads start folded, so theirs marks an opening.
+ * The saved key of each fold. Projects and pins are listed while they are open, so their keys mark a fold; snoozed and
+ * resolved threads start folded, so theirs mark an opening.
  */
 export const sidebarFoldKey: Record<SidebarFold, (projectId: string) => string> = {
   project: (id) => `project:${id}`,
   pinned: (id) => `pinned:${id}`,
   snoozed: (id) => `snoozed-open:${id}`,
+  resolved: (id) => `resolved-open:${id}`,
 };
 
 /** Whether a section shows its threads, by the keys the reader saved. */
 export function sidebarSectionOpen(collapsed: readonly string[], fold: SidebarFold, projectId: string): boolean {
   const saved = collapsed.includes(sidebarFoldKey[fold](projectId));
-  return fold === "snoozed" ? saved : !saved;
+  return fold === "snoozed" || fold === "resolved" ? saved : !saved;
 }
 
 /** The saved keys after the reader folds or opens the section `key` names. */
@@ -92,15 +96,23 @@ export function toggleSidebarFold(collapsed: readonly string[], key: string): st
 
 /** Match expanded rows, including opt-in snoozed rows. Single-project browsing ignores project folds. */
 export function visibleSidebarThreadIds(
-  sections: readonly { id: string; pinned: ThreadSummary[]; rest: ThreadSummary[]; snoozed: ThreadSummary[] }[],
+  sections: readonly { id: string; list?: ThreadSummary[]; pinned: ThreadSummary[]; rest: ThreadSummary[]; snoozed: ThreadSummary[] }[],
   collapsed: readonly string[],
   projectId: string | null = null,
+  reveal: readonly string[] = [],
+  childLimits: Readonly<Record<string, number>> = {},
 ): string[] {
   return sections
     .flatMap((section) =>
       projectId === null && !sidebarSectionOpen(collapsed, "project", section.id)
         ? []
-        : [...(sidebarSectionOpen(collapsed, "pinned", section.id) ? section.pinned : []), ...section.rest, ...(sidebarSectionOpen(collapsed, "snoozed", section.id) ? section.snoozed : [])],
+        : threadTreeRows(
+            [...(sidebarSectionOpen(collapsed, "pinned", section.id) ? section.pinned : []), ...section.rest, ...(sidebarSectionOpen(collapsed, "snoozed", section.id) ? section.snoozed : [])],
+            section.list ?? [],
+            collapsed,
+            reveal,
+            childLimits,
+          ).map((row) => row.thread),
     )
     .map((thread) => thread.id);
 }
@@ -111,7 +123,11 @@ export type ProjectMeta = { text: string; tone: "attention" | "faint" };
  * What a project heading says beside its name, most urgent first: a thread waiting on you, then how many are
  * running, then how many threads it lists. `more` marks a list with further pages. Nothing while it loads.
  */
-export function projectMeta(threads: readonly Pick<ThreadSummary, "activity">[], { loaded, more = false }: { loaded: boolean; more?: boolean }): ProjectMeta | null {
+export function projectMeta(
+  threads: readonly (Pick<ThreadSummary, "activity"> & Partial<Pick<ThreadSummary, "parentRelation">>)[],
+  { loaded, more = false }: { loaded: boolean; more?: boolean },
+): ProjectMeta | null {
+  threads = threads.filter((thread) => thread.parentRelation !== "subagent");
   if (threads.some((thread) => thread.activity === "waiting")) return { text: "Needs you", tone: "attention" };
   const running = threads.filter((thread) => thread.activity === "running").length;
   if (running) return { text: `${running} running`, tone: "faint" };

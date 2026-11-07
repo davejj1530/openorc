@@ -1,32 +1,33 @@
-import type { UseQueryResult } from "@tanstack/react-query";
 import { Menu } from "@base-ui/react/menu";
-import { useEffect, useRef, useState } from "react";
 import { distillationHarnessIds, harnessCatalog, type AppSettings, type ExtractionProviderChoice, type RpcResults } from "@openorc/protocol";
-import { idleTimeoutLabel, memoryModelAgent, learningStatus } from "./settings-presentation";
-import { ClaudeAccountSettings } from "./settings-claude-accounts";
-import { AgentConnections } from "./settings-agent-updates";
-import { useRouter, type Route, type SettingsSection } from "../lib/router";
-import { useLayout } from "../lib/layout";
-import { cn } from "../lib/cn";
-import { CoversPreview } from "../lib/browser-preview";
-import { settingsSection, settingsSections } from "../lib/settings-sections";
+import type { UseQueryResult } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, RefreshCw } from "../components/icons";
+import { MemoryControl } from "../components/MemoryControl";
 import { menuItem, menuPopup } from "../components/menu";
 import { TopBar } from "../components/TopBar";
-import { MemoryControl } from "../components/MemoryControl";
 import { Button, Input, Select } from "../components/ui";
+import { CoversPreview } from "../lib/browser-preview";
 import { useRpc } from "../lib/client";
+import { cn } from "../lib/cn";
+import { useLayout } from "../lib/layout";
+import { useRouter, type Route, type SettingsSection } from "../lib/router";
+import { settingsSection, settingsSections } from "../lib/settings-sections";
+import { floatingGround } from "../lib/use-anchor-ground";
+import { AgentConnections } from "./settings-agent-updates";
 import { AppearanceSettings } from "./settings-appearance";
+import { ClaudeAccountSettings } from "./settings-claude-accounts";
+import { CloudSettings } from "./settings-cloud";
+import { DeviceSettings } from "./settings-devices";
 import { GitHubSettings } from "./settings-github";
+import { PairPhone, PhoneSettings } from "./settings-phone";
+import { idleTimeoutLabel, learningStatus, memoryModelAgent } from "./settings-presentation";
 import { Field, LoadError, SaveStatus, Section, Toggle, usePreference } from "./settings-shared";
 import { SkillsSettings } from "./settings-skills";
-import { DeviceSettings } from "./settings-devices";
 import { SlackSettings } from "./settings-slack";
-import { PairPhone, PhoneSettings } from "./settings-phone";
-import { ProviderUsageOverview } from "./settings-usage";
 import { TextGenerationSettings } from "./settings-text-generation";
 import { UpdateSettingsSection } from "./settings-updates";
-import { floatingGround } from "../lib/use-anchor-ground";
+import { ProviderUsageOverview } from "./settings-usage";
 
 type SettingsRoute = Extract<Route, { view: "settings" }>;
 
@@ -41,9 +42,8 @@ export function Settings({ route }: { route: SettingsRoute }) {
     return () => cancelAnimationFrame(frame);
   }, [route]);
   const info = useRpc("system.info", { refresh: true });
-  const sidebarOpen = useLayout((s) => s.sidebarOpen);
   return (
-    <div className="settings-sheet" data-plane data-sidebar={sidebarOpen ? "open" : "closed"}>
+    <div className="settings-sheet" data-plane>
       <TopBar showProject={false} className="settings-sheet-bar">
         {null}
       </TopBar>
@@ -73,9 +73,8 @@ export function Settings({ route }: { route: SettingsRoute }) {
   );
 }
 
-/** Brings what a link into Settings points at into view: a provider's usage, or team execution. */
+/** Brings what a link into Settings points at into view: a provider's usage. */
 function revealSetting(route: SettingsRoute) {
-  if (route.setting === "team-execution") document.getElementById("team-execution-setting")?.scrollIntoView?.({ block: "center" });
   if (route.section !== "usage" || !route.provider) return;
   const target = document.querySelector<HTMLElement>(`[data-usage-provider="${route.provider}"]`);
   target?.scrollIntoView?.({ block: "start" });
@@ -126,6 +125,8 @@ function SectionSettings({ id, active, info }: { id: SettingsSection; active: bo
           <GitHubSettings info={info.data} />
         </>
       );
+    case "cloud":
+      return <CloudSettings active={active} />;
     case "slack":
       return <SlackSettings active={active} />;
     case "phone":
@@ -200,15 +201,6 @@ function GeneralSettings() {
           checked={v.claudeUserMcpServers ?? true}
           disabled={s.disabled}
           onChange={(claudeUserMcpServers) => void s.commit({ claudeUserMcpServers })}
-        />
-      </Section>
-      <Section id="team-execution-setting" title="Teams">
-        <Toggle
-          label="Team execution (Beta)"
-          hint="Let a lead coordinate managers and workers. Turning this off keeps existing activity and Stop available."
-          checked={v.experimentalTeamExecution ?? true}
-          disabled={s.disabled}
-          onChange={(experimentalTeamExecution) => void s.commit({ experimentalTeamExecution })}
         />
       </Section>
       <SaveStatus status={s.status} retry={() => void s.retry()} />

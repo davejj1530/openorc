@@ -1,15 +1,15 @@
 import { useEffect, useRef, type ReactNode } from "react";
-import { TaskActivity } from "../components/TaskActivity";
 import { Panel, type PanelContext } from "../components/Panel";
 import { StatusIcon } from "../components/status";
 import { TabTrack } from "../components/TabTrack";
+import { TaskActivity } from "../components/TaskActivity";
 import { TopBar } from "../components/TopBar";
 import { Button, Empty, TextButton } from "../components/ui";
-import { useLayout } from "../lib/layout";
 import { useRpc } from "../lib/client";
+import { useLayout } from "../lib/layout";
 import { newThread, openTask, useRouter, type TaskTab } from "../lib/router";
-import { TaskDocument, type TaskDocumentHandle } from "./TaskDocument";
 import { TaskDraftProvider } from "../lib/task-draft-context";
+import { TaskDocument, type TaskDocumentHandle } from "./TaskDocument";
 
 const tabs: { id: TaskTab; label: string }[] = [
   { id: "spec", label: "Overview" },
@@ -38,11 +38,10 @@ function taskUnavailableContent(input: { loading: boolean; error: Error | null; 
 export function TaskView({ taskId, tab }: { taskId: string; tab: TaskTab }) {
   const task = useRpc("tasks.get", { id: taskId });
   const owner = useRpc("tasks.executionThread", { taskId }, { enabled: Boolean(task.data) });
-  const team = useRpc("orchestration.taskState", { taskId }, { enabled: Boolean(task.data?.threadId) });
   const project = useRpc("projects.get", { id: task.data?.projectId ?? "" }, { enabled: Boolean(task.data) });
   const setPanel = useLayout((s) => s.setPanel);
   const setProject = useLayout((s) => s.setProject);
-  const t = task.data;
+  const t = task.data?.retiredTeam ? undefined : task.data;
   const p = project.data;
   const document = tab === "spec";
   const editor = useRef<TaskDocumentHandle>(null);
@@ -68,8 +67,7 @@ export function TaskView({ taskId, tab }: { taskId: string; tab: TaskTab }) {
   }, [tab, taskId, setPanel]);
   let context: PanelContext | null = null;
   if (t && p) {
-    if (team.data || owner.data?.teamInstanceId) context = { kind: "task", task: t, project: p };
-    else if (owner.data) context = { kind: "thread", thread: owner.data, project: p, task: t };
+    if (owner.data && !owner.data.teamInstanceId) context = { kind: "thread", thread: owner.data, project: p, task: t };
   }
   return (
     <TaskDraftProvider key={taskId} taskId={taskId}>

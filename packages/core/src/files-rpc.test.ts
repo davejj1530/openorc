@@ -58,7 +58,7 @@ it("searches a worktree thread's own folder, after searching the checkout of the
   expect(await call("files.search", { scope: { kind: "thread", id: apart.id }, query: "only" })).toEqual(["only-in-worktree.ts"]);
 });
 
-it("lists immediate folders and files, including empty, ignored and hidden entries, folders first", async () => {
+it("lists immediate folders and files, including empty and ignored entries, folders first", async () => {
   await mkdir(path.join(checkout, "src"));
   await mkdir(path.join(checkout, "empty"));
   await mkdir(path.join(checkout, "node_modules"));
@@ -68,14 +68,13 @@ it("lists immediate folders and files, including empty, ignored and hidden entri
   const listing = await call("files.list", { scope, path: "" });
   expect(listing.root).toBe(checkout);
   expect(listing.entries.map((entry) => [entry.name, entry.kind])).toEqual([
-    [".git", "directory"],
     ["empty", "directory"],
     ["node_modules", "directory"],
     ["src", "directory"],
     [".gitignore", "file"],
     ["README.md", "file"],
   ]);
-  expect(listing.entries.filter((entry) => entry.ignored).map((entry) => entry.name)).toEqual([".git", "node_modules"]);
+  expect(listing.entries.filter((entry) => entry.ignored).map((entry) => entry.name)).toEqual(["node_modules"]);
   expect(await call("files.list", { scope, path: FolderPath.parse("src") })).toEqual({ root: checkout, entries: [{ name: "index.ts", path: "src/index.ts", kind: "file", ignored: false }] });
   expect((await call("files.list", { scope, path: FolderPath.parse("empty") })).entries).toEqual([]);
 });
@@ -108,32 +107,47 @@ it("does not list folders through a symlink outside the workspace, but allows in
   expect((await call("files.list", { scope, path: FolderPath.parse("alias") })).entries).toEqual([{ name: "index.ts", path: "alias/index.ts", kind: "file", ignored: false }]);
 });
 
-it("marks Git ignore rules and metadata without hiding tracked files or useful dot folders", async () => {
+it("marks Git ignore rules without marking tracked files or useful dot folders, and leaves out repository and OS metadata", async () => {
   for (const directory of [".github", "output", "src"]) await mkdir(path.join(checkout, directory));
-  await writeFile(path.join(checkout, ".gitignore"), "output/\n*.log\nREADME.md\n");
+  await writeFile(path.join(checkout, ".gitignore"), "output/\n*.log\nREADME.md\n.env*\n");
   await writeFile(path.join(checkout, ".DS_Store"), "metadata");
+  await writeFile(path.join(checkout, ".env"), "SECRET=1\n");
+  await writeFile(path.join(checkout, ".env.local"), "SECRET=2\n");
   await writeFile(path.join(checkout, "src", ".gitignore"), "!keep.log\n");
   await writeFile(path.join(checkout, "src", "debug.log"), "ignored");
   await writeFile(path.join(checkout, "src", "keep.log"), "included");
   const scope = { kind: "thread", id: thread.id } as const;
   const rootEntries = (await call("files.list", { scope, path: "" })).entries;
-  expect(rootEntries.filter((entry) => entry.ignored).map((entry) => entry.name)).toEqual([".git", "output", ".DS_Store"]);
+  expect(rootEntries.filter((entry) => entry.ignored).map((entry) => entry.name)).toEqual(["output", ".env", ".env.local"]);
   expect(rootEntries.filter((entry) => !entry.ignored).map((entry) => entry.name)).toEqual([".github", "src", ".gitignore", "README.md"]);
   const sourceEntries = (await call("files.list", { scope, path: FolderPath.parse("src") })).entries;
   expect(sourceEntries.filter((entry) => entry.ignored).map((entry) => entry.name)).toEqual(["debug.log"]);
+});
+
+it("searches Git-ignored env files by name, but not other ignored files or anything in an ignored folder", async () => {
+  await mkdir(path.join(checkout, "web"));
+  await mkdir(path.join(checkout, "node_modules", "library"), { recursive: true });
+  await writeFile(path.join(checkout, ".gitignore"), ".env*\nnode_modules/\n");
+  for (const file of [".env", ".envrc", "web/.env.local", "node_modules/library/.env"]) await writeFile(path.join(checkout, file), "SECRET=1\n");
+  const found = await call("files.search", { scope: { kind: "thread", id: thread.id }, query: "env" });
+  expect(found.sort()).toEqual([".env", "web/.env.local"]);
 });
 
 it("searches the folder a Workspace conversation chose", async () => {
   const chosen = path.join(root, "notes");
   await mkdir(chosen);
   await writeFile(path.join(chosen, "ideas.md"), "# Ideas\n");
+  await writeFile(path.join(chosen, ".env"), "SECRET=1\n");
+  await writeFile(path.join(chosen, ".npmrc"), "fixture\n");
   const notes = threads.insert(core.db, { projectId: WORKSPACE_ID, title: "Notes", ...conversation });
   threads.update(core.db, notes.id, { workingDirectory: chosen });
-  expect(await call("files.search", { scope: { kind: "thread", id: notes.id }, query: "" })).toEqual(["ideas.md"]);
+  expect((await call("files.search", { scope: { kind: "thread", id: notes.id }, query: "" })).sort()).toEqual([".env", "ideas.md"]);
   await mkdir(path.join(chosen, "node_modules"));
   const listing = await call("files.list", { scope: { kind: "thread", id: notes.id }, path: "" });
   expect(listing.entries.map((entry) => [entry.name, entry.ignored])).toEqual([
     ["node_modules", true],
+    [".env", false],
+    [".npmrc", false],
     ["ideas.md", false],
   ]);
 });

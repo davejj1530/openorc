@@ -60,7 +60,7 @@ export function foldable(block: Block, taskCards: boolean): boolean {
       return !block.status || block.status === "success" || block.status === "running";
     case "tool":
       // Collaboration milestones and visual explanations remain individually visible.
-      if (visualizationFromTool(block) || /(?:spawn_agent|thread_send|send_message|team_say|team_complete)$/.test(block.name)) return false;
+      if (visualizationFromTool(block) || /(?:spawn_agent|thread_send|send_message)$/.test(block.name)) return false;
       return (!block.status || ["running", "success", "error"].includes(block.status)) && !(taskCards && toolShowsCard(block));
     case "activity":
       return ["running", "success"].includes(block.status) && !/finished|completed/i.test(block.label) && !isImageGeneration(block) && !isImageView(block);
@@ -209,6 +209,7 @@ function classify(block: Block, taskCards: boolean, pinned: string | undefined):
   if (isSignal(block)) return "signal";
   if (block.kind === "message") return block.role === "assistant" && block.text.trim() ? "narration" : "block";
   if (planItems(block).length) return "plan";
+  if (block.kind === "tool" && block.subagent) return "action";
   if (!foldable(block, taskCards)) return "block";
   return block.kind === "thinking" ? "reasoning" : "action";
 }
@@ -388,6 +389,11 @@ function holder(entries: WorkEntry[], current: Block): LiveHeadline | null {
 export function liveHeadline(entries: WorkEntry[], turn: Block[]): LiveHeadline | null {
   const current = turn.findLast(isLive);
   if (current?.kind === "message") return null;
+  // A note that finished while the turn goes on, with nothing after it yet, names the step it announced; until that
+  // step's first call, the work above it is done, not running again.
+  const note = turn[turn.length - 1];
+  if (!current && note?.kind === "message" && note.role === "assistant" && !entries.some((entry) => entry.kind === "phase" && entry.phase.blocks.includes(note)))
+    return { label: narrationTitle(note.text), since: note.at, entryId: null };
   const held = current ? holder(entries, current) : null;
   if (held) return held;
   const gap = gapWords(current);

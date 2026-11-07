@@ -13,11 +13,13 @@
 @import "./settings-design.css";
 /* Surface stylesheets, in cascade order. The keyboard focus fill in controls.css loads after the sidebar and floating rules and before the conversation, composer and queue rules, which override it on their own controls. */
 @import "./styles/sidebar.css";
+@import "./styles/resolved.css";
 @import "./styles/floating.css";
 @import "./styles/controls.css";
 @import "./styles/motion.css";
 @import "./styles/destinations.css";
 @import "./styles/conversation.css";
+@import "./styles/subagents.css";
 @import "./styles/composer.css";
 @import "./styles/new-thread.css";
 @import "./components/MessageQueue.css";
@@ -81,7 +83,7 @@
      so there is no fill step to give it an edge. */
   --shadow-overlay: 0 0 32px -12px rgb(0 0 0 / 0.24);
   --ring: var(--accent-ink);
-  /* Content planes (transcript cards, provider, memory and orchestration cards) are planes:
+  /* Content planes (transcript cards, provider and memory cards) are planes:
      one fill step off the tile ground, with no border or shadow. */
   --plane-fill: var(--surface);
   /* The selected segment of a --surface-2 track, such as the appearance modes. It sits one
@@ -653,6 +655,23 @@ body:has(.sidebar-shell[data-open="true"]) .work-row > .well:first-child {
 body[data-resizing] .panel-shell {
   transition: none;
 }
+/* Docked on the left, the panel and its grip come before the conversation. Only the visual order
+   changes, so a swap remounts nothing, and reading-flow keeps Tab in the order the eye reads.
+   The pane hangs from the seam rather than the window edge, so it slides in from the left. */
+.panel-shell[data-side="left"] {
+  order: -2;
+  display: flex;
+  justify-content: flex-end;
+}
+.panel-shell[data-side="left"] > .panel-pane {
+  flex-shrink: 0;
+}
+.resize-handle[data-edge="panel"][data-side="left"] {
+  order: -1;
+}
+.work-row:has(> .panel-shell[data-side="left"]) {
+  reading-flow: flex-visual;
+}
 /* An open panel shares the work plane's edge, like the sidebar on the left.
    Remove the well gutter so the resize grip sits on one visible seam. */
 .work-row:has(> .panel-shell[data-open="true"]) > .well,
@@ -670,7 +689,6 @@ body[data-resizing] .panel-shell {
 }
 .panel-shell[data-expanded="true"] .panel-pane {
   width: 100%;
-  background: var(--bg);
 }
 
 /* The sidebar slides in and out; its content keeps its width so nothing reflows while it moves.
@@ -695,39 +713,6 @@ body[data-resizing] .sidebar-shell {
    container flush with the shell. This also clears the resize grip in the same gutter. */
 .sidebar-thread-content {
   margin-right: calc(2 * var(--spacing-well));
-}
-
-.sidebar-brand-mark {
-  width: 22px;
-  height: 22px;
-  object-fit: contain;
-}
-.sidebar-wordmark {
-  color: var(--ink);
-  font-size: 17px;
-  letter-spacing: -0.03em;
-  line-height: 1;
-}
-.sidebar-brand-new-thread {
-  color: var(--ink-2);
-  background-color: color-mix(in srgb, var(--ink) 7%, transparent);
-}
-.sidebar-brand-new-thread:is(:hover, :focus-visible) {
-  color: var(--ink);
-  background-color: color-mix(in srgb, var(--ink) 12%, transparent);
-}
-
-.sidebar-project-add {
-  opacity: 0;
-}
-.sidebar-project:hover .sidebar-project-add,
-.sidebar-project:focus-within .sidebar-project-add {
-  opacity: 1;
-}
-@media (hover: none) {
-  .sidebar-project-add {
-    opacity: 1;
-  }
 }
 
 /* The handle takes no width: it sits on the seam between two panes, its grip and hit area straddling both, and the grip shows only when the pointer is near. */
@@ -1117,8 +1102,8 @@ span.property-chip {
     display: none;
   }
 }
-/* Settings is a surface sheet (r20) beside the settings sidebar. Its toolbar is the window chrome
-   inside the sheet; the open section heads a left-aligned 860px column. Cards inside it are tile
+/* Settings is one flush surface plane beside the settings sidebar, like the work panel, its
+   toolbar included. The open section heads a left-aligned 860px column. Cards inside it are tile
    cards (--bg) on the sheet. */
 .settings-sheet {
   display: flex;
@@ -1126,27 +1111,10 @@ span.property-chip {
   flex-direction: column;
   min-height: 0;
   min-width: 0;
-  /* The well gutter. --spacing-well is an inline theme value, so it has no runtime variable. */
-  margin: 8px 8px 8px 0;
-  border-radius: var(--radius-3xl);
   background: var(--surface);
 }
-.settings-sheet[data-sidebar="closed"] {
-  margin-left: 8px;
-}
-.app-shell .well:has(> .settings-sheet)::before {
-  top: 0;
-}
-/* The toolbar reaches up into the sheet's top gutter, so its controls share the window chrome's
-   centerline with the traffic lights and every other view's header. With the sidebar hidden it
-   reaches into the left gutter too, so the window corner keeps its place beside the lights. */
 .app-shell .settings-sheet .settings-sheet-bar {
-  position: relative;
-  top: -8px;
   background: transparent;
-}
-.app-shell .settings-sheet[data-sidebar="closed"] .settings-sheet-bar {
-  margin-left: -8px;
 }
 .settings-shell {
   --settings-content-width: 860px;
@@ -1157,8 +1125,6 @@ span.property-chip {
   min-height: 0;
   min-width: 0;
   overflow: hidden;
-  /* The sheet leaves its toolbar unclipped, so the scroller rounds its own bottom corners. */
-  border-radius: 0 0 var(--radius-3xl) var(--radius-3xl);
 }
 .settings-page-head {
   display: flex;
@@ -1626,6 +1592,10 @@ body:has(.sidebar-shell[data-open="false"]) .thread-pane:first-child > .well {
     right: 0;
     bottom: 0;
     z-index: 20;
+  }
+  .panel-shell[data-side="left"][data-open="true"]:not([data-expanded="true"]) {
+    right: auto;
+    left: 0;
   }
   .resize-handle[data-edge="panel"] {
     display: none;

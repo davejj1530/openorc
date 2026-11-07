@@ -2,7 +2,7 @@ import { z } from "zod";
 import { ClaudeAccountId } from "./claude-accounts.js";
 import type { Memory, PermissionPreset, Run, RunMode } from "./domain.js";
 import { executionModeAvailable, executionModeSettings } from "./execution-mode.js";
-import { ModelExecutionSettings } from "./orchestration.js";
+import { ModelExecutionSettings } from "./execution-target.js";
 
 /**
  * How an Orcling looks. Each number picks a variant in the Orcling Rive file,

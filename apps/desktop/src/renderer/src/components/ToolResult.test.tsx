@@ -78,8 +78,9 @@ it("restores image-only results from the ledger without requiring a live provide
 });
 
 it("keeps plain output verbatim and replaces it with media on completion", () => {
-  const { rerender } = show("first line\n<script>not markup</script>");
-  expect(screen.getByText(/first line/).textContent).toBe("first line\n<script>not markup</script>");
+  const { rerender, container } = show("first line\n<script>not markup</script>");
+  expect([...container.querySelectorAll(".tool-view-printed-lines > div")].map((line) => line.textContent)).toEqual(["first line", "<script>not markup</script>"]);
+  expect(container.querySelector("script")).toBeNull();
   runs.applyFrame({ runId: base.runId, seq: 2, events: [completed({ content: [image] })] });
   rerender(view());
   expect(screen.queryByText(/first line/)).toBeNull();

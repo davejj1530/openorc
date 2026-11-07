@@ -12,6 +12,7 @@ export const REMOTE_METHODS = [
   "projects.get",
   "projects.git",
   "threads.list",
+  "threads.resolvedCount",
   "threads.get",
   "threads.messages",
   "threads.lastMessage",
@@ -27,9 +28,12 @@ export const REMOTE_METHODS = [
   "app.settings.get",
   "threads.start",
   "threads.update",
+  // Moves a thread to another of the Mac's Claude accounts between turns, as the thread header on the Mac does.
+  "threads.switchClaudeAccount",
   "runs.start",
   "runs.send",
   "runs.interrupt",
+  "subagents.stop",
   "threads.queue",
   "threads.unqueue",
   "threads.sendQueued",
@@ -40,6 +44,7 @@ export const REMOTE_METHODS = [
   "review.threadChanges",
   "review.threadFileDiff",
   "git.threadLog",
+  "git.commitRange",
   "git.threadPushState",
   "review.threadPrTemplate",
   "pulls.branches",
@@ -49,6 +54,17 @@ export const REMOTE_METHODS = [
   "review.createThreadPr",
   // Whether the Mac shows a page for a thread, its address and title shaped. Frames come only to a session watching it.
   "preview.state",
+  // Whether the Mac offers cloud threads, and moving a thread to the cloud after the phone's confirm, with the files a
+  // move from the checkout would take. Starting one is `threads.start` with `cloud`.
+  "cloud.offer",
+  "cloud.move",
+  "threads.movePreview",
+  // The Mac coordinates every move to and from its cloud brain: a phone asks it to bring a thread home or keep one put.
+  "cloud.bringToMac",
+  "cloud.keep",
+  // The brain's own Mac lists the sandboxes the brain made for its threads and deletes one; phones are refused.
+  "cloud.sandboxes",
+  "cloud.sandboxes.remove",
 ] as const satisfies readonly RpcMethod[];
 export type RemoteMethod = (typeof REMOTE_METHODS)[number];
 
@@ -58,20 +74,33 @@ export const isRemoteMethod = (method: string): method is RemoteMethod => remote
 /** The largest image a phone may attach, before base64. */
 export const REMOTE_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
-/** How a phone reaches the Mac: the same network (a `.local` name or a private address), or Tailscale. */
+/** Every way a phone can reach a host. Route's kind and both link validators read this one list. */
+export const ROUTE_KINDS = ["lan", "tailnet", "public"] as const;
+
+/**
+ * How a phone reaches a host: the same network (a `.local` name or a private address), Tailscale, or the internet
+ * through a TLS proxy at a public name (a cloud host's address). Only a host with a public address emits `public`, and
+ * its pairing code always carries one, so phones in the field, whose exact validators refuse the kind, never save it.
+ */
 export interface Route {
-  kind: "lan" | "tailnet";
+  kind: (typeof ROUTE_KINDS)[number];
   host: string;
+  /** The port phones dial: the listener's for lan and tailnet, the proxy's for public. */
   port: number;
 }
 
 /**
- * Bytes a phone may fetch, always by a reference its transcript already holds, never by a path on the Mac. An
+ * Bytes a phone may fetch, always by a reference its transcript already holds, never by a path it chose. An
  * attachment by its stored file name, a tool image by the URL the ledger stored, an image an agent generated or
- * viewed by the activity that recorded it, and the newest frame of a Preview the session watches, by its `seq`.
+ * viewed by the activity that recorded it, the newest frame of a Preview the session watches, by its `seq`, and an
+ * image an agent put in a reply, by the message and the path as that message wrote it.
  */
 export type AssetRef =
-  { kind: "attachment"; name: string } | { kind: "tool-image"; url: string } | { kind: "activity"; runId: string; activityId: string } | { kind: "preview"; threadId: string; seq: number };
+  | { kind: "attachment"; name: string }
+  | { kind: "tool-image"; url: string }
+  | { kind: "activity"; runId: string; activityId: string }
+  | { kind: "preview"; threadId: string; seq: number }
+  | { kind: "reply-image"; runId: string; messageId: string; path: string };
 
 /**
  * The pushes a phone hears. `ready` carries nothing about the Mac's processes or ports. `preview` and `preview.ended`

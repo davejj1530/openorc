@@ -2,10 +2,18 @@ import { PHONE_APP } from "@openorc/protocol";
 import { createRequire } from "node:module";
 import { expect, it } from "vitest";
 import app from "../app.json" with { type: "json" };
+import eas from "../eas.json" with { type: "json" };
 
 const require = createRequire(import.meta.url);
 const target = require("../targets/notification-service/expo-target.config.js") as Record<string, unknown>;
 const { ios, plugins } = app.expo as { ios: Record<string, unknown>; plugins: unknown[] };
+
+// An update built on newer native code would crash an installed binary, so updates match binaries by native fingerprint.
+it("takes over-the-air updates only from this project's production channel, for its own native code", () => {
+  expect(app.expo.runtimeVersion).toEqual({ policy: "fingerprint" });
+  expect(app.expo.updates.url).toBe(`https://u.expo.dev/${app.expo.extra.eas.projectId}`);
+  expect(eas.build.production.channel).toBe("production");
+});
 
 it("signs for the team and topic the Mac sends to", () => {
   expect(ios.bundleIdentifier).toBe(PHONE_APP.bundleId);

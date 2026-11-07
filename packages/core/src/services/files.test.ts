@@ -80,9 +80,9 @@ it("refuses media outside the folder before it looks at the extension, through a
   await expect(files.read(folder(), outside)).rejects.toThrow("outside the conversation's workspace");
 });
 
-it("offers a folder's files without git, skipping hidden entries and dependency or build output", async () => {
+it("offers a folder's files without git, skipping hidden entries other than env files, and dependency or build output", async () => {
   for (const folder of ["src", ".cache", "node_modules/lib", "dist"]) await mkdir(join(root, folder), { recursive: true });
-  for (const file of ["plan.md", "src/app.ts", ".env", ".cache/entry", "node_modules/lib/index.js", "dist/app.js"]) await writeFile(join(root, file), "x");
+  for (const file of ["plan.md", "src/app.ts", ".env", ".npmrc", ".cache/entry", "node_modules/lib/index.js", "dist/app.js"]) await writeFile(join(root, file), "x");
   const project = {
     id: "plain",
     name: "workspace",
@@ -93,7 +93,7 @@ it("offers a folder's files without git, skipping hidden entries and dependency 
     createdAt: 0,
     updatedAt: 0,
   };
-  expect((await files.search({ root, project }, "")).sort()).toEqual(["plan.md", "src/app.ts"]);
+  expect((await files.search({ root, project }, "")).sort()).toEqual([".env", "plan.md", "src/app.ts"]);
   expect(await files.search({ root, project }, "app")).toEqual(["src/app.ts"]);
 });
 

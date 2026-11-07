@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { failureParts, queueHint } from "@openorc/client";
 import type { QueuedMessage } from "@openorc/protocol";
 import { ChevronDown, X } from "./icons";
 import { Button, IconButton } from "./ui";
@@ -41,7 +42,7 @@ export function MessageQueue({
                   <span className="message-queue-preview">{message.text.trim() || "Attached images"}</span>
                   {message.error ? (
                     <span role="status" className="message-queue-error">
-                      {message.error}
+                      {failureParts(message.error).headline}
                     </span>
                   ) : null}
                   {message.attachments.length > 0 ? (
@@ -75,7 +76,7 @@ export function MessageQueue({
         ))}
         <button type="button" className="message-queue-front" aria-expanded={open} onClick={() => setExpanded(!open)}>
           <span className="message-queue-count tabular">{messages.length} queued</span>
-          <span className="message-queue-hint">{agentName ? `Sends when ${agentName} finishes` : "Runs after this turn"}</span>
+          <span className="message-queue-hint">{queueHint(messages, agentName)}</span>
           <ChevronDown size={14} className="message-queue-chevron" />
         </button>
       </div>

@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { ScrollView, View, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewInstance } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRpc } from "../client";
+import { useHeaderScope } from "../connection/HostScope";
 import { perfEnabled } from "../thread/perf-probe";
 import { createSheetWindow, SheetWindowContext } from "../thread/sheet-window";
 import { CopyText } from "../ui/Mono";
@@ -58,6 +59,7 @@ export function DiffScreen() {
   const diff = useRpc("review.threadFileDiff", { threadId, comparison, path: path as FolderPath });
   const list = useRpc("review.threadChanges", { threadId, comparison });
   const [sheet] = useState(createSheetWindow);
+  const inScope = useHeaderScope();
   const scroller = useRef<ScrollViewInstance>(null);
   const contentHeight = useRef(0);
   const scrolled = ({ nativeEvent }: NativeSyntheticEvent<NativeScrollEvent>) => sheet.scrolled(nativeEvent.contentOffset.y, nativeEvent.layoutMeasurement.height);
@@ -71,7 +73,7 @@ export function DiffScreen() {
   else if (diff.error) body = <FailedBlock message={diff.error.message} onRetry={() => void diff.refetch()} />;
   return (
     <SheetWindowContext.Provider value={sheet}>
-      <Stack.Screen options={{ headerTitle: () => <PanelTitle title={fileName(path)} line={diff.data ? diffLine(diff.data) : null} /> }} />
+      <Stack.Screen options={{ headerTitle: () => inScope(<PanelTitle title={fileName(path)} line={diff.data ? diffLine(diff.data) : null} />) }} />
       <FileSteps paths={list.data?.files.map((file) => file.path) ?? []} path={path} />
       <ScrollView
         ref={scroller}

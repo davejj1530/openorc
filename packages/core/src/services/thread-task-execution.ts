@@ -1,13 +1,13 @@
-import { audit, orchestration, projects, runs as runRepo, snapshots, taskForwardings, tasks, teamDeletedThreads, teamRuntime, threads, threadQueue, type Db } from "@openorc/db";
+import { audit, projects, retiredTeams, runs as runRepo, snapshots, tasks, threadQueue, threads, type Db } from "@openorc/db";
 import { WORKSPACE_ID, defaultHarnessId, type Project, type Run, type Task, type Thread, type ThreadSummary, type WorkspaceMode } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
 import type { RunScope, RunService, StartRunInput } from "./runs.js";
-import type { WorkspaceService } from "./workspace.js";
-import { executionProject } from "./workspace-home.js";
 import { AppSettingsService } from "./settings.js";
-import type { WorkspaceWriters } from "./workspace-writers.js";
-import type { SpawnTaskInput, ThreadService } from "./threads.js";
 import type { ThreadMessageQueue } from "./thread-message-queue.js";
+import type { SpawnTaskInput, ThreadService } from "./threads.js";
+import { executionProject } from "./workspace-home.js";
+import type { WorkspaceWriters } from "./workspace-writers.js";
+import type { WorkspaceService } from "./workspace.js";
 
 type ContinueThreadInput = Parameters<ThreadService["continueThread"]>[1];
 
@@ -17,7 +17,7 @@ interface TaskThreadContext {
   taskThreadForStart: ThreadService["taskThreadForStart"];
   continueThread(id: string, input: ContinueThreadInput): Promise<Run>;
   handoffBrief(thread: Thread, own: Run[]): string;
-  rejectPinnedTeam(id: string | null): void;
+  rejectRetiredThread(id: string | null): void;
 }
 
 /** Owns task assignment, start identity, workspace preparation, and return reports. */
@@ -47,11 +47,10 @@ export class ThreadTaskExecution {
   /** A preference is editable only before a task owns or shares an execution workspace. */
   assertTaskWorkspaceEditable(task: Task): void {
     if (this.startingTaskThreads.has(task.id) || this.runs.liveRunForTask(task.id)) throw new Error("Wait for this task to stop before changing its execution location.");
-    if (teamRuntime.assignmentForTask(this.db, task.id) || (task.threadId && orchestration.getInstance(this.db, task.threadId)))
-      throw new Error("This task uses its saved team's workspace policy. Use the team workspace controls.");
+    if (retiredTeams.hasTask(this.db, task.id) || (task.threadId && retiredTeams.isHidden(this.db, task.threadId))) throw new Error("This item is no longer available.");
     const assigned = task.executionThreadId ? this.context.executionThreadFor(task.id) : null;
-    if (assigned?.archivedAt != null) throw new Error("Unarchive the execution conversation before changing its location.");
-    if (assigned?.hasStarted || assigned?.worktreePath || task.worktreePath || runRepo.listForTask(this.db, task.id).length || taskForwardings.target(this.db, task.id))
+    if (assigned?.archivedAt != null) throw new Error("Reopen the execution conversation before changing its location.");
+    if (assigned?.hasStarted || assigned?.worktreePath || task.worktreePath || runRepo.listForTask(this.db, task.id).length)
       throw new Error("Move this task's thread to change its execution location.");
     if (task.projectId === WORKSPACE_ID) throw new Error("Workspace tasks use their conversation folder. Open a project to use a worktree.");
   }
@@ -83,7 +82,8 @@ export class ThreadTaskExecution {
   executionThreadFor(taskId: string): ThreadSummary | null {
     const task = tasks.get(this.db, taskId);
     if (!task) throw new Error("Task not found.");
-    const executionId = task.executionThreadId ?? (task.threadId && orchestration.getInstance(this.db, task.threadId) ? task.threadId : null);
+    if (task.retiredTeam) return null;
+    const executionId = task.executionThreadId;
     if (!executionId) return null;
     const thread = this.context.get(executionId);
     if (!thread) throw new Error("This task's execution conversation was deleted. Its saved history is retained.");
@@ -103,22 +103,21 @@ export class ThreadTaskExecution {
   private resolveTaskThread(taskId: string, selected: Pick<Thread, "agent" | "model" | "effort"> | undefined, starting: boolean): Thread {
     const task = tasks.get(this.db, taskId);
     if (!task) throw new Error("Task not found.");
+    if (retiredTeams.hasTask(this.db, taskId)) throw new Error("This item is no longer available.");
     const assigned = this.context.executionThreadFor(taskId);
     if (assigned) return assigned;
-    const handoff = taskForwardings.target(this.db, taskId);
-    if (handoff?.state === "preparing") throw new Error("Finish this task’s saved handoff before opening its thread.");
     if (this.runs.liveRunForTask(taskId)) throw new Error("Stop the existing task agent in Activity before opening its conversation as a thread.");
     const previous = runRepo.listForTask(this.db, taskId).at(-1);
-    const retainedWorkspace = Boolean(previous || task.worktreePath || handoff);
+    const retainedWorkspace = Boolean(previous || task.worktreePath);
     const creator = task.threadId ? threads.get(this.db, task.threadId) : null;
-    if (creator && teamDeletedThreads.has(this.db, creator.id)) throw new Error("This conversation was deleted. Its saved activity is available on the task.");
+    if (creator && retiredTeams.isDeleted(this.db, creator.id)) throw new Error("This conversation was deleted. Its saved activity is available on the task.");
     const defaultPermissionMode = new AppSettingsService(this.db).get().defaultPermissionMode;
     const target = this.taskAgentSettings(selected, previous, creator);
     if (this.canReuseCreator(creator, task, target, starting, retainedWorkspace)) {
       this.invalidate(["tasks", `task:${taskId}`, "threads"]);
       return creator;
     }
-    return this.createTaskThread({ task, previous, creator, target, starting, retainedWorkspace, handoff, defaultPermissionMode });
+    return this.createTaskThread({ task, previous, creator, target, starting, retainedWorkspace, defaultPermissionMode });
   }
 
   private taskAgentSettings(selected: Pick<Thread, "agent" | "model" | "effort"> | undefined, previous: Run | undefined, creator: Thread | null): Pick<Thread, "agent" | "model" | "effort"> {
@@ -153,10 +152,9 @@ export class ThreadTaskExecution {
     target: Pick<Thread, "agent" | "model" | "effort">;
     starting: boolean;
     retainedWorkspace: boolean;
-    handoff: ReturnType<typeof taskForwardings.target>;
     defaultPermissionMode: Thread["permissionMode"];
   }): Thread {
-    const { task, previous, creator, target, starting, retainedWorkspace, handoff, defaultPermissionMode } = input;
+    const { task, previous, creator, target, starting, retainedWorkspace, defaultPermissionMode } = input;
     let mode = creator?.mode ?? "act";
     if (retainedWorkspace) mode = previous?.mode ?? "act";
     if (starting) mode = "act";
@@ -178,7 +176,7 @@ export class ThreadTaskExecution {
       threads.update(this.db, created.id, {
         ...(task.projectId === WORKSPACE_ID ? { workingDirectory: creator?.workingDirectory ?? null } : {}),
         ...(retainedWorkspace ? { worktreePath: task.worktreePath, branch: task.branch, baseSha: task.baseSha } : {}),
-        draft: this.taskThreadDraft(task, previous, creator, handoff),
+        draft: this.taskThreadDraft(task, previous, creator),
       });
       tasks.update(this.db, task.id, { executionThreadId: created.id });
       audit.record(this.db, { actor: "user", action: "thread.create", resourceType: "thread", resourceId: created.id, metadata: { taskId: task.id, creatorThreadId: task.threadId } });
@@ -188,9 +186,8 @@ export class ThreadTaskExecution {
     return thread;
   }
 
-  private taskThreadDraft(task: Task, previous: Run | undefined, creator: Thread | null, handoff: ReturnType<typeof taskForwardings.target>): string {
+  private taskThreadDraft(task: Task, previous: Run | undefined, creator: Thread | null): string {
     return [
-      handoff?.context ?? "",
       `Work on task "${task.title}" (${task.id}).\n\n${task.spec ?? ""}`,
       previous?.resultText ? `Previous task result:\n${previous.resultText}` : "",
       creator ? this.context.handoffBrief(creator, runRepo.listForThread(this.db, creator.id)) : "",
@@ -226,7 +223,7 @@ export class ThreadTaskExecution {
     this.assertTaskThreadStartAllowed(task, workspaceMode, input);
     const thread = this.context.taskThreadForStart(taskId, input ? { agent: input.agent, model: input.model ?? null, effort: input.effort ?? null } : undefined);
     if (workspaceMode && workspaceMode !== thread.workspaceMode) throw new Error("Move the thread to change its workspace before starting this task.");
-    if (thread.archivedAt !== null) throw new Error("Unarchive this thread before starting work.");
+    if (thread.archivedAt !== null) threads.reopen(this.db, thread.id);
     if (!input && thread.mode !== "act") throw new Error("Switch the thread to Act before starting this task.");
     this.queue.reserveTaskThread(thread.id);
     return { task, thread };
@@ -234,12 +231,10 @@ export class ThreadTaskExecution {
 
   private assertTaskThreadStartAllowed(task: Task, workspaceMode: WorkspaceMode | undefined, input?: ContinueThreadInput): void {
     const taskId = task.id;
-    this.context.rejectPinnedTeam(task.threadId);
-    if (teamRuntime.assignmentForTask(this.db, taskId)) throw new Error("This task is managed by a saved team. Use its team execution controls.");
+    this.context.rejectRetiredThread(task.threadId);
+    if (retiredTeams.hasTask(this.db, taskId)) throw new Error("This item is no longer available.");
     if (this.runs.liveRunForTask(taskId)) throw new Error("Finish or stop this task's existing run before continuing in its thread.");
     if (task.status === "archived" || (task.status === "done" && !input)) throw new Error("Reopen this task before starting it.");
-    const handoff = taskForwardings.target(this.db, taskId);
-    if (handoff?.snapshot && workspaceMode && workspaceMode !== task.workspaceMode) throw new Error("This task already has forwarded files. Keep its handoff location.");
     if (!task.executionThreadId && workspaceMode) {
       if ((task.worktreePath || runRepo.listForTask(this.db, taskId).length) && workspaceMode !== task.workspaceMode)
         throw new Error("This task already has a workspace. Keep its existing execution location.");
@@ -266,7 +261,6 @@ export class ThreadTaskExecution {
       prompt: [
         input?.prompt ?? `Work on task "${task.title}" (${task.id}) in this conversation.`,
         `Task: ${task.title} (${task.id})\n\n${task.spec ?? ""}`,
-        taskForwardings.target(this.db, task.id)?.context ?? "",
         thread.importedFrom === `task:${task.id}` ? (thread.draft ?? "") : "",
         images.length ? `Task images in document order (open them from these paths):\n${images.map((file, index) => `${index + 1}. ${file}`).join("\n")}` : "",
       ]
@@ -291,11 +285,8 @@ export class ThreadTaskExecution {
   ): Promise<Task> {
     task = tasks.get(this.db, task.id) ?? task;
     try {
-      const handoff = taskForwardings.target(this.db, task.id);
-      if (handoff?.state === "preparing") throw new Error("Finish this task’s saved handoff before starting an agent.");
-      if (handoff?.snapshot && workspaceMode && workspaceMode !== task.workspaceMode) throw new Error("This task already has forwarded files. Keep its handoff location.");
-      this.context.rejectPinnedTeam(task.threadId);
-      if (teamRuntime.assignmentForTask(this.db, task.id)) throw new Error("This task is managed by a saved team. Use its team execution controls.");
+      this.context.rejectRetiredThread(task.threadId);
+      if (retiredTeams.hasTask(this.db, task.id)) throw new Error("This item is no longer available.");
     } catch (error) {
       return Promise.reject(error);
     }

@@ -1,32 +1,32 @@
-import http from "node:http";
-import { randomUUID } from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { z } from "zod";
-import { UserInput, type UserInputResult } from "./questions.js";
-export { UserInput, validateUserAnswers, type UserInputResult } from "./questions.js";
 import {
   AgentKind,
-  TaskStatus,
   CommentIntent,
   parseFileBoundary,
+  TaskStatus,
   type ApprovalDecision,
   type BrowserCommand,
   type BrowserResult,
   type DeviceToolInput,
   type DeviceToolResult,
 } from "@openorc/protocol";
+import { randomUUID } from "node:crypto";
+import http from "node:http";
+import { z } from "zod";
 import { registerBrowserTool } from "./browser.js";
 import { registerDeviceTool } from "./device.js";
-import { registerVisualizationTool } from "./visualization.js";
-import { registerPullReviewTools, type PullReviewTools } from "./pull-review.js";
-export type { PullReviewComment, PullReviewTools } from "./pull-review.js";
-import { orclingToolNames, registerOrclingTools, type OrclingTools } from "./orcling-tools.js";
-export type { OrclingMemoryEntry, OrclingTools } from "./orcling-tools.js";
 import { fileBoundaryAnswer } from "./file-boundary.js";
+import { orclingToolNames, registerOrclingTools, type OrclingTools } from "./orcling-tools.js";
+import { registerPullReviewTools, type PullReviewTools } from "./pull-review.js";
+import { UserInput, type UserInputResult } from "./questions.js";
+import { registerVisualizationTool } from "./visualization.js";
+export type { ExecutionSwitchInput, ExecutionTools } from "./execution-tools.js";
+export type { OrclingMemoryEntry, OrclingTools } from "./orcling-tools.js";
+export type { PullReviewComment, PullReviewTools } from "./pull-review.js";
+export { UserInput, validateUserAnswers, type UserInputResult } from "./questions.js";
 
 import { registerExecutionTools, type ExecutionTools } from "./execution-tools.js";
-export type { ExecutionSwitchInput, ExecutionTools } from "./execution-tools.js";
 
 export interface ApprovalRequest {
   runId: string;
@@ -77,27 +77,8 @@ export interface McpHost {
   threads: ThreadTools;
   /** Execution choices scoped to the authenticated, active Slack run. */
   execution?: ExecutionTools;
-  /** Available when the host supports authenticated team execution. */
-  team?: TeamTools;
   pullReview?: PullReviewTools;
   orcling?: OrclingTools;
-}
-
-/** The host derives the team actor and execution from the authenticated run. */
-export interface TeamTools {
-  available(runId: string): boolean;
-  status(runId: string): Promise<unknown>;
-  message(runId: string, input: { recipientId: string; text: string; requestKey: string }): Promise<unknown>;
-  /** Speak in the team chat, to named colleagues, mentions or the lead. */
-  say(runId: string, input: { text: string; to?: string[]; requestKey?: string }): Promise<unknown>;
-  /** Claim or release files in the shared team workspace. */
-  claim(runId: string, input: { paths: string[]; note?: string; release?: boolean }): Promise<unknown>;
-  wait(runId: string, input: { assignmentIds?: string[] }): Promise<unknown>;
-  complete(runId: string, input: { result: string }): Promise<unknown>;
-  /** Verbatim history a context handoff stored by id because of size. */
-  context(runId: string, input: { id: string }): Promise<{ id: string; bytes: number; text: string }>;
-  /** A page of the team room, oldest first, scoped to the caller's conversation. */
-  history(runId: string, input: { afterSeq?: number; beforeSeq?: number; limit?: number }): Promise<unknown>;
 }
 
 export interface ThreadCard {
@@ -116,12 +97,12 @@ export interface ThreadTools {
   list(runId: string): Promise<ThreadCard[]>;
   /** The last few messages of a thread in the same project. */
   read(runId: string, id: string, limit?: number): Promise<{ thread: ThreadCard; messages: { role: string; text: string }[] } | null>;
-  /** Delivers a message into another thread: into its running turn, or as a new turn when idle. A team lead receives it as queued direction. */
+  /** Delivers a message into another thread: into its running turn, or as a new turn when idle. */
   send(runId: string, id: string, text: string, requestKey?: string): Promise<{ delivered: boolean; message: string }>;
   /** Starts a thread in the caller's folder, with the caller as its parent; the two talk through send. */
   start(
     runId: string,
-    input: { prompt: string; title?: string; agent?: AgentKind; model?: string; effort?: string },
+    input: { prompt: string; title?: string; agent?: AgentKind; model?: string; effort?: string; fast?: boolean },
   ): Promise<{ thread: { id: string; title: string }; agent: string; model: string | null; message: string }>;
 }
 
@@ -156,18 +137,9 @@ export interface TaskTools {
       labels?: string[];
       execution?: "backlog" | "delegate";
       workspaceMode?: "current" | "worktree";
-      memberKey?: string;
-      requestKey?: string;
-      dependencies?: string[];
-      dependencyTaskIds?: string[];
     },
   ): Promise<{ task: TaskCard; duplicate: boolean; started: boolean; message: string }>;
-  start(
-    runId: string,
-    id: string,
-    options?: { workspaceMode?: "current" | "worktree"; admissionId?: string; memberKey?: string; requestKey?: string },
-  ): Promise<TaskCard & { admissionId?: string; message?: string }>;
-  complete?(runId: string, input: { taskId: string; admissionId?: string; result: string }): Promise<unknown>;
+  start(runId: string, id: string, options?: { workspaceMode?: "current" | "worktree" }): Promise<TaskCard>;
   list(runId: string): Promise<TaskCard[]>;
   get(runId: string, id: string): Promise<TaskCard | null>;
   update(runId: string, id: string, patch: { status?: TaskStatus; spec?: string }): Promise<TaskCard | null>;
@@ -285,7 +257,6 @@ export const internalToolNames = [
   "memory_feedback",
   "task_create",
   "task_start",
-  "task_complete",
   "task_list",
   "task_get",
   "task_update",
@@ -295,24 +266,11 @@ export const internalToolNames = [
   "thread_start",
   "execution_context",
   "execution_switch",
-  "team_status",
-  "team_message",
-  "team_wait",
-  "team_complete",
-  "team_context",
-  "team_say",
-  "team_claim",
-  "team_history",
   "pull_request_diff",
   "pull_request_comment",
   "pull_request_summary",
   ...orclingToolNames,
 ];
-
-function requireTeam(host: McpHost): TeamTools {
-  if (!host.team) throw new Error("Team tools are unavailable in this host.");
-  return host.team;
-}
 
 /** Translate a host decision into Claude Code's permission-prompt response. */
 function approvalPayload(toolName: string, input: Record<string, unknown>, result: ApprovalResult): { behavior: "deny"; message: string } | { behavior: "allow"; updatedInput: unknown } {
@@ -336,7 +294,6 @@ function registerOptionalTools(mcp: McpServer, host: McpHost, runId: string): vo
 function buildServer(host: McpHost, runId: string): McpServer {
   const mcp = new McpServer({ name: "openorc", version: "0.0.0" });
   const memoryEnabled = host.memoryEnabled?.() !== false;
-  const teamAvailable = host.team?.available(runId) ?? false;
 
   mcp.registerTool(
     "ask_user",
@@ -469,7 +426,7 @@ function buildServer(host: McpHost, runId: string): McpServer {
     "task_create",
     {
       description:
-        "Create a polished task document directly in OpenOrc, only when the user explicitly asks for a task. A task is work the user asked to have saved or built. Never create one on your own initiative, for follow-ups, ideas, or issues you notice; mention those in your reply instead. Conversation is not a task: greetings, questions, opinions, status and coordination are answered in your reply or with team_say, never captured or delegated as tasks. Defaults to backlog: no agent starts and no worktree is created, even in Act mode. 'Create a task' or 'add to backlog' requests capture, not implementation: save with execution=backlog and confirm. Act permits the requested action; it never overrides the user's intent. For ordinary tasks, creation only saves the document, including legacy execution=delegate requests. When asked to implement, call task_start and do the work in this same conversation; never forward it to a separate task agent. execution=delegate is only for explicit saved-team delegation. In a team execution, delegation and proposals require member_key and request_key. Backlog capture can also retain member_key and dependency_task_ids; dependencies instead identifies current assignment IDs. The host checks the caller's team hierarchy and permissions. Use MCP directly, not Computer Use, browser automation, or database writes. Call task_list first to avoid duplicates. Outside team execution, only threads can create tasks.",
+        "Create a polished task document directly in OpenOrc, only when the user explicitly asks for a task. A task is work the user asked to have saved or built. Never create one on your own initiative, for follow-ups, ideas, or issues you notice; mention those in your reply instead. Conversation is not a task: greetings, questions, opinions, status and coordination are answered in your reply never captured or delegated as tasks. Defaults to backlog: no agent starts and no worktree is created, even in Act mode. 'Create a task' or 'add to backlog' requests capture, not implementation: save with execution=backlog and confirm. Act permits the requested action; it never overrides the user's intent. For ordinary tasks, creation only saves the document, including legacy execution=delegate requests. When asked to implement, call task_start and do the work in this same conversation; never forward it to a separate task agent. Use MCP directly, not Computer Use, browser automation, or database writes. Call task_list first to avoid duplicates. Only threads can create tasks.",
       inputSchema: {
         title: z.string().min(3).max(120).describe("Imperative, specific, unique within the thread"),
         spec: z
@@ -480,29 +437,16 @@ function buildServer(host: McpHost, runId: string): McpServer {
           ),
         priority: z.enum(["none", "low", "medium", "high", "urgent"]).optional(),
         labels: z.array(z.string().min(1).max(60)).max(20).optional(),
-        execution: z.enum(["backlog", "delegate"]).default("backlog").describe("Backlog saves only. Delegate is for explicit saved-team assignments; ordinary tasks always save only."),
+        execution: z.enum(["backlog", "delegate"]).default("backlog").describe("Saves the task without starting an agent. Legacy delegate requests also save only."),
         workspace_mode: z
           .enum(["current", "worktree"])
           .optional()
           .describe(
-            "Ordinary tasks only: current uses the existing checkout and branch, worktree creates an isolated workspace. Omit to save the user’s default. Exclusive workspace operations can block local startup; never silently fall back to a worktree.",
+            "Current uses the existing checkout and branch, worktree creates an isolated workspace. Omit to save the user’s default. Exclusive workspace operations can block local startup; never silently fall back to a worktree.",
           ),
-        member_key: z.string().min(1).optional().describe("Saved direct-report member key. Required for team delegation and proposals; optional intended assignee for backlog capture."),
-        request_key: z
-          .string()
-          .min(1)
-          .max(200)
-          .optional()
-          .describe("Stable idempotency key for this team task. Reuse it when retrying the same request. Required for team delegation or proposals; recommended for backlog capture."),
-        dependencies: z.array(z.string().min(1)).optional().describe("Assignment IDs that must finish before this team assignment can run."),
-        dependency_task_ids: z
-          .array(z.string().min(1))
-          .max(100)
-          .optional()
-          .describe("Task IDs to retain as dependencies when saving a team backlog task or Plan proposal. Do not combine with dependencies. Immediate delegation uses assignment IDs instead."),
       },
     },
-    async ({ title, spec, priority, labels, execution, workspace_mode, member_key, request_key, dependencies, dependency_task_ids }) => {
+    async ({ title, spec, priority, labels, execution, workspace_mode }) => {
       const result = await host.tasks.create(runId, {
         title,
         spec,
@@ -510,10 +454,6 @@ function buildServer(host: McpHost, runId: string): McpServer {
         ...(workspace_mode !== undefined ? { workspaceMode: workspace_mode } : {}),
         ...(priority ? { priority } : {}),
         ...(labels ? { labels } : {}),
-        ...(member_key !== undefined ? { memberKey: member_key } : {}),
-        ...(request_key !== undefined ? { requestKey: request_key } : {}),
-        ...(dependencies !== undefined ? { dependencies } : {}),
-        ...(dependency_task_ids !== undefined ? { dependencyTaskIds: dependency_task_ids } : {}),
       });
       return { content: [{ type: "text", text: JSON.stringify(result) }] };
     },
@@ -523,48 +463,25 @@ function buildServer(host: McpHost, runId: string): McpServer {
     "task_start",
     {
       description:
-        "Mark an existing ordinary task in progress and implement it yourself in the current conversation and workspace. This does not launch or forward to another agent. Or route an explicitly accepted team request through its saved manager hierarchy. Requires Act mode. Reuse the task ID and admission_id; member_key selects a saved direct report. Creating a backlog task does not require starting it.",
+        "Mark an existing ordinary task in progress and implement it yourself in the current conversation and workspace. This does not launch or forward to another agent. Requires Act mode. Reuse the task ID. Creating a backlog task does not require starting it.",
       inputSchema: {
         id: z.string().min(1),
-        workspace_mode: z
-          .enum(["current", "worktree"])
-          .optional()
-          .describe("Ordinary tasks run in the current conversation workspace. Omit this field; a different location requires moving the thread."),
-        admission_id: z.string().min(1).optional(),
-        member_key: z.string().min(1).optional(),
-        request_key: z.string().min(1).max(200).optional(),
+        workspace_mode: z.enum(["current", "worktree"]).optional().describe("Tasks run in the current conversation workspace. Omit this field; a different location requires moving the thread."),
       },
     },
-    async ({ id, workspace_mode, admission_id, member_key, request_key }) => ({
+    async ({ id, workspace_mode }) => ({
       content: [
         {
           type: "text",
           text: JSON.stringify(
             await host.tasks.start(runId, id, {
               ...(workspace_mode !== undefined ? { workspaceMode: workspace_mode } : {}),
-              ...(admission_id ? { admissionId: admission_id } : {}),
-              ...(member_key ? { memberKey: member_key } : {}),
-              ...(request_key ? { requestKey: request_key } : {}),
             }),
           ),
         },
       ],
     }),
   );
-
-  if (teamAvailable && host.tasks.complete)
-    mcp.registerTool(
-      "task_complete",
-      {
-        description:
-          "Record completion intent for your accepted team task. A lead handling a task itself must supply its admission_id. The result becomes final only after this turn succeeds and its output is captured. An assigned worker may also use team_complete.",
-        inputSchema: { id: z.string().min(1), admission_id: z.string().min(1).optional(), result: z.string().trim().min(1).max(100000) },
-      },
-      async ({ id, admission_id, result }) => {
-        if (!host.tasks.complete) throw new Error("Task completion is unavailable in this host.");
-        return { content: [{ type: "text", text: JSON.stringify(await host.tasks.complete(runId, { taskId: id, result, ...(admission_id ? { admissionId: admission_id } : {}) })) }] };
-      },
-    );
 
   mcp.registerTool(
     "task_list",
@@ -576,7 +493,7 @@ function buildServer(host: McpHost, runId: string): McpServer {
     "task_get",
     {
       description:
-        "Read any task in this project by ID, regardless of its originating thread or team. Live progress includes: latest agent commentary, current action, permission/input wait, run outcome, and result summary. Use this when the user asks for a report; waiting means paused, not still implementing.",
+        "Read any task in this project by ID, regardless of its originating thread. Live progress includes: latest agent commentary, current action, permission/input wait, run outcome, and result summary. Use this when the user asks for a report; waiting means paused, not still implementing.",
       inputSchema: { id: z.string() },
     },
     async ({ id }) => ({ content: [{ type: "text", text: JSON.stringify(await host.tasks.get(runId, id)) }] }),
@@ -586,7 +503,7 @@ function buildServer(host: McpHost, runId: string): McpServer {
     "task_update",
     {
       description:
-        "Update any task in this project by ID, regardless of its originating thread, team or assigned agent. Set its board status or refine its spec. A status move does not stop an execution or change its recorded outcome.",
+        "Update any task in this project by ID, regardless of its originating thread or assigned agent. Set its board status or refine its spec. A status move does not stop an execution or change its recorded outcome.",
       inputSchema: { id: z.string(), status: TaskStatus.optional(), spec: z.string().optional() },
     },
     async ({ id, status, spec }) => ({ content: [{ type: "text", text: JSON.stringify(await host.tasks.update(runId, id, { ...(status ? { status } : {}), ...(spec ? { spec } : {}) })) }] }),
@@ -609,7 +526,7 @@ function buildServer(host: McpHost, runId: string): McpServer {
     "thread_send",
     {
       description:
-        "Send a short message to another thread in this project. If its agent is working, the message joins the current turn; otherwise it starts a new turn. A team's lead receives it as queued direction while that team is running. Use it when that thread's work depends on yours, or to ask for something it knows. Send only what the other thread needs from you or what you need from it; an exchange ends when one side stops replying, so never message just to acknowledge or thank. Pass the same request_key when retrying so the message is delivered once. A thread that works in a more permissive mode than yours acts on the message with its own permissions, so the user is asked first; from Plan mode you can message only Plan threads. After 20 agent messages in a row with no one writing, sending stops until a person writes.",
+        "Send a short message to another thread in this project. If its agent is working, the message joins the current turn; otherwise it starts a new turn. Use it when that thread's work depends on yours, or to ask for something it knows. Send only what the other thread needs from you or what you need from it; an exchange ends when one side stops replying, so never message just to acknowledge or thank. Pass the same request_key when retrying so the message is delivered once. A thread that works in a more permissive mode than yours acts on the message with its own permissions, so the user is asked first; from Plan mode you can message only Plan threads. After 50 agent messages in a row with no one writing, sending stops until a person writes.",
       inputSchema: { id: z.string(), text: z.string().min(1).max(4000), request_key: z.string().min(1).max(200).optional() },
     },
     async ({ id, text, request_key }) => ({ content: [{ type: "text", text: JSON.stringify(await host.threads.send(runId, id, text, request_key)) }] }),
@@ -619,139 +536,17 @@ function buildServer(host: McpHost, runId: string): McpServer {
     "thread_start",
     {
       description:
-        "Start a new thread in this project that works beside you, in your folder, with you as its parent. Use it when the user asks you to hand work to another agent or have something done alongside your own, such as generating assets while you code. Don't ask the user for permission when they asked for this; ask first only when it's unclear what to start or with which agent. The prompt is the new thread's first message, after a note that you started it. It works in your mode with your permissions, on your agent and model unless you name others; an unknown model name is answered with the available models. Talk to it with thread_send, and it can reach you the same way. Up to 3 threads you started can work at once, and a thread you started can't start its own.",
+        "Start a new thread in this project that works beside you, in your folder, with you as its parent. Use it when the user asks you to hand work to another agent or have something done alongside your own, such as generating assets while you code. Don't ask the user for permission when they asked for this; ask first only when it's unclear what to start or with which agent. The prompt is the new thread's first message, after a note that you started it. It works in your mode with your permissions, on your agent and model unless you name others; on another agent with no model named, it uses the model last used with that agent. An unknown model name is answered with the available models. It keeps your Fast mode only on your own model; set fast to choose it. Talk to it with thread_send, and it can reach you the same way. Up to 3 threads you started can work at once, and a thread you started can't start its own.",
       inputSchema: {
         prompt: z.string().min(1).max(20000),
         title: z.string().min(1).max(120).optional(),
         agent: AgentKind.optional(),
         model: z.string().min(1).max(120).optional(),
         effort: z.string().min(1).max(40).optional(),
+        fast: z.boolean().optional(),
       },
     },
     async (input) => ({ content: [{ type: "text", text: JSON.stringify(await host.threads.start(runId, input)) }] }),
-  );
-
-  if (!teamAvailable) return mcp;
-
-  mcp.registerTool(
-    "team_status",
-    {
-      description: "Read your team execution, assigned work, and current progress. Your identity and visibility come from this run; the host enforces team membership and hierarchy.",
-      inputSchema: {},
-    },
-    async () => ({ content: [{ type: "text", text: JSON.stringify(await requireTeam(host).status(runId)) }] }),
-  );
-
-  mcp.registerTool(
-    "team_message",
-    {
-      description:
-        "Send a message to the lead or an assignment in your team execution. Use a recipient ID from team_status. Reuse the request key when retrying the same message. The host checks the recipient and your authority. Messages enter the active turn when confirmed steering is supported, otherwise they remain queued. A reserved or claimed message is still awaiting provider acknowledgment; delivery never proves the recipient acted on it.",
-      inputSchema: {
-        recipient_id: z.string().min(1).describe("Lead or assignment recipient ID from team_status."),
-        text: z.string().min(1),
-        request_key: z.string().min(1).describe("Stable idempotency key for this message."),
-      },
-    },
-    async ({ recipient_id, text, request_key }) => ({
-      content: [{ type: "text", text: JSON.stringify(await requireTeam(host).message(runId, { recipientId: recipient_id, text, requestKey: request_key })) }],
-    }),
-  );
-
-  mcp.registerTool(
-    "team_say",
-    {
-      description:
-        "Say something in the team chat. Address colleagues or the lead by member key in `to`, or mention them as @Name in the text; addressed members are woken with your message and reply in the chat, which the user sees. Without `to` or mentions the message goes to the lead. Everyone else reads it as context on their next turn. A delivery marked sending is awaiting provider acknowledgment, not proof of reading or action; one marked read means that member already holds the user's request and reads yours without a reply turn. Route user corrections only to affected recipients; do not copy prior reply recipients or broadcast routine acknowledgments. Use a stable request_key when retrying the same message.",
-      inputSchema: {
-        text: z.string().min(1).max(100_000),
-        to: z.array(z.string().min(1).max(200)).max(50).optional().describe('Member keys from team_status, "lead" or "all".'),
-        request_key: z.string().min(1).max(200).optional(),
-      },
-    },
-    async ({ text, to, request_key }) => ({
-      content: [{ type: "text", text: JSON.stringify(await requireTeam(host).say(runId, { text, ...(to ? { to } : {}), ...(request_key ? { requestKey: request_key } : {}) })) }],
-    }),
-  );
-
-  mcp.registerTool(
-    "team_claim",
-    {
-      description:
-        "Claim files you are about to edit in the shared team workspace, so colleagues see them and are refused the same paths; pass release=true when you are done. Paths are relative to the workspace. A path a colleague holds is refused: ask them in the chat instead.",
-      inputSchema: {
-        paths: z.array(z.string().min(1).max(4096)).min(1).max(50),
-        note: z.string().max(2000).optional().describe("What you are doing with these files."),
-        release: z.boolean().optional(),
-      },
-    },
-    async ({ paths, note, release }) => ({
-      content: [{ type: "text", text: JSON.stringify(await requireTeam(host).claim(runId, { paths, ...(note ? { note } : {}), ...(release ? { release } : {}) })) }],
-    }),
-  );
-
-  mcp.registerTool(
-    "team_wait",
-    {
-      description:
-        "Record that you are waiting for assignments or a team message, then end your turn. Returns promptly; the coordinator resumes you when the condition is met. The host checks which assignments you can wait for.",
-      inputSchema: {
-        assignment_ids: z.array(z.string().min(1)).optional().describe("Assignment IDs to wait for. Omit to wait for a team message or relevant progress."),
-      },
-    },
-    async ({ assignment_ids }) => ({ content: [{ type: "text", text: JSON.stringify(await requireTeam(host).wait(runId, assignment_ids !== undefined ? { assignmentIds: assignment_ids } : {})) }] }),
-  );
-
-  mcp.registerTool(
-    "team_complete",
-    {
-      description:
-        "Record your completion intent and result, then finish your turn. For the lead this completes the team execution; for a delegated member it completes the current assignment. Required children must be resolved. Completion becomes final only after a successful provider turn and captured output.",
-      inputSchema: { result: z.string().min(1).describe("A useful result summary, including verification and any limitations.") },
-    },
-    async ({ result }) => ({ content: [{ type: "text", text: JSON.stringify(await requireTeam(host).complete(runId, { result })) }] }),
-  );
-
-  mcp.registerTool(
-    "team_history",
-    {
-      description:
-        "Read the team conversation's message history, oldest first: who said what to whom, with sequence numbers. Your turn's input already carries what you missed; use this to look further back or to page through a long stretch. Reading history does not change what is delivered to you.",
-      inputSchema: {
-        after_seq: z.number().int().nonnegative().optional().describe("Return messages after this sequence number."),
-        before_seq: z.number().int().positive().optional().describe("Return messages before this sequence number."),
-        limit: z.number().int().min(1).max(200).optional().describe("Page size, default 50."),
-      },
-    },
-    async ({ after_seq, before_seq, limit }) => ({
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify(
-            await requireTeam(host).history(runId, {
-              ...(after_seq !== undefined ? { afterSeq: after_seq } : {}),
-              ...(before_seq !== undefined ? { beforeSeq: before_seq } : {}),
-              ...(limit !== undefined ? { limit } : {}),
-            }),
-          ),
-        },
-      ],
-    }),
-  );
-
-  mcp.registerTool(
-    "team_context",
-    {
-      description:
-        "Read verbatim history that your context handoff stored outside its seed because of size. Pass a stored id from the handoff. Returns the exact original text: a message, or a JSON array of the original entries. Nothing stored was summarized.",
-      inputSchema: {
-        id: z
-          .string()
-          .regex(/^[0-9a-f]{64}$/)
-          .describe("A stored id from the context handoff."),
-      },
-    },
-    async ({ id }) => ({ content: [{ type: "text", text: JSON.stringify(await requireTeam(host).context(runId, { id })) }] }),
   );
 
   return mcp;

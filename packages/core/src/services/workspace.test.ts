@@ -342,6 +342,18 @@ describe("thread workspace preparation", () => {
     expect((await service.prepareThread(thread(), project, "HEAD")).baseBranch).toBeNull();
   });
 
+  it("follows the checkout's branch from turn to turn for a thread in the checkout", async () => {
+    const thread = threads.insert(db, { projectId: project.id, title: "Here", agent: "codex", model: "fixture", mode: "act", permissionMode: "trusted", workspaceMode: "current" });
+    const first = await service.prepareThread(thread, project);
+    expect(first.branch).toBe("main");
+    await git(root, ["checkout", "-qb", "feature"]);
+    const second = await service.prepareThread(first, project);
+    expect(second).toMatchObject({ branch: "feature", baseSha: first.baseSha });
+    expect(threads.get(db, thread.id)?.branch).toBe("feature");
+    await git(root, ["checkout", "-q", "--detach"]);
+    expect((await service.prepareThread(second, project)).branch).toBeNull();
+  });
+
   it("won't rebuild a pull request's missing copy as an ordinary worktree on a branch", async () => {
     const review = threads.insert(db, { projectId: project.id, title: "Review #7", agent: "codex", model: "fixture", mode: "plan", permissionMode: "review", workspaceMode: "worktree" });
     const gone = threads.update(db, review.id, { worktreePath: path.join(directory, "pr-7-copy"), baseSha: "a".repeat(40) });

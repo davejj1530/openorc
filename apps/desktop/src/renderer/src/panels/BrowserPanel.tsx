@@ -56,6 +56,7 @@ export function BrowserPanel({
   onUrl,
   onPage,
   navigation,
+  placement,
 }: {
   id: string;
   context?: string;
@@ -63,6 +64,8 @@ export function BrowserPanel({
   onUrl?: (url: string) => void;
   onPage?: (state: BrowserPaneState) => void;
   navigation?: Pick<PanelNavigationProps, "canGoBack" | "canGoForward" | "onBack" | "onForward" | "onHome">;
+  /** Changes whenever the window moves the pane without resizing it, such as a panel changing sides. */
+  placement?: string;
 }) {
   const [state, setState] = useState<BrowserPaneState>(() => starting(defaultUrl));
   const initialUrl = useRef(defaultUrl).current;
@@ -186,6 +189,10 @@ export function BrowserPanel({
     };
     const observer = new ResizeObserver(follow);
     observer.observe(node);
+    // A change of placement reruns this effect, and with it the loop. Drags beside the pane write
+    // the width variables straight onto the root element, with no render to rerun it.
+    const widths = new MutationObserver(follow);
+    widths.observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
     // Capture phase: a scroll inside an ancestor moves the pane, and a
     // scrolling container's event never reaches window on its own. It also
     // brings every other scroller in the app with it, so the pane only
@@ -202,10 +209,11 @@ export function BrowserPanel({
     return () => {
       cancelAnimationFrame(frame.current);
       observer.disconnect();
+      widths.disconnect();
       window.removeEventListener("scroll", scrolled, true);
       window.removeEventListener("resize", follow);
     };
-  }, [id, measure]);
+  }, [id, measure, placement]);
 
   // The view is composited above this panel rather than inside it, so it has
   // to give the rectangle back whenever something else must show there: a

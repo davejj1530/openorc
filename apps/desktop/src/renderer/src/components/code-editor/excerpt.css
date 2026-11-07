@@ -1,0 +1,37 @@
+/* A few lines of a file outside the editor, set like the editor's own lines. */
+.code-excerpt {
+  margin: 0;
+  padding: 8px 0;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 20px;
+  color: var(--ink);
+  tab-size: 4;
+  scrollbar-width: thin;
+}
+.code-excerpt-line {
+  display: flex;
+  min-width: max-content;
+  padding-right: 14px;
+}
+.code-excerpt[data-wrap] .code-excerpt-line {
+  min-width: 0;
+}
+.code-excerpt-number {
+  flex: 0 0 auto;
+  width: calc(var(--excerpt-number-width) + 28px);
+  padding: 0 14px;
+  text-align: right;
+  color: var(--ink-4);
+  user-select: none;
+}
+.code-excerpt code {
+  flex: 1 1 auto;
+  white-space: pre;
+}
+.code-excerpt[data-wrap] code {
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

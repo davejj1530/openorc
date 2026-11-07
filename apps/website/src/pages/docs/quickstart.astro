@@ -84,14 +84,14 @@ import { docHref } from "../../data/docs";
       <li>On <strong>Project</strong>, click <strong>Choose repository</strong> and pick the folder that holds your Git repository. Your files stay where they are. Click <strong>Finish setup</strong>.</li>
       <li>On <strong>Ready to work</strong>, click <strong>Start your first thread</strong>.</li>
     </ol>
-    <p>To add another project later, click <strong>Add project</strong> at the bottom of the sidebar.</p>
+    <p>To add another project later, click the project's name on the New thread page and choose <strong>Add project</strong>.</p>
   </section>
 
   <section aria-labelledby="first-thread">
     <h2 id="first-thread">Start your first thread</h2>
-    <p>The <strong>New thread</strong> page opens on your project.</p>
+    <p>The <strong>New thread</strong> page opens on your project and asks <strong>What should we work on in</strong> it.</p>
     <ol class="docs-steps">
-      <li>Above the composer, keep <strong>Local checkout</strong> to work in your repository as it is, or choose <strong>Worktree</strong> to give the thread a branch and folder of its own.</li>
+      <li>Under the composer, a line says where the thread works. Click it to keep <strong>Local checkout</strong>, which works in your repository as it is, or choose <strong>Worktree</strong> to give the thread a branch and folder of its own.</li>
       <li>Check the agent and model in the composer's bottom row, and the mode beside them. By default the agent edits files on its own: Claude Code asks before running commands (<strong>Accept edits</strong>), and Codex asks only for actions outside its sandbox (<strong>Ask for approval</strong>). OpenCode runs only in <strong>Plan</strong> or <strong>Autonomous</strong>.</li>
       <li>Type what you want done, or click a suggestion such as <strong>Explore this project</strong>. Press <kbd>Enter</kbd>.</li>
       <li>Follow the work in the thread. When the agent asks before acting, choose <strong>Allow</strong>, <strong>Allow for this run</strong>, or <strong>Deny</strong>.</li>
@@ -102,7 +102,7 @@ import { docHref } from "../../data/docs";
     <h2 id="review">Review and commit</h2>
     <ol class="docs-steps">
       <li>When the turn ends, a card under the reply lists the files it changed. Click <strong>Review</strong> to read the diff beside the conversation, or <strong>Undo</strong> to put the files back as they were before the turn.</li>
-      <li>At the bottom of the composer, a row shows the thread's uncommitted changes and how many lines were added and removed. Click <strong>Commit changes</strong>.</li>
+      <li>Under the composer, a row shows the thread's folder and branch, then how many lines its uncommitted changes add and remove. Click <strong>Commit</strong> beside the numbers.</li>
       <li>Write a message and click <strong>Commit</strong>.</li>
     </ol>
     <Callout>

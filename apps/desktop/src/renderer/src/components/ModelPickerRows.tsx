@@ -1,26 +1,8 @@
-import type { KeyboardEvent, ReactNode } from "react";
 import type { ModelOption, Orcling } from "@openorc/protocol";
+import type { KeyboardEvent } from "react";
 import { useRouter } from "../lib/router";
 import { Check, Plus } from "./icons";
 import { OrclingAvatar } from "./OrclingAvatar";
-
-export interface TeamPickerOption {
-  teamId: string;
-  revisionId: string;
-  name: string;
-  revision: number;
-  memberCount: number;
-  disabledReason?: string | null;
-}
-
-export interface TeamPickerChoices {
-  options: TeamPickerOption[];
-  selectedRevisionId?: string;
-  selectedLabel?: string;
-  onSelect: (revisionId: string) => void;
-  status?: ReactNode;
-  action?: { label: string; onSelect: () => void };
-}
 
 /** Orclings a picker offers; choosing one brings its own model, instructions and memory. */
 export interface OrclingPickerChoices {
@@ -32,44 +14,6 @@ export interface OrclingPickerChoices {
 }
 
 export type RowProps = { disabled?: boolean | undefined; closeOnSelect: boolean; close: () => void; moveRowFocus: (event: KeyboardEvent<HTMLButtonElement>) => void };
-
-/** Saved teams of the project, with why any cannot start here. */
-export function TeamRows({ teams, disabled, closeOnSelect, close, moveRowFocus }: RowProps & { teams: TeamPickerChoices | undefined }) {
-  return (
-    <>
-      {teams?.options.map((option) => (
-        <button
-          key={option.revisionId}
-          type="button"
-          data-picker-row
-          className="model-picker-row model-picker-team-row"
-          aria-pressed={teams.selectedRevisionId === option.revisionId}
-          disabled={disabled || Boolean(option.disabledReason)}
-          title={option.disabledReason ?? `${option.memberCount} agents · Version ${option.revision}`}
-          onClick={() => {
-            teams.onSelect(option.revisionId);
-            if (closeOnSelect) close();
-          }}
-          onKeyDown={moveRowFocus}
-        >
-          <span className="model-picker-row-name">{option.name}</span>
-          <span className="model-picker-row-meta">{option.disabledReason ?? `${option.memberCount} agents · Version ${option.revision}`}</span>
-          {teams.selectedRevisionId === option.revisionId ? <Check size={15} className="model-picker-check" aria-hidden="true" /> : null}
-        </button>
-      ))}
-      {teams?.status ? (
-        <p role="status" className="model-picker-message">
-          {teams.status}
-        </p>
-      ) : null}
-      {teams?.action ? (
-        <button type="button" className="model-picker-text-action" onClick={teams.action.onSelect}>
-          {teams.action.label}
-        </button>
-      ) : null}
-    </>
-  );
-}
 
 /** Orclings the picker offers, each with the model it brings. */
 export function OrclingRows({ orclings, models, disabled, closeOnSelect, close, moveRowFocus }: RowProps & { orclings: OrclingPickerChoices | undefined; models: ModelOption[] }) {

@@ -74,6 +74,7 @@ describe("phone access", () => {
     const phone = await pairPhone("David's iPhone");
     const list = await phone.call("threads.list", { projectId: project.id });
     expect(list.map((thread) => thread.title)).toEqual(["Seen from a phone"]);
+    expect(await phone.device("host.kind", {})).toBe("mac");
     const status = await core.remote.status();
     expect(status.listener).toMatchObject({ state: "on", routes: [{ kind: "lan", host: "127.0.0.1" }] });
     expect(status.devices).toContainEqual(expect.objectContaining({ id: phone.deviceId, name: "David's iPhone", connected: true }));
@@ -247,6 +248,28 @@ describe("phone access", () => {
     await expect(phone.asset({ kind: "tool-image", url: `file://${saved}` })).rejects.toThrow("not available");
   });
 
+  it("serves an image a reply shows to that reply alone, a relative path from the thread's folder", async () => {
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64");
+    const folder = await mkdtemp(path.join(os.tmpdir(), "openorc-reply-image-"));
+    await mkdir(path.join(folder, "shots"));
+    await writeFile(path.join(folder, "shots", "dot.png"), png);
+    await writeFile(path.join(folder, "shots", "other.png"), png);
+    const shown = path.join(folder, "shots", "dot.png");
+    const project = projects.insert(core.db, { name: "Reply images", rootPath: folder, gitRemote: null, defaultBranch: "main", settings: {} });
+    const thread = threads.insert(core.db, { projectId: project.id, title: "Screens", agent: "claude", model: null, mode: "act", permissionMode: "trusted" });
+    const run = runs.insert(core.db, { id: "run-reply-image", taskId: null, threadId: thread.id, agent: "claude", model: null, mode: "act", permissionMode: "trusted" });
+    core.ledger.push({ type: "message.completed", runId: run.id, ts: 1, messageId: "m1", role: "assistant", text: `Fixed:\n\n![Dark](${shown})\n\n![Same, relative](shots/dot.png)` });
+    const phone = await pairPhone();
+    const ask = (messageId: string, at: string) => phone.asset({ kind: "reply-image", runId: run.id, messageId, path: at });
+
+    expect((await ask("m1", shown)).mime).toBe("image/png");
+    expect(Buffer.from((await ask("m1", "shots/dot.png")).bytes)).toEqual(png);
+    // The phone names a file, but the reply never showed it, or names the shown file under another message.
+    await expect(ask("m1", path.join(folder, "shots", "other.png"))).rejects.toThrow("not available");
+    await expect(ask("m2", shown)).rejects.toThrow("not available");
+    await rm(folder, { recursive: true, force: true });
+  });
+
   it("keeps each phone's push registration under its own device, counts it, and forgets it on null or removal", async () => {
     const [first, second] = [await pairPhone("First"), await pairPhone("Second")];
     const before = (await core.remote.status()).push.phones;
@@ -273,6 +296,27 @@ describe("phone access", () => {
     expect(tokens().has(first.deviceId)).toBe(false);
     core.remote.removeDevice(second.deviceId);
     expect((await core.remote.status()).push.phones).toBe(before);
+  });
+
+  it("hands each phone its own key to a host's door, and none from a Mac", async () => {
+    const mac = await pairPhone();
+    expect(await mac.device("door.key", {})).toBeNull();
+    const directory = await mkdtemp(path.join(os.tmpdir(), "openorc-remote-door-"));
+    const door = (deviceId: string) => ({ host: "openorc-door-abcdefghijklmnop.vercel.app", device: deviceId, epoch: 685, ticket: `ticket-for-${deviceId}` });
+    const host = await OpenOrc.create({ dataDir: directory, ephemeral: true, transport: { push() {} }, remoteSecrets: memorySecrets(), remoteNetwork: { port: 0, machine, door } });
+    try {
+      await host.remote.attach((request) => host.handle(request));
+      await host.remote.configure(true);
+      const [first, second] = [client(await RemoteTestClient.pair((await host.remote.beginPairing()).url)), client(await RemoteTestClient.pair((await host.remote.beginPairing()).url))];
+      expect(await first.device("door.key", {})).toEqual(door(first.deviceId));
+      expect(await second.device("door.key", {})).toEqual(door(second.deviceId));
+      await expect(second.request("door.key", { deviceId: first.deviceId })).rejects.toThrow("invalid params for door.key");
+      first.close();
+      second.close();
+    } finally {
+      await host.close();
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   it("ends a removed phone's session and refuses it afterwards", async () => {

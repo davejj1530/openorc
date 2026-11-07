@@ -1,11 +1,11 @@
+import type { Commit, FileChange, Project, PushState, RpcMethod, RpcParams, RpcResults, ThreadSummary } from "@openorc/protocol";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Commit, FileChange, Project, PushState, RpcMethod, RpcParams, RpcResults, ThreadSummary } from "@openorc/protocol";
 import { ComposerCommitChip } from "../components/ComposerFooter";
-import { core } from "../lib/rpc";
 import { queryClient } from "../lib/client";
 import { useComposerChanges } from "../lib/composer-changes";
+import { core } from "../lib/rpc";
 import { ChangesPanel } from "./ChangesPanel";
 import { CommitsPanel } from "./CommitsPanel";
 
@@ -110,10 +110,6 @@ function mockCore(world: World) {
       return (world.push ?? published(0)) as RpcResults[M];
     }
     if (method === "system.info") return { gh: { installed: world.gh ?? true, path: world.gh === false ? null : "/usr/bin/gh" } } as unknown as RpcResults[M];
-    if (method === "orchestration.runtime") {
-      const action = { allowed: !world.team, reason: world.team ?? null };
-      return { actions: { commit: action, push: action, createPr: action } } as RpcResults[M];
-    }
     if (method === "review.threadPrTemplate") return { body: null } as RpcResults[M];
     if (method === "pulls.branches") return { branches: ["main"], defaultBranch: "main" } as RpcResults[M];
     if (method === "review.comments.list") return [] as unknown as RpcResults[M];
@@ -176,9 +172,9 @@ describe("Changes", () => {
     ["Changes in a worktree", { thread: worktree, head: edited }, { controls: ["Uncommitted", "Branch", "Refresh", "Commit"] }],
     ["Uncommitted read failed", { thread: worktree, head: "error" }, { controls: ["Uncommitted", "Branch", "Refresh", "Commit (disabled)"] }],
     [
-      "A team's workspace that is busy",
-      { thread: { teamInstanceId: "team" }, head: edited, team: "Team is working" },
-      { controls: ["Refresh", "Commit (disabled)", "Refresh team status"], notices: ["Team is working Refresh team status"] },
+      "A saved team workspace",
+      { thread: { teamInstanceId: "team" }, head: edited, team: "This item is no longer available." },
+      { controls: ["Refresh", "Commit (disabled)"], notices: ["This item is no longer available."] },
     ],
     ["A detached copy, read only", { thread: { workspaceMode: "worktree", worktreePath: "/data/worktrees/pr-7", branch: null }, head: edited }, { controls: ["Uncommitted", "Branch", "Refresh"] }],
     [
@@ -212,9 +208,9 @@ describe("Commits", () => {
     ["PR merged", { thread: { ...worktree, prUrl: "https://github.com/openorc/site/pull/7", prState: "merged" }, log: commits, push: published(0) }, { controls: ["merged"], notices: [] }],
     ["No PR from the default branch", { log: commits, push: published(0, { branch: "main" }) }, { controls: [], notices: [] }],
     [
-      "A team's workspace that is busy",
-      { thread: { ...worktree, teamInstanceId: "team" }, log: commits, push: published(1), team: "Team is working" },
-      { controls: ["Push 1 commit (disabled)"], text: "Team is working" },
+      "A saved team workspace",
+      { thread: { ...worktree, teamInstanceId: "team" }, log: commits, push: published(1), team: "This item is no longer available." },
+      { controls: ["Push 1 commit (disabled)"], text: "This item is no longer available." },
     ],
     ["Push state could not be read", { thread: worktree, log: commits, push: "error" }, { controls: [], text: "Could not read push state" }],
   ])("%s", async (_state, world, expected) => {
@@ -244,7 +240,7 @@ describe("the composer's Commit", () => {
     ["No changes", {}, { controls: [] }],
     // The chip counts what the failed read returned: nothing, so it hides.
     ["Uncommitted read failed", { head: "error" }, { controls: [] }],
-    ["A team's workspace that is busy", { thread: { teamInstanceId: "team" }, head: edited, team: "Team is working" }, { controls: ["Commit (disabled)", "+2−1"] }],
+    ["A saved team workspace", { thread: { teamInstanceId: "team" }, head: edited, team: "This item is no longer available." }, { controls: ["Commit (disabled)", "+2−1"] }],
   ])("%s", async (_state, world, expected) => {
     expect((await mount(world, "composer")).controls).toEqual(expected.controls);
   });

@@ -23,6 +23,9 @@ export interface RunControls {
   send: (text: string, attachments?: string[]) => Promise<void>;
   /** Stop one command the agent left running in the background, such as a dev server. One that already ended is left alone. */
   stopCommand?: (commandId: string) => Promise<void>;
+  /** Whole-parent cancellation skips child-specific notices and parent wakeups. */
+  stopSubagent?: (nativeId: string, reason?: "parent-stop") => Promise<void>;
+  canStopSubagent?: (nativeId: string) => boolean;
   /** Live input only: unavailable proves no input was sent; errors may be ambiguous. */
   steer?: (text: string, attachments?: string[]) => Promise<"accepted" | "unavailable">;
   /** Dynamic provider readiness. A live process can be between turns or compacting. */
@@ -66,6 +69,13 @@ export class RunHandle extends EventEmitter<RunHandleEvents> {
   stopCommand(commandId: string): Promise<void> {
     if (!this.controls.stopCommand) return Promise.reject(new Error("this agent cannot stop a background command"));
     return this.controls.stopCommand(commandId);
+  }
+  canStopSubagent(nativeId: string): boolean {
+    return !this.closed && Boolean(this.controls.stopSubagent) && (this.controls.canStopSubagent?.(nativeId) ?? true);
+  }
+  stopSubagent(nativeId: string, reason?: "parent-stop"): Promise<void> {
+    if (!this.canStopSubagent(nativeId) || !this.controls.stopSubagent) return Promise.reject(new Error("This subagent cannot be stopped."));
+    return reason ? this.controls.stopSubagent(nativeId, reason) : this.controls.stopSubagent(nativeId);
   }
   get compacting(): boolean {
     return this.controls.compacting?.() ?? false;

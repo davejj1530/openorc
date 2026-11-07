@@ -1,4 +1,6 @@
 import { z } from "zod";
+import type { Task } from "./domain.js";
+import type { MoveRefusal } from "./thread-owner.js";
 import type { CorePush } from "./rpc.js";
 
 /** The iPhone app: its APNs topic and the team whose key signs for it. apps/mobile/app.json must agree (tested). */
@@ -38,11 +40,63 @@ export const PUSH_SENDER_TAG = "push.sender";
 export const deviceRpcParams = {
   /** Null stops alerts to this phone. */
   "push.register": z.object({ registration: pushRegistration.nullable() }).strict(),
+  /** This phone's key to wake its host through the host's door, renewed on every session. */
+  "door.key": z.object({}).strict(),
+  /**
+   * Whether the host is a cloud brain or a Mac, asked once a session. Not in the hello: phones already installed read
+   * its keys exactly and refuse one they do not know. A host from before this method answers with an error: a Mac.
+   */
+  "host.kind": z.object({}).strict(),
+  /**
+   * The cloud brains this host removed, by the ids phones saved them under, newest first: a phone forgets each it keeps.
+   * A host from before this method answers with an error: none removed.
+   */
+  "brains.removed": z.object({}).strict(),
+  /**
+   * This host's open tasks, and on a cloud brain, its Mac's as it last heard them, for the phone's task list. A host from
+   * before this method answers with an error: the phone shows no task list.
+   */
+  "tasks.board": z.object({}).strict(),
+  /**
+   * The moves this Mac asked for that were refused, by thread, for the phone's "Didn't move" card. A host from before
+   * this method answers with an error: none.
+   */
+  "moves.refused": z.object({}).strict(),
 };
 export type DeviceMethod = keyof typeof deviceRpcParams;
 export type DeviceParams<M extends DeviceMethod> = z.infer<(typeof deviceRpcParams)[M]>;
+
+/**
+ * What a host that sleeps gives a phone to knock on its door with: its ticket for this phone's own device id, for one
+ * epoch. The ticket is a secret, kept in the phone's Keychain only.
+ */
+export interface DoorKey {
+  /** The door's host name. */
+  host: string;
+  /** This phone's id on the host, as its paired list names it. */
+  device: string;
+  epoch: number;
+  /** 32 bytes, base64url. */
+  ticket: string;
+}
+
 export interface DeviceRpcResults {
   "push.register": PushSenderStates;
+  /** Null from a host without a door, such as a Mac. */
+  "door.key": DoorKey | null;
+  "host.kind": "mac" | "brain";
+  "brains.removed": string[];
+  "tasks.board": TaskBoard;
+  "moves.refused": { threadId: string; refusal: MoveRefusal }[];
+}
+
+/** A task as a phone's list shows it: nothing about folders or branches on the host. */
+export type BoardTask = Pick<Task, "id" | "projectId" | "title" | "status" | "priority" | "threadId" | "executionThreadId" | "updatedAt">;
+
+export interface TaskBoard {
+  tasks: BoardTask[];
+  /** On a cloud brain, its Mac's open tasks as of its last exchange, never changed here; null on a Mac or before one. */
+  mac: { at: number; tasks: BoardTask[] } | null;
 }
 export const isDeviceMethod = (method: string): method is DeviceMethod => Object.hasOwn(deviceRpcParams, method);
 

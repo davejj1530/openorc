@@ -27,7 +27,7 @@ const { a } = threads;
         </span>
       </div>
       <TurnHead harness={a.harness} agent={a.agent} model={a.label} took={duration(elapsed(handoff, "aWork", "aFinish"))} />
-      <Receipt steps="1 step" />
+      <Receipt changes={`+${a.change.added} in 1 file`} />
       <div class="hs-reply"><Prose text={a.result} /></div>
       <ChangeLine files={1} added={a.change.added} removed={a.change.removed} undo />
       <div class="hs-turn-actions"><ProductIcon name="copy" /></div>

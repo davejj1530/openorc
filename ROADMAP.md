@@ -1,6 +1,6 @@
 # Roadmap
 
-OpenOrc is under active development. The desktop supports conversations, task documents, provider integrations, local memory, and Git review. Team execution is in Beta and enabled for new profiles (**Team execution (Beta)** in Settings); existing choices are preserved. See the [README](README.md) for setup and the [product model](PRODUCT.md) for behavior.
+OpenOrc is under active development. The desktop supports conversations, task documents, provider integrations, local memory, and Git review, and the iPhone app drives the same threads from a paired phone. Cloud threads and the cloud brain run on the user's own Vercel or Agent37 account. See the [README](README.md) for setup and the [product model](PRODUCT.md) for behavior.
 
 ## Reliability and platform support
 
@@ -12,6 +12,11 @@ OpenOrc is under active development. The desktop supports conversations, task do
 - Review dependency notices and provider-asset presentation whenever versions or artwork change.
 
 The [packaged runtime checks](docs/packaged-runtime-validation.md) describe the macOS, Windows and Linux harnesses and their limits. No release date or support guarantee is implied by these priorities.
+
+## Phone and cloud
+
+- Set up the cloud brain from the phone alone, without the desktop.
+- Keep App Store builds of the phone working against newer desktops by gating each new event or result per phone and testing against the installed builds' readers.
 
 ## Architecture priorities
 

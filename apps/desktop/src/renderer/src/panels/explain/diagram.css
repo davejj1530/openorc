@@ -1,0 +1,308 @@
+/* The Diagram view: white node pieces on an r14 well inset in the panel card, like the browser viewport. The zoom
+   pill and the detail piece float over content that pans beneath them, so they keep a hairline ring. */
+.explain-diagram {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+.explain-diagram-summary {
+  display: -webkit-box;
+  flex-shrink: 0;
+  margin: 0 20px 10px;
+  overflow: hidden;
+  color: var(--ink-3);
+  font-size: var(--text-base);
+  line-height: var(--text-base--line-height);
+  letter-spacing: var(--text-base--letter-spacing);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+.explain-diagram-well {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0 10px 10px;
+  border-radius: var(--radius-viewport);
+  background: var(--surface-2);
+  overflow: clip;
+  isolation: isolate;
+}
+/* overflow: clip, not hidden, so focusing a node off screen cannot scroll the canvas out from under the camera. */
+.explain-diagram-canvas {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.explain-diagram-canvas[data-panning] {
+  cursor: grabbing;
+}
+.explain-diagram-world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+.explain-diagram-world[data-glide] {
+  transition: transform var(--duration-arrive) var(--ease-out);
+}
+
+.explain-diagram-edges {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.explain-diagram-edge {
+  fill: none;
+  stroke: var(--line-strong);
+  stroke-width: 1.25px;
+  vector-effect: non-scaling-stroke;
+  transition: stroke var(--duration-quick) var(--ease-out);
+}
+.explain-diagram-arrow {
+  fill: var(--line-strong);
+  transition: fill var(--duration-quick) var(--ease-out);
+}
+[data-active] > .explain-diagram-edge {
+  stroke: var(--ink-3);
+}
+[data-active] > .explain-diagram-arrow {
+  fill: var(--ink-3);
+}
+.explain-diagram-edge-label {
+  position: absolute;
+  box-sizing: border-box;
+  height: 20px;
+  padding: 0 8px;
+  overflow: hidden;
+  translate: -50% -50%;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  line-height: 20px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  transition: color var(--duration-quick) var(--ease-out);
+}
+.explain-diagram-edge-label[data-active] {
+  color: var(--ink);
+}
+
+/* Kinds differ by shape and fill step: the ends of the flow are pills, data sinks one ink step below the well whatever
+   the palette's fills, and a small mark names entry, output, decision, data and external. Plain steps carry no mark. */
+.explain-diagram-node {
+  --explain-diagram-hover: color-mix(in srgb, var(--ink) 4%, transparent);
+  --explain-diagram-press: color-mix(in srgb, var(--ink) 6%, transparent);
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  box-sizing: border-box;
+  padding: 10px 14px 12px;
+  border-radius: var(--radius-xl);
+  background-color: var(--surface);
+  color: var(--ink);
+  text-align: left;
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
+}
+.explain-diagram-node:hover {
+  background-image: linear-gradient(var(--explain-diagram-hover), var(--explain-diagram-hover));
+}
+.explain-diagram-node:active {
+  background-image: linear-gradient(var(--explain-diagram-press), var(--explain-diagram-press));
+}
+.explain-diagram-node:is([data-kind="entry"], [data-kind="output"]) {
+  border-radius: var(--radius-pill);
+  padding-inline: 22px;
+}
+.explain-diagram-node[data-kind="data"] {
+  background-color: color-mix(in srgb, var(--ink) 5%, transparent);
+}
+.explain-diagram-node[aria-expanded="true"] {
+  --explain-diagram-hover: color-mix(in srgb, var(--accent-fg) 12%, transparent);
+  --explain-diagram-press: color-mix(in srgb, var(--accent-fg) 20%, transparent);
+  background-color: var(--accent);
+  color: var(--accent-fg);
+}
+.explain-diagram-node-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: var(--text-base);
+  line-height: var(--text-base--line-height);
+  letter-spacing: var(--text-base--letter-spacing);
+}
+.explain-diagram-node-label {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.explain-diagram-node-summary {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+/* Two fills deep, muted text would fall under 4.5:1, so data steps up a gray. */
+.explain-diagram-node[data-kind="data"] .explain-diagram-node-summary {
+  color: var(--ink-2);
+}
+.explain-diagram-mark {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+.explain-diagram-node[aria-expanded="true"] :is(.explain-diagram-node-summary, .explain-diagram-mark) {
+  color: color-mix(in srgb, var(--accent-fg) 72%, transparent);
+}
+
+.explain-diagram-zoom {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: 0 0 0 var(--hairline) var(--line);
+}
+
+/* Opening grows the piece from nothing while its parts come out of a blur one after another. Closing blurs the parts
+   away first and folds quicker than it opened. */
+.explain-diagram-detail {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  height: auto;
+  overflow: hidden;
+  border-radius: var(--radius-2xl);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 0 0 var(--hairline) var(--line);
+  interpolate-size: allow-keywords;
+  transition:
+    height var(--duration-resize) var(--ease-out),
+    opacity var(--duration-leave) var(--ease-out);
+}
+@starting-style {
+  .explain-diagram-detail {
+    height: 0;
+    opacity: 0;
+  }
+}
+.explain-diagram-detail[data-leaving] {
+  height: 0;
+  opacity: 0;
+  transition:
+    height var(--duration-arrive) var(--ease-out) 60ms,
+    opacity var(--duration-arrive) var(--ease-out) 60ms;
+}
+.explain-diagram-detail[data-leaving] .motion-arrive {
+  opacity: 0;
+  filter: blur(3px);
+  transition-duration: var(--duration-leave);
+  transition-delay: 0ms;
+}
+.explain-diagram-detail-content {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+.explain-diagram-detail-head {
+  --motion-delay: 40ms;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 10px 4px 16px;
+}
+.explain-diagram-detail-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--text-md);
+  font-weight: 400;
+  line-height: var(--text-md--line-height);
+  letter-spacing: var(--text-md--letter-spacing);
+  overflow-wrap: anywhere;
+}
+.explain-diagram-detail-body {
+  min-height: 0;
+  padding: 0 16px 16px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.explain-diagram-detail-summary {
+  --motion-delay: 80ms;
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--text-base);
+  line-height: var(--text-base--line-height);
+  letter-spacing: var(--text-base--letter-spacing);
+}
+.explain-diagram-detail-markdown.prose-chat {
+  --motion-delay: 120ms;
+  margin-top: 8px;
+  color: var(--ink-2);
+  font-size: var(--text-base);
+  line-height: var(--text-base--line-height);
+}
+.explain-diagram-detail-action {
+  --motion-delay: 160ms;
+  margin-top: 14px;
+}
+
+@property --explain-diagram-fade-top {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --explain-diagram-fade-bottom {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@supports (animation-timeline: scroll()) {
+  .explain-diagram-detail-body {
+    mask-image: linear-gradient(to bottom, transparent, #000 var(--explain-diagram-fade-top), #000 calc(100% - var(--explain-diagram-fade-bottom)), transparent);
+    animation: explain-diagram-fade linear both;
+    animation-timeline: scroll(self block);
+  }
+}
+@keyframes explain-diagram-fade {
+  0% {
+    --explain-diagram-fade-top: 0px;
+    --explain-diagram-fade-bottom: 16px;
+  }
+  8%,
+  92% {
+    --explain-diagram-fade-top: 16px;
+    --explain-diagram-fade-bottom: 16px;
+  }
+  100% {
+    --explain-diagram-fade-top: 16px;
+    --explain-diagram-fade-bottom: 0px;
+  }
+}

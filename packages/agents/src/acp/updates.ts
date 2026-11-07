@@ -167,7 +167,7 @@ export class AcpUpdateMapper {
   }
 
   private toolCall(update: Extract<SessionUpdate, { sessionUpdate: "tool_call" }>, ts: number): AgentEvent[] {
-    const name = update.name ?? toolNameFor[update.kind ?? "other"];
+    const name = update.name ?? (update.title === "subagent" ? "subagent" : toolNameFor[update.kind ?? "other"]);
     const input = update.rawInput ?? { title: update.title };
     this.tools.set(update.toolCallId, { name, input, text: "", title: update.title });
     const events: AgentEvent[] = [{ type: "tool.started", runId: this.runId, ts, toolCallId: update.toolCallId, name, input, parentToolCallId: null }];
@@ -192,7 +192,7 @@ export class AcpUpdateMapper {
       case "failed": {
         this.tools.delete(update.toolCallId);
         const failed = update.status === "failed";
-        const output = update.rawOutput !== undefined && update.rawOutput !== null ? outputOf(update.rawOutput) : (text ?? null);
+        const output = update.rawOutput !== undefined && update.rawOutput !== null ? outputOf(update.rawOutput, text) : (text ?? null);
         events.push({
           type: "tool.completed",
           runId: this.runId,
@@ -242,11 +242,11 @@ function toolText(content: ToolCallContent[] | null | undefined): string | null 
 }
 
 /** OpenCode wraps a tool's output as `{ output, metadata }`; the transcript wants the output itself. */
-function outputOf(raw: unknown): unknown {
+function outputOf(raw: unknown, content: string | null): unknown {
   if (raw && typeof raw === "object" && !Array.isArray(raw)) {
     const record = raw as Record<string, unknown>;
     if (typeof record["output"] === "string") return record["output"];
     if (typeof record["error"] === "string") return record["error"];
   }
-  return raw;
+  return content ?? raw;
 }

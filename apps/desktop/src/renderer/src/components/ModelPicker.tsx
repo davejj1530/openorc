@@ -1,34 +1,46 @@
-import { useClaudeAccountId } from "../lib/claude-account";
-import { useModelCatalog } from "../lib/use-model-catalog";
-import { useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import { effortHint, effortLabel, normalizeModelSettings } from "@openorc/protocol";
-import { harnessCatalog, harnessIds, harnessInfo, harnessInstalled, harnessLoggedIn, harnessName, isHarnessId, type HarnessId, type ModelOption, type Orcling } from "@openorc/protocol";
-import { Check, ChevronDown, Orcling as OrclingIcon, Plus, Search, Workflow, RotateCcw, Zap } from "./icons";
-import { OrclingAvatar } from "./OrclingAvatar";
 import { Popover } from "@base-ui/react/popover";
+import { browserModels, catalogModel, modelChoiceFor, pickerCatalog, pickerSettings, providerGroups, type ModelChoice } from "@openorc/client";
+import {
+  effortHint,
+  effortLabel,
+  harnessCatalog,
+  harnessIds,
+  harnessInfo,
+  harnessInstalled,
+  harnessLoggedIn,
+  harnessName,
+  isHarnessId,
+  normalizeModelSettings,
+  type HarnessId,
+  type ModelOption,
+  type Orcling,
+} from "@openorc/protocol";
+import { useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { CoversPreview } from "../lib/browser-preview";
+import { useClaudeAccountId } from "../lib/claude-account";
 import { useRpc } from "../lib/client";
 import { cn } from "../lib/cn";
 import { useRouter } from "../lib/router";
-import { HarnessLogo } from "./HarnessLogo";
-import { CoversPreview } from "../lib/browser-preview";
 import { floatingGround } from "../lib/use-anchor-ground";
-import { BrowserEffortFooter, ComposerEffortPanel, fastStatus, orclingLed, type EffortTeam } from "./ModelPickerEffort";
-import { OrclingRows, TeamRows, type OrclingPickerChoices, type TeamPickerChoices } from "./ModelPickerRows";
-import { browserModels, catalogModel, modelChoiceFor, pickerCatalog, pickerSettings, providerGroups, type ModelChoice } from "@openorc/client";
+import { useModelCatalog } from "../lib/use-model-catalog";
+import { HarnessLogo } from "./HarnessLogo";
+import { Check, ChevronDown, Orcling as OrclingIcon, Plus, RotateCcw, Search, Zap } from "./icons";
+import { BrowserEffortFooter, ComposerEffortPanel, fastStatus } from "./ModelPickerEffort";
+import { OrclingRows, type OrclingPickerChoices } from "./ModelPickerRows";
+import { OrclingAvatar } from "./OrclingAvatar";
 
 export { defaultChoice, matchesQuery, multiProviderAgents, providerGroups } from "@openorc/client";
 export type { ModelChoice } from "@openorc/client";
-export type { OrclingPickerChoices, TeamPickerChoices, TeamPickerOption } from "./ModelPickerRows";
+export type { OrclingPickerChoices } from "./ModelPickerRows";
 
 /** The chosen model's name with the exact ID it pins, for tooltips. */
 function modelTitle(current: ModelOption | undefined, model: string | undefined): string | undefined {
   return current ? `${current.label} · ${current.id}` : model;
 }
 
-type PickerSection = HarnessId | "teams" | "orclings";
+type PickerSection = HarnessId | "orclings";
 
-function initialPickerSection(teams: TeamPickerChoices | undefined, orclings: OrclingPickerChoices | undefined, value: ModelChoice | null): PickerSection {
-  if (teams?.selectedLabel) return "teams";
+function initialPickerSection(orclings: OrclingPickerChoices | undefined, value: ModelChoice | null): PickerSection {
   if (orclings?.selectedId) return "orclings";
   if (value && isHarnessId(value.agent)) return value.agent;
   return harnessIds[0]!;
@@ -52,8 +64,7 @@ function modelRowMeta(model: ModelOption): ReactNode {
   return null;
 }
 
-function pickerTriggerIcon(teamSelected: boolean, value: ModelChoice | null, teamSize: number, modelSize: number): ReactNode {
-  if (teamSelected) return <Workflow size={teamSize} className={teamSize === 13 ? "shrink-0" : undefined} />;
+function pickerTriggerIcon(value: ModelChoice | null, modelSize: number): ReactNode {
   if (value && isHarnessId(value.agent)) return <HarnessLogo id={value.agent} size={modelSize} />;
   return null;
 }
@@ -84,7 +95,7 @@ function usePickerPopup() {
   return { open, setOpen, trigger, boundary, maxWidth, onOpenChange };
 }
 
-const SECTION_LABELS: Record<"teams" | "orclings", string> = { teams: "Project teams", orclings: "Orclings" };
+const SECTION_LABELS: Record<"orclings", string> = { orclings: "Orclings" };
 const sectionLabel = (section: PickerSection) => (isHarnessId(section) ? `${harnessName(section)} models` : SECTION_LABELS[section]);
 
 /** Search and effort stay fixed while the provider's model list scrolls. */
@@ -92,9 +103,7 @@ function ModelBrowser({
   value,
   onChange,
   onSelectModel = onChange,
-  teams,
   orclings,
-  team,
   showEffort,
   showFast,
   disabled,
@@ -104,9 +113,7 @@ function ModelBrowser({
   value: ModelChoice | null;
   onChange: (choice: ModelChoice) => void;
   onSelectModel?: (choice: ModelChoice) => void;
-  teams?: TeamPickerChoices;
   orclings?: OrclingPickerChoices;
-  team?: EffortTeam;
   showEffort: boolean;
   showFast: boolean;
   disabled?: boolean;
@@ -118,14 +125,14 @@ function ModelBrowser({
   const system = useRpc("system.info", claudeAccountId ? { claudeAccountId } : {});
   const list = useMemo(() => pickerCatalog(models.data ?? []), [models.data]);
   const current = catalogModel(list, value);
-  const [section, setSection] = useState<PickerSection>(() => initialPickerSection(teams, orclings, value));
+  const [section, setSection] = useState<PickerSection>(() => initialPickerSection(orclings, value));
   const [query, setQuery] = useState("");
   const [showLegacy, setShowLegacy] = useState(false);
   const search = useRef<HTMLInputElement>(null);
   const results = useRef<HTMLDivElement>(null);
   const fastDescriptionId = useId();
-  // An Orcling, chosen or leading the chosen team, brings its own effort and Fast mode.
-  const orclingSettings = Boolean(orclings?.selectedId) || orclingLed(team);
+  // An Orcling brings its own effort and Fast mode.
+  const orclingSettings = Boolean(orclings?.selectedId);
   const harness = isHarnessId(section) ? section : null;
   const provider = harness && system.data ? harnessInfo(system.data, harness) : null;
   const ready = !harness || Boolean(provider && harnessLoggedIn(provider));
@@ -166,7 +173,7 @@ function ModelBrowser({
     else search.current?.focus();
   };
   const modelRow = (model: ModelOption, showProvider: boolean) => {
-    const selected = !teams?.selectedLabel && !orclings?.selectedId && value?.agent === model.agent && value.model === model.id;
+    const selected = !orclings?.selectedId && value?.agent === model.agent && value.model === model.id;
     return (
       <button
         key={`${model.agent}:${model.id}`}
@@ -196,11 +203,6 @@ function ModelBrowser({
             <OrclingIcon size={20} />
           </button>
         ) : null}
-        {teams ? (
-          <button type="button" className="model-picker-rail-button" aria-label="Project teams" aria-pressed={section === "teams"} title="Project teams" onClick={() => switchSection("teams")}>
-            <Workflow size={19} />
-          </button>
-        ) : null}
         {harnessIds.map((id) => {
           const status = system.data ? harnessInfo(system.data, id) : null;
           const hint = providerHint(status);
@@ -222,7 +224,7 @@ function ModelBrowser({
           <button
             type="button"
             className="model-picker-rail-button model-picker-fast"
-            aria-label={team ? "Lead Fast mode" : "Fast mode"}
+            aria-label="Fast mode"
             aria-pressed={fast}
             data-blocked={fastBlocked || undefined}
             aria-describedby={fastDescriptionId}
@@ -284,7 +286,7 @@ function ModelBrowser({
               </button>
             </div>
           ) : null}
-          {section === "teams" ? <TeamRows teams={teams} disabled={disabled} closeOnSelect={closeOnSelect} close={close} moveRowFocus={moveRowFocus} /> : null}
+
           {section === "orclings" ? <OrclingRows orclings={orclings} models={list} disabled={disabled} closeOnSelect={closeOnSelect} close={close} moveRowFocus={moveRowFocus} /> : null}
           {harness ? (
             <>
@@ -331,7 +333,6 @@ function ModelBrowser({
             fast={fast}
             fastBlocked={fastBlocked}
             fastHint={fastHint}
-            team={team}
             loading={models.isPending}
             failed={models.isError}
           />
@@ -353,7 +354,6 @@ export function ModelPicker({
   onChange,
   disabled,
   showEffort = true,
-  teams,
   orclings,
   placeholder = "Choose a model",
   ariaLabel,
@@ -362,7 +362,6 @@ export function ModelPicker({
   onChange: (choice: ModelChoice) => void;
   disabled?: boolean;
   showEffort?: boolean;
-  teams?: TeamPickerChoices;
   orclings?: OrclingPickerChoices;
   placeholder?: string;
   ariaLabel?: string;
@@ -372,7 +371,7 @@ export function ModelPicker({
   value = value ? normalizeModelSettings(value) : null;
   const current = catalogModel(models.data, value);
   const chosen = chosenOrcling(orclings);
-  const selectedLabel = chosen?.name ?? teams?.selectedLabel;
+  const selectedLabel = chosen?.name;
   const detail = triggerDetail(chosen, showEffort && !selectedLabel ? value?.effort : null, models.data);
   return (
     <Popover.Root
@@ -389,7 +388,7 @@ export function ModelPicker({
         title={selectedLabel ?? modelTitle(current, value?.model) ?? placeholder}
         className="inline-flex min-w-0 items-center gap-1.5 h-7 pl-2 pr-1.5 rounded-md text-base text-ink-2 hover:bg-surface-2 hover:text-ink disabled:text-ink-4 disabled:pointer-events-none"
       >
-        {chosen ? <OrclingAvatar orcling={chosen} size={14} /> : pickerTriggerIcon(Boolean(teams?.selectedLabel), value, 13, 14)}
+        {chosen ? <OrclingAvatar orcling={chosen} size={14} /> : pickerTriggerIcon(value, 14)}
         <span className="truncate max-w-40">{selectedLabel ?? current?.label ?? value?.model ?? placeholder}</span>
         {detail ? <span className="model-effort shrink-0 text-ink-3 text-sm">{detail}</span> : null}
         <ChevronDown size={13} className="text-ink-4" />
@@ -398,17 +397,7 @@ export function ModelPicker({
         <CoversPreview />
         <Popover.Positioner side="top" align="start" sideOffset={6} collisionPadding={12} collisionBoundary={popup.boundary}>
           <Popover.Popup className="model-picker-popup" initialFocus={false} data-no-effort={!showEffort || undefined} style={popup.maxWidth ? { maxWidth: popup.maxWidth } : undefined}>
-            <ModelBrowser
-              value={value}
-              onChange={onChange}
-              teams={teams}
-              orclings={orclings}
-              showEffort={showEffort}
-              showFast={showEffort}
-              disabled={disabled}
-              closeOnSelect
-              close={() => popup.setOpen(false)}
-            />
+            <ModelBrowser value={value} onChange={onChange} orclings={orclings} showEffort={showEffort} showFast={showEffort} disabled={disabled} closeOnSelect close={() => popup.setOpen(false)} />
           </Popover.Popup>
         </Popover.Positioner>
       </Popover.Portal>
@@ -435,18 +424,16 @@ function TriggerEffort({ label, efforts }: { label: string; efforts: string[] })
   );
 }
 
-function ComposerTriggerIcon({ orcling, team, value }: { orcling: Orcling | null; team: boolean; value: ModelChoice | null }) {
+function ComposerTriggerIcon({ orcling, value }: { orcling: Orcling | null; value: ModelChoice | null }) {
   if (orcling) return <OrclingAvatar orcling={orcling} size={14} />;
-  return <>{pickerTriggerIcon(team, value, 14, 14)}</>;
+  return <>{pickerTriggerIcon(value, 14)}</>;
 }
 
-/** A compact trigger with one model browser, or lead settings when a team is already running. */
+/** A compact trigger with one model browser. */
 export function ComposerModelPicker({
   value,
   onChange,
   onSelectModel,
-  team,
-  teams,
   orclings,
   modelSelector,
   disabled,
@@ -455,8 +442,6 @@ export function ComposerModelPicker({
   value: ModelChoice | null;
   onChange: (choice: ModelChoice) => void;
   onSelectModel?: (choice: ModelChoice) => void;
-  team?: EffortTeam;
-  teams?: TeamPickerChoices;
   orclings?: OrclingPickerChoices;
   modelSelector?: ReactNode;
   disabled?: boolean;
@@ -483,7 +468,7 @@ export function ComposerModelPicker({
   });
   const label = effort ? effortLabel(effort) : "Default";
   const hint = effortHint(effort);
-  const title = team ? `${team.name} · Version ${team.revision} · ${team.leadName}: ${label}` : `${modelTitle(current, value?.model) ?? "Choose a model"} · ${label}`;
+  const title = `${modelTitle(current, value?.model) ?? "Choose a model"} · ${label}`;
   return (
     <Popover.Root
       open={popup.open}
@@ -496,12 +481,12 @@ export function ComposerModelPicker({
         ref={popup.trigger}
         disabled={disabled}
         className="composer-model-trigger"
-        aria-label={team ? "Team and lead effort" : "Model and effort"}
+        aria-label="Model and effort"
         title={fast && fastBlocked ? `${title} · ${fastStatus(fast, fastBlocked)}${fastHint}` : title}
       >
-        <ComposerTriggerIcon orcling={chosenOrcling(orclings)} team={Boolean(team)} value={value} />
+        <ComposerTriggerIcon orcling={chosenOrcling(orclings)} value={value} />
         {fast ? <Zap size={13} aria-label={fastBlocked ? "Fast mode can't run" : "Fast mode requested"} className="composer-fast-indicator shrink-0" data-blocked={fastBlocked || undefined} /> : null}
-        <span className="composer-model-name">{chosenOrcling(orclings)?.name ?? team?.name ?? current?.label ?? value?.model ?? "Choose model"}</span>
+        <span className="composer-model-name">{chosenOrcling(orclings)?.name ?? current?.label ?? value?.model ?? "Choose model"}</span>
         {value ? <TriggerEffort label={label} efforts={efforts} /> : null}
       </Popover.Trigger>
       <Popover.Portal>
@@ -528,7 +513,6 @@ export function ComposerModelPicker({
                 fastBlocked={fastBlocked}
                 fastHint={fastHint}
                 hint={hint}
-                team={team}
                 loading={models.isPending}
                 failed={models.isError}
               >
@@ -539,8 +523,6 @@ export function ComposerModelPicker({
                 value={value}
                 onChange={onChange}
                 onSelectModel={onSelectModel}
-                team={team}
-                teams={teams}
                 orclings={orclings}
                 showEffort
                 showFast

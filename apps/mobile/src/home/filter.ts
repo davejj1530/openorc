@@ -1,48 +1,41 @@
-import type { SidebarFilter } from "@openorc/client";
 import { useSyncExternalStore } from "react";
 import { storage } from "../client";
 
 /**
- * Which threads Home lists, as the desktop sidebar's filter: orcmode's working set, every active thread, or the
- * archive; `pinnedOnly` narrows the active ones to pins. The filter is kept on the phone across launches; pinned-only
- * is not, as on the desktop.
+ * Which threads Home lists, as the desktop sidebar's filter: every thread, or with `pinnedOnly` only the pinned ones.
+ * Resolved threads sit in their own part at the foot, not behind a filter. Pinned-only is not kept across launches, as on
+ * the desktop.
  */
 export interface HomeFilter {
-  filter: SidebarFilter;
   pinnedOnly: boolean;
 }
 
-export type FilterChoice = SidebarFilter | "pinned";
+export type FilterChoice = "all" | "pinned";
 
 export const FILTER_CHOICES: readonly { choice: FilterChoice; label: string }[] = [
-  { choice: "orc", label: "Orcmode" },
-  { choice: "active", label: "Active threads" },
-  { choice: "archived", label: "Archived threads" },
+  { choice: "all", label: "All threads" },
   { choice: "pinned", label: "Pinned threads" },
 ];
 
+/** Where the archive filter kept its choice, before Resolved took its place. */
 const KEY = "home.filter";
+storage.remove(KEY);
+
 const listeners = new Set<() => void>();
-let shown: HomeFilter = { filter: readFilter(), pinnedOnly: false };
+let shown: HomeFilter = { pinnedOnly: false };
 
-function readFilter(): SidebarFilter {
-  const saved = storage.getString(KEY);
-  return saved === "orc" || saved === "archived" ? saved : "active";
-}
+export const filterChoice = ({ pinnedOnly }: HomeFilter): FilterChoice => (pinnedOnly ? "pinned" : "all");
 
-export const filterChoice = ({ filter, pinnedOnly }: HomeFilter): FilterChoice => (pinnedOnly ? "pinned" : filter);
-
-/** Chooses what Home lists. Pinned threads are the active ones narrowed, so choosing them keeps the filter on Active. */
 export function chooseFilter(choice: FilterChoice): void {
-  shown = choice === "pinned" ? { filter: "active", pinnedOnly: true } : { filter: choice, pinnedOnly: false };
-  if (shown.filter === "active") storage.remove(KEY);
-  else storage.set(KEY, shown.filter);
+  shown = { pinnedOnly: choice === "pinned" };
+  // Touches the demo's scratch storage, so a choice made in the demo goes when it ends.
+  storage.remove(KEY);
   listeners.forEach((listener) => listener());
 }
 
-// A filter chosen in the demo goes with it, pinned-only too, as on a fresh install.
+// A filter chosen in the demo goes with it, as on a fresh install.
 storage.onDropped(() => {
-  shown = { filter: readFilter(), pinnedOnly: false };
+  shown = { pinnedOnly: false };
   listeners.forEach((listener) => listener());
 });
 

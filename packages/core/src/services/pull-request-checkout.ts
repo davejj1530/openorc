@@ -45,7 +45,7 @@ export async function moveReviewCheckout(deps: { db: Db; writers: Pick<Workspace
       await worktree.addDetached(project.rootPath, { path: cwd, commit: detail.headSha });
     } else {
       if (await isDirty(cwd))
-        throw new Error("The review conversation's copy of the pull request has changes, so it can't move to the new commits. Archive that conversation to review in a fresh one.");
+        throw new Error("The review conversation's copy of the pull request has changes, so it can't move to the new commits. Resolve that conversation to review in a fresh one.");
       await worktree.checkoutDetached(cwd, detail.headSha);
     }
     const tree = await treeHash(cwd);

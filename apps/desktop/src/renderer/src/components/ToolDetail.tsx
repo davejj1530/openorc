@@ -5,19 +5,19 @@ import {
   toolResultDetails,
   type ChangedFile,
   type ChangeStatus,
-  type TestTally,
   joinPath,
   toolInputView,
   toolOutputView,
-  type CommandStep,
   type Field,
   type InputView,
   type OutputView,
   type Block,
 } from "@openorc/client";
-import { Check, Globe, Search, WorkDelegate, X } from "./icons";
+import { Globe, Search, WorkDelegate } from "./icons";
 import { FileLine, Matches } from "./Matches";
 import { ThreadLink, ThreadRichText } from "./ThreadImages";
+import { CommandSteps, shortPath } from "./ToolCommand";
+import { Code, PrintedText } from "./ToolPrinted";
 import { ToolResult } from "./ToolResult";
 import "./ToolDetail.css";
 
@@ -34,8 +34,8 @@ const loading = (
 
 /**
  * A tool call opened: what it was asked, in the form that suits it, and what came back the same way. A command
- * reads as its steps, a printed file as highlighted code, a search as its matches, a test run as its tally. The raw
- * call stays one click away.
+ * reads as its steps in plain words, a printed file as highlighted code, a search as its matches, anything else it
+ * printed as read lines. The raw call stays one click away.
  */
 export function ToolDetail({ block, output }: { block: ToolBlock; output: unknown }) {
   const input = useMemo(() => toolInputView(block), [block]);
@@ -60,7 +60,7 @@ export function ToolDetail({ block, output }: { block: ToolBlock; output: unknow
 function InputPart({ view }: { view: InputView }) {
   switch (view.kind) {
     case "command":
-      return <CommandLine steps={view.steps} cwd={view.cwd} />;
+      return <CommandSteps steps={view.steps} cwd={view.cwd} />;
     case "file":
       return <FileLine path={view.path} note={view.lines} />;
     case "patch":
@@ -107,8 +107,9 @@ function OutputPart({ view, cwd }: { view: OutputView; cwd: string | null }) {
           <InlineDiff patch={view.patch} />
         </Suspense>
       );
+    // The tally is in the runner's own summary lines, and the work view draws it; the output reads like any other.
     case "tests":
-      return <Tests tally={view.tally} text={view.text} />;
+      return <PrintedText text={view.text} cwd={cwd} />;
     case "json":
       return <Code code={view.json} language="json" startLine={null} />;
     case "markdown":
@@ -118,74 +119,8 @@ function OutputPart({ view, cwd }: { view: OutputView; cwd: string | null }) {
         </div>
       );
     case "text":
-      return <pre className="tool-view-plain">{view.text}</pre>;
+      return <PrintedText text={view.text} cwd={cwd} />;
   }
-}
-
-/** "…/renderer/src": enough of a folder to place it. */
-function shortPath(path: string): string {
-  const parts = path.split(/[\\/]/).filter(Boolean);
-  return parts.length > 2 ? `…/${parts.slice(-2).join("/")}` : path;
-}
-
-const COMMAND_LINES = 12;
-
-const lineCount = (text: string) => text.split("\n").length;
-
-/** The first `budget` lines of a command: each step's line, then its script, until the budget runs out. */
-function firstLines(steps: CommandStep[], budget: number): CommandStep[] {
-  const shown: CommandStep[] = [];
-  let left = budget;
-  for (const step of steps) {
-    if (left <= 0) break;
-    const text = step.text.split("\n").slice(0, left);
-    left -= text.length;
-    const code = step.body && left > 0 ? step.body.code.split("\n").slice(0, left) : [];
-    left -= code.length;
-    shown.push({ text: text.join("\n"), body: step.body && code.length ? { ...step.body, code: code.join("\n") } : null });
-  }
-  return shown;
-}
-
-/** A command as a terminal would show it: the folder, then each step at its prompt with the script it feeds in. */
-function CommandLine({ steps, cwd }: { steps: CommandStep[]; cwd: string | null }) {
-  const [all, setAll] = useState(false);
-  const total = useMemo(() => steps.reduce((sum, step) => sum + lineCount(step.text) + (step.body ? lineCount(step.body.code) : 0), 0), [steps]);
-  const shown = all || total <= COMMAND_LINES ? steps : firstLines(steps, COMMAND_LINES);
-  return (
-    <div className="tool-view-command">
-      {cwd ? (
-        <span className="tool-view-cwd" title={cwd}>
-          {shortPath(cwd)}
-        </span>
-      ) : null}
-      {shown.map((step, index) => (
-        <Step key={index} step={step} />
-      ))}
-      {total > COMMAND_LINES ? (
-        <button type="button" className="tool-view-more" aria-expanded={all} onClick={() => setAll((value) => !value)}>
-          {all ? "Show less" : `Show all ${total} lines`}
-        </button>
-      ) : null}
-    </div>
-  );
-}
-
-function Step({ step }: { step: CommandStep }) {
-  const comment = step.text.startsWith("#");
-  return (
-    <div className="tool-view-step">
-      <code data-comment={comment || undefined}>
-        {comment ? null : (
-          <span className="tool-view-prompt" aria-hidden="true">
-            $
-          </span>
-        )}
-        {step.text}
-      </code>
-      {step.body ? <Code code={step.body.code} language={step.body.language} startLine={null} script /> : null}
-    </div>
-  );
 }
 
 function SearchLine({ pattern, scope, flags }: { pattern: string; scope: string | null; flags: string[] }) {
@@ -246,24 +181,6 @@ function Fields({ fields }: { fields: Field[] }) {
   );
 }
 
-/** Fenced so it renders as code in replies does: highlighted, numbered from where the excerpt starts. */
-function fence(code: string, language: string, startLine: number | null): string {
-  const longest = (code.match(/`+/g) ?? []).reduce((max, run) => Math.max(max, run.length), 2);
-  const ticks = "`".repeat(longest + 1);
-  const meta = startLine && startLine > 1 ? ` startLine=${startLine}` : "";
-  return `${ticks}${language}${meta}\n${code}\n${ticks}`;
-}
-
-/** Highlighted code. A `script` is the body a command step feeds in, set inside the command rather than apart. */
-function Code({ code, language, startLine, script }: { code: string; language: string; startLine: number | null; script?: boolean }) {
-  const markdown = useMemo(() => fence(code, language, startLine), [code, language, startLine]);
-  return (
-    <div className="tool-view-code" data-script={script || undefined}>
-      <ThreadRichText lineNumbers={startLine !== null}>{markdown}</ThreadRichText>
-    </div>
-  );
-}
-
 /** The search pattern as a highlighter, literal when it is not a valid expression here. */
 function highlighter(pattern: string | null): RegExp | null {
   if (!pattern) return null;
@@ -315,30 +232,6 @@ function FileList({ items, cwd }: { items: FileItem[]; cwd: string | null }) {
           Show all {items.length} files
         </button>
       ) : null}
-    </div>
-  );
-}
-
-/** The tally first; the runner's output opens by itself only when something failed. */
-function Tests({ tally, text }: { tally: TestTally; text: string }) {
-  const [open, setOpen] = useState(tally.failed > 0);
-  return (
-    <div className="tool-view-tests">
-      <div className="tool-view-tally">
-        {tally.failed ? (
-          <span data-tone="bad">
-            <X size={12} /> {tally.failed} failed
-          </span>
-        ) : null}
-        <span data-tone="ok">
-          <Check size={12} /> {tally.passed} passed
-        </span>
-        {tally.skipped ? <span>{tally.skipped} skipped</span> : null}
-        <button type="button" className="tool-view-more" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
-          {open ? "Hide output" : "Output"}
-        </button>
-      </div>
-      {open ? <pre className="tool-view-plain">{text}</pre> : null}
     </div>
   );
 }

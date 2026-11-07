@@ -1,13 +1,13 @@
-import { realpathSync } from "node:fs";
-import path from "node:path";
-import { randomUUID } from "node:crypto";
 import { projects, tasks, threads, type Db } from "@openorc/db";
 import type { AgentEvent, Project } from "@openorc/protocol";
-import { overlaps } from "./workspace-writers.js";
-import { executionFolder } from "./conversation-folder.js";
-import { executionProject } from "./workspace-home.js";
+import { randomUUID } from "node:crypto";
+import { realpathSync } from "node:fs";
+import path from "node:path";
 import type { Logger } from "../transport.js";
+import { executionFolder } from "./conversation-folder.js";
 import { occupied, working, type LiveRun, type RunHooks } from "./run-types.js";
+import { executionProject } from "./workspace-home.js";
+import { overlaps } from "./workspace-writers.js";
 
 /** Workspace leases hold resolved paths; records may not. Compare checkouts by the directory they resolve to. */
 function canonicalDirectory(dir: string): string {
@@ -29,7 +29,7 @@ interface RunLiveDependencies {
   isClosing: () => boolean;
   isAgentUpdateReserved: () => boolean;
   closeAndWait: (runId: string) => Promise<void>;
-  hooks: Pick<RunHooks, "idleTimeoutMs">;
+  hooks: Pick<RunHooks, "idleTimeoutMs" | "syncCloud">;
   emit: (event: AgentEvent) => void;
   invalidate: (keys: string[]) => void;
   keysFor: (scope: LiveRun["scope"]) => string[];
@@ -102,7 +102,7 @@ export class RunLive {
   armIdle(entry: LiveRun): void {
     const runId = entry.run.id;
     this.disarmIdle(runId);
-    const timeout = this.deps.hooks.idleTimeoutMs?.() ?? null;
+    const timeout = this.deps.hooks.idleTimeoutMs?.(entry.scope.thread ?? null) ?? null;
     if (!timeout || entry.scope.task || this.deps.isClosing() || occupied(entry)) return;
     const timer = setTimeout(() => {
       this.idleTimers.delete(runId);
@@ -117,8 +117,7 @@ export class RunLive {
 
   async yieldIdle(paths: readonly string[]): Promise<boolean> {
     const idle = [...this.live.values()].filter(
-      (entry) =>
-        entry.scope.thread && !entry.team && !occupied(entry) && !entry.exiting && !entry.closingRequested && !this.pendingCompactions.has(entry.run.id) && overlaps(entry.workspaceLease.paths, paths),
+      (entry) => entry.scope.thread && !occupied(entry) && !entry.exiting && !entry.closingRequested && !this.pendingCompactions.has(entry.run.id) && overlaps(entry.workspaceLease.paths, paths),
     );
     if (idle.length === 0) return false;
     for (const entry of idle) {
@@ -133,7 +132,11 @@ export class RunLive {
   watchDiffs(entry: LiveRun, project: Project): void {
     if (entry.scope.comment) return;
     const ticker = setInterval(() => {
-      if (working(entry)) this.refreshDiffs(entry, project);
+      if (!working(entry)) return;
+      const thread = entry.scope.thread;
+      // A cloud conversation's files change in its sandbox; they reach the worktree on the Mac before its diffs refresh.
+      if (thread && this.deps.hooks.syncCloud) void this.deps.hooks.syncCloud(thread).then(() => this.refreshDiffs(entry, project));
+      else this.refreshDiffs(entry, project);
     }, WORKING_DIFF_REFRESH_MS);
     ticker.unref();
     this.diffRefreshes.set(entry.run.id, { ticker, window: null, owed: false });

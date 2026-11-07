@@ -1,12 +1,11 @@
+import { emptyRun, type Block } from "@openorc/client";
+import type { AgentEvent, ProviderUsage } from "@openorc/protocol";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
-import type { AgentEvent, ProviderUsage } from "@openorc/protocol";
 import { runs } from "../lib/client";
-import { emptyRun, type Block } from "@openorc/client";
 import { core } from "../lib/rpc";
-import { TeamWorkTranscript } from "./TeamWorkTranscript";
-import { Transcript, WorkTranscript, groupBlocks, groupSummary, AgentPresence } from "./Transcript";
+import { AgentPresence, Transcript, WorkTranscript, groupBlocks, groupSummary } from "./Transcript";
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
 vi.mock("./ThreadImages", () => ({
   ThreadRichText: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -38,6 +37,15 @@ const tool: Block = { id: "read", kind: "tool", name: "read_file", input: { path
 const thought: Block = { id: "think", kind: "thinking", text: "Available reasoning summary", startedAt: 1100, endedAt: 1200 };
 const reply: Block = { id: "reply", kind: "message", role: "assistant", text: "The final answer.", streaming: false };
 const end: Block = { id: "end", kind: "status", boundary: "turn", durationMs: 222000, outcome: "success", text: "turn finished", tone: "ok" };
+
+it("shows a quiet child Stop notice outside collapsed work", () => {
+  const notice: Block = { id: "stopped-child", kind: "status", tone: "muted", notice: true, text: "Stopped Checker" };
+  render(<WorkTranscript runId="run" blocks={[{ ...tool, done: true }, notice, reply, end]} />);
+  const line = screen.getByText("Stopped Checker");
+  expect(line.className).toContain("text-ink-4");
+  expect(line.closest(".journal-prompt")).toBeNull();
+  expect(receipt().getAttribute("aria-expanded")).toBe("false");
+});
 
 it("shows a lone startup status once without a duplicate disclosure", () => {
   const startup: Block = { id: "startup", kind: "activity", label: "Starting OpenCode", status: "success", text: "" };
@@ -83,14 +91,19 @@ it("names MCP tool calls by server and tool in each provider's naming", () => {
   render(<WorkTranscript runId="run" blocks={blocks} />);
   fireEvent.click(receipt());
   fireEvent.click(screen.getByRole("button", { name: "Used Codegraph, used Mobbin" }));
-  for (const [chip, call] of [
-    ["explore", /^Codegraph: explore who calls describe/],
-    ["search screens", /^Mobbin: search screens onboarding/],
-    ["get design context", /^Figma: get design context/],
-    ["thread list", /^OpenOrc: thread list/],
+  // Each row reads the tool and what it was asked beside its server, and grows into its call with no second head.
+  for (const [name, server] of [
+    [/^explore who calls describe/, "Codegraph"],
+    [/^search screens onboarding/, "Mobbin"],
+    [/^get design context/, "Figma"],
+    [/^thread list/, "OpenOrc"],
   ] as const) {
-    fireEvent.click(screen.getByRole("button", { name: chip }));
-    expect(screen.getByRole("button", { name: call }).getAttribute("aria-expanded")).toBe("true");
+    const chip = screen.getByRole("button", { name });
+    expect(chip.closest(".work-object")?.querySelector(".work-object-verb")?.textContent).toBe(server);
+    fireEvent.click(chip);
+    expect(chip.getAttribute("aria-pressed")).toBe("true");
+    expect(chip.closest(".work-call")?.querySelector(".tool-view")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: new RegExp(`^${server}: `) })).toBeNull();
   }
   expect(groupSummary([call("task", `${own}.task_create`, { title: "Ship it" })])).toBe("Created task");
 });
@@ -133,12 +146,15 @@ it("carries the live step on one line, open or folded", () => {
 it("preserves an inspected command when it fails and a retry arrives", () => {
   const command: Block = { ...tool, name: "shell", input: { command: "pnpm test" } };
   const { rerender } = render(<WorkTranscript runId="run" blocks={[command]} live />);
-  // A phase that is its one call opens straight to it.
-  fireEvent.click(screen.getByRole("button", { name: /Running command pnpm test/ }));
+  // A test run under way is drawn as one; its row grows into the call itself, the row standing as its only head.
+  fireEvent.click(screen.getByRole("button", { name: "Run the tests" }));
+  expect(screen.getByRole("button", { name: "Run the tests" }).getAttribute("aria-pressed")).toBe("true");
+  expect(screen.getByText("pnpm test")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /command pnpm test/ })).toBeNull();
+  // It failed without a runner's counts, so it turns into a plain command and stays open as the retry starts.
   const failed: Block = { ...command, done: true, isError: true, status: "error", output: "7 tests failed" };
   rerender(<WorkTranscript runId="run" blocks={[failed, { ...command, id: "retry" }]} live />);
-  expect(screen.getByRole("button", { name: /pnpm test.*Failed/ }).getAttribute("aria-expanded")).toBe("true");
-  expect(screen.getByText("7 tests failed")).toBeTruthy();
+  expect(screen.getByRole("button", { pressed: true }).closest(".work-call")?.textContent).toContain("7 tests failed");
 });
 it("defaults completed work closed, preserves the final answer and reveals nested detail with keyboard-accessible controls", () => {
   render(<WorkTranscript runId="run" blocks={[{ ...tool, done: true }, thought, reply, end]} />);
@@ -165,7 +181,8 @@ it("keeps pending input visible and failed tools inside collapsed work", () => {
   expect(screen.queryByRole("button", { name: /failed-test.*Failed/ })).toBeNull();
   fireEvent.click(receipt());
   expect(screen.queryByRole("button", { name: /failed-test.*Failed/ })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Read a file, ran a command" }));
+  // The folded step says what failed; the call itself stays one click deeper.
+  fireEvent.click(screen.getByRole("button", { name: "Read a file, ran a command Command failed" }));
   fireEvent.click(screen.getByRole("button", { name: "Ran" }));
   expect(screen.getByRole("button", { name: /failed-test.*Failed/ })).toBeTruthy();
 });
@@ -213,11 +230,13 @@ it.each([["individual", WorkTranscript]] as const)("keeps failed attempts in %s 
   expect(screen.queryByRole("button", { name: /.*Failed/ })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Read a file, ran the tests" }));
   fireEvent.click(screen.getByRole("button", { name: "Read" }));
-  fireEvent.click(screen.getByRole("button", { name: "Ran" }));
+  // Each run keeps its place in time: the failed one, then the retry that passed.
+  fireEvent.click(screen.getAllByRole("button", { name: "Ran" })[0]!);
   fireEvent.click(screen.getByRole("button", { name: /cat scripts\/build-mascot-review.cjs.*Failed/ }));
   fireEvent.click(screen.getByRole("button", { name: /pnpm test.*Failed/ }));
   expect(screen.getByText("No such file or directory")).toBeTruthy();
-  expect(screen.getByText("7 tests failed")).toBeTruthy();
+  // The failed run's last line reads under its row too, so its output shows twice once its call is open.
+  expect(screen.getAllByText("7 tests failed")).toHaveLength(2);
   expect(screen.getByText("Verified all 37 tests.").closest(".work-section")).toBeNull();
 });
 it("preserves the orb presence independently of the work header", () => {
@@ -241,27 +260,6 @@ it.each([false])("keeps a genuine turn failure visible with showActivity=%s", (s
   );
   expect(screen.getByText("Failed after 3m 42s")).toBeTruthy();
   expect(screen.getByText("Provider lost connection")).toBeTruthy();
-});
-
-it("keeps a streaming reply outside activity while retaining intermediate work and ambient privacy", () => {
-  const streaming: Block = { ...reply, streaming: true };
-  const { container, rerender } = render(<TeamWorkTranscript runId="run" blocks={[thought, streaming]} live showActivity={false} />);
-  expect(screen.getByText("The final answer.").closest(".work-section")).toBeNull();
-  rerender(<TeamWorkTranscript runId="run" blocks={[thought, streaming]} live showActivity />);
-  expect(screen.getAllByText("The final answer.")).toHaveLength(1);
-  expect(screen.getByText("The final answer.").closest(".work-section")).toBeNull();
-  fireEvent.click(receipt());
-  expect(screen.getByText("The final answer.").closest("[hidden]")).toBeNull();
-
-  // A subsequent tool reveals that the previous text was intermediate commentary.
-  rerender(<TeamWorkTranscript runId="run" blocks={[thought, reply, tool]} live showActivity={false} />);
-  expect(screen.queryByText("The final answer.")).toBeNull();
-  const answer: Block = { ...streaming, id: "answer", text: "The result is ready." };
-  rerender(<TeamWorkTranscript runId="run" blocks={[thought, reply, { ...tool, done: true }, answer]} live showActivity={false} />);
-  expect(screen.getByText("The result is ready.")).toBeTruthy();
-  expect(screen.queryByText("The final answer.")).toBeNull();
-  rerender(<TeamWorkTranscript runId="run" blocks={[thought, streaming]} ambient live showActivity={false} />);
-  expect(container.childElementCount).toBe(0);
 });
 
 it.each(["error", "cancelled"] as const)("quiet mode retains a %s turn status without an activity control", (outcome) => {
@@ -425,4 +423,34 @@ it("opens the folded work that holds a message asked for, with its whole narrati
   expect(screen.getByText(/tracing how the cursor is built/)).toBeTruthy();
   expect(animate.mock.contexts).toEqual([found]);
   delete (HTMLElement.prototype as { animate?: unknown }).animate;
+});
+
+it("counts work steps without counting the separately displayed child cards again", () => {
+  const child = (id: string): Block => ({
+    id,
+    kind: "tool",
+    name: "Agent",
+    input: {},
+    done: true,
+    subagent: { nativeId: id, threadId: id, title: id, status: "completed", startedAt: 1, endedAt: 2 },
+  });
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <WorkTranscript
+        runId="run"
+        blocks={[
+          { ...tool, done: true },
+          { ...thought, text: "**Tracing the callers**\n\nReading the graph." },
+          { id: "mcp", kind: "tool", name: "mcp__codegraph__explore", input: {}, done: true },
+          child("a"),
+          child("b"),
+          reply,
+          end,
+        ]}
+      />
+    </QueryClientProvider>,
+  );
+  // A turn that came to agents' findings says so; its children are counted once, as agents.
+  expect(receipt().textContent).toContain("2 agents");
+  expect(receipt().textContent).not.toMatch(/\d steps?/);
 });

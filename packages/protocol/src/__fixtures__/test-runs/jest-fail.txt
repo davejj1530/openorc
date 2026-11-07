@@ -1,0 +1,40 @@
+FAIL ./mailer.test.js
+  ● mailer › retries › sends once
+
+    expect(send).toHaveBeenCalledTimes(expected)
+
+    Expected number of calls: 1
+    Received number of calls: 2
+
+       5 |       send();
+       6 |       send();
+    >  7 |       expect(send).toHaveBeenCalledTimes(1);
+         |                    ^
+       8 |     });
+       9 |     it("gives up after three tries", () => expect(3).toBe(3));
+      10 |   });
+
+      at Object.toHaveBeenCalledTimes (mailer.test.js:7:20)
+
+  ● mailer › loads the template
+
+    template missing: welcome.html
+
+      11 |   it("formats the subject", () => expect("Hi".toUpperCase()).toBe("HI"));
+      12 |   it("loads the template", () => {
+    > 13 |     throw new Error("template missing: welcome.html");
+         |           ^
+      14 |   });
+      15 | });
+      16 |
+
+      at Object.<anonymous> (mailer.test.js:13:11)
+
+PASS ./queue.test.js
+PASS ./cart.test.js
+
+Test Suites: 1 failed, 2 passed, 3 total
+Tests:       2 failed, 1 skipped, 7 passed, 10 total
+Snapshots:   0 total
+Time:        0.945 s, estimated 1 s
+Ran all test suites.

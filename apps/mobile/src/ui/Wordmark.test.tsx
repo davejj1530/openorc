@@ -22,9 +22,9 @@ function drawn(fontScale: number) {
 }
 
 it("grows with the reader's text size as one unit, cube, gap and name together, up to 1.2 times", () => {
-  expect(drawn(1)).toEqual({ cube: 26, gap: 10, grows: 1.2 });
-  expect(drawn(1.1)).toMatchObject({ cube: 26 * 1.1, gap: 10 * 1.1 });
+  expect(drawn(1)).toEqual({ cube: 28, gap: 12, grows: 1.2 });
+  expect(drawn(1.1)).toMatchObject({ cube: 28 * 1.1, gap: 12 * 1.1 });
   // The largest accessibility size (AX5) stops at 1.2, where the name's own cap stops it.
-  expect(drawn(3.12)).toMatchObject({ cube: 26 * 1.2, gap: 10 * 1.2, grows: 1.2 });
-  expect(drawn(0.82)).toMatchObject({ cube: 26 * 0.82, gap: 10 * 0.82 });
+  expect(drawn(3.12)).toMatchObject({ cube: 28 * 1.2, gap: 12 * 1.2, grows: 1.2 });
+  expect(drawn(0.82)).toMatchObject({ cube: 28 * 0.82, gap: 12 * 0.82 });
 });

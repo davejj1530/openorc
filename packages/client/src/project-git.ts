@@ -5,7 +5,7 @@ export interface ProjectGitView {
   state: ProjectGit | null;
   /** The folder is a repository, so its changes, checkpoints and commits can be read. */
   tracks: boolean;
-  /** Worktrees and teams are known to be unavailable: they branch from a commit the folder doesn't have. */
+  /** Worktrees are known to be unavailable: they branch from a commit the folder doesn't have. */
   cannotBranch: boolean;
 }
 

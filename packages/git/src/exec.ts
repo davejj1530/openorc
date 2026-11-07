@@ -1,4 +1,7 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
+import { once } from "node:events";
+import { createWriteStream } from "node:fs";
+import { pipeline } from "node:stream/promises";
 
 export class GitError extends Error {
   constructor(
@@ -49,6 +52,30 @@ export function useGitHubSignIn(environment: () => Record<string, string>): void
   signIn = environment;
 }
 
+/** What every git and gh this process runs is given beside the process's own environment. */
+const environment = (bin: string, extra: NodeJS.ProcessEnv | undefined): NodeJS.ProcessEnv => ({
+  ...process.env,
+  GIT_TERMINAL_PROMPT: "0",
+  LC_ALL: "C",
+  ...(bin === "git" || bin === "gh" ? signIn() : {}),
+  ...extra,
+});
+
+/**
+ * Runs git with its output written to `file` as it comes, for output too large to hold, such as a pack. A pack asked
+ * for this way never moves: one git writes itself is made beside the repository's objects and renamed to its name,
+ * which fails when that name is on another disk, as /tmp is on a Linux host.
+ */
+export async function gitToFile(cwd: string, args: string[], file: string, options: Pick<ExecOptions, "input" | "timeoutMs" | "env"> = {}): Promise<void> {
+  const child = spawn("git", [...WITHOUT_HOOKS, ...args], { cwd, env: environment("git", options.env), timeout: options.timeoutMs ?? 60_000 });
+  const stderr: Buffer[] = [];
+  child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
+  child.stdin.on("error", () => undefined);
+  child.stdin.end(options.input);
+  const [[code]] = (await Promise.all([once(child, "close"), pipeline(child.stdout, createWriteStream(file))])) as [[number | null], void];
+  if (code !== 0) throw new GitError(args, cwd, code, Buffer.concat(stderr).toString("utf8"));
+}
+
 /** Runs the user's own git. Nothing here reads credentials, and no hook runs unless `hooks` asks for them. */
 export function git(cwd: string, args: string[], options: ExecOptions = {}): Promise<ExecResult> {
   return execute("git", cwd, args, options, options.hooks ? [] : WITHOUT_HOOKS);
@@ -69,7 +96,7 @@ function execute(bin: string, cwd: string, args: string[], options: ExecOptions,
         cwd,
         timeout: options.timeoutMs ?? 60_000,
         maxBuffer: options.maxBuffer ?? 64 * 1024 * 1024,
-        env: { ...process.env, GIT_TERMINAL_PROMPT: "0", LC_ALL: "C", ...(bin === "git" || bin === "gh" ? signIn() : {}), ...options.env },
+        env: environment(bin, options.env),
       },
       (error, stdout, stderr) => {
         const code = commandExitCode(error);

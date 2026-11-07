@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { git, pinObject, switchFiles, treeHash } from "@openorc/git";
+import { git, gitToFile, pinObject, switchFiles, treeHash } from "@openorc/git";
 import { runRunner, type RunnerInstall } from "./runner-client.js";
 import { SNAPSHOT_REF, type SnapshotResult } from "./runner/repo.js";
 import type { HarnessId } from "@openorc/protocol";
@@ -94,8 +94,9 @@ async function send(install: RunnerInstall, file: string, name: string): Promise
 /** A pack in `dir` of the commit and its files, none of its history: what a checkout starts from before its history. */
 async function tipPack(source: string, commit: string, dir: string): Promise<string> {
   const objects = (await git(source, ["rev-list", "--objects", "--no-object-names", "--max-count=1", commit])).stdout;
-  const hash = (await git(source, ["pack-objects", "-q", path.join(dir, "tip")], { input: objects })).stdout.trim();
-  return path.join(dir, `tip-${hash}.pack`);
+  const pack = path.join(dir, "tip.pack");
+  await gitToFile(source, ["pack-objects", "-q", "--stdout"], pack, { input: objects });
+  return pack;
 }
 
 /**

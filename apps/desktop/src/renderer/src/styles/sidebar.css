@@ -150,6 +150,41 @@
 .sidebar-rail-project {
   position: relative;
 }
+/* OpenOrc's update, above Settings while there is one: a dot while it waits for the user, a ring
+   while it downloads. */
+.sidebar-rail-update {
+  position: relative;
+  color: var(--ink);
+}
+.sidebar-rail-update[aria-disabled="true"] {
+  cursor: default;
+}
+.sidebar-rail-update-dot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-ink);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+.sidebar-rail-update-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke-width: 2;
+}
+.sidebar-rail-update-track {
+  stroke: var(--surface-3);
+}
+.sidebar-rail-update-fill {
+  stroke: var(--ink-2);
+  stroke-linecap: round;
+  transition: stroke-dasharray var(--duration-quick) var(--ease-out);
+}
 .sidebar-rail-project[data-selected],
 .sidebar-rail-project[data-selected]:hover {
   background-color: var(--current-row-fill);

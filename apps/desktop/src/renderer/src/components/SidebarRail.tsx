@@ -8,6 +8,7 @@ import { activeScheduleCount, openTaskCount } from "../lib/task-stage-counts";
 import { useSlidingKnob } from "../lib/use-sliding-knob";
 import { RAIL_ICON, SCREENS } from "./sidebar-screens";
 import { RailProjects } from "./SidebarRailProjects";
+import { RailUpdate } from "./SidebarRailUpdate";
 import { Tooltip } from "./ui";
 
 /** What a screen's button says beside its name: open tasks, and schedules that are switched on. */
@@ -61,6 +62,7 @@ export function SidebarRail({ route, orclings, onProject }: { route: Route; orcl
       <span aria-hidden="true" className="sidebar-rail-divider" />
       <RailProjects onSelect={onProject} />
       <span aria-hidden="true" className="sidebar-rail-gap" />
+      <RailUpdate />
       <RailButton label="Settings" onClick={() => useRouter.getState().navigate({ view: "settings" })}>
         <Settings size={RAIL_ICON} />
       </RailButton>

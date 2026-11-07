@@ -28,6 +28,9 @@ import { BrainMove, MOVE_PHONES, type BrainThread } from "./cloud-brain-move.js"
 import { NO_SIGN_INS } from "./cloud-brain-signins.js";
 import type { ProtectedSecretStore } from "./extraction-credentials.js";
 
+/** CI machines run these flows several times slower than a laptop, so a wait gives up after 10 s, not vitest's 1 s. */
+const waitFor = <T>(check: () => T | Promise<T>, options: { timeout?: number; interval?: number } = {}) => vi.waitFor(check, { timeout: 10_000, ...options });
+
 const VERCEL = { token: "vcp_move-fixture-token-0123456789", teamId: "team_move" };
 const GITHUB = { token: "gho_move-fixture-token-0123456789", name: "Test", email: null };
 const IDENTITY = { GIT_AUTHOR_NAME: "Test", GIT_AUTHOR_EMAIL: "test@example.com", GIT_COMMITTER_NAME: "Test", GIT_COMMITTER_EMAIL: "test@example.com" };
@@ -268,8 +271,8 @@ const thread = (id: string, title: string, extra: Partial<BrainThread> = {}): Br
 type Record_ = { key: string; service?: string; moving?: { stage: string; threads: string[] }; projects?: { id: string; brainId: string | null }[] };
 const record = () => JSON.parse(main.value() || "null") as Record_ | null;
 const staged = () => JSON.parse(beside.value() || "null") as Record_ | null;
-const ended = () => vi.waitFor(async () => expect((await move.status()).state).not.toBe("moving"), { timeout: 5000 });
-const stopped = () => vi.waitFor(async () => expect(await move.status()).toMatchObject({ state: "moving", error: expect.any(String) }), { timeout: 5000 });
+const ended = () => waitFor(async () => expect((await move.status()).state).not.toBe("moving"), { timeout: 5000 });
+const stopped = () => waitFor(async () => expect(await move.status()).toMatchObject({ state: "moving", error: expect.any(String) }), { timeout: 5000 });
 const at = (line: string) => log.indexOf(line);
 
 beforeEach(async () => {
@@ -296,12 +299,12 @@ beforeEach(async () => {
   start();
   // A brain on Vercel with the project's copy and GitHub, a phone paired, and two threads, one with a subagent's under it.
   await brain.create("fra1");
-  await vi.waitFor(async () => expect((await brain.status()).state).toBe("ready"));
+  await waitFor(async () => expect((await brain.status()).state).toBe("ready"));
   await brain.setProject(projectId, true);
   await brain.setGitHub(true);
   await brain.rememberLinkKey("vercel-link");
   machines.vercel.phones = [{ id: "phone-1", name: "Pocket", createdAt: 1, lastSeenAt: 2, connected: false }];
-  await vi.waitFor(() => expect(brain.phones.list()).toHaveLength(1));
+  await waitFor(() => expect(brain.phones.list()).toHaveLength(1));
   onBrain = [thread("t1", "Fix login"), thread("t1-sub", "Explore", { parentRelation: "subagent" }), thread("t2", "Write docs")];
   log = [];
 });
@@ -533,7 +536,7 @@ describe("moving the cloud brain to the other service", () => {
     log = [];
     await move.cancel();
     expect(log).toEqual(expect.arrayContaining(["agent37 remove", "vercel leaving off"]));
-    await vi.waitFor(() => expect(log).toContain("vercel door open"));
+    await waitFor(() => expect(log).toContain("vercel door open"));
     expect([machines.vercel.made, machines.agent37.made]).toEqual([true, false]);
     expect(beside.value()).toBe("");
     expect(record()).toMatchObject({ service: "vercel" });
@@ -612,14 +615,14 @@ describe("moving the cloud brain to the other service", () => {
       it(`finishes a move stopped while ${where}, with one new brain and every thread back`, async () => {
         stop();
         await move.start("agent37", undefined);
-        await vi.waitFor(() => expect(quitted).toBe(true));
+        await waitFor(() => expect(quitted).toBe(true));
         // What the quitting Mac was doing unwinds, as its process would end.
         await new Promise((resolve) => setTimeout(resolve, 200));
         const kept = staged()?.key;
         hooks = {};
         start();
         move.resume();
-        await vi.waitFor(() => expect(record()).not.toHaveProperty("moving"), { timeout: 5000 });
+        await waitFor(() => expect(record()).not.toHaveProperty("moving"), { timeout: 5000 });
         await ended();
         const now = record()!;
         expect(now).toMatchObject({ service: "agent37" });

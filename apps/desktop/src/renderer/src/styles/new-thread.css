@@ -290,3 +290,20 @@
     padding: 0 12px 32px;
   }
 }
+
+/* The dither behind the screen sits under its content, densest at the top-left and gone well
+   before the composer. */
+.new-thread-body {
+  position: relative;
+  isolation: isolate;
+}
+.dither-backdrop {
+  /* The dots' ink, a step from the ground toward the text in any palette. DitherBackdrop reads it
+     for the shader. */
+  --dither-ink: color-mix(in srgb, var(--ink) 12%, var(--bg));
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  mask-image: radial-gradient(110% 90% at 0% 0%, #000 0%, rgb(0 0 0 / 0.55) 35%, transparent 70%);
+}

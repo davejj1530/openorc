@@ -10,6 +10,7 @@ export * from "./mcp-apps.js";
 export * from "./model-catalog.js";
 export * from "./orclings.js";
 export * from "./provider-usage.js";
+export * from "./usage-history.js";
 export * from "./pull-requests.js";
 export * from "./review-comments.js";
 export * from "./rpc.js";

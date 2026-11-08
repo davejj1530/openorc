@@ -31,6 +31,7 @@ export const HOST_TABLES: Record<string, string> = {
   cloud_workspaces: "the target makes its own sandbox record",
   thread_relocations: "each host keeps its own journal",
   messages_fts: "rebuilt on the target from the package's search rows",
+  usage_reports: "rebuilt by ledger triggers from the imported events and artifacts",
   memories: "memory merges by its own rules",
   extraction_jobs: "memory work belongs to the host that ran it",
   orclings: "an Orcling's conversation is refused",

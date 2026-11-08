@@ -29,7 +29,7 @@ import { SkillsSettings } from "./settings-skills";
 import { SlackSettings } from "./settings-slack";
 import { TextGenerationSettings } from "./settings-text-generation";
 import { UpdateSettingsSection } from "./settings-updates";
-import { ProviderUsageOverview } from "./settings-usage";
+import { UsageDashboard } from "./settings-usage-dashboard";
 
 type SettingsRoute = Extract<Route, { view: "settings" }>;
 
@@ -46,7 +46,7 @@ export function Settings({ route }: { route: SettingsRoute }) {
   const info = useRpc("system.info", { refresh: true });
   const [actionsSlot, setActionsSlot] = useState<HTMLElement | null>(null);
   return (
-    <div className="settings-sheet">
+    <div className="settings-sheet" data-section={current.id}>
       <TopBar
         actions={
           <>
@@ -128,7 +128,7 @@ function SectionSettings({ id, active, info }: { id: SettingsSection; active: bo
   const enabled = useEnabledHarnesses();
   switch (id) {
     case "usage":
-      return <ProviderUsageOverview active={active} />;
+      return <UsageDashboard active={active} />;
     case "connections":
       return (
         <>

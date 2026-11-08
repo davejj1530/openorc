@@ -3,7 +3,7 @@ import { SETTINGS_SECTIONS, type Route, type SettingsSection } from "./router";
 
 /** Each section's name and icon, and the line that leads it; Skills fills the body edge to edge, with none. */
 const presentation: Record<SettingsSection, { label: string; description?: string; Icon: typeof Brain }> = {
-  usage: { label: "Usage", description: "Account allowances, across your providers.", Icon: Signal },
+  usage: { label: "Usage", Icon: Signal },
   connections: { label: "Connections", description: "The agents and tools connected to OpenOrc.", Icon: Link2 },
   cloud: { label: "Cloud", description: "Where cloud threads run.", Icon: Cloud },
   slack: { label: "Slack", description: "Bring requests from Slack to this computer.", Icon: MessageSquare },

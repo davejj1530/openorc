@@ -407,14 +407,18 @@ describe("Codex notification ownership", () => {
 describe("Codex exact-turn steering", () => {
   it("carries a model and effort change on the next turn instead of a new process", async () => {
     const s = server("autonomous", { model: "gpt-5.6-sol", effort: "medium" });
+    const events: AgentEvent[] = [];
+    s.handle.on("event", (event) => events.push(event));
     try {
       await vi.waitFor(() => expect(s.handle.canSteer).toBe(true));
+      s.notify("thread/tokenUsage/updated", { threadId: "thread-1", tokenUsage: { total: { inputTokens: 1000, outputTokens: 50 } } });
       expect(s.handle.canApplySettings).toBe(true);
       await expect(s.handle.applySettings({ model: "gpt-6-astra" })).rejects.toThrow("Wait for the current turn to finish");
       s.finish("work-1");
       await vi.waitFor(() => expect(s.handle.canSteer).toBe(false));
       await s.handle.applySettings({ model: "gpt-6-astra", effort: "high", fastMode: true });
       await s.handle.send("Next");
+      s.notify("thread/tokenUsage/updated", { threadId: "thread-1", tokenUsage: { total: { inputTokens: 2000, outputTokens: 100 } } });
       s.finish("work-2");
       await vi.waitFor(() => expect(s.handle.canSteer).toBe(false));
       await s.handle.applySettings({ fastMode: false });
@@ -426,6 +430,10 @@ describe("Codex exact-turn steering", () => {
       expect(starts[1]!.params).toMatchObject({ model: "gpt-6-astra", effort: "high", serviceTier: "priority" });
       expect(starts[2]!.params).toMatchObject({ model: "gpt-6-astra", effort: "high", serviceTier: "default" });
       expect(s.calls.filter((c) => ["thread/start", "thread/resume"].includes(c.method))).toHaveLength(1);
+      expect(events.filter((event) => event.type === "usage.updated").map((event) => event.usage)).toMatchObject([
+        { model: "gpt-5.6-sol", fastMode: false, inputTokens: 1000 },
+        { model: "gpt-6-astra", fastMode: true, inputTokens: 2000 },
+      ]);
     } finally {
       s.handle.close();
     }

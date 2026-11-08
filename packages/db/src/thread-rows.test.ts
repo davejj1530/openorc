@@ -7,6 +7,7 @@ import { projects, runs, snapshots, tasks, threads } from "./repos.js";
 import { messages } from "./search.js";
 import { threadQueue } from "./thread-queue.js";
 import { deleteThreadRows, readThreadRows, unclassifiedTables, writeThreadRows } from "./thread-rows.js";
+import { usageHistory } from "./usage-history.js";
 
 const open: Db[] = [];
 afterEach(() => {
@@ -52,7 +53,7 @@ function seed(db: Db, root: string, dataDir: string) {
   const writer = new LedgerWriter(db, { flushMs: 60_000, artifactThresholdBytes: 200, previewBytes: 50 });
   writer.push({ type: "message.completed", runId: run.id, ts: 1, messageId: "m1", role: "user", text: "please fix the bug", attachments: [`${dataDir}/attachments/shot.png`] } as never);
   writer.push({ type: "message.completed", runId: run.id, ts: 2, messageId: "m2", role: "assistant", text: `done ${"x".repeat(400)}` } as never);
-  writer.push({ type: "turn.completed", runId: run.id, ts: 3 } as never);
+  writer.push({ type: "turn.completed", runId: run.id, ts: 3, turnId: "turn-1", status: "success", durationMs: 1, usage: { inputTokens: 100, outputTokens: 20, costUsd: 0.25 } });
   writer.push({ type: "message.completed", runId: childRun.id, ts: 4, messageId: "m3", role: "assistant", text: "found it" } as never);
   writer.flush();
   threadQueue.enqueue(db, { threadId: thread.id, text: "and the tests", attachments: [`${dataDir}/attachments/log.txt`], requestKey: "k1" });
@@ -102,6 +103,7 @@ describe("a thread's rows between two ledgers", () => {
     expect(plans.list(brain, thread.id).map((plan) => plan.text)).toEqual(["Plan"]);
     expect(messages.search(brain, "fix bug").map((hit) => hit.threadId)).toContain(thread.id);
     expect(counts(brain, thread.id)).toEqual(counts(mac, thread.id));
+    expect(usageHistory(brain, { boundaries: [0, 10] }).total).toMatchObject({ costUsd: 0.5, sessions: 2, inputTokens: 200 });
   });
 
   it("takes the same package twice as once", () => {
@@ -131,6 +133,7 @@ describe("a thread's rows between two ledgers", () => {
     expect((db.raw.prepare("SELECT COUNT(*) AS c FROM events WHERE run_id IN (?, ?)").get(first.run.id, first.childRun.id) as { c: number }).c).toBe(0);
     expect((db.raw.prepare("SELECT COUNT(*) AS c FROM messages_fts WHERE run_id = ?").get(first.run.id) as { c: number }).c).toBe(0);
     expect(counts(db, second.thread.id)).toEqual(before);
+    expect(usageHistory(db, { boundaries: [0, 10] }).total).toMatchObject({ costUsd: 0.25, sessions: 1, inputTokens: 100 });
   });
 });
 

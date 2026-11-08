@@ -790,13 +790,22 @@ button.browser-empty:hover,
 .sidebar-dock-button[data-current]:hover {
   background-color: transparent;
 }
-/* The week's usage is a rail button, its ring at the rail's glyph size; a low week turns it. */
-.account-usage-rail .account-usage-ring {
-  width: 18px;
-  height: 18px;
+/* The week's usage is a rail button: Settings' usage bars, lit in ink by the share left over the rest
+   on the ring's track; a low week turns them. An account with no weekly limit shows the bars plain. */
+.account-usage-bars {
+  display: grid;
 }
-.account-usage-rail[data-low] .account-usage-fill {
-  stroke: var(--attention);
+.account-usage-bars > * {
+  grid-area: 1 / 1;
+}
+.account-usage-bars-track {
+  color: var(--surface-3);
+}
+.account-usage-bars-fill {
+  color: var(--ink);
+}
+.account-usage-rail[data-low] .account-usage-bars-fill {
+  color: var(--attention);
 }
 .account-usage-ring {
   flex-shrink: 0;
@@ -932,6 +941,30 @@ button.browser-empty:hover,
 .usage-table-more:hover {
   background-color: var(--surface-2);
   color: var(--ink);
+}
+/* The open conversation's cost leads the table, on the current row's fill as the thread's account does
+   in it, with where the figure comes from under it. */
+.usage-cost-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 52px;
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  background: var(--current-row-fill);
+}
+.usage-cost-value {
+  flex-shrink: 0;
+  font-size: var(--text-base);
+  line-height: 16px;
+  color: var(--ink);
+}
+.usage-cost-note {
+  padding: 6px 10px 8px;
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--ink-4);
 }
 /* The resize grip rides the seam between the sidebar and the work column. */
 .app-shell .resize-handle[data-edge="sidebar"] {

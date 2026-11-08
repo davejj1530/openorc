@@ -85,6 +85,7 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "agents.availability": ["system", "claude-accounts"],
   "agents.updates.get": ["agent-updates"],
   "providers.usage": ["provider-usage", "system", "settings"],
+  "usage.history": ["usage-history"],
   // Not "settings": a palette changed on the Mac must not start its CLIs again for a phone.
   "providers.limits": ["provider-usage", "claude-accounts", "system"],
   "agents.models": ["models"],

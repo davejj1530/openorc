@@ -1,6 +1,7 @@
 import { spawnAgentProcess } from "../process-recovery.js";
 import { withCodexConnection } from "./connection.js";
 import { mapNotification } from "./notifications.js";
+import { codexUsageContext } from "./usage-context.js";
 import { codexMcpApps } from "./mcp-apps.js";
 import { CodexSubagents } from "./subagents.js";
 import { modelEfforts, normalizeModelEffort, normalizeModelSettings } from "@openorc/protocol";
@@ -66,7 +67,7 @@ export interface CodexAdapterOptions {
   env?: NodeJS.ProcessEnv;
   mcpServerName?: string;
   clientVersion?: string;
-  /** The UI answers these. Spikes auto-allow. */
+  /** Resolves tool permission requests through OpenOrc's approval policy. */
   onApproval: (request: CodexApprovalRequest) => Promise<ApprovalDecision | ApprovalResolution>;
 }
 
@@ -259,7 +260,7 @@ export class CodexAdapter {
     };
     let turns = 0;
     const notificationState = { summaryIndex: new Map<string, number>(), buffering: new Set<string>() };
-    const emit = (ev: AgentEvent) => handle.emit("event", ev);
+    const emit = (ev: AgentEvent) => handle.emit("event", codexUsageContext(ev, resolvedModel, serviceTier === "priority"));
     const now = () => Date.now();
     let interrupting = false;
     const subagents = new CodexSubagents({

@@ -26,6 +26,7 @@ import { remotePushTargetMigration } from "./remote-push-target-schema.js";
 import { cloudWorkspaceMigration, cloudWorkspaceRemovedMigration } from "./cloud-workspace-schema.js";
 import { startedByAgentMigration, subagentMigration, subagentIdentityMigration, subagentObservationMigration } from "./subagent-schema.js";
 import { cloudBrainMigrations } from "./cloud-brain-schema.js";
+import { usageHistoryMigration } from "./usage-history-schema.js";
 /**
  * Migrations run in order; `PRAGMA user_version` records how many applied.
  * Never edit a shipped migration. Append a new one.
@@ -794,4 +795,6 @@ export const migrations: Migration[] = [
   retireTeamSchedulesMigration,
   ...cloudBrainMigrations,
   startedByAgentMigration,
+  `CREATE INDEX events_usage_history ON events(ts, id) WHERE kind IN ('turn.completed', 'usage.updated');`,
+  usageHistoryMigration,
 ];

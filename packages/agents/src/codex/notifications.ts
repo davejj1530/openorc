@@ -478,19 +478,24 @@ function readTokenUsage(p: Record<string, unknown>): Usage | null {
   const holder = (p["tokenUsage"] ?? p["usage"] ?? p) as Record<string, unknown>;
   const total = (holder["total"] ?? holder) as Record<string, unknown>;
   const last = (holder["last"] ?? null) as Record<string, unknown> | null;
-  const num = (o: Record<string, unknown>, k: string) => (typeof o[k] === "number" ? (o[k] as number) : undefined);
-  const inputTokens = num(total, "inputTokens") ?? num(total, "input_tokens");
-  const outputTokens = num(total, "outputTokens") ?? num(total, "output_tokens");
+  const num = (o: Record<string, unknown>, key: string, alias = key) => {
+    const value = o[key] ?? o[alias];
+    return typeof value === "number" ? value : undefined;
+  };
+  const inputTokens = num(total, "inputTokens", "input_tokens");
+  const outputTokens = num(total, "outputTokens", "output_tokens");
   if (inputTokens === undefined || outputTokens === undefined) return null;
-  const cached = num(total, "cachedInputTokens") ?? num(total, "cached_input_tokens");
-  const lastInput = last ? (num(last, "inputTokens") ?? num(last, "input_tokens")) : undefined;
-  const lastTotal = last ? (num(last, "totalTokens") ?? num(last, "total_tokens")) : undefined;
+  const cached = num(total, "cachedInputTokens", "cached_input_tokens");
+  const lastInput = last ? num(last, "inputTokens", "input_tokens") : undefined;
+  const lastTotal = last ? num(last, "totalTokens", "total_tokens") : undefined;
   // Codex inputTokens already includes cachedInputTokens; last.totalTokens is the active context size.
   const contextTokens = lastTotal ?? lastInput;
   const window = num(holder, "modelContextWindow");
   return {
     inputTokens,
     outputTokens,
+    requestInputTokens: lastInput,
+    cacheWriteTokens: num(total, "cacheWriteTokens", "cache_write_tokens"),
     ...(cached !== undefined ? { cacheReadTokens: cached } : {}),
     ...(contextTokens !== undefined ? { contextTokens } : {}),
     ...(window !== undefined ? { contextWindow: window } : {}),

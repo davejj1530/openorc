@@ -7,7 +7,7 @@ import { seedRetiredTeam } from "./fixtures/retired-team.js";
 import { projects, tasks, threads } from "./repos.js";
 import { retiredTeams } from "./retired-teams.js";
 import { scheduleFirings, schedules } from "./schedules.js";
-import { migrations } from "./schema.js";
+import { retireTeamSchedulesMigration } from "./schedule-schema.js";
 
 it("upgrades saved teams without removing their history or work, and cancels scheduled execution", () => {
   const folder = mkdtempSync(path.join(os.tmpdir(), "retired-teams-"));
@@ -51,7 +51,7 @@ it("upgrades saved teams without removing their history or work, and cancels sch
       schedule.id,
       snapshot,
     );
-    db.raw.exec(`PRAGMA user_version=${migrations.findIndex((migration) => typeof migration === "string" && migration.includes("Teams are no longer supported."))}`);
+    db.raw.exec(retireTeamSchedulesMigration);
     db.close();
     db = Db.open(file);
     expect(schedules.get(db, schedule.id)).toMatchObject({ enabled: false, retiredTeam: true, executionTarget: null });

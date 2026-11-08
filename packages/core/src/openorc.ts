@@ -45,6 +45,7 @@ import { createSchedulesHandlers } from "./handlers/schedules.js";
 import { createSettingsHandlers } from "./handlers/settings.js";
 import { createSlackHandlers } from "./handlers/slack.js";
 import { createSystemHandlers } from "./handlers/system.js";
+import { createUsageHandlers } from "./handlers/usage.js";
 import { createTaskCreateHandlers } from "./handlers/task-create.js";
 import { createTaskDeleteHandlers } from "./handlers/task-delete.js";
 import { createTaskQueriesHandlers } from "./handlers/task-queries.js";
@@ -678,6 +679,7 @@ export class OpenOrc {
       }),
       createCloudCarryHandlers({ db: this.db, env: this.cloudParts.env, skills: this.cloudParts.skills, cloud: this.cloudParts.cloud }),
       createClaudeAccountHandlers(this.claudeAccounts),
+      createUsageHandlers({ db: this.db, ledger: this.ledger }),
       createConnectorHandlers({ db: this.db, connectors: this.connectors }),
       createBrainSyncHandlers({ db: this.db, memory: this.memory, textGeneration: this.textGeneration, cloudOnly: this.options.cloudOnly ?? false, invalidate }),
       createSystemHandlers({

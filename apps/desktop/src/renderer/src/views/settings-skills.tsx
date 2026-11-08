@@ -12,7 +12,7 @@ import { useRpc } from "../lib/client";
 import { focusedProject, useLayout } from "../lib/layout";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { projectSkillsPlaceholder } from "./settings-presentation";
-import { LoadError } from "./settings-shared";
+import { LoadError, SectionActions } from "./settings-shared";
 import { SkillsBrowser } from "./settings-skills-browser";
 import "./settings-skills.css";
 
@@ -87,13 +87,13 @@ export function SkillsSettings({ active }: { active: boolean }) {
   const refreshing = harnessIds.some((id) => lists[id].isFetching);
   return (
     <div className="skills-page">
-      <div className="skills-toolbar">
+      <SectionActions active={active}>
         <Segmented label="Agent" value={agent} options={agentOptions(lists)} onChange={setAgent} />
-        <IconButton aria-label="Refresh skills" className="ml-auto" disabled={refreshing} onClick={() => harnessIds.forEach((id) => void lists[id].refetch())}>
+        <IconButton aria-label="Refresh skills" disabled={refreshing} onClick={() => harnessIds.forEach((id) => void lists[id].refetch())}>
           <RefreshCw size={14} />
         </IconButton>
         <ProjectChoice projects={projects.data} projectId={projectId} error={projects.isError} onProject={setProjectId} />
-      </div>
+      </SectionActions>
       {projects.isError ? <LoadError retry={() => void projects.refetch()} /> : null}
       {projects.isSuccess && projectId === "" ? <p className="settings-note">Import a project and OpenOrc will list the skills it can resolve there.</p> : null}
       {projectId ? <SkillsBrowser key={projectId} place={{ agent, scope: { kind: "project", id: projectId }, projectId, active }} list={lists[agent]} /> : null}

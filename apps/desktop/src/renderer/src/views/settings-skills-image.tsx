@@ -10,7 +10,7 @@ import { floatingGround } from "../lib/use-anchor-ground";
 import { patchSkill } from "./settings-skills-data";
 import { skillRef, skillTitle, type SkillsPlace } from "./settings-skills-model";
 
-const logoSizes = { row: 24, head: 34 };
+const logoSizes = { row: 18, head: 28 };
 const IMAGE_TYPES = "image/png,image/jpeg,image/webp,image/svg+xml";
 const MAX_IMAGE_BYTES = 1024 * 1024;
 

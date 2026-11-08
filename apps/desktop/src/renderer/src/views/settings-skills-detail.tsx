@@ -98,7 +98,7 @@ export function SkillDetail({ place, skill, file, drafts, onToggle }: DetailProp
   const [view, setView] = useState<FileView>("preview");
   const [problem, setProblem] = useState<string | null>(null);
   return (
-    <section className="skills-pane skill-detail" data-plane="tile" aria-label={skillTitle(skill)}>
+    <section className="skills-pane skill-detail" aria-label={skillTitle(skill)}>
       <SkillHead place={place} skill={skill} onToggle={onToggle} onProblem={setProblem} />
       {problem ? (
         <p role="alert" className="text-sm text-bad">

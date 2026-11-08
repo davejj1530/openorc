@@ -182,7 +182,7 @@ export function SkillFileView({
   const read = useRpc("skills.readFile", { ...skillRef(place, skill), file }, { enabled: place.active });
   const editing = useSkillEditing({ place, skill, file, read: read.data, drafts });
   return (
-    <div className="skill-file" data-plane="">
+    <div className="skill-file">
       <div className="skill-file-head">
         <span className="skill-file-path">
           <span className="truncate">{file}</span>

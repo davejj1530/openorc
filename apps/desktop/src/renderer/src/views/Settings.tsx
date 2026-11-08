@@ -59,7 +59,7 @@ export function Settings({ route }: { route: SettingsRoute }) {
       <SectionActionsSlot.Provider value={actionsSlot}>
         <div className="settings-shell">
           <div ref={content} className="settings-content">
-            <p className="settings-page-lead">{current.description}</p>
+            {current.description ? <p className="settings-page-lead">{current.description}</p> : null}
             {settingsSections.map(({ id, label }) => (
               <section key={id} id={`settings-${id}`} aria-label={label} hidden={id !== current.id}>
                 <SectionSettings id={id} active={id === current.id} info={info} />

@@ -48,10 +48,8 @@ function SkillRow({ skill, current, props }: { skill: AgentSkill; current: boole
       <div className="skill-row" data-current={current || undefined} data-off={skill.enabled === false || undefined}>
         <button type="button" className="skill-row-main" data-skills-nav="" aria-current={current || undefined} onClick={() => props.onSelect(skill)}>
           <SkillBadge skill={skill} size="row" />
-          <span className="skill-row-text">
-            <span className="skill-row-name">{title}</span>
-            <span className="skill-row-line">{skillLine(skill)}</span>
-          </span>
+          <span className="skill-row-name">{title}</span>
+          <span className="skill-row-line">{skillLine(skill)}</span>
         </button>
         {skill.enabled === undefined ? null : <Switch size="sm" aria-label={`Use ${title}`} checked={skill.enabled} onChange={(event) => props.onToggle(skill, event.target.checked)} />}
       </div>
@@ -65,7 +63,7 @@ export function SkillList(props: SkillListProps) {
   const { groups } = props;
   const selected = props.selected ? skillKey(props.selected) : null;
   return (
-    <section className="skills-pane skill-list-pane" data-plane="tile" aria-label="Skills">
+    <section className="skills-pane skill-list-pane" aria-label="Skills">
       <div className="skill-list-head">
         <span role="status">{props.status}</span>
         <HeaderSearch label="Search skills" placeholder="Search" value={props.search} onChange={props.onSearch} />

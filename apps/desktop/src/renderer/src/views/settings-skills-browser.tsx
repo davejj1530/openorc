@@ -70,9 +70,7 @@ export function SkillsBrowser({ place, list }: { place: SkillsPlace; list: UseQu
         {selected ? (
           <SkillDetail key={skillKey(selected)} place={place} skill={selected} file={file} drafts={drafts} onToggle={toggle} />
         ) : (
-          <section className="skills-pane skill-detail-empty" data-plane="tile">
-            {list.isSuccess ? "No skills yet" : null}
-          </section>
+          <section className="skills-pane skill-detail-empty">{list.isSuccess ? "No skills yet" : null}</section>
         )}
       </div>
     </>

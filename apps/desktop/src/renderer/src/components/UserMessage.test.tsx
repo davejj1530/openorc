@@ -28,7 +28,7 @@ it("draws a sent message as the composer did: the skill in blue, the connector's
   const bubble = container.querySelector<HTMLElement>(".message-bubble")!;
   expect(bubble.textContent).toBe("run /code-review on the @figma file");
   expect(bubble.querySelector("mark.skill-token")?.textContent).toBe("/code-review");
-  expect(bubble.querySelector<HTMLElement>("mark.connector-token .connector-token-at")?.style.backgroundImage).toContain("data:image/png");
+  expect(bubble.querySelector<HTMLElement>("mark.connector-token .connector-token-at")?.style.getPropertyValue("--token-logo")).toContain("data:image/png");
   fireEvent.pointerMove(bubble, { clientX: 30, clientY: 15 });
   await act(async () => void vi.advanceTimersByTime(400));
   expect(screen.getByText("Review the branch for bugs")).toBeTruthy();

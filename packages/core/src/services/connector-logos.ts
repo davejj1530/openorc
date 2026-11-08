@@ -97,6 +97,12 @@ const KNOWN: Record<string, LogoSource> = {
   posthog: { site: "posthog.com" },
   netlify: { site: "netlify.com" },
   huggingface: { site: "huggingface.co" },
+  context7: { site: "context7.com" },
+  neon: { site: "neon.tech" },
+  mobbin: { site: "mobbin.com" },
+  paper: { site: "paper.design" },
+  rive: { site: "rive.app" },
+  higgsfield: { site: "higgsfield.ai" },
 };
 
 /** Subdomains a server's address carries that its maker's site does not: `mcp.linear.app` is linear.app's. */

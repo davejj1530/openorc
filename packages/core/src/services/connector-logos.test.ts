@@ -51,6 +51,9 @@ it("finds a server's maker from its address, past service labels, and never on t
 it("knows the makers of servers that keep their address to themselves, by the name people use", () => {
   expect(logoSource("Google Calendar", [])).toEqual({ icon: "https://ssl.gstatic.com/images/branding/product/2x/calendar_2020q4_32dp.png" });
   expect(logoSource("vercel", [])).toEqual({ site: "vercel.com" });
+  // A server on this Mac, or one whose address names no maker, still finds its maker by name.
+  expect(logoSource("mobbin", [])).toEqual({ site: "mobbin.com" });
+  expect(logoSource("rive", ["127.0.0.1"])).toEqual({ site: "rive.app" });
   expect(logoSource("codegraph", [])).toBeNull();
 });
 

@@ -180,9 +180,11 @@
   background: var(--line);
   pointer-events: none;
 }
+/* Above the pane's content: the code view pins an opaque line-number gutter to this same edge. */
 .app-shell .panel-pane::before {
   top: calc(var(--height-topbar) - var(--hairline));
   bottom: 0;
+  z-index: 1;
 }
 .app-shell .panel-header::before {
   top: 20%;

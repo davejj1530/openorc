@@ -44,6 +44,7 @@ export function commandRows(matches: SlashCommand[], { query, token, caret, valu
     // A project may have a command named like one of the app's own actions, and both are offered.
     key: `${command.insert ? `skill:${command.prefix}` : "action:/"}${command.name}`,
     label: `${command.insert ? command.prefix : "/"}${command.name}`,
+    ...(command.icon ? { logo: { title: command.displayName ?? command.name, logo: command.icon } } : {}),
     hint: command.hint,
     insert: command.insert === true,
     complete: command.insert === true && query !== null && (command.name === query || (command.aliases ?? []).includes(query)),

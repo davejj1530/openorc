@@ -56,7 +56,7 @@ function composerDestination(props: ComposerProps): ReactNode {
  * an entry carrying neither, or both, fails to typecheck rather than picking
  * silently doing nothing.
  */
-export type SlashCommand = { name: string; hint: string; run: () => void; insert?: never; prefix?: never; aliases?: never } | (SkillCommand & { run?: never });
+export type SlashCommand = { name: string; hint: string; run: () => void; insert?: never; prefix?: never; aliases?: never; displayName?: never; icon?: never } | (SkillCommand & { run?: never });
 
 export interface ComposerChanges {
   projectName: string;

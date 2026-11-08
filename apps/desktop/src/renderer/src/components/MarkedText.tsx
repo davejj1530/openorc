@@ -1,13 +1,15 @@
 import { Tooltip as BaseTooltip } from "@base-ui/react/tooltip";
-import { createContext, useEffect, useMemo, useRef, useState, type PointerEvent, type RefObject } from "react";
+import { createContext, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent, type RefObject } from "react";
 import { skillNames, skillSegments } from "@openorc/client";
 import type { UsableConnector } from "@openorc/protocol";
 import { connectorSpans, type ConnectorMentions } from "../lib/connector-mentions";
 import { floatingGround } from "../lib/use-anchor-ground";
+import { ConnectorLogo } from "./ConnectorLogo";
 
 /** What a message's words may name: the agent's skills, and the connectors `@` can name. */
 export interface MarkSources {
-  commands?: readonly { name: string; hint: string; insert?: boolean; prefix?: "/" | "$"; aliases?: readonly string[] | undefined }[] | undefined;
+  commands?:
+    readonly { name: string; hint: string; insert?: boolean; prefix?: "/" | "$"; aliases?: readonly string[] | undefined; displayName?: string | undefined; icon?: string | undefined }[] | undefined;
   connectors?: readonly UsableConnector[] | undefined;
 }
 
@@ -24,14 +26,14 @@ export function useMessageMarks(commands: MarkSources["commands"], mentions: Con
   return useMemo(() => ({ commands, connectors: [...connectors, ...(connectorsAside?.connectors ?? [])] }), [commands, connectors, connectorsAside]);
 }
 
-/** Text with each connector's `@` drawn as its image, at the width of the `@`, so the letters after it keep their places. */
+/** Text with each connector's `@` drawn as its image, within the width of the `@`, so the letters after it keep their places. */
 function ConnectorText({ text, connectors }: { text: string; connectors: readonly UsableConnector[] }) {
   return connectorSpans(text, [...connectors]).map((span, index) =>
     span.connector ? (
       <mark key={index} className="connector-token">
         <span
           className="connector-token-at"
-          style={span.connector.logo ? { backgroundImage: `url("${span.connector.logo}")` } : undefined}
+          style={span.connector.logo ? ({ "--token-logo": `url("${span.connector.logo}")` } as CSSProperties) : undefined}
           data-letter={span.connector.logo ? undefined : span.connector.title.slice(0, 1).toUpperCase()}
         >
           @
@@ -91,18 +93,27 @@ export function useSkillHover(marks: RefObject<HTMLElement | null>) {
   return { hovered: hovered?.isConnected ? hovered : null, onPointerMove, onPointerLeave: () => settle(null) };
 }
 
-/** What the skill under the pointer is for, over its mark: its name, then its description. */
+/** What the skill under the pointer is for, over its mark: its image and name over the call that runs it, then what it does. */
 export function SkillHoverCard({ mark, commands }: { mark: HTMLElement | null } & Pick<MarkSources, "commands">) {
   const name = mark?.dataset["skill"] ?? "";
   const skill = commands?.find((command) => command.insert && (command.name === name || command.aliases?.includes(name)));
+  const title = skill?.displayName ?? skill?.name ?? "";
   return (
     <BaseTooltip.Root open={Boolean(mark && skill)}>
       <BaseTooltip.Portal>
         <BaseTooltip.Positioner anchor={mark} side="top" sideOffset={6} collisionPadding={8}>
           <BaseTooltip.Popup ref={floatingGround} className="tooltip-popup skill-hover">
-            <span className="skill-hover-name">
-              {skill?.prefix ?? "/"}
-              {skill?.name}
+            <span className="skill-hover-head">
+              <span className="logo-badge skill-hover-mark">
+                <ConnectorLogo title={title} logo={skill?.icon ?? null} size={22} />
+              </span>
+              <span className="skill-hover-title">
+                <span className="skill-hover-name">{title}</span>
+                <span className="skill-hover-call">
+                  {skill?.prefix ?? "/"}
+                  {skill?.name}
+                </span>
+              </span>
             </span>
             {skill?.hint ? <span className="skill-hover-hint">{skill.hint}</span> : null}
           </BaseTooltip.Popup>

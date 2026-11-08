@@ -714,4 +714,25 @@ describe("skill hover", () => {
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
+
+  it("heads what a skill is for with its image and name over the call that runs it", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(HTMLElement.prototype, "getClientRects").mockImplementation(function (this: HTMLElement) {
+      return (this.dataset["skill"] ? [new DOMRect(10, 10, 80, 16)] : []) as unknown as DOMRectList;
+    });
+    if (!("PointerEvent" in window)) Object.assign(window, { PointerEvent: MouseEvent });
+    const icon = "data:image/png;base64,AAAA";
+    mount({ value: "please /immaculate this", commands: [{ name: "immaculate", displayName: "Immaculate", icon, hint: "Design like a member of the studio", insert: true, prefix: "/" }] });
+    fireEvent.pointerMove(screen.getByRole("textbox", { name: "Message" }), { clientX: 20, clientY: 15 });
+    await act(async () => void vi.advanceTimersByTime(400));
+    const card = document.querySelector<HTMLElement>(".skill-hover")!;
+    expect([...card.querySelectorAll(".skill-hover-name, .skill-hover-call, .skill-hover-hint")].map((part) => part.textContent)).toEqual([
+      "Immaculate",
+      "/immaculate",
+      "Design like a member of the studio",
+    ]);
+    expect(card.querySelector("img")?.getAttribute("src")).toBe(icon);
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
 });

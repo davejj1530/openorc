@@ -807,8 +807,9 @@
   color: inherit;
   -webkit-text-stroke: 0;
 }
-/* A connector named in the message: its image takes the place of the @, at the @'s own width so
-   the letters stay where the textarea has them. */
+/* A connector named in the message: its image takes the place of the @, within the @'s own width so
+   the letters stay where the textarea has them, and never past its start, where a line's edge would
+   clip it. The end of that width is the gap before the name. */
 .connector-token {
   background: none;
   color: var(--mention-ink);
@@ -818,26 +819,26 @@
   position: relative;
   color: transparent;
   -webkit-text-stroke: 0;
-  background-position: center;
-  background-size: 0.78em;
-  background-repeat: no-repeat;
+}
+.connector-token-at::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 1em;
+  height: 1em;
+  border-radius: 0.25em;
+  background: var(--token-logo) center / cover no-repeat;
+  font-size: 0.76em;
+  transform: translateY(-50%);
 }
 .connector-token-at[data-letter]::before {
   content: attr(data-letter);
-  position: absolute;
-  top: 50%;
-  left: 50%;
   display: grid;
   place-items: center;
-  width: 0.78em;
-  height: 0.78em;
-  border-radius: 0.2em;
   background: var(--surface-3);
   color: var(--ink-2);
-  font-size: 1em;
   line-height: 1;
-  transform: translate(-50%, -50%) scale(0.62);
-  transform-origin: center;
 }
 
 /* Composer popups open out of the control that was touched, clear of the composer surface: they

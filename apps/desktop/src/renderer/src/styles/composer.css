@@ -786,7 +786,7 @@
 .composer-suggestions [role="listbox"][hidden] {
   display: none;
 }
-.composer-suggestions [role="listbox"]:not([hidden]) + .composer-suggestions-notice {
+.composer-suggestions .composer-suggestions-notice + [role="listbox"]:not([hidden]) {
   margin-top: 2px;
 }
 .composer-suggestion-hint {

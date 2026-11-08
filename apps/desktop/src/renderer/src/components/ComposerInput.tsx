@@ -145,6 +145,12 @@ export function ComposerInput(props: ComposerInputProps) {
     <>
       {suggestionsOpen ? (
         <ComposerSuggestions anchor={props.suggestionAnchor} side={props.suggestionSide} members={memberList} cursor={cursor} count={suggestions.length} onDismiss={() => setSuggestionsActive(false)}>
+          {/* First, where the rows it waits for will land: connectors head the list, above the files that match. */}
+          {notice ? (
+            <div role="status" title={notice.reason} className="composer-suggestions-notice">
+              {notice.text}
+            </div>
+          ) : null}
           <div id={listId} role="listbox" hidden={suggestions.length === 0} aria-label={suggestionLabel(memberList, atQuery !== null)} data-agent-mention-list={memberList || undefined}>
             {suggestions.map((suggestion, index) => (
               <Fragment key={suggestion.key}>
@@ -182,11 +188,6 @@ export function ComposerInput(props: ComposerInputProps) {
               </Fragment>
             ))}
           </div>
-          {notice ? (
-            <div role="status" title={notice.reason} className="composer-suggestions-notice">
-              {notice.text}
-            </div>
-          ) : null}
         </ComposerSuggestions>
       ) : null}
       <SkillHoverCard mark={skillHover.hovered} commands={commands} />

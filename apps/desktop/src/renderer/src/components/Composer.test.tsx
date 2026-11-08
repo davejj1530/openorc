@@ -684,10 +684,13 @@ describe("connector mentions", () => {
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
   });
 
-  it("says it is loading connectors while their list is read for the first time", () => {
+  it("says it is loading connectors while their list is read for the first time, above the rows, where they will land", () => {
     mount({ value: "", connectors: [], connectorsLoading: true });
     typeAt("@");
-    expect(screen.getByRole("status").textContent).toBe("Loading connectors…");
+    const status = screen.getByRole("status");
+    expect(status.textContent).toBe("Loading connectors…");
+    const list = screen.getByRole("listbox", { hidden: true });
+    expect(status.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
 

@@ -328,8 +328,8 @@
   flex: 1;
   min-height: 0;
 }
-/* The rail (SidebarRail.tsx): the screens and Orclings, a short hairline, Projects, and Settings at its foot. The open
-   screen sits on the plane. */
+/* The rail (SidebarRail.tsx): New thread, the screens and Orclings, a short hairline, Projects, and at its foot the
+   week's usage as a ring above Settings. The open screen sits on the plane. */
 .hs-sidebar-rail {
   display: flex;
   flex: none;
@@ -359,8 +359,15 @@
   margin: calc(6 * var(--u)) 0;
   background: var(--hs-line);
 }
-.hs-rail-foot {
+.hs-rail-gap {
   margin-top: auto;
+}
+.hs-rail-button[hidden] {
+  display: none;
+}
+.hs-rail-usage .hs-ring {
+  width: calc(18 * var(--u));
+  height: calc(18 * var(--u));
 }
 .hero-scene[data-view="task"] .hs-sidebar-rail [data-screen="tasks"] {
   background: var(--hs-plane);
@@ -406,7 +413,7 @@
 .hs-workspace-name .hs-icon:last-child {
   color: var(--hs-muted);
 }
-/* The list head: Search where the titles start, then the filter and New thread at the row's end. */
+/* The list head: Search where the titles start, then the filter at the row's end. */
 .hs-list-head {
   display: flex;
   flex: none;
@@ -424,9 +431,6 @@
   padding: 0 calc(14 * var(--u)) 0 calc(10 * var(--u));
   color: var(--hs-muted);
   line-height: calc(16 * var(--u));
-}
-.hs-compose {
-  color: var(--hs-ink);
 }
 /* One list by day: a quiet 28-unit heading, its chevron showing while the section is folded. */
 .hs-threads {
@@ -622,33 +626,6 @@
 .hs-resolved .hs-icon {
   width: calc(14 * var(--u));
   height: calc(14 * var(--u));
-}
-/* The list's foot: the open thread's weekly usage, a ring and what is left. None shows while no thread is open. */
-.hs-sidebar-foot {
-  display: flex;
-  flex: none;
-  align-items: center;
-  height: calc(48 * var(--u));
-  padding: calc(6 * var(--u)) calc(10 * var(--u)) calc(10 * var(--u));
-}
-.hs-usage {
-  display: flex;
-  align-items: center;
-  gap: calc(6 * var(--u));
-  height: calc(32 * var(--u));
-  padding: 0 calc(12 * var(--u)) 0 calc(8 * var(--u));
-  border-radius: 999px;
-  background: var(--hs-control);
-  line-height: calc(16 * var(--u));
-  font-variant-numeric: tabular-nums;
-}
-.hs-usage-label {
-  margin-left: calc(-2 * var(--u));
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
-}
-.hero-scene[data-view="task"] .hs-usage {
-  visibility: hidden;
 }
 
 /* Panes: the conversation on the tile under its header on the window's top line, closed off by a hairline. */

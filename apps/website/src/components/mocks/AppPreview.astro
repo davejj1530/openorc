@@ -9,6 +9,7 @@ import "../../styles/hero-scene.css";
 import BrowserPage from "../hero/BrowserPage.astro";
 import ChangeLine from "../hero/ChangeLine.astro";
 import ChangesDiff from "../hero/ChangesDiff.astro";
+import FileChips from "../hero/FileChips.astro";
 import FilesPage, { type Entry } from "../hero/FilesPage.astro";
 import PanelHeader from "../hero/PanelHeader.astro";
 import ProductIcon from "../hero/ProductIcon.astro";
@@ -126,7 +127,15 @@ const searchChange = { added: 14, removed: 3 };
         <ThreadBody model={codex} permission={models.codex.permission} placeholder="Message Codex…" changes>
           <div class="hs-turn">
             <div class="hs-user"><div class="hs-bubble">Let’s make onboarding feel more thoughtful. Help people connect their first project, then give them a clear next step.</div></div>
-            <TurnHead harness="codex" agent="Codex" model={codex.label} />
+            <TurnHead harness="codex" agent="Codex" model={codex.label} took="1m 36s" />
+            <Receipt thought="Thought 7s" changes={`+${welcomeDiff.added} −${welcomeDiff.removed} in 1 file`} check="tests passed" />
+            <ol class="hs-steps">
+              <Step title="Reading the onboarding flow" meta={{ text: "4 files" }} />
+              <Step title="Writing the welcome screen" open>
+                <FileChips label="Edited" files={[welcomeDiff]} />
+              </Step>
+              <Step title="Running the onboarding tests" meta={{ text: "12 passed" }} />
+            </ol>
             <div class="hs-reply">
               <Prose text="The welcome flow is ready to review. It uses the existing components and keeps the first run focused on one decision at a time." />
               <p class="hs-prose-heading">A calmer first five minutes</p>

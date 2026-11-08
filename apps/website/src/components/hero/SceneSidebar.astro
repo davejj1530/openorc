@@ -1,10 +1,10 @@
 ---
 /**
  * The app's navigation as Sidebar.tsx lays it out. On the window's top line, the OpenOrc wordmark after the window
- * controls with Inbox and the sidebar toggle. Under it, a rail of the screens (Tasks, Pull requests, Schedules,
- * Orclings), Projects after a short divider, and Settings at its foot; beside the rail, the thread list: the project
- * filter, Search with the list's filter and New thread, one list of threads by day with Yesterday folded, the
- * Resolved drawer, and the open thread's weekly usage at the foot. A row is its title, what the agent is doing while
+ * controls with Inbox and the sidebar toggle. Under it, a rail: New thread, the screens (Tasks, Pull requests,
+ * Schedules, Orclings), Projects after a short divider, and at its foot the open thread's weekly usage as a ring above
+ * Settings; beside the rail, the thread list: the project filter, Search with the list's filter, one list of threads
+ * by day with Yesterday folded, and the Resolved drawer at its foot. A row is its title, what the agent is doing while
  * it works (its title lit by a moving band, a spinner at the line's end), or an amber call while it waits on you, then
  * its project and where it works. Stills pass no journey.
  */
@@ -71,17 +71,23 @@ const screens: { id: string; icon: IconName }[] = [
   </div>
   <div class="hs-sidebar-body">
     <nav class="hs-sidebar-rail">
+      <span class="hs-rail-button" data-screen="newthread"><ProductIcon name="compose" /></span>
       {screens.map((screen) => <span class="hs-rail-button" data-screen={screen.id}><ProductIcon name={screen.icon} /></span>)}
       <span class="hs-rail-divider"></span>
       <span class="hs-rail-button"><ProductIcon name="layers" /></span>
-      <span class="hs-rail-button hs-rail-foot"><ProductIcon name="settings" /></span>
+      <span class="hs-rail-gap"></span>
+      {usage.map(({ left, for: owners, hidden }) => (
+        <span class="hs-rail-button hs-rail-usage" data-for={owners} hidden={hidden}>
+          <svg class="hs-ring" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" /><circle cx="8" cy="8" r="6" pathLength="100" stroke-dasharray={`${left} 100`} transform="rotate(-90 8 8)" /></svg>
+        </span>
+      ))}
+      <span class="hs-rail-button"><ProductIcon name="settings" /></span>
     </nav>
     <div class="hs-workspace">
       <span class="hs-workspace-name"><ProductIcon name="layers" /><span>All projects</span><ProductIcon name="chevronDown" /></span>
       <div class="hs-list-head">
         <span class="hs-search"><ProductIcon name="search" />Search</span>
         <span class="hs-round"><ProductIcon name="funnel" /></span>
-        <span class="hs-round hs-compose"><ProductIcon name="compose" /></span>
       </div>
       <div class="hs-threads">
         {sections.map((section) => (
@@ -120,15 +126,6 @@ const screens: { id: string; icon: IconName }[] = [
         <span>Resolved</span>
         <span class="hs-resolved-count">{resolved}</span>
         <ProductIcon name="chevronRight" />
-      </div>
-      <div class="hs-sidebar-foot">
-        {usage.map(({ left, for: owners, hidden }) => (
-          <span class="hs-usage" data-for={owners} hidden={hidden}>
-            <svg class="hs-ring" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" /><circle cx="8" cy="8" r="6" pathLength="100" stroke-dasharray={`${left} 100`} transform="rotate(-90 8 8)" /></svg>
-            <span>{left}%</span>
-            <span class="hs-usage-label">left</span>
-          </span>
-        ))}
       </div>
     </div>
   </div>

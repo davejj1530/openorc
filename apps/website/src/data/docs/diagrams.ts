@@ -61,7 +61,7 @@ export const systemDiagram: DiagramSpec = {
     nodes: [
       { x: 24, y: 56, w: 200, h: 72, label: "Interface", sub: "React, one per window" },
       { x: 280, y: 56, w: 200, h: 72, label: "Core", sub: "Records, runs, tools", emphasis: true },
-      { x: 536, y: 56, w: 200, h: 72, label: "Agent CLIs", sub: "Claude Code, Codex, OpenCode" },
+      { x: 536, y: 56, w: 200, h: 72, label: "Agent CLIs", sub: "Installed coding agents" },
       { x: 176, y: 204, w: 200, h: 72, label: "SQLite database", sub: "Conversations and events" },
       { x: 408, y: 204, w: 200, h: 72, label: "Your repository", sub: "Checkout and worktrees" },
       { x: 536, y: 324, w: 200, h: 72, label: "Model providers", sub: "Through your accounts" },

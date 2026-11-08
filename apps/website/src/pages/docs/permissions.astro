@@ -56,7 +56,9 @@ import { docHref } from "../../data/docs";
         </tbody>
       </table>
     </div>
-    <p>OpenCode offers only <strong>Plan</strong> and <strong>Autonomous</strong>, because OpenOrc can't make it ask before every command. If an OpenCode thread is set to another mode, the composer shows <strong>Mode unavailable</strong> until you pick one of those two.</p>
+    <p>OpenCode, Cursor, and Antigravity offer <strong>Plan</strong> and <strong>Autonomous</strong>. Their saved permission rules can allow actions without a fresh approval, so OpenOrc does not offer Review everything or Accept edits for them. An incompatible saved mode shows <strong>Mode unavailable</strong> until you choose a supported one.</p>
+    <p>Oh My Pi and Pi offer all four modes. Review asks before changes and commands; Accept edits permits file edits and asks before commands. Plan blocks tools that change files, while OpenOrc's plan and project tools keep their own permission checks.</p>
+    <p>fx offers <strong>Ask</strong>, <strong>Auto review</strong>, and <strong>Full access</strong>. Ask follows fx's saved permission rules, Auto review lets fx evaluate actions and ask when needed, and Full access runs outside its sandbox without prompts. fx has no read-only Plan mode. OpenOrc's choice applies to that session and leaves the terminal's default unchanged.</p>
     <Callout title="Limits">
       Outside Autonomous, Claude Code runs with a fixed set of tools: reading, searching, edits, commands, web fetch and search, questions, and skills. Its own subagents and the MCP servers from your Claude Code configuration are off, and OpenOrc's tools stay on. Your MCP servers connect in Autonomous when <strong>Your Claude Code MCP servers</strong> is on in <a href={docHref("settings")}>Settings</a>. In Plan, Codex turns off your own MCP servers too. On Windows, Claude Code can't run in Plan or Accept edits.
     </Callout>

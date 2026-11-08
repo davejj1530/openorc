@@ -54,17 +54,16 @@ import { docHref } from "../../data/docs";
         </tbody>
       </table>
     </div>
-    <p>The ring beside the model shows how full the agent's context is. Click it for the numbers or to <strong>Compact context</strong>, which summarizes earlier messages and may lose some detail.</p>
+    <p>The ring beside the model shows context usage when the agent reports it. <strong>Compact context</strong> uses native compaction for Codex, Claude Code, OpenCode, Oh My Pi, and Pi. For Cursor, Antigravity, and fx, it starts a fresh session with a short handover brief. Either can lose earlier detail; the brief preserves less than native compaction.</p>
   </section>
 
   <section aria-labelledby="while-working">
     <h2 id="while-working">Send while the agent works</h2>
-    <p>You don't have to wait for a turn to end. Type while the agent works and press <kbd>Enter</kbd>:</p>
-    <ul>
-      <li>Codex and Claude Code read the message during the current turn, so you can correct course without stopping them. The placeholder reads <strong>Say it during this turn…</strong></li>
-      <li>OpenCode reads new messages only after its turn, so the message waits in the queue. The placeholder reads <strong>Queue a message for when it finishes…</strong></li>
-    </ul>
-    <p>A message also waits after you switch the agent or change the mode, and while the conversation compacts. To hold a message for the next turn on purpose, click <strong>Queue</strong> instead of sending.</p>
+    <p>
+      You don't have to wait for a turn to end. Type while the agent works and press <kbd>Enter</kbd>: Codex, Claude Code, OpenCode, Oh My Pi, Pi, Antigravity, and fx read text messages during the current turn, so you can
+      correct course without stopping them. The placeholder reads <strong>Say it during this turn…</strong>
+    </p>
+    <p>Cursor queues messages for the next turn. fx also queues images. A message waits after you switch the agent or change the mode, and while the conversation compacts. To hold a message for the next turn on purpose, click <strong>Queue</strong> instead of sending.</p>
     <p>Queued messages wait above the composer under <strong>Queued</strong> and go out one at a time, each as a new turn. Each has <strong>Send now</strong>, which hands it to the running turn when the agent can take it, and <strong>×</strong> to remove it. The queue survives a restart: OpenOrc sends what's left when it opens again.</p>
   </section>
 
@@ -79,6 +78,7 @@ import { docHref } from "../../data/docs";
   <section aria-labelledby="fork">
     <h2 id="fork">Fork a thread</h2>
     <p>A fork is a new thread that continues the conversation while the original stays as it is. Use it to try another approach without losing the first.</p>
+    <p>Forking is available for Codex, Claude Code, OpenCode, Oh My Pi, and Pi. Cursor, Antigravity, and fx do not expose native conversation forks; start a new thread instead.</p>
     <p>To fork, choose <strong>Fork</strong> in the <strong>Thread actions</strong> menu (⋯) in the thread's header, type <code>/fork</code>, or hover your latest message and click <strong>Fork thread</strong>.</p>
     <p>The fork opens with the original title followed by "(fork)", and the same agent, model, and mode. It shares its parent's folder and branch, so both threads edit the same files.</p>
     <Callout>

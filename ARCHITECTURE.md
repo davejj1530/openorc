@@ -105,7 +105,7 @@ Depth means that callers get substantial behavior through a small interface. A u
 - Keep composition in `OpenOrc`, but move domain policy into its owning workflow when it can be exercised through a smaller interface.
 - Treat provider model discovery and revision-aware caching as a coherent candidate module, separate from live-run ownership.
 - Keep transport adapters thin; domain tests should exercise the same interface used by callers with a fake transport or provider.
-- Put agent-specific state, such as sessions, sign-ins, and CLI files, behind one per-agent interface that Claude Code, Codex, and OpenCode each implement, as `SessionSlot` in `agents` and `CloudSignIn` in `core` do for cloud threads.
+- Put agent-specific state, such as sessions, sign-ins, and CLI files, behind one per-agent interface that Claude Code, Codex, OpenCode, and Oh My Pi each implement, as `SessionSlot` in `agents` and `CloudSignIn` in `core` do for cloud threads.
 - Test database upgrades using historical fixtures and the real current open/migration path.
 - Preserve replay behavior when changing streaming events or transcript projection.
 

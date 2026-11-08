@@ -219,7 +219,8 @@
       "sha256": "545636e19386d3d4e0ae6d77354527499999c3ebfbca61b9fa5aa4ead7c0b308",
       "desktop": {
         "resource": "licenses/vendor/oh-my-pi-MIT.txt"
-      }
+      },
+      "website": "licenses/oh-my-pi-MIT.txt"
     },
     {
       "id": "rive-harfbuzz-COPYING",
@@ -724,7 +725,8 @@
       "sha256": "4f6a1985796db5225e3b1e59972bd47e07a27a0748427cb3d3c8fbf39f9311f0",
       "desktop": {
         "resource": "licenses/vendor/pi-MIT.txt"
-      }
+      },
+      "website": "licenses/pi-MIT.txt"
     }
   ],
   "unresolved": [

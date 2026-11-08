@@ -22,7 +22,7 @@ import { docHref } from "../../data/docs";
     <ol class="docs-steps">
       <li>Click <strong>Settings</strong> at the bottom of the sidebar, then <strong>Skills</strong>.</li>
       <li>Choose a project in <strong>Project</strong>. Project skills differ from one project to the next.</li>
-      <li>Choose an agent: <strong>Codex</strong>, <strong>Claude Code</strong>, or <strong>OpenCode</strong>. Each button shows how many skills that agent has in the project.</li>
+      <li>Choose one of your enabled agents. Each button shows how many skills that agent has in the project.</li>
       <li>Type in <strong>Search skills</strong> to filter by name, description, or path. Click a skill to see its <strong>Location</strong>.</li>
     </ol>
     <p>The list groups skills by where they come from:</p>
@@ -89,6 +89,11 @@ import { docHref } from "../../data/docs";
               >, and any sources listed under <code>skills</code> in <code>opencode.json</code>.
             </td>
           </tr>
+          <tr><td>Oh My Pi</td><td>Asks <code>omp skill list --json</code>, including its native provider and plugin skill sources.</td></tr>
+          <tr><td>Pi</td><td>Asks Pi for its native skill commands in the project. Custom extensions are disabled, as in OpenOrc conversations.</td></tr>
+          <tr><td>Cursor</td><td>Reads project and personal <code>.cursor/skills</code>, <code>.agents/skills</code>, and Cursor's Claude/Codex compatibility folders.</td></tr>
+          <tr><td>Antigravity</td><td>Reads project <code>.agents/skills</code> and personal <code>.gemini</code> skill folders. Manifest and plugin skills are not enumerated here yet.</td></tr>
+          <tr><td>fx</td><td>Reads project <code>.fx/skills</code>, personal <code>$FX_HOME/skills</code>, and the standard compatibility folders fx uses.</td></tr>
         </tbody>
       </table>
     </div>
@@ -98,8 +103,9 @@ import { docHref } from "../../data/docs";
     <h2 id="use">Use a skill in a conversation</h2>
     <p>The composer suggests the skills of the conversation's current agent, with the project's own first. Scroll the list or keep typing to narrow it. How you open it depends on the agent:</p>
     <ul>
-      <li>Claude Code: type <kbd>/</kbd> and pick a skill. OpenOrc inserts <code>/name</code>, which Claude Code runs as that skill.</li>
-      <li>Codex: type <kbd>/</kbd> or <kbd>$</kbd> and pick a skill. OpenOrc inserts <code>$name</code>, the form Codex uses.</li>
+      <li>Claude Code, Cursor, and Antigravity: type <kbd>/</kbd> and pick a skill. OpenOrc inserts <code>/name</code>, which the agent resolves using its own skill rules.</li>
+      <li>Codex and fx: type <kbd>/</kbd> or <kbd>$</kbd> and pick a skill. OpenOrc inserts <code>$name</code>, the form those agents use.</li>
+      <li>Pi and Oh My Pi: choose a skill from the composer to insert <code>/skill:name</code>.</li>
       <li>OpenCode: there's no picker. Ask it to use a skill by name, and it loads the skill with its own skill tool.</li>
     </ul>
     <p>The suggestions refresh every minute, so a skill you install while a conversation is open shows up without restarting anything.</p>

@@ -13,9 +13,9 @@
   <a href="CONTRIBUTING.md">Contribute</a>
 </p>
 
-OpenOrc is a **desktop workspace for Codex, Claude Code, and OpenCode**. Bring your existing agents and accounts to plan work, build features, and review changes in one place.
+OpenOrc is a **desktop workspace for Codex, Claude Code, OpenCode, Oh My Pi, Cursor, Pi, Antigravity, and fx**. Bring your existing agents and accounts to plan work, build features, and review changes in one place.
 
-Work with Codex, Claude Code, and OpenCode in one workspace. Agents can share context between threads and carry project decisions into the next task, so you spend less time repeating yourself.
+Work with Codex, Claude Code, OpenCode, Oh My Pi, Cursor, Pi, Antigravity, and fx in one workspace. Agents can share context between threads and carry project decisions into the next task, so you spend less time repeating yourself.
 
 ## Why OpenOrc
 
@@ -39,7 +39,7 @@ Memory is optional. Turn it off or configure automatic extraction in Settings.
 
 Capture an idea as a task, ask multiple models for input, then start implementation when you're ready. Work in your local checkout or an isolated worktree, and review changes beside the conversation. The same panel opens the project's files to read, edit, or have explained in plain English, along with a terminal, a browser preview, and iOS Simulators or Android Emulators that you and your agents can drive.
 
-![OpenOrc with New thread, the screens and the weekly usage ring on the rail, threads listed by day in the sidebar, two conversations open in tabs, a Codex turn showing its three steps and a reply ending in the OpenOrc cube, and a source diff in the Changes panel beside Files and Terminal tabs](docs/images/readme/workspace.png)
+![OpenOrc with New thread, the screens, the weekly usage ring and the update button on the rail, threads listed by day in the sidebar, two conversations open in tabs, a Codex turn showing its three steps and a reply ending in the OpenOrc cube, and a source diff in the Changes panel beside Files and Terminal tabs](docs/images/readme/workspace.png)
 
 _Screenshots use sample projects and conversations._
 
@@ -77,11 +77,16 @@ On Linux, install the rpm on Fedora or openSUSE (`sudo dnf install ./OpenOrc-…
 
 You'll need **Node.js 24**, **pnpm 11.21.0**, and Git on your shell's PATH. These Node and pnpm versions are recorded in `.node-version` and `package.json`. On Linux, the terminal's native module compiles during installation, so you also need a C++ compiler, make and Python 3 (`sudo dnf install gcc-c++ make python3` on Fedora, `sudo apt install build-essential python3` on Debian and Ubuntu). Install and sign in to at least one supported agent CLI. The GitHub CLI (`gh`) is optional and enables pull request workflows.
 
-| Agent       | Setup                                                                                      |
-| ----------- | ------------------------------------------------------------------------------------------ |
-| Codex       | [Install Codex CLI](https://developers.openai.com/codex/cli), then run `codex login`       |
-| Claude Code | [Install Claude Code](https://code.claude.com/docs/en/setup), then run `claude auth login` |
-| OpenCode    | [Install OpenCode](https://opencode.ai/docs/), then run `opencode auth login`              |
+| Agent       | Setup                                                                                                          |
+| ----------- | -------------------------------------------------------------------------------------------------------------- |
+| Codex       | [Install Codex CLI](https://developers.openai.com/codex/cli), then run `codex login`                           |
+| Claude Code | [Install Claude Code](https://code.claude.com/docs/en/setup), then run `claude auth login`                     |
+| OpenCode    | [Install OpenCode](https://opencode.ai/docs/), then run `opencode auth login`                                  |
+| Oh My Pi    | [Install Oh My Pi](https://omp.sh), then run `omp login` or add a provider API key                             |
+| Cursor      | [Install Cursor CLI](https://cursor.com/docs/cli/installation), then run `cursor-agent login`                  |
+| Pi          | [Install Pi](https://pi.dev), then run `pi` and use `/login`, or configure a provider API key                  |
+| Antigravity | [Install Antigravity CLI](https://antigravity.google/docs/getting-started?tab=cli), then run `agy acp --login` |
+| fx          | [Install fx](https://fx.sh/docs), then run `fx login`, `fx setup`, or configure a compatible local provider    |
 
 Use your existing provider accounts. No separate OpenOrc account is required.
 
@@ -114,7 +119,7 @@ Conversations, task records, and project memory are stored on your machine. Each
 
 Phone access is off until you turn on **Allow paired phones** in **Settings → Phone**. While it is on, the desktop listens on port 47820, or another free port when that one is taken, on every network interface. It drops connections from outside private networks, link-local addresses, and Tailscale's address range before reading them, and paired phones talk to it over a Noise session encrypted end to end. Phone notifications need an Apple push key added in the same section; the desktop then seals each alert for one phone and sends it through Apple's Push Notification service.
 
-Cloud threads run in a sandbox on the Vercel or Agent37 account you connect in **Settings → Cloud**. Code moves between the desktop and the sandbox as Git bundles while the thread works. Agents there sign in with a token each Claude account makes with `claude setup-token`, and with a Codex or OpenCode sign-in made for the cloud or a key copied from this computer after you approve. To offer those keys, Settings → Cloud reads an OpenAI API key from Codex's `auth.json` and the provider keys OpenCode keeps; ChatGPT and Claude logins are never copied. On Vercel, when the team's plan allows it, the sandbox firewall adds the sign-ins to the agents' requests on their way out, so the sandbox holds only stand-ins; Agent37 sandboxes hold the sign-ins themselves. The optional cloud brain is a headless copy of OpenOrc in the same account. It keeps copies of the projects you choose, shares memory and tasks with the desktop, and answers paired phones while the computer sleeps.
+Cloud threads run in a sandbox on the Vercel or Agent37 account you connect in **Settings → Cloud**. Code moves between the desktop and the sandbox as Git bundles while the thread works. Agents there sign in with a token each Claude account makes with `claude setup-token`, and with a Codex or OpenCode sign-in made for the cloud or a key copied from this computer after you approve. Oh My Pi uses the same provider keys as OpenCode there. To offer those keys, Settings → Cloud reads an OpenAI API key from Codex's `auth.json` and the provider keys OpenCode keeps; ChatGPT and Claude logins are never copied. On Vercel, when the team's plan allows it, the sandbox firewall adds the sign-ins to the agents' requests on their way out, so the sandbox holds only stand-ins; Agent37 sandboxes hold the sign-ins themselves. The optional cloud brain is a headless copy of OpenOrc in the same account. It keeps copies of the projects you choose, shares memory and tasks with the desktop, and answers paired phones while the computer sleeps.
 
 The desktop stores its SQLite ledger, attachments, images tools return, and managed workspaces in the application data directory: `~/Library/Application Support/OpenOrc` on macOS, `%APPDATA%\OpenOrc` on Windows, and `~/.config/OpenOrc` on Linux. `OPENORC_USER_DATA` selects a different profile. Treat this directory as private: it can contain prompts, source snippets, terminal output, and project history. Native provider output goes to a debug log in `logs/provider` there, kept for 14 days or 512 MB; deleting a thread does not remove its lines from that log before they expire. Redaction of the ledger, its search index, run results, memories, and logs is a best-effort filter, not a guarantee that all sensitive content is removed. Plans and task comments are stored as written because agents receive them later. The ledger also records each paired phone with its push token, and each cloud sandbox.
 

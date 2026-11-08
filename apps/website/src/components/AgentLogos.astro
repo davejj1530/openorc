@@ -1,53 +1,24 @@
 ---
-/**
- * The coding agents OpenOrc works with, named in one quiet line with their marks: the provider files the app ships
- * (public/*.svg). Codex is drawn in the text color, as OpenAI's mark is monochrome; Claude and OpenCode keep theirs.
- */
-import openai from "../../public/openai.svg?raw";
-import claude from "../../public/claude.svg?raw";
-import opencode from "../../public/opencode.svg?raw";
-
-const paths = (svg: string) => svg.match(/<path[^>]*\/>|<path[^>]*>.*?<\/path>/gs)?.join("") ?? "";
-const agents = [
-  { name: "Codex", viewBox: "0 0 41 41", paths: paths(openai).replace(/fill="[^"]*"/g, 'fill="currentColor"'), tone: "ink" },
-  { name: "Claude Code", viewBox: "0 0 125 125", paths: paths(claude) },
-  { name: "OpenCode", viewBox: "96 64 320 384", paths: paths(opencode), tone: "invert" },
-];
+import { agents } from "../data/agents";
+import AgentMark from "./AgentMark.astro";
 ---
 
 <p class="works-with">
-  Works with
-  {agents.map((agent, i) => (
-    <Fragment>
-      {i === agents.length - 1 ? " and " : i > 0 ? ", " : " "}
-      <span class="works-with-agent">
-        <svg viewBox={agent.viewBox} data-tone={agent.tone} aria-hidden="true" set:html={agent.paths} />
-        {agent.name}
+  <span>Works with</span>
+  <span class="works-with-marks">
+    {agents.map((agent) => (
+      <span class="works-with-agent" role="img" aria-label={agent.name} title={agent.name}>
+        <AgentMark id={agent.id} size={20} />
       </span>
-    </Fragment>
-  ))}
+    ))}
+  </span>
 </p>
 
 <style>
-  .works-with {
-    color: var(--faint);
-    font-size: 0.8125rem;
-    line-height: 1.4;
-  }
-  .works-with-agent {
-    white-space: nowrap;
-  }
-  .works-with svg {
-    width: 14px;
-    height: 14px;
-    margin-right: 5px;
-    vertical-align: -2px;
-  }
-  .works-with svg[data-tone="ink"] {
-    color: var(--text);
-  }
-  /* OpenCode's mark is dark, so the dark theme inverts it, as the app does. */
-  :global(:root[data-theme="dark"]) .works-with svg[data-tone="invert"] {
-    filter: invert(1);
+  .works-with { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; color: var(--faint); font-size: 0.8125rem; line-height: 1.6; }
+  .works-with-marks { display: inline-flex; align-items: center; gap: 16px; }
+  .works-with-agent { display: inline-flex; flex: none; }
+  @media (max-width: 480px) {
+    .works-with-marks { gap: 12px; }
   }
 </style>

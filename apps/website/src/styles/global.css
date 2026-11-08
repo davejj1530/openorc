@@ -497,7 +497,7 @@ h3 {
   .nav-actions .button-small {
     display: none;
   }
-  /* On phones the search circle joins the actions, as on Immaculate's site. */
+  /* Keep the mobile header actions at their natural width. */
   .nav-actions {
     flex: none;
   }

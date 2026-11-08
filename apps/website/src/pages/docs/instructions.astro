@@ -25,8 +25,7 @@ The openorc MCP server also offers memory_search, task_context, and memory_recor
   <section aria-labelledby="files">
     <h2 id="files">Instruction files</h2>
     <p>
-      An instruction file is a Markdown file of standing directions for agents, such as how to build and test the project and which conventions its code follows. <code>AGENTS.md</code> is the shared name that Codex and OpenCode
-      read, and <code>CLAUDE.md</code> is Claude Code's own.
+      An instruction file is a Markdown file of standing directions for agents, such as how to build and test the project and which conventions its code follows. <code>AGENTS.md</code> is a shared name used by several agents, and <code>CLAUDE.md</code> is Claude Code's own.
     </p>
     <p>
       Each agent CLI finds and reads these files itself when its session starts. OpenOrc doesn't change which files an agent loads, with one exception: in a conversation that reviews a pull request, Claude Code skips the
@@ -64,6 +63,11 @@ The openorc MCP server also offers memory_search, task_context, and memory_recor
             <td>The first <code>AGENTS.md</code> it finds, looking up from the working folder. Without one, it reads <code>CLAUDE.md</code>.</td>
             <td><code>~/.config/opencode/AGENTS.md</code>, falling back to <code>~/.claude/CLAUDE.md</code></td>
           </tr>
+          <tr><td>Oh My Pi</td><td><code>AGENTS.md</code>, along with Oh My Pi's own configured context sources</td><td><code>~/.omp/agent/AGENTS.md</code></td></tr>
+          <tr><td>Pi</td><td><code>AGENTS.md</code> through Pi's native context loader</td><td><code>~/.pi/agent/AGENTS.md</code></td></tr>
+          <tr><td>Cursor</td><td><code>AGENTS.md</code>, <code>CLAUDE.md</code>, and Cursor's native project rules</td><td>Managed by Cursor; OpenOrc does not assume a personal file</td></tr>
+          <tr><td>Antigravity</td><td><code>AGENTS.md</code> and <code>GEMINI.md</code>, with its native customization rules</td><td><code>~/.gemini/GEMINI.md</code></td></tr>
+          <tr><td>fx</td><td><code>AGENTS.md</code></td><td><code>~/.fx/AGENTS.md</code>, or <code>$FX_HOME/AGENTS.md</code></td></tr>
         </tbody>
       </table>
     </div>
@@ -175,7 +179,7 @@ The openorc MCP server also offers memory_search, task_context, and memory_recor
         A recap of the conversation, with your last few requests and the previous agent's last reply, follows the brief when a conversation with earlier turns starts a fresh session. That happens, for example, when you switch to
         an agent that hasn't worked in it yet.
       </li>
-      <li>In Plan mode, Claude Code and OpenCode get a note on how to hand over their plan.</li>
+      <li>Agents running in Plan get instructions for handing over their plan through their native interface or OpenOrc's plan tools.</li>
     </ul>
     <p>A model answering a task discussion gets a short note that the discussion is read-only.</p>
   </section>
@@ -200,8 +204,10 @@ The openorc MCP server also offers memory_search, task_context, and memory_recor
             <td>Sent as developer instructions when the session starts or resumes</td>
           </tr>
           <tr>
-            <td>OpenCode</td>
+            <td>OpenCode, Oh My Pi, Cursor, Antigravity, fx</td>
             <td>Placed before your first message to each new process</td>
+          </tr>
+          <tr><td>Pi</td><td>Appended to Pi's system prompt when its process starts</td>
           </tr>
         </tbody>
       </table>

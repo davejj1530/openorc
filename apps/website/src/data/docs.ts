@@ -19,7 +19,7 @@ export interface DocSection {
 }
 
 /** When these pages were last checked against the source. Update it when a page is revised. */
-export const docsReviewed = { date: "November 6, 2026" };
+export const docsReviewed = { date: "November 9, 2026" };
 
 /** The sidebar, in reading order. Groups are named after parts of the app. */
 export const docGroups: DocGroup[] = [
@@ -30,7 +30,7 @@ export const docGroups: DocGroup[] = [
         slug: "",
         title: "OpenOrc documentation",
         label: "Welcome",
-        description: "Run Codex, Claude Code, and OpenCode side by side, plan the work in tasks, and review every change before it ships.",
+        description: "Run eight coding agents side by side, plan the work in tasks, and review every change before it ships.",
         sections: [
           { id: "start-here", title: "Start here" },
           { id: "what-you-can-do", title: "What you can do" },
@@ -86,7 +86,7 @@ export const docGroups: DocGroup[] = [
       {
         slug: "agents",
         title: "Agents and models",
-        description: "Choose Codex, Claude Code, or OpenCode for each thread, then the model and effort that fit the job.",
+        description: "Connect Codex, Claude Code, OpenCode, Oh My Pi, Cursor, Pi, Antigravity, or fx, then choose the model and effort for each thread.",
         sections: [
           { id: "supported", title: "Supported agents" },
           { id: "differences", title: "How they differ" },

@@ -10,7 +10,7 @@ import { docHref } from "../../data/docs";
     <h2 id="how">How cloud threads work</h2>
     <p>
       A cloud thread runs its agent in a sandbox of its own, a Linux machine on your own Vercel or Agent37 account. OpenOrc has no cloud of its own. You connect your account, and that service bills you for what its sandboxes use.
-      Cloud threads work the same way for Claude Code, Codex, and OpenCode.
+      Cloud threads support Claude Code, Codex, OpenCode, and Oh My Pi. Cursor, Pi, Antigravity, and fx run on the connected computer.
     </p>
     <p>
       The conversation stays in OpenOrc on your computer, which keeps a worktree for the thread on a branch of its own. The Changes panel, commits, pushes, and pull requests all work from that worktree, as they do for any thread. Code
@@ -86,10 +86,10 @@ import { docHref } from "../../data/docs";
             </td>
           </tr>
           <tr>
-            <td>OpenCode</td>
+            <td>OpenCode and Oh My Pi</td>
             <td>
               A key for each provider, under <strong>OpenCode</strong> → <strong>Add a key</strong>. A turn gets only the key of its model's provider. OpenCode's free models need no key. A provider your OpenCode signs in to with an account
-              needs a key typed in.
+              needs a key typed in. Oh My Pi uses these same saved provider keys; its subscription sign-ins stay on your computer.
             </td>
           </tr>
         </tbody>
@@ -106,7 +106,7 @@ import { docHref } from "../../data/docs";
     <h3>Sign-ins kept outside the sandbox</h3>
     <p>
       On Vercel, when your plan allows it, the sandbox's firewall adds the real sign-in to the agent's requests on their way out. The sandbox holds only a stand-in that works nowhere, so nothing running there can read the sign-in.
-      This covers Claude Code's requests to <code>api.anthropic.com</code> and <code>mcp-proxy.anthropic.com</code>, Codex's to <code>chatgpt.com</code> or <code>api.openai.com</code>, and OpenCode's to Anthropic, OpenAI, OpenRouter,
+      This covers Claude Code's requests to <code>api.anthropic.com</code> and <code>mcp-proxy.anthropic.com</code>, Codex's to <code>chatgpt.com</code> or <code>api.openai.com</code>, and OpenCode's and Oh My Pi's to Anthropic, OpenAI, OpenRouter,
       Google, Groq, Mistral, xAI, and DeepSeek.
     </p>
     <p>

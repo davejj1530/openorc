@@ -240,6 +240,21 @@ describe("removing a skill", () => {
     expect(await readFile(path.join(path.dirname(notes), "references", "a.md"), "utf8")).toBe("A.");
   });
 
+  it("creates a skill whose agent can't list skills right now without leaving that failure unhandled", async () => {
+    const unhandled: unknown[] = [];
+    const note = (reason: unknown) => unhandled.push(reason);
+    process.on("unhandledRejection", note);
+    try {
+      const handlers = createSkillsHandlers({ db: core.db, files: core.files, list: () => Promise.reject(new Error("Codex could not start")) });
+      const created = await handlers["skills.create"]({ agent: "codex", scope, place: "user", name: "triage", description: "Sorts issues.", instructions: "" });
+      expect(created.skill).toBe(path.join(home, ".agents", "skills", "triage", "SKILL.md"));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off("unhandledRejection", note);
+    }
+  });
+
   it("leaves the skill in place where there is no Trash", async () => {
     const notes = await skill(path.join(claudeDir, "skills"), "notes");
     const handlers = createSkillsHandlers({ db: core.db, files: core.files, claudeEnvironment: () => process.env });

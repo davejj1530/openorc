@@ -61,8 +61,8 @@ async function skillContext({ db, claudeEnvironment, claudeLaunch }: Pick<Depend
 
 /** A new skill's path as its agent lists it, found by its folder; its own SKILL.md when the agent lists it otherwise, or can't list. */
 async function listedPath(skills: Promise<AgentSkill[]>, folder: string): Promise<string> {
-  const real = await realpath(folder);
-  for (const skill of await skills.catch(() => [])) {
+  const [real, found] = await Promise.all([realpath(folder), skills.catch(() => [])]);
+  for (const skill of found) {
     const at = skillFolderOf(skill.path);
     if (at && (await realpath(at).catch(() => null)) === real) return skill.path;
   }

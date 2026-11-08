@@ -505,6 +505,22 @@
 .settings-card > button {
   align-self: flex-start;
 }
+/* An image on a light badge in both themes, drawn in the light scheme: makers draw their marks for a
+   light ground, and a mark that turns white in dark mode (Mobbin's) would vanish on it. Connectors and
+   skills set its size. */
+.logo-badge {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: var(--radius-lg);
+  background: #fff;
+  color-scheme: light;
+}
+/* A letter in place of an image takes the badge as its tile. */
+.logo-badge .connector-logo-letter {
+  background: none;
+  color: #52525b;
+}
 .settings-card-tag {
   flex-shrink: 0;
   color: var(--ink-3);

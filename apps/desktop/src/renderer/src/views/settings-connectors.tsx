@@ -2,15 +2,16 @@ import { Menu } from "@base-ui/react/menu";
 import { useEffect, useState } from "react";
 import { harnessCatalog, type AgentConnector, type Connector, type ConnectorList } from "@openorc/protocol";
 import { ConnectorLogo } from "../components/ConnectorLogo";
-import { ChevronDown, MoreHorizontal, Plus, RefreshCw } from "../components/icons";
+import { HarnessLogo } from "../components/HarnessLogo";
+import { MoreHorizontal, Plus, RefreshCw } from "../components/icons";
 import { menuItem, menuItemDanger, menuPopup } from "../components/menu";
 import { Button, IconButton, Switch } from "../components/ui";
 import { CoversPreview } from "../lib/browser-preview";
 import { useRpc, useRpcMutation } from "../lib/client";
-import { agentName, agentStatusText, connectorStatus, isDormant, isYours, statusLabel } from "../lib/connector-presentation";
+import { agentName, agentStatusText, connectorOrigin, connectorStatus, isDormant, isYours } from "../lib/connector-presentation";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { ConnectorForm, type ConnectorDraft } from "./settings-connector-form";
-import { LoadError, Status } from "./settings-shared";
+import { LoadError } from "./settings-shared";
 import "./settings-connectors.css";
 
 /** What a line says while its switch waits for a read to agree. */
@@ -28,10 +29,12 @@ function AgentLine({ connector, agent }: { connector: Connector; agent: AgentCon
     if (wanted === on) setWanted(null);
   }, [on, wanted]);
   const error = agent.places.find((place) => place.error)?.error;
+  const connected = agent.places.length > 0 && agent.places.every((place) => place.status === "connected");
   return (
     <div className="connector-agent">
+      <HarnessLogo id={agent.agent} size={14} />
       <span className="connector-agent-name">{agentName(agent)}</span>
-      <span className="connector-agent-status" title={error}>
+      <span className="connector-agent-status" data-ok={(connected && wanted === null) || undefined} title={error}>
         {switchingText(wanted) ?? agentStatusText(agent)}
       </span>
       {agent.switchable ? (
@@ -89,24 +92,25 @@ function RowMenu({ connector, onEdit, onProblem }: { connector: Connector; onEdi
   );
 }
 
-function ConnectorRow({ connector, busy, onEdit }: { connector: Connector; busy: boolean; onEdit: () => void }) {
-  const [open, setOpen] = useState(false);
+/**
+ * One connector as a card: its image, name and where it comes from, Sign in when it needs one, and a line for each
+ * agent that has it, saying how it stands there, with its switch.
+ */
+function ConnectorCard({ connector, busy, onEdit }: { connector: Connector; busy: boolean; onEdit: () => void }) {
   const [problem, setProblem] = useState<string | null>(null);
   const signIn = useRpcMutation("connectors.signIn");
   const status = connectorStatus(connector);
-  const detail = `connector-detail-${connector.name}`;
+  const origin = connectorOrigin(connector);
   return (
-    <li className="connector-row" data-open={open || undefined}>
-      <div className="connector-head">
-        <button type="button" className="connector-toggle" aria-expanded={open} aria-controls={detail} onClick={() => setOpen(!open)}>
-          <ConnectorLogo title={connector.title} logo={connector.logo} />
-          <span className="connector-name">
-            <span>{connector.title}</span>
-            <span className="connector-agents">{connector.agents.map(agentName).join(", ")}</span>
-          </span>
-          <Status ok={status === "connected"}>{statusLabel[status]}</Status>
-          <ChevronDown size={14} className="connector-chevron" aria-hidden="true" />
-        </button>
+    <li className="connector-card" aria-label={connector.title}>
+      <div className="connector-card-head">
+        <span className="logo-badge connector-mark">
+          <ConnectorLogo title={connector.title} logo={connector.logo} size={22} />
+        </span>
+        <span className="connector-card-name">
+          <span className="connector-card-title">{connector.title}</span>
+          {origin ? <span className="connector-card-origin">{origin}</span> : null}
+        </span>
         {status === "needs-sign-in" ? (
           <Button size="sm" disabled={busy || signIn.isPending} onClick={() => signIn.mutate({ name: connector.name })}>
             Sign in
@@ -119,13 +123,11 @@ function ConnectorRow({ connector, busy, onEdit }: { connector: Connector; busy:
           {problem}
         </p>
       ) : null}
-      {open ? (
-        <div id={detail} className="connector-detail">
-          {connector.agents.map((agent) => (
-            <AgentLine key={agent.agent} connector={connector} agent={agent} />
-          ))}
-        </div>
-      ) : null}
+      <div className="connector-agents-list">
+        {connector.agents.map((agent) => (
+          <AgentLine key={agent.agent} connector={connector} agent={agent} />
+        ))}
+      </div>
     </li>
   );
 }
@@ -137,9 +139,9 @@ function ConnectorGroup({ title, connectors, busy, onEdit }: { title: string; co
       <header className="settings-section-intro">
         <h2>{title}</h2>
       </header>
-      <ul className="settings-group connector-list">
+      <ul className="connector-grid">
         {connectors.map((connector) => (
-          <ConnectorRow key={connector.name} connector={connector} busy={busy} onEdit={() => onEdit(connector)} />
+          <ConnectorCard key={connector.name} connector={connector} busy={busy} onEdit={() => onEdit(connector)} />
         ))}
       </ul>
     </section>
@@ -210,9 +212,9 @@ export function ConnectorSettings({ active }: { active: boolean }) {
       {dormant.length ? (
         <details className="settings-disclosure connector-dormant">
           <summary>Not connected on your Claude account ({dormant.length})</summary>
-          <ul className="connector-list">
+          <ul className="connector-grid">
             {dormant.map((connector) => (
-              <ConnectorRow key={connector.name} connector={connector} busy={busy} onEdit={() => undefined} />
+              <ConnectorCard key={connector.name} connector={connector} busy={busy} onEdit={() => undefined} />
             ))}
           </ul>
         </details>

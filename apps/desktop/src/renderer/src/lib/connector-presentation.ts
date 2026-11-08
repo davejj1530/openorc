@@ -1,4 +1,4 @@
-import { harnessCatalog, type AgentConnector, type Connector, type ConnectorStatus } from "@openorc/protocol";
+import { harnessCatalog, type AgentConnector, type Connector, type ConnectorSource, type ConnectorStatus } from "@openorc/protocol";
 
 /** The worse state wins, so a row reads what most needs doing. */
 const RANK: ConnectorStatus[] = ["needs-sign-in", "failed", "connected", "off"];
@@ -32,6 +32,15 @@ export function agentStatusText(agent: AgentConnector): string {
 }
 
 export const agentName = (agent: AgentConnector) => harnessCatalog[agent.agent].name;
+
+const kindWords: Record<NonNullable<Connector["kind"]>, string> = { url: "Remote server", command: "Runs on this computer" };
+const sourceWords: Partial<Record<ConnectorSource, string>> = { project: "From a project", plugin: "From a plugin", account: "From your Claude account" };
+
+/** Where a connector comes from and how it runs, in one short line: "Remote server · From a plugin". */
+export function connectorOrigin(connector: Connector): string {
+  const source = connector.agents.map((agent) => sourceWords[agent.source]).find(Boolean);
+  return [connector.kind ? kindWords[connector.kind] : null, source].filter(Boolean).join(" · ");
+}
 
 /** Connectors from the user's Claude account that it has never connected: listed, but out of the way. */
 export function isDormant(connector: Connector): boolean {

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { logoLetter } from "../lib/connector-presentation";
+import "./ConnectorLogo.css";
 
 /** A connector's image, or the first letter of its name on a tile when it has none or it does not load. */
 export function ConnectorLogo({ title, logo, size = 20 }: { title: string; logo: string | null; size?: number }) {

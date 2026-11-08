@@ -1,90 +1,80 @@
-/* Connectors: one row per server, its agents on demand. */
-.connector-list {
+/* Connectors: a card per server in the grid Usage's accounts use, each with its agents' lines and
+   switches under its head. Cards in a row share the tallest one's height. */
+.connector-grid {
   display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: 12px;
 }
-.connector-list > .connector-row + .connector-row {
-  border-top: var(--hairline) solid var(--line);
-}
-.connector-head {
+.connector-card {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 52px;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px 16px 12px 16px;
+  border-radius: var(--radius-4xl);
+  background: var(--settings-card-fill);
 }
-.connector-toggle {
+.connector-card-head {
   display: flex;
-  flex: 1;
   align-items: center;
   gap: 12px;
   min-width: 0;
-  min-height: 52px;
-  text-align: left;
 }
-.connector-toggle:focus-visible {
-  outline: 2px solid var(--line-strong);
-  outline-offset: -2px;
-  border-radius: var(--radius-md);
+.connector-mark {
+  width: 40px;
+  height: 40px;
 }
-.connector-name {
+.connector-card-name {
   display: grid;
   flex: 1;
   min-width: 0;
-  color: var(--ink);
-  font-size: var(--text-base);
 }
-.connector-name > span {
+.connector-card-name > span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.connector-agents {
+.connector-card-title {
+  color: var(--ink);
+  font-size: var(--text-md);
+  line-height: 20px;
+}
+.connector-card-origin {
   color: var(--ink-3);
-  font-size: var(--text-xs);
-}
-.connector-chevron {
-  flex-shrink: 0;
-  color: var(--ink-3);
-  transition: transform 160ms;
-}
-.connector-row[data-open] .connector-chevron {
-  transform: rotate(180deg);
-}
-.connector-problem {
-  margin: -6px 0 12px 32px;
   font-size: var(--text-sm);
 }
-.connector-detail {
+.connector-problem {
+  font-size: var(--text-sm);
+}
+.connector-agents-list {
   display: grid;
   gap: 2px;
-  padding: 0 0 12px 32px;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: var(--hairline) solid var(--line);
 }
 .connector-agent {
-  display: grid;
-  grid-template-columns: 110px minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   min-height: 32px;
   color: var(--ink-2);
   font-size: var(--text-sm);
 }
 .connector-agent-name {
+  flex-shrink: 0;
   color: var(--ink);
 }
 .connector-agent-status {
+  flex: 1;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--ink-3);
 }
-.connector-logo {
-  flex-shrink: 0;
-  border-radius: 5px;
-  object-fit: contain;
-}
-.connector-logo-letter {
-  display: inline-grid;
-  place-items: center;
-  background: var(--surface-3);
-  color: var(--ink-2);
-  line-height: 1;
+.connector-agent-status[data-ok] {
+  color: var(--ok);
 }
 .connector-progress {
   display: flex;
@@ -98,13 +88,8 @@
   color: var(--ink-2);
   font-size: var(--text-sm);
 }
-.connector-dormant .connector-list {
-  margin-top: 4px;
-}
-@media (prefers-reduced-motion: reduce) {
-  .connector-chevron {
-    transition: none;
-  }
+.connector-dormant .connector-grid {
+  margin-top: 8px;
 }
 
 /* The add and edit form. */

@@ -15,6 +15,7 @@ import { createCatalogHandlers } from "./handlers/catalog.js";
 import { createClaudeAccountHandlers } from "./handlers/claude-accounts.js";
 import { createConnectorHandlers } from "./handlers/connectors.js";
 import { ConnectorService, type ConnectorPlaces } from "./services/connectors.js";
+import { rememberedConnectors } from "./services/remembered-connectors.js";
 import { createBrainSyncHandlers } from "./handlers/brain-sync.js";
 import { createCloudHandlers } from "./handlers/cloud.js";
 import { createCloudCarryHandlers } from "./handlers/cloud-carry.js";
@@ -530,6 +531,7 @@ export class OpenOrc {
       connectorPlaces(this.db, this.options.cloudOnly ?? false, () => this.environment.current(), this.claudeAccounts),
       this.settings,
       () => this.options.transport.push({ type: "invalidate", keys: ["connectors"] }),
+      { remembered: rememberedConnectors(this.db) },
     );
     return this.connectorService;
   }

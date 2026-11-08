@@ -3,6 +3,7 @@ import os from "node:os";
 import { claudeConnectorDriver, codexConnectorDriver, openCodeConnectorDriver, readableConnectorError, type AgentLaunchEnvironment, type ConnectorDriver, type ConnectorRow } from "@openorc/agents";
 import { harnessIds, type AgentConnector, type Connector, type ConnectorList, type ConnectorSignIn, type ConnectorSpec, type HarnessId } from "@openorc/protocol";
 import { iconImage, LOGO_BYTES, logoSource, SiteLogos } from "./connector-logos.js";
+import { nothingRemembered, type RememberedConnectors } from "./remembered-connectors.js";
 import type { AppSettingsService } from "./settings.js";
 
 type Launch = Pick<AgentLaunchEnvironment, "binary" | "env">;
@@ -106,23 +107,41 @@ export class ConnectorService {
   private signIn: SignInRun | null = null;
   private signInError: string | null = null;
 
+  private readonly open: (url: string) => void;
+  private readonly drivers: ConnectorDrivers;
+  /** Images from the makers' sites, for servers that send none. */
+  private readonly siteLogos: Pick<SiteLogos, "get" | "look">;
+  private readonly remembered: RememberedConnectors;
+
   constructor(
     private readonly places: ConnectorPlaces,
     private readonly settings: AppSettingsService,
     private readonly changed: () => void,
-    private readonly open: (url: string) => void = openInBrowser,
-    private readonly drivers: ConnectorDrivers = realDrivers,
-    /** Images from the makers' sites, for servers that send none. */
-    private readonly siteLogos: Pick<SiteLogos, "get" | "look"> = new SiteLogos(),
-  ) {}
+    options: { open?: (url: string) => void; drivers?: ConnectorDrivers; siteLogos?: Pick<SiteLogos, "get" | "look">; remembered?: RememberedConnectors } = {},
+  ) {
+    this.open = options.open ?? openInBrowser;
+    this.drivers = options.drivers ?? realDrivers;
+    this.siteLogos = options.siteLogos ?? new SiteLogos();
+    this.remembered = options.remembered ?? nothingRemembered;
+  }
 
   get hasPendingWork(): boolean {
     return this.signIn !== null;
   }
 
+  /**
+   * The connectors in `folder`. Reading them starts every agent's servers, which takes a while, so a list read since
+   * the start answers at once and reads again behind it once stale. Before the first read since the start, the list
+   * last read here answers while that read runs.
+   */
   async list(folder = os.homedir(), refresh = false): Promise<ConnectorList> {
     const entry = this.readings.get(folder);
     const fresh = entry?.value && Date.now() - entry.value.at < FRESH_MS;
+    const remembered = refresh || entry?.value ? null : this.remembered.load(folder);
+    if (remembered) {
+      void this.read(folder).then(this.changed, () => undefined);
+      return { ...this.answer(folder), connectors: remembered, checking: true };
+    }
     if (refresh || !entry?.value) await this.read(folder);
     else if (!fresh) void this.read(folder).then(this.changed, () => undefined);
     return this.answer(folder);
@@ -252,6 +271,7 @@ export class ConnectorService {
       const value = await this.readEverywhere(folder);
       // A change landed while this read ran: keep the answer to show, but read again before trusting it.
       entry.value = generation === this.generation ? value : { ...value, at: 0 };
+      this.remembered.save(folder, this.answer(folder).connectors);
       return value;
     })().finally(() => {
       if (entry.pending === pending) entry.pending = null;

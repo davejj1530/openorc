@@ -1,7 +1,8 @@
 import { describe, expect, it, onTestFinished, vi } from "vitest";
 import type { ConnectorDriver, ConnectorRow } from "@openorc/agents";
-import type { AppSettings, ConnectorSpec } from "@openorc/protocol";
+import type { AppSettings, Connector, ConnectorSpec } from "@openorc/protocol";
 import { ConnectorService, type ConnectorDrivers } from "./connectors.js";
+import type { RememberedConnectors } from "./remembered-connectors.js";
 import type { AppSettingsService } from "./settings.js";
 
 /** Where each host resolves; any other name is not found. */
@@ -47,7 +48,9 @@ function fakeSiteLogos(images: Record<string, string> = {}) {
   };
 }
 
-function setup(options: { claude?: Record<string, ConnectorRow[]>; codex?: ConnectorRow[]; settings?: Partial<AppSettings>; siteImages?: Record<string, string> } = {}) {
+function setup(
+  options: { claude?: Record<string, ConnectorRow[]>; codex?: ConnectorRow[]; settings?: Partial<AppSettings>; siteImages?: Record<string, string>; remembered?: RememberedConnectors } = {},
+) {
   const siteLogos = fakeSiteLogos(options.siteImages);
   const calls: string[] = [];
   const opened: string[] = [];
@@ -84,9 +87,7 @@ function setup(options: { claude?: Record<string, ConnectorRow[]>; codex?: Conne
     },
     store,
     changed,
-    (url) => opened.push(url),
-    drivers,
-    siteLogos,
+    { open: (url) => opened.push(url), drivers, siteLogos, ...(options.remembered ? { remembered: options.remembered } : {}) },
   );
   return { service, calls, opened, changed, siteLogos, settings: () => settings };
 }
@@ -94,6 +95,23 @@ function setup(options: { claude?: Record<string, ConnectorRow[]>; codex?: Conne
 const spec: ConnectorSpec = { kind: "url", url: "https://paper.example/mcp", headers: {} };
 
 describe("connectors", () => {
+  it("answers a fresh start with the list last read in the folder, then reads again and keeps what it finds", async () => {
+    const kept = new Map<string, Connector[]>();
+    const remembered: RememberedConnectors = { load: (folder) => kept.get(folder) ?? null, save: (folder, connectors) => void kept.set(folder, connectors) };
+    const first = setup({ claude: { main: [row("paper", "connected")] }, remembered });
+    expect((await first.service.list("/project")).connectors.map((connector) => connector.name)).toEqual(["paper"]);
+
+    const next = setup({ claude: { main: [row("paper", "connected"), row("rive", "connected")] }, remembered });
+    const answered = await next.service.list("/project");
+    expect(answered.connectors.map((connector) => connector.name)).toEqual(["paper"]);
+    expect(answered.checking).toBe(true);
+    await vi.waitFor(() => expect(next.changed).toHaveBeenCalled());
+    expect((await next.service.list("/project")).connectors.map((connector) => connector.name)).toEqual(["paper", "rive"]);
+    expect(kept.get("/project")?.map((connector) => connector.name)).toEqual(["paper", "rive"]);
+    // Another folder has nothing remembered, so its first read is waited for.
+    expect((await next.service.list("/elsewhere")).checking).toBe(false);
+  });
+
   it("are one row per server, with each Claude account's status and an agent that is missing said once", async () => {
     const { service } = setup({ claude: { main: [row("paper", "connected")], work: [row("paper", "needs-sign-in")] }, codex: [row("paper", "connected", { source: "project" })] });
     const list = await service.list("/project");

@@ -66,3 +66,39 @@ it("restores the open tab without a step to go back over", async () => {
   expect(useRouter.getState().route).toEqual({ view: "thread", threadId: "kept" });
   expect(useRouter.getState().history).toEqual([]);
 });
+
+it("hands a closed current tab over at once to its left neighbor, folds it away, and forgets it once the fold ends", async () => {
+  vi.useFakeTimers();
+  const { useRouter } = await import("./router");
+  useRouter.setState({ route: { view: "thread", threadId: "first" }, history: [], future: [], threadIds: [] });
+  const { useThreadTabs } = await import("./thread-tabs");
+  useThreadTabs.getState().openThread("second");
+  const closing = useThreadTabs.getState().active!;
+  useThreadTabs.getState().close(closing);
+  expect(useRouter.getState().route).toEqual({ view: "thread", threadId: "first" });
+  expect(useThreadTabs.getState().leaving).toEqual([closing]);
+  expect(useThreadTabs.getState().tabs).toHaveLength(2);
+  // Folding, it holds nothing: opening its thread again makes a new tab, and it is never saved.
+  expect(JSON.parse(localStorage.getItem("openorc.threadTabs") ?? "{}").tabs).toHaveLength(1);
+  useThreadTabs.getState().openThread("second");
+  expect(useThreadTabs.getState().active).not.toBe(closing);
+  vi.advanceTimersByTime(500);
+  expect(useThreadTabs.getState().tabs.map((tab) => tab.route)).toEqual([
+    { view: "thread", threadId: "first" },
+    { view: "thread", threadId: "second" },
+  ]);
+  expect(useThreadTabs.getState().leaving).toEqual([]);
+  vi.useRealTimers();
+});
+
+it("folds the last tab away while a new thread takes its place", async () => {
+  vi.useFakeTimers();
+  const { useRouter } = await import("./router");
+  useRouter.setState({ route: { view: "thread", threadId: "only" }, history: [], future: [], threadIds: [] });
+  const { useThreadTabs } = await import("./thread-tabs");
+  useThreadTabs.getState().close(useThreadTabs.getState().active!);
+  expect(useRouter.getState().route).toEqual({ view: "newthread" });
+  vi.advanceTimersByTime(500);
+  expect(useThreadTabs.getState().tabs.map((tab) => tab.route)).toEqual([{ view: "newthread" }]);
+  vi.useRealTimers();
+});

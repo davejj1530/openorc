@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { createRoot } from "react-dom/client";
 import { useRouter } from "../../apps/desktop/src/renderer/src/lib/router";
 import type { Block, RunTranscript } from "../../packages/client/src/index";
+import type { UpdateState } from "../../apps/desktop/src/shared/app-updates";
 import { defaultOrclingLook } from "../../packages/protocol/src/index";
 import { createDesignSettingsRpc } from "./design-settings";
 // main.tsx stamps the saved typefaces on <html>; the panel crops render without App, which would otherwise skip them.
@@ -11,6 +12,10 @@ import "../../apps/desktop/src/renderer/src/lib/app-font";
 import "../../apps/desktop/src/renderer/src/lib/code-font";
 
 let automaticChecks = false;
+/** OpenOrc's own update as a release build reports it: up to date, or the phase `?update=` names. */
+const updatePhase = new URLSearchParams(location.search).get("update") ?? "current";
+const updateState = (["available", "downloading", "ready", "installing"].includes(updatePhase) ? { phase: updatePhase, version: "0.42.0", percent: 64 } : { phase: updatePhase }) as UpdateState;
+
 Object.assign(window, {
   openorc: {
     platform: "darwin",
@@ -18,7 +23,13 @@ Object.assign(window, {
     openWindow() {},
     onTheme: () => () => {},
     setTheme() {},
-    updates: { settings: async () => ({ automaticChecks }), setAutomaticChecks: async (value: boolean) => ({ automaticChecks: (automaticChecks = value) }) },
+    updates: {
+      settings: async () => ({ automaticChecks }),
+      setAutomaticChecks: async (value: boolean) => ({ automaticChecks: (automaticChecks = value) }),
+      getState: async () => ({ state: updateState, dismissed: true }),
+      onState: () => () => {},
+      check: async () => {},
+    },
     assetUrl: (p: string) => p,
     revealFile() {},
     ...panelBridges(),
@@ -269,6 +280,8 @@ async function main() {
           { id: "codex", state: "ready" },
           { id: "claude", state: "ready" },
           { id: "opencode", state: "not_found" },
+          { id: "omp", state: "not_found" },
+          { id: "cursor", state: "not_found" },
         ],
         codex: { installed: true, loggedIn: true },
         gh: { installed: true, loggedIn: true },
@@ -419,7 +432,7 @@ type Row = Record<string, unknown>;
 type Seed = (runId: string, blocks: Block[], state?: Partial<RunTranscript>) => void;
 
 /**
- * ?view=shell and ?view=inbox: the workspace data plus the sidebar and inbox states the redesign restyles. In the open
+ * ?view=shell and ?view=inbox: workspace data with varied sidebar and inbox states. In the open
  * project, threads run, wait on an approval, failed, finished unread, or carry a merged pull request, and a title runs
  * long. Folded, website waits on a question and atlas-api runs. The last project, with a long name, has no threads.
  * A thread with a second line gets a seeded live run, as the app holds one while the thread is live. The inbox lists
@@ -484,7 +497,7 @@ function addShellStates({ base, projects, threads, tasks, seed }: { base: Record
 }
 
 /**
- * ?view=working: the conversation the transcript restyle needs. A finished turn with thinking, reads, an edit, a
+ * ?view=working: a finished turn with thinking, reads, an edit, a
  * passing test run, its reply and a change card, then a live turn with a plan on step 3 of 3, a running command, a
  * pending approval and a pending question, two queued messages and a background command. ?view=review shows the
  * finished turn alone.
@@ -606,7 +619,7 @@ function addWorkingStates({ base, threads, now, response, seed, running }: { bas
 }
 
 /**
- * Unit 9.0: the pages the redesign restyles that no other view reaches. project is the Project view (its Settings tab
+ * Standalone page fixtures. project is the Project view (its Settings tab
  * reads the real settings shape), orcling and orcling-edit are the Orcling designer new and editing Rini, onboarding is
  * first-run setup with one agent in each scan state, pulls and pull are the pull request list and one pull request,
  * memory-page is the Memory page. notices is the conversation with both update toasts:
@@ -679,7 +692,9 @@ function pageStates({ mode, now, project, orclings, patch }: { mode: string; now
   const harnesses = [
     { id: "claude", state: "ready", path: "/usr/local/bin/claude", version: "2.1.296", revision: 1 },
     { id: "codex", state: "sign_in", path: "/usr/local/bin/codex", version: "0.81.0", revision: 1 },
-    // ?scan=failed swaps OpenCode's missing row for a failed check: three agents carry four states.
+    { id: "omp", state: "not_found", path: null, version: null, revision: 1 },
+    { id: "cursor", state: "sign_in", path: "/usr/local/bin/cursor-agent", version: "2026.11.05-86047df", revision: 1 },
+    // ?scan=failed swaps OpenCode's missing row for a failed check.
     new URLSearchParams(location.search).get("scan") === "failed"
       ? { id: "opencode", state: "check_failed", path: "/usr/local/bin/opencode", version: null, revision: 1 }
       : { id: "opencode", state: "not_found", path: null, version: null, revision: 1 },

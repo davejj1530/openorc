@@ -22,7 +22,6 @@ export function SidebarOrclings({ route }: { route: Route }) {
         ))}
         {!orclings.length ? <p className="browser-empty">Create an Orcling to start a conversation.</p> : null}
       </div>
-      <p className="browser-hint">Each Orcling keeps its own instructions and memory.</p>
     </section>
   );
 }

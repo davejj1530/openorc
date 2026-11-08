@@ -1,13 +1,23 @@
 import { useState } from "react";
 import type { UpdateState } from "../../../shared/app-updates";
 import { useAppUpdate } from "./AppUpdateNotice";
-import { Download } from "./icons";
+import { Download, Loader2 } from "./icons";
 import { RAIL_ICON } from "./sidebar-screens";
 import { Tooltip } from "./ui";
 
-/** What the rail's update button says in each phase with something to offer, and what pressing it does then. */
-function updateStep(state: UpdateState): { label: string; act?: "download" | "install"; percent?: number } | null {
+type UpdateAct = "check" | "download" | "install";
+
+/** What the rail's update button says in each phase and what pressing it does then: a check while nothing newer is known. */
+function updateStep(state: UpdateState): { label: string; act?: UpdateAct; percent?: number; busy?: boolean } | null {
   switch (state.phase) {
+    case "idle":
+      return { label: "Check for updates", act: "check" };
+    case "checking":
+      return { label: "Checking for updates…", busy: true };
+    case "current":
+      return { label: "OpenOrc is up to date. Check again", act: "check" };
+    case "error":
+      return { label: `Couldn’t check for updates: ${state.message} Check again`, act: "check" };
     case "available":
       return { label: state.error ? `Retry downloading OpenOrc ${state.version}` : `Download OpenOrc ${state.version}`, act: "download" };
     case "downloading":
@@ -24,8 +34,8 @@ function updateStep(state: UpdateState): { label: string; act?: "download" | "in
 }
 
 /**
- * OpenOrc's own update, above Settings while there is one: download it, watch it come down, then restart into it. It
- * stays after the update notice is put off, so the way to update is always here; with nothing new it is not shown.
+ * OpenOrc's own updates, above Settings: check for one, download it, watch it come down, then restart into it. It
+ * stays after the update notice is put off, so the way to update is always here. A build that can't update hides it.
  */
 export function RailUpdate() {
   const snapshot = useAppUpdate();
@@ -33,19 +43,21 @@ export function RailUpdate() {
   const [failed, setFailed] = useState<string | null>(null);
   const step = snapshot ? updateStep(snapshot.state) : null;
   if (!step) return null;
-  const run = async (act: "download" | "install") => {
+  const run = async (act: UpdateAct) => {
     setPending(true);
     setFailed(null);
     await window.openorc.updates[act]().catch((error: unknown) => setFailed(`${error instanceof Error ? error.message : "The update didn’t start."} Try again.`));
     setPending(false);
   };
   const label = failed ?? step.label;
+  const offer = step.act === "download" || step.act === "install";
   return (
     <Tooltip label={label} side="right">
       <button
         type="button"
         aria-label={label}
         aria-disabled={!step.act || pending || undefined}
+        data-offer={offer || undefined}
         className="sidebar-dock-button sidebar-rail-update no-drag"
         onClick={() => {
           if (step.act && !pending) void run(step.act);
@@ -57,8 +69,8 @@ export function RailUpdate() {
             <circle cx="18" cy="18" r="16" pathLength="100" strokeDasharray={`${Math.min(100, step.percent)} 100`} transform="rotate(-90 18 18)" className="sidebar-rail-update-fill" />
           </svg>
         ) : null}
-        <Download size={RAIL_ICON} />
-        {step.act ? <span aria-hidden="true" className="sidebar-rail-update-dot" /> : null}
+        {step.busy ? <Loader2 size={RAIL_ICON} className="sidebar-rail-update-spin" /> : <Download size={RAIL_ICON} />}
+        {offer ? <span aria-hidden="true" className="sidebar-rail-update-dot" /> : null}
       </button>
     </Tooltip>
   );

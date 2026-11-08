@@ -329,7 +329,7 @@
   min-height: 0;
 }
 /* The rail (SidebarRail.tsx): New thread, the screens and Orclings, a short hairline, Projects, and at its foot the
-   week's usage as a ring above Settings. The open screen sits on the plane. */
+   week's usage as a ring, updates and Settings. The open screen sits on the plane. */
 .hs-sidebar-rail {
   display: flex;
   flex: none;

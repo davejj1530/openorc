@@ -63,6 +63,7 @@ const api: OpenOrcApi = {
   platform: process.platform,
   updates: {
     getState: () => ipcRenderer.invoke("updates:getState"),
+    check: () => ipcRenderer.invoke("updates:check"),
     download: () => ipcRenderer.invoke("updates:download"),
     install: () => ipcRenderer.invoke("updates:install"),
     dismiss: (request) => ipcRenderer.invoke("updates:dismiss", request),

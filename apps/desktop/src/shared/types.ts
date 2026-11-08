@@ -184,6 +184,7 @@ export interface OpenOrcApi {
     getState(): Promise<import("./app-updates").UpdateSnapshot>;
     onState(callback: (snapshot: import("./app-updates").UpdateSnapshot) => void): () => void;
     dismiss(request: import("./app-updates").UpdateDismissal): Promise<import("./app-updates").UpdateSnapshot>;
+    check(): Promise<void>;
     download(): Promise<void>;
     install(): Promise<void>;
   };

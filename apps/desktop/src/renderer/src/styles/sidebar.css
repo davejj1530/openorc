@@ -168,11 +168,22 @@
 .sidebar-rail-project {
   position: relative;
 }
-/* OpenOrc's update, above Settings while there is one: a dot while it waits for the user, a ring
-   while it downloads. */
+/* OpenOrc's updates, above Settings: a check while nothing newer is known, a dot while a new version
+   waits for the user, a ring while it downloads. */
 .sidebar-rail-update {
   position: relative;
+}
+/* Ink, with its dot, only while there is a new version to download or restart into; a check looks like the rail. */
+.sidebar-rail-update[data-offer] {
   color: var(--ink);
+}
+.sidebar-rail-update-spin {
+  animation: work-spin 1.2s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-rail-update-spin {
+    animation: none;
+  }
 }
 .sidebar-rail-update[aria-disabled="true"] {
   cursor: default;
@@ -720,13 +731,6 @@ button.browser-empty:hover,
 .sidebar-thread-list > .browser-load-more {
   padding-left: 10px;
 }
-.browser-hint {
-  padding: 8px 20px;
-  color: var(--ink-4);
-  font-size: var(--text-sm);
-  line-height: 16px;
-}
-
 /* Orclings: contacts with a face, a name and the last thing said. */
 .orcling-contact {
   display: flex;

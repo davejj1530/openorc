@@ -508,5 +508,6 @@ verify()
         process.exitCode = 1;
       });
     clearTimeout(deadline);
-    fs.rmSync(root, { recursive: true, force: true });
+    // Windows keeps an exited app's files locked for a moment while its helpers finish; Node retries EPERM and EBUSY.
+    fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   });

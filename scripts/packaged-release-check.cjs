@@ -205,5 +205,6 @@ main()
   .finally(async () => {
     for (const run of launched) stop(run);
     await Promise.all(launched.map((run) => Promise.race([run.exit, delay(5000)])));
-    fs.rmSync(home, { recursive: true, force: true });
+    // Windows keeps an exited app's files locked for a moment while its helpers finish; Node retries EPERM and EBUSY.
+    fs.rmSync(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   });

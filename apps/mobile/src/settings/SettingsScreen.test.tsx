@@ -180,6 +180,26 @@ it("shows the usage at full strength, with no read time, while connected", () =>
   expect(dimmed(screen.getByRole("header", { name: "Codex, Pro" }))).toBe(false);
 });
 
+it("shows Antigravity's model pools and reset times in the same usage cards", () => {
+  const antigravity: PlanLimits = {
+    id: "antigravity",
+    provider: "antigravity",
+    name: "Antigravity",
+    plan: null,
+    status: "available",
+    refreshedAt: now,
+    windows: [
+      { ...codex.windows[0]!, id: "gemini-weekly", label: "Weekly Limit · Gemini Models", group: "Gemini Models", usedPercent: 3, remainingPercent: 97 },
+      { ...codex.windows[0]!, id: "3p-weekly", label: "Weekly Limit · Claude and GPT models", group: "Claude and GPT models", usedPercent: 0, remainingPercent: 100 },
+    ],
+  };
+  usage.current = { accounts: [antigravity], state: "ready", live: true, readAt: now, now, hostName: "Studio", retry: () => undefined };
+  render(<SettingsScreen />);
+  expect(screen.getByRole("header", { name: "Antigravity" })).toBeTruthy();
+  expect(screen.getByLabelText(/Weekly Limit · Gemini Models, 97% left, Resets/)).toBeTruthy();
+  expect(screen.getByLabelText(/Weekly Limit · Claude and GPT models, 100% left, Resets/)).toBeTruthy();
+});
+
 it("waits for the host by name, and offers another try after a read that failed, instead of a dead end", () => {
   usage.current = { accounts: [], state: "loading", live: false, readAt: null, now, hostName: "Eliass-MacBook-Pro", retry: () => undefined };
   const waiting = render(<SettingsScreen />);

@@ -115,6 +115,7 @@ export const Copy = icon(
     <Path d="M15 4H6a2 2 0 0 0-2 2v9" />
   </>,
 );
+export const CornerUpLeft = icon("CornerUpLeft", <Path d="m10 15-5-5 5-5 M5 10h9a5 5 0 0 1 5 5v4" />);
 export const Download = icon("Download", <Path d="M4 15v4a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 20 19v-4 M12 3.5v12m-5-5 5 5 5-5" />);
 export const Expand = icon("Expand", <Path d="M4 9V6.5A2.5 2.5 0 0 1 6.5 4H9 M15 4h2.5A2.5 2.5 0 0 1 20 6.5V9 M20 15v2.5a2.5 2.5 0 0 1-2.5 2.5H15 M9 20H6.5A2.5 2.5 0 0 1 4 17.5V15" />);
 export const ExternalLink = icon("ExternalLink", <Path d="M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6 M15 3h6v6 M11 13 21 3" />);
@@ -266,6 +267,14 @@ export const MoreHorizontal = icon(
     <Circle cx="19" cy="12" r=".8" />
   </>,
 );
+export const MoreVertical = icon(
+  "MoreVertical",
+  <>
+    <Circle cx="12" cy="5" r=".8" />
+    <Circle cx="12" cy="12" r=".8" />
+    <Circle cx="12" cy="19" r=".8" />
+  </>,
+);
 export const Orcling = icon("Orcling", <Path d="M12 4.5c5.6 0 7.5 1.9 7.5 7.5s-1.9 7.5-7.5 7.5-7.5-1.9-7.5-7.5 1.9-7.5 7.5-7.5Z M9.75 10.25v2.5 M14.25 10.25v2.5" />);
 export const Orclings = icon("Orclings", <Path d="M12 3.5c7 0 8.5 1.5 8.5 8.5s-1.5 8.5-8.5 8.5-8.5-1.5-8.5-8.5S5 3.5 12 3.5Z M9 10v4 M15 10v4" />);
 export const PanelIcon = icon(
@@ -302,6 +311,7 @@ export const Pencil = icon("Pencil", <Path d="m5 15 11-11a1.4 1.4 0 0 1 2 0l2 2a
 export const Pin = icon("Pin", <Path d="M9 3.5h6 M10 3.5v6l-3 4v2h10v-2l-3-4v-6 M12 15.5v5" />);
 export const PinOff = icon("PinOff", <Path d="M10 3.5h5 M14 3.5v5 M8.5 10l-1.5 3.5v2h7 M12 15.5v5 M3 3l18 18" />);
 export const Play = icon("Play", <Path d="M7 4.5 20 12 7 19.5Z" />);
+export const Plug = icon("Plug", <Path d="M9 3v4.5 M15 3v4.5 M6.5 7.5h11v3.5a5.5 5.5 0 0 1-11 0z M12 16.5V21" />);
 export const Plus = icon("Plus", <Path d="M12 5v14 M5 12h14" />);
 export const Power = icon("Power", <Path d="M12 3v8 M7.4 6.2a7.5 7.5 0 1 0 9.2 0" />);
 export const Quote = icon("Quote", <Path d="M4 7h6v7H5c0 3 1 4 3 5 M14 7h6v7h-5c0 3 1 4 3 5" />);

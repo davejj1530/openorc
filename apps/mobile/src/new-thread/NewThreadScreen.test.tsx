@@ -8,8 +8,9 @@ import { attachImage, pickImages } from "../composer/attachments";
 import type { DraftImage } from "../composer/drafts";
 import { HostContext } from "../connection/host-context";
 import type { FakeMac } from "../test-fixtures/fake-mac";
-import { nativeProps } from "../test-fixtures/react-native";
+import { keyboard, nativeProps } from "../test-fixtures/react-native";
 import { NewThreadScreen } from "./NewThreadScreen";
+import { ProjectSheet } from "./ProjectSheet";
 
 /**
  * A Mac with a repository, two folders without git (a test gives `later` its first commit while the Mac's project row
@@ -41,8 +42,8 @@ vi.mock("../client", async () => {
 });
 vi.mock("react-native-keyboard-controller", () => ({ KeyboardStickyView: ({ children }: { children: ReactNode }) => <>{children}</> }));
 vi.mock("expo-router", () => ({
-  router: { replace: vi.fn() },
-  useLocalSearchParams: () => ({ projectId: "openorc" }),
+  router: { replace: vi.fn(), push: vi.fn(), back: vi.fn() },
+  useLocalSearchParams: () => ({ projectId: "openorc", composerId: "new-thread" }),
   useNavigation: () => ({ isFocused: () => mac.focused }),
 }));
 vi.mock("../composer/attachments", () => ({ pickImages: vi.fn(), attachImage: vi.fn() }));
@@ -54,16 +55,31 @@ beforeEach(() => {
   mac.focused = true;
   Object.assign(mac.git, { openorc: "ready", notes: "none", later: "none" });
   vi.mocked(router.replace).mockClear();
+  vi.mocked(router.push).mockClear();
+  vi.mocked(router.back).mockClear();
 });
 afterEach(cleanup);
 
 const button = (name: string) => screen.getByRole("button", { name }) as HTMLButtonElement;
 const project = (name: string) => screen.getByRole("radio", { name }) as HTMLButtonElement;
 
+function openProjects() {
+  fireEvent.click(screen.getByRole("button", { name: /^Project, / }));
+  expect(router.push).toHaveBeenCalledWith({ pathname: "/project", params: { composerId: "new-thread" } });
+  return render(<ProjectSheet />, { wrapper: mac.phone!.wrapper });
+}
+
+async function chooseProject(name: string) {
+  const sheet = openProjects();
+  await act(async () => fireEvent.click(project(name)));
+  expect(router.back).toHaveBeenCalled();
+  sheet.unmount();
+}
+
 /** Opens the screen from the openorc heading's plus and writes the prompt once Start can go. */
 async function openAndWrite(prompt: string) {
   render(<NewThreadScreen />, { wrapper: mac.phone!.wrapper });
-  await waitFor(() => expect(project("notes")).toBeTruthy());
+  await screen.findByRole("button", { name: "Project, openorc" });
   act(() => (nativeProps.get(screen.getByLabelText("Message"))!.onChangeText as (text: string) => void)(prompt));
   await waitFor(() => expect(button("Start").getAttribute("aria-disabled")).toBe("false"));
 }
@@ -83,7 +99,7 @@ it("opens a thread started on the cloud brain there, not on the shown Mac", asyn
     </HostContext.Provider>,
     { wrapper: mac.phone!.wrapper },
   );
-  await waitFor(() => expect(project("notes")).toBeTruthy());
+  await screen.findByRole("button", { name: "Project, openorc" });
   act(() => (nativeProps.get(screen.getByLabelText("Message"))!.onChangeText as (text: string) => void)("Try the cloud"));
   await waitFor(() => expect(button("Start").getAttribute("aria-disabled")).toBe("false"));
   mac.start.mockResolvedValue({ thread: { id: "cloud-thread-1" } });
@@ -104,7 +120,7 @@ it("leaves the person where they went when the Mac answers after they left", asy
 
 it("starts a plain folder's thread in the folder, as the desktop does", async () => {
   await openAndWrite("Fix the build");
-  await act(async () => fireEvent.click(project("notes")));
+  await chooseProject("notes");
   act(() => (nativeProps.get(screen.getByLabelText("Message"))!.onChangeText as (text: string) => void)("Tidy the notes"));
   mac.start.mockResolvedValue({ thread: { id: "thread-2" } });
   await act(async () => fireEvent.click(button("Start")));
@@ -113,7 +129,7 @@ it("starts a plain folder's thread in the folder, as the desktop does", async ()
 
 it("starts a worktree in a project that got its first commit after the screen showed it, as the desktop does", async () => {
   await openAndWrite("Fix the build");
-  await act(async () => fireEvent.click(project("later")));
+  await chooseProject("later");
   act(() => (nativeProps.get(screen.getByLabelText("Message"))!.onChangeText as (text: string) => void)("Isolate the change"));
   await waitFor(() => expect(button("Start").disabled).toBe(false));
   // The first commit, made on the Mac outside OpenOrc.
@@ -129,10 +145,50 @@ it("holds the project while an image is on its way to the Mac", async () => {
   vi.mocked(pickImages).mockResolvedValue([{ uri: "file:///a.heic" }] as Awaited<ReturnType<typeof pickImages>>);
   vi.mocked(attachImage).mockReturnValue(new Promise((resolve) => (upload = resolve)));
   await act(async () => fireEvent.click(button("Attach image")));
-  expect(project("notes").disabled).toBe(true);
+  expect(button("Project, openorc").disabled).toBe(true);
   await act(async () => upload({ path: "/attachments/a.jpg", preview: "file:///cache/a.jpg" }));
-  expect(project("notes").disabled).toBe(false);
+  expect(button("Project, openorc").disabled).toBe(false);
   expect(screen.getByLabelText("Attached image")).toBeTruthy();
+});
+
+it("opens a searchable project list and restores the draft when switching back", async () => {
+  await openAndWrite("Fix the build");
+  expect(screen.queryByRole("radio", { name: "notes" })).toBeNull();
+  keyboard.up = true;
+  const sheet = openProjects();
+  expect(keyboard.up).toBe(false);
+  act(() => {
+    const write = nativeProps.get(screen.getByLabelText("Search projects"))?.onChangeText;
+    if (typeof write !== "function") throw new Error("Search input has no change handler");
+    write("  NoT  ");
+  });
+  expect(project("notes")).toBeTruthy();
+  expect(screen.queryByRole("radio", { name: "openorc" })).toBeNull();
+  await act(async () => fireEvent.click(project("notes")));
+  expect(button("Project, notes")).toBeTruthy();
+  sheet.unmount();
+  await chooseProject("openorc");
+  expect(screen.getByLabelText("Message").textContent).toBe("Fix the build");
+  await chooseProject("Workspace");
+  expect(button("Project, Workspace")).toBeTruthy();
+  expect(screen.getByRole("header").textContent).toBe("What should we work on?");
+});
+
+it("keeps the project and draft when an empty search is dismissed", async () => {
+  await openAndWrite("Fix the build");
+  const sheet = openProjects();
+  act(() => {
+    const write = nativeProps.get(screen.getByLabelText("Search projects"))?.onChangeText;
+    if (typeof write !== "function") throw new Error("Search input has no change handler");
+    write("unlisted project");
+  });
+  expect(screen.getByText("No projects found")).toBeTruthy();
+  expect(screen.queryByRole("radio")).toBeNull();
+  fireEvent.click(button("Close project picker"));
+  expect(router.back).toHaveBeenCalled();
+  sheet.unmount();
+  expect(button("Project, openorc")).toBeTruthy();
+  expect(screen.getByLabelText("Message").textContent).toBe("Fix the build");
 });
 
 it("says why Start is dim when it is tapped, and starts nothing", async () => {
@@ -140,7 +196,7 @@ it("says why Start is dim when it is tapped, and starts nothing", async () => {
   mac.reads["agents.models"] = [];
   onTestFinished(() => void (mac.reads["agents.models"] = models));
   render(<NewThreadScreen />, { wrapper: mac.phone!.wrapper });
-  await waitFor(() => expect(project("notes")).toBeTruthy());
+  await screen.findByRole("button", { name: "Project, openorc" });
   act(() => (nativeProps.get(screen.getByLabelText("Message"))!.onChangeText as (text: string) => void)("Fix it"));
   expect(screen.queryByRole("alert")).toBeNull();
   fireEvent.click(button("Start"));
@@ -155,7 +211,7 @@ it("offers the project's skills as a / word is typed, and puts the one tapped in
   ];
   onTestFinished(() => void delete mac.reads["skills.list"]);
   render(<NewThreadScreen />, { wrapper: mac.phone!.wrapper });
-  await waitFor(() => expect(project("notes")).toBeTruthy());
+  await screen.findByRole("button", { name: "Project, openorc" });
   const prompt = () => nativeProps.get(screen.getByLabelText("Message"))!;
   const write = (text: string) =>
     act(() => {

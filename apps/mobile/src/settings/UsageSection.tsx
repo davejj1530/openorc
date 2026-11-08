@@ -96,7 +96,7 @@ function noCardsWords({ state, live, hostName }: Pick<Usage, "state" | "live" | 
 }
 
 /**
- * The Claude and Codex limits of the shown host's group, read only, as the desktop's Settings > Usage shows them. While
+ * The account limits of the shown host's group, read only, as the desktop's Settings > Usage shows them. While
  * neither host is connected the last read stays, dimmed and held still, with the time it was read under the label.
  */
 export function UsageSection() {

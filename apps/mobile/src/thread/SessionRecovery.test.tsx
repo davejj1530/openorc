@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import type { SubmitRequest } from "@openorc/client";
-import type { ClaudeAccountConnection, PlanLimits, RpcMethod, ThreadSession, ThreadSummary } from "@openorc/protocol";
+import { harnessShortName, type ClaudeAccountConnection, type PlanLimits, type RpcMethod, type ThreadSession, type ThreadSummary } from "@openorc/protocol";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { FakeMac } from "../test-fixtures/fake-mac";
@@ -54,7 +54,7 @@ const share = (id: string, remainingPercent: number, over: Partial<PlanLimits["w
   refreshedAt: now,
 });
 
-const limited: ThreadSession = { status: "error", message: "You've hit your 5-hour limit · resets 4:20pm (Asia/Manila)", recovery: { kind: "usage", provider: "claude" } };
+const limited: ThreadSession = { status: "error", message: "You've hit your 5-hour limit · resets 4:20pm (UTC)", recovery: { kind: "usage", provider: "claude" } };
 const thread = (session: ThreadSession, over: Partial<ThreadSummary> = {}) => ({ id: "t1", agent: "claude", orclingId: null, claudeAccountId: "secondary", session, ...over }) as ThreadSummary;
 const request: Omit<SubmitRequest, "now"> = {
   target: { kind: "thread", threadId: "t1" },
@@ -82,7 +82,7 @@ const offered = () => screen.getAllByRole("button").map((button) => button.getAt
 beforeEach(() => {
   vi.useFakeTimers({ now, toFake: ["Date"] });
   mac.phone!.module.queryClient.clear();
-  mac.accounts = [account("secondary", "Q6 secondary"), account("main", "q6 main"), account("rainy", "Rainy")];
+  mac.accounts = [account("secondary", "Secondary"), account("main", "Primary"), account("backup", "Backup")];
   mac.limits = [];
   mac.starts = [];
   mac.refuse = null;
@@ -96,38 +96,45 @@ afterEach(() => {
 });
 
 it("names the account that hit its limit and offers the others, the most left first", async () => {
-  mac.limits = [share("main", 12), share("rainy", 62), share("secondary", 0)];
+  mac.limits = [share("main", 12), share("backup", 62), share("secondary", 0)];
   show(limited);
-  await waitFor(() => expect(offered()).toEqual(["Continue with Rainy, 62% left", "Continue with q6 main, 12% left"]));
-  expect(screen.getByRole("header").textContent).toBe("Q6 secondary reached its limit");
+  await waitFor(() => expect(offered()).toEqual(["Continue with Backup, 62% left", "Continue with Primary, 12% left"]));
+  expect(screen.getByRole("header").textContent).toBe("Secondary reached its limit");
   expect(screen.getByText(limited.message!)).toBeTruthy();
+});
+it.each(["opencode", "omp", "cursor", "pi", "antigravity", "fx"] as const)("names %s's sign-in failure without offering an unrelated account or a fresh session", (agent) => {
+  show({ status: "error", message: "Authentication required", recovery: { kind: "sign_in", provider: agent } }, { over: { agent, claudeAccountId: null } });
+  expect(screen.getByRole("header").textContent).toBe(`${harnessShortName(agent)} is signed out`);
+  expect(screen.getByText("Sign in again on your Mac.")).toBeTruthy();
+  expect(screen.queryAllByRole("button")).toHaveLength(0);
+  expect(mac.calls).not.toContain("claude.accounts.list");
 });
 
 it("goes on with the chosen account, resuming the conversation there", async () => {
-  mac.limits = [share("rainy", 62)];
+  mac.limits = [share("backup", 62)];
   const sent = vi.fn();
   show(limited, { sent });
-  const choice = await screen.findByRole("button", { name: /Continue with Rainy/ });
+  const choice = await screen.findByRole("button", { name: /Continue with Backup/ });
   await act(async () => choice.click());
-  expect(mac.starts).toEqual([expect.objectContaining({ threadId: "t1", claudeAccountId: "rainy", resume: true, prompt: "Continue where you left off.", agent: "claude", model: "opus" })]);
+  expect(mac.starts).toEqual([expect.objectContaining({ threadId: "t1", claudeAccountId: "backup", resume: true, prompt: "Continue where you left off.", agent: "claude", model: "opus" })]);
   expect(sent).toHaveBeenCalledTimes(1);
   expect(felt).toContain("success");
 });
 
 it("rules out an account a current report says is at its limit, and says when it resets", async () => {
-  mac.limits = [share("main", 0), share("rainy", 30)];
+  mac.limits = [share("main", 0), share("backup", 30)];
   show(limited);
-  const atLimit = await screen.findByRole("button", { name: /Continue with q6 main, Resets in 2h/ });
+  const atLimit = await screen.findByRole("button", { name: /Continue with Primary, Resets in 2h/ });
   expect(atLimit.getAttribute("aria-disabled") === "true" || (atLimit as HTMLButtonElement).disabled).toBe(true);
   await act(async () => atLimit.click());
   expect(mac.starts).toEqual([]);
-  expect(offered()[0]).toContain("Rainy");
+  expect(offered()[0]).toContain("Backup");
 });
 
 it("does not hold a stale report against an account", async () => {
   mac.limits = [share("main", 0, { observedAt: now - 3_600_000 })];
   show(limited);
-  const choice = await screen.findByRole("button", { name: "Continue with q6 main" });
+  const choice = await screen.findByRole("button", { name: "Continue with Primary" });
   await act(async () => choice.click());
   expect(mac.starts).toHaveLength(1);
 });
@@ -135,31 +142,31 @@ it("does not hold a stale report against an account", async () => {
 it("offers the accounts before usage answers, so a slow read holds nothing up", async () => {
   mac.limits = [];
   show(limited);
-  expect(await screen.findByRole("button", { name: "Continue with q6 main" })).toBeTruthy();
+  expect(await screen.findByRole("button", { name: "Continue with Primary" })).toBeTruthy();
 });
 
 it("says why a start failed and lets the person choose again", async () => {
   mac.refuse = "Claude isn't signed in for that account.";
   show(limited);
-  const choice = await screen.findByRole("button", { name: "Continue with q6 main" });
+  const choice = await screen.findByRole("button", { name: "Continue with Primary" });
   await act(async () => choice.click());
   expect(screen.getByRole("alert").textContent).toBe(mac.refuse);
   expect(felt).toContain("error");
   mac.refuse = null;
-  await act(async () => screen.getByRole("button", { name: "Continue with q6 main" }).click());
+  await act(async () => screen.getByRole("button", { name: "Continue with Primary" }).click());
   expect(mac.starts).toHaveLength(1);
   expect(screen.queryByRole("alert")).toBeNull();
 });
 
 it("holds still while the phone cannot send", async () => {
   show(limited, { disabled: true });
-  const choice = await screen.findByRole("button", { name: "Continue with q6 main" });
+  const choice = await screen.findByRole("button", { name: "Continue with Primary" });
   await act(async () => choice.click());
   expect(mac.starts).toEqual([]);
 });
 
 it("stops at the reset time with one account, and offers no fresh start that would hit the same limit", async () => {
-  mac.accounts = [account("secondary", "Q6 secondary")];
+  mac.accounts = [account("secondary", "Secondary")];
   show(limited);
   await waitFor(() => expect(mac.calls).toContain("claude.accounts.list"));
   expect(screen.getByText(limited.message!)).toBeTruthy();
@@ -175,8 +182,8 @@ it("offers no Claude account while the composer is set to another agent", async 
 
 it("sends a signed-out account's thread on to another, and says where to sign back in", async () => {
   show({ status: "error", message: "Not logged in", recovery: { kind: "sign_in", provider: "claude" } });
-  expect(await screen.findByRole("button", { name: "Continue with q6 main" })).toBeTruthy();
-  expect(screen.getByRole("header").textContent).toBe("Q6 secondary is signed out");
+  expect(await screen.findByRole("button", { name: "Continue with Primary" })).toBeTruthy();
+  expect(screen.getByRole("header").textContent).toBe("Secondary is signed out");
   expect(screen.getByText("Sign in again on your Mac.")).toBeTruthy();
 });
 
@@ -216,7 +223,7 @@ it("draws nothing and asks nothing while the session is well", () => {
 });
 
 it("offers only the accounts the thread's project uses, when it uses only some", async () => {
-  mac.projects = [{ id: "p1", name: "block8", settings: { claudeAccounts: { only: true, accountIds: ["secondary", "rainy"], defaultId: "rainy", autoSwitch: false } } }];
+  mac.projects = [{ id: "p1", name: "Example project", settings: { claudeAccounts: { only: true, accountIds: ["secondary", "backup"], defaultId: "backup", autoSwitch: false } } }];
   show(limited, { over: { projectId: "p1" } });
-  await waitFor(() => expect(offered()).toEqual(["Continue with Rainy"]));
+  await waitFor(() => expect(offered()).toEqual(["Continue with Backup"]));
 });

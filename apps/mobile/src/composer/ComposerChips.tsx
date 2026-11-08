@@ -3,8 +3,7 @@ import { effortLabel, executionMode, executionModePresentation } from "@openorc/
 import { router } from "expo-router";
 import type { ReactNode } from "react";
 import { Keyboard, Pressable } from "react-native";
-import { Cloud, Laptop, Lightbulb, Pencil, ShieldCheck, Wand, Zap } from "../generated/icons";
-import { cn } from "../ui/cn";
+import { Lightbulb, Pencil, ShieldCheck, Wand, Zap } from "../generated/icons";
 import { HarnessLogo } from "../ui/HarnessLogo";
 import { Text } from "../ui/Text";
 import { useComposerModels } from "./claude-account";
@@ -16,7 +15,7 @@ const modeIcons = { plan: Lightbulb, review: ShieldCheck, trusted: Pencil, auton
  * A 28 pt chip on the composer's fill that opens one of the thread's native sheets. The keyboard goes first: a focused
  * prompt would keep it up over the sheet.
  */
-function Chip({ label, children, onPress, round = false }: { label: string; children: ReactNode; onPress: () => void; round?: boolean }) {
+function Chip({ label, children, onPress }: { label: string; children: ReactNode; onPress: () => void }) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -26,24 +25,14 @@ function Chip({ label, children, onPress, round = false }: { label: string; chil
         onPress();
       }}
       hitSlop={{ top: 8, bottom: 8 }}
-      className={cn("h-control-sm min-w-0 flex-shrink flex-row items-center gap-1.5 rounded-full bg-surface-2 pl-2 pr-2.5 active:bg-surface-3", round && "w-7 flex-shrink-0 justify-center px-0")}
+      className="h-control-sm min-w-0 flex-shrink flex-row items-center gap-1.5 rounded-full bg-surface-2 pl-2 pr-2.5 active:bg-surface-3"
     >
       {children}
     </Pressable>
   );
 }
 
-/** Where a new thread runs, as its mark alone, so the model and mode keep their names beside it. */
-function PlaceChip({ composerId, place }: { composerId: string; place: "mac" | "cloud" }) {
-  const Icon = place === "cloud" ? Cloud : Laptop;
-  return (
-    <Chip round label={`Runs on, ${place === "cloud" ? "Cloud" : "This Mac"}`} onPress={() => router.push({ pathname: "/place", params: { composerId } })}>
-      <Icon size={14} className="text-ink-3" />
-    </Chip>
-  );
-}
-
-/** The model with its effort, the mode and, for a new thread the Mac could run in the cloud, where it runs; each opens its sheet for this composer. */
+/** The model with its effort and the mode; each opens its sheet for this composer. */
 export function ComposerChips({ composerId, settings }: { composerId: string; settings: ComposerSettings }) {
   const models = useComposerModels(settings);
   const { choice } = settings;
@@ -75,7 +64,6 @@ export function ComposerChips({ composerId, settings }: { composerId: string; se
           {modeLabel}
         </Text>
       </Chip>
-      {settings.place ? <PlaceChip composerId={composerId} place={settings.place.chosen} /> : null}
     </>
   );
 }

@@ -53,7 +53,7 @@ export function demoLimits(now: number): PlanLimits[] {
       id: "claude:claude-cli",
       provider: "claude",
       name: "Claude",
-      plan: "Max",
+      plan: "Ultra",
       status: "available",
       windows: [window("session", "5-hour window", 34, 2 * HOUR + 10 * MINUTE), window("weekly_all", "7-day window", 58, 3 * 24 * HOUR + 4 * HOUR)],
       refreshedAt: now - MINUTE,

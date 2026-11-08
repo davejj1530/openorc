@@ -1,5 +1,5 @@
 import { isHarnessId } from "@openorc/protocol";
-import Svg, { Path } from "react-native-svg";
+import Svg, { Path, SvgXml } from "react-native-svg";
 import { harnessMarks } from "../generated/harness-marks";
 import { useMode } from "./mode";
 
@@ -16,6 +16,7 @@ export function HarnessLogo({ agent, size = 14 }: { agent: string; size?: number
   const dark = useMode() === "dark";
   if (!isHarnessId(agent)) return null;
   const mark = harnessMarks[agent];
+  if (mark.kind === "svg") return <SvgXml xml={mark.xml} width={size} height={size} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" />;
   const invert = dark && mark.invertsInDark;
   return (
     <Svg width={size} height={size} viewBox={mark.viewBox} fill="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">

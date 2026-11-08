@@ -102,24 +102,23 @@
   left: -8px;
   border-left: 1.5px solid var(--line-strong);
 }
+/* The last lane's trunk ends where its elbow turns, so the line runs on into the turn. */
 .subagent-lanes[data-trunk] > .subagent-card:last-child::before {
   bottom: auto;
-  height: 14px;
+  height: 15px;
 }
-/* The elbow ends where the mark's glyph begins, so each lane reads as one line from the trunk into its mark. */
+/* The elbow is the turn alone, leaving the trunk at its radius and ending where the mark's glyph begins, so each lane
+   reads as one line from the trunk into its mark and no line lies over another. */
 .subagent-lanes[data-trunk] > .subagent-card::after {
   content: "";
   position: absolute;
-  top: 8px;
+  top: 15px;
   left: -8px;
   width: 11px;
-  height: 14px;
+  height: 7px;
   border-bottom: 1.5px solid var(--line-strong);
   border-left: 1.5px solid var(--line-strong);
   border-bottom-left-radius: 7px;
-}
-.subagent-lanes[data-trunk] > .subagent-card[data-status="running"]::after {
-  border-color: var(--ink-3);
 }
 .subagent-card-heading {
   display: flex;

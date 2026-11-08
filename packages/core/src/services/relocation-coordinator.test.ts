@@ -562,7 +562,8 @@ describe("moving to the cloud", () => {
     expect(stepsSeen).toEqual(["waking", "sending"]);
     stepsSeen = [];
     await bringHome(threadId);
-    await until(settledHere);
+    // The step reads "none" at the first brain call after the move settles, which a slow machine reaches later.
+    await until(() => settledHere() && stepsSeen.at(-1) === "none");
     expect(stepsSeen).toEqual(["waking", "packing", "sending", "none"]);
   }, 60_000);
 
@@ -573,7 +574,7 @@ describe("moving to the cloud", () => {
     watched = threadId;
     failHandOffs = 1;
     await bringHome(threadId);
-    await until(settledHere);
+    await until(() => settledHere() && stepsSeen.at(-1) === "none");
     expect(stepsSeen).toEqual(["waking", "packing", "waking", "packing", "sending", "none"]);
   }, 60_000);
 

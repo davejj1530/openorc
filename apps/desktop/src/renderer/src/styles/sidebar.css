@@ -992,9 +992,7 @@ button.browser-empty:hover,
     z-index: 30;
     max-width: calc(100vw - 40px);
     height: 100%;
-    background:
-      var(--surface-gradient) fixed,
-      var(--bg);
+    background: var(--bg);
     box-shadow: var(--shadow-overlay);
   }
   .app-shell .workspace-navigation[data-open="false"] {

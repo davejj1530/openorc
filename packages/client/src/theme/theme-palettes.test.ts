@@ -43,10 +43,12 @@ describe("themePresets", () => {
     }
   });
 
-  it("keeps product workspaces flat when switching palettes", () => {
-    const authored = new Set(["kamakura", "cyberpunk", "eliron"]);
-    for (const theme of themePresets.filter((theme) => !authored.has(theme.id))) {
-      for (const mode of ["light", "dark"] as const) expect(theme.colors[mode]["--surface-gradient"], `${theme.id} ${mode}`).toBe("none");
+  it("paints the window's ground in one color, so the sidebar, the work column and the panel match in every palette", () => {
+    for (const theme of themePresets) {
+      for (const mode of ["light", "dark"] as const) {
+        const painted = Object.entries(theme.colors[mode]).filter(([, value]) => String(value).includes("gradient("));
+        expect(painted, `${theme.id} ${mode}`).toEqual([]);
+      }
     }
   });
 

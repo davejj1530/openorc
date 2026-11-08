@@ -20,9 +20,7 @@
 }
 /* Its foot is the hairline the sidebar's list starts under, carried across the window to its edge. */
 .app-shell .app-topbar {
-  background:
-    var(--surface-gradient) fixed,
-    var(--bg);
+  background: var(--bg);
   border-bottom: var(--hairline) solid var(--line);
 }
 .agent-presence-mark {

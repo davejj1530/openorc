@@ -74,8 +74,6 @@
   --attention: var(--warn);
   --selection: color-mix(in srgb, #0169cc 26%, #ffffff);
   --bubble: #f4f4f4;
-  /* An image a palette may paint over --surface on the work plane; see .well::before. */
-  --surface-gradient: none;
   /* The thinking glyph's tone in the transcript. */
   --tone-think: #7c5cd6;
   /* Floating layers (menus, popovers, tooltips) have no shadow. They paint the fill step away
@@ -624,17 +622,13 @@ html[data-transparent-shell="true"] .sidebar-shell {
   z-index: -1;
   border-radius: var(--radius-lg);
 }
-/* The window ground: the palette's --surface-gradient over --bg, shared by the sidebar, the
-   conversation and page toolbars. The gradient is fixed to the window rather than to each box,
-   so anything that has to blend into the ground, such as a sticky header or footer, paints this
-   same fill and meets it without a seam. */
+/* The window ground, one color shared by the sidebar, the work column, the panel and their toolbars, so anything that
+   blends into it, such as a sticky header or footer, meets it without a seam. */
 .well::before,
 .well-fill,
 .onboarding-surface,
 .settings-feedback {
-  background:
-    var(--surface-gradient) fixed,
-    var(--bg);
+  background: var(--bg);
 }
 /* Two adjacent wells share one gutter rather than stacking two. */
 .well + .well {
@@ -1112,12 +1106,6 @@ span.property-chip {
   flex-direction: column;
   min-height: 0;
   min-width: 0;
-}
-/* Settings shares one ground with its sidebar in every palette: the gradient some palettes light the work column
-   with stays out of it, its top bar and its save line. */
-.app-shell .well:has(> .settings-sheet)::before,
-.app-shell .settings-sheet :is(.app-topbar, .settings-feedback) {
-  background: var(--bg);
 }
 .settings-shell {
   --settings-content-width: 860px;

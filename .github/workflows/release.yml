@@ -168,8 +168,12 @@ jobs:
         with:
           name: cloud-brain
           path: apps/brain/dist
+      # The download tries again, and falls back to a mirror whose file must match Electron's own checksums, when
+      # GitHub's release downloads fail. Packaging still fetches the Electron it ships through electron-builder.
       - name: Prepare Electron runtime and notice files
-        run: pnpm --filter @openorc/desktop exec node -e 'require("electron")'
+        run: |
+          node --input-type=module -e "await (await import('./apps/desktop/src/electron-binary.global-setup.ts')).default()"
+          pnpm --filter @openorc/desktop exec node -e 'require("electron")'
       - run: pnpm check:size
       - run: node --test scripts/size-limit.test.cjs
       - run: pnpm -r typecheck

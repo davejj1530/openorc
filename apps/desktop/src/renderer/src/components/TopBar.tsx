@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { PanelIcon } from "./icons";
 import { cn } from "../lib/cn";
 import { useLayout, type PanelSide } from "../lib/layout";
+import { PanelSideSwitch } from "./PanelSideSwitch";
 import { WindowNav } from "./Sidebar";
 import { useWindowCorner } from "../lib/navigation-column";
 import { IconButton, Tooltip } from "./ui";
@@ -34,8 +35,9 @@ function headerEnds({ inSplit, panelShown, panelSide, rightmost }: { inSplit?: b
  * leftmost header, so it also clears the native window controls.
  * When a panel is available its toggle lives here, showing it or hiding it, so
  * the third column is one click away either way (the panel's own Hide shows only
- * while it covers this header). A panel docked on the left takes the window
- * navigation into its own header.
+ * while it covers this header). While it is open on the right, this column is the
+ * middle one, so the switch that moves it sits here too. A panel docked on the left
+ * takes the window navigation and that switch into its own header.
  */
 export function TopBar({
   children,
@@ -94,6 +96,7 @@ export function TopBar({
       {windowDragSurface ? <span className="thread-header-gap w-2 shrink-0 self-stretch" aria-hidden="true" /> : null}
       <div className="topbar-actions flex shrink-0 items-center gap-1">
         {actions}
+        {panel && panelOpen ? <PanelSideSwitch docked="right" /> : null}
         {panel ? (
           <Tooltip label={panelLabel}>
             <IconButton onClick={() => setPanel(!panelOpen)} aria-label={panelLabel} aria-pressed={panelOpen}>

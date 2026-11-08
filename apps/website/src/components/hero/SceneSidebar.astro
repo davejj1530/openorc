@@ -3,7 +3,7 @@
  * The app's navigation as Sidebar.tsx lays it out. On the window's top line, the OpenOrc wordmark after the window
  * controls with Inbox and the sidebar toggle. Under it, a rail: New thread, the screens (Tasks, Pull requests,
  * Schedules, Orclings), Projects after a short divider, and at its foot the open thread's weekly usage as a ring above
- * Settings; beside the rail, the thread list: the project filter, Search with the list's filter, one list of threads
+ * Settings; beside the rail, the thread list: the project filter, Search with the filter and New thread, one list of threads
  * by day with Yesterday folded, and the Resolved drawer at its foot. A row is its title, what the agent is doing while
  * it works (its title lit by a moving band, a spinner at the line's end), or an amber call while it waits on you, then
  * its project and where it works. Stills pass no journey.
@@ -88,6 +88,7 @@ const screens: { id: string; icon: IconName }[] = [
       <div class="hs-list-head">
         <span class="hs-search"><ProductIcon name="search" />Search</span>
         <span class="hs-round"><ProductIcon name="funnel" /></span>
+        <span class="hs-round hs-list-new"><ProductIcon name="compose" /></span>
       </div>
       <div class="hs-threads">
         {sections.map((section) => (

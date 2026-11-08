@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 
@@ -24,4 +24,16 @@ it("keeps the panel's toggle in the header both ways, so an open panel can be hi
   expect(useLayout.getState().panelOpen).toBe(false);
   fireEvent.click(screen.getByRole("button", { name: "Show panel" }));
   expect(useLayout.getState().panelOpen).toBe(true);
+});
+
+it("moves an open panel docked on the right from here, the middle column, and leaves the switch to the panel's own header on the left", () => {
+  useLayout.setState({ panelOpen: true, panelSide: "right" });
+  render(<TopBar panel>{null}</TopBar>);
+  fireEvent.click(screen.getByRole("button", { name: "Move panel left" }));
+  expect(useLayout.getState().panelSide).toBe("left");
+  expect(screen.queryByRole("button", { name: /^Move panel/ })).toBeNull();
+  act(() => useLayout.getState().togglePanelSide());
+  expect(screen.getByRole("button", { name: "Move panel left" })).toBeTruthy();
+  act(() => useLayout.getState().setPanel(false));
+  expect(screen.queryByRole("button", { name: /^Move panel/ })).toBeNull();
 });

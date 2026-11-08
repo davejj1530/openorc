@@ -121,8 +121,8 @@ it("waits for an emitted plan and preserves manual sidebar choices", () => {
   expect(useLayout.getState()).toMatchObject({ panelThreadId: "b", panelOpen: true, panelTab: "plan" });
 });
 
-it("swaps the open panel's side from the thread header, handing the window navigation to whichever column comes first", () => {
-  useLayout.setState({ sidebarOpen: false });
+it("moves the open panel left from the thread header, handing the window navigation and the side switch to the panel", () => {
+  useLayout.setState({ sidebarOpen: false, panelSide: "right" });
   const { container } = render(<ThreadWorkspace />);
   const header = () => container.querySelector<HTMLElement>('[data-thread-pane="a"] header')!;
   expect(within(header()).queryByRole("button", { name: "Move panel left" })).toBeNull();
@@ -131,9 +131,10 @@ it("swaps the open panel's side from the thread header, handing the window navig
   fireEvent.click(within(header()).getByRole("button", { name: "Move panel left" }));
   expect(useLayout.getState().panelSide).toBe("left");
   expect(header().hasAttribute("data-window-navigation")).toBe(false);
+  // The panel is now the middle column, so its own header moves it back.
+  expect(within(header()).queryByRole("button", { name: /^Move panel/ })).toBeNull();
 
-  fireEvent.click(within(header()).getByRole("button", { name: "Move panel right" }));
-  expect(useLayout.getState().panelSide).toBe("right");
+  act(() => useLayout.getState().togglePanelSide());
   expect(header().hasAttribute("data-window-navigation")).toBe(true);
 });
 

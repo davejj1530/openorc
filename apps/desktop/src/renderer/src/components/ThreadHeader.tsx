@@ -67,15 +67,16 @@ export function ThreadHeader({
   onRenamingChange: (renaming: boolean) => void;
   onRename: (title: string) => void;
 }) {
-  const lineage = (
+  // Before a split pane's title the parent reads as a crumb; among the first pane's facts, as a fact of its own.
+  const lineage = (fact: boolean) => (
     <>
-      {t.parentThreadId ? <ThreadParent id={t.parentThreadId} /> : <ForkParent parent={t.forkedFromId} />}
+      {t.parentThreadId ? <ThreadParent id={t.parentThreadId} fact={fact} /> : <ForkParent parent={t.forkedFromId} />}
       <ThreadOrcling threadId={t.id} orclingId={t.orclingId} />
     </>
   );
   const facts = (
     <span className="thread-header-facts">
-      {first ? lineage : null}
+      {first ? lineage(true) : null}
       <ThreadFacts thread={t} />
     </span>
   );
@@ -118,7 +119,7 @@ export function ThreadHeader({
         />
       ) : (
         <>
-          {lineage}
+          {lineage(false)}
           {isSubagentThread(t) ? <span className="truncate text-sm">{t.title}</span> : <ThreadTitle title={t.title} editing={renaming} onEditingChange={onRenamingChange} onSave={onRename} />}
           {facts}
         </>

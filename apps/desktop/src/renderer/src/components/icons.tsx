@@ -97,6 +97,7 @@ export const Check = icon("Check", <path d="m5 12 4.5 4.5L19 7" />);
 export const ChevronDown = icon("ChevronDown", <path d="m6 9 6 6 6-6" />);
 export const ChevronRight = icon("ChevronRight", <path d="m9 6 6 6-6 6" />);
 export const ChevronLeft = icon("ChevronLeft", <path d="m15 6-6 6 6 6" />);
+export const CornerUpLeft = icon("CornerUpLeft", <path d="m10 15-5-5 5-5 M5 10h9a5 5 0 0 1 5 5v4" />);
 export const ChevronsUpDown = icon("ChevronsUpDown", <path d="m7 8 5-5 5 5 M7 16l5 5 5-5" />);
 export const ArrowRight = icon("ArrowRight", <path d="M4 12h16m-6-6 6 6-6 6" />);
 export const ArrowLeft = icon("ArrowLeft", <path d="M20 12H4m6-6-6 6 6 6" />);

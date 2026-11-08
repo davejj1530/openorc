@@ -103,6 +103,12 @@
 .thread-header-facts > * {
   flex-shrink: 0;
 }
+/* The thread this one started from: the one fact that gives way, its name ending in an ellipsis. */
+.thread-header-facts > .thread-parent-fact {
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 200px;
+}
 /* Thread actions sit on a narrow pill: the vertical dots need no more width than themselves. */
 .thread-more {
   width: 20px;

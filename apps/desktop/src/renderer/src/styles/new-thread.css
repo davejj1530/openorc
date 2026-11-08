@@ -126,7 +126,6 @@
 
 /* The composer: r24 on the writing-area role, a 15px prompt and one bar with a 34px send. */
 .composer-new-thread .composer-shell {
-  min-height: 156px;
   gap: 18px;
   padding: 18px 14px 14px 20px;
   border-radius: var(--radius-5xl);
@@ -140,9 +139,6 @@
 }
 .composer-new-thread .composer-input {
   min-height: 24px;
-}
-.composer-new-thread .composer-bar {
-  margin-top: auto;
 }
 .composer-new-thread .composer-tools {
   margin-left: -6px;

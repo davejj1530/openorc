@@ -26,7 +26,7 @@ beforeEach(() => {
 });
 
 it("starts plain when nothing is saved or the entry cannot be read", () => {
-  const fallback = { style: "off", image: null, imageColors: false, grid: "4x4", size: 2, motion: 12 };
+  const fallback = { style: "off", image: null, grid: "4x4", size: 2, motion: 12 };
   expect(parseBackdrop(null, null)).toEqual(fallback);
   expect(parseBackdrop("{not json", null)).toEqual(fallback);
 });
@@ -36,7 +36,7 @@ it("keeps what still makes sense in a damaged entry, clamping the sliders into r
 });
 
 it("shows an image only while one is kept, and only an image data URL counts as one", () => {
-  expect(parseBackdrop(JSON.stringify({ style: "image", imageColors: true }), image)).toMatchObject({ style: "image", image, imageColors: true });
+  expect(parseBackdrop(JSON.stringify({ style: "image" }), image)).toMatchObject({ style: "image", image });
   expect(parseBackdrop(JSON.stringify({ style: "image" }), null)).toMatchObject({ style: "off", image: null });
   expect(parseBackdrop(JSON.stringify({ style: "image" }), "https://example.com/picture.png")).toMatchObject({ style: "off", image: null });
 });
@@ -45,7 +45,7 @@ it("keeps the image under its own key, so a slider step saves only the small set
   const backdrop = await launch();
   expect(backdrop.getState().chooseImage(image)).toBe("saved");
   expect(localStorage.getItem(IMAGE)).toBe(image);
-  expect(JSON.parse(localStorage.getItem(SETTINGS) ?? "")).toEqual({ style: "image", imageColors: false, grid: "4x4", size: 2, motion: 12 });
+  expect(JSON.parse(localStorage.getItem(SETTINGS) ?? "")).toEqual({ style: "image", grid: "4x4", size: 2, motion: 12 });
 
   const writes = vi.spyOn(Storage.prototype, "setItem");
   expect(backdrop.getState().change({ size: 4 })).toBe(true);
@@ -54,10 +54,10 @@ it("keeps the image under its own key, so a slider step saves only the small set
 });
 
 it("moves the image out of a settings entry saved before it had its own key", async () => {
-  localStorage.setItem(SETTINGS, JSON.stringify({ style: "image", image, imageColors: true, grid: "8x8", size: 3, motion: 40 }));
-  expect((await launch()).getState()).toMatchObject({ style: "image", image, imageColors: true, grid: "8x8", size: 3, motion: 40 });
+  localStorage.setItem(SETTINGS, JSON.stringify({ style: "image", image, grid: "8x8", size: 3, motion: 40 }));
+  expect((await launch()).getState()).toMatchObject({ style: "image", image, grid: "8x8", size: 3, motion: 40 });
   expect(localStorage.getItem(IMAGE)).toBe(image);
-  expect(JSON.parse(localStorage.getItem(SETTINGS) ?? "")).toEqual({ style: "image", imageColors: true, grid: "8x8", size: 3, motion: 40 });
+  expect(JSON.parse(localStorage.getItem(SETTINGS) ?? "")).toEqual({ style: "image", grid: "8x8", size: 3, motion: 40 });
   expect((await launch()).getState()).toMatchObject({ style: "image", image });
 });
 

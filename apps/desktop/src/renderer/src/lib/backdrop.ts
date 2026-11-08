@@ -28,8 +28,6 @@ export interface Backdrop {
   style: BackdropStyle;
   /** The user's image as a data URL, kept while another style shows so choosing it again needs no new upload. */
   image: string | null;
-  /** The image dithers in its own colors rather than the backdrop's ink. */
-  imageColors: boolean;
   grid: BackdropGrid;
   /** The dots' size in pixels. */
   size: number;
@@ -43,7 +41,7 @@ type Settings = Omit<Backdrop, "image">;
 export const backdropLimits = { size: { min: 1, max: 6 }, motion: { min: 0, max: 100 } } as const;
 
 // Plain until chosen: the patterns are there to turn on in Settings.
-const DEFAULT: Backdrop = { style: "off", image: null, imageColors: false, grid: "4x4", size: 2, motion: 12 };
+const DEFAULT: Backdrop = { style: "off", image: null, grid: "4x4", size: 2, motion: 12 };
 const KEY = "openorc.backdrop";
 /** The image keeps its own entry, rewritten only when one is chosen or removed. */
 const IMAGE_KEY = "openorc.backdrop.image";
@@ -71,7 +69,6 @@ function backdropOf(value: Entry, image: unknown): Backdrop {
   return {
     style: oneOf<BackdropStyle>(value.style, styles, DEFAULT.style),
     image: kept,
-    imageColors: value.imageColors === true,
     grid: oneOf(value.grid, backdropGrids, DEFAULT.grid),
     size: clamp(value.size, backdropLimits.size, DEFAULT.size),
     motion: clamp(value.motion, backdropLimits.motion, DEFAULT.motion),
@@ -83,7 +80,7 @@ export function parseBackdrop(settings: string | null, image: string | null): Ba
   return backdropOf(entryOf(settings), image);
 }
 
-const settingsOf = ({ style, imageColors, grid, size, motion }: Settings): Settings => ({ style, imageColors, grid, size, motion });
+const settingsOf = ({ style, grid, size, motion }: Settings): Settings => ({ style, grid, size, motion });
 
 /** Whether a chosen image was kept for the next launch, and if not, whether storage was full or out of reach. */
 export type BackdropSaved = "saved" | "full" | "unavailable";

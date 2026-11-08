@@ -24,8 +24,7 @@ const inkOf = (element: Element): Ink => getShaderColorFromString(toHex(getCompu
 /** What the shader is told: the style's own uniforms, the grid and dot size, and the ink. */
 function uniforms(backdrop: Backdrop, ink: Ink) {
   const grid = { u_type: DitheringTypes[backdrop.grid], u_pxSize: backdrop.size };
-  if (backdrop.style === "image")
-    return { ...grid, u_colorFront: ink, u_colorHighlight: ink, u_colorBack: [...CLEAR], u_originalColors: backdrop.imageColors, u_inverted: false, u_colorSteps: 2, u_scale: 1 };
+  if (backdrop.style === "image") return { ...grid, u_colorFront: ink, u_colorHighlight: ink, u_colorBack: [...CLEAR], u_originalColors: true, u_inverted: false, u_colorSteps: 2, u_scale: 1 };
   const pattern = backdrop.style === "off" ? "sphere" : backdrop.style;
   return { ...grid, u_colorFront: ink, u_colorBack: [...CLEAR], u_shape: DitheringShapes[pattern], u_scale: SCALE[pattern] ?? 1 };
 }
@@ -97,9 +96,9 @@ function animate(mount: ShaderMount, speed: number): () => void {
 }
 
 /**
- * The backdrop chosen in Settings: a pattern from the shader's shapes, or the user's image, in ordered dots on a clear
- * ground that fade out from the top-left by the mask. It follows the palette and reduced motion, and paints nothing
- * without WebGL2.
+ * The backdrop chosen in Settings: a pattern from the shader's shapes in the palette's ink, or the user's image in its own
+ * colors, in ordered dots on a clear ground that the mask fades out. It follows the palette and reduced motion, and
+ * paints nothing without WebGL2.
  */
 export function DitherBackdrop({ className }: { className?: string }) {
   const backdrop = useBackdrop();
@@ -147,5 +146,5 @@ export function DitherBackdrop({ className }: { className?: string }) {
 
   useEffect(() => (mount && speed > 0 ? animate(mount, speed) : undefined), [mount, speed]);
 
-  return <div ref={frame} aria-hidden="true" className={cn("dither-backdrop", className)} />;
+  return <div ref={frame} aria-hidden="true" data-style={backdrop.style === "image" ? "image" : "pattern"} className={cn("dither-backdrop", className)} />;
 }

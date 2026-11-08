@@ -2,7 +2,7 @@ import { useRef, useState, type ChangeEvent } from "react";
 import { DitherBackdrop } from "../components/DitherBackdrop";
 import { Button } from "../components/ui";
 import { backdropGrids, backdropImage, backdropLimits, backdropPatterns, useBackdrop, type BackdropStyle } from "../lib/backdrop";
-import { Field, Section, SettingRow, Toggle } from "./settings-shared";
+import { Field, Section, SettingRow } from "./settings-shared";
 
 type Report = (saved: boolean) => void;
 
@@ -91,7 +91,6 @@ export function BackdropSettings({ report }: { report: Report }) {
             </Button>
           ) : null}
         </SettingRow>
-        {backdrop.style === "image" ? <Toggle label="Keep the image’s colors" checked={backdrop.imageColors} disabled={false} onChange={(value) => report(change({ imageColors: value }))} /> : null}
         <SettingRow label="Grid">
           <span className="appearance-modes" role="group" aria-label="Grid">
             {backdropGrids.map(({ id, name }) => (

@@ -291,8 +291,8 @@
   }
 }
 
-/* The dither behind the screen sits under its content, densest at the top-left and gone well
-   before the composer. */
+/* The dither behind the screen sits under its content. A pattern is densest at the top-left and gone
+   well before the composer. */
 .new-thread-body {
   position: relative;
   isolation: isolate;
@@ -306,4 +306,11 @@
   z-index: -1;
   pointer-events: none;
   mask-image: radial-gradient(110% 90% at 0% 0%, #000 0%, rgb(0 0 0 / 0.55) 35%, transparent 70%);
+}
+/* An image is a picture rather than a texture: it spans the screen's width and fades out under the
+   composer, leaving the thread list on the plain ground. Half strength keeps the title readable over
+   its darkest and lightest parts in either theme. */
+.dither-backdrop[data-style="image"] {
+  opacity: 0.5;
+  mask-image: linear-gradient(#000, rgb(0 0 0 / 0.75) 25%, transparent 58%);
 }

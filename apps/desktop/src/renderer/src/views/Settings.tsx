@@ -23,7 +23,7 @@ import { DeviceSettings } from "./settings-devices";
 import { GitHubSettings } from "./settings-github";
 import { PairPhone, PhoneSettings } from "./settings-phone";
 import { idleTimeoutLabel, learningStatus, memoryModelAgent } from "./settings-presentation";
-import { Field, LoadError, SaveStatus, Section, Toggle, usePreference } from "./settings-shared";
+import { Field, LoadError, SaveStatus, Section, SectionActionsSlot, Toggle, usePreference } from "./settings-shared";
 import { SkillsSettings } from "./settings-skills";
 import { SlackSettings } from "./settings-slack";
 import { TextGenerationSettings } from "./settings-text-generation";
@@ -32,7 +32,7 @@ import { ProviderUsageOverview } from "./settings-usage";
 
 type SettingsRoute = Extract<Route, { view: "settings" }>;
 
-/** The sidebar lists the sections, and the route says which one is open. */
+/** The sidebar lists the sections, the route says which one is open, and the top bar names it. */
 export function Settings({ route }: { route: SettingsRoute }) {
   const current = settingsSection(route);
   const content = useRef<HTMLDivElement>(null);
@@ -43,33 +43,45 @@ export function Settings({ route }: { route: SettingsRoute }) {
     return () => cancelAnimationFrame(frame);
   }, [route]);
   const info = useRpc("system.info", { refresh: true });
+  const [actionsSlot, setActionsSlot] = useState<HTMLElement | null>(null);
   return (
-    <div className="settings-sheet" data-plane>
-      <TopBar className="settings-sheet-bar">{null}</TopBar>
-      <div className="settings-shell">
-        <div ref={content} className="settings-content">
-          <header className="settings-page-head">
-            <div className="min-w-0">
-              <SettingsTitle current={current} />
-              <p>{current.description}</p>
-            </div>
-            {current.id === "connections" && (
-              <Button size="lg" disabled={info.isFetching} onClick={() => void info.refetch()}>
-                <RefreshCw size={13} />
-                {info.isFetching ? "Checking…" : "Refresh connections"}
-              </Button>
-            )}
-            {current.id === "phone" && <PairPhone />}
-          </header>
-          {settingsSections.map(({ id, label }) => (
-            <section key={id} id={`settings-${id}`} aria-label={label} hidden={id !== current.id}>
-              <SectionSettings id={id} active={id === current.id} info={info} />
-            </section>
-          ))}
+    <div className="settings-sheet">
+      <TopBar
+        actions={
+          <>
+            <PageActions id={current.id} info={info} />
+            <span ref={setActionsSlot} className="flex items-center gap-1" />
+          </>
+        }
+      >
+        <SettingsTitle current={current} />
+      </TopBar>
+      <SectionActionsSlot.Provider value={actionsSlot}>
+        <div className="settings-shell">
+          <div ref={content} className="settings-content">
+            <p className="settings-page-lead">{current.description}</p>
+            {settingsSections.map(({ id, label }) => (
+              <section key={id} id={`settings-${id}`} aria-label={label} hidden={id !== current.id}>
+                <SectionSettings id={id} active={id === current.id} info={info} />
+              </section>
+            ))}
+          </div>
         </div>
-      </div>
+      </SectionActionsSlot.Provider>
     </div>
   );
+}
+
+/** What the open section offers beside its title: checking the connections again, or pairing a phone. */
+function PageActions({ id, info }: { id: SettingsSection; info: UseQueryResult<RpcResults["system.info"]> }) {
+  if (id === "connections")
+    return (
+      <Button size="lg" disabled={info.isFetching} onClick={() => void info.refetch()}>
+        <RefreshCw size={13} />
+        {info.isFetching ? "Checking…" : "Refresh connections"}
+      </Button>
+    );
+  return id === "phone" ? <PairPhone /> : null;
 }
 
 /** Brings what a link into Settings points at into view: a provider's usage. */
@@ -80,7 +92,7 @@ function revealSetting(route: SettingsRoute) {
   target?.focus({ preventScroll: true });
 }
 
-/** The open section's name. While the sidebar is hidden, it also switches sections. */
+/** The open section's name, in the top bar. While the sidebar is hidden, it also switches sections. */
 export function SettingsTitle({ current }: { current: { id: SettingsSection; label: string } }) {
   const sidebarOpen = useLayout((s) => s.sidebarOpen);
   const navigate = useRouter((s) => s.navigate);
@@ -90,7 +102,7 @@ export function SettingsTitle({ current }: { current: { id: SettingsSection; lab
       <Menu.Root>
         <Menu.Trigger className="settings-section-menu no-drag">
           <span className="truncate">{current.label}</span>
-          <ChevronDown size={16} className="shrink-0" />
+          <ChevronDown size={14} className="shrink-0" />
         </Menu.Trigger>
         <Menu.Portal>
           <CoversPreview />

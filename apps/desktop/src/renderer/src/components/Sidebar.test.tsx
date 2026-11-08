@@ -289,7 +289,7 @@ it("reaches the app's screens from the rail, marking the open one as current", (
     within(dock)
       .getAllByRole("button")
       .map((button) => button.getAttribute("aria-label")),
-  ).toEqual(["Tasks", "Pull requests", "Schedules", "Orclings", "Show projects", "Settings"]);
+  ).toEqual(["New thread", "Tasks", "Pull requests", "Schedules", "Orclings", "Show projects", "Settings"]);
   fireEvent.click(within(dock).getByRole("button", { name: "Schedules" }));
   expect(useRouter.getState().route).toEqual({ view: "scheduled" });
   expect(within(dock).getByRole("button", { name: "Schedules" }).getAttribute("aria-current")).toBe("page");
@@ -424,7 +424,7 @@ it("marks each project in the filter with its most pressing open thread, sub thr
   expect(scope("five-project").getAttribute("aria-description")).toBeNull();
 });
 
-it("lists Settings' sections in place of the app's navigation, then goes back to the screen Settings was opened from", () => {
+it("lists Settings' sections in place of the thread list beside the rail, then goes back to the screen Settings was opened from", () => {
   useRouter.setState({ route: { view: "settings", section: "slack" }, history: [{ view: "tasks" }, { view: "settings" }] });
   mountSidebar();
   const sections = screen.getByRole("navigation", { name: "Settings" });
@@ -434,7 +434,15 @@ it("lists Settings' sections in place of the app's navigation, then goes back to
       .map((row) => row.textContent),
   ).toEqual(["Usage", "Connections", "Cloud", "Slack", "Phone", "Skills", "Connectors", "Devices", "Appearance", "General", "Memory & models", "Data"]);
   expect(within(sections).getByRole("button", { name: "Slack" }).getAttribute("aria-current")).toBe("page");
-  expect(screen.queryByRole("button", { name: "New thread" })).toBeNull();
+  // The rail stays, with the New thread the list's head would hold, and Settings as the current screen.
+  const rail = screen.getByRole("navigation", { name: "Screens" });
+  expect(
+    within(rail)
+      .getAllByRole("button")
+      .map((button) => button.getAttribute("aria-label"))
+      .slice(0, 2),
+  ).toEqual(["New thread", "Tasks"]);
+  expect(within(rail).getByRole("button", { name: "Settings" }).getAttribute("aria-current")).toBe("page");
   expect(screen.queryByRole("button", { name: "Add project" })).toBeNull();
   // The thread list waits underneath, so its loaded pages and scroll survive the visit.
   expect(screen.getByRole("region", { name: "Thread browser", hidden: true })).toBeTruthy();
@@ -447,8 +455,8 @@ it("lists Settings' sections in place of the app's navigation, then goes back to
   fireEvent.click(screen.getByRole("button", { name: "Back to app" }));
   expect(useRouter.getState().route).toEqual({ view: "tasks" });
   expect(screen.queryByRole("navigation", { name: "Settings" })).toBeNull();
-  expect(screen.getByRole("button", { name: "New thread" })).toBeTruthy();
-  expect(screen.getByRole("button", { name: "Settings" })).toBeTruthy();
+  expect(within(screen.getByRole("navigation", { name: "Screens" })).getByRole("button", { name: "New thread" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Settings" }).getAttribute("aria-current")).toBeNull();
 });
 
 it("goes back to a new thread when Settings was opened first", () => {
@@ -760,7 +768,8 @@ it("keeps the rail while the sidebar is hidden, with New thread at its top for t
   expect(useRouter.getState().route).toMatchObject({ view: "newthread", projectId: "notes" });
 });
 
-it("leaves New thread to the list's head while the sidebar shows", () => {
+it("keeps New thread on the rail while the sidebar shows, and not again in the list's head", () => {
   mountSidebar();
-  expect(within(screen.getByRole("navigation", { name: "Screens" })).queryByRole("button", { name: "New thread" })).toBeNull();
+  expect(within(screen.getByRole("navigation", { name: "Screens" })).getByRole("button", { name: "New thread" })).toBeTruthy();
+  expect(screen.getAllByRole("button", { name: "New thread" })).toHaveLength(1);
 });

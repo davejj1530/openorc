@@ -42,35 +42,31 @@ function RailButton({ label, current, pressed, onClick, children }: { label: str
 
 /**
  * The rail beside the thread list: the app's screens as round buttons with Orclings among them, then Projects, which
- * lists the projects under it while open, and Settings at its foot. The current screen sits on a knob that slides
- * between them. Orclings switches the list beside it between project threads and Orclings. While the list is
- * `folded` away, the rail takes over what it held: New thread at the top, and the usage above the update and Settings.
+ * lists the projects under it while open, then the week's usage, the update and Settings at its foot. New thread
+ * leads it, for the project the list focuses. The current screen sits on a knob that slides
+ * between them. Orclings switches the list beside it between project threads and Orclings.
  */
 export function SidebarRail({
   route,
   orclings,
   onProject,
-  folded,
   projectId,
 }: {
   route: Route;
   orclings: { active: boolean; toggle: () => void };
   onProject: (workspace: string) => void;
-  folded: boolean;
   /** The project a new thread starts in: the one the filter focuses. */
   projectId: string | null;
 }) {
   const notes = useScreenNotes();
   const rail = useRef<HTMLElement>(null);
-  const knob = useSlidingKnob(rail, "[data-current]", `${route.view}:${orclings.active}:${folded}`);
+  const knob = useSlidingKnob(rail, "[data-current]", `${route.view}:${orclings.active}`);
   return (
     <nav ref={rail} className="sidebar-rail" aria-label="Screens">
       <span aria-hidden="true" className="sidebar-dock-knob" data-placed={knob.placed || undefined} hidden={!knob.style} style={knob.style} />
-      {folded ? (
-        <RailButton label="New thread" current={route.view === "newthread"} onClick={() => newThread(projectId ?? undefined)}>
-          <PenSquare size={RAIL_ICON} />
-        </RailButton>
-      ) : null}
+      <RailButton label="New thread" current={route.view === "newthread"} onClick={() => newThread(projectId ?? undefined)}>
+        <PenSquare size={RAIL_ICON} />
+      </RailButton>
       {SCREENS.map(({ id, label, Icon, route: to, views }) => (
         <RailButton key={id} label={notes[id] ? `${label} · ${notes[id]}` : label} current={views.includes(route.view)} onClick={() => useRouter.getState().navigate(to)}>
           <Icon size={RAIL_ICON} />
@@ -82,9 +78,9 @@ export function SidebarRail({
       <span aria-hidden="true" className="sidebar-rail-divider" />
       <RailProjects onSelect={onProject} />
       <span aria-hidden="true" className="sidebar-rail-gap" />
-      {folded ? <AccountUsage rail /> : null}
+      <AccountUsage />
       <RailUpdate />
-      <RailButton label="Settings" onClick={() => useRouter.getState().navigate({ view: "settings" })}>
+      <RailButton label="Settings" current={route.view === "settings"} onClick={() => useRouter.getState().navigate({ view: "settings" })}>
         <Settings size={RAIL_ICON} />
       </RailButton>
     </nav>

@@ -11,13 +11,9 @@
   background: none;
 }
 /* Hidden, the column keeps its rail and the seam's turn beside it: the list folds away behind the
-   curve, which now meets the work column's top bar. Settings hides it whole, since it takes the
-   column over. */
+   curve, which now meets the work column's top bar. */
 .app-shell .workspace-navigation[data-open="false"] {
   width: calc(var(--width-rail) + var(--radius-lg));
-}
-.app-shell .workspace-navigation[data-open="false"][data-settings] {
-  width: 0;
 }
 .workspace-navigation[data-open="false"] :is(.sidebar-header, .sidebar-workspace) > * {
   visibility: hidden;
@@ -32,10 +28,10 @@
    (--spacing-wordmark), and the corner passes the pointer through to that header. Narrow windows
    float the sidebar instead and keep no rail. */
 @media (min-width: 901px) {
-  .app-shell .workspace-navigation[data-open="false"]:not([data-traffic-lights="true"], [data-settings]) {
+  .app-shell .workspace-navigation[data-open="false"]:not([data-traffic-lights="true"]) {
     overflow: visible;
   }
-  .workspace-navigation[data-open="false"]:not([data-traffic-lights="true"], [data-settings]) .sidebar-wordmark {
+  .workspace-navigation[data-open="false"]:not([data-traffic-lights="true"]) .sidebar-wordmark {
     visibility: visible;
   }
   .workspace-navigation[data-open="false"] .sidebar-header {
@@ -43,10 +39,9 @@
   }
 }
 /* The column slides; its parts keep the full width so nothing reflows while it moves. The window
-   corner and Settings' sections span the rail and the list; the list keeps its own width. */
+   corner spans the rail and the list; the list keeps its own width. */
 .sidebar-header,
-.sidebar-columns,
-.settings-destinations {
+.sidebar-columns {
   width: var(--width-navigation);
   flex-shrink: 0;
 }
@@ -106,8 +101,11 @@
   border-top-left-radius: var(--radius-lg);
   pointer-events: none;
 }
-/* Settings takes the column over; the app's navigation waits underneath it. */
-.sidebar-columns[hidden] {
+/* Settings takes the list's place; the list waits underneath it. Shown, its parts lay out in the column itself. */
+.sidebar-list-pane {
+  display: contents;
+}
+.sidebar-list-pane[hidden] {
   display: none;
 }
 
@@ -352,7 +350,6 @@ button.sidebar-workspace-name:is(:hover, [data-popup-open]) .sidebar-workspace-n
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   padding: 0 10px;
-  margin-top: 6px;
 }
 .sidebar-nav-row {
   display: flex;
@@ -464,9 +461,6 @@ button.sidebar-nav-row:hover {
   flex-shrink: 0;
   align-items: center;
   gap: 2px;
-}
-.sidebar-new-thread {
-  color: var(--ink);
 }
 
 /* Lists */
@@ -754,22 +748,7 @@ button.browser-empty:hover,
   margin-top: 2px;
 }
 
-/* The list's foot: the next message's weekly usage, its chip in the fullest look that fits, in line
-   with Settings at the rail's foot. The rail's round buttons and their knob follow. */
-.sidebar-footer {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-  padding: 6px 10px 10px;
-}
-.sidebar-usage {
-  display: flex;
-  flex: 1 1 0;
-  min-width: 32px;
-}
-.sidebar-usage:empty {
-  display: none;
-}
+/* The rail's round buttons and the knob that slides between them. */
 .sidebar-dock-knob {
   position: absolute;
   top: 0;
@@ -808,36 +787,7 @@ button.browser-empty:hover,
 .sidebar-dock-button[data-current]:hover {
   background-color: transparent;
 }
-/* The chip's looks (AccountUsage measures which fits): "64% left", "64%" with its ring, or the ring
-   alone in a 32px circle. */
-.account-usage-chip {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 12px 0 8px;
-  border-radius: var(--radius-pill);
-  background: var(--control-fill);
-  white-space: nowrap;
-  transition: background-color var(--duration-quick) var(--ease-out);
-}
-.account-usage-chip[data-look="short"] .account-usage-label,
-.account-usage-chip[data-look="icon"] :is(.account-usage-value, .account-usage-label) {
-  display: none;
-}
-.account-usage-chip[data-look="icon"] {
-  padding: 0 8px;
-}
-.account-usage-chip:hover,
-.account-usage-chip[data-popup-open] {
-  background-image: linear-gradient(var(--surface-2), var(--surface-2));
-}
-.account-usage-chip:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-}
-/* On the folded rail the ring alone is a rail button, at the rail's glyph size; a low week turns it. */
+/* The week's usage is a rail button, its ring at the rail's glyph size; a low week turns it. */
 .account-usage-rail .account-usage-ring {
   width: 18px;
   height: 18px;
@@ -860,21 +810,7 @@ button.browser-empty:hover,
   stroke-linecap: round;
   transition: stroke-dasharray var(--duration-resize) var(--ease-out);
 }
-.account-usage-value {
-  font-size: var(--text-base);
-  line-height: 16px;
-  color: var(--ink);
-}
-.account-usage-chip[data-low] .account-usage-value {
-  color: var(--attention);
-}
-.account-usage-label {
-  margin-left: -2px;
-  font-size: var(--text-xs);
-  line-height: 16px;
-  color: var(--ink-4);
-}
-/* The chip's popover: every account's 5-hour and weekly limits in one table. Hairlines sit between
+/* The ring's popover: every account's 5-hour and weekly limits in one table. Hairlines sit between
    rows; the open thread's account sits on the current-row fill instead. */
 .account-usage-popup {
   width: min(440px, calc(100vw - 24px));
@@ -948,15 +884,7 @@ button.browser-empty:hover,
   align-items: center;
   column-gap: 8px;
 }
-.usage-table-limit /* On the folded rail the ring alone is a rail button, at the rail's glyph size; a low week turns it. */
-.account-usage-rail .account-usage-ring {
-  width: 18px;
-  height: 18px;
-}
-.account-usage-rail[data-low] .account-usage-fill {
-  stroke: var(--attention);
-}
-.account-usage-ring {
+.usage-table-limit .account-usage-ring {
   grid-row: span 2;
 }
 .usage-table-value {
@@ -1041,13 +969,6 @@ button.browser-empty:hover,
 /* Folded to its rail, the column's seam is the list's curve alone. */
 .app-shell .sidebar-shell[data-open="false"]::after,
 .app-shell .sidebar-shell[data-open="false"] .sidebar-header::after {
-  display: none;
-}
-/* Settings keeps the seam the window's full height beside its one sheet, with no title bar line. */
-.app-shell .sidebar-shell[data-settings]::after {
-  top: 0;
-}
-.app-shell .sidebar-shell[data-settings] .sidebar-header::after {
   display: none;
 }
 

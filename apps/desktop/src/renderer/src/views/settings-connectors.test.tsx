@@ -5,6 +5,7 @@ import type { Connector, ConnectorList, RpcMethod, RpcParams, RpcResults } from 
 import { queryClient } from "../lib/client";
 import { core } from "../lib/rpc";
 import { ConnectorSettings } from "./settings-connectors";
+import { SectionActionsSlot } from "./settings-shared";
 
 const connector = (name: string, extra: Partial<Connector>): Connector => ({ name, title: name, kind: "url", logo: null, agents: [], ...extra });
 const list: ConnectorList = {
@@ -62,4 +63,25 @@ it("signs a connector in from its card", async () => {
   const linear = await screen.findByRole("listitem", { name: "Linear" });
   fireEvent.click(within(linear).getByRole("button", { name: "Sign in" }));
   await vi.waitFor(() => expect(calls).toContainEqual({ method: "connectors.signIn", params: { name: "linear" } }));
+});
+
+it("puts its controls in the top bar's slot while it is the open section, and keeps them out while it is not", async () => {
+  const slot = document.createElement("div");
+  document.body.append(slot);
+  const page = (active: boolean) => (
+    <QueryClientProvider client={queryClient}>
+      <SectionActionsSlot.Provider value={slot}>
+        <main>
+          <ConnectorSettings active={active} />
+        </main>
+      </SectionActionsSlot.Provider>
+    </QueryClientProvider>
+  );
+  const { rerender } = render(page(true));
+  expect(within(slot).getByRole("button", { name: "Add connector" })).toBeTruthy();
+  expect(within(slot).getByRole("button", { name: "Check again" })).toBeTruthy();
+  expect(within(screen.getByRole("main")).queryByRole("button", { name: "Add connector" })).toBeNull();
+  rerender(page(false));
+  expect(within(slot).queryByRole("button", { name: "Add connector" })).toBeNull();
+  slot.remove();
 });

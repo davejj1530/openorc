@@ -13,8 +13,8 @@ export type Ground = "tile" | "plane";
 /* Planes and the tile cards that sit inside them. Keep in step with the contextual-fill lists in
    app.css; new planes should carry data-plane rather than join these lists. */
 const PLANE =
-  ':is([data-plane]:not([data-plane="tile"]), .panel-content, .composer-shell, [role="dialog"], .menu-popup, .floating-popover, .model-picker-popup, .composer-context-popup, .composer-effort-popup, .command-palette)';
-const TILE_CARD = ':is([data-plane="tile"], .settings-group, .settings-card, .settings-disclosure, .usage-account, .memory-control, .harness-list)';
+  ':is([data-plane]:not([data-plane="tile"]), .panel-content, .composer-shell, [role="dialog"], .menu-popup, .floating-popover, .model-picker-popup, .composer-context-popup, .composer-effort-popup, .command-palette, .settings-group, .settings-card, .settings-disclosure, .usage-account, .memory-control)';
+const TILE_CARD = ':is([data-plane="tile"], .harness-list)';
 
 export function groundOf(element: Element | null): Ground {
   const nearest = element?.closest(`${PLANE}, ${TILE_CARD}`);

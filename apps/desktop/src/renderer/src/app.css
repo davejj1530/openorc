@@ -110,11 +110,26 @@
 /* Planes (sheets, menus, popovers, dialogs, the composer) restate the contextual fills
    one step off their own fill. A tile card inside a plane steps them back to the plane. Mark new
    planes with data-plane and tile cards with data-plane="tile" rather than growing these lists. */
-:where([data-plane], .menu-popup, .floating-popover, .project-picker-popup, .composer-context-popup, .model-picker-popup, .composer-effort-popup, .composer-shell, [role="dialog"]) {
+:where(
+  [data-plane],
+  .menu-popup,
+  .floating-popover,
+  .project-picker-popup,
+  .composer-context-popup,
+  .model-picker-popup,
+  .composer-effort-popup,
+  .composer-shell,
+  [role="dialog"],
+  .settings-group,
+  .settings-card,
+  .settings-disclosure,
+  .usage-account,
+  .memory-control
+) {
   --current-row-fill: var(--surface-2);
   --control-fill: var(--surface-2);
 }
-:where([data-plane="tile"], .settings-group, .settings-card, .settings-disclosure, .usage-account, .memory-control, .harness-list) {
+:where([data-plane="tile"], .harness-list) {
   --current-row-fill: var(--surface);
   --control-fill: var(--surface);
 }
@@ -1089,54 +1104,48 @@ span.property-chip {
     display: none;
   }
 }
-/* Settings is one flush surface plane beside the settings sidebar, like the work panel, its
-   toolbar included. The open section heads a left-aligned 860px column. Cards inside it are tile
-   cards (--bg) on the sheet. */
+/* Settings sits on the window's ground like every screen, its section named in the top bar. The open
+   section fills a left-aligned 860px column, and its cards are planes (--surface) on the ground. */
 .settings-sheet {
   display: flex;
   flex: 1;
   flex-direction: column;
   min-height: 0;
   min-width: 0;
-  background: var(--surface);
 }
-.app-shell .settings-sheet .settings-sheet-bar {
-  background: transparent;
-  border-bottom: 0;
+/* Settings shares one ground with its sidebar in every palette: the gradient some palettes light the work column
+   with stays out of it, its top bar and its save line. */
+.app-shell .well:has(> .settings-sheet)::before,
+.app-shell .settings-sheet :is(.app-topbar, .settings-feedback) {
+  background: var(--bg);
 }
 .settings-shell {
   --settings-content-width: 860px;
   --settings-control-width: 240px;
-  --settings-card-fill: var(--bg);
+  --settings-card-fill: var(--surface);
   container-type: inline-size;
   flex: 1;
   min-height: 0;
   min-width: 0;
   overflow: hidden;
 }
-.settings-page-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px 24px;
+/* What the open section holds, in a line above it. */
+.settings-page-lead {
   max-width: var(--settings-content-width);
-  margin-bottom: 32px;
-}
-.settings-page-head p {
-  margin-top: 6px;
+  margin-bottom: 28px;
   color: var(--ink-4);
   font-size: var(--text-md);
   line-height: 20px;
   letter-spacing: var(--text-md--letter-spacing);
 }
+/* The section's name in the top bar, set like every screen's title there. */
 .settings-window-title {
-  display: flex;
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
   min-width: 0;
+  padding: 0 4px;
   color: var(--ink);
-  font-size: var(--text-title);
-  line-height: var(--text-title--line-height);
-  letter-spacing: var(--text-title--letter-spacing);
 }
 /* With the sidebar hidden, the title opens the section list. */
 .settings-section-menu {
@@ -1144,8 +1153,9 @@ span.property-chip {
   align-items: center;
   gap: 6px;
   min-width: 0;
-  margin-inline: -10px;
-  padding: 0 10px;
+  height: 28px;
+  margin-inline: -4px;
+  padding: 0 8px;
   border-radius: var(--radius-md);
   color: var(--ink);
   transition: background-color var(--duration-leave) var(--ease-out);
@@ -1232,9 +1242,6 @@ span.property-chip {
   color: var(--ink-3);
   font-size: var(--text-sm);
   padding-block: 8px;
-}
-.settings-sheet .settings-feedback {
-  background: var(--surface);
 }
 /* A path is field-shaped, so it takes the field's well at the field's radius. Turns the Data
    tab from two floating text nodes into a card with wells in it. */

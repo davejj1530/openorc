@@ -493,6 +493,8 @@
   place-items: center;
   border-radius: var(--radius-lg);
   background: #fff;
+  /* On a card that is white too, the badge keeps its edge. */
+  box-shadow: inset 0 0 0 var(--hairline) var(--line);
   color-scheme: light;
 }
 /* A letter in place of an image takes the badge as its tile. */
@@ -638,15 +640,11 @@
 }
 
 /* A project's own Claude accounts, under its worktree card on the tile: a plane card with the
-   settings rows, outside the settings sheet, so it sets the sheet's measures itself. */
+   settings rows, outside Settings, so it sets Settings' measures itself. */
 .project-accounts {
   --settings-card-fill: var(--surface);
   --settings-control-width: 240px;
   margin-top: 32px;
-}
-.project-accounts .settings-group {
-  --current-row-fill: var(--surface-2);
-  --control-fill: var(--surface-2);
 }
 .project-account-choice {
   display: flex;

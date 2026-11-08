@@ -11,7 +11,7 @@ import { useRpc, useRpcMutation } from "../lib/client";
 import { agentName, agentStatusText, connectorOrigin, connectorStatus, isDormant, isYours } from "../lib/connector-presentation";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { ConnectorForm, type ConnectorDraft } from "./settings-connector-form";
-import { LoadError } from "./settings-shared";
+import { LoadError, SectionActions } from "./settings-shared";
 import "./settings-connectors.css";
 
 /** What a line says while its switch waits for a read to agree. */
@@ -187,21 +187,18 @@ export function ConnectorSettings({ active }: { active: boolean }) {
   };
   return (
     <>
-      <div className="settings-toolbar">
-        <p>{list.data?.checking || refresh.isPending ? "Checking connectors…" : null}</p>
-        <span className="flex items-center gap-2">
-          <IconButton aria-label="Check again" size="sm" disabled={refresh.isPending} onClick={() => refresh.mutate({ refresh: true })}>
-            <RefreshCw size={14} />
-          </IconButton>
-          <Button size="lg" onClick={() => setDraft({ name: "", spec: null, agents: [] })}>
-            <Plus size={14} />
-            Add connector
-          </Button>
-        </span>
-      </div>
+      <SectionActions active={active}>
+        <IconButton aria-label="Check again" disabled={refresh.isPending} onClick={() => refresh.mutate({ refresh: true })}>
+          <RefreshCw size={14} />
+        </IconButton>
+        <Button size="lg" onClick={() => setDraft({ name: "", spec: null, agents: [] })}>
+          <Plus size={14} />
+          Add connector
+        </Button>
+      </SectionActions>
+      {list.isPending || list.data?.checking || refresh.isPending ? <p className="settings-note">Checking connectors…</p> : null}
       {list.isError ? <LoadError retry={() => void list.refetch()} /> : null}
       {list.data ? <SignInProgress list={list.data} /> : null}
-      {list.isPending ? <p className="settings-note">Checking connectors…</p> : null}
       {list.data && !connectors.length ? <p className="settings-note">No connectors yet.</p> : null}
       <ConnectorGroup title="Yours" connectors={connectors.filter((connector) => isYours(connector) && !isDormant(connector))} busy={busy} onEdit={(connector) => void edit(connector)} />
       <ConnectorGroup

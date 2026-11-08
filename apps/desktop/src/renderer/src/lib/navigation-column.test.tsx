@@ -28,8 +28,9 @@ it("leaves the folded rail's corner to the wordmark only when no traffic lights 
   expect(corner({ open: true, lights: false })).toBeNull();
 });
 
-it("clears the traffic lights when nothing of the navigation shows: Settings folded, or a narrow window", () => {
-  expect(corner({ open: false, lights: true, settings: true })).toBe("lights");
+it("clears the traffic lights only when nothing of the navigation shows, in a narrow window; Settings keeps the folded rail", () => {
+  expect(corner({ open: false, lights: true, settings: true })).toBeNull();
+  expect(corner({ open: false, lights: false, settings: true })).toBe("wordmark");
   expect(corner({ open: false, lights: true, narrow: true })).toBe("lights");
   expect(corner({ open: false, lights: false, narrow: true })).toBeNull();
 });

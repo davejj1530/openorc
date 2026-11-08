@@ -371,6 +371,8 @@ async function readOpenCodeRoot(root: SkillRoot): Promise<AgentSkill[]> {
     if (depth > 8 || found.length >= MAX_ENTRIES) return;
     for (const entry of await treeEntries(dir)) {
       if (found.length >= MAX_ENTRIES) break;
+      // Hidden entries hold no skills: Claude's synced skills keep staging copies under hidden folders.
+      if (entry.name.startsWith(".")) continue;
       if (entry.directory) {
         // Depth bounds symlink cycles as well as unexpectedly large skill trees.
         await visit(entry.file, depth + 1);

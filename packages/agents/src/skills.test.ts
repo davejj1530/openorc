@@ -247,6 +247,14 @@ describe("listSkills", () => {
     expect(withoutClaude.some((entry) => entry.name === "paired")).toBe(false);
   });
 
+  it("leaves OpenCode the staging copies Claude keeps in hidden folders", async () => {
+    await skill(path.join(home, ".claude", "skills", "synced", "account", ".staging", "20339"), ".replaced-20339-abc", "---\ndescription: A staged copy.\n---\n");
+    await skill(path.join(home, ".claude", "skills", "synced", "account"), "pptx", "---\ndescription: Slides.\n---\n");
+    const found = await listSkills({ projectRoot, home, agent: "opencode", env: {}, nativeDiscovery: false });
+    expect(found.some((entry) => entry.name.startsWith(".replaced"))).toBe(false);
+    expect(found.find((entry) => entry.name === "pptx")?.description).toBe("Slides.");
+  });
+
   it("reads a configured OpenCode HTTP catalog", async () => {
     const server = createServer((request, response) => {
       if (request.url === "/catalog/index.json") response.end(JSON.stringify({ skills: [{ name: "remote", version: "1", files: ["remote.md"] }] }));

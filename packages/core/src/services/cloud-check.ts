@@ -42,7 +42,9 @@ export class CloudChecks {
     this.running = checkSandbox(provider, { files, ...(node ? { node } : {}), ...(agent ? { agent } : {}), report })
       .then((passed) => {
         check.passed = passed;
-        this.log.info(`cloud check on ${provider.id} ${passed ? "passed" : "failed"}`);
+        const failed = check.steps.find((entry) => entry.state === "failed");
+        const why = failed ? ` at ${failed.step}: ${failed.error}` : "";
+        this.log.info(`cloud check on ${provider.id} ${passed ? "passed" : `failed${why}`}`);
       })
       .catch((error: unknown) => {
         check.passed = false;

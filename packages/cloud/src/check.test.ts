@@ -20,13 +20,13 @@ afterEach(async () => {
   await rm(base, { recursive: true, force: true });
 });
 
-/** A sandbox service whose VMs find `claude` only when `withClaude` is set. */
-async function provider(withClaude: boolean): Promise<LocalSandboxProvider> {
+/** A sandbox service whose VMs find `claude` only when `withClaude` is set, and fall asleep after `awayMs` unless kept awake. */
+async function provider(withClaude: boolean, awayMs?: number): Promise<LocalSandboxProvider> {
   if (withClaude) {
     await writeFile(path.join(bin, "claude"), `#!/bin/sh\necho "2.1.316 (Claude Code)"\n`);
     await chmod(path.join(bin, "claude"), 0o755);
   }
-  return new LocalSandboxProvider(path.join(base, "sandboxes"), () => ({ ...process.env, PATH: `${bin}:/usr/bin:/bin:${path.dirname(process.execPath)}` }));
+  return new LocalSandboxProvider(path.join(base, "sandboxes"), () => ({ ...process.env, PATH: `${bin}:/usr/bin:/bin:${path.dirname(process.execPath)}` }), awayMs);
 }
 
 it("passes every step in a throwaway sandbox, says what it found, and deletes the sandbox", async () => {
@@ -55,5 +55,14 @@ it("stops at the first step that fails, and still deletes the sandbox", async ()
   ]);
   expect(progress.find((entry) => entry.state === "failed")?.error).toBe("Claude Code is not installed in the sandbox.");
   expect(existsSync(path.join(base, "sandboxes")) ? await readdir(path.join(base, "sandboxes")) : []).toEqual([]);
+  await sandboxes.close();
+}, 60_000);
+
+it("keeps its sandbox awake through every step, however soon the sandbox would fall asleep on its own", async () => {
+  const sandboxes = await provider(true, 1);
+  const progress: CheckProgress[] = [];
+  const passed = await checkSandbox(sandboxes, { files: runnerFiles(), node: process.execPath, report: (entry) => progress.push(entry) });
+  expect(progress.filter((entry) => entry.state === "failed")).toEqual([]);
+  expect(passed).toBe(true);
   await sandboxes.close();
 }, 60_000);

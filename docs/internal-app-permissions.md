@@ -67,7 +67,7 @@ The Preview shares your signed-in sessions (see [agent access to the Preview](ag
 
 ## Default mode for new work
 
-Choosing a mode in a permission picker saves it as your default (`app.settings.defaultPermissionMode`). New conversations and new schedules start with it. A task conversation takes its mode from the task's previous run, then from the conversation that created the task, and only then from the default. Existing conversations and schedules keep their own mode; changing the default never raises them. New work waits for settings to load before it can start. Until you choose, the default is **Accept edits**. A choice made on the phone stays with its thread and leaves the default as it was.
+Choosing a mode in a permission picker saves it as your default (`app.settings.defaultPermissionMode`). New conversations and new schedules start with it. A task conversation takes its mode from the task's previous run, then from the conversation that created the task, and only then from the default. Existing conversations and schedules keep their own mode; changing the default never raises them. New work waits for settings to load before it can start. Until you choose, the default is **Autonomous** for every coding agent, labelled **Full access** for Codex. A choice made on the phone stays with its thread and leaves the default as it was.
 
 ## For contributors
 

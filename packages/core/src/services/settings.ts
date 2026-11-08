@@ -8,7 +8,7 @@ const defaults: AppSettings = {
   autoDoneOnPrMerge: true,
   autoArchiveDoneDays: 14,
   defaultWorkspaceMode: "current",
-  defaultPermissionMode: "trusted",
+  defaultPermissionMode: "autonomous",
   defaultHarness: null,
   look: null,
   idleProcessMinutes: 10,

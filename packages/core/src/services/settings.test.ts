@@ -9,9 +9,10 @@ describe("settings persistence", () => {
   it("loads older settings and remembers the latest permission without losing other preferences", () => {
     const db = Db.memory();
     databases.push(db);
+    expect(new AppSettingsService(db).get().defaultPermissionMode).toBe("autonomous");
     settings.set(db, "app.settings", JSON.stringify({ sound: true, defaultWorkspaceMode: "worktree" }));
     const service = new AppSettingsService(db);
-    expect(service.get()).toMatchObject({ sound: true, defaultWorkspaceMode: "worktree", defaultPermissionMode: "trusted", defaultHarness: null });
+    expect(service.get()).toMatchObject({ sound: true, defaultWorkspaceMode: "worktree", defaultPermissionMode: "autonomous", defaultHarness: null });
     for (const permission of ["autonomous", "review", "trusted"] as const) {
       service.set({ defaultPermissionMode: permission });
       expect(new AppSettingsService(db).get()).toMatchObject({ sound: true, defaultWorkspaceMode: "worktree", defaultPermissionMode: permission });

@@ -43,7 +43,8 @@ it("keeps a choice on its own work where the client may not change app settings"
   const phone = testClient(undefined, { savesDefaultPermission: false });
   phone.call.mockResolvedValue({ defaultPermissionMode: "trusted" });
   const { result } = renderHook(() => phone.client.usePermissionSelection(), { wrapper: phone.wrapper });
-  await vi.waitFor(() => expect(result.current.permission).toBe("trusted"));
+  expect(result.current).toMatchObject({ permission: "autonomous", ready: false });
+  await vi.waitFor(() => expect(result.current).toMatchObject({ permission: "trusted", ready: true }));
   act(() => result.current.select("autonomous"));
   expect(result.current.permission).toBe("autonomous");
   expect(result.current.error).toBeNull();

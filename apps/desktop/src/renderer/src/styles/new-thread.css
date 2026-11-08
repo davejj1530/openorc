@@ -297,6 +297,20 @@
   position: relative;
   isolation: isolate;
 }
+/* Folded to its rail, the sidebar runs --radius-lg past the seam for the seam's turn into the top
+   bar, and the work column starts after the turn. Beside it, the body reaches back under the turn,
+   its content where it was, so the backdrop meets the seam and rounds its corner with the turn. The
+   sidebar draws its lines above it. A narrow window floats the sidebar and keeps no rail. */
+@media (min-width: 901px) {
+  body:has(.sidebar-shell[data-open="false"]) .work-row:not(:has(> .panel-shell[data-side="left"][data-open="true"])) > .well:first-child > .new-thread-body {
+    margin-left: calc(-1 * var(--radius-lg));
+    padding-left: calc(48px + var(--radius-lg));
+  }
+  body:has(.sidebar-shell[data-open="false"]) .work-row:not(:has(> .panel-shell[data-side="left"][data-open="true"])) > .well:first-child > .new-thread-body > .dither-backdrop {
+    overflow: hidden;
+    border-top-left-radius: var(--radius-lg);
+  }
+}
 .dither-backdrop {
   /* The dots' ink, a step from the ground toward the text in any palette. DitherBackdrop reads it
      for the shader. */

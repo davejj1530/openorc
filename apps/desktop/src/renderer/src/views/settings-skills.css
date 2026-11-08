@@ -1,0 +1,432 @@
+/* Skills: one agent's skills in a list beside the chosen one, two tile cards that fill the sheet's height and
+   scroll on their own. A short window scrolls the sheet instead, from the browser's minimum height. */
+.settings-content:has(> section:not([hidden]) > .skills-page) {
+  display: flex;
+  flex-direction: column;
+}
+.settings-content > section:has(> .skills-page):not([hidden]) {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  max-width: 1180px;
+}
+.skills-page {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+}
+.skills-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.skills-agent-count {
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.skills-project {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 240px;
+  height: var(--control-lg);
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: var(--text-base);
+  transition:
+    background-color var(--duration-leave) var(--ease-out),
+    color var(--duration-leave) var(--ease-out);
+}
+.skills-project svg {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+.skills-project:hover,
+.skills-project[data-popup-open] {
+  background: var(--surface-3);
+  color: var(--ink);
+}
+.skills-project:disabled {
+  color: var(--ink-3);
+}
+/* A zero height with a floor: the browser takes the room left, never its content's height, so its panes scroll. */
+.skills-browser {
+  display: grid;
+  flex: 1 0 auto;
+  grid-template-columns: 340px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 12px;
+  height: 0;
+  min-height: 480px;
+}
+.skills-pane {
+  --surface-2: color-mix(in srgb, var(--ink) 7%, transparent);
+  --surface-3: color-mix(in srgb, var(--ink) 11%, transparent);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--radius-3xl);
+  background: var(--settings-card-fill);
+}
+
+/* The list: a head with the count, search and add, then the skills by where they come from. */
+.skill-list-head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 46px;
+  padding: 8px 8px 4px 18px;
+  color: var(--ink-2);
+  font-size: var(--text-base);
+}
+.skill-list-head > [role="status"] {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.skill-list-head .header-search-field {
+  width: 168px;
+  height: var(--control-md);
+}
+.skill-list-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 8px 12px;
+}
+.skill-group h3 {
+  padding: 12px 10px 4px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  font-weight: 400;
+}
+.skill-group ul,
+.skill-tree,
+.skill-tree ul {
+  display: grid;
+  gap: 1px;
+}
+.skill-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 10px;
+  border-radius: var(--radius-lg);
+  transition: background-color var(--duration-leave) var(--ease-out);
+}
+.skill-row:hover {
+  background: var(--surface-2);
+}
+.skill-row[data-current] {
+  background: var(--current-row-fill);
+}
+.skill-row:has(.skill-row-main:focus-visible) {
+  background: var(--surface-3);
+}
+.skill-row-main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+  padding: 8px 0 8px 10px;
+  border-radius: inherit;
+  text-align: left;
+}
+.skill-row-main:focus-visible {
+  background-color: transparent;
+}
+.skill-row-text {
+  display: grid;
+  min-width: 0;
+}
+.skill-row-text > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.skill-row-name {
+  color: var(--ink);
+  font-size: var(--text-base);
+  line-height: 18px;
+}
+.skill-row-line {
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+.skill-row :is(.skill-row-name, .skill-badge) {
+  transition: opacity var(--duration-leave) var(--ease-out);
+}
+.skill-row[data-off] :is(.skill-row-name, .skill-badge) {
+  opacity: 0.45;
+}
+.skill-list-note {
+  padding: 12px 10px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+
+/* A skill's image on the shared light badge, ringed by a hairline so it holds its edge on a current row's plane. */
+.skill-badge {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  box-shadow: 0 0 0 var(--hairline) var(--line);
+}
+.skill-badge[data-size="head"] {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-lg);
+}
+.skill-badge-button {
+  flex-shrink: 0;
+  border-radius: var(--radius-lg);
+}
+.skill-badge-button .skill-badge {
+  transition: box-shadow var(--duration-leave) var(--ease-out);
+}
+.skill-badge-button:is(:hover, [data-popup-open]) .skill-badge {
+  box-shadow: 0 0 0 1px var(--line-strong);
+}
+.skill-badge-button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* The chosen skill's folder, opened under its row and lined up with its name. */
+.skill-tree {
+  margin: 2px 0 8px 51px;
+}
+.skill-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  height: 28px;
+  padding-right: 8px;
+  border-radius: var(--radius-md);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  text-align: left;
+  transition: background-color var(--duration-leave) var(--ease-out);
+}
+.skill-tree-row svg {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+.skill-tree-row:hover {
+  background: var(--surface-2);
+}
+.skill-tree-row[aria-current="true"] {
+  background: var(--current-row-fill);
+  color: var(--ink);
+}
+.skill-tree-chevron {
+  transition: rotate var(--duration-quick) var(--ease-out);
+}
+.skill-tree-note {
+  padding: 4px 8px 10px 59px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+.skill-unsaved {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  margin-left: auto;
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+}
+
+/* The detail: image, name and call with the switch and menu, the facts, the description, then the file. */
+.skill-detail {
+  gap: 14px;
+  padding: 20px 22px;
+  overflow-y: auto;
+}
+.skill-detail-empty {
+  display: grid;
+  place-items: center;
+  color: var(--ink-3);
+  font-size: var(--text-base);
+}
+.skill-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.skill-head-name {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.skill-head-name > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.skill-head-name h2 {
+  color: var(--ink);
+  font-size: var(--text-lg);
+  line-height: 22px;
+  letter-spacing: var(--text-lg--letter-spacing);
+}
+.skill-call-text {
+  color: var(--mention-ink);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+.skill-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 32px;
+  color: var(--ink);
+  font-size: var(--text-base);
+  line-height: 20px;
+}
+.skill-facts > div {
+  min-width: 0;
+  max-width: 100%;
+}
+.skill-facts dt {
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  line-height: 16px;
+}
+.skill-facts dd {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.skill-facts .skill-call-text {
+  color: inherit;
+}
+.skill-description {
+  color: var(--ink-2);
+  font-size: var(--text-base);
+  line-height: 20px;
+}
+
+/* The file: a plane card whose editor paints the card's own ground. */
+.skill-file {
+  --bg: var(--surface);
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 280px;
+  overflow: hidden;
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+}
+.skill-file-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 8px 10px 8px 16px;
+  border-bottom: var(--hairline) solid var(--line);
+}
+.skill-file-path {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--ink-2);
+  font-size: var(--text-base);
+}
+.skill-file-path .skill-unsaved {
+  margin-left: 0;
+}
+.skill-view-toggle .segmented-option {
+  padding-inline: 8px;
+}
+.skill-read-only {
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-4);
+  font-size: var(--text-sm);
+}
+.skill-read-only:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 0;
+}
+.skill-file-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px 0;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+.skill-file-notice > span {
+  flex: 1;
+  min-width: 0;
+}
+.skill-file-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 18px 22px;
+}
+.skill-file-editor {
+  flex: 1;
+  min-height: 0;
+}
+.skill-file-status {
+  padding: 16px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+
+/* Write a skill and Upload a skill. */
+.skill-form {
+  display: grid;
+  gap: 14px;
+}
+.skill-form-field {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+.skill-form-field > :is(input, textarea) {
+  justify-self: stretch;
+}
+.skill-form-instructions {
+  min-height: 160px;
+  resize: vertical;
+}
+.skill-form-folder {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--text-base);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.skill-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Narrow sheets stack the list over the detail. */
+@container (max-width: 760px) {
+  .skills-browser {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(220px, 2fr) minmax(0, 3fr);
+    min-height: 760px;
+  }
+}

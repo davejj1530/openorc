@@ -1,6 +1,6 @@
-/* Appearance modes, fonts and skill harnesses are pressed-button groups drawn as the segmented
+/* Appearance modes and fonts are pressed-button groups drawn as the segmented
    track: a fill track at natural width, the current choice on a surface pill. */
-:is(.appearance-modes, .skills-harnesses) {
+.appearance-modes {
   display: flex;
   gap: 0;
   width: fit-content;
@@ -12,7 +12,7 @@
   overflow-x: auto;
   scrollbar-width: none;
 }
-:is(.appearance-modes, .skills-harnesses) button {
+.appearance-modes button {
   display: flex;
   flex-shrink: 0;
   align-items: center;
@@ -33,23 +33,23 @@
     padding-inline: 10px;
   }
 }
-:is(.appearance-modes, .skills-harnesses) button:hover {
+.appearance-modes button:hover {
   color: var(--ink);
 }
-:is(.appearance-modes, .skills-harnesses) button[aria-pressed="true"] {
+.appearance-modes button[aria-pressed="true"] {
   background: var(--surface);
   color: var(--navigation-ink);
 }
-:is(.appearance-modes, .skills-harnesses) button:focus-visible {
+.appearance-modes button:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: -2px;
   background: var(--surface);
 }
 @media (forced-colors: active) {
-  :is(.appearance-modes, .skills-harnesses) {
+  .appearance-modes {
     outline: 1px solid ButtonBorder;
   }
-  :is(.appearance-modes, .skills-harnesses) button[aria-pressed="true"] {
+  .appearance-modes button[aria-pressed="true"] {
     outline: 2px solid Highlight;
     outline-offset: -2px;
   }

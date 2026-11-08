@@ -7,20 +7,6 @@
   position: static;
   min-height: 0;
 }
-/* The skills scope and empty states are cards like every other group. */
-.settings-shell :is(.skills-scope, .skills-empty) {
-  border: 0;
-  border-radius: var(--radius-2xl);
-  background: var(--settings-card-fill);
-  box-shadow: none;
-}
-.settings-shell .skills-scope {
-  margin-bottom: 20px;
-  padding: 14px 20px;
-}
-.settings-shell .skills-list {
-  margin-top: 10px;
-}
 .settings-agent-location {
   color: var(--ink-3);
   font-size: var(--text-xs);
@@ -315,7 +301,7 @@
 
 /* Inside a card the raised roles step up from the card's own fill, so secondary buttons, hovers
    and selected fills stay visible on it in every palette. */
-.settings-shell :is(.settings-group, .settings-card, .settings-disclosure, .usage-account, .memory-control, .skills-scope) {
+.settings-shell :is(.settings-group, .settings-card, .settings-disclosure, .usage-account, .memory-control) {
   --surface-2: color-mix(in srgb, var(--ink) 7%, transparent);
   --surface-3: color-mix(in srgb, var(--ink) 11%, transparent);
 }
@@ -444,13 +430,6 @@
   line-height: 1.6;
 }
 
-.settings-shell .skills-harness-count {
-  background: transparent;
-}
-.settings-shell .skills-section-heading h2 {
-  color: var(--ink);
-  font-size: 13px;
-}
 /* A disclosure that is its own card, for long guides such as Slack setup. */
 .settings-disclosure {
   margin-bottom: 32px;

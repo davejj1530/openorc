@@ -7,7 +7,7 @@ const presentation: Record<SettingsSection, { label: string; description: string
   cloud: { label: "Cloud", description: "Where cloud threads run.", Icon: Cloud },
   slack: { label: "Slack", description: "Bring requests from Slack to this computer.", Icon: MessageSquare },
   phone: { label: "Phone", description: "Your threads, from your phone.", Icon: Smartphone },
-  skills: { label: "Skills", description: "Browse the skills your agents can use.", Icon: BookText },
+  skills: { label: "Skills", description: "What each agent knows how to do, and what it says.", Icon: BookText },
   connectors: { label: "Connectors", description: "The tools and services your agents reach.", Icon: Plug },
   devices: { label: "Devices", description: "Simulators and emulators for you and your agents.", Icon: Tablet },
   appearance: { label: "Appearance", description: "Your workspace, in your own colors.", Icon: SunMoon },

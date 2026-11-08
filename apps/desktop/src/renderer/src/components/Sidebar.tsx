@@ -6,8 +6,6 @@ import { useNavigationGone } from "../lib/navigation-column";
 import { useProjectIconChanges } from "../lib/project-icons";
 import { OrclingsRailContext, useOrclingsRail } from "../lib/orclings-rail";
 import { useOrclings } from "../lib/orclings";
-import { dismissCompactNavigation } from "../lib/compact-navigation";
-import { PenSquare } from "./icons";
 import { ResizeHandle } from "./ResizeHandle";
 import { SidebarListHead, Wordmark } from "./SidebarListHead";
 import { NewOrclingButton, SidebarOrclings } from "./SidebarOrclings";
@@ -15,7 +13,6 @@ import { SidebarSettings } from "./SidebarSettings";
 import { SidebarThreadBrowser, ThreadFilter } from "./SidebarThreadBrowser";
 import { SidebarRail } from "./SidebarRail";
 import { ProjectFilter } from "./SidebarWorkspaces";
-import { IconButton, Tooltip } from "./ui";
 import { WindowCorner } from "./WindowCorner";
 
 /**
@@ -53,18 +50,7 @@ export function Sidebar() {
             {/* Settings takes the list's place; the list keeps its pages, filters and scroll for the way back. */}
             <div className="sidebar-list-pane" hidden={settings}>
               {orclings.active ? null : <ProjectFilter onSelect={chooseWorkspace} />}
-              <SidebarListHead
-                tools={
-                  orclings.active ? (
-                    <NewOrclingButton />
-                  ) : (
-                    <>
-                      <ThreadFilter />
-                      <NewThreadButton projectId={projectId} />
-                    </>
-                  )
-                }
-              />
+              <SidebarListHead tools={orclings.active ? <NewOrclingButton /> : <ThreadFilter />} />
               {/* Keep loaded pages and filters when switching to a companion. */}
               <div className="sidebar-browser-slot" hidden={orclings.active}>
                 <SidebarThreadBrowser />
@@ -76,24 +62,6 @@ export function Sidebar() {
       </aside>
       {open ? <ResizeHandle edge="sidebar" /> : null}
     </>
-  );
-}
-
-function NewThreadButton({ projectId }: { projectId: string | null }) {
-  return (
-    <Tooltip label="New thread">
-      <IconButton
-        size="lg"
-        aria-label="New thread"
-        className="sidebar-new-thread no-drag"
-        onClick={() => {
-          newThread(projectId ?? undefined);
-          dismissCompactNavigation();
-        }}
-      >
-        <PenSquare size={16} />
-      </IconButton>
-    </Tooltip>
   );
 }
 

@@ -84,12 +84,14 @@
   height: 100%;
 }
 /* Beside an open file the explorer sits one fill step down, with a faint seam. Its current row
-   and the filter's hover step back up to the card's surface, like a tile card inside a plane. */
+   and filter step back up to the card's surface, like a tile card inside a plane. */
 .file-explorer-sidebar > .file-explorer {
   --current-row-fill: var(--surface);
   --control-fill: var(--surface);
-  --filter-hover: var(--surface);
   background: var(--surface-2);
+}
+.file-explorer-sidebar .file-explorer-filter input {
+  background: var(--surface);
 }
 .file-explorer-sidebar > .file-explorer {
   grid-row: 1 / 3;
@@ -114,8 +116,6 @@
   padding: 8px;
   flex-shrink: 0;
 }
-/* The filter reads like the sidebar's Search: no field, the glyph and its words in the toolbar's
-   ink, and a fill only under the pointer. The glyph lines up with the toolbar's title. */
 .file-explorer-filter > svg {
   position: absolute;
   left: 16px;
@@ -124,17 +124,10 @@
   pointer-events: none;
 }
 .file-explorer-filter input {
-  height: 32px;
-  padding-left: 32px;
+  height: 30px;
+  padding-left: 28px;
   border-radius: var(--radius-pill);
-  background: transparent;
-  transition: background-color var(--duration-quick) var(--ease-out);
-}
-.file-explorer-filter input::placeholder {
-  color: var(--ink-3);
-}
-.file-explorer-filter input:hover:not(:focus) {
-  background: var(--filter-hover, var(--surface-2));
+  font-size: var(--text-sm);
 }
 .file-explorer-scroll {
   flex: 1;

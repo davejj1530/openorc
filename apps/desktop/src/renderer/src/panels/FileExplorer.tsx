@@ -177,7 +177,7 @@ export function FileExplorer({ scope, directory, selected = "" }: ExplorerProps)
       <FileExplorerToolbar scope={scope} />
       <div className="file-explorer-body">
         <div className="file-explorer-filter">
-          <Search size={16} />
+          <Search size={13} />
           <Input
             ref={input}
             aria-label="Search files"

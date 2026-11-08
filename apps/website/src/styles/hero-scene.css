@@ -413,7 +413,7 @@
 .hs-workspace-name .hs-icon:last-child {
   color: var(--hs-muted);
 }
-/* The list head: Search where the titles start, then the filter and New thread, in ink, at the row's end. */
+/* The list head: Search where the titles start, then the filter at the row's end. */
 .hs-list-head {
   display: flex;
   flex: none;
@@ -421,9 +421,6 @@
   gap: calc(2 * var(--u));
   height: calc(34 * var(--u));
   margin: calc(6 * var(--u)) calc(10 * var(--u)) 0;
-}
-.hs-list-new {
-  color: var(--hs-ink);
 }
 .hs-search {
   display: flex;
@@ -2447,22 +2444,23 @@
   width: calc(14 * var(--u));
   height: calc(14 * var(--u));
 }
-/* The filter reads like the list head's Search: no field, the glyph and its words in the muted ink. */
 .hs-explorer-filter {
   display: flex;
   flex: none;
   align-items: center;
-  gap: calc(8 * var(--u));
-  height: calc(32 * var(--u));
+  gap: calc(6 * var(--u));
+  height: calc(30 * var(--u));
   margin: calc(8 * var(--u));
   padding: 0 calc(12 * var(--u)) 0 calc(8 * var(--u));
   border-radius: 999px;
-  color: var(--hs-muted);
-  line-height: calc(16 * var(--u));
+  background: var(--hs-fill);
+  color: var(--hs-faint);
+  font-size: calc(12 * var(--u));
 }
 .hs-explorer-filter .hs-icon {
-  width: calc(16 * var(--u));
-  height: calc(16 * var(--u));
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
+  color: var(--hs-muted);
 }
 .hs-tree {
   padding: 0 calc(5 * var(--u)) calc(12 * var(--u));

@@ -40,17 +40,7 @@ beforeEach(() => {
   });
   usePanelSessions.setState({ sessions: {} });
   usePanelSessions.getState().open("thread:thread", { kind: "browser", url: "", title: "" });
-  useLayout.setState({
-    panelOpen: true,
-    panelTab: "browser",
-    panelRequest: null,
-    panelThreadId: thread.id,
-    selectedChanges: null,
-    selectedFile: null,
-    panelExpanded: true,
-    panelSide: "right",
-    previewUrls: {},
-  });
+  useLayout.setState({ panelOpen: true, panelTab: "browser", panelRequest: null, panelThreadId: thread.id, selectedChanges: null, selectedFile: null, panelExpanded: true, previewUrls: {} });
 });
 
 afterEach(() => {
@@ -81,15 +71,4 @@ it("stays expanded when what had focus already handled Escape, as an editor does
   fireEvent.keyDown(await screen.findByRole("textbox", { name: "Handles Escape" }), { key: "Escape" });
   expect(screen.getByRole("button", { name: "Collapse panel" })).toBeTruthy();
   expect(useLayout.getState().panelExpanded).toBe(true);
-});
-
-it("moves itself back to the right from its own header while docked on the left as the middle column, but not while expanded", () => {
-  useLayout.setState({ panelSide: "left" });
-  renderExpandedPanel();
-  expect(screen.queryByRole("button", { name: /^Move panel/ })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Collapse panel" }));
-  fireEvent.click(screen.getByRole("button", { name: "Move panel right" }));
-  expect(useLayout.getState().panelSide).toBe("right");
-  // On the right the main column is the middle one, and its header holds the switch.
-  expect(screen.queryByRole("button", { name: /^Move panel/ })).toBeNull();
 });

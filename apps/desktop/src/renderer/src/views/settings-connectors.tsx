@@ -30,12 +30,13 @@ function AgentLine({ connector, agent }: { connector: Connector; agent: AgentCon
   }, [on, wanted]);
   const error = agent.places.find((place) => place.error)?.error;
   const connected = agent.places.length > 0 && agent.places.every((place) => place.status === "connected");
+  const status = switchingText(wanted) ?? agentStatusText(agent);
   return (
     <div className="connector-agent">
       <HarnessLogo id={agent.agent} size={14} />
       <span className="connector-agent-name">{agentName(agent)}</span>
-      <span className="connector-agent-status" data-ok={(connected && wanted === null) || undefined} title={error}>
-        {switchingText(wanted) ?? agentStatusText(agent)}
+      <span className="connector-agent-status" data-ok={(connected && wanted === null) || undefined} title={error ?? status}>
+        {status}
       </span>
       {agent.switchable ? (
         <Switch

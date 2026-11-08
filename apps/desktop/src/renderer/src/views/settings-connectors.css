@@ -48,6 +48,8 @@
 }
 .connector-agents-list {
   display: grid;
+  /* The card's width, not the longest line's: a long status truncates instead of pushing the switch out. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 2px;
   margin-top: auto;
   padding-top: 10px;

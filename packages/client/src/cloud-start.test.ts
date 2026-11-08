@@ -9,6 +9,7 @@ import {
   cloudStartSteps,
   failureParts,
   missingCloudSignIn,
+  offersBrainMove,
   preparingCloud,
   threadMoveCard,
   type StartingCloudThread,
@@ -17,12 +18,19 @@ import { queueHint } from "./composer-presentation.js";
 
 const thread = (more: Partial<ThreadSummary>) => ({ agent: "claude", projectId: "openorc", teamInstanceId: null, cloud: undefined, ...more }) as ThreadSummary;
 
-it("moves a project's conversation on this Mac, whichever agent it has, and nothing else", () => {
-  for (const agent of ["claude", "codex", "opencode"] as const) expect(canMoveToCloud(thread({ agent }))).toBe(true);
+it("moves a project's supported conversation on this Mac, and nothing else", () => {
+  for (const agent of ["claude", "codex", "opencode", "omp"] as const) expect(canMoveToCloud(thread({ agent }))).toBe(true);
+  expect(canMoveToCloud(thread({ agent: "cursor" }))).toBe(false);
   expect(canMoveToCloud(thread({ agent: "acp" }))).toBe(false);
   expect(canMoveToCloud(thread({ projectId: WORKSPACE_ID }))).toBe(false);
   expect(canMoveToCloud(thread({ teamInstanceId: "team-1" }))).toBe(false);
   expect(canMoveToCloud(thread({ cloud: { provider: "vercel", state: "ready", step: null, setup: false, error: null } }))).toBe(false);
+});
+
+it("keeps Cursor on the connected computer even when a cloud brain is available", () => {
+  expect(offersBrainMove(thread({ agent: "cursor" }))).toBe(false);
+  expect(offersBrainMove(thread({ agent: "omp" }))).toBe(true);
+  expect(offersBrainMove(thread({ agent: undefined }))).toBe(true);
 });
 
 it("names where a cloud thread runs, or that its sandbox is gone", () => {

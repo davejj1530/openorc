@@ -476,7 +476,13 @@ const deviceId = text(100, /^[A-Za-z0-9-]+$/);
 const packageFile = text(255, /^\w[\w.-]*$/);
 const refused = object({ refused: text(2000) });
 const release = nullable(text(32, /^\d+\.\d+\.\d+$/));
-const agentVersions = object({ claude: release, codex: release, opencode: release } satisfies { [A in HarnessId]: Parse<string | null> });
+/** Oh My Pi joined after the others: a Mac or brain from before it sends no version for it, read as none. */
+const agentVersionsRead = object(
+  { claude: release, codex: release, opencode: release },
+  { omp: release, pi: release, antigravity: release, fx: release, cursor: nullable(text(40, /^\d{4}\.\d{2}\.\d{2}-[a-f0-9]+$/)) },
+);
+const agentVersions: Parse<AgentVersions> = (value, field) =>
+  ({ omp: null, cursor: null, pi: null, antigravity: null, fx: null, ...agentVersionsRead(value, field) }) satisfies { [A in HarnessId]: string | null };
 const REQUESTS = variants<BrainControlRequest>({
   status: object({ op: literal("status") }),
   wake: object({ op: literal("wake") }),

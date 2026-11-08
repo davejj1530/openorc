@@ -20,6 +20,7 @@ const PROVIDER_NAMES: Record<string, string> = {
   mistral: "Mistral",
   xai: "xAI",
   deepseek: "DeepSeek",
+  opencode: "OpenCode Zen",
 };
 export const openCodeProviderName = (provider: string): string => PROVIDER_NAMES[provider] ?? provider;
 

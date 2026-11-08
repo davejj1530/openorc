@@ -35,7 +35,7 @@ const RESERVED = new Set([
  * Names that choose an agent's own sign-in: one from a project would switch the agent off its subscription, onto an
  * API key billed by the token, or sign it in somewhere else.
  */
-const SIGN_IN_PREFIXES = ["ANTHROPIC_", "CLAUDE_", "OPENAI_", "CODEX_", "OPENCODE_", "OPENORC_"];
+const SIGN_IN_PREFIXES = ["ANTHROPIC_", "CLAUDE_", "OPENAI_", "CODEX_", "OPENCODE_", "OPENORC_", "OMP_", "PI_CODING_AGENT_", "PI_CONFIG_", "PI_PROFILE"];
 
 /** Why a name cannot be one of a project's cloud variables, or null when it can. */
 export function cloudEnvNameProblem(name: string): string | null {

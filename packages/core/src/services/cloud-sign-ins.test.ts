@@ -6,6 +6,7 @@ import type { ClaudeCloudAccess, CloudBrainSignIns, CodexCloudAccess } from "@op
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { CloudSignInsFlow } from "./cloud-sign-ins.js";
 import { macSignIns } from "./mac-agent-keys.js";
+import { AppSettingsService } from "./settings.js";
 
 const MAC_CODEX_KEY = "sk-mac-codex-fixture-0123456789";
 const MAC_OPENROUTER_KEY = "sk-or-mac-fixture-0123456789";
@@ -143,7 +144,7 @@ function services(brainSetUp: boolean) {
 
 function flowWith(parts: ReturnType<typeof services>) {
   const env = { HOME: path.join(root, "home"), CODEX_HOME: path.join(root, "codex"), XDG_DATA_HOME: path.join(root, "data"), XDG_STATE_HOME: path.join(root, "state") };
-  const mac = macSignIns(() => ({ env, binaries: { claude: null, codex: "/fixture/codex", opencode: "/fixture/opencode" } }));
+  const mac = macSignIns(() => ({ env, binaries: { claude: null, codex: "/fixture/codex", opencode: "/fixture/opencode", omp: null, cursor: null, pi: null, antigravity: null, fx: null } }));
   return new CloudSignInsFlow({ db, ...parts, mac, changed: () => undefined });
 }
 
@@ -151,6 +152,16 @@ async function settled(flow: CloudSignInsFlow) {
   await vi.waitFor(async () => expect((await flow.status()).bringing).toBe(false));
   return flow.status();
 }
+
+it("offers and brings sign-ins only for enabled coding agents", async () => {
+  new AppSettingsService(db).set({ enabledHarnesses: ["claude"] });
+  const flow = flowWith(services(false));
+  expect((await flow.status()).rows.every((row) => row.kind === "claude")).toBe(true);
+  flow.bringAll(true);
+  await settled(flow);
+  expect(browser.opened.every((name) => name.startsWith("claude:"))).toBe(true);
+  expect(browser.events.some((event) => /codex|opencode/.test(event))).toBe(false);
+});
 
 async function macKeys(): Promise<void> {
   await mkdir(path.join(root, "codex"), { recursive: true });

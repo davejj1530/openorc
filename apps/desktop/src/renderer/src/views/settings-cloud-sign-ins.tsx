@@ -25,10 +25,10 @@ export function missingRows(signIns: CloudSignIns | undefined): CloudSignIn[] {
 /** How many sign-ins are still missing, said the same in the step's summary and on its Bring them row. */
 export const notSignedIn = (count: number) => `${count} not signed in`;
 
-/** A row names its agent where the name alone could be another's: Claude's accounts beside OpenCode's providers. */
+/** A row names its agent where the name alone could be another's: Claude's accounts beside the provider keys OpenCode and Oh My Pi share. */
 export function signInTitle(row: CloudSignIn): string {
   if (row.kind === "claude") return `Claude · ${row.label}`;
-  return row.kind === "opencode" ? `OpenCode · ${row.label}` : row.label;
+  return row.kind === "opencode" ? `${row.label} key` : row.label;
 }
 
 /**

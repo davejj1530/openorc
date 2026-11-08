@@ -30,7 +30,6 @@ it("says an agent in a sandbox can read the key its model uses, and adds one for
   expect(screen.getByText(/An agent in a sandbox can read the key its model uses\./)).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Add a key" }));
   await waitFor(() => expect(screen.getByRole("option", { name: "Anthropic" })).toBeTruthy());
-  expect(screen.queryByRole("option", { name: "OpenCode Zen" })).toBeNull();
   fireEvent.change(screen.getByRole("combobox"), { target: { value: "anthropic" } });
   fireEvent.change(screen.getByPlaceholderText("Paste key"), { target: { value: "sk-ant-0123456789" } });
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -43,4 +42,25 @@ it("lists each provider with a key by its name, never the key, and removes one",
   expect(screen.getByText("Key saved")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Remove" }));
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.opencode.removeKey", { provider: "openrouter" }));
+});
+
+it("offers this Mac's providers first, then the common ones and OpenCode Zen, and leaves out any that already has a key", async () => {
+  show(["openai"]);
+  fireEvent.click(screen.getByRole("button", { name: "Add a key" }));
+  await waitFor(() => expect(screen.getByRole("group", { name: "On this Mac" })).toBeTruthy());
+  const options = (group: string) => [...screen.getByRole("group", { name: group }).querySelectorAll("option")].map((option) => option.textContent);
+  expect(options("On this Mac")).toEqual(["OpenRouter", "Anthropic"]);
+  expect(options("Others")).toEqual(["Google", "Groq", "Mistral", "xAI", "DeepSeek", "OpenCode Zen"]);
+  expect(screen.getByRole("option", { name: "Another provider…" })).toBeTruthy();
+});
+
+it("takes a key for a provider typed in, as a model id names it", async () => {
+  show([]);
+  fireEvent.click(screen.getByRole("button", { name: "Add a key" }));
+  await waitFor(() => expect(screen.getByRole("option", { name: "Another provider…" })).toBeTruthy());
+  fireEvent.change(screen.getByRole("combobox"), { target: { value: "typed" } });
+  fireEvent.change(screen.getByPlaceholderText("As in a model id, like togetherai"), { target: { value: " TogetherAI " } });
+  fireEvent.change(screen.getByPlaceholderText("Paste key"), { target: { value: "tg-0123456789" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("cloud.opencode.saveKey", { provider: "togetherai", key: "tg-0123456789" }));
 });

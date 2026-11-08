@@ -15,6 +15,7 @@ export {
 } from "./sandbox.js";
 export { LocalSandbox, LocalSandboxProvider, SETTLING_RM } from "./local-sandbox.js";
 export { ensureAgent } from "./agent-install.js";
+export { PREBUILT_INSTALL } from "./prebuilt-install.js";
 export {
   brokeringPolicy,
   VercelSandbox,

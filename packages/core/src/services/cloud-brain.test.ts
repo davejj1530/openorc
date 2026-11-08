@@ -257,7 +257,7 @@ const asked = () => brain.calls.filter((call) => call !== "control sign-ins");
 const stored = () => JSON.parse(record.saved.at(-1) || "null") as { key: string; region: string; teamId: string } | null;
 
 /** Stand-in agent CLIs on this Mac that only say their versions, which the brain is brought to. */
-const MAC_VERSIONS = { claude: "2.1.317 (Claude Code)", codex: "codex-cli 0.166.0", opencode: "opencode v2.0.11" };
+const MAC_VERSIONS = { claude: "2.1.317 (Claude Code)", codex: "codex-cli 0.166.0", opencode: "opencode v2.0.11", omp: "omp/18.18.1", cursor: null, pi: null, antigravity: null, fx: null };
 let env: NodeJS.ProcessEnv;
 
 beforeEach(async () => {
@@ -296,7 +296,7 @@ describe("the cloud brain from the Mac", () => {
     await setUp();
     expect(asked()).toEqual(["provision v1 archive sin1", "wake", "control agent-versions", "control handover", "status"]);
     // Its agent CLIs are brought to this Mac's as it starts; later wakes ask only once one changed.
-    expect(brain.agentVersions).toEqual([{ claude: "2.1.317", codex: "0.166.0", opencode: "2.0.11" }]);
+    expect(brain.agentVersions).toEqual([{ claude: "2.1.317", codex: "0.166.0", opencode: "2.0.11", omp: "18.18.1", cursor: null, pi: null, antigravity: null, fx: null }]);
     expect(brain.access[0]).toEqual({ service: "vercel", token: VERCEL_TOKEN, teamId: "team_fixture" });
     expect(brain.opens.slice(0, 2)).toEqual([
       { create: false, saved: 0 },

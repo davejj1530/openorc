@@ -15,10 +15,11 @@ import { macGitHub, macMemoryKey, type SignInSources } from "./cloud-brain-signi
 import type { MemoryService } from "./memory.js";
 import { savedPushKey } from "../remote/push/keys.js";
 import { ClaudeCloudSignIn } from "./cloud-agent-env.js";
-import { cloudAgents, type CloudAgents } from "./cloud-agents.js";
+import { LOCAL_ONLY_SIGN_INS, cloudAgents, type CloudAgents } from "./cloud-agents.js";
 import { CloudChecks } from "./cloud-check.js";
 import { CodexCloudSignIn } from "./cloud-codex.js";
 import { OpenCodeCloudKeys, OpenCodeCloudSignIn } from "./cloud-opencode.js";
+import { OmpCloudSignIn } from "./cloud-omp.js";
 import { CloudProjectEnv } from "./cloud-env.js";
 import { CloudBases } from "./cloud-bases.js";
 import { CloudSkills, StoredCloudSkills, skillsPayload, type CloudSkillSource } from "./cloud-skills.js";
@@ -229,9 +230,11 @@ export function createCloud(input: CloudInput): CloudParts {
     brain.signInsChanged();
   });
   const agents = cloudAgents({
+    ...LOCAL_ONLY_SIGN_INS,
     claude: new ClaudeCloudSignIn({ accounts, tokens, snapshot: environment }),
     codex: new CodexCloudSignIn(codexLogin),
     opencode: new OpenCodeCloudSignIn(opencode),
+    omp: new OmpCloudSignIn(opencode),
   });
   const { sessions, versions } = agentParts(input, agents);
   const changed = (id: string) => invalidate(["threads", `thread:${id}`]);

@@ -1,4 +1,5 @@
 import type { HarnessCatalogEntry } from "@openorc/protocol";
+import { PREBUILT_INSTALL } from "./prebuilt-install.js";
 import type { Sandbox } from "./sandbox.js";
 
 export interface AgentInstall {
@@ -27,6 +28,13 @@ export async function ensureAgent(sandbox: Sandbox, cli: HarnessCatalogEntry["cl
   }
   const current = await has();
   if (current && (install.version === null || current === install.version)) return;
+  if (cli.prebuilt) {
+    // Beside npm's own CLIs, on the PATH they share.
+    const placed = await sandbox.exec("sh", ["-c", 'node -e "$1" "$2" "$3" "$(npm prefix -g)/bin/$4"', "sh", PREBUILT_INSTALL, cli.prebuilt, install.version ?? "", cli.bin], { sudo: true });
+    if (placed.code !== 0) throw new Error(`${install.name} could not be installed in the cloud workspace: ${placed.stderr.trim().slice(-500)}`);
+    return;
+  }
+  if (!cli.npm) throw new Error(`${install.name} cannot be installed in a cloud workspace yet. Run it on the connected computer.`);
   const wanted = install.version ? `${cli.npm}@${install.version}` : cli.npm;
   let installed = await sandbox.exec("npm", ["install", "-g", wanted], { sudo: true });
   // The image's own copy of the CLI, from another package, holds the command's name: this host's version takes it over.

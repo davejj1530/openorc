@@ -18,7 +18,7 @@ function asked(row: CloudSignIn): string {
   if (row.kind === "claude") return `Claude account “${row.label}” has no sign-in for the cloud.`;
   if (row.kind === "codex") return "Codex has no sign-in for the cloud.";
   if (row.kind === "brain-codex") return "Codex has no sign-in on the cloud brain.";
-  return `OpenCode has no ${row.label} key for the cloud.`;
+  return `There is no ${row.label} key for the cloud.`;
 }
 
 const WAITING: Partial<Record<CloudSignIn["way"], string>> = { browser: "Sign in in your browser.", "private-window": "Sign in in the private window that opened." };

@@ -8,7 +8,7 @@ import type { ProtectedSecretStore } from "./extraction-credentials.js";
  * Where each provider OpenCode calls takes its key, so the sandbox's firewall can add it there: the host, the header
  * its AI SDK provider sends, and the scheme before the key.
  */
-const PROVIDER_APIS: Record<string, { domain: string; header: string; scheme?: string }> = {
+export const PROVIDER_APIS: Record<string, { domain: string; header: string; scheme?: string }> = {
   anthropic: { domain: "api.anthropic.com", header: "x-api-key" },
   openai: { domain: "api.openai.com", header: "authorization", scheme: "Bearer" },
   openrouter: { domain: "openrouter.ai", header: "authorization", scheme: "Bearer" },
@@ -105,8 +105,10 @@ export class OpenCodeCloudSignIn implements CloudSignIn {
 
   private async keyFor(who: CloudRunWho): Promise<{ provider: string; key: string } | null> {
     const provider = openCodeProvider(who.model);
-    if (!provider || provider === OPENCODE_FREE_PROVIDER) return null;
+    if (!provider) return null;
     const key = await this.keys.key(provider);
+    // OpenCode Zen's free models need no key; one saved for it opens its paid models.
+    if (provider === OPENCODE_FREE_PROVIDER) return key ? { provider, key } : null;
     if (!key) throw new Error(`OpenCode has no key for ${this.label(provider)} in the cloud. Add one in Settings > Cloud.`);
     return { provider, key };
   }

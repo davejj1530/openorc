@@ -163,13 +163,17 @@ export interface BrainHome<Vm extends BrainVm = BrainVm> {
 /** How setup supplies each thing the survey can find missing. */
 type Remedy = { kind: "image" } | { kind: "apt"; package: string } | { kind: "folders" } | { kind: "npm"; package: string };
 
-/** Each agent's CLI, from the one list of them, in the brain's own npm prefix. */
-const AGENT_NEEDS = Object.fromEntries(
-  harnessIds.map((id) => {
-    const { npm, bin } = harnessCatalog[id].cli;
-    return [id, { check: `"$npm/bin/${bin}" --version`, remedy: { kind: "npm", package: npm } }];
+/**
+ * Each agent's CLI, from the one list of them, in the brain's own npm prefix. One installed as a prebuilt binary is not
+ * part of setup: the brain installs it when its Mac has it, as it brings each CLI to the Mac's version.
+ */
+const AGENT_NEEDS: Partial<Record<HarnessId, { check: string; remedy: Remedy }>> = Object.fromEntries(
+  harnessIds.flatMap((id) => {
+    if (!harnessCatalog[id].cloud) return [];
+    const { npm, bin, prebuilt } = harnessCatalog[id].cli;
+    return npm ? [[id, { check: prebuilt ? "true" : `"$npm/bin/${bin}" --version`, remedy: { kind: "npm", package: npm } }]] : [];
   }),
-) as Record<HarnessId, { check: string; remedy: Remedy }>;
+);
 
 /** Checks run with `$npm` set and the layout's folders as arguments. */
 const NEEDS = {
@@ -285,8 +289,8 @@ function parseSurvey(stdout: string): Survey {
 
 function packages(missing: Need[], kind: "apt" | "npm"): string[] {
   return missing.flatMap((need) => {
-    const remedy: Remedy = NEEDS[need].remedy;
-    return "package" in remedy && remedy.kind === kind ? [remedy.package] : [];
+    const remedy = NEEDS[need]?.remedy;
+    return remedy && "package" in remedy && remedy.kind === kind ? [remedy.package] : [];
   });
 }
 

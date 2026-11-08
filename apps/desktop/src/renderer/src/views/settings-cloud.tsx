@@ -11,6 +11,7 @@ import {
 } from "@openorc/protocol";
 import { Button, Select, TextButton, Tooltip } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
+import { useEnabledHarnesses } from "../lib/enabled-harnesses";
 import { Agent37Settings, CloudServiceChoice } from "./settings-cloud-agent37";
 import { CloudBrain } from "./settings-cloud-brain";
 import { BrainCodexRow, BrainGitHubSection } from "./settings-cloud-brain-signins";
@@ -266,7 +267,8 @@ function ServiceStep({ status }: { status: CloudStatus }) {
  * brain's own Codex login and GitHub among them once there is a brain.
  */
 function SignInsStep({ status, signIns, brain, active }: { status: CloudStatus; signIns: CloudSignIns | undefined; brain: CloudBrainStatus | undefined; active: boolean }) {
-  const onBrain = signIns?.rows.some((row) => row.kind === "brain-codex") ?? false;
+  const enabled = useEnabledHarnesses();
+  const onBrain = signIns?.rows.some((row) => row.kind === "brain-codex" || row.kind === "github") ?? false;
   const busy = brain?.state === "ready" && brain.working !== null;
   return (
     <>
@@ -275,9 +277,9 @@ function SignInsStep({ status, signIns, brain, active }: { status: CloudStatus; 
           <BringMissing signIns={signIns} />
         </div>
       ) : null}
-      <ClaudeCloudAccounts status={status} active={active} />
-      <CodexCloudSection codex={status.codex} brain={onBrain ? <BrainCodexRow active={active} busy={busy} /> : undefined} />
-      <OpenCodeCloudSection opencode={status.opencode} />
+      {enabled.includes("claude") ? <ClaudeCloudAccounts status={status} active={active} /> : null}
+      {enabled.includes("codex") ? <CodexCloudSection codex={status.codex} brain={onBrain ? <BrainCodexRow active={active} busy={busy} /> : undefined} /> : null}
+      {enabled.includes("opencode") || enabled.includes("omp") ? <OpenCodeCloudSection opencode={status.opencode} /> : null}
       {onBrain ? <BrainGitHubSection active={active} busy={busy} /> : null}
     </>
   );

@@ -58,6 +58,7 @@ describe("choosing the user's skills for cloud sessions", () => {
         { agent: "codex", skills: [{ name: "review", description: "review things", chosen: false }], error: null },
         { agent: "claude", skills: [{ name: "review", description: "review things", chosen: false }], error: null },
         { agent: "opencode", skills: [], error: null },
+        { agent: "omp", skills: [], error: null },
       ],
     });
     const of = (view: Awaited<ReturnType<CloudSkills["catalog"]>>, agent: HarnessId) => view.agents.find((each) => each.agent === agent)!.skills[0]!.chosen;
@@ -79,6 +80,7 @@ describe("choosing the user's skills for cloud sessions", () => {
       ["codex", "Codex is not installed."],
       ["claude", null],
       ["opencode", null],
+      ["omp", null],
     ]);
   });
 
@@ -142,7 +144,10 @@ describe("the skills a Mac sends its cloud brain", () => {
 
   it("are refused whole when a name or a path would leave the brain's folder, or the file is not skills", async () => {
     const kept = path.join(dir, "kept");
-    const payload = (name: string, file: string) => ({ v: 1 as const, agents: { claude: [{ name, files: [{ path: file, data: "", executable: false }] }], codex: [], opencode: [] } });
+    const payload = (name: string, file: string) => ({
+      v: 1 as const,
+      agents: { claude: [{ name, files: [{ path: file, data: "", executable: false }] }], codex: [], opencode: [], omp: [], cursor: [], pi: [], antigravity: [], fx: [] },
+    });
     await expect(storeSkills(kept, payload("../up", "SKILL.md"))).rejects.toThrow(/cannot be kept/);
     await expect(storeSkills(kept, payload("ok", "../../etc/passwd"))).rejects.toThrow(/outside its folder/);
     await expect(storeSkills(kept, payload("ok", "/etc/passwd"))).rejects.toThrow(/outside its folder/);

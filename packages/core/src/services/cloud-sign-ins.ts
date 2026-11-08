@@ -5,6 +5,7 @@ import type { CloudBrain } from "./cloud-brain.js";
 import type { OpenCodeCloudKeys } from "./cloud-opencode.js";
 import type { CodexCloudLogin } from "./codex-cloud-login.js";
 import type { MacSignIns } from "./mac-agent-keys.js";
+import { AppSettingsService } from "./settings.js";
 
 export interface CloudSignInsDeps {
   db: Db;
@@ -114,8 +115,14 @@ export class CloudSignInsFlow {
 
   private async rows(fresh: boolean): Promise<Row[]> {
     const { brain, mac } = this.deps;
+    const enabled = new AppSettingsService(this.deps.db).enabledHarnesses();
     const [codexKey, held] = await Promise.all([mac.codexApiKey(fresh).catch(() => null), brain.exists().then((exists) => (exists ? brain.signIns() : null))]);
-    const rows = [...(await this.claude()), ...this.codex(await this.deps.codex.status(), codexKey), ...(held ? this.brainCodex(held.codex, codexKey) : []), ...(await this.openCode(fresh))];
+    const rows = [
+      ...(enabled.includes("claude") ? await this.claude() : []),
+      ...(enabled.includes("codex") ? this.codex(await this.deps.codex.status(), codexKey) : []),
+      ...(held && enabled.includes("codex") ? this.brainCodex(held.codex, codexKey) : []),
+      ...(enabled.includes("opencode") || enabled.includes("omp") ? await this.openCode(fresh) : []),
+    ];
     if (held) rows.push(this.github(held.github));
     return rows.map((row) => this.overlaid(row));
   }
@@ -197,12 +204,13 @@ export class CloudSignInsFlow {
 
   /**
    * Each provider with a cloud key or on this Mac's OpenCode. A Mac key may be copied; a provider the Mac signs in to
-   * with an account needs a key typed in, as the cloud passes OpenCode a key alone. Its free provider needs none.
+   * with an account needs a key typed in, as the cloud passes OpenCode a key alone. OpenCode Zen's free models need
+   * none, so it shows only once a key is saved for its paid ones.
    */
   private async openCode(fresh: boolean): Promise<Row[]> {
     const { opencode, mac } = this.deps;
     const [cloud, here] = await Promise.all([opencode.providers(), mac.opencode(fresh).catch(() => [])]);
-    const providers = [...new Set([...cloud, ...here.map((each) => each.provider)])].filter((provider) => provider !== OPENCODE_FREE_PROVIDER).sort();
+    const providers = [...new Set([...cloud, ...here.map((each) => each.provider)])].filter((provider) => provider !== OPENCODE_FREE_PROVIDER || cloud.includes(provider)).sort();
     return providers.map((provider) => {
       const key = here.find((each) => each.provider === provider)?.key ?? null;
       return {

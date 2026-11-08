@@ -33,9 +33,10 @@ import { cloudAgentHost } from "./cloud-agent-host.js";
 import { CloudAwake } from "./cloud-awake.js";
 import type { CloudCheckTarget } from "./cloud-check.js";
 import type { AgentSessions, SessionBase } from "./agent-sessions.js";
-import { cloudAgents, SANDBOX_OWN, type CloudAgents, type CloudRunWho } from "./cloud-agents.js";
+import { LOCAL_ONLY_SIGN_INS, cloudAgents, SANDBOX_OWN, type CloudAgents, type CloudRunWho } from "./cloud-agents.js";
 import { CodexCloudSignIn } from "./cloud-codex.js";
 import { OpenCodeCloudKeys, OpenCodeCloudSignIn } from "./cloud-opencode.js";
+import { OmpCloudSignIn } from "./cloud-omp.js";
 import { sandboxHome } from "./agent-homes.js";
 import { SandboxSkills, type CloudSkillSource } from "./cloud-skills.js";
 import { Phases } from "./cloud-phases.js";
@@ -46,7 +47,6 @@ import { CloudWarm, prepareAhead, type Warmed } from "./cloud-warm.js";
 import { CloudBroker } from "./cloud-broker.js";
 import type { StartThreadInput } from "./thread-inputs.js";
 import { usesDocker } from "./uses-docker.js";
-
 export interface CloudWorkspaceOptions {
   /** Every sandbox service a workspace may have been made with. A workspace keeps using its own. */
   providers: SandboxProvider[];
@@ -198,7 +198,6 @@ export class CloudWorkspaceService {
   private readonly syncs = new Map<string, Promise<boolean>>();
   /** Conversations seeded since their last turn: nothing has changed on either side, so their first turn starts without a sync. */
   private readonly pristine = new Set<string>();
-  /** The preparing step each conversation is on. */
   private readonly progress = new Map<string, { step: CloudStep; setup: boolean }>();
   /** Each sandbox's agent CLIs at the version found or installed there, so a turn asks again only after a version changes. */
   private readonly agentsReady = new WeakMap<Sandbox, Map<HarnessId, string | null>>();
@@ -213,7 +212,15 @@ export class CloudWorkspaceService {
   ) {
     this.files = options.files ?? null;
     this.awake = new CloudAwake({ released: (threadId) => this.sleep(threadId), log });
-    this.agents = options.agents ?? cloudAgents({ claude: SANDBOX_OWN, codex: new CodexCloudSignIn(undefined), opencode: new OpenCodeCloudSignIn(new OpenCodeCloudKeys(undefined)) });
+    this.agents =
+      options.agents ??
+      cloudAgents({
+        ...LOCAL_ONLY_SIGN_INS,
+        claude: SANDBOX_OWN,
+        codex: new CodexCloudSignIn(undefined),
+        opencode: new OpenCodeCloudSignIn(new OpenCodeCloudKeys(undefined)),
+        omp: new OmpCloudSignIn(new OpenCodeCloudKeys(undefined)),
+      });
     this.skills = new SandboxSkills(options.skills, (message) => log.warn(message));
     this.broker = new CloudBroker(log);
     this.history = new CloudHistory(log);

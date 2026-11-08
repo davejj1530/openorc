@@ -1,5 +1,5 @@
 import { Menu } from "@base-ui/react/menu";
-import { distillationHarnessIds, harnessCatalog, type AppSettings, type ExtractionProviderChoice, type RpcResults } from "@openorc/protocol";
+import { distillationHarnessIds, harnessCatalog, isHarnessId, type AppSettings, type ExtractionProviderChoice, type RpcResults } from "@openorc/protocol";
 import type { UseQueryResult } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, RefreshCw } from "../components/icons";
@@ -15,6 +15,7 @@ import { useRouter, type Route, type SettingsSection } from "../lib/router";
 import { settingsSection, settingsSections } from "../lib/settings-sections";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { AgentConnections } from "./settings-agent-updates";
+import { useEnabledHarnesses } from "../lib/enabled-harnesses";
 import { AppearanceSettings } from "./settings-appearance";
 import { ClaudeAccountSettings } from "./settings-claude-accounts";
 import { ConnectorSettings } from "./settings-connectors";
@@ -124,6 +125,7 @@ export function SettingsTitle({ current }: { current: { id: SettingsSection; lab
 
 /** One section's settings. Every section stays mounted, so a change in progress survives a look at another. */
 function SectionSettings({ id, active, info }: { id: SettingsSection; active: boolean; info: UseQueryResult<RpcResults["system.info"]> }) {
+  const enabled = useEnabledHarnesses();
   switch (id) {
     case "usage":
       return <ProviderUsageOverview active={active} />;
@@ -132,7 +134,7 @@ function SectionSettings({ id, active, info }: { id: SettingsSection; active: bo
         <>
           {info.isError && <LoadError retry={() => void info.refetch()} />}
           <AgentConnections info={info.data} />
-          <ClaudeAccountSettings active={active} />
+          {enabled.includes("claude") ? <ClaudeAccountSettings active={active} /> : null}
           <GitHubSettings info={info.data} />
         </>
       );
@@ -222,6 +224,21 @@ const providerLabel = (choice: ExtractionProviderChoice): string => {
   if (choice === "off") return "Off · no background learning";
   return `${harnessCatalog[choice].name} subscription`;
 };
+function MemoryProviderOptions() {
+  const enabled = useEnabledHarnesses();
+  return (
+    <>
+      {providerChoices
+        .filter((provider) => !isHarnessId(provider) || enabled.includes(provider))
+        .map((provider) => (
+          <option key={provider} value={provider}>
+            {providerLabel(provider)}
+          </option>
+        ))}
+    </>
+  );
+}
+
 export function MemorySettings() {
   const s = usePreference("memory.settings.set");
   const v = s.value;
@@ -252,11 +269,7 @@ export function MemorySettings() {
               void s.commit({ provider: e.target.value as ExtractionProviderChoice });
             }}
           >
-            {providerChoices.map((p) => (
-              <option key={p} value={p}>
-                {providerLabel(p)}
-              </option>
-            ))}
+            <MemoryProviderOptions />
           </Select>
         </Field>
         {provider === "apikey" && (

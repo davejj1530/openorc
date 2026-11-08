@@ -46,6 +46,15 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+it.each(["cursor", "antigravity", "fx"] as const)("explains why %s cannot fork before creating a thread", (agent) => {
+  open({ agent });
+  const item = screen.getByText("Fork").closest("[role=menuitem]");
+  expect(item?.getAttribute("aria-disabled")).toBe("true");
+  expect(item?.getAttribute("title")).toContain("does not support forking");
+  fireEvent.click(screen.getByText("Fork"));
+  expect(mutations.get("threads.fork")).not.toHaveBeenCalled();
+});
+
 it("offers Bring to Mac for a thread the cloud brain holds, and no folder moves or fork", () => {
   open({ owner: { brain: "cloud", reach: "live", heardAt: 1 } });
   fireEvent.click(screen.getByText("Bring to Mac"));

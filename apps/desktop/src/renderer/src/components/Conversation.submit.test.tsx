@@ -133,11 +133,25 @@ it.each([
     expected: [["threads.queue", { id: "thread", text: "hello", attachments: [], requestKey: expect.any(String) }]],
   },
   {
-    name: "queues when the agent reads messages only between turns",
+    name: "steers OpenCode's running turn when asked for now",
     thread: { activity: "running", agent: "opencode", model: "o" },
     runs: [{ id: "A", agent: "opencode", live: true }],
     now: true,
-    expected: [["threads.queue", { id: "thread", text: "hello", attachments: [], requestKey: expect.any(String) }]],
+    expected: [["runs.send", { runId: "A", text: "hello", attachments: [] }]],
+  },
+  {
+    name: "steers Pi's running turn through the normal send endpoint",
+    thread: { activity: "running", agent: "pi", model: "fixture/model" },
+    runs: [{ id: "A", agent: "pi", live: true }],
+    now: true,
+    expected: [["runs.send", { runId: "A", text: "hello", attachments: [] }]],
+  },
+  {
+    name: "steers Antigravity's running turn through the normal send endpoint",
+    thread: { activity: "running", agent: "antigravity", model: "gemini-3.8-flash" },
+    runs: [{ id: "A", agent: "antigravity", live: true }],
+    now: true,
+    expected: [["runs.send", { runId: "A", text: "hello", attachments: [] }]],
   },
   {
     name: "queues when the running process has other settings",

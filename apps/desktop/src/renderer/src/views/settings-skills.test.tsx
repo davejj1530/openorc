@@ -183,3 +183,12 @@ it("shows a new skill in the list even when a search was hiding it", async () =>
   expect(await within(list()).findByRole("button", { name: /release-notes/ })).toBeTruthy();
   expect(called("skills.create")).toEqual([{ agent: "codex", scope: { kind: "project", id: "p1" }, place: "user", name: "release-notes", description: "Write release notes", instructions: "" }]);
 });
+
+it("shows and reads skills only for enabled agents", async () => {
+  queryClient.setQueryData(["app.settings.get", {}], { enabledHarnesses: ["claude"] });
+  mount();
+  await waitFor(() => expect(called("skills.list")).toContainEqual({ scope: { kind: "project", id: "p1" }, agent: "claude" }));
+  expect(called("skills.list")).toEqual([{ scope: { kind: "project", id: "p1" }, agent: "claude" }]);
+  expect(screen.queryByRole("radio", { name: /Codex/ })).toBeNull();
+  expect(screen.queryByRole("radio", { name: /Cursor/ })).toBeNull();
+});

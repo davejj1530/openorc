@@ -21,6 +21,11 @@ const info: SystemInfo = {
     { id: "codex", state: "ready", path: "/bin/codex", version: "1", revision: 0 },
     { id: "claude", state: "sign_in", path: "/bin/claude", version: "1", revision: 0 },
     { id: "opencode", state: "ready", path: "/bin/opencode", version: "1", revision: 0 },
+    { id: "omp", state: "not_found", path: null, version: null, revision: 0 },
+    { id: "cursor", state: "not_found", path: null, version: null, revision: 0 },
+    { id: "pi", state: "not_found", path: null, version: null, revision: 0 },
+    { id: "antigravity", state: "not_found", path: null, version: null, revision: 0 },
+    { id: "fx", state: "not_found", path: null, version: null, revision: 0 },
   ],
   gh: { installed: false, path: null },
 };
@@ -38,6 +43,22 @@ const rows = () =>
     .map((row) => row.textContent);
 
 describe("ModelPicker", () => {
+  it("offers only the harnesses allowed by the calling feature", async () => {
+    mocks.call.mockImplementation(async (method) => (method === "agents.modelCatalog" ? { models, providers: [] } : info));
+    const onChange = vi.fn();
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <ModelPicker value={{ agent: "opencode", model: "opencode/big", effort: null }} onChange={onChange} harnesses={["codex"]} showEffort={false} />
+      </QueryClientProvider>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Choose a model" }));
+    expect(await screen.findByRole("button", { name: "Codex" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "OpenCode" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Claude Code/ })).toBeNull();
+    fireEvent.click(await screen.findByRole("button", { name: "GPT default" }));
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ agent: "codex", model: "gpt" }));
+  });
+
   it.each([false, true])("selects OpenCode variants and resets to Default in both picker layouts (composer=%s)", async (composer) => {
     const model: ModelOption = { ...models[2]!, efforts: ["low", "high", "deep-analysis", "default"], defaultEffort: "default" };
     mocks.call.mockImplementation(async (method) => (method === "agents.modelCatalog" ? { models: [model], providers: [] } : info));
@@ -64,6 +85,30 @@ describe("ModelPicker", () => {
     expect(changed).toHaveBeenLastCalledWith({ agent: "opencode", model: model.id, effort: "deep-analysis" });
     fireEvent.click(screen.getByRole("button", { name: "Reset effort to model default" }));
     expect(changed).toHaveBeenLastCalledWith({ agent: "opencode", model: model.id, effort: "default" });
+  });
+
+  it.each([false, true])("leaves Fast out where the model cannot run it, unless a saved request needs turning off (composer=%s)", async (composer) => {
+    const model: ModelOption = { ...models[0]!, fastMode: { supported: false, reason: "Usage credits are off for this account." } };
+    mocks.call.mockImplementation(async (method) => (method === "agents.modelCatalog" ? { models: [model], providers: [] } : info));
+    async function open(fastMode: boolean) {
+      const value: ModelChoice = { agent: "codex", model: "gpt", effort: "low", fastMode };
+      render(
+        <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+          {composer ? <ComposerModelPicker value={value} onChange={() => {}} modelSelector={<span>Model selector</span>} /> : <ModelPicker value={value} onChange={() => {}} />}
+        </QueryClientProvider>,
+      );
+      fireEvent.click(await screen.findByRole("button", { name: composer ? "Model and effort" : /^GPT Low/ }));
+      // The slider only appears once the catalog has loaded the model's efforts.
+      await screen.findByRole("slider", { name: "Reasoning effort" });
+    }
+    await open(false);
+    expect(screen.queryByRole("button", { name: "Fast mode" })).toBeNull();
+    expect(screen.queryByText(/Usage credits are off/)).toBeNull();
+    cleanup();
+    await open(true);
+    const fast = screen.getByRole("button", { name: "Fast mode" });
+    expect(fast.getAttribute("data-blocked")).toBe("true");
+    expect((fast as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("describes absent effort options without claiming the model has a fixed level", async () => {
@@ -129,7 +174,8 @@ describe("ModelPicker", () => {
     ).toEqual(["Extra high", "High", "Low", "Max", "Medium", "Ultracode"]);
   });
   it("keeps model selection and effort in one composer panel", async () => {
-    const catalog = [models[0]!, { ...models[0]!, id: "gpt-plus", label: "GPT Plus", defaultEffort: "high", isDefault: false }];
+    const gpt: ModelOption = { ...models[0]!, fastMode: { supported: true } };
+    const catalog = [gpt, { ...gpt, id: "gpt-plus", label: "GPT Plus", defaultEffort: "high", isDefault: false }];
     mocks.call.mockImplementation(async (method) => (method === "agents.modelCatalog" ? { models: catalog, providers: [] } : info));
     function Fixture() {
       const [choice, setChoice] = useState<ModelChoice>({ agent: "codex", model: "gpt", effort: "low" });
@@ -272,6 +318,7 @@ describe("ModelPicker", () => {
     let rejectLoad!: (error: Error) => void;
     mocks.call.mockImplementation((method: string) => {
       if (method === "system.info") return Promise.resolve(info);
+      if (method === "app.settings.get") return Promise.resolve({ enabledHarnesses: null });
       return new Promise((_, reject) => {
         rejectLoad = reject;
       });
@@ -408,4 +455,30 @@ it("finds legacy models by search, labels them, and never picks one by default",
   expect(rows()).toEqual(["GPTdefault"]);
   fireEvent.change(screen.getByLabelText("Search models"), { target: { value: "old" } });
   expect(rows()).toEqual(["GPT Oldlegacy"]);
+});
+
+it.each([false, true])("offers only enabled agents even when a cached catalog and selection include disabled ones (composer=%s)", async (composer) => {
+  mocks.call.mockImplementation(async (method) => {
+    if (method === "app.settings.get") return { enabledHarnesses: ["codex"] };
+    if (method === "agents.modelCatalog") return { models, providers: [] };
+    return info;
+  });
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  client.setQueryData(["app.settings.get", {}], { enabledHarnesses: ["codex"] });
+  render(
+    <QueryClientProvider client={client}>
+      {composer ? (
+        <ComposerModelPicker value={{ agent: "opencode", model: "opencode/big", effort: null }} onChange={vi.fn()} />
+      ) : (
+        <ModelPicker value={{ agent: "opencode", model: "opencode/big", effort: null }} onChange={vi.fn()} />
+      )}
+    </QueryClientProvider>,
+  );
+  fireEvent.click(await screen.findByRole("button", { name: composer ? "Model and effort" : "Choose a model" }));
+  await screen.findByRole("button", { name: "Codex" });
+  expect(screen.queryByRole("button", { name: "OpenCode" })).toBeNull();
+  expect(screen.queryByRole("button", { name: /Claude Code/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: /Oh My Pi/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: /Cursor/ })).toBeNull();
+  expect(rows()).toEqual(["GPTdefault"]);
 });

@@ -1,8 +1,14 @@
+import { Menu } from "@base-ui/react/menu";
 import { useState } from "react";
 import type { ClaudeAccountConnection } from "@openorc/protocol";
-import { Button, Input, TextButton } from "../components/ui";
+import { ChevronDown, MoreHorizontal, Plus } from "../components/icons";
+import { menuItem, menuPopup, menuSeparator } from "../components/menu";
+import { Button, IconButton, Input } from "../components/ui";
+import { CoversPreview } from "../lib/browser-preview";
 import { useRpc, useRpcMutation } from "../lib/client";
+import { floatingGround } from "../lib/use-anchor-ground";
 import { Section, Status, Toggle, usePreference } from "./settings-shared";
+import "./settings-claude-accounts.css";
 
 export function ClaudeAccountSettings({ active }: { active: boolean }) {
   const accounts = useRpc(
@@ -16,47 +22,48 @@ export function ClaudeAccountSettings({ active }: { active: boolean }) {
   const [name, setName] = useState("");
   const error = accounts.error ?? refresh.error ?? add.error ?? login.error;
   return (
-    <Section
-      title="Claude accounts"
-      description="Add as many accounts as you need. Each account keeps its own Claude login, settings, plugins, and usage. Choose an account when starting a thread."
-      flush
-    >
+    <Section title="Claude accounts" flush>
       <div className="settings-toolbar">
-        <p>Changing the default affects new threads. Existing threads keep their account.</p>
+        <p>The default applies to new threads.</p>
         <Button size="sm" disabled={refresh.isPending} onClick={() => refresh.mutate({ refresh: true })}>
           Refresh accounts
         </Button>
       </div>
-      <div className="settings-cards">
+      <div className="settings-account-list" data-plane aria-description="Each account keeps its own Claude login, settings, plugins, and usage. Existing threads keep their account.">
         {accounts.data?.accounts.map((account) => (
-          <AccountCard key={account.id} account={account} isDefault={accounts.data.defaultId === account.id} />
+          <AccountRow key={account.id} account={account} isDefault={accounts.data.defaultId === account.id} />
         ))}
-        <form
-          className="settings-card"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (!name.trim() || add.isPending) return;
-            add.mutate(
-              { name: name.trim() },
-              {
-                onSuccess: (account) => {
-                  setName("");
-                  login.mutate({ id: account.id });
+        <details className="settings-account-add">
+          <summary aria-label="Add account">
+            <Plus size={16} />
+            <span>Add account</span>
+            <ChevronDown size={14} className="settings-agent-chevron" />
+          </summary>
+          <form
+            className="settings-account-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!name.trim() || add.isPending) return;
+              add.mutate(
+                { name: name.trim() },
+                {
+                  onSuccess: (account) => {
+                    setName("");
+                    login.mutate({ id: account.id });
+                  },
                 },
-              },
-            );
-          }}
-        >
-          <label className="settings-card-label">
-            Account name
-            <Input value={name} onChange={(event) => setName(event.target.value)} maxLength={80} placeholder="Work, Personal, Client…" required />
-          </label>
-          <div className="settings-card-actions">
+              );
+            }}
+          >
+            <label className="settings-account-label">
+              Account name
+              <Input value={name} onChange={(event) => setName(event.target.value)} maxLength={80} placeholder="Work, Personal, Client…" required />
+            </label>
             <Button size="sm" type="submit" disabled={!name.trim() || add.isPending || login.isPending}>
               Add account and sign in
             </Button>
-          </div>
-        </form>
+          </form>
+        </details>
       </div>
       {(accounts.data?.accounts.filter((account) => account.enabled).length ?? 0) > 1 ? <AutoSwitch /> : null}
       {accounts.isPending ? <p className="settings-note">Checking accounts…</p> : null}
@@ -72,10 +79,10 @@ export function ClaudeAccountSettings({ active }: { active: boolean }) {
 function AutoSwitch() {
   const preference = usePreference("app.settings.set");
   return (
-    <div className="settings-group">
+    <div className="settings-group settings-account-preferences">
       <Toggle
         label="Switch accounts at usage limits"
-        hint="When a thread's account reaches its usage limit, the thread continues on the account with the most 5-hour usage left. Projects with their own accounts use their own setting."
+        hint="Continue with the account that has the most 5-hour usage left. Projects with their own accounts use their own setting."
         checked={preference.value.claudeAccountAutoSwitch ?? false}
         disabled={preference.disabled}
         onChange={(claudeAccountAutoSwitch) => void preference.commit({ claudeAccountAutoSwitch })}
@@ -84,35 +91,58 @@ function AutoSwitch() {
   );
 }
 
-function AccountCard({ account, isDefault }: { account: ClaudeAccountConnection; isDefault: boolean }) {
+function AccountRow({ account, isDefault }: { account: ClaudeAccountConnection; isDefault: boolean }) {
   const update = useRpcMutation("claude.accounts.update");
   const [name, setName] = useState(account.name);
+  const [editing, setEditing] = useState(false);
   return (
-    <div className="settings-card">
-      <div className="settings-card-head">
-        <Input aria-label={`Name for ${account.name}`} value={name} onChange={(event) => setName(event.target.value)} maxLength={80} className="settings-label-input" />
-        {isDefault ? <span className="settings-card-tag">Default</span> : null}
-        <Status ok={account.status === "ready"}>{connectionLabels[account.status]}</Status>
+    <div className="settings-account-row" role="group" aria-label={account.name}>
+      <div className="min-w-0">
+        <div className="settings-account-title">
+          <h3>{account.name}</h3>
+          {isDefault ? <span className="settings-account-default">Default</span> : null}
+        </div>
+        <p className="settings-account-meta">{accountMeta(account)}</p>
       </div>
-      <p className="settings-card-meta">{accountMeta(account)}</p>
+      <AccountActions
+        account={account}
+        isDefault={isDefault}
+        onRename={() => {
+          setName(account.name);
+          setEditing(true);
+        }}
+      />
       {account.message ? (
-        <p className="settings-card-meta" role="status">
+        <p className="settings-account-feedback" role="status">
           {account.message}
         </p>
       ) : null}
       {update.error ? (
-        <p className="settings-card-meta text-bad" role="alert">
+        <p className="settings-account-feedback text-bad" role="alert">
           {update.error.message}
         </p>
       ) : null}
-      <div className="settings-card-actions">
-        {name.trim() !== account.name ? (
-          <Button size="sm" disabled={!name.trim() || update.isPending} onClick={() => update.mutate({ id: account.id, name: name.trim() })}>
+      {editing ? (
+        <form
+          className="settings-account-form settings-account-rename"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!name.trim() || update.isPending) return;
+            update.mutate({ id: account.id, name: name.trim() }, { onSuccess: () => setEditing(false) });
+          }}
+        >
+          <label className="settings-account-label">
+            Account name
+            <Input aria-label={`Name for ${account.name}`} value={name} onChange={(event) => setName(event.target.value)} maxLength={80} autoFocus required />
+          </label>
+          <Button size="sm" type="submit" disabled={!name.trim() || update.isPending}>
             Save name
           </Button>
-        ) : null}
-        <AccountActions account={account} isDefault={isDefault} />
-      </div>
+          <Button size="sm" variant="ghost" disabled={update.isPending} onClick={() => setEditing(false)}>
+            Cancel
+          </Button>
+        </form>
+      ) : null}
     </div>
   );
 }
@@ -133,48 +163,63 @@ export const connectionLabels: Record<ClaudeAccountConnection["status"], string>
   unavailable: "CLI unavailable",
 };
 
-function AccountActions({ account, isDefault }: { account: ClaudeAccountConnection; isDefault: boolean }) {
+function AccountActions({ account, isDefault, onRename }: { account: ClaudeAccountConnection; isDefault: boolean; onRename: () => void }) {
   const update = useRpcMutation("claude.accounts.update");
-  return (
-    <>
-      {!isDefault && account.enabled ? (
-        <Button size="sm" disabled={update.isPending} onClick={() => update.mutate({ id: account.id, makeDefault: true })}>
-          Make default
-        </Button>
-      ) : null}
-      <AccountLogin account={account} />
-      {!isDefault ? (
-        <TextButton tone="muted" disabled={update.isPending || account.status === "signing_in"} onClick={() => update.mutate({ id: account.id, enabled: !account.enabled })}>
-          {account.enabled ? "Disable" : "Enable"}
-        </TextButton>
-      ) : null}
-      {update.error ? (
-        <p className="settings-card-meta w-full text-bad" role="alert">
-          {update.error.message}
-        </p>
-      ) : null}
-    </>
-  );
-}
-
-function AccountLogin({ account }: { account: ClaudeAccountConnection }) {
   const login = useRpcMutation("claude.accounts.login");
   const cancel = useRpcMutation("claude.accounts.cancelLogin");
-  const error = login.error ?? cancel.error;
-  if (!account.enabled) return null;
+  const error = update.error ?? login.error ?? cancel.error;
+  const signingIn = account.status === "signing_in";
+  const needsSignIn = account.enabled && !signingIn && account.status !== "ready";
   return (
     <>
-      {account.status === "signing_in" ? (
-        <Button size="sm" disabled={cancel.isPending} onClick={() => cancel.mutate({ id: account.id })}>
-          Cancel sign-in
-        </Button>
-      ) : (
-        <Button size="sm" disabled={login.isPending} onClick={() => login.mutate({ id: account.id })}>
-          {account.status === "ready" ? "Sign in again" : "Sign in"}
-        </Button>
-      )}
+      <div className="settings-account-actions">
+        <Status ok={account.status === "ready"}>{connectionLabels[account.status]}</Status>
+        {signingIn ? (
+          <Button size="sm" disabled={cancel.isPending} onClick={() => cancel.mutate({ id: account.id })}>
+            Cancel sign-in
+          </Button>
+        ) : null}
+        {needsSignIn ? (
+          <Button size="sm" disabled={login.isPending} onClick={() => login.mutate({ id: account.id })}>
+            Sign in
+          </Button>
+        ) : null}
+        <Menu.Root>
+          <Menu.Trigger render={<IconButton aria-label={`More for ${account.name}`} size="sm" />}>
+            <MoreHorizontal size={16} />
+          </Menu.Trigger>
+          <Menu.Portal>
+            <CoversPreview />
+            <Menu.Positioner sideOffset={6} align="end" className="z-40" collisionPadding={8}>
+              <Menu.Popup ref={floatingGround} className={menuPopup}>
+                {!isDefault && account.enabled ? (
+                  <Menu.Item className={menuItem} disabled={update.isPending} onClick={() => update.mutate({ id: account.id, makeDefault: true })}>
+                    Make default
+                  </Menu.Item>
+                ) : null}
+                <Menu.Item className={menuItem} disabled={update.isPending} onClick={onRename}>
+                  Rename
+                </Menu.Item>
+                {account.enabled && account.status === "ready" ? (
+                  <Menu.Item className={menuItem} disabled={login.isPending} onClick={() => login.mutate({ id: account.id })}>
+                    Sign in again
+                  </Menu.Item>
+                ) : null}
+                {!isDefault ? (
+                  <>
+                    <Menu.Separator className={menuSeparator} />
+                    <Menu.Item className={menuItem} disabled={update.isPending || signingIn} onClick={() => update.mutate({ id: account.id, enabled: !account.enabled })}>
+                      {account.enabled ? "Disable" : "Enable"}
+                    </Menu.Item>
+                  </>
+                ) : null}
+              </Menu.Popup>
+            </Menu.Positioner>
+          </Menu.Portal>
+        </Menu.Root>
+      </div>
       {error ? (
-        <p className="settings-card-meta w-full text-bad" role="alert">
+        <p className="settings-account-feedback text-bad" role="alert">
           {error.message}
         </p>
       ) : null}

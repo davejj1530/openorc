@@ -1,17 +1,22 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { realpath, readFile } from "node:fs/promises";
-import { detectAgentInstallation, type UpdateRunner } from "./agent-update-installation.js";
+import { realpath, readFile, lstat } from "node:fs/promises";
+import { detectAgentInstallation, fetchAgentRelease, type UpdateRunner } from "./agent-update-installation.js";
+import { OMP_FORMULA } from "./agent-update-homebrew.js";
+import { harnessCatalog } from "@openorc/protocol";
 import { resolveBinary, type EnvSnapshot } from "./shell-environment.js";
-vi.mock("node:fs/promises", () => ({ realpath: vi.fn(), readFile: vi.fn() }));
+vi.mock("node:fs/promises", () => ({ realpath: vi.fn(), readFile: vi.fn(), lstat: vi.fn() }));
 vi.mock("./shell-environment.js", () => ({ resolveBinary: vi.fn() }));
 const snapshot: EnvSnapshot = {
   revision: 1,
   shell: "/bin/zsh",
   path: "/prefix/bin",
-  binaries: { codex: "/prefix/bin/codex", claude: null, opencode: null },
+  binaries: { codex: "/prefix/bin/codex", claude: null, opencode: null, omp: null, cursor: null, pi: null, antigravity: null, fx: null },
   env: { HOME: "/home/test", PATH: "/prefix/bin" },
 };
-afterEach(() => vi.resetAllMocks());
+afterEach(() => {
+  vi.resetAllMocks();
+  vi.unstubAllGlobals();
+});
 it("updates npm only when the active npm global root owns that installation", async () => {
   vi.mocked(realpath).mockImplementation(async (p) => (String(p) === "/prefix/bin/codex" ? "/prefix/lib/node_modules/@openai/codex/bin/codex.js" : String(p)));
   vi.mocked(resolveBinary).mockResolvedValue("/prefix/bin/npm");
@@ -26,6 +31,13 @@ it("keeps custom wrappers and pnpm installations manual", async () => {
     vi.mocked(realpath).mockResolvedValue(target);
     expect(await detectAgentInstallation("codex", "/prefix/bin/codex", snapshot)).toMatchObject({ command: null, repair: null });
   }
+});
+it.each(["cursor", "antigravity", "fx"] as const)("never infers an npm package for the native-only %s agent", async (id) => {
+  vi.mocked(realpath).mockResolvedValue(`/prefix/lib/node_modules/null/bin/${id}`);
+  vi.mocked(resolveBinary).mockResolvedValue("/prefix/bin/npm");
+  const run = vi.fn<UpdateRunner>().mockResolvedValue("/prefix/lib/node_modules");
+  expect((await detectAgentInstallation(id, `/prefix/bin/${id}`, snapshot, run)).command).toBeNull();
+  expect(run).not.toHaveBeenCalled();
 });
 it.each<{ codexHome: string; targetHome?: string; binDir: string; env: EnvSnapshot["env"] }>([
   { codexHome: "/home/test/.codex", binDir: "/home/test/.local/bin", env: {} },
@@ -104,6 +116,92 @@ it("uses the owning Homebrew prefix and its release metadata", async () => {
     repair: { binary: "/opt/homebrew/bin/brew", args: ["reinstall", "--cask", "codex"] },
   });
   expect(resolveBinary).toHaveBeenCalledWith("brew", "/opt/homebrew/bin");
+});
+it("offers an in-app update for Oh My Pi installed from its Homebrew tap", async () => {
+  vi.mocked(realpath).mockResolvedValue("/opt/homebrew/Cellar/omp/18.18.1/bin/omp");
+  vi.mocked(readFile).mockResolvedValue(JSON.stringify({ source: { tap: "can1357/tap", spec: "stable" } }));
+  vi.mocked(resolveBinary).mockResolvedValue("/opt/homebrew/bin/brew");
+  expect(await detectAgentInstallation("omp", "/opt/homebrew/bin/omp", snapshot)).toMatchObject({
+    method: "Homebrew",
+    command: { binary: "/opt/homebrew/bin/brew", args: ["upgrade", "--formula", "can1357/tap/omp"] },
+    repair: { binary: "/opt/homebrew/bin/brew", args: ["reinstall", "--formula", "can1357/tap/omp"] },
+    message: null,
+  });
+});
+it("uses the stable Homebrew formula release for OpenCode", async () => {
+  vi.mocked(realpath).mockResolvedValue("/opt/homebrew/Cellar/opencode/2.2.0/bin/opencode");
+  vi.mocked(readFile).mockResolvedValue(JSON.stringify({ source: { tap: "homebrew/core", spec: "stable" } }));
+  vi.mocked(resolveBinary).mockResolvedValue("/opt/homebrew/bin/brew");
+  const install = await detectAgentInstallation("opencode", "/opt/homebrew/bin/opencode", snapshot);
+  expect(install).toMatchObject({
+    releaseUrl: "https://formulae.brew.sh/api/formula/opencode.json",
+    command: { args: ["upgrade", "--formula", "homebrew/core/opencode"] },
+  });
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response('{"versions":{"stable":"2.2.1","head":"HEAD"}}')),
+  );
+  expect(await fetchAgentRelease(install.releaseUrl)).toBe("2.2.1");
+});
+it.each([
+  JSON.stringify({ source: { tap: "custom/tap", spec: "stable" } }),
+  JSON.stringify({ source: { tap: "can1357/tap", spec: "head" } }),
+  JSON.stringify({ source: { tap: "can1357/tap" } }),
+  "invalid receipt",
+])("does not change an unverified Homebrew formula or channel: %s", async (receipt) => {
+  vi.mocked(realpath).mockResolvedValue("/opt/homebrew/Cellar/omp/18.18.1/bin/omp");
+  vi.mocked(readFile).mockResolvedValue(receipt);
+  const run = vi.fn<UpdateRunner>();
+  expect(await detectAgentInstallation("omp", "/opt/homebrew/bin/omp", snapshot, run)).toMatchObject({ method: "Homebrew", command: null, repair: null });
+  expect(resolveBinary).not.toHaveBeenCalled();
+  expect(run).not.toHaveBeenCalled();
+});
+it("keeps a pinned formula pinned and explains how to resume updates", async () => {
+  vi.mocked(realpath).mockResolvedValue("/opt/homebrew/Cellar/omp/18.18.1/bin/omp");
+  vi.mocked(readFile).mockResolvedValue(JSON.stringify({ source: { tap: "can1357/tap", spec: "stable" } }));
+  vi.mocked(lstat).mockImplementation(async () => {
+    throw Object.assign(new Error("not found"), { code: "ENOENT" });
+  });
+  vi.mocked(resolveBinary).mockResolvedValue("/opt/homebrew/bin/brew");
+  expect((await detectAgentInstallation("omp", "/opt/homebrew/bin/omp", snapshot)).command).not.toBeNull();
+  vi.mocked(lstat).mockResolvedValue({} as Awaited<ReturnType<typeof lstat>>);
+  expect(await detectAgentInstallation("omp", "/opt/homebrew/bin/omp", snapshot)).toMatchObject({
+    command: null,
+    repair: null,
+    message: "Homebrew has pinned omp. Run brew unpin omp before updating it here.",
+  });
+});
+it("offers no updater when Homebrew's receipt or owning executable is missing", async () => {
+  vi.mocked(realpath).mockResolvedValue("/opt/homebrew/Cellar/omp/18.18.1/bin/omp");
+  vi.mocked(readFile).mockRejectedValueOnce(new Error("unreadable"));
+  expect((await detectAgentInstallation("omp", "/opt/homebrew/bin/omp", snapshot)).command).toBeNull();
+  vi.mocked(readFile).mockResolvedValue(JSON.stringify({ source: { tap: "can1357/tap", spec: "stable" } }));
+  vi.mocked(resolveBinary).mockResolvedValue(null);
+  expect(await detectAgentInstallation("omp", "/opt/homebrew/bin/omp", snapshot)).toMatchObject({
+    command: null,
+    repair: null,
+    message: "Homebrew could not be found. Update in a terminal, then check again.",
+  });
+});
+it("reads Oh My Pi's published formula version without evaluating Ruby or substituting npm's release", async () => {
+  const fetch = vi.fn(async () => new Response('class Omp < Formula\n  version "18.18.1"\n  url "https://example.com/omp-18.18.1"\nend'));
+  vi.stubGlobal("fetch", fetch);
+  expect(await fetchAgentRelease(OMP_FORMULA)).toBe("18.18.1");
+  expect(fetch).toHaveBeenCalledTimes(1);
+  for (const invalid of ['version "18.18.1-dev"', 'version "18.18.1"; system("exit 1")', 'url "https://example.com/18.18.1"']) {
+    fetch.mockResolvedValueOnce(new Response(invalid));
+    await expect(fetchAgentRelease(OMP_FORMULA)).rejects.toThrow("did not identify");
+  }
+});
+it.each(["omp", "pi"] as const)("updates and repairs npm-installed %s through the owning package manager", async (id) => {
+  const pkg = harnessCatalog[id].cli.npm;
+  vi.mocked(realpath).mockImplementation(async (p) => (String(p) === `/prefix/bin/${id}` ? `/prefix/lib/node_modules/${pkg}/dist/cli.js` : String(p)));
+  vi.mocked(resolveBinary).mockResolvedValue("/prefix/bin/npm");
+  const run = vi.fn<UpdateRunner>().mockResolvedValue("/prefix/lib/node_modules");
+  const command = { binary: "/prefix/bin/npm", args: ["install", "--global", `${pkg}@latest`] };
+  expect(await detectAgentInstallation(id, `/prefix/bin/${id}`, snapshot, run)).toMatchObject({ method: "npm", command, repair: command });
+  run.mockResolvedValueOnce("/different/lib/node_modules");
+  expect((await detectAgentInstallation(id, `/prefix/bin/${id}`, snapshot, run)).command).toBeNull();
 });
 it("preserves Claude’s selected stable channel for native installations", async () => {
   vi.mocked(realpath).mockResolvedValue("/home/test/.local/share/claude/versions/2.1.0");

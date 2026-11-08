@@ -1,6 +1,7 @@
 import type { AllowanceWindow, PlanLimits, ProviderUsage, SlackStatus } from "@openorc/protocol";
 import { createDesignClaudeAccountsRpc } from "./design-claude-accounts";
 import { createDesignRemoteRpc } from "./design-remote";
+import { designUsage } from "./design-usage";
 
 /** Session-only settings for the design preview. Never reads or writes a real account. */
 export function createDesignSettingsRpc({ phone = null }: { phone?: string | null } = {}) {
@@ -20,8 +21,10 @@ export function createDesignSettingsRpc({ phone = null }: { phone?: string | nul
       if (method.endsWith(".set")) settings[key] = { ...settings[key], ...params };
       return settings[key];
     }
-    if (method === "providers.usage") return usageReport(params.provider as ProviderUsage["provider"]);
+    if (method === "providers.usage") return usageReport(params.provider as ProviderUsage["provider"], typeof params.claudeAccountId === "string" ? params.claudeAccountId : undefined);
     if (method === "providers.limits") return planLimits();
+    if (method === "agents.availability") return ["codex", "claude"].map((id) => ({ id, state: "ready" }));
+    if (method === "usage.history") return designUsage(params);
     if (method === "slack.status") return slack;
     if (method === "reviewerApp.get") return { app: null, setupUrl: null, error: null };
     if (method === "skills.list")
@@ -39,16 +42,19 @@ export function createDesignSettingsRpc({ phone = null }: { phone?: string | nul
   };
 }
 
-function usageReport(provider: ProviderUsage["provider"]): ProviderUsage {
+function usageReport(provider: ProviderUsage["provider"], claudeAccountId?: string): ProviderUsage {
   const now = Date.now();
-  const connected = provider !== "opencode";
+  const limits = planLimits().find(({ id }) => id === (provider === "claude" ? `claude:${claudeAccountId ?? "claude-cli"}` : provider));
+  const connected = provider !== "opencode" && limits?.status !== "disconnected";
   const localRuns = provider === "codex" ? 128 : 64;
   const report: ProviderUsage = {
     provider,
+    ...(claudeAccountId ? { claudeAccountId } : {}),
     status: connected ? "available" : "disconnected",
+    plan: limits?.plan ?? null,
     source: "Design preview · synthetic account data",
     context: connected ? `${provider === "codex" ? "ChatGPT Pro" : "Claude Max"} · design@example.test` : "No connected account",
-    windows: [],
+    windows: limits?.windows ?? [],
     credits: [],
     localRuns: connected ? localRuns : 0,
     refreshedAt: connected ? now : null,
@@ -56,27 +62,6 @@ function usageReport(provider: ProviderUsage["provider"]): ProviderUsage {
     accountUrl: "https://example.test/usage",
     message: null,
   };
-  if (connected)
-    report.windows = [
-      {
-        id: "session",
-        label: "Current session",
-        usedPercent: provider === "codex" ? 18 : 47,
-        remainingPercent: provider === "codex" ? 82 : 53,
-        resetsAt: now + 144 * 60_000,
-        observedAt: now,
-        exhausted: false,
-      },
-      {
-        id: "weekly",
-        label: "Weekly limit",
-        usedPercent: provider === "codex" ? 36 : 72,
-        remainingPercent: provider === "codex" ? 64 : 28,
-        resetsAt: now + 3 * 86_400_000,
-        observedAt: now,
-        exhausted: false,
-      },
-    ];
   if (provider === "codex") report.resets = { availableCount: null, credits: null, redemption: "external" };
   return report;
 }

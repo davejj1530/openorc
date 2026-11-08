@@ -4,7 +4,6 @@ import {
   effortHint,
   effortLabel,
   harnessCatalog,
-  harnessIds,
   harnessInfo,
   harnessInstalled,
   harnessLoggedIn,
@@ -24,6 +23,7 @@ import { cn } from "../lib/cn";
 import { useRouter } from "../lib/router";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { useModelCatalog } from "../lib/use-model-catalog";
+import { useEnabledHarnesses } from "../lib/enabled-harnesses";
 import { HarnessLogo } from "./HarnessLogo";
 import { Check, ChevronDown, Orcling as OrclingIcon, Plus, RotateCcw, Search, Zap } from "./icons";
 import { BrowserEffortFooter, ComposerEffortPanel, fastStatus } from "./ModelPickerEffort";
@@ -41,10 +41,14 @@ function modelTitle(current: ModelOption | undefined, model: string | undefined)
 
 type PickerSection = HarnessId | "orclings";
 
-function initialPickerSection(orclings: OrclingPickerChoices | undefined, value: ModelChoice | null): PickerSection {
+function initialPickerSection(orclings: OrclingPickerChoices | undefined, value: ModelChoice | null, enabled: readonly HarnessId[]): PickerSection {
   if (orclings?.selectedId) return "orclings";
-  if (value && isHarnessId(value.agent)) return value.agent;
-  return harnessIds[0]!;
+  if (value && isHarnessId(value.agent) && enabled.includes(value.agent)) return value.agent;
+  return enabled[0] ?? "orclings";
+}
+
+function enabledPickerSection(section: PickerSection, fallback: PickerSection, enabled: readonly HarnessId[]): PickerSection {
+  return section === "orclings" || enabled.includes(section) ? section : fallback;
 }
 
 /** The Orcling a picker shows as chosen, if any. */
@@ -68,6 +72,12 @@ function modelRowMeta(model: ModelOption): ReactNode {
 function pickerTriggerIcon(value: ModelChoice | null, modelSize: number): ReactNode {
   if (value && isHarnessId(value.agent)) return <HarnessLogo id={value.agent} size={modelSize} />;
   return null;
+}
+
+/** A saved choice for a disabled agent asks for a new choice without changing the saved draft or thread. */
+function useEnabledChoice(value: ModelChoice | null, harnesses?: readonly HarnessId[]): ModelChoice | null {
+  const enabled = useEnabledHarnesses(harnesses);
+  return value && isHarnessId(value.agent) && enabled.includes(value.agent) ? normalizeModelSettings(value) : null;
 }
 
 /** Keep the floating panel inside the conversation pane, including after a pane resize. */
@@ -122,6 +132,7 @@ function ModelBrowser({
   disabled,
   closeOnSelect,
   close,
+  harnesses,
 }: {
   value: ModelChoice | null;
   onChange: (choice: ModelChoice) => void;
@@ -134,13 +145,16 @@ function ModelBrowser({
   disabled?: boolean;
   closeOnSelect: boolean;
   close: () => void;
+  harnesses?: readonly HarnessId[];
 }) {
   const models = useModelCatalog();
+  const enabled = useEnabledHarnesses(harnesses);
   const claudeAccountId = useClaudeAccountId();
   const system = useRpc("system.info", claudeAccountId ? { claudeAccountId } : {});
-  const list = useMemo(() => pickerCatalog(models.data ?? []), [models.data]);
+  const list = useMemo(() => pickerCatalog((models.data ?? []).filter((model) => isHarnessId(model.agent) && enabled.includes(model.agent))), [models.data, enabled]);
   const current = catalogModel(list, value);
-  const [section, setSection] = useState<PickerSection>(() => initialPickerSection(orclings, value));
+  const [chosenSection, setSection] = useState<PickerSection>(() => initialPickerSection(orclings, value, enabled));
+  const section = enabledPickerSection(chosenSection, initialPickerSection(orclings, value, enabled), enabled);
   const [query, setQuery] = useState("");
   const [showLegacy, setShowLegacy] = useState(false);
   const search = useRef<HTMLInputElement>(null);
@@ -196,6 +210,8 @@ function ModelBrowser({
     );
   };
 
+  // Fast shows only where it can run, or while a saved request is on so it can be turned off.
+  const fastShown = showFast && !orclingSettings && (fastAvailable || fast);
   return (
     <div className="model-picker-layout">
       <Popover.Title className="sr-only">{showEffort ? "Model and effort" : "Choose a model"}</Popover.Title>
@@ -205,7 +221,7 @@ function ModelBrowser({
             <OrclingIcon size={20} />
           </button>
         ) : null}
-        {harnessIds.map((id) => {
+        {enabled.map((id) => {
           const status = system.data ? harnessInfo(system.data, id) : null;
           const hint = providerHint(status);
           return (
@@ -222,7 +238,7 @@ function ModelBrowser({
             </button>
           );
         })}
-        {showFast && !orclingSettings ? (
+        {fastShown ? (
           <button
             type="button"
             className="model-picker-rail-button model-picker-fast"
@@ -231,7 +247,7 @@ function ModelBrowser({
             data-blocked={fastBlocked || undefined}
             aria-describedby={fastDescriptionId}
             title={`${fast ? "Turn off" : "Request"} Fast mode. ${fastHint}`}
-            disabled={disabled || !value || (!fastAvailable && !fast)}
+            disabled={disabled || !value}
             onClick={() => {
               if (value) onChange({ ...value, fastMode: !fast });
             }}
@@ -239,7 +255,7 @@ function ModelBrowser({
             <Zap size={20} />
           </button>
         ) : null}
-        {showFast && !orclingSettings ? (
+        {fastShown ? (
           <span className="sr-only" id={fastDescriptionId}>
             {fastStatus(fast, fastBlocked)}
             {fastHint}
@@ -268,7 +284,7 @@ function ModelBrowser({
         </div>
         <div ref={results} className="model-picker-results" aria-label={sectionLabel(section)}>
           {models.providers
-            .filter((item) => item.message)
+            .filter((item) => item.message && enabled.includes(item.agent))
             .map((item) => (
               <p key={item.agent} role="status" className="model-picker-message">
                 {harnessName(item.agent)}: {item.message}
@@ -360,6 +376,7 @@ export function ModelPicker({
   orclings,
   placeholder = "Choose a model",
   ariaLabel,
+  harnesses,
 }: {
   value: ModelChoice | null;
   onChange: (choice: ModelChoice) => void;
@@ -368,10 +385,11 @@ export function ModelPicker({
   orclings?: OrclingPickerChoices;
   placeholder?: string;
   ariaLabel?: string;
+  harnesses?: readonly HarnessId[];
 }) {
   const models = useModelCatalog();
   const popup = usePickerPopup();
-  value = value ? normalizeModelSettings(value) : null;
+  value = useEnabledChoice(value, harnesses);
   const current = catalogModel(models.data, value);
   const chosen = chosenOrcling(orclings);
   const selectedLabel = chosen?.name;
@@ -400,7 +418,17 @@ export function ModelPicker({
         <CoversPreview />
         <Popover.Positioner side="top" align="start" sideOffset={6} collisionPadding={12} collisionBoundary={popup.boundary}>
           <Popover.Popup className="model-picker-popup" initialFocus={false} data-no-effort={!showEffort || undefined} style={popup.maxWidth ? { maxWidth: popup.maxWidth } : undefined}>
-            <ModelBrowser value={value} onChange={onChange} orclings={orclings} showEffort={showEffort} showFast={showEffort} disabled={disabled} closeOnSelect close={() => popup.setOpen(false)} />
+            <ModelBrowser
+              value={value}
+              onChange={onChange}
+              orclings={orclings}
+              showEffort={showEffort}
+              showFast={showEffort}
+              disabled={disabled}
+              harnesses={harnesses}
+              closeOnSelect
+              close={() => popup.setOpen(false)}
+            />
           </Popover.Popup>
         </Popover.Positioner>
       </Popover.Portal>
@@ -455,8 +483,8 @@ export function ComposerModelPicker({
 }) {
   const models = useModelCatalog();
   const popup = usePickerPopup();
+  value = useEnabledChoice(value);
   const current = catalogModel(models.data, value);
-  value = value ? normalizeModelSettings(value) : null;
   const {
     efforts,
     defaultEffort,

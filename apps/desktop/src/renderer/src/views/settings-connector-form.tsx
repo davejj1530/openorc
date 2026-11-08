@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { harnessCatalog, harnessIds, type ConnectorList, type ConnectorSpec, type HarnessId } from "@openorc/protocol";
+import { harnessCatalog, type ConnectorList, type ConnectorSpec, type HarnessId } from "@openorc/protocol";
+import { useEnabledHarnesses } from "../lib/enabled-harnesses";
 import { Plus, X } from "../components/icons";
 import { Button, Dialog, IconButton, Input } from "../components/ui";
 import { useRpcMutation } from "../lib/client";
@@ -40,10 +41,11 @@ function Pairs({ label, rows, onChange, keyLabel }: { label: string; rows: Pair[
 }
 
 function AgentChoice({ agents, missing, onChange }: { agents: HarnessId[]; missing: Map<HarnessId, string>; onChange: (agents: HarnessId[]) => void }) {
+  const enabled = useEnabledHarnesses();
   return (
     <fieldset className="connector-form-agents">
       <legend>Agents</legend>
-      {harnessIds.map((agent) => (
+      {enabled.map((agent) => (
         <label key={agent} title={missing.get(agent)}>
           <input
             type="checkbox"
@@ -60,6 +62,7 @@ function AgentChoice({ agents, missing, onChange }: { agents: HarnessId[]; missi
 
 /** Adds or edits one connector for the agents chosen. Each agent saves it in its own configuration. */
 export function ConnectorForm({ draft, unavailable, onClose }: { draft: ConnectorDraft | null; unavailable: ConnectorList["unavailable"]; onClose: () => void }) {
+  const enabled = useEnabledHarnesses();
   const save = useRpcMutation("connectors.save");
   const [name, setName] = useState("");
   const [kind, setKind] = useState<ConnectorSpec["kind"]>("url");
@@ -78,7 +81,7 @@ export function ConnectorForm({ draft, unavailable, onClose }: { draft: Connecto
     setUrl(spec?.kind === "url" ? spec.url : "");
     setCommand(spec?.kind === "command" ? joinCommandLine([spec.command, ...spec.args]) : "");
     setExtras(spec ? pairs(spec.kind === "url" ? spec.headers : spec.env) : []);
-    setAgents(draft.agents.length ? draft.agents : harnessIds.filter((agent) => !missing.has(agent)));
+    setAgents((draft.agents.length ? draft.agents : enabled).filter((agent) => enabled.includes(agent) && !missing.has(agent)));
     setProblem(null);
     save.reset();
     // A draft opens the form once; later list reads must not reset what the user is typing.

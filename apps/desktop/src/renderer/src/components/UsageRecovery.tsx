@@ -1,11 +1,11 @@
 import type { ReactNode } from "react";
-import type { ProviderUsage } from "@openorc/protocol";
+import type { HarnessId, ProviderUsage } from "@openorc/protocol";
 import { cn } from "../lib/cn";
 import { useRpc } from "../lib/client";
 import { useRouter } from "../lib/router";
 import { CodexResetDialog, useCodexReset } from "./CodexReset";
 
-type Provider = "codex" | "claude";
+type Provider = HarnessId;
 
 /**
  * Recovery where a limit surfaced. A reset the provider reports is one

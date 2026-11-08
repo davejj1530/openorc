@@ -299,6 +299,31 @@ function OnboardingChrome({ children }: { children: ReactNode }) {
   );
 }
 
+function DefaultHarness({ rows, value, onChange }: { rows: readonly HarnessRow[]; value: HarnessId | null; onChange: (id: HarnessId) => void }) {
+  return (
+    <div className="onboarding-default">
+      <div>
+        <label className="onboarding-section-title" htmlFor="onboarding-default">
+          Start new threads with
+        </label>
+        <p className="onboarding-section-copy" id="onboarding-default-hint">
+          You can switch agents in any thread.
+        </p>
+      </div>
+      <Select id="onboarding-default" aria-describedby="onboarding-default-hint" value={value ?? ""} onChange={(event) => onChange(event.target.value as HarnessId)}>
+        <option value="" disabled>
+          Choose an agent
+        </option>
+        {rows.map((row) => (
+          <option key={row.id} value={row.id}>
+            {harnessCatalog[row.id].name}
+          </option>
+        ))}
+      </Select>
+    </div>
+  );
+}
+
 interface OnboardingProps {
   mode?: OnboardingMode;
   previewInitially?: boolean;
@@ -424,28 +449,6 @@ function OnboardingFlow({ mode = "first_run", initialStep, persisted, onPersist,
                 />
               </>
             ) : null}
-            {step === "scan" && selectedReady.length > 1 ? (
-              <div className="onboarding-default">
-                <div>
-                  <label className="onboarding-section-title" htmlFor="onboarding-default">
-                    Start new threads with
-                  </label>
-                  <p className="onboarding-section-copy" id="onboarding-default-hint">
-                    You can switch agents in any thread.
-                  </p>
-                </div>
-                <Select id="onboarding-default" aria-describedby="onboarding-default-hint" value={defaultHarness ?? ""} onChange={(event) => chooseDefault(event.target.value as HarnessId)}>
-                  <option value="" disabled>
-                    Choose an agent
-                  </option>
-                  {selectedReady.map((row) => (
-                    <option key={row.id} value={row.id}>
-                      {harnessCatalog[row.id].name}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-            ) : null}
             {step === "scan" && !preview && rescanFailed ? (
               <p className="onboarding-feedback" role="alert">
                 Couldn’t refresh agent status. The last results are shown. Try Rescan again.
@@ -486,7 +489,11 @@ function OnboardingFlow({ mode = "first_run", initialStep, persisted, onPersist,
         </div>
         {step !== "done" ? (
           <footer className="onboarding-actions onboarding-footer">
-            <p className="onboarding-action-note">{setupActionNote({ step, selectedCount: selectedReady.length, readyCount: ready.length, defaultHarness, preview, selectedProject })}</p>
+            {step === "scan" && selectedReady.length > 1 ? (
+              <DefaultHarness rows={selectedReady} value={defaultHarness} onChange={chooseDefault} />
+            ) : (
+              <p className="onboarding-action-note">{setupActionNote({ step, selectedCount: selectedReady.length, readyCount: ready.length, defaultHarness, preview, selectedProject })}</p>
+            )}
             <div className="onboarding-action-buttons">
               {step !== "scan" ? (
                 <Button size="xl" onClick={retreat} disabled={importing}>

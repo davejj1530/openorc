@@ -1,15 +1,5 @@
 import { useState } from "react";
-import {
-  harnessIds,
-  harnessInfo,
-  harnessLoggedIn,
-  isHarnessId,
-  type ModelExecutionSettings,
-  type ModelOption,
-  type PullRequestDetail,
-  type PullRequestReview,
-  type ThreadSummary,
-} from "@openorc/protocol";
+import { harnessInfo, harnessLoggedIn, isHarnessId, type ModelExecutionSettings, type ModelOption, type PullRequestDetail, type PullRequestReview, type ThreadSummary } from "@openorc/protocol";
 import { LoaderCircle, Wand } from "./icons";
 import { defaultChoice, ModelPicker, type ModelChoice } from "./ModelPicker";
 import { Button, Segmented, TextButton } from "./ui";
@@ -18,6 +8,7 @@ import { orclingById, useOrclings } from "../lib/orclings";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { openThread } from "../lib/router";
 import { useModelCatalog } from "../lib/use-model-catalog";
+import { useEnabledHarnesses } from "../lib/enabled-harnesses";
 
 const reviewers = [
   { value: "you", label: "You" },
@@ -26,10 +17,11 @@ const reviewers = [
 
 /** The saved reviewer, with the model it would run: the one you picked, or the default of a harness you are signed in to. */
 function useReviewer() {
+  const enabled = useEnabledHarnesses();
   const [reviewer, setReviewer] = useState<PullReviewer>(readPullReviewer);
   const models = useModelCatalog();
   const info = useRpc("system.info", {});
-  const signedIn = info.data ? (harnessIds.find((id) => harnessLoggedIn(harnessInfo(info.data, id))) ?? null) : null;
+  const signedIn = info.data ? (enabled.find((id) => harnessLoggedIn(harnessInfo(info.data, id))) ?? null) : null;
   const fallback = models.data ? defaultChoice(models.data, signedIn) : null;
   const choose = (next: PullReviewer) => {
     setReviewer(next);

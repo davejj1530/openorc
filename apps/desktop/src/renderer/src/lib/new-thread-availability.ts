@@ -34,6 +34,7 @@ export function evaluateNewThreadAvailability(input: NewThreadAvailabilityInput)
   if (input.projectsFailed) projectIssue = "Projects could not load. Retry to continue.";
   else if (input.projects && !selectedProject) projectIssue = "This project is unavailable. Choose a project to continue.";
   else if (!selectedProject) projectIssue = "Loading projects…";
-  const disabledReason = projectIssue ?? (!input.permissionReady ? "Loading saved permissions…" : null) ?? targetIssue ?? (!choice ? "Log in to Codex or Claude Code first" : null);
+  const disabledReason =
+    projectIssue ?? (!input.permissionReady ? "Loading saved permissions…" : null) ?? targetIssue ?? (!choice ? "Enable and sign in to an agent in Settings → Connections." : null);
   return { selectedProject, targetIssue, projectIssue, disabledReason };
 }

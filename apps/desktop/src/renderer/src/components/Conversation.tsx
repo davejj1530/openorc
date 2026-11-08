@@ -13,7 +13,19 @@ import {
   RESTART_PROMPT,
   type SubmitRequest,
 } from "@openorc/client";
-import { WORKSPACE_ID, defaultHarnessId, executionMode, harnessShortName, isSubagentThread, type Project, type Run, type Task, type ThreadSummary, type WorkspaceMode } from "@openorc/protocol";
+import {
+  WORKSPACE_ID,
+  defaultHarnessId,
+  executionMode,
+  forkUnavailable,
+  harnessShortName,
+  isSubagentThread,
+  type Project,
+  type Run,
+  type Task,
+  type ThreadSummary,
+  type WorkspaceMode,
+} from "@openorc/protocol";
 import { useCallback, useState, type ComponentProps, type ReactNode } from "react";
 import { useConversationSettings, useConversationTranscript, useRpc, useRpcMutation, useSubmit } from "../lib/client";
 import { useThreadAccounts } from "../lib/use-thread-accounts";
@@ -90,8 +102,22 @@ function useMessageTarget(scope: ConversationScope): MessageTarget | undefined {
 }
 
 /** A thread's own `/` commands; compacting waits for the turn to finish. */
-function threadCommands({ working, compact, fork }: { working: boolean; compact: () => void; fork: () => void }): SlashCommand[] {
-  return [...(!working ? [{ name: "compact", hint: "Fold the conversation so far into a summary", run: compact }] : []), { name: "fork", hint: "Continue in a new thread from here", run: fork }];
+function threadCommands({
+  thread,
+  working,
+  compact,
+  fork,
+}: {
+  thread: ThreadSummary | null;
+  working: boolean;
+  compact: (input: { id: string }) => void;
+  fork: (() => void) | undefined;
+}): SlashCommand[] {
+  if (!thread) return [];
+  return [
+    ...(!working ? [{ name: "compact", hint: "Fold the conversation so far into a summary", run: () => compact({ id: thread.id }) }] : []),
+    ...(fork ? [{ name: "fork", hint: "Continue in a new thread from here", run: fork }] : []),
+  ];
 }
 
 /** What a conversation's transcript reads from around it: whose voice each turn is, the marks its messages are drawn with, and its turns' change footers. */
@@ -190,7 +216,8 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
 
   const skills = useSkillCommands(conversation, choice?.agent);
   const connectorMentions = useConnectorMentions(conversation, choice?.agent, executionMode(mode, permission));
-  const commands: SlashCommand[] = [...(thread ? threadCommands({ working, compact: () => compact.mutate({ id: thread.id }), fork: forkConversation }) : []), ...skills.commands];
+  const onFork = thread && !forkUnavailable(thread.agent) ? forkConversation : undefined;
+  const commands: SlashCommand[] = [...threadCommands({ thread, working, compact: compact.mutate, fork: onFork }), ...skills.commands];
   const marks = useMessageMarks(skills.commands, connectorMentions);
 
   const location = conversationLocation({ scope, project, mode: workspaceMode, basePath: links ?? project.rootPath, checkoutBranch: checkout.data?.branch, plainFolder: git.state === "none" });
@@ -207,7 +234,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
             run={merged}
             scrollKey={conversation.id}
             followKey={sends}
-            onFork={thread ? forkConversation : undefined}
+            onFork={onFork}
             hasOlder={hasOlder}
             onLoadOlder={loadOlder}
             reveal={target}

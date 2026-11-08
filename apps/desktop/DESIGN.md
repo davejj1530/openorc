@@ -290,6 +290,10 @@ Tasks, Pull requests, Schedules, and Memory share one header: the toolbar holds 
 
 Settings is a plane sheet beside the sidebar, which lists its sections. Like the work panel, it runs flush to the window edges with its toolbar inside it. Each page has a 28/34 title and one faint line of context in a left-aligned 860px column. Groups and cards are tile cards on the sheet (r18, 20px inset), with hairlines between rows. Usage is a grid of r22 account cards; each limit is a 48px ring with the share used as a stat numeral, the label muted and the reset faint. Appearance tiles are fill-only with a navigation ring on the current choice.
 
+Connections lists enabled agents in one group with hairlines between rows. Each row keeps its mark, name, connection status, version, and enable switch visible; expanding the name reveals installation details. Update actions and errors remain visible. Add agents is a compact disclosure at the bottom of the same group, and update preferences sit in a separate group below.
+
+Claude accounts use the same grouped rows: account name and identity on the left, connection status and an overflow menu on the right, and a quiet Default label beside the chosen name. Sign in and Cancel sign-in remain visible when needed; Rename, Make default, Sign in again, and Enable or Disable live in the menu. Rename opens an inline form. Add account opens a form in the group's last row, with account-switching preferences in a separate group below.
+
 **The Save Feedback Rule.** Announce actual saves and errors in place (Save becomes Saved with a check); leave the idle state empty.
 
 **The Recovery Visibility Rule.** Keep actionable resets and unresolved attempts visible on the front of a usage card.

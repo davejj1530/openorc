@@ -1,7 +1,7 @@
 import { Menu } from "@base-ui/react/menu";
 import { canMoveToCloud, cloudServiceMissing, offersBrainMove, snoozePresets, threadResolved } from "@openorc/client";
 import type { ThreadSummary } from "@openorc/protocol";
-import { WORKSPACE_ID, isSubagentThread } from "@openorc/protocol";
+import { WORKSPACE_ID, isSubagentThread, forkUnavailable } from "@openorc/protocol";
 import { useRef, useState } from "react";
 import { CoversPreview } from "../lib/browser-preview";
 import { useRpc, useRpcMutation } from "../lib/client";
@@ -242,8 +242,8 @@ function ThreadForkActions({ thread, parts: M }: { thread: ThreadSummary; parts:
       </M.Item>
       <M.Item
         className={menuItem}
-        disabled={Boolean(thread.teamInstanceId) || inCloud || mutating || fork.isPending}
-        title={inCloud ? "Bring it to this Mac first." : undefined}
+        disabled={Boolean(thread.teamInstanceId) || inCloud || mutating || fork.isPending || Boolean(forkUnavailable(thread.agent))}
+        title={inCloud ? "Bring it to this Mac first." : (forkUnavailable(thread.agent) ?? undefined)}
         onClick={() => fork.mutate({ id: thread.id }, { onSuccess: (t) => openThread(t.id) })}
       >
         <GitFork size={13} /> {fork.isPending ? "Forking…" : "Fork"}

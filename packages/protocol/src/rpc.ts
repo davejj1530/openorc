@@ -102,7 +102,7 @@ export const rpcParams = {
   "system.gh": z.object({}).strict(),
   "agents.updates.get": z.object({}),
   "agents.updates.check": z.object({}),
-  "agents.updates.install": z.object({ ids: z.array(HarnessId).min(1).max(3) }).strict(),
+  "agents.updates.install": z.object({ ids: z.array(HarnessId).min(1).max(HarnessId.options.length) }).strict(),
   "agents.updates.configure": z.object({ automatic: z.boolean().optional(), dismissed: z.string().max(300).optional() }).strict(),
   "providers.usage": z.object({
     provider: z.enum([...HarnessId.options, "anthropic-api"]),

@@ -1,0 +1,69 @@
+.settings-account-list {
+  container: account-list / inline-size;
+}
+.settings-account-row {
+  align-items: center;
+}
+.settings-account-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  color: var(--ink);
+  font-size: var(--text-md);
+  line-height: 20px;
+}
+.settings-account-default {
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+.settings-account-meta {
+  margin-top: 3px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  line-height: 18px;
+  overflow-wrap: anywhere;
+}
+.settings-account-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.settings-account-form {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-bottom: 16px;
+}
+.settings-account-label {
+  display: grid;
+  gap: 6px;
+  flex: 1;
+  min-width: min(100%, 200px);
+  max-width: 320px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+.settings-account-rename {
+  grid-column: 1 / -1;
+  padding: 16px 0 0;
+}
+@layer components {
+  .settings-account-feedback {
+    grid-column: 1 / -1;
+    margin-top: 8px;
+    color: var(--ink-3);
+    font-size: var(--text-xs);
+    line-height: 1.5;
+  }
+}
+@container account-list (max-width: 520px) {
+  .settings-account-row {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 8px;
+  }
+  .settings-account-actions > button:last-child {
+    margin-left: auto;
+  }
+}

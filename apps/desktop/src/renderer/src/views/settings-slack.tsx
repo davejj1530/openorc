@@ -1,17 +1,8 @@
-import {
-  ExecutionMode,
-  executionMode,
-  executionModeAvailable,
-  executionModeNote,
-  executionModePresentation,
-  executionModeSettings,
-  harnessCatalog,
-  harnessIds,
-  type SlackClientConfig,
-} from "@openorc/protocol";
+import { ExecutionMode, executionMode, executionModeAvailable, executionModeNote, executionModePresentation, executionModeSettings, type SlackClientConfig } from "@openorc/protocol";
 import { useState } from "react";
 import { Button, Input, Select } from "../components/ui";
 import { useRpc } from "../lib/client";
+import { EnabledAgentOptions } from "../components/EnabledAgentOptions";
 import { relayClientStatus, relayHostStatus } from "./settings-presentation";
 import { Field, LoadError, Section, Status } from "./settings-shared";
 import { DirectSlackSettings } from "./settings-slack-direct";
@@ -88,11 +79,7 @@ function RelaySlackSettings({ active }: { active: boolean }) {
         </Field>
         <Field label="Default coding agent">
           <Select value={config.agent} disabled={disabled || client?.enabled || client?.busy} onChange={(e) => updateConfig({ agent: e.target.value as SlackClientConfig["agent"] })}>
-            {harnessIds.map((id) => (
-              <option key={id} value={id}>
-                {harnessCatalog[id].name}
-              </option>
-            ))}
+            <EnabledAgentOptions />
           </Select>
         </Field>
         <Field label="Default model" hint="Say “using Astra” or another available model in Slack to change it for that thread. Leave blank for the agent's default.">

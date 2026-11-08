@@ -24,6 +24,12 @@ export function SignInRecovery({ provider, lead, className }: { provider: Activi
           Run <code>{command}</code> in a terminal.
         </>
       )}
+      {provider === "pi" ? (
+        <>
+          {" "}
+          Then enter <code>/login</code> to connect a provider.
+        </>
+      ) : null}
     </p>
   );
 }

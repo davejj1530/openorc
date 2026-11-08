@@ -112,24 +112,30 @@ export function ComposerEffortPanel({
   const fastDescriptionId = useId();
   // Nothing changes without a model.
   const fixed = disabled || !value;
+  // Fast shows only where it can run, or while a saved request is on so it can be turned off.
+  const fastShown = fastAvailable || fast;
   return (
     <>
       <div className="composer-effort-heading">
-        <button
-          type="button"
-          className="composer-icon-button composer-fast-toggle"
-          aria-label="Fast mode"
-          aria-pressed={fast}
-          data-blocked={fastBlocked || undefined}
-          aria-describedby={fastDescriptionId}
-          title={`${fast ? "Turn off" : "Request"} Fast mode. ${fastHint}`}
-          disabled={fixed || (!fastAvailable && !fast)}
-          onClick={() => {
-            if (value) onChange({ ...value, fastMode: !fast });
-          }}
-        >
-          <Zap size={18} />
-        </button>
+        {fastShown ? (
+          <button
+            type="button"
+            className="composer-icon-button composer-fast-toggle"
+            aria-label="Fast mode"
+            aria-pressed={fast}
+            data-blocked={fastBlocked || undefined}
+            aria-describedby={fastDescriptionId}
+            title={`${fast ? "Turn off" : "Request"} Fast mode. ${fastHint}`}
+            disabled={fixed}
+            onClick={() => {
+              if (value) onChange({ ...value, fastMode: !fast });
+            }}
+          >
+            <Zap size={18} />
+          </button>
+        ) : (
+          <span />
+        )}
         <Popover.Title className="composer-effort-title">{label}</Popover.Title>
         <button
           type="button"
@@ -163,10 +169,12 @@ export function ComposerEffortPanel({
         <p className="text-xs text-ink-3 text-center mt-3">{effortAvailability(current, Boolean(value), loading, failed)}</p>
       )}
       {hint ? <p className="composer-effort-hint">{hint}</p> : null}
-      <Popover.Description id={fastDescriptionId} className="composer-fast-description">
-        {fastStatus(fast, fastBlocked)}
-        {fastHint}
-      </Popover.Description>
+      {fastShown ? (
+        <Popover.Description id={fastDescriptionId} className="composer-fast-description">
+          {fastStatus(fast, fastBlocked)}
+          {fastHint}
+        </Popover.Description>
+      ) : null}
     </>
   );
 }

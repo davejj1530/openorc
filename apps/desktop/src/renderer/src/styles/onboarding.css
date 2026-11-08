@@ -617,11 +617,11 @@
 }
 .onboarding-default {
   display: flex;
+  flex: 1 1 400px;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: var(--spacing-md);
-  margin-top: var(--spacing-xl);
 }
 .onboarding-default select {
   min-width: 180px;

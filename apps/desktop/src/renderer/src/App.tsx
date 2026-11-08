@@ -12,7 +12,7 @@ import { ImportSessionsDialog } from "./dialogs/ImportSessionsDialog";
 import { NewFileDialog } from "./dialogs/NewFileDialog";
 import { useAppShortcuts } from "./lib/app-shortcuts";
 import { useRpc } from "./lib/client";
-import { useOnboardingDefaultHarness } from "./lib/default-harness";
+import { useOnboardingAgents } from "./lib/default-harness";
 import { focusedProject, useLayout } from "./lib/layout";
 import { useLookHandover } from "./lib/mac-look";
 import { readOnboardingState, resolveOnboarding, writeOnboardingState, type PersistedOnboardingState } from "./lib/onboarding";
@@ -60,8 +60,11 @@ export function App() {
   const projectId = useLayout(focusedProject);
   const system = useRpc("system.info", { refresh: false });
   const projects = useRpc("projects.list", {});
-  const [onboardingState, setOnboardingState] = useState(readOnboardingState);
-  const recordDefaultHarness = useOnboardingDefaultHarness();
+  const [savedOnboarding, setOnboardingState] = useState(readOnboardingState);
+  const settings = useRpc("app.settings.get", {});
+  const onboardingState =
+    settings.data?.enabledHarnesses == null ? savedOnboarding : { ...savedOnboarding, selectedHarnesses: settings.data.enabledHarnesses, defaultHarness: settings.data.defaultHarness };
+  const recordAgents = useOnboardingAgents();
   useLookHandover();
   const [onboardingSession, setOnboardingSession] = useState<"first_run" | "recovery" | "dismissed" | null>(null);
   const currentProject = projectForRoute(route, projectId);
@@ -96,7 +99,7 @@ export function App() {
   const persistOnboarding = (next: PersistedOnboardingState): boolean => {
     if (!writeOnboardingState(next)) return false;
     setOnboardingState(next);
-    recordDefaultHarness(next.defaultHarness);
+    recordAgents(next);
     return true;
   };
 

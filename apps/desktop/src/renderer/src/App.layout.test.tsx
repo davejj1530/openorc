@@ -20,6 +20,7 @@ vi.mock("./lib/client", async (original) => {
     "workspace.get": null,
     "system.info": { harnesses: [{ id: "codex", state: "ready" }], gh: { installed: false } },
     "app.settings.get": { defaultPermissionMode: "review", defaultWorkspaceMode: "current" },
+    "agents.updates.get": undefined,
     "orchestration.availability": { enabled: false },
     "review.projectDiff": { files: [], patch: "" },
   };

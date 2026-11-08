@@ -301,11 +301,11 @@
 
 /* Inside a card the raised roles step up from the card's own fill, so secondary buttons, hovers
    and selected fills stay visible on it in every palette. */
-.settings-shell :is(.settings-group, .settings-card, .settings-disclosure, .usage-account, .memory-control) {
+.settings-shell :is(.settings-group, .settings-card, .settings-disclosure, .settings-agent-list, .settings-account-list, .usage-account, .memory-control) {
   --surface-2: color-mix(in srgb, var(--ink) 7%, transparent);
   --surface-3: color-mix(in srgb, var(--ink) 11%, transparent);
 }
-/* Parallel things (agents, accounts) are equal cards: every row of the grid takes the tallest
+/* Parallel things such as accounts are equal cards: every row of the grid takes the tallest
    card's height, and each card's actions sit on its foot. */
 .settings-cards {
   display: grid;
@@ -367,6 +367,121 @@
 }
 .settings-card-actions:empty {
   display: none;
+}
+.settings-agent-list,
+.settings-account-list {
+  padding-inline: 20px;
+  border-radius: var(--radius-2xl);
+  background: var(--settings-card-fill);
+}
+.settings-agent-row,
+.settings-account-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 20px;
+  padding-block: 16px;
+  border-bottom: var(--hairline) solid var(--line);
+}
+.settings-agent-row:last-child,
+.settings-account-row:last-child {
+  border-bottom: 0;
+}
+.settings-agent-details > summary,
+.settings-agent-add > summary,
+.settings-account-add > summary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  list-style: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.settings-agent-details > summary::-webkit-details-marker,
+.settings-agent-add > summary::-webkit-details-marker,
+.settings-account-add > summary::-webkit-details-marker {
+  display: none;
+}
+.settings-agent-details > summary:focus-visible,
+.settings-agent-add > summary:focus-visible,
+.settings-account-add > summary:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 4px;
+}
+.settings-agent-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+  font-size: var(--text-md);
+  line-height: 20px;
+}
+.settings-agent-chevron {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+.settings-agent-details[open] > summary .settings-agent-chevron,
+.settings-agent-add[open] > summary .settings-agent-chevron,
+.settings-account-add[open] > summary .settings-agent-chevron {
+  transform: rotate(180deg);
+}
+.settings-agent-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin-top: 3px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+.settings-agent-actions {
+  display: flex;
+  align-items: center;
+  align-self: start;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+  min-height: 42px;
+}
+.settings-agent-installation {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 0 36px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+@layer components {
+  .settings-agent-feedback {
+    grid-column: 1 / -1;
+    margin: 8px 0 0 36px;
+    color: var(--ink-3);
+    font-size: var(--text-xs);
+    line-height: 1.5;
+  }
+}
+.settings-agent-add > summary,
+.settings-account-add > summary {
+  gap: 20px;
+  min-height: 48px;
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+.settings-agent-add > summary > span,
+.settings-account-add > summary > span {
+  flex: 1;
+}
+.settings-agent-available {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 48px;
+  border-top: var(--hairline) solid var(--line);
+  font-size: var(--text-sm);
+}
+.settings-agent-preferences,
+.settings-account-preferences {
+  margin-top: 20px;
 }
 /* A name that edits in place: it reads as the card's title, hover outlines it, and focus takes the
    app's text-field fill. */

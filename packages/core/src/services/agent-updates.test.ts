@@ -4,9 +4,15 @@ import { AgentUpdateService } from "./agent-updates.js";
 import { fetchAgentRelease, newerRelease, releaseVersion, type AgentInstallation } from "./agent-update-installation.js";
 import type { EnvSnapshot } from "./shell-environment.js";
 
-const environment: EnvSnapshot = { revision: 1, shell: "/bin/zsh", path: "/fixture", binaries: { codex: "/fixture/codex", claude: "/fixture/claude", opencode: null }, env: { PATH: "/fixture" } };
+const environment: EnvSnapshot = {
+  revision: 1,
+  shell: "/bin/zsh",
+  path: "/fixture",
+  binaries: { codex: "/fixture/codex", claude: "/fixture/claude", opencode: null, omp: null, cursor: null, pi: null, antigravity: null, fx: null },
+  env: { PATH: "/fixture" },
+};
 function setup() {
-  const versions: Record<HarnessId, string | null> = { codex: "codex-cli 1.0.0", claude: "2.1.0 (Claude Code)", opencode: null };
+  const versions: Record<HarnessId, string | null> = { codex: "codex-cli 1.0.0", claude: "2.1.0 (Claude Code)", opencode: null, omp: null, cursor: null, pi: null, antigravity: null, fx: null };
   /** Installed agents whose version command fails. */
   const failing = new Set<HarnessId>();
   const info = vi.fn(async (): Promise<SystemInfo> => ({
@@ -26,7 +32,7 @@ function setup() {
     repair: { binary: "/fixture/npm", args: [id, "repair"] },
     message: null,
   }));
-  const latest = vi.fn(async (id: string) => (id === "codex" ? "1.1.0" : "2.2.0"));
+  const latest = vi.fn(async (id: string): Promise<string> => (id === "codex" ? "1.1.0" : "2.2.0"));
   const run = vi.fn(async (command: { binary: string; args: string[] }) => {
     const id = command.args[0] as HarnessId;
     versions[id] = await latest(id);
@@ -67,7 +73,7 @@ describe("agent release checks", () => {
     expect(f.info).toHaveBeenCalledTimes(1);
     expect(f.latest).toHaveBeenCalledTimes(2);
     expect(state.checking).toBe(false);
-    expect(state.agents.map((row) => row.status)).toEqual(["available", "available", "not_installed"]);
+    expect(state.agents.map((row) => row.status)).toEqual(harnessIds.map((id) => (id === "codex" || id === "claude" ? "available" : "not_installed")));
     expect(f.run).not.toHaveBeenCalled();
   });
   it("keeps offline failures separate from up-to-date results", async () => {
@@ -116,13 +122,28 @@ describe("agent release checks", () => {
 });
 
 describe("agent updates", () => {
+  it.each(harnessIds)("updates %s and verifies its new version before releasing the run fence", async (id) => {
+    const f = setup();
+    const installed = id === "cursor" ? "2026.11.01-abcdef1" : "1.0.0";
+    const latest = id === "cursor" ? "2026.11.02-abcdef2" : "1.1.0";
+    f.versions[id] = installed;
+    f.latest.mockImplementation(async (agent) => (agent === id ? latest : "2.2.0"));
+    const checked = await f.service.check();
+    expect(checked.agents.find((a) => a.id === id)).toMatchObject({ status: "available", canUpdate: true });
+    expect(f.run).not.toHaveBeenCalled();
+    const updated = await f.service.install([id]);
+    expect(f.run).toHaveBeenCalledExactlyOnceWith({ binary: "/fixture/npm", args: [id] }, environment.env);
+    expect(updated.agents.find((a) => a.id === id)).toMatchObject({ status: "current", installedVersion: latest });
+    expect(f.reserve).toHaveBeenCalledOnce();
+    expect(f.release).toHaveBeenCalledOnce();
+  });
   it("refuses active work without executing or changing available releases", async () => {
     const f = setup();
-    await f.service.check();
+    const before = await f.service.check();
     f.reserve.mockRejectedValueOnce(new Error("Finish agent work"));
     await expect(f.service.install(["codex"])).rejects.toThrow("Finish agent work");
     expect(f.run).not.toHaveBeenCalled();
-    expect(f.service.get()).toMatchObject({ updating: false, agents: [expect.objectContaining({ status: "available" }), expect.anything(), expect.anything()] });
+    expect(f.service.get()).toMatchObject({ updating: false, agents: before.agents });
   });
   it("updates sequentially, verifies versions, and releases admission even when one agent fails", async () => {
     const f = setup();

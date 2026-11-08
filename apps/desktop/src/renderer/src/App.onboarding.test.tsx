@@ -41,12 +41,15 @@ let harnesses: HarnessInfo[] | undefined;
 let projectCount = 1;
 let checkFailed = false;
 let coreDefault: HarnessId | null | undefined;
+let coreEnabled: HarnessId[] | null;
 let coreLook: AppLook | null | undefined;
 const saveSettings = vi.fn();
 vi.mock("./lib/client", async (original) => {
   const rpcData = (method: string) => {
     if (method === "system.info") return harnesses ? { harnesses } : undefined;
-    if (method === "app.settings.get") return coreDefault === undefined ? undefined : { defaultHarness: coreDefault, ...(coreLook === undefined ? {} : { look: coreLook }) };
+    if (method === "agents.updates.get") return undefined;
+    if (method === "app.settings.get")
+      return coreDefault === undefined ? undefined : { defaultHarness: coreDefault, enabledHarnesses: coreEnabled, ...(coreLook === undefined ? {} : { look: coreLook }) };
     return Array.from({ length: projectCount }, (_, i) => ({
       id: `project-${i}`,
       name: "Existing project",
@@ -77,7 +80,7 @@ vi.mock("./lib/client", async (original) => {
 import { App } from "./App";
 import { useRouter } from "./lib/router";
 import { useTheme } from "./lib/theme";
-import { useOnboardingDefaultHarness } from "./lib/default-harness";
+import { useOnboardingAgents } from "./lib/default-harness";
 import { writeOnboardingState } from "./lib/onboarding";
 
 const harness = (id: HarnessInfo["id"], state: HarnessInfo["state"]): HarnessInfo => ({
@@ -99,6 +102,7 @@ beforeEach(() => {
   checkFailed = false;
   trafficLights = true;
   coreDefault = null;
+  coreEnabled = null;
   coreLook = undefined;
   saveSettings.mockReset();
 });
@@ -130,7 +134,7 @@ describe("the default harness", () => {
     expect(saveSettings).not.toHaveBeenCalled();
     coreDefault = null;
     view.rerender(<App />);
-    expect(saveSettings).toHaveBeenCalledExactlyOnceWith({ defaultHarness: "claude" });
+    expect(saveSettings).toHaveBeenCalledExactlyOnceWith({ defaultHarness: "claude", enabledHarnesses: ["claude", "codex"] });
     coreDefault = "claude";
     view.rerender(<App />);
     expect(saveSettings).toHaveBeenCalledOnce();
@@ -138,14 +142,14 @@ describe("the default harness", () => {
 
   it("hands it over once, so a default onboarding saves later is never replaced by the older choice", () => {
     completed("claude");
-    const handover = renderHook(() => useOnboardingDefaultHarness());
+    const handover = renderHook(() => useOnboardingAgents());
     coreDefault = "claude";
     handover.rerender();
     // Recovery: the person deselects Claude while two other harnesses are ready, so onboarding saves no default.
-    handover.result.current(null);
+    handover.result.current({ defaultHarness: null, selectedHarnesses: ["codex", "cursor"] });
     coreDefault = null;
     handover.rerender();
-    expect(saveSettings.mock.calls).toEqual([[{ defaultHarness: "claude" }], [{ defaultHarness: null }]]);
+    expect(saveSettings.mock.calls).toEqual([[{ defaultHarness: "claude", enabledHarnesses: ["claude", "codex"] }], [{ defaultHarness: null, enabledHarnesses: ["codex", "cursor"] }]]);
   });
 
   it.each([
@@ -156,6 +160,14 @@ describe("the default harness", () => {
     harnesses = bothReady();
     coreDefault = core;
     render(<App />);
+    expect(saveSettings).toHaveBeenCalledExactlyOnceWith({ enabledHarnesses: ["claude", "codex"] });
+  });
+
+  it("keeps a newer enabled list in the core instead of restoring onboarding's older list", () => {
+    completed("claude");
+    coreDefault = "cursor";
+    coreEnabled = ["cursor"];
+    renderHook(() => useOnboardingAgents());
     expect(saveSettings).not.toHaveBeenCalled();
   });
 });
@@ -224,8 +236,8 @@ describe("app onboarding recovery", () => {
       projectId: "project-0",
     });
     // The default chosen here is the core's, so the phone starts new threads with it too.
-    expect(saveSettings).toHaveBeenCalledWith({ defaultHarness: "claude" });
-    expect(saveSettings).not.toHaveBeenCalledWith({ defaultHarness: "codex" });
+    expect(saveSettings).toHaveBeenCalledWith({ defaultHarness: "claude", enabledHarnesses: ["claude", "codex"] });
+    expect(saveSettings).not.toHaveBeenCalledWith(expect.objectContaining({ defaultHarness: "codex" }));
   });
 
   it("does not latch recovery during loading for a completed profile", () => {

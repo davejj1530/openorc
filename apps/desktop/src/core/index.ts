@@ -3,6 +3,7 @@ import { newestBrainBundle } from "./brain-bundle";
 import { BrowserClient } from "./browser-client";
 import { PreviewClient } from "./preview-client";
 import { PresenceClient } from "./presence";
+import { TrashClient } from "./trash";
 import { windowPorts } from "./reply";
 import { basename, join } from "node:path";
 import { Worker } from "node:worker_threads";
@@ -40,6 +41,7 @@ const secrets = new ProtectedSecretsClient((message) => process.parentPort.postM
 const browser = new BrowserClient((message) => process.parentPort.postMessage(message));
 const preview = new PreviewClient((message) => process.parentPort.postMessage(message));
 const presence = new PresenceClient((message) => process.parentPort.postMessage(message));
+const trash = new TrashClient((message) => process.parentPort.postMessage(message));
 // The runner a cloud workspace runs is uploaded as source, so the bundle carries its files as text.
 const cloudRunner = import.meta.glob<string>(["../../../../packages/cloud/src/runner/*.ts", "!../../../../packages/cloud/src/runner/*.test.ts"], {
   query: "?raw",
@@ -79,6 +81,7 @@ const corePromise = OpenOrc.create({
   cloudBrainMoveSecrets: secrets.store("cloud-brain-move.secrets"),
   terminal,
   presence: presence.inUse,
+  trash: trash.move,
   // The embedding model runs in its own thread, so loading it and embedding memories never stall the core.
   embedder: new WorkerEmbedder(() => new Worker(join(import.meta.dirname, "embedder-worker.mjs"), { workerData: { cacheDir: dataDir } })),
   // Prettier formats in its own thread too, so a large file never stalls the core.
@@ -131,6 +134,7 @@ process.parentPort.on("message", (e) => {
   if (browser.receive(e.data)) return;
   if (preview.receive(e.data)) return;
   if (presence.receive(e.data)) return;
+  if (trash.receive(e.data)) return;
   if (secrets.receive(e.data)) return;
   if (e.data?.type === "update:prepare" && typeof e.data.id === "string") {
     void prepareUpdate(e.data.id);

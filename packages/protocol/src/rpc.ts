@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { AgentUpdates } from "./agent-updates.js";
 import { ClaudeAccountId, claudeAccountRpcParams, type ClaudeAccountRpcResults } from "./claude-accounts.js";
 import { connectorRpcParams, type ConnectorRpcResults } from "./connectors.js";
+import { skillRpcParams, type SkillRpcResults } from "./skills.js";
 import { cloudRpcParams, type CloudRpcResults } from "./cloud.js";
 import { codeExplanationRpcParams, type CodeExplanationRpcResults } from "./code-explanations.js";
 import { editorRpcParams, type EditorRpcResults } from "./code-intelligence.js";
@@ -69,6 +70,7 @@ const REVIEW_SCOPE_REQUIRED = "Review comments need a conversation or a task.";
 export const rpcParams = {
   ...claudeAccountRpcParams,
   ...connectorRpcParams,
+  ...skillRpcParams,
   ...slackRpcParams,
   ...pullRequestRpcParams,
   ...orclingRpcParams,
@@ -539,6 +541,7 @@ export interface RpcResults
     CodeExplanationRpcResults,
     ClaudeAccountRpcResults,
     ConnectorRpcResults,
+    SkillRpcResults,
     RemoteRpcResults,
     DevicePanelRpcResults,
     PreviewRpcResults,

@@ -272,7 +272,9 @@ describe("listSkills", () => {
       await mkdir(path.join(root, ".git"));
       await writeFile(path.join(root, "opencode.json"), JSON.stringify({ skills: [`http://127.0.0.1:${address.port}/catalog/`] }));
       const found = await listSkills({ projectRoot: root, home: root, agent: "opencode", env: {}, nativeDiscovery: false });
-      expect(found).toEqual([{ name: "remote", description: "From the HTTP catalog.", source: "project", path: `http://127.0.0.1:${address.port}/catalog/remote/remote.md` }]);
+      expect(found).toEqual([
+        { name: "remote", description: "From the HTTP catalog.", source: "project", path: `http://127.0.0.1:${address.port}/catalog/remote/remote.md`, enabled: true, editable: false },
+      ]);
     } finally {
       await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
     }

@@ -24,6 +24,7 @@ import { createDeviceHandlers } from "./handlers/devices.js";
 import { invalidParamsMessage, rpcLogLine } from "./handlers/diagnostics.js";
 import { createEventsHandlers } from "./handlers/events.js";
 import { createFilesHandlers } from "./handlers/files.js";
+import { createSkillsHandlers } from "./handlers/skills.js";
 import { createInboxHandlers } from "./handlers/inbox.js";
 import { createInstructionsHandlers } from "./handlers/instructions.js";
 import { createMcpAppsHandlers } from "./handlers/mcp-apps.js";
@@ -695,11 +696,13 @@ export class OpenOrc {
       createReviewThreadHandlers({ review: this.review, db: this.db, invalidate }),
       createReviewCommentsHandlers({ review: this.review, invalidate }),
       createReviewWorkspaceHandlers({ review: this.review, db: this.db, taskCheckout: this.taskCheckout, invalidate }),
-      createFilesHandlers({
+      createFilesHandlers({ db: this.db, files: this.files }),
+      createSkillsHandlers({
         db: this.db,
         files: this.files,
         claudeEnvironment: (id) => this.claudeAccounts.environment(this.environment.current(), id).env,
         claudeLaunch: (id) => captureLaunchEnvironment("claude", this.claudeAccounts.environment(this.environment.current(), id)),
+        trash: this.options.trash,
       }),
       createCodeExplanationHandlers({ db: this.db, files: this.files, textGeneration: this.textGeneration, settings: this.settings, dataDir: this.options.dataDir }),
       createInstructionsHandlers({ db: this.db, files: this.files, claudeEnvironment: (id) => this.claudeAccounts.environment(this.environment.current(), id).env }),

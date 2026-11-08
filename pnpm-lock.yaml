@@ -578,10 +578,16 @@ importers:
       '@openorc/protocol':
         specifier: workspace:*
         version: link:../protocol
+      js-yaml:
+        specifier: 4.3.2
+        version: 4.3.2
       jsonc-parser:
         specifier: ^3.3.1
         version: 3.3.1
     devDependencies:
+      '@types/js-yaml':
+        specifier: ^4.0.9
+        version: 4.0.9
       '@types/node':
         specifier: ^24.0.0
         version: 24.13.4

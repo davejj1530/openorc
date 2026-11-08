@@ -139,7 +139,7 @@ export class CloudSkills implements CloudSkillSource {
     if (!fresh && last && Date.now() - last.at < LISTED_MS) return last.skills;
     const list = this.deps.list ?? listSkills;
     const env = agent === "claude" && this.deps.claudeEnv ? { env: this.deps.claudeEnv() } : {};
-    const skills = list({ projectRoot: this.deps.root, agent, ...env }).then((all) => all.filter((skill) => skill.source === "user"));
+    const skills = list({ projectRoot: this.deps.root, agent, ...env }).then((all) => all.filter((skill) => skill.source === "user" && skill.enabled !== false));
     this.listed.set(agent, { at: Date.now(), skills });
     skills.catch(() => this.listed.delete(agent));
     return skills;

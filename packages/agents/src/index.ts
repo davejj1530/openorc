@@ -21,6 +21,8 @@ export { agentBinary } from "./bin.js";
 export { launchCommand, type CommandLaunch } from "./command-launch.js";
 export { isImageAttachment, partitionAttachments, withAttachedFiles } from "./attachments.js";
 export { listSkills } from "./skills.js";
+export { setSkillEnabled } from "./skill-switches.js";
+export { MAX_SKILL_ICON_BYTES, SKILL_ICON_TYPES, SKILL_INTERFACE_FILE, newSkillText, skillFolderOf, skillIconDataUrl, withSkillIcon } from "./skill-interface.js";
 export { instructionFiles } from "./instructions.js";
 export { readCodexUsage, consumeCodexReset, type CodexUsageOptions, type CodexAccountReport } from "./codex/usage.js";
 export { readClaudeUsage, type ClaudeUsageResult, type ClaudeUsageOptions } from "./claude/usage.js";

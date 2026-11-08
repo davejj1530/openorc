@@ -1,13 +1,13 @@
 import { spawn } from "node:child_process";
-import { randomUUID } from "node:crypto";
-import { existsSync, statSync } from "node:fs";
-import { mkdir, readFile, realpath, rename, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
-import { applyEdits, modify, parse, type ParseError } from "jsonc-parser";
+import { parse, type ParseError } from "jsonc-parser";
 import type { ConnectorSpec, ConnectorStatus } from "@openorc/protocol";
 import { launchCommand } from "../command-launch.js";
+import { editedConfig, replaceFile } from "../config-file.js";
 import { CONNECTOR_READ_WAIT_MS, delay, readableConnectorError, siteOf, whenAborted, type ConnectorDriver, type ConnectorRow } from "../connectors.js";
 import { inFolder, type AgentLaunchEnvironment } from "../launch-environment.js";
 import { stopProcess, waitForProcessGroup } from "../process-lifetime.js";
@@ -63,12 +63,8 @@ export function openCodeServerConfig(saved: SavedServer | undefined, spec: Conne
   return { ...rest, type: "local", command: [spec.command, ...spec.args], ...(Object.keys(spec.env).length ? { environment: spec.env } : {}) };
 }
 
-/** Changes one value in a configuration file the user may have written by hand, leaving their comments and order alone. */
-export function editedOpenCodeConfig(text: string, at: string[], value: unknown): string {
-  return applyEdits(text, modify(text, at, value, { formattingOptions: { insertSpaces: true, tabSize: 2 } }));
-}
-
-function configFile(env: NodeJS.ProcessEnv): string {
+/** The configuration file OpenCode reads first in the user's config folder, or where a new one goes. */
+export function openCodeConfigFile(env: NodeJS.ProcessEnv): string {
   const dir = path.join(env["XDG_CONFIG_HOME"] || path.join(env["HOME"] || os.homedir(), ".config"), "opencode");
   return [path.join(dir, "opencode.jsonc"), path.join(dir, "opencode.json")].find((file) => existsSync(file)) ?? path.join(dir, "opencode.jsonc");
 }
@@ -79,16 +75,6 @@ async function readConfig(file: string): Promise<{ text: string; mcp: Record<str
   const config = parse(text, errors, { allowTrailingComma: true }) as { mcp?: Record<string, unknown> } | null;
   if (errors.length) throw new Error("OpenCode's configuration file could not be read. Fix it and try again.");
   return { text, mcp: config?.mcp };
-}
-
-/** Writes the whole file at once. A configuration kept elsewhere behind a link, as dotfiles often are, is written where it lives. */
-async function replaceFile(file: string, text: string): Promise<void> {
-  await mkdir(path.dirname(file), { recursive: true });
-  const target = await realpath(file).catch(() => file);
-  const mode = existsSync(target) ? statSync(target).mode & 0o777 : 0o600;
-  const temporary = `${target}.${process.pid}.${randomUUID()}.tmp`;
-  await writeFile(temporary, text, { mode });
-  await rename(temporary, target);
 }
 
 /**
@@ -201,11 +187,11 @@ export function openCodeConnectorDriver(launch: Launch): ConnectorDriver {
     return id;
   };
   const edit = async (name: string, change: (found: { server: SavedServer; at: string[] } | undefined, at: string[]) => { at: string[]; value: unknown }) => {
-    const file = configFile(launch.env);
+    const file = openCodeConfigFile(launch.env);
     const { text, mcp } = await readConfig(file);
     const found = savedOpenCodeServers(mcp).get(name);
     const { at, value } = change(found, found?.at ?? ["mcp", "servers", name]);
-    await replaceFile(file, editedOpenCodeConfig(text, at, value));
+    await replaceFile(file, editedConfig(text, at, value));
   };
 
   return {
@@ -213,9 +199,9 @@ export function openCodeConnectorDriver(launch: Launch): ConnectorDriver {
       withService(launch, folder, 25_000, async (api) => {
         const entries = await api<ConfigEntry[]>("GET", "/api/config");
         const names = new Set(entries.flatMap((entry) => (entry.type === "document" ? [...savedOpenCodeServers(entry.info?.mcp).keys()] : [])));
-        return openCodeConnectorRows(entries, await settledServers(api, names), configFile(launch.env));
+        return openCodeConnectorRows(entries, await settledServers(api, names), openCodeConfigFile(launch.env));
       }),
-    spec: async (name) => savedAsSpec(savedOpenCodeServers((await readConfig(configFile(launch.env))).mcp).get(name)?.server),
+    spec: async (name) => savedAsSpec(savedOpenCodeServers((await readConfig(openCodeConfigFile(launch.env))).mcp).get(name)?.server),
     save: (name, spec) => edit(name, (found, at) => ({ at, value: openCodeServerConfig(found?.server, spec) })),
     remove: (name) => edit(name, (_found, at) => ({ at, value: undefined })),
     setOn: (name, on) =>

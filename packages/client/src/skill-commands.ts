@@ -79,7 +79,8 @@ export function useSkillCommandsWith(queries: ClientQueries, scope: FileScope | 
     () =>
       agent === "opencode"
         ? []
-        : [...(found ?? [])]
+        : (found ?? [])
+            .filter((skill) => skill.enabled !== false)
             .sort((a, b) => SOURCE_ORDER[a.source] - SOURCE_ORDER[b.source])
             .map((skill) => ({ name: skill.name, hint: skill.description, insert: true as const, prefix, ...(skill.aliases?.length ? { aliases: skill.aliases } : {}) })),
     [agent, found, prefix],

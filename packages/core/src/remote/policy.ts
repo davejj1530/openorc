@@ -203,8 +203,18 @@ export const remoteReplies: { [M in RemoteMethod]: Reply<M> } = {
   }),
   "agents.models": same,
   "agents.availability": same,
-  // Where each skill's file lives on the Mac stays there; a description is the skill author's text and may hold a token.
-  "skills.list": (skills) => skills.map((skill) => ({ ...skill, path: "", description: redact(skill.description).text })),
+  // Where each skill's file lives on the Mac stays there, and its image, which can be large; a description is the skill
+  // author's text and may hold a token. A phone offers what the agent uses, so a skill turned off is left out, and it
+  // changes no skill, so whether one could be changed stays too.
+  "skills.list": (skills) =>
+    skills
+      .filter((skill) => skill.enabled !== false)
+      .map(({ icon: _icon, enabled: _enabled, editable: _editable, ...skill }) => ({
+        ...skill,
+        path: "",
+        description: redact(skill.description).text,
+        ...(skill.shortDescription === undefined ? {} : { shortDescription: redact(skill.shortDescription).text }),
+      })),
   // A sign-in's email and organization, and the CLI's own words, stay on the Mac.
   "claude.accounts.list": ({ accounts, defaultId }) => ({ defaultId, accounts: accounts.map((account) => ({ ...account, email: null, organization: null, message: null })) }),
   "providers.limits": same,

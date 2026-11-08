@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { codexConnectorRows, codexServerConfig } from "./codex/connectors.js";
 import { readableConnectorError } from "./connectors.js";
-import { editedOpenCodeConfig, openCodeServerConfig, savedOpenCodeServers } from "./opencode/connectors.js";
+import { editedConfig } from "./config-file.js";
+import { openCodeServerConfig, savedOpenCodeServers } from "./opencode/connectors.js";
 
 describe("connector errors", () => {
   it("keep a server's host and drop the rest of its address, where a token can sit", () => {
@@ -58,7 +59,7 @@ describe("OpenCode connectors", () => {
 
   it("change one value and keep the user's comments", () => {
     const text = '{\n  // mine\n  "model": "x"\n}\n';
-    const edited = editedOpenCodeConfig(text, ["mcp", "servers", "paper"], openCodeServerConfig(undefined, { kind: "command", command: "paper", args: ["--stdio"], env: {} }));
+    const edited = editedConfig(text, ["mcp", "servers", "paper"], openCodeServerConfig(undefined, { kind: "command", command: "paper", args: ["--stdio"], env: {} }));
     expect(edited).toContain("// mine");
     expect(JSON.parse(edited.replace("// mine", ""))).toEqual({ model: "x", mcp: { servers: { paper: { type: "local", command: ["paper", "--stdio"] } } } });
   });

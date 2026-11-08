@@ -49,6 +49,33 @@ describe("phone policy", () => {
     ]);
   });
 
+  it("offers a phone only the skills its agent uses, without their images, and none of the Skills page's changes", () => {
+    const listed = remoteReply(
+      "skills.list",
+      [
+        {
+          name: "deploy",
+          description: "Ship it.",
+          shortDescription: `Uses ${TOKEN}`,
+          source: "user",
+          path: "/Users/me/.claude/skills/deploy/SKILL.md",
+          icon: "data:image/png;base64,AAAA",
+          enabled: true,
+          editable: true,
+        },
+        { name: "drafts", description: "Off.", source: "user", path: "/Users/me/.claude/skills/drafts/SKILL.md", enabled: false, editable: true },
+      ],
+      { words: (text: string) => text, roots: () => ({ home: "/Users/me", dataDir: "/Users/me/.openorc", projects: [] }) },
+    );
+    expect(listed.map((skill) => skill.name)).toEqual(["deploy"]);
+    expect(Object.keys(listed[0]!).sort()).toEqual(["description", "name", "path", "shortDescription", "source"]);
+    expect(JSON.stringify(listed)).not.toContain(TOKEN);
+    for (const method of ["skills.files", "skills.readFile", "skills.writeFile", "skills.setEnabled", "skills.setIcon", "skills.create", "skills.import", "skills.remove"]) {
+      expect(isRemoteMethod(method), method).toBe(false);
+      expect(admitRemoteRequest(method, {}, context).ok, method).toBe(false);
+    }
+  });
+
   it("lets only the brain's own Mac name a new thread's id", () => {
     const named = { id: "5b0e7a52-1c3f-4d8e-9a6b-2f4c8e1d7a90", projectId: "p", agent: "claude", mode: "act", permissionMode: "autonomous", cloud: true, prompt: "x" };
     expect(admitRemoteRequest("threads.start", named, context)).toEqual({ ok: false, message: "This is not available from a phone." });

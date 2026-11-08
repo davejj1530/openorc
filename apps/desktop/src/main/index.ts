@@ -28,6 +28,7 @@ import { installBrowserBridge } from "./browser-bridge";
 import { installPreviewBridge } from "./preview-bridge";
 import { createPreviewHost } from "./preview-host";
 import { installPresence } from "./presence-ipc";
+import { installTrash } from "./trash-ipc";
 import { installPowerEvents } from "./power-ipc";
 import { cancelPtyUpdate, detachAllPtys, installPtyHost, killAllPtys, preparePtysForUpdate } from "./pty-host";
 
@@ -110,6 +111,7 @@ function startCore(): UtilityProcess {
   installBrowserBridge(child, executeBrowserCommand);
   installPreviewBridge(child, previewHost);
   installPresence(child);
+  installTrash(child);
   installPowerEvents(child);
   child.stdout?.on("data", (d: Buffer) => process.stdout.write(`[core] ${d}`));
   child.stderr?.on("data", (d: Buffer) => process.stderr.write(`[core!] ${d}`));

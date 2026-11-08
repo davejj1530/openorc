@@ -46,11 +46,11 @@ function lister(byAgent: Partial<Record<HarnessId, AgentSkill[]>>) {
 const user = (name: string, folder: string): AgentSkill => ({ name, description: `${name} things`, source: "user", path: path.join(folder, "SKILL.md") });
 
 describe("choosing the user's skills for cloud sessions", () => {
-  it("lists each agent's own skills, not a project's, and remembers which go", async () => {
+  it("lists each agent's own skills it uses, not a project's, and remembers which go", async () => {
     const review = await skill("review");
     const { list } = lister({
       claude: [user("review", review), { name: "local", description: "", source: "project", path: "/p/.claude/skills/local/SKILL.md" }],
-      codex: [user("review", review)],
+      codex: [user("review", review), { ...user("drafts", review), enabled: false }],
     });
     const skills = new CloudSkills({ db, root: dir, list });
     expect(await skills.catalog()).toEqual({

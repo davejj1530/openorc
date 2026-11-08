@@ -620,6 +620,16 @@ export const AgentSkill = z.object({
   path: z.string(),
   /** Other names it answers to, as a plugin command's short name. */
   aliases: z.array(z.string()).optional(),
+  /** The name people see, from the skill's interface metadata; without one, `name`. */
+  displayName: z.string().optional(),
+  /** One line for lists, from the same metadata; without one, `description`. */
+  shortDescription: z.string().optional(),
+  /** Its image as a data URL, from the same metadata. */
+  icon: z.string().optional(),
+  /** Whether the agent uses it; absent where the agent has no switch for it. */
+  enabled: z.boolean().optional(),
+  /** Whether its folder is the user's to change: their own or the project's, on disk. */
+  editable: z.boolean().optional(),
 });
 export type AgentSkill = z.infer<typeof AgentSkill>;
 

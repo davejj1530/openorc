@@ -74,9 +74,15 @@ const contract: Array<[RpcMethod, RpcMethod[]]> = [
   ["remote.pairing.begin", ["remote.status"]],
   ["remote.pairing.cancel", ["remote.status"]],
   ["remote.devices.remove", ["remote.status"]],
+  ["skills.writeFile", ["skills.list", "skills.files", "skills.readFile"]],
+  ["skills.setEnabled", ["skills.list", "cloud.skills"]],
+  ["skills.setIcon", ["skills.list", "skills.files", "skills.readFile"]],
+  ["skills.create", ["skills.list", "cloud.skills"]],
+  ["skills.import", ["skills.list", "cloud.skills"]],
+  ["skills.remove", ["skills.list", "skills.files", "cloud.skills"]],
 ];
 
-const params = { id: "t1", taskId: "t1", threadId: "t1", projectId: "p1", scope: { kind: "thread" as const, id: "t1" }, path: "README.md", query: "" };
+const params = { id: "t1", taskId: "t1", threadId: "t1", projectId: "p1", scope: { kind: "thread" as const, id: "t1" }, path: "README.md", query: "", skill: "/skills/notes/SKILL.md" };
 
 describe("query cache tags", () => {
   it("every write refreshes the reads it affects", () => {
@@ -135,6 +141,9 @@ describe("query cache tags", () => {
       "remote.status",
       "devices.status",
       "devices.list",
+      "skills.list",
+      "skills.files",
+      "skills.readFile",
     ];
     for (const read of reads) expect(tagsFor(read, params).length, `${read} has no tag`).toBeGreaterThan(0);
   });

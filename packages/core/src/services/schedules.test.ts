@@ -1,4 +1,4 @@
-import { Db, projects, runs, scheduleFirings, schedules, threads } from "@openorc/db";
+import { claudeAccounts, Db, projects, runs, scheduleFirings, schedules, threads } from "@openorc/db";
 import { type Project } from "@openorc/protocol";
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -222,4 +222,46 @@ it("leaves due firings untouched during agent updates and resumes after maintena
   updating = false;
   await service.tick();
   expect(modelStart).toHaveBeenCalledTimes(1);
+});
+
+describe("a project's own Claude accounts", () => {
+  const claudeSchedule = (claudeAccountId?: string) =>
+    service.create({
+      projectId: project.id,
+      title: "Scheduled Claude",
+      prompt: "Check the project",
+      agent: "claude",
+      model: null,
+      effort: null,
+      mode: "plan",
+      permissionMode: "trusted",
+      workspaceMode: "current",
+      everyMinutes: 30,
+      ...(claudeAccountId ? { claudeAccountId } : {}),
+    });
+  const onlyUse = (accountIds: string[], defaultId: string) => projects.updateSettings(db, project.id, { claudeAccounts: { only: true, accountIds, defaultId, autoSwitch: false } });
+
+  it("saves a schedule on an account the project uses, or its default, and refuses one it does not", () => {
+    const [work, personal] = ["Work", "Personal"].map((name) => claudeAccounts.add(db, name).id) as [string, string];
+    onlyUse([work], work);
+    expect(claudeSchedule().claudeAccountId).toBe(work);
+    expect(() => claudeSchedule(personal)).toThrow(/only uses these Claude accounts/);
+    const saved = claudeSchedule(work);
+    expect(() => service.update(saved.id, { claudeAccountId: personal })).toThrow(/only uses these Claude accounts/);
+    expect(schedules.get(db, saved.id)?.claudeAccountId).toBe(work);
+  });
+
+  it("keeps firing on the project's default once the project stops using the schedule's account, and says so", async () => {
+    const [work, personal] = ["Work", "Personal"].map((name) => claudeAccounts.add(db, name).id) as [string, string];
+    const schedule = claudeSchedule(work);
+    onlyUse([personal], personal);
+    await service.trigger(schedule.id, "after-the-change");
+    expect(modelStart).toHaveBeenCalledWith(expect.objectContaining({ claudeAccountId: personal }), expect.anything());
+    expect(warnings).toHaveBeenCalledWith(expect.stringContaining("runs on its project's default Claude account"));
+    expect(schedules.get(db, schedule.id)?.claudeAccountId).toBe(work);
+    // Said once, not at every firing.
+    await service.trigger(schedule.id, "and-again");
+    expect(modelStart).toHaveBeenCalledTimes(2);
+    expect(warnings.mock.calls.filter(([message]) => message.includes("default Claude account"))).toHaveLength(1);
+  });
 });

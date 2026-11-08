@@ -9,7 +9,7 @@ import { Button, Empty, IconButton, Input, Select, TextButton } from "../compone
 import { readDraft, removeDraft, writeDraft } from "../lib/drafts";
 import { useProjectGit } from "../lib/project-git";
 import { useRpc, useRpcMutation } from "../lib/client";
-import { newThread, openTask, openThread, useRouter } from "../lib/router";
+import { openTask, openThread, useRouter } from "../lib/router";
 import { useUi } from "../lib/ui";
 import { ExecutionLocationSelect } from "../components/TaskExecutionSettings";
 
@@ -150,13 +150,6 @@ export function NewTask({ projectId, threadId }: { projectId?: string; threadId?
   return (
     <div className="task-workspace h-full flex flex-col min-h-0">
       <TopBar
-        projectId={selectedId || undefined}
-        projectName={project?.name}
-        onProjectChange={(id) => {
-          if (threadId) newThread(id ?? undefined);
-          else if (id && projects.data?.some((p) => p.id === id)) patch({ projectId: id, baseRef: "" });
-          else newThread(id ?? undefined);
-        }}
         actions={
           <span className={cn("text-sm inline-flex items-center gap-1.5", draftStored ? "text-ink-4" : "text-bad")} role="status">
             {draftStored ? (

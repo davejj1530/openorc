@@ -13,7 +13,7 @@ import "./app.css";
 const params = new URLSearchParams(location.search);
 useTheme.getState().setPreset("openorc");
 useTheme.getState().set(params.get("theme") === "light" ? "light" : "dark");
-useLayout.setState({ sidebarOpen: true, projectId: "fixture" });
+useLayout.setState({ sidebarOpen: true, workspace: "fixture" });
 queryClient.setDefaultOptions({ queries: { retry: false } });
 let policy: Settings = { enabled: params.get("state") === "on", provider: "off", model: null, hasApiKey: false, resolved: null, automatic: [], reason: null };
 let failSave = params.get("state") === "save-error";

@@ -3,9 +3,10 @@ import { ResizeHandle } from "./ResizeHandle";
 import { PANE_MS } from "../lib/motion";
 import { requestFilesFocus, useFilesHost } from "../lib/files-tool";
 import { useLayout } from "../lib/layout";
+import { useWindowCorner } from "../lib/navigation-column";
 import { usePanelSessions } from "../lib/panel-tabs";
 import { toolPage, usePanelWorkspace } from "../lib/panel-workspace";
-import { useTrafficLights, useWindowsControls } from "../lib/window";
+import { useWindowsControls } from "../lib/window";
 import { panelFileScope, terminalId, type PanelContext } from "./panel-tools";
 import { PanelContent } from "./PanelContent";
 import { PanelNavigation } from "./PanelNavigation";
@@ -98,7 +99,6 @@ export function Panel({ context }: { context: PanelContext }) {
   const workspace = usePanelWorkspace(context);
   useFilesHost(panelFileScope(context));
   const windowsControls = useWindowsControls();
-  const trafficLights = useTrafficLights();
   const { scope, session, tab } = workspace;
   const closeTab = (id: string) => {
     window.openorc.browser?.close?.(id);
@@ -111,7 +111,7 @@ export function Panel({ context }: { context: PanelContext }) {
     });
   };
   const closing = useFileTabClosing(session, { close: closeTab, show: (id) => usePanelSessions.getState().select(scope, id) });
-  const trafficClearance = !sidebarOpen && trafficLights;
+  const corner = useWindowCorner();
   return (
     <>
       {open && !expanded ? <ResizeHandle edge="panel" /> : null}
@@ -127,17 +127,8 @@ export function Panel({ context }: { context: PanelContext }) {
           if (expanded && event.key === "Escape" && !event.defaultPrevented) useLayout.getState().setPanelExpanded(false);
         }}
       >
-        <div className="panel-pane h-full flex flex-col" data-plane>
-          <PanelHeader
-            scope={scope}
-            session={session}
-            side={side}
-            expanded={expanded}
-            sidebarOpen={sidebarOpen}
-            trafficClearance={trafficClearance}
-            windowsControls={windowsControls}
-            onClose={closing.requestClose}
-          />
+        <div className="panel-pane h-full flex flex-col" data-plane="tile">
+          <PanelHeader scope={scope} session={session} side={side} expanded={expanded} sidebarOpen={sidebarOpen} corner={corner} windowsControls={windowsControls} onClose={closing.requestClose} />
           <div
             id="panel-tab-content"
             role="tabpanel"

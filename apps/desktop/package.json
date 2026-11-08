@@ -43,6 +43,7 @@
     "@openorc/core": "workspace:*",
     "@openorc/mcp": "workspace:*",
     "@openorc/protocol": "workspace:*",
+    "@paper-design/shaders": "0.0.81",
     "@pierre/diffs": "1.4.2",
     "@rive-app/canvas": "2.42.1",
     "@streamdown/code": "^1.1.1",

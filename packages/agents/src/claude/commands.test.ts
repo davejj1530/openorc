@@ -87,11 +87,11 @@ describe.skipIf(process.platform === "win32")("Claude Code's own command list", 
     const skills = await listSkills({ projectRoot: project, agent: "claude", home: configDir, launch: { binary: f.binary, env } });
 
     expect(skills).toEqual([
-      { name: "deploy", description: "Ship it.", source: "project", path: path.join(project, ".claude", "skills", "deploy", "SKILL.md") },
-      { name: "init", description: "Initialize a CLAUDE.md", source: "system", path: "" },
-      { name: "notes", description: "Personal.", source: "user", path: "" },
-      { name: "parent-skill", description: "From a folder above the project.", source: "project", path: "" },
-      { name: "pstack:how", description: "How it works", source: "plugin", path: "", aliases: ["how"] },
+      { name: "deploy", description: "Ship it.", source: "project", path: path.join(project, ".claude", "skills", "deploy", "SKILL.md"), enabled: true, editable: true },
+      { name: "init", description: "Initialize a CLAUDE.md", source: "system", path: "", editable: false },
+      { name: "notes", description: "Personal.", source: "user", path: "", enabled: true, editable: false },
+      { name: "parent-skill", description: "From a folder above the project.", source: "project", path: "", enabled: true, editable: false },
+      { name: "pstack:how", description: "How it works", source: "plugin", path: "", aliases: ["how"], enabled: true, editable: false },
     ]);
     const missing = await listSkills({ projectRoot: project, agent: "claude", home: configDir, launch: { binary: path.join(configDir, "no-claude"), env } });
     expect(missing.map((skill) => skill.name)).toEqual(["deploy"]);

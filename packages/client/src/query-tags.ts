@@ -42,6 +42,11 @@ function each(methods: RpcMethod[], rule: (p: Params) => string[]): MethodRules 
   return Object.fromEntries(methods.map((method) => [method, rule]));
 }
 
+/** One skill's files, by the path its listing gives. */
+function skillTag(p: Params): string {
+  return `skill:${String(p["skill"])}`;
+}
+
 /** The task a write names, by its own id or the task it belongs to. */
 function taskTag(p: Params): string {
   return `task:${String(p["taskId"] ?? p["id"])}`;
@@ -55,6 +60,8 @@ function scopedTask(p: Params): string[] {
 /** Reads whose tags never depend on their parameters. */
 const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "claude.accounts.list": ["claude-accounts"],
+  "connectors.list": ["connectors"],
+  "connectors.spec": ["connectors"],
   "workspace.get": ["workspace"],
   "slack.status": ["slack"],
   "cloud.status": ["cloud"],
@@ -86,7 +93,8 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "app.settings.get": ["settings"],
   "textGeneration.settings.get": ["text-generation", "system", "models"],
   "schedules.list": ["schedules"],
-  "projects.list": ["projects"],
+  // Ordered by thread activity, so it follows the thread list.
+  "projects.list": ["projects", "threads"],
   "projects.checkoutBranch": ["projects", "workspace-diff"],
   "threads.list": ["threads"],
   "threads.resolvedCount": ["threads"],
@@ -115,6 +123,8 @@ const idReadTags: MethodRules = {
     const scope = p["scope"] as { kind?: unknown; id?: unknown } | undefined;
     return ["skills", ...(scope?.kind === "project" ? [`project:${String(scope.id)}`] : [])];
   },
+  // A skill's folder changes with its own writes; the agent's edits to it show the next time it is opened.
+  ...each(["skills.files", "skills.readFile"], (p) => ["skills", skillTag(p)]),
   "tasks.executionThread": (p) => ["tasks", "threads", `task:${String(p["taskId"])}`],
   "projects.get": (p) => ["projects", `project:${String(p["id"])}`],
   // Git can appear in a turn, a commit, the terminal or outside the app; focus and settled commands refresh workspace-diff.
@@ -177,6 +187,13 @@ const fixedInvalidations: Partial<Record<RpcMethod, readonly string[]>> = {
   "claude.accounts.update": ["claude-accounts", "system", "models", "provider-usage"],
   "claude.accounts.login": ["claude-accounts"],
   "claude.accounts.cancelLogin": ["claude-accounts"],
+  "connectors.list": ["connectors"],
+  "connectors.save": ["connectors"],
+  "connectors.remove": ["connectors"],
+  "connectors.setOn": ["connectors"],
+  "connectors.signIn": ["connectors"],
+  "connectors.cancelSignIn": ["connectors"],
+  "connectors.signOut": ["connectors"],
   "providers.codex.reset": ["provider-usage"],
   "agents.models.refresh": ["models"],
   "workspace.configure": ["workspace", "projects"],
@@ -213,6 +230,12 @@ const fixedInvalidations: Partial<Record<RpcMethod, readonly string[]>> = {
   "remote.pairing.begin": ["remote"],
   "remote.pairing.cancel": ["remote"],
   "remote.devices.remove": ["remote"],
+  // A skill's switch, image or folder shows in every agent's listing that reads the same folders; the cloud's copy follows.
+  "skills.setEnabled": ["skills", "cloud-skills"],
+  "skills.setIcon": ["skills"],
+  "skills.create": ["skills", "cloud-skills"],
+  "skills.import": ["skills", "cloud-skills"],
+  "skills.remove": ["skills", "cloud-skills"],
 };
 
 function workspaceMutationTags(id: string): string[] {
@@ -241,6 +264,7 @@ const idInvalidations: MethodRules = {
     `thread:${String(p["threadId"])}`,
     `runs:thread:${String(p["threadId"])}`,
   ]),
+  "skills.writeFile": (p) => ["skills", skillTag(p)],
   ...each(["workspace.cleanup", "review.markReviewed"], (p) => ["tasks", taskTag(p), `diff:${String(p["taskId"])}`]),
   "review.commitProject": (p) => ["workspace-diff", `projectdiff:${String(p["projectId"])}`],
   "review.pushProject": (p) => ["workspace-diff", `projectlog:${String(p["projectId"])}`, "threads"],

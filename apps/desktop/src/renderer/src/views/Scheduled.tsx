@@ -14,11 +14,12 @@ import { ClaudeAccountPicker } from "../components/ClaudeAccountPicker";
 import { Plus } from "../components/icons";
 import { ComposerModelPicker, ModelPicker } from "../components/ModelPicker";
 import { PageFilters, PageSearch } from "../components/PageFilters";
+import { ScopedTitle } from "../components/ScopedTitle";
 import { TopBar } from "../components/TopBar";
 import { Button, Dialog, Empty, Field, Input, Segmented, Select, Textarea } from "../components/ui";
 import { ClaudeAccountScope } from "../lib/claude-account";
 import { useRpc } from "../lib/client";
-import { useLayout } from "../lib/layout";
+import { focusedProject, useLayout } from "../lib/layout";
 import { useScheduleEditor } from "../lib/use-schedule-editor";
 import { intervalLabel, intervals, ScheduleRow } from "./schedule-row";
 
@@ -64,7 +65,7 @@ function scheduleListBody(input: {
 
 /** Prompts that start a thread on a timer with a saved model. */
 export function Scheduled() {
-  const projectId = useLayout((s) => s.projectId);
+  const projectId = useLayout(focusedProject);
   const projects = useRpc("projects.list", {});
   const list = useRpc("schedules.list", projectId ? { projectId } : {});
   const [editing, setEditing] = useState<Schedule | "new" | null>(null);
@@ -83,7 +84,7 @@ export function Scheduled() {
           </Button>
         }
       >
-        Schedules
+        <ScopedTitle>Schedules</ScopedTitle>
       </TopBar>
       <div className="page-column">
         <PageFilters
@@ -196,7 +197,7 @@ function ScheduleDialog({
               </Select>
             </Field>
           )}
-          {usesClaude ? <ClaudeAccountPicker accounts={accounts.data} value={claudeAccountId} onChange={setAccount} disabled={pending} /> : null}
+          {usesClaude ? <ClaudeAccountPicker accounts={accounts} value={claudeAccountId} onChange={setAccount} disabled={pending} /> : null}
           <Field label="Name">
             <Input autoFocus value={title} disabled={pending} onChange={(event) => setTitle(event.target.value)} placeholder="Nightly dependency check" />
           </Field>

@@ -13,9 +13,11 @@ import {
   RESTART_PROMPT,
   type SubmitRequest,
 } from "@openorc/client";
-import { WORKSPACE_ID, defaultHarnessId, harnessShortName, isSubagentThread, type Project, type Run, type Task, type ThreadSummary, type WorkspaceMode } from "@openorc/protocol";
-import { useCallback, useState } from "react";
+import { WORKSPACE_ID, defaultHarnessId, executionMode, harnessShortName, isSubagentThread, type Project, type Run, type Task, type ThreadSummary, type WorkspaceMode } from "@openorc/protocol";
+import { useCallback, useState, type ComponentProps, type ReactNode } from "react";
 import { useConversationSettings, useConversationTranscript, useRpc, useRpcMutation, useSubmit } from "../lib/client";
+import { useThreadAccounts } from "../lib/use-thread-accounts";
+import { MessageMarks, useMessageMarks } from "./MarkedText";
 import { useConversationDraft } from "../lib/conversation-draft";
 import {
   conversationEmptyHint,
@@ -27,6 +29,7 @@ import {
   workspaceDestination,
 } from "../lib/conversation-status-presentation";
 import { openThread, useRouter, type MessageTarget } from "../lib/router";
+import { useConnectorMentions } from "../lib/connector-mentions";
 import { useSkillCommands } from "../lib/skill-commands";
 import { ConversationVoice, useRunVoices } from "../lib/turn-authors";
 import { useTurnFooters } from "../lib/turn-footers";
@@ -91,6 +94,31 @@ function threadCommands({ working, compact, fork }: { working: boolean; compact:
   return [...(!working ? [{ name: "compact", hint: "Fold the conversation so far into a summary", run: compact }] : []), { name: "fork", hint: "Continue in a new thread from here", run: fork }];
 }
 
+/** What a conversation's transcript reads from around it: whose voice each turn is, the marks its messages are drawn with, and its turns' change footers. */
+function TranscriptContext({
+  voice,
+  marks,
+  footers,
+  threadId,
+  children,
+}: {
+  voice: ComponentProps<typeof ConversationVoice.Provider>["value"];
+  marks: ComponentProps<typeof MessageMarks.Provider>["value"];
+  footers: ComponentProps<typeof TurnChangesProvider>["footers"];
+  threadId: ComponentProps<typeof TurnChangesProvider>["threadId"];
+  children: ReactNode;
+}) {
+  return (
+    <ConversationVoice.Provider value={voice}>
+      <MessageMarks.Provider value={marks}>
+        <TurnChangesProvider footers={footers} threadId={threadId}>
+          {children}
+        </TurnChangesProvider>
+      </MessageMarks.Provider>
+    </ConversationVoice.Provider>
+  );
+}
+
 function IndividualConversation({ scope, project }: { scope: ConversationScope; project: Project }) {
   const runsQuery = useRpc(scope.kind === "task" ? "runs.listForTask" : "runs.listForThread", scope.kind === "task" ? { taskId: scope.task.id } : { threadId: scope.thread.id });
   const runs = runsQuery.data ?? [];
@@ -100,6 +128,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const thread = scope.kind === "thread" ? scope.thread : null;
   const conversation = { kind: scope.kind, id: scope.kind === "thread" ? scope.thread.id : scope.task.id };
   const { checkout, changes: composerChanges, git } = useCheckout(thread, project);
+  const accounts = useThreadAccounts(thread, project);
 
   const activeRun: Run | undefined = runs[runs.length - 1];
   const links = linkFolder(scope, project);
@@ -109,7 +138,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
 
   const settings = useConversationSettings({ thread, activeRun });
   const { choice, mode, permission, permissionReady, permissionError } = settings;
-  const orclings = useOrclingConversation({ thread, runs, choice, onModel: settings.selectModel });
+  const orclings = useOrclingConversation({ thread, runs, choice, onModel: settings.selectModel, accounts });
   const voice = useRunVoices(orclings.voice, runs, thread);
   const draftKey = `conversation.${conversation.id}`;
   const { prompt, setPrompt, clearDraft, error: draftError } = useConversationDraft({ draftKey, threadId: thread?.id ?? null, initialText: thread?.draft ?? "" });
@@ -160,7 +189,9 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const continueWith = (claudeAccountId: string) => submitter.submit({ ...request, now: false, claudeAccountId }, { text: CONTINUE_PROMPT, attachments: [] }).then(clearDraft);
 
   const skills = useSkillCommands(conversation, choice?.agent);
+  const connectorMentions = useConnectorMentions(conversation, choice?.agent, executionMode(mode, permission));
   const commands: SlashCommand[] = [...(thread ? threadCommands({ working, compact: () => compact.mutate({ id: thread.id }), fork: forkConversation }) : []), ...skills.commands];
+  const marks = useMessageMarks(skills.commands, connectorMentions);
 
   const location = conversationLocation({ scope, project, mode: workspaceMode, basePath: links ?? project.rootPath, checkoutBranch: checkout.data?.branch, plainFolder: git.state === "none" });
   const emptyHint = conversationEmptyHint({ task: scope.kind === "task", workspace: project.id === WORKSPACE_ID });
@@ -169,22 +200,20 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   function renderTranscript() {
     if (merged && merged.blocks.length > 0)
       return (
-        <ConversationVoice.Provider value={voice}>
-          <TurnChangesProvider footers={footers} threadId={threadId}>
-            <Transcript
-              working={working}
-              media={links ? { basePath: links, fileScope: conversation } : { fileLinks: "cite" }}
-              run={merged}
-              scrollKey={conversation.id}
-              followKey={sends}
-              onFork={thread ? forkConversation : undefined}
-              hasOlder={hasOlder}
-              onLoadOlder={loadOlder}
-              reveal={target}
-              trailing={turnFooter}
-            />
-          </TurnChangesProvider>
-        </ConversationVoice.Provider>
+        <TranscriptContext voice={voice} marks={marks} footers={footers} threadId={threadId}>
+          <Transcript
+            working={working}
+            media={links ? { basePath: links, fileScope: conversation } : { fileLinks: "cite" }}
+            run={merged}
+            scrollKey={conversation.id}
+            followKey={sends}
+            onFork={thread ? forkConversation : undefined}
+            hasOlder={hasOlder}
+            onLoadOlder={loadOlder}
+            reveal={target}
+            trailing={turnFooter}
+          />
+        </TranscriptContext>
       );
     if (runsQuery.isLoading) return null;
     return (
@@ -233,6 +262,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
             placeholder={orclings.placeholder ?? placeholder}
             mentions={orclings.mentions}
             modelControl={orclings.modelControl}
+            accounts={accounts}
             model={choice}
             onModel={settings.selectModel}
             onExecutionMode={settings.selectExecutionMode}
@@ -260,6 +290,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
             commands={commands}
             onCommandsWanted={skills.onCommandsWanted}
             commandsNotice={skills.commandsNotice}
+            {...connectorMentions}
             error={(submitter.error ?? sendQueued.error ?? stopCommand.error ?? compact.error ?? unqueue.error ?? fork.error ?? settings.error ?? draftError)?.message ?? permissionError}
           >
             {firstTaskRun && scope.kind === "task" ? (

@@ -2,7 +2,10 @@ import type { ClaudeAccounts } from "@openorc/protocol";
 import { Select, TextButton } from "./ui";
 import { useRouter } from "../lib/router";
 
-/** The Claude account a run uses. The compact chip drops the visible label; its select keeps the name. */
+/**
+ * The Claude account a run uses, from the accounts it is given: the app's, or the ones a project uses, already narrowed
+ * by the caller. The compact chip drops the visible label; its select keeps the name.
+ */
 export function ClaudeAccountPicker({
   accounts,
   value,

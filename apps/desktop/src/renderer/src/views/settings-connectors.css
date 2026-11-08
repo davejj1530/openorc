@@ -1,0 +1,164 @@
+/* Connectors: a card per server in the grid Usage's accounts use, each with its agents' lines and
+   switches under its head. Cards in a row share the tallest one's height. */
+.connector-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: 12px;
+}
+.connector-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px 16px 12px 16px;
+  border-radius: var(--radius-4xl);
+  background: var(--settings-card-fill);
+}
+.connector-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.connector-mark {
+  width: 40px;
+  height: 40px;
+}
+.connector-card-name {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.connector-card-name > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.connector-card-title {
+  color: var(--ink);
+  font-size: var(--text-md);
+  line-height: 20px;
+}
+.connector-card-origin {
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+.connector-problem {
+  font-size: var(--text-sm);
+}
+.connector-agents-list {
+  display: grid;
+  /* The card's width, not the longest line's: a long status truncates instead of pushing the switch out. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: var(--hairline) solid var(--line);
+}
+.connector-agent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+.connector-agent-name {
+  flex-shrink: 0;
+  color: var(--ink);
+}
+.connector-agent-status {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-3);
+}
+.connector-agent-status[data-ok] {
+  color: var(--ok);
+}
+.connector-progress {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 10px 12px 10px 16px;
+  border-radius: var(--radius-xl);
+  background: var(--settings-card-fill);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+.connector-dormant .connector-grid {
+  margin-top: 8px;
+}
+
+/* The add and edit form. */
+.connector-form {
+  display: grid;
+  gap: 14px;
+}
+.connector-form-field {
+  display: grid;
+  gap: 6px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+.connector-form-kinds {
+  display: flex;
+  gap: 4px;
+}
+.connector-form-kinds > button {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+.connector-form-kinds > button:hover {
+  background: var(--surface-2);
+}
+.connector-form-kinds > button[aria-pressed="true"] {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.connector-form-pairs,
+.connector-form-agents {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+.connector-form-pairs > legend,
+.connector-form-agents > legend {
+  margin-bottom: 6px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+.connector-form-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.connector-form-agents {
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: 16px;
+}
+.connector-form-agents > legend {
+  grid-column: 1 / -1;
+}
+.connector-form-agents > label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+  font-size: var(--text-sm);
+}
+.connector-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}

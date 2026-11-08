@@ -1,6 +1,6 @@
-/* Appearance modes, fonts and skill harnesses are pressed-button groups drawn as the segmented
+/* Appearance modes and fonts are pressed-button groups drawn as the segmented
    track: a fill track at natural width, the current choice on a surface pill. */
-:is(.appearance-modes, .skills-harnesses) {
+.appearance-modes {
   display: flex;
   gap: 0;
   width: fit-content;
@@ -12,7 +12,7 @@
   overflow-x: auto;
   scrollbar-width: none;
 }
-:is(.appearance-modes, .skills-harnesses) button {
+.appearance-modes button {
   display: flex;
   flex-shrink: 0;
   align-items: center;
@@ -33,23 +33,23 @@
     padding-inline: 10px;
   }
 }
-:is(.appearance-modes, .skills-harnesses) button:hover {
+.appearance-modes button:hover {
   color: var(--ink);
 }
-:is(.appearance-modes, .skills-harnesses) button[aria-pressed="true"] {
+.appearance-modes button[aria-pressed="true"] {
   background: var(--surface);
   color: var(--navigation-ink);
 }
-:is(.appearance-modes, .skills-harnesses) button:focus-visible {
+.appearance-modes button:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: -2px;
   background: var(--surface);
 }
 @media (forced-colors: active) {
-  :is(.appearance-modes, .skills-harnesses) {
+  .appearance-modes {
     outline: 1px solid ButtonBorder;
   }
-  :is(.appearance-modes, .skills-harnesses) button[aria-pressed="true"] {
+  .appearance-modes button[aria-pressed="true"] {
     outline: 2px solid Highlight;
     outline-offset: -2px;
   }
@@ -67,14 +67,14 @@
   color: var(--ink-2);
   font-size: var(--text-sm);
 }
-.transparency-control {
+.range-control {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 4ch;
   align-items: center;
   gap: 12px;
   max-width: var(--settings-control-width);
 }
-.settings-field .transparency-control input[type="range"] {
+.settings-field .range-control input[type="range"] {
   width: 100%;
   height: 28px;
   margin: 0;
@@ -82,15 +82,15 @@
   accent-color: var(--ink);
   cursor: pointer;
 }
-.transparency-control input[type="range"]:focus-visible {
+.range-control input[type="range"]:focus-visible {
   outline: 2px solid var(--ink-2);
   outline-offset: 3px;
   border-radius: var(--radius-sm);
 }
-.transparency-control:has(input:disabled) {
+.range-control:has(input:disabled) {
   opacity: 0.5;
 }
-.settings-field .transparency-control input:disabled {
+.settings-field .range-control input:disabled {
   cursor: not-allowed;
 }
 .color-editor-head {
@@ -294,4 +294,32 @@
     grid-template-columns: minmax(0, 1fr);
     gap: 16px;
   }
+}
+
+/* The backdrop's preview: a corner of the new thread screen on the window's ground, drawn as it
+   will be there. */
+.backdrop-preview {
+  position: relative;
+  isolation: isolate;
+  height: 180px;
+  margin-top: 12px;
+  border-radius: var(--radius-3xl);
+  background: var(--bg);
+  overflow: hidden;
+}
+.backdrop-controls {
+  margin-top: 12px;
+}
+.backdrop-controls .appearance-modes {
+  margin-top: 0;
+}
+.backdrop-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}
+.appearance-modes button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

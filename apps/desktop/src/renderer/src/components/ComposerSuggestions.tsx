@@ -25,7 +25,11 @@ export function ComposerSuggestions({
 }) {
   const popup = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    popup.current?.querySelector<HTMLElement>('[role="option"][aria-selected="true"]')?.scrollIntoView?.({ block: "nearest" });
+    const row = popup.current?.querySelector<HTMLElement>('[role="option"][aria-selected="true"]');
+    // A row first under its heading brings the heading into view with it.
+    const heading = row?.previousElementSibling?.classList.contains("composer-suggestion-group") ? row.previousElementSibling : null;
+    heading?.scrollIntoView?.({ block: "nearest" });
+    row?.scrollIntoView?.({ block: "nearest" });
   }, [cursor, count]);
   return (
     <Popover.Root

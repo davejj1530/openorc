@@ -159,6 +159,15 @@ describe("usage refresh", () => {
     const failedRefresh = await service.redeemCodex({ attemptId: "00000000-0000-4000-8000-000000000002", confirmationToken: report.resets!.confirmationToken! });
     expect(failedRefresh).toMatchObject({ outcome: "reset", usage: { status: "error", windows: [] } });
   });
+  it("answers a reader that takes a recent report from the last read of that account, and asks the CLI for another account", async () => {
+    const { service, claude } = setup();
+    const first = await service.read("claude", "work");
+    expect(await service.recent("claude", "work", 60_000)).toBe(first);
+    expect(claude).toHaveBeenCalledTimes(1);
+    await service.recent("claude", "personal", 60_000);
+    expect(claude).toHaveBeenCalledTimes(2);
+  });
+
   it("deduplicates concurrent refreshes and performs another read afterward", async () => {
     const { service, read } = setup();
     await Promise.all([service.read("codex"), service.read("codex")]);

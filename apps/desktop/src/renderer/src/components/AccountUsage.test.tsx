@@ -67,7 +67,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it("opens every account's 5-hour and weekly limits from the chip, the thread's account first", async () => {
+it("opens every account's 5-hour and weekly limits from the rail's ring, the thread's account first", async () => {
   useRouter.setState({ route: { view: "thread", threadId: "notes" } });
   render(<AccountUsage />);
   fireEvent.click(screen.getByRole("button", { name: "Claude · Work: 59% left this week" }));
@@ -92,23 +92,4 @@ it("off a thread, reports on the agent and account the new-thread composer has c
   expect(screen.getByRole("button", { name: "Codex: 64% left this week" })).toBeTruthy();
   act(() => publishComposerAccount({ agent: "claude", claudeAccountId: "work" }));
   expect(screen.getByRole("button", { name: "Claude · Work: 59% left this week" })).toBeTruthy();
-});
-
-it.each([
-  [120, "full"],
-  [70, "short"],
-  [40, "icon"],
-])("in a %ipx slot, takes the fullest look that fits: %s", (room, look) => {
-  const widths: Record<string, number> = { full: 88, short: 66, icon: 32 };
-  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
-    const width = this.classList.contains("sidebar-usage") ? room : (widths[this.dataset.look ?? "full"] ?? 0);
-    return { width, height: 32, top: 0, left: 0, right: width, bottom: 32, x: 0, y: 0, toJSON: () => ({}) };
-  });
-  useRouter.setState({ route: { view: "thread", threadId: "notes" } });
-  render(
-    <div className="sidebar-usage">
-      <AccountUsage />
-    </div>,
-  );
-  expect((screen.getByRole("button", { name: "Claude · Work: 59% left this week" }) as HTMLElement).dataset.look).toBe(look);
 });

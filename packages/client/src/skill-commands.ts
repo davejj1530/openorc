@@ -13,6 +13,10 @@ export interface SkillCommand {
   prefix: SkillPrefix;
   /** Other names it answers to, as a built-in may. */
   aliases?: string[];
+  /** The name people see, where the skill gives one. */
+  displayName?: string;
+  /** Its image, as a data URL. */
+  icon?: string;
 }
 
 /** Said in the picker while there are no skills to offer yet, when a word starts with the agent's prefix for them. */
@@ -79,9 +83,18 @@ export function useSkillCommandsWith(queries: ClientQueries, scope: FileScope | 
     () =>
       agent === "opencode"
         ? []
-        : [...(found ?? [])]
+        : (found ?? [])
+            .filter((skill) => skill.enabled !== false)
             .sort((a, b) => SOURCE_ORDER[a.source] - SOURCE_ORDER[b.source])
-            .map((skill) => ({ name: skill.name, hint: skill.description, insert: true as const, prefix, ...(skill.aliases?.length ? { aliases: skill.aliases } : {}) })),
+            .map((skill) => ({
+              name: skill.name,
+              hint: skill.description,
+              insert: true as const,
+              prefix,
+              ...(skill.aliases?.length ? { aliases: skill.aliases } : {}),
+              ...(skill.displayName ? { displayName: skill.displayName } : {}),
+              ...(skill.icon ? { icon: skill.icon } : {}),
+            })),
     [agent, found, prefix],
   );
   // A list read before keeps being offered while it is read again, and when that fails.

@@ -243,9 +243,9 @@
 }
 .home-page [data-card="worktrees"] .hs-mock-worktree {
   --hs-canvas: 548;
-  width: calc(820 * var(--u));
+  width: calc(880 * var(--u));
   height: 100%;
-  margin-left: calc(-272 * var(--u));
+  margin-left: calc(-332 * var(--u));
 }
 /* The transcript is cut where the plane ends, so its top fades the way the app's scrolled transcript does. */
 .home-page [data-card="worktrees"] .hs-transcript {
@@ -912,7 +912,7 @@
     container-type: inline-size;
   }
   .home-page .demo-window {
-    --crop-offset: 220px;
+    --crop-offset: 274px;
     width: 1000px;
     height: 560px;
     aspect-ratio: auto;
@@ -923,12 +923,8 @@
     --u: calc(100cqi / 1120);
   }
   .home-page .demo-window:has([data-scene="handoff"]) {
-    --crop-offset: 180px;
+    --crop-offset: 234px;
   }
-  .home-page .demo-window:has([data-scene="handoff"][data-view="b"]) {
-    --crop-offset: 560px;
-  }
-  .home-page .demo-window:has([data-scene="handoff"][data-sidebar="open"]),
   .home-page .demo-window:has([data-scene="workflow"][data-sidebar="open"]) {
     --crop-offset: 0px;
   }
@@ -954,8 +950,8 @@
   }
   .home-page .hero-window .hs-mock-app {
     --u: 0.82px;
-    width: calc(1248 * var(--u));
-    margin-left: calc(-272 * var(--u));
+    width: calc(1456 * var(--u));
+    margin-left: calc(-332 * var(--u));
   }
   .home-page .showcase-head {
     align-items: flex-start;

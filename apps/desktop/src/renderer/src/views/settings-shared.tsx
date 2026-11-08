@@ -1,7 +1,18 @@
 import { createContext, useContext, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import type { RpcParams, RpcResults } from "@openorc/protocol";
 import { Button, Switch } from "../components/ui";
 import { queryClient, useRpc, useRpcMutation } from "../lib/client";
+
+/** Where the open section's controls go in Settings' top bar, beside its name. */
+export const SectionActionsSlot = createContext<HTMLElement | null>(null);
+
+/** A section's own controls, in the top bar beside its name while the section is open; in place, outside Settings. */
+export function SectionActions({ active, children }: { active: boolean; children: ReactNode }) {
+  const slot = useContext(SectionActionsSlot);
+  if (!active) return null;
+  return slot ? createPortal(children, slot) : children;
+}
 
 const preferenceQueries = { "app.settings.set": "app.settings.get", "memory.settings.set": "memory.settings.get", "textGeneration.settings.set": "textGeneration.settings.get" } as const;
 

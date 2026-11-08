@@ -1,4 +1,6 @@
 export * from "./claude-accounts.js";
+export * from "./connectors.js";
+export * from "./skills.js";
 export * from "./diff-lines.js";
 export * from "./domain.js";
 export * from "./events.js";

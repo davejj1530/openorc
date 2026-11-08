@@ -8,9 +8,29 @@ import { useRpc, useRpcMutation } from "../lib/client";
 import { orclingHome, useOrclings } from "../lib/orclings";
 import { MAX_THREAD_PANES, newSubthread, openThread, useRouter } from "../lib/router";
 import { useThreadMutationPending } from "../lib/thread-mutations";
+import { useThreadTabs } from "../lib/thread-tabs";
 import { useUi } from "../lib/ui";
 import { floatingGround } from "../lib/use-anchor-ground";
-import { AlarmClock, AppWindow, ChevronRight, CircleCheck, Cloud, Columns2, Folder, GitBranch, GitFork, Laptop, MailOpen, PenSquare, Pencil, Pin, PinOff, RotateCcw, Trash2 } from "./icons";
+import {
+  AlarmClock,
+  AppWindow,
+  ChevronRight,
+  CircleCheck,
+  Cloud,
+  Columns2,
+  Folder,
+  GitBranch,
+  GitFork,
+  Laptop,
+  MailOpen,
+  PenSquare,
+  Pencil,
+  Pin,
+  PinOff,
+  RotateCcw,
+  SquarePlus,
+  Trash2,
+} from "./icons";
 import { menuItem, menuItemDanger, menuPopup, menuSeparator } from "./menu";
 import { Button, Dialog } from "./ui";
 
@@ -23,6 +43,9 @@ export function ThreadMenuItems({ thread, parts: M }: { thread: ThreadSummary; p
   if (isSubagentThread(thread))
     return (
       <>
+        <M.Item className={menuItem} onClick={() => useThreadTabs.getState().openThread(thread.id)}>
+          <SquarePlus size={13} /> Open in new tab
+        </M.Item>
         <M.Item className={menuItem} onClick={() => useRouter.getState().addThreadPane(thread.id)}>
           <Columns2 size={13} /> Open beside
         </M.Item>
@@ -75,6 +98,9 @@ function ThreadMenuContent({ thread, parts: M }: { thread: ThreadSummary; parts:
 
   return (
     <>
+      <M.Item className={menuItem} onClick={() => useThreadTabs.getState().openThread(thread.id)}>
+        <SquarePlus size={13} /> Open in new tab
+      </M.Item>
       <M.Item className={menuItem} disabled={cannotSplit} onClick={() => addPane(thread.id)}>
         <Columns2 size={13} /> Open beside
       </M.Item>

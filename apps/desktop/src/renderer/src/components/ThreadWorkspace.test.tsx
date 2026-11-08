@@ -35,7 +35,6 @@ vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onPush: () => () => {} } }
 vi.mock("../lib/window", () => ({ useTrafficLights: () => true, useWindowsControls: () => false }));
 vi.mock("./Sidebar", () => ({ WindowNav: () => null }));
 vi.mock("./Panel", () => ({ Panel: () => <div data-testid="shared-panel" /> }));
-vi.mock("./ThreadClaudeAccount", () => ({ ThreadClaudeAccount: () => <button>Claude account</button> }));
 vi.mock("./SubagentConversation", () => ({ SubagentConversation: () => null, ThreadParent: () => null }));
 // Keep real headers and controls; tooltip positioning is exercised in the Electron smoke.
 vi.mock("./ui", async (importOriginal) => ({
@@ -69,7 +68,7 @@ beforeEach(() => {
   window.openorc = { ...window.openorc, openExternal: vi.fn() };
   vi.stubGlobal("CSS", { escape: (value: string) => value });
   useRouter.setState({ route: { view: "thread", threadId: "a" }, threadIds: ["a"], history: [], future: [] });
-  useLayout.setState({ sidebarOpen: true, panelOpen: false, panelSide: "right", panelThreadId: "a", panelTab: "changes", projectId: null });
+  useLayout.setState({ sidebarOpen: true, panelOpen: false, panelSide: "right", panelThreadId: "a", panelTab: "changes" });
 });
 
 const active = () => useRouter.getState().route;

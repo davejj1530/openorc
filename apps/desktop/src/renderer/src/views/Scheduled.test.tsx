@@ -55,7 +55,7 @@ beforeEach(() => {
   schedule = null;
   paused = [];
   saveFailure = false;
-  useLayout.setState({ projectId: null });
+  useLayout.setState({ workspace: "all" });
   vi.mocked(core.call).mockImplementation(async (method, _input) => {
     if (method === "projects.list")
       return [
@@ -133,4 +133,32 @@ it("preserves a failed save for retry", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
   await screen.findByText(/Save unavailable Your draft is kept in this editor/);
   expect(name.value).toBe("Unsent review");
+});
+
+it("offers a schedule only the Claude accounts its project uses, moving one saved before onto the project's default", async () => {
+  schedule = Schedule.parse({
+    ...savedSchedule(),
+    agent: "claude",
+    claudeAccountId: "work",
+    executionTarget: { kind: "model", settings: { agent: "claude", model: "model", effort: null, fastMode: false } },
+  });
+  const account = (id: string) => ({ id, name: id, kind: "managed", enabled: true, createdAt: 1, status: "ready", email: null, organization: null, message: null });
+  const base = vi.mocked(core.call).getMockImplementation()!;
+  vi.mocked(core.call).mockImplementation((async (method: string, input: never) => {
+    if (method === "projects.list")
+      return [{ id: "project", name: "Project", settings: { claudeAccounts: { only: true, accountIds: ["personal", "client"], defaultId: "personal", autoSwitch: false } } }];
+    if (method === "claude.accounts.list") return { defaultId: "work", accounts: ["work", "personal", "client"].map(account) };
+    return base(method as never, input);
+  }) as never);
+  render(
+    <QueryClientProvider client={queryClient}>
+      <Scheduled />
+    </QueryClientProvider>,
+  );
+  fireEvent.click(await screen.findByRole("button", { name: /Review/ }));
+  const picker = await screen.findByRole<HTMLSelectElement>("combobox", { name: "Claude account" });
+  await waitFor(() => expect([...picker.options].map((option) => option.value)).toEqual(["personal", "client"]));
+  expect(picker.value).toBe("personal");
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("schedules.update", expect.objectContaining({ patch: expect.objectContaining({ claudeAccountId: "personal" }) })));
 });

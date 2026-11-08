@@ -8,6 +8,7 @@ import type { SpawnTaskInput, ThreadService } from "./threads.js";
 import { executionProject } from "./workspace-home.js";
 import type { WorkspaceWriters } from "./workspace-writers.js";
 import type { WorkspaceService } from "./workspace.js";
+import { startingAccount } from "./project-claude-accounts.js";
 
 type ContinueThreadInput = Parameters<ThreadService["continueThread"]>[1];
 
@@ -96,11 +97,12 @@ export class ThreadTaskExecution {
     return this.resolveTaskThread(taskId, undefined, false);
   }
 
-  taskThreadForStart(taskId: string, selected?: Pick<Thread, "agent" | "model" | "effort">): Thread {
-    return this.resolveTaskThread(taskId, selected, true);
+  /** `ownAccount` is the starter's own Claude account, as an Orcling's, which the project's accounts leave alone. */
+  taskThreadForStart(taskId: string, selected?: Pick<Thread, "agent" | "model" | "effort">, ownAccount?: string): Thread {
+    return this.resolveTaskThread(taskId, selected, true, ownAccount);
   }
 
-  private resolveTaskThread(taskId: string, selected: Pick<Thread, "agent" | "model" | "effort"> | undefined, starting: boolean): Thread {
+  private resolveTaskThread(taskId: string, selected: Pick<Thread, "agent" | "model" | "effort"> | undefined, starting: boolean, ownAccount?: string): Thread {
     const task = tasks.get(this.db, taskId);
     if (!task) throw new Error("Task not found.");
     if (retiredTeams.hasTask(this.db, taskId)) throw new Error("This item is no longer available.");
@@ -117,7 +119,7 @@ export class ThreadTaskExecution {
       this.invalidate(["tasks", `task:${taskId}`, "threads"]);
       return creator;
     }
-    return this.createTaskThread({ task, previous, creator, target, starting, retainedWorkspace, defaultPermissionMode });
+    return this.createTaskThread({ task, previous, creator, target, starting, retainedWorkspace, defaultPermissionMode, ownAccount });
   }
 
   private taskAgentSettings(selected: Pick<Thread, "agent" | "model" | "effort"> | undefined, previous: Run | undefined, creator: Thread | null): Pick<Thread, "agent" | "model" | "effort"> {
@@ -153,8 +155,9 @@ export class ThreadTaskExecution {
     starting: boolean;
     retainedWorkspace: boolean;
     defaultPermissionMode: Thread["permissionMode"];
+    ownAccount: string | undefined;
   }): Thread {
-    const { task, previous, creator, target, starting, retainedWorkspace, defaultPermissionMode } = input;
+    const { task, previous, creator, target, starting, retainedWorkspace, defaultPermissionMode, ownAccount } = input;
     let mode = creator?.mode ?? "act";
     if (retainedWorkspace) mode = previous?.mode ?? "act";
     if (starting) mode = "act";
@@ -163,7 +166,8 @@ export class ThreadTaskExecution {
         projectId: task.projectId,
         title: task.title,
         ...target,
-        claudeAccountId: previous?.claudeAccountId ?? creator?.claudeAccountId,
+        // The starter's own, or the account it ran on, or its creator's, unless the project no longer uses that.
+        claudeAccountId: ownAccount ?? startingAccount(this.db, task.projectId, previous?.claudeAccountId ?? creator?.claudeAccountId ?? undefined, target.agent === "claude" ? "inherited" : "unused"),
         fastMode: previous?.fastMode ?? creator?.fastMode ?? false,
         mode,
         permissionMode: previous?.permissionMode ?? creator?.permissionMode ?? defaultPermissionMode,

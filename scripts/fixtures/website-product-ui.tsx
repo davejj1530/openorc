@@ -166,7 +166,7 @@ async function main() {
       ...state,
     });
   const shell = mode === "shell" || mode === "inbox" ? addShellStates({ base, projects, threads, tasks, seed: seedTranscript }) : null;
-  const working = mode === "working" ? addWorkingStates({ base, threads, now, response: messages[1]!.text, seed: seedTranscript }) : null;
+  const working = mode === "working" || mode === "review" ? addWorkingStates({ base, threads, now, response: messages[1]!.text, seed: seedTranscript, running: mode === "working" }) : null;
   const models = [
     { agent: "codex", id: "gpt-6-astra", label: "GPT-6-Astra", efforts: ["high"], defaultEffort: "high", isDefault: true },
     { agent: "claude", id: "claude-opus-5-5[1m]", label: "Opus 5.5 (1M context)", efforts: ["high"], defaultEffort: "high" },
@@ -326,6 +326,7 @@ async function main() {
   else if (mode === "orclings") useRouter.getState().navigate({ view: "thread", threadId: "orcling-rini" });
   else if (mode === "document") useRouter.getState().navigate({ view: "task", taskId: "welcome", tab: "spec" });
   else useRouter.getState().navigate({ view: "thread", threadId: "onboarding" });
+  if (query.get("tabs")) await openThreadTabs(query.get("tabs")!);
   if (mode === "review") useLayout.getState().openWorkspaceChanges({ kind: "thread", id: "onboarding" });
   if (query.get("panel")) await openPanelTabs(query.get("panel")!, mode === "orclings" ? "thread:orcling-rini" : "thread:onboarding");
   const { App } = await import("../../apps/desktop/src/renderer/src/App");
@@ -485,22 +486,24 @@ function addShellStates({ base, projects, threads, tasks, seed }: { base: Record
 /**
  * ?view=working: the conversation the transcript restyle needs. A finished turn with thinking, reads, an edit, a
  * passing test run, its reply and a change card, then a live turn with a plan on step 3 of 3, a running command, a
- * pending approval and a pending question, two queued messages and a background command.
+ * pending approval and a pending question, two queued messages and a background command. ?view=review shows the
+ * finished turn alone.
  */
-function addWorkingStates({ base, threads, now, response, seed }: { base: Row; threads: Row[]; now: number; response: string; seed: Seed }) {
+function addWorkingStates({ base, threads, now, response, seed, running }: { base: Row; threads: Row[]; now: number; response: string; seed: Seed; running: boolean }) {
   const at = (secondsAgo: number) => now - secondsAgo * 1000;
-  Object.assign(
-    threads.find((row) => row.id === "onboarding")!,
-    {
-      activity: "running",
-      liveRunId: "working-live",
-      queued: [
-        { id: "queued-1", text: "Then add a short tour for returning people.", attachments: [], queuedAt: at(20) },
-        { id: "queued-2", text: "Keep the copy under two lines.", attachments: [], queuedAt: at(10) },
-      ],
-      backgroundCommands: [{ id: "dev", description: "pnpm dev --port 5173" }],
-    },
-  );
+  if (running)
+    Object.assign(
+      threads.find((row) => row.id === "onboarding")!,
+      {
+        activity: "running",
+        liveRunId: "working-live",
+        queued: [
+          { id: "queued-1", text: "Then add a short tour for returning people.", attachments: [], queuedAt: at(20) },
+          { id: "queued-2", text: "Keep the copy under two lines.", attachments: [], queuedAt: at(10) },
+        ],
+        backgroundCommands: [{ id: "dev", description: "pnpm dev --port 5173" }],
+      },
+    );
   const run = (id: string, startedAt: number, state: string) => ({
     ...base,
     id,
@@ -516,6 +519,15 @@ function addWorkingStates({ base, threads, now, response, seed }: { base: Row; t
     error: null,
   });
   const read = (id: string, file: string): Block => ({ id, kind: "tool", name: "Read", input: { file_path: `/Projects/studio/src/${file}` }, done: true, at: at(590) });
+  /** Codex titles each stretch of its reasoning; the app opens a step at every title. */
+  const thought = (id: string, title: string, text: string, from: number, to: number): Block => ({
+    id,
+    kind: "thinking",
+    text: `**${title}**\n\n${text}`,
+    startedAt: at(from),
+    endedAt: at(to),
+    at: at(from),
+  });
   const finished: Block[] = [
     {
       id: "w-request",
@@ -525,16 +537,10 @@ function addWorkingStates({ base, threads, now, response, seed }: { base: Row; t
       streaming: false,
       at: at(600),
     },
-    {
-      id: "w-thinking",
-      kind: "thinking",
-      text: "**Planning the welcome**\n\nThe empty state competes with the picker. Lead with one action and keep the keyboard path obvious.",
-      startedAt: at(599),
-      endedAt: at(587),
-      at: at(599),
-    },
+    thought("w-thinking", "Reading the onboarding flow", "Start from the current empty state and the picker it sits beside.", 599, 594),
     read("w-read-1", "Welcome.tsx"),
     read("w-read-2", "ProjectPicker.tsx"),
+    thought("w-thinking-2", "Writing the welcome screen", "The empty state competes with the picker. Lead with one action and keep the keyboard path obvious.", 588, 583),
     {
       id: "w-edit",
       kind: "tool",
@@ -543,6 +549,7 @@ function addWorkingStates({ base, threads, now, response, seed }: { base: Row; t
       done: true,
       at: at(570),
     },
+    thought("w-thinking-3", "Running the tests", "Check that the welcome still renders the picker.", 566, 564),
     { id: "w-tests", kind: "tool", name: "Bash", input: { command: "pnpm test", description: "Run the tests" }, output: "42 passed in 8.2s", done: true, at: at(560) },
     { id: "w-reply", kind: "message", role: "assistant", text: response, streaming: false, at: at(530) },
     { id: "w-end", kind: "status", text: "turn finished in 72.0s", tone: "ok", boundary: "turn", durationMs: 72000, outcome: "success", at: at(528) },
@@ -575,27 +582,24 @@ function addWorkingStates({ base, threads, now, response, seed }: { base: Row; t
     },
     { id: "l-question", kind: "approval", approvalId: "l-question", approvalKind: "user_input", input: { questions: [question] }, at: at(8) },
   ];
-  seed("working-live", live, { live: true, pendingApprovals: 2 });
+  if (running) seed("working-live", live, { live: true, pendingApprovals: 2 });
   const checkpoint = (id: string, turn: number, runId: string | null) => ({
     id,
     threadId: "onboarding",
     runId,
     turn,
     treeSha: id,
-    diffStat: { files: 2, insertions: 8, deletions: 2, untracked: 0 },
+    diffStat: { files: 1, insertions: 8, deletions: 2, untracked: 0 },
     note: null,
     root: "/Projects/studio",
     outside: null,
     createdAt: at(528),
   });
   return {
-    runs: [run("working-done", at(600), "success"), run("working-live", at(48), "running")],
+    runs: [run("working-done", at(600), "success"), ...(running ? [run("working-live", at(48), "running")] : [])],
     checkpoints: [checkpoint("cp-0", 0, null), checkpoint("cp-1", 1, "working-done")],
     turnChanges: {
-      files: [
-        { path: "src/Welcome.tsx", added: 6, removed: 2 },
-        { path: "src/ui/KeyboardHint.tsx", added: 2, removed: 0 },
-      ],
+      files: [{ path: "src/Welcome.tsx", added: 8, removed: 2 }],
       patch: null,
     },
   };
@@ -739,6 +743,20 @@ function panelBridges() {
       kill: noop,
     },
   };
+}
+
+/**
+ * ?tabs=<thread>[,<thread>...]: those threads in tabs of their own ahead of the view's, which stays selected. Thread ids
+ * are the sample threads' (search, tokens, welcome, perf, ...).
+ */
+async function openThreadTabs(spec: string) {
+  const { useThreadTabs } = await import("../../apps/desktop/src/renderer/src/lib/thread-tabs");
+  const tabs = useThreadTabs.getState();
+  const current = useRouter.getState().route;
+  useThreadTabs.setState({ tabs: [], active: null });
+  for (const threadId of spec.split(",")) tabs.openThread(threadId);
+  if (current.view === "thread") tabs.openThread(current.threadId);
+  else useRouter.getState().navigate(current);
 }
 
 /**

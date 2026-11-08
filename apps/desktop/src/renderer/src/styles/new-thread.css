@@ -126,7 +126,6 @@
 
 /* The composer: r24 on the writing-area role, a 15px prompt and one bar with a 34px send. */
 .composer-new-thread .composer-shell {
-  min-height: 156px;
   gap: 18px;
   padding: 18px 14px 14px 20px;
   border-radius: var(--radius-5xl);
@@ -140,9 +139,6 @@
 }
 .composer-new-thread .composer-input {
   min-height: 24px;
-}
-.composer-new-thread .composer-bar {
-  margin-top: auto;
 }
 .composer-new-thread .composer-tools {
   margin-left: -6px;
@@ -289,4 +285,46 @@
   .app-shell .new-thread-body {
     padding: 0 12px 32px;
   }
+}
+
+/* The dither behind the screen sits under its content. A pattern is densest at the top-left and gone
+   well before the composer. */
+.new-thread-body {
+  position: relative;
+  isolation: isolate;
+}
+/* Folded to its rail, the sidebar runs --radius-lg past the seam for the seam's turn into the top
+   bar, and the work column starts after the turn. Beside it, the body reaches back under the turn,
+   its content where it was, so the backdrop meets the seam and rounds its corner with the turn. The
+   sidebar draws its lines above it. A narrow window floats the sidebar and keeps no rail. */
+@media (min-width: 901px) {
+  body:has(.sidebar-shell[data-open="false"]) .work-row:not(:has(> .panel-shell[data-side="left"][data-open="true"])) > .well:first-child > .new-thread-body {
+    margin-left: calc(-1 * var(--radius-lg));
+    padding-left: calc(48px + var(--radius-lg));
+  }
+  body:has(.sidebar-shell[data-open="false"]) .work-row:not(:has(> .panel-shell[data-side="left"][data-open="true"])) > .well:first-child > .new-thread-body > .dither-backdrop {
+    overflow: hidden;
+    border-top-left-radius: var(--radius-lg);
+  }
+}
+.dither-backdrop {
+  /* The dots' ink, a step from the ground toward the text in any palette. DitherBackdrop reads it
+     for the shader. */
+  --dither-ink: color-mix(in srgb, var(--ink) 12%, var(--bg));
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  mask-image: radial-gradient(110% 90% at 0% 0%, #000 0%, rgb(0 0 0 / 0.55) 35%, transparent 70%);
+}
+/* The canvas holds whole CSS pixels, so its scale to the screen is whole too: square dots, not blurred ones. */
+.dither-backdrop canvas {
+  image-rendering: pixelated;
+}
+/* An image is a picture rather than a texture: it spans the screen's width and fades out under the
+   composer, leaving the thread list on the plain ground. Half strength keeps the title readable over
+   its darkest and lightest parts in either theme. */
+.dither-backdrop[data-style="image"] {
+  opacity: 0.5;
+  mask-image: linear-gradient(#000, rgb(0 0 0 / 0.75) 25%, transparent 58%);
 }

@@ -4,17 +4,22 @@ import path from "node:path";
 import { claudeAccounts, runs, threads, type Db } from "@openorc/db";
 import { DEFAULT_CLAUDE_ACCOUNT, type AgentKind, type Run, type Thread } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
+import { allowsAccount, NOT_A_PROJECT_ACCOUNT, projectAccountPolicy } from "./project-claude-accounts.js";
 import type { RunService, StartRunInput } from "./runs.js";
 import type { WorkspaceService } from "./workspace.js";
 
 /** The folder where an account's Claude keeps its login, settings and sessions on this Mac. */
 export type ClaudeFolder = (accountId: string) => string;
 
-/** The other Claude account a turn names for its conversation; null when it stays. An Orcling's speaks with its own. */
+/**
+ * The other Claude account a turn names for its conversation; null when it stays. An Orcling's speaks with its own, and
+ * a project that uses only some accounts moves to no other.
+ */
 export function switchedClaudeAccount(db: Db, thread: Thread, agent: AgentKind, requested: string | undefined): string | null {
   if (agent !== "claude" || !requested || requested === (thread.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT)) return null;
   if (thread.orclingId) throw new Error("An Orcling's conversation runs on the Orcling's Claude account.");
   if (!claudeAccounts.get(db, requested).enabled) throw new Error("This Claude account is disabled. Enable it in Settings → Connections.");
+  if (!allowsAccount(projectAccountPolicy(db, thread.projectId, { claudeAccountAutoSwitch: false }), requested)) throw new Error(NOT_A_PROJECT_ACCOUNT);
   return requested;
 }
 
@@ -53,7 +58,7 @@ export class ThreadSessions {
     if (carried) return { resume: false, resumeFrom: carried };
     const restart = Boolean(fresh || moved);
     const handoff = this.deps.handoffFor(thread, own, agent, restart);
-    return { resume: !restart, ...(restart ? {} : (this.forkSource(thread, agent) ?? {})), ...(handoff ? { handoff } : {}) };
+    return { resume: !restart, ...(restart ? {} : ((await this.forkSource(thread, agent)) ?? {})), ...(handoff ? { handoff } : {}) };
   }
 
   private async closeIdle(thread: Thread): Promise<void> {
@@ -64,12 +69,23 @@ export class ThreadSessions {
     await service.closeAndWait(previous.id);
   }
 
-  /** A fork's first run continues its parent's session as a new one; the parent keeps its own history. */
-  private forkSource(thread: Thread, agent: AgentKind): { resumeFrom: { sessionId: string; fork: boolean } } | null {
+  /**
+   * A fork's first run continues its parent's session as a new one; the parent keeps its own history. A fork on another
+   * Claude account than its parent's, as its project's default once the project stopped using the parent's, takes a
+   * copy of the parent's newest session along.
+   */
+  private async forkSource(thread: Thread, agent: AgentKind): Promise<{ resumeFrom: { sessionId: string; fork: boolean } } | null> {
     const { db } = this.deps;
     if (!thread.forkedFromId || runs.lastSession(db, { threadId: thread.id }, agent, null, thread.claudeAccountId ?? undefined)) return null;
     const parentSession = runs.lastSession(db, { threadId: thread.forkedFromId }, agent, null, thread.claudeAccountId ?? undefined);
-    return parentSession ? { resumeFrom: { sessionId: parentSession, fork: true } } : null;
+    if (parentSession) return { resumeFrom: { sessionId: parentSession, fork: true } };
+    if (agent !== "claude" || this.deps.workspaces.cloudState(thread.id)) return null;
+    const moved = movedSession(
+      thread,
+      runs.listForThread(db, thread.forkedFromId).filter((run) => !run.orclingId),
+    );
+    const carried = moved ? await this.carry(thread, moved) : null;
+    return carried ? { resumeFrom: carried } : null;
   }
 
   /** The conversation's newest Claude session, copied into its account's folder to resume there as a fork. */

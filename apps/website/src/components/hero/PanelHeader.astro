@@ -1,28 +1,24 @@
 ---
 /**
- * The work panel's header as PanelHeader.tsx draws it: its pages as text tabs (the open one in ink), the round add
- * button after them, and the panel's tools at the far end.
+ * The work panel's header on the window's top line (PanelHeader.tsx, PanelTabs.tsx): its pages as tabs drawn like the
+ * work column's, each as wide as its name, then the add button, and expand at the far end.
  */
-import FileGlyph from "./FileGlyph.astro";
-import ProductIcon, { type IconName } from "./ProductIcon.astro";
+import ProductIcon from "./ProductIcon.astro";
+import WorkTab, { type Tab } from "./WorkTab.astro";
 
 interface Props {
-  /** A page with an icon, or a file page with its glyph. */
-  tabs: { label: string; icon?: IconName; file?: string; selected?: boolean }[];
-  tools?: IconName[];
+  /** A page's tab shows its tool's icon, or a file page its file's glyph. */
+  tabs: (Tab & { icon: NonNullable<Tab["icon"]> } | Tab & { file: string })[];
+  /** Names the tabs as a tablist, for tabs the visitor can pick. */
+  tablist?: string;
 }
-const { tabs, tools = ["expand"] } = Astro.props;
+const { tabs, tablist } = Astro.props;
 ---
 
 <div class="hs-panel-header">
-  <span class="hs-panel-tabs">
-    {tabs.map((tab) => (
-      <span class="hs-panel-tab" data-selected={tab.selected ? "" : undefined}>
-        {tab.file ? <FileGlyph path={tab.file} /> : <ProductIcon name={tab.icon ?? "fileDiff"} />}
-        {tab.label}
-      </span>
-    ))}
+  <span class="hs-panel-tabs" role={tablist ? "tablist" : undefined} aria-label={tablist}>
+    {tabs.map((tab) => <WorkTab {...tab} />)}
   </span>
-  <span class="hs-round"><ProductIcon name="plus" /></span>
-  <span class="hs-panel-tools">{tools.map((tool) => <span class="hs-round"><ProductIcon name={tool} /></span>)}</span>
+  <span class="hs-round" aria-hidden="true"><ProductIcon name="plus" /></span>
+  <span class="hs-round hs-panel-expand" aria-hidden="true"><ProductIcon name="expand" /></span>
 </div>

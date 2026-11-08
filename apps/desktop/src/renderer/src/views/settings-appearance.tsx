@@ -11,6 +11,7 @@ import { PaletteSelector } from "../components/PaletteSelector";
 import { MascotStill } from "../components/MascotStill";
 import { ColorRow } from "../components/ColorRow";
 import { AccentSettings } from "./settings-accents";
+import { BackdropSettings } from "./settings-backdrop";
 import { appFonts, useAppFont } from "../lib/app-font";
 import { CodeFontSettings } from "./settings-code-font";
 
@@ -42,6 +43,7 @@ export function AppearanceSettings() {
       <Section flush title="Palette" description="Product palettes for your workspace. Every palette works in light and dark.">
         <PaletteSelector preset={preset} mode={resolved} custom={custom} onChange={(next) => report(setPreset(next))} />
       </Section>
+      <BackdropSettings report={report} />
       <FontSettings report={report} />
       <CodeFontSettings report={report} />
       <WindowAppearanceSettings report={report} />
@@ -87,7 +89,7 @@ function WindowAppearanceSettings({ report }: { report: Report }) {
         onChange={(value) => report(setTransparent(value))}
       />
       <Field label="Transparency" hint="Higher values reveal more of the desktop. The background stays blurred.">
-        <span className="transparency-control">
+        <span className="range-control">
           <input
             type="range"
             aria-label="Transparency"

@@ -1,19 +1,18 @@
 import { useEffect, type RefObject } from "react";
 import { create } from "zustand";
-import type { FileScope, FindQuery } from "@openorc/protocol";
+import type { FileScope } from "@openorc/protocol";
 import { useLayout } from "./layout";
 import { useRouter } from "./router";
 import { withFileScope } from "./file-scope";
 
-/** Browse the tree, find file names (Cmd+P), or search their contents (Cmd+Shift+F). */
-export type FilesMode = "tree" | "names" | "contents";
-
-/** One conversation's Files tool for this session: its mode and what was typed in each. */
-interface FilesTool {
-  mode: FilesMode;
-  names: string;
-  /** `text` may be empty here; a find runs once there is something to find. */
-  contents: FindQuery;
+/**
+ * One conversation's Files search for this session: what was typed, which narrows the tree, names files across the
+ * project and finds lines in them, and how the lines are matched.
+ */
+export interface FilesTool {
+  query: string;
+  caseSensitive: boolean;
+  regex: boolean;
 }
 
 interface FilesToolState {
@@ -25,7 +24,7 @@ interface FilesToolState {
   tools: Record<string, FilesTool>;
 }
 
-const EMPTY: FilesTool = { mode: "tree", names: "", contents: { text: "", regex: false, caseSensitive: false } };
+export const EMPTY_SEARCH: FilesTool = { query: "", caseSensitive: false, regex: false };
 
 export const useFilesTool = create<FilesToolState>(() => ({ host: null, focus: null, tools: {} }));
 
@@ -34,13 +33,13 @@ export function filesKey(scope: FileScope): string {
 }
 
 function updateTool(key: string, change: Partial<FilesTool>): void {
-  useFilesTool.setState((state) => ({ tools: { ...state.tools, [key]: { ...(state.tools[key] ?? EMPTY), ...change } } }));
+  useFilesTool.setState((state) => ({ tools: { ...state.tools, [key]: { ...(state.tools[key] ?? EMPTY_SEARCH), ...change } } }));
 }
 
 /** One conversation's Files tool, and a setter that merges a change into it. */
 export function useFilesToolState(scope: FileScope): [FilesTool, (change: Partial<FilesTool>) => void] {
   const key = filesKey(scope);
-  const tool = useFilesTool((state) => state.tools[key]) ?? EMPTY;
+  const tool = useFilesTool((state) => state.tools[key]) ?? EMPTY_SEARCH;
   return [tool, (change) => updateTool(key, change)];
 }
 
@@ -84,13 +83,12 @@ export function fileTarget(focusedThreadId: string | null): FileScope | null {
   return focusedThreadId ? { kind: "thread", id: focusedThreadId } : useFilesTool.getState().host;
 }
 
-/** Cmd+P and Cmd+Shift+F: the Files tool in `mode` on the target's panel, its search box focused. False when no conversation is on screen. */
-export function openFilesTool(mode: FilesMode, focusedThreadId: string | null): boolean {
+/** Cmd+P and Cmd+Shift+F: the Files tool on the target's panel, its search box focused. False when no conversation is on screen. */
+export function openFilesTool(focusedThreadId: string | null): boolean {
   const target = fileTarget(focusedThreadId);
   if (!target) return false;
   withFileScope(target, () => {
     if (focusedThreadId && focusedThread() !== focusedThreadId) return;
-    updateTool(filesKey(target), { mode });
     requestFilesFocus();
     useLayout.getState().openFiles(focusedThreadId ?? undefined);
   });

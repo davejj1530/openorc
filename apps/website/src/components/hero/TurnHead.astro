@@ -2,7 +2,8 @@
 /**
  * One head per turn, as the app's TurnHead draws it: the harness mark, the agent's name, then its model and a status
  * that swaps in place. A played turn says it is working with its clock, then Writing while the reply streams, then
- * how long it took; a finished one says how long it took.
+ * how long it took; a finished one says how long it took. A still's turn that is still working counts on from
+ * `working` seconds (scripts/app-preview.ts).
  */
 import { duration, elapsed, timed, type Journey } from "../../data/hero/timeline";
 
@@ -17,10 +18,11 @@ interface Props extends Record<string, unknown> {
   took?: string;
   /** A played turn: working from `from`, writing its reply from `writing`, done at `to`. */
   clock?: { from: string; writing?: string; to?: string };
+  working?: number;
 }
-const { journey, harness, agent, model, took, clock, grow, ...rest } = Astro.props;
+const { journey, harness, agent, model, took, clock, working, grow, ...rest } = Astro.props;
 const at = (windows: string) => (journey ? timed(journey, windows) : {});
-const working = clock ? (clock.writing ?? clock.to) : undefined;
+const workingUntil = clock ? (clock.writing ?? clock.to) : undefined;
 // Without a player the page shows the journey's last moment, so the words start there.
 const since = (from: string, to?: string) => (journey ? duration(elapsed(journey, from, to)) : "0s");
 ---
@@ -29,8 +31,9 @@ const since = (from: string, to?: string) => (journey ? duration(elapsed(journey
   <svg class="hs-logo" data-provider={harness} aria-hidden="true"><use href={`#hs-logo-${harness}`} /></svg>
   <span class="hs-head-name">{agent}</span>
   <span class="hs-head-status">
-    {took || clock ? `${model} · ` : model}{took}
-    {clock ? <span {...(working ? at(`<${working}`) : {})} data-clock={clock.from} data-clock-text="working {t}">working {clock && since(clock.from)}</span> : null}
+    {took || clock || working !== undefined ? `${model} · ` : model}{took}
+    {working !== undefined ? <span data-tick={working}>working {duration(working)}</span> : null}
+    {clock ? <span {...(workingUntil ? at(`<${workingUntil}`) : {})} data-clock={clock.from} data-clock-text="working {t}">working {clock && since(clock.from)}</span> : null}
     {clock?.writing ? <span {...at(clock.to ? `${clock.writing}~${clock.to}` : `>${clock.writing}`)}>Writing</span> : null}
     {clock?.to ? <span {...at(`>${clock.to}`)} data-duration={`${clock.from}~${clock.to}`}>{since(clock.from, clock.to)}</span> : null}
   </span>

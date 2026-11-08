@@ -1,0 +1,49 @@
+---
+/**
+ * A conversation pane's header on the window's top line (ThreadHeader.tsx). The first pane holds the work column's
+ * tabs and +; a pane split beside it names its thread instead. Then the faint facts ("working" while the agent works),
+ * Close pane in a split, the thread's actions as vertical dots, and its tools: the panel's side while the panel is
+ * open, and the panel toggle. A new thread's header keeps only its tab and the panel toggle.
+ */
+import ProductIcon from "./ProductIcon.astro";
+import WorkTab, { type Tab } from "./WorkTab.astro";
+import type { Journey } from "../../data/hero/timeline";
+
+interface Props {
+  journey?: Journey;
+  /** The work column's tabs; a pane split beside the first passes `title` instead. */
+  tabs?: Tab[];
+  title?: string;
+  /** Names the tabs as a tablist, for tabs the visitor can pick. */
+  tablist?: string;
+  panel?: boolean;
+  /** The new-thread page's header. */
+  fresh?: boolean;
+}
+const { journey, tabs, title, tablist, panel, fresh } = Astro.props;
+---
+
+<header class="hs-header" data-kind={tabs ? "tabs" : "title"}>
+  {tabs ? (
+    <div class="hs-tabs-row">
+      <div class="hs-tabs" role={tablist ? "tablist" : undefined} aria-label={tablist}>
+        {tabs.map((tab) => <WorkTab journey={journey} {...tab} />)}
+      </div>
+      <span class="hs-round" aria-hidden="true"><ProductIcon name="plus" /></span>
+    </div>
+  ) : (
+    <>
+      <span class="hs-title">{title}</span>
+      <span class="hs-facts" aria-hidden="true"><span class="hs-fact-working"><i></i>working</span></span>
+    </>
+  )}
+  <span class="hs-header-actions" aria-hidden="true">
+    {tabs && !fresh ? <span class="hs-facts"><span class="hs-fact-working"><i></i>working</span></span> : null}
+    {fresh ? null : <span class="hs-round hs-close-pane"><ProductIcon name="close" /></span>}
+    {fresh ? null : <span class="hs-round hs-more"><ProductIcon name="moreVertical" /></span>}
+    <span class="hs-tools">
+      {panel ? <span class="hs-round"><ProductIcon name="arrowLeftRight" /></span> : null}
+      <span class="hs-round" data-on={panel ? "" : undefined}><ProductIcon name="panelRight" /></span>
+    </span>
+  </span>
+</header>

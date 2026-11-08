@@ -16,6 +16,8 @@ interface Props {
   placeholder: string;
   model: { label: string; effort: string; harness?: string };
   permission: string;
+  /** The project the conversation works in; studio unless given. */
+  folder?: string;
   branch?: string;
   /** Window during which uncommitted changes show beside the branch, with their counts; `true` for the whole scene. */
   changes?: string | boolean;
@@ -26,7 +28,7 @@ interface Props {
   context?: number | null;
   layout?: "thread" | "new";
 }
-const { journey, placeholder, model, permission, branch = project.branch, changes, changeStat = { added: 8, removed: 2 }, prompt, context = 18, layout = "thread" } = Astro.props;
+const { journey, placeholder, model, permission, folder = project.name, branch = project.branch, changes, changeStat = { added: 8, removed: 2 }, prompt, context = 18, layout = "thread" } = Astro.props;
 const fresh = layout === "new";
 const ring = 2 * Math.PI * 6;
 ---
@@ -65,7 +67,7 @@ const ring = 2 * Math.PI * 6;
   </div>
   {fresh ? null : (
     <div class="hs-rail">
-      <span class="hs-directory"><ProductIcon name="folder" /><span>/Projects/{project.name}</span></span>
+      <span class="hs-directory"><ProductIcon name="folder" /><span>/Projects/{folder}</span></span>
       <span class="hs-branch"><ProductIcon name="branch" /><span>{branch}</span></span>
       {changes ? (
         <span class="hs-commit" {...(typeof changes === "string" && journey ? timed(journey, changes) : {})}>

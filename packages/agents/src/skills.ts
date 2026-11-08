@@ -16,8 +16,11 @@ import { SHARED_CLAUDE_CONFIG_DIR, claudeConfigDir } from "./claude/config-dir.j
 import { claudeCommandRows, listClaudeCommands } from "./claude/commands.js";
 import { installedClaudePlugins, type InstalledClaudePlugin } from "./claude/plugins.js";
 import type { AgentLaunchEnvironment } from "./launch-environment.js";
+import { claudeSkillsOff } from "./claude/skill-overrides.js";
 import { listCodexSkills } from "./codex/skills.js";
+import { openCodeSkillDenied, openCodeSkillRules, type SkillRule } from "./opencode/skill-policies.js";
 import { listNativeOpenCodeSkills, openCodeSkillRows } from "./opencode/skills.js";
+import { readSkillInterface, skillFolderOf, within } from "./skill-interface.js";
 
 /** A directory of skills, and what the CLI would call the ones inside it. */
 interface SkillRoot {
@@ -371,6 +374,8 @@ async function readOpenCodeRoot(root: SkillRoot): Promise<AgentSkill[]> {
     if (depth > 8 || found.length >= MAX_ENTRIES) return;
     for (const entry of await treeEntries(dir)) {
       if (found.length >= MAX_ENTRIES) break;
+      // Hidden entries hold no skills: Claude's synced skills keep staging copies under hidden folders.
+      if (entry.name.startsWith(".")) continue;
       if (entry.directory) {
         // Depth bounds symlink cycles as well as unexpectedly large skill trees.
         await visit(entry.file, depth + 1);
@@ -400,32 +405,40 @@ function configuredSourceLocation(entry: string, projectRoot: string, home: stri
   return path.resolve(projectRoot, entry);
 }
 
-/** OpenCode combines skill source arrays from global and project JSONC config files. */
-async function configuredOpenCodeSources(projectRoot: string, directories: string[], configDir: string, home: string, env: NodeJS.ProcessEnv): Promise<ConfiguredSkillSource[]> {
+type ConfigText = { text: string; source: AgentSkill["source"] };
+
+/** OpenCode's configuration files as written: the user's, then each project folder's, then any given inline. */
+async function openCodeConfigTexts(directories: string[], configDir: string, env: NodeJS.ProcessEnv): Promise<ConfigText[]> {
   const files = [
     ...["opencode.json", "opencode.jsonc"].map((name) => ({ file: path.join(configDir, name), source: "user" as const })),
     ...(env["OPENCODE_CONFIG"] ? [{ file: env["OPENCODE_CONFIG"], source: "user" as const }] : []),
     ...directories.flatMap((dir) => ["opencode.json", "opencode.jsonc"].map((name) => ({ file: path.join(dir, name), source: "project" as const }))),
     ...directories.flatMap((dir) => ["opencode.json", "opencode.jsonc"].map((name) => ({ file: path.join(dir, ".opencode", name), source: "project" as const }))),
   ];
+  const texts: ConfigText[] = [];
+  for (const { file, source } of files) {
+    try {
+      texts.push({ text: await readFile(file, "utf8"), source });
+    } catch {
+      // A missing or unreadable config says nothing.
+    }
+  }
+  if (env["OPENCODE_CONFIG_CONTENT"]) texts.push({ text: env["OPENCODE_CONFIG_CONTENT"], source: "user" });
+  return texts;
+}
+
+/** OpenCode combines skill source arrays from global and project JSONC config files. */
+function configuredOpenCodeSources(texts: ConfigText[], projectRoot: string, home: string): ConfiguredSkillSource[] {
   const sources: ConfiguredSkillSource[] = [];
-  const add = (content: string, source: AgentSkill["source"]) => {
-    const config: unknown = parse(content);
+  for (const { text, source } of texts) {
+    const config: unknown = parse(text);
     const skills = config && typeof config === "object" && "skills" in config ? config.skills : null;
-    if (!Array.isArray(skills)) return;
+    if (!Array.isArray(skills)) continue;
     for (const entry of skills.slice(0, MAX_ENTRIES)) {
       if (typeof entry !== "string" || !entry.trim()) continue;
       sources.push({ location: configuredSourceLocation(entry, projectRoot, home), source });
     }
-  };
-  for (const { file, source } of files) {
-    try {
-      add(await readFile(file, "utf8"), source);
-    } catch {
-      // A missing or unreadable config contributes no sources.
-    }
   }
-  if (env["OPENCODE_CONFIG_CONTENT"]) add(env["OPENCODE_CONFIG_CONTENT"], "user");
   return sources;
 }
 
@@ -480,10 +493,18 @@ async function readRemoteOpenCodeRoot(root: ConfiguredSkillSource): Promise<Agen
   return found;
 }
 
+/** Where OpenCode looks in one project: its folders up to the repository's root, and the user's config folder. */
+interface OpenCodePlaces {
+  directories: string[];
+  configDir: string;
+}
+
+async function openCodePlaces(projectRoot: string, home: string, env: NodeJS.ProcessEnv): Promise<OpenCodePlaces> {
+  return { directories: await projectDirectories(projectRoot), configDir: path.join(env["XDG_CONFIG_HOME"] || path.join(home, ".config"), "opencode") };
+}
+
 /** Apply OpenCode's source priority so only the definition it would load is shown. */
-async function listOpenCodeSkills(projectRoot: string, home: string, env: NodeJS.ProcessEnv): Promise<AgentSkill[]> {
-  const directories = await projectDirectories(projectRoot);
-  const configDir = path.join(env["XDG_CONFIG_HOME"] || path.join(home, ".config"), "opencode");
+async function listOpenCodeSkills(projectRoot: string, home: string, env: NodeJS.ProcessEnv, { directories, configDir }: OpenCodePlaces, texts: ConfigText[]): Promise<AgentSkill[]> {
   const claudeEnabled = !env["OPENCODE_DISABLE_CLAUDE_CODE"] && !env["OPENCODE_DISABLE_CLAUDE_CODE_SKILLS"];
   const roots: SkillRoot[] = [
     ...(claudeEnabled
@@ -498,17 +519,68 @@ async function listOpenCodeSkills(projectRoot: string, home: string, env: NodeJS
   ];
   const found = new Map<string, AgentSkill>();
   for (const root of roots) for (const skill of await readOpenCodeRoot(root)) found.set(skill.name, skill);
-  for (const source of await configuredOpenCodeSources(projectRoot, directories, configDir, home, env)) {
+  for (const source of configuredOpenCodeSources(texts, projectRoot, home)) {
     const skills = /^https?:\/\//.test(source.location) ? await readRemoteOpenCodeRoot(source) : await readOpenCodeRoot({ dir: source.location, source: source.source });
     for (const skill of skills) found.set(skill.name, skill);
   }
   return [...found.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** The skill rules OpenCode applies in one project, from every configuration file it reads there. */
+export async function openCodeSkillRulesFor(projectRoot: string, home: string, env: NodeJS.ProcessEnv): Promise<SkillRule[]> {
+  const { directories, configDir } = await openCodePlaces(projectRoot, home, env);
+  return openCodeSkillRules((await openCodeConfigTexts(directories, configDir, env)).map(({ text }) => text));
+}
+
+const byName = (skills: AgentSkill[]) => skills.sort((a, b) => a.name.localeCompare(b.name));
+
 /**
- * The skills a selected harness offers in one project. With `launch`, Claude's are the commands Claude Code itself lists
- * there, built-ins included, and its folders only say where each comes from; without it, or when Claude Code cannot be
- * asked, the folders alone.
+ * What a listing adds to each skill: the interface its folder describes, whether its agent uses it, where the agent has
+ * a switch for that, and whether it is the user's to change: their own or the project's file on disk, not one a sync
+ * keeps, which would put its own copy back.
+ */
+async function describeSkills(skills: AgentSkill[], { synced, enabled }: { synced: string[]; enabled: (skill: AgentSkill) => boolean | undefined }): Promise<AgentSkill[]> {
+  return Promise.all(
+    skills.map(async (skill) => {
+      const folder = skillFolderOf(skill.path);
+      const on = enabled(skill);
+      const owned = (skill.source === "user" || skill.source === "project") && path.isAbsolute(skill.path) && !synced.some((root) => within(root, skill.path));
+      return { ...skill, ...(folder ? await readSkillInterface(folder) : {}), ...(on === undefined ? {} : { enabled: on }), editable: owned };
+    }),
+  );
+}
+
+/** OpenCode's own list where it can be asked, else the folders; a skill its policies deny is listed off, from its folder. */
+async function listOpenCode(projectRoot: string, home: string, env: NodeJS.ProcessEnv, nativeDiscovery: boolean): Promise<AgentSkill[]> {
+  const places = await openCodePlaces(projectRoot, home, env);
+  const texts = await openCodeConfigTexts(places.directories, places.configDir, env);
+  const rules = openCodeSkillRules(texts.map(({ text }) => text));
+  const denied = (skill: AgentSkill) => openCodeSkillDenied(rules, skill.name);
+  const [native, disk] = await Promise.all([nativeDiscovery ? listNativeOpenCodeSkills(projectRoot) : Promise.resolve(null), listOpenCodeSkills(projectRoot, home, env, places, texts)]);
+  const listed = native ? openCodeSkillRows(native, new Map(disk.map((skill) => [skill.path, skill.source])), home) : disk;
+  const names = new Set(listed.map((skill) => skill.name));
+  const off = native ? disk.filter((skill) => denied(skill) && !names.has(skill.name)) : [];
+  return describeSkills(byName([...listed, ...off]), { synced: [path.join(home, ".claude", "skills", "synced")], enabled: (skill) => !denied(skill) });
+}
+
+/** Claude Code's list where it can be asked, else the folders; a skill its settings turn off is listed off, from its folder. */
+async function listClaude(projectRoot: string, home: string, env: NodeJS.ProcessEnv, launch: Pick<AgentLaunchEnvironment, "binary" | "env"> | undefined): Promise<AgentSkill[]> {
+  const configDir = claudeConfigDir(home, env);
+  const [listed, read, off] = await Promise.all([
+    launch ? listClaudeCommands(launch, projectRoot).catch(() => null) : Promise.resolve(null),
+    listClaudeSkills(projectRoot, home, env),
+    claudeSkillsOff(configDir, projectRoot),
+  ]);
+  const names = new Set(listed?.map((command) => command.name));
+  const rows = listed ? [...claudeCommandRows(listed, read), ...read.filter((skill) => off.has(skill.name) && !names.has(skill.name))] : read;
+  // Built-in commands answer to no skill setting.
+  return describeSkills(byName(rows), { synced: [path.join(configDir, "skills", "synced")], enabled: (skill) => (skill.source === "system" ? undefined : !off.has(skill.name)) });
+}
+
+/**
+ * The skills a selected harness offers in one project, turned off or not. With `launch`, Claude's are the commands
+ * Claude Code itself lists there, built-ins included, and its folders only say where each comes from; without it, or
+ * when Claude Code cannot be asked, the folders alone.
  */
 export async function listSkills({
   projectRoot,
@@ -526,12 +598,6 @@ export async function listSkills({
   launch?: Pick<AgentLaunchEnvironment, "binary" | "env"> | undefined;
 }): Promise<AgentSkill[]> {
   if (agent === "codex") return listCodexSkills(projectRoot);
-  if (agent === "opencode") {
-    const [native, disk] = await Promise.all([nativeDiscovery ? listNativeOpenCodeSkills(projectRoot) : Promise.resolve(null), listOpenCodeSkills(projectRoot, home, env)]);
-    if (!native) return disk;
-    return openCodeSkillRows(native, new Map(disk.map((skill) => [skill.path, skill.source])), home);
-  }
-  if (!launch) return listClaudeSkills(projectRoot, home, env);
-  const [listed, read] = await Promise.all([listClaudeCommands(launch, projectRoot).catch(() => null), listClaudeSkills(projectRoot, home, launch.env)]);
-  return listed ? claudeCommandRows(listed, read) : read;
+  if (agent === "opencode") return listOpenCode(projectRoot, home, env, nativeDiscovery);
+  return listClaude(projectRoot, home, launch?.env ?? env, launch);
 }

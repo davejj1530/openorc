@@ -10,7 +10,7 @@ type Dependencies = {
   /** The checks for the default Claude account, which a thread started without naming one runs on. */
   defaultAccountInfo: () => ReturnType<SystemService["info"]>;
   agentUpdates: Pick<AgentUpdateService, "get" | "check" | "install" | "configure">;
-  providerUsage: Pick<ProviderUsageService, "read" | "redeemCodex">;
+  providerUsage: Pick<ProviderUsageService, "read" | "recent" | "redeemCodex">;
   planLimits: () => Promise<PlanLimits[]>;
   invalidate: (keys: string[]) => void;
 };
@@ -44,7 +44,7 @@ export function createSystemHandlers({
     "agents.updates.check": () => agentUpdates.check(),
     "agents.updates.install": ({ ids }) => agentUpdates.install(ids),
     "agents.updates.configure": (patch) => agentUpdates.configure(patch),
-    "providers.usage": ({ provider, claudeAccountId }) => providerUsage.read(provider, claudeAccountId),
+    "providers.usage": ({ provider, claudeAccountId, maxAgeMs }) => (maxAgeMs ? providerUsage.recent(provider, claudeAccountId, maxAgeMs) : providerUsage.read(provider, claudeAccountId)),
     "providers.limits": () => planLimits(),
     "providers.codex.reset": async (input) => {
       const result = await providerUsage.redeemCodex(input);

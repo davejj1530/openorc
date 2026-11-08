@@ -1,6 +1,8 @@
 import { z } from "zod";
 import type { AgentUpdates } from "./agent-updates.js";
 import { ClaudeAccountId, claudeAccountRpcParams, type ClaudeAccountRpcResults } from "./claude-accounts.js";
+import { connectorRpcParams, type ConnectorRpcResults } from "./connectors.js";
+import { skillRpcParams, type SkillRpcResults } from "./skills.js";
 import { cloudRpcParams, type CloudRpcResults } from "./cloud.js";
 import { codeExplanationRpcParams, type CodeExplanationRpcResults } from "./code-explanations.js";
 import { editorRpcParams, type EditorRpcResults } from "./code-intelligence.js";
@@ -67,6 +69,8 @@ const REVIEW_SCOPE_REQUIRED = "Review comments need a conversation or a task.";
 
 export const rpcParams = {
   ...claudeAccountRpcParams,
+  ...connectorRpcParams,
+  ...skillRpcParams,
   ...slackRpcParams,
   ...pullRequestRpcParams,
   ...orclingRpcParams,
@@ -100,7 +104,17 @@ export const rpcParams = {
   "agents.updates.check": z.object({}),
   "agents.updates.install": z.object({ ids: z.array(HarnessId).min(1).max(3) }).strict(),
   "agents.updates.configure": z.object({ automatic: z.boolean().optional(), dismissed: z.string().max(300).optional() }).strict(),
-  "providers.usage": z.object({ provider: z.enum([...HarnessId.options, "anthropic-api"]), claudeAccountId: ClaudeAccountId.optional() }),
+  "providers.usage": z.object({
+    provider: z.enum([...HarnessId.options, "anthropic-api"]),
+    claudeAccountId: ClaudeAccountId.optional(),
+    /** A report this young, from any reader, answers at once instead of asking the CLI again; none means a live read. */
+    maxAgeMs: z
+      .number()
+      .int()
+      .positive()
+      .max(15 * 60_000)
+      .optional(),
+  }),
   /** The Mac's plan limits for a phone: Codex, then each enabled Claude account. Takes nothing, so a phone cannot force a fresh read. */
   "providers.limits": z.object({}).strict(),
   "providers.codex.reset": z.object({ attemptId: z.string().uuid(), creditId: z.string().min(1).optional(), confirmationToken: z.string().min(1) }),
@@ -435,6 +449,7 @@ const SECRET_PARAMS: ReadonlySet<RpcMethod> = new Set<RpcMethod>([
   "cloud.env.set",
   "cloud.brain.codex.apiKey",
   "providers.codex.reset",
+  "connectors.save",
 ]);
 
 export const secretParams = (method: string): boolean => method.startsWith("slack.") || SECRET_PARAMS.has(method as RpcMethod);
@@ -525,6 +540,8 @@ export interface RpcResults
     EditorRpcResults,
     CodeExplanationRpcResults,
     ClaudeAccountRpcResults,
+    ConnectorRpcResults,
+    SkillRpcResults,
     RemoteRpcResults,
     DevicePanelRpcResults,
     PreviewRpcResults,

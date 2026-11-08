@@ -19,6 +19,12 @@ export type PanelSide = "left" | "right";
 /** A screen the sidebar's footer reaches. Inbox sits in the window's header instead. */
 export type SidebarScreen = "tasks" | "pulls" | "scheduled";
 
+/** All projects: the sidebar lists every project's threads. A project's id lists only its own. */
+export const ALL_WORKSPACES = "all";
+
+/** The project the sidebar's filter focuses, or null on All projects. */
+export const focusedProject = (state: { workspace: string }): string | null => (state.workspace === ALL_WORKSPACES ? null : state.workspace);
+
 interface LayoutState {
   sidebarOpen: boolean;
   sidebarWidth: number;
@@ -37,8 +43,13 @@ interface LayoutState {
   openFile: (file: FileSelection) => void;
   /** The Files tool rather than a file a link chose: on this thread's panel when given, else on the panel on screen. */
   openFiles: (threadId?: string) => void;
-  /** The navigation scope for tasks, memory, and new threads. Null selects all projects. */
-  projectId: string | null;
+  /**
+   * The app's scope, chosen in the sidebar's project filter: one project, or every project under ALL_WORKSPACES. The
+   * thread list, tasks, schedules, pull requests, memory and new work all follow it; read it with focusedProject.
+   */
+  workspace: string;
+  /** The rail lists the projects under its Projects button. */
+  railProjects: boolean;
   /** The visible thread whose controls last opened the shared panel. */
   panelThreadId: string | null;
   toggleThreadPanel: (id: string) => void;
@@ -62,8 +73,11 @@ interface LayoutState {
   setPanel: (open: boolean, tab?: PanelTab) => void;
   setPanelWidth: (px: number) => void;
   togglePanelSide: () => void;
-  setProject: (id: string | null) => void;
+  setWorkspace: (id: string) => void;
+  /** Work opened in another project brings a focused filter along to it; on All projects the filter stays. */
+  followProject: (id: string) => void;
   setPinnedOnly: (pinnedOnly: boolean) => void;
+  setRailProjects: (open: boolean) => void;
   toggleCollapsed: (key: string) => void;
   toggleThreadChildren: (id: string, expanded: boolean) => void;
   rememberPreviewUrl: (key: string, url: string) => void;
@@ -77,7 +91,7 @@ export const limits = {
 
 const KEY = "openorc.layout";
 
-function read(): Partial<Pick<LayoutState, "sidebarOpen" | "sidebarWidth" | "panelOpen" | "panelWidth" | "panelSide" | "projectId" | "collapsed" | "previewUrls">> {
+function read(): Partial<Pick<LayoutState, "sidebarOpen" | "sidebarWidth" | "panelOpen" | "panelWidth" | "panelSide" | "workspace" | "railProjects" | "collapsed" | "previewUrls">> {
   try {
     return JSON.parse(localStorage.getItem(KEY) ?? "{}") as Partial<LayoutState>;
   } catch {
@@ -95,7 +109,8 @@ function persist(s: LayoutState): void {
         panelOpen: s.panelOpen,
         panelWidth: s.panelWidth,
         panelSide: s.panelSide,
-        projectId: s.projectId,
+        workspace: s.workspace,
+        railProjects: s.railProjects,
         collapsed: s.collapsed,
         previewUrls: s.previewUrls,
       }),
@@ -141,7 +156,9 @@ export const useLayout = create<LayoutState>((set, get) => {
     selectedFile: null,
     selectedChanges: null,
     workspaceChanges: null,
-    projectId: saved.projectId === undefined ? WORKSPACE_ID : saved.projectId,
+    // Layouts saved before the project filter list every project, as the sidebar did then.
+    workspace: typeof saved.workspace === "string" && saved.workspace ? saved.workspace : ALL_WORKSPACES,
+    railProjects: saved.railProjects === true,
     panelThreadId: null,
     pinnedOnly: false,
     collapsed: (saved.collapsed ?? []).filter(liveSidebarFold),
@@ -192,13 +209,18 @@ export const useLayout = create<LayoutState>((set, get) => {
     openFiles: (threadId) => commit({ selectedFile: null, panelOpen: true, panelTab: "file", panelRequest: { tab: "file" }, ...(threadId ? { panelThreadId: threadId } : {}) }),
     setPanelWidth: (px) => commit({ panelWidth: clamp(px, limits.panel) }),
     togglePanelSide: () => commit({ panelSide: get().panelSide === "left" ? "right" : "left" }),
-    setProject: (projectId) => commit({ projectId }),
+    setWorkspace: (workspace) => commit({ workspace }),
+    // Workspace's threads have no project of their own in the filter, so they show under All projects.
+    followProject: (id) => {
+      if (get().workspace !== ALL_WORKSPACES) commit({ workspace: id === WORKSPACE_ID ? ALL_WORKSPACES : id });
+    },
     openThreadPanel: (id, tab) => commit({ panelThreadId: id, panelOpen: true, panelTab: tab, panelRequest: { tab } }),
     toggleThreadPanel: (id) => {
       const open = get().panelThreadId !== id || !get().panelOpen;
       commit({ panelThreadId: id, panelOpen: open, ...(open ? {} : { panelExpanded: false }) });
     },
     setPinnedOnly: (pinnedOnly) => commit({ pinnedOnly }),
+    setRailProjects: (railProjects) => commit({ railProjects }),
     toggleCollapsed: (key) => commit({ collapsed: toggleSidebarFold(get().collapsed, key) }),
     toggleThreadChildren: (id, expanded) => commit({ collapsed: toggleThreadTree(get().collapsed, id, expanded) }),
     ...threadFoldActions(get, commit),

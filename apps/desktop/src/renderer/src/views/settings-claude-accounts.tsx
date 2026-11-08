@@ -75,7 +75,7 @@ function AutoSwitch() {
     <div className="settings-group">
       <Toggle
         label="Switch accounts at usage limits"
-        hint="When a thread's account reaches its usage limit, the thread continues on the account with the most 5-hour usage left."
+        hint="When a thread's account reaches its usage limit, the thread continues on the account with the most 5-hour usage left. Projects with their own accounts use their own setting."
         checked={preference.value.claudeAccountAutoSwitch ?? false}
         disabled={preference.disabled}
         onChange={(claudeAccountAutoSwitch) => void preference.commit({ claudeAccountAutoSwitch })}
@@ -94,10 +94,7 @@ function AccountCard({ account, isDefault }: { account: ClaudeAccountConnection;
         {isDefault ? <span className="settings-card-tag">Default</span> : null}
         <Status ok={account.status === "ready"}>{connectionLabels[account.status]}</Status>
       </div>
-      <p className="settings-card-meta">
-        {[account.email, account.organization].filter(Boolean).join(" · ") ||
-          (account.kind === "cli" ? "Uses your existing Claude Code login and configuration." : "Separate Claude Code login and configuration.")}
-      </p>
+      <p className="settings-card-meta">{accountMeta(account)}</p>
       {account.message ? (
         <p className="settings-card-meta" role="status">
           {account.message}
@@ -120,7 +117,15 @@ function AccountCard({ account, isDefault }: { account: ClaudeAccountConnection;
   );
 }
 
-const connectionLabels: Record<ClaudeAccountConnection["status"], string> = {
+/** Who an account signs in as, or what kind of login it is before it has signed in. */
+export function accountMeta(account: ClaudeAccountConnection): string {
+  return (
+    [account.email, account.organization].filter(Boolean).join(" · ") ||
+    (account.kind === "cli" ? "Uses your existing Claude Code login and configuration." : "Separate Claude Code login and configuration.")
+  );
+}
+
+export const connectionLabels: Record<ClaudeAccountConnection["status"], string> = {
   ready: "Connected",
   signing_in: "Signing in…",
   disabled: "Disabled",

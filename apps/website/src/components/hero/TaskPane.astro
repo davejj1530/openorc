@@ -1,8 +1,8 @@
 ---
 /**
- * The task view (TaskView.tsx, TaskDocument.tsx): the breadcrumb header with the task's status mark, the tab track,
- * the scrolling document in the slot, and the footer. The task waits in the backlog until its work starts, then
- * runs in its own worktree on `branch`.
+ * The task view (TaskView.tsx, TaskDocument.tsx): the breadcrumb on the top line with the task's status mark, the tab
+ * track, the scrolling document in the slot, and the footer. The task waits in the backlog until its work starts,
+ * then runs in its own worktree on `branch`.
  */
 import ProductIcon from "./ProductIcon.astro";
 import StatusMark from "./StatusMark.astro";
@@ -31,7 +31,6 @@ const tabs = ["Overview", "Activity", "Changes", "Commits", "Memory"];
     <StatusMark status="backlog" {...waiting} />
     <StatusMark status="in_progress" {...started} />
     <span class="hs-title">{title}</span>
-    <span class="hs-header-chip">{project.name}<ProductIcon name="chevronDown" /></span>
   </header>
   <nav class="hs-task-tabs">
     <span class="hs-track">{tabs.map((tab, i) => <span data-selected={i === 0 ? "" : undefined}>{tab}</span>)}</span>

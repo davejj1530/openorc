@@ -27,7 +27,7 @@ const pull = (number: number, title: string) =>
 
 beforeEach(() => {
   queryClient.setDefaultOptions({ queries: { retry: false } });
-  useLayout.setState({ projectId: null });
+  useLayout.setState({ workspace: "all" });
   vi.mocked(core.call).mockImplementation(async (method, params) => {
     if (method === "system.info") return { gh: { installed: true, loggedIn: true } } as never;
     if (method === "projects.list")

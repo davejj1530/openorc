@@ -10,7 +10,7 @@ import { ProjectPicker } from "./ProjectPicker";
 
 vi.mock("../lib/browser-preview", () => ({ CoversPreview: () => null }));
 beforeEach(() => {
-  useLayout.setState({ projectId: "repo", collapsed: [] });
+  useLayout.setState({ workspace: "repo", collapsed: [] });
   useRouter.setState({ route: { view: "thread", threadId: "running-thread" }, threadIds: ["running-thread"] });
 });
 afterEach(() => {
@@ -50,13 +50,12 @@ it("offers removal on right-click without toggling the project, and cancellation
   expect(call).not.toHaveBeenCalled();
 });
 
-it("removes through the keyboard context menu and resets its scope while keeping the open conversation", async () => {
+it("removes through the keyboard context menu while keeping the open conversation", async () => {
   const call = vi.spyOn(core, "call").mockResolvedValue({ ok: true });
   show();
   fireEvent.click(await confirmFromContextMenu("keyboard"));
   await waitFor(() => expect(screen.queryByRole("dialog", { name: /Remove/ })).toBeNull());
   expect(call).toHaveBeenCalledExactlyOnceWith("projects.remove", { id: "repo" });
-  expect(useLayout.getState().projectId).toBe(WORKSPACE_ID);
   expect(useRouter.getState().route).toEqual({ view: "thread", threadId: "running-thread" });
 });
 
@@ -71,7 +70,7 @@ it("keeps errors visible, prevents repeat submission while pending, and allows r
         }),
     )
     .mockResolvedValue({ ok: true });
-  useLayout.setState({ projectId: "other" });
+  useLayout.setState({ workspace: "other" });
   show();
   const remove = await confirmFromContextMenu();
   fireEvent.click(remove);
@@ -80,11 +79,11 @@ it("keeps errors visible, prevents repeat submission while pending, and allows r
   expect(call).toHaveBeenCalledTimes(1);
   reject(new Error("Could not save changes"));
   expect((await screen.findByRole("alert")).textContent).toBe("Could not save changes");
-  expect(useLayout.getState().projectId).toBe("other");
+  expect(useLayout.getState().workspace).toBe("other");
   fireEvent.click(screen.getByRole("button", { name: "Remove project" }));
   await waitFor(() => expect(screen.queryByRole("dialog", { name: /Remove/ })).toBeNull());
   expect(call).toHaveBeenCalledTimes(2);
-  expect(useLayout.getState().projectId).toBe("other");
+  expect(useLayout.getState().workspace).toBe("other");
 });
 
 it("keeps Workspace permanent", async () => {

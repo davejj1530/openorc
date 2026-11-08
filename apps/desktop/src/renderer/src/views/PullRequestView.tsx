@@ -125,7 +125,6 @@ function PullRequestDescription({ body }: { body: string }) {
  */
 export function PullRequestView({ projectId, number }: { projectId: string; number: number }) {
   const navigate = useRouter((s) => s.navigate);
-  const project = useRpc("projects.get", { id: projectId });
   const pull = useRpc("pulls.get", { projectId, number });
   const review = useRpc("pulls.review.get", { projectId, number });
   const [section, setSection] = useState<Section>("changes");
@@ -156,9 +155,6 @@ export function PullRequestView({ projectId, number }: { projectId: string; numb
   return (
     <>
       <TopBar
-        projectId={projectId}
-        projectName={project.data?.name ?? null}
-        onProjectChange={() => navigate({ view: "pulls" })}
         actions={
           <>
             {detail ? (

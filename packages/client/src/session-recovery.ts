@@ -1,4 +1,5 @@
 import { DEFAULT_CLAUDE_ACCOUNT, type ClaudeAccountConnection, type ThreadSummary } from "@openorc/protocol";
+import { projectAccountChoice, type AccountsProject } from "./project-claude-accounts.js";
 
 /** What a conversation says to go on with another account, which resumes its session there. */
 export const CONTINUE_PROMPT = "Continue where you left off.";
@@ -15,9 +16,17 @@ export function canContinueWithAnother({ agent, orclingId, session }: Recovering
   return session.status === "error" && agent === "claude" && !orclingId && session.recovery?.provider === "claude";
 }
 
-/** The signed-in Claude accounts a stopped turn can go on with: every one but its own. */
-export function accountsToContinueWith(thread: Recovering & Pick<ThreadSummary, "claudeAccountId">, accounts: readonly ClaudeAccountConnection[]): ClaudeAccountConnection[] {
+/**
+ * The signed-in Claude accounts a stopped turn can go on with: every one but its own, of those its project uses when it
+ * uses only some.
+ */
+export function accountsToContinueWith(
+  thread: Recovering & Pick<ThreadSummary, "claudeAccountId">,
+  accounts: readonly ClaudeAccountConnection[],
+  project?: AccountsProject | null,
+): ClaudeAccountConnection[] {
   if (!canContinueWithAnother(thread)) return [];
   const current = thread.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT;
-  return accounts.filter((account) => account.id !== current && account.status === "ready");
+  const usable = projectAccountChoice(project, { accounts: [...accounts], defaultId: DEFAULT_CLAUDE_ACCOUNT }).accounts;
+  return usable.filter((account) => account.id !== current && account.status === "ready");
 }

@@ -10,6 +10,7 @@ import {
   type FileScope,
   type PermissionPreset,
   type RunMode,
+  type UsableConnector,
 } from "@openorc/protocol";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRpcMutation } from "../lib/client";
@@ -25,6 +26,7 @@ import { ComposerInput } from "./ComposerInput";
 import { ComposerSendButton } from "./ComposerSendButton";
 import { ContextUsage } from "./ContextUsage";
 import { Cloud, FileText, Laptop, Lightbulb, Pencil, Plus, ShieldCheck, Square, Wand, X } from "./icons";
+import { type PickerAccounts } from "./ModelPickerAccounts";
 import { ComposerModelPicker, type ModelChoice } from "./ModelPicker";
 import { Button, Tooltip } from "./ui";
 
@@ -54,7 +56,7 @@ function composerDestination(props: ComposerProps): ReactNode {
  * an entry carrying neither, or both, fails to typecheck rather than picking
  * silently doing nothing.
  */
-export type SlashCommand = { name: string; hint: string; run: () => void; insert?: never; prefix?: never; aliases?: never } | (SkillCommand & { run?: never });
+export type SlashCommand = { name: string; hint: string; run: () => void; insert?: never; prefix?: never; aliases?: never; displayName?: never; icon?: never } | (SkillCommand & { run?: never });
 
 export interface ComposerChanges {
   projectName: string;
@@ -79,6 +81,8 @@ export interface ComposerProps {
   onModel: (choice: ModelChoice) => void;
   /** A saved identity can supply its model controls in the toolbar. */
   modelControl?: ReactNode;
+  /** The Claude accounts the conversation can run on, offered in the model picker with their usage. */
+  accounts?: PickerAccounts | undefined;
   mode: RunMode;
   onMode: (mode: RunMode) => void;
   permission: PermissionPreset;
@@ -131,6 +135,11 @@ export interface ComposerProps {
   /** Called as a `/` or `$` word starts, so a list read a while ago can be read again before it is used. */
   onCommandsWanted?: () => void;
   commandsNotice?: SkillListNotice | null;
+  /** Connectors `@` can name, and the call that reads them as an `@` word starts. */
+  connectors?: UsableConnector[];
+  connectorsAside?: { connectors: UsableConnector[]; reason: string } | undefined;
+  connectorsLoading?: boolean | undefined;
+  onConnectorsWanted?: () => void;
   autoFocus?: boolean;
   size?: "md" | "lg";
   /** The landing screen draws the roomier composer and shows where the thread works below it, not in a footer. */
@@ -284,6 +293,10 @@ export function Composer(props: ComposerProps) {
             commands={props.commands}
             onCommandsWanted={props.onCommandsWanted}
             commandsNotice={props.commandsNotice}
+            connectors={props.connectors}
+            connectorsAside={props.connectorsAside}
+            connectorsLoading={props.connectorsLoading}
+            onConnectorsWanted={props.onConnectorsWanted}
             suggestionAnchor={shell}
             suggestionSide={isNewThread ? "bottom" : "top"}
           />
@@ -369,7 +382,7 @@ function composerModelControl(props: ComposerProps): ReactNode {
   const unavailable = props.model ? executionModeUnavailable(props.model.agent, executionMode(props.mode, props.permission)) : null;
   return (
     <>
-      {props.modelControl ?? <ComposerModelPicker value={props.model} onChange={props.onModel} />}
+      {props.modelControl ?? <ComposerModelPicker value={props.model} onChange={props.onModel} accounts={props.accounts} />}
       {unavailable ? (
         <Tooltip label={unavailable}>
           <span className="composer-activity" role="status">

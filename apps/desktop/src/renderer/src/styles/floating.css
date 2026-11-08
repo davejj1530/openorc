@@ -528,3 +528,55 @@
 .command-palette-item[data-selected="true"] .command-palette-icon {
   color: var(--ink-3);
 }
+
+/* A skill under the pointer in a message: its image beside its name, the call in the mark's blue
+   under it, then what it does, a few lines at most. */
+.tooltip-popup.skill-hover {
+  display: grid;
+  gap: 10px;
+  width: 300px;
+  max-width: 300px;
+  padding: 12px;
+  border-radius: var(--radius-xl);
+}
+.skill-hover-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.skill-hover-mark {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+}
+.skill-hover-title {
+  display: grid;
+  min-width: 0;
+}
+.skill-hover-name {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: var(--text-base);
+  line-height: 18px;
+  letter-spacing: var(--text-base--letter-spacing);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.skill-hover-call {
+  overflow: hidden;
+  color: var(--mention-ink);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.skill-hover-hint {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--ink-3);
+  line-height: 18px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}

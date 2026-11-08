@@ -15,6 +15,7 @@ import SceneFrame from "./SceneFrame.astro";
 import Step from "./Step.astro";
 import TaskPane from "./TaskPane.astro";
 import TaskProperties from "./TaskProperties.astro";
+import ThreadHeader from "./ThreadHeader.astro";
 import ThreadPane from "./ThreadPane.astro";
 import TurnHead from "./TurnHead.astro";
 import { busy, workflow, workflowJourney } from "../../data/hero/workflow";
@@ -28,8 +29,9 @@ const { label } = Astro.props;
 const { thread, task, work } = workflow;
 const at = (windows: string) => timed(workflowJourney, windows);
 const head = { journey: workflowJourney };
+const waiting = { a: "aQuestion~aPick" };
 const rows = [
-  { id: "a", title: thread.title, busy: busy.a, headline: thread.headline, waiting: "aQuestion~aPick", show: ">aSend" },
+  { id: "a", title: thread.title, busy: busy.a, headline: thread.headline, waiting: waiting.a, show: ">aSend" },
   { id: "b", title: work.title, branch: branches.cacheThread, busy: busy.b, headline: work.headline, show: ">bStart" },
 ];
 const codex = { harness: "codex", label: models.codex.label, effort: models.codex.effort };
@@ -51,9 +53,7 @@ const comments = [
 <SceneFrame id="workflow" journey={workflowJourney} label={label} rows={rows} inboxPending="aQuestion~aPick">
   <div class="hs-panes" data-views>
     <section class="hs-pane" data-pane="new">
-      <header class="hs-header">
-        <span class="hs-header-actions"><span class="hs-round"><ProductIcon name="panelRight" /></span></span>
-      </header>
+      <ThreadHeader tabs={[{ label: "New thread", icon: "compose", current: true }]} fresh />
       <div class="hs-new-body">
         <div class="hs-new-column">
           <div class="hs-new-question">What should we work on in <span class="hs-new-project">{project.name}</span>?</div>
@@ -68,7 +68,16 @@ const comments = [
       </div>
     </section>
 
-    <ThreadPane id="a" journey={workflowJourney} title={thread.title} busy={busy.a} model={codex} permission={models.codex.permission} placeholder="Message Codex…">
+    <ThreadPane
+      id="a"
+      journey={workflowJourney}
+      title={thread.title}
+      busy={busy.a}
+      tabs={[{ label: thread.title, current: true, busy: busy.a, waiting: waiting.a }]}
+      model={codex}
+      permission={models.codex.permission}
+      placeholder="Message Codex…"
+    >
       <div class="hs-turn" data-grow {...at(">aSend")}>
         <div class="hs-user"><div class="hs-bubble">{thread.prompt}</div></div>
         <TurnHead {...head} harness="codex" agent="Codex" model={codex.label} clock={{ from: "aSend", writing: "aIntroStart", to: "aDone" }} />

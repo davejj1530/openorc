@@ -1,0 +1,20 @@
+---
+/**
+ * The panel's browser (BrowserPanel.tsx, panel-browser.css): Back and Forward, the address pill holding Reload, and
+ * Home; under them the page, inset on its own rounded viewport. The page's content is the slot.
+ */
+import ProductIcon from "./ProductIcon.astro";
+
+interface Props {
+  url: string;
+}
+const { url } = Astro.props;
+---
+
+<div class="hs-browser-bar">
+  <span class="hs-round"><ProductIcon name="chevronLeft" /></span>
+  <span class="hs-round hs-browser-forward"><ProductIcon name="chevronRight" /></span>
+  <span class="hs-address">{url}<span class="hs-round"><ProductIcon name="refresh" /></span></span>
+  <span class="hs-round"><ProductIcon name="home" /></span>
+</div>
+<div class="hs-viewport"><slot /></div>

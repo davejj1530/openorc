@@ -263,8 +263,8 @@ it("uses an existing thread's account and lets its saved Fast request be turned 
 });
 
 /** An open Claude thread on Work, its settings built as ThreadScreen builds them. */
-function OpenThread({ activity = "idle" }: { activity?: ThreadSummary["activity"] }) {
-  const thread = { id: "open", agent: "claude", model: "opus", effort: "high", fastMode: false, mode: "act", permissionMode: "trusted", claudeAccountId: "work", activity } as ThreadSummary;
+function OpenThread({ activity = "idle", projectId = "openorc" }: { activity?: ThreadSummary["activity"]; projectId?: string }) {
+  const thread = { id: "open", projectId, agent: "claude", model: "opus", effort: "high", fastMode: false, mode: "act", permissionMode: "trusted", claudeAccountId: "work", activity } as ThreadSummary;
   const settings = { ...client.useConversationSettings({ thread, activeRun: undefined }), claudeAccountId: "work", claudeAccount: useThreadClaudeAccount(thread) };
   useShareSettings("new-thread", settings);
   return <ComposerChips composerId="new-thread" settings={settings} />;
@@ -309,4 +309,40 @@ it("holds an open thread's account while its turn runs", async () => {
   fireEvent.click(menu);
   expect(screen.queryByRole("menuitemradio")).toBeNull();
   expect(mac.switchAccount).not.toHaveBeenCalled();
+});
+
+/** The project uses only these accounts, as the Mac's project list says. */
+function projectUses(accountIds: string[], defaultId: string) {
+  mac.reads["projects.list"] = [{ id: "openorc", name: "openorc", defaultBranch: "main", settings: { claudeAccounts: { only: true, accountIds, defaultId, autoSwitch: false } } }];
+}
+
+it("offers a new thread only the accounts its project uses, on the project's default until one is chosen", async () => {
+  macState({ accounts: [mac.account("claude-cli", "Existing CLI login"), mac.account("work", "Work"), mac.account("personal", "Personal")] });
+  projectUses(["work", "personal"], "personal");
+  await open();
+  fireEvent.click(await screen.findByRole("button", { name: "Claude account, Personal" }));
+  expect(screen.getAllByRole("menuitemradio").map((item) => item.textContent)).toEqual(["Work", "Personal"]);
+  fireEvent.click(screen.getByRole("menuitemradio", { name: "Work" }));
+  await screen.findByRole("button", { name: "Claude account, Work" });
+  write("Fix the build");
+  mac.start.mockResolvedValue({ thread: { id: "thread-1" } });
+  await waitFor(() => expect((screen.getByRole("button", { name: "Start" }) as HTMLButtonElement).disabled).toBe(false));
+  await start();
+  expect(mac.start.mock.calls[0]![0]).toMatchObject({ claudeAccountId: "work" });
+});
+
+it("offers an open thread its project's accounts, keeping its own listed while it is not one of them", async () => {
+  macState({ accounts: [mac.account("claude-cli", "Existing CLI login"), mac.account("work", "Work"), mac.account("personal", "Personal")] });
+  projectUses(["claude-cli", "personal"], "personal");
+  render(
+    <>
+      <OpenThread />
+      <ModelSheet />
+    </>,
+    { wrapper: mac.phone!.wrapper },
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "Claude account, Work" }));
+  await waitFor(() => expect(screen.getAllByRole("menuitemradio").map((item) => item.textContent)).toEqual(["Existing CLI login", "Personal", "Work"]));
+  fireEvent.click(screen.getByRole("menuitemradio", { name: "Personal" }));
+  await waitFor(() => expect(mac.switchAccount.mock.calls.map(([params]) => params)).toEqual([{ id: "open", claudeAccountId: "personal" }]));
 });

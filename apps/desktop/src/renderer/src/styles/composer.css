@@ -731,6 +731,23 @@
   grid-column: 1 / -1;
   grid-template-columns: subgrid;
 }
+/* A run's heading in `@`'s list: Connectors, then Files, across the whole row. */
+.composer-suggestion-group {
+  grid-column: 1 / -1;
+  padding: 8px 10px 4px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+.composer-suggestion-group:first-child {
+  padding-top: 2px;
+}
+/* A connector the agent goes without in this mode: listed, dimmed, under the heading that says why. */
+.composer-suggestion[aria-disabled="true"] {
+  cursor: default;
+}
+.composer-suggestion[aria-disabled="true"] > * {
+  opacity: 0.5;
+}
 .composer-suggestion-label {
   flex-shrink: 0;
   min-width: 72px;
@@ -746,6 +763,11 @@
   font-family: var(--font-mono);
   font-size: var(--text-sm);
   letter-spacing: 0;
+}
+.composer-suggestion-label > .connector-logo {
+  display: inline-grid;
+  margin-right: 8px;
+  vertical-align: -3px;
 }
 .composer-suggestion-label:only-child {
   grid-column: 1 / -1;
@@ -764,7 +786,7 @@
 .composer-suggestions [role="listbox"][hidden] {
   display: none;
 }
-.composer-suggestions [role="listbox"]:not([hidden]) + .composer-suggestions-notice {
+.composer-suggestions .composer-suggestions-notice + [role="listbox"]:not([hidden]) {
   margin-top: 2px;
 }
 .composer-suggestion-hint {
@@ -784,6 +806,39 @@
 .composer-suggestions .skill-token {
   color: inherit;
   -webkit-text-stroke: 0;
+}
+/* A connector named in the message: its image takes the place of the @, within the @'s own width so
+   the letters stay where the textarea has them, and never past its start, where a line's edge would
+   clip it. The end of that width is the gap before the name. */
+.connector-token {
+  background: none;
+  color: var(--mention-ink);
+  -webkit-text-stroke: 0.04em currentColor;
+}
+.connector-token-at {
+  position: relative;
+  color: transparent;
+  -webkit-text-stroke: 0;
+}
+.connector-token-at::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 1em;
+  height: 1em;
+  border-radius: 0.25em;
+  background: var(--token-logo) center / cover no-repeat;
+  font-size: 0.76em;
+  transform: translateY(-50%);
+}
+.connector-token-at[data-letter]::before {
+  content: attr(data-letter);
+  display: grid;
+  place-items: center;
+  background: var(--surface-3);
+  color: var(--ink-2);
+  line-height: 1;
 }
 
 /* Composer popups open out of the control that was touched, clear of the composer surface: they
@@ -992,6 +1047,14 @@
 .model-picker-check {
   flex: 0 0 auto;
   color: var(--ink);
+}
+/* An account's check follows its name, so every row's usage lines up at the end. */
+.model-picker-account .model-picker-row-name {
+  flex: 0 1 auto;
+}
+.model-picker-account .model-picker-row-meta {
+  flex-shrink: 0;
+  margin-left: auto;
 }
 .model-picker-message {
   margin: 0;

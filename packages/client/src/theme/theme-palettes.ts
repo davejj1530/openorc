@@ -44,13 +44,9 @@ function palette(neutrals: Neutrals, accent: string, accentInk: string, accentFo
     "--mascot-body": /^#[0-9a-f]{8}$/i.test(neutrals.text) ? neutrals.text.slice(0, 7) : neutrals.text,
     "--mascot-eyes": neutrals.body,
     "--bubble-ink": neutrals.text,
-    // Product references use flat surfaces; original themes may override this.
-    "--surface-gradient": "none",
     ...overrides,
   };
 }
-// Original OpenOrc themes may retain their authored dark-plane treatment.
-const fadeIntoSidebar = "linear-gradient(var(--surface), var(--bg))";
 // Status: --ok for +N counts, checks and diff additions; --warn for waiting, approvals and warning
 // text; --bad for failures and diff removals; --attention for status dots, which default to --warn.
 // Every palette starts from these and changes only the ones it names. The soft fills tint their
@@ -555,7 +551,7 @@ const presets: ThemeTemplate[] = [
         "#575e51",
         "#b5bfaa",
         "#ffffff",
-        { "--mascot-body": "#a08769", "--mascot-eyes": "#1a1d18", "--surface-gradient": fadeIntoSidebar },
+        { "--mascot-body": "#a08769", "--mascot-eyes": "#1a1d18" },
       ),
     },
   },
@@ -646,7 +642,7 @@ const presets: ThemeTemplate[] = [
         "#49e6ee",
         "#68eef4",
         "#10111f",
-        { "--mascot-body": "#ff70cd", "--mascot-eyes": "#10111f", "--surface-gradient": fadeIntoSidebar },
+        { "--mascot-body": "#ff70cd", "--mascot-eyes": "#10111f" },
       ),
     },
   },
@@ -760,7 +756,6 @@ const presets: ThemeTemplate[] = [
           "--navigation-accent": "#ffc9ff",
           "--content-accent": "#cbefff",
           "--selection": "color-mix(in srgb, #ffc9ff 26%, #191c20)",
-          "--surface-gradient": fadeIntoSidebar,
           "--ok": "#9ef2a4",
           "--warn": "#e8f552",
         },

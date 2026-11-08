@@ -636,3 +636,103 @@ describe("mode pill", () => {
     expect(onExecutionMode).toHaveBeenCalledExactlyOnceWith({ mode: "plan", permissionMode: "review" });
   });
 });
+
+describe("connector mentions", () => {
+  const connectors: ComposerProps["connectors"] = [{ name: "paper", title: "Paper", logo: null }];
+  const message = () => screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" });
+  const typeAt = (text: string) => {
+    fireEvent.change(message(), { target: { value: text, selectionStart: text.length, selectionEnd: text.length } });
+    fireEvent.select(message());
+  };
+
+  it("offers a connector for an @ word and Enter picks it, even at the end of the message", () => {
+    const onSubmit = vi.fn(async () => {});
+    const onConnectorsWanted = vi.fn();
+    const { container } = mount({ value: "", connectors, onConnectorsWanted, onSubmit });
+    typeAt("do you see @pa");
+    expect(onConnectorsWanted).toHaveBeenCalled();
+    expect(screen.getByRole("option", { name: "@paper Paper" })).toBeTruthy();
+    fireEvent.keyDown(message(), { key: "Enter" });
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(message().value).toBe("do you see @paper ");
+    const mark = container.querySelector(".composer-input-mirror mark.connector-token");
+    expect(mark?.textContent).toBe("@paper");
+    expect(mark?.querySelector(".connector-token-at")?.getAttribute("data-letter")).toBe("P");
+  });
+
+  it("leaves an @ word that names no connector unmarked", () => {
+    const { container } = mount({ value: "mail me@paper.com or @papers", connectors });
+    expect(container.querySelector(".composer-input-mirror mark.connector-token")).toBeNull();
+  });
+
+  it("lists the connectors the agent goes without in this mode, dimmed under why, and picking one leaves the message", () => {
+    mount({ value: "", connectors: [], connectorsAside: { connectors, reason: "Claude has connectors in Autonomous mode." } });
+    typeAt("ask @pa");
+    const row = screen.getByRole("option", { name: /@paper/ });
+    expect([row.getAttribute("aria-disabled"), row.title]).toEqual(["true", "Claude has connectors in Autonomous mode."]);
+    expect(document.querySelector(".composer-suggestion-group")?.textContent).toBe("Claude has connectors in Autonomous mode.");
+    fireEvent.mouseDown(row);
+    expect(message().value).toBe("ask @pa");
+  });
+
+  it("sends on Enter when only dimmed connectors match, since none of them can be picked", async () => {
+    const onSubmit = vi.fn(async () => {});
+    mount({ value: "", connectors: [], connectorsAside: { connectors, reason: "Claude has connectors in Autonomous mode." }, onSubmit });
+    typeAt("ask @pa");
+    fireEvent.keyDown(message(), { key: "ArrowDown" });
+    fireEvent.keyDown(message(), { key: "Enter" });
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+  });
+
+  it("says it is loading connectors while their list is read for the first time, above the rows, where they will land", () => {
+    mount({ value: "", connectors: [], connectorsLoading: true });
+    typeAt("@");
+    const status = screen.getByRole("status");
+    expect(status.textContent).toBe("Loading connectors…");
+    const list = screen.getByRole("listbox", { hidden: true });
+    expect(status.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
+
+describe("skill hover", () => {
+  it("says what a skill is for once the pointer rests on its mark", async () => {
+    vi.useFakeTimers();
+    // jsdom draws nothing, so the mark says where it is, and its pointer events keep their coordinates.
+    vi.spyOn(HTMLElement.prototype, "getClientRects").mockImplementation(function (this: HTMLElement) {
+      return (this.dataset["skill"] ? [new DOMRect(10, 10, 80, 16)] : []) as unknown as DOMRectList;
+    });
+    if (!("PointerEvent" in window)) Object.assign(window, { PointerEvent: MouseEvent });
+    mount({ value: "please /code-review this", commands: [{ name: "code-review", hint: "Review the branch for bugs", insert: true, prefix: "/" }] });
+    const message = screen.getByRole("textbox", { name: "Message" });
+    fireEvent.pointerMove(message, { clientX: 20, clientY: 15 });
+    expect(screen.queryByText("Review the branch for bugs")).toBeNull();
+    await act(async () => void vi.advanceTimersByTime(400));
+    expect(screen.getByText("Review the branch for bugs")).toBeTruthy();
+    fireEvent.pointerMove(message, { clientX: 200, clientY: 15 });
+    await act(async () => void vi.advanceTimersByTime(400));
+    await vi.waitFor(() => expect(screen.queryByText("Review the branch for bugs")).toBeNull());
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("heads what a skill is for with its image and name over the call that runs it", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(HTMLElement.prototype, "getClientRects").mockImplementation(function (this: HTMLElement) {
+      return (this.dataset["skill"] ? [new DOMRect(10, 10, 80, 16)] : []) as unknown as DOMRectList;
+    });
+    if (!("PointerEvent" in window)) Object.assign(window, { PointerEvent: MouseEvent });
+    const icon = "data:image/png;base64,AAAA";
+    mount({ value: "please /immaculate this", commands: [{ name: "immaculate", displayName: "Immaculate", icon, hint: "Design like a member of the studio", insert: true, prefix: "/" }] });
+    fireEvent.pointerMove(screen.getByRole("textbox", { name: "Message" }), { clientX: 20, clientY: 15 });
+    await act(async () => void vi.advanceTimersByTime(400));
+    const card = document.querySelector<HTMLElement>(".skill-hover")!;
+    expect([...card.querySelectorAll(".skill-hover-name, .skill-hover-call, .skill-hover-hint")].map((part) => part.textContent)).toEqual([
+      "Immaculate",
+      "/immaculate",
+      "Design like a member of the studio",
+    ]);
+    expect(card.querySelector("img")?.getAttribute("src")).toBe(icon);
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+});

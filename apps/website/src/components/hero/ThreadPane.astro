@@ -1,56 +1,34 @@
 ---
 /**
- * One conversation pane as the app draws it (ThreadView.tsx): the title and its faint facts in the header, then
- * Close pane in a split, More, and the thread's tools (Tasks, the panel's side while it is open, the panel toggle);
- * the transcript ending in the OpenOrc cube, and the composer. The `presence` slot sits beside the cube.
+ * One conversation pane as the app draws it (ThreadView.tsx): its header on the window's top line, then the
+ * conversation. The first pane's header holds the work column's tabs, by default one for its own thread; a pane split
+ * beside it names its thread instead.
  */
-import Composer from "./Composer.astro";
-import PresenceMark from "./PresenceMark.astro";
-import ProductIcon from "./ProductIcon.astro";
-import { project } from "../../data/hero/workspace";
+import ThreadBody from "./ThreadBody.astro";
+import ThreadHeader from "./ThreadHeader.astro";
+import type { Tab } from "./WorkTab.astro";
 import { flagged } from "../../data/hero/timeline";
 import type { ComponentProps } from "astro/types";
 
-type ComposerProps = ComponentProps<typeof Composer>;
+type BodyProps = ComponentProps<typeof ThreadBody>;
 
-interface Props extends Omit<ComposerProps, "layout"> {
+interface Props extends BodyProps {
   id: string;
   title: string;
   /** Windows during which the thread's agent is working; stills pass none. */
   busy?: string;
   /** The work panel is open beside the thread, so its toggle shows as on. */
   panel?: boolean;
+  /** The work column's tabs, when more than this thread's own is open or its tab has more to say. */
+  tabs?: Tab[];
+  /** The pane is split beside the first. */
+  split?: boolean;
 }
-const { id, title, busy, panel, ...composer } = Astro.props;
-const { journey } = composer;
+const { id, title, busy, panel, tabs = [{ label: title, current: true, busy }], split, ...body } = Astro.props;
+const { journey } = body;
 ---
 
 <section class="hs-pane" data-pane={id} {...(busy && journey ? flagged(journey, { busy }) : {})}>
-  <header class="hs-header">
-    <span class="hs-title">{title}</span>
-    <span class="hs-facts">
-      <span>{project.name}</span>
-      <span class="hs-fact-working"><i></i>working</span>
-    </span>
-    <span class="hs-header-actions">
-      <slot name="status" />
-      <span class="hs-round hs-close-pane"><ProductIcon name="close" /></span>
-      <span class="hs-round"><ProductIcon name="more" /></span>
-      <span class="hs-tools">
-        <span class="hs-round"><ProductIcon name="tasks" /></span>
-        {panel ? <span class="hs-round"><ProductIcon name="arrowLeftRight" /></span> : null}
-        <span class="hs-round" data-on={panel ? "" : undefined}><ProductIcon name="panelRight" /></span>
-      </span>
-    </span>
-  </header>
-  <div class="hs-transcript">
-    <div class="hs-column">
-      <slot />
-      <PresenceMark><slot name="presence" /></PresenceMark>
-    </div>
-  </div>
-  <div class="hs-composer-area">
-    <slot name="hint" />
-    <Composer {...composer} />
-  </div>
+  <ThreadHeader journey={journey} tabs={split ? undefined : tabs} title={split ? title : undefined} panel={panel} />
+  <ThreadBody {...body}><slot /></ThreadBody>
 </section>

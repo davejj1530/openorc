@@ -1,8 +1,8 @@
 ---
 /**
- * The work panel's file page, still (FilePanel.tsx, FileToolbar.tsx): the file's tab beside Changes, its path with
- * Save for the unsaved edit, and the code in the app's editor colors (Shiki's GitHub themes) with the caret where the
- * person is typing.
+ * The work panel's file page, still (FilePanel.tsx, FileToolbar.tsx): the file's tab beside Changes, its dot saying
+ * the edit is unsaved, its path with Save, and the code in the app's editor colors (Shiki's GitHub themes) with the
+ * caret where the person is typing.
  */
 import PanelHeader from "../hero/PanelHeader.astro";
 import ProductIcon from "../hero/ProductIcon.astro";
@@ -34,8 +34,8 @@ const active = 11;
 <div class="hs-mock hs-mock-editor">
   <PanelHeader
     tabs={[
-      { label: "Changes" },
-      { label: "Welcome.tsx", file: "Welcome.tsx", selected: true },
+      { label: "Changes", icon: "fileDiff" },
+      { label: "Welcome.tsx", file: "Welcome.tsx", unsaved: true, current: true },
     ]}
   />
   <div class="hs-file-toolbar">

@@ -3,7 +3,8 @@ import { subagentStatusLabel, useTicking, workDuration } from "@openorc/client";
 import { useConversationTranscript, useRpc, useRpcMutation } from "../lib/client";
 import { openThread, useRouter } from "../lib/router";
 import { Transcript } from "./Transcript";
-import { Button } from "./ui";
+import { CornerUpLeft } from "./icons";
+import { Button, Tooltip } from "./ui";
 import { ConversationVoice, useRunVoices } from "../lib/turn-authors";
 import { subagentLinkFolder } from "../lib/conversation-status-presentation";
 
@@ -69,9 +70,20 @@ function SubagentStatusBar({ thread, model }: { thread: ThreadSummary; model: st
 }
 
 /** The thread a sub thread sits under, ahead of its title in the header. */
-export function ThreadParent({ id }: { id: string | null | undefined }) {
+export function ThreadParent({ id, fact = false }: { id: string | null | undefined; fact?: boolean }) {
   const parent = useRpc("threads.get", { id: id ?? "" }, { enabled: Boolean(id) });
   if (!id) return null;
+  const title = parent.data?.title ?? "Parent";
+  // Among the header's facts it stands alone, not before a title: a mark and the name, cut short with an ellipsis.
+  if (fact)
+    return (
+      <Tooltip label={`Started from ${title}`}>
+        <button type="button" className="thread-header-fact thread-header-fact-link thread-parent-fact no-drag" onClick={() => openThread(id)}>
+          <CornerUpLeft size={12} />
+          <span className="truncate">{title}</span>
+        </button>
+      </Tooltip>
+    );
   return (
     <button className="subagent-parent no-drag" onClick={() => openThread(id)} title={parent.data?.title}>
       {" "}

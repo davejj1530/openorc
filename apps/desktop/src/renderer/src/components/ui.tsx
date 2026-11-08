@@ -1,7 +1,7 @@
 import { createContext, forwardRef, useContext, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import { Tooltip as BaseTooltip } from "@base-ui/react/tooltip";
 import { Dialog as BaseDialog } from "@base-ui/react/dialog";
-import { X } from "./icons";
+import { Check, X } from "./icons";
 import selectChevron from "./icons-select.svg?url";
 import { cn } from "../lib/cn";
 import { CoversPreview } from "../lib/browser-preview";
@@ -253,6 +253,16 @@ export const Switch = forwardRef<HTMLInputElement, Omit<InputHTMLAttributes<HTML
   );
 });
 
+/** A box that is ticked or not, drawn like the switch: a fill when clear, an ink fill with the plane's check when ticked. */
+export const Checkbox = forwardRef<HTMLInputElement, Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "size">>(function Checkbox({ className, ...props }, ref) {
+  return (
+    <span className={cn("settings-checkbox", className)}>
+      <input ref={ref} type="checkbox" {...props} />
+      <Check size={12} className="settings-checkbox-mark" />
+    </span>
+  );
+});
+
 const TooltipGroup = createContext(false);
 
 /**
@@ -267,14 +277,14 @@ export function TooltipProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/** Names a control on hover. Outside a TooltipProvider it keeps its own 400ms delay. */
-export function Tooltip({ label, children }: { label: string; children: ReactNode }) {
+/** Names a control on hover, above it unless `side` says otherwise. Outside a TooltipProvider it keeps its own 400ms delay. */
+export function Tooltip({ label, side, children }: { label: ReactNode; side?: "top" | "right" | "bottom" | "left"; children: ReactNode }) {
   const grouped = useContext(TooltipGroup);
   const tooltip = (
     <BaseTooltip.Root>
       <BaseTooltip.Trigger render={<span className="inline-flex" />}>{children}</BaseTooltip.Trigger>
       <BaseTooltip.Portal>
-        <BaseTooltip.Positioner sideOffset={6}>
+        <BaseTooltip.Positioner sideOffset={6} {...(side ? { side } : {})}>
           <BaseTooltip.Popup ref={floatingGround} className="tooltip-popup">
             {label}
           </BaseTooltip.Popup>

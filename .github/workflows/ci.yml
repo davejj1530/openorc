@@ -150,6 +150,10 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Electron fetches its binary on first use. Fetch it once, as the desktop tests do, from a mirror whose file must
+      # match Electron's own checksums when GitHub's release downloads fail.
+      - name: Fetch Electron's binary
+        run: node --input-type=module -e "await (await import('./apps/desktop/src/electron-binary.global-setup.ts')).default()"
       - name: Verify benchmark measurement and budget checks
         run: node --test scripts/benchmark-measurement.test.cjs scripts/check-benchmark.test.cjs
       # The benchmarks drive the app through its test switches, which only a QA build carries.

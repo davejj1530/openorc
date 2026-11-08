@@ -5,6 +5,11 @@ import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
 const ATTEMPTS = 4;
+/**
+ * Every other try fetches from a mirror of Electron's releases, for when GitHub's release downloads fail. The
+ * installer checks the file against the checksums in Electron's npm package, so a mirror cannot hand over another one.
+ */
+const SOURCES: NodeJS.ProcessEnv[] = [{}, { ELECTRON_MIRROR: "https://npmmirror.com/mirrors/electron/", ELECTRON_CUSTOM_DIR: "{{ version }}" }];
 
 /** Whether the Electron package in `folder` has its binary where it says it is. */
 function hasBinary(folder: string): boolean {
@@ -19,7 +24,8 @@ function hasBinary(folder: string): boolean {
  */
 export async function ensureElectronBinary(folder: string, wait = (attempt: number) => delay(attempt * 5000)): Promise<void> {
   for (let attempt = 1; !hasBinary(folder); attempt++) {
-    const install = spawnSync(process.execPath, [path.join(folder, "install.js")], { stdio: "inherit" });
+    const source = SOURCES[(attempt - 1) % SOURCES.length];
+    const install = spawnSync(process.execPath, [path.join(folder, "install.js")], { stdio: "inherit", env: { ...process.env, ...source } });
     if (install.status === 0 && hasBinary(folder)) return;
     if (attempt === ATTEMPTS) throw new Error(`Electron's binary could not be downloaded in ${ATTEMPTS} tries.`);
     await wait(attempt);

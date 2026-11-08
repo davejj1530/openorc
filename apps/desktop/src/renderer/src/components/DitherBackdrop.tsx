@@ -11,8 +11,18 @@ const SCALE: Partial<Record<BackdropPattern, number>> = { sphere: 2.2 };
 const CLEAR = [0, 0, 0, 0] as const;
 /** Dots are a CSS pixel or larger, so the shader's default of 2 canvas pixels per CSS pixel buys nothing. */
 const PIXEL_RATIO = 1;
-/** A full HD frame at most: a larger window stretches the canvas rather than drawing every device pixel. */
+/** A full HD frame at most: a larger backdrop draws one canvas pixel for every two CSS pixels across. */
 const MAX_PIXELS = 1920 * 1080;
+
+/**
+ * The canvas pixels a backdrop of this CSS size draws: one per CSS pixel, or one per two each way past MAX_PIXELS. The
+ * shader starts from device pixels and shrinks them to its budget by whatever fraction fits, which puts each dot on two
+ * or three canvas pixels and stretches it unevenly, larger as the backdrop widens. A whole step keeps every dot its size.
+ */
+function pixelBudget(width: number, height: number): number {
+  const area = Math.max(1, Math.round(width) * Math.round(height));
+  return area <= MAX_PIXELS ? area : Math.ceil(area / 4);
+}
 
 const sizing = { u_fit: ShaderFitOptions.cover, u_rotation: 0, u_offsetX: 0, u_offsetY: 0, u_originX: 0.5, u_originY: 0.5, u_worldWidth: 0, u_worldHeight: 0 };
 
@@ -121,7 +131,8 @@ export function DitherBackdrop({ className }: { className?: string }) {
     if (!element || !program || !canDraw()) return;
     const shader = program === "image" ? imageDitheringFragmentShader : ditheringFragmentShader;
     const texture = image ? { u_image: image } : {};
-    const created = new ShaderMount(element, shader, { ...sizing, ...uniforms(latest.current, inkOf(element)), ...texture }, undefined, 0, 0, PIXEL_RATIO, MAX_PIXELS);
+    const budget = pixelBudget(element.clientWidth, element.clientHeight);
+    const created = new ShaderMount(element, shader, { ...sizing, ...uniforms(latest.current, inkOf(element)), ...texture }, undefined, 0, 0, PIXEL_RATIO, budget);
     const canvas = created.canvasElement;
     // The browser restores a lost context only when its loss is cancelled.
     const lost = (event: Event) => event.preventDefault();
@@ -145,6 +156,15 @@ export function DitherBackdrop({ className }: { className?: string }) {
   }, [mount, backdrop, theme]);
 
   useEffect(() => (mount && speed > 0 ? animate(mount, speed) : undefined), [mount, speed]);
+
+  useEffect(() => {
+    if (!mount) return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) mount.setMaxPixelCount(pixelBudget(entry.contentRect.width, entry.contentRect.height));
+    });
+    observer.observe(mount.parentElement);
+    return () => observer.disconnect();
+  }, [mount]);
 
   return <div ref={frame} aria-hidden="true" data-style={backdrop.style === "image" ? "image" : "pattern"} className={cn("dither-backdrop", className)} />;
 }

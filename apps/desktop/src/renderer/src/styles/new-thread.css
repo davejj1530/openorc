@@ -307,6 +307,10 @@
   pointer-events: none;
   mask-image: radial-gradient(110% 90% at 0% 0%, #000 0%, rgb(0 0 0 / 0.55) 35%, transparent 70%);
 }
+/* The canvas holds whole CSS pixels, so its scale to the screen is whole too: square dots, not blurred ones. */
+.dither-backdrop canvas {
+  image-rendering: pixelated;
+}
 /* An image is a picture rather than a texture: it spans the screen's width and fades out under the
    composer, leaving the thread list on the plain ground. Half strength keeps the title readable over
    its darkest and lightest parts in either theme. */

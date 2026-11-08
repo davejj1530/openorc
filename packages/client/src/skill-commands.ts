@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { AgentKind, AgentSkill, FileScope } from "@openorc/protocol";
 import type { ClientQueries } from "./query.js";
 
-/** What an agent takes before a skill's name in a message: Claude `/name`, Codex `$name`. */
+/** What an agent takes before a skill's name: Claude `/name`, Codex `$name`, Pi and Oh My Pi `/skill:name`. */
 export type SkillPrefix = "/" | "$";
 
 /** A skill as a composer offers it, to put into the message. */
@@ -74,7 +74,7 @@ export function useSkillCommandsWith(queries: ClientQueries, scope: FileScope | 
   );
   const found = skills.data;
   const { dataUpdatedAt, isFetching, refetch } = skills;
-  const prefix: SkillPrefix = agent === "codex" ? "$" : "/";
+  const prefix: SkillPrefix = agent === "codex" || agent === "fx" ? "$" : "/";
   // By the clock, not `isStale`: a list going stale renders nothing, so the flag can still say fresh.
   const onCommandsWanted = useCallback(() => {
     if (enabled && !isFetching && Date.now() - dataUpdatedAt > FRESH_MS) void refetch();
@@ -87,7 +87,8 @@ export function useSkillCommandsWith(queries: ClientQueries, scope: FileScope | 
             .filter((skill) => skill.enabled !== false)
             .sort((a, b) => SOURCE_ORDER[a.source] - SOURCE_ORDER[b.source])
             .map((skill) => ({
-              name: skill.name,
+              // Pi and Oh My Pi call a skill by its command, `/skill:<name>`.
+              name: agent === "omp" || agent === "pi" ? `skill:${skill.name}` : skill.name,
               hint: skill.description,
               insert: true as const,
               prefix,

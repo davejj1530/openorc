@@ -1,10 +1,11 @@
 import { harnessCatalog, type AgentConnector, type Connector, type ConnectorSource, type ConnectorStatus } from "@openorc/protocol";
 
 /** The worse state wins, so a row reads what most needs doing. */
-const RANK: ConnectorStatus[] = ["needs-sign-in", "failed", "connected", "off"];
+const RANK: ConnectorStatus[] = ["needs-sign-in", "failed", "configured", "connected", "off"];
 
 export const statusLabel: Record<ConnectorStatus, string> = {
   connected: "Connected",
+  configured: "Configured",
   "needs-sign-in": "Needs sign-in",
   failed: "Can’t connect",
   off: "Off",

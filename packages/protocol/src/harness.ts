@@ -9,11 +9,17 @@ import { z } from "zod";
  * for its catalog entry below, its shell probes in the core registry and its
  * run adapter. Nothing else in the app should name a harness by string.
  */
-export const HarnessId = z.enum(["codex", "claude", "opencode"]);
+export const HarnessId = z.enum(["codex", "claude", "opencode", "omp", "cursor", "pi", "antigravity", "fx"]);
 export type HarnessId = z.infer<typeof HarnessId>;
 
 /** Stable registry order. Onboarding rows, the model list, usage reports and fallbacks all follow it. */
 export const harnessIds: readonly HarnessId[] = HarnessId.options;
+
+/** The user's enabled agents, in registry order. Profiles without a choice retain their existing agents. */
+export function enabledHarnessIds(settings?: { enabledHarnesses?: readonly HarnessId[] | null }): readonly HarnessId[] {
+  const selected = settings?.enabledHarnesses;
+  return selected == null ? harnessIds : harnessIds.filter((id) => selected.includes(id));
+}
 
 export const isHarnessId = (value: unknown): value is HarnessId => typeof value === "string" && (harnessIds as readonly string[]).includes(value);
 
@@ -42,15 +48,76 @@ export interface HarnessCatalogEntry {
   fastModeHint: string;
   /** Whether the memory extractor can drive this harness for one-shot distillation prompts. */
   distillation: boolean;
+  /** Whether the background text runner can generate titles and code explanations with this harness. */
+  textGeneration: boolean;
   /** Whether Plan mode hands over its plan document itself; otherwise the agent saves it with OpenOrc's plan_write tool. */
   nativePlans: boolean;
   /** Whether a message can reach the agent during a running turn; otherwise it waits in the queue for the next one. */
   liveInput: boolean;
-  /** The npm package that installs the CLI and the binary it puts on PATH: the one list for updates and cloud installs. */
-  cli: { npm: string; bin: string };
+  /** Whether a new conversation can continue an independent copy of this harness's native session. */
+  forks: boolean;
+  /** Whether OpenOrc can install, sign in and resume this harness in a cloud workspace. */
+  cloud: boolean;
+  /**
+   * The CLI's npm package, or null for a native-only installation, and its binary on PATH.
+   * `prebuilt` is the maker's build service, for a CLI whose npm package needs a runtime the cloud lacks: there it is
+   * installed as the maker's own checked binary instead.
+   */
+  cli: { npm: string | null; bin: string; prebuilt?: string };
 }
 
 export const harnessCatalog: Record<HarnessId, HarnessCatalogEntry> = {
+  fx: {
+    id: "fx",
+    name: "fx",
+    shortName: "fx",
+    account: { id: "fx", label: "fx provider accounts" },
+    setupUrl: "https://fx.sh/docs",
+    loginCommand: "fx login",
+    accountUsageUrl: "https://fx.sh/docs/using-fx/usage-and-costs",
+    fastModeHint: "OpenOrc does not expose fx's Fast or Ultra controls yet.",
+    distillation: false,
+    textGeneration: false,
+    nativePlans: false,
+    liveInput: true,
+    forks: false,
+    cloud: false,
+    cli: { npm: null, bin: "fx" },
+  },
+  antigravity: {
+    id: "antigravity",
+    name: "Antigravity",
+    shortName: "Antigravity",
+    account: { id: "antigravity", label: "Google Antigravity account" },
+    setupUrl: "https://antigravity.google/docs/getting-started?tab=cli",
+    loginCommand: "agy acp --login",
+    accountUsageUrl: "https://antigravity.google/docs/plans",
+    fastModeHint: "Antigravity does not expose a separate Fast mode control.",
+    distillation: false,
+    textGeneration: false,
+    nativePlans: false,
+    liveInput: true,
+    forks: false,
+    cloud: false,
+    cli: { npm: null, bin: "agy" },
+  },
+  pi: {
+    id: "pi",
+    name: "Pi",
+    shortName: "Pi",
+    account: { id: "pi", label: "Pi provider accounts" },
+    setupUrl: "https://pi.dev",
+    loginCommand: "pi",
+    accountUsageUrl: "https://pi.dev/docs/providers",
+    fastModeHint: "Pi does not expose a separate Fast mode control.",
+    distillation: false,
+    textGeneration: false,
+    nativePlans: false,
+    liveInput: true,
+    forks: true,
+    cloud: false,
+    cli: { npm: "@earendil-works/pi-coding-agent", bin: "pi" },
+  },
   codex: {
     id: "codex",
     name: "Codex",
@@ -61,8 +128,11 @@ export const harnessCatalog: Record<HarnessId, HarnessCatalogEntry> = {
     accountUsageUrl: "https://chatgpt.com/codex/settings/usage",
     fastModeHint: "Higher credit usage · subject to account availability.",
     distillation: true,
+    textGeneration: true,
     nativePlans: true,
     liveInput: true,
+    forks: true,
+    cloud: true,
     cli: { npm: "@openai/codex", bin: "codex" },
   },
   claude: {
@@ -75,8 +145,11 @@ export const harnessCatalog: Record<HarnessId, HarnessCatalogEntry> = {
     accountUsageUrl: "https://claude.ai/settings/usage",
     fastModeHint: "Higher cost · requires paid usage credits and account access.",
     distillation: true,
+    textGeneration: true,
     nativePlans: true,
     liveInput: true,
+    forks: true,
+    cloud: true,
     cli: { npm: "@anthropic-ai/claude-code", bin: "claude" },
   },
   opencode: {
@@ -90,18 +163,64 @@ export const harnessCatalog: Record<HarnessId, HarnessCatalogEntry> = {
     accountUsageUrl: "https://opencode.ai/docs/providers/",
     fastModeHint: "OpenOrc does not expose a separate Fast mode control for OpenCode.",
     distillation: false,
+    textGeneration: true,
     nativePlans: false,
-    liveInput: false,
+    liveInput: true,
+    forks: true,
+    cloud: true,
     cli: { npm: "@opencode/cli", bin: "opencode" },
+  },
+  omp: {
+    id: "omp",
+    name: "Oh My Pi",
+    shortName: "Oh My Pi",
+    // Models run through the provider accounts signed into Oh My Pi.
+    account: { id: "omp", label: "Oh My Pi provider accounts" },
+    setupUrl: "https://omp.sh",
+    loginCommand: "omp login",
+    accountUsageUrl: "https://omp.sh/docs/providers",
+    fastModeHint: "OpenOrc does not expose a separate Fast mode control for Oh My Pi.",
+    distillation: false,
+    textGeneration: true,
+    nativePlans: true,
+    liveInput: true,
+    forks: true,
+    cloud: true,
+    // The npm package runs on Bun; the cloud installs the prebuilt binary its installer fetches.
+    cli: { npm: "@oh-my-pi/pi-coding-agent", bin: "omp", prebuilt: "https://build.stencil.so/api/products/omp" },
+  },
+  cursor: {
+    id: "cursor",
+    name: "Cursor",
+    shortName: "Cursor",
+    account: { id: "cursor", label: "Cursor account" },
+    setupUrl: "https://cursor.com/docs/cli/installation",
+    loginCommand: "cursor-agent login",
+    accountUsageUrl: "https://cursor.com/dashboard",
+    fastModeHint: "Choose a model variant in Cursor's model list. There is no separate Fast mode control.",
+    distillation: false,
+    textGeneration: false,
+    nativePlans: true,
+    liveInput: false,
+    forks: false,
+    cloud: false,
+    cli: { npm: null, bin: "cursor-agent" },
   },
 };
 
 /** Harnesses the memory extractor can distil with, in registry order. */
 export const distillationHarnessIds: readonly HarnessId[] = harnessIds.filter((id) => harnessCatalog[id].distillation);
 
+export const textGenerationHarnessIds: readonly HarnessId[] = harnessIds.filter((id) => harnessCatalog[id].textGeneration);
+
 /** The product name for a run's agent, or the raw id when it is not a harness. */
 export const harnessName = (agent: string): string => (isHarnessId(agent) ? harnessCatalog[agent].name : agent);
 export const harnessShortName = (agent: string): string => (isHarnessId(agent) ? harnessCatalog[agent].shortName : agent);
+
+/** Shared by the menus and the write boundary, so an unavailable fork never creates a broken thread. */
+export function forkUnavailable(agent: string): string | null {
+  return isHarnessId(agent) && !harnessCatalog[agent].forks ? `${harnessName(agent)} does not support forking conversations. Start a new conversation instead.` : null;
+}
 
 /** "Codex or Claude Code", for messages that name several harnesses; every harness unless told which. */
 export const harnessNameList = (ids: readonly HarnessId[] = harnessIds): string => ids.map((id) => harnessCatalog[id].name).join(" or ");

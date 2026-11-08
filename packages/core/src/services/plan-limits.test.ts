@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { claudeAccounts, Db } from "@openorc/db";
-import type { ClaudeUsageResult } from "@openorc/agents";
+import type { AntigravityUsageResult, ClaudeUsageResult } from "@openorc/agents";
 import type { HarnessAvailability, HarnessId, SystemInfo } from "@openorc/protocol";
 import { PLAN_LIMITS_MAX_AGE_MS, readPlanLimits } from "./plan-limits.js";
 import { ProviderUsageService } from "./provider-usage.js";
@@ -14,6 +14,7 @@ const installed: SystemInfo = {
     { id: "codex", state: "ready", path: "/Users/me/.local/bin/codex", version: "1.0.0", revision: 0 },
     { id: "claude", state: "ready", path: "/Users/me/.local/bin/claude", version: "1.0.0", revision: 0 },
     { id: "opencode", state: "not_found", path: null, version: null, revision: 0 },
+    { id: "antigravity", state: "ready", path: "/usr/local/bin/agy", version: "1.5.3", revision: 0 },
   ],
   gh: { installed: false, path: null },
 };
@@ -28,7 +29,7 @@ const codexAnswer = {
 };
 const claudeAnswer: ClaudeUsageResult = {
   status: "ok",
-  subscriptionType: "max",
+  plan: "Ultra",
   usage: {
     limits: [
       { kind: "session", group: "session", percent: 38, resets_at: "2027-01-15T20:30:00Z" },
@@ -47,7 +48,13 @@ function shell(revision: number, signingIn?: string): (claudeAccountId?: string)
   return (claudeAccountId) => {
     if (claudeAccountId && claudeAccountId === signingIn) throw new Error(`${claudeAccountId} is signing in`);
     const env = { PATH: "/usr/bin", OPENORC_CODEX_BIN: "/usr/bin/codex", OPENORC_CLAUDE_BIN: "/usr/bin/claude" };
-    return { revision, shell: "/bin/zsh", path: env.PATH, binaries: { claude: env.OPENORC_CLAUDE_BIN, codex: env.OPENORC_CODEX_BIN, opencode: null }, env };
+    return {
+      revision,
+      shell: "/bin/zsh",
+      path: env.PATH,
+      binaries: { claude: env.OPENORC_CLAUDE_BIN, codex: env.OPENORC_CODEX_BIN, opencode: null, omp: null, cursor: null, pi: null, antigravity: null, fx: null },
+      env,
+    };
   };
 }
 
@@ -58,7 +65,14 @@ function mac({ harnesses = ["codex", "claude"] as HarnessId[], environment }: { 
   const system = { info: vi.fn(async () => installed), infoFor: vi.fn(async () => installed) };
   const codex = vi.fn(async () => codexAnswer);
   const claude = vi.fn(async (): Promise<ClaudeUsageResult> => claudeAnswer);
-  const usage = new ProviderUsageService(db, system, { codex, claude }, environment && ((id) => environment()(id)), () => now);
+  const antigravity = vi.fn(async (): Promise<AntigravityUsageResult> => ({
+    status: "ok",
+    groups: [
+      { name: "Gemini Models", buckets: [{ id: "gemini-weekly", name: "Weekly Limit Remaining", remaining_fraction: 0.42, reset_time: "2027-01-20T00:00:00Z" }] },
+      { name: "Claude and GPT models", buckets: [{ id: "3p-weekly", name: "Weekly Limit Remaining", remaining_fraction: 1 }] },
+    ],
+  }));
+  const usage = new ProviderUsageService(db, system, { codex, claude, antigravity }, environment && ((id) => environment()(id)), () => now);
   const availability = async (): Promise<HarnessAvailability[]> => installed.harnesses.map(({ id, state }) => ({ id, state: harnesses.includes(id) ? state : "not_found" }));
   return {
     db,
@@ -71,14 +85,32 @@ function mac({ harnesses = ["codex", "claude"] as HarnessId[], environment }: { 
 }
 
 describe("plan limits for a phone", () => {
+  it("includes Antigravity's separate quota pools and reset times in the sanitized report", async () => {
+    const { read } = mac({ harnesses: ["antigravity"] });
+    const limits = await read();
+    expect(limits).toHaveLength(1);
+    expect(limits[0]).toMatchObject({
+      id: "antigravity",
+      provider: "antigravity",
+      name: "Antigravity",
+      status: "available",
+      windows: [
+        { id: "gemini-weekly", group: "Gemini Models", remainingPercent: 42, resetsAt: Date.parse("2027-01-20T00:00:00Z") },
+        { id: "3p-weekly", group: "Claude and GPT models", remainingPercent: 100, resetsAt: null },
+      ],
+    });
+    expect(Object.keys(limits[0]!)).toEqual(["id", "provider", "name", "plan", "status", "windows", "refreshedAt"]);
+    expect(JSON.stringify(limits)).not.toMatch(/accountUrl|source|context|localRuns/);
+  });
+
   it("answers Codex, then each enabled Claude account, with the shares and plans and nothing of who they belong to", async () => {
     const { db, read } = mac();
     claudeAccounts.add(db, "Work");
     const limits = await read();
     expect(limits.map(({ id, name, plan, status }) => [id.split(":")[0], name, plan, status])).toEqual([
       ["codex", "Codex", "Pro", "available"],
-      ["claude", "Claude · Existing CLI login", "Max", "available"],
-      ["claude", "Claude · Work", "Max", "available"],
+      ["claude", "Claude · Existing CLI login", "Ultra", "available"],
+      ["claude", "Claude · Work", "Ultra", "available"],
     ]);
     expect(limits[0]!.windows.map((window) => [window.label, window.remainingPercent])).toEqual([
       ["5-hour window", 88],

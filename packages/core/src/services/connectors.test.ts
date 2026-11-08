@@ -1,6 +1,6 @@
 import { describe, expect, it, onTestFinished, vi } from "vitest";
 import type { ConnectorDriver, ConnectorRow } from "@openorc/agents";
-import type { AppSettings, Connector, ConnectorSpec } from "@openorc/protocol";
+import { enabledHarnessIds, type AppSettings, type Connector, type ConnectorSpec } from "@openorc/protocol";
 import { ConnectorService, type ConnectorDrivers } from "./connectors.js";
 import type { RememberedConnectors } from "./remembered-connectors.js";
 import type { AppSettingsService } from "./settings.js";
@@ -55,7 +55,11 @@ function setup(
   const calls: string[] = [];
   const opened: string[] = [];
   let settings = { claudeUserMcpServers: true, claudeConnectorsOff: [] as string[], ...options.settings } as AppSettings;
-  const store = { get: () => settings, set: (patch: Partial<AppSettings>) => (settings = { ...settings, ...patch }) } as unknown as AppSettingsService;
+  const store = {
+    get: () => settings,
+    set: (patch: Partial<AppSettings>) => (settings = { ...settings, ...patch }),
+    enabledHarnesses: () => enabledHarnessIds(settings),
+  } as unknown as AppSettingsService;
   const claudeRows = options.claude ?? { main: [] };
   const drivers: ConnectorDrivers = {
     claude: (launch) => {
@@ -73,6 +77,21 @@ function setup(
     opencode: () => {
       throw new Error("OpenCode was not found. Rescan after installing it.");
     },
+    cursor: () => {
+      throw new Error("Cursor was not found. Rescan after installing it.");
+    },
+    pi: () => {
+      throw new Error("Pi was not found. Rescan after installing it.");
+    },
+    fx: () => {
+      throw new Error("fx was not found. Rescan after installing it.");
+    },
+    antigravity: () => {
+      throw new Error("Antigravity was not found. Rescan after installing it.");
+    },
+    omp: () => {
+      throw new Error("Oh My Pi was not found. Rescan after installing it.");
+    },
   };
   const launch = (account: string) => ({ binary: "claude", env: { ACCOUNT: account } });
   const changed = vi.fn();
@@ -83,6 +102,21 @@ function setup(
       codex: () => ({ binary: "codex", env: {} }),
       opencode: () => {
         throw new Error("OpenCode was not found. Rescan after installing it.");
+      },
+      cursor: () => {
+        throw new Error("Cursor was not found. Rescan after installing it.");
+      },
+      pi: () => {
+        throw new Error("Pi was not found. Rescan after installing it.");
+      },
+      fx: () => {
+        throw new Error("fx was not found. Rescan after installing it.");
+      },
+      antigravity: () => {
+        throw new Error("Antigravity was not found. Rescan after installing it.");
+      },
+      omp: () => {
+        throw new Error("Oh My Pi was not found. Rescan after installing it.");
       },
     },
     store,
@@ -136,7 +170,14 @@ describe("connectors", () => {
         ],
       },
     ]);
-    expect(list.unavailable).toEqual([{ agent: "opencode", reason: "OpenCode was not found. Rescan after installing it." }]);
+    expect(list.unavailable).toEqual([
+      { agent: "opencode", reason: "OpenCode was not found. Rescan after installing it." },
+      { agent: "omp", reason: "Oh My Pi was not found. Rescan after installing it." },
+      { agent: "cursor", reason: "Cursor was not found. Rescan after installing it." },
+      { agent: "pi", reason: "Pi was not found. Rescan after installing it." },
+      { agent: "antigravity", reason: "Antigravity was not found. Rescan after installing it." },
+      { agent: "fx", reason: "fx was not found. Rescan after installing it." },
+    ]);
   });
 
   it("save to the agents chosen and leave the ones that lost it without it", async () => {
@@ -293,4 +334,15 @@ describe("connectors", () => {
     const agents = (await service.list("/project")).connectors.find((connector) => connector.name === "paper")?.agents.map((agent) => agent.agent);
     expect(agents).toEqual(["codex"]);
   });
+});
+
+it("reads only enabled agents and immediately removes cached disabled connectors", async () => {
+  const f = setup({ codex: [row("codex-only", "connected")], claude: { main: [row("claude-only", "connected")] }, settings: { enabledHarnesses: ["codex"] } });
+  const first = await f.service.list("/fixture/project");
+  expect(first.connectors.map((connector) => connector.name)).toEqual(["codex-only"]);
+  expect(first.unavailable).toEqual([]);
+  f.settings().enabledHarnesses = ["claude"];
+  const changed = await f.service.list("/fixture/project");
+  expect(changed.connectors.some((connector) => connector.name === "codex-only")).toBe(false);
+  await vi.waitFor(async () => expect((await f.service.list("/fixture/project")).connectors.map((connector) => connector.name)).toEqual(["claude-only"]));
 });

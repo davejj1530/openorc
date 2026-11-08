@@ -1,4 +1,4 @@
-import { AcpAdapter, captureLaunchEnvironment, ClaudeAdapter, CodexAdapter, type AgentLaunchEnvironment } from "@openorc/agents";
+import { AcpAdapter, captureLaunchEnvironment, ClaudeAdapter, CodexAdapter, PiAdapter, listOmpModels, ompAcp, cursorAcp, antigravityAcp, fxAcp, type AgentLaunchEnvironment } from "@openorc/agents";
 import { completedToolCall, digestedEvent, plans, runs, subagents, tasks, type Db, type LedgerWriter } from "@openorc/db";
 import { UserInput, type OpenOrcMcpServer, type TaskCard, type UserInputResult } from "@openorc/mcp";
 import {
@@ -150,6 +150,10 @@ export class RunService {
   private readonly claude = new ClaudeAdapter({});
   private readonly codex: CodexAdapter;
   private readonly opencode: AcpAdapter;
+  private readonly omp: AcpAdapter;
+  private readonly cursor: AcpAdapter;
+  private readonly pi: PiAdapter;
+  private readonly antigravity: AcpAdapter;
   private readonly adapters: RunAdapterRegistry;
   private readonly catalog: RunCatalog;
   private readonly startingAccounts = new Map<string, number>();
@@ -194,9 +198,14 @@ export class RunService {
         ),
     );
     this.codex = new CodexAdapter({ onApproval: (request) => this.approvals.handleCodexApproval(request) });
-    this.opencode = new AcpAdapter({ onApproval: (request) => this.approvals.handleOpenCodeApproval(request) });
-    this.adapters = adapters ?? { codex: this.codex, claude: this.claude, opencode: this.opencode };
-    this.catalog = new RunCatalog(this.hooks, this.codex, this.opencode, () => this.assertAgentUpdateIdle());
+    this.opencode = new AcpAdapter({ onApproval: (request) => this.approvals.handleAcpApproval(request) });
+    this.omp = new AcpAdapter({ profile: ompAcp, listModels: (launch) => listOmpModels(launch), onApproval: (request) => this.approvals.handleAcpApproval(request) });
+    this.cursor = new AcpAdapter({ profile: cursorAcp, onApproval: (request) => this.approvals.handleAcpApproval(request) });
+    this.pi = new PiAdapter({ onApproval: (request) => this.approvals.handleAcpApproval(request) });
+    this.antigravity = new AcpAdapter({ profile: antigravityAcp, onApproval: (request) => this.approvals.handleAcpApproval(request) });
+    const fx = new AcpAdapter({ profile: fxAcp, onApproval: (request) => this.approvals.handleAcpApproval(request) });
+    this.adapters = adapters ?? { codex: this.codex, claude: this.claude, opencode: this.opencode, omp: this.omp, cursor: this.cursor, pi: this.pi, antigravity: this.antigravity, fx };
+    this.catalog = new RunCatalog(this.hooks, this.codex, this.opencode, this.omp, this.cursor, () => this.assertAgentUpdateIdle(), this.pi, this.antigravity, fx);
     this.briefs = new RunBriefs(this.db, this.hooks);
     this.liveView = new RunLive({
       db: this.db,
@@ -312,6 +321,7 @@ export class RunService {
 
   private createLauncher(): RunLaunch {
     return new RunLaunch({
+      assertHarnessEnabled: (agent) => this.catalog.assertEnabled(agent),
       db: this.db,
       ledger: this.ledger,
       mcp: this.mcp,
@@ -547,6 +557,7 @@ export class RunService {
   }
 
   async start(input: StartRunInput): Promise<Run> {
+    this.catalog.assertEnabled(input.agent);
     if (input.scope.thread) this.subagents.assertExecutable({ threadId: input.scope.thread.id });
     this.assertAgentUpdateIdle();
     input = normalizeModelSettings(input);
@@ -630,6 +641,8 @@ export class RunService {
   }
 
   async send(runId: string, text: string, options: SendOptions = {}): Promise<void> {
+    const run = this.live.get(runId)?.run ?? runs.get(this.db, runId);
+    if (run) this.catalog.assertEnabled(run.agent);
     this.subagents.assertExecutable({ runId });
     this.assertAgentUpdateIdle();
     this.pendingSends++;

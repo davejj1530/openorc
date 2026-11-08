@@ -63,12 +63,12 @@ export class RunSettlement {
 
   /**
    * What this turn cost. Providers report the session's running total, so the turn's share is the difference from
-   * the previous report: this run's last turn, or for a resumed session, the last total an earlier run recorded.
+   * the previous turn's report: this run's last turn, or for a resumed session, the last total an earlier run recorded.
+   * The run's usage cannot say it: a usage update earlier in this turn may already carry this turn's total.
    */
-  private costSinceLastReport(entry: LiveRun, reported: number | undefined): number {
-    if (reported === undefined) return 0;
-    const sessionId = entry.usage?.costUsd === undefined ? runs.get(this.deps.db, entry.run.id)?.externalSessionId : null;
-    const before = entry.usage?.costUsd ?? (sessionId ? runCosts.previousSessionCost(this.deps.db, sessionId, entry.run.id) : 0);
+  private costSinceLastReport(entry: LiveRun, reported: number): number {
+    const sessionId = entry.costAtLastTurn === undefined ? runs.get(this.deps.db, entry.run.id)?.externalSessionId : null;
+    const before = entry.costAtLastTurn ?? (sessionId ? runCosts.previousSessionCost(this.deps.db, sessionId, entry.run.id) : 0);
     return Math.max(0, reported - before);
   }
 
@@ -76,7 +76,9 @@ export class RunSettlement {
     entry.turns += 1;
     this.deps.refreshDiffs(entry, project);
     if (turn.usage) {
-      const spent = this.costSinceLastReport(entry, turn.usage.costUsd);
+      const reported = turn.usage.costUsd;
+      const spent = reported === undefined ? 0 : this.costSinceLastReport(entry, reported);
+      if (reported !== undefined) entry.costAtLastTurn = reported;
       entry.usage = { ...entry.usage, ...turn.usage };
       if (spent > 0 && entry.scope.task) tasks.addCost(this.deps.db, entry.scope.task.id, spent);
     }

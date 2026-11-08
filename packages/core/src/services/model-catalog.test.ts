@@ -176,7 +176,13 @@ describe("Claude account Fast access", () => {
 it("keeps other provider models available when the selected Claude account is disabled", async () => {
   const catalog = new RunCatalog(
     {
-      environment: () => ({ revision: 1, shell: "/bin/sh", path: "/fixture", env: {}, binaries: { codex: "/fixture/codex", claude: "/fixture/claude", opencode: "/fixture/opencode" } }),
+      environment: () => ({
+        revision: 1,
+        shell: "/bin/sh",
+        path: "/fixture",
+        env: {},
+        binaries: { codex: "/fixture/codex", claude: "/fixture/claude", opencode: "/fixture/opencode", omp: "/fixture/omp", cursor: null, pi: null, antigravity: null, fx: null },
+      }),
       claudeVersion: async () => null,
       claudeEnvironment: () => {
         throw new Error("Account disabled");
@@ -184,13 +190,23 @@ it("keeps other provider models available when the selected Claude account is di
     },
     { listModels: async () => [] },
     { listModels: async () => [] },
+    { listModels: async () => [] },
+    { listModels: async () => [] },
     () => {},
+    undefined,
+    { listModels: async () => [] },
+    { listModels: async () => [] },
   );
   const result = await catalog.modelCatalog();
   expect(result.providers.map((provider) => [provider.agent, provider.status])).toEqual([
     ["codex", "ready"],
     ["claude", "error"],
     ["opencode", "ready"],
+    ["omp", "ready"],
+    ["cursor", "error"],
+    ["pi", "error"],
+    ["antigravity", "error"],
+    ["fx", "error"],
   ]);
   expect(result.providers.find((provider) => provider.agent === "claude")?.message).toBe("Account disabled");
 });

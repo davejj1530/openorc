@@ -4,6 +4,8 @@ import type { HarnessId } from "./harness.js";
 export interface AllowanceWindow {
   id: string;
   label: string;
+  /** Model families that share this allowance, when the provider reports separate pools. */
+  group?: string;
   usedPercent: number | null;
   remainingPercent: number | null;
   resetsAt: number | null;
@@ -35,10 +37,10 @@ export interface ProviderUsage {
  * said, or how to reset it.
  */
 export interface PlanLimits {
-  /** "codex", or "claude:" and the Claude account's id: stable from one read to the next. */
+  /** The provider, or "claude:" and the Claude account's id: stable from one read to the next. */
   id: string;
-  provider: "codex" | "claude";
-  /** "Codex" or "Claude", followed by the account's own name when the Mac has more than one Claude account on. */
+  provider: "codex" | "claude" | "antigravity";
+  /** The provider name, followed by the account's own name when the Mac has more than one Claude account on. */
   name: string;
   plan: string | null;
   status: ProviderUsage["status"];

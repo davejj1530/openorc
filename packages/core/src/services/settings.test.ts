@@ -31,6 +31,7 @@ describe("settings persistence", () => {
       defaultWorkspaceMode: "worktree" as const,
       defaultPermissionMode: "review" as const,
       defaultHarness: "claude" as const,
+      enabledHarnesses: ["codex", "claude"] as ("codex" | "claude")[],
       look: { palette: "linear", colors: { dark: { "--accent": "#5e6ad2" } } },
       idleProcessMinutes: null,
       claudeUserMcpServers: false,
@@ -67,4 +68,17 @@ it("ignores a saved Teams preference without discarding other settings", () => {
   settings.set(db, "app.settings", JSON.stringify({ experimentalTeamExecution: true, sound: true }));
   expect(new AppSettingsService(db).get()).toMatchObject({ sound: true });
   expect(new AppSettingsService(db).get()).not.toHaveProperty("experimentalTeamExecution");
+});
+
+it("persists enabled agents and moves a disabled default to an enabled agent", () => {
+  const db = Db.memory();
+  databases.push(db);
+  const service = new AppSettingsService(db);
+  expect(service.enabledHarnesses()).toContain("cursor");
+  service.set({ defaultHarness: "codex", enabledHarnesses: ["claude", "cursor"] });
+  expect(new AppSettingsService(db).get()).toMatchObject({ defaultHarness: "claude", enabledHarnesses: ["claude", "cursor"] });
+  service.set({ sound: true });
+  expect(service.enabledHarnesses()).toEqual(["claude", "cursor"]);
+  service.set({ enabledHarnesses: [] });
+  expect(service.get()).toMatchObject({ defaultHarness: null, enabledHarnesses: [] });
 });

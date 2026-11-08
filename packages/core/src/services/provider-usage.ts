@@ -1,5 +1,5 @@
 import { CodexResetService, type ResetInput } from "./provider-resets.js";
-import { captureLaunchEnvironment, readClaudeUsage, readCodexUsage, consumeCodexReset } from "@openorc/agents";
+import { captureLaunchEnvironment, readClaudeUsage, readCodexUsage, consumeCodexReset, readAntigravityUsage, type AntigravityQuotaGroup } from "@openorc/agents";
 import { settings, runs, claudeAccounts, type Db } from "@openorc/db";
 import {
   DEFAULT_CLAUDE_ACCOUNT,
@@ -42,7 +42,6 @@ const claudeLabels: Record<string, string> = {
   seven_day_sonnet: "7-day window · Sonnet",
   overage: "Extra usage window",
 };
-const claudePlans: Record<string, string> = { pro: "Pro", max: "Max", team: "Team", enterprise: "Enterprise" };
 const capitalized = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);
 
 function allowanceWindow({ id, label, used, resets, at, exhausted = false }: { id: string; label: string; used: unknown; resets: unknown; at: number; exhausted?: boolean }): AllowanceWindow {
@@ -178,10 +177,30 @@ export function normalizeClaudeAccount(payload: unknown, at: number): Pick<Provi
   return { windows, credits: [], message: null };
 }
 
+/** Each native bucket is its own limit. Missing fractions and reset times stay unknown. */
+export function normalizeAntigravity(groups: AntigravityQuotaGroup[], at: number): AllowanceWindow[] {
+  return groups.flatMap((group) =>
+    group.buckets.map((bucket) => {
+      const remaining = fraction(bucket.remaining_fraction);
+      return {
+        id: bucket.id,
+        label: `${bucket.name.replace(/\s+remaining$/i, "")} · ${group.name}`,
+        group: group.name,
+        usedPercent: remaining === null ? null : Math.round((100 - remaining) * 100) / 100,
+        remainingPercent: remaining,
+        resetsAt: timestamp(bucket.reset_time),
+        observedAt: at,
+        exhausted: bucket.remaining_fraction === 0,
+      };
+    }),
+  );
+}
+
 export interface ProviderUsageReaders {
   codex?: typeof readCodexUsage;
   consumeReset?: typeof consumeCodexReset;
   claude?: typeof readClaudeUsage;
+  antigravity?: typeof readAntigravityUsage;
   apiKey?: () => Promise<Pick<MemorySettings, "hasApiKey" | "apiKeyError">>;
 }
 
@@ -207,7 +226,36 @@ export class ProviderUsageService {
   private readonly resets: CodexResetService;
   private readonly apiKey: NonNullable<ProviderUsageReaders["apiKey"]>;
   private readonly claudeAccount: typeof readClaudeUsage;
+  private readonly antigravityAccount: typeof readAntigravityUsage;
   private readonly harnesses: Record<HarnessId, HarnessUsageReader> = {
+    fx: {
+      source: "fx provider accounts",
+      read: (result) => {
+        result.context = "fx provider accounts";
+        result.message = "fx reports token usage in each conversation. Run fx usage for provider spend or fx credits for your Vercel AI Gateway balance.";
+        return Promise.resolve(result);
+      },
+    },
+    antigravity: {
+      source: "Antigravity CLI · account usage",
+      read: (result, at, _row, snapshot) => this.readAntigravity(result, at, snapshot),
+    },
+    pi: {
+      source: "Pi provider accounts",
+      read: (result) => {
+        result.context = "Pi provider accounts";
+        result.message = "Pi reports token usage and cost in each conversation. Check your model provider for account limits.";
+        return Promise.resolve(result);
+      },
+    },
+    cursor: {
+      source: "Cursor account",
+      read: (result) => {
+        result.context = "Cursor account";
+        result.message = "Cursor's CLI does not report account allowances here. Open the Cursor dashboard for usage and limits.";
+        return Promise.resolve(result);
+      },
+    },
     codex: { source: "Codex app-server · account usage", read: (result, _at, _row, snapshot) => this.readCodex(result, snapshot) },
     claude: {
       source: "Claude Code · account usage",
@@ -228,6 +276,14 @@ export class ProviderUsageService {
         return Promise.resolve(result);
       },
     },
+    omp: {
+      source: "Oh My Pi provider accounts",
+      read: (result) => {
+        result.context = "Provider accounts signed into Oh My Pi";
+        result.message = "Oh My Pi bills each model through the provider account it was signed into. Run omp usage in a terminal, or open that provider's own dashboard, for allowances and spend.";
+        return Promise.resolve(result);
+      },
+    },
   };
 
   constructor(
@@ -241,6 +297,7 @@ export class ProviderUsageService {
     this.codex = readers.codex ?? readCodexUsage;
     this.resets = new CodexResetService(db, readers.consumeReset, this.now);
     this.claudeAccount = readers.claude ?? readClaudeUsage;
+    this.antigravityAccount = readers.antigravity ?? readAntigravityUsage;
   }
 
   /** Claude Code's stream carries the account's rate limits; no other harness reports them this way. */
@@ -332,7 +389,7 @@ export class ProviderUsageService {
     if (live.status === "ok") {
       Object.assign(result, normalizeClaudeAccount(live.usage, at));
       result.source = "Claude Code · live account usage";
-      result.plan = live.subscriptionType ? (claudePlans[live.subscriptionType] ?? live.subscriptionType) : null;
+      result.plan = live.plan;
       result.context = result.plan ? `Claude ${result.plan}` : "Claude Code login";
       result.refreshedAt = at;
       result.status = result.windows.length ? "available" : "unavailable";
@@ -354,6 +411,33 @@ export class ProviderUsageService {
         ? `Claude Code did not report live usage: ${live.detail}. Refresh to try again.${fallback}`
         : `Could not fetch live usage. Check your connection, then refresh.${fallback}`;
     return result;
+  }
+
+  private async readAntigravity(result: ProviderUsage, at: number, snapshot: EnvSnapshot | undefined): Promise<ProviderUsage> {
+    const launch = snapshot ? captureLaunchEnvironment("antigravity", snapshot) : undefined;
+    const live = await this.antigravityAccount(launch ? { binary: launch.binary, env: launch.env } : undefined);
+    result.context = "Google Antigravity account";
+    switch (live.status) {
+      case "ok":
+        result.windows = normalizeAntigravity(live.groups, at);
+        result.refreshedAt = at;
+        result.status = result.windows.length ? "available" : "unavailable";
+        result.message = result.windows.length ? null : "Antigravity returned no model quotas for this account.";
+        return result;
+      case "unsupported":
+        result.context = "Gemini API key";
+        result.accountUrl = "https://aistudio.google.com/usage";
+        result.message = "This connection uses a Gemini API key. Check Google AI Studio for its usage and limits; Antigravity plan quotas do not apply.";
+        return result;
+      case "disconnected":
+        result.status = "disconnected";
+        result.message = "Sign in with agy acp --login, then refresh usage.";
+        return result;
+      case "unavailable":
+        result.status = "error";
+        result.message = "Could not read Antigravity usage. Check your connection and CLI login, update Antigravity if needed, then refresh.";
+        return result;
+    }
   }
 
   private async readCodex(result: ProviderUsage, snapshot: EnvSnapshot | undefined): Promise<ProviderUsage> {

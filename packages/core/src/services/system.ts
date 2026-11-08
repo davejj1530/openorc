@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { captureProcessEnvironment, launchCommand } from "@openorc/agents";
+import { captureProcessEnvironment, antigravityAuthenticated, cursorAuthenticated, piAuthenticated, fxAuthenticated, launchCommand } from "@openorc/agents";
 import { hasGh } from "@openorc/git";
 import { harnessIds, type HarnessId, type HarnessInfo, type SystemInfo } from "@openorc/protocol";
 import { resolveBinary, type EnvSnapshot, type RefreshResult, type ShellEnvironment } from "./shell-environment.js";
@@ -13,10 +13,18 @@ export interface HarnessProbe {
   versionArgs: readonly string[];
   authArgs: readonly string[];
   /** True or false from a recognised answer; null when the output says nothing either way. */
-  authenticated(output: string): boolean | null;
+  authenticated(output: string, env?: Readonly<NodeJS.ProcessEnv>): boolean | null;
 }
 
 export const harnessProbes: Record<HarnessId, HarnessProbe> = {
+  fx: { versionArgs: ["--version"], authArgs: ["status", "--json"], authenticated: fxAuthenticated },
+  antigravity: { versionArgs: ["--version"], authArgs: ["models"], authenticated: antigravityAuthenticated },
+  pi: { versionArgs: ["--version"], authArgs: ["--offline", "--list-models"], authenticated: piAuthenticated },
+  cursor: {
+    versionArgs: ["--version"],
+    authArgs: ["status", "--format", "json"],
+    authenticated: cursorAuthenticated,
+  },
   codex: {
     versionArgs: ["--version"],
     authArgs: ["login", "status"],
@@ -46,6 +54,15 @@ export const harnessProbes: Record<HarnessId, HarnessProbe> = {
     authenticated(output) {
       if (/\bstored\b/i.test(output)) return true;
       return output.trim() === "" || /^(no |none)/i.test(output.trim()) ? false : null;
+    },
+  },
+  omp: {
+    versionArgs: ["--version"],
+    authArgs: ["models", "--json"],
+    // Oh My Pi lists only the models of providers it can reach: a saved login, an API key or cloud credentials.
+    authenticated(output) {
+      if (/"selector"\s*:/.test(output)) return true;
+      return /"models"\s*:\s*\[\s*\]/.test(output) ? false : null;
     },
   },
 };
@@ -121,7 +138,7 @@ export class SystemService {
 
     const probe = this.probes[id];
     const [version, auth] = await Promise.all([this.command(binary, probe.versionArgs, { ...env }), this.command(binary, probe.authArgs, { ...env })]);
-    const loggedIn = probe.authenticated(auth.output);
+    const loggedIn = probe.authenticated(auth.output, env);
     const state = harnessReadiness(version.status !== "ok" || auth.status === "failed", loggedIn);
     return {
       id,

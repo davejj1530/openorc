@@ -217,7 +217,7 @@
       "lines": 121
     },
     "packages/agents/src/acp/adapter.ts::AcpAdapter.start": {
-      "lines": 191
+      "lines": 245
     },
     "packages/agents/src/acp/adapter.ts::AcpAdapter.start.settle": {
       "complexity": 17

@@ -6,8 +6,7 @@ import { ToolDigest } from "./tool-digest.js";
 /**
  * The internal event model. Every adapter (Claude Code, Codex, ACP) maps its
  * native stream onto these events. The ledger stores them, the renderer draws
- * them, and the MCP server reads them back. Shapes follow ACP's vocabulary so
- * the future ACP adapter is a mapping, not a redesign.
+ * them, and the MCP server reads them back.
  */
 
 /** Every harness, plus the ACP kind reserved for adapters that do not exist yet. */
@@ -39,11 +38,19 @@ export const ContextFill = z.object({
 export type ContextFill = z.infer<typeof ContextFill>;
 
 export const Usage = z.object({
+  /** The settings when this report was recorded, retained when a live session switches models. */
+  model: z.string().optional(),
+  fastMode: z.boolean().optional(),
+  /** The latest request's input size, distinct from cumulative input and the context after its response. */
+  requestInputTokens: z.number().int().nonnegative().optional(),
   inputTokens: z.number().int().nonnegative(),
   outputTokens: z.number().int().nonnegative(),
   cacheReadTokens: z.number().int().nonnegative().optional(),
   cacheWriteTokens: z.number().int().nonnegative().optional(),
-  /** What the provider session has cost so far, as the provider reports it: a running total that a resumed session continues, not one turn's share. */
+  /**
+   * What the provider session has cost so far, as the provider reports it: a running total that a resumed session
+   * continues, not one turn's share. It includes the session's subagents, which OpenCode prices on sessions of their own.
+   */
   costUsd: z.number().nonnegative().optional(),
   /** A model request also says how full the conversation is afterwards. */
   ...ContextFill.partial().shape,
@@ -65,7 +72,7 @@ export const ActivityStatus = z.enum(["running", "success", "error", "cancelled"
 export type ActivityStatus = z.infer<typeof ActivityStatus>;
 
 /** What gets a failed activity going again: more usage, or signing the provider's CLI back in. */
-export const ActivityRecovery = z.object({ kind: z.enum(["usage", "sign_in"]), provider: z.enum(["codex", "claude"]) });
+export const ActivityRecovery = z.object({ kind: z.enum(["usage", "sign_in"]), provider: HarnessId });
 export type ActivityRecovery = z.infer<typeof ActivityRecovery>;
 
 /** A command the agent left running in the background, such as a dev server. It runs until it ends or is stopped. */

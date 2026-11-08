@@ -5,8 +5,14 @@ import path from "node:path";
 import { PassThrough } from "node:stream";
 import { spawn, type ChildProcess } from "node:child_process";
 import { describe, expect, it, vi } from "vitest";
-import type { AgentEvent, ApprovalDecision, PermissionPreset, RunSpec } from "@openorc/protocol";
+import { AgentEvent, type ApprovalDecision, type PermissionPreset, type RunSpec } from "@openorc/protocol";
 import { AcpAdapter, modelsFrom, type AcpApprovalRequest } from "./adapter.js";
+import type { AcpProfile } from "./profile.js";
+import { openCodeAcp } from "../opencode/acp.js";
+import { cursorAcp } from "../cursor/acp.js";
+import { antigravityAcp } from "../antigravity/acp.js";
+import { fxAcp } from "../fx/acp.js";
+import { LiveInputUnavailable } from "../run-handle.js";
 
 const launch = { revision: 0, binary: "opencode", env: process.env };
 
@@ -20,8 +26,13 @@ function agent(
   overrides: Partial<RunSpec> = {},
   decide: (request: AcpApprovalRequest) => Promise<ApprovalDecision> = async () => "allow",
   place: Parameters<AcpAdapter["start"]>[1] = launch,
+  // Reads beside the session start no process here; one that answers nothing leaves the agent's own cost.
+  runCommand: (args: string[]) => Promise<string> = async () => {
+    throw new Error("No command runs in these tests.");
+  },
+  profile: AcpProfile = openCodeAcp,
 ) {
-  const stdin = new PassThrough();
+  const stdin = new PassThrough({ highWaterMark: 1 });
   const stdout = new PassThrough();
   const stderr = new PassThrough();
   const proc = Object.assign(new EventEmitter(), {
@@ -116,7 +127,7 @@ function agent(
     }
   });
   const events: AgentEvent[] = [];
-  const handle = new AcpAdapter({ onApproval: decide }).start(
+  const handle = new AcpAdapter({ profile, onApproval: decide, runCommand }).start(
     {
       runId: "run-1",
       agent: "opencode",
@@ -148,10 +159,10 @@ function agent(
       permissions.push({ id, resolve });
       write({ jsonrpc: "2.0", id, method: "session/request_permission", params: { sessionId, toolCall, options } });
     });
-  const fail = (message: string) => {
+  const fail = (message: string, code = -32603) => {
     const id = prompts.shift();
     if (id === undefined) throw new Error("no prompt in flight");
-    write({ jsonrpc: "2.0", id, error: { code: -32603, message } });
+    write({ jsonrpc: "2.0", id, error: { code, message } });
   };
   const promptCalls = () => calls.filter((call) => call.method === "session/prompt");
   return { calls, notifications, events, handle, finish, fail, update, write, askPermission, promptCalls, proc };
@@ -160,6 +171,163 @@ function agent(
 const eventTypes = (events: AgentEvent[]) => events.map((event) => event.type);
 
 describe("AcpAdapter", () => {
+  it("marks a blocked follow-up as safe to queue without sending it to the provider", async () => {
+    const s = agent("autonomous", {}, undefined, launch, undefined, { ...openCodeAcp, steer: undefined, promptSteering: false });
+    try {
+      await vi.waitFor(() => expect(s.promptCalls()).toHaveLength(1));
+      await expect(s.handle.send("Also check the docs.")).rejects.toBeInstanceOf(LiveInputUnavailable);
+      expect(s.promptCalls()).toHaveLength(1);
+      s.finish();
+      await vi.waitFor(() => expect(eventTypes(s.events)).toContain("turn.completed"));
+      await s.handle.send("Now check the docs.");
+      expect(s.promptCalls()).toHaveLength(2);
+    } finally {
+      s.handle.close();
+      await s.handle.wait();
+    }
+  });
+
+  it.each(["omp", "antigravity", "fx"] as const)("keeps %s steering out of automatic compaction", async (id) => {
+    const s = agent("autonomous", {}, undefined, launch, undefined, { ...openCodeAcp, agent: id, promptSteering: true, steer: undefined });
+    await vi.waitFor(() => expect(s.promptCalls()).toHaveLength(1));
+    expect(s.handle.canSteer).toBe(true);
+    if (id === "omp") s.write({ jsonrpc: "2.0", method: "_omp/compaction/start", params: { sessionId: "ses_1" } });
+    else s.update("ses_1", { sessionUpdate: "compaction_update", compactionId: "fold", status: "in_progress" });
+    await vi.waitFor(() => expect(s.handle.compacting).toBe(true));
+    expect(await s.handle.steer("wait until ready")).toBe("unavailable");
+    expect(s.promptCalls()).toHaveLength(1);
+    if (id === "omp") s.write({ jsonrpc: "2.0", method: "_omp/compaction/end", params: { sessionId: "ses_1" } });
+    else s.update("ses_1", { sessionUpdate: "compaction_update", compactionId: "fold", status: "completed" });
+    await vi.waitFor(() => expect(s.handle.canSteer).toBe(true));
+    s.handle.close();
+    await s.handle.wait();
+  });
+
+  it("does not acknowledge Stop before the transport accepts cancellation", async () => {
+    const s = agent();
+    await vi.waitFor(() => expect(s.promptCalls()).toHaveLength(1));
+    let release: () => void = () => {};
+    const original = s.proc.stdin._write.bind(s.proc.stdin);
+    vi.spyOn(s.proc.stdin, "_write").mockImplementationOnce((chunk, encoding, callback) => {
+      release = () => original(chunk, encoding, callback);
+    });
+    let accepted = false;
+    const interrupt = s.handle.interrupt().then(() => {
+      accepted = true;
+    });
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(accepted).toBe(false);
+    release();
+    await interrupt;
+    expect(s.notifications).toContainEqual({ method: "session/cancel", params: { sessionId: "ses_1" } });
+    s.handle.close();
+    await s.handle.wait();
+  });
+  it.each(["send", "steer"] as const)("delivers Antigravity live input through %s without completing or duplicating the active turn", async (method) => {
+    const s = agent(
+      "autonomous",
+      { agent: "antigravity", mode: "act", model: "gemini-3.8-flash", effort: "high" },
+      undefined,
+      { ...launch, env: { GEMINI_API_KEY: "fixture-key" } },
+      undefined,
+      antigravityAcp,
+    );
+    try {
+      await vi.waitFor(() => expect(s.promptCalls()).toHaveLength(1));
+      expect(s.calls[0]?.params["clientInfo"]).toMatchObject({ name: "openorc", title: "OpenOrc" });
+      expect(s.calls.find((call) => call.method === "authenticate")?.params).toEqual({ methodId: "gemini-api-key" });
+      expect(s.calls.filter((call) => call.method === "session/set_config_option").map((call) => call.params)).toEqual([
+        { sessionId: "ses_1", configId: "mode", value: "default" },
+        { sessionId: "ses_1", configId: "model", value: "gemini-3.8-flash" },
+        { sessionId: "ses_1", configId: "thought_level", value: "high" },
+      ]);
+      expect(s.handle.canSteer).toBe(true);
+      const sending = s.handle[method]("Include the new requirement");
+      await vi.waitFor(() => expect(s.promptCalls()).toHaveLength(2));
+      const delivered = s.promptCalls()[1]!;
+      expect(delivered.params).toMatchObject({ sessionId: "ses_1", prompt: [{ type: "text", text: "Include the new requirement" }] });
+      s.write({ jsonrpc: "2.0", id: delivered.id, result: { stopReason: "end_turn" } });
+      await sending;
+      expect(s.events.filter((event) => event.type === "turn.started")).toHaveLength(1);
+      expect(s.events.filter((event) => event.type === "turn.completed")).toHaveLength(0);
+      s.update("ses_1", { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Included" } });
+      s.finish();
+      await vi.waitFor(() => expect(s.events.filter((event) => event.type === "turn.completed")).toHaveLength(1));
+      expect(await s.handle.steer("Too late")).toBe("unavailable");
+      expect(s.promptCalls()).toHaveLength(2);
+    } finally {
+      s.handle.close();
+    }
+  });
+
+  it("reuses Antigravity's cached login and loads Plan without auto-approving its tools", async () => {
+    const s = agent("review", { agent: "antigravity", mode: "plan", resumeSessionId: "ses_1" }, () => new Promise(() => {}), { ...launch, env: {} }, undefined, antigravityAcp);
+    try {
+      await vi.waitFor(() => expect(s.promptCalls()).toHaveLength(1));
+      expect(s.calls.some((call) => call.method === "authenticate")).toBe(false);
+      expect(s.calls.some((call) => call.method === "session/load")).toBe(true);
+      expect(vi.mocked(spawn).mock.lastCall?.[1]).toEqual(["acp", "--process-per-session"]);
+      expect(s.calls.find((call) => call.method === "session/set_config_option")?.params).toMatchObject({ configId: "mode", value: "plan" });
+      const pending = s.askPermission({ toolCallId: "write-1", kind: "edit", title: "Write a file" });
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(s.handle.canSteer).toBe(false);
+      await s.handle.interrupt();
+      await expect(pending).resolves.toEqual({ outcome: { outcome: "cancelled" } });
+    } finally {
+      s.handle.close();
+    }
+  });
+
+  it("refuses unsupported Cursor operations before starting its process", () => {
+    const before = vi.mocked(spawn).mock.calls.length;
+    expect(() => agent("review", { agent: "cursor", mode: "act" }, undefined, launch, undefined, cursorAcp)).toThrow("saved permission rules");
+    expect(() => agent("autonomous", { agent: "cursor", untrustedCheckout: true }, undefined, launch, undefined, cursorAcp)).toThrow("untrusted checkouts");
+    expect(() => agent("autonomous", { agent: "cursor", resumeSessionId: "saved-session", forkSession: true }, undefined, launch, undefined, cursorAcp)).toThrow("forking conversations");
+    expect(vi.mocked(spawn).mock.calls).toHaveLength(before);
+  });
+
+  it("authenticates Cursor before opening its session, supplies MCP, and applies its native mode and model", async () => {
+    const s = agent("autonomous", { agent: "cursor", mode: "act", model: "auto" }, undefined, launch, undefined, { ...cursorAcp, checkReady: async () => {} });
+    try {
+      await vi.waitFor(() => expect(s.promptCalls()).toHaveLength(1));
+      expect(s.calls.slice(0, 3).map((call) => call.method)).toEqual(["initialize", "authenticate", "session/new"]);
+      expect(s.calls[1]?.params).toEqual({ methodId: "cursor_login" });
+      expect(s.calls[0]?.params["clientCapabilities"]).not.toHaveProperty("elicitation");
+      expect(s.calls[2]?.params["mcpServers"]).toEqual([{ type: "http", name: "openorc_0123456789abcdef0123456789abcdef", url: "http://127.0.0.1:1/mcp", headers: [] }]);
+      expect(JSON.stringify(s.promptCalls()[0]?.params)).toContain("openorc_0123456789abcdef0123456789abcdef_ask_user");
+      expect(s.calls.filter((call) => call.method === "session/set_config_option").map((call) => call.params)).toEqual([
+        { sessionId: "ses_1", configId: "mode", value: "agent" },
+        { sessionId: "ses_1", configId: "model", value: "auto" },
+      ]);
+      expect(s.handle.canSteer).toBe(false);
+      expect(s.handle.canCompact).toBe(false);
+      s.update("ses_1", { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Ready" } });
+      s.finish();
+      await vi.waitFor(() => expect(s.events).toContainEqual(expect.objectContaining({ type: "turn.completed", status: "success", resultText: "Ready" })));
+      await s.handle.applySettings({ model: "another-variant" });
+      await expect(s.handle.applySettings({ effort: "high" })).rejects.toThrow("model variant");
+    } finally {
+      s.handle.close();
+    }
+  });
+
+  it("loads an existing Cursor session and keeps cancellation responsive while permission is pending", async () => {
+    const s = agent("autonomous", { agent: "cursor", mode: "plan", resumeSessionId: "ses_1" }, () => new Promise(() => {}), launch, undefined, { ...cursorAcp, checkReady: async () => {} });
+    try {
+      await vi.waitFor(() => expect(s.promptCalls()).toHaveLength(1));
+      expect(s.calls.some((call) => call.method === "session/load")).toBe(true);
+      expect(s.calls.some((call) => call.method === "session/resume" || call.method === "session/new")).toBe(false);
+      expect(s.calls.find((call) => call.method === "session/set_config_option")?.params).toMatchObject({ configId: "mode", value: "plan" });
+      const pending = s.askPermission({ toolCallId: "shell-1", kind: "execute", title: "Run a command" });
+      await new Promise((resolve) => setImmediate(resolve));
+      await s.handle.interrupt();
+      await expect(pending).resolves.toEqual({ outcome: { outcome: "cancelled" } });
+      await vi.waitFor(() => expect(s.events).toContainEqual(expect.objectContaining({ type: "turn.completed", status: "cancelled" })));
+    } finally {
+      s.handle.close();
+    }
+  });
+
   it("keeps child permissions separate from the parent's cancellation", async () => {
     const requests: AcpApprovalRequest[] = [];
     const s = agent("autonomous", {}, async (request) => {
@@ -340,6 +508,81 @@ describe("AcpAdapter", () => {
     s.handle.close();
   });
 
+  it("adds what the session's subagents have cost, read from OpenCode as the turn ends, to the session's own cost", async () => {
+    const tree: Record<string, { id: string; cost: number }[]> = {
+      ses_1: [
+        { id: "a", cost: 1.5 },
+        { id: "b", cost: 0.25 },
+      ],
+      a: [{ id: "c", cost: 0.5 }],
+    };
+    const asked: string[] = [];
+    const s = agent("autonomous", {}, undefined, launch, async (args) => {
+      const parent = args.find((arg) => arg.startsWith("parentID="))!.slice("parentID=".length);
+      asked.push(parent);
+      return JSON.stringify({ data: (tree[parent] ?? []).map((child) => ({ ...child, time: { updated: 1 } })), cursor: { previous: null, next: "more" } });
+    });
+    try {
+      await vi.waitFor(() => expect(s.promptCalls()).toHaveLength(1));
+      s.write({
+        jsonrpc: "2.0",
+        method: "opencode/session/child_update",
+        params: { rootSessionId: "ses_1", childSessionId: "a", parentSessionId: "ses_1", title: "A", type: "status", status: "created" },
+      });
+      s.update("ses_1", { sessionUpdate: "usage_update", used: 900, size: 128_000, cost: { amount: 2, currency: "USD" } });
+      s.finish();
+      await vi.waitFor(() => expect(eventTypes(s.events)).toContain("turn.completed"));
+      expect(s.events.find((event) => event.type === "turn.completed")).toMatchObject({ usage: { costUsd: 4.25 } });
+      expect(asked.sort()).toEqual(["a", "b", "c", "ses_1"]);
+      // The next turn lists the session's subagents again, but under none that have not changed since.
+      asked.length = 0;
+      await s.handle.send("Again");
+      await vi.waitFor(() => expect(s.promptCalls()).toHaveLength(2));
+      s.update("ses_1", { sessionUpdate: "usage_update", used: 950, size: 128_000, cost: { amount: 2.5, currency: "USD" } });
+      s.finish();
+      await vi.waitFor(() => expect(s.events.filter((event) => event.type === "turn.completed")).toHaveLength(2));
+      expect(s.events.filter((event) => event.type === "turn.completed")[1]).toMatchObject({ usage: { costUsd: 4.75 } });
+      expect(asked).toEqual(["ses_1"]);
+    } finally {
+      s.handle.close();
+    }
+  });
+
+  it("steers a message into OpenCode's running turn through its own server, and a message sent mid-turn steers too", async () => {
+    const steered: string[][] = [];
+    const s = agent("autonomous", {}, undefined, launch, async (args) => {
+      if (args[1] === "session.list") return JSON.stringify({ data: [] });
+      steered.push(args);
+      return JSON.stringify({ data: { id: `msg_${steered.length}`, delivery: "steer" } });
+    });
+    try {
+      await vi.waitFor(() => expect(s.promptCalls()).toHaveLength(1));
+      expect(s.handle.canSteer).toBe(true);
+      await expect(s.handle.steer("Also check the tests.")).resolves.toBe("accepted");
+      await s.handle.send("And the docs.");
+      expect(steered.map((args) => args.slice(0, 4))).toEqual([
+        ["api", "session.prompt", "--param", "sessionID=ses_1"],
+        ["api", "session.prompt", "--param", "sessionID=ses_1"],
+      ]);
+      expect(steered.map((args) => JSON.parse(args.at(-1)!) as unknown)).toEqual([
+        { text: "Also check the tests.", delivery: "steer" },
+        { text: "And the docs.", delivery: "steer" },
+      ]);
+      expect(s.promptCalls()).toHaveLength(1);
+      // A picture goes by path for OpenCode to read; another file is named for the agent to open.
+      await s.handle.send("See this.", ["/tmp/shot.png", "/tmp/notes.md"]);
+      const withFiles = JSON.parse(steered[2]!.at(-1)!) as { text: string; files?: unknown };
+      expect(withFiles.files).toEqual([{ uri: "file:///tmp/shot.png", name: "shot.png" }]);
+      expect(withFiles.text).toContain("See this.");
+      expect(withFiles.text).toContain("/tmp/notes.md");
+      expect(s.promptCalls()).toHaveLength(1);
+      s.finish();
+      await vi.waitFor(() => expect(s.handle.canSteer).toBe(false));
+    } finally {
+      s.handle.close();
+    }
+  });
+
   it("changes the model and effort of the open session between turns and refuses during one", async () => {
     const s = agent("autonomous", { model: "openrouter/acme/fast" });
     await vi.waitFor(() => expect(s.promptCalls()).toHaveLength(1));
@@ -350,6 +593,7 @@ describe("AcpAdapter", () => {
     await s.handle.applySettings({ model: "opencode/big", effort: "high" });
     const options = s.calls.filter((call) => call.method === "session/set_config_option").map((call) => call.params);
     expect(options).toEqual([
+      { sessionId: "ses_1", configId: "mode", value: "build" },
       { sessionId: "ses_1", configId: "model", value: "openrouter/acme/fast" },
       { sessionId: "ses_1", configId: "model", value: "opencode/big" },
       { sessionId: "ses_1", configId: "effort", value: "high" },
@@ -401,7 +645,7 @@ describe("AcpAdapter", () => {
   it("resumes an existing session without creating one and reports the process exit once", async () => {
     const s = agent("autonomous", { resumeSessionId: "ses_old" });
     await vi.waitFor(() => expect(s.promptCalls()).toHaveLength(1));
-    expect(s.calls.map((call) => call.method)).toEqual(["initialize", "session/resume", "session/prompt"]);
+    expect(s.calls.map((call) => call.method)).toEqual(["initialize", "session/resume", "session/set_config_option", "session/prompt"]);
     expect(s.calls[1]!.params).toMatchObject({ sessionId: "ses_old", cwd: "/repo" });
     expect(s.events.find((event) => event.type === "session.started")).toMatchObject({ externalSessionId: "ses_old" });
     s.handle.close();
@@ -436,8 +680,11 @@ describe("AcpAdapter on a host", () => {
     await vi.waitFor(() => expect(s.promptCalls()).toHaveLength(1));
     expect(sandbox.spawn).toHaveBeenCalledWith("opencode", ["acp"], expect.objectContaining({ runId: "run-1", cwd: "/repo" }));
     const env = (sandbox.spawn.mock.calls[0] as unknown as [string, string[], { env: Record<string, string> }])[2].env;
-    expect(JSON.parse(env["OPENCODE_CONFIG_CONTENT"]!).provider.openrouter.options.apiKey).toBe("k");
-    expect(s.calls.find((call) => call.method === "session/new")!.params["mcpServers"]).toEqual([expect.objectContaining({ url: "http://127.0.0.1:41000/mcp" })]);
+    const config = JSON.parse(env["OPENCODE_CONFIG_CONTENT"]!);
+    expect(config.provider.openrouter.options.apiKey).toBe("k");
+    // OpenOrc's tools go in the configuration, listed directly rather than behind Code Mode, at the host's address.
+    expect(Object.values(config.mcp.servers)).toEqual([{ type: "remote", url: "http://127.0.0.1:41000/mcp", oauth: false, codemode: false }]);
+    expect(s.calls.find((call) => call.method === "session/new")!.params["mcpServers"]).toEqual([]);
     expect(JSON.stringify(s.promptCalls()[0]!.params["prompt"])).toContain("/home/sandbox/uploads/notes.md");
   });
 
@@ -452,6 +699,37 @@ describe("AcpAdapter on a host", () => {
 });
 
 describe("AcpAdapter errors", () => {
+  it.each([
+    ["max_output_tokens", "error"],
+    ["max_model_turns", "max_turns"],
+    ["refused", "error"],
+    ["yielded", "cancelled"],
+    ["unknown-new-reason", "error"],
+  ])("settles fx's %s as a valid %s event", async (stopReason, status) => {
+    const s = agent("autonomous", { agent: "fx" }, undefined, launch, undefined, { ...openCodeAcp, agent: "fx", promptOutcome: fxAcp.promptOutcome });
+    await vi.waitFor(() => expect(s.promptCalls()).toHaveLength(1));
+    s.finish({ stopReason });
+    await vi.waitFor(() => expect(eventTypes(s.events)).toContain("turn.completed"));
+    expect(AgentEvent.parse(s.events.find((event) => event.type === "turn.completed"))).toMatchObject({ status });
+    s.handle.close();
+    await s.handle.wait();
+  });
+
+  it.each(["opencode", "omp", "cursor", "antigravity", "fx"] as const)("offers %s recovery for a provider failure and allows the next turn", async (provider) => {
+    const s = agent("autonomous", { agent: provider }, undefined, launch, undefined, { ...openCodeAcp, agent: provider });
+    await vi.waitFor(() => expect(s.promptCalls()).toHaveLength(1));
+    s.fail("Authentication required", -32000);
+    await vi.waitFor(() => expect(eventTypes(s.events)).toContain("turn.completed"));
+    expect(s.events.find((event) => event.type === "activity.updated")).toMatchObject({ recovery: { kind: "sign_in", provider } });
+    await s.handle.send("Try again after signing in");
+    await vi.waitFor(() => expect(s.promptCalls()).toHaveLength(2));
+    s.fail("Your usage limit has been reached.");
+    await vi.waitFor(() => expect(s.events.filter((event) => event.type === "turn.completed")).toHaveLength(2));
+    expect(s.events.filter((event) => event.type === "activity.updated").at(-1)).toMatchObject({ recovery: { kind: "usage", provider } });
+    s.handle.close();
+    await s.handle.wait();
+  });
+
   it("preserves an unavailable-model error without inventing an authentication diagnosis", async () => {
     const s = agent("autonomous", { model: "opencode/glm-5.3-flash" });
     await vi.waitFor(() => expect(s.promptCalls()).toHaveLength(1));

@@ -1,9 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { harnessIds } from "@openorc/protocol";
 import { decodeOnboardingState, readOnboardingState, resolveOnboarding, writeOnboardingState } from "./onboarding";
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe("onboarding persistence", () => {
+  it.each(harnessIds)("preserves %s as the selected agent and default", (id) => {
+    const state = { version: 1, step: "done", completedAt: 1, selectedHarnesses: [id], defaultHarness: id };
+    expect(decodeOnboardingState(state)).toEqual(state);
+  });
+
   it("migrates a legacy default into the selected harness list", () => {
     const stored = {
       version: 1,
@@ -41,7 +47,7 @@ describe("onboarding persistence", () => {
     { version: 2, step: "done", completedAt: 1, defaultHarness: "claude" },
     { version: 1, step: "unknown", completedAt: null, defaultHarness: null },
     { version: 1, step: "done", completedAt: -1, defaultHarness: "claude" },
-    { version: 1, step: "done", completedAt: 1, defaultHarness: "pi" },
+    { version: 1, step: "done", completedAt: 1, defaultHarness: "unknown-agent" },
   ])("treats missing, older, newer, or malformed state as fresh", (stored) => {
     expect(decodeOnboardingState(stored)).toEqual({
       version: 1,

@@ -16,10 +16,15 @@ import { SHARED_CLAUDE_CONFIG_DIR, claudeConfigDir } from "./claude/config-dir.j
 import { claudeCommandRows, listClaudeCommands } from "./claude/commands.js";
 import { installedClaudePlugins, type InstalledClaudePlugin } from "./claude/plugins.js";
 import type { AgentLaunchEnvironment } from "./launch-environment.js";
+import { agentBinary } from "./bin.js";
 import { claudeSkillsOff } from "./claude/skill-overrides.js";
 import { listCodexSkills } from "./codex/skills.js";
 import { openCodeSkillDenied, openCodeSkillRules, type SkillRule } from "./opencode/skill-policies.js";
 import { listNativeOpenCodeSkills, openCodeSkillRows } from "./opencode/skills.js";
+import { listNativeOmpSkills } from "./omp/skills.js";
+import { listPiSkills } from "./pi/skills.js";
+import { antigravityProjectDirectories } from "./antigravity/home.js";
+import { fxHome } from "./fx/home.js";
 import { readSkillInterface, skillFolderOf, within } from "./skill-interface.js";
 
 /** A directory of skills, and what the CLI would call the ones inside it. */
@@ -599,5 +604,54 @@ export async function listSkills({
 }): Promise<AgentSkill[]> {
   if (agent === "codex") return listCodexSkills(projectRoot);
   if (agent === "opencode") return listOpenCode(projectRoot, home, env, nativeDiscovery);
+  if (agent === "omp") return listOmp(projectRoot, home, launch?.env ?? env, launch);
+  if (agent === "cursor") return listCursorSkills(projectRoot, home);
+  if (agent === "antigravity") return listAntigravitySkills(projectRoot, home);
+  if (agent === "fx") return listFxSkills(projectRoot, home, launch?.env ?? env);
+  if (agent === "pi") return describeSkills(await listPiSkills(projectRoot, launch ?? { binary: agentBinary("pi"), env }), { synced: [], enabled: () => undefined });
   return listClaude(projectRoot, home, launch?.env ?? env, launch);
+}
+
+/** Antigravity's standard skill folders, in its precedence order; manifests and plugins remain owned by the CLI. */
+async function listAntigravitySkills(projectRoot: string, home: string): Promise<AgentSkill[]> {
+  const roots: SkillRoot[] = [{ dir: path.join(home, ".gemini/config/skills"), source: "user" }];
+  for (const dir of await antigravityProjectDirectories(projectRoot)) roots.push({ dir: path.join(dir, ".agents/skills"), source: "project" });
+  for (const dir of [".gemini/skills", ".gemini/antigravity-cli/skills"]) roots.push({ dir: path.join(home, dir), source: "user" });
+  const found = new Map<string, AgentSkill>();
+  for (const root of roots) for (const skill of await readSkillDir(root)) found.set(skill.name, skill);
+  return describeSkills(byName([...found.values()]), { synced: [], enabled: () => undefined });
+}
+
+/** fx scans workspace ancestors below home, then its managed and compatibility roots. */
+async function listFxSkills(projectRoot: string, home: string, env: NodeJS.ProcessEnv): Promise<AgentSkill[]> {
+  const roots: SkillRoot[] = [];
+  for (let dir = path.resolve(projectRoot); dir !== home && dir !== path.dirname(dir); dir = path.dirname(dir)) {
+    for (const folder of [".fx/skills", "skills", ".opencode/skills", ".codex/skills", ".claude/skills", ".agents/skills", ".claw/skills"])
+      roots.push({ dir: path.join(dir, folder), source: "project" });
+  }
+  roots.push({ dir: path.join(fxHome(env, home), "skills"), source: "user" });
+  for (const folder of [".config/opencode/skills", ".codex/skills", ".claude/skills", ".agents/skills", ".claw/skills"]) roots.push({ dir: path.join(home, folder), source: "user" });
+  const found = new Map<string, AgentSkill>();
+  for (const root of roots) for (const skill of await readOpenCodeRoot(root)) if (path.basename(skill.path) === "SKILL.md" && !found.has(skill.name)) found.set(skill.name, skill);
+  return describeSkills(byName([...found.values()]), { synced: [], enabled: () => undefined });
+}
+
+/** Cursor's portable skill folders, including the Claude and Codex compatibility locations. */
+async function listCursorSkills(projectRoot: string, home: string): Promise<AgentSkill[]> {
+  const roots: SkillRoot[] = [];
+  const folders = [".claude", ".codex", ".agents", ".cursor"];
+  for (const name of folders) roots.push({ dir: path.join(home, name, "skills"), source: "user" });
+  for (const dir of await projectDirectories(projectRoot)) for (const name of folders) roots.push({ dir: path.join(dir, name, "skills"), source: "project" });
+  const found = new Map<string, AgentSkill>();
+  for (const root of roots) {
+    // The shared recursive reader accepts loose OpenCode Markdown too; Cursor requires SKILL.md.
+    for (const skill of await readOpenCodeRoot(root)) if (path.basename(skill.path) === "SKILL.md") found.set(skill.name, skill);
+  }
+  return describeSkills(byName([...found.values()]), { synced: [], enabled: () => undefined });
+}
+
+/** Oh My Pi's own list, which reads every place it looks: its own folders and those of Claude, Codex and the others. */
+async function listOmp(projectRoot: string, home: string, env: NodeJS.ProcessEnv, launch: Pick<AgentLaunchEnvironment, "binary" | "env"> | undefined): Promise<AgentSkill[]> {
+  const listed = await listNativeOmpSkills(projectRoot, launch?.binary ?? agentBinary("omp"), env);
+  return describeSkills(byName(listed), { synced: [path.join(home, ".claude", "skills", "synced")], enabled: () => undefined });
 }

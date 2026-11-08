@@ -1,11 +1,12 @@
 import { Db, retiredTeams, runs } from "@openorc/db";
+import { LiveInputUnavailable } from "@openorc/agents";
 import { AttachmentService } from "../services/attachments.js";
 import { RunService } from "../services/runs.js";
 import { ThreadService } from "../services/threads.js";
 import { taskAndProject } from "./context.js";
 import type { Handlers } from "./types.js";
 type Dependencies = {
-  threadService: Pick<ThreadService, "continueThread" | "startTaskInThread" | "conversationRuns">;
+  threadService: Pick<ThreadService, "continueThread" | "startTaskInThread" | "conversationRuns" | "queue">;
   runService: Pick<RunService, "send" | "interrupt" | "close" | "subagents">;
   db: Db;
   dataDir: string;
@@ -31,7 +32,14 @@ export function createRunsHandlers({
       return threadService.startTaskInThread(taskId, workspaceMode, images, { agent, model, effort, fastMode, attachments, mode, permissionMode, prompt, fresh: resume === false });
     },
     "runs.send": async ({ runId, text, attachments }) => {
-      await runService.send(runId, text, { attachments });
+      try {
+        await runService.send(runId, text, { attachments });
+      } catch (error) {
+        if (!(error instanceof LiveInputUnavailable)) throw error;
+        const threadId = runs.get(db, runId)?.threadId;
+        if (!threadId) throw error;
+        threadService.queue(threadId, text, attachments ?? []);
+      }
       return null;
     },
     "runs.interrupt": async ({ runId }) => {

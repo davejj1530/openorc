@@ -19,7 +19,7 @@ interface Sources {
 
 type Account = Pick<PlanLimits, "id" | "provider" | "name"> & { read: () => Promise<ProviderUsage> };
 
-/** Codex, then each enabled Claude account, each read on its own so one that fails is only that card's error. */
+/** Each account is read on its own so one that fails is only that card's error. */
 export async function readPlanLimits({ db, usage, availability }: Sources): Promise<PlanLimits[]> {
   const installed = new Set((await availability()).filter((row) => row.state !== "not_found").map((row) => row.id));
   const claude = installed.has("claude") ? claudeAccounts.list(db).filter((account) => account.enabled) : [];
@@ -31,6 +31,7 @@ export async function readPlanLimits({ db, usage, availability }: Sources): Prom
       name: claude.length > 1 ? `Claude · ${account.name}` : "Claude",
       read: () => usage.recent("claude", account.id, PLAN_LIMITS_MAX_AGE_MS),
     })),
+    ...(installed.has("antigravity") ? [{ id: "antigravity", provider: "antigravity" as const, name: "Antigravity", read: () => usage.recent("antigravity", undefined, PLAN_LIMITS_MAX_AGE_MS) }] : []),
   ];
   return Promise.all(
     accounts.map(({ read, ...account }) =>
@@ -53,8 +54,8 @@ function planLimits(account: Pick<PlanLimits, "id" | "provider" | "name">, repor
   };
 }
 
-function limitWindow({ id, label, usedPercent, remainingPercent, resetsAt, observedAt, exhausted }: AllowanceWindow, provider: PlanLimits["provider"], plan: string | null): AllowanceWindow {
-  return { id, label: windowLabel(label, provider, plan), usedPercent, remainingPercent, resetsAt, observedAt, exhausted };
+function limitWindow({ id, label, group, usedPercent, remainingPercent, resetsAt, observedAt, exhausted }: AllowanceWindow, provider: PlanLimits["provider"], plan: string | null): AllowanceWindow {
+  return { id, label: windowLabel(label, provider, plan), ...(group ? { group } : {}), usedPercent, remainingPercent, resetsAt, observedAt, exhausted };
 }
 
 /** Codex names its own bucket and plan before each window ("codex · pro · 5-hour window"); the card names both already. */

@@ -217,3 +217,11 @@ describe("query cache tags", () => {
     }
   });
 });
+
+it("refreshes catalogs and agent availability when the enabled selection changes", () => {
+  const changed = invalidatesFor("app.settings.set", { enabledHarnesses: ["claude"] });
+  for (const method of ["app.settings.get", "agents.models", "agents.modelCatalog", "agents.availability", "connectors.list", "cloud.signIns"] as const) {
+    expect(tagsFor(method, {}).some((tag) => changed.includes(tag))).toBe(true);
+  }
+  expect(invalidatesFor("app.settings.set", { sound: true })).toEqual(["settings"]);
+});

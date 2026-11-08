@@ -333,7 +333,11 @@ describe("core", () => {
     expect(await call("app.settings.get", {})).toMatchObject({ ...optedOut, defaultHarness: "claude", defaultPermissionMode: "trusted", sound: true });
     await call("app.settings.set", { defaultHarness: null });
     expect((await call("app.settings.get", {})).defaultHarness).toBeNull();
-    await expect(call("app.settings.set", { defaultHarness: "pi" as never })).rejects.toThrow();
+    for (const id of harnessIds) {
+      await call("app.settings.set", { defaultHarness: id });
+      expect((await call("app.settings.get", {})).defaultHarness).toBe(id);
+    }
+    await expect(call("app.settings.set", { defaultHarness: "unknown-agent" as never })).rejects.toThrow();
   });
 
   it("answers which harnesses can start a thread as the desktop's New thread reads them, without their paths", async () => {

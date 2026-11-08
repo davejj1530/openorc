@@ -129,6 +129,11 @@ export interface LiveRun {
   handle: RunHandle;
   workspaceLease: WorkspaceLease;
   usage: Usage | null;
+  /**
+   * The provider session's running cost as this run's last completed turn reported it. Kept apart from `usage`, which
+   * a usage update during the turn already moves to the new total before the turn ends.
+   */
+  costAtLastTurn?: number;
   turns: number;
   /** A turn is in progress. Sessions stay open between turns, so live alone does not mean working. */
   busy: boolean;
@@ -206,6 +211,7 @@ export interface ThreadPermissionState {
 export type Notification = Extract<CorePush, { type: "notify" }>;
 
 export interface RunHooks {
+  enabledHarnesses?(): readonly HarnessId[];
   claudeEnvironment?(snapshot: EnvSnapshot, accountId?: string): EnvSnapshot;
   claudeAccountFor?(input: StartRunInput): string;
   processRegistry?: string;

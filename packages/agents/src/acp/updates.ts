@@ -54,8 +54,15 @@ export class AcpUpdateMapper {
   private message: OpenText | null = null;
   private thought: OpenText | null = null;
   private readonly tools = new Map<string, ToolState>();
+  /** Calls already reported finished. Oh My Pi can update one after, as when a command it backgrounded ends. */
+  private readonly finished = new Set<string>();
   private context: ContextReport | null = null;
   private turnText: string[] = [];
+  private readonly compactions = new Set<string>();
+
+  get compacting(): boolean {
+    return this.compactions.size > 0;
+  }
 
   constructor(private readonly runId: string) {}
 
@@ -76,25 +83,14 @@ export class AcpUpdateMapper {
         return [update.plan.type === "items" ? this.planActivity(update.plan.planId, update.plan.entries, ts) : this.planText(update.plan.planId, update.plan.uri, ts)];
       case "plan_removed":
         return [{ type: "activity.updated", runId: this.runId, ts, activityId: `plan-${update.planId}`, label: "Plan", status: "success" }];
-      case "compaction_update": {
-        let status: "running" | "success" | "error" = "error";
-        if (update.status === "in_progress") status = "running";
-        else if (update.status === "completed") status = "success";
-        const text =
-          update.summary
-            ?.map(contentText)
-            .filter((part): part is string => part !== null)
-            .join("") ||
-          update.error ||
-          undefined;
-        return [{ type: "activity.updated", runId: this.runId, ts, activityId: `compaction-${update.compactionId}`, label: "Compacting context", status, ...(text ? { text } : {}) }];
-      }
+      case "compaction_update":
+        return [this.compactionUpdate(update, ts)];
       case "compaction_summary_chunk": {
         const text = contentText(update.content);
         return text ? [{ type: "activity.delta", runId: this.runId, ts, activityId: `compaction-${update.compactionId}`, label: "Compacting context", text }] : [];
       }
       case "usage_update":
-        this.context = { used: update.used, size: update.size, ...(update.cost ? { costUsd: update.cost.amount } : {}) };
+        this.context = { used: update.used, size: update.size, ...(update.cost?.currency.toUpperCase() === "USD" ? { costUsd: update.cost.amount } : {}) };
         return [];
       default:
         // User echoes, command lists, mode and config changes carry nothing the transcript shows.
@@ -110,6 +106,22 @@ export class AcpUpdateMapper {
     this.turnText = [];
     this.context = null;
     return { events, text, context };
+  }
+
+  private compactionUpdate(update: Extract<SessionUpdate, { sessionUpdate: "compaction_update" }>, ts: number): AgentEvent {
+    if (update.status === "in_progress") this.compactions.add(update.compactionId);
+    else this.compactions.delete(update.compactionId);
+    let status: "running" | "success" | "error" = "error";
+    if (update.status === "in_progress") status = "running";
+    else if (update.status === "completed") status = "success";
+    const text =
+      update.summary
+        ?.map(contentText)
+        .filter((part): part is string => part !== null)
+        .join("") ||
+      update.error ||
+      undefined;
+    return { type: "activity.updated", runId: this.runId, ts, activityId: `compaction-${update.compactionId}`, label: "Compacting context", status, ...(text ? { text } : {}) };
   }
 
   /** A checklist plan: done once every entry is. */
@@ -167,32 +179,40 @@ export class AcpUpdateMapper {
   }
 
   private toolCall(update: Extract<SessionUpdate, { sessionUpdate: "tool_call" }>, ts: number): AgentEvent[] {
+    if (this.finished.has(update.toolCallId)) return [];
     const name = update.name ?? (update.title === "subagent" ? "subagent" : toolNameFor[update.kind ?? "other"]);
     const input = update.rawInput ?? { title: update.title };
+    if (this.tools.has(update.toolCallId)) return this.toolCallUpdate({ ...update, sessionUpdate: "tool_call_update" }, ts);
     this.tools.set(update.toolCallId, { name, input, text: "", title: update.title });
     const events: AgentEvent[] = [{ type: "tool.started", runId: this.runId, ts, toolCallId: update.toolCallId, name, input, parentToolCallId: null }];
-    events.push(...this.fileChanges(update.content, ts));
+    events.push(...this.toolCallUpdate({ ...update, sessionUpdate: "tool_call_update" }, ts));
     return events;
+  }
+
+  /** The call an update is for. One this session never announced, as after a resume, is announced now. */
+  private toolFor(update: Extract<SessionUpdate, { sessionUpdate: "tool_call_update" }>, ts: number, events: AgentEvent[]): ToolState {
+    const known = this.tools.get(update.toolCallId);
+    if (known) return known;
+    const tool = { name: update.name ?? toolNameFor[update.kind ?? "other"], input: update.rawInput ?? {}, text: "", title: update.title ?? null };
+    this.tools.set(update.toolCallId, tool);
+    events.push({ type: "tool.started", runId: this.runId, ts, toolCallId: update.toolCallId, name: tool.name, input: tool.input, parentToolCallId: null });
+    return tool;
   }
 
   private toolCallUpdate(update: Extract<SessionUpdate, { sessionUpdate: "tool_call_update" }>, ts: number): AgentEvent[] {
     const events: AgentEvent[] = [];
-    let tool = this.tools.get(update.toolCallId);
-    if (!tool) {
-      // An update for a call this session never announced, as after a resume: announce it now.
-      tool = { name: update.name ?? toolNameFor[update.kind ?? "other"], input: update.rawInput ?? {}, text: "", title: update.title ?? null };
-      this.tools.set(update.toolCallId, tool);
-      events.push({ type: "tool.started", runId: this.runId, ts, toolCallId: update.toolCallId, name: tool.name, input: tool.input, parentToolCallId: null });
-    }
+    if (this.finished.has(update.toolCallId)) return events;
+    const tool = this.toolFor(update, ts, events);
     if (update.rawInput !== undefined && update.rawInput !== null) tool.input = update.rawInput;
     events.push(...this.fileChanges(update.content, ts));
-    const text = toolText(update.content);
+    const text = progressText(update);
     switch (update.status) {
       case "completed":
       case "failed": {
         this.tools.delete(update.toolCallId);
+        this.finished.add(update.toolCallId);
         const failed = update.status === "failed";
-        const output = update.rawOutput !== undefined && update.rawOutput !== null ? outputOf(update.rawOutput, text) : (text ?? null);
+        const output = update.rawOutput !== undefined && update.rawOutput !== null ? outputOf(update.rawOutput, text) : (text ?? (tool.text || null));
         events.push({
           type: "tool.completed",
           runId: this.runId,
@@ -241,12 +261,29 @@ function toolText(content: ToolCallContent[] | null | undefined): string | null 
   return parts.length ? parts.join("") : null;
 }
 
-/** OpenCode wraps a tool's output as `{ output, metadata }`; the transcript wants the output itself. */
+/** What a running call has printed. Oh My Pi's content also repeats the command and each output chunk; its raw result holds the output alone. */
+function progressText(update: { rawOutput?: unknown; content?: ToolCallContent[] | null }): string | null {
+  return resultText(update.rawOutput) ?? toolText(update.content);
+}
+
+/** A Pi-style tool result, `{ content: [{ type: "text", text }], details }`, as its text; null for any other shape. */
+function resultText(raw: unknown): string | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const content = (raw as Record<string, unknown>)["content"];
+  if (!Array.isArray(content)) return null;
+  const parts = content.flatMap((block: unknown) => {
+    const item = block && typeof block === "object" ? (block as Record<string, unknown>) : {};
+    return item["type"] === "text" && typeof item["text"] === "string" ? [item["text"]] : [];
+  });
+  return parts.length ? parts.join("") : null;
+}
+
+/** OpenCode wraps a tool's output as `{ output, metadata }`, Oh My Pi as Pi's tool result; the transcript wants the output itself. */
 function outputOf(raw: unknown, content: string | null): unknown {
   if (raw && typeof raw === "object" && !Array.isArray(raw)) {
     const record = raw as Record<string, unknown>;
     if (typeof record["output"] === "string") return record["output"];
     if (typeof record["error"] === "string") return record["error"];
   }
-  return content ?? raw;
+  return resultText(raw) ?? content ?? raw;
 }

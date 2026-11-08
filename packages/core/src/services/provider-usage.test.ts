@@ -46,7 +46,7 @@ function setup(
 ) {
   if (!databases.includes(db)) databases.push(db);
   const system = { info: vi.fn(async () => connected), infoFor: vi.fn(async () => connected) };
-  const claude = vi.fn(async (_options?: ClaudeUsageOptions): Promise<ClaudeUsageResult> => ({ status: "ok", usage: account, subscriptionType: "max" }));
+  const claude = vi.fn(async (_options?: ClaudeUsageOptions): Promise<ClaudeUsageResult> => ({ status: "ok", usage: account, plan: "Ultra" }));
   const apiKey = vi.fn(async (): Promise<Pick<MemorySettings, "hasApiKey" | "apiKeyError">> => ({ hasApiKey: false }));
   return { db, system, read, claude, apiKey, service: new ProviderUsageService(db, system, { codex: read, claude, apiKey, consumeReset }, snapshot ? () => snapshot : undefined, () => at) };
 }
@@ -181,7 +181,7 @@ describe("usage refresh", () => {
       revision: 7,
       shell: "/bin/zsh",
       path: env.PATH,
-      binaries: Object.freeze({ claude: env.OPENORC_CLAUDE_BIN, codex: env.OPENORC_CODEX_BIN, opencode: null }),
+      binaries: Object.freeze({ claude: env.OPENORC_CLAUDE_BIN, codex: env.OPENORC_CODEX_BIN, opencode: null, omp: null, cursor: null, pi: null, antigravity: null, fx: null }),
       env,
     });
     const { service, system, read, claude } = setup(undefined, undefined, snapshot);

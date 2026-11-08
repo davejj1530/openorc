@@ -83,7 +83,7 @@ beforeEach(async () => {
       notify() {},
       claudeVersion: async () => null,
     },
-    { codex: { start }, claude: { start }, opencode: { start } },
+    { codex: { start }, claude: { start }, opencode: { start }, omp: { start }, cursor: { start }, pi: { start }, antigravity: { start }, fx: { start } },
     writers,
   );
   workspace = new WorkspaceService(db, { dataDir: root }, quiet, writers);

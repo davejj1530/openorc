@@ -114,6 +114,8 @@ export function partsDigest(parts: SavedSession["parts"]): string {
 
 /** The first x.y.z in a CLI's version line. */
 export function releaseOf(output: string): string | null {
+  const cursor = /(?:^|\s)(\d{4}\.\d{2}\.\d{2}-[a-f0-9]+)(?=\s|$)/.exec(output)?.[1];
+  if (cursor) return cursor;
   return /(\d+\.\d+\.\d+)/.exec(output)?.[1] ?? null;
 }
 

@@ -87,7 +87,16 @@ beforeEach(() => {
     scripted.set(spec.runId, { handle, finish });
     return handle;
   };
-  adapters = { codex: { start: vi.fn(start) }, claude: { start: vi.fn(start) }, opencode: { start: vi.fn(start) } };
+  adapters = {
+    codex: { start: vi.fn(start) },
+    claude: { start: vi.fn(start) },
+    opencode: { start: vi.fn(start) },
+    omp: { start: vi.fn(start) },
+    cursor: { start: vi.fn(start) },
+    pi: { start: vi.fn(start) },
+    antigravity: { start: vi.fn(start) },
+    fx: { start: vi.fn(start) },
+  };
   const environment = new ShellEnvironment({ env: { ...process.env, OPENORC_CLAUDE_BIN: "/fixture/claude", OPENORC_CODEX_BIN: "/fixture/codex" } });
   hooks = {
     environment: () => environment.current(),
@@ -136,7 +145,7 @@ function environmentSnapshot(revision: number): EnvSnapshot {
     revision,
     shell: "/bin/zsh",
     path: env.PATH,
-    binaries: Object.freeze({ claude: env.OPENORC_CLAUDE_BIN, codex: env.OPENORC_CODEX_BIN, opencode: null }),
+    binaries: Object.freeze({ claude: env.OPENORC_CLAUDE_BIN, codex: env.OPENORC_CODEX_BIN, opencode: null, omp: null, cursor: null, pi: null, antigravity: null, fx: null }),
     env,
   });
 }
@@ -907,5 +916,44 @@ describe("notification text", () => {
     emit(run.id, { type: "turn.completed", runId: run.id, ts: Date.now(), turnId: "one", status: "success", durationMs: 1 });
     await service.closeAndWait(run.id);
     expect(hooks.notify).toHaveBeenCalledWith(expect.objectContaining({ kind: "task", title: "Assignment", body: cut }));
+  });
+});
+
+describe("task cost", () => {
+  /** One task run of one turn, its agent reporting the session's running total first mid-turn and again as it ends, as OpenCode does. */
+  async function runTurn(input: StartRunInput, totalUsd: number): Promise<void> {
+    const run = await service.start(input);
+    const usage = { inputTokens: 10, outputTokens: 5, costUsd: totalUsd };
+    emit(run.id, { type: "session.started", runId: run.id, ts: Date.now(), agent: "opencode", externalSessionId: "ses_task", model: "fixture" });
+    emit(run.id, { type: "turn.started", runId: run.id, ts: Date.now(), turnId: "turn" });
+    emit(run.id, { type: "usage.updated", runId: run.id, ts: Date.now(), usage });
+    emit(run.id, { type: "turn.completed", runId: run.id, ts: Date.now(), turnId: "turn", status: "success", usage, durationMs: 1 });
+    await service.closeAndWait(run.id);
+  }
+
+  it("charges each turn its share of the running total even when a usage update already carried it", async () => {
+    const input = taskInput({ agent: "opencode" });
+    const task = input.scope.task!;
+    await runTurn(input, 1);
+    expect(tasks.get(db, task.id)?.costUsd).toBeCloseTo(1, 6);
+    // A follow-up resumes the session in a run of its own; only what it added is charged.
+    await runTurn({ ...input, scope: { task: tasks.get(db, task.id)!, thread: null } }, 1.6);
+    expect(tasks.get(db, task.id)?.costUsd).toBeCloseTo(1.6, 6);
+  });
+});
+
+describe("disabled agents", () => {
+  it("rejects a saved execution choice before launching its provider", async () => {
+    hooks.enabledHarnesses = () => ["claude"];
+    await expect(service.start(taskInput())).rejects.toThrow("Codex is disabled");
+    expect(adapters.codex.start).not.toHaveBeenCalled();
+    expect(mcp).not.toHaveBeenCalled();
+  });
+
+  it("prevents a new turn on a retained session after its agent is disabled", async () => {
+    const run = await service.start(taskInput());
+    hooks.enabledHarnesses = () => ["claude"];
+    await expect(service.send(run.id, "Continue")).rejects.toThrow("Codex is disabled");
+    expect(followupTransport).not.toHaveBeenCalled();
   });
 });

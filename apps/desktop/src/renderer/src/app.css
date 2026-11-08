@@ -1027,7 +1027,7 @@ span.property-chip {
 .task-activity {
   margin-top: 40px;
 }
-/* Harness marks. The OpenAI and OpenCode marks are dark on light and invert in dark themes. */
+/* Dark harness marks invert in dark themes. */
 .harness-logo {
   display: inline-block;
   flex-shrink: 0;
@@ -1036,15 +1036,27 @@ span.property-chip {
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .harness-provider-logo[data-provider="codex"],
   :root:not([data-theme="light"]) .harness-provider-logo[data-provider="opencode"],
+  :root:not([data-theme="light"]) .harness-provider-logo[data-provider="omp"],
+  :root:not([data-theme="light"]) .harness-provider-logo[data-provider="pi"],
+  :root:not([data-theme="light"]) .harness-provider-logo[data-provider="fx"],
+  :root:not([data-theme="light"]) .harness-logo[data-provider="fx"],
   :root:not([data-theme="light"]) .harness-logo[data-provider="codex"],
-  :root:not([data-theme="light"]) .harness-logo[data-provider="opencode"] {
+  :root:not([data-theme="light"]) .harness-logo[data-provider="opencode"],
+  :root:not([data-theme="light"]) .harness-logo[data-provider="omp"],
+  :root:not([data-theme="light"]) .harness-logo[data-provider="pi"] {
     filter: invert(1);
   }
 }
 :root[data-theme="dark"] .harness-provider-logo[data-provider="codex"],
 :root[data-theme="dark"] .harness-provider-logo[data-provider="opencode"],
+:root[data-theme="dark"] .harness-provider-logo[data-provider="omp"],
+:root[data-theme="dark"] .harness-provider-logo[data-provider="pi"],
+:root[data-theme="dark"] .harness-provider-logo[data-provider="fx"],
+:root[data-theme="dark"] .harness-logo[data-provider="fx"],
 :root[data-theme="dark"] .harness-logo[data-provider="codex"],
-:root[data-theme="dark"] .harness-logo[data-provider="opencode"] {
+:root[data-theme="dark"] .harness-logo[data-provider="opencode"],
+:root[data-theme="dark"] .harness-logo[data-provider="omp"],
+:root[data-theme="dark"] .harness-logo[data-provider="pi"] {
   filter: invert(1);
 }
 /* The panel yields before the conversation does: it takes what the conversation's floor leaves

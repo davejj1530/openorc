@@ -13,13 +13,16 @@ export interface LiveSettings {
   fastMode?: boolean;
 }
 
+/** No input was delivered because the running turn cannot accept it yet. Safe to queue for a later turn. */
+export class LiveInputUnavailable extends Error {}
+
 export interface RunControls {
   mcpApps?: McpAppConnection;
   /** Stop the current turn, or between turns the background work it left running; resolve after transport acceptance, or reject on failure. */
   interrupt: () => void | Promise<void>;
   /** End the process. */
   close: () => void;
-  /** Send a follow-up prompt on the same session, where the agent supports it. */
+  /** Send a user message: steer an active turn when supported, or start the next turn between replies. */
   send: (text: string, attachments?: string[]) => Promise<void>;
   /** Stop one command the agent left running in the background, such as a dev server. One that already ended is left alone. */
   stopCommand?: (commandId: string) => Promise<void>;

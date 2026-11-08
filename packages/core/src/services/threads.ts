@@ -4,6 +4,7 @@ import {
   THREAD_EXISTS,
   WORKSPACE_ID,
   executionModeUnavailable,
+  forkUnavailable,
   normalizeModelEffort,
   normalizeModelSettings,
   type AgentKind,
@@ -525,8 +526,7 @@ export class ThreadService {
   }
 
   /**
-   * A new thread that carries this whole conversation forward, leaving the
-   * original as it is. Same settings, same workspace; the first message resumes
+   * A new thread with the same conversation, settings and workspace; its first message resumes
    * the parent's latest session as a fork. There is no earlier cut point: the
    * provider's session holds every turn, so the fork would remember turns its
    * transcript leaves out.
@@ -536,6 +536,8 @@ export class ThreadService {
     this.runs.subagents.assertExecutable({ threadId: id });
     this.rejectRetiredThread(id);
     const parent = this.thread(id);
+    const unavailable = forkUnavailable(parent.agent);
+    if (unavailable) throw new Error(unavailable);
     const at = runRepo.listForThread(this.db, id).at(-1);
     const forked = threads.insert(this.db, {
       projectId: parent.projectId,
@@ -619,12 +621,7 @@ export class ThreadService {
 
   /* Compaction */
 
-  /**
-   * Codex compacts a live session in place. Claude Code has no such call in
-   * print mode, so its threads get a fresh session seeded with a brief of the
-   * conversation so far, which is what compaction amounts to. An idle Claude
-   * process is closed by the fresh start.
-   */
+  /** Compact natively when the live harness supports it, otherwise start a fresh session with a conversation brief. */
   async compact(id: string): Promise<void> {
     const thread = this.thread(id);
     const live = this.runs.liveRunForThread(id);

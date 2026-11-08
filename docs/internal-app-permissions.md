@@ -8,7 +8,8 @@ Each provider is set up so it does not ask you about OpenOrc's tools itself. Ope
 
 - **Claude Code** gets exact `--allowedTools` entries for that connection.
 - **Codex** gets a per-tool `approval_mode="approve"` override for that connection.
-- **OpenCode** asks OpenOrc about each tool call. OpenOrc approves tools named `<server>_<tool>` from that connection. In Plan, OpenOrc's OpenCode configuration also allows these tools explicitly.
+- **OpenCode** asks OpenOrc about each tool call. OpenOrc approves tools named `<server>_<tool>` from that connection. OpenOrc gives OpenCode this server in the run's configuration with Code Mode off, so the model calls each tool by that name rather than through `execute`, and OpenOrc can show what it did, such as a visualization. In Plan, OpenOrc's OpenCode configuration also allows these tools explicitly.
+- **Oh My Pi** asks, unless Autonomous, through a form naming the tool. OpenOrc approves tools named `mcp__<server>_<tool>` from that connection.
 
 These settings apply only to that agent process. Your own MCP configuration and the provider's shell and file permissions are unchanged. See the [Claude CLI permission flags](https://code.claude.com/docs/en/cli-reference) and [Codex MCP configuration](https://developers.openai.com/codex/config-reference).
 

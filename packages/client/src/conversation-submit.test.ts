@@ -28,9 +28,9 @@ describe("planSubmit", () => {
     { name: "steers a turn that can take it", input: { working: true, live: true, activeRun: warm, now: true }, plan: { kind: "steer", runId: "A" } },
     { name: "queues by default", input: { working: true, live: true, activeRun: warm }, plan: { kind: "queue", threadId: "thread" } },
     {
-      name: "queues for an agent that reads between turns",
+      name: "steers OpenCode's running turn when asked now",
       input: { working: true, live: true, activeRun: { ...warm, agent: "opencode" }, choice: { ...codex, agent: "opencode" }, now: true },
-      plan: { kind: "queue", threadId: "thread" },
+      plan: { kind: "steer", runId: "A" },
     },
     { name: "queues while compacting", input: { working: true, live: true, activeRun: warm, compacting: true, now: true }, plan: { kind: "queue", threadId: "thread" } },
     { name: "never queues a task, which has no thread", input: { target: { kind: "task", taskId: "task" }, working: true, live: true, activeRun: warm }, plan: { kind: "continue", runId: "A" } },

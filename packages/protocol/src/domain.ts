@@ -420,6 +420,8 @@ export const AppSettings = z.object({
   defaultPermissionMode: PermissionPreset,
   /** The harness new threads start with on every client, chosen at onboarding; null until one is. */
   defaultHarness: HarnessId.nullable(),
+  /** Agents enabled in OpenOrc; null keeps older profiles unrestricted until onboarding hands over their selection. */
+  enabledHarnesses: z.array(HarnessId).nullable().optional(),
   /** The desktop's look, which phones follow; null until the desktop hands it over. One this version cannot read is none, so it never resets the other settings. */
   look: AppLook.nullable().catch(null),
   /** Minutes a provider process may sit idle between turns before it is closed; the session resumes on the next message. Null keeps processes running. */

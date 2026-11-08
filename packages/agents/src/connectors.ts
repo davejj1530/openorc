@@ -14,6 +14,8 @@ export interface ConnectorRow {
   error?: string;
   /** Images the server offers, most preferred first. */
   icons: string[];
+  /** False when the native CLI owns switches that cannot be changed from this settings page. */
+  switchable?: boolean;
   /** The host a URL server lives at, from its saved address; absent for a command or an address the agent keeps to itself. */
   site?: string;
 }

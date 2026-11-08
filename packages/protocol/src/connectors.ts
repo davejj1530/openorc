@@ -13,7 +13,7 @@ export const ConnectorSpec = z.discriminatedUnion("kind", [
 ]);
 export type ConnectorSpec = z.infer<typeof ConnectorSpec>;
 
-export const ConnectorStatus = z.enum(["connected", "needs-sign-in", "failed", "off"]);
+export const ConnectorStatus = z.enum(["connected", "configured", "needs-sign-in", "failed", "off"]);
 export type ConnectorStatus = z.infer<typeof ConnectorStatus>;
 
 /** Who provides it, which decides what OpenOrc may change: only a `user` connector is the user's to edit or remove. */

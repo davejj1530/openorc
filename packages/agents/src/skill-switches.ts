@@ -33,6 +33,11 @@ export async function setSkillEnabled({
     await setClaudeSkillOff(configDir, skill.name, !enabled);
     return !(await claudeSkillsOff(configDir, projectRoot)).has(skill.name);
   }
+  if (agent === "omp") throw new Error("Oh My Pi turns skills on and off in its own settings.");
+  if (agent === "cursor") throw new Error("Manage Cursor skill availability in Cursor's settings.");
+  if (agent === "pi") throw new Error("Manage Pi skill availability in Pi's settings.");
+  if (agent === "antigravity") throw new Error("Manage Antigravity skill availability in its customization settings.");
+  if (agent === "fx") throw new Error("Manage fx skill availability with /skills in fx.");
   await setOpenCodeSkillDenied(openCodeConfigFile({ ...env, HOME: home }), skill.name, !enabled);
   return !openCodeSkillDenied(await openCodeSkillRulesFor(projectRoot, home, env), skill.name);
 }

@@ -1,14 +1,27 @@
 import { spawn } from "node:child_process";
 import os from "node:os";
-import { claudeConnectorDriver, codexConnectorDriver, openCodeConnectorDriver, readableConnectorError, type AgentLaunchEnvironment, type ConnectorDriver, type ConnectorRow } from "@openorc/agents";
-import { harnessIds, type AgentConnector, type Connector, type ConnectorList, type ConnectorSignIn, type ConnectorSpec, type HarnessId } from "@openorc/protocol";
+import {
+  claudeConnectorDriver,
+  codexConnectorDriver,
+  cursorConnectorDriver,
+  piConnectorDriver,
+  antigravityConnectorDriver,
+  fxConnectorDriver,
+  ompConnectorDriver,
+  openCodeConnectorDriver,
+  readableConnectorError,
+  type AgentLaunchEnvironment,
+  type ConnectorDriver,
+  type ConnectorRow,
+} from "@openorc/agents";
+import { harnessName, type AgentConnector, type Connector, type ConnectorList, type ConnectorSignIn, type ConnectorSpec, type HarnessId } from "@openorc/protocol";
 import { iconImage, LOGO_BYTES, logoSource, SiteLogos } from "./connector-logos.js";
 import { nothingRemembered, type RememberedConnectors } from "./remembered-connectors.js";
 import type { AppSettingsService } from "./settings.js";
 
 type Launch = Pick<AgentLaunchEnvironment, "binary" | "env">;
 
-/** One place an agent answers about its connectors: Codex, OpenCode, or one Claude account. */
+/** One harness login or account that can list its connectors. */
 interface Place {
   agent: HarnessId;
   accountId?: string;
@@ -23,16 +36,34 @@ export interface ConnectorPlaces {
   claudeLogin(): Launch;
   codex(): Launch;
   opencode(): Launch;
+  omp(): Launch;
+  cursor(): Launch;
+  pi(): Launch;
+  antigravity(): Launch;
+  fx(): Launch;
 }
 
 export interface ConnectorDrivers {
   claude(launch: Launch, off: () => string[]): ConnectorDriver;
   codex(launch: Launch): ConnectorDriver;
   opencode(launch: Launch): ConnectorDriver;
+  omp(launch: Launch): ConnectorDriver;
+  cursor(launch: Launch): ConnectorDriver;
+  pi(launch: Launch): ConnectorDriver;
+  antigravity(launch: Launch): ConnectorDriver;
+  fx(launch: Launch): ConnectorDriver;
 }
 
-const realDrivers: ConnectorDrivers = { claude: claudeConnectorDriver, codex: codexConnectorDriver, opencode: openCodeConnectorDriver };
-const AGENTS: readonly HarnessId[] = harnessIds;
+const realDrivers: ConnectorDrivers = {
+  claude: claudeConnectorDriver,
+  codex: codexConnectorDriver,
+  opencode: openCodeConnectorDriver,
+  omp: ompConnectorDriver,
+  cursor: cursorConnectorDriver,
+  pi: piConnectorDriver,
+  antigravity: antigravityConnectorDriver,
+  fx: fxConnectorDriver,
+};
 const FRESH_MS = 60_000;
 
 interface Reading {
@@ -78,7 +109,7 @@ export function mergeConnectors(readings: Reading["rows"], logos: ReadonlyMap<st
       let agent = connector.agents.find((entry) => entry.agent === place.agent);
       if (!agent) {
         const editable = row.source === "user";
-        agent = { agent: place.agent, source: row.source, editable, switchable: place.agent === "claude" || editable, places: [] } satisfies AgentConnector;
+        agent = { agent: place.agent, source: row.source, editable, switchable: row.switchable ?? (place.agent === "claude" || editable), places: [] } satisfies AgentConnector;
         connector.agents.push(agent);
       }
       agent.places.push({
@@ -100,6 +131,7 @@ export class ConnectorService {
   private readonly readings = new Map<string, { value: Reading | null; pending: Promise<Reading> | null; generation: number }>();
   /** Counts changes, so a read that started before one is never taken for what is there now. */
   private generation = 0;
+  private selection: string;
   private readonly logos = new Map<string, string>();
   /** The last image each connector showed, kept while it is signed out or off and so sends none. */
   private readonly logoByName = new Map<string, string>();
@@ -119,6 +151,7 @@ export class ConnectorService {
     private readonly changed: () => void,
     options: { open?: (url: string) => void; drivers?: ConnectorDrivers; siteLogos?: Pick<SiteLogos, "get" | "look">; remembered?: RememberedConnectors } = {},
   ) {
+    this.selection = settings.enabledHarnesses().join(",");
     this.open = options.open ?? openInBrowser;
     this.drivers = options.drivers ?? realDrivers;
     this.siteLogos = options.siteLogos ?? new SiteLogos();
@@ -135,12 +168,17 @@ export class ConnectorService {
    * last read here answers while that read runs.
    */
   async list(folder = os.homedir(), refresh = false): Promise<ConnectorList> {
+    const selection = this.settings.enabledHarnesses().join(",");
+    if (selection !== this.selection) {
+      this.selection = selection;
+      this.forget();
+    }
     const entry = this.readings.get(folder);
     const fresh = entry?.value && Date.now() - entry.value.at < FRESH_MS;
     const remembered = refresh || entry?.value ? null : this.remembered.load(folder);
     if (remembered) {
       void this.read(folder).then(this.changed, () => undefined);
-      return { ...this.answer(folder), connectors: remembered, checking: true };
+      return { ...this.answer(folder), connectors: this.enabledConnectors(remembered), checking: true };
     }
     if (refresh || !entry?.value) await this.read(folder);
     else if (!fresh) void this.read(folder).then(this.changed, () => undefined);
@@ -162,7 +200,7 @@ export class ConnectorService {
     }
     const editable = input.previousName === undefined ? new Set<HarnessId>() : this.editableAgents(from);
     const failed = await this.eachAgent(
-      AGENTS.filter((agent) => input.agents.includes(agent) || editable.has(agent)),
+      this.settings.enabledHarnesses().filter((agent) => input.agents.includes(agent) || editable.has(agent)),
       async (agent) => {
         const driver = this.driver(agent);
         if (input.agents.includes(agent)) await driver.save(input.name, input.spec);
@@ -202,7 +240,9 @@ export class ConnectorService {
   signInEverywhere(name: string, folder = os.homedir()): { started: boolean } {
     if (this.signIn) return { started: false };
     const reading = this.readings.get(folder)?.value;
-    const queue = (reading?.rows ?? []).filter(({ rows }) => rows.some((row) => row.name === name && row.status === "needs-sign-in")).map(({ place }) => place);
+    const queue = (reading?.rows ?? [])
+      .filter(({ place, rows }) => this.settings.enabledHarnesses().includes(place.agent) && rows.some((row) => row.name === name && row.status === "needs-sign-in"))
+      .map(({ place }) => place);
     if (!queue.length) return { started: false };
     const abort = new AbortController();
     this.signInError = null;
@@ -234,7 +274,9 @@ export class ConnectorService {
 
   async signOut(name: string, folder = os.homedir()): Promise<{ failed: ConnectorList["unavailable"] }> {
     const reading = this.readings.get(folder)?.value ?? (await this.read(folder));
-    const places = reading.rows.filter(({ rows }) => rows.some((row) => row.name === name && row.kind === "url" && row.status === "connected")).map(({ place }) => place);
+    const places = reading.rows
+      .filter(({ place, rows }) => this.settings.enabledHarnesses().includes(place.agent) && rows.some((row) => row.name === name && row.kind === "url" && row.status === "connected"))
+      .map(({ place }) => place);
     const failed: ConnectorList["unavailable"] = [];
     for (const place of places) {
       await place.driver.signOut(name, folder).catch((error: unknown) => failed.push({ agent: place.agent, reason: readableConnectorError(String(error instanceof Error ? error.message : error)) }));
@@ -252,12 +294,17 @@ export class ConnectorService {
       return { ...connector, logo: logo ?? this.logoByName.get(connector.name) ?? null };
     });
     return {
-      connectors,
-      unavailable: reading?.value?.unavailable ?? [],
+      connectors: this.enabledConnectors(connectors),
+      unavailable: (reading?.value?.unavailable ?? []).filter((row) => this.settings.enabledHarnesses().includes(row.agent)),
       checking: Boolean(reading?.pending),
       signIn: this.signIn?.current ?? null,
       signInError: this.signInError,
     };
+  }
+
+  private enabledConnectors(connectors: Connector[]): Connector[] {
+    const enabled = this.settings.enabledHarnesses();
+    return connectors.map((connector) => ({ ...connector, agents: connector.agents.filter((row) => enabled.includes(row.agent)) })).filter((connector) => connector.agents.length > 0);
   }
 
   private read(folder: string): Promise<Reading> {
@@ -284,7 +331,7 @@ export class ConnectorService {
   private async readEverywhere(folder: string): Promise<Reading> {
     const unavailable: Reading["unavailable"] = [];
     const places: Place[] = [];
-    for (const agent of AGENTS) {
+    for (const agent of this.settings.enabledHarnesses()) {
       try {
         places.push(...this.placesOf(agent));
       } catch (error) {
@@ -335,8 +382,14 @@ export class ConnectorService {
 
   /** The driver that writes for `agent`; for Claude, the CLI login's, whose servers every account shares. */
   private driver(agent: HarnessId): ConnectorDriver {
+    if (!this.settings.enabledHarnesses().includes(agent)) throw new Error(`${harnessName(agent)} is disabled. Enable it in Settings → Connections.`);
     if (agent === "claude") return this.claudeDriver(this.places.claudeLogin());
-    return agent === "codex" ? this.drivers.codex(this.places.codex()) : this.drivers.opencode(this.places.opencode());
+    if (agent === "codex") return this.drivers.codex(this.places.codex());
+    if (agent === "cursor") return this.drivers.cursor(this.places.cursor());
+    if (agent === "pi") return this.drivers.pi(this.places.pi());
+    if (agent === "antigravity") return this.drivers.antigravity(this.places.antigravity());
+    if (agent === "fx") return this.drivers.fx(this.places.fx());
+    return agent === "omp" ? this.drivers.omp(this.places.omp()) : this.drivers.opencode(this.places.opencode());
   }
 
   private knownNames(): Set<string> {
@@ -346,7 +399,8 @@ export class ConnectorService {
   private editableAgents(name: string): Set<HarnessId> {
     const agents = new Set<HarnessId>();
     for (const entry of this.readings.values()) {
-      for (const { place, rows } of entry.value?.rows ?? []) if (rows.some((row) => row.name === name && row.source === "user")) agents.add(place.agent);
+      for (const { place, rows } of entry.value?.rows ?? [])
+        if (this.settings.enabledHarnesses().includes(place.agent) && rows.some((row) => row.name === name && row.source === "user")) agents.add(place.agent);
     }
     return agents;
   }

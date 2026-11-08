@@ -20,7 +20,8 @@ function defaultModel(provider: Provider, models: ModelOption[]): ModelOption | 
         defaultEffort: null,
       }
     );
-  if (provider === "opencode") {
+  // Both run models from whichever providers they are signed into, so a small one is found by its name.
+  if (provider === "opencode" || provider === "omp") {
     const tiers = [/:free$/, /(?:^|[-/])nano(?:-|$)/, /flash-lite/, /(?:^|[-/])mini(?:-|$)/, /haiku/];
     return tiers.flatMap((tier) => models.filter((model) => !model.unavailable && tier.test(model.id)))[0] ?? null;
   }
@@ -65,6 +66,8 @@ export class TextGenerationService {
 
   /** The model that names a conversation through `provider`: the chosen one, else a small default. Never the conversation's flagship. */
   private async resolve(provider: Provider, chosen: string | null, claudeAccountId?: string): Promise<Pick<TextGenerationSettings, "resolved" | "reason">> {
+    if (!harnessCatalog[provider].textGeneration)
+      return { resolved: null, reason: `Background text generation is not available through ${harnessCatalog[provider].name} yet. Choose another provider in Settings.` };
     const login = await this.providers.loggedIn(claudeAccountId).catch(() => ({}) as Partial<Record<Provider, boolean>>);
     if (!login[provider] || !this.providers.launch(provider, claudeAccountId)) return { resolved: null, reason: `${harnessCatalog[provider].name} is unavailable. Check its connection in Settings.` };
     const models = await this.providers.models(provider, claudeAccountId).catch(() => []);

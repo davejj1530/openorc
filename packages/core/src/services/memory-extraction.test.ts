@@ -7,7 +7,7 @@ import { MemoryService, type ProviderInfo } from "./memory.js";
 const silent = { info() {}, warn() {}, error() {} };
 const providers: ProviderInfo = {
   models: async () => [],
-  loggedIn: async () => ({ claude: true, codex: false, opencode: false }),
+  loggedIn: async () => ({ claude: true, codex: false, opencode: false, omp: false, cursor: false, pi: false, antigravity: false, fx: false }),
   launch: (agent) => ({ revision: 1, binary: agent, env: Object.freeze({ PATH: "/fixture" }) }),
 };
 

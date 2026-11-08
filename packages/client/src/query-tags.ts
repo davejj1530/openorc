@@ -273,6 +273,8 @@ const idInvalidations: MethodRules = {
 };
 
 export function invalidatesFor<M extends RpcMethod>(method: M, params: RpcParams<M>): string[] {
+  if (method === "app.settings.set" && "enabledHarnesses" in params)
+    return ["settings", "models", "system", "agent-updates", "connectors", "text-generation", "provider-usage", "cloud-sign-ins", "cloud-skills"];
   const fixed = fixedInvalidations[method];
   if (fixed) return [...fixed];
   const rule = mutationRules[method];

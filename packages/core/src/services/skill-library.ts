@@ -2,7 +2,19 @@ import { randomUUID } from "node:crypto";
 import { chmod, copyFile, constants, lstat, mkdir, readFile, readdir, readlink, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { MAX_SKILL_ICON_BYTES, SHARED_CLAUDE_CONFIG_DIR, SKILL_ICON_TYPES, SKILL_INTERFACE_FILE, claudeConfigDir, newSkillText, skillFolderOf, withSkillIcon } from "@openorc/agents";
+import {
+  MAX_SKILL_ICON_BYTES,
+  SHARED_CLAUDE_CONFIG_DIR,
+  SKILL_ICON_TYPES,
+  SKILL_INTERFACE_FILE,
+  claudeConfigDir,
+  newSkillText,
+  ompAgentDir,
+  piAgentDir,
+  fxHome,
+  skillFolderOf,
+  withSkillIcon,
+} from "@openorc/agents";
 import { FolderPath, SkillName, type AgentSkill, type HarnessId, type SkillFile, type SkillPlace } from "@openorc/protocol";
 import { versionOf } from "./file-write.js";
 import type { FileService } from "./files.js";
@@ -10,7 +22,16 @@ import { assertSafeParentPath } from "./safe-parent-path.js";
 import { within } from "./skill-files.js";
 
 /** Where each agent finds a project's skills, from the project's folder. */
-const PROJECT_SKILLS: Record<HarnessId, string> = { claude: ".claude/skills", codex: ".agents/skills", opencode: ".opencode/skills" };
+const PROJECT_SKILLS: Record<HarnessId, string> = {
+  claude: ".claude/skills",
+  codex: ".agents/skills",
+  opencode: ".opencode/skills",
+  omp: ".omp/skills",
+  cursor: ".cursor/skills",
+  pi: ".pi/skills",
+  antigravity: ".agents/skills",
+  fx: ".fx/skills",
+};
 
 /**
  * The folder a new skill goes in, one the agent lists skills from. A Claude account added in OpenOrc gets the CLI
@@ -21,6 +42,11 @@ export function skillPlace(agent: HarnessId, place: SkillPlace, projectRoot: str
   const home = os.homedir();
   if (agent === "claude") return path.join(env[SHARED_CLAUDE_CONFIG_DIR] || claudeConfigDir(home, env), "skills");
   if (agent === "codex") return path.join(home, ".agents", "skills");
+  if (agent === "omp") return path.join(ompAgentDir(home, env), "skills");
+  if (agent === "antigravity") return path.join(home, ".gemini", "config", "skills");
+  if (agent === "cursor") return path.join(home, ".cursor", "skills");
+  if (agent === "pi") return path.join(piAgentDir(home, env), "skills");
+  if (agent === "fx") return path.join(fxHome(env, home), "skills");
   return path.join(env["XDG_CONFIG_HOME"] || path.join(home, ".config"), "opencode", "skills");
 }
 

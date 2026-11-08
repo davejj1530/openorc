@@ -41,7 +41,7 @@ if (process.argv.includes('login')) {
     revision: 1,
     shell: "/bin/sh",
     path: process.env.PATH ?? "",
-    binaries: { claude: binary, codex: null, opencode: null },
+    binaries: { claude: binary, codex: null, opencode: null, omp: null, cursor: null, pi: null, antigravity: null, fx: null },
     env: Object.freeze({
       HOME: root,
       PATH: process.env.PATH ?? "",

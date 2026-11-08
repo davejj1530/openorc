@@ -137,17 +137,20 @@ export class RunApprovals {
     );
   }
 
-  handleOpenCodeApproval({ runId, approvalId, kind, toolName, detail, input, onceOnly, subagentId }: AcpApprovalRequest): Promise<ApprovalResolution> {
-    // OpenCode names its MCP tools `<server>_<tool>`.
+  handleAcpApproval({ runId, approvalId, kind, toolName, detail, input, onceOnly, subagentId }: AcpApprovalRequest): Promise<ApprovalResolution> {
+    // OpenCode names its MCP tools `<server>_<tool>`, Oh My Pi `mcp__<server>_<tool>`.
     const integration = this.deps.live.get(runId)?.internalMcp;
-    const category = integration && toolName.startsWith(`${integration.serverName}_`) ? "internal_app" : "external";
+    const server = integration?.serverName;
+    const category = server && (toolName.startsWith(`${server}_`) || toolName.startsWith(`mcp__${server.toLowerCase()}_`)) ? "internal_app" : "external";
+    // A question waits for the person in every mode, Plan and Autonomous included.
+    const question = kind === "user_input";
     return this.awaitApproval(
       runId,
       approvalId,
       detail,
       () => this.deps.emit({ type: "approval.requested", runId, ts: Date.now(), approvalId, kind, toolName, input, ...(onceOnly ? { onceOnly } : {}) }),
-      false,
-      category,
+      question,
+      question ? "external" : category,
       undefined,
       subagentId,
     );

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { HarnessId } from "@openorc/protocol";
 import { useLayout } from "./layout";
 
 export type TaskTab = "chat" | "spec" | "files" | "commits" | "memory";
@@ -31,7 +32,7 @@ export type Route =
   /** The Orcling designer: a new Orcling, or one being changed. */
   | { view: "orcling"; orclingId?: string }
   /** A section, optionally with what to bring into view there: a provider's usage, or a project to add to the cloud brain. */
-  | { view: "settings"; section?: SettingsSection; provider?: "codex" | "claude"; project?: string }
+  | { view: "settings"; section?: SettingsSection; provider?: HarnessId; project?: string }
   | { view: "diagnostics" };
 
 interface RouterState {

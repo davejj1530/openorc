@@ -55,6 +55,7 @@ const imageReplyInstructions =
 
 /** Acquires the writer, records startup, launches the provider, then transfers the lease to the live entry. */
 interface RunLaunchDependencies {
+  assertHarnessEnabled: (agent: string) => void;
   db: Db;
   ledger: LedgerWriter;
   mcp: () => Promise<OpenOrcMcpServer>;
@@ -124,6 +125,7 @@ export class RunLaunch {
     // The admission closure must see the normalized input returned by prepareSession.
     let admitted = input;
     const assertAdmission = () => {
+      this.deps.assertHarnessEnabled(admitted.agent);
       if (this.deps.isClosing()) throw new Error("OpenOrc is closing.");
       if (admitted.scope.thread) assertNotMoving(this.deps.db, admitted.scope.thread.id);
       admitted.assertCanStart?.();

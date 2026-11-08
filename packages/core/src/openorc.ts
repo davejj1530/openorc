@@ -119,7 +119,7 @@ import { transportLogger, type Logger, type RpcReply } from "./transport.js";
  * The renderer talks to it only through `handle`, so every capability is a
  * validated method and every push is a typed message.
  */
-/** Where each agent answers about connectors: Codex, OpenCode and every enabled Claude account. A cloud-only host has none. */
+/** Where each agent answers about connectors: Codex, OpenCode, Oh My Pi and every enabled Claude account. A cloud-only host has none. */
 function connectorPlaces(db: Db, cloudOnly: boolean, environment: () => EnvSnapshot, accounts: ClaudeAccountService): ConnectorPlaces {
   const onTheMac = <T>(read: () => T): T => {
     if (cloudOnly) throw new Error("Connectors are set up on your Mac.");
@@ -140,6 +140,11 @@ function connectorPlaces(db: Db, cloudOnly: boolean, environment: () => EnvSnaps
     claudeLogin: () => onTheMac(() => captureLaunchEnvironment("claude", environment())),
     codex: () => onTheMac(() => captureLaunchEnvironment("codex", environment())),
     opencode: () => onTheMac(() => captureLaunchEnvironment("opencode", environment())),
+    omp: () => onTheMac(() => captureLaunchEnvironment("omp", environment())),
+    cursor: () => onTheMac(() => captureLaunchEnvironment("cursor", environment())),
+    pi: () => onTheMac(() => captureLaunchEnvironment("pi", environment())),
+    antigravity: () => onTheMac(() => captureLaunchEnvironment("antigravity", environment())),
+    fx: () => onTheMac(() => captureLaunchEnvironment("fx", environment())),
   };
 }
 
@@ -291,19 +296,7 @@ export class OpenOrc {
     this.cloudHandoff = cloud.handoff;
     this.cloudStandby = cloud.standby;
     this.workspaces = new WorkspaceService(db, { dataDir: options.dataDir, cloud: this.cloud }, this.log, this.workspaceWriters);
-    const backgroundProviders: ProviderInfo = {
-      models: (agent, accountId) => this.runs.models(agent, undefined, undefined, accountId),
-      loggedIn: (accountId) => this.claudeSystemInfo(accountId).then((info) => Object.fromEntries(info.harnesses.map((row) => [row.id, harnessLoggedIn(row)])) as Record<HarnessId, boolean>),
-      launch: (agent, accountId) => {
-        if (this.agentUpdates.get().updating) return null;
-        try {
-          const snapshot = this.environment.current();
-          return captureLaunchEnvironment(agent, agent === "claude" ? this.claudeAccounts.environment(snapshot, accountId) : snapshot);
-        } catch {
-          return null;
-        }
-      },
-    };
+    const backgroundProviders = this.backgroundProviders();
     this.memory = new MemoryService(db, { dataDir: options.dataDir, secrets: options.memorySecrets, embedder: options.embedder }, backgroundProviders, invalidate, this.log);
     this.textGeneration = new TextGenerationService(db, backgroundProviders, invalidate);
     this.orclings = new OrclingService({ db, dataDir: options.dataDir, memory: this.memory, runs: () => this.runs, threads: () => this.threads, invalidate });
@@ -418,11 +411,32 @@ export class OpenOrc {
     this.options.preview?.threadGone(threadId);
   }
 
+  private backgroundProviders(): ProviderInfo {
+    return {
+      models: (agent, accountId) => this.runs.models(agent, undefined, undefined, accountId),
+      loggedIn: (accountId) =>
+        this.claudeSystemInfo(accountId).then(
+          (info) => Object.fromEntries(info.harnesses.map((row) => [row.id, this.settings.enabledHarnesses().includes(row.id) && harnessLoggedIn(row)])) as Record<HarnessId, boolean>,
+        ),
+      launch: (agent, accountId) => {
+        if (!this.settings.enabledHarnesses().includes(agent)) return null;
+        if (this.agentUpdates.get().updating) return null;
+        try {
+          const snapshot = this.environment.current();
+          return captureLaunchEnvironment(agent, agent === "claude" ? this.claudeAccounts.environment(snapshot, accountId) : snapshot);
+        } catch {
+          return null;
+        }
+      },
+    };
+  }
+
   /** What the run module asks of the rest of the app: briefs, permissions, the environment, and what to do as turns end. */
   private runHooks(notify: (n: Omit<Notification, "type">) => void): RunHooks {
     const { options, db } = this;
     return {
       browserAvailable: Boolean(options.browser),
+      enabledHarnesses: () => this.settings.enabledHarnesses(),
       processRegistry: path.join(options.dataDir, "agent-processes"),
       idleTimeoutMs: (thread) => {
         const minutes = this.settings.get().idleProcessMinutes;
@@ -670,9 +684,15 @@ export class OpenOrc {
         system: this.system,
         accountInfo: (refresh, id) => (id ? this.claudeSystemInfo(id, refresh) : this.system.info(refresh)),
         defaultAccountInfo: () => this.claudeSystemInfo(),
+        enabledHarnesses: () => this.settings.enabledHarnesses(),
         agentUpdates: this.agentUpdates,
         providerUsage: this.providerUsage,
-        planLimits: () => readPlanLimits({ db: this.db, usage: this.providerUsage, availability: async () => harnessAvailability(await this.claudeSystemInfo()) }),
+        planLimits: () =>
+          readPlanLimits({
+            db: this.db,
+            usage: this.providerUsage,
+            availability: async () => harnessAvailability(await this.claudeSystemInfo()).filter((row) => this.settings.enabledHarnesses().includes(row.id)),
+          }),
         invalidate,
       }),
       createProjectsHandlers({ db: this.db, projectService: this.projects, invalidate, transport: this.options.transport, copies: this.options.cloudOnly ?? false }),

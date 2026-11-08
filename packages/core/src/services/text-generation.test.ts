@@ -8,7 +8,10 @@ import { TextGenerationService } from "./text-generation.js";
 const quiet = { info() {}, warn() {}, error() {} };
 const model = (id: string, agent: HarnessId = "codex"): ModelOption => ({ id, label: id, agent, isDefault: true, efforts: ["low", "high"], defaultEffort: "high" });
 const databases: Db[] = [];
-function fixture(login = { claude: true, codex: true, opencode: false }, models = [model("gpt-6-astra"), model("gpt-5.6-luna")]) {
+function fixture(
+  login: Record<HarnessId, boolean> = { claude: true, codex: true, opencode: false, omp: false, cursor: false, pi: false, antigravity: false, fx: false },
+  models = [model("gpt-6-astra"), model("gpt-5.6-luna")],
+) {
   const db = Db.memory();
   databases.push(db);
   const providers: ProviderInfo = {
@@ -25,6 +28,29 @@ afterEach(() => {
 });
 
 describe("independent text generation", () => {
+  it.each(["cursor", "pi", "antigravity", "fx"] as const)("reports unsupported background text for %s without probing or launching it", async (agent) => {
+    const { service, providers } = fixture();
+    const title = vi.spyOn(TextGenerator.prototype, "title");
+    const complete = vi.spyOn(TextGenerator.prototype, "complete");
+    await expect(service.title({ request: "Export", reply: null }, agent)).resolves.toBeNull();
+    await expect(service.complete({ prompt: "Explain the export", schema: {}, system: "Explain code", agent })).resolves.toMatchObject({
+      kind: "unavailable",
+      reason: expect.stringMatching(/Background text generation is not available/),
+    });
+    expect(await service.updateSettings({ provider: agent, model: "custom-small-model" })).toMatchObject({
+      provider: agent,
+      model: "custom-small-model",
+      resolved: null,
+      reason: expect.stringMatching(/Background text generation is not available/),
+    });
+    await expect(service.title({ request: "Export", reply: null }, "codex")).resolves.toBeNull();
+    expect(providers.loggedIn).not.toHaveBeenCalled();
+    expect(providers.models).not.toHaveBeenCalled();
+    expect(providers.launch).not.toHaveBeenCalled();
+    expect(title).not.toHaveBeenCalled();
+    expect(complete).not.toHaveBeenCalled();
+  });
+
   it("names a conversation with a small model from its own agent in Automatic", async () => {
     const { service, providers } = fixture();
     const title = vi.spyOn(TextGenerator.prototype, "title").mockResolvedValue("CSV export filters");
@@ -40,7 +66,7 @@ describe("independent text generation", () => {
   });
 
   it("never sends a conversation to another provider in Automatic", async () => {
-    const { service, providers } = fixture({ claude: true, codex: false, opencode: false });
+    const { service, providers } = fixture({ claude: true, codex: false, opencode: false, omp: false, cursor: false, pi: false, antigravity: false, fx: false });
     const title = vi.spyOn(TextGenerator.prototype, "title");
     await expect(service.title({ request: "Export", reply: null }, "codex")).resolves.toBeNull();
     expect(providers.launch).not.toHaveBeenCalledWith("claude", undefined);
@@ -48,7 +74,10 @@ describe("independent text generation", () => {
   });
 
   it("never silently substitutes a flagship or fast premium model for a cheap default", async () => {
-    const { service } = fixture({ claude: false, codex: true, opencode: false }, [model("gpt-6-astra"), model("gpt-5.3-codex-spark")]);
+    const { service } = fixture({ claude: false, codex: true, opencode: false, omp: false, cursor: false, pi: false, antigravity: false, fx: false }, [
+      model("gpt-6-astra"),
+      model("gpt-5.3-codex-spark"),
+    ]);
     const title = vi.spyOn(TextGenerator.prototype, "title");
     expect(await service.updateSettings({ provider: "codex" })).toMatchObject({ resolved: null, reason: expect.stringMatching(/no small model/) });
     await expect(service.title({ request: "Export", reply: null }, "codex")).resolves.toBeNull();
@@ -68,7 +97,7 @@ describe("independent text generation", () => {
   });
 
   it("resolves OpenCode connected-provider models, persists selections, and skips unavailable cheap models", async () => {
-    const { service, db, providers, invalidate } = fixture({ claude: false, codex: false, opencode: true });
+    const { service, db, providers, invalidate } = fixture({ claude: false, codex: false, opencode: true, omp: false, cursor: false, pi: false, antigravity: false, fx: false });
     vi.mocked(providers.models).mockResolvedValue([model("openrouter/anthropic/claude-opus-4.6", "opencode"), model("openrouter/google/gemini-2.5-flash-lite", "opencode")]);
     expect((await service.updateSettings({ provider: "opencode" })).resolved).toMatchObject({ provider: "opencode", model: "openrouter/google/gemini-2.5-flash-lite" });
     await service.updateSettings({ provider: "opencode", model: "openrouter/openai/gpt-5-mini" });
@@ -106,7 +135,7 @@ describe("independent text generation", () => {
   });
 
   it("does not launch when off, logged out, or the selected binary is unavailable", async () => {
-    const { providers, service } = fixture({ claude: false, codex: false, opencode: false });
+    const { providers, service } = fixture({ claude: false, codex: false, opencode: false, omp: false, cursor: false, pi: false, antigravity: false, fx: false });
     const title = vi.spyOn(TextGenerator.prototype, "title");
     expect((await service.updateSettings({ provider: "codex" })).reason).toMatch(/unavailable/);
     await expect(service.title({ request: "Export", reply: null }, "codex")).resolves.toBeNull();
@@ -114,7 +143,7 @@ describe("independent text generation", () => {
     vi.mocked(providers.loggedIn).mockClear();
     await expect(service.title({ request: "Export", reply: null }, "codex")).resolves.toBeNull();
     expect(providers.loggedIn).not.toHaveBeenCalled();
-    vi.mocked(providers.loggedIn).mockResolvedValue({ claude: true, codex: true, opencode: false });
+    vi.mocked(providers.loggedIn).mockResolvedValue({ claude: true, codex: true, opencode: false, omp: false, cursor: false, pi: false, antigravity: false, fx: false });
     vi.mocked(providers.launch).mockReturnValue(null);
     expect((await service.updateSettings({ provider: "claude" })).resolved).toBeNull();
     expect(title).not.toHaveBeenCalled();

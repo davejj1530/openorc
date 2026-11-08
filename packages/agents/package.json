@@ -17,7 +17,8 @@
     "@agentclientprotocol/sdk": "1.4.0",
     "@openorc/protocol": "workspace:*",
     "js-yaml": "4.3.2",
-    "jsonc-parser": "^3.3.1"
+    "jsonc-parser": "^3.3.1",
+    "zod": "^4.6.2"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",

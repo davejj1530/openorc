@@ -46,8 +46,8 @@ export function groupSkills(skills: readonly AgentSkill[], term: string): SkillG
   return skillSources.map(({ id, title }) => ({ id, title, items: matching.filter((skill) => skill.source === id) })).filter((group) => group.items.length > 0);
 }
 
-/** What a message types to call a skill: Codex `$name`, Claude `/name`. OpenCode loads skills through its own tool, so it has none. */
-const callPrefixes: Record<HarnessId, string | null> = { codex: "$", claude: "/", opencode: null };
+/** What a message types to call a skill: Codex `$name`, Claude `/name`, Oh My Pi `/skill:name`. OpenCode loads skills through its own tool, so it has none. */
+const callPrefixes: Record<HarnessId, string | null> = { codex: "$", claude: "/", opencode: null, omp: "/skill:", cursor: "/", pi: "/skill:", antigravity: "/", fx: "$" };
 
 export function skillCall(agent: HarnessId, skill: AgentSkill): string | null {
   const prefix = callPrefixes[agent];
@@ -98,7 +98,7 @@ export interface SkillTrigger {
 
 /** The file of a skill that says how it starts: Claude's header in its own file, Codex's `agents/openai.yaml`. */
 export function triggerSettingsFile(agent: HarnessId, skill: AgentSkill): string | null {
-  const files: Record<HarnessId, string | null> = { claude: mainFile(skill), codex: "agents/openai.yaml", opencode: null };
+  const files: Record<HarnessId, string | null> = { claude: mainFile(skill), codex: "agents/openai.yaml", opencode: null, omp: null, cursor: mainFile(skill), pi: null, antigravity: null, fx: null };
   return files[agent];
 }
 

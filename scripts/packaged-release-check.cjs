@@ -139,7 +139,8 @@ function stop(run) {
     try {
       process.kill(-run.child.pid, "SIGKILL");
     } catch (error) {
-      if (error.code !== "ESRCH") throw error;
+      // macOS answers EPERM, not ESRCH, while the group's only members are processes that exited and await reaping.
+      if (error.code !== "ESRCH" && error.code !== "EPERM") throw error;
     }
   }
 }

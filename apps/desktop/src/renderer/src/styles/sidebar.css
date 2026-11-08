@@ -462,6 +462,9 @@ button.sidebar-nav-row:hover {
   align-items: center;
   gap: 2px;
 }
+.sidebar-new-thread {
+  color: var(--ink);
+}
 
 /* Lists */
 .sidebar-browser-slot {

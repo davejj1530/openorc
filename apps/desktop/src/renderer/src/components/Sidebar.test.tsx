@@ -300,10 +300,12 @@ it("reaches the app's screens from the rail, marking the open one as current", (
 const openFilter = () => fireEvent.click(screen.getByRole("button", { name: /^Threads in / }));
 const scope = (name: string) => screen.getAllByRole("menuitem").find((item) => item.querySelector(".sidebar-scope-name")?.textContent === name)!;
 const chosen = (name: string) => scope(name).querySelector("[data-icon=Check]")?.classList.contains("text-accent-ink") ?? false;
+/** The list head's New thread, beside the filter; the rail holds the other. */
+const listNewThread = () => screen.getAllByRole("button", { name: "New thread" }).find((button) => !button.closest("nav"))!;
 
 it("starts a new thread from the list head, and adds a project from the project filter", () => {
   open("notes");
-  fireEvent.click(screen.getByRole("button", { name: "New thread" }));
+  fireEvent.click(listNewThread());
   expect(useRouter.getState().route).toMatchObject({ view: "newthread" });
   openFilter();
   fireEvent.click(screen.getByRole("menuitem", { name: "Add project" }));
@@ -345,7 +347,7 @@ it("lists only the chosen project's threads, remembers the choice, starts new th
   expect(screen.getByRole("button", { name: /Other notes/ })).toBeTruthy();
   expect(screen.getByRole("button", { name: "Resolved, 2" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "Threads in Second project" })).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "New thread" }));
+  fireEvent.click(listNewThread());
   expect(useRouter.getState().route).toEqual({ view: "newthread", projectId: "two" });
   openFilter();
   expect([chosen("Second project"), chosen("All projects")]).toEqual([true, false]);
@@ -768,8 +770,14 @@ it("keeps the rail while the sidebar is hidden, with New thread at its top for t
   expect(useRouter.getState().route).toMatchObject({ view: "newthread", projectId: "notes" });
 });
 
-it("keeps New thread on the rail while the sidebar shows, and not again in the list's head", () => {
+it("keeps New thread on the rail and beside the filter at the end of the list's head", () => {
   mountSidebar();
   expect(within(screen.getByRole("navigation", { name: "Screens" })).getByRole("button", { name: "New thread" })).toBeTruthy();
-  expect(screen.getAllByRole("button", { name: "New thread" })).toHaveLength(1);
+  expect(screen.getAllByRole("button", { name: "New thread" })).toHaveLength(2);
+  const head = screen.getByRole("button", { name: "Search" }).parentElement!;
+  expect(
+    within(head)
+      .getAllByRole("button")
+      .map((button) => button.getAttribute("aria-label") ?? button.textContent),
+  ).toEqual(["Search", "Filter threads", "New thread"]);
 });

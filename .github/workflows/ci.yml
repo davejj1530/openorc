@@ -22,7 +22,7 @@ jobs:
     # Keep the existing required-check name while the work runs in parallel.
     name: Typecheck, test, build
     runs-on: ubuntu-24.04
-    needs: [quality, core-tests, linux, linux-tests, linux-core-tests]
+    needs: [quality, core-tests, linux, linux-tests, linux-desktop-tests, linux-core-tests]
     if: always()
     steps:
       - name: Require all checks and test shards to pass
@@ -49,9 +49,15 @@ jobs:
       - run: pnpm check:size
       - run: node --test scripts/size-limit.test.cjs
       - run: node --test scripts/distribution-notices.test.cjs scripts/desktop-release.test.cjs scripts/packaged-native-target.test.cjs scripts/packaged-runtime-dependencies.test.cjs
-      # Core has its own shards; keep every other workspace's test script here. Tests need no build order, so every
-      # workspace starts at once instead of waiting for the ones it depends on.
-      - run: pnpm -r --no-sort --filter '!@openorc/core' test
+      # Core has its own shards. Desktop's jsdom tests time out beside other workspaces and render the same on Linux,
+      # which runs them alone; its main-process tests run here after the rest.
+      - run: pnpm -r --filter '!@openorc/core' --filter '!@openorc/desktop' test
+        env:
+          GIT_AUTHOR_NAME: ci
+          GIT_AUTHOR_EMAIL: ci@openorc.local
+          GIT_COMMITTER_NAME: ci
+          GIT_COMMITTER_EMAIL: ci@openorc.local
+      - run: pnpm --filter @openorc/desktop exec vitest run --project node
         env:
           GIT_AUTHOR_NAME: ci
           GIT_AUTHOR_EMAIL: ci@openorc.local
@@ -146,7 +152,27 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm -r --no-sort --filter '!@openorc/core' test
+      - run: pnpm -r --filter '!@openorc/core' --filter '!@openorc/desktop' test
+        env:
+          GIT_AUTHOR_NAME: ci
+          GIT_AUTHOR_EMAIL: ci@openorc.local
+          GIT_COMMITTER_NAME: ci
+          GIT_COMMITTER_EMAIL: ci@openorc.local
+
+  # Desktop's jsdom tests wait on rendering and time out when other workspaces share the runner.
+  linux-desktop-tests:
+    name: Linux desktop tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @openorc/desktop test
         env:
           GIT_AUTHOR_NAME: ci
           GIT_AUTHOR_EMAIL: ci@openorc.local

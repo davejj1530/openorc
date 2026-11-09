@@ -289,7 +289,7 @@ async function siteImage(web: LogoWeb, site: string): Promise<string | null> {
 export class SiteLogos {
   private readonly found = new Map<string, string | null>();
   private readonly failedAt = new Map<string, number>();
-  private readonly looking = new Set<string>();
+  private readonly looking = new Map<string, Promise<void>>();
 
   constructor(private readonly web: LogoWeb = theWeb) {}
 
@@ -298,10 +298,20 @@ export class SiteLogos {
     return source ? (this.found.get(keyOf(source)) ?? null) : null;
   }
 
-  /** Looks for each source not yet answered for; resolves when every new look has ended, true if one found an image. */
-  async look(sources: readonly LogoSource[]): Promise<boolean> {
-    const due = new Map(sources.filter((source) => this.due(keyOf(source))).map((source) => [keyOf(source), source]));
-    await Promise.all([...due].map(([key, source]) => this.lookFor(key, source)));
+  /** Shares pending lookups and reports each image as it arrives; resolves true if any lookup found an image. */
+  async look(sources: readonly LogoSource[], onFound?: () => void): Promise<boolean> {
+    const due = new Map(sources.filter((source) => this.looking.has(keyOf(source)) || this.due(keyOf(source))).map((source) => [keyOf(source), source]));
+    await Promise.all(
+      [...due].map(async ([key, source]) => {
+        let pending = this.looking.get(key);
+        if (!pending) {
+          pending = this.lookFor(key, source);
+          this.looking.set(key, pending);
+        }
+        await pending;
+        if (this.found.get(key)) onFound?.();
+      }),
+    );
     return [...due.keys()].some((key) => this.found.get(key));
   }
 
@@ -311,7 +321,6 @@ export class SiteLogos {
   }
 
   private async lookFor(key: string, source: LogoSource): Promise<void> {
-    this.looking.add(key);
     try {
       this.found.set(key, "site" in source ? await siteImage(this.web, source.site) : await iconImage(source.icon, this.web));
       this.failedAt.delete(key);

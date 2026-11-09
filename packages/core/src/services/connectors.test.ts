@@ -1,8 +1,13 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it, onTestFinished, vi } from "vitest";
 import type { ConnectorDriver, ConnectorRow } from "@openorc/agents";
+import { Db } from "@openorc/db";
 import { enabledHarnessIds, type AppSettings, type Connector, type ConnectorSpec } from "@openorc/protocol";
+import { SiteLogos, type LogoWeb } from "./connector-logos.js";
 import { ConnectorService, type ConnectorDrivers } from "./connectors.js";
-import type { RememberedConnectors } from "./remembered-connectors.js";
+import { rememberedConnectors, type RememberedConnectors } from "./remembered-connectors.js";
 import type { AppSettingsService } from "./settings.js";
 
 /** Where each host resolves; any other name is not found. */
@@ -41,15 +46,23 @@ function fakeSiteLogos(images: Record<string, string> = {}) {
   return {
     looked,
     get: (source: { site: string } | { icon: string } | null) => images[key(source)] ?? null,
-    look: async (sources: readonly ({ site: string } | { icon: string })[]) => {
+    look: async (sources: readonly ({ site: string } | { icon: string })[], onFound?: () => void) => {
       looked.push(...sources.map(key));
+      for (const source of sources) if (images[key(source)]) onFound?.();
       return sources.some((source) => images[key(source)]);
     },
   };
 }
 
 function setup(
-  options: { claude?: Record<string, ConnectorRow[]>; codex?: ConnectorRow[]; settings?: Partial<AppSettings>; siteImages?: Record<string, string>; remembered?: RememberedConnectors } = {},
+  options: {
+    claude?: Record<string, ConnectorRow[]>;
+    codex?: ConnectorRow[];
+    settings?: Partial<AppSettings>;
+    siteImages?: Record<string, string>;
+    logoWeb?: LogoWeb;
+    remembered?: RememberedConnectors;
+  } = {},
 ) {
   const siteLogos = fakeSiteLogos(options.siteImages);
   const calls: string[] = [];
@@ -121,12 +134,42 @@ function setup(
     },
     store,
     changed,
-    { open: (url) => opened.push(url), drivers, siteLogos, ...(options.remembered ? { remembered: options.remembered } : {}) },
+    { open: (url) => opened.push(url), drivers, siteLogos: options.logoWeb ? new SiteLogos(options.logoWeb) : siteLogos, ...(options.remembered ? { remembered: options.remembered } : {}) },
   );
   return { service, calls, opened, changed, siteLogos, settings: () => settings };
 }
 
 const spec: ConnectorSpec = { kind: "url", url: "https://paper.example/mcp", headers: {} };
+
+const SITE_IMAGE = "data:image/png;base64,iVBORw0KGgo=";
+
+function delayedLogoWeb() {
+  const waiting = new Map<string, () => void>();
+  const asked: string[] = [];
+  const web: LogoWeb = {
+    timeoutMs: 1000,
+    resolve: async () => ["93.184.216.34"],
+    fetch: async (url) => {
+      asked.push(url.href);
+      if (url.pathname === "/") {
+        await new Promise<void>((resolve) => waiting.set(url.hostname, resolve));
+        return new Response('<link rel="icon" href="/logo.png">', { headers: { "content-type": "text/html" } });
+      }
+      return new Response(new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]), { headers: { "content-type": "image/png" } });
+    },
+  };
+  onTestFinished(() => {
+    for (const release of waiting.values()) release();
+  });
+  return {
+    web,
+    asked,
+    release: async (host: string) => {
+      await vi.waitFor(() => expect(waiting.has(host)).toBe(true));
+      waiting.get(host)?.();
+    },
+  };
+}
 
 describe("connectors", () => {
   it("answers a fresh start with the list last read in the folder, then reads again and keeps what it finds", async () => {
@@ -276,6 +319,71 @@ describe("connectors", () => {
       ["linear", image],
       ["local", null],
     ]);
+  });
+
+  it("publish each website logo before another connector's lookup finishes", async () => {
+    const web = delayedLogoWeb();
+    const { service, changed } = setup({
+      codex: [row("fast", "connected", { site: "fast.example.com" }), row("slow", "connected", { site: "slow.example.com" })],
+      logoWeb: web.web,
+    });
+    expect((await service.list("/tmp/example-project")).connectors.map((connector) => connector.logo)).toEqual([null, null]);
+
+    await web.release("fast.example.com");
+    await vi.waitFor(() => expect(changed).toHaveBeenCalled());
+    expect((await service.list("/tmp/example-project")).connectors.map((connector) => connector.logo)).toEqual([SITE_IMAGE, null]);
+
+    changed.mockClear();
+    await web.release("slow.example.com");
+    await vi.waitFor(() => expect(changed).toHaveBeenCalled());
+    expect((await service.list("/tmp/example-project")).connectors.map((connector) => connector.logo)).toEqual([SITE_IMAGE, SITE_IMAGE]);
+  });
+
+  it("save downloaded logos and keep them through an offline restart and refresh", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "connector-logos-"));
+    const file = path.join(dir, "ledger.sqlite");
+    let db = Db.open(file);
+    onTestFinished(async () => {
+      db.close();
+      await rm(dir, { recursive: true, force: true });
+    });
+    const web = delayedLogoWeb();
+    const codex = [row("example", "connected", { site: "icons.example.com" })];
+    const remembered = rememberedConnectors(db);
+    const first = setup({ codex, logoWeb: web.web, remembered });
+    expect((await first.service.list("/tmp/example-project")).connectors[0]?.logo).toBeNull();
+    await web.release("icons.example.com");
+    await vi.waitFor(() => expect(first.changed).toHaveBeenCalled());
+    expect(remembered.load("/tmp/example-project")?.[0]?.logo).toBe(SITE_IMAGE);
+
+    db.close();
+    db = Db.open(file);
+    const offline: LogoWeb = {
+      ...web.web,
+      fetch: async () => {
+        throw new TypeError("fetch failed");
+      },
+    };
+    for (const refresh of [false, true]) {
+      const next = setup({ codex, logoWeb: offline, remembered: rememberedConnectors(db) });
+      expect((await next.service.list("/tmp/example-project", refresh)).connectors[0]?.logo).toBe(SITE_IMAGE);
+      await vi.waitFor(async () => expect((await next.service.list("/tmp/example-project")).checking).toBe(false));
+      expect((await next.service.list("/tmp/example-project")).connectors[0]?.logo).toBe(SITE_IMAGE);
+      expect(rememberedConnectors(db).load("/tmp/example-project")?.[0]?.logo).toBe(SITE_IMAGE);
+    }
+  });
+
+  it("save a shared website download for every folder waiting for its logo", async () => {
+    const web = delayedLogoWeb();
+    const kept = new Map<string, Connector[]>();
+    const remembered: RememberedConnectors = { load: (folder) => kept.get(folder) ?? null, save: (folder, connectors) => void kept.set(folder, connectors) };
+    const { service } = setup({ codex: [row("example", "connected", { site: "icons.example.com" })], logoWeb: web.web, remembered });
+    const folders = ["/tmp/example-project", "/tmp/another-project"];
+    for (const folder of folders) await service.list(folder);
+
+    await web.release("icons.example.com");
+    await vi.waitFor(() => expect(folders.map((folder) => remembered.load(folder)?.[0]?.logo)).toEqual([SITE_IMAGE, SITE_IMAGE]));
+    expect(web.asked).toEqual(["https://icons.example.com/", "https://icons.example.com/logo.png"]);
   });
 
   it("read again after a change that landed while a read was under way", async () => {

@@ -175,8 +175,9 @@ export class ConnectorService {
     }
     const entry = this.readings.get(folder);
     const fresh = entry?.value && Date.now() - entry.value.at < FRESH_MS;
-    const remembered = refresh || entry?.value ? null : this.remembered.load(folder);
-    if (remembered) {
+    const remembered = entry?.value ? null : this.remembered.load(folder);
+    for (const connector of remembered ?? []) if (connector.logo && !this.logoByName.has(connector.name)) this.logoByName.set(connector.name, connector.logo);
+    if (remembered && !refresh) {
       void this.read(folder).then(this.changed, () => undefined);
       return { ...this.answer(folder), connectors: this.enabledConnectors(remembered), checking: true };
     }
@@ -319,6 +320,7 @@ export class ConnectorService {
       // A change landed while this read ran: keep the answer to show, but read again before trusting it.
       entry.value = generation === this.generation ? value : { ...value, at: 0 };
       this.remembered.save(folder, this.answer(folder).connectors);
+      this.lookForSiteLogos(folder, value.rows);
       return value;
     })().finally(() => {
       if (entry.pending === pending) entry.pending = null;
@@ -357,7 +359,6 @@ export class ConnectorService {
     );
     this.retireLegacySwitch(rows);
     await this.fetchLogos(rows.flatMap((entry) => entry.rows.flatMap((row) => row.icons.slice(0, 1))));
-    this.lookForSiteLogos(rows);
     rows.sort((a, b) => places.indexOf(a.place) - places.indexOf(b.place));
     return { at: Date.now(), rows, unavailable };
   }
@@ -421,13 +422,16 @@ export class ConnectorService {
   }
 
   /** For servers that send no image, looks on their makers' sites behind the list, and shows what it finds. */
-  private lookForSiteLogos(rows: Reading["rows"]): void {
+  private lookForSiteLogos(folder: string, rows: Reading["rows"]): void {
     const sites = connectorSites(rows);
     const sources = mergeConnectors(rows, this.logos).flatMap((connector) => {
       const source = connector.logo ? null : logoSource(connector.title, sites.get(connector.name) ?? []);
       return source ? [source] : [];
     });
-    void this.siteLogos.look(sources).then((found) => found && this.changed());
+    void this.siteLogos.look(sources, () => {
+      this.remembered.save(folder, this.answer(folder).connectors);
+      this.changed();
+    });
   }
 
   private async fetchLogos(sources: string[]): Promise<void> {

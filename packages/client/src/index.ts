@@ -219,3 +219,17 @@ export {
 } from "./work-steps.js";
 export { workDuration, workParts, workTiming, workTurns } from "./work-transcript.js";
 export { useChildThreadPages, cachedChildPage, cachedListPage } from "./thread-child-pages.js";
+export {
+  ORCLING_ACCESSORIES,
+  ORCLING_BODY_COLORS,
+  ORCLING_EYE_COLORS,
+  ORCLING_EYES,
+  ORCLING_GLASSES,
+  ORCLING_INKS,
+  ORCLING_SHAPES,
+  ORCLING_TEXTURES,
+  orclingAccessory,
+  orclingEyes,
+  orclingGlasses,
+} from "./orcling-art.js";
+export { CHAT_STRETCH_MS, chatRows, stretchTime, typingBeat, type ChatRow } from "./orcling-chat.js";

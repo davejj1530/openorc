@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
 import { Reaction, reactionEmoji, type MessageReaction, type Orcling } from "@openorc/protocol";
-import type { Block } from "@openorc/client";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { useReducedMotion } from "../lib/motion";
-import { chatRows, stretchTime, typingBeat, type ChatRow } from "../lib/orcling-chat";
+import { chatRows, stretchTime, typingBeat, type Block, type ChatRow } from "@openorc/client";
 import { OrclingAvatar } from "./OrclingAvatar";
 import { ThreadRichText } from "./ThreadImages";
 import { UserMessage } from "./UserMessage";

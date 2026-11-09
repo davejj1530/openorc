@@ -4,7 +4,7 @@ import { cn } from "../lib/cn";
 import { useLayout } from "../lib/layout";
 import { orclingById, useOrclings } from "../lib/orclings";
 import { Tooltip } from "./ui";
-import { ORCLING_SHAPES, orclingAccessory, orclingEyes, orclingGlasses } from "./orcling-art";
+import { ORCLING_SHAPES, orclingAccessory, orclingEyes, orclingGlasses } from "@openorc/client";
 
 /** Light from the top left and shade at the bottom right, over any body color. */
 function Texture({ id, body, look }: { id: string; body: string; look: OrclingLook }) {

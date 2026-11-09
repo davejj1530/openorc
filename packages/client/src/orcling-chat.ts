@@ -1,5 +1,6 @@
 import { chatBubbles } from "@openorc/protocol";
-import { startedWorkFromTool, taskIdFromTool, type Block } from "@openorc/client";
+import { startedWorkFromTool, taskIdFromTool } from "./task-progress.js";
+import type { Block } from "./transcript.js";
 
 type Message = Extract<Block, { kind: "message" }>;
 

@@ -12,7 +12,7 @@ import { ArrowLeft } from "../components/icons";
 import { ModelPicker } from "../components/ModelPicker";
 import { OrclingSilhouette, OrclingStill } from "../components/OrclingAvatar";
 import { OrclingPreview } from "../components/OrclingPreview";
-import { ORCLING_ACCESSORIES, ORCLING_BODY_COLORS, ORCLING_EYE_COLORS, ORCLING_EYES, ORCLING_GLASSES, ORCLING_SHAPES, ORCLING_TEXTURES } from "../components/orcling-art";
+import { ORCLING_ACCESSORIES, ORCLING_BODY_COLORS, ORCLING_EYE_COLORS, ORCLING_EYES, ORCLING_GLASSES, ORCLING_SHAPES, ORCLING_TEXTURES } from "@openorc/client";
 import { TopBar } from "../components/TopBar";
 import { Button, Dialog, IconButton, Segmented, Select } from "../components/ui";
 import "./OrclingDesigner.css";

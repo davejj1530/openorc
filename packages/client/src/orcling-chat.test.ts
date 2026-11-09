@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
-import type { Block } from "@openorc/client";
-import { CHAT_STRETCH_MS, chatRows } from "./orcling-chat";
+import type { Block } from "./transcript.js";
+import { CHAT_STRETCH_MS, chatRows } from "./orcling-chat.js";
 
 const message = (id: string, role: "user" | "assistant" | "system", text: string, at: number, streaming = false): Block => ({ id, kind: "message", role, text, streaming, at, runId: "run" });
 

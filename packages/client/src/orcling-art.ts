@@ -86,6 +86,9 @@ export const ORCLING_EYE_COLORS: readonly { name: string; hex: string }[] = [
   { name: "Light eyes", hex: "#f4f4f7" },
 ];
 
+/** The artwork's own fixed colors, the same on every ground: glints and texture light, texture shade, and dark lenses. */
+export const ORCLING_INKS = { light: "#fff", shade: "#000", lens: "#1b1c20" } as const;
+
 /** The eyes as SVG shapes in the eye color, with white glints where the style has them. */
 export function orclingEyes(style: number): { path: string; glints: string } {
   switch (style) {

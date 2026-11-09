@@ -1,7 +1,7 @@
 import { Menu } from "@base-ui/react/menu";
-import { canMoveToCloud, cloudServiceMissing, offersBrainMove, snoozePresets, threadResolved } from "@openorc/client";
+import { snoozePresets, threadResolved } from "@openorc/client";
 import type { ThreadSummary } from "@openorc/protocol";
-import { WORKSPACE_ID, isSubagentThread, forkUnavailable } from "@openorc/protocol";
+import { isSubagentThread, forkUnavailable } from "@openorc/protocol";
 import { useRef, useState } from "react";
 import { CoversPreview } from "../lib/browser-preview";
 import { useRpc, useRpcMutation } from "../lib/client";
@@ -11,51 +11,30 @@ import { useThreadMutationPending } from "../lib/thread-mutations";
 import { useThreadTabs } from "../lib/thread-tabs";
 import { useUi } from "../lib/ui";
 import { floatingGround } from "../lib/use-anchor-ground";
-import {
-  AlarmClock,
-  AppWindow,
-  ChevronRight,
-  CircleCheck,
-  Cloud,
-  Columns2,
-  Folder,
-  GitBranch,
-  GitFork,
-  Laptop,
-  MailOpen,
-  PenSquare,
-  Pencil,
-  Pin,
-  PinOff,
-  RotateCcw,
-  SquarePlus,
-  Trash2,
-} from "./icons";
+import { AlarmClock, AppWindow, ChevronRight, CircleCheck, Columns2, GitFork, MailOpen, PenSquare, Pencil, Pin, PinOff, RotateCcw, SquarePlus, Trash2 } from "./icons";
 import { menuItem, menuItemDanger, menuPopup, menuSeparator } from "./menu";
+import { ThreadPlaceItems } from "./ThreadPlaceItems";
 import { Button, Dialog } from "./ui";
 
 /** The parts a dropdown and a context menu share, so one item list serves both. */
 export type MenuParts = Pick<typeof Menu, "Item" | "Separator" | "SubmenuRoot" | "SubmenuTrigger" | "Portal" | "Positioner" | "Popup">;
 
+/**
+ * Where the menu opens. The header's thread is open right there, so opening it again, its parent (the header shows
+ * that link) and marking it unread (looking at it reads it) drop out; Rename joins in. A sidebar row keeps them all.
+ */
+type ItemsProps = { thread: ThreadSummary; parts: MenuParts; header?: boolean; onRename?: () => void };
+
 /** Every action a thread has, as menu items. The same list serves the header menu and the sidebar's context menu. */
-export function ThreadMenuItems({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
+export function ThreadMenuItems({ thread, parts: M, header, onRename }: ItemsProps) {
   const home = orclingHome(useOrclings(), thread.id);
   if (isSubagentThread(thread))
     return (
       <>
-        <M.Item className={menuItem} onClick={() => useThreadTabs.getState().openThread(thread.id)}>
-          <SquarePlus size={13} /> Open in new tab
-        </M.Item>
-        <M.Item className={menuItem} onClick={() => useRouter.getState().addThreadPane(thread.id)}>
-          <Columns2 size={13} /> Open beside
-        </M.Item>
-        <M.Item className={menuItem} onClick={() => window.openorc.openWindow(`thread:${thread.id}`)}>
-          <AppWindow size={13} /> Open in new window
-        </M.Item>
-        <OpenParentItem thread={thread} parts={M} />
+        {header ? <OpenWindowItem thread={thread} parts={M} /> : <OpenItems thread={thread} parts={M} />}
         {thread.subagent?.status !== "running" && thread.activity === "idle" ? (
           <M.Item className={menuItemDanger} onClick={() => useUi.getState().setDeleteThread(thread.id)}>
-            <Trash2 size={13} /> Delete thread
+            <Trash2 size={13} /> Delete
           </M.Item>
         ) : null}
       </>
@@ -63,166 +42,139 @@ export function ThreadMenuItems({ thread, parts: M }: { thread: ThreadSummary; p
   // An Orcling's own conversation lives and goes with the Orcling, which you change in its designer.
   if (home) {
     return (
-      <M.Item className={menuItem} onClick={() => useRouter.getState().navigate({ view: "orcling", orclingId: home.id })}>
-        <Pencil size={13} /> Edit {home.name}
-      </M.Item>
+      <>
+        {onRename ? <RenameItem parts={M} onRename={onRename} /> : null}
+        <M.Item className={menuItem} onClick={() => useRouter.getState().navigate({ view: "orcling", orclingId: home.id })}>
+          <Pencil size={13} /> Edit {home.name}
+        </M.Item>
+      </>
     );
   }
-  return <ThreadMenuContent key={thread.id} thread={thread} parts={M} />;
+  return <ThreadMenuContent key={thread.id} thread={thread} parts={M} header={header} onRename={onRename} />;
 }
 
-function OpenParentItem({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
-  const parent = thread.parentThreadId;
-  return parent ? (
-    <M.Item className={menuItem} onClick={() => openThread(parent)}>
-      Open parent
+function RenameItem({ parts: M, onRename }: { parts: MenuParts; onRename: () => void }) {
+  return (
+    <M.Item className={menuItem} onClick={onRename}>
+      <Pencil size={13} /> Rename
     </M.Item>
-  ) : null;
+  );
 }
 
-function ThreadMenuContent({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
-  const update = useRpcMutation("threads.update");
-  const addPane = useRouter((s) => s.addThreadPane);
+/** A sidebar row's ways to look at its thread, without leaving the one in front. */
+function OpenItems({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
   const cannotSplit = useRouter((s) => s.threadIds.includes(thread.id) || s.threadIds.length >= MAX_THREAD_PANES);
-  const patch = (p: Parameters<typeof update.mutate>[0]["patch"]) => update.mutate({ id: thread.id, patch: p });
-  const resolved = threadResolved(thread, Date.now());
-  const busy = thread.activity !== "idle";
-  const team = Boolean(thread.teamInstanceId);
-  // Mutations can outlive a closed menu. Reopening it must not enable sibling writes.
-  const mutating = useThreadMutationPending(thread.id);
-  const lifecycleBlocked = mutating;
-  const moveReason = team ? "This item is no longer available." : null;
-  const deleteReason = moveReason;
-  const actionError = update.error;
-  const inCloud = thread.owner?.brain === "cloud";
-
+  const parent = thread.parentThreadId;
   return (
     <>
       <M.Item className={menuItem} onClick={() => useThreadTabs.getState().openThread(thread.id)}>
         <SquarePlus size={13} /> Open in new tab
       </M.Item>
-      <M.Item className={menuItem} disabled={cannotSplit} onClick={() => addPane(thread.id)}>
+      <M.Item className={menuItem} disabled={cannotSplit} onClick={() => useRouter.getState().addThreadPane(thread.id)}>
         <Columns2 size={13} /> Open beside
       </M.Item>
-      <M.Item className={menuItem} onClick={() => window.openorc.openWindow(`thread:${thread.id}`)}>
-        <AppWindow size={13} /> Open in new window
-      </M.Item>
-      <OpenParentItem thread={thread} parts={M} />
-      <M.Separator className={menuSeparator} />
+      <OpenWindowItem thread={thread} parts={M} />
+      {parent ? (
+        <M.Item className={menuItem} onClick={() => openThread(parent)}>
+          Open parent
+        </M.Item>
+      ) : null}
+    </>
+  );
+}
 
-      {actionError ? (
+function ThreadMenuContent({ thread, parts: M, header, onRename }: ItemsProps) {
+  const update = useRpcMutation("threads.update");
+  const patch = (p: Parameters<typeof update.mutate>[0]["patch"]) => update.mutate({ id: thread.id, patch: p });
+  // Mutations can outlive a closed menu. Reopening it must not enable sibling writes.
+  const mutating = useThreadMutationPending(thread.id);
+
+  return (
+    <>
+      {header ? null : (
+        <>
+          <OpenItems thread={thread} parts={M} />
+          <M.Separator className={menuSeparator} />
+        </>
+      )}
+      <ThreadPlaceItems thread={thread} parts={M} />
+      {update.error ? (
         <div className="max-w-64 px-2 py-1 text-xs text-bad break-words" role="alert">
-          {actionError?.message}
+          {update.error.message}
         </div>
       ) : null}
+      {onRename ? <RenameItem parts={M} onRename={onRename} /> : null}
       <M.Item className={menuItem} disabled={mutating} onClick={() => patch({ pinned: !thread.pinnedAt })}>
         {thread.pinnedAt ? <PinOff size={13} /> : <Pin size={13} />} {thread.pinnedAt ? "Unpin" : "Pin"}
       </M.Item>
-      <M.SubmenuRoot>
-        <M.SubmenuTrigger className={menuItem} disabled={lifecycleBlocked}>
-          <AlarmClock size={13} /> {thread.snoozedUntil ? "Snoozed" : "Snooze"}
-          <ChevronRight size={14} className="ml-auto" />
-        </M.SubmenuTrigger>
-        <M.Portal>
-          <CoversPreview />
-          <M.Positioner sideOffset={4} alignOffset={-6} collisionPadding={8}>
-            <M.Popup ref={floatingGround} className={menuPopup}>
-              {snoozePresets().map((p) => (
-                <M.Item key={p.label} className={menuItem} disabled={lifecycleBlocked} closeOnClick onClick={() => patch({ snoozedUntil: p.until(new Date()) })}>
-                  {p.label}
-                </M.Item>
-              ))}
-              {thread.snoozedUntil ? (
-                <>
-                  <M.Separator className={menuSeparator} />
-                  <M.Item className={menuItem} disabled={lifecycleBlocked} closeOnClick onClick={() => patch({ snoozedUntil: null })}>
-                    Wake now
-                  </M.Item>
-                </>
-              ) : null}
-            </M.Popup>
-          </M.Positioner>
-        </M.Portal>
-      </M.SubmenuRoot>
-      <M.Item className={menuItem} disabled={mutating} onClick={() => patch({ seen: thread.unread })}>
-        <MailOpen size={13} /> {thread.unread ? "Mark as read" : "Mark as unread"}
-      </M.Item>
+      <SnoozeItem thread={thread} parts={M} disabled={mutating} patch={patch} />
+      {header ? null : (
+        <M.Item className={menuItem} disabled={mutating} onClick={() => patch({ seen: thread.unread })}>
+          <MailOpen size={13} /> {thread.unread ? "Mark as read" : "Mark as unread"}
+        </M.Item>
+      )}
       <M.Separator className={menuSeparator} />
       <ThreadForkActions thread={thread} parts={M} />
-
-      {thread.projectId !== WORKSPACE_ID && !inCloud ? (
-        <M.Item className={menuItem} disabled={team ? Boolean(moveReason) || mutating : busy} title={moveReason ?? undefined} onClick={() => useUi.getState().setMoveThread(thread.id)}>
-          {thread.workspaceMode === "worktree" ? <Laptop size={13} /> : <GitBranch size={13} />} {thread.workspaceMode === "worktree" ? "Move to the checkout" : "Move to a worktree"}
-        </M.Item>
-      ) : null}
-      <CloudMoveItems thread={thread} parts={M} />
+      {header ? <OpenWindowItem thread={thread} parts={M} /> : null}
       <M.Separator className={menuSeparator} />
-      <M.Item className={menuItem} disabled={lifecycleBlocked} closeOnClick onClick={() => patch({ archived: !resolved })}>
+      <LifecycleItems thread={thread} parts={M} disabled={mutating} patch={patch} />
+    </>
+  );
+}
+
+function OpenWindowItem({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
+  return (
+    <M.Item className={menuItem} onClick={() => window.openorc.openWindow(`thread:${thread.id}`)}>
+      <AppWindow size={13} /> Open in new window
+    </M.Item>
+  );
+}
+
+type Patch = (patch: { snoozedUntil?: number | null; archived?: boolean }) => void;
+
+function SnoozeItem({ thread, parts: M, disabled, patch }: { thread: ThreadSummary; parts: MenuParts; disabled: boolean; patch: Patch }) {
+  return (
+    <M.SubmenuRoot>
+      <M.SubmenuTrigger className={menuItem} disabled={disabled}>
+        <AlarmClock size={13} /> {thread.snoozedUntil ? "Snoozed" : "Snooze"}
+        <ChevronRight size={14} className="ml-auto" />
+      </M.SubmenuTrigger>
+      <M.Portal>
+        <CoversPreview />
+        <M.Positioner sideOffset={4} alignOffset={-6} collisionPadding={8}>
+          <M.Popup ref={floatingGround} className={menuPopup}>
+            {snoozePresets().map((p) => (
+              <M.Item key={p.label} className={menuItem} disabled={disabled} closeOnClick onClick={() => patch({ snoozedUntil: p.until(new Date()) })}>
+                {p.label}
+              </M.Item>
+            ))}
+            {thread.snoozedUntil ? (
+              <>
+                <M.Separator className={menuSeparator} />
+                <M.Item className={menuItem} disabled={disabled} closeOnClick onClick={() => patch({ snoozedUntil: null })}>
+                  Wake now
+                </M.Item>
+              </>
+            ) : null}
+          </M.Popup>
+        </M.Positioner>
+      </M.Portal>
+    </M.SubmenuRoot>
+  );
+}
+
+function LifecycleItems({ thread, parts: M, disabled, patch }: { thread: ThreadSummary; parts: MenuParts; disabled: boolean; patch: Patch }) {
+  const resolved = threadResolved(thread, Date.now());
+  const team = Boolean(thread.teamInstanceId);
+  return (
+    <>
+      <M.Item className={menuItem} disabled={disabled} closeOnClick onClick={() => patch({ archived: !resolved })}>
         {resolved ? <RotateCcw size={13} /> : <CircleCheck size={13} />} {resolved ? "Reopen" : "Resolve"}
       </M.Item>
-
-      <M.Item className={menuItemDanger} disabled={team || mutating} title={deleteReason ?? undefined} onClick={() => useUi.getState().setDeleteThread(thread.id)}>
-        <Trash2 size={13} /> {"Delete thread"}
+      <M.Item className={menuItemDanger} disabled={team || disabled} title={team ? "This item is no longer available." : undefined} onClick={() => useUi.getState().setDeleteThread(thread.id)}>
+        <Trash2 size={13} /> Delete
       </M.Item>
     </>
-  );
-}
-
-/** Where the conversation lives: Move to cloud, Bring to Mac, or Keep where it is while it moves. */
-function CloudMoveItems({ thread, parts }: { thread: ThreadSummary; parts: MenuParts }) {
-  if (thread.moving) return <KeepItem thread={thread} parts={parts} to={thread.moving.to} />;
-  if (thread.owner?.brain === "cloud") return <CloudThreadItems thread={thread} parts={parts} />;
-  return <MoveToCloudItem thread={thread} parts={parts} />;
-}
-
-function MenuError({ error }: { error: Error | null }) {
-  return error ? (
-    <p role="alert" className="max-w-64 px-2 py-1 text-xs text-bad break-words">
-      {error.message}
-    </p>
-  ) : null;
-}
-
-function KeepItem({ thread, parts: M, to }: { thread: ThreadSummary; parts: MenuParts; to: "mac" | "cloud" }) {
-  const keep = useRpcMutation("cloud.keep");
-  return (
-    <>
-      <MenuError error={keep.error} />
-      <M.Item className={menuItem} disabled={keep.isPending} onClick={() => keep.mutate({ threadId: thread.id })}>
-        {to === "cloud" ? <Laptop size={13} /> : <Cloud size={13} />} {to === "cloud" ? "Keep on this Mac" : "Keep in the cloud"}
-      </M.Item>
-    </>
-  );
-}
-
-function CloudThreadItems({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
-  const bring = useRpcMutation("cloud.bringToMac");
-  const openCopy = useRpcMutation("cloud.openOnMac");
-  const closeCopy = useRpcMutation("cloud.closeOnMac");
-  const mirrored = Boolean(thread.owner?.mirror);
-  return (
-    <>
-      <MenuError error={bring.error ?? openCopy.error ?? closeCopy.error} />
-      <M.Item className={menuItem} disabled={thread.activity !== "idle" || bring.isPending} onClick={() => bring.mutate({ threadId: thread.id })}>
-        <Laptop size={13} /> Bring to Mac
-      </M.Item>
-      <M.Item className={menuItem} disabled={openCopy.isPending || closeCopy.isPending} onClick={() => (mirrored ? closeCopy : openCopy).mutate({ threadId: thread.id })}>
-        <Folder size={13} /> {mirrored ? "Close on Mac" : "Open on Mac"}
-      </M.Item>
-    </>
-  );
-}
-
-/** With a cloud brain, the move is the brain's and may be refused with its reason; without one, today's sandbox move. */
-function MoveToCloudItem({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
-  const offer = useRpc("cloud.offer", {}).data;
-  const brain = Boolean(offer?.brain);
-  if (!(brain ? offersBrainMove(thread) : canMoveToCloud(thread))) return null;
-  const missing = cloudServiceMissing(offer);
-  return (
-    <M.Item className={menuItem} disabled={thread.activity !== "idle" || Boolean(missing)} title={missing ?? undefined} onClick={() => useUi.getState().setMoveThread(thread.id, "cloud")}>
-      <Cloud size={13} /> Move to cloud
-    </M.Item>
   );
 }
 

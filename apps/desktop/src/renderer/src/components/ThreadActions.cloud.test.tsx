@@ -24,7 +24,7 @@ import { ThreadMenuItems, type MenuParts } from "./ThreadActions";
 
 const base = { id: "t1", title: "Thread", projectId: "p1", agent: "claude", activity: "idle", openTaskCount: 0, workspaceMode: "worktree", queued: [] } as unknown as ThreadSummary;
 
-function open(thread: Partial<ThreadSummary>): void {
+function open(thread: Partial<ThreadSummary>, place?: string): void {
   render(
     <Menu.Root open>
       <Menu.Portal>
@@ -37,6 +37,7 @@ function open(thread: Partial<ThreadSummary>): void {
       </Menu.Portal>
     </Menu.Root>,
   );
+  if (place) fireEvent.click(screen.getByText(place));
 }
 
 beforeEach(() => {
@@ -55,41 +56,51 @@ it.each(["cursor", "antigravity", "fx"] as const)("explains why %s cannot fork b
   expect(mutations.get("threads.fork")).not.toHaveBeenCalled();
 });
 
-it("offers Bring to Mac for a thread the cloud brain holds, and no folder moves or fork", () => {
-  open({ owner: { brain: "cloud", reach: "live", heardAt: 1 } });
-  fireEvent.click(screen.getByText("Bring to Mac"));
+it("offers Bring to Mac from a cloud thread's place, and no folder moves or fork", async () => {
+  open({ owner: { brain: "cloud", reach: "live", heardAt: 1 }, branch: "fix/menu" }, "Cloud");
+  fireEvent.click(await screen.findByText("Bring to Mac"));
   expect(mutations.get("cloud.bringToMac")).toHaveBeenCalledWith({ threadId: "t1" });
   expect(screen.queryByText("Move to cloud")).toBeNull();
-  expect(screen.queryByText("Move to a worktree")).toBeNull();
+  fireEvent.click(screen.getByText("fix/menu"));
+  await screen.findByText("Copy branch name");
+  expect(screen.queryByText("Move to the checkout")).toBeNull();
+  expect(screen.queryByText("Show in Finder")).toBeNull();
   expect(screen.getByText("Fork").closest("[role=menuitem]")?.getAttribute("title")).toBe("Bring it to this Mac first.");
 });
 
-it("offers to keep a moving thread where it was", () => {
-  open({ moving: { to: "cloud", since: 1 } });
-  fireEvent.click(screen.getByText("Keep on this Mac"));
+it("offers to keep a moving thread where it was", async () => {
+  open({ moving: { to: "cloud", since: 1 } }, "Moving to the cloud");
+  fireEvent.click(await screen.findByText("Keep on this Mac"));
   expect(mutations.get("cloud.keep")).toHaveBeenCalledWith({ threadId: "t1" });
 });
 
-it("offers Move to cloud for every agent's conversation, the brain checking again when asked", () => {
+it("offers Move to cloud for every agent's conversation, the brain checking again when asked", async () => {
   for (const agent of ["claude", "codex", "opencode"] as const) {
-    open({ agent });
-    const item = screen.getAllByText("Move to cloud").at(-1)!.closest("[role=menuitem]");
+    open({ agent }, "This Mac");
+    const item = (await screen.findByText("Move to cloud")).closest("[role=menuitem]");
     expect(item?.getAttribute("aria-disabled")).not.toBe("true");
     expect(item?.getAttribute("title")).toBeNull();
+    cleanup();
   }
 });
 
-it("keeps today's sandbox move without a brain", () => {
+it("keeps today's sandbox move without a brain", async () => {
   offer.brain = null;
-  open({ agent: "codex" });
-  expect(screen.getByText("Move to cloud").closest("[role=menuitem]")?.getAttribute("aria-disabled")).not.toBe("true");
+  open({ agent: "codex" }, "This Mac");
+  expect((await screen.findByText("Move to cloud")).closest("[role=menuitem]")?.getAttribute("aria-disabled")).not.toBe("true");
 });
 
-it("says what to connect when there is no brain and no cloud service to move to", () => {
+it("says what to connect when there is no brain and no cloud service to move to", async () => {
   offer.brain = null;
   offer.provider = null;
-  open({ agent: "claude" });
-  const item = screen.getByText("Move to cloud").closest("[role=menuitem]");
+  open({ agent: "claude" }, "This Mac");
+  const item = (await screen.findByText("Move to cloud")).closest("[role=menuitem]");
   expect(item?.getAttribute("aria-disabled")).toBe("true");
   expect(item?.getAttribute("title")).toBe("Connect Vercel or Agent37 in Settings > Cloud first.");
+});
+
+it("leaves out the place for this Mac when the cloud has no move for the thread", () => {
+  offer.brain = { host: "brain-key", projects: [] };
+  open({ agent: "claude", owner: { brain: "mac", reach: "live", heardAt: 1 } });
+  expect(screen.queryByText("This Mac")).toBeNull();
 });

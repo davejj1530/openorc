@@ -91,7 +91,7 @@ import { docHref } from "../../data/docs";
 
   <section aria-labelledby="move">
     <h2 id="move">Move a thread</h2>
-    <p>Open the thread's menu, from the three-dot button in its header or by right-clicking it in the sidebar, and choose <strong>Move to a worktree</strong> or <strong>Move to the checkout</strong>. A dialog lists every file that will move. Moving doesn't start an agent, and you can't move a thread while its agent is working.</p>
+    <p>Open the thread's menu, from the three-dot button in its header or by right-clicking it in the sidebar. Its first row names the thread's branch, marked <strong>Worktree</strong> or <strong>Checkout</strong>. Point at it and choose <strong>Move to a worktree</strong> or <strong>Move to the checkout</strong>. A dialog lists every file that will move. Moving doesn't start an agent, and you can't move a thread while its agent is working.</p>
     <ul>
       <li><strong>Move to a worktree</strong> takes every uncommitted change in the checkout, including yours and other threads', into a new worktree on its own branch. The worktree starts at the checkout's current commit. Those files in the checkout then go back to its last commit.</li>
       <li><strong>Move to the checkout</strong> merges everything the worktree changed since it started, committed or not, into your checkout's files, unstaged. Then the worktree is removed. Its branch stays, with any commits made on it.</li>

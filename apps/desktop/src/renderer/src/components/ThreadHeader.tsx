@@ -2,6 +2,7 @@ import { Menu } from "@base-ui/react/menu";
 import { snoozeWakeLabel } from "@openorc/client";
 import type { CloudThreadState, ThreadSummary as Thread } from "@openorc/protocol";
 import { isSubagentThread } from "@openorc/protocol";
+import { useCallback, useRef } from "react";
 import { CoversPreview } from "../lib/browser-preview";
 import { openThread, useRouter } from "../lib/router";
 import { floatingGround } from "../lib/use-anchor-ground";
@@ -13,7 +14,7 @@ import { ThreadTitle } from "./ThreadTitle";
 import { ThreadTools } from "./ThreadTools";
 import { TopBar } from "./TopBar";
 import { AlarmClock, ArrowLeft, Cloud, GitFork, GitPullRequest, MoreVertical, X } from "./icons";
-import { menuItem, menuPopup } from "./menu";
+import { menuPopup } from "./menu";
 import { IconButton, StatusDot, Tooltip } from "./ui";
 
 /** Whether the header starts or ends the work row, which decides who clears the native window controls. */
@@ -90,24 +91,7 @@ export function ThreadHeader({
         <>
           {first ? facts : null}
           <ClosePane onClose={onClose} />
-          <Menu.Root>
-            <Menu.Trigger render={<IconButton aria-label="Thread actions" className="thread-more" />}>
-              <MoreVertical size={16} />
-            </Menu.Trigger>
-            <Menu.Portal>
-              <CoversPreview />
-              <Menu.Positioner sideOffset={6} align="end" className="z-40" collisionPadding={8}>
-                <Menu.Popup ref={floatingGround} className={menuPopup} finalFocus={renaming ? false : undefined}>
-                  {!isSubagentThread(t) ? (
-                    <Menu.Item className={menuItem} onClick={() => onRenamingChange(true)}>
-                      Rename
-                    </Menu.Item>
-                  ) : null}
-                  <ThreadMenuItems thread={t} parts={Menu} />
-                </Menu.Popup>
-              </Menu.Positioner>
-            </Menu.Portal>
-          </Menu.Root>
+          <ThreadMenu thread={t} renaming={renaming} {...(isSubagentThread(t) ? {} : { onRename: () => onRenamingChange(true) })} />
           {!isSubagentThread(t) ? <ThreadTools threadId={t.id} /> : null}
         </>
       }
@@ -125,6 +109,30 @@ export function ThreadHeader({
         </>
       )}
     </TopBar>
+  );
+}
+
+/**
+ * The header's thread menu. It hangs from the header rather than its button: 8px under the header's hairline, its right
+ * edge in line with the header's last round tool, 8px in from the thread's edge.
+ */
+function ThreadMenu({ thread, renaming, onRename }: { thread: Thread; renaming: boolean; onRename?: () => void }) {
+  const trigger = useRef<HTMLButtonElement>(null);
+  const header = useCallback(() => trigger.current?.closest("header") ?? null, []);
+  return (
+    <Menu.Root>
+      <Menu.Trigger ref={trigger} render={<IconButton aria-label="Thread actions" className="thread-more" />}>
+        <MoreVertical size={16} />
+      </Menu.Trigger>
+      <Menu.Portal>
+        <CoversPreview />
+        <Menu.Positioner anchor={header} side="bottom" sideOffset={8} align="end" alignOffset={8} collisionAvoidance={{ side: "flip", align: "shift" }} className="z-40" collisionPadding={8}>
+          <Menu.Popup ref={floatingGround} className={menuPopup} finalFocus={renaming ? false : undefined}>
+            <ThreadMenuItems thread={thread} parts={Menu} header onRename={onRename} />
+          </Menu.Popup>
+        </Menu.Positioner>
+      </Menu.Portal>
+    </Menu.Root>
   );
 }
 

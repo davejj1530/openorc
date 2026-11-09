@@ -109,12 +109,13 @@ async function launch(empty = true) {
   session.inspector = await inspector(stderr.match(/Debugger listening on (ws:\/\/127\.0\.0\.1:\d+\/[^\s]+)/)[1]);
   session.main = (expression, timeout) => session.inspector.evaluate(expression, timeout);
   // The inspector can accept requests before Electron installs its built-in
-  // module loader. Wait for that boundary, not just the inspector's socket.
+  // module loader and sets its resources path. Wait for that boundary, not
+  // just the inspector's socket.
   await until(
     () =>
       session.main(`(() => {
         const module = process.getBuiltinModule('module');
-        if (typeof module.createRequire !== 'function') return false;
+        if (typeof module.createRequire !== 'function' || !process.resourcesPath) return false;
         const require = module.createRequire(process.resourcesPath + '/app.asar/package.json');
         try {
           // The explicit main entry cannot resolve the npm electron launcher

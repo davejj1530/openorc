@@ -36,6 +36,22 @@ export function CommitsPanel({ source }: { source: CommitSource }) {
   const empty = !log.isLoading && commits.length === 0;
   // A branch can carry commits origin lacks from before the work began, such as a worktree started from local commits.
   const pushable = !empty || Boolean(push.data?.unpushedCount);
+  if (log.isError) {
+    return (
+      <Empty title="Could not load commits">
+        <p>{log.error.message}</p>
+        <Button className="mt-3" onClick={() => void log.refetch()}>
+          Try again
+        </Button>
+      </Empty>
+    );
+  }
+  if (log.isLoading)
+    return (
+      <div role="status" className="py-4 text-sm text-ink-3">
+        Loading commits…
+      </div>
+    );
   return (
     <div className="h-full flex flex-col min-h-0">
       {pushable ? <SourcePushBar source={source} state={push.data} error={push.error} /> : null}

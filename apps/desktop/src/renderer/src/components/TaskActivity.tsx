@@ -36,7 +36,7 @@ function TaskHistory({ task, project }: { task: Task; project: Project }) {
   else if (history.isPending || history.data?.length) historyPlaceholder = "Loading history…";
   return (
     <div className="h-full flex flex-col min-h-0">
-      <div className="px-6 py-4 flex items-center gap-3">
+      <div className="pb-4 flex flex-wrap items-center gap-3">
         <p className="text-sm text-ink-3 flex-1">Task activity is saved here. Continue the work in its thread.</p>
         {stoppable ? (
           <Button disabled={stop.isPending} onClick={() => stop.mutate({ runId: latest.id })}>
@@ -48,12 +48,12 @@ function TaskHistory({ task, project }: { task: Task; project: Project }) {
         </Button>
       </div>
       {actionError ? (
-        <p role="alert" className="px-6 text-sm text-bad">
+        <p role="alert" className="text-sm text-bad">
           {actionError.message}
         </p>
       ) : null}
       {historyError ? (
-        <p role="alert" className="px-6 text-sm text-bad">
+        <p role="alert" className="text-sm text-bad">
           {historyError}{" "}
           <Button
             onClick={() => {
@@ -68,7 +68,7 @@ function TaskHistory({ task, project }: { task: Task; project: Project }) {
       {merged ? (
         <Transcript run={merged} media={{ basePath: task.worktreePath ?? project.rootPath, fileScope: { kind: "task", id: task.id } }} />
       ) : (
-        <div className="p-6 text-sm text-ink-3">{historyPlaceholder}</div>
+        <div className="py-4 text-sm text-ink-3">{historyPlaceholder}</div>
       )}
     </div>
   );

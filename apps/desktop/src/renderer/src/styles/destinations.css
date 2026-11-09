@@ -148,11 +148,50 @@
   }
 }
 
-/* The task page: its tabs sit on the tile under the toolbar as a natural-width track. */
+/* Task navigation and reading tabs share the document's column. Diffs use the full workspace. */
+.task-tabs,
+.task-tab-body {
+  width: 100%;
+  max-width: var(--container-document);
+  margin-inline: auto;
+  padding-inline: var(--document-gutter);
+}
 .task-tabs {
   display: flex;
   flex-shrink: 0;
-  padding: 2px 20px 6px;
+  padding-top: 24px;
+}
+.task-tab-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding-block: 32px 24px;
+}
+.task-tab-content .task-document {
+  padding-top: 32px;
+}
+.task-tab-content[data-tab="files"] {
+  padding-top: 24px;
+}
+.task-tab-body :is(.panel-bar, .panel-notice, .memory-panel-heading, .memory-run, .memory-entry, .commit-rows) {
+  padding-inline: 0;
+}
+.app-shell .task-tab-body [data-transcript] > .max-w-chat {
+  max-width: none;
+  padding-inline: 0;
+}
+@container (max-width: 600px) {
+  .task-tabs,
+  .task-tab-body {
+    padding-inline: 24px;
+  }
+}
+@container (max-width: 400px) {
+  .task-tabs,
+  .task-tab-body {
+    padding-inline: 16px;
+  }
 }
 .segmented-option[aria-selected="true"] {
   color: var(--navigation-ink);

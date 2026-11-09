@@ -110,7 +110,7 @@ export function TaskCard({ taskId, compact = false }: { taskId: string; compact?
             <Play size={11} /> Start
           </Button>
         ) : (
-          <TextButton onClick={() => openTask(t.id, t.status === "review" ? "files" : "spec")} tone="faint" title="Open task" aria-label={`Open ${t.title}`}>
+          <TextButton onClick={() => openTask(t.id)} tone="faint" title="Open task" aria-label={`Open ${t.title}`}>
             <ArrowUpRight size={14} />
           </TextButton>
         )}

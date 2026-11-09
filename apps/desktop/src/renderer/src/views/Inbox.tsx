@@ -42,7 +42,7 @@ function Row({ item }: { item: InboxItem }) {
   const updatedAt = item.kind === "task" ? item.task.updatedAt : item.thread.lastActivityAt;
   const open = () => {
     if (item.kind === "thread") openThread(item.thread.id);
-    else openTask(item.task.id, item.reason === "review" ? "files" : "chat");
+    else openTask(item.task.id, item.reason === "approval" ? "chat" : "spec");
   };
   let Icon = Eye;
   if (item.reason === "approval") Icon = ShieldQuestion;

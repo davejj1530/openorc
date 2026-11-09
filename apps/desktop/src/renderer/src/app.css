@@ -1089,9 +1089,6 @@ span.property-chip {
   .thread-branch {
     display: none;
   }
-  .task-tabs {
-    padding-inline: 16px;
-  }
 }
 @container (max-width: 400px) {
   .task-document {

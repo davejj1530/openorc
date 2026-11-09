@@ -114,6 +114,16 @@ it("marks the commits origin lacks and pushes them once everything is committed"
   expect(screen.queryByText("Pushed site-refresh to origin")).toBeNull();
 });
 
+it("reports a failed commit read and retries without presenting it as an empty history", async () => {
+  vi.mocked(core.call).mockRejectedValueOnce(new Error("Commit history unavailable"));
+  mount();
+  expect(await screen.findByText("Could not load commits")).toBeTruthy();
+  expect(screen.queryByText("No commits from this thread yet")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+  expect(await screen.findByText(commits[0]!.subject)).toBeTruthy();
+  expect(screen.queryByText("Could not load commits")).toBeNull();
+});
+
 it("publishes a branch origin doesn't have yet", async () => {
   state = { ...state, published: false, unpushedCount: 2, unpushed: commits.map((commit) => commit.sha) };
   mount();

@@ -286,6 +286,8 @@ The panel is one opaque plane from the window's top edge to its bottom, beside t
 
 ### Pages, tasks, and settings
 
+Task details open on Overview. The tab track starts 24px below the top rail, aligned with the document's 800px column and 48px gutters (24px below 600px, 16px below 400px). Overview, Activity, Commits, and Memory share that column, with 32px between the track and body. Changes uses the workspace width. Tabs replace the page body; Memory shows task history without requiring an execution conversation. Keyboard navigation uses arrows, Home, and End, and leaving Overview waits for its edits to save.
+
 Tasks, Pull requests, Schedules, and Memory share one header: the toolbar holds the page name, a round search that grows into a field, a filter menu, and the page's lg secondary create pill. Lists group under quiet headings (13px name, faint count, chevron on hover) in a 1120px column. Task rows are 44px r12, bare, with a fill hover, title in ink (muted for backlog and proposed), and a priority glyph in a fixed trailing slot. Schedules are r16 plane cards with a switch for Pause/Resume. The Inbox page keeps its route with 52px rows.
 
 Settings is a plane sheet beside the sidebar, which lists its sections. Like the work panel, it runs flush to the window edges with its toolbar inside it. Each page has a 28/34 title and one faint line of context in a left-aligned 860px column. Groups and cards are tile cards on the sheet (r18, 20px inset), with hairlines between rows. Appearance tiles are fill-only with a navigation ring on the current choice.

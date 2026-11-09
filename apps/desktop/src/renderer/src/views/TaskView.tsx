@@ -1,4 +1,5 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode, type RefObject } from "react";
+import type { Project, Task, ThreadSummary } from "@openorc/protocol";
 import { Panel, type PanelContext } from "../components/Panel";
 import { StatusIcon } from "../components/status";
 import { TabTrack } from "../components/TabTrack";
@@ -9,6 +10,9 @@ import { useRpc } from "../lib/client";
 import { useLayout } from "../lib/layout";
 import { openTask, useRouter, type TaskTab } from "../lib/router";
 import { TaskDraftProvider } from "../lib/task-draft-context";
+import { ChangesPanel } from "../panels/ChangesPanel";
+import { CommitsPanel } from "../panels/CommitsPanel";
+import { MemoryPanel } from "../panels/MemoryPanel";
 import { TaskDocument, type TaskDocumentHandle } from "./TaskDocument";
 
 const tabs: { id: TaskTab; label: string }[] = [
@@ -35,6 +39,38 @@ function taskUnavailableContent(input: { loading: boolean; error: Error | null; 
 }
 
 /** Task documents and saved activity link out to their conversation. */
+/**
+ * One tab's page: the document, the activity, memory, or the execution conversation's changes and commits, which wait
+ * for that conversation to exist.
+ */
+function TaskTabBody({
+  tab,
+  task,
+  project,
+  thread,
+  owner,
+  editor,
+}: {
+  tab: TaskTab;
+  task: Task;
+  project: Project;
+  thread: ThreadSummary | null;
+  owner: { error: Error | null; isPending: boolean; refetch: () => unknown };
+  editor: RefObject<TaskDocumentHandle | null>;
+}) {
+  if (tab === "spec") return <TaskDocument ref={editor} task={task} project={project} />;
+  if (tab === "chat") return <TaskActivity task={task} project={project} />;
+  if (tab === "memory") return <MemoryPanel context={{ kind: "task", task, project }} />;
+  if (!thread)
+    return (
+      <Empty title={executionUnavailableTitle(owner.error, owner.isPending)}>
+        {owner.error ? <Button onClick={() => void owner.refetch()}>Try again</Button> : `${tab === "commits" ? "Commits" : "Changes"} will appear here when this task has an execution conversation.`}
+      </Empty>
+    );
+  if (tab === "files") return <ChangesPanel thread={thread} task={task} project={project} />;
+  return <CommitsPanel source={{ kind: "thread", thread, project }} />;
+}
+
 export function TaskView({ taskId, tab }: { taskId: string; tab: TaskTab }) {
   const task = useRpc("tasks.get", { id: taskId });
   const owner = useRpc("tasks.executionThread", { taskId }, { enabled: Boolean(task.data) });
@@ -51,6 +87,8 @@ export function TaskView({ taskId, tab }: { taskId: string; tab: TaskTab }) {
     navigating.current = true;
     try {
       if (document && editor.current && !(await editor.current.flush())) return;
+      const route = useRouter.getState().route;
+      if (route.view !== "task" || route.taskId !== taskId || route.tab !== tab) return;
       openTask(taskId, next);
     } finally {
       navigating.current = false;
@@ -60,19 +98,15 @@ export function TaskView({ taskId, tab }: { taskId: string; tab: TaskTab }) {
     if (t) followProject(t.projectId);
   }, [t?.projectId, followProject]);
   useEffect(() => {
-    if (tab === "files") setPanel(true, "changes");
-    else if (tab === "commits") setPanel(true, "commits");
-    else if (tab === "memory") setPanel(true, "memory");
-    else setPanel(false);
+    setPanel(false);
   }, [tab, taskId, setPanel]);
-  let context: PanelContext | null = null;
-  if (t && p) {
-    if (owner.data && !owner.data.teamInstanceId) context = { kind: "thread", thread: owner.data, project: p, task: t };
-  }
+  const thread = owner.data && !owner.data.teamInstanceId ? owner.data : null;
+  const activityContext: PanelContext | null = t && p ? { kind: "task", task: t, project: p } : null;
+  const body = t && p ? <TaskTabBody key={t.id} tab={tab} task={t} project={p} thread={thread} owner={owner} editor={editor} /> : null;
   return (
     <TaskDraftProvider key={taskId} taskId={taskId}>
       <main className="task-workspace workspace-main well flex-1 min-w-0 flex flex-col">
-        <TopBar panel={!document && Boolean(context)}>
+        <TopBar panel={tab === "chat" && Boolean(activityContext)}>
           <TextButton onClick={() => useRouter.getState().navigate({ view: "tasks" })} tone="muted">
             Tasks
           </TextButton>
@@ -93,21 +127,11 @@ export function TaskView({ taskId, tab }: { taskId: string; tab: TaskTab }) {
         {t && p ? (
           <>
             <div className="task-tabs">
-              <TabTrack label="Task workspace" items={tabs} value={tab} onSelect={(next) => void selectTab(next)} />
+              <TabTrack label="Task workspace" items={tabs} value={tab} panelId="task-tab-content" onSelect={(next) => void selectTab(next)} />
             </div>
-            {document ? (
-              <TaskDocument ref={editor} key={t.id} task={t} project={p} />
-            ) : (
-              <div className="flex-1 min-h-0">
-                {(tab === "files" || tab === "commits") && !context ? (
-                  <Empty title={executionUnavailableTitle(owner.error, owner.isPending)}>
-                    {owner.error ? owner.error.message : "Changes will appear here when this task has an execution conversation."}
-                  </Empty>
-                ) : (
-                  <TaskActivity key={t.id} task={t} project={p} />
-                )}
-              </div>
-            )}
+            <div id="task-tab-content" role="tabpanel" aria-label={tabs.find((item) => item.id === tab)?.label} className="task-tab-content flex-1 min-h-0 flex flex-col" data-tab={tab}>
+              {document || tab === "files" ? body : <div className="task-tab-body">{body}</div>}
+            </div>
           </>
         ) : (
           taskUnavailableContent({
@@ -120,7 +144,7 @@ export function TaskView({ taskId, tab }: { taskId: string; tab: TaskTab }) {
           })
         )}
       </main>
-      {!document && context ? <Panel context={context} /> : null}
+      {tab === "chat" && activityContext ? <Panel context={activityContext} /> : null}
     </TaskDraftProvider>
   );
 }

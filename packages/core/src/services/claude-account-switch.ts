@@ -106,8 +106,8 @@ function name(db: Db, id: string): string {
   return claudeAccounts.get(db, id).name;
 }
 
-/** The conversation's next turn as it stood, on another account, opened by OpenOrc's notice. */
-function continuation(thread: Thread, claudeAccountId: string, prompt: string): Parameters<ThreadService["continueThread"]>[1] {
+/** The conversation's next turn as it stood, on the given account, opened by OpenOrc's notice. */
+export function continuation(thread: Thread, claudeAccountId: string, prompt: string): Parameters<ThreadService["continueThread"]>[1] {
   return {
     agent: thread.agent,
     model: thread.model ?? undefined,

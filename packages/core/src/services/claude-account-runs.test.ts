@@ -9,6 +9,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { FrameCoalescer } from "../frames.js";
 import { ClaudeAccountSwitch } from "./claude-account-switch.js";
 import { ClaudeAccountService } from "./claude-accounts.js";
+import { ClaudeSignInRetry } from "./claude-sign-in-retry.js";
 import { claudeRunAccount } from "./claude-run-account.js";
 import type { RunHooks } from "./run-types.js";
 import { RunService } from "./runs.js";
@@ -317,6 +318,42 @@ it("leaves a stopped conversation alone when no account has 5-hour usage left, o
   again.settled(runs.get(db, run!.id)!, { task: null, thread: threads.get(db, thread.id)! }, { status: "error", snapshotId: null, error: "You've hit your 5-hour limit" });
   await new Promise((resolve) => setTimeout(resolve, 20));
   expect([start.mock.calls.length, threads.get(db, thread.id)?.claudeAccountId]).toEqual([1, personal]);
+});
+
+it("goes on once on the same account when Claude starts up signed out but the account's CLI then finds its login", async () => {
+  const work = accounts.add("Work").id;
+  let signedIn = true;
+  const asked = vi.fn(async (_id: string) => signedIn);
+  const retry = new ClaudeSignInRetry({ db, accounts: { signedIn: asked }, runs: service, threads: conversations, log: quiet });
+  turnSettled = (run, scope, _project, outcome) => retry.settled(run, scope, outcome);
+  const notLoggedIn = (handle: RunHandle, runId: string) => {
+    const ts = Date.now();
+    handle.emit("event", { type: "activity.updated", runId, ts, activityId: "sign-in", label: "Claude is signed out", status: "error", recovery: { kind: "sign_in", provider: "claude" } });
+    handle.emit("event", { type: "turn.completed", runId, ts, turnId: "fixture", status: "error", resultText: "Not logged in · Please run /login", durationMs: 1 });
+  };
+
+  const { thread, run } = await conversations.start({ ...input, projectId: project.id, claudeAccountId: work });
+  runs.update(db, run!.id, { externalSessionId: "work-session" });
+  notLoggedIn(start.mock.results[0]!.value, run!.id);
+  await vi.waitFor(() => expect(start).toHaveBeenCalledTimes(2));
+  const [spec, launch] = start.mock.lastCall!;
+  expect([spec.resumeSessionId, spec.forkSession ?? false, path.basename(launch.env.CLAUDE_CONFIG_DIR!), asked.mock.calls]).toEqual(["work-session", false, work, [[work]]]);
+  expect(spec.prompt.split("\n")[0]).toBe("Claude Code could not read the sign-in for Work as it started. The account is signed in, so OpenOrc tried again. Continue where you left off.");
+
+  // The run it started stops signed out too: that one keeps its sign-in.
+  const retried = service.liveRunForThread(thread.id)!;
+  notLoggedIn(start.mock.results[1]!.value, retried.id);
+  await vi.waitFor(() => expect(service.threadSession(thread.id).recovery?.kind).toBe("sign_in"));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect([start.mock.calls.length, asked.mock.calls.length]).toEqual([2, 1]);
+
+  // A later message that stops signed out is asked about again, and an account that really signed out keeps its sign-in.
+  signedIn = false;
+  const next = await conversations.continueThread(thread.id, { ...input, prompt: "Next" });
+  notLoggedIn(start.mock.results[2]!.value, next.id);
+  await vi.waitFor(() => expect(asked).toHaveBeenCalledTimes(2));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect([start.mock.calls.length, service.threadSession(thread.id).recovery?.kind]).toEqual([3, "sign_in"]);
 });
 
 it("captures the default on new threads and records the account even if a launch fails", async () => {

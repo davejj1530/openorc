@@ -3,7 +3,6 @@ import { browserModels, catalogModel, modelChoiceFor, pickerCatalog, pickerSetti
 import {
   effortHint,
   effortLabel,
-  harnessCatalog,
   harnessInfo,
   harnessInstalled,
   harnessLoggedIn,
@@ -14,7 +13,7 @@ import {
   type ModelOption,
   type Orcling,
 } from "@openorc/protocol";
-import { useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { CoversPreview } from "../lib/browser-preview";
 import { useClaudeAccountId } from "../lib/claude-account";
 import { PickerAccountRows, warmAccountUsage, type PickerAccounts } from "./ModelPickerAccounts";
@@ -25,8 +24,9 @@ import { floatingGround } from "../lib/use-anchor-ground";
 import { useModelCatalog } from "../lib/use-model-catalog";
 import { useEnabledHarnesses } from "../lib/enabled-harnesses";
 import { HarnessLogo } from "./HarnessLogo";
-import { Check, ChevronDown, Orcling as OrclingIcon, Plus, RotateCcw, Search, Zap } from "./icons";
+import { Check, ChevronDown, Plus, RotateCcw, Search, Zap } from "./icons";
 import { BrowserEffortFooter, ComposerEffortPanel, fastStatus } from "./ModelPickerEffort";
+import { ModelPickerRail, type PickerSection } from "./ModelPickerRail";
 import { OrclingRows, type OrclingPickerChoices } from "./ModelPickerRows";
 import { OrclingAvatar } from "./OrclingAvatar";
 
@@ -38,8 +38,6 @@ export type { OrclingPickerChoices } from "./ModelPickerRows";
 function modelTitle(current: ModelOption | undefined, model: string | undefined): string | undefined {
   return current ? `${current.label} · ${current.id}` : model;
 }
-
-type PickerSection = HarnessId | "orclings";
 
 function initialPickerSection(orclings: OrclingPickerChoices | undefined, value: ModelChoice | null, enabled: readonly HarnessId[]): PickerSection {
   if (orclings?.selectedId) return "orclings";
@@ -54,12 +52,6 @@ function enabledPickerSection(section: PickerSection, fallback: PickerSection, e
 /** The Orcling a picker shows as chosen, if any. */
 function chosenOrcling(orclings: OrclingPickerChoices | undefined): Orcling | null {
   return orclings?.selectedId ? (orclings.options.find((orcling) => orcling.id === orclings.selectedId) ?? null) : null;
-}
-
-function providerHint(status: ReturnType<typeof harnessInfo> | null): string | null {
-  if (status && !harnessInstalled(status)) return "Not installed";
-  if (status && !harnessLoggedIn(status)) return "Sign in";
-  return null;
 }
 
 function modelRowMeta(model: ModelOption): ReactNode {
@@ -159,7 +151,6 @@ function ModelBrowser({
   const [showLegacy, setShowLegacy] = useState(false);
   const search = useRef<HTMLInputElement>(null);
   const results = useRef<HTMLDivElement>(null);
-  const fastDescriptionId = useId();
   // An Orcling brings its own effort and Fast mode.
   const orclingSettings = Boolean(orclings?.selectedId);
   const harness = isHarnessId(section) ? section : null;
@@ -215,53 +206,26 @@ function ModelBrowser({
   return (
     <div className="model-picker-layout">
       <Popover.Title className="sr-only">{showEffort ? "Model and effort" : "Choose a model"}</Popover.Title>
-      <div className="model-picker-rail" role="group" aria-label="Model providers">
-        {orclings ? (
-          <button type="button" className="model-picker-rail-button" aria-label="Orclings" aria-pressed={section === "orclings"} title="Orclings" onClick={() => switchSection("orclings")}>
-            <OrclingIcon size={20} />
-          </button>
-        ) : null}
-        {enabled.map((id) => {
-          const status = system.data ? harnessInfo(system.data, id) : null;
-          const hint = providerHint(status);
-          return (
-            <button
-              key={id}
-              type="button"
-              className="model-picker-rail-button"
-              aria-label={`${harnessCatalog[id].name}${hint ? ` · ${hint}` : ""}`}
-              aria-pressed={section === id}
-              title={`${harnessCatalog[id].name}${hint ? ` · ${hint}` : ""}`}
-              onClick={() => switchSection(id)}
-            >
-              <HarnessLogo id={id} size={20} />
-            </button>
-          );
-        })}
-        {fastShown ? (
-          <button
-            type="button"
-            className="model-picker-rail-button model-picker-fast"
-            aria-label="Fast mode"
-            aria-pressed={fast}
-            data-blocked={fastBlocked || undefined}
-            aria-describedby={fastDescriptionId}
-            title={`${fast ? "Turn off" : "Request"} Fast mode. ${fastHint}`}
-            disabled={disabled || !value}
-            onClick={() => {
-              if (value) onChange({ ...value, fastMode: !fast });
-            }}
-          >
-            <Zap size={20} />
-          </button>
-        ) : null}
-        {fastShown ? (
-          <span className="sr-only" id={fastDescriptionId}>
-            {fastStatus(fast, fastBlocked)}
-            {fastHint}
-          </span>
-        ) : null}
-      </div>
+      <ModelPickerRail
+        section={section}
+        onSectionChange={switchSection}
+        enabled={enabled}
+        orclings={Boolean(orclings)}
+        system={system.data}
+        fast={
+          fastShown
+            ? {
+                active: fast,
+                blocked: fastBlocked,
+                hint: fastHint,
+                disabled: Boolean(disabled || !value),
+                onToggle: () => {
+                  if (value) onChange({ ...value, fastMode: !fast });
+                },
+              }
+            : null
+        }
+      />
       <div className="model-picker-main">
         <div className="model-picker-search">
           <Search size={16} aria-hidden="true" />

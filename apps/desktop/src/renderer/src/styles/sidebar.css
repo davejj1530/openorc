@@ -50,12 +50,13 @@
   flex-shrink: 0;
 }
 
-/* The window's corner: traffic lights where the OS draws them, the wordmark, then Inbox and the
-   sidebar toggle at the right. */
+/* The window's corner: traffic lights where the OS draws them, the wordmark, then Back, Forward and
+   the sidebar toggle at the right. The wordmark's name gives way before it would touch Back. */
 .sidebar-header {
   position: relative;
   display: flex;
   align-items: center;
+  gap: 8px;
   padding: 0 10px 0 16px;
 }
 .workspace-navigation[data-traffic-lights="true"] .sidebar-header {
@@ -65,12 +66,6 @@
   display: flex;
   align-items: center;
   flex-shrink: 0;
-}
-/* The count hangs on the icon's top-right corner, over count-badge's own positioning. */
-.window-corner .window-corner-badge {
-  position: absolute;
-  top: 2px;
-  right: 0;
 }
 .app-shell .workspace-window-nav[data-sidebar-open="true"] {
   display: none;
@@ -130,7 +125,7 @@
 .sidebar-rail-gap {
   flex: 1;
 }
-/* A short hairline between the screens and Projects. */
+/* A short hairline between the screens and Projects, and between Projects and Inbox. */
 .sidebar-rail-divider {
   flex-shrink: 0;
   width: 20px;
@@ -167,6 +162,15 @@
 }
 .sidebar-rail-project {
   position: relative;
+}
+/* Inbox's count hangs on the glyph's top-right corner, over count-badge's own positioning. */
+.sidebar-rail-inbox {
+  position: relative;
+}
+.sidebar-rail-inbox .sidebar-rail-badge {
+  position: absolute;
+  top: 3px;
+  right: 1px;
 }
 /* OpenOrc's updates, above Settings: a check while nothing newer is known, a dot while a new version
    waits for the user, a ring while it downloads. */

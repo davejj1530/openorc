@@ -14,6 +14,9 @@ const fixture: {
   resolvedCount?: number;
   /** What Resolved holds in each project, when the count depends on the projects asked about. */
   resolvedByProject?: Record<string, number>;
+  tasks?: { status: string }[];
+  /** Approvals waiting in the runs loaded here. */
+  approvals?: number;
 } = vi.hoisted(() => ({ projects: [], threads: [] }));
 
 /** The core's answer to a thread list, as the fixture's threads read. */
@@ -34,6 +37,7 @@ vi.mock("../lib/client", async (original) => {
   const rpcData = (method: string, params: { id?: string }) => {
     if (method === "threads.get" && !params.id) return null;
     if (method === "projects.list") return fixture.projects;
+    if (method === "tasks.list") return fixture.tasks;
     if (method === "orclings.list") return [{ id: "rini", name: "Rini", threadId: "rini-home", look: defaultOrclingLook }];
     if (method === "threads.get")
       return (
@@ -58,7 +62,7 @@ vi.mock("../lib/client", async (original) => {
   return {
     ...(await original<object>()),
     useRpc: (method: string, params: { id?: string }, options?: { enabled?: boolean }) => ({ data: options?.enabled === false ? undefined : rpcData(method, params) }),
-    usePendingApprovals: () => 0,
+    usePendingApprovals: () => fixture.approvals ?? 0,
     useRun: () => undefined,
   };
 });
@@ -102,6 +106,8 @@ beforeEach(() => {
   fixture.threads = [];
   fixture.resolvedCount = undefined;
   fixture.resolvedByProject = undefined;
+  fixture.tasks = undefined;
+  fixture.approvals = undefined;
   localStorage.clear();
   useWindow.setState({ fullscreen: false });
   useLayout.setState({ collapsed: [], workspace: ALL_WORKSPACES, sidebarOpen: true, pinnedOnly: false, railProjects: false });
@@ -249,7 +255,7 @@ it("leads the window corner with the OpenOrc wordmark, in and out of fullscreen,
     within(screen.getByRole("group", { name: "Window" }))
       .getAllByRole("button")
       .map((button) => button.getAttribute("aria-label")),
-  ).toEqual(["Inbox", "Toggle sidebar"]);
+  ).toEqual(["Back", "Forward", "Toggle sidebar"]);
   act(() => useWindow.setState({ fullscreen: true }));
   expect(screen.getAllByRole("img", { name: "OpenOrc" })).toHaveLength(1);
   expect(screen.getByRole("img", { name: "OpenOrc" }).closest("header")).toBe(corner());
@@ -289,12 +295,33 @@ it("reaches the app's screens from the rail, marking the open one as current", (
     within(dock)
       .getAllByRole("button")
       .map((button) => button.getAttribute("aria-label")),
-  ).toEqual(["New thread", "Tasks", "Pull requests", "Schedules", "Orclings", "Show projects", "Settings"]);
+  ).toEqual(["New thread", "Tasks", "Pull requests", "Schedules", "Orclings", "Show projects", "Inbox", "Settings"]);
   fireEvent.click(within(dock).getByRole("button", { name: "Schedules" }));
   expect(useRouter.getState().route).toEqual({ view: "scheduled" });
   expect(within(dock).getByRole("button", { name: "Schedules" }).getAttribute("aria-current")).toBe("page");
   expect(within(dock).getByRole("button", { name: "Tasks" }).getAttribute("aria-current")).toBeNull();
   expect(screen.queryByRole("button", { name: "More" })).toBeNull();
+});
+
+it("opens the Inbox from the rail, under Projects, counting what waits in it", () => {
+  fixture.tasks = [{ status: "review" }, { status: "proposed" }, { status: "backlog" }];
+  fixture.approvals = 2;
+  mountSidebar();
+  const rail = screen.getByRole("navigation", { name: "Screens" });
+  const inbox = within(rail).getByRole("button", { name: "Inbox, 4" });
+  expect(inbox.textContent).toBe("4");
+  expect(inbox.getAttribute("aria-current")).toBeNull();
+  fireEvent.click(inbox);
+  expect(useRouter.getState().route).toEqual({ view: "inbox" });
+  expect(within(rail).getByRole("button", { name: "Inbox, 4" }).getAttribute("aria-current")).toBe("page");
+  expect(within(screen.getByRole("group", { name: "Window" })).queryByRole("button", { name: /^Inbox/ })).toBeNull();
+});
+
+it("caps the rail's Inbox count at 99+", () => {
+  fixture.tasks = Array.from({ length: 120 }, () => ({ status: "review" }));
+  fixture.approvals = 2;
+  mountSidebar();
+  expect(within(screen.getByRole("navigation", { name: "Screens" })).getByRole("button", { name: "Inbox, 122" }).textContent).toBe("99+");
 });
 
 const openFilter = () => fireEvent.click(screen.getByRole("button", { name: /^Threads in / }));

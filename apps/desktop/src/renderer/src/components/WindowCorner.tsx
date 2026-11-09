@@ -1,50 +1,46 @@
-import { Inbox, PanelLeft } from "./icons";
-import { cn } from "../lib/cn";
+import type { ReactNode } from "react";
+import { ArrowLeft, ArrowRight, PanelLeft } from "./icons";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
 import { useLayout } from "../lib/layout";
-import { useRpc, usePendingApprovals } from "../lib/client";
 import { useRouter } from "../lib/router";
-import { CountBadge, IconButton, Tooltip } from "./ui";
+import { IconButton, Tooltip } from "./ui";
 
 /**
- * The window's corner: Inbox and the sidebar toggle. It sits in the sidebar's header while the
+ * The window's corner: Back, Forward and the sidebar toggle. It sits in the sidebar's header while the
  * sidebar is open and in the main column's header while it is hidden. Search lives in the sidebar's
- * list head. Window history has no buttons; ⌘[ and ⌘] still go back and forward.
+ * list head and Inbox on the rail.
  */
 export function WindowCorner({ sidebarOpen }: { sidebarOpen: boolean }) {
+  const canBack = useRouter((s) => s.history.length > 0);
+  const canForward = useRouter((s) => s.future.length > 0);
   return (
     <div className="window-corner" role="group" aria-label="Window">
-      <InboxButton />
+      <HistoryButton label="Back" disabled={!canBack} onClick={() => useRouter.getState().back()}>
+        <ArrowLeft size={16} />
+      </HistoryButton>
+      <HistoryButton label="Forward" disabled={!canForward} onClick={() => useRouter.getState().forward()}>
+        <ArrowRight size={16} />
+      </HistoryButton>
       <SidebarToggle open={sidebarOpen} />
     </div>
   );
 }
 
-/** What waits for the user: approvals in the runs loaded here, and tasks to review or accept. */
-function useInboxCount(): number {
-  const approvals = usePendingApprovals();
-  const tasks = useRpc("tasks.list", {});
-  return approvals + (tasks.data ?? []).filter((task) => task.status === "review" || task.status === "proposed").length;
-}
-
-/** Opens the Inbox page, with what waits in it counted on the icon's corner. */
-function InboxButton() {
-  const current = useRouter((s) => s.route.view === "inbox");
-  const count = useInboxCount();
+/** One step through the window's history, the same as ⌘[ and ⌘]. */
+function HistoryButton({ label, disabled, onClick, children }: { label: string; disabled: boolean; onClick: () => void; children: ReactNode }) {
   return (
-    <Tooltip label="Inbox">
+    <Tooltip label={label}>
       <IconButton
         size="lg"
+        disabled={disabled}
         onClick={() => {
-          useRouter.getState().navigate({ view: "inbox" });
+          onClick();
           dismissCompactNavigation();
         }}
-        aria-label={count ? `Inbox, ${count}` : "Inbox"}
-        aria-current={current ? "page" : undefined}
-        className={cn("window-corner-inbox relative no-drag", current && "bg-surface-2 text-ink")}
+        aria-label={label}
+        className="no-drag"
       >
-        <Inbox size={16} />
-        {count ? <CountBadge count={count} size="sm" className="window-corner-badge" /> : null}
+        {children}
       </IconButton>
     </Tooltip>
   );

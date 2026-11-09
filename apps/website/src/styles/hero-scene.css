@@ -271,7 +271,8 @@
   top: calc(44 * var(--u) - var(--hairline));
   bottom: 0;
 }
-/* The window's corner: the wordmark after the traffic lights, then Inbox and the sidebar toggle. */
+/* The window's corner: the wordmark after the traffic lights, then Back, Forward (off, with nothing to go forward to)
+   and the sidebar toggle. */
 .hs-sidebar-head {
   position: relative;
   display: flex;
@@ -304,13 +305,17 @@
   width: calc(16 * var(--u));
   height: calc(16 * var(--u));
 }
+.hs-sidebar-head .hs-round[data-off] {
+  color: var(--hs-faint);
+}
+/* Inbox on the rail, its count on the glyph's top-right corner. */
 .hs-inbox {
   position: relative;
 }
 .hs-inbox-count {
   position: absolute;
-  top: calc(2 * var(--u));
-  left: calc(16 * var(--u));
+  top: calc(3 * var(--u));
+  right: calc(1 * var(--u));
   display: grid;
   place-items: center;
   min-width: calc(16 * var(--u));
@@ -328,8 +333,8 @@
   flex: 1;
   min-height: 0;
 }
-/* The rail (SidebarRail.tsx): New thread, the screens and Orclings, a short hairline, Projects, and at its foot the
-   week's usage as a ring, updates and Settings. The open screen sits on the plane. */
+/* The rail (SidebarRail.tsx): New thread, the screens and Orclings, a short hairline, Projects, another, Inbox, and at
+   its foot the week's usage as a ring, updates and Settings. The open screen sits on the plane. */
 .hs-sidebar-rail {
   display: flex;
   flex: none;

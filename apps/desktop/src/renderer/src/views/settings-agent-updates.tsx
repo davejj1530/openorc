@@ -1,5 +1,5 @@
 import { agentUpdateStatus, agentConnectionStatus } from "./settings-presentation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   agentUpdateNoticeKey,
   harnessCatalog,
@@ -23,7 +23,7 @@ import { Section, Status, Toggle } from "./settings-shared";
 import { HarnessLogo } from "../components/HarnessLogo";
 
 /** The shared core state survives navigation and keeps every window in agreement. */
-export function AgentConnections({ info }: { info?: SystemInfo }) {
+export function AgentConnections({ info, actions }: { info?: SystemInfo; actions?: ReactNode }) {
   const enabled = useEnabledHarnesses();
   const settings = useRpc("app.settings.get", {});
   const selection = useRpcMutation("app.settings.set");
@@ -50,7 +50,7 @@ export function AgentConnections({ info }: { info?: SystemInfo }) {
   const error = [selection.error, settings.error, install.error, check.error, configure.error, updates.error].find(Boolean);
   const checked = state?.agents.map((row) => row.checkedAt ?? 0).reduce((a, b) => Math.max(a, b), 0);
   return (
-    <Section title="Coding agents" flush>
+    <Section title="Coding agents" flush actions={actions}>
       <div className="settings-toolbar">
         <p className="text-sm text-ink-2" role="status">
           {agentUpdateStatus({ updating: Boolean(state?.updating), checking: Boolean(state?.checking || check.isPending), checked })}

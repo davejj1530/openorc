@@ -3,9 +3,7 @@ import { createPortal } from "react-dom";
 import type { RpcParams, RpcResults } from "@openorc/protocol";
 import { Button, Switch } from "../components/ui";
 import { queryClient, useRpc, useRpcMutation } from "../lib/client";
-
-/** Where the open section's controls go in Settings' top bar, beside its name. */
-export const SectionActionsSlot = createContext<HTMLElement | null>(null);
+import { SectionActionsSlot } from "./settings-actions-context";
 
 /** A section's own controls, in the top bar beside its name while the section is open; in place, outside Settings. */
 export function SectionActions({ active, children }: { active: boolean; children: ReactNode }) {
@@ -67,12 +65,15 @@ export function SaveStatus({ status, retry }: { status: string; retry: () => voi
 export const SectionLevel = createContext<2 | 3>(2);
 
 /** A titled section. Its rows sit in one card; `flush` sections lay out their own cards. */
-export function Section({ id, title, children, description, flush }: { id?: string; title: string; children: ReactNode; description?: string; flush?: boolean }) {
+export function Section({ id, title, children, description, flush, actions }: { id?: string; title: string; children: ReactNode; description?: string; flush?: boolean; actions?: ReactNode }) {
   const Heading = useContext(SectionLevel) === 3 ? "h3" : "h2";
   return (
     <section id={id} className="settings-section">
       <header className="settings-section-intro">
-        <Heading>{title}</Heading>
+        <div className="settings-section-heading">
+          <Heading>{title}</Heading>
+          {actions ? <div className="settings-section-actions">{actions}</div> : null}
+        </div>
         {description && <p>{description}</p>}
       </header>
       <div className={flush ? "settings-section-body" : "settings-section-body settings-group"}>{children}</div>

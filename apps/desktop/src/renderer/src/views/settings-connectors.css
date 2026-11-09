@@ -1,3 +1,14 @@
+.connector-page-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+  margin-bottom: 28px;
+}
+.connector-page-heading > .settings-page-lead {
+  margin-bottom: 0;
+}
+
 /* Connectors: a card per server in the grid Usage's accounts use, each with its agents' lines and
    switches under its head. Cards in a row share the tallest one's height. */
 .connector-grid {
@@ -95,45 +106,85 @@
 }
 
 /* The add and edit form. */
+.connector-dialog {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.connector-dialog .dialog-sheet-head {
+  flex-shrink: 0;
+}
+.connector-dialog .dialog-sheet-body {
+  display: flex;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
 .connector-form {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.connector-form-fields {
   display: grid;
-  gap: 14px;
+  gap: 20px;
+  min-width: 0;
+  min-height: 0;
+  padding: 16px 20px 20px;
+  overflow-y: auto;
 }
 .connector-form-field {
   display: grid;
+  min-width: 0;
   gap: 6px;
   color: var(--ink-3);
   font-size: var(--text-sm);
 }
-.connector-form-kinds {
+.connector-form-connection {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
+}
+.connector-form-options {
+  min-width: 0;
+}
+.connector-form-options > summary {
   display: flex;
-  gap: 4px;
-}
-.connector-form-kinds > button {
-  height: 28px;
-  padding: 0 12px;
-  border-radius: var(--radius-pill);
-  color: var(--ink-2);
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+  border-radius: var(--radius-lg);
+  color: var(--ink-3);
   font-size: var(--text-sm);
+  cursor: pointer;
+  list-style: none;
+  transition: color var(--duration-leave) var(--ease-out);
 }
-.connector-form-kinds > button:hover {
-  background: var(--surface-2);
+.connector-form-options > summary::-webkit-details-marker {
+  display: none;
 }
-.connector-form-kinds > button[aria-pressed="true"] {
-  background: var(--surface-2);
+.connector-form-options > summary:hover {
   color: var(--ink);
 }
-.connector-form-pairs,
-.connector-form-agents {
-  display: grid;
-  gap: 6px;
-  justify-items: start;
+.connector-form-options > summary svg {
+  transition: rotate var(--duration-quick) var(--ease-out);
 }
-.connector-form-pairs > legend,
-.connector-form-agents > legend {
-  margin-bottom: 6px;
-  color: var(--ink-3);
-  font-size: var(--text-sm);
+.connector-form-options[open] > summary svg {
+  rotate: 180deg;
+}
+.connector-form-options > summary:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.connector-form-pairs {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  min-width: 0;
+  padding-top: 8px;
 }
 .connector-form-pair {
   display: grid;
@@ -143,19 +194,45 @@
   width: 100%;
 }
 .connector-form-agents {
-  grid-auto-flow: column;
-  justify-content: start;
-  gap: 16px;
+  min-width: 0;
 }
 .connector-form-agents > legend {
-  grid-column: 1 / -1;
-}
-.connector-form-agents > label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--ink);
+  margin-bottom: 8px;
+  color: var(--ink-3);
   font-size: var(--text-sm);
+}
+.connector-form-agent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 2px 12px;
+}
+.connector-form-agent {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: var(--radius-lg);
+  color: var(--ink);
+  font-size: var(--text-base);
+  cursor: pointer;
+  transition: background-color var(--duration-leave) var(--ease-out);
+}
+.connector-form-agent:hover:not([data-disabled]),
+.connector-form-agent:has(input:focus-visible) {
+  background: var(--surface-2);
+}
+.connector-form-agent[data-disabled] {
+  color: var(--ink-4);
+  cursor: default;
+}
+.connector-form-footer {
+  display: grid;
+  flex-shrink: 0;
+  gap: 12px;
+  padding: 16px 20px 20px;
+  border-top: var(--hairline) solid var(--line);
 }
 .connector-form-actions {
   display: flex;

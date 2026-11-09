@@ -5,13 +5,13 @@ import { ConnectorLogo } from "../components/ConnectorLogo";
 import { HarnessLogo } from "../components/HarnessLogo";
 import { MoreHorizontal, Plus, RefreshCw } from "../components/icons";
 import { menuItem, menuItemDanger, menuPopup } from "../components/menu";
-import { Button, IconButton, Switch } from "../components/ui";
+import { Button, IconButton, Switch, Tooltip } from "../components/ui";
 import { CoversPreview } from "../lib/browser-preview";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { agentName, agentStatusText, connectorOrigin, connectorStatus, isDormant, isYours } from "../lib/connector-presentation";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { ConnectorForm, type ConnectorDraft } from "./settings-connector-form";
-import { LoadError, SectionActions } from "./settings-shared";
+import { LoadError } from "./settings-shared";
 import "./settings-connectors.css";
 
 /** What a line says while its switch waits for a read to agree. */
@@ -172,7 +172,7 @@ function SignInProgress({ list }: { list: ConnectorList }) {
   ) : null;
 }
 
-export function ConnectorSettings({ active }: { active: boolean }) {
+export function ConnectorSettings({ active, description }: { active: boolean; description?: string }) {
   const list = useRpc("connectors.list", {}, { enabled: active, refetchInterval: (query) => (active && (query.state.data?.signIn || query.state.data?.checking) ? 1500 : false) });
   const refresh = useRpcMutation("connectors.list");
   const spec = useRpcMutation("connectors.spec");
@@ -187,15 +187,20 @@ export function ConnectorSettings({ active }: { active: boolean }) {
   };
   return (
     <>
-      <SectionActions active={active}>
-        <IconButton aria-label="Check again" disabled={refresh.isPending} onClick={() => refresh.mutate({ refresh: true })}>
-          <RefreshCw size={14} />
-        </IconButton>
-        <Button size="lg" onClick={() => setDraft({ name: "", spec: null, agents: [] })}>
-          <Plus size={14} />
-          Add connector
-        </Button>
-      </SectionActions>
+      <div className="connector-page-heading">
+        {description ? <p className="settings-page-lead">{description}</p> : null}
+        <div className="ml-auto flex items-center gap-2">
+          <Tooltip label="Check again">
+            <IconButton aria-label="Check again" disabled={refresh.isPending} onClick={() => refresh.mutate({ refresh: true })}>
+              <RefreshCw size={14} />
+            </IconButton>
+          </Tooltip>
+          <Button size="lg" onClick={() => setDraft({ name: "", spec: null, agents: [] })}>
+            <Plus size={14} />
+            Add connector
+          </Button>
+        </div>
+      </div>
       {list.isPending || list.data?.checking || refresh.isPending ? <p className="settings-note">Checking connectors…</p> : null}
       {list.isError ? <LoadError retry={() => void list.refetch()} /> : null}
       {list.data ? <SignInProgress list={list.data} /> : null}

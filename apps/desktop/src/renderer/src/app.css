@@ -1187,6 +1187,19 @@ span.property-chip {
 .settings-section-intro {
   margin-bottom: 10px;
 }
+.settings-section-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+.settings-section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
 .settings-section-intro h2 {
   color: var(--ink);
   font-size: var(--text-md);

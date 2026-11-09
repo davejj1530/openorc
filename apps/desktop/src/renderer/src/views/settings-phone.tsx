@@ -38,13 +38,19 @@ export function PhoneSettings({ active }: { active: boolean }) {
           </p>
         )}
       </Section>
-      <div className="motion-collapse" hidden={!enabled && devices.length === 0}>
-        <Section title="Paired phones">
-          {devices.length ? devices.map((device) => <MacPhone key={device.id} device={device} />) : <p className="flex min-h-13 items-center text-ink-3">No paired phones yet.</p>}
-        </Section>
-      </div>
+      <PairedPhones active={active} enabled={enabled} devices={devices} />
       {enabled && status.data && <PushKey push={status.data.push} />}
     </>
+  );
+}
+
+function PairedPhones({ active, enabled, devices }: { active: boolean; enabled: boolean; devices: RemoteDevice[] }) {
+  return (
+    <div className="motion-collapse" hidden={!enabled && devices.length === 0}>
+      <Section title="Paired phones" actions={active ? <PairPhone /> : undefined}>
+        {devices.length ? devices.map((device) => <MacPhone key={device.id} device={device} />) : <p className="flex min-h-13 items-center text-ink-3">No paired phones yet.</p>}
+      </Section>
+    </div>
   );
 }
 
@@ -140,7 +146,7 @@ export function pairingSheet<O extends PairingCodeOffer>({
 }
 
 /** The Phone page's ink pill, while phones can connect, and the sheet with the code it opens. */
-export function PairPhone() {
+function PairPhone() {
   const status = useRpc("remote.status", {});
   const pairing = usePairing(status.data?.pairing?.offerId);
   return (

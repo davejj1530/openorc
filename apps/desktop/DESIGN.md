@@ -294,6 +294,8 @@ Usage uses a wider 1120px column with Cost, Tokens, and Limits views. Its agent 
 
 Connections lists enabled agents in one group with hairlines between rows. Each row keeps its mark, name, connection status, version, and enable switch visible; expanding the name reveals installation details. Update actions and errors remain visible. Add agents is a compact disclosure at the bottom of the same group, and update preferences sit in a separate group below.
 
+Settings actions live with their content: Refresh connections beside Coding agents, Pair a phone beside Paired phones, and connector actions beside the page description above their list. The 520px connector dialog uses 40px sheet fields and a two-column agent list that becomes one column in narrow windows. Optional headers or environment variables sit behind a disclosure. The title and action footer stay in place while the fields scroll; validation appears above the footer buttons.
+
 Claude accounts use the same grouped rows: account name and identity on the left, connection status and an overflow menu on the right, and a quiet Default label beside the chosen name. Sign in and Cancel sign-in remain visible when needed; Rename, Make default, Sign in again, and Enable or Disable live in the menu. Rename opens an inline form. Add account opens a form in the group's last row, with account-switching preferences in a separate group below.
 
 **The Save Feedback Rule.** Announce actual saves and errors in place (Save becomes Saved with a check); leave the idle state empty.

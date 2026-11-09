@@ -299,13 +299,27 @@ export function Tooltip({ label, side, children }: { label: ReactNode; side?: "t
  * A modal sheet: r20 over a dimmed backdrop, a 14px title with no divider and a round close. Base
  * UI returns focus to the control that opened it.
  */
-export function Dialog({ open, onOpenChange, title, children, width = 480 }: { open: boolean; onOpenChange: (open: boolean) => void; title: string; children: ReactNode; width?: number }) {
+export function Dialog({
+  open,
+  onOpenChange,
+  title,
+  children,
+  width = 480,
+  className,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  children: ReactNode;
+  width?: number;
+  className?: string;
+}) {
   return (
     <BaseDialog.Root open={open} onOpenChange={onOpenChange}>
       <BaseDialog.Portal>
         <CoversPreview />
         <BaseDialog.Backdrop className="dialog-backdrop fixed inset-0" />
-        <BaseDialog.Popup className="dialog-sheet fixed inset-x-0 top-1/5 mx-auto" style={{ width }}>
+        <BaseDialog.Popup className={cn("dialog-sheet fixed inset-x-0 top-1/5 mx-auto", className)} style={{ width }}>
           <div className="dialog-sheet-head">
             <BaseDialog.Title className="dialog-sheet-title">{title}</BaseDialog.Title>
             <BaseDialog.Close render={<IconButton aria-label="Close" size="sm" />}>

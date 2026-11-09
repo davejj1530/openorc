@@ -22,9 +22,10 @@ import { ConnectorSettings } from "./settings-connectors";
 import { CloudSettings } from "./settings-cloud";
 import { DeviceSettings } from "./settings-devices";
 import { GitHubSettings } from "./settings-github";
-import { PairPhone, PhoneSettings } from "./settings-phone";
+import { PhoneSettings } from "./settings-phone";
 import { idleTimeoutLabel, learningStatus, memoryModelAgent } from "./settings-presentation";
-import { Field, LoadError, SaveStatus, Section, SectionActionsSlot, Toggle, usePreference } from "./settings-shared";
+import { SectionActionsSlot } from "./settings-actions-context";
+import { Field, LoadError, SaveStatus, Section, Toggle, usePreference } from "./settings-shared";
 import { SkillsSettings } from "./settings-skills";
 import { SlackSettings } from "./settings-slack";
 import { TextGenerationSettings } from "./settings-text-generation";
@@ -47,23 +48,16 @@ export function Settings({ route }: { route: SettingsRoute }) {
   const [actionsSlot, setActionsSlot] = useState<HTMLElement | null>(null);
   return (
     <div className="settings-sheet" data-section={current.id}>
-      <TopBar
-        actions={
-          <>
-            <PageActions id={current.id} info={info} />
-            <span ref={setActionsSlot} className="flex items-center gap-1" />
-          </>
-        }
-      >
+      <TopBar actions={<span ref={setActionsSlot} className="flex items-center gap-1" />}>
         <SettingsTitle current={current} />
       </TopBar>
       <SectionActionsSlot.Provider value={actionsSlot}>
         <div className="settings-shell">
           <div ref={content} className="settings-content">
-            {current.description ? <p className="settings-page-lead">{current.description}</p> : null}
-            {settingsSections.map(({ id, label }) => (
+            {current.description && current.id !== "connectors" ? <p className="settings-page-lead">{current.description}</p> : null}
+            {settingsSections.map(({ id, label, description }) => (
               <section key={id} id={`settings-${id}`} aria-label={label} hidden={id !== current.id}>
-                <SectionSettings id={id} active={id === current.id} info={info} />
+                <SectionSettings id={id} active={id === current.id} info={info} description={description} />
               </section>
             ))}
           </div>
@@ -71,18 +65,6 @@ export function Settings({ route }: { route: SettingsRoute }) {
       </SectionActionsSlot.Provider>
     </div>
   );
-}
-
-/** What the open section offers beside its title: checking the connections again, or pairing a phone. */
-function PageActions({ id, info }: { id: SettingsSection; info: UseQueryResult<RpcResults["system.info"]> }) {
-  if (id === "connections")
-    return (
-      <Button size="lg" disabled={info.isFetching} onClick={() => void info.refetch()}>
-        <RefreshCw size={13} />
-        {info.isFetching ? "Checking…" : "Refresh connections"}
-      </Button>
-    );
-  return id === "phone" ? <PairPhone /> : null;
 }
 
 /** Brings what a link into Settings points at into view: a provider's usage. */
@@ -124,20 +106,12 @@ export function SettingsTitle({ current }: { current: { id: SettingsSection; lab
 }
 
 /** One section's settings. Every section stays mounted, so a change in progress survives a look at another. */
-function SectionSettings({ id, active, info }: { id: SettingsSection; active: boolean; info: UseQueryResult<RpcResults["system.info"]> }) {
-  const enabled = useEnabledHarnesses();
+function SectionSettings({ id, active, info, description }: { id: SettingsSection; active: boolean; info: UseQueryResult<RpcResults["system.info"]>; description?: string }) {
   switch (id) {
     case "usage":
       return <UsageDashboard active={active} />;
     case "connections":
-      return (
-        <>
-          {info.isError && <LoadError retry={() => void info.refetch()} />}
-          <AgentConnections info={info.data} />
-          {enabled.includes("claude") ? <ClaudeAccountSettings active={active} /> : null}
-          <GitHubSettings info={info.data} />
-        </>
-      );
+      return <ConnectionsSettings active={active} info={info} />;
     case "cloud":
       return <CloudSettings active={active} />;
     case "slack":
@@ -147,7 +121,7 @@ function SectionSettings({ id, active, info }: { id: SettingsSection; active: bo
     case "skills":
       return <SkillsSettings active={active} />;
     case "connectors":
-      return <ConnectorSettings active={active} />;
+      return <ConnectorSettings active={active} description={description} />;
     case "devices":
       return <DeviceSettings active={active} />;
     case "appearance":
@@ -164,6 +138,26 @@ function SectionSettings({ id, active, info }: { id: SettingsSection; active: bo
     case "data":
       return <DataSettings dataDir={info.data?.dataDir} error={info.isError} retry={() => void info.refetch()} />;
   }
+}
+
+function ConnectionsSettings({ active, info }: { active: boolean; info: UseQueryResult<RpcResults["system.info"]> }) {
+  const enabled = useEnabledHarnesses();
+  return (
+    <>
+      {info.isError && <LoadError retry={() => void info.refetch()} />}
+      <AgentConnections
+        info={info.data}
+        actions={
+          <Button size="sm" disabled={info.isFetching} onClick={() => void info.refetch()}>
+            <RefreshCw size={13} />
+            {info.isFetching ? "Checking…" : "Refresh connections"}
+          </Button>
+        }
+      />
+      {enabled.includes("claude") ? <ClaudeAccountSettings active={active} /> : null}
+      <GitHubSettings info={info.data} />
+    </>
+  );
 }
 
 const days = (v: number | null | undefined) => (v == null ? "" : String(v));

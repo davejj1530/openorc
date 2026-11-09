@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ClaudeAccountId } from "./claude-accounts.js";
-import type { Memory, PermissionPreset, Run, RunMode } from "./domain.js";
+import type { Memory, PermissionPreset, Run, RunMode, ThreadMessage, ThreadSummary } from "./domain.js";
 import { executionModeAvailable, executionModeSettings } from "./execution-mode.js";
 import { ModelExecutionSettings } from "./execution-target.js";
 
@@ -143,6 +143,39 @@ export function chatBubbles(text: string): string[] {
   return bubbles;
 }
 
+/**
+ * An Orcling as a phone lists it: how it looks and where its own conversation stands, without its model, account,
+ * permission, wakes or instructions.
+ */
+export interface OrclingChatSummary {
+  id: string;
+  name: string;
+  look: OrclingLook;
+  threadId: string;
+  /** Its own conversation, whose marks say whether it works, waits on the person or has texts unread. */
+  thread: ThreadSummary | null;
+  /** The newest message there, cut to a preview. */
+  last: ThreadMessage | null;
+}
+
+/**
+ * One Orcling as a phone shows it when you open it from its chat: who it is, what it runs on, when it checks in, its
+ * current instructions and what it remembers. Earlier instruction versions stay on the Mac.
+ */
+export interface OrclingProfile {
+  id: string;
+  name: string;
+  look: OrclingLook;
+  settings: ModelExecutionSettings;
+  permission: OrclingPermission;
+  /** The Claude account it runs on whenever its model is Claude's. */
+  claudeAccountId: string;
+  wakes: OrclingWake[];
+  /** The newest version's text; null before any was written. */
+  instructions: string | null;
+  memories: { id: string; title: string; body: string; updatedAt: number }[];
+}
+
 export interface OrclingInstructionsVersion {
   version: number;
   body: string;
@@ -165,6 +198,10 @@ export function orclingExecution(o: Pick<OrclingDraft, "permission" | "settings"
 const id = z.string().min(1);
 export const orclingRpcParams = {
   "orclings.list": z.object({}).strict(),
+  /** Every Orcling with its own conversation's state and newest message, for a phone's list. */
+  "orclings.chats": z.object({}).strict(),
+  /** One Orcling for a phone's sheet: its model, permission, check-ins, current instructions and memories. */
+  "orclings.profile": z.object({ id }).strict(),
   "orclings.create": z.object({ draft: OrclingDraft }).strict(),
   "orclings.update": z.object({ id, draft: OrclingDraft }).strict(),
   /** Removes the Orcling, its instructions, memories and conversation. Threads it helped in keep their history. */
@@ -190,6 +227,8 @@ export const orclingRpcParams = {
 
 export interface OrclingRpcResults {
   "orclings.list": Orcling[];
+  "orclings.chats": OrclingChatSummary[];
+  "orclings.profile": OrclingProfile;
   "orclings.create": Orcling;
   "orclings.update": Orcling;
   "orclings.delete": null;

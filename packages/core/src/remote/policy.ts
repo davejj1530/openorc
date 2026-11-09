@@ -173,6 +173,14 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   "review.createThreadPr": (params, context) => teamWork(params.threadId, context) ?? prTitle(params.title) ?? prBody(params.body),
   // One page's state; the handler answers closed for a missing or retired thread.
   "preview.state": allow,
+  // Faces, names and their own conversations' state; the reply leaves the rest of each Orcling on the Mac.
+  "orclings.chats": allow,
+  "orclings.profile": allow,
+  // When it checks in: the schema bounds the list, and nothing there reaches its model, account or instructions.
+  "orclings.wakes.save": allow,
+  // The core takes tapbacks only in an Orcling's own conversation, on a message there.
+  "orclings.reactions": allow,
+  "orclings.react": allow,
 };
 
 /** What a reply's shaping needs besides the result: how an error or a reason reads on a phone, and the Mac's folders. */
@@ -251,6 +259,16 @@ export const remoteReplies: { [M in RemoteMethod]: Reply<M> } = {
   "review.pushThread": same,
   "review.createThreadPr": same,
   "preview.state": (state, context) => previewReply(state, context),
+  "orclings.chats": same,
+  // Instructions and memories are text that may hold a token.
+  "orclings.profile": (profile) => ({
+    ...profile,
+    instructions: profile.instructions === null ? null : redact(profile.instructions).text,
+    memories: profile.memories.map((memory) => ({ ...memory, title: redact(memory.title).text, body: redact(memory.body).text })),
+  }),
+  "orclings.wakes.save": same,
+  "orclings.reactions": same,
+  "orclings.react": same,
 };
 
 /** One result shaped for a phone by its method's entry in remoteReplies. */

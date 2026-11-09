@@ -1,9 +1,9 @@
 import { useKeyboardChatComposerInset } from "@legendapp/list/keyboard";
 import type { LegendListRef } from "@legendapp/list/react-native";
 import { conversationActivity, conversationSendDisabledReason, preparingCloud, processFit, queueAfterStart, startingInCloud, type SubmitRequest } from "@openorc/client";
-import { isSubagentThread, type Run, type ThreadSummary } from "@openorc/protocol";
+import { isSubagentThread, type OrclingChatSummary, type Run, type ThreadSummary } from "@openorc/protocol";
 import { router, Stack, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement, type RefObject } from "react";
 import { Pressable, View } from "react-native";
 import type { SharedValue } from "react-native-reanimated";
 import { useHostClient, useLinkState, useRpc } from "../client";
@@ -15,6 +15,9 @@ import { linkReason } from "../connection/link-reason";
 import type { LinkState } from "../connection/manager";
 import { useCoverHome } from "../home/home-cover";
 import { useThreadOnScreen } from "../notifications/on-screen";
+import { chatFor, useOrclingChats } from "../orclings/orcling-chats";
+import { OrclingChatPane } from "../orclings/OrclingChatPane";
+import { OrclingHeader } from "../orclings/OrclingHeader";
 import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
 import { CloudStart } from "./CloudStart";
@@ -124,6 +127,24 @@ function TranscriptPane({ threadId, thread, runs, loading, failed, retry, onActi
   );
 }
 
+/** An Orcling's own conversation names it in a pill by the back button; any other thread titles itself under its More menu. */
+function ConversationHeader({ chat, title, menu }: { chat: OrclingChatSummary | null; title: () => ReactElement; menu: ReactElement | null }) {
+  if (chat) return <OrclingHeader chat={chat} />;
+  return (
+    <>
+      <Stack.Screen options={{ headerTitle: title }} />
+      {menu}
+    </>
+  );
+}
+
+/** An Orcling's own conversation reads as texting; any other as its work transcript. */
+function ConversationPane({ chat, ...props }: PaneProps & { chat: OrclingChatSummary | null; thread: ThreadSummary }) {
+  if (!chat) return <TranscriptPane {...props} />;
+  const { thread, runs, loading, onActivity, composerInset, listRef, followKey } = props;
+  return <OrclingChatPane chat={chat} thread={thread} runs={runs} loading={loading} onActivity={onActivity} composerInset={composerInset} listRef={listRef} followKey={followKey} />;
+}
+
 /**
  * A thread on the phone: its conversation at phone size, from the newest turn back a page at a time, with the composer
  * pinned above the keyboard. The send tree, the paging and the settings are the desktop's, from @openorc/client. The
@@ -149,6 +170,7 @@ export function ThreadScreen() {
   const menu = useThreadHeaderMenu(thread, now, actions.run);
   const linkState = useLinkState();
   const inScope = useHeaderScope();
+  const chat = chatFor(useOrclingChats().chats, id);
   useThreadOnScreen(linkState.kind === "unpaired" ? null : linkState.mac.id, id);
 
   const { canSteer } = processFit({ live, activeRun, choice: settings.choice, mode: settings.mode, permission: settings.permission, compacting: false });
@@ -177,13 +199,13 @@ export function ThreadScreen() {
 
   return (
     <View className="flex-1 bg-bg">
-      <Stack.Screen options={{ headerTitle: () => inScope(<ThreadTitle thread={thread} onRename={actions.rename} />) }} />
-      {menu}
+      <ConversationHeader chat={chat} title={() => inScope(<ThreadTitle thread={thread} onRename={actions.rename} />)} menu={menu} />
       <DisclosureContext.Provider value={disclosure}>
         <VoicesContext.Provider value={voices}>
           {thread ? <MoveRefused thread={thread} /> : null}
           {thread ? (
-            <TranscriptPane
+            <ConversationPane
+              chat={chat}
               threadId={id}
               thread={thread}
               runs={runs}
@@ -219,6 +241,7 @@ export function ThreadScreen() {
               disabledReason={disabledReason}
               onLayout={onComposerLayout}
               onSent={follow}
+              to={chat?.name}
             />
           )}
         </View>

@@ -40,6 +40,8 @@ vi.mock("../client", async () => ({
   useSavedMacs: () => phone.macs,
   useHostGroup: () => ({ primary: "studio", partner: null }),
   usePartnerLinkState: () => phone.state,
+  // A Mac that has not listed Orclings: this iPhone's Orclings row stays out.
+  useRpc: () => ({ data: undefined }),
   storage: new (await import("../scratch-store")).ScratchStore({
     getString: (key) => phone.saved.get(key),
     set: (key, value) => void phone.saved.set(key, value),

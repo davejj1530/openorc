@@ -11,7 +11,7 @@ type Dependencies = {
 };
 
 /** Enough of a message to fill a preview line at any sidebar width. */
-const PREVIEW_CHARS = 280;
+export const PREVIEW_CHARS = 280;
 
 export function createThreadQueriesHandlers({
   threadService,

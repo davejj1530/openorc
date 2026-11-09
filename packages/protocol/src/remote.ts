@@ -56,6 +56,14 @@ export const REMOTE_METHODS = [
   "review.createThreadPr",
   // Whether the Mac shows a page for a thread, its address and title shaped. Frames come only to a session watching it.
   "preview.state",
+  // Orclings by face, name and their own conversation's state, and tapbacks in that conversation. One Orcling's profile
+  // (model, permission, check-ins, current instructions and memories, text redacted) and its check-in times. Its earlier
+  // instructions stay on the Mac, as do creating, renaming, redrawing and rewriting one.
+  "orclings.chats",
+  "orclings.profile",
+  "orclings.wakes.save",
+  "orclings.reactions",
+  "orclings.react",
   // Whether the Mac offers cloud threads, and moving a thread to the cloud after the phone's confirm, with the files a
   // move from the checkout would take. Starting one is `threads.start` with `cloud`.
   "cloud.offer",

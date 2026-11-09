@@ -1,12 +1,25 @@
+import { lastThreadMessage, type Db, type LedgerWriter } from "@openorc/db";
 import type { OrclingService } from "../services/orclings.js";
+import type { ThreadService } from "../services/threads.js";
+import { PREVIEW_CHARS } from "./thread-queries.js";
 import type { Handlers } from "./types.js";
 
-type Dependencies = { orclings: OrclingService };
+type Dependencies = { orclings: OrclingService; threads: Pick<ThreadService, "get">; db: Db; ledger: Pick<LedgerWriter, "flush"> };
 type OrclingMethod = Extract<keyof Handlers, `orclings.${string}`>;
 
-export function createOrclingHandlers({ orclings }: Dependencies): Pick<Handlers, OrclingMethod> {
+export function createOrclingHandlers({ orclings, threads, db, ledger }: Dependencies): Pick<Handlers, OrclingMethod> {
   return {
     "orclings.list": () => orclings.list(),
+    "orclings.chats": () => {
+      // A message sent a moment ago can still be waiting for the ledger's next write.
+      ledger.flush();
+      return orclings.list().map(({ id, name, look, threadId }) => ({ id, name, look, threadId, thread: threads.get(threadId), last: lastThreadMessage(db, threadId, PREVIEW_CHARS) }));
+    },
+    "orclings.profile": ({ id }) => {
+      const { name, look, settings, permission, claudeAccountId, wakes } = orclings.get(id);
+      const memories = orclings.memories(id).map(({ id: memoryId, title, body, updatedAt }) => ({ id: memoryId, title, body, updatedAt }));
+      return { id, name, look, settings, permission, claudeAccountId, wakes, instructions: orclings.instructions(id)[0]?.body ?? null, memories };
+    },
     "orclings.create": ({ draft }) => orclings.create(draft),
     "orclings.update": ({ id, draft }) => orclings.update(id, draft),
     "orclings.delete": async ({ id }) => {

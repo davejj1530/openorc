@@ -7,7 +7,7 @@ import { projects, runs, threads } from "@openorc/db";
 import { linkUrl, toBase64Url } from "@openorc/link";
 import { nodeCrypto } from "@openorc/link/node";
 import { INSTALLED_PHONES, rawMacHello } from "@openorc/link/test-fixtures/installed-phone";
-import type { AgentEvent } from "@openorc/protocol";
+import { defaultOrclingLook, type AgentEvent } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
 import { RemoteTestClient } from "./test-client.js";
 import { linkSocket } from "./ws-socket.js";
@@ -137,4 +137,26 @@ it("hides child inbox entries and notifications from legacy sessions, preserving
   } finally {
     pending.mockRestore();
   }
+});
+
+it("lists Orclings to a phone by face, name and conversation, opens one's profile with its text redacted, saves its check-ins, and leaves making or rewriting one to the Mac", async () => {
+  const pip = await core.orclings.create({ name: "Pip", look: defaultOrclingLook, settings: { agent: "codex", model: "fixture", effort: null, fastMode: false }, permission: "allow" });
+  const capable = await phone();
+  await expect(capable.request("session.negotiate", { capabilities: ["orclings"] })).resolves.toEqual({ capabilities: ["orclings"] });
+  const [chat] = await capable.call("orclings.chats", {});
+  expect(Object.keys(chat!).sort()).toEqual(["id", "last", "look", "name", "thread", "threadId"]);
+  expect(chat).toMatchObject({ id: pip.id, name: "Pip", look: defaultOrclingLook, threadId: pip.threadId, thread: { id: pip.threadId }, last: null });
+  await expect(capable.call("orclings.reactions", { threadId: pip.threadId })).resolves.toEqual([]);
+  core.orclings.saveInstructions(pip.id, "Ping me when CI breaks. Token ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij12", "user", null);
+  const profile = await capable.call("orclings.profile", { id: pip.id });
+  expect(Object.keys(profile).sort()).toEqual(["id", "instructions", "look", "memories", "name", "permission", "settings", "wakes"]);
+  expect(profile).toMatchObject({ id: pip.id, name: "Pip", permission: "allow", settings: { agent: "codex", model: "fixture" }, wakes: [], memories: [] });
+  expect(profile.instructions).toBe("Ping me when CI breaks. Token [redacted:github-token]");
+  const saved = await capable.call("orclings.wakes.save", { id: pip.id, wakes: [{ kind: "startup" }, { kind: "time", at: "09:00", days: [1, 2, 3, 4, 5] }] });
+  expect(saved.wakes).toEqual([{ kind: "startup" }, { kind: "time", at: "09:00", days: [1, 2, 3, 4, 5] }]);
+  await expect(capable.request("orclings.instructions.save", { id: pip.id, body: "Something else" })).rejects.toThrow();
+  await expect(capable.request("orclings.list", {})).rejects.toThrow();
+  await expect(
+    capable.request("orclings.create", { draft: { name: "Rex", look: defaultOrclingLook, settings: { agent: "codex", model: "fixture", effort: null, fastMode: false }, permission: "allow" } }),
+  ).rejects.toThrow();
 });

@@ -86,6 +86,7 @@ export default function RootLayout() {
             <Stack.Screen name="pull-request" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [1] }} />
             <Stack.Screen name="branch" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [0.6, 1] }} />
             <Stack.Screen name="details" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [0.6, 1] }} />
+            <Stack.Screen name="orcling" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [1] }} />
           </Stack>
         </QueryClientProvider>
       </KeyboardProvider>

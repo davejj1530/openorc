@@ -744,7 +744,7 @@ export class OpenOrc {
       createSchedulesHandlers({ schedules: this.schedules }),
       createCatalogHandlers({ runService: this.runs, invalidate }),
       createMemoryHandlers({ memory: this.memory, db: this.db, files: this.files, keyChanged: () => this.cloudParts.brain.signInsChanged() }),
-      createOrclingHandlers({ orclings: this.orclings }),
+      createOrclingHandlers({ orclings: this.orclings, threads: this.threads, db: this.db, ledger: this.ledger }),
       createDeviceHandlers({ devices: this.devices }),
       createInboxHandlers({ runService: this.runs, db: this.db }),
       createRemoteHandlers({ remote: this.remote, pushKeyChanged: () => this.cloudParts.brain.signInsChanged() }),

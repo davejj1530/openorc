@@ -27,6 +27,8 @@ export interface ComposerPlaneProps {
   onText: (text: string) => void;
   onRemoveImage: (path: string) => void;
   onAttach: () => void;
+  /** Model and mode in the bar; an Orcling's chat leaves them to the Orcling, as texting has no such controls. */
+  chips?: boolean;
   /** The bar's end: activity, then the actions, the ink pill last. */
   children: ReactNode;
 }
@@ -36,7 +38,21 @@ export interface ComposerPlaneProps {
  * model and mode on the left and the actions on the right. While the prompt has the keyboard, a `/` word opens the
  * skill picker in a piece above it.
  */
-export function ComposerPlane({ composerId, skillScope, settings, draft, uploading, placeholder, autoFocus, onFocusChange, onText, onRemoveImage, onAttach, children }: ComposerPlaneProps) {
+export function ComposerPlane({
+  composerId,
+  skillScope,
+  settings,
+  draft,
+  uploading,
+  placeholder,
+  autoFocus,
+  onFocusChange,
+  onText,
+  onRemoveImage,
+  onAttach,
+  chips = true,
+  children,
+}: ComposerPlaneProps) {
   const [focused, setFocused] = useState(Boolean(autoFocus));
   const picker = useSkillPicker({ scope: skillScope, agent: settings.choice?.agent, claudeAccountId: settings.claudeAccount?.chosen ?? settings.claudeAccountId, text: draft.text, onText });
   return (
@@ -90,7 +106,7 @@ export function ComposerPlane({ composerId, skillScope, settings, draft, uploadi
             >
               <Plus size={16} className="text-ink-4" />
             </Pressable>
-            <ComposerChips composerId={composerId} settings={settings} />
+            {chips ? <ComposerChips composerId={composerId} settings={settings} /> : null}
           </View>
           <View className="flex-row items-center gap-2.5">{children}</View>
         </View>

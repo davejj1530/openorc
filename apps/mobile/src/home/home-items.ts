@@ -188,7 +188,8 @@ export function homeItems(list: HomeList, options: HomeOptions): HomeItem[] {
         open: sidebarSectionOpen(options.collapsed, "resolved", SIDEBAR_LIST),
         more: days.resolved.hasMore,
         total: list.resolvedCount,
-        standsEmpty: list.listed && !options.pinnedOnly,
+        // Not once the host says it holds nothing: an empty fold at the foot says only "0".
+        standsEmpty: list.listed && !options.pinnedOnly && list.resolvedCount !== 0,
       },
       list,
       options,

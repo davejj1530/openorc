@@ -1,8 +1,10 @@
 import { Host, Menu, Picker, RNHostView, Text as MenuText } from "@expo/ui/swift-ui";
 import { accessibilityLabel, accessibilityValue, pickerStyle, tag } from "@expo/ui/swift-ui/modifiers";
-import { View } from "react-native";
+import { Switch, View } from "react-native";
 import { APPEARANCES, chooseAppearance, useAppearance, type AppearanceChoice } from "../appearance";
-import { ChevronsUpDown, SunMoon } from "../generated/icons";
+import { ChevronsUpDown, Orclings, SunMoon } from "../generated/icons";
+import { setOrclingFaces, useOrclingFaces } from "../orclings/face-row";
+import { useOrclingChats } from "../orclings/orcling-chats";
 import { haptic } from "../ui/haptics";
 import { useMode } from "../ui/mode";
 import { Text } from "../ui/Text";
@@ -55,12 +57,42 @@ function AppearanceRow() {
   );
 }
 
+/** Whether Threads shows the Orclings' faces at its top; off, the Orclings tab counts the ones that need you instead. */
+function OrclingFacesRow() {
+  const shown = useOrclingFaces();
+  return (
+    <View className={rowClass}>
+      <RowLines
+        lead={<Orclings size={16} className="text-ink-4" />}
+        label="Orclings on Threads"
+        trailing={
+          <Switch
+            accessibilityLabel="Orclings on Threads"
+            value={shown}
+            onValueChange={(next) => {
+              haptic.select();
+              setOrclingFaces(next);
+            }}
+          />
+        }
+      />
+    </View>
+  );
+}
+
 /** What this phone keeps for itself. */
 export function PhoneSection({ notifications }: { notifications: boolean }) {
+  const orclings = useOrclingChats().supported;
   return (
     <Section title="This iPhone">
       <Card>
         <AppearanceRow />
+        {orclings ? (
+          <>
+            <Divider />
+            <OrclingFacesRow />
+          </>
+        ) : null}
         {notifications ? (
           <>
             <Divider />

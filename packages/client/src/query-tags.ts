@@ -112,6 +112,9 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "reviewerApp.get": ["reviewer-app"],
   // Orclings, their instructions and what they remember.
   "orclings.list": ["orclings"],
+  // Each Orcling's own conversation with its newest message, which a turn or a read there changes.
+  "orclings.chats": ["orclings", "threads"],
+  "orclings.profile": ["orclings", "memory"],
   "orclings.instructions": ["orclings"],
   "orclings.memories": ["orclings", "memory"],
   // The Device panel's status and device list. The core invalidates "devices" whenever either changes.

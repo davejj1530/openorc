@@ -27,6 +27,12 @@ export interface ComposerProps extends Omit<ComposerInput, "threadId"> {
   settings: Settings;
   generatingImage: boolean;
   onLayout: (event: LayoutChangeEvent) => void;
+  /**
+   * The Orcling whose own conversation this is, texted as a person is: its name in the field whether or not it works, one
+   * send that joins its turn (or waits for it where the agent cannot take a message mid-turn), and its model and mode
+   * left to it.
+   */
+  to?: string;
 }
 
 /** Messages waiting for the running turn, each able to go now or leave the queue. */
@@ -58,7 +64,7 @@ function Queue({ thread, queued, canSteer, typing, onSent }: { thread: ThreadSum
  * bar of attach, model and mode on the left, and activity, Queue, Stop and the send pill on the right. What a send does
  * (into the turn, after it, the warm process or a new one) is the desktop's send tree.
  */
-export function Composer({ thread, queued, preparing, settings, generatingImage, onLayout, ...input }: ComposerProps) {
+export function Composer({ thread, queued, preparing, settings, generatingImage, onLayout, to, ...input }: ComposerProps) {
   const insets = useSafeAreaInsets();
   const composer = useComposer({ ...input, threadId: thread.id });
   const [typing, setTyping] = useState(false);
@@ -88,10 +94,11 @@ export function Composer({ thread, queued, preparing, settings, generatingImage,
           draft={composer.draft}
           uploading={composer.uploading}
           onFocusChange={setTyping}
-          placeholder={conversationPlaceholder({ firstTaskRun: false, working: input.working, canSteer: input.canSteer, agent: settings.choice?.agent })}
+          placeholder={to ? `Message ${to}…` : conversationPlaceholder({ firstTaskRun: false, working: input.working, canSteer: input.canSteer, agent: settings.choice?.agent })}
           onText={composer.setText}
           onRemoveImage={composer.removeImage}
           onAttach={composer.chooseImages}
+          chips={!to}
         >
           {activity ? <Text className="text-sm text-ink-4">{activity}</Text> : null}
           {controls.stop ? (
@@ -106,7 +113,7 @@ export function Composer({ thread, queued, preparing, settings, generatingImage,
               <Square size={14} className="text-ink-4" />
             </Pressable>
           ) : null}
-          {controls.queue ? (
+          {controls.queue && !to ? (
             <Pressable
               accessibilityRole="button"
               disabled={!controls.canSend}

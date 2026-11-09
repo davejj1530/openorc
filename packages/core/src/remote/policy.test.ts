@@ -92,6 +92,26 @@ describe("phone policy", () => {
     }
   });
 
+  it("lets a phone read Orclings' own conversations, open one's profile, set its check-ins and react there, and keeps the rest on the Mac", () => {
+    expect(admitRemoteRequest("orclings.chats", {}, context)).toEqual({ ok: true });
+    expect(admitRemoteRequest("orclings.profile", { id: "o" }, context)).toEqual({ ok: true });
+    expect(admitRemoteRequest("orclings.wakes.save", { id: "o", wakes: [{ kind: "startup" }] }, context)).toEqual({ ok: true });
+    expect(admitRemoteRequest("orclings.reactions", { threadId: "t" }, context)).toEqual({ ok: true });
+    expect(admitRemoteRequest("orclings.react", { threadId: "t", runId: "r", messageId: "m", part: 0, reaction: "heart" }, context)).toEqual({ ok: true });
+    for (const method of [
+      "orclings.list",
+      "orclings.create",
+      "orclings.update",
+      "orclings.delete",
+      "orclings.instructions",
+      "orclings.memories",
+      "orclings.ask",
+      "orclings.assign",
+      "orclings.instructions.save",
+    ])
+      expect(admitRemoteRequest(method, {}, context).ok, method).toBe(false);
+  });
+
   it("keeps phone access and its push key out of a phone's reach", () => {
     expect(Object.keys(remoteRpcParams)).toEqual(expect.arrayContaining(["remote.push.setKey", "remote.push.removeKey", "remote.push.test"]));
     for (const method of Object.keys(remoteRpcParams)) expect(isRemoteMethod(method), method).toBe(false);

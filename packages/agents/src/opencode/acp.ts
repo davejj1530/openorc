@@ -7,6 +7,7 @@ import type { AcpProfile, AcpRunContext } from "../acp/profile.js";
 import { questionConfig } from "../acp/questions.js";
 import { ownServerConfig } from "../acp/server-config.js";
 import { steerOpenCode } from "./steer.js";
+import { openCodeOwnTurns } from "./own-turns.js";
 import { openCodeSubagentCosts } from "./subagent-cost.js";
 
 /**
@@ -59,4 +60,5 @@ export const openCodeAcp: AcpProfile = {
   briefing: planInstructions,
   subagentCosts: openCodeSubagentCosts,
   steer: steerOpenCode,
+  ownTurns: openCodeOwnTurns,
 };

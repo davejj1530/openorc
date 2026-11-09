@@ -21,9 +21,10 @@ import {
   type RequestPermissionRequest,
   type RequestPermissionResponse,
   type SessionConfigOption,
+  type SessionUpdate,
   type Usage as AcpUsage,
 } from "@agentclientprotocol/sdk";
-import type { AgentEvent, ApprovalDecision, ApprovalKind, ApprovalResolution, RunSpec, Usage } from "@openorc/protocol";
+import type { AgentEvent, ApprovalDecision, ApprovalKind, ApprovalResolution, RunSpec, RunStatus, Usage } from "@openorc/protocol";
 import { definedEnv, launchPlace, type AgentHost, type LaunchPlace } from "../agent-host.js";
 import { agentBinary } from "../bin.js";
 import { emitProviderFailure, providerErrorActivity } from "../provider-errors.js";
@@ -38,11 +39,12 @@ import { AcpSubagents, childUpdate } from "./subagents.js";
 import { agentCommand, SubagentSpend } from "./subagent-spend.js";
 import { questionInstructions } from "./questions.js";
 import { answerForm, AutoCompactions, type FormRun, type PendingRequest } from "./forms.js";
-import type { AcpProfile, AcpRunContext, AgentCommand } from "./profile.js";
+import type { AcpProfile, AcpRunContext, AgentCommand, OwnTurns } from "./profile.js";
 import { openCodeAcp } from "../opencode/acp.js";
 import { readModels } from "./models.js";
 import { acpControl } from "./control.js";
 import { promptOutcome } from "./outcome.js";
+import { OwnTurnWatcher, type OwnTurnHost } from "./own-turns.js";
 import { AcpSettings, selectedModel, setModelOption } from "./settings.js";
 export { modelsFrom } from "./models.js";
 import { cursorPlan, cursorQuestion, answerCursorQuestion, presentCursorPlan } from "../cursor/interactions.js";
@@ -212,6 +214,8 @@ interface AcpTurn {
   planShown?: boolean;
   /** The answer is kept while the subagents' cost is read. */
   answer?: PromptResponse;
+  /** A turn the agent started itself, read from its session rather than streamed. */
+  own?: boolean;
 }
 
 /** Resolve a maintenance request only after its activity has a final state. */
@@ -237,6 +241,68 @@ function compactionControls(
       if (turn?.maintenance) return Promise.resolve();
       if (turn) return Promise.reject(new Error("Wait for the current turn to finish before compacting."));
       return compactAsTurn(runId, `manual-compaction-${++count}`, emit, (maintenance) => prompt(profile.compactCommand ?? "/compact", undefined, undefined, maintenance));
+    },
+  };
+}
+
+/**
+ * The turns an agent starts itself, followed beside its ACP stream when its profile can read them: they open, take
+ * updates and close as a prompt's turn does. Tool calls that leave a job running are noted as the stream maps them.
+ */
+function trackOwnTurns(
+  source: OwnTurns | undefined,
+  runId: string,
+  run: AgentCommand,
+  env: NodeJS.ProcessEnv,
+  mapper: AcpUpdateMapper,
+  emit: (event: AgentEvent) => void,
+  state: { session(): string | null; current(): AcpTurn | null; set(turn: AcpTurn | null): void; counted(): void },
+) {
+  const now = () => Date.now();
+  const report = (event: AgentEvent) => {
+    emit(event);
+    watcher?.observe(event);
+  };
+  const close = (status: RunStatus) => {
+    const turn = state.current();
+    if (!turn?.own) return;
+    state.set(null);
+    const ended = mapper.endTurn(now());
+    for (const ev of ended.events) emit(ev);
+    state.counted();
+    emit({ type: "turn.completed", runId, ts: now(), turnId: turn.id, status, ...(ended.text ? { resultText: ended.text } : {}), durationMs: now() - turn.startedAt });
+  };
+  const host: OwnTurnHost = {
+    runId,
+    run,
+    env,
+    session: state.session,
+    emit,
+    now,
+    prompting: () => Boolean(state.current() && !state.current()?.own),
+    answering: () => Boolean(state.current()?.own),
+    open: () => {
+      const turn = { id: randomUUID(), startedAt: now(), maintenance: null, own: true };
+      state.set(turn);
+      emit({ type: "turn.started", runId, ts: now(), turnId: turn.id });
+    },
+    feed: (update) => {
+      for (const ev of mapper.map(update, now())) report(ev);
+    },
+    close,
+  };
+  const watcher = source ? new OwnTurnWatcher(source, host) : null;
+  return {
+    watcher,
+    /** An update the ACP stream sent, mapped onto the app's events. */
+    stream: (update: SessionUpdate) => {
+      watcher?.saw(update);
+      for (const ev of mapper.map(update, now())) report(ev);
+    },
+    /** The process is gone: nothing more is read, and a turn still open ends with it. */
+    close: (status: RunStatus) => {
+      watcher?.close();
+      close(status);
     },
   };
 }
@@ -399,6 +465,7 @@ export class AcpAdapter {
     };
     const command = this.options.runCommand ?? agentCommand(launch, spec.runId, env);
     const subagentSpend = new SubagentSpend(profile.subagentCosts?.(command), Boolean(spec.resumeSessionId && !spec.forkSession));
+    const own = trackOwnTurns(profile.ownTurns, spec.runId, command, env, mapper, emit, { session: () => sessionId, current: () => turn, set: (next) => (turn = next), counted: () => (turns += 1) });
 
     const app = client({ name: "openorc" })
       .onNotification("session/update", ({ params }) => {
@@ -412,7 +479,7 @@ export class AcpAdapter {
         }
         subagents.observe(sessionId, params.update, now());
         if (params.update.sessionUpdate === "tool_call" || params.update.sessionUpdate === "tool_call_update") lastPlan = planWrite(params.update) ?? lastPlan;
-        for (const ev of mapper.map(params.update, now())) emit(ev);
+        own.stream(params.update);
       })
       .onNotification("_omp/compaction/start", notice, ({ params }) => autoCompactions.started(params))
       .onNotification("_omp/compaction/end", notice, ({ params }) => autoCompactions.ended(params))
@@ -443,7 +510,7 @@ export class AcpAdapter {
     const connection = app.connect(streamOf(proc));
 
     const settle = (id: string, response: PromptResponse | null, error?: unknown, subagentCostUsd = subagentSpend.last): void => {
-      if (!turn || turn.id !== id) return;
+      if (!turn || turn.id !== id || turn.own) return;
       const { startedAt: turnStartedAt, maintenance, planShown } = turn;
       turn = null;
       subagents.endParentTurn(now());
@@ -469,6 +536,7 @@ export class AcpAdapter {
         ...(usage ? { usage } : {}),
         durationMs: now() - turnStartedAt,
       });
+      own.watcher?.promptEnded(ended.text);
     };
 
     const settings = new AcpSettings(
@@ -483,7 +551,7 @@ export class AcpAdapter {
      */
     const canSteer = () =>
       steering &&
-      Boolean(sessionId && turn && !turn.maintenance) &&
+      Boolean(sessionId && turn && !turn.maintenance && !turn.own) &&
       !exited() &&
       !autoCompactions.active &&
       !mapper.compacting &&
@@ -501,6 +569,7 @@ export class AcpAdapter {
     const prompt = async (text: string, attachments: string[] | undefined, appendix?: string, maintenance?: NonNullable<typeof turn>["maintenance"]): Promise<void> => {
       if (!sessionId) throw new Error(`${name} has no session yet.`);
       if (exited()) throw new Error(`The ${name} process is no longer running.`);
+      if (!turn && own.watcher?.active) await own.watcher.sync();
       if (turn || settings.busy) throw new LiveInputUnavailable(`${name} is still answering or changing settings. Wait for it to finish.`);
       const blocks = await promptBlocks(text, attachments, host, [appendix, askUser && !profile.elicitation ? questionInstructions(serverName) : undefined].filter(Boolean).join("\n\n") || undefined);
       if (turn || settings.busy || exited()) throw new Error(`${name} cannot start another turn right now.`);
@@ -524,6 +593,7 @@ export class AcpAdapter {
         if (privateDir) place.remove(privateDir);
         connection.close();
         subagents.close(now());
+        own.close(closing ? "cancelled" : "error");
         // A turn the agent had answered, its subagents' cost still being read, ended as it answered.
         if (turn) settle(turn.id, turn.answer ?? null, turn.answer ? undefined : new Error(`${name} exited before the turn finished.`));
         // Oh My Pi exits with the signal's code when stopped; a stop OpenOrc asked for is a clean end.

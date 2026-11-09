@@ -1,5 +1,5 @@
-import type { McpServer, PromptResponse } from "@agentclientprotocol/sdk";
-import type { PermissionPreset, RunMode, RunSpec, RunStatus } from "@openorc/protocol";
+import type { McpServer, PromptResponse, SessionUpdate } from "@agentclientprotocol/sdk";
+import type { BackgroundCommand, PermissionPreset, RunMode, RunSpec, RunStatus } from "@openorc/protocol";
 import type { AgentHost, LaunchPlace } from "../agent-host.js";
 import type { AgentLaunchEnvironment } from "../launch-environment.js";
 
@@ -20,6 +20,43 @@ export interface AcpRunContext {
 
 /** Runs the agent's command line once where a run's session is, here or on its host, and resolves with what it printed. */
 export type AgentCommand = (args: string[]) => Promise<string>;
+
+/** A background job's report, as the agent wrote it into the session when the job ended. */
+export interface JobReport {
+  id: string;
+  state: "completed" | "cancelled" | "error";
+  exit?: number;
+  /** What the job printed, when the report carries it. */
+  output?: string;
+  /** The command the job ran, for an agent whose job ids the ACP stream never shows. */
+  command?: string;
+}
+
+/** One message of a session as the agent keeps it, read beside the ACP connection. */
+export type SessionEntry =
+  /** The agent finished a turn. */
+  | { id: string; kind: "idle"; outcome: RunStatus }
+  | { id: string; kind: "user"; text: string }
+  /** The whole message so far, as the updates its ACP server would have streamed for it. */
+  | { id: string; kind: "assistant"; updates: SessionUpdate[] }
+  /** Something the agent added itself, such as a background job's report; `job` names the job it reports on. */
+  | { id: string; kind: "other"; job?: JobReport };
+
+/**
+ * For an agent whose ACP server streams only the turns OpenOrc prompts, although the agent starts turns of its own, as
+ * when a background command it ran ends: how OpenOrc reads those turns from the session itself.
+ */
+export interface OwnTurns {
+  /** The session's recent messages, oldest first, reaching back to `since` when it can. */
+  read(run: AgentCommand, sessionId: string, since: string | null, env: NodeJS.ProcessEnv): Promise<SessionEntry[]>;
+  /** The background job a finished tool call left running, which reports back with a turn of its own. */
+  startedJob?(tool: { name: string; input: unknown; output: unknown }): BackgroundCommand | null;
+  /**
+   * The background job a tool call still open when its turn ended stands for: the agent reports its end with a turn of
+   * its own rather than by finishing the call.
+   */
+  leftRunning?(tool: { id: string; name: string; input: unknown }): BackgroundCommand | null;
+}
 
 /** The ACP server's command line and environment for one run. */
 export interface AcpLaunch {
@@ -102,4 +139,6 @@ export interface AcpProfile {
    * its pictures as paths where the agent runs. Without it, the agent says in `initialize` whether it steers.
    */
   steer?(run: AgentCommand, sessionId: string, text: string, images: string[]): Promise<"accepted" | "unavailable">;
+  /** Turns the agent starts itself, which its ACP server does not stream. */
+  readonly ownTurns?: OwnTurns;
 }

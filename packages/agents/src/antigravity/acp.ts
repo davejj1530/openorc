@@ -1,4 +1,5 @@
 import type { AcpProfile } from "../acp/profile.js";
+import { antigravityOwnTurns } from "./own-turns.js";
 
 /** Antigravity keeps its own Google login, customizations and session store. */
 export const antigravityAcp: AcpProfile = {
@@ -21,4 +22,5 @@ export const antigravityAcp: AcpProfile = {
   },
   modeValue: (mode) => (mode === "plan" ? "plan" : "default"),
   briefing: () => undefined,
+  ownTurns: antigravityOwnTurns,
 };

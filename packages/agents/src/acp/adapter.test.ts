@@ -508,6 +508,48 @@ describe("AcpAdapter", () => {
     s.handle.close();
   });
 
+  it("reports the turn OpenCode starts itself when a background command ends, which its ACP server never streams", async () => {
+    let messages: unknown[] = [];
+    const s = agent("autonomous", {}, undefined, launch, async (args) => {
+      if (args[1] === "session.list") return JSON.stringify({ data: [] });
+      return JSON.stringify({ data: [...messages].reverse(), cursor: {} });
+    });
+    try {
+      await vi.waitFor(() => expect(s.promptCalls()).toHaveLength(1));
+      s.update("ses_1", { sessionUpdate: "tool_call", toolCallId: "toolu_1", name: "shell", title: "shell", rawInput: { command: "pnpm build" }, status: "pending" });
+      s.update("ses_1", {
+        sessionUpdate: "tool_call_update",
+        toolCallId: "toolu_1",
+        status: "completed",
+        rawOutput: { output: "Command moved to the background (shell ID: sh_1).\nYou will be notified automatically when the command finishes." },
+      });
+      s.update("ses_1", { sessionUpdate: "agent_message_chunk", messageId: "msg_2", content: { type: "text", text: "Building." } });
+      await vi.waitFor(() => expect(s.events).toContainEqual(expect.objectContaining({ type: "background.updated", commands: [{ id: "sh_1", description: "pnpm build" }] })));
+      s.finish();
+      await vi.waitFor(() => expect(eventTypes(s.events)).toContain("turn.completed"));
+      messages = [
+        { id: "msg_1", type: "user", text: "Hello" },
+        { id: "msg_2", type: "assistant", content: [{ type: "text", text: "Building." }] },
+        { id: "msg_3", type: "idle", outcome: "succeeded" },
+        { id: "msg_4", type: "synthetic", metadata: { source: "shell", shellID: "sh_1", state: "completed", exit: 0 } },
+        { id: "msg_5", type: "assistant", content: [{ type: "text", text: "The build passed." }] },
+      ];
+      // A message sent now would join the turn OpenCode started, so it waits for that turn, which is reported first.
+      await expect(s.handle.send("Next")).rejects.toBeInstanceOf(LiveInputUnavailable);
+      expect(s.promptCalls()).toHaveLength(1);
+      expect(eventTypes(s.events).filter((type) => type === "turn.started")).toHaveLength(2);
+      expect(s.events).toContainEqual(expect.objectContaining({ type: "message.completed", role: "system", text: "Background command finished: pnpm build" }));
+      expect(s.events).toContainEqual(expect.objectContaining({ type: "background.updated", commands: [] }));
+      messages.push({ id: "msg_6", type: "idle", outcome: "succeeded" });
+      await vi.waitFor(() => expect(s.events.filter((event) => event.type === "turn.completed")).toHaveLength(2), { timeout: 5_000 });
+      expect(s.events.filter((event) => event.type === "turn.completed")[1]).toMatchObject({ status: "success", resultText: "The build passed." });
+      await s.handle.send("Next");
+      expect(s.promptCalls()).toHaveLength(2);
+    } finally {
+      s.handle.close();
+    }
+  }, 15_000);
+
   it("adds what the session's subagents have cost, read from OpenCode as the turn ends, to the session's own cost", async () => {
     const tree: Record<string, { id: string; cost: number }[]> = {
       ses_1: [

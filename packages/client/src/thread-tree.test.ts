@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { mergeThreadPages, type ThreadSummary } from "@openorc/protocol";
-import { threadBranchPath, threadPageBranchPath, threadTreeRows } from "./thread-tree.js";
+import { subthreadStatuses, threadBranchPath, threadPageBranchPath, threadTreeRows } from "./thread-tree.js";
 import { sidebarThreadPage, visibleSidebarThreadIds } from "./sidebar-thread-groups.js";
 
 const parent = { id: "parent", projectId: "project", title: "Parent", createdAt: 0, lastActivityAt: 0, activity: "idle", parentThreadId: null, archivedAt: null } as ThreadSummary;
@@ -97,4 +97,30 @@ it("preserves hidden-child activity when merging Mac and cloud root pages", () =
     "mac",
   );
   expect(merged.map((row) => row.id)).toEqual(["parent"]);
+});
+
+it("tells every ancestor how many sub threads below it work or need you, and leaves resting trees and the threads themselves out", () => {
+  const [mine, helper] = children(parent, 2);
+  const nested = children(mine!, 2);
+  const running = (thread: ThreadSummary): ThreadSummary => ({ ...thread, activity: "running" });
+  const quiet = [parent, mine!, helper!, ...nested, { ...parent, id: "other", activity: "running" } as ThreadSummary];
+  expect(subthreadStatuses(quiet).size).toBe(0);
+
+  const busy = subthreadStatuses([parent, running(mine!), running(helper!), running(nested[0]!), nested[1]!]);
+  expect(busy.get("parent")).toEqual({ kind: "running", label: "3 subthreads are working" });
+  expect(busy.get("parent-0")).toEqual({ kind: "running", label: "A subthread is working" });
+  expect(busy.has("parent-1")).toBe(false);
+  expect(busy.has("parent-0-0")).toBe(false);
+
+  const asking = subthreadStatuses([parent, running(mine!), { ...nested[0]!, activity: "waiting" }]);
+  expect(asking.get("parent")).toEqual({ kind: "waiting", label: "A subthread needs you" });
+  expect(asking.get("parent-0")).toEqual({ kind: "waiting", label: "A subthread needs you" });
+});
+
+it("stops climbing at a parent cycle or a parent the list never read", () => {
+  const a = { ...parent, id: "a", parentThreadId: "b", activity: "running" } as ThreadSummary;
+  const b = { ...parent, id: "b", parentThreadId: "a" } as ThreadSummary;
+  const orphan = { ...parent, id: "orphan", parentThreadId: "gone", activity: "running" } as ThreadSummary;
+  const statuses = subthreadStatuses([a, b, orphan]);
+  expect([...statuses.keys()]).toEqual(["b"]);
 });

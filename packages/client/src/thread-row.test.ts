@@ -1,6 +1,6 @@
 import { WORKSPACE_ID } from "@openorc/protocol";
 import { describe, expect, it } from "vitest";
-import { pullRequestNumber, renamedTitle, threadMark, threadPlace, workspaceLabel } from "./thread-row.js";
+import { pullRequestNumber, renamedTitle, threadMark, threadPlace, threadStatus, threadTreeStatus, workspaceLabel } from "./thread-row.js";
 
 const resting = { activity: "idle", session: { status: "idle", message: null }, unread: false, prUrl: null, prState: null } as const;
 const pr = "https://github.com/me/openorc/pull/482";
@@ -33,6 +33,22 @@ describe("threadMark", () => {
     expect(threadMark({ ...resting, prUrl: pr, prState: "merged" })).toEqual({ kind: "pull", label: "Pull request #482, merged", state: "merged" });
     expect(threadMark({ ...resting, prUrl: pr })).toEqual({ kind: "pull", label: "Pull request #482, open", state: "open" });
     expect(threadMark(resting)).toBeNull();
+  });
+});
+
+describe("threadTreeStatus", () => {
+  it("shows what sub threads do over a resting or merely unread parent, and keeps the parent's own live state and failure", () => {
+    const working = { kind: "running", label: "2 subthreads are working" } as const;
+    const asking = { kind: "waiting", label: "A subthread needs you" } as const;
+    const server = { id: "b1", description: "pnpm dev" };
+    expect(threadTreeStatus(threadStatus(resting), working)).toBe(working);
+    expect(threadTreeStatus(threadStatus({ ...resting, unread: true }), working)).toBe(working);
+    expect(threadTreeStatus(threadStatus({ ...resting, backgroundCommands: [server] }), working)).toBe(working);
+    expect(threadTreeStatus(threadStatus({ ...resting, activity: "running" }), working)).toEqual({ kind: "running", label: "Working" });
+    expect(threadTreeStatus(threadStatus({ ...resting, activity: "running" }), asking)).toBe(asking);
+    expect(threadTreeStatus(threadStatus({ ...resting, session: { status: "error", message: null } }), working)).toEqual({ kind: "failed", label: "Failed" });
+    expect(threadTreeStatus(threadStatus({ ...resting, unread: true }), null)).toEqual({ kind: "unread", label: "Unread" });
+    expect(threadTreeStatus(null, null)).toBeNull();
   });
 });
 

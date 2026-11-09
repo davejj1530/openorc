@@ -30,6 +30,21 @@ export function threadStatus(thread: Pick<ThreadSummary, "activity" | "session" 
   return commands ? { kind: "background", label: commands === 1 ? "A background command is running" : `${commands} background commands are running` } : null;
 }
 
+/**
+ * How a mark that speaks for more than one thread picks: one that needs you, a failure, work under way, a result
+ * waiting, then commands left running.
+ */
+export const STATUS_PRIORITY: readonly ThreadStatus["kind"][] = ["waiting", "failed", "running", "unread", "background"];
+
+/**
+ * A parent row's mark: its own status, unless its sub threads say something more pressing. On a tie its own wins, so a
+ * working parent reads "Working" however many sub threads work with it.
+ */
+export function threadTreeStatus(own: ThreadStatus | null, below: ThreadStatus | null): ThreadStatus | null {
+  if (!own || !below) return own ?? below;
+  return STATUS_PRIORITY.indexOf(below.kind) < STATUS_PRIORITY.indexOf(own.kind) ? below : own;
+}
+
 /** A resting thread's pull request, if it has one. */
 export function pullRequestMark(thread: Pick<ThreadSummary, "prUrl" | "prState">): Extract<ThreadMark, { kind: "pull" }> | null {
   const pull = pullRequestNumber(thread.prUrl);

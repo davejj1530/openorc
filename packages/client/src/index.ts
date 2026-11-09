@@ -143,8 +143,22 @@ export { snoozePresets, snoozePresetsChangeAt, snoozeWakeLabel } from "./snooze.
 export { startedWorkFromTool, taskActivity, taskCardStatusLabel, taskIdFromTool, taskStepLabel, uniqueTaskCards } from "./task-progress.js";
 export { pruneThreadFolds, threadFoldIds } from "./thread-folds.js";
 export { threadHeadline, type ThreadHeadline } from "./thread-headline.js";
-export { pullRequestMark, pullRequestNumber, renamedTitle, threadMark, threadPlace, threadStatus, workspaceLabel, type ThreadMark, type ThreadPlace, type ThreadStatus } from "./thread-row.js";
 export {
+  pullRequestMark,
+  pullRequestNumber,
+  renamedTitle,
+  STATUS_PRIORITY,
+  threadMark,
+  threadPlace,
+  threadStatus,
+  threadTreeStatus,
+  workspaceLabel,
+  type ThreadMark,
+  type ThreadPlace,
+  type ThreadStatus,
+} from "./thread-row.js";
+export {
+  subthreadStatuses,
   threadAncestors,
   threadBranchPath,
   threadPageBranchPath,

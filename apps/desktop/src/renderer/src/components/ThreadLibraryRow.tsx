@@ -11,6 +11,7 @@ import {
   workDuration,
   workspaceLabel,
   type ThreadPlace,
+  type ThreadStatus,
 } from "@openorc/client";
 import { harnessShortName, isHarnessId, type ThreadSummary } from "@openorc/protocol";
 import { useMemo, type ReactNode } from "react";
@@ -74,12 +75,15 @@ function PullRequestStatus({ thread }: { thread: ThreadSummary }) {
 /** The project a sidebar row belongs to. Workspace has no folder of its own. */
 export type RowProject = { name: string; rootPath?: string };
 
+type ThreadRowProps = { thread: ThreadSummary; subthreads?: ThreadStatus | null; active: boolean; project?: RowProject; compact?: boolean };
+
 /**
  * A thread row: its title with what it needs from you at the end, what its agent is doing while it works, then its
- * project and pull request. A sub thread keeps its mark ahead of its title, where the tree's lines reach it.
- * ⌘-click opens it in the split; right-click gives every action.
+ * project and pull request. A sub thread keeps its mark ahead of its title, where the tree's lines reach it. A parent's
+ * mark also tells of its sub threads (`subthreads`) while they need you or work. ⌘-click opens it in the split;
+ * right-click gives every action.
  */
-export function ThreadRow({ thread, active, project, compact = false }: { thread: ThreadSummary; active: boolean; project?: RowProject; compact?: boolean }) {
+export function ThreadRow({ thread, subthreads = null, active, project, compact = false }: ThreadRowProps) {
   const navigate = useRouter((s) => s.navigate);
   const addPane = useRouter((s) => s.addThreadPane);
   // Every thread open in a pane is marked alike; aria-current names only the focused one.
@@ -126,7 +130,7 @@ export function ThreadRow({ thread, active, project, compact = false }: { thread
           />
         }
       >
-        {compact ? <SubThreadLines thread={thread} /> : <ThreadLines thread={thread} project={project} />}
+        {compact ? <SubThreadLines thread={thread} subthreads={subthreads} /> : <ThreadLines thread={thread} subthreads={subthreads} project={project} />}
         <span className="thread-preview-meta flex min-w-0 items-center gap-2 text-xs leading-4 text-ink-3">
           <span className="flex flex-1 min-w-0 items-center gap-1" title={title}>
             {placeIcons[place.kind]}
@@ -194,13 +198,13 @@ function RowTitle({ title, working }: { title: string; working: boolean }) {
 
 /**
  * A thread's visible lines: its title, swept while it works; what its agent is doing; then its project and pull
- * request. Its mark (the spinner, what it needs from you, a failure or an unread dot) sits at the end of the line under
- * the title, in one column under a parent's chevron. A row with no line under its title keeps the mark at its end.
+ * request. Its mark (the spinner, what it or a sub thread needs from you, a failure or an unread dot) sits at the end of
+ * the line under the title, in one column under a parent's chevron. A row with no line under its title keeps the mark at its end.
  */
-function ThreadLines({ thread, project }: { thread: ThreadSummary; project?: RowProject }) {
+function ThreadLines({ thread, subthreads, project }: { thread: ThreadSummary; subthreads: ThreadStatus | null; project?: RowProject }) {
   const working = threadStatus(thread)?.kind === "running";
   const headline = useRowHeadline(thread);
-  const mark = <SidebarThreadMark thread={thread} pull={!project} />;
+  const mark = <SidebarThreadMark thread={thread} subthreads={subthreads} pull={!project} />;
   const below = Boolean(headline || project);
   const trailing = below ? <span className="thread-preview-mark">{mark}</span> : null;
   return (
@@ -236,11 +240,11 @@ function ProjectLine({ thread, project, trailing }: { thread: ThreadSummary; pro
 }
 
 /** A sub thread's one line: its mark where the tree's line reaches it, its title, then how long a subagent has been running. */
-function SubThreadLines({ thread }: { thread: ThreadSummary }) {
+function SubThreadLines({ thread, subthreads }: { thread: ThreadSummary; subthreads: ThreadStatus | null }) {
   return (
     <span className="thread-preview-heading">
       <span className="thread-preview-status">
-        <SidebarThreadMark thread={thread} pull />
+        <SidebarThreadMark thread={thread} subthreads={subthreads} pull />
       </span>
       <span className="thread-preview-title">{thread.title}</span>
       {thread.subagent ? <SubagentRunTime thread={thread} /> : null}
@@ -255,12 +259,15 @@ function SubagentRunTime({ thread }: { thread: ThreadSummary }) {
   return child && running ? <span className="sidebar-child-meta tabular">{workDuration(now - child.startedAt)}</span> : null;
 }
 
-/** What a thread needs from you, a sub thread's outcome, or at rest its pull request when no project line shows it. */
-function SidebarThreadMark({ thread, pull }: { thread: ThreadSummary; pull: boolean }) {
+/**
+ * What a thread or its sub threads need from you or are doing, a finished subagent's outcome, or at rest its pull request
+ * when no project line shows it.
+ */
+function SidebarThreadMark({ thread, subthreads, pull }: { thread: ThreadSummary; subthreads: ThreadStatus | null; pull: boolean }) {
   let Icon = X;
   if (thread.subagent?.status === "completed") Icon = CircleCheck;
   if (thread.subagent?.status === "no_updates") Icon = CircleDashed;
-  return thread.subagent && thread.activity === "idle" ? (
+  return thread.subagent && thread.activity === "idle" && !subthreads ? (
     <span
       role="img"
       aria-label={subagentStatusLabel[thread.subagent.status]}
@@ -270,6 +277,6 @@ function SidebarThreadMark({ thread, pull }: { thread: ThreadSummary; pull: bool
       <Icon size={13} />
     </span>
   ) : (
-    <ThreadStatusIndicator thread={thread} idle={pull ? <PullRequestMark thread={thread} /> : null} />
+    <ThreadStatusIndicator thread={thread} subthreads={subthreads} idle={pull ? <PullRequestMark thread={thread} /> : null} />
   );
 }

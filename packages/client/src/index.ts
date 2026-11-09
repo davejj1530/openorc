@@ -80,6 +80,7 @@ export {
   multiProviderAgents,
   pickerCatalog,
   pickerSettings,
+  providerChoice,
   providerGroups,
   type ModelChoice,
 } from "./model-picker-selection.js";

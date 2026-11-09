@@ -1,5 +1,5 @@
 import { Popover } from "@base-ui/react/popover";
-import { browserModels, catalogModel, modelChoiceFor, pickerCatalog, pickerSettings, providerGroups, type ModelChoice } from "@openorc/client";
+import { browserModels, catalogModel, modelChoiceFor, pickerCatalog, pickerSettings, providerChoice, providerGroups, type ModelChoice } from "@openorc/client";
 import {
   effortHint,
   effortLabel,
@@ -9,11 +9,13 @@ import {
   harnessName,
   isHarnessId,
   normalizeModelSettings,
+  type AgentKind,
   type HarnessId,
   type ModelOption,
   type Orcling,
+  type SystemInfo,
 } from "@openorc/protocol";
-import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { CoversPreview } from "../lib/browser-preview";
 import { useClaudeAccountId } from "../lib/claude-account";
 import { PickerAccountRows, warmAccountUsage, type PickerAccounts } from "./ModelPickerAccounts";
@@ -112,6 +114,45 @@ function moveRowFocusIn(event: KeyboardEvent<HTMLButtonElement>, results: HTMLEl
   else search?.focus();
 }
 
+/**
+ * A provider's tab selects one of its models, so the choice follows the list on show, and the chosen row scrolls into
+ * view below the accounts. Each agent's choice is kept while the picker stays open, so going back finds it again. A
+ * provider that can't run, or a chosen Orcling, leaves the choice alone.
+ */
+function useProviderTabChoice({
+  list,
+  value,
+  system,
+  locked,
+  select,
+  results,
+}: {
+  list: ModelOption[];
+  value: ModelChoice | null;
+  system: SystemInfo | undefined;
+  locked: boolean;
+  select: (choice: ModelChoice) => void;
+  results: RefObject<HTMLDivElement | null>;
+}) {
+  const earlier = useRef(new Map<AgentKind, ModelChoice>());
+  const reveal = useRef(false);
+  useLayoutEffect(() => {
+    if (!reveal.current) return;
+    reveal.current = false;
+    results.current?.querySelector("[data-model-row][aria-pressed='true']")?.scrollIntoView?.({ block: "nearest" });
+  }, [value?.agent, value?.model, results]);
+  return (next: PickerSection) => {
+    if (!isHarnessId(next) || next === value?.agent || locked) return;
+    const status = system ? harnessInfo(system, next) : null;
+    if (!status || !harnessLoggedIn(status)) return;
+    if (value) earlier.current.set(value.agent, value);
+    const choice = providerChoice(list, next, earlier.current.get(next));
+    if (!choice) return;
+    reveal.current = true;
+    select(choice);
+  };
+}
+
 /** Search and effort stay fixed while the provider's model list scrolls. */
 function ModelBrowser({
   value,
@@ -167,12 +208,14 @@ function ModelBrowser({
     fastBlocked,
     fastHint,
   } = pickerSettings({ model: current, value, loading: models.isPending, failed: models.isError });
+  const selectProvider = useProviderTabChoice({ list, value, system: system.data, locked: orclingSettings || Boolean(disabled), select: onSelectModel, results });
 
   const switchSection = (next: PickerSection) => {
     setSection(next);
     setQuery("");
     setShowLegacy(false);
     if (results.current) results.current.scrollTop = 0;
+    selectProvider(next);
   };
   const chooseModel = (model: ModelOption) => {
     onSelectModel(modelChoiceFor(model, value));
@@ -186,6 +229,7 @@ function ModelBrowser({
         key={`${model.agent}:${model.id}`}
         type="button"
         data-picker-row
+        data-model-row
         className="model-picker-row"
         aria-pressed={selected}
         title={model.unavailable ?? model.id}

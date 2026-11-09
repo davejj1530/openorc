@@ -87,3 +87,11 @@ export function defaultChoice(list: ModelOption[], prefer: AgentKind | null): Mo
     usable.find((model) => model.agent === (prefer ?? model.agent) && model.isDefault) ?? usable.find((model) => model.agent === prefer) ?? usable.find((model) => model.isDefault) ?? usable[0];
   return pick ? { agent: pick.agent, model: pick.id, effort: pick.defaultEffort } : null;
 }
+
+/** What a provider's tab selects: the agent's earlier choice while it still runs, else the agent's own default. */
+export function providerChoice(list: ModelOption[], agent: AgentKind, earlier: ModelChoice | undefined): ModelChoice | null {
+  const model = catalogModel(list, earlier ?? null);
+  if (earlier && model && !model.unavailable) return earlier;
+  const fallback = defaultChoice(list, agent);
+  return fallback?.agent === agent ? fallback : null;
+}

@@ -1,4 +1,4 @@
-import type { ModelOption, SystemInfo } from "@openorc/protocol";
+import { defaultOrclingLook, type ModelOption, type Orcling, type SystemInfo } from "@openorc/protocol";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
@@ -265,6 +265,62 @@ describe("ModelPicker", () => {
     fireEvent.click(screen.getByRole("button", { name: /Acme Fast/ }));
     expect(onChange).toHaveBeenCalledWith({ agent: "opencode", model: "openrouter/acme/fast", effort: null, fastMode: false });
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("selects a model from a provider's tab and finds each agent's earlier choice again", async () => {
+    const states: Partial<Record<string, SystemInfo["harnesses"][number]["state"]>> = { claude: "ready", opencode: "sign_in" };
+    const signedIn: SystemInfo = { ...info, harnesses: info.harnesses.map((row) => ({ ...row, state: states[row.id] ?? row.state })) };
+    mocks.call.mockImplementation(async (method) => (method === "agents.modelCatalog" ? { models, providers: [] } : signedIn));
+    const selected = vi.fn();
+    function Fixture() {
+      const [choice, setChoice] = useState<ModelChoice>({ agent: "codex", model: "gpt", effort: "high" });
+      const onChange = (next: ModelChoice) => {
+        selected(next);
+        setChoice(next);
+      };
+      return <ComposerModelPicker value={choice} onChange={onChange} />;
+    }
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <Fixture />
+      </QueryClientProvider>,
+    );
+    const trigger = await screen.findByRole("button", { name: "Model and effort" });
+    fireEvent.click(trigger);
+    await waitFor(() => expect((screen.getByRole("button", { name: /GPT default/ }) as HTMLButtonElement).disabled).toBe(false));
+
+    fireEvent.click(screen.getByRole("button", { name: "Claude Code" }));
+    expect(selected).toHaveBeenLastCalledWith(expect.objectContaining({ agent: "claude", model: "sonnet" }));
+    expect(screen.getByRole("button", { name: /^Sonnet/ }).getAttribute("aria-pressed")).toBe("true");
+    expect(trigger.textContent).toContain("Sonnet");
+    expect(screen.getByRole("dialog", { name: "Model and effort" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Codex" }));
+    expect(selected).toHaveBeenLastCalledWith(expect.objectContaining({ agent: "codex", model: "gpt", effort: "high" }));
+
+    // A provider that isn't signed in only shows its models.
+    fireEvent.click(screen.getByRole("button", { name: "OpenCode · Sign in" }));
+    expect(rows()).toEqual(["Bigdefault", "Acme Fast"]);
+    expect(selected).toHaveBeenCalledTimes(2);
+    expect(trigger.textContent).toContain("GPT");
+  });
+
+  it("keeps a chosen Orcling when a provider's tab opens", async () => {
+    mocks.call.mockImplementation(async (method) => (method === "agents.modelCatalog" ? { models, providers: [] } : info));
+    const orcling = { id: "scout", name: "Scout", look: defaultOrclingLook, settings: { agent: "codex", model: "gpt", effort: "low", fastMode: false } } as unknown as Orcling;
+    const onChange = vi.fn();
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <ComposerModelPicker value={orcling.settings} onChange={onChange} orclings={{ options: [orcling], selectedId: "scout", onSelect: vi.fn() }} />
+      </QueryClientProvider>,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Model and effort" }));
+    expect(await screen.findByRole("button", { name: /^Scout/ })).toBeTruthy();
+    // Sign-in hints show once the providers' status has loaded.
+    await screen.findByRole("button", { name: "Claude Code · Sign in" });
+    fireEvent.click(screen.getByRole("button", { name: "OpenCode" }));
+    expect(rows()).toEqual(["Bigdefault", "Acme Fast"]);
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it("moves keyboard focus over unavailable rows and selects the focused model", async () => {

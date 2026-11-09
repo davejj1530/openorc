@@ -93,6 +93,7 @@ function ThreadMenuContent({ thread, parts: M, header, onRename }: ItemsProps) {
     <>
       {header ? null : (
         <>
+          <NewSubthreadItem thread={thread} parts={M} />
           <OpenItems thread={thread} parts={M} />
           <M.Separator className={menuSeparator} />
         </>
@@ -114,7 +115,7 @@ function ThreadMenuContent({ thread, parts: M, header, onRename }: ItemsProps) {
         </M.Item>
       )}
       <M.Separator className={menuSeparator} />
-      <ThreadForkActions thread={thread} parts={M} />
+      <ThreadForkActions thread={thread} parts={M} header={header} />
       {header ? <OpenWindowItem thread={thread} parts={M} /> : null}
       <M.Separator className={menuSeparator} />
       <LifecycleItems thread={thread} parts={M} disabled={mutating} patch={patch} />
@@ -178,7 +179,17 @@ function LifecycleItems({ thread, parts: M, disabled, patch }: { thread: ThreadS
   );
 }
 
-function ThreadForkActions({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
+/** A sidebar row's menu leads with it; the header's keeps it beside Fork. */
+function NewSubthreadItem({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
+  const inCloud = thread.owner?.brain === "cloud";
+  return (
+    <M.Item className={menuItem} disabled={Boolean(thread.teamInstanceId) || inCloud} title={inCloud ? "Bring it to this Mac first." : undefined} onClick={() => newSubthread(thread.id)}>
+      <PenSquare size={13} /> New subthread
+    </M.Item>
+  );
+}
+
+function ThreadForkActions({ thread, parts: M, header }: { thread: ThreadSummary; parts: MenuParts; header?: boolean }) {
   const fork = useRpcMutation("threads.fork");
   const mutating = useThreadMutationPending(thread.id);
   const inCloud = thread.owner?.brain === "cloud";
@@ -189,9 +200,7 @@ function ThreadForkActions({ thread, parts: M }: { thread: ThreadSummary; parts:
           {fork.error.message}
         </p>
       ) : null}
-      <M.Item className={menuItem} disabled={Boolean(thread.teamInstanceId) || inCloud} title={inCloud ? "Bring it to this Mac first." : undefined} onClick={() => newSubthread(thread.id)}>
-        <PenSquare size={13} /> New subthread
-      </M.Item>
+      {header ? <NewSubthreadItem thread={thread} parts={M} /> : null}
       <M.Item
         className={menuItem}
         disabled={Boolean(thread.teamInstanceId) || inCloud || mutating || fork.isPending || Boolean(forkUnavailable(thread.agent))}

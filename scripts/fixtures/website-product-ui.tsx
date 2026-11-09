@@ -120,7 +120,7 @@ async function main() {
     { ...base, id: "onboarding-branch", title: "Build a thoughtful onboarding", ...yesterday(17) },
     { ...base, id: "search", title: "A faster command menu", agent: "claude", model: "claude-opus-5-5[1m]", activity: "running", ...minutesAgo(0) },
     { ...base, id: "tokens", title: "Simplify the design tokens", workspaceMode: "worktree", branch: "openorc/design-tokens-2c91f0", ...earlierToday },
-    { ...base, id: "welcome", projectId: "website", title: "Tell the product story", ...minutesAgo(38) },
+    { ...base, id: "welcome", projectId: "website", title: "Tell the product story", agent: "claude", model: "claude-opus-5-5[1m]", ...minutesAgo(38) },
     { ...base, id: "perf", projectId: "atlas", title: "Review the search endpoint", agent: "claude", model: "claude-opus-5-5[1m]", ...yesterday(11) },
   ];
   const orclings = ["Rini", "Atlas", "Pip"].map((name, index) => ({
@@ -246,6 +246,7 @@ async function main() {
     if (method === "threads.lastMessage") return messages[1];
     if (method === "orclings.instructions") return [{ version: 1, body: "Help me make clear decisions. Keep project work and personal memory separate.", author: "user", note: null, createdAt: now }];
     if (method === "projects.list") return projects;
+    if (method === "projects.activity") return sampleActivity((params.boundaries as number[]).length - 1);
     if (method === "projects.git") return "ready";
     if (method === "projects.get")
       return params.id === "openorc-workspace" ? { ...project, id: "openorc-workspace", name: "Workspace", rootPath: "/Projects" } : (projects.find((p) => p.id === params.id) ?? project);
@@ -757,6 +758,35 @@ function panelBridges() {
       resize: noop,
       kill: noop,
     },
+  };
+}
+
+/**
+ * A project that started about seven months ago: busy weekdays, quiet weekends, a few days off. Seeded, so every capture
+ * draws the same year.
+ */
+function sampleActivity(count: number) {
+  let seed = 7;
+  const random = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+  const started = count - 210;
+  return {
+    days: Array.from({ length: count }, (_, index) => {
+      const weekend = index % 7 >= 5;
+      const roll = random();
+      const turns = index < started || roll < (weekend ? 0.6 : 0.12) ? 0 : Math.round((weekend ? 4 : 10) + random() * (weekend ? 8 : 34) * Math.min(1, (index - started) / 90 + 0.4));
+      const codex = Math.round(turns * (0.4 + random() * 0.3));
+      return {
+        turns,
+        steps: turns * (18 + Math.round(random() * 14)),
+        threads: Math.ceil(turns / 5),
+        agents: turns
+          ? [
+              { agent: "codex" as const, turns: codex },
+              { agent: "claude" as const, turns: turns - codex },
+            ].filter((share) => share.turns)
+          : [],
+      };
+    }),
   };
 }
 

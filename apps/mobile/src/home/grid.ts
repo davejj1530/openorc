@@ -28,12 +28,12 @@ export const ACTION_RESERVE = ACTION_RIGHT + 44 - ROW_INSET;
 const CHROME_SCALE = 1.4;
 
 /**
- * Where a row's title line is centered, from the row's top, at the reader's text size: a two-line row's 8 pt padding
- * and half its 22 pt line; a compact row is centered on its 44 pt height until its text outgrows it.
+ * Where a row's title line is centered, from the row's top, at the reader's text size: a root row's 8 pt padding and
+ * half its title's 24 pt line; a compact row is centered on its 44 pt height until its 22 pt line outgrows it.
  */
 export function titleMid(compact: boolean, fontScale: number): number {
-  const half = 11 * Math.min(fontScale, CHROME_SCALE);
-  return compact ? Math.max(22, 11 + half) : 8 + half;
+  const scale = Math.min(fontScale, CHROME_SCALE);
+  return compact ? Math.max(22, 11 + 11 * scale) : 8 + 12 * scale;
 }
 /** How many levels a sub thread steps in; deeper ones stay at the last. */
 export const MAX_DEPTH = 3;

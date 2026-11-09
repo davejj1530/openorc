@@ -77,7 +77,7 @@ describe("the phone's Orclings", () => {
   it("counts the Orclings that want you on the tab when their faces are off", async () => {
     given(() => chats);
     const { BottomBar } = await import("../home/BottomBar");
-    render(<BottomBar tab="threads" tabs={["threads", "orclings"]} onTab={() => undefined} badge={2} onNew={() => undefined} />);
+    render(<BottomBar tab="threads" tabs={["threads", "orclings"]} onTab={() => undefined} badge={2} action={{ kind: "press", label: "New thread", onPress: () => undefined }} />);
     expect(screen.getByRole("tab", { name: "Orclings, 2 need you" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "New thread" })).toBeTruthy();
   });
@@ -117,7 +117,7 @@ describe("the phone's Orclings", () => {
     const { BottomBar, homeTabs } = await import("../home/BottomBar");
     expect(homeTabs({ orclings: false, tasks: false })).toEqual(["threads"]);
     expect(homeTabs({ orclings: false, tasks: true })).toEqual(["threads", "tasks"]);
-    render(<BottomBar tab="tasks" tabs={homeTabs({ orclings: true, tasks: true })} onTab={() => undefined} badge={0} onNew={() => undefined} />);
+    render(<BottomBar tab="tasks" tabs={homeTabs({ orclings: true, tasks: true })} onTab={() => undefined} badge={0} action={{ kind: "press", label: "New task", onPress: () => undefined }} />);
     expect(screen.getAllByRole("tab").map((tab) => tab.getAttribute("aria-label"))).toEqual(["Threads", "Orclings", "Tasks"]);
   });
 });

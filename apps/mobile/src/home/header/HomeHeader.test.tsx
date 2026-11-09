@@ -4,72 +4,71 @@ import type { ReactNode } from "react";
 import type { SharedValue } from "react-native-reanimated";
 import { afterEach, expect, it, vi } from "vitest";
 import type { LinkState } from "../../connection/manager";
-import { flatStyle, nativeProps } from "../../test-fixtures/react-native";
 import { HomeBar } from "./HomeBar";
-import { LostLine, MacLine } from "./MacLine";
+import { LostLine } from "./MacLine";
 
 vi.mock("expo-router", () => ({ Link: ({ children }: { children: ReactNode }) => <>{children}</> }));
-const demo = vi.hoisted(() => ({ ended: 0 }));
+const demo = vi.hoisted(() => ({ ended: 0, saved: [] as { id: string; kind?: "brain" }[] }));
 vi.mock("../../client", async () => {
   const { ScratchStore } = await import("../../scratch-store");
-  return { storage: new ScratchStore({ getString: () => undefined, set: () => undefined, remove: () => undefined }), endDemo: () => void demo.ended++ };
+  return {
+    storage: new ScratchStore({ getString: () => undefined, set: () => undefined, remove: () => undefined }),
+    endDemo: () => void demo.ended++,
+    useSavedMacs: () => demo.saved,
+  };
 });
+vi.mock("../../generated/icons", async (original) => ({
+  ...(await original<object>()),
+  Laptop: () => <span data-testid="laptop" />,
+  Cloud: () => <span data-testid="cloud" />,
+}));
 
-const board = vi.hoisted(() => ({ available: false }));
-vi.mock("../../tasks/use-task-board", () => ({ useTaskBoard: () => ({ sections: [], available: board.available }) }));
-
-afterEach(() => {
-  cleanup();
-  board.available = false;
-});
+afterEach(cleanup);
 
 const studio = { id: "studio", name: "Studio" };
 const connected: LinkState = { kind: "connected", mac: studio, route: { kind: "lan", host: "studio.local", port: 1 }, serial: 1 };
 const tailnet: LinkState = { kind: "waiting", mac: studio, why: "tailnet", retryAt: null };
 const quickConnect: LinkState = { kind: "connecting", mac: studio, why: null };
 
-/** The list scrolled `y` points, with the Mac line ending 16 points into it. */
+/** The list scrolled `y` points. */
 const shared = <T,>(value: T) => ({ value }) as SharedValue<T>;
-const scrolled = (y: number) => ({ scrollY: shared(y), lineBottom: shared(16) });
-const bar = (state: LinkState, y: number) => render(<HomeBar state={state} scroll={scrolled(y)} />);
+const bar = (state: LinkState, tab?: "threads" | "orclings" | "tasks") => render(<HomeBar state={state} scroll={{ scrollY: shared(0) }} tab={tab} />);
+/** The bar's buttons by the names VoiceOver reads, left to right. */
+const circles = () => screen.getAllByRole("button").map((button) => button.getAttribute("aria-label") ?? button.textContent);
 
-/** The pinned row's word on the link, as VoiceOver finds it, with how much of it shows. */
-function pinnedStatus(name: string) {
-  const found = screen.queryByRole("button", { name });
-  if (!found) return null;
-  let shown = 1;
-  for (let node: Element | null = found; node; node = node.parentElement) shown *= (flatStyle(nativeProps.get(node)?.style).opacity as number | undefined) ?? 1;
-  return shown;
-}
-
-it("keeps the pinned row to the wordmark and its buttons while the Mac line is in view", () => {
-  bar(tailnet, 0);
+it("puts the connection first among the circles, a laptop for a Mac and a cloud for a cloud brain", () => {
+  demo.saved = [{ id: "studio" }];
+  bar(connected);
   expect(screen.getByRole("header", { name: "OpenOrc" })).toBeTruthy();
-  expect(screen.getByRole("button", { name: "Settings" })).toBeTruthy();
-  expect(pinnedStatus("Studio, Not reachable over Tailscale")).toBeNull();
-  expect(screen.queryByText("Check Tailscale")?.closest("[aria-hidden]")).toBeTruthy();
+  expect(circles()).toEqual(["Studio, Connected over Wi-Fi", "Show", "Settings"]);
+  expect(screen.getByTestId("laptop")).toBeTruthy();
+  expect(screen.queryByTestId("link-dot")).toBeNull();
+  cleanup();
+  demo.saved = [{ id: "cloud", kind: "brain" }];
+  const cloud: LinkState = { kind: "connected", mac: { id: "cloud", name: "Cloud" }, route: { kind: "public", host: "cloud.example", port: 1 }, serial: 1 };
+  bar(cloud);
+  expect(screen.getByRole("button", { name: "Cloud, Connected over Internet" })).toBeTruthy();
+  expect(screen.getByTestId("cloud")).toBeTruthy();
 });
 
-it("says what is wrong after the wordmark once the Mac line has scrolled under the bar", () => {
-  bar(tailnet, 40);
-  expect(pinnedStatus("Studio, Not reachable over Tailscale")).toBe(1);
+it("rings the connection and says what is wrong after the wordmark while the phone is not connected", () => {
+  demo.saved = [{ id: "studio" }];
+  bar(tailnet);
+  expect(screen.getAllByRole("button", { name: "Studio, Not reachable over Tailscale" })).toHaveLength(2);
   expect(screen.getByText("Check Tailscale")).toBeTruthy();
+  expect(screen.getAllByTestId("link-dot")).toHaveLength(2);
 });
 
-it("adds nothing to the pinned row while connected, or while a quick connect holds its words back", () => {
-  bar(connected, 40);
-  expect(screen.queryByRole("button", { name: /^Studio/ })).toBeNull();
+it("adds nothing after the wordmark while connected, or while a quick connect holds its words back", () => {
+  bar(connected);
   expect(screen.queryByText("Wi-Fi")).toBeNull();
+  expect(screen.getAllByRole("button", { name: /^Studio/ })).toHaveLength(1);
   cleanup();
-  bar(quickConnect, 40);
-  expect(screen.queryByRole("button", { name: /^Studio/ })).toBeNull();
+  bar(quickConnect);
+  expect(screen.getAllByRole("button", { name: /^Studio/ })).toHaveLength(1);
 });
 
-it("draws the link's dot beside a paired Mac, and none for a Mac that removed this iPhone or a lost key", () => {
-  render(<MacLine state={tailnet} {...scrolled(0)} />);
-  expect(screen.getByRole("button", { name: "Studio, Not reachable over Tailscale" })).toBeTruthy();
-  expect(screen.getAllByTestId("link-dot")).toHaveLength(1);
-  cleanup();
+it("says why a Mac went, with no dot, when the person did not forget it", () => {
   render(<LostLine lost={{ why: "removed", macName: "Studio" }} />);
   expect(screen.getByText("Studio removed this iPhone")).toBeTruthy();
   expect(screen.queryByTestId("link-dot")).toBeNull();
@@ -79,19 +78,9 @@ it("draws the link's dot beside a paired Mac, and none for a Mac that removed th
   expect(screen.queryByTestId("link-dot")).toBeNull();
 });
 
-it("leaves the Mac line to VoiceOver only while the bar does not say the same", () => {
-  render(<MacLine state={tailnet} {...scrolled(0)} />);
-  expect(screen.getByRole("button", { name: "Studio, Not reachable over Tailscale" })).toBeTruthy();
-  cleanup();
-  // Past wherever the line lays out its words, here the whole window.
-  render(<MacLine state={tailnet} {...scrolled(2_000)} />);
-  expect(screen.queryByRole("button", { name: "Studio, Not reachable over Tailscale" })).toBeNull();
-});
-
-it("offers only Settings in the bar with no Mac, with no pinned status and no hairline, as nothing scrolls", () => {
+it("offers only Settings in the bar with no Mac, with no connection, status or hairline, as nothing scrolls", () => {
   render(<HomeBar state={{ kind: "unpaired", lost: { why: "removed", macName: "Studio" } }} />);
-  expect(screen.getByRole("button", { name: "Settings" })).toBeTruthy();
-  expect(screen.queryByRole("button", { name: /^Show/ })).toBeNull();
+  expect(circles()).toEqual(["Settings"]);
   expect(screen.queryByTestId("link-dot")).toBeNull();
   expect(screen.queryByTestId("scroll-edge")).toBeNull();
 });
@@ -100,44 +89,18 @@ const demoMac: LinkState = { kind: "connected", mac: { id: "demo", name: "Demo M
 
 it("puts Skip where Settings sits while the demo shows, and Skip leaves the demo", () => {
   demo.ended = 0;
-  bar(demoMac, 0);
-  expect(screen.queryByRole("button", { name: "Settings" })).toBeNull();
-  expect(screen.getByRole("button", { name: /^Show/ })).toBeTruthy();
+  demo.saved = [];
+  bar(demoMac);
+  expect(circles()).toEqual(["Demo Mac, On this iPhone", "Show", "Skip"]);
   screen.getByRole("button", { name: "Skip" }).click();
   expect(demo.ended).toBe(1);
 });
 
-it("names the demo Mac on the Mac line, with its dot and no route", () => {
-  render(<MacLine state={demoMac} {...scrolled(0)} />);
-  expect(screen.getByRole("button", { name: "Demo Mac, On this iPhone" })).toBeTruthy();
-  expect(screen.getByText("Demo Mac")).toBeTruthy();
-  expect(screen.queryByText(/·/)).toBeNull();
-});
-
-it("offers the task list only once a host answers with one, so a host from before shows the bar as it was", () => {
-  bar(connected, 0);
-  expect(screen.queryByRole("button", { name: "Tasks" })).toBeNull();
-  cleanup();
-  board.available = true;
-  bar(connected, 0);
-  expect(screen.getByRole("button", { name: "Tasks" })).toBeTruthy();
-});
-
-it("heads the shown host's threads with its name and how this phone reaches it while its partner is listed too", () => {
-  const cloud: LinkState = { kind: "connected", mac: { id: "cloud", name: "Cloud" }, route: { kind: "public", host: "cloud.example", port: 1 }, serial: 1 };
-  render(<MacLine state={cloud} host="brain" {...scrolled(0)} />);
-  expect(screen.getByRole("button", { name: "Cloud, Connected over Internet" })).toBeTruthy();
-  expect(screen.getByText("Cloud")).toBeTruthy();
-  expect(screen.getByText("Connected over Internet")).toBeTruthy();
-  expect(screen.queryByText(/·/)).toBeNull();
-  cleanup();
-  render(<MacLine state={{ kind: "waiting", mac: studio, why: "silent", retryAt: null }} host="mac" {...scrolled(0)} />);
-  expect(screen.getByText("Studio")).toBeTruthy();
-  expect(screen.getByText("Not reachable")).toBeTruthy();
-});
-
-it("keeps a quick connect's words back in the heading without giving up the line", () => {
-  render(<MacLine state={quickConnect} host="mac" {...scrolled(0)} />);
-  expect(screen.queryByText("Connecting")).toBeNull();
-  expect(screen.getAllByTestId("link-dot")).toHaveLength(1);
+it("keeps the filter for Threads alone; over the Orclings and Tasks tabs the connection and Settings stay", () => {
+  demo.saved = [{ id: "studio" }];
+  for (const tab of ["orclings", "tasks"] as const) {
+    cleanup();
+    bar(connected, tab);
+    expect(circles()).toEqual(["Studio, Connected over Wi-Fi", "Settings"]);
+  }
 });

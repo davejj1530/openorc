@@ -8,7 +8,7 @@ import { turn } from "../ui/motion";
 import { useColors } from "../ui/mode";
 import { useReducedMotion } from "../ui/reduced-motion";
 import { movingStyle, type RowMotion } from "./fold-motion";
-import { ACTION_RIGHT, MAX_DEPTH, STEP, TEXT_X, titleMid } from "./grid";
+import { ACTION_INSET, MAX_DEPTH, STEP, TEXT_X, titleMid } from "./grid";
 import { branchPath, pagePath, SEAM } from "./tree-lines";
 
 /** How far a row of the tree steps in from a root's. */
@@ -48,6 +48,9 @@ export function ThreadBranch({ row, height, mid, reach = null, paging = false }:
   );
 }
 
+/** The pressed circle behind a disclosure, at most: the header's circles. */
+const TOGGLE = 40;
+
 /**
  * A parent's disclosure, in the action column on its title line, where the headings' pluses and the header's circles
  * line up: the chevron points down while its sub threads are folded and turns up as they open. `open` already says
@@ -55,7 +58,10 @@ export function ThreadBranch({ row, height, mid, reach = null, paging = false }:
  */
 export function TreeToggle({ tree, open, compact, onFold }: { tree?: ThreadTreeRow; open: boolean; compact: boolean; onFold?: (id: string, open: boolean) => void }) {
   const still = useReducedMotion();
-  const top = titleMid(compact, useWindowDimensions().fontScale) - 22;
+  const mid = titleMid(compact, useWindowDimensions().fontScale);
+  // Centered on the title line, the circle stays inside the row, which clips it: at smaller text sizes a root row's
+  // title sits nearer its top, so the circle shrinks with it while the touch stays 44 pt.
+  const size = Math.min(TOGGLE, 2 * mid);
   if (!tree?.hasChildren || !onFold) return null;
   return (
     <Pressable
@@ -63,8 +69,9 @@ export function TreeToggle({ tree, open, compact, onFold }: { tree?: ThreadTreeR
       accessibilityLabel={`${open ? "Collapse" : "Expand"} ${tree.thread.title}`}
       accessibilityState={{ expanded: open }}
       onPress={() => onFold(tree.thread.id, !open)}
-      className="absolute size-touch items-center justify-center rounded-full active:bg-surface-2"
-      style={{ right: ACTION_RIGHT, top }}
+      hitSlop={(44 - size) / 2}
+      className="absolute items-center justify-center rounded-full active:bg-surface-2"
+      style={{ right: ACTION_INSET - size / 2, top: mid - size / 2, width: size, height: size }}
     >
       {/* Keyed so a row the list recycles for another thread does not turn from that thread's state. */}
       <Animated.View key={tree.thread.id} style={turn(open, still)}>

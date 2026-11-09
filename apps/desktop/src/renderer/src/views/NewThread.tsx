@@ -192,7 +192,7 @@ function NewThreadProject({
     const initial = newThreadChoice(models.data, { preferred: defaultHarness, harnesses: info.data.harnesses });
     if (initial) changeDraft({ target: { kind: "model", choice: initial } });
   }, [target, models.data, info.data, defaultHarness]);
-  usePublishComposerAccount(choice?.agent, claudeAccountId);
+  usePublishComposerAccount(choice?.agent, claudeAccountId, choice?.model);
 
   const {
     selectedProject: selected,

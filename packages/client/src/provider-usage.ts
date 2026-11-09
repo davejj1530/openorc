@@ -1,4 +1,4 @@
-import type { AllowanceWindow } from "@openorc/protocol";
+import type { AllowanceWindow, ProviderCredit } from "@openorc/protocol";
 
 export function allowanceState(window: AllowanceWindow, now: number) {
   const expired = window.resetsAt !== null && window.resetsAt <= now;
@@ -17,4 +17,12 @@ export function usageResetLabel(timestamp: number | null, now: number): string {
   if (minutes < 60) return `Resets in ${minutes}m`;
   if (minutes < 24 * 60) return `Resets in ${Math.floor(minutes / 60)}h${minutes % 60 ? ` ${minutes % 60}m` : ""}`;
   return `Resets ${new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric" }).format(timestamp)}`;
+}
+
+export function creditBalanceLabel(credit: Pick<ProviderCredit, "unlimited" | "balance" | "currency">): string {
+  if (credit.unlimited) return "Unlimited";
+  const balance = credit.balance?.trim() ? Number(credit.balance) : NaN;
+  if (!Number.isFinite(balance)) return "Balance unavailable";
+  if (credit.currency) return balance.toLocaleString(undefined, { style: "currency", currency: credit.currency });
+  return `${balance.toLocaleString(undefined, { maximumFractionDigits: 2 })} credits`;
 }

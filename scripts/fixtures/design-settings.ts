@@ -23,7 +23,7 @@ export function createDesignSettingsRpc({ phone = null }: { phone?: string | nul
     }
     if (method === "providers.usage") return usageReport(params.provider as ProviderUsage["provider"], typeof params.claudeAccountId === "string" ? params.claudeAccountId : undefined);
     if (method === "providers.limits") return planLimits();
-    if (method === "agents.availability") return ["codex", "claude"].map((id) => ({ id, state: "ready" }));
+    if (method === "agents.availability") return ["codex", "claude", "fx"].map((id) => ({ id, state: "ready" }));
     if (method === "usage.history") return designUsage(params);
     if (method === "slack.status") return slack;
     if (method === "reviewerApp.get") return { app: null, setupUrl: null, error: null };
@@ -55,13 +55,14 @@ function usageReport(provider: ProviderUsage["provider"], claudeAccountId?: stri
     source: "Design preview · synthetic account data",
     context: connected ? `${provider === "codex" ? "ChatGPT Pro" : "Claude Max"} · design@example.test` : "No connected account",
     windows: limits?.windows ?? [],
-    credits: [],
+    credits: limits?.credits ?? [],
     localRuns: connected ? localRuns : 0,
     refreshedAt: connected ? now : null,
     checkedAt: now,
     accountUrl: "https://example.test/usage",
     message: null,
   };
+  if (provider === "fx") report.context = "Vercel AI Gateway";
   if (provider === "codex") report.resets = { availableCount: null, credits: null, redemption: "external" };
   return report;
 }
@@ -74,7 +75,7 @@ const slack: SlackStatus = {
   client: { configured: false, enabled: false, connected: false, config: null, userId: null, busy: false, error: null },
 };
 
-/** Every account's limits as the sidebar's usage table reads them: two Claude accounts, one signed out, and Codex. */
+/** Synthetic allowance windows and balances for the account usage surfaces. */
 function planLimits(): PlanLimits[] {
   const now = Date.now();
   const window = (id: string, label: string, used: number, resetsInMinutes: number): AllowanceWindow => ({
@@ -87,6 +88,16 @@ function planLimits(): PlanLimits[] {
     exhausted: used >= 100,
   });
   return [
+    {
+      id: "fx",
+      provider: "fx",
+      name: "fx",
+      plan: null,
+      status: "available",
+      refreshedAt: now,
+      windows: [window("gateway:budget", "Monthly budget", 25, 7 * 1440)],
+      credits: [{ label: "AI Gateway balance", balance: "12.50", unlimited: false, currency: "USD" }],
+    },
     {
       id: "codex",
       provider: "codex",

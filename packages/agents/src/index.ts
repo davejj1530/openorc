@@ -20,6 +20,8 @@ export { antigravityAcp } from "./antigravity/acp.js";
 export { fxAcp } from "./fx/acp.js";
 export { fxAuthenticated } from "./fx/auth.js";
 export { fxHome } from "./fx/home.js";
+export { readFxUsage, type FxUsageOptions, type FxUsageResult } from "./fx/usage.js";
+export type { FxUsageReport, FxCreditsReport } from "./fx/usage-schema.js";
 export { fxConnectorDriver } from "./fx/connectors.js";
 export { antigravityAuthenticated } from "./antigravity/auth.js";
 export { antigravityConnectorDriver } from "./antigravity/connectors.js";

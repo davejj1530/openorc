@@ -108,6 +108,13 @@ export const rpcParams = {
   "providers.usage": z.object({
     provider: z.enum([...HarnessId.options, "anthropic-api"]),
     claudeAccountId: ClaudeAccountId.optional(),
+    fxModel: z
+      .string()
+      .trim()
+      .min(3)
+      .max(500)
+      .regex(/^[^/]+\/.+$/)
+      .optional(),
     /** A report this young, from any reader, answers at once instead of asking the CLI again; none means a live read. */
     maxAgeMs: z
       .number()

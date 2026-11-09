@@ -48,7 +48,10 @@ const antigravity: PlanLimits = {
 };
 
 const claudeThread = { id: "notes", agent: "claude", claudeAccountId: "work", teamInstanceId: null };
-let thread: { id: string; agent: string; claudeAccountId: string | null; teamInstanceId: null } = claudeThread;
+let thread: { id: string; agent: string; claudeAccountId: string | null; teamInstanceId: null; model?: string } = claudeThread;
+let fx: PlanLimits = { id: "fx", provider: "fx", name: "fx", plan: null, status: "available", refreshedAt: NOW, windows: [], credits: [] };
+let fxInstalled = false;
+const fxReads: (string | undefined)[] = [];
 const usage = (costUsd: number) => ({ inputTokens: 10, outputTokens: 5, costUsd });
 const runs = [
   { id: "r1", externalSessionId: "ses_1", usage: usage(0.4) },
@@ -56,7 +59,7 @@ const runs = [
 ];
 
 vi.mock("../lib/client", async (original) => {
-  const read = (method: string, params: { provider?: string; claudeAccountId?: string }, options?: { enabled?: boolean }) => {
+  const read = (method: string, params: { provider?: string; claudeAccountId?: string; fxModel?: string }, options?: { enabled?: boolean }) => {
     if (options?.enabled === false) return { data: undefined };
     if (method === "threads.get") return { data: thread };
     if (method === "claude.accounts.list")
@@ -69,8 +72,13 @@ vi.mock("../lib/client", async (original) => {
           ],
         },
       };
-    if (method === "agents.availability") return { data: ["codex", "claude", ...(thread.agent === "antigravity" ? ["antigravity"] : [])].map((id) => ({ id, state: "ready" })) };
+    if (method === "agents.availability")
+      return { data: ["codex", "claude", ...(thread.agent === "antigravity" ? ["antigravity"] : []), ...(fxInstalled ? ["fx"] : [])].map((id) => ({ id, state: "ready" })) };
     if (method === "providers.usage") {
+      if (params.provider === "fx") {
+        fxReads.push(params.fxModel);
+        return { data: { ...fx, context: params.fxModel?.startsWith("codex/") ? "Codex subscription via fx" : "Vercel AI Gateway" } };
+      }
       if (params.provider === "opencode") return { data: { windows: [] } };
       if (params.provider === "antigravity") return { data: antigravity };
       return { data: params.provider === "codex" ? accounts[0] : accounts.find((account) => account.id === `claude:${params.claudeAccountId}`) };
@@ -96,6 +104,8 @@ beforeEach(() => {
   );
   useComposerAccount.setState({ chosen: null });
   thread = claudeThread;
+  fxReads.length = 0;
+  fxInstalled = false;
 });
 afterEach(() => {
   cleanup();
@@ -169,4 +179,45 @@ it("off a thread, reports on the agent and account the new-thread composer has c
   expect(screen.getByRole("button", { name: "Codex: 64% left this week" })).toBeTruthy();
   act(() => publishComposerAccount({ agent: "claude", claudeAccountId: "work" }));
   expect(screen.getByRole("button", { name: "Claude · Work: 59% left this week" })).toBeTruthy();
+});
+
+it("shows an fx balance before a first turn, without a percentage meter or invented weekly limit", async () => {
+  fxInstalled = true;
+  fx = { ...fx, windows: [], credits: [{ label: "AI Gateway balance", balance: "12.50", unlimited: false, currency: "USD" }] };
+  useRouter.setState({ route: { view: "newthread" } });
+  publishComposerAccount({ agent: "fx", model: "gateway/anthropic/example" });
+  render(<AccountUsage />);
+  const button = screen.getByRole("button", { name: "fx: AI Gateway balance: $12.50" });
+  expect(button.querySelector(".account-usage-bars")).toBeNull();
+  fireEvent.click(button);
+  const details = await screen.findByRole("region", { name: "fx account usage" });
+  expect(within(details).getByText("$12.50")).toBeTruthy();
+  expect(within(details).queryByText("No limits reported")).toBeNull();
+  expect(screen.queryByRole("region", { name: "This conversation" })).toBeNull();
+  expect(fxReads.every((provider) => provider === "gateway/anthropic/example")).toBe(true);
+});
+
+it("labels fx budgets by their actual period and switches the usage connection with the composer model", async () => {
+  fxInstalled = true;
+  fx = { ...fx, windows: [limit("gateway:budget", "Monthly budget", 25, 10000)], credits: [] };
+  useRouter.setState({ route: { view: "newthread" } });
+  publishComposerAccount({ agent: "fx", model: "gateway/example" });
+  render(<AccountUsage />);
+  fireEvent.click(screen.getByRole("button", { name: "fx: 75% left · Monthly budget" }));
+  const details = await screen.findByRole("region", { name: "fx account usage" });
+  expect(within(details).getByText("Monthly budget")).toBeTruthy();
+  expect(within(details).getByText("75% left")).toBeTruthy();
+  await act(async () => publishComposerAccount({ agent: "fx", model: "codex/example" }));
+  expect(fxReads.at(-1)).toBe("codex/example");
+  expect(within(screen.getByRole("region", { name: "fx account usage" })).getByText("Codex subscription via fx")).toBeTruthy();
+});
+
+it("reads an fx thread's connection instead of the saved CLI default", () => {
+  fxInstalled = true;
+  fx = { ...fx, windows: [limit("codex:primary", "Codex · 5-hour window", 20, 100)], credits: [] };
+  thread = { id: "notes", agent: "fx", model: "codex/example", claudeAccountId: null, teamInstanceId: null };
+  useRouter.setState({ route: { view: "thread", threadId: "notes" } });
+  render(<AccountUsage />);
+  expect(screen.getByRole("button", { name: "fx: 80% left · Codex · 5-hour window" })).toBeTruthy();
+  expect(fxReads).toEqual(["codex/example"]);
 });

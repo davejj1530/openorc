@@ -1,5 +1,5 @@
 import { CodexResetService, type ResetInput } from "./provider-resets.js";
-import { captureLaunchEnvironment, readClaudeUsage, readCodexUsage, consumeCodexReset, readAntigravityUsage, type AntigravityQuotaGroup } from "@openorc/agents";
+import { captureLaunchEnvironment, readClaudeUsage, readCodexUsage, consumeCodexReset, readAntigravityUsage, readFxUsage, type AntigravityQuotaGroup } from "@openorc/agents";
 import { settings, runs, claudeAccounts, type Db } from "@openorc/db";
 import {
   DEFAULT_CLAUDE_ACCOUNT,
@@ -18,6 +18,8 @@ import {
 } from "@openorc/protocol";
 import type { SystemService } from "./system.js";
 import type { EnvSnapshot } from "./shell-environment.js";
+
+import { normalizeFx } from "./fx-usage.js";
 
 const record = (v: unknown): Record<string, unknown> => (v !== null && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
 const text = (v: unknown): string | null => (typeof v === "string" && v.length > 0 ? v.slice(0, 160) : null);
@@ -201,6 +203,7 @@ export interface ProviderUsageReaders {
   consumeReset?: typeof consumeCodexReset;
   claude?: typeof readClaudeUsage;
   antigravity?: typeof readAntigravityUsage;
+  fx?: typeof readFxUsage;
   apiKey?: () => Promise<Pick<MemorySettings, "hasApiKey" | "apiKeyError">>;
 }
 
@@ -209,7 +212,7 @@ interface HarnessUsageReader {
   /** Where the numbers come from, shown on the report. */
   source: string;
   /** Fills in the report for an installed harness; `row` is its current probe result. */
-  read(result: ProviderUsage, at: number, row: HarnessInfo, snapshot: EnvSnapshot | undefined): Promise<ProviderUsage>;
+  read(result: ProviderUsage, at: number, row: HarnessInfo, snapshot: EnvSnapshot | undefined, fxModel?: string): Promise<ProviderUsage>;
   /** Drops anything remembered from the account once the harness is gone. */
   forget?(accountId?: string): void;
 }
@@ -226,14 +229,15 @@ export class ProviderUsageService {
   private readonly resets: CodexResetService;
   private readonly apiKey: NonNullable<ProviderUsageReaders["apiKey"]>;
   private readonly claudeAccount: typeof readClaudeUsage;
+  private readonly fxAccount: typeof readFxUsage;
   private readonly antigravityAccount: typeof readAntigravityUsage;
   private readonly harnesses: Record<HarnessId, HarnessUsageReader> = {
     fx: {
-      source: "fx provider accounts",
-      read: (result) => {
-        result.context = "fx provider accounts";
-        result.message = "fx reports token usage in each conversation. Run fx usage for provider spend or fx credits for your Vercel AI Gateway balance.";
-        return Promise.resolve(result);
+      source: "fx CLI · account usage",
+      read: async (result, at, _row, snapshot, model) => {
+        const launch = snapshot ? captureLaunchEnvironment("fx", snapshot) : undefined;
+        const live = await this.fxAccount({ ...(launch ? { binary: launch.binary, env: launch.env } : {}), model });
+        return { ...result, ...normalizeFx(live, at) };
       },
     },
     antigravity: {
@@ -297,6 +301,7 @@ export class ProviderUsageService {
     this.codex = readers.codex ?? readCodexUsage;
     this.resets = new CodexResetService(db, readers.consumeReset, this.now);
     this.claudeAccount = readers.claude ?? readClaudeUsage;
+    this.fxAccount = readers.fx ?? readFxUsage;
     this.antigravityAccount = readers.antigravity ?? readAntigravityUsage;
   }
 
@@ -311,14 +316,14 @@ export class ProviderUsageService {
     settings.set(this.db, this.windowsKey(id), JSON.stringify([...saved.values()]));
   }
 
-  read(provider: ProviderUsage["provider"], claudeAccountId?: string): Promise<ProviderUsage> {
+  read(provider: ProviderUsage["provider"], claudeAccountId?: string, fxModel?: string): Promise<ProviderUsage> {
     const id = this.accountId(provider, claudeAccountId);
-    const key = usageKey(provider, id);
+    const key = usageKey(provider, id, fxModel);
     const pending = this.inFlight.get(key);
     if (pending) return pending;
     const revision = this.environment?.().revision;
     const login = this.logins.get(key);
-    const next = this.fetch(provider, id)
+    const next = this.fetch(provider, id, fxModel)
       .then((usage) => (this.logins.get(key) === login ? this.remember(key, revision, usage) : usage))
       .finally(() => {
         if (this.inFlight.get(key) === next) this.inFlight.delete(key);
@@ -328,10 +333,10 @@ export class ProviderUsageService {
   }
 
   /** The account's last report while it is younger than `maxAgeMs` and from the current environment, or a fresh read. */
-  recent(provider: ProviderUsage["provider"], claudeAccountId: string | undefined, maxAgeMs: number): Promise<ProviderUsage> {
-    const kept = this.latest.get(usageKey(provider, this.accountId(provider, claudeAccountId)));
+  recent(provider: ProviderUsage["provider"], claudeAccountId: string | undefined, maxAgeMs: number, fxModel?: string): Promise<ProviderUsage> {
+    const kept = this.latest.get(usageKey(provider, this.accountId(provider, claudeAccountId), fxModel));
     const fresh = kept && this.now() - kept.usage.checkedAt < maxAgeMs && kept.revision === this.environment?.().revision;
-    return fresh ? Promise.resolve(kept.usage) : this.read(provider, claudeAccountId);
+    return fresh ? Promise.resolve(kept.usage) : this.read(provider, claudeAccountId, fxModel);
   }
 
   async redeemCodex(input: ResetInput): Promise<ResetResult> {
@@ -492,7 +497,7 @@ export class ProviderUsageService {
     };
   }
 
-  private async fetch(provider: ProviderUsage["provider"], claudeAccountId?: string): Promise<ProviderUsage> {
+  private async fetch(provider: ProviderUsage["provider"], claudeAccountId?: string, fxModel?: string): Promise<ProviderUsage> {
     // Capture before the first await. Provider checks and the usage process
     // must agree even if a Rescan publishes the next revision midway.
     const snapshot = this.environment?.(claudeAccountId);
@@ -540,7 +545,7 @@ export class ProviderUsageService {
         result.message = `${harnessCatalog[provider].name} fails to start. Reinstall it in Settings → Connections, then refresh.`;
         return result;
       }
-      return await reader.read(result, at, row, snapshot);
+      return await reader.read(result, at, row, snapshot, fxModel);
     } catch {
       // Never forward CLI stderr, authentication payloads, or provider errors.
       return { ...result, status: "error", message: "Could not refresh usage. Check your connection and CLI login, update the CLI if needed, then try Refresh." };
@@ -548,7 +553,8 @@ export class ProviderUsageService {
   }
 }
 
-function usageKey(provider: ProviderUsage["provider"], claudeAccountId: string | undefined): string {
+function usageKey(provider: ProviderUsage["provider"], claudeAccountId: string | undefined, fxModel?: string): string {
+  if (provider === "fx" && fxModel) return `fx:${fxModel.split("/")[0]}`;
   return claudeAccountId ? `${provider}:${claudeAccountId}` : provider;
 }
 

@@ -218,3 +218,22 @@ function dimmed(node: Element): boolean {
   for (let at: Element | null = node; at; at = at.parentElement) if (/\bopacity-/.test(String(nativeProps.get(at)?.className ?? ""))) return true;
   return false;
 }
+
+it("shows an fx monetary balance without an empty allowance or guessed percentage", () => {
+  const fx: PlanLimits = {
+    id: "fx",
+    provider: "fx",
+    name: "fx",
+    plan: null,
+    status: "available",
+    refreshedAt: now,
+    windows: [],
+    credits: [{ label: "AI Gateway balance", balance: "12.50", unlimited: false, currency: "USD" }],
+  };
+  usage.current = { accounts: [fx], state: "ready", live: true, readAt: now, now, hostName: "Studio", retry: () => undefined };
+  render(<SettingsScreen />);
+  expect(screen.getByRole("header", { name: "fx" })).toBeTruthy();
+  expect(screen.getByText("AI Gateway balance")).toBeTruthy();
+  expect(screen.getByText("$12.50")).toBeTruthy();
+  expect(screen.queryByText("No limits reported")).toBeNull();
+});

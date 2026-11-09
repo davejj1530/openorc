@@ -1,6 +1,6 @@
 import { Popover } from "@base-ui/react/popover";
-import { DEFAULT_CLAUDE_ACCOUNT, harnessCatalog, isHarnessId, percentLeft, sessionWindow, weeklyWindow, type AllowanceWindow } from "@openorc/protocol";
-import { allowanceState, conversationCost, formatCost, formatUsageTime, usageResetLabel } from "@openorc/client";
+import { DEFAULT_CLAUDE_ACCOUNT, harnessCatalog, isHarnessId, percentLeft, sessionWindow, weeklyWindow, type AllowanceWindow, type ProviderUsage } from "@openorc/protocol";
+import { allowanceState, conversationCost, creditBalanceLabel, formatCost, formatUsageTime, usageResetLabel } from "@openorc/client";
 import { useEffect, useState, type ReactNode } from "react";
 import { CoversPreview } from "../lib/browser-preview";
 import { cn } from "../lib/cn";
@@ -15,8 +15,9 @@ import { RAIL_ICON } from "./sidebar-screens";
 import { Tooltip } from "./ui";
 
 /** An agent and Claude account as the chip names them, or null for an agent OpenOrc does not run. */
-function usageAccount(agent: string, claudeAccountId: string | undefined, accountName: (id: string) => string | undefined): UsageAccount | null {
+function usageAccount(agent: string, claudeAccountId: string | undefined, accountName: (id: string) => string | undefined, model?: string | null): UsageAccount | null {
   if (!isHarnessId(agent)) return null;
+  if (agent === "fx" && model?.includes("/")) return { provider: "fx", name: "fx", fxModel: model };
   if (agent !== "claude") return { provider: agent, name: harnessCatalog[agent].name };
   const id = claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT;
   return { provider: "claude", claudeAccountId: id, name: `Claude · ${accountName(id) ?? "Existing CLI login"}` };
@@ -34,9 +35,9 @@ function useUsageAccount(): UsageAccount | null {
   const agent = threadId ? thread?.agent : composer?.agent;
   const accounts = useRpc("claude.accounts.list", {}, { enabled: agent === "claude" }).data;
   const accountName = (id: string) => accounts?.accounts.find((account) => account.id === id)?.name;
-  if (!threadId) return composer ? usageAccount(composer.agent, composer.claudeAccountId, accountName) : null;
+  if (!threadId) return composer ? usageAccount(composer.agent, composer.claudeAccountId, accountName, composer.model) : null;
   if (!thread || thread.id !== threadId || thread.teamInstanceId) return null;
-  return usageAccount(thread.agent, thread.claudeAccountId ?? undefined, accountName);
+  return usageAccount(thread.agent, thread.claudeAccountId ?? undefined, accountName, thread.model);
 }
 
 /**
@@ -152,11 +153,16 @@ function UsageTable({ current }: { current: UsageAccount }) {
     const timer = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(timer);
   }, []);
-  const accounts = read.accounts;
+  const accounts = read.accounts.filter((account) => account.provider !== "fx");
   const currentId = usageAccountId(current);
   return (
     <div className="usage-table-wrap">
-      {accounts.length ? (
+      {read.accounts
+        .filter((account) => account.provider === "fx")
+        .map((account) => (
+          <FxAccountUsage key={account.id} account={account} now={now} />
+        ))}
+      {accounts.length > 0 && (
         <table className="usage-table">
           <thead>
             <tr>
@@ -191,7 +197,8 @@ function UsageTable({ current }: { current: UsageAccount }) {
             ))}
           </tbody>
         </table>
-      ) : (
+      )}
+      {read.accounts.length === 0 && (
         <p className="usage-table-note" role="status">
           {noteWords(read.failed, !read.pending)}
         </p>
@@ -205,6 +212,43 @@ function UsageTable({ current }: { current: UsageAccount }) {
         Usage in Settings
       </button>
     </div>
+  );
+}
+
+/** fx connections report budgets and balances as well as rolling plan limits. */
+function FxAccountUsage({ account, now }: { account: UsageAccountReport; now: number }) {
+  return (
+    <section className="usage-cost" aria-label="fx account usage" aria-busy={account.status === "loading"}>
+      <div className="usage-table-account">
+        <HarnessLogo id="fx" size={16} className="shrink-0" />
+        <span className="usage-table-name">
+          <span>fx</span>
+          <span className="usage-table-plan">{[account.context, account.plan].filter(Boolean).join(" · ")}</span>
+        </span>
+      </div>
+      {account.windows.map((window) => {
+        const left = percentLeft(window);
+        return (
+          <div className="usage-cost-row" key={window.id}>
+            <span className="usage-table-name">
+              <span>{window.label}</span>
+              <span className="usage-table-plan">{resetWords(window, now)}</span>
+            </span>
+            <span className="usage-table-limit" data-tone={left === null ? undefined : limitTone(window, left, now)}>
+              <LeftRing left={left ?? 0} />
+              <span className="usage-cost-value tabular">{left === null ? "Not reported" : `${Math.round(left)}% left`}</span>
+            </span>
+          </div>
+        );
+      })}
+      {account.credits.map((credit, index) => (
+        <div className="usage-cost-row" key={`${credit.label}:${index}`}>
+          <span>{credit.label}</span>
+          <span className="usage-cost-value tabular">{creditBalanceLabel(credit)}</span>
+        </div>
+      ))}
+      {((!account.windows.length && !account.credits.length) || account.status === "error" || account.status === "disconnected") && <p className="usage-cost-note">{emptyWords[account.status]}</p>}
+    </section>
   );
 }
 
@@ -246,27 +290,30 @@ function noLimitMark(account: UsageAccount): RailMark {
   return { tooltip: "No weekly limit", label: `${account.name}: no weekly limit`, low: false, mark: <Signal size={RAIL_ICON} /> };
 }
 
+function fxMark(account: UsageAccount, windows: AllowanceWindow[], credits: UsageAccountReport["credits"]): RailMark | null {
+  const primary = windows.filter((window) => window.group === windows[0]?.group);
+  const window = weeklyWindow(primary) ?? sessionWindow(primary) ?? primary.find((window) => percentLeft(window) !== null);
+  if (window) {
+    const left = percentLeft(window)!;
+    const tooltip = `${Math.round(left)}% left · ${window.label}`;
+    return { tooltip, label: `${account.name}: ${tooltip}`, low: left <= 10, mark: <LeftBars left={left} /> };
+  }
+  const credit = credits.find((credit) => credit.unlimited || credit.balance !== null);
+  if (!credit) return null;
+  const tooltip = `${credit.label}: ${creditBalanceLabel(credit)}`;
+  return { tooltip, label: `fx: ${tooltip}`, low: !credit.unlimited && Number(credit.balance) <= 0, mark: <Signal size={RAIL_ICON} /> };
+}
+
 /** Where the table opens: beside the rail's button. */
 const PLACE = { side: "right", align: "end", sideOffset: 10 } as const;
 
-/**
- * What is left this week of the account the next message would spend, as Settings' usage bars among the rail's
- * buttons, lit by the share left. It opens a table of every account's limits beside the rail. An account without a
- * weekly limit, such as OpenCode's provider accounts, shows the bars plain once its agent has reported what the open
- * conversation cost, and the popup leads with that cost; otherwise nothing.
- */
+/** Allowances and balances for the selected account, alongside reported conversation costs. */
 export function AccountUsage() {
   const account = useUsageAccount();
   const usage = useRpc("providers.usage", usageParams(account ?? { provider: "claude" }), { enabled: Boolean(account), staleTime: USAGE_MAX_AGE_MS });
   const cost = useConversationCost(account);
-  // Antigravity exposes Gemini to OpenOrc; its native CLI also reports a separate Claude/GPT pool.
-  const windows = account?.provider === "antigravity" ? usage.data?.windows.filter((window) => window.id.startsWith("gemini-")) : usage.data?.windows;
-  const week = account && windows ? weeklyWindow(windows) : null;
-  const left = week ? percentLeft(week) : null;
   if (!account) return null;
-  let rail: RailMark | null = null;
-  if (left !== null) rail = weekMark(account, left);
-  else if (cost !== null) rail = noLimitMark(account);
+  const rail = accountMark(account, usage.data, cost);
   if (!rail) return null;
   return (
     <Popover.Root>
@@ -286,4 +333,16 @@ export function AccountUsage() {
       </Popover.Portal>
     </Popover.Root>
   );
+}
+
+function accountMark(account: UsageAccount, report: ProviderUsage | undefined, cost: number | null): RailMark | null {
+  // Antigravity exposes Gemini to OpenOrc; its native CLI also reports a separate Claude/GPT pool.
+  const windows = account.provider === "antigravity" ? report?.windows.filter((window) => window.id.startsWith("gemini-")) : report?.windows;
+  const week = windows ? weeklyWindow(windows) : null;
+  const left = week ? percentLeft(week) : null;
+  let rail: RailMark | null = null;
+  if (account.provider === "fx") rail = fxMark(account, windows ?? [], report?.credits ?? []);
+  else if (left !== null) rail = weekMark(account, left);
+  if (!rail && cost !== null) rail = noLimitMark(account);
+  return rail;
 }

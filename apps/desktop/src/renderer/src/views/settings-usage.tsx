@@ -1,10 +1,10 @@
-import { creditBalanceLabel, usageCardState, type UsageCardState } from "./settings-presentation";
+import { usageCardState, type UsageCardState } from "./settings-presentation";
 import { ResetControls } from "./settings-resets";
 import { harnessCatalog, percentLeft, type AllowanceWindow, type ProviderUsage } from "@openorc/protocol";
 import { Button, IconButton, TextButton, Tooltip } from "../components/ui";
 import { HarnessLogo } from "../components/HarnessLogo";
 import { ChevronDown, ExternalLink, RefreshCw } from "../components/icons";
-import { allowanceState, formatUsageTime, usageResetLabel } from "@openorc/client";
+import { creditBalanceLabel, allowanceState, formatUsageTime, usageResetLabel } from "@openorc/client";
 import { useEffect, useId, useRef, useState } from "react";
 import { useRpc } from "../lib/client";
 import { useEnabledHarnesses } from "../lib/enabled-harnesses";
@@ -165,7 +165,9 @@ function ProviderAllowances({ report: d, now, outdated }: { report: ProviderUsag
   const resets = d.resets;
   return (
     <>
-      {d.windows.length === 0 && <p className="usage-empty">{d.status === "disconnected" ? "Connect this provider to see its account allowances." : "No limits reported."}</p>}
+      {d.windows.length === 0 && d.credits.length === 0 && (
+        <p className="usage-empty">{d.status === "disconnected" ? "Connect this provider to see its account allowances." : "No limits reported."}</p>
+      )}
       {d.windows.length > 0 && (
         <div className="usage-windows">
           {d.windows.map((w) => (

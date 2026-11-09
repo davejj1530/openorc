@@ -830,6 +830,9 @@ button.browser-empty:hover,
    rows; the open thread's account sits on the current-row fill instead. */
 .account-usage-popup {
   width: min(440px, calc(100vw - 24px));
+  max-height: min(calc(100dvh - 24px), var(--available-height, 100dvh));
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 6px;
 }
 .usage-table-wrap {
@@ -916,7 +919,8 @@ button.browser-empty:hover,
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.usage-table-cell[data-tone] .usage-table-value {
+.usage-table-cell[data-tone] .usage-table-value,
+.usage-table-limit[data-tone] .usage-cost-value {
   color: var(--warn);
 }
 .usage-table-cell[data-empty] {

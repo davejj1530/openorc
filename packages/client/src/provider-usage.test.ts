@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allowanceState, usageResetLabel } from "./provider-usage.js";
+import { creditBalanceLabel, allowanceState, usageResetLabel } from "./provider-usage.js";
 const report = { id: "5h", label: "5-hour", usedPercent: 50, remainingPercent: 50, resetsAt: 2_000_000, observedAt: 1_000_000, exhausted: false };
 describe("usage freshness", () => {
   it("marks old and expired reports stale without inferring a reset to zero", () => {
@@ -16,4 +16,12 @@ it("shows unavailable and elapsed resets explicitly instead of inventing a new a
   expect(usageResetLabel(now, now)).toBe("Reset passed · refresh usage");
   expect(usageResetLabel(now + 30_000, now)).toBe("Resets in 1m");
   expect(usageResetLabel(now + 144 * 60_000, now)).toBe("Resets in 2h 24m");
+});
+
+it("formats monetary balances separately from credits and keeps an unknown balance unknown", () => {
+  expect(creditBalanceLabel({ balance: "12.5", unlimited: false, currency: "USD" })).toBe("$12.50");
+  expect(creditBalanceLabel({ balance: "12.5", unlimited: false })).toBe("12.5 credits");
+  expect(creditBalanceLabel({ balance: "0", unlimited: false, currency: "USD" })).toBe("$0.00");
+  expect(creditBalanceLabel({ balance: "", unlimited: false })).toBe("Balance unavailable");
+  expect(creditBalanceLabel({ balance: null, unlimited: true })).toBe("Unlimited");
 });

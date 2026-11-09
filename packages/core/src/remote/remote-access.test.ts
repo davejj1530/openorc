@@ -188,11 +188,13 @@ describe("phone access", () => {
         ["Claude · Existing CLI login", "Max", "5-hour window"],
         ["Claude · Work", "Max", "5-hour window"],
         ["Antigravity", null, "Weekly Limit · Gemini Models"],
+        ["fx", null, "5-hour window"],
       ]);
-      expect(JSON.stringify(limits)).not.toMatch(/@|\/|token|hash|attempt|CLAUDE_CONFIG_DIR|claude-accounts|ChatGPT|credits/);
+      expect(JSON.stringify(limits)).not.toMatch(/@|\/|token|hash|attempt|CLAUDE_CONFIG_DIR|claude-accounts|ChatGPT/);
+      expect(limits[0]?.credits).toEqual([{ label: "codex · workspace credits", balance: "12", unlimited: false }]);
       await expect(phone.call("providers.limits", { refresh: true } as never)).rejects.toThrow();
-      expect(limits.at(-1)?.windows[0]?.group).toBe("Gemini Models");
-      expect(usage).toHaveBeenCalledTimes(4);
+      expect(limits.find((account) => account.name === "Antigravity")?.windows[0]?.group).toBe("Gemini Models");
+      expect(usage).toHaveBeenCalledTimes(5);
     } finally {
       usage.mockRestore();
       system.mockRestore();

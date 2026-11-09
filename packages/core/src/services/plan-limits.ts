@@ -32,6 +32,7 @@ export async function readPlanLimits({ db, usage, availability }: Sources): Prom
       read: () => usage.recent("claude", account.id, PLAN_LIMITS_MAX_AGE_MS),
     })),
     ...(installed.has("antigravity") ? [{ id: "antigravity", provider: "antigravity" as const, name: "Antigravity", read: () => usage.recent("antigravity", undefined, PLAN_LIMITS_MAX_AGE_MS) }] : []),
+    ...(installed.has("fx") ? [{ id: "fx", provider: "fx" as const, name: "fx", read: () => usage.recent("fx", undefined, PLAN_LIMITS_MAX_AGE_MS) }] : []),
   ];
   return Promise.all(
     accounts.map(({ read, ...account }) =>
@@ -50,6 +51,7 @@ function planLimits(account: Pick<PlanLimits, "id" | "provider" | "name">, repor
     plan: report.plan,
     status: report.status,
     windows: report.windows.map((window) => limitWindow(window, account.provider, report.plan)),
+    ...(report.credits.length ? { credits: report.credits.map(({ label, balance, unlimited, currency }) => ({ label, balance, unlimited, ...(currency === "USD" ? { currency } : {}) })) } : {}),
     refreshedAt: report.refreshedAt,
   };
 }

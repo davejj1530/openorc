@@ -46,7 +46,8 @@ export function createSystemHandlers({
     "agents.updates.check": () => agentUpdates.check(),
     "agents.updates.install": ({ ids }) => agentUpdates.install(ids),
     "agents.updates.configure": (patch) => agentUpdates.configure(patch),
-    "providers.usage": ({ provider, claudeAccountId, maxAgeMs }) => (maxAgeMs ? providerUsage.recent(provider, claudeAccountId, maxAgeMs) : providerUsage.read(provider, claudeAccountId)),
+    "providers.usage": ({ provider, claudeAccountId, maxAgeMs, fxModel }) =>
+      maxAgeMs ? providerUsage.recent(provider, claudeAccountId, maxAgeMs, fxModel) : providerUsage.read(provider, claudeAccountId, fxModel),
     "providers.limits": async () => (await planLimits()).filter((row) => !enabledHarnesses || enabledHarnesses().includes(row.provider)),
     "providers.codex.reset": async (input) => {
       const result = await providerUsage.redeemCodex(input);

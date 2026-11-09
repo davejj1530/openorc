@@ -1,9 +1,10 @@
-import type { ModelChoice } from "@openorc/client";
+import { offeredAccount, projectAccountChoice, type ModelChoice } from "@openorc/client";
 import { executionMode, type Thread } from "@openorc/protocol";
 import { useEffect, useRef, useState } from "react";
 import { Composer } from "../components/Composer";
 import { DitherBackdrop } from "../components/DitherBackdrop";
 import { ComposerModelPicker, ModelPicker } from "../components/ModelPicker";
+import type { PickerAccounts } from "../components/ModelPickerAccounts";
 import { ProjectActivity } from "../components/ProjectActivity";
 import { TopBar } from "../components/TopBar";
 import { Button } from "../components/ui";
@@ -15,7 +16,7 @@ import { useComposerSuggestions } from "../lib/connector-mentions";
 
 const draftKey = (parentId: string) => `subthread.${parentId}`;
 
-/** Starts a thread under another, in its folder, on the parent's model and settings until you change them. */
+/** Starts a thread under another, in its folder, on the parent's model, account and settings until you change them. */
 export function NewSubthread({ parentId }: { parentId: string }) {
   const parent = useRpc("threads.get", { id: parentId });
   if (parent.error) {
@@ -44,7 +45,8 @@ function SubthreadComposer({ parent }: { parent: Thread }) {
   const [mode, setMode] = useState(parent.mode);
   const [permission, setPermission] = useState(parent.permissionMode);
   const start = useRpcMutation("threads.start");
-  const claudeAccountId = parent.claudeAccountId ?? undefined;
+  const { list: accounts, picker: accountPicker, claudeAccountId } = useSubthreadAccount(parent, start.isPending, () => start.reset());
+  const accountsMissing = choice?.agent === "claude" && !accounts.data ? (accounts.error?.message ?? "Loading Claude accounts…") : null;
   const suggestions = useComposerSuggestions({ kind: "thread", id: parent.id }, choice?.agent, executionMode(mode, permission), claudeAccountId);
   const mounted = useRef(true);
   useEffect(() => {
@@ -60,6 +62,7 @@ function SubthreadComposer({ parent }: { parent: Thread }) {
   };
   const submit = async (text: string, attachments: string[]) => {
     if (!choice) throw new Error("Choose a model first.");
+    if (accountsMissing) throw new Error(accountsMissing);
     const { thread } = await start.mutateAsync({
       projectId: parent.projectId,
       parentThreadId: parent.id,
@@ -108,7 +111,7 @@ function SubthreadComposer({ parent }: { parent: Thread }) {
               onModel={chooseModel}
               modelControl={
                 choice ? (
-                  <ComposerModelPicker value={choice} onChange={chooseModel} onSelectModel={chooseModel} disabled={start.isPending} />
+                  <ComposerModelPicker value={choice} onChange={chooseModel} onSelectModel={chooseModel} accounts={accountPicker} disabled={start.isPending} />
                 ) : (
                   <ModelPicker value={null} onChange={chooseModel} disabled={start.isPending} />
                 )
@@ -122,7 +125,7 @@ function SubthreadComposer({ parent }: { parent: Thread }) {
               fileSearch={{ kind: "thread", id: parent.id }}
               {...suggestions}
               busy={start.isPending}
-              disabledReason={choice ? null : "Choose a model first."}
+              disabledReason={choice ? accountsMissing : "Choose a model first."}
               error={start.error?.message ?? null}
             />
           </div>
@@ -131,4 +134,30 @@ function SubthreadComposer({ parent }: { parent: Thread }) {
       </main>
     </ClaudeAccountScope>
   );
+}
+
+/**
+ * The Claude accounts a subthread can start on: the ones its project uses, starting on the parent's while the project
+ * still uses it, else on the project's default.
+ */
+function useSubthreadAccount(parent: Thread, starting: boolean, onChoose: () => void) {
+  const list = useRpc("claude.accounts.list", {});
+  const project = useRpc("projects.get", { id: parent.projectId });
+  const [chosen, setChosen] = useState(parent.claudeAccountId ?? undefined);
+  const choice = list.data && (project.data !== undefined || project.error) ? projectAccountChoice(project.data, list.data) : undefined;
+  const claudeAccountId = offeredAccount(choice, chosen) ?? choice?.defaultId;
+  const picker: PickerAccounts | undefined =
+    choice && claudeAccountId
+      ? {
+          accounts: choice.accounts,
+          current: claudeAccountId,
+          choose: (id) => {
+            setChosen(id);
+            onChoose();
+          },
+          blocked: starting ? "Starting the thread…" : undefined,
+          project: choice.restricted && project.data ? { id: project.data.id, name: project.data.name } : undefined,
+        }
+      : undefined;
+  return { list, picker, claudeAccountId };
 }

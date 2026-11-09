@@ -30,7 +30,18 @@ export type { ClientPush, CoreConnection, Notice } from "./connection.js";
 export { conversationCost, formatCost } from "./conversation-cost.js";
 export { conversationActivity, conversationCanSteer, conversationPlaceholder, conversationSendDisabledReason, conversationSteerReason } from "./conversation-presentation.js";
 export type { SavedThreadSettings } from "./conversation-settings.js";
-export { composerActions, messageBody, planSubmit, processFit, type ComposerActionsInput, type SubmitInput, type SubmitPlan, type SubmitRequest, type SubmitTarget } from "./conversation-submit.js";
+export {
+  composerActions,
+  messageBody,
+  planSubmit,
+  processFit,
+  type ComposerActionsInput,
+  type OutgoingMessage,
+  type SubmitInput,
+  type SubmitPlan,
+  type SubmitRequest,
+  type SubmitTarget,
+} from "./conversation-submit.js";
 export { accountsToContinueWith, canContinueWithAnother, CONTINUE_PROMPT, RESTART_PROMPT } from "./session-recovery.js";
 export { offeredAccount, projectAccountChoice, type AccountsProject, type ProjectAccountChoice } from "./project-claude-accounts.js";
 export {

@@ -235,7 +235,7 @@ export class RunLaunch {
         type: "message.completed",
         runId,
         ts: Date.now(),
-        messageId: `${input.promptRole ?? "user"}-${Date.now()}`,
+        messageId: input.promptMessageId ?? `${input.promptRole ?? "user"}-${Date.now()}`,
         role: input.promptRole ?? "user",
         text: input.prompt,
         ...(input.attachments?.length ? { attachments: input.attachments } : {}),

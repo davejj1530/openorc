@@ -18,6 +18,8 @@ export interface SendOptions {
   recordPrompt?: boolean;
   /** OpenOrc's own idea rather than anyone's message, such as an Orcling waking up: the turn counts as activity only once the agent says something. */
   unprompted?: boolean;
+  /** The id the message is recorded under, when a window already shows it as sent. */
+  messageId?: string | undefined;
   /** Called once the provider has taken the input, with the run and the process's turn index. Throwing closes the process. */
   onAccepted?: (run: Run, processTurn: number) => void;
 }
@@ -83,6 +85,8 @@ export interface StartRunInput {
   recordPrompt?: boolean;
   /** See SendOptions.unprompted. */
   unprompted?: boolean;
+  /** See SendOptions.messageId. */
+  promptMessageId?: string | undefined;
   resume: boolean;
   /** Where the session to resume comes from, when it is not this scope's own last session (a fork continues its parent's). */
   resumeFrom?: { sessionId: string; fork: boolean };

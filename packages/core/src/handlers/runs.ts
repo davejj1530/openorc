@@ -23,17 +23,30 @@ export function createRunsHandlers({
       await runService.subagents.stop(threadId);
       return null;
     },
-    "runs.start": async ({ taskId, threadId, workspaceMode, agent, model, effort, fastMode, attachments, mode, permissionMode, prompt, resume, claudeAccountId }) => {
-      if (threadId) return threadService.continueThread(threadId, { agent, model, effort, fastMode, attachments, mode, permissionMode, prompt, fresh: resume === false, claudeAccountId });
+    "runs.start": async ({ taskId, threadId, workspaceMode, agent, model, effort, fastMode, attachments, mode, permissionMode, prompt, resume, claudeAccountId, messageId }) => {
+      if (threadId)
+        return threadService.continueThread(threadId, {
+          agent,
+          model,
+          effort,
+          fastMode,
+          attachments,
+          mode,
+          permissionMode,
+          prompt,
+          fresh: resume === false,
+          claudeAccountId,
+          promptMessageId: messageId,
+        });
       if (!taskId) throw new Error("runs.start needs a taskId or a threadId");
       if (claudeAccountId) throw new Error("A task goes on with the Claude account it ran on.");
       const { task } = taskAndProject(db, taskId);
       const images = await new AttachmentService(dataDir).forTask(task.spec ?? "");
       return threadService.startTaskInThread(taskId, workspaceMode, images, { agent, model, effort, fastMode, attachments, mode, permissionMode, prompt, fresh: resume === false });
     },
-    "runs.send": async ({ runId, text, attachments }) => {
+    "runs.send": async ({ runId, text, attachments, messageId }) => {
       try {
-        await runService.send(runId, text, { attachments });
+        await runService.send(runId, text, { attachments, messageId });
       } catch (error) {
         if (!(error instanceof LiveInputUnavailable)) throw error;
         const threadId = runs.get(db, runId)?.threadId;

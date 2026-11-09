@@ -7,7 +7,6 @@ import {
   forkUnavailable,
   normalizeModelEffort,
   normalizeModelSettings,
-  type AgentKind,
   type ChangePreview,
   type PermissionPreset,
   type RpcParams,
@@ -29,7 +28,7 @@ import { executionFolder } from "./conversation-folder.js";
 import { inUnvettedCopy } from "./review-copies.js";
 import type { RunService } from "./runs.js";
 import { ThreadAgentTools } from "./thread-agent-tools.js";
-import { startAccount, titleFromPrompt, type StartThreadInput, type ThreadPatch, type ThreadTitler } from "./thread-inputs.js";
+import { startAccount, titleFromPrompt, type ContinueThreadInput, type StartThreadInput, type ThreadPatch, type ThreadTitler } from "./thread-inputs.js";
 import { ThreadMessageQueue } from "./thread-message-queue.js";
 import { ThreadMoves, fileChanges } from "./thread-moves.js";
 import { assertMutableThread } from "./thread-mutations.js";
@@ -323,29 +322,7 @@ export class ThreadService {
     return { path: file };
   }
 
-  async continueThread(
-    id: string,
-    input: {
-      agent: AgentKind;
-      model: string | undefined;
-      effort: string | undefined;
-      fastMode?: boolean | undefined;
-      mode: RunMode;
-      permissionMode: PermissionPreset;
-      prompt: string;
-      attachments: string[] | undefined;
-      promptRole?: "user" | "system";
-      recordPrompt?: boolean;
-      unprompted?: boolean;
-      fresh?: boolean;
-      /** Another Claude account the conversation goes on with from this turn. */
-      claudeAccountId?: string | undefined;
-      workingDirectory?: string;
-      baseRef?: string;
-      onCreated?: (run: Run) => void;
-      assertCanStart?: () => void;
-    },
-  ): Promise<Run> {
+  async continueThread(id: string, input: ContinueThreadInput): Promise<Run> {
     input = normalizeModelSettings(input);
     this.rejectRetiredThread(id);
     const thread = this.thread(id);
@@ -400,6 +377,7 @@ export class ThreadService {
           prompt: input.prompt,
           recordPrompt: input.recordPrompt,
           unprompted: input.unprompted,
+          promptMessageId: input.promptMessageId,
           onCreated: input.onCreated,
           assertCanStart: input.assertCanStart,
           ...(input.promptRole ? { promptRole: input.promptRole } : {}),

@@ -83,8 +83,17 @@ async function submit(options: { thread?: Partial<ThreadSummary>; runs?: RunSpec
   } catch (error) {
     return { error: (error as Error).message };
   }
-  // What reached the core, whichever hook made the call.
-  return vi.mocked(core.call).mock.calls.filter(([method]) => sends.has(method));
+  // What reached the core, whichever hook made the call. A thread's next message carries the id it already shows under
+  // while on its way, and a queued one does not; each case below is about the rest of the call.
+  return vi
+    .mocked(core.call)
+    .mock.calls.filter(([method]) => sends.has(method))
+    .map(([method, params]) => {
+      const { messageId, ...rest } = params as { messageId?: string };
+      if (method === "threads.queue") expect(messageId).toBeUndefined();
+      else expect(messageId).toMatch(/^user-[0-9a-f-]{36}$/);
+      return [method, rest];
+    });
 }
 const sends = new Set(["runs.start", "runs.send", "threads.queue"]);
 
@@ -231,7 +240,7 @@ it("holds a cloud turn whose sign-in the cloud lacks, offers that sign-in in pla
   expect(sent()).toEqual([]);
   act(heard);
   await act(() => sending);
-  await waitFor(() => expect(sent()).toEqual(start(true)));
+  await waitFor(() => expect(sent()).toEqual(start(true, { messageId: expect.stringMatching(/^user-/) })));
   expect(screen.queryByText("Codex has no sign-in for the cloud.")).toBeNull();
 });
 

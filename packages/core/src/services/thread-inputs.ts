@@ -1,7 +1,31 @@
 import { redact, type Db } from "@openorc/db";
-import type { AgentKind, PermissionPreset, RunMode, TaskPriority, WorkspaceMode } from "@openorc/protocol";
+import type { AgentKind, PermissionPreset, Run, RunMode, TaskPriority, WorkspaceMode } from "@openorc/protocol";
 import { leadingText } from "./notice-text.js";
 import { startingAccount, type AccountSource } from "./project-claude-accounts.js";
+
+/** The next turn of a conversation: its settings, what is said, and how the saying is recorded. */
+export interface ContinueThreadInput {
+  agent: AgentKind;
+  model: string | undefined;
+  effort: string | undefined;
+  fastMode?: boolean | undefined;
+  mode: RunMode;
+  permissionMode: PermissionPreset;
+  prompt: string;
+  attachments: string[] | undefined;
+  promptRole?: "user" | "system";
+  recordPrompt?: boolean;
+  unprompted?: boolean;
+  /** The id the prompt is recorded under, when a window already shows it as sent. */
+  promptMessageId?: string | undefined;
+  fresh?: boolean;
+  /** Another Claude account the conversation goes on with from this turn. */
+  claudeAccountId?: string | undefined;
+  workingDirectory?: string;
+  baseRef?: string;
+  onCreated?: (run: Run) => void;
+  assertCanStart?: () => void;
+}
 
 export interface StartThreadInput {
   /** The id its owner chose, as the cloud brain's Mac does; a new one unless given. */

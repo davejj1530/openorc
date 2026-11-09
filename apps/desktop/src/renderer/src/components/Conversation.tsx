@@ -59,6 +59,7 @@ import { Transcript } from "./Transcript";
 import { TurnChangesProvider, useTurnFooter } from "./TurnFooter";
 import { Button, Empty } from "./ui";
 import { useOrclingConversation } from "./useOrclingConversation";
+import { useOptimisticSend } from "./useOptimisticSend";
 
 export type ConversationScope = { kind: "task"; task: Task } | { kind: "thread"; thread: ThreadSummary };
 
@@ -185,7 +186,6 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const { sameAgent, settingsPending, canSteer } = processFit({ live, activeRun, choice, mode, permission, compacting: compact.isPending });
   const steerReason = conversationSteerReason({ canSteer, compacting: compact.isPending, settingsPending, sameAgent, agent: activeRun?.agent });
   const sendDisabledReason = conversationSendDisabledReason({ permissionReady, historyLoading: runsQuery.isLoading, historyFailed: Boolean(runsQuery.error), hasModel: Boolean(choice), thread });
-  const busy = submitter.pending;
   const turnFooter = useTurnFooter({ footers, threadId, working });
   const switching = Boolean(thread && choice && runs.length > 0 && !runs.some((r) => r.agent === choice.agent));
   const signIn = useCloudSignInGate(cloudTurnOf(thread, choice, live || working));
@@ -203,12 +203,13 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
     compacting: compact.isPending,
     waitForSave: settings.waitForSave,
   };
+  const optimistic = useOptimisticSend({ submitter, request, run: merged, attachmentsKey: `${draftKey}.attachments`, restore: setPrompt });
   const submit = async (text: string, attachments: string[], now: boolean) => {
     setSends((count) => count + 1);
     // A message to an Orcling goes to the Orcling, not to this conversation's agent.
     if (await orclings.ask(messageBody(text, attachments), attachments)) return clearDraft();
     await signIn.ready();
-    await submitter.submit({ ...request, now }, { text, attachments });
+    await optimistic.send({ ...request, now }, { text, attachments });
     clearDraft();
   };
   const restart = () => submitter.submit({ ...request, now: false, restart: true }, { text: RESTART_PROMPT, attachments: [] }).then(clearDraft);
@@ -225,13 +226,13 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const placeholder = conversationPlaceholder({ firstTaskRun, working, canSteer, agent: choice?.agent });
 
   function renderTranscript() {
-    if (merged && merged.blocks.length > 0)
+    if (optimistic.run && optimistic.run.blocks.length > 0)
       return (
         <TranscriptContext voice={voice} marks={marks} footers={footers} threadId={threadId}>
           <Transcript
             working={working}
             media={links ? { basePath: links, fileScope: conversation } : { fileLinks: "cite" }}
-            run={merged}
+            run={optimistic.run}
             scrollKey={conversation.id}
             followKey={sends}
             onFork={onFork}
@@ -272,7 +273,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
           ) : null}
           {thread ? <BackgroundCommands commands={thread.backgroundCommands ?? []} pending={stopCommand.isPending} onStop={(commandId) => stopCommand.mutate({ id: thread.id, commandId })} /> : null}
           {thread?.session && !working ? (
-            <SessionRecovery thread={thread} disabled={!choice || busy} onRestart={() => void restart().catch(() => {})} onContinueWith={(id) => void continueWith(id).catch(() => {})} />
+            <SessionRecovery thread={thread} disabled={!choice || optimistic.busy} onRestart={() => void restart().catch(() => {})} onContinueWith={(id) => void continueWith(id).catch(() => {})} />
           ) : null}
           {signIn.offer}
           <SwitchingNote agent={switching && choice ? choice.agent : null} />
@@ -300,7 +301,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
             location={location}
             hasStarted={thread?.hasStarted ?? (runs.length > 0 || Boolean(thread?.forkedAtRunId))}
             changes={composerChanges}
-            busy={busy}
+            busy={optimistic.busy}
             allowEmpty={firstTaskRun}
             disabledReason={sendDisabledReason}
             live={live && activeRun ? { runId: activeRun.id, working } : null}
@@ -334,7 +335,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
                   },
                 ]}
                 onChange={setWorkspace}
-                disabled={busy || Boolean(scope.task.worktreePath) || !runsQuery.data}
+                disabled={optimistic.busy || Boolean(scope.task.worktreePath) || !runsQuery.data}
               />
             ) : null}
           </Composer>

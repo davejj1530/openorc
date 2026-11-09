@@ -12,7 +12,18 @@ export const activityBlockId = (activityId: string) => `${ACTIVITY_BLOCK}${activ
 export const activityIdOf = (blockId: string) => (blockId.startsWith(ACTIVITY_BLOCK) ? blockId.slice(ACTIVITY_BLOCK.length) : blockId);
 
 export type Block = { at?: number; turnKey?: string; runId?: string } & (
-  | { id: string; kind: "message"; role: "assistant" | "user" | "system"; text: string; streaming: boolean; at?: number; attachments?: string[]; runId?: string }
+  | {
+      id: string;
+      kind: "message";
+      role: "assistant" | "user" | "system";
+      text: string;
+      streaming: boolean;
+      at?: number;
+      attachments?: string[];
+      runId?: string;
+      /** Sent from this window and shown at once; the core has not recorded it yet. */
+      pending?: boolean;
+    }
   | { id: string; kind: "thinking"; text: string; startedAt: number; endedAt: number | null; explicit?: boolean; status?: ActivityStatus }
   | {
       id: string;

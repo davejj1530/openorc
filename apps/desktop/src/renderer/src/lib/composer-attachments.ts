@@ -104,3 +104,18 @@ export function removeAcceptedAttachments(draftKey: string | undefined, paths: s
   if (!draftKey) return;
   updateState(`draft:${draftKey}`, draftKey, (state) => ({ ...state, attachments: state.attachments.filter((attachment) => !paths.includes(attachment.path)) }));
 }
+
+/** The draft's attachments with these paths, kept by a send that already shows as sent in case it has to give them back. */
+export function draftAttachments(draftKey: string | undefined, paths: readonly string[]): Attachment[] {
+  if (!draftKey) return [];
+  return currentState(`draft:${draftKey}`, draftKey).attachments.filter((attachment) => paths.includes(attachment.path));
+}
+
+/** Gives a failed send's attachments back to its draft, ahead of any added since. */
+export function restoreDraftAttachments(draftKey: string | undefined, attachments: readonly Attachment[]): void {
+  if (!draftKey || !attachments.length) return;
+  updateState(`draft:${draftKey}`, draftKey, (state) => {
+    const kept = state.attachments.filter((attachment) => !attachments.some((back) => back.path === attachment.path));
+    return { ...state, attachments: [...attachments, ...kept] };
+  });
+}

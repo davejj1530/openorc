@@ -261,8 +261,10 @@ export const rpcParams = {
     resume: z.boolean().optional(),
     /** A conversation goes on with another Claude account: this turn and the next ones run there, resuming its session. */
     claudeAccountId: ClaudeAccountId.optional(),
+    /** The id the prompt is recorded under, so a window that already shows it as sent sees the same message land. */
+    messageId: z.string().min(1).max(100).optional(),
   }),
-  "runs.send": z.object({ runId: z.string(), text: z.string().min(1), attachments: z.array(z.string()).optional() }),
+  "runs.send": z.object({ runId: z.string(), text: z.string().min(1), attachments: z.array(z.string()).optional(), messageId: z.string().min(1).max(100).optional() }),
   "runs.interrupt": z.object({ runId: z.string() }),
   "runs.close": z.object({ runId: z.string() }),
   "runs.listForTask": z.object({ taskId: z.string() }),

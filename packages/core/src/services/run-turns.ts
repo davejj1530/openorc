@@ -89,6 +89,7 @@ export class RunTurns {
       promptRole: options.role ?? "user",
       recordPrompt: options.recordPrompt ?? true,
       unprompted: options.unprompted,
+      promptMessageId: options.messageId,
       attachments: options.attachments,
       resume: true,
     });
@@ -126,7 +127,10 @@ export class RunTurns {
         throw error;
       }
     }
-    if (recordPrompt) this.deps.emit({ type: "message.completed", runId, ts: Date.now(), messageId: `${role}-${randomUUID()}`, role, text, ...(attachments?.length ? { attachments } : {}) });
+    if (recordPrompt) {
+      const messageId = options.messageId ?? `${role}-${randomUUID()}`;
+      this.deps.emit({ type: "message.completed", runId, ts: Date.now(), messageId, role, text, ...(attachments?.length ? { attachments } : {}) });
+    }
     if (entry.scope.thread) touchUnlessUnprompted(this.deps.db, entry, entry.scope.thread.id);
     this.deps.invalidate(this.deps.keysFor(entry.scope));
   }

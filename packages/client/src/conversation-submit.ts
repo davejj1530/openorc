@@ -125,7 +125,14 @@ export interface SubmitRequest extends SubmitInput {
   waitForSave(): Promise<unknown>;
 }
 
-function startParams(request: SubmitRequest, plan: Extract<SubmitPlan, { kind: "start" }>, prompt: string, attachments: string[]): RpcParams<"runs.start"> {
+/** What a send carries: the words, the files, and the id its message is recorded under when it already shows as sent. */
+export interface OutgoingMessage {
+  text: string;
+  attachments: string[];
+  messageId?: string;
+}
+
+function startParams(request: SubmitRequest, plan: Extract<SubmitPlan, { kind: "start" }>, prompt: string, attachments: string[], messageId: string | undefined): RpcParams<"runs.start"> {
   const { kind: _kind, ...where } = request.target;
   const { choice } = plan;
   return {
@@ -140,6 +147,7 @@ function startParams(request: SubmitRequest, plan: Extract<SubmitPlan, { kind: "
     prompt,
     resume: plan.resume,
     ...(request.claudeAccountId ? { claudeAccountId: request.claudeAccountId } : {}),
+    ...(messageId ? { messageId } : {}),
   };
 }
 
@@ -150,32 +158,33 @@ export interface SubmitCalls {
   queue: { mutateAsync(params: RpcParams<"threads.queue">): Promise<unknown> };
 }
 
-/** Sends one message: plans it once every chosen setting is saved, then makes the plan's one call. */
-export async function sendMessage(calls: SubmitCalls, randomId: () => string, request: SubmitRequest, message: { text: string; attachments: string[] }): Promise<void> {
+/** Sends one message: plans it once every chosen setting is saved, then makes the plan's one call. Says which call it made. */
+export async function sendMessage(calls: SubmitCalls, randomId: () => string, request: SubmitRequest, message: OutgoingMessage): Promise<SubmitPlan["kind"]> {
   await request.waitForSave();
   const plan = planSubmit(request);
   const text = messageBody(message.text, message.attachments);
-  const { attachments } = message;
+  const { attachments, messageId } = message;
   switch (plan.kind) {
     case "blocked":
       throw new Error(plan.reason);
     case "steer":
     case "continue":
-      await calls.send.mutateAsync({ runId: plan.runId, text, attachments });
-      return;
+      await calls.send.mutateAsync({ runId: plan.runId, text, attachments, ...(messageId ? { messageId } : {}) });
+      break;
     case "queue":
       await calls.queue.mutateAsync({ id: plan.threadId, text, attachments, requestKey: randomId() });
-      return;
+      break;
     case "start":
-      await calls.start.mutateAsync(startParams(request, plan, text, attachments));
+      await calls.start.mutateAsync(startParams(request, plan, text, attachments, messageId));
   }
+  return plan.kind;
 }
 
 /** The one way to send. `pending` and `error` cover every call a send can make. */
 export function useSubmitWith(useRpcMutation: ClientQueries["useRpcMutation"], randomId: () => string) {
   const calls = { start: useRpcMutation("runs.start"), send: useRpcMutation("runs.send"), queue: useRpcMutation("threads.queue") };
   return {
-    submit: (request: SubmitRequest, message: { text: string; attachments: string[] }) => sendMessage(calls, randomId, request, message),
+    submit: (request: SubmitRequest, message: OutgoingMessage) => sendMessage(calls, randomId, request, message),
     pending: calls.start.isPending || calls.send.isPending || calls.queue.isPending,
     error: calls.start.error ?? calls.send.error ?? calls.queue.error,
   };

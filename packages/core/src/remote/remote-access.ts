@@ -1,4 +1,4 @@
-import { projects, refusedMoves, remoteDevices, remotePushTargets, retiredTeams, settings, threads, type Db, type LedgerWriter, type RemoteDeviceRecord } from "@openorc/db";
+import { projects, refusedMoves, remoteDevices, remotePushTargets, retiredTeams, settings, tasks, threads, type Db, type LedgerWriter, type RemoteDeviceRecord } from "@openorc/db";
 import {
   acceptLink,
   encodePairingUrl,
@@ -407,6 +407,10 @@ export class RemoteAccess {
         thread: (id) => {
           const thread = threads.get(db, id);
           return thread ? { team: retiredTeams.isHidden(db, id), parentRelation: thread.parentRelation } : null;
+        },
+        task: (id) => {
+          const task = tasks.get(db, id);
+          return task ? { spec: task.spec } : null;
         },
       },
       roots: () => this.macRoots(),

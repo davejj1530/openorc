@@ -90,6 +90,14 @@ const answers: Answers = {
   "agents.models": (_core, { agent }) => demoModels.filter((model) => !agent || model.agent === agent),
   "agents.availability": () => demoAvailability,
   // The demo Mac has no Orclings: its Orclings tab says where to make one.
+  // The demo Mac has no saved tasks.
+  "tasks.get": () => null,
+  "tasks.create": () => {
+    throw new Error("The demo Mac saves no tasks.");
+  },
+  "tasks.update": () => {
+    throw new Error("The demo Mac has no saved tasks.");
+  },
   "orclings.chats": () => [],
   "orclings.profile": () => {
     throw new Error("The demo Mac has no Orclings.");

@@ -1,7 +1,7 @@
 import type { AgentEvent } from "./events.js";
 
 /** Declared per session, before interests/RPCs. An absent declaration means an installed legacy phone. */
-export const PHONE_CAPABILITIES = ["subagent-threads", "reply-images", "skill-lists", "orclings"] as const;
+export const PHONE_CAPABILITIES = ["subagent-threads", "reply-images", "skill-lists", "orclings", "task-details", "subthread-starts"] as const;
 export const supportsSubagents = (capabilities: readonly string[] = []): boolean => capabilities.includes("subagent-threads");
 /** The Mac answers `session.negotiate` with the capabilities it shares; an older Mac's link refuses a reply image. */
 export const supportsReplyImages = (capabilities: readonly string[] = []): boolean => capabilities.includes("reply-images");
@@ -9,6 +9,10 @@ export const supportsReplyImages = (capabilities: readonly string[] = []): boole
 export const supportsSkillLists = (capabilities: readonly string[] = []): boolean => capabilities.includes("skill-lists");
 /** A Mac that shares it lists Orclings for a phone and takes its tapbacks; an older Mac refuses `orclings.*`. */
 export const supportsOrclings = (capabilities: readonly string[] = []): boolean => capabilities.includes("orclings");
+/** A Mac that shares it opens, saves and edits a phone's tasks; an older Mac refuses `tasks.get`, `tasks.create` and `tasks.update`. */
+export const supportsTaskDetails = (capabilities: readonly string[] = []): boolean => capabilities.includes("task-details");
+/** A Mac that shares it starts a phone's thread under another; an older one refuses `threads.start` with `parentThreadId`. */
+export const supportsSubthreadStarts = (capabilities: readonly string[] = []): boolean => capabilities.includes("subthread-starts");
 
 /**
  * Frozen at the installed builds, App Store 1.0.0 (202610270002, 85bf1c5e) and TestFlight 202610270003, whose

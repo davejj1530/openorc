@@ -15,8 +15,9 @@ import { arrive, confirm, ease } from "../ui/motion";
 import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
 import { ImageTile } from "./images";
-import { ActivityRow, ToolRow } from "./tools";
+import { ActivityRow } from "./tools";
 import { useVoice } from "./voices";
+import { ToolCard } from "./work-cards";
 
 type ApprovalBlock = Extract<Block, { kind: "approval" }>;
 
@@ -400,7 +401,7 @@ export const Card = memo(function Card({ block, runId }: { block: Block; runId: 
     case "activity":
       return isImageGeneration(block) ? <ImageGeneration block={block} runId={runId} /> : <ActivityRow block={block} runId={runId} />;
     case "tool":
-      return <ToolRow block={block} runId={runId} />;
+      return <ToolCard block={block} runId={runId} />;
     case "thinking":
       return null;
   }

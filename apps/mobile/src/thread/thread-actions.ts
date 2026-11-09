@@ -9,7 +9,7 @@ export type OrganizePatch = Pick<RpcParams<"threads.update">["patch"], "pinned" 
 type Symbol = NonNullable<ComponentProps<typeof Link.MenuAction>["icon"]>;
 
 /** The screens a thread's menu opens over the thread: the desktop's side panel tools a phone has, and the move to the cloud. */
-export type ThreadScreenPath = "/changes" | "/preview" | "/move-to-cloud";
+export type ThreadScreenPath = "/changes" | "/preview" | "/move-to-cloud" | "/subthreads" | "/new-subthread";
 
 /**
  * One item of a thread's menu: a change to save, a snooze (its time counted when it is chosen, as a row keeps its menu
@@ -47,6 +47,8 @@ export interface ThreadPanels {
   toCloud?: boolean;
   /** The Mac grouped with its cloud brain, which brings the brain's threads home; null without both. */
   moves?: { mac: string; onBrain: boolean } | null;
+  /** How many threads were started from this one. */
+  subthreads?: number;
 }
 
 const NO_PANELS: ThreadPanels = { uncommitted: null, preview: null };
@@ -75,7 +77,8 @@ function changes(files: number): ThreadAction {
 }
 
 /**
- * What a paired phone may do to a thread, in the desktop menu's order and sections: pin, snooze, read state; rename and
+ * What a paired phone may do to a thread, in the desktop menu's order and sections: a row's menu leads with New
+ * Subthread, the header's keeps it with the thread's family; pin, snooze, read state; rename and
  * the pull request and the move to the cloud; archive. A team thread's lifecycle (snooze, archive) stays with the team
  * on the Mac. Deleting, forking and moving within the Mac stay there. The header leads with the thread's panels, Changes then Preview: every thread
  * action lives in the More menu, so the title keeps the header's center.
@@ -102,8 +105,26 @@ export function threadMenu(thread: ThreadSummary, place: MenuPlace, now: Date, p
           ? { kind: "patch", label: "Reopen", icon: "arrow.uturn.backward.circle", patch: { archived: false } }
           : { kind: "patch", label: "Resolve", icon: "checkmark.circle", patch: { archived: true } },
       ];
-  const sections = place === "header" ? [[...screens, rename], organize, [...pull, ...move], resolve] : [organize, [rename, ...pull], resolve];
+  const sections = place === "header" ? [[...screens, rename], family(thread, panels), organize, [...pull, ...move], resolve] : [startUnder(thread), organize, [rename, ...pull], resolve];
   return sections.filter((section) => section.length > 0);
+}
+
+/**
+ * New Subthread, as the desktop's menus offer it: a thread started under this one, in its folder. A team's thread, a
+ * thread that lives in the cloud and an Orcling's conversation start none from a phone.
+ */
+function startUnder(thread: ThreadSummary): ThreadAction[] {
+  if (thread.teamInstanceId || thread.owner?.brain === "cloud" || thread.orclingId) return [];
+  return [{ kind: "screen", label: "New Subthread", icon: "square.and.pencil", pathname: "/new-subthread" }];
+}
+
+/** A thread's family in its header: a new subthread, the thread it came from, and the subthreads it has. */
+function family(thread: ThreadSummary, panels: ThreadPanels): ThreadAction[] {
+  return [
+    ...startUnder(thread),
+    ...(thread.parentThreadId ? [{ kind: "parent", label: "Open Parent Thread", icon: "arrow.turn.up.left", threadId: thread.parentThreadId } as const] : []),
+    ...(panels.subthreads ? [{ kind: "screen", label: "Subthreads", icon: "arrow.triangle.branch", subtitle: String(panels.subthreads), pathname: "/subthreads" } as const] : []),
+  ];
 }
 
 type Swipe = { label: string; patch: OrganizePatch };

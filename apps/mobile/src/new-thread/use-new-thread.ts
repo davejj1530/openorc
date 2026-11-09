@@ -130,7 +130,7 @@ function useCloudPlace(projectId: string, draft: SheetDraft, change: (patch: Par
 }
 
 /** The desktop's first choice, made from the same reads once they are in and kept with the draft. Returns the Mac's settings. */
-function useDefaultChoice(draft: SheetDraft, setDraft: ReturnType<typeof useSheetDraft>[1]) {
+export function useDefaultChoice(draft: SheetDraft, setDraft: ReturnType<typeof useSheetDraft>[1]) {
   const models = useRpc("agents.models", {}, { staleTime: 5 * 60_000 });
   const harnesses = useRpc("agents.availability", {});
   const appSettings = useRpc("app.settings.get", {});

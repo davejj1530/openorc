@@ -68,11 +68,15 @@ export default function RootLayout() {
             {/* The back button's long-press menu and VoiceOver name Home by this title. */}
             <Stack.Screen name="index" options={{ title: "Threads" }} />
             <Stack.Screen name="thread/[id]" dangerouslySingular={onePerThread} options={pushed} />
+            <Stack.Screen name="task/[id]" dangerouslySingular={onePerThread} options={pushed} />
+            <Stack.Screen name="task-description" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [1] }} />
+            <Stack.Screen name="subthreads" dangerouslySingular={onePerPanel} options={pushed} />
             <Stack.Screen name="changes" dangerouslySingular={onePerPanel} options={pushed} />
             <Stack.Screen name="preview" dangerouslySingular={onePerPanel} options={pushed} />
             <Stack.Screen name="diff" options={pushed} />
             <Stack.Screen name="new" dangerouslySingular options={pushed} />
-            <Stack.Screen name="tasks" dangerouslySingular options={pushed} />
+            <Stack.Screen name="new-subthread" dangerouslySingular={onePerPanel} options={pushed} />
+            <Stack.Screen name="new-task" dangerouslySingular options={pushed} />
             <Stack.Screen name="pair" dangerouslySingular options={{ presentation: "modal" }} />
             <Stack.Screen name="settings" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [1] }} />
             <Stack.Screen name="filter" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: "fitToContents" }} />

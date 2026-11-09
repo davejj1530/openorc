@@ -9,7 +9,7 @@ const words = (message: string) => `shaped: ${message}`;
 const macWords = (message: string) => remoteError(message, roots);
 const phoneAddress = (url: string) => shapeAddress(url, roots);
 const shaping = (fake = words) => ({ words: fake, roots: () => roots });
-const context: GuardContext = { attachmentsDir: "/data/attachments", thread: (id) => (id === "gone" ? null : { team: false }) };
+const context: GuardContext = { attachmentsDir: "/data/attachments", thread: (id) => (id === "gone" ? null : { team: false }), task: () => null };
 const page = (overrides: Partial<Extract<PreviewState, { open: true }>> = {}): PreviewState => ({
   open: true,
   pane: "0123456789ab",

@@ -8,8 +8,9 @@ const outline = (sections: ThreadAction[][]) =>
   sections.map((section) => section.map((action) => (action.kind === "menu" ? `${action.label} ▸ ${action.actions.map((item) => item.label).join(", ")}` : action.label)));
 
 describe("a thread's menu on the phone", () => {
-  it("offers the desktop's organizing actions, and nothing that deletes, forks or moves", () => {
+  it("leads with New Subthread, then the desktop's organizing actions, and nothing that deletes, forks or moves", () => {
     expect(outline(threadMenu(thread("t-plan"), "row", wednesday))).toEqual([
+      ["New Subthread"],
       ["Pin", "Snooze ▸ In 1 hour, In 3 hours, This evening, Tomorrow morning, Next week", "Mark as Unread"],
       ["Rename…"],
       ["Resolve"],
@@ -19,14 +20,22 @@ describe("a thread's menu on the phone", () => {
   it("turns each action around for a pinned, unread, snoozed or resolved thread, with the pull request beside Rename", () => {
     const notes = { ...thread("t-headline"), unread: true, snoozedUntil: wednesday.getTime() + 60_000, archivedAt: 1 };
     expect(outline(threadMenu(notes, "row", wednesday))).toEqual([
+      ["New Subthread"],
       ["Unpin", "Snoozed ▸ In 1 hour, In 3 hours, This evening, Tomorrow morning, Next week, Wake Now", "Mark as Read"],
       ["Rename…", "Open Pull Request"],
       ["Reopen"],
     ]);
   });
 
-  it("leads with Rename in the thread's header", () => {
-    expect(outline(threadMenu(thread("t-settings"), "header", wednesday)).map((section) => section[0])).toEqual(["Rename…", "Pin", "Open Pull Request", "Resolve"]);
+  it("leads with Rename in the thread's header, with New Subthread after it", () => {
+    expect(outline(threadMenu(thread("t-settings"), "header", wednesday)).map((section) => section[0])).toEqual(["Rename…", "New Subthread", "Pin", "Open Pull Request", "Resolve"]);
+  });
+
+  it("starts a subthread under any thread but a team's, one that lives in the cloud, or an Orcling's", () => {
+    expect(threadMenu(thread("t-plan"), "row", wednesday)[0]).toEqual([{ kind: "screen", label: "New Subthread", icon: "square.and.pencil", pathname: "/new-subthread" }]);
+    for (const other of [{ teamInstanceId: "team-1" }, { owner: { brain: "cloud" as const, reach: "live" as const, heardAt: 1 } }, { orclingId: "orc-1" }]) {
+      for (const place of ["row", "header"] as const) expect(outline(threadMenu({ ...thread("t-plan"), ...other }, place, wednesday)).flat()).not.toContain("New Subthread");
+    }
   });
 
   it("puts Changes first in the header of a thread with Git, the uncommitted files beneath it, and keeps the rest in order", () => {
@@ -35,6 +44,18 @@ describe("a thread's menu on the phone", () => {
     expect(outline(menu)).toEqual([["Changes", "Rename…"], ...rest]);
     expect(menu[0]![0]).toEqual({ kind: "screen", label: "Changes", icon: expect.any(String), subtitle: "3 files", pathname: "/changes" });
     expect(threadMenu(thread("t-settings"), "header", wednesday, { uncommitted: 1, preview: null })[0]![0]).toMatchObject({ label: "Changes", subtitle: "1 file" });
+  });
+
+  it("leads a subthread back to its parent and lists a thread's subthreads in the header, after Rename", () => {
+    const child = { ...thread("t-settings"), parentThreadId: "t-plan" };
+    const menu = threadMenu(child, "header", wednesday, { uncommitted: null, preview: null, subthreads: 2 });
+    expect(outline(menu)[1]).toEqual(["New Subthread", "Open Parent Thread", "Subthreads"]);
+    expect(menu[1]).toEqual([
+      { kind: "screen", label: "New Subthread", icon: expect.any(String), pathname: "/new-subthread" },
+      { kind: "parent", label: "Open Parent Thread", icon: expect.any(String), threadId: "t-plan" },
+      { kind: "screen", label: "Subthreads", icon: expect.any(String), subtitle: "2", pathname: "/subthreads" },
+    ]);
+    expect(outline(threadMenu(thread("t-settings"), "header", wednesday)).flat()).not.toContain("Subthreads");
   });
 
   it("names no count under Changes when nothing waits to be committed", () => {
@@ -68,7 +89,7 @@ describe("a thread's menu on the phone", () => {
 
   it("offers Move to Cloud in the header after the pull request when the thread can move there, and never on a Home row", () => {
     const menu = outline(threadMenu(thread("t-settings"), "header", wednesday, { uncommitted: null, preview: null, toCloud: true }));
-    expect(menu[2]).toEqual(["Open Pull Request", "Move to Cloud"]);
+    expect(menu[3]).toEqual(["Open Pull Request", "Move to Cloud"]);
     const move = { kind: "screen", label: "Move to Cloud", icon: "icloud.and.arrow.up", pathname: "/move-to-cloud" };
     expect(threadMenu(thread("t-plan"), "header", wednesday, { uncommitted: null, preview: null, toCloud: true }).flat()).toContainEqual(move);
     expect(outline(threadMenu(thread("t-settings"), "header", wednesday)).flat()).not.toContain("Move to Cloud");
@@ -100,7 +121,7 @@ describe("a thread's menu on the phone", () => {
   });
 
   it("saves each change as the patch the phone may send", () => {
-    const [organize, , resolve] = threadMenu(thread("t-plan"), "row", wednesday);
+    const [, organize, , resolve] = threadMenu(thread("t-plan"), "row", wednesday);
     const snooze = organize![1]!;
     expect(organize![0]).toMatchObject({ patch: { pinned: true } });
     const inAnHour = snooze.kind === "menu" ? snooze.actions[0] : undefined;

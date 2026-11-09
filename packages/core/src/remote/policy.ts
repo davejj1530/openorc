@@ -26,6 +26,8 @@ export interface GuardContext {
   attachmentsDir: string;
   /** A thread as the guards need it, read synchronously; null when there is no such thread. */
   thread(id: string): { team: boolean; parentRelation?: Thread["parentRelation"] } | null;
+  /** A task's description as stored, read synchronously; null when there is no such task. */
+  task(id: string): { spec: string | null } | null;
 }
 
 /** Null admits; a string refuses with that message. Guards see params already parsed by the method's schema. */
@@ -41,6 +43,11 @@ const PHONE_THREAD_PATCH = new Set(["seen", "agent", "model", "effort", "fastMod
 /** A snooze from the phone wakes within this long. */
 const SNOOZE_HORIZON_MS = 366 * 24 * 60 * 60 * 1000;
 const TITLE_MAX = 200;
+/** What the phone's task screen changes: the title, status, priority, labels and description, never the workspace. */
+const PHONE_TASK_PATCH = new Set(["title", "spec", "status", "priority", "labels"]);
+const TASK_LABELS_MAX = 20;
+const TASK_LABEL_MAX = 50;
+const TASK_SPEC_MAX = 100_000;
 /** Control characters, line and paragraph breaks, and bidi overrides and isolates: a title goes into briefs, logs and notifications. */
 const TITLE_FORBIDDEN = /[\p{Cc}\p{Zl}\p{Zp}\u202A-\u202E\u2066-\u2069]/u;
 /** A commit message keeps tabs and line feeds, and nothing else that moves a terminal or reorders text. */
@@ -98,6 +105,45 @@ function threadUpdate({ patch }: RpcParams<"threads.update">): string | null {
   if (!Object.keys(patch).every((key) => PHONE_THREAD_PATCH.has(key))) return "Make this change on your Mac.";
   return phoneTitle(patch.title) ?? phoneSnooze(patch.snoozedUntil);
 }
+
+function taskLabels(labels: readonly string[] | undefined): string | null {
+  if (labels === undefined) return null;
+  const fits = labels.length <= TASK_LABELS_MAX && labels.every((label) => label.trim() && [...label].length <= TASK_LABEL_MAX && !TITLE_FORBIDDEN.test(label));
+  return fits ? null : `A task takes up to ${TASK_LABELS_MAX} labels of up to ${TASK_LABEL_MAX} characters each.`;
+}
+
+/**
+ * A phone reads a description with its secrets redacted, so a description it saves over one that holds a secret would
+ * lose the secret: that description is edited on the Mac.
+ */
+function plainSpec(spec: string | null | undefined): string | null {
+  if (spec === undefined || spec === null) return null;
+  return [...spec].length > TASK_SPEC_MAX || MESSAGE_FORBIDDEN.test(spec) ? `A description must be plain text of up to ${TASK_SPEC_MAX.toLocaleString("en-US")} characters.` : null;
+}
+
+function taskSpec(id: string, spec: string | null | undefined, { task }: GuardContext): string | null {
+  if (spec === undefined) return null;
+  if (plainSpec(spec)) return plainSpec(spec);
+  const stored = task(id)?.spec;
+  return stored && redact(stored).redacted ? "This description holds a secret, so edit it on your Mac." : null;
+}
+
+/** What the phone's New task screen sends: a project, title, description, priority and labels, and whether it works in a worktree. */
+const PHONE_TASK_CREATE = new Set(["projectId", "title", "spec", "priority", "labels", "useWorktree"]);
+
+/** A task a phone saves: on its own in a project, never under a thread, from a branch or in a folder the phone names. */
+function taskCreate(params: RpcParams<"tasks.create">): string | null {
+  if (!Object.keys(params).every((key) => PHONE_TASK_CREATE.has(key))) return "Make this change on your Mac.";
+  return phoneTitle(params.title) ?? taskLabels(params.labels) ?? plainSpec(params.spec);
+}
+
+function taskUpdate({ id, patch }: RpcParams<"tasks.update">, context: GuardContext): string | null {
+  if (!Object.keys(patch).every((key) => PHONE_TASK_PATCH.has(key))) return "Make this change on your Mac.";
+  return phoneTitle(patch.title) ?? taskLabels(patch.labels) ?? taskSpec(id, patch.spec, context);
+}
+
+/** A task as a phone reads it: a worktree's path names the Mac's folders, and a description may hold a token. */
+const phoneTask = <T extends RpcResults["tasks.update"] | null>(task: T): T => (task ? { ...task, worktreePath: null, spec: task.spec === null ? null : redact(task.spec).text } : task);
 
 const NOT_FROM_PHONE = "This is not available from a phone.";
 
@@ -173,6 +219,10 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   "review.createThreadPr": (params, context) => teamWork(params.threadId, context) ?? prTitle(params.title) ?? prBody(params.body),
   // One page's state; the handler answers closed for a missing or retired thread.
   "preview.state": allow,
+  // Reads one task by id, saves a new one and edits what its screen shows; starting, moving or deleting one stays on the Mac.
+  "tasks.get": allow,
+  "tasks.create": taskCreate,
+  "tasks.update": taskUpdate,
   // Faces, names and their own conversations' state; the reply leaves the rest of each Orcling on the Mac.
   "orclings.chats": allow,
   "orclings.profile": allow,
@@ -259,6 +309,9 @@ export const remoteReplies: { [M in RemoteMethod]: Reply<M> } = {
   "review.pushThread": same,
   "review.createThreadPr": same,
   "preview.state": (state, context) => previewReply(state, context),
+  "tasks.get": phoneTask,
+  "tasks.create": phoneTask,
+  "tasks.update": phoneTask,
   "orclings.chats": same,
   // Instructions and memories are text that may hold a token.
   "orclings.profile": (profile) => ({

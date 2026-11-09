@@ -1,5 +1,5 @@
 import { relativeTime } from "@openorc/client";
-import type { BoardTask, TaskBoard, TaskStatus } from "@openorc/protocol";
+import type { BoardTask, TaskBoard, TaskPriority, TaskStatus } from "@openorc/protocol";
 
 /** A host the phone reads tasks from: the shown one (`host` null) or its partner, by its id here. */
 export interface BoardHost {
@@ -41,6 +41,19 @@ export const boardStatus: Record<TaskStatus, string> = {
   done: "Done",
   archived: "Archived",
 };
+
+/** A group's heading may say more than its status's short name, as the desktop's task list does. */
+export const boardGroup: Record<TaskStatus, string> = { ...boardStatus, review: "Ready for review" };
+
+export const boardPriority: Record<TaskPriority, string> = { none: "No priority", low: "Low priority", medium: "Medium priority", high: "High priority", urgent: "Urgent" };
+
+/** The desktop task list's group order: work under way first, then what waits on the person, then the rest. */
+const GROUP_ORDER: readonly TaskStatus[] = ["in_progress", "review", "proposed", "backlog", "done", "archived"];
+
+/** A host's tasks by status, in the list's group order, each group keeping the host's order; empty groups left out. */
+export function boardGroups(tasks: readonly BoardTask[]): { status: TaskStatus; tasks: BoardTask[] }[] {
+  return GROUP_ORDER.map((status) => ({ status, tasks: tasks.filter((task) => task.status === status) })).filter((group) => group.tasks.length > 0);
+}
 
 /** Why a task from the brain's copy of the Mac's list does nothing here, said when the person presses it. */
 export const MAC_NEEDED = "This task is on your Mac, which is asleep.";

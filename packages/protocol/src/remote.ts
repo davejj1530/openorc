@@ -56,6 +56,12 @@ export const REMOTE_METHODS = [
   "review.createThreadPr",
   // Whether the Mac shows a page for a thread, its address and title shaped. Frames come only to a session watching it.
   "preview.state",
+  // One task: its title, status, spec and the conversations it belongs to; never its worktree's path on the Mac. A new
+  // one is saved in a project, and its title, status, priority, labels and spec are edited as the Mac's task document
+  // edits them.
+  "tasks.get",
+  "tasks.create",
+  "tasks.update",
   // Orclings by face, name and their own conversation's state, and tapbacks in that conversation. One Orcling's profile
   // (model, permission, check-ins, current instructions and memories, text redacted) and its check-in times. Its earlier
   // instructions stay on the Mac, as do creating, renaming, redrawing and rewriting one.

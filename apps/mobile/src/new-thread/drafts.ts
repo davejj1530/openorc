@@ -1,4 +1,4 @@
-import { PermissionPreset } from "@openorc/protocol";
+import { PermissionPreset, type ThreadSummary } from "@openorc/protocol";
 import { useCallback, useState } from "react";
 import { shownMacId, storage, useHostClient } from "../client";
 import { decodeSheetDraft, type SheetDraft } from "./new-thread-state";
@@ -6,6 +6,7 @@ import { decodeSheetDraft, type SheetDraft } from "./new-thread-state";
 const draftKey = (projectId: string) => `newthread.${shownMacId() ?? "none"}.${projectId}`;
 const projectKey = () => `newthread.${shownMacId() ?? "none"}.project`;
 const permissionKey = () => `newthread.${shownMacId() ?? "none"}.permission`;
+const subthreadKey = (parentId: string) => `newsubthread.${shownMacId() ?? "none"}.${parentId}`;
 
 function read(projectId: string): SheetDraft {
   try {
@@ -58,4 +59,36 @@ export function rememberedProject(): string | null {
 
 export function rememberProject(projectId: string): void {
   storage.set(projectKey(), projectId);
+}
+
+type Parent = Pick<ThreadSummary, "id" | "projectId" | "agent" | "model" | "effort" | "fastMode" | "mode" | "claudeAccountId">;
+
+/** A subthread's draft before anything is chosen: its parent's model, mode and account, as the desktop starts one. */
+function parentDraft(parent: Parent): SheetDraft {
+  const choice = parent.model ? { agent: parent.agent, model: parent.model, effort: parent.effort, fastMode: parent.fastMode } : null;
+  return { ...decodeSheetDraft(parent.projectId, null), target: { kind: "model", choice }, mode: parent.mode, ...(parent.claudeAccountId ? { claudeAccountId: parent.claudeAccountId } : {}) };
+}
+
+function readSubthread(parent: Parent): SheetDraft {
+  try {
+    const saved: unknown = JSON.parse(storage.getString(subthreadKey(parent.id)) ?? "null");
+    return saved === null ? parentDraft(parent) : decodeSheetDraft(parent.projectId, saved);
+  } catch {
+    return parentDraft(parent);
+  }
+}
+
+/** A thread's next subthread, kept on the phone per Mac and parent as the person writes and chooses, as a new thread's is. */
+export function useSubthreadDraft(parent: Parent): [SheetDraft, (update: (draft: SheetDraft) => SheetDraft) => void] {
+  const [draft, setDraft] = useState(() => readSubthread(parent));
+  const update = useCallback(
+    (change: (draft: SheetDraft) => SheetDraft) => {
+      // The saved draft is the one to change: a start or an image can land after the screen has closed.
+      const next = change(readSubthread(parent));
+      storage.set(subthreadKey(parent.id), JSON.stringify(next));
+      setDraft(next);
+    },
+    [parent],
+  );
+  return [draft, update];
 }

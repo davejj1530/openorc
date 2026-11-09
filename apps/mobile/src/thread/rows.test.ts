@@ -379,6 +379,27 @@ describe("transcriptRows", () => {
     expect(rows.find((row) => row.kind === "head")).toMatchObject({ live: true, writing: false });
   });
 
+  it("puts the work after an answered question below its card, where the newest step stays in view", () => {
+    const { frame } = runStore();
+    const run = frame(
+      { type: "session.started", agent: "opencode", externalSessionId: "s", model: "m", tools: [] },
+      { type: "turn.started", turnId: "t1" },
+      { type: "message.completed", messageId: "ask", role: "user", text: "Fix it" },
+      { type: "tool.started", toolCallId: "ls", name: "shell", input: { command: "ls" }, parentToolCallId: null },
+      { type: "tool.completed", toolCallId: "ls", name: "shell", output: "a", isError: false, status: "success", input: { command: "ls" } },
+      { type: "approval.requested", approvalId: "q", kind: "user_input", input: { questions: [{ id: "how", question: "Fix it now?" }] } },
+      { type: "approval.resolved", approvalId: "q", decision: "allow", answers: { how: ["Yes"] } },
+      { type: "tool.started", toolCallId: "test", name: "shell", input: { command: "pnpm test" }, parentToolCallId: null },
+    );
+    const rows = transcriptRows(run.blocks, activity(run), "r", emptyRowMemo());
+    expect(outline(rows)).toEqual(["prompt", "head", "work", "card:approval-q", ":1", "presence"].map((key) => expect.stringContaining(key)));
+    const works = rows.filter((row) => row.kind === "work");
+    expect(works.map((row) => [row.live, row.work.map((block) => block.id)])).toEqual([
+      [false, [expect.stringContaining("ls")]],
+      [true, [expect.stringContaining("test")]],
+    ]);
+  });
+
   it("names the question cards still waiting for an answer, so the list keeps what the reader typed", () => {
     const { frame } = runStore();
     frame(...finishedTurn);

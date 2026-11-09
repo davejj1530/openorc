@@ -20,16 +20,21 @@ import "./settings-skills.css";
 type SkillList = UseQueryResult<AgentSkill[]>;
 
 function agentOptions(agents: readonly HarnessId[], lists: Partial<Record<HarnessId, SkillList>>) {
-  return agents.map((id) => ({
-    value: id,
-    label: (
-      <>
-        <HarnessLogo id={id} size={14} />
-        {harnessCatalog[id].name}
-        {lists[id]?.data ? <span className="skills-agent-count">{lists[id].data.length}</span> : null}
-      </>
-    ),
-  }));
+  return agents.map((id) => {
+    const count = lists[id]?.data?.length;
+    const name = harnessCatalog[id].name;
+    const title = count === undefined ? name : `${name}, ${count} ${count === 1 ? "skill" : "skills"}`;
+    return {
+      value: id,
+      title,
+      label: (
+        <>
+          <HarnessLogo id={id} size={14} />
+          <span className="sr-only">{title}</span>
+        </>
+      ),
+    };
+  });
 }
 
 function ProjectChoice({ projects, projectId, error, onProject }: { projects: Project[] | undefined; projectId: string; error: boolean; onProject: (id: string) => void }) {
@@ -93,7 +98,7 @@ export function SkillsSettings({ active }: { active: boolean }) {
   return (
     <div className="skills-page">
       <SectionActions active={active}>
-        {agent ? <Segmented label="Agent" value={agent} options={agentOptions(enabled, lists)} onChange={setAgent} /> : null}
+        {agent ? <Segmented className="skills-agents" label="Agent" value={agent} options={agentOptions(enabled, lists)} onChange={setAgent} /> : null}
         <IconButton aria-label="Refresh skills" disabled={refreshing || !enabled.length} onClick={() => enabled.forEach((id) => void lists[id]?.refetch())}>
           <RefreshCw size={14} />
         </IconButton>

@@ -25,9 +25,15 @@ it("asks Xcode for the sandbox push environment its own signing gives, and build
   expect(plugins).toContain("@bacons/apple-targets");
 });
 
+// An Orcling's text shows as a message with its face, which iOS allows an app that declares messages and has the capability.
+it("may show an Orcling's text as a message from it", () => {
+  expect(ios.entitlements).toEqual({ "com.apple.developer.usernotifications.communication": true });
+  expect((ios.infoPlist as Record<string, unknown>).NSUserActivityTypes).toEqual(["INSendMessageIntent"]);
+});
+
 // The app's keys stay in its default group; only the extension names that group, so it can read them.
 it("lets only the extension read the app's Keychain group", () => {
-  expect(ios.entitlements).toBeUndefined();
+  expect(ios.entitlements).not.toHaveProperty("keychain-access-groups");
   expect(target).toEqual({
     type: "notification-service",
     name: "NotificationService",

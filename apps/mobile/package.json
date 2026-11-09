@@ -74,6 +74,7 @@
     "jsdom": "^26.1.0",
     "postcss": "^8.5.0",
     "svg-path-bbox": "^2.1.0",
+    "svgpath": "2.6.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.0",
     "vitest": "^4.1.11",

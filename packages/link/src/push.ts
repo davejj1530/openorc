@@ -1,4 +1,4 @@
-import { pushGroups, type NotifyKind } from "@openorc/protocol";
+import { pushGroups, type NotifyKind, type OrclingLook } from "@openorc/protocol";
 import { concat, fromBase64Url, fromUtf8, toBase64Url, utf8 } from "./bytes.js";
 import { anyText, shape, type Check } from "./checks.js";
 import { TAG_BYTES, type KeyPair, type LinkCrypto } from "./crypto.js";
@@ -79,6 +79,28 @@ const kind: Check = (value) => value === "test" || (typeof value === "string" &&
 const threadId: Check = (value) => value === null || typeof value === "string";
 const notice = shape({ id: anyText, kind, threadId, title: anyText, body: anyText }, { approval: shape({ runId: anyText, approvalId: anyText }) });
 const isNotice = (value: unknown): value is PushNotice => notice(value);
+
+/**
+ * An Orcling's look, for an alert from its chat: sealed with the notice's key beside it as `f`, under its own
+ * associated data, so neither can stand in for the other. An opener that knows no faces never reads it.
+ */
+const faceData = (macId: string) => utf8(`${LABEL}.face.${macId}`);
+
+export function sealFace(crypto: LinkCrypto, seal: Uint8Array, macPublic: Uint8Array, look: OrclingLook, nonce = crypto.randomBytes(NONCE_BYTES)): PushEnvelope {
+  const m = toBase64Url(macPublic);
+  return { v: PUSH_VERSION, m, n: toBase64Url(nonce), c: toBase64Url(crypto.seal(seal, nonce, faceData(m), utf8(JSON.stringify(look)))) };
+}
+
+/** The look sealed beside an alert; null when it fails to authenticate or parse. */
+export function openFace(crypto: LinkCrypto, seal: Uint8Array, envelope: PushEnvelope): OrclingLook | null {
+  if (envelope.v !== PUSH_VERSION) return null;
+  try {
+    const plaintext = crypto.open(seal, fromBase64Url(envelope.n), faceData(envelope.m), fromBase64Url(envelope.c));
+    return plaintext ? (JSON.parse(fromUtf8(plaintext)) as OrclingLook) : null;
+  } catch {
+    return null;
+  }
+}
 
 /** Null when anything fails to authenticate or parse, or the version is unknown. */
 export function openPush(crypto: LinkCrypto, seal: Uint8Array, envelope: PushEnvelope): PushNotice | null {

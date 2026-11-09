@@ -1,4 +1,4 @@
-import { fromBase64Url, pushKeys, sealPush, type PushEnvelope, type PushNotice } from "@openorc/link";
+import { fromBase64Url, pushKeys, sealFace, sealPush, type PushEnvelope, type PushNotice } from "@openorc/link";
 import { nodeCrypto } from "@openorc/link/node";
 import vectorFile from "@openorc/link/test-fixtures/push-vectors.json" with { type: "json" };
 import { execFileSync } from "node:child_process";
@@ -8,7 +8,7 @@ import { join, resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 
 const target = resolve(import.meta.dirname, "../../targets/notification-service");
-const sources = [join(target, "PushOpener.swift"), join(target, "NotificationService.swift"), resolve(import.meta.dirname, "main.swift")];
+const sources = ["PushOpener.swift", "NotificationService.swift", "OrclingFace.swift", "OrclingArt.swift"].map((file) => join(target, file)).concat(resolve(import.meta.dirname, "main.swift"));
 
 type Key = "found" | "missing" | "locked";
 interface Shown {
@@ -20,6 +20,7 @@ interface Shown {
   categoryIdentifier: string;
   userInfo: Record<string, unknown>;
   asked: string[];
+  face?: { bodyColor: string; center: string; corner: string };
 }
 
 const mac = nodeCrypto.keyPairFromPrivate(fromBase64Url(vectorFile.mac.privateKey));
@@ -32,7 +33,7 @@ const unopenable = { tampered: "tampered ciphertext", "another Mac": "another Ma
 
 let binary: string;
 
-function show(cases: { name: string; userInfo: unknown; key: Key }[]): Map<string, Shown> {
+function show(cases: { name: string; userInfo: unknown; key: Key; facePath?: string }[]): Map<string, Shown> {
   const input = { phoneKey: vectorFile.phone.privateKey, cases: cases.map((item) => ({ ...item, userInfo: JSON.stringify(item.userInfo) })) };
   const shown = JSON.parse(execFileSync(binary, { input: JSON.stringify(input) }).toString("utf8")) as Shown[];
   return new Map(shown.map((item) => [item.name, item]));
@@ -83,6 +84,22 @@ describe.runIf(process.platform === "darwin")("the notification service extensio
     expect(shown.get("vector")).toMatchObject({ title: "Launch �", body: "Shipped �", threadIdentifier: "thread-5" });
     expect(shown.get("cut reply")).toMatchObject({ title: "Release �", body: `${"a".repeat(139)}�`, threadIdentifier: "thread-5" });
     expect(shown.get("cut reply")!.userInfo).toMatchObject({ body: { macId, id: "cut", kind: "finished", threadId: "thread-5" } });
+  });
+
+  it("opens an Orcling's face sealed beside its text and draws it, and shows none that another key sealed", () => {
+    const look = { shape: 1, eyes: 2, texture: 0, glasses: 0, accessory: 0, bodyColor: "#ec7ba8", eyeColor: "#1b1c20" };
+    const seal = pushKeys(nodeCrypto, mac, phonePublic, "mac").seal;
+    const text = sealed({ id: "pip", kind: "finished", threadId: "thread-9", title: "Pip", body: "the build went green" });
+    const facePath = join(tmpdir(), "openorc-orcling-face.png");
+    const shown = show([
+      { name: "face", userInfo: { ...outer(text), f: sealFace(nodeCrypto, seal, mac.publicKey, look) }, key: "found", facePath },
+      { name: "forged face", userInfo: { ...outer(text), f: sealFace(nodeCrypto, nodeCrypto.randomBytes(32), mac.publicKey, look) }, key: "found" },
+      { name: "no face", userInfo: outer(text), key: "found" },
+    ]);
+    // The body's color under the eyes, and a clear corner outside the circle.
+    expect(shown.get("face")).toMatchObject({ title: "Pip", body: "the build went green", face: { bodyColor: "#ec7ba8", center: "#ec7ba8ff", corner: "#00000000" } });
+    expect(shown.get("forged face")!.face).toBeUndefined();
+    expect(shown.get("no face")!.face).toBeUndefined();
   });
 
   it("offers Allow and Deny only on an approval that carries both ids", () => {

@@ -532,6 +532,9 @@ importers:
       svg-path-bbox:
         specifier: ^2.1.0
         version: 2.1.0
+      svgpath:
+        specifier: 2.6.0
+        version: 2.6.0
       tailwindcss:
         specifier: ^4.3.3
         version: 4.3.3

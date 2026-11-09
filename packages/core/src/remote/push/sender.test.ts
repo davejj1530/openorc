@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Db, projects, threads, remoteDevices, remotePushTargets } from "@openorc/db";
-import { collapseId, openPush, pushKeys, type KeyPair, type PushEnvelope } from "@openorc/link";
+import { Db, orclings, projects, threads, remoteDevices, remotePushTargets } from "@openorc/db";
+import { collapseId, openFace, openPush, pushKeys, type KeyPair, type PushEnvelope } from "@openorc/link";
 import { nodeCrypto } from "@openorc/link/node";
-import type { PushAlerts, PushEnvironment, RemotePush } from "@openorc/protocol";
+import { DEFAULT_CLAUDE_ACCOUNT, defaultOrclingLook, type PushAlerts, type PushEnvironment, type RemotePush } from "@openorc/protocol";
 import type { PushDelivery, PushOutcome, PushRoute } from "./route.js";
 import { PushSender } from "./sender.js";
 
@@ -69,7 +69,7 @@ function notice(patch: Partial<Notice> = {}): Notice {
   return { type: "notify", id: "notice-1", kind: "finished", threadId: "thread-1", taskId: null, title: "Fix the login bug", body: "Done. The tests pass.", ...patch };
 }
 
-const payloadOf = (delivery: PushDelivery) => JSON.parse(delivery.payload) as { aps: Record<string, unknown>; o: PushEnvelope };
+const payloadOf = (delivery: PushDelivery) => JSON.parse(delivery.payload) as { aps: Record<string, unknown>; o: PushEnvelope; f?: PushEnvelope };
 const sealKey = (to: Phone) => pushKeys(nodeCrypto, to.keys, mac.publicKey, "phone").seal;
 const open = (delivery: PushDelivery, to: Phone) => openPush(nodeCrypto, sealKey(to), payloadOf(delivery).o);
 const sentTo = (to: Phone) => route.sent.filter((delivery) => delivery.token === to.token);
@@ -168,6 +168,31 @@ describe("the push sender", () => {
     await send(notice({ kind: "finished" }));
     await send(notice({ kind: "approval", runId: "r", approvalId: "a" }));
     expect(sentTo(to).map((delivery) => delivery.priority)).toEqual([5]);
+  });
+
+  it("rings an Orcling's text while the Mac is in use, as a person's would, and holds back a thread's outcome", async () => {
+    const to = phone();
+    inUse = async () => true;
+    projects.insert(db, { name: "Workspace", rootPath: "/tmp/workspace", gitRemote: null, defaultBranch: null, settings: {} });
+    const project = projects.list(db)[0]!.id;
+    const home = threads.insert(db, { projectId: project, title: "Pip", agent: "codex", model: "fixture", mode: "act", permissionMode: "autonomous" });
+    const pip = orclings.insert(db, {
+      id: "pip",
+      draft: { name: "Pip", look: defaultOrclingLook, settings: { agent: "codex", model: "fixture", effort: null, fastMode: false }, permission: "allow", claudeAccountId: DEFAULT_CLAUDE_ACCOUNT },
+      threadId: home.id,
+    });
+    const work = threads.insert(db, { projectId: project, title: "Fix the login bug", agent: "codex", model: "fixture", mode: "act", permissionMode: "autonomous" });
+    await send(notice({ threadId: work.id }));
+    await send(notice({ id: "notice-2", threadId: pip.threadId, title: "Pip", body: "the build went green" }));
+    const sent = sentTo(to);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.priority).toBe(10);
+    expect(open(sent[0]!, to)).toMatchObject({ threadId: pip.threadId, title: "Pip" });
+    // The face rides beside the notice, sealed for this phone alone; a thread's alert carries none.
+    expect(openFace(nodeCrypto, sealKey(to), payloadOf(sent[0]!).f!)).toEqual(defaultOrclingLook);
+    inUse = async () => false;
+    await send(notice({ id: "notice-3", threadId: work.id }));
+    expect(payloadOf(sentTo(to).at(-1)!).f).toBeUndefined();
   });
 
   it("reads the Mac as away when presence is slower than 250 ms or fails", async () => {

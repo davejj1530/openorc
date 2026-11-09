@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { fromBase64Url, toBase64Url, utf8 } from "./bytes.js";
 import type { KeyPair, LinkCrypto } from "./crypto.js";
 import { nodeCrypto } from "./node.js";
-import { collapseId, openPush, pushKeys, sealPush, type PushEnvelope, type PushNotice } from "./push.js";
+import { collapseId, openFace, openPush, pushKeys, sealFace, sealPush, type PushEnvelope, type PushNotice } from "./push.js";
 import { nobleCrypto } from "./test-fixtures/noble-crypto.js";
 import vectorFile from "./test-fixtures/push-vectors.json" with { type: "json" };
 
@@ -130,6 +130,15 @@ describe.each([
     expect(first.m).toBe(toBase64Url(mac.publicKey));
     expect(openPush(phoneCrypto, phoneKeys.seal, first)).toEqual(notice);
     expect(openPush(phoneCrypto, phoneKeys.seal, second)).toEqual(notice);
+  });
+
+  it("seal an Orcling's face beside a notice, which only a face opener takes and a notice opener refuses", () => {
+    const look = { shape: 4, eyes: 1, texture: 2, glasses: 1, accessory: 5, bodyColor: "#ec7ba8", eyeColor: "#1b1c20" };
+    const face = sealFace(macCrypto, macKeys.seal, mac.publicKey, look);
+    expect(openFace(phoneCrypto, phoneKeys.seal, face)).toEqual(look);
+    expect(openPush(phoneCrypto, phoneKeys.seal, face)).toBeNull();
+    expect(openFace(phoneCrypto, phoneKeys.seal, sealPush(macCrypto, macKeys.seal, mac.publicKey, goodNotices[0]!.notice))).toBeNull();
+    expect(openFace(phoneCrypto, new Uint8Array(32), face)).toBeNull();
   });
 
   it("seal half an emoji as U+FFFD, in any field, so no reader meets a lone surrogate", () => {

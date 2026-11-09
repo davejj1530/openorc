@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { remotePushTargets, threads, type Db, type PushRecipient } from "@openorc/db";
-import { collapseId, pushKeys, sealPush, type KeyPair, type PushNotice } from "@openorc/link";
+import { orclingGroups, orclings, remotePushTargets, threads, type Db, type PushRecipient } from "@openorc/db";
+import { collapseId, pushKeys, sealFace, sealPush, type KeyPair, type PushNotice } from "@openorc/link";
 import { nodeCrypto } from "@openorc/link/node";
-import type { PushEnvironment, PushRefusal, RemotePush, RemoteRpcResults } from "@openorc/protocol";
+import type { OrclingLook, PushEnvironment, PushRefusal, RemotePush, RemoteRpcResults } from "@openorc/protocol";
 import type { Logger } from "../../transport.js";
 import { fitPayload, type AlertHost } from "./payload.js";
 import { groupOf, planAlert, QUIET_WINDOW_MS, type AlertGroup, type AlertPlan } from "./plan.js";
@@ -136,7 +136,19 @@ export class PushSender {
     if (epoch !== this.epoch) return;
     const route = await this.deps.route();
     if (!route || remotePushTargets.count(this.deps.db) === 0) return;
-    await this.fanOut(route, notice, mac, await macInUse(this.deps.presence), epoch);
+    await this.fanOut(route, notice, mac, await macInUse(this.deps.presence), epoch, this.sender(notice));
+  }
+
+  /**
+   * Who texted, when the notice is an Orcling's turn in its own chat (its look, for the face the phone draws) or in a
+   * group chat (no one face); null for any other notice. A text rings as a person's would.
+   */
+  private sender(notice: PushNotice): { look: OrclingLook | null } | null {
+    const { threadId } = notice;
+    if (notice.kind !== "finished" || threadId === null) return null;
+    const own = orclings.forThread(this.deps.db, threadId);
+    if (own) return { look: own.look };
+    return orclingGroups.get(this.deps.db, threadId) ? { look: null } : null;
   }
 
   /**
@@ -144,7 +156,8 @@ export class PushSender {
    * take a while, so each row is read again just before its alert is sealed: a phone removed or turned off meanwhile
    * gets nothing, and one that registered again gets what it asked for last. A ring counts once APNs took it.
    */
-  private async fanOut(route: PushRoute, notice: PushNotice, mac: KeyPair, inUse: boolean, epoch: number): Promise<Sent[]> {
+  private async fanOut(route: PushRoute, notice: PushNotice, mac: KeyPair, inUse: boolean, epoch: number, from: { look: OrclingLook | null } | null = null): Promise<Sent[]> {
+    const texted = from !== null;
     const now = this.now();
     for (const [key, ring] of this.lastRing) if (now - ring.at >= QUIET_WINDOW_MS) this.lastRing.delete(key);
     const outcomes: Sent[] = [];
@@ -153,18 +166,18 @@ export class PushSender {
       const recipient = remotePushTargets.recipient(this.deps.db, deviceId);
       if (!recipient) continue;
       const ringKey = `${recipient.deviceId}\n${notice.threadId}`;
-      const plan = planAlert(notice, recipient, { macInUse: inUse, lastRing: this.lastRing.get(ringKey) ?? null, now });
+      const plan = planAlert({ ...notice, texted }, recipient, { macInUse: inUse, lastRing: this.lastRing.get(ringKey) ?? null, now });
       if (!plan) continue;
-      const outcome = await this.sendTo(route, notice, recipient, mac, plan);
+      const outcome = await this.sendTo(route, notice, recipient, mac, plan, from?.look ?? null);
       if (!outcome) continue;
       outcomes.push({ outcome, environment: recipient.environment });
-      if (outcome.kind === "sent" && plan.kind === "ring" && notice.kind !== "test") this.lastRing.set(ringKey, { at: this.now(), group: groupOf(notice.kind) });
+      if (outcome.kind === "sent" && plan.kind === "ring" && notice.kind !== "test") this.lastRing.set(ringKey, { at: this.now(), group: groupOf(notice.kind, texted) });
     }
     return outcomes;
   }
 
-  private async sendTo(route: PushRoute, notice: PushNotice, recipient: PushRecipient, mac: KeyPair, plan: AlertPlan): Promise<PushOutcome | null> {
-    const delivery = this.delivery(notice, recipient, mac, plan);
+  private async sendTo(route: PushRoute, notice: PushNotice, recipient: PushRecipient, mac: KeyPair, plan: AlertPlan, look: OrclingLook | null): Promise<PushOutcome | null> {
+    const delivery = this.delivery(notice, recipient, mac, plan, look);
     if (!delivery) {
       this.deps.log.warn("A phone alert was too large to send.");
       return null;
@@ -174,9 +187,10 @@ export class PushSender {
     return outcome;
   }
 
-  private delivery(notice: PushNotice, recipient: PushRecipient, mac: KeyPair, plan: AlertPlan): PushDelivery | null {
+  private delivery(notice: PushNotice, recipient: PushRecipient, mac: KeyPair, plan: AlertPlan, look: OrclingLook | null): PushDelivery | null {
     const keys = pushKeys(nodeCrypto, mac, recipient.publicKey, "mac");
-    const payload = fitPayload(notice, plan, (fitted) => sealPush(nodeCrypto, keys.seal, mac.publicKey, fitted), this.deps.host);
+    const face = look ? sealFace(nodeCrypto, keys.seal, mac.publicKey, look) : null;
+    const payload = fitPayload(notice, plan, (fitted) => sealPush(nodeCrypto, keys.seal, mac.publicKey, fitted), this.deps.host, face);
     if (!payload) return null;
     const priority = plan.kind === "ring" ? 10 : 5;
     return {

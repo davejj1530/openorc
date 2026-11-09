@@ -104,6 +104,8 @@ export interface ComposerProps {
   hasStarted?: boolean;
   /** Uncommitted changes, shown as the Commit chip over the composer's left edge. */
   changes?: ComposerChanges | null;
+  /** Status and recovery controls below the Commit chip and above the writing surface; an empty slot takes no room. */
+  notices?: ReactNode;
   busy?: boolean;
   disabledReason?: string | null;
   /** A saved task can start from its spec without an additional message. */
@@ -239,6 +241,7 @@ export function Composer(props: ComposerProps) {
   return (
     <div className={cn("composer min-w-0", props.size === "lg" && "composer-large", isNewThread && "composer-new-thread")}>
       {isNewThread ? null : <ComposerChangesBar changes={props.changes} />}
+      <div className="mb-2 grid grid-cols-1 gap-2 empty:hidden">{props.notices}</div>
       {interrupt.error || files.error || submission?.error || props.error ? (
         <div role="alert" className="composer-alert">
           {interrupt.error ? `Couldn’t stop the agent. ${interrupt.error.message}` : files.error || submission?.error || props.error}

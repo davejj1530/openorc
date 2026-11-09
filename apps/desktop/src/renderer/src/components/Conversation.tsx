@@ -13,19 +13,7 @@ import {
   RESTART_PROMPT,
   type SubmitRequest,
 } from "@openorc/client";
-import {
-  WORKSPACE_ID,
-  defaultHarnessId,
-  executionMode,
-  forkUnavailable,
-  harnessShortName,
-  isSubagentThread,
-  type Project,
-  type Run,
-  type Task,
-  type ThreadSummary,
-  type WorkspaceMode,
-} from "@openorc/protocol";
+import { WORKSPACE_ID, executionMode, forkUnavailable, harnessShortName, isSubagentThread, type Project, type Run, type Task, type ThreadSummary, type WorkspaceMode } from "@openorc/protocol";
 import { useCallback, useState, type ComponentProps, type ReactNode } from "react";
 import { useConversationSettings, useConversationTranscript, useRpc, useRpcMutation, useSubmit } from "../lib/client";
 import { useThreadAccounts } from "../lib/use-thread-accounts";
@@ -45,13 +33,11 @@ import { useConnectorMentions } from "../lib/connector-mentions";
 import { useSkillCommands } from "../lib/skill-commands";
 import { ConversationVoice, useRunVoices } from "../lib/turn-authors";
 import { useTurnFooters } from "../lib/turn-footers";
-import { BackgroundCommands } from "./BackgroundCommands";
 import { useCloudSignInGate } from "./CloudSignInOffer";
-import { CloudPreparing, CloudStart, queueAfterStart } from "./CloudStart";
+import { CloudPreparing, CloudStart } from "./CloudStart";
 import { Composer, type SlashCommand } from "./Composer";
 import { ComposerChoice } from "./ComposerChoice";
 import { GitBranch, Laptop } from "./icons";
-import { MessageQueue } from "./MessageQueue";
 import { SessionRecovery } from "./SessionRecovery";
 import { SubagentConversation } from "./SubagentConversation";
 import { ThreadMoveCard } from "./ThreadMoveCard";
@@ -60,6 +46,7 @@ import { TurnChangesProvider, useTurnFooter } from "./TurnFooter";
 import { Button, Empty } from "./ui";
 import { useOrclingConversation } from "./useOrclingConversation";
 import { useOptimisticSend } from "./useOptimisticSend";
+import { useThreadControls } from "./useThreadControls";
 
 export type ConversationScope = { kind: "task"; task: Task } | { kind: "thread"; thread: ThreadSummary };
 
@@ -171,9 +158,6 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const { prompt, setPrompt, clearDraft, error: draftError } = useConversationDraft({ draftKey, threadId: thread?.id ?? null, initialText: thread?.draft ?? "" });
   const submitter = useSubmit();
   const [sends, setSends] = useState(0);
-  const unqueue = useRpcMutation("threads.unqueue");
-  const sendQueued = useRpcMutation("threads.sendQueued");
-  const stopCommand = useRpcMutation("threads.stopCommand");
   const compact = useRpcMutation("threads.compact");
   const fork = useRpcMutation("threads.fork");
   const forkThread = fork.mutate;
@@ -185,6 +169,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const { live, working, generatingImage } = conversationActivity({ thread, activeRun, liveTranscript, compacting: compact.isPending });
   const { sameAgent, settingsPending, canSteer } = processFit({ live, activeRun, choice, mode, permission, compacting: compact.isPending });
   const steerReason = conversationSteerReason({ canSteer, compacting: compact.isPending, settingsPending, sameAgent, agent: activeRun?.agent });
+  const controls = useThreadControls(thread, runs.length, { canSteer, reason: steerReason, onSent: () => setSends((count) => count + 1) });
   const sendDisabledReason = conversationSendDisabledReason({ permissionReady, historyLoading: runsQuery.isLoading, historyFailed: Boolean(runsQuery.error), hasModel: Boolean(choice), thread });
   const turnFooter = useTurnFooter({ footers, threadId, working });
   const switching = Boolean(thread && choice && runs.length > 0 && !runs.some((r) => r.agent === choice.agent));
@@ -271,7 +256,6 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
               onRemove={(messageId) => unqueue.mutate({ id: thread.id, messageId })}
             />
           ) : null}
-          {thread ? <BackgroundCommands commands={thread.backgroundCommands ?? []} pending={stopCommand.isPending} onStop={(commandId) => stopCommand.mutate({ id: thread.id, commandId })} /> : null}
           {thread?.session && !working ? (
             <SessionRecovery thread={thread} disabled={!choice || optimistic.busy} onRestart={() => void restart().catch(() => {})} onContinueWith={(id) => void continueWith(id).catch(() => {})} />
           ) : null}
@@ -301,6 +285,29 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
             location={location}
             hasStarted={thread?.hasStarted ?? (runs.length > 0 || Boolean(thread?.forkedAtRunId))}
             changes={composerChanges}
+            notices={
+              <>
+                <ThreadMoveCard thread={thread} />
+                <CloudPreparing thread={preparingCloud(thread, runs.length)} />
+                {controls.queue}
+                {controls.commands}
+                {thread?.session && !working ? (
+                  <SessionRecovery
+                    thread={thread}
+                    disabled={!choice || optimistic.busy}
+                    onRestart={() => void restart().catch(() => {})}
+                    onContinueWith={(id) => void continueWith(id).catch(() => {})}
+                  />
+                ) : null}
+                {signIn.offer}
+                <SwitchingNote agent={switching && choice ? choice.agent : null} />
+                {settingsPending && activeRun && thread && activeRun.mode === "act" && permission === "autonomous" && activeRun.permissionMode !== permission ? (
+                  <div role="status" className="text-xs text-ink-3 px-1">
+                    {settings.error ? "Could not apply Autonomous. Select it again to retry." : "Applying Autonomous to the current turn…"}
+                  </div>
+                ) : null}
+              </>
+            }
             busy={optimistic.busy}
             allowEmpty={firstTaskRun}
             disabledReason={sendDisabledReason}
@@ -319,7 +326,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
             onCommandsWanted={skills.onCommandsWanted}
             commandsNotice={skills.commandsNotice}
             {...connectorMentions}
-            error={(submitter.error ?? sendQueued.error ?? stopCommand.error ?? compact.error ?? unqueue.error ?? fork.error ?? settings.error ?? draftError)?.message ?? permissionError}
+            error={(submitter.error ?? controls.error ?? compact.error ?? fork.error ?? settings.error ?? draftError)?.message ?? permissionError}
           >
             {firstTaskRun && scope.kind === "task" ? (
               <ComposerChoice

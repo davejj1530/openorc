@@ -266,7 +266,6 @@ function NewThreadProject({
                   <div className="new-thread-changes empty:hidden">
                     <ComposerCommitChip changes={composerChanges} />
                   </div>
-                  <div className="mb-2 empty:hidden">{signIn.offer}</div>
                   <Composer
                     draftKey={`newthread.${projectId}.attachments`}
                     autoFocus
@@ -276,6 +275,7 @@ function NewThreadProject({
                     placeholder="Ask OpenOrc to build, fix bugs, explore"
                     size="lg"
                     presentation="new-thread"
+                    notices={signIn.offer}
                     model={choice}
                     onModel={chooseModel}
                     modelControl={

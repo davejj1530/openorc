@@ -20,7 +20,7 @@ vi.mock("./Composer", async (original) => ({
   ...(await original<object>()),
   Composer: (props: ComposerProps) => {
     composer.props = props;
-    return null;
+    return props.notices;
   },
 }));
 vi.mock("./AgentOrb", () => ({ AgentOrb: () => null }));

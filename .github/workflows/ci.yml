@@ -22,17 +22,18 @@ jobs:
     # Keep the existing required-check name while the work runs in parallel.
     name: Typecheck, test, build
     runs-on: ubuntu-24.04
-    needs: [quality, core-tests, linux]
+    needs: [quality, core-tests, linux, linux-tests, linux-core-tests]
     if: always()
     steps:
       - name: Require all checks and test shards to pass
         env:
-          QUALITY_RESULT: ${{ needs.quality.result }}
-          CORE_TESTS_RESULT: ${{ needs.core-tests.result }}
-          LINUX_RESULT: ${{ needs.linux.result }}
+          RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
-          [[ "$QUALITY_RESULT" == "success" && "$CORE_TESTS_RESULT" == "success" && "$LINUX_RESULT" == "success" ]]
+          for result in $RESULTS; do
+            if [[ "$result" != "success" ]]; then echo "::error::A required job ended as $result"; exit 1; fi
+          done
 
+  # Typecheck, lint and the format check read the same sources on every system, so Linux runs them once.
   quality:
     name: Typecheck, build and workspace tests
     runs-on: macos-15
@@ -47,11 +48,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check:size
       - run: node --test scripts/size-limit.test.cjs
-      - run: pnpm -r typecheck
-      - run: pnpm format:check
       - run: node --test scripts/distribution-notices.test.cjs scripts/desktop-release.test.cjs scripts/packaged-native-target.test.cjs scripts/packaged-runtime-dependencies.test.cjs
-      # Core has its own shards; keep every other workspace's test script here.
-      - run: pnpm -r --filter '!@openorc/core' test
+      # Core has its own shards; keep every other workspace's test script here. Tests need no build order, so every
+      # workspace starts at once instead of waiting for the ones it depends on.
+      - run: pnpm -r --no-sort --filter '!@openorc/core' test
         env:
           GIT_AUTHOR_NAME: ci
           GIT_AUTHOR_EMAIL: ci@openorc.local
@@ -110,7 +110,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
 
   linux:
-    name: Linux typecheck, lint, test and build
+    name: Linux typecheck, lint and build
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -127,16 +127,54 @@ jobs:
       - run: pnpm lint
         env:
           NODE_OPTIONS: --max-old-space-size=8192
+      - run: pnpm format:check
       - run: node --test scripts/distribution-notices.test.cjs scripts/desktop-release.test.cjs scripts/packaged-native-target.test.cjs scripts/packaged-runtime-dependencies.test.cjs
-      - run: pnpm -r test
+      - run: pnpm build
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+  # Linux runs the whole suite too, split like macOS: Linux runners are plentiful where macOS runners are not.
+  linux-tests:
+    name: Linux workspace tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r --no-sort --filter '!@openorc/core' test
         env:
           GIT_AUTHOR_NAME: ci
           GIT_AUTHOR_EMAIL: ci@openorc.local
           GIT_COMMITTER_NAME: ci
           GIT_COMMITTER_EMAIL: ci@openorc.local
-      - run: pnpm build
+
+  linux-core-tests:
+    name: Linux core tests (${{ matrix.shard }}/3)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @openorc/core test --shard=${{ matrix.shard }}/3
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GIT_AUTHOR_NAME: ci
+          GIT_AUTHOR_EMAIL: ci@openorc.local
+          GIT_COMMITTER_NAME: ci
+          GIT_COMMITTER_EMAIL: ci@openorc.local
 
   bench:
     name: Bridge benchmark

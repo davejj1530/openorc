@@ -19,7 +19,7 @@ import ThreadHeader from "./ThreadHeader.astro";
 import ThreadPane from "./ThreadPane.astro";
 import TurnHead from "./TurnHead.astro";
 import { busy, workflow, workflowJourney } from "../../data/hero/workflow";
-import { branches, models, otherThreads, project } from "../../data/hero/workspace";
+import { branches, models, project } from "../../data/hero/workspace";
 import { flagged, timed } from "../../data/hero/timeline";
 
 interface Props {
@@ -35,7 +35,6 @@ const rows = [
   { id: "b", title: work.title, branch: branches.cacheThread, busy: busy.b, headline: work.headline, show: ">bStart" },
 ];
 const codex = { harness: "codex", label: models.codex.label, effort: models.codex.effort };
-const starters = ["Explore this project", "Plan a change", "Review my changes"];
 const options = [
   { name: task.mentions.codex, harness: "Codex" },
   { name: task.mentions.claude, harness: "Claude Code" },
@@ -59,11 +58,6 @@ const comments = [
           <div class="hs-new-question">What should we work on in <span class="hs-new-project">{project.name}</span>?</div>
           <Composer journey={workflowJourney} layout="new" placeholder="Ask OpenOrc to build, fix bugs, explore" model={codex} permission={models.codex.permission} prompt={{ text: thread.prompt, typo: thread.typo, window: "typeStart~typeEnd", typed: "typeStart~aSend" }} />
           <div class="hs-new-location"><ProductIcon name="branch" />Works in the local checkout on {project.branch}<ProductIcon name="chevronDown" /></div>
-          <div class="hs-starters">{starters.map((starter) => <span class="hs-button hs-button-sm">{starter}</span>)}</div>
-          <section class="hs-recent">
-            <div class="hs-recent-label">Pick up where you left off</div>
-            {otherThreads.map((recent) => <div class="hs-recent-row"><span class="hs-recent-title">{recent.title}</span><span class="hs-recent-meta">just now</span></div>)}
-          </section>
         </div>
       </div>
     </section>

@@ -17,8 +17,8 @@ let settings: Partial<RpcResults["app.settings.get"]>;
 let offer: RpcResults["cloud.offer"] | undefined;
 let signIns: CloudSignIns;
 const mutated: [string, unknown][] = [];
-/** A project's reads held open by a test; any other project's are already in. */
-const arrivalReads: Record<string, Promise<unknown>> = {};
+/** A project's git read held open by a test; any other project's is already in. */
+const gitReads: Record<string, Promise<unknown>> = {};
 
 vi.mock("../lib/client", async (original) => ({
   ...(await original<object>()),
@@ -47,10 +47,9 @@ vi.mock("../lib/client", async (original) => ({
 vi.mock("../lib/rpc", () => ({ core: { call: async (method: string) => (method === "cloud.signIns" ? signIns : null), onReady: () => () => {}, onPush: () => () => {} } }));
 vi.mock("../lib/skill-commands", () => ({ projectScope: () => null, useSkillCommands: () => ({ commands: [], onCommandsWanted: () => {} }) }));
 vi.mock("../lib/composer-changes", () => ({ useComposerChanges: () => null }));
-vi.mock("../components/NewThreadActivity", () => ({
-  useArrivalActivity: () => ({ any: false }),
-  NewThreadRecent: () => null,
-  loadArrivalActivity: (id: string) => arrivalReads[id] ?? Promise.resolve(),
+vi.mock("../lib/project-git", async (original) => ({
+  ...(await original<object>()),
+  loadProjectGit: (id: string) => gitReads[id] ?? Promise.resolve(),
 }));
 vi.mock("../components/NewThreadMascot", () => ({ NewThreadMascot: () => null }));
 vi.mock("../components/Panel", () => ({ Panel: () => null }));
@@ -223,7 +222,7 @@ describe("NewThread", () => {
   it("lands on the last project chosen when an earlier switch is still reading", async () => {
     projects = ["p1", "p2", "p3"].map(makeProject);
     let finishP2Reads = () => {};
-    arrivalReads.p2 = new Promise<void>((resolve) => (finishP2Reads = resolve));
+    gitReads.p2 = new Promise<void>((resolve) => (finishP2Reads = resolve));
     useLayout.setState({ workspace: "p1" });
     render(<NewThread projectId="p1" />);
     fireEvent.click(screen.getByRole("button", { name: "Project: p1" }));
@@ -234,7 +233,7 @@ describe("NewThread", () => {
     await act(async () => finishP2Reads());
     expect(screen.getByRole("button", { name: "Project: p3" })).toBeTruthy();
     expect(useLayout.getState().workspace).toBe("p3");
-    delete arrivalReads.p2;
+    delete gitReads.p2;
   });
 
   it("starts in the project the sidebar's filter focuses, and follows the filter while open", async () => {
@@ -311,29 +310,6 @@ describe("NewThread", () => {
     fireEvent.keyDown(message, { key: "Enter", code: "Enter" });
     expect(start).not.toHaveBeenCalled();
   });
-});
-
-it("prepares a starter as an editable plan without starting a run", () => {
-  saveModelDraft("p1", "");
-  render(<NewThread projectId="p1" />);
-  fireEvent.click(screen.getByRole("button", { name: "Explore this project" }));
-  const message = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" });
-  expect(message.value).toContain("Walk me through this project");
-  expect(document.activeElement).toBe(message);
-  expect(screen.queryByRole("group", { name: "Suggested prompts" })).toBeNull();
-  expect(readNewThreadDraft("p1").mode).toBe("plan");
-  expect(start).not.toHaveBeenCalled();
-  fireEvent.change(message, { target: { value: "Explore just the renderer" } });
-  expect(readNewThreadDraft("p1").prompt).toBe("Explore just the renderer");
-});
-
-it("offers starters only for an empty draft", () => {
-  saveModelDraft("p1", "Keep my current request");
-  render(<NewThread projectId="p1" />);
-  expect(screen.queryByRole("group", { name: "Suggested prompts" })).toBeNull();
-  fireEvent.change(screen.getByRole("textbox", { name: "Message" }), { target: { value: "" } });
-  expect(screen.getByRole("button", { name: "Explore this project" })).toBeTruthy();
-  expect(start).not.toHaveBeenCalled();
 });
 
 it("keeps a chosen third Claude account in the draft and sends it when starting", async () => {

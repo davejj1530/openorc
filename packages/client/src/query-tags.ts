@@ -86,6 +86,8 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "agents.updates.get": ["agent-updates"],
   "providers.usage": ["provider-usage", "system", "settings"],
   "usage.history": ["usage-history"],
+  // A turn ends with its thread's activity changing, which every thread read already follows.
+  "projects.activity": ["threads"],
   // Not "settings": a palette changed on the Mac must not start its CLIs again for a phone.
   "providers.limits": ["provider-usage", "claude-accounts", "system"],
   "agents.models": ["models"],

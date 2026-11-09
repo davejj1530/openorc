@@ -2,7 +2,9 @@ import type { ModelChoice } from "@openorc/client";
 import { executionMode, type Thread } from "@openorc/protocol";
 import { useEffect, useRef, useState } from "react";
 import { Composer } from "../components/Composer";
+import { DitherBackdrop } from "../components/DitherBackdrop";
 import { ComposerModelPicker, ModelPicker } from "../components/ModelPicker";
+import { ProjectActivity } from "../components/ProjectActivity";
 import { TopBar } from "../components/TopBar";
 import { Button } from "../components/ui";
 import { ClaudeAccountScope } from "../lib/claude-account";
@@ -84,6 +86,7 @@ function SubthreadComposer({ parent }: { parent: Thread }) {
       <main className="workspace-main well flex flex-1 flex-col min-w-0 min-h-0">
         <TopBar>{null}</TopBar>
         <div className="new-thread-body flex-1 min-h-0 overflow-y-auto">
+          <DitherBackdrop />
           <div className="new-thread-column">
             <h1 className="new-thread-question">
               What should we work on under{" "}
@@ -123,6 +126,7 @@ function SubthreadComposer({ parent }: { parent: Thread }) {
               error={start.error?.message ?? null}
             />
           </div>
+          <ProjectActivity projectId={parent.projectId} />
         </div>
       </main>
     </ClaudeAccountScope>

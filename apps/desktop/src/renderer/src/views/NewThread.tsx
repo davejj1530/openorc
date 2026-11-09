@@ -17,9 +17,8 @@ import { ComposerCommitChip } from "../components/ComposerCommitChip";
 import { FolderGit2 } from "../components/icons";
 import { type PickerAccounts } from "../components/ModelPickerAccounts";
 import { ComposerModelPicker, ModelPicker, type ModelChoice, type OrclingPickerChoices } from "../components/ModelPicker";
-import { loadArrivalActivity, NewThreadRecent, useArrivalActivity } from "../components/NewThreadActivity";
 import { NewThreadOptions } from "../components/NewThreadOptions";
-import { NewThreadStarters } from "../components/NewThreadStarters";
+import { loadProjectActivity, ProjectActivity } from "../components/ProjectActivity";
 import { Panel } from "../components/Panel";
 import { NewThreadQuestion } from "../components/ProjectPicker";
 import { DitherBackdrop } from "../components/DitherBackdrop";
@@ -76,12 +75,12 @@ export function NewThread({ projectId }: { projectId?: string }) {
     if (projects.data && project !== WORKSPACE_ID && !projects.data.some((each) => each.id === project)) chooseProject(WORKSPACE_ID);
   }, [project, projects.data]);
   // Choosing a project in the question brings a focused sidebar filter along. The screen swaps in place once the
-  // project's recent threads and git state are read, so its sections never blink out and back.
+  // project's git state and activity are read, so the Commit chip, location and activity never blink out and back.
   const switching = useRef(0);
   useEffect(() => () => void switching.current++, []);
   const switchProject = (id: string) => {
     const turn = ++switching.current;
-    const reads = Promise.all([loadArrivalActivity(id), loadProjectGit(id)]);
+    const reads = Promise.all([loadProjectGit(id), loadProjectActivity(id)]);
     void Promise.race([reads, new Promise((resolve) => setTimeout(resolve, SWITCH_READS_MS))])
       .catch(() => undefined)
       .then(() => {
@@ -159,12 +158,10 @@ function NewThreadProject({
   const models = useRpc("agents.models", { claudeAccountId }, { staleTime: 5 * 60_000 });
   const settings = useRpc("app.settings.get", {});
   const defaultHarness = useDefaultHarness();
-  const activity = useArrivalActivity();
   const [storageError, setStorageError] = useState<string | null>(null);
   const { permission, select: setPermission, error: permissionError, ready: permissionReady } = usePermissionSelection();
   const start = useRpcMutation("threads.start");
   const mounted = useRef(true);
-  const composer = useRef<HTMLDivElement>(null);
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -252,7 +249,7 @@ function NewThreadProject({
         </TopBar>
         <div className="new-thread-body flex-1 min-h-0 overflow-y-auto">
           <DitherBackdrop />
-          <div ref={composer} className="new-thread-column">
+          <div className="new-thread-column">
             {projects?.length === 0 ? (
               <div className="new-thread-empty">
                 Import a project to start.
@@ -321,17 +318,8 @@ function NewThreadProject({
                 ) : null}
               </>
             )}
-            {selected && !isWorkspace && !draft.prompt.trim() ? (
-              <NewThreadStarters
-                disabled={start.isPending}
-                onStart={(prompt) => {
-                  changeDraft({ prompt, mode: "plan" });
-                  composer.current?.querySelector<HTMLTextAreaElement>(".composer-input")?.focus();
-                }}
-              />
-            ) : null}
-            {activity.any ? <NewThreadRecent activity={activity} /> : null}
           </div>
+          <ProjectActivity projectId={projectId} />
         </div>
       </main>
       {panelContext ? <Panel context={panelContext} /> : null}

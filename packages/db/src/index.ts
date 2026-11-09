@@ -10,6 +10,7 @@ export { redact, redactJson, redactValue, type RedactResult, type RedactValueRes
 export { audit, comments, projects, runs, snapshots, tasks, threads, type ReviewCommentScope, type TaskPatch, type ThreadInsert, type ThreadListFilter, type ThreadPatch } from "./repos.js";
 export { runCosts } from "./run-costs.js";
 export { usageHistory } from "./usage-history.js";
+export { projectActivity } from "./project-activity.js";
 export { scheduleFirings, schedules, type SchedulePatch } from "./schedules.js";
 export { messages } from "./search.js";
 export { subagents, type SubagentRecord } from "./subagents.js";

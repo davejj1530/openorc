@@ -1507,7 +1507,7 @@
   padding: 0 calc(12 * var(--u)) 0 calc(6 * var(--u));
 }
 
-/* The new-thread page (NewThread.tsx): the question, the large composer, where it works, starters and recent work. */
+/* The new-thread page (NewThread.tsx): the question, the large composer and where it works. */
 .hs-new-body {
   display: flex;
   flex: 1;
@@ -1581,48 +1581,6 @@
   width: calc(12 * var(--u));
   height: calc(12 * var(--u));
 }
-.hs-starters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: calc(6 * var(--u));
-  padding: 0 calc(2 * var(--u));
-}
-.hs-starters .hs-button {
-  background: var(--hs-fill);
-  color: var(--hs-muted);
-}
-.hs-recent {
-  margin-top: calc(26 * var(--u));
-}
-.hs-recent-label {
-  padding: 0 calc(12 * var(--u)) calc(8 * var(--u));
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
-  line-height: calc(16 * var(--u));
-}
-.hs-recent-row {
-  display: flex;
-  align-items: center;
-  gap: calc(10 * var(--u));
-  height: calc(42 * var(--u));
-  padding: 0 calc(12 * var(--u));
-  line-height: calc(16 * var(--u));
-}
-.hs-recent-row + .hs-recent-row {
-  margin-top: calc(2 * var(--u));
-}
-.hs-recent-title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.hs-recent-meta {
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
-}
-
 /* A Markdown table in a reply, as Streamdown renders it with the app's overrides. */
 .hs-table-wrap {
   margin: calc(16 * var(--u)) 0;

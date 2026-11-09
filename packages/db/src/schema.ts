@@ -23,7 +23,7 @@ import { pullRequestReviewMigration } from "./pull-review-schema.js";
 import { orclingAccountMigration, orclingCompanionMigration, orclingMigration } from "./orcling-schema.js";
 import { remoteDeviceMigration } from "./remote-device-schema.js";
 import { remotePushTargetMigration } from "./remote-push-target-schema.js";
-import { cloudWorkspaceMigration, cloudWorkspaceRemovedMigration } from "./cloud-workspace-schema.js";
+import { cloudWorkspaceMigration, cloudWorkspaceMirrorHeadMigration, cloudWorkspaceRemovedMigration } from "./cloud-workspace-schema.js";
 import { startedByAgentMigration, subagentMigration, subagentIdentityMigration, subagentObservationMigration } from "./subagent-schema.js";
 import { cloudBrainMigrations } from "./cloud-brain-schema.js";
 import { usageHistoryMigration } from "./usage-history-schema.js";
@@ -784,8 +784,7 @@ export const migrations: Migration[] = [
   remotePushTargetMigration,
   orclingAccountMigration,
   cloudWorkspaceMigration,
-  /** The commit a cloud conversation's worktree was on after its last sync, so commits made on the Mac reach the sandbox. */
-  `ALTER TABLE cloud_workspaces ADD COLUMN mirror_head TEXT;`,
+  cloudWorkspaceMirrorHeadMigration,
   cloudWorkspaceRemovedMigration,
   subagentMigration,
   subagentIdentityMigration,
@@ -796,4 +795,6 @@ export const migrations: Migration[] = [
   `CREATE INDEX events_usage_history ON events(ts, id) WHERE kind IN ('turn.completed', 'usage.updated');`,
   usageHistoryMigration,
   orclingCompanionMigration,
+  /** A project's steps by day, for the new thread screen, read from this index alone rather than from every event. */
+  `CREATE INDEX events_steps ON events(run_id, ts) WHERE kind = 'tool.completed';`,
 ];

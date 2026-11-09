@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { UsageHistoryParams } from "./usage-history.js";
+import { ProjectActivityParams } from "./project-activity.js";
 import type { AgentUpdates } from "./agent-updates.js";
 import { ClaudeAccountId, claudeAccountRpcParams, type ClaudeAccountRpcResults } from "./claude-accounts.js";
 import { connectorRpcParams, type ConnectorRpcResults } from "./connectors.js";
@@ -126,6 +127,8 @@ export const rpcParams = {
   /** The Mac's plan limits for a phone: Codex, then each enabled Claude account. Takes nothing, so a phone cannot force a fresh read. */
   "providers.limits": z.object({}).strict(),
   "usage.history": UsageHistoryParams,
+  /** Turns finished per day in a project's own conversations, for the new thread screen. */
+  "projects.activity": ProjectActivityParams,
   "providers.codex.reset": z.object({ attemptId: z.string().uuid(), creditId: z.string().min(1).optional(), confirmationToken: z.string().min(1) }),
   /** Active threads by default; every project when none is named. Offset pages older threads in. */
   "threads.list": ThreadListParams,
@@ -581,6 +584,7 @@ export interface RpcResults
   "providers.usage": import("./provider-usage.js").ProviderUsage;
   "providers.limits": import("./provider-usage.js").PlanLimits[];
   "usage.history": import("./usage-history.js").UsageHistory;
+  "projects.activity": import("./project-activity.js").ProjectActivity;
   "providers.codex.reset": import("./provider-usage.js").ResetResult;
   "threads.list": ThreadSummary[];
   "threads.resolvedCount": number;

@@ -1,4 +1,15 @@
-import { createContext, forwardRef, useContext, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import {
+  createContext,
+  forwardRef,
+  useContext,
+  useState,
+  type ButtonHTMLAttributes,
+  type InputHTMLAttributes,
+  type ReactElement,
+  type ReactNode,
+  type SelectHTMLAttributes,
+  type TextareaHTMLAttributes,
+} from "react";
 import { Tooltip as BaseTooltip } from "@base-ui/react/tooltip";
 import { Dialog as BaseDialog } from "@base-ui/react/dialog";
 import { Check, X } from "./icons";
@@ -277,12 +288,15 @@ export function TooltipProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/** Names a control on hover, above it unless `side` says otherwise. Outside a TooltipProvider it keeps its own 400ms delay. */
-export function Tooltip({ label, side, children }: { label: ReactNode; side?: "top" | "right" | "bottom" | "left"; children: ReactNode }) {
+/**
+ * Names a control on hover, above it unless `side` says otherwise. It wraps the control in a span, or with `render` the
+ * given element is the trigger itself. Outside a TooltipProvider it keeps its own 400ms delay.
+ */
+export function Tooltip({ label, side, render, children }: { label: ReactNode; side?: "top" | "right" | "bottom" | "left"; render?: ReactElement; children: ReactNode }) {
   const grouped = useContext(TooltipGroup);
   const tooltip = (
     <BaseTooltip.Root>
-      <BaseTooltip.Trigger render={<span className="inline-flex" />}>{children}</BaseTooltip.Trigger>
+      <BaseTooltip.Trigger render={render ?? <span className="inline-flex" />}>{children}</BaseTooltip.Trigger>
       <BaseTooltip.Portal>
         <BaseTooltip.Positioner sideOffset={6} {...(side ? { side } : {})}>
           <BaseTooltip.Popup ref={floatingGround} className="tooltip-popup">

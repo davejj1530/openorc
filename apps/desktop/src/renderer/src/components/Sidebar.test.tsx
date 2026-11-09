@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { defaultOrclingLook, WORKSPACE_ID, type RpcParams, type ThreadSummary } from "@openorc/protocol";
 
 vi.hoisted(() => Object.assign(window, { openorc: { platform: "darwin" } }));
@@ -77,10 +77,13 @@ vi.mock("../lib/rpc", () => ({
   },
 }));
 vi.mock("../lib/browser-preview", () => ({ CoversPreview: () => null }));
-vi.mock("./ui", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("./ui")>()),
-  Tooltip: ({ children }: { children: ReactNode }) => children,
-}));
+vi.mock("./ui", async (importOriginal) => {
+  const { cloneElement } = await import("react");
+  return {
+    ...(await importOriginal<typeof import("./ui")>()),
+    Tooltip: ({ children, render }: { children: ReactNode; render?: ReactElement }) => (render ? cloneElement(render, undefined, children) : children),
+  };
+});
 
 import { ALL_WORKSPACES, useLayout } from "../lib/layout";
 import { useRouter } from "../lib/router";

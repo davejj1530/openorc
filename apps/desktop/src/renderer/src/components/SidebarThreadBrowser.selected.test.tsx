@@ -62,7 +62,7 @@ function thread(id: string, lastActivityAt: number, activity: ThreadSummary["act
 const set = (id: string, change: Partial<ThreadSummary>) => {
   host.threads = host.threads.map((each) => (each.id === id ? { ...each, ...change } : each));
 };
-const row = (title: string) => screen.getAllByRole("button").find((button) => button.getAttribute("title")?.startsWith(`${title}\n`));
+const row = (title: string) => screen.queryByText(title, { selector: ".thread-preview-title" })?.closest("button") ?? undefined;
 const working = (title: string) => Boolean(row(title) && within(row(title)!).queryByRole("img", { name: "Working" }));
 
 const mount = (threadId: string) => {

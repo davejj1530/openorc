@@ -28,6 +28,7 @@ import { ThreadRowHeadline, useRowHeadline } from "./ThreadHeadline";
 import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
 import { CircleCheck, CircleDashed, Cloud, Folder, GitBranch, GitMerge, GitPullRequest, GitPullRequestClosed, Globe, X } from "./icons";
 import { menuPopup } from "./menu";
+import { Tooltip } from "./ui";
 
 const placeIcons: Record<ThreadPlace["kind"], ReactNode> = {
   branch: <GitBranch size={11} className="shrink-0" />,
@@ -93,23 +94,35 @@ export function ThreadRow({ thread, active, project, compact = false }: { thread
   const mark = ownerMark(thread);
   return (
     <ContextMenu.Root>
-      <ContextMenu.Trigger
+      <Tooltip
+        side="right"
+        label={
+          <>
+            <span className="block">{thread.title}</span>
+            <span className="block text-ink-3">
+              {rowAbout(thread, place.label)} · {agentLabel} · {relativeTime(thread.lastActivityAt)}
+            </span>
+          </>
+        }
         render={
-          <button
-            draggable
-            onDragStart={(event) => startThreadDrag(event.dataTransfer, thread.id)}
-            onDragEnd={endThreadDrag}
-            onClick={(e) => {
-              if (e.metaKey || e.ctrlKey) addPane(thread.id);
-              else {
-                dismissCompactNavigation();
-                navigate({ view: "thread", threadId: thread.id });
-              }
-            }}
-            aria-current={active ? "page" : undefined}
-            data-open={open || undefined}
-            className={`sidebar-thread-row thread-preview no-drag${compact ? " sidebar-thread-child" : ""}`}
-            title={`${thread.title}\n${place.label} · ${agentLabel} · ${relativeTime(thread.lastActivityAt)}`}
+          <ContextMenu.Trigger
+            render={
+              <button
+                draggable
+                onDragStart={(event) => startThreadDrag(event.dataTransfer, thread.id)}
+                onDragEnd={endThreadDrag}
+                onClick={(e) => {
+                  if (e.metaKey || e.ctrlKey) addPane(thread.id);
+                  else {
+                    dismissCompactNavigation();
+                    navigate({ view: "thread", threadId: thread.id });
+                  }
+                }}
+                aria-current={active ? "page" : undefined}
+                data-open={open || undefined}
+                className={`sidebar-thread-row thread-preview no-drag${compact ? " sidebar-thread-child" : ""}`}
+              />
+            }
           />
         }
       >
@@ -147,7 +160,7 @@ export function ThreadRow({ thread, active, project, compact = false }: { thread
           )}
           <span className="thread-preview-date">{relativeTime(thread.lastActivityAt)}</span>
         </span>
-      </ContextMenu.Trigger>
+      </Tooltip>
       <ContextMenu.Portal>
         <CoversPreview />
         <ContextMenu.Positioner className="z-40" collisionPadding={8}>
@@ -158,6 +171,12 @@ export function ThreadRow({ thread, active, project, compact = false }: { thread
       </ContextMenu.Portal>
     </ContextMenu.Root>
   );
+}
+
+/** What a row's tooltip says it is: a subagent by the kind its agent started, any other thread by where it works. */
+function rowAbout(thread: ThreadSummary, place: string): string {
+  if (!thread.subagent) return place;
+  return thread.subagent.agentType ? `Subagent · ${thread.subagent.agentType}` : "Subagent";
 }
 
 /** How long one sweep of a working title takes; every working row sweeps on the same clock. */
@@ -216,7 +235,7 @@ function ProjectLine({ thread, project, trailing }: { thread: ThreadSummary; pro
   );
 }
 
-/** A sub thread's one line: its mark where the tree's line reaches it, its title, then its agent's kind and time. */
+/** A sub thread's one line: its mark where the tree's line reaches it, its title, then how long a subagent has been running. */
 function SubThreadLines({ thread }: { thread: ThreadSummary }) {
   return (
     <span className="thread-preview-heading">
@@ -224,20 +243,16 @@ function SubThreadLines({ thread }: { thread: ThreadSummary }) {
         <SidebarThreadMark thread={thread} pull />
       </span>
       <span className="thread-preview-title">{thread.title}</span>
-      {thread.subagent ? <SubagentRowMeta thread={thread} /> : null}
+      {thread.subagent ? <SubagentRunTime thread={thread} /> : null}
     </span>
   );
 }
 
-function SubagentRowMeta({ thread }: { thread: ThreadSummary }) {
+function SubagentRunTime({ thread }: { thread: ThreadSummary }) {
   const child = thread.subagent;
-  const now = useTicking(child?.status === "running");
-  return child ? (
-    <span className="sidebar-child-meta">
-      {child.agentType ? <span>{child.agentType}</span> : null}
-      {child.status === "running" ? <span className="tabular">{workDuration(now - child.startedAt)}</span> : null}
-    </span>
-  ) : null;
+  const running = child?.status === "running";
+  const now = useTicking(running);
+  return child && running ? <span className="sidebar-child-meta tabular">{workDuration(now - child.startedAt)}</span> : null;
 }
 
 /** What a thread needs from you, a sub thread's outcome, or at rest its pull request when no project line shows it. */

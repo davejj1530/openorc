@@ -50,17 +50,10 @@
   color: var(--ink);
 }
 .sidebar-child-meta {
-  display: flex;
-  gap: 6px;
   margin-left: auto;
   color: var(--ink-3);
   font-size: var(--text-xs);
   white-space: nowrap;
-}
-.sidebar-child-meta > span:first-child:not(.tabular) {
-  max-width: 60px;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .subagent-cards {
   background: var(--surface);

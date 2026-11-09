@@ -188,7 +188,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
     compacting: compact.isPending,
     waitForSave: settings.waitForSave,
   };
-  const optimistic = useOptimisticSend({ submitter, request, run: merged, attachmentsKey: `${draftKey}.attachments`, restore: setPrompt });
+  const optimistic = useOptimisticSend({ submitter, request, run: merged, attachmentsKey: `${draftKey}.attachments`, restore: setPrompt, route: orclings.route });
   const submit = async (text: string, attachments: string[], now: boolean) => {
     setSends((count) => count + 1);
     // A message to an Orcling goes to the Orcling, not to this conversation's agent.
@@ -240,32 +240,6 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
       <div className="flex-1 min-h-0 relative">{renderTranscript()}</div>
       <div className="composer-padding shrink-0 px-6 pb-6 pt-2">
         <div className="max-w-chat w-full min-w-0 mx-auto grid grid-cols-1 gap-2">
-          <ThreadMoveCard thread={thread} />
-          <CloudPreparing thread={preparingCloud(thread, runs.length)} />
-          {thread ? (
-            <MessageQueue
-              messages={queueAfterStart(thread, runs.length)}
-              canSend={canSteer}
-              pending={sendQueued.isPending || unqueue.isPending}
-              sendReason={steerReason}
-              agentName={harnessShortName(thread.agent ?? defaultHarnessId)}
-              onSend={(messageId) => {
-                setSends((count) => count + 1);
-                sendQueued.mutate({ id: thread.id, messageId });
-              }}
-              onRemove={(messageId) => unqueue.mutate({ id: thread.id, messageId })}
-            />
-          ) : null}
-          {thread?.session && !working ? (
-            <SessionRecovery thread={thread} disabled={!choice || optimistic.busy} onRestart={() => void restart().catch(() => {})} onContinueWith={(id) => void continueWith(id).catch(() => {})} />
-          ) : null}
-          {signIn.offer}
-          <SwitchingNote agent={switching && choice ? choice.agent : null} />
-          {settingsPending && activeRun && thread && activeRun.mode === "act" && permission === "autonomous" && activeRun.permissionMode !== permission ? (
-            <div role="status" className="text-xs text-ink-3 px-1">
-              {settings.error ? "Could not apply Autonomous. Select it again to retry." : "Applying Autonomous to the current turn…"}
-            </div>
-          ) : null}
           <Composer
             draftKey={`${draftKey}.attachments`}
             value={prompt}

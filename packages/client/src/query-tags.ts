@@ -117,6 +117,8 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "orclings.profile": ["orclings", "memory"],
   "orclings.instructions": ["orclings"],
   "orclings.memories": ["orclings", "memory"],
+  // A group's title is its thread's, and deleting the thread removes the group.
+  "orclings.groups.list": ["orclings", "orcling-groups", "threads"],
   // The Device panel's status and device list. The core invalidates "devices" whenever either changes.
   "devices.status": ["devices"],
   "devices.list": ["devices"],
@@ -162,6 +164,7 @@ const idReadTags: MethodRules = {
   ...each(["memory.list", "memory.search"], (p) => ["memory", `memory:${String(p["projectId"])}`]),
   "memory.forTask": (p) => ["memory", `memory:task:${String(p["taskId"])}`],
   "orclings.reactions": (p) => [`reactions:${String(p["threadId"])}`],
+  "orclings.origins": (p) => [`origins:${String(p["threadId"])}`, `thread:${String(p["threadId"])}`],
 };
 
 /**
@@ -234,6 +237,8 @@ const fixedInvalidations: Partial<Record<RpcMethod, readonly string[]>> = {
   "orclings.ask": ["threads"],
   "orclings.assign": ["orclings", "threads"],
   "orclings.wakes.save": ["orclings"],
+  "orclings.groups.create": ["orclings", "orcling-groups", "threads"],
+  "orclings.groups.delete": ["orcling-groups", "threads"],
   "remote.configure": ["remote"],
   "remote.pairing.begin": ["remote"],
   "remote.pairing.cancel": ["remote"],
@@ -253,6 +258,7 @@ function workspaceMutationTags(id: string): string[] {
 /** Writes whose effects follow the ids in their parameters. */
 const idInvalidations: MethodRules = {
   "orclings.react": (p) => [`reactions:${String(p["threadId"])}`],
+  "orclings.groups.send": (p) => ["threads", `thread:${String(p["threadId"])}`, `runs:thread:${String(p["threadId"])}`],
   ...each(["tasks.create", "tasks.update", "tasks.delete", "tasks.prepareWorkspace", "tasks.start", "tasks.openThread"], (p) => ["tasks", "inbox", "threads", taskTag(p)]),
   "threads.delete": (p) => ["threads", "tasks", "inbox", `thread:${String(p["id"])}`, `importable:${String(p["projectId"])}`],
   ...each(["threads.start", "threads.fork", "threads.import"], (p) => ["threads", "tasks", "inbox", `thread:${String(p["id"])}`, `importable:${String(p["projectId"])}`]),

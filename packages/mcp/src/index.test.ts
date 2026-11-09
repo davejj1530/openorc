@@ -310,6 +310,9 @@ void test("an Orcling's own conversation has its own tools instead of the genera
     startWork: answer,
     sendThread: answer,
     react: answer,
+    orclings: answer,
+    message: answer,
+    startGroup: answer,
   };
   const general = [
     "memory_search",
@@ -332,7 +335,8 @@ void test("an Orcling's own conversation has its own tools instead of the genera
     home.filter((name) => general.includes(name)),
     [],
   );
-  for (const name of ["ask_user", "orcling_project", "orcling_remember", "orcling_thread_start", "orcling_react"]) assert.ok(home.includes(name));
+  for (const name of ["ask_user", "orcling_project", "orcling_remember", "orcling_thread_start", "orcling_react", "orcling_orclings", "orcling_message", "orcling_group_start"])
+    assert.ok(home.includes(name));
   assert.deepEqual(
     general.filter((name) => elsewhere.includes(name)),
     general,

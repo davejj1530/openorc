@@ -176,11 +176,17 @@ export class ThreadMessageQueue {
   }
 
   /** Puts a message into the thread: on the live session when there is one, else on a run that resumes it. */
-  async deliver(thread: Thread, text: string, role: "user" | "system", attachments: string[] = [], { recordPrompt = true, unprompted = false } = {}): Promise<void> {
+  async deliver(
+    thread: Thread,
+    text: string,
+    role: "user" | "system",
+    attachments: string[] = [],
+    { recordPrompt = true, unprompted = false, messageId }: { recordPrompt?: boolean; unprompted?: boolean; messageId?: string } = {},
+  ): Promise<void> {
     this.rejectRetiredThread(thread.id);
     const live = this.runs.liveRunForThread(thread.id);
     if (live && live.agent === thread.agent) {
-      await this.runs.send(live.id, text, { role, attachments, recordPrompt, unprompted });
+      await this.runs.send(live.id, text, { role, attachments, recordPrompt, unprompted, messageId });
       return;
     }
     await this.continueThread(thread.id, {
@@ -195,18 +201,25 @@ export class ThreadMessageQueue {
       promptRole: role,
       recordPrompt,
       unprompted,
+      promptMessageId: messageId,
     });
   }
 
   /**
    * A message into a thread from the outside: another thread, or the user relaying between them. Unprompted, it is
-   * OpenOrc's own nudge, such as an Orcling waking up: the agent reads it, the transcript does not show it.
+   * OpenOrc's own: a nudge the agent reads and the transcript does not show, such as an Orcling waking up, or a message
+   * from another Orcling that the transcript shows under its own id. Either way the turn is quiet unless the agent answers.
    */
-  async send(id: string, text: string, from: Thread | null, unprompted = false): Promise<void> {
+  async send(
+    id: string,
+    text: string,
+    from: Thread | null,
+    { unprompted = false, record = !unprompted, messageId }: { unprompted?: boolean; record?: boolean; messageId?: string } = {},
+  ): Promise<void> {
     const thread = this.thread(id);
     if (thread.archivedAt) throw new Error("the thread is resolved");
     const body = from ? `Message from the thread "${from.title}" (id ${from.id}):\n\n${text}` : text;
-    await this.deliver(thread, body, "system", [], { recordPrompt: !unprompted, unprompted });
+    await this.deliver(thread, body, "system", [], { recordPrompt: record, unprompted, ...(messageId ? { messageId } : {}) });
     audit.record(this.db, { actor: messageActor(from, unprompted), action: "thread.message", resourceType: "thread", resourceId: id, metadata: { from: from?.id ?? null } });
   }
 }

@@ -73,3 +73,31 @@ CREATE TABLE message_reactions (
 );
 CREATE INDEX message_reactions_thread ON message_reactions(thread_id, created_at);
 `;
+
+/**
+ * Orclings talking to each other. A group is a Workspace conversation shared by the person and several Orclings, its
+ * members in the order they answer a message that names none of them. An Orcling's message into another conversation,
+ * a direct message into another Orcling's own chat or the words that open a group, remembers who sent it.
+ */
+export const orclingTalkMigration = `
+CREATE TABLE orcling_groups (
+ thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE,
+ created_by TEXT REFERENCES orclings(id) ON DELETE SET NULL,
+ created_at INTEGER NOT NULL
+);
+CREATE TABLE orcling_group_members (
+ thread_id TEXT NOT NULL REFERENCES orcling_groups(thread_id) ON DELETE CASCADE,
+ orcling_id TEXT NOT NULL REFERENCES orclings(id) ON DELETE CASCADE,
+ position INTEGER NOT NULL,
+ PRIMARY KEY(thread_id, orcling_id)
+);
+CREATE INDEX orcling_group_members_orcling ON orcling_group_members(orcling_id);
+CREATE TABLE orcling_messages (
+ message_id TEXT PRIMARY KEY,
+ thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+ from_orcling_id TEXT NOT NULL REFERENCES orclings(id) ON DELETE CASCADE,
+ to_orcling_id TEXT REFERENCES orclings(id) ON DELETE SET NULL,
+ created_at INTEGER NOT NULL
+);
+CREATE INDEX orcling_messages_thread ON orcling_messages(thread_id, created_at);
+`;

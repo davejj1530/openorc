@@ -2,11 +2,14 @@
    soft tint of its body color, so each Orcling's side of the chat is its own. Consecutive bubbles from one
    side sit 4px apart and close up their facing corners; a change of side leaves 14px. */
 .orcling-chat {
-  --orcling-fill: color-mix(in srgb, var(--orcling-tint) 14%, var(--surface));
   display: grid;
   gap: 14px;
 }
-.dark .orcling-chat {
+/* Each run of bubbles takes its own Orcling's tint, so a group reads by color as well as by face. */
+.orcling-run {
+  --orcling-fill: color-mix(in srgb, var(--orcling-tint) 14%, var(--surface));
+}
+.dark .orcling-run {
   --orcling-fill: color-mix(in srgb, var(--orcling-tint) 20%, var(--surface));
 }
 
@@ -39,9 +42,22 @@
   align-items: end;
 }
 .orcling-run-face {
+  grid-row: 2;
+  grid-column: 1;
   margin-bottom: 2px;
 }
+/* Who is speaking, above a run where more than one Orcling can speak: the bubbles' own inset, small and quiet. */
+.orcling-run-name {
+  grid-row: 1;
+  grid-column: 2;
+  padding: 0 14px 3px;
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
+  color: var(--ink-3);
+}
 .orcling-run-bubbles {
+  grid-row: 2;
+  grid-column: 2;
   display: grid;
   gap: 4px;
   justify-items: start;
@@ -154,8 +170,42 @@
   }
 }
 
-/* The person's tapbacks, floating just above the bubble under the pointer or focus, so they never take the bubble's
-   room. Fill changes only; nothing lifts. */
+/* The way into the tapbacks: a small round button beside the bubble, there while the bubble is pointed at or focused,
+   or while its tapbacks are open. Fill and ink change; nothing lifts. */
+.orcling-react-open {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 6px);
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  color: var(--ink-4);
+  translate: 0 -50%;
+  opacity: 0;
+  transition:
+    opacity var(--duration-quick) var(--ease-out),
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
+}
+.orcling-bubble-row:hover .orcling-react-open,
+.orcling-bubble-row:focus-within .orcling-react-open,
+.orcling-bubble-row[data-open] .orcling-react-open {
+  opacity: 1;
+}
+.orcling-react-open:hover,
+.orcling-bubble-row[data-open] .orcling-react-open {
+  color: var(--ink-2);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+.orcling-react-open:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* The person's tapbacks, a pill floating just above the bubble once its button opens them. They come out of a blur
+   and fold back into the bubble when one is chosen, on Escape, or on a press anywhere else. */
 .orcling-react-bar {
   position: absolute;
   bottom: calc(100% - 6px);
@@ -169,8 +219,8 @@
   box-shadow: 0 0 0 0.5px var(--line-strong);
   opacity: 0;
   filter: blur(4px);
-  scale: 0.94;
-  translate: 0 4px;
+  scale: 0.9;
+  translate: 0 6px;
   transform-origin: 24px 100%;
   pointer-events: none;
   transition:
@@ -179,25 +229,13 @@
     scale var(--duration-leave) var(--ease-out),
     translate var(--duration-leave) var(--ease-out);
 }
-.orcling-bubble-row:hover .orcling-react-bar,
-.orcling-bubble-row:focus-within .orcling-react-bar {
+.orcling-bubble-row[data-open] .orcling-react-bar {
   opacity: 1;
   filter: none;
   scale: 1;
   translate: 0 0;
   pointer-events: auto;
   transition-duration: var(--duration-arrive);
-}
-/* Once a tapback is chosen the bar folds back into the bubble, quicker than it came, and stays away until the
-   pointer leaves; the tapback itself lands on the bubble's corner. */
-.orcling-chat[data-hushed] .orcling-react-bar,
-.orcling-bubble-row[data-picked] .orcling-react-bar {
-  opacity: 0;
-  filter: blur(4px);
-  scale: 0.9;
-  translate: 0 6px;
-  pointer-events: none;
-  transition-duration: var(--duration-quick);
 }
 .orcling-react-choice {
   display: grid;
@@ -255,4 +293,46 @@
 }
 .sidebar-rail-orclings .sidebar-rail-mark {
   background: var(--bg);
+}
+
+/* A group's faces, overlapping by a third, each cut out of the ground with a ring of it. */
+.orcling-faces {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+}
+.orcling-faces-face {
+  border-radius: 30%;
+  box-shadow: 0 0 0 1.5px var(--bg);
+}
+.orcling-faces-face + .orcling-faces-face {
+  margin-left: calc(var(--face) / -3);
+}
+
+/* A group's two front faces in the list, in the same slot an Orcling's single face takes. */
+.orcling-contact-faces {
+  width: 24px;
+  justify-content: center;
+}
+.orcling-contact-faces .orcling-faces-face {
+  box-shadow: 0 0 0 1.5px var(--bg);
+}
+/* The composer's group faces sit where the model picker would, the bar's quiet weight. */
+.composer-orcling-faces {
+  padding: 0 6px;
+}
+/* One Orcling to choose for a new group: its face, its name, and its box at the row's end. */
+.orcling-group-choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  padding: 0 4px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+  color: var(--ink);
+  cursor: default;
+}
+.orcling-group-choice:hover {
+  background: var(--surface-2);
 }

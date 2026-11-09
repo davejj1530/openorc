@@ -5,7 +5,7 @@ import type { Project } from "@openorc/protocol";
 import { CoversPreview } from "../lib/browser-preview";
 import { useRpc } from "../lib/client";
 import { ALL_WORKSPACES, useLayout } from "../lib/layout";
-import { useOrclings } from "../lib/orclings";
+import { useOrclingChatIds } from "../lib/orclings";
 import { openProject } from "../lib/router";
 import { useUi } from "../lib/ui";
 import { floatingGround } from "../lib/use-anchor-ground";
@@ -24,7 +24,7 @@ import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
  * while it shows every project, so it costs nothing more there.
  */
 export function useWorkspaceMarks(projectIds: readonly string[], enabled: boolean): Map<string, WorkspaceMark> {
-  const homes = new Set(useOrclings().map((orcling) => orcling.threadId));
+  const homes = useOrclingChatIds();
   const now = useSidebarNow();
   const needsYou = useRpc(
     "threads.list",

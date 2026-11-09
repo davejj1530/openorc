@@ -100,6 +100,26 @@ export interface Orcling extends OrclingDraft {
   updatedAt: number;
 }
 
+/** A group chat: one Workspace conversation shared by the person and several Orclings. */
+export interface OrclingGroup {
+  threadId: string;
+  title: string;
+  /** Its Orclings, in the order they answer a message that names none of them. */
+  memberIds: string[];
+  createdAt: number;
+}
+
+/**
+ * A message one Orcling sent into another conversation: a direct message into another Orcling's own chat, or the
+ * words that opened a group chat. The conversation shows it as that Orcling's.
+ */
+export interface OrclingMessageOrigin {
+  messageId: string;
+  fromOrclingId: string;
+  /** The Orcling a direct message went to; null when it went to a group. */
+  toOrclingId: string | null;
+}
+
 /** A tapback on one bubble of a message in an Orcling's own conversation. */
 export const Reaction = z.enum(["heart", "like", "dislike", "haha", "wow", "sad"]);
 export type Reaction = z.infer<typeof Reaction>;
@@ -223,6 +243,15 @@ export const orclingRpcParams = {
   "orclings.reactions": z.object({ threadId: id }).strict(),
   /** Your tapback on one bubble of the Orcling's message, replacing your earlier one there; null takes it back. The Orcling hears it on its next turn. */
   "orclings.react": z.object({ threadId: id, runId: id, messageId: id, part: z.number().int().min(0), reaction: Reaction.nullable() }).strict(),
+  /** Which messages in a conversation came from another Orcling, and from whom. */
+  "orclings.origins": z.object({ threadId: id }).strict(),
+  "orclings.groups.list": z.object({}).strict(),
+  /** A group chat with these Orclings and you; without a title it is named after them. */
+  "orclings.groups.create": z.object({ memberIds: z.array(id).min(2).max(8), title: z.string().trim().min(1).max(60).optional() }).strict(),
+  /** Your message to a group: the Orclings it names answer, or every one of them when it names none. */
+  "orclings.groups.send": z.object({ threadId: id, text: z.string().min(1), attachments: z.array(z.string()).optional(), messageId: z.string().min(1).max(100).optional() }).strict(),
+  /** Removes a group chat and its history. Its Orclings and their own conversations stay. */
+  "orclings.groups.delete": z.object({ threadId: id }).strict(),
 };
 
 export interface OrclingRpcResults {
@@ -241,4 +270,9 @@ export interface OrclingRpcResults {
   "orclings.wakes.save": Orcling;
   "orclings.reactions": MessageReaction[];
   "orclings.react": null;
+  "orclings.origins": OrclingMessageOrigin[];
+  "orclings.groups.list": OrclingGroup[];
+  "orclings.groups.create": OrclingGroup;
+  "orclings.groups.send": null;
+  "orclings.groups.delete": null;
 }

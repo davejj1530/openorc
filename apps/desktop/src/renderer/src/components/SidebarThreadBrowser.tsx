@@ -26,7 +26,7 @@ import {
   useChildThreadPages,
   useSidebarNow,
 } from "@openorc/client";
-import { useOrclings } from "../lib/orclings";
+import { useOrclingChatIds } from "../lib/orclings";
 import { useRpc, useRpcs } from "../lib/client";
 import { useRouter } from "../lib/router";
 import { useUi } from "../lib/ui";
@@ -110,7 +110,7 @@ function useThreadList(children: ChildPages) {
   const [limit, setLimit] = useState(THREAD_PAGE);
   const [resolvedLimit, setResolvedLimit] = useState(THREAD_PAGE);
   const { query: projects, ids: projectIds } = useSidebarProjects();
-  const homes = new Set(useOrclings().map((orcling) => orcling.threadId));
+  const homes = useOrclingChatIds();
   const activeId = useRouter((s) => (s.route.view === "thread" ? s.route.threadId : null));
   const active = useRpc("threads.get", { id: activeId ?? "" }, { enabled: Boolean(activeId) });
   const listed = { projectIds, filter: "active" as const, orderBy: "activity" as const, includeChildren: true, ...children.params() };

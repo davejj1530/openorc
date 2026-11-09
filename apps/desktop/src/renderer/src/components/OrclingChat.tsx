@@ -1,8 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Reaction, reactionEmoji, type MessageReaction, type Orcling } from "@openorc/protocol";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { useReducedMotion } from "../lib/motion";
 import { chatRows, stretchTime, typingBeat, type Block, type ChatRow } from "@openorc/client";
+import { orclingById, useOrclings } from "../lib/orclings";
+import type { OrclingChatSpec } from "../lib/turn-authors";
+import { SmilePlus } from "./icons";
 import { OrclingAvatar } from "./OrclingAvatar";
 import { ThreadRichText } from "./ThreadImages";
 import { UserMessage } from "./UserMessage";
@@ -12,13 +15,13 @@ type Group = { kind: "theirs"; id: string; rows: Theirs[] } | { kind: "row"; id:
 
 const reactionKey = (runId: string | undefined, messageId: string, part: number) => `${runId ?? ""}|${messageId}|${part}`;
 
-/** Consecutive messages from the Orcling read as one run beside its face; anything else stands alone. */
-function groups(rows: ChatRow[]): Group[] {
+/** Consecutive messages from one Orcling to one place read as one run beside its face; anything else stands alone. */
+function groups(rows: ChatRow[], speakerOf: (row: Theirs) => Orcling): Group[] {
   const out: Group[] = [];
   for (const row of rows) {
     const last = out.at(-1);
     if (row.kind !== "theirs") out.push({ kind: "row", id: row.id, row });
-    else if (last?.kind === "theirs") last.rows.push(row);
+    else if (last?.kind === "theirs" && speakerOf(last.rows[0]!).id === speakerOf(row).id && last.rows[0]!.to === row.to) last.rows.push(row);
     else out.push({ kind: "theirs", id: row.id, rows: [row] });
   }
   return out;
@@ -91,10 +94,15 @@ function ReactionBadge({ reaction, side }: { reaction: Reaction | undefined; sid
   );
 }
 
-/** The person's tapbacks, above an Orcling bubble while it is hovered or focused; choosing the current one takes it back. */
-function ReactionBar({ current, onReact }: { current: Reaction | undefined; onReact: (reaction: Reaction | null) => void }) {
+/** The person's tapbacks, above an Orcling bubble once its reaction button opens them; choosing the current one takes it back. */
+function ReactionBar({ open, current, onReact }: { open: boolean; current: Reaction | undefined; onReact: (reaction: Reaction | null) => void }) {
+  const bar = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const choice = bar.current?.querySelector<HTMLButtonElement>("[data-current]") ?? bar.current?.querySelector<HTMLButtonElement>("button");
+    if (open) choice?.focus({ preventScroll: true });
+  }, [open]);
   return (
-    <div className="orcling-react-bar" role="toolbar" aria-label="React">
+    <div ref={bar} className="orcling-react-bar" role="toolbar" aria-label="Reactions" inert={!open}>
       {Reaction.options.map((reaction) => (
         <button
           key={reaction}
@@ -113,31 +121,39 @@ function ReactionBar({ current, onReact }: { current: Reaction | undefined; onRe
 }
 
 /**
- * One bubble of the Orcling's. Choosing a tapback folds the bar away until the pointer comes back to the bubble or
- * focus leaves it. Leaving does not reset it: the folding bar lets go of the pointer, and that alone reads as a leave.
+ * One bubble of the Orcling's. Pointing at it shows a reaction button beside it; the button opens the tapbacks, and
+ * choosing one closes them again. They never open on their own, so nothing pops up under a resting pointer.
  */
-function TheirBubble({ text, reaction, onReact }: { text: string; reaction: Reaction | undefined; onReact: (reaction: Reaction | null) => void }) {
-  const [picked, setPicked] = useState(false);
+function TheirBubble({
+  text,
+  reaction,
+  open,
+  onOpen,
+  onReact,
+}: {
+  text: string;
+  reaction: Reaction | undefined;
+  open: boolean;
+  onOpen: (open: boolean) => void;
+  onReact: (reaction: Reaction | null) => void;
+}) {
   return (
-    <div
-      className="orcling-bubble-row"
-      data-picked={picked || undefined}
-      onPointerEnter={() => setPicked(false)}
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setPicked(false);
-      }}
-    >
+    <div className="orcling-bubble-row" data-open={open || undefined}>
       <div className="orcling-bubble" data-reacted={reaction ? true : undefined}>
         <div className="text-prose text-ink prose-chat">
           <ThreadRichText mode="static">{text}</ThreadRichText>
         </div>
         <ReactionBadge reaction={reaction} side="end" />
       </div>
+      <button type="button" className="orcling-react-open" aria-label="React" aria-expanded={open} onClick={() => onOpen(!open)}>
+        <SmilePlus size={16} />
+      </button>
       <ReactionBar
+        open={open}
         current={reaction}
         onReact={(next) => {
-          setPicked(true);
           onReact(next);
+          onOpen(false);
         }}
       />
     </div>
@@ -159,80 +175,121 @@ function OrclingRun({
   count,
   typing,
   orcling,
+  label,
   reactions,
   onReact,
+  picking,
 }: {
   rows: Theirs[];
   count: (row: Theirs) => number;
   typing: boolean;
   orcling: Orcling;
+  /** Who is speaking and to whom, where more than one Orcling can speak. */
+  label: string | null;
   reactions: ReturnType<typeof useReactions>;
   onReact: (row: Theirs, part: number, reaction: Reaction | null) => void;
+  picking: Picking;
 }) {
   const bubbles = rows.flatMap((row) => row.bubbles.slice(0, count(row)).map((text, part) => ({ row, part, text })));
   if (!bubbles.length && !typing) return null;
   return (
-    <div className="orcling-run" data-turn={rows[0]?.id ?? "typing"}>
+    <div className="orcling-run" data-turn={rows[0]?.id ?? "typing"} style={{ "--orcling-tint": orcling.look.bodyColor } as CSSProperties}>
+      {label && bubbles.length ? <span className="orcling-run-name">{label}</span> : null}
       <OrclingAvatar orcling={orcling} size={28} className="orcling-run-face" />
       <div className="orcling-run-bubbles">
-        {bubbles.map(({ row, part, text }) => (
-          <TheirBubble key={`${row.id}:${part}`} text={text} reaction={reactions.person(reactionKey(row.block.runId, row.block.id, part))} onReact={(reaction) => onReact(row, part, reaction)} />
-        ))}
+        {bubbles.map(({ row, part, text }) => {
+          const key = reactionKey(row.block.runId, row.block.id, part);
+          return (
+            <TheirBubble
+              key={`${row.id}:${part}`}
+              text={text}
+              reaction={reactions.person(key)}
+              open={picking.open === key}
+              onOpen={(open) => picking.set(open ? key : null)}
+              onReact={(reaction) => onReact(row, part, reaction)}
+            />
+          );
+        })}
         {typing ? <Typing /> : null}
       </div>
     </div>
   );
 }
 
-/**
- * An Orcling's own conversation, the way people text: the person's messages on the right, the Orcling's on the left
- * beside its face, one bubble per paragraph, typing dots while it works, and tapbacks both ways. `card` draws what
- * needs the person, such as an approval, as the work transcript would.
- */
-/**
- * After a tapback, no bubble offers its bar until the pointer really moves: the folding bar uncovers the bubble under
- * the pointer, which would otherwise answer with a bar of its own, as if the first one had never closed.
- */
-function useHush() {
-  const [at, setAt] = useState<{ x: number; y: number } | null>(null);
-  return {
-    hushed: at !== null,
-    hush: (x: number, y: number) => setAt({ x, y }),
-    move: (event: PointerEvent) => {
-      if (at && Math.hypot(event.clientX - at.x, event.clientY - at.y) > 6) setAt(null);
-    },
-  };
+type Picking = { open: string | null; set: (key: string | null) => void };
+
+/** One bubble's tapbacks open at a time; Escape or a press anywhere else closes them. */
+function usePicking(): Picking {
+  const [open, set] = useState<string | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = () => set(null);
+    const key = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    const press = (event: globalThis.PointerEvent) => {
+      if (!(event.target as Element | null)?.closest(".orcling-bubble-row[data-open]")) close();
+    };
+    document.addEventListener("keydown", key);
+    document.addEventListener("pointerdown", press, true);
+    return () => {
+      document.removeEventListener("keydown", key);
+      document.removeEventListener("pointerdown", press, true);
+    };
+  }, [open]);
+  return { open, set };
 }
 
-export function OrclingChat({ orcling, blocks, live, card }: { orcling: Orcling; blocks: Block[]; live: boolean; card: (block: Block) => ReactNode }) {
+/**
+ * An Orcling chat, its own or a group's, the way people text: the person's messages on the right, each Orcling's on the
+ * left beside its face and in its own tint, one bubble per paragraph, typing dots while one works, and tapbacks both
+ * ways. Where more than one Orcling can speak, a run of bubbles carries its speaker's name, and a message an Orcling
+ * sent another says whom it went to. `card` draws what needs the person, such as an approval, as the work transcript would.
+ */
+export function OrclingChat({ chat, blocks, live, card }: { chat: OrclingChatSpec; blocks: Block[]; live: boolean; card: (block: Block) => ReactNode }) {
   const since = useRef(Date.now()).current;
-  const hush = useHush();
-  const rows = useMemo(() => chatRows(blocks), [blocks]);
+  const picking = usePicking();
+  const everyone = useOrclings();
+  const origins = useRpc("orclings.origins", { threadId: chat.threadId }).data;
+  const rows = useMemo(() => chatRows(blocks, new Map((origins ?? []).map((origin) => [origin.messageId, origin.fromOrclingId]))), [blocks, origins]);
   const arriving = useArrivingBubbles(rows, since);
-  const reactions = useReactions(orcling.threadId);
+  const reactions = useReactions(chat.threadId);
   const react = useRpcMutation("orclings.react");
+  const own = chat.members[0]!;
+  const speakerOf = (row: Theirs) => orclingById(everyone, row.from) ?? (row.block.runId ? chat.speakers.get(row.block.runId) : undefined) ?? own;
   // A message on its way gets typing dots at once, before the agent has even taken it.
   const typing = live || arriving.pending || rows.some((row) => row.kind === "mine" && row.block.pending);
-  const grouped = groups(rows);
+  const latest = blocks.findLast((block) => block.runId && chat.speakers.has(block.runId));
+  const typist = (latest?.runId && chat.speakers.get(latest.runId)) || own;
+  const grouped = groups(rows, speakerOf);
   const lastRun = grouped.at(-1)?.kind === "theirs";
+  const label = (row: Theirs | undefined, speaker: Orcling) => {
+    if (row?.to) return `${speaker.name} to ${row.to}`;
+    return chat.group || speaker.id !== own.id ? speaker.name : null;
+  };
   const onReact = (row: Theirs, part: number, reaction: Reaction | null) => {
     if (!row.block.runId) return;
     reactions.choose(reactionKey(row.block.runId, row.block.id, part), reaction);
-    react.mutate({ threadId: orcling.threadId, runId: row.block.runId, messageId: row.block.id, part, reaction });
+    react.mutate({ threadId: chat.threadId, runId: row.block.runId, messageId: row.block.id, part, reaction });
   };
-  const run = (group: Extract<Group, { kind: "theirs" }>, last: boolean) => (
-    <OrclingRun key={group.id} rows={group.rows} count={arriving.count} typing={last && typing} orcling={orcling} reactions={reactions} onReact={onReact} />
-  );
+  const run = (group: Extract<Group, { kind: "theirs" }>, last: boolean) => {
+    const speaker = group.rows[0] ? speakerOf(group.rows[0]) : typist;
+    return (
+      <OrclingRun
+        key={group.id}
+        rows={group.rows}
+        count={arriving.count}
+        typing={last && typing && speaker.id === typist.id}
+        orcling={speaker}
+        label={label(group.rows[0], speaker)}
+        reactions={reactions}
+        onReact={onReact}
+        picking={picking}
+      />
+    );
+  };
   return (
-    <div
-      className="orcling-chat"
-      data-hushed={hush.hushed || undefined}
-      onPointerMove={hush.move}
-      onClickCapture={(event) => {
-        if ((event.target as Element).closest(".orcling-react-choice")) hush.hush(event.clientX, event.clientY);
-      }}
-      style={{ "--orcling-tint": orcling.look.bodyColor } as CSSProperties}
-    >
+    <div className="orcling-chat">
       {grouped.map((group, index) => {
         if (group.kind === "theirs") return run(group, index === grouped.length - 1);
         const { row } = group;
@@ -260,7 +317,7 @@ export function OrclingChat({ orcling, blocks, live, card }: { orcling: Orcling;
           </div>
         );
       })}
-      {typing && !lastRun ? run({ kind: "theirs", id: "typing", rows: [] }, true) : null}
+      {typing && (!lastRun || speakerOf((grouped.at(-1) as Extract<Group, { kind: "theirs" }>).rows[0]!).id !== typist.id) ? run({ kind: "theirs", id: "typing", rows: [] }, true) : null}
     </div>
   );
 }

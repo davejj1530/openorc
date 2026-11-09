@@ -41,5 +41,16 @@ export function createOrclingHandlers({ orclings, threads, db, ledger }: Depende
       orclings.react({ threadId, runId, messageId, part }, reaction, null);
       return null;
     },
+    "orclings.origins": ({ threadId }) => orclings.talk.origins(threadId),
+    "orclings.groups.list": () => orclings.talk.groupsList(),
+    "orclings.groups.create": ({ memberIds, title }) => orclings.talk.createGroup(memberIds, title, null),
+    "orclings.groups.send": async ({ threadId, text, attachments, messageId }) => {
+      await orclings.talk.sendToGroup(threadId, text, { ...(messageId ? { messageId } : {}), ...(attachments?.length ? { attachments } : {}) });
+      return null;
+    },
+    "orclings.groups.delete": ({ threadId }) => {
+      orclings.talk.deleteGroup(threadId);
+      return null;
+    },
   };
 }

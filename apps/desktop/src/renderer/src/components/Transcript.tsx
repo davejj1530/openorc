@@ -385,7 +385,7 @@ type WorkTurnProps = WorkTranscriptProps & { id?: string; latest?: boolean };
 function ConversationBody(props: WorkTranscriptProps) {
   const { chat } = useContext(ConversationVoice);
   if (!chat) return <WorkTranscript {...props} />;
-  return <OrclingChat orcling={chat} blocks={props.blocks} live={props.live ?? false} card={(block) => <BlockView block={block} runId={block.runId ?? props.runId} taskCards actions={false} />} />;
+  return <OrclingChat chat={chat} blocks={props.blocks} live={props.live ?? false} card={(block) => <BlockView block={block} runId={block.runId ?? props.runId} taskCards actions={false} />} />;
 }
 
 export function WorkTranscript({ blocks, live = false, onFork, reveal, ...props }: WorkTranscriptProps) {

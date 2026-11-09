@@ -16,11 +16,21 @@ export interface RunVoice {
  */
 export interface ConversationVoice {
   authors: ReadonlyMap<string, string>;
-  /** The Orcling whose own conversation this is: its transcript reads as a chat with it. */
-  chat?: Orcling | undefined;
+  /** An Orcling chat, its own or a group's: its transcript reads as texting. */
+  chat?: OrclingChatSpec | undefined;
   face?: ((working: boolean) => ReactNode) | undefined;
   runs?: ReadonlyMap<string, RunVoice> | undefined;
   agent?: RunVoice | undefined;
+}
+
+/** An Orcling's own conversation, or a group chat of Orclings, as the chat view draws it. */
+export interface OrclingChatSpec {
+  threadId: string;
+  /** Who can speak here: the Orcling whose chat it is, or the group's members. */
+  members: Orcling[];
+  /** Which Orcling spoke in each run. */
+  speakers: ReadonlyMap<string, Orcling>;
+  group: boolean;
 }
 
 export const ConversationVoice = createContext<ConversationVoice>({ authors: new Map() });

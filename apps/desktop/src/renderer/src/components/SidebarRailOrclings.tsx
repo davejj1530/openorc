@@ -5,7 +5,7 @@ import { CoversPreview } from "../lib/browser-preview";
 import { useRpc } from "../lib/client";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
 import { useLayout } from "../lib/layout";
-import { useOrclings } from "../lib/orclings";
+import { useOrclingChatIds, useOrclings } from "../lib/orclings";
 import { useRouter } from "../lib/router";
 import { useScrollEdges } from "../lib/use-scroll-edges";
 import { floatingGround } from "../lib/use-anchor-ground";
@@ -17,9 +17,9 @@ import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
 import { RAIL_ICON } from "./sidebar-screens";
 import { Tooltip } from "./ui";
 
-/** What Orclings' own conversations have to say together: the most pressing one's mark, and how many of each. */
-function useOrclingsMark(orclings: readonly Orcling[]): WorkspaceMark | undefined {
-  const homes = new Set(orclings.map((orcling) => orcling.threadId));
+/** What Orclings' chats, their own and their groups', have to say together: the most pressing one's mark, and how many of each. */
+function useOrclingsMark(): WorkspaceMark | undefined {
+  const homes = useOrclingChatIds();
   const now = useSidebarNow();
   const rows = useRpc(
     "threads.list",
@@ -79,7 +79,7 @@ function RailOrcling({ orcling, selected }: { orcling: Orcling; selected: boolea
 export function RailOrclings({ active, toggle, threadId }: { active: boolean; toggle: () => void; threadId: string | null }) {
   const orclings = useOrclings();
   const open = useLayout((s) => s.railOrclings) && orclings.length > 0;
-  const mark = useOrclingsMark(orclings);
+  const mark = useOrclingsMark();
   const summary = workspaceSummary(mark);
   const edges = useScrollEdges();
   return (

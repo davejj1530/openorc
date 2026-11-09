@@ -2,7 +2,7 @@ import { Command } from "cmdk";
 import { useEffect, useState, type ReactNode } from "react";
 import { CoversPreview } from "../lib/browser-preview";
 import { useRpc } from "../lib/client";
-import { useOrclings } from "../lib/orclings";
+import { useOrclingChatIds, useOrclings } from "../lib/orclings";
 import { paletteActions } from "../lib/palette-actions";
 import { openTask, openThread, useRouter } from "../lib/router";
 import { useUi } from "../lib/ui";
@@ -130,7 +130,7 @@ function PlaceGroups({ go }: { go: (fn: () => void) => void }) {
   const projects = useRpc("projects.list", {}).data ?? [];
   const orclings = useOrclings();
   const navigate = useRouter((s) => s.navigate);
-  const homes = new Set(orclings.map((orcling) => orcling.threadId));
+  const homes = useOrclingChatIds();
   return (
     <>
       <PlaceGroup

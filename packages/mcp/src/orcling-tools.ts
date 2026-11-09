@@ -29,6 +29,12 @@ export interface OrclingTools {
   createTask(runId: string, input: { projectId: string; title: string; spec: string }): Promise<string>;
   startWork(runId: string, input: { projectId: string; prompt: string; taskId?: string; title?: string }): Promise<string>;
   sendThread(runId: string, input: { threadId: string; text: string; requestKey?: string }): Promise<string>;
+  /** The person's other Orclings and the group chats this one is in. */
+  orclings(runId: string): Promise<string>;
+  /** A direct message to another Orcling, which lands in its own chat as this Orcling's. */
+  message(runId: string, input: { to: string; text: string }): Promise<string>;
+  /** A group chat with the person and the Orclings named, opened with these words. */
+  startGroup(runId: string, input: { with: string[]; title?: string; text: string }): Promise<string>;
   /** A tapback on the person's newest message in the Orcling's own conversation. */
   react(runId: string, reaction: "heart" | "like" | "dislike" | "haha" | "wow" | "sad"): Promise<string>;
 }
@@ -46,11 +52,15 @@ export const orclingToolNames = [
   "orcling_thread_start",
   "orcling_thread_send",
   "orcling_react",
+  "orcling_orclings",
+  "orcling_message",
+  "orcling_group_start",
 ];
 
 const text = (value: string) => ({ content: [{ type: "text" as const, text: value }] });
 
 export function registerOrclingTools(mcp: McpServer, tools: OrclingTools, runId: string): void {
+  registerOrclingTalk(mcp, tools, runId);
   if (tools.ownConversation(runId))
     mcp.registerTool(
       "orcling_react",
@@ -144,5 +154,34 @@ export function registerOrclingTools(mcp: McpServer, tools: OrclingTools, runId:
       inputSchema: { thread_id: z.string().min(1), text: z.string().min(1).max(4000), request_key: z.string().min(1).max(200).optional() },
     },
     async ({ thread_id, text: message, request_key }) => text(await tools.sendThread(runId, { threadId: thread_id, text: message, ...(request_key ? { requestKey: request_key } : {}) })),
+  );
+}
+
+/** Talking to the person's other Orclings: who they are, a direct message, a group chat. */
+function registerOrclingTalk(mcp: McpServer, tools: OrclingTools, runId: string): void {
+  mcp.registerTool("orcling_orclings", { description: "The person's other Orclings, by name and whether they are busy, and the group chats you are in.", inputSchema: {} }, async () =>
+    text(await tools.orclings(runId)),
+  );
+  mcp.registerTool(
+    "orcling_message",
+    {
+      description:
+        "Text another of the person's Orclings directly, by name. It lands in that Orcling's own chat as yours, where the person can read it, and its answer reaches you the same way. Use it when another Orcling can help or needs to know something, not to chat; keep it short. Depending on your permission and theirs, the person may be asked first. Messages between Orclings stop after a few in a row until the person writes.",
+      inputSchema: { to: z.string().trim().min(1).max(40), text: z.string().trim().min(1).max(4000) },
+    },
+    async ({ to, text: message }) => text(await tools.message(runId, { to, text: message })),
+  );
+  mcp.registerTool(
+    "orcling_group_start",
+    {
+      description:
+        "Open a group chat with the person and the Orclings you name, and say the first thing in it. Each of them answers in turn; after that, whoever a message names answers. Use it when a few Orclings and the person should work something out together. Depending on your permission, the person may be asked first.",
+      inputSchema: {
+        with: z.array(z.string().trim().min(1).max(40)).min(1).max(7),
+        title: z.string().trim().min(1).max(60).optional(),
+        text: z.string().trim().min(1).max(4000),
+      },
+    },
+    async ({ with: names, title, text: message }) => text(await tools.startGroup(runId, { with: names, ...(title ? { title } : {}), text: message })),
   );
 }

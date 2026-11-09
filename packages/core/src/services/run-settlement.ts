@@ -41,7 +41,7 @@ interface RunSettlementDependencies {
   db: Db;
   ledger: LedgerWriter;
   log: Logger;
-  hooks: Pick<RunHooks, "onThreadTurn" | "onRunFinished" | "syncCloud">;
+  hooks: Pick<RunHooks, "onThreadTurn" | "onRunFinished" | "syncCloud" | "orclings">;
   mcp: () => Promise<OpenOrcMcpServer>;
   mcpApps: McpAppService;
   detach: (runId: string) => void;
@@ -123,6 +123,7 @@ export class RunSettlement {
     this.deps.invalidate([...this.deps.keysFor(entry.scope), `checkpoints:${thread.id}`, `threaddiff:${thread.id}`, `projectgit:${project.id}`]);
     // Still a turn's end, so a message the person queued meanwhile goes out; there is no exchange to name the thread from.
     this.deps.hooks.onThreadTurn(thread, quiet ? { prompt: null, reply: null } : { prompt: entry.prompt, reply });
+    this.deps.hooks.orclings?.turnEnded?.(thread, entry.run, reply?.trim() ? reply : entry.reply);
     if (quiet) return;
     if (turn.status === "success") this.deps.notifyFor(entry.scope, "finished", thread.title, reply ? noticeBody(reply) : "The agent finished its turn.");
     else if (turn.status !== "cancelled") this.deps.notifyFor(entry.scope, "error", thread.title, entry.failed ?? "The turn failed.");

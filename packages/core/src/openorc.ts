@@ -304,7 +304,7 @@ export class OpenOrc {
     const backgroundProviders = this.backgroundProviders();
     this.memory = new MemoryService(db, { dataDir: options.dataDir, secrets: options.memorySecrets, embedder: options.embedder }, backgroundProviders, invalidate, this.log);
     this.textGeneration = new TextGenerationService(db, backgroundProviders, invalidate);
-    this.orclings = new OrclingService({ db, dataDir: options.dataDir, memory: this.memory, runs: () => this.runs, threads: () => this.threads, invalidate });
+    this.orclings = new OrclingService({ db, dataDir: options.dataDir, memory: this.memory, runs: () => this.runs, threads: () => this.threads, invalidate, log: this.log });
     this.memory.extractionOwner = (run, thread) => this.orclings.memoryOwner(run, thread);
     this.runs = new RunService(db, this.ledger, this.frames, () => this.mcpServer(), invalidate, this.log, this.runHooks(notify), undefined, this.workspaceWriters);
     this.threads = new ThreadService(
@@ -331,7 +331,7 @@ export class OpenOrc {
       maintenance: () => this.agentUpdates.get().updating,
     });
     const maintenance = () => this.agentUpdates.get().updating;
-    this.orclingWakes = new OrclingWakeService({ db, activity: (id) => this.runs.threadActivity(id), nudge: (id, text) => this.threads.send(id, text, null, true), log: this.log, maintenance });
+    this.orclingWakes = new OrclingWakeService({ db, activity: (id) => this.runs.threadActivity(id), threads: this.threads, log: this.log, maintenance });
     this.files = createFileService({ options, writers: this.workspaceWriters, invalidate, environment: () => this.environment.current() });
     this.imports = new ImportService(db, this.ledger, invalidate, this.log, this.toolImages);
     this.reviewerApp = new ReviewerAppService(db, { secrets: options.githubSecrets, invalidate });

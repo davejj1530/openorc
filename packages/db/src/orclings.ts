@@ -7,6 +7,8 @@ import {
   Reaction,
   type MessageReaction,
   type Orcling,
+  type OrclingGroup,
+  type OrclingMessageOrigin,
   type OrclingDraft,
   type OrclingInstructionsVersion,
   type OrclingWake,
@@ -216,5 +218,58 @@ export const messageReactions = {
       db.stmt("UPDATE message_reactions SET heard_at = ? WHERE thread_id = ? AND reactor = ? AND heard_at IS NULL").run(now, threadId, PERSON);
       return rows.map(toReaction).filter((reaction) => reaction !== null);
     });
+  },
+};
+
+interface GroupRow {
+  thread_id: string;
+  title: string;
+  created_at: number;
+}
+
+export const orclingGroups = {
+  /** Makes a conversation a group of these Orclings, in this order. */
+  create(db: Db, threadId: string, memberIds: readonly string[], createdBy: string | null, now = Date.now()): void {
+    db.transaction(() => {
+      db.stmt("INSERT INTO orcling_groups (thread_id, created_by, created_at) VALUES (?, ?, ?)").run(threadId, createdBy, now);
+      memberIds.forEach((orclingId, position) => db.stmt("INSERT INTO orcling_group_members (thread_id, orcling_id, position) VALUES (?, ?, ?)").run(threadId, orclingId, position));
+    });
+  },
+  get(db: Db, threadId: string): OrclingGroup | null {
+    const row = db.stmt("SELECT g.thread_id, t.title, g.created_at FROM orcling_groups g JOIN threads t ON t.id = g.thread_id WHERE g.thread_id = ?").get(threadId) as unknown as GroupRow | undefined;
+    return row ? toGroup(db, row) : null;
+  },
+  list(db: Db): OrclingGroup[] {
+    const rows = db.stmt("SELECT g.thread_id, t.title, g.created_at FROM orcling_groups g JOIN threads t ON t.id = g.thread_id ORDER BY g.created_at, g.thread_id").all() as unknown as GroupRow[];
+    return rows.map((row) => toGroup(db, row));
+  },
+  /** The groups an Orcling is in. */
+  of(db: Db, orclingId: string): OrclingGroup[] {
+    return orclingGroups.list(db).filter((group) => group.memberIds.includes(orclingId));
+  },
+};
+
+function toGroup(db: Db, row: GroupRow): OrclingGroup {
+  const members = db.stmt("SELECT orcling_id FROM orcling_group_members WHERE thread_id = ? ORDER BY position").all(row.thread_id) as { orcling_id: string }[];
+  return { threadId: row.thread_id, title: row.title, memberIds: members.map((member) => member.orcling_id), createdAt: row.created_at };
+}
+
+export const orclingMessages = {
+  record(db: Db, origin: OrclingMessageOrigin & { threadId: string }, now = Date.now()): void {
+    db.stmt("INSERT OR REPLACE INTO orcling_messages (message_id, thread_id, from_orcling_id, to_orcling_id, created_at) VALUES (?, ?, ?, ?, ?)").run(
+      origin.messageId,
+      origin.threadId,
+      origin.fromOrclingId,
+      origin.toOrclingId,
+      now,
+    );
+  },
+  list(db: Db, threadId: string): OrclingMessageOrigin[] {
+    const rows = db.stmt("SELECT message_id, from_orcling_id, to_orcling_id FROM orcling_messages WHERE thread_id = ? ORDER BY created_at").all(threadId) as {
+      message_id: string;
+      from_orcling_id: string;
+      to_orcling_id: string | null;
+    }[];
+    return rows.map((row) => ({ messageId: row.message_id, fromOrclingId: row.from_orcling_id, toOrclingId: row.to_orcling_id }));
   },
 };

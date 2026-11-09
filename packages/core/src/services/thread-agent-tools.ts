@@ -1,4 +1,4 @@
-import { audit, listEvents, projects, retiredTeams, runs as runRepo, tasks, threads, type Db } from "@openorc/db";
+import { audit, listEvents, orclingGroups, orclings, projects, retiredTeams, runs as runRepo, tasks, threads, type Db } from "@openorc/db";
 import type { TaskCard, ThreadCard } from "@openorc/mcp";
 import {
   DEFAULT_CLAUDE_ACCOUNT,
@@ -74,8 +74,17 @@ function opener(parent: Thread): string {
 const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max).trimEnd()}…` : text);
 
 /** Agents reach the threads of their own project; an Orcling works across all of the person's projects. */
+/**
+ * Whether a run may read or message a thread: one in its own project, or any for an Orcling. An Orcling's own chat is
+ * that Orcling's alone and a group chat its members', whoever asks: other Orclings reach them with their own messages.
+ */
 export function reachesThread(db: Db, runId: string, source: Thread, target: Thread): boolean {
-  return target.projectId === source.projectId || Boolean(runRepo.get(db, runId)?.orclingId);
+  const speaker = runRepo.get(db, runId)?.orclingId ?? null;
+  const home = orclings.forThread(db, target.id);
+  if (home) return home.id === speaker;
+  const group = orclingGroups.get(db, target.id);
+  if (group) return speaker !== null && group.memberIds.includes(speaker);
+  return target.projectId === source.projectId || speaker !== null;
 }
 
 type MessageResult = { delivered: boolean; message: string };

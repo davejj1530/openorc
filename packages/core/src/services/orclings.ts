@@ -1,4 +1,4 @@
-import { audit, claudeAccounts, messageReactions, orclings, retiredTeams, runs as runRepo, tasks, threads, type Db, type ReactionTarget } from "@openorc/db";
+import { audit, claudeAccounts, messageReactions, orclingGroups, orclings, retiredTeams, runs as runRepo, tasks, threads, type Db, type ReactionTarget } from "@openorc/db";
 import {
   isHarnessId,
   orclingExecution,
@@ -23,6 +23,8 @@ import type { MemoryService } from "./memory.js";
 import { catchUp, orclingBrief, rolloverSeed, type OrclingPlace } from "./orcling-briefs.js";
 import { OrclingFolders } from "./orcling-folders.js";
 import { messageInThread, reactionNote } from "./orcling-reactions.js";
+import { OrclingTalk } from "./orcling-talk.js";
+import type { Logger } from "../transport.js";
 import type { OrclingRunHooks, StartRunInput } from "./run-types.js";
 import type { RunService } from "./runs.js";
 import type { StartThreadInput, ThreadPatch } from "./thread-inputs.js";
@@ -46,9 +48,10 @@ interface Dependencies {
   dataDir: string;
   memory: Pick<MemoryService, "orclingBrief" | "listOrcling" | "remove">;
   /** Resolved when used: the run and thread services start after this one, because they launch with its hooks. */
-  runs: () => Pick<RunService, "liveRunForThread" | "closeAndWait" | "threadContext" | "threadActivity" | "start">;
-  threads: () => Pick<ThreadService, "delete" | "start" | "update" | "taskThreadForStart" | "startTaskInThread">;
+  runs: () => Pick<RunService, "liveRunForThread" | "closeAndWait" | "threadContext" | "threadActivity" | "start" | "send" | "agentChain" | "noteAgentMessage">;
+  threads: () => Pick<ThreadService, "delete" | "start" | "update" | "taskThreadForStart" | "startTaskInThread" | "send">;
   invalidate: (keys: string[]) => void;
+  log: Logger;
 }
 
 /**
@@ -60,9 +63,12 @@ interface Dependencies {
  */
 export class OrclingService {
   private readonly folders: OrclingFolders;
+  /** How Orclings talk to each other: direct messages and group chats. */
+  readonly talk: OrclingTalk;
 
   constructor(private readonly deps: Dependencies) {
     this.folders = new OrclingFolders(deps.dataDir);
+    this.talk = new OrclingTalk({ db: deps.db, dataDir: deps.dataDir, runs: deps.runs, threads: deps.threads, invalidate: deps.invalidate, log: deps.log });
   }
 
   list(): Orcling[] {
@@ -227,7 +233,7 @@ export class OrclingService {
   /** A tapback in an Orcling's own conversation: the person's when orclingId is null, else that Orcling's. */
   react(target: ReactionTarget, reaction: Reaction | null, orclingId: string | null): void {
     const { db } = this.deps;
-    if (!orclings.forThread(db, target.threadId)) throw new Error("Reactions are for an Orcling's own conversation.");
+    if (!orclings.forThread(db, target.threadId) && !orclingGroups.get(db, target.threadId)) throw new Error("Reactions are for Orcling chats.");
     if (!messageInThread(db, target.threadId, target.runId, target.messageId)) throw new Error("That message is not in this conversation.");
     messageReactions.set(db, target, orclingId, reaction);
     this.deps.invalidate([`reactions:${target.threadId}`]);
@@ -386,7 +392,11 @@ export class OrclingService {
       const ceiling = orclingExecution(this.get(orclingId));
       return ceiling.mode === "plan" ? "review" : ceiling.permissionMode;
     },
-    turnNote: (threadId) => (orclings.forThread(this.deps.db, threadId) ? reactionNote(this.deps.db, threadId) : ""),
+    turnNote: (threadId) => {
+      if (!orclings.forThread(this.deps.db, threadId)) return "";
+      return [reactionNote(this.deps.db, threadId), this.talk.takeNote(threadId)].filter(Boolean).join("\n\n");
+    },
+    turnEnded: (thread, run, reply) => this.talk.turnEnded(thread, run, reply),
   };
 
   private identity(input: StartRunInput): string | null {
@@ -420,13 +430,17 @@ export class OrclingService {
     const orcling = input.orclingId ? orclings.get(this.deps.db, input.orclingId) : null;
     if (!orcling) return "";
     const instructions = orclings.currentInstructions(this.deps.db, orcling.id)?.body ?? "";
-    return orclingBrief(orcling, { instructions, memory: this.deps.memory.orclingBrief(orcling.id), place: this.place(orcling, input), tools: !input.scope.comment });
+    const place = this.place(orcling, input);
+    const group = place === "group" && input.scope.thread ? orclingGroups.get(this.deps.db, input.scope.thread.id) : null;
+    const others = (group?.memberIds ?? []).filter((id) => id !== orcling.id).map((id) => this.name(id) ?? "an Orcling");
+    return orclingBrief(orcling, { instructions, memory: this.deps.memory.orclingBrief(orcling.id), place, tools: !input.scope.comment, others });
   }
 
   private place(orcling: Orcling, input: StartRunInput): OrclingPlace {
     const thread = input.scope.thread ? threads.get(this.deps.db, input.scope.thread.id) : null;
     if (!thread) return "elsewhere";
     if (thread.id === orcling.threadId) return "home";
+    if (orclingGroups.get(this.deps.db, thread.id)?.memberIds.includes(orcling.id)) return "group";
     return thread.orclingId === orcling.id ? "thread" : "guest";
   }
 

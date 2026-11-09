@@ -1,12 +1,26 @@
-import type { Orcling } from "@openorc/protocol";
+import { useMemo } from "react";
+import type { Orcling, OrclingGroup } from "@openorc/protocol";
 import type { MentionEntry } from "./composer-mentions";
 import { useRpc } from "./client";
 
 const NONE: Orcling[] = [];
+const NO_GROUPS: OrclingGroup[] = [];
 
 /** Every Orcling, oldest first. */
 export function useOrclings(): Orcling[] {
   return useRpc("orclings.list", {}).data ?? NONE;
+}
+
+/** Every group chat of Orclings, oldest first. */
+export function useOrclingGroups(): OrclingGroup[] {
+  return useRpc("orclings.groups.list", {}).data ?? NO_GROUPS;
+}
+
+/** Conversations that belong to Orclings, never listed among project threads: their own chats and their group chats. */
+export function useOrclingChatIds(): ReadonlySet<string> {
+  const orclings = useOrclings();
+  const groups = useOrclingGroups();
+  return useMemo(() => new Set([...orclings.map((orcling) => orcling.threadId), ...groups.map((group) => group.threadId)]), [orclings, groups]);
 }
 
 export function orclingById(orclings: readonly Orcling[], id: string | null | undefined): Orcling | null {

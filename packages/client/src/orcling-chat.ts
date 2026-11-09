@@ -3,6 +3,7 @@ import { startedWorkFromTool, taskIdFromTool } from "./task-progress.js";
 import type { Block } from "./transcript.js";
 
 type Message = Extract<Block, { kind: "message" }>;
+type Tool = Extract<Block, { kind: "tool" }>;
 
 /**
  * An Orcling's own conversation as a chat shows it: what the person wrote, what the Orcling texted as one message per
@@ -12,7 +13,16 @@ type Message = Extract<Block, { kind: "message" }>;
 export type ChatRow =
   | { kind: "time"; id: string; at: number }
   | { kind: "mine"; id: string; block: Message }
-  | { kind: "theirs"; id: string; block: Message; bubbles: string[] }
+  | {
+      kind: "theirs";
+      id: string;
+      block: Message;
+      bubbles: string[];
+      /** The Orcling who sent it when it came from another Orcling; otherwise whoever spoke in its run. */
+      from?: string;
+      /** Who it was sent to, when the Orcling texted another Orcling or opened a group. */
+      to?: string;
+    }
   | { kind: "card"; id: string; block: Block };
 
 /** A gap this long between messages starts a new stretch, headed by its time. */
@@ -35,30 +45,62 @@ function card(block: Block): boolean {
   }
 }
 
-export function chatRows(blocks: readonly Block[]): ChatRow[] {
+const names = (list: string[]) => new Intl.ListFormat("en", { style: "long", type: "conjunction" }).format(list);
+
+/** A message an Orcling sent another Orcling, or the words it opened a group with, as its tool call carries them. */
+function sentMessage(block: Tool): { to: string; text: string } | null {
+  const input = block.input as { to?: unknown; with?: unknown; text?: unknown } | null;
+  if (block.isError || typeof input?.text !== "string") return null;
+  if (/orcling_message$/.test(block.name) && typeof input.to === "string") return { to: input.to, text: input.text };
+  if (/orcling_group_start$/.test(block.name) && Array.isArray(input.with)) return { to: names(input.with.map(String)), text: input.text };
+  return null;
+}
+
+/** A message the Orcling sent another Orcling or a new group, as its own bubbles there. */
+function sentRow(block: Tool): Extract<ChatRow, { kind: "theirs" }> | null {
+  const sent = sentMessage(block);
+  if (!sent) return null;
+  const message: Message = {
+    id: block.id,
+    kind: "message",
+    role: "assistant",
+    text: sent.text,
+    streaming: false,
+    ...(block.at === undefined ? {} : { at: block.at }),
+    ...(block.runId ? { runId: block.runId } : {}),
+  };
+  return { kind: "theirs", id: block.id, block: message, bubbles: chatBubbles(sent.text), to: sent.to };
+}
+
+/** A block's row in the chat, and whether it heads a stretch of time; null for what stays out of sight. */
+function rowOf(block: Block, origins: ReadonlyMap<string, string>): { row: ChatRow; timed: boolean } | null {
+  const sent = block.kind === "tool" ? sentRow(block) : null;
+  if (sent) return { row: sent, timed: true };
+  const from = block.kind === "message" && block.role === "system" ? origins.get(block.id) : undefined;
+  if (from && block.kind === "message") return { row: { kind: "theirs", id: block.id, block, bubbles: chatBubbles(block.text), from }, timed: true };
+  if (card(block)) return { row: { kind: "card", id: block.id, block }, timed: false };
+  if (block.kind !== "message") return null;
+  if (block.role === "user") return block.text || block.attachments?.length ? { row: { kind: "mine", id: block.id, block }, timed: true } : null;
+  if (block.role !== "assistant" || block.streaming) return null;
+  const bubbles = chatBubbles(block.text);
+  return bubbles.length ? { row: { kind: "theirs", id: block.id, block, bubbles }, timed: true } : null;
+}
+
+/**
+ * The chat's rows. `origins` names the Orcling behind each message another Orcling sent here, by message id, so its
+ * words show as that Orcling's rather than as a notice.
+ */
+export function chatRows(blocks: readonly Block[], origins: ReadonlyMap<string, string> = new Map()): ChatRow[] {
   const rows: ChatRow[] = [];
   let lastAt: number | null = null;
-  const stamp = (block: Block) => {
-    const at = block.at;
-    if (at === undefined) return;
-    if (lastAt === null || at - lastAt >= CHAT_STRETCH_MS) rows.push({ kind: "time", id: `time-${block.id}`, at });
-    lastAt = at;
-  };
   for (const block of blocks) {
-    if (card(block)) {
-      rows.push({ kind: "card", id: block.id, block });
-      continue;
+    const found = rowOf(block, origins);
+    if (!found) continue;
+    if (found.timed && block.at !== undefined) {
+      if (lastAt === null || block.at - lastAt >= CHAT_STRETCH_MS) rows.push({ kind: "time", id: `time-${block.id}`, at: block.at });
+      lastAt = block.at;
     }
-    if (block.kind !== "message") continue;
-    if (block.role === "user" && (block.text || block.attachments?.length)) {
-      stamp(block);
-      rows.push({ kind: "mine", id: block.id, block });
-    } else if (block.role === "assistant" && !block.streaming) {
-      const bubbles = chatBubbles(block.text);
-      if (!bubbles.length) continue;
-      stamp(block);
-      rows.push({ kind: "theirs", id: block.id, block, bubbles });
-    }
+    rows.push(found.row);
   }
   return rows;
 }

@@ -82,14 +82,14 @@ it("an Orcling that wakes with nothing to say leaves its conversation as it was;
     const noticed = notices().length;
 
     replies.push("");
-    await core.threads.send(pip.threadId, wakePrompt([{ kind: "startup" }], Date.now()), null, true);
+    await core.threads.send(pip.threadId, wakePrompt([{ kind: "startup" }], Date.now()), null, { unprompted: true });
     await settled(pip.threadId, 2);
     expect(threads.get(core.db, pip.threadId)!.lastActivityAt).toBe(before.lastActivityAt);
     expect(core.threads.get(pip.threadId)!.unread).toBe(false);
     expect(notices()).toHaveLength(noticed);
 
     replies.push("morning! the openorc build went green overnight");
-    await core.threads.send(pip.threadId, wakePrompt([{ kind: "startup" }], Date.now()), null, true);
+    await core.threads.send(pip.threadId, wakePrompt([{ kind: "startup" }], Date.now()), null, { unprompted: true });
     await settled(pip.threadId, 3);
     expect(core.threads.get(pip.threadId)!.unread).toBe(true);
     expect(notices().at(-1)).toMatchObject({ title: "Pip", body: expect.stringContaining("morning!") });
@@ -191,7 +191,7 @@ it("keeps a wake quiet when its process has to start again, as after a change of
     const noticed = notices().length;
 
     replies.push("");
-    await core.threads.send(pip.threadId, wakePrompt([{ kind: "startup" }], Date.now()), null, true);
+    await core.threads.send(pip.threadId, wakePrompt([{ kind: "startup" }], Date.now()), null, { unprompted: true });
     await settled(pip.threadId, 2);
     expect(starts()).toBe(2);
     expect(threads.get(core.db, pip.threadId)!.lastActivityAt).toBe(before);
@@ -212,7 +212,7 @@ it("sends a message the person queued during a quiet wake once the wake ends", a
 
     replies.push("", "morning to you too");
     const release = hold();
-    await core.threads.send(pip.threadId, wakePrompt([{ kind: "startup" }], Date.now()), null, true);
+    await core.threads.send(pip.threadId, wakePrompt([{ kind: "startup" }], Date.now()), null, { unprompted: true });
     await core.threads.queue(pip.threadId, "morning", []);
     release();
     await settled(pip.threadId, 3);

@@ -330,6 +330,24 @@ export const Tablet = icon(
   </>,
 );
 export const Power = icon("Power", <path d="M12 3v8 M7.4 6.2a7.5 7.5 0 1 0 9.2 0" />);
+export const People = icon(
+  "People",
+  <>
+    <circle cx="9" cy="8.5" r="3.25" />
+    <path d="M3.5 19c.6-3 2.8-4.75 5.5-4.75s4.9 1.75 5.5 4.75" />
+    <path d="M15.25 5.6a3.25 3.25 0 0 1 0 5.8" />
+    <path d="M17 14.6c1.9.6 3.15 2.1 3.5 4.4" />
+  </>,
+);
+export const SmilePlus = icon(
+  "SmilePlus",
+  <>
+    <path d="M20.5 12A8.5 8.5 0 1 1 12 3.5" />
+    <path d="M8.75 14.25c.85 1.1 1.95 1.75 3.25 1.75s2.4-.65 3.25-1.75" />
+    <path d="M9.25 10h.01 M14.75 10h.01" />
+    <path d="M19 2.75v5 M16.5 5.25h5" />
+  </>,
+);
 export const Clock = icon(
   "Clock",
   <>

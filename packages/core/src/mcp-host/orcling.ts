@@ -1,6 +1,6 @@
-import { messages, orclings, projects, retiredTeams, runs, tasks, threads, type Db } from "@openorc/db";
+import { messages, orclingGroups, orclings, projects, retiredTeams, runs, tasks, threads, type Db } from "@openorc/db";
 import type { McpHost, OrclingTools } from "@openorc/mcp";
-import { reactionEmoji, WORKSPACE_ID, type MemoryType, type Orcling, type Project, type TaskStatus } from "@openorc/protocol";
+import { executionMode, reactionEmoji, WORKSPACE_ID, type MemoryType, type Orcling, type Project, type TaskStatus } from "@openorc/protocol";
 import { latestPersonMessage } from "../services/orcling-reactions.js";
 import type { MemoryService } from "../services/memory.js";
 import type { OrclingService } from "../services/orclings.js";
@@ -10,7 +10,7 @@ import type { ThreadService } from "../services/threads.js";
 
 type Dependencies = {
   db: Db;
-  orclings: Pick<OrclingService, "forRun" | "saveInstructions" | "startThread" | "startTask" | "react">;
+  orclings: Pick<OrclingService, "forRun" | "saveInstructions" | "startThread" | "startTask" | "react" | "talk">;
   memory: Pick<MemoryService, "assertEnabled" | "record" | "retrieveOrcling" | "retrieve" | "brief">;
   runs: Pick<RunService, "authorizeAppAction">;
   threads: Pick<ThreadService, "toolThreadRead">;
@@ -44,6 +44,7 @@ export function createOrclingHost(deps: Dependencies): Pick<McpHost, "orcling"> 
       },
       ...selfTools(deps, speaker),
       ...projectTools(deps, speaker),
+      ...talkTools(deps, speaker),
     },
   };
 }
@@ -142,7 +143,7 @@ function projectTools(deps: Dependencies, speaker: Speaker): Pick<OrclingTools, 
         .slice(0, 20)
         .map((t) => ({ id: t.id, title: t.title, status: t.status }));
       // Orclings' own conversations sit in the Workspace but are private chats, not its work.
-      const chats = new Set(orclings.list(db).map((orcling) => orcling.threadId));
+      const chats = new Set([...orclings.list(db).map((orcling) => orcling.threadId), ...orclingGroups.list(db).map((group) => group.threadId)]);
       const recent = threads
         .list(db, { projectId, filter: "active", limit: 10 })
         .filter((t) => !retiredTeams.isHidden(db, t.id) && !chats.has(t.id))
@@ -198,6 +199,40 @@ function projectTools(deps: Dependencies, speaker: Speaker): Pick<OrclingTools, 
       speaker(runId);
       if (!threads.get(db, input.threadId)) return "No such thread.";
       return json(await deps.send(runId, input.threadId, input.text, input.requestKey));
+    },
+  };
+}
+
+/** Talking to the person's other Orclings, in their own chats or in a group with the person. */
+function talkTools(deps: Dependencies, speaker: Speaker): Pick<OrclingTools, "orclings" | "message" | "startGroup"> {
+  const { db } = deps;
+  const talk = deps.orclings.talk;
+  return {
+    orclings: async (runId) => json(talk.directory(speaker(runId).id)),
+    message: async (runId, input) => {
+      const self = speaker(runId);
+      const to = talk.byName(input.to, self.id);
+      const home = threads.get(db, to.threadId);
+      await deps.runs.authorizeAppAction(
+        runId,
+        "thread_message",
+        { toolName: "orcling_message", reason: `${self.name} wants to text ${to.name}.`, input: { to: to.name, text: input.text } },
+        home ? executionMode(home.mode, home.permissionMode) : undefined,
+      );
+      await talk.direct(self.id, runs.get(db, runId)?.threadId ?? null, to.name, input.text);
+      return json({ delivered: true, to: to.name, note: `${to.name}'s answer reaches you as a message from it.` });
+    },
+    startGroup: async (runId, input) => {
+      const self = speaker(runId);
+      const others = input.with.map((name) => talk.byName(name, self.id));
+      await deps.runs.authorizeAppAction(
+        runId,
+        "thread_message",
+        { toolName: "orcling_group_start", reason: `${self.name} wants to open a group chat with ${others.map((other) => other.name).join(", ")}.`, input },
+        executionMode("act", "autonomous"),
+      );
+      const group = await talk.startGroup(self.id, input.with, input.title, input.text);
+      return json({ group: group.title, threadId: group.threadId, members: others.map((other) => other.name) });
     },
   };
 }

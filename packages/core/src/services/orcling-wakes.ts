@@ -2,6 +2,7 @@ import { orclings, threadQueue, threads, type Db } from "@openorc/db";
 import { orclingWakeKey, type Orcling, type OrclingWake } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
 import { ORCLING_QUIET_MS } from "./orclings.js";
+import type { ThreadService } from "./threads.js";
 
 type TimeWake = Extract<OrclingWake, { kind: "time" }>;
 
@@ -69,8 +70,8 @@ export function wakePrompt(reasons: WakeReason[], now: number): string {
 interface Dependencies {
   db: Db;
   activity: (threadId: string) => "idle" | "running" | "waiting";
-  /** Delivers OpenOrc's own nudge to the Orcling's conversation: read by its agent, never shown, and quiet if it says nothing. */
-  nudge: (threadId: string, text: string) => Promise<void>;
+  /** Where a wake goes: OpenOrc's own nudge into the Orcling's chat, read by its agent, never shown, and quiet if it says nothing. */
+  threads: Pick<ThreadService, "send">;
   log: Logger;
   maintenance?: () => boolean;
   now?: () => number;
@@ -122,13 +123,15 @@ export class OrclingWakeService {
       // Busy with the person already, or about to be with a message they queued, it has no need to wake.
       if (this.deps.activity(home.id) !== "idle" || threadQueue.list(db, home.id).some((message) => message.state === "pending" || message.state === "delivering")) continue;
       this.deps.log.info(`Waking ${orcling.name}: ${due.map(({ key }) => key).join(", ")}`);
-      await this.deps
-        .nudge(
+      await this.deps.threads
+        .send(
           home.id,
           wakePrompt(
             due.map(({ reason }) => reason),
             now,
           ),
+          null,
+          { unprompted: true },
         )
         .catch((error: unknown) => {
           this.deps.log.warn(`${orcling.name} could not wake: ${error instanceof Error ? error.message : String(error)}`);

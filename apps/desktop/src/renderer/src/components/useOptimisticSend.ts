@@ -64,6 +64,7 @@ export function useOptimisticSend({
   run,
   attachmentsKey,
   restore,
+  route,
 }: {
   submitter: Submitter;
   request: Omit<SubmitRequest, "now">;
@@ -71,6 +72,8 @@ export function useOptimisticSend({
   run: RunTranscript | null;
   attachmentsKey: string;
   restore: (text: string) => void;
+  /** Where the conversation's messages go instead of to one agent, as a group chat's go to its Orclings. */
+  route?: ((message: OutgoingMessage) => Promise<void>) | undefined;
 }) {
   const request: SubmitRequest = { ...current, now: false };
   const threadId = request.target.kind === "thread" ? request.target.threadId : null;
@@ -93,7 +96,8 @@ export function useOptimisticSend({
       const going = { ...latest.current, now };
       last.current = { request: going, landed: false };
       try {
-        const kind = await submitter.submit(going, { ...message, messageId: echo.id });
+        const outgoing = { ...message, messageId: echo.id };
+        const kind = route ? (await route(outgoing), "continue") : await submitter.submit(going, outgoing);
         last.current = { request: going, landed: true };
         if (kind === "queue") drop(echo.id);
         else setEchoes((current) => current.map((other) => (other.id === echo.id ? { ...other, settledAt: Date.now() } : other)));
@@ -103,13 +107,13 @@ export function useOptimisticSend({
         restoreDraftAttachments(attachmentsKey, files);
       }
     },
-    [submitter, attachmentsKey, drop],
+    [submitter, attachmentsKey, drop, route],
   );
 
   const send = useCallback(
     async (sent: SubmitRequest, message: { text: string; attachments: string[] }) => {
       const plan = planSubmit(sent);
-      if (!threadId || plan.kind === "blocked" || plan.kind === "queue") {
+      if (!route && (!threadId || plan.kind === "blocked" || plan.kind === "queue")) {
         setAwaiting((count) => count + 1);
         try {
           await submitter.submit(sent, message);
@@ -129,7 +133,7 @@ export function useOptimisticSend({
           inFlight.current -= 1;
         });
     },
-    [threadId, submitter, attachmentsKey, deliver],
+    [threadId, submitter, attachmentsKey, deliver, route],
   );
 
   useEffect(() => {

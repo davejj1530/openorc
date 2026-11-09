@@ -166,6 +166,7 @@ export const docGroups: DocGroup[] = [
           { id: "create", title: "Create an Orcling" },
           { id: "own-conversation", title: "Its own conversation" },
           { id: "check-ins", title: "Check-ins" },
+          { id: "orclings-together", title: "Orclings together" },
           { id: "what-it-sees", title: "What it sees" },
           { id: "instructions-and-memory", title: "Instructions and memory" },
           { id: "project-work", title: "Bring it into project work" },

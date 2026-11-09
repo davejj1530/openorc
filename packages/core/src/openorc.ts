@@ -102,6 +102,7 @@ import { ReviewService } from "./services/review.js";
 import { ReviewerAppService } from "./services/reviewer-app.js";
 import { RunService, type Notification, type RunHooks } from "./services/runs.js";
 import { ScheduleService } from "./services/schedules.js";
+import { OrclingWakeService } from "./services/orcling-wakes.js";
 import { AppSettingsService } from "./services/settings.js";
 import { ShellEnvironment, inheritedProbe, type EnvSnapshot } from "./services/shell-environment.js";
 import { SlackService } from "./services/slack/service.js";
@@ -193,6 +194,7 @@ export class OpenOrc {
   readonly pullRequests: PullRequestService;
   readonly reviewerApp: ReviewerAppService;
   readonly schedules: ScheduleService;
+  readonly orclingWakes: OrclingWakeService;
   readonly files: FileService;
   readonly imports: ImportService;
   readonly devices: DeviceService;
@@ -328,6 +330,8 @@ export class OpenOrc {
     this.schedules = new ScheduleService(db, this.threads, invalidate, notify, this.log, {
       maintenance: () => this.agentUpdates.get().updating,
     });
+    const maintenance = () => this.agentUpdates.get().updating;
+    this.orclingWakes = new OrclingWakeService({ db, activity: (id) => this.runs.threadActivity(id), nudge: (id, text) => this.threads.send(id, text, null, true), log: this.log, maintenance });
     this.files = createFileService({ options, writers: this.workspaceWriters, invalidate, environment: () => this.environment.current() });
     this.imports = new ImportService(db, this.ledger, invalidate, this.log, this.toolImages);
     this.reviewerApp = new ReviewerAppService(db, { secrets: options.githubSecrets, invalidate });
@@ -528,6 +532,7 @@ export class OpenOrc {
     options.transport.push({ type: "ready", pid: process.pid, mcpPort: mcp.port });
     core.lifecycle.start();
     core.schedules.start();
+    core.orclingWakes.start();
     core.threads.recoverQueue();
     core.upkeep.start();
     core.cloudParts.brain.opened();
@@ -650,6 +655,7 @@ export class OpenOrc {
     this.lifecycle.stop();
     this.reviewerApp.shutdown();
     await this.upkeep.stop();
+    this.orclingWakes.stop();
     await this.schedules.shutdown();
     await this.workspaces.shutdown();
     this.cloudStandby.close();

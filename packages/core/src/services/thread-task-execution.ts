@@ -361,7 +361,9 @@ export class ThreadTaskExecution {
     if (!this.runs.postThreadNotice(thread.id, `task-report-${run.id}`, report)) return;
     if (thread.mode !== "act" || thread.archivedAt) return;
     try {
-      await this.queue.deliver(thread, `${report}\n\nTask id: ${task.id}. Report the outcome to the user. Start further work only if their request calls for it.`, "system", [], false);
+      await this.queue.deliver(thread, `${report}\n\nTask id: ${task.id}. Report the outcome to the user. Start further work only if their request calls for it.`, "system", [], {
+        recordPrompt: false,
+      });
     } catch (e) {
       this.log.warn(`could not report task ${task.id} to thread ${thread.id}: ${e instanceof Error ? e.message : String(e)}`);
     }

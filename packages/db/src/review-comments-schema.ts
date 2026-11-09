@@ -40,3 +40,7 @@ export function conversationReviewCommentsMigration(raw: DatabaseSync): void {
     CREATE INDEX review_comments_task ON review_comments(task_id, created_at);
   `);
 }
+
+/** A review comment can cover a range of lines, as a pull request review does; one line leaves both empty. */
+export const reviewCommentRangeMigration = `ALTER TABLE review_comments ADD COLUMN start_line INTEGER;
+  ALTER TABLE review_comments ADD COLUMN start_side TEXT;`;

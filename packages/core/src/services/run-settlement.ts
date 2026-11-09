@@ -114,11 +114,16 @@ export class RunSettlement {
     entry.busy = false;
     this.deps.armIdle(entry);
     this.deps.turnSettled(entry.run, entry.scope, project, capturedTurnOutcome(turn, entry.failed, capture));
-    threads.touch(this.deps.db, thread.id);
+    const reply = turn.resultText ?? entry.reply;
+    // An unprompted turn that ended without a word, such as an Orcling with nothing to say, leaves the thread as it was.
+    const quiet = entry.unprompted && !reply?.trim() && !entry.reply?.trim() && turn.status === "success";
+    entry.unprompted = false;
+    if (!quiet) threads.touch(this.deps.db, thread.id);
     // An agent may have set up git or made the first commit, which turns on more of the project.
     this.deps.invalidate([...this.deps.keysFor(entry.scope), `checkpoints:${thread.id}`, `threaddiff:${thread.id}`, `projectgit:${project.id}`]);
-    const reply = turn.resultText ?? entry.reply;
-    this.deps.hooks.onThreadTurn(thread, { prompt: entry.prompt, reply });
+    // Still a turn's end, so a message the person queued meanwhile goes out; there is no exchange to name the thread from.
+    this.deps.hooks.onThreadTurn(thread, quiet ? { prompt: null, reply: null } : { prompt: entry.prompt, reply });
+    if (quiet) return;
     if (turn.status === "success") this.deps.notifyFor(entry.scope, "finished", thread.title, reply ? noticeBody(reply) : "The agent finished its turn.");
     else if (turn.status !== "cancelled") this.deps.notifyFor(entry.scope, "error", thread.title, entry.failed ?? "The turn failed.");
   }

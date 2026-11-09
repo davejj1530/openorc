@@ -17,10 +17,10 @@ import { teamLocalStartMigration } from "./team-local-start-schema.js";
 import { teamHarnessMigration } from "./team-harness-schema.js";
 import { teamJournalMigration } from "./team-journal-schema.js";
 import { taskExecutionMigration } from "./task-execution-schema.js";
-import { conversationReviewCommentsMigration } from "./review-comments-schema.js";
+import { conversationReviewCommentsMigration, reviewCommentRangeMigration } from "./review-comments-schema.js";
 import { teamCancellationMigration } from "./team-cancellation-schema.js";
 import { pullRequestReviewMigration } from "./pull-review-schema.js";
-import { orclingAccountMigration, orclingMigration } from "./orcling-schema.js";
+import { orclingAccountMigration, orclingCompanionMigration, orclingMigration } from "./orcling-schema.js";
 import { remoteDeviceMigration } from "./remote-device-schema.js";
 import { remotePushTargetMigration } from "./remote-push-target-schema.js";
 import { cloudWorkspaceMigration, cloudWorkspaceRemovedMigration } from "./cloud-workspace-schema.js";
@@ -759,9 +759,7 @@ export const migrations: Migration[] = [
   `CREATE INDEX team_room_events_execution ON team_room_events(instance_id, execution_id, seq);`,
   taskExecutionMigration,
   conversationReviewCommentsMigration,
-  /** A review comment can cover a range of lines, as a pull request review does; one line leaves both empty. */
-  `ALTER TABLE review_comments ADD COLUMN start_line INTEGER;
-  ALTER TABLE review_comments ADD COLUMN start_side TEXT;`,
+  reviewCommentRangeMigration,
   teamCancellationMigration,
   /** Removing a project from navigation preserves its files and historical records. */
   `ALTER TABLE projects ADD COLUMN removed_at INTEGER;`,
@@ -797,4 +795,5 @@ export const migrations: Migration[] = [
   startedByAgentMigration,
   `CREATE INDEX events_usage_history ON events(ts, id) WHERE kind IN ('turn.completed', 'usage.updated');`,
   usageHistoryMigration,
+  orclingCompanionMigration,
 ];

@@ -34,7 +34,15 @@ const TOOLS = [
 function placeNote(orcling: Orcling, place: OrclingPlace): string {
   switch (place) {
     case "home":
-      return "This is your own conversation with the person: one thread that never ends, like texting a friend. Code changes belong in project threads: when the person wants work done in a project, start it there with orcling_thread_start rather than editing its files from here.";
+      return [
+        "This is your own conversation with the person: one thread that never ends, like texting a friend. Code changes belong in project threads: when the person wants work done in a project, start it there with orcling_thread_start rather than editing its files from here.",
+        "",
+        "## Texting",
+        "- Text like a person, not a report. Keep messages short, one thought each, and put a blank line between them: each paragraph arrives as its own message. Skip headings and tables; use a list only when they ask for something long, like a plan.",
+        '- Before anything that takes more than a moment, send a quick heads-up first, such as "on it, checking openorc", then do the work, then text what you found. They see you typing in between, never your tool calls.',
+        "- React with orcling_react when a reaction says it better than words: a heart for thanks, haha for a joke. A reaction can be the whole reply.",
+        "- Their reactions to your messages reach you as a note before their next message. Take them in without making a thing of them.",
+      ].join("\n");
     case "guest":
       return `The person mentioned you in a conversation that belongs to another agent. Answer what they asked of you, as ${orcling.name}; the conversation's own agent carries on after you.`;
     case "thread":

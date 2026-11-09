@@ -11,6 +11,7 @@ import { useRouter } from "../lib/router";
 import { relativeTime } from "@openorc/client";
 import { modelLabel } from "../lib/model-effort-label";
 import { useModelCatalog } from "../lib/use-model-catalog";
+import { OrclingWakes } from "./OrclingWakes";
 
 /** An Orcling's profile beside a conversation it works in: its instructions, with every earlier version, and what it remembers. */
 export function OrclingPanel({ orclingId }: { orclingId: string }) {
@@ -31,6 +32,7 @@ export function OrclingPanel({ orclingId }: { orclingId: string }) {
           <Pencil size={14} /> Edit
         </Button>
       </header>
+      <OrclingWakes orcling={orcling} />
       <Instructions orcling={orcling} />
       <Memories orcling={orcling} />
     </div>

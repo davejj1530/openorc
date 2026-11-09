@@ -47,6 +47,7 @@ export class RunProcess {
       lastAgentEventAt: null,
       prompt: input.promptRole === "system" ? null : input.prompt,
       reply: null,
+      unprompted: Boolean(input.unprompted),
       started: false,
       stderr: [],
       failed: null,

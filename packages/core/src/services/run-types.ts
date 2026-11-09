@@ -16,6 +16,8 @@ export interface SendOptions {
   role?: "user" | "system";
   attachments?: string[];
   recordPrompt?: boolean;
+  /** OpenOrc's own idea rather than anyone's message, such as an Orcling waking up: the turn counts as activity only once the agent says something. */
+  unprompted?: boolean;
   /** Called once the provider has taken the input, with the run and the process's turn index. Throwing closes the process. */
   onAccepted?: (run: Run, processTurn: number) => void;
 }
@@ -79,6 +81,8 @@ export interface StartRunInput {
   promptRole?: "user" | "system";
   /** A delivered task report may already be visible in the thread ledger. */
   recordPrompt?: boolean;
+  /** See SendOptions.unprompted. */
+  unprompted?: boolean;
   resume: boolean;
   /** Where the session to resume comes from, when it is not this scope's own last session (a fork continues its parent's). */
   resumeFrom?: { sessionId: string; fork: boolean };
@@ -111,6 +115,8 @@ export interface OrclingRunHooks {
   rolloverDue(thread: Thread): boolean;
   /** The loosest permission an Orcling may work with anywhere. */
   ceiling(orclingId: string): PermissionPreset;
+  /** What an Orcling's own conversation tells it ahead of the next message it reads there, such as reactions since; empty elsewhere. Heard once. */
+  turnNote(threadId: string): string;
 }
 
 export interface LiveRun {
@@ -149,6 +155,8 @@ export interface LiveRun {
   /** The user's latest message and the agent's latest reply, for naming the thread after its first exchange. */
   prompt: string | null;
   reply: string | null;
+  /** The turn under way is OpenOrc's own idea: until the agent says something, nothing happened in the thread. */
+  unprompted?: boolean;
   /** The provider announced its session. Without it, a run that exits early never had one. */
   started: boolean;
   stderr: string[];

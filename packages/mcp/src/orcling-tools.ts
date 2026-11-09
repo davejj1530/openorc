@@ -29,6 +29,8 @@ export interface OrclingTools {
   createTask(runId: string, input: { projectId: string; title: string; spec: string }): Promise<string>;
   startWork(runId: string, input: { projectId: string; prompt: string; taskId?: string; title?: string }): Promise<string>;
   sendThread(runId: string, input: { threadId: string; text: string; requestKey?: string }): Promise<string>;
+  /** A tapback on the person's newest message in the Orcling's own conversation. */
+  react(runId: string, reaction: "heart" | "like" | "dislike" | "haha" | "wow" | "sad"): Promise<string>;
 }
 
 /** Every Orcling tool, so providers treat them as OpenOrc's own. */
@@ -43,11 +45,22 @@ export const orclingToolNames = [
   "orcling_task_create",
   "orcling_thread_start",
   "orcling_thread_send",
+  "orcling_react",
 ];
 
 const text = (value: string) => ({ content: [{ type: "text" as const, text: value }] });
 
 export function registerOrclingTools(mcp: McpServer, tools: OrclingTools, runId: string): void {
+  if (tools.ownConversation(runId))
+    mcp.registerTool(
+      "orcling_react",
+      {
+        description:
+          "React to the person's newest message with a tapback, the way people do in a chat: heart, like, dislike, haha, wow or sad. Use it when a reaction says it better than words, such as a heart for thanks or haha for a joke. A reaction can be your whole reply: after it, you may end your turn without writing anything.",
+        inputSchema: { reaction: z.enum(["heart", "like", "dislike", "haha", "wow", "sad"]) },
+      },
+      async ({ reaction }) => text(await tools.react(runId, reaction)),
+    );
   mcp.registerTool(
     "orcling_instructions_update",
     {

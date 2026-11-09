@@ -1,4 +1,16 @@
-import { DEFAULT_CLAUDE_ACCOUNT, defaultOrclingLook, isHarnessId, OrclingLook, type Orcling, type OrclingDraft, type OrclingInstructionsVersion } from "@openorc/protocol";
+import {
+  DEFAULT_CLAUDE_ACCOUNT,
+  defaultOrclingLook,
+  isHarnessId,
+  OrclingLook,
+  OrclingWakes,
+  Reaction,
+  type MessageReaction,
+  type Orcling,
+  type OrclingDraft,
+  type OrclingInstructionsVersion,
+  type OrclingWake,
+} from "@openorc/protocol";
 import type { Db } from "./database.js";
 
 interface OrclingRow {
@@ -12,6 +24,7 @@ interface OrclingRow {
   permission: "allow" | "approve";
   claude_account_id: string | null;
   thread_id: string;
+  wakes: string;
   created_at: number;
   updated_at: number;
 }
@@ -22,6 +35,14 @@ interface InstructionsRow {
   author: "user" | "orcling";
   note: string | null;
   created_at: number;
+}
+
+function parseWakes(text: string): OrclingWake[] {
+  try {
+    return OrclingWakes.parse(JSON.parse(text));
+  } catch {
+    return [];
+  }
 }
 
 function parseLook(text: string): OrclingLook {
@@ -40,6 +61,7 @@ const toOrcling = (row: OrclingRow): Orcling => ({
   permission: row.permission,
   claudeAccountId: row.claude_account_id ?? DEFAULT_CLAUDE_ACCOUNT,
   threadId: row.thread_id,
+  wakes: parseWakes(row.wakes),
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -102,6 +124,29 @@ export const orclings = {
   delete(db: Db, id: string): void {
     db.stmt("DELETE FROM orclings WHERE id = ?").run(id);
   },
+  setWakes(db: Db, id: string, wakes: OrclingWake[], now = Date.now()): Orcling | null {
+    db.stmt("UPDATE orclings SET wakes = ?, updated_at = ? WHERE id = ?").run(JSON.stringify(wakes), now, id);
+    return orclings.get(db, id);
+  },
+  /** How far each of an Orcling's wake rules has been checked, by rule key. */
+  wakeState(db: Db, id: string): Map<string, number> {
+    const rows = db.stmt("SELECT rule_key, checked_until FROM orcling_wake_state WHERE orcling_id = ?").all(id) as { rule_key: string; checked_until: number }[];
+    return new Map(rows.map((row) => [row.rule_key, row.checked_until]));
+  },
+  /** Keeps state for exactly these rules; a rule new to the list starts checked until the time given for it. */
+  syncWakeState(db: Db, id: string, initial: ReadonlyMap<string, number>): void {
+    db.transaction(() => {
+      for (const key of orclings.wakeState(db, id).keys()) if (!initial.has(key)) db.stmt("DELETE FROM orcling_wake_state WHERE orcling_id = ? AND rule_key = ?").run(id, key);
+      for (const [key, until] of initial) db.stmt("INSERT OR IGNORE INTO orcling_wake_state (orcling_id, rule_key, checked_until) VALUES (?, ?, ?)").run(id, key, until);
+    });
+  },
+  markWakeChecked(db: Db, id: string, key: string, until: number): void {
+    db.stmt("INSERT INTO orcling_wake_state (orcling_id, rule_key, checked_until) VALUES (?, ?, ?) ON CONFLICT(orcling_id, rule_key) DO UPDATE SET checked_until = excluded.checked_until").run(
+      id,
+      key,
+      until,
+    );
+  },
   /** Every version of an Orcling's instructions, newest first. */
   instructions(db: Db, id: string): OrclingInstructionsVersion[] {
     return (db.stmt("SELECT version, body, author, note, created_at FROM orcling_instructions WHERE orcling_id = ? ORDER BY version DESC").all(id) as unknown as InstructionsRow[]).map(toVersion);
@@ -117,6 +162,59 @@ export const orclings = {
       const { next } = db.stmt("SELECT COALESCE(MAX(version), 0) + 1 AS next FROM orcling_instructions WHERE orcling_id = ?").get(id) as { next: number };
       db.stmt("INSERT INTO orcling_instructions (orcling_id, version, body, author, note, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(id, next, input.body, input.author, input.note, now);
       return { version: next, body: input.body, author: input.author, note: input.note, createdAt: now };
+    });
+  },
+};
+
+interface ReactionRow {
+  run_id: string;
+  message_id: string;
+  part: number;
+  reactor: string;
+  reaction: string;
+  created_at: number;
+}
+
+/** The person reacts as this reactor; an Orcling as its own id. */
+const PERSON = "person";
+
+const toReaction = (row: ReactionRow): MessageReaction | null => {
+  const reaction = Reaction.safeParse(row.reaction);
+  if (!reaction.success) return null;
+  return { runId: row.run_id, messageId: row.message_id, part: row.part, orclingId: row.reactor === PERSON ? null : row.reactor, reaction: reaction.data, at: row.created_at };
+};
+
+export interface ReactionTarget {
+  threadId: string;
+  runId: string;
+  messageId: string;
+  part: number;
+}
+
+export const messageReactions = {
+  list(db: Db, threadId: string): MessageReaction[] {
+    const rows = db.stmt("SELECT run_id, message_id, part, reactor, reaction, created_at FROM message_reactions WHERE thread_id = ? ORDER BY created_at").all(threadId) as unknown as ReactionRow[];
+    return rows.map(toReaction).filter((reaction) => reaction !== null);
+  },
+  /** One reaction per reactor on a bubble: a new one replaces the old, null takes it back. */
+  set(db: Db, target: ReactionTarget, orclingId: string | null, reaction: Reaction | null, now = Date.now()): void {
+    const reactor = orclingId ?? PERSON;
+    if (!reaction) {
+      db.stmt("DELETE FROM message_reactions WHERE run_id = ? AND message_id = ? AND part = ? AND reactor = ?").run(target.runId, target.messageId, target.part, reactor);
+      return;
+    }
+    db.stmt(
+      "INSERT INTO message_reactions (thread_id, run_id, message_id, part, reactor, reaction, heard_at, created_at) VALUES (?, ?, ?, ?, ?, ?, NULL, ?) ON CONFLICT(run_id, message_id, part, reactor) DO UPDATE SET reaction = excluded.reaction, heard_at = NULL, created_at = excluded.created_at",
+    ).run(target.threadId, target.runId, target.messageId, target.part, reactor, reaction, now);
+  },
+  /** The person's reactions the Orcling has not heard yet, oldest first, marked heard as they are taken. */
+  takeUnheard(db: Db, threadId: string, now = Date.now()): MessageReaction[] {
+    return db.transaction(() => {
+      const rows = db
+        .stmt("SELECT run_id, message_id, part, reactor, reaction, created_at FROM message_reactions WHERE thread_id = ? AND reactor = ? AND heard_at IS NULL ORDER BY created_at")
+        .all(threadId, PERSON) as unknown as ReactionRow[];
+      db.stmt("UPDATE message_reactions SET heard_at = ? WHERE thread_id = ? AND reactor = ? AND heard_at IS NULL").run(now, threadId, PERSON);
+      return rows.map(toReaction).filter((reaction) => reaction !== null);
     });
   },
 };

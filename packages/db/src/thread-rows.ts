@@ -35,6 +35,7 @@ export const HOST_TABLES: Record<string, string> = {
   memories: "memory merges by its own rules",
   extraction_jobs: "memory work belongs to the host that ran it",
   orclings: "an Orcling's conversation is refused",
+  message_reactions: "reactions live in an Orcling's own conversation, which is refused",
   schedules: "a schedule stays with the host that runs it",
   schedule_firings: "as schedules",
   pull_request_reviews: "a review stays with the Mac's pull request copy",

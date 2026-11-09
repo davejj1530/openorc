@@ -50,6 +50,8 @@ interface LayoutState {
   workspace: string;
   /** The rail lists the projects under its Projects button. */
   railProjects: boolean;
+  /** The rail shows each Orcling's face under its Orclings button. */
+  railOrclings: boolean;
   /** The visible thread whose controls last opened the shared panel. */
   panelThreadId: string | null;
   toggleThreadPanel: (id: string) => void;
@@ -78,6 +80,7 @@ interface LayoutState {
   followProject: (id: string) => void;
   setPinnedOnly: (pinnedOnly: boolean) => void;
   setRailProjects: (open: boolean) => void;
+  setRailOrclings: (open: boolean) => void;
   toggleCollapsed: (key: string) => void;
   toggleThreadChildren: (id: string, expanded: boolean) => void;
   rememberPreviewUrl: (key: string, url: string) => void;
@@ -91,7 +94,7 @@ export const limits = {
 
 const KEY = "openorc.layout";
 
-function read(): Partial<Pick<LayoutState, "sidebarOpen" | "sidebarWidth" | "panelOpen" | "panelWidth" | "panelSide" | "workspace" | "railProjects" | "collapsed" | "previewUrls">> {
+function read(): Partial<Pick<LayoutState, "sidebarOpen" | "sidebarWidth" | "panelOpen" | "panelWidth" | "panelSide" | "workspace" | "railProjects" | "railOrclings" | "collapsed" | "previewUrls">> {
   try {
     return JSON.parse(localStorage.getItem(KEY) ?? "{}") as Partial<LayoutState>;
   } catch {
@@ -111,6 +114,7 @@ function persist(s: LayoutState): void {
         panelSide: s.panelSide,
         workspace: s.workspace,
         railProjects: s.railProjects,
+        railOrclings: s.railOrclings,
         collapsed: s.collapsed,
         previewUrls: s.previewUrls,
       }),
@@ -159,6 +163,7 @@ export const useLayout = create<LayoutState>((set, get) => {
     // Layouts saved before the project filter list every project, as the sidebar did then.
     workspace: typeof saved.workspace === "string" && saved.workspace ? saved.workspace : ALL_WORKSPACES,
     railProjects: saved.railProjects === true,
+    railOrclings: saved.railOrclings === true,
     panelThreadId: null,
     pinnedOnly: false,
     collapsed: (saved.collapsed ?? []).filter(liveSidebarFold),
@@ -221,6 +226,7 @@ export const useLayout = create<LayoutState>((set, get) => {
     },
     setPinnedOnly: (pinnedOnly) => commit({ pinnedOnly }),
     setRailProjects: (railProjects) => commit({ railProjects }),
+    setRailOrclings: (railOrclings) => commit({ railOrclings }),
     toggleCollapsed: (key) => commit({ collapsed: toggleSidebarFold(get().collapsed, key) }),
     toggleThreadChildren: (id, expanded) => commit({ collapsed: toggleThreadTree(get().collapsed, id, expanded) }),
     ...threadFoldActions(get, commit),

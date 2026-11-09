@@ -48,16 +48,17 @@ export function useOrclingConversation({
   const orclings = useOrclings();
   const own = thread?.orclingId ?? null;
   const speaker = orclingById(orclings, own);
+  const home = orclingHome(orclings, thread?.id);
   const voice = useMemo(
     () => ({
       authors: new Map(runs.flatMap((run) => (run.orclingId && run.orclingId !== own ? [[run.id, orclings.find((orcling) => orcling.id === run.orclingId)?.name ?? "An Orcling"] as const] : []))),
       face: speaker ? face(speaker) : undefined,
+      chat: home ?? undefined,
     }),
-    [runs, own, orclings, speaker],
+    [runs, own, orclings, speaker, home],
   );
   const askOrcling = useRpcMutation("orclings.ask");
   const assign = useRpcMutation("orclings.assign");
-  const home = orclingHome(orclings, thread?.id);
   const open = Boolean(thread && !home && !thread.teamInstanceId && orclings.length);
   const guests = open ? orclings.filter((orcling) => orcling.id !== thread?.orclingId) : [];
   const assignable = open && thread?.projectId !== WORKSPACE_ID;

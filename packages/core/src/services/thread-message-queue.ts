@@ -176,11 +176,11 @@ export class ThreadMessageQueue {
   }
 
   /** Puts a message into the thread: on the live session when there is one, else on a run that resumes it. */
-  async deliver(thread: Thread, text: string, role: "user" | "system", attachments: string[] = [], recordPrompt = true): Promise<void> {
+  async deliver(thread: Thread, text: string, role: "user" | "system", attachments: string[] = [], { recordPrompt = true, unprompted = false } = {}): Promise<void> {
     this.rejectRetiredThread(thread.id);
     const live = this.runs.liveRunForThread(thread.id);
     if (live && live.agent === thread.agent) {
-      await this.runs.send(live.id, text, { role, attachments, recordPrompt });
+      await this.runs.send(live.id, text, { role, attachments, recordPrompt, unprompted });
       return;
     }
     await this.continueThread(thread.id, {
@@ -194,15 +194,24 @@ export class ThreadMessageQueue {
       attachments,
       promptRole: role,
       recordPrompt,
+      unprompted,
     });
   }
 
-  /** A message into a thread from the outside: another thread, or the user relaying between them. */
-  async send(id: string, text: string, from: Thread | null): Promise<void> {
+  /**
+   * A message into a thread from the outside: another thread, or the user relaying between them. Unprompted, it is
+   * OpenOrc's own nudge, such as an Orcling waking up: the agent reads it, the transcript does not show it.
+   */
+  async send(id: string, text: string, from: Thread | null, unprompted = false): Promise<void> {
     const thread = this.thread(id);
     if (thread.archivedAt) throw new Error("the thread is resolved");
     const body = from ? `Message from the thread "${from.title}" (id ${from.id}):\n\n${text}` : text;
-    await this.deliver(thread, body, "system");
-    audit.record(this.db, { actor: from ? "agent" : "user", action: "thread.message", resourceType: "thread", resourceId: id, metadata: { from: from?.id ?? null } });
+    await this.deliver(thread, body, "system", [], { recordPrompt: !unprompted, unprompted });
+    audit.record(this.db, { actor: messageActor(from, unprompted), action: "thread.message", resourceType: "thread", resourceId: id, metadata: { from: from?.id ?? null } });
   }
+}
+
+function messageActor(from: Thread | null, unprompted: boolean): "openorc" | "agent" | "user" {
+  if (unprompted) return "openorc";
+  return from ? "agent" : "user";
 }

@@ -1,6 +1,6 @@
 import { useRef, type ReactNode } from "react";
 import type { SidebarScreen } from "../lib/layout";
-import { Orclings, PenSquare, Settings } from "./icons";
+import { PenSquare, Settings } from "./icons";
 import { AccountUsage } from "./AccountUsage";
 import { useRpc } from "../lib/client";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
@@ -9,6 +9,7 @@ import { activeScheduleCount, openTaskCount } from "../lib/task-stage-counts";
 import { useSlidingKnob } from "../lib/use-sliding-knob";
 import { RAIL_ICON, SCREENS } from "./sidebar-screens";
 import { RailProjects } from "./SidebarRailProjects";
+import { RailOrclings } from "./SidebarRailOrclings";
 import { RailUpdate } from "./SidebarRailUpdate";
 import { Tooltip } from "./ui";
 
@@ -72,9 +73,7 @@ export function SidebarRail({
           <Icon size={RAIL_ICON} />
         </RailButton>
       ))}
-      <RailButton label="Orclings" pressed={orclings.active} onClick={orclings.toggle}>
-        <Orclings size={RAIL_ICON} />
-      </RailButton>
+      <RailOrclings active={orclings.active} toggle={orclings.toggle} threadId={route.view === "thread" ? route.threadId : null} />
       <span aria-hidden="true" className="sidebar-rail-divider" />
       <RailProjects onSelect={onProject} />
       <span aria-hidden="true" className="sidebar-rail-gap" />

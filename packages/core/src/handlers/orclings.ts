@@ -22,5 +22,11 @@ export function createOrclingHandlers({ orclings }: Dependencies): Pick<Handlers
       orclings.assign(threadId, orclingId);
       return null;
     },
+    "orclings.wakes.save": ({ id, wakes }) => orclings.saveWakes(id, wakes),
+    "orclings.reactions": ({ threadId }) => orclings.reactions(threadId),
+    "orclings.react": ({ threadId, runId, messageId, part, reaction }) => {
+      orclings.react({ threadId, runId, messageId, part }, reaction, null);
+      return null;
+    },
   };
 }

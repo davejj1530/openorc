@@ -107,7 +107,8 @@ export class RunEvents {
         this.onContextUpdated(entry, ev);
         return;
       case "message.completed":
-        if (ev.role === "assistant") entry.reply = ev.text;
+        // An empty message after a reply does not take the reply back.
+        if (ev.role === "assistant" && ev.text.trim()) entry.reply = ev.text;
         return;
       case "error":
         this.onError(entry, ev);

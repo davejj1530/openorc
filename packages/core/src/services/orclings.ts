@@ -1,14 +1,18 @@
-import { audit, claudeAccounts, orclings, retiredTeams, runs as runRepo, tasks, threads, type Db } from "@openorc/db";
+import { audit, claudeAccounts, messageReactions, orclings, retiredTeams, runs as runRepo, tasks, threads, type Db, type ReactionTarget } from "@openorc/db";
 import {
   isHarnessId,
   orclingExecution,
   orclingHandle,
+  orclingWakeKey,
   stricterPermission,
   WORKSPACE_ID,
   type Orcling,
   type OrclingDraft,
+  type MessageReaction,
   type OrclingInstructionsVersion,
+  type OrclingWake,
   type PermissionPreset,
+  type Reaction,
   type Run,
   type RunMode,
   type Thread,
@@ -18,6 +22,7 @@ import { AttachmentService } from "./attachments.js";
 import type { MemoryService } from "./memory.js";
 import { catchUp, orclingBrief, rolloverSeed, type OrclingPlace } from "./orcling-briefs.js";
 import { OrclingFolders } from "./orcling-folders.js";
+import { messageInThread, reactionNote } from "./orcling-reactions.js";
 import type { OrclingRunHooks, StartRunInput } from "./run-types.js";
 import type { RunService } from "./runs.js";
 import type { StartThreadInput, ThreadPatch } from "./thread-inputs.js";
@@ -198,6 +203,36 @@ export class OrclingService {
     return this.saveInstructions(id, earlier.body, "user", `Restored version ${version}`);
   }
 
+  /**
+   * When the Orcling wakes up on its own. A time new to the list counts from now, so its earlier times never wake it;
+   * waking as OpenOrc opens works from the next opening.
+   */
+  saveWakes(id: string, wakes: OrclingWake[]): Orcling {
+    this.get(id);
+    const unique = new Map(wakes.map((wake) => [orclingWakeKey(wake), wake.kind === "time" ? { ...wake, days: [...new Set(wake.days)].sort() } : wake]));
+    const now = Date.now();
+    const orcling = this.deps.db.transaction(() => {
+      const saved = orclings.setWakes(this.deps.db, id, [...unique.values()])!;
+      orclings.syncWakeState(this.deps.db, id, new Map([...unique].map(([key, wake]) => [key, wake.kind === "startup" ? 0 : now])));
+      return saved;
+    });
+    this.changed(orcling);
+    return orcling;
+  }
+
+  reactions(threadId: string): MessageReaction[] {
+    return messageReactions.list(this.deps.db, threadId);
+  }
+
+  /** A tapback in an Orcling's own conversation: the person's when orclingId is null, else that Orcling's. */
+  react(target: ReactionTarget, reaction: Reaction | null, orclingId: string | null): void {
+    const { db } = this.deps;
+    if (!orclings.forThread(db, target.threadId)) throw new Error("Reactions are for an Orcling's own conversation.");
+    if (!messageInThread(db, target.threadId, target.runId, target.messageId)) throw new Error("That message is not in this conversation.");
+    messageReactions.set(db, target, orclingId, reaction);
+    this.deps.invalidate([`reactions:${target.threadId}`]);
+  }
+
   /** A project conversation the Orcling works in, from its first message. Its own conversation is where you talk to it outside projects. */
   async startThread(id: string, input: Omit<StartThreadInput, "agent" | "model" | "effort" | "fastMode">) {
     const orcling = this.get(id);
@@ -351,6 +386,7 @@ export class OrclingService {
       const ceiling = orclingExecution(this.get(orclingId));
       return ceiling.mode === "plan" ? "review" : ceiling.permissionMode;
     },
+    turnNote: (threadId) => (orclings.forThread(this.deps.db, threadId) ? reactionNote(this.deps.db, threadId) : ""),
   };
 
   private identity(input: StartRunInput): string | null {

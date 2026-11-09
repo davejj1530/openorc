@@ -1,0 +1,258 @@
+/* An Orcling's own conversation, read as texting. The person's messages keep the prompt bubble; the Orcling's take a
+   soft tint of its body color, so each Orcling's side of the chat is its own. Consecutive bubbles from one
+   side sit 4px apart and close up their facing corners; a change of side leaves 14px. */
+.orcling-chat {
+  --orcling-fill: color-mix(in srgb, var(--orcling-tint) 14%, var(--surface));
+  display: grid;
+  gap: 14px;
+}
+.dark .orcling-chat {
+  --orcling-fill: color-mix(in srgb, var(--orcling-tint) 20%, var(--surface));
+}
+
+.orcling-chat-time {
+  justify-self: center;
+  padding-top: 6px;
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+}
+
+.orcling-chat-mine {
+  transition:
+    opacity var(--duration-arrive) var(--ease-out),
+    filter var(--duration-arrive) var(--ease-out),
+    translate var(--duration-arrive) var(--ease-out);
+}
+.orcling-chat-mine .journal-prompt {
+  margin: 0;
+}
+.orcling-chat-mine .message-bubble {
+  position: relative;
+}
+
+.orcling-run {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: end;
+}
+.orcling-run-face {
+  margin-bottom: 2px;
+}
+.orcling-run-bubbles {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+}
+
+.orcling-bubble-row {
+  position: relative;
+  display: flex;
+  max-width: min(78%, 72ch);
+}
+.orcling-bubble {
+  position: relative;
+  min-width: 0;
+  padding: 9px 14px;
+  border-radius: 18px;
+  background: var(--orcling-fill);
+  overflow-wrap: anywhere;
+  transition:
+    opacity var(--duration-arrive) var(--ease-out),
+    filter var(--duration-arrive) var(--ease-out),
+    translate var(--duration-arrive) var(--ease-out);
+}
+/* Bubbles that land once the chat has filled come out of a blur; history and remounts never animate. */
+@starting-style {
+  [data-transcript][data-arrivals] .orcling-bubble,
+  [data-transcript][data-arrivals] .orcling-chat-mine {
+    opacity: 0;
+    filter: blur(var(--arrive-blur));
+    translate: 0 var(--arrive-rise);
+  }
+}
+/* The Orcling's words in the reply's own type and ink, as the person's bubble draws theirs. */
+.app-shell .orcling-bubble .prose-chat {
+  font-size: var(--text-md);
+  line-height: var(--text-md--line-height);
+  letter-spacing: var(--text-md--letter-spacing);
+  color: var(--ink);
+}
+.orcling-bubble .prose-chat > :first-child {
+  margin-top: 0;
+}
+.orcling-bubble .prose-chat > :last-child {
+  margin-bottom: 0;
+}
+/* Facing corners close up within a run, the way a chat stacks one sender's texts. */
+.orcling-run-bubbles > :not(:first-child) .orcling-bubble,
+.orcling-run-bubbles > .orcling-typing:not(:first-child) {
+  border-top-left-radius: 6px;
+}
+.orcling-run-bubbles > :not(:last-child) .orcling-bubble {
+  border-bottom-left-radius: 6px;
+}
+
+.orcling-typing {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  height: 36px;
+  padding: 0 14px;
+}
+.orcling-typing span {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--ink-3);
+  animation: reply-pulse 0.7s var(--ease-out) infinite alternate;
+}
+.orcling-typing span:nth-child(2) {
+  animation-delay: 0.18s;
+}
+.orcling-typing span:nth-child(3) {
+  animation-delay: 0.36s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .orcling-typing span {
+    animation: none;
+  }
+}
+
+/* A tapback rests on a bubble's top corner, cut out of the bubble by a ring of the ground. */
+.orcling-reaction {
+  position: absolute;
+  top: -10px;
+  display: flex;
+  gap: 1px;
+  height: 22px;
+  padding: 0 5px;
+  align-items: center;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  box-shadow: 0 0 0 2px var(--bg);
+  font-size: 12px;
+  line-height: 1;
+  animation: orcling-reaction-land 320ms var(--ease-out) both;
+}
+.orcling-reaction[data-side="end"] {
+  right: -8px;
+}
+.orcling-reaction[data-side="start"] {
+  left: -8px;
+}
+@keyframes orcling-reaction-land {
+  from {
+    opacity: 0;
+    scale: 0.6;
+  }
+  60% {
+    opacity: 1;
+    scale: 1.08;
+  }
+}
+
+/* The person's tapbacks, floating just above the bubble under the pointer or focus, so they never take the bubble's
+   room. Fill changes only; nothing lifts. */
+.orcling-react-bar {
+  position: absolute;
+  bottom: calc(100% - 6px);
+  left: 8px;
+  z-index: 2;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--float-fill);
+  box-shadow: 0 0 0 0.5px var(--line-strong);
+  opacity: 0;
+  filter: blur(4px);
+  scale: 0.94;
+  translate: 0 4px;
+  transform-origin: 24px 100%;
+  pointer-events: none;
+  transition:
+    opacity var(--duration-leave) var(--ease-out),
+    filter var(--duration-leave) var(--ease-out),
+    scale var(--duration-leave) var(--ease-out),
+    translate var(--duration-leave) var(--ease-out);
+}
+.orcling-bubble-row:hover .orcling-react-bar,
+.orcling-bubble-row:focus-within .orcling-react-bar {
+  opacity: 1;
+  filter: none;
+  scale: 1;
+  translate: 0 0;
+  pointer-events: auto;
+  transition-duration: var(--duration-arrive);
+}
+/* Once a tapback is chosen the bar folds back into the bubble, quicker than it came, and stays away until the
+   pointer leaves; the tapback itself lands on the bubble's corner. */
+.orcling-chat[data-hushed] .orcling-react-bar,
+.orcling-bubble-row[data-picked] .orcling-react-bar {
+  opacity: 0;
+  filter: blur(4px);
+  scale: 0.9;
+  translate: 0 6px;
+  pointer-events: none;
+  transition-duration: var(--duration-quick);
+}
+.orcling-react-choice {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  font-size: 15px;
+  line-height: 1;
+  transition: background-color var(--duration-quick) var(--ease-out);
+}
+.orcling-react-choice:hover {
+  background: var(--surface-2);
+}
+.orcling-react-choice[data-current] {
+  background: var(--surface-3);
+}
+.orcling-react-choice:active {
+  background: var(--surface-3);
+}
+.orcling-react-choice:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+
+/* A check-in's weekdays, as small circles: ink when chosen. */
+.orcling-day {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  background: var(--surface-2);
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
+}
+.orcling-day:hover {
+  background: var(--surface-3);
+}
+.orcling-day[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--surface);
+}
+.orcling-day:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* The rail's Orclings button carries the mark of whichever Orcling most needs you while their faces are tucked away. */
+.sidebar-rail-orclings {
+  position: relative;
+}
+.sidebar-rail-orclings .sidebar-rail-mark {
+  background: var(--bg);
+}

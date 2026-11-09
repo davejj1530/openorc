@@ -336,6 +336,7 @@ export class ThreadService {
       attachments: string[] | undefined;
       promptRole?: "user" | "system";
       recordPrompt?: boolean;
+      unprompted?: boolean;
       fresh?: boolean;
       /** Another Claude account the conversation goes on with from this turn. */
       claudeAccountId?: string | undefined;
@@ -398,6 +399,7 @@ export class ThreadService {
           permissionMode: input.permissionMode,
           prompt: input.prompt,
           recordPrompt: input.recordPrompt,
+          unprompted: input.unprompted,
           onCreated: input.onCreated,
           assertCanStart: input.assertCanStart,
           ...(input.promptRole ? { promptRole: input.promptRole } : {}),

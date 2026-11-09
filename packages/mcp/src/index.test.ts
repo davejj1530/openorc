@@ -309,6 +309,7 @@ void test("an Orcling's own conversation has its own tools instead of the genera
     createTask: answer,
     startWork: answer,
     sendThread: answer,
+    react: answer,
   };
   const general = [
     "memory_search",
@@ -331,11 +332,13 @@ void test("an Orcling's own conversation has its own tools instead of the genera
     home.filter((name) => general.includes(name)),
     [],
   );
-  for (const name of ["ask_user", "orcling_project", "orcling_remember", "orcling_thread_start"]) assert.ok(home.includes(name));
+  for (const name of ["ask_user", "orcling_project", "orcling_remember", "orcling_thread_start", "orcling_react"]) assert.ok(home.includes(name));
   assert.deepEqual(
     general.filter((name) => elsewhere.includes(name)),
     general,
   );
+  // A tapback lands on the person's message in the Orcling's own chat; elsewhere there is no chat to react in.
+  assert.ok(!elsewhere.includes("orcling_react"));
 });
 
 void test("approval decisions preserve denial, answers and edited tool input across the MCP interface", async (t) => {

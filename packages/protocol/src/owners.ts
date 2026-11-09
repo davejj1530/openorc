@@ -145,6 +145,8 @@ export const OWNER_ROUTES: { [M in RoutedMethod]: OwnerRoute<M> } & { [M in Excl
   "threads.restorePreview": ownerOnly(BRING_FIRST),
   "orclings.ask": { by: "owner-only", thread: (p) => p.threadId, words: BRING_FIRST },
   "orclings.assign": { by: "owner-only", thread: (p) => p.threadId, words: BRING_FIRST },
+  "orclings.reactions": byThreadId,
+  "orclings.react": byThreadId,
   "cloud.move": { by: "owner-only", thread: (p) => p.threadId, words: IN_CLOUD },
   // This Mac coordinates every move, whichever brain holds the thread.
   "cloud.bringToMac": here,

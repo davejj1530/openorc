@@ -45,3 +45,31 @@ export const orclingAccountMigration = `
 ALTER TABLE orclings ADD COLUMN claude_account_id TEXT REFERENCES claude_accounts(id);
 UPDATE orclings SET claude_account_id = (SELECT claude_account_id FROM threads WHERE threads.id = orclings.thread_id);
 `;
+
+/**
+ * An Orcling's life between your messages. Wakes are its rules for checking in on its own, and each rule's state is how
+ * far it has been checked, so a rule fires once for its latest missed time and never for times before it existed.
+ * Reactions are tapbacks on one bubble of a message: the person's on the Orcling's, or the Orcling's on the person's.
+ * A person's reaction is heard by the Orcling once, on its next turn.
+ */
+export const orclingCompanionMigration = `
+ALTER TABLE orclings ADD COLUMN wakes TEXT NOT NULL DEFAULT '[]';
+CREATE TABLE orcling_wake_state (
+ orcling_id TEXT NOT NULL REFERENCES orclings(id) ON DELETE CASCADE,
+ rule_key TEXT NOT NULL,
+ checked_until INTEGER NOT NULL,
+ PRIMARY KEY(orcling_id, rule_key)
+);
+CREATE TABLE message_reactions (
+ thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+ run_id TEXT NOT NULL,
+ message_id TEXT NOT NULL,
+ part INTEGER NOT NULL CHECK(part >= 0),
+ reactor TEXT NOT NULL,
+ reaction TEXT NOT NULL CHECK(reaction IN ('heart', 'like', 'dislike', 'haha', 'wow', 'sad')),
+ heard_at INTEGER,
+ created_at INTEGER NOT NULL,
+ PRIMARY KEY(run_id, message_id, part, reactor)
+);
+CREATE INDEX message_reactions_thread ON message_reactions(thread_id, created_at);
+`;

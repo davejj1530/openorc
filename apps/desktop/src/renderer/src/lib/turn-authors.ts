@@ -1,4 +1,4 @@
-import type { Run, ThreadSummary } from "@openorc/protocol";
+import type { Orcling, Run, ThreadSummary } from "@openorc/protocol";
 import { useRpc } from "./client";
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 
@@ -16,6 +16,8 @@ export interface RunVoice {
  */
 export interface ConversationVoice {
   authors: ReadonlyMap<string, string>;
+  /** The Orcling whose own conversation this is: its transcript reads as a chat with it. */
+  chat?: Orcling | undefined;
   face?: ((working: boolean) => ReactNode) | undefined;
   runs?: ReadonlyMap<string, RunVoice> | undefined;
   agent?: RunVoice | undefined;

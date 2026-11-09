@@ -186,7 +186,7 @@ export class RunLaunch {
     const { input, runId } = prepared;
     input.onCreated?.(run);
     if (input.scope.task) tasks.update(this.deps.db, input.scope.task.id, { status: "in_progress" });
-    if (input.scope.thread) threads.touch(this.deps.db, input.scope.thread.id);
+    if (input.scope.thread && !input.unprompted) threads.touch(this.deps.db, input.scope.thread.id);
     this.recordPromptAndAudit(attempt);
     const mcp = await this.deps.mcp();
     phase("mcp");
@@ -297,7 +297,7 @@ export class RunLaunch {
       agent: input.agent,
       fastMode: input.fastMode ?? false,
       cwd: cwd ?? lease.paths[0]!,
-      prompt: withOutsideNote(input.prompt, outside),
+      prompt: withOutsideNote(this.withTurnNote(input), outside),
       permissionMode: input.mode === "plan" ? "review" : input.permissionMode,
       systemPromptAppendix: this.systemPrompt(input, taskImages),
       internalMcp,
@@ -322,6 +322,11 @@ export class RunLaunch {
       const parent = thread.parentThreadId ? subagents.byThread(this.deps.db, thread.parentThreadId) : null;
       return [{ nativeId: row.nativeId, taskId: row.taskId, title: thread.title, parentSubagentId: parent?.nativeId, endedAt: row.endedAt ?? row.startedAt }];
     });
+  }
+
+  private withTurnNote(input: StartRunInput): string {
+    const note = input.scope.thread ? this.deps.hooks.orclings?.turnNote(input.scope.thread.id) : "";
+    return note ? `${note}\n\n${input.prompt}` : input.prompt;
   }
 
   private systemPrompt(input: StartRunInput, taskImages: string[]): string {

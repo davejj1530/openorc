@@ -64,14 +64,83 @@ export const OrclingDraft = z
   .strict();
 export type OrclingDraft = z.infer<typeof OrclingDraft>;
 
+/**
+ * When an Orcling wakes up on its own to see whether there is anything worth texting about: as OpenOrc opens, or at
+ * a time of day on chosen weekdays (0 is Sunday). A time missed while OpenOrc was closed wakes it once when it opens.
+ */
+export const OrclingWake = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("startup") }).strict(),
+  z
+    .object({
+      kind: z.literal("time"),
+      at: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+      days: z.array(z.number().int().min(0).max(6)).min(1).max(7),
+    })
+    .strict(),
+]);
+export type OrclingWake = z.infer<typeof OrclingWake>;
+export const OrclingWakes = z
+  .array(OrclingWake)
+  .max(12)
+  .refine((wakes) => wakes.filter((wake) => wake.kind === "startup").length <= 1, "Waking when OpenOrc opens is one choice.");
+
+/** One rule's identity: the same time on the same days is the same wake, however it was listed. */
+export function orclingWakeKey(wake: OrclingWake): string {
+  return wake.kind === "startup" ? "startup" : `time@${wake.at}:${[...new Set(wake.days)].sort().join("")}`;
+}
+
 /** A saved identity: the same Orcling in its own thread and wherever it is asked to help. */
 export interface Orcling extends OrclingDraft {
   id: string;
   claudeAccountId: string;
   /** Its one personal conversation. */
   threadId: string;
+  wakes: OrclingWake[];
   createdAt: number;
   updatedAt: number;
+}
+
+/** A tapback on one bubble of a message in an Orcling's own conversation. */
+export const Reaction = z.enum(["heart", "like", "dislike", "haha", "wow", "sad"]);
+export type Reaction = z.infer<typeof Reaction>;
+export const reactionEmoji: Record<Reaction, string> = { heart: "❤️", like: "👍", dislike: "👎", haha: "😂", wow: "😮", sad: "😢" };
+
+export interface MessageReaction {
+  runId: string;
+  messageId: string;
+  /** Which bubble of the message, as chatBubbles splits it. */
+  part: number;
+  /** The Orcling that reacted, or null for the person. */
+  orclingId: string | null;
+  reaction: Reaction;
+  at: number;
+}
+
+const LIST_ITEM = /^\s*(?:[-*+]|\d+[.)])\s/;
+
+/**
+ * A text in an Orcling's own conversation as the messages it arrives as: one per paragraph, the way people text. A
+ * code block stays whole, and a list stays one message even when its items are spaced apart.
+ */
+export function chatBubbles(text: string): string[] {
+  const bubbles: string[] = [];
+  let current: string[] = [];
+  let fenced = false;
+  const flush = () => {
+    const bubble = current.join("\n").trim();
+    current = [];
+    if (!bubble) return;
+    const previous = bubbles.at(-1);
+    if (previous !== undefined && LIST_ITEM.test(bubble) && LIST_ITEM.test(previous.split("\n").at(-1) ?? "")) bubbles[bubbles.length - 1] = `${previous}\n\n${bubble}`;
+    else bubbles.push(bubble);
+  };
+  for (const line of text.split("\n")) {
+    if (/^\s*(```|~~~)/.test(line)) fenced = !fenced;
+    if (!fenced && !line.trim()) flush();
+    else current.push(line);
+  }
+  flush();
+  return bubbles;
 }
 
 export interface OrclingInstructionsVersion {
@@ -111,6 +180,12 @@ export const orclingRpcParams = {
   "orclings.ask": z.object({ id, threadId: id, prompt: z.string().min(1), attachments: z.array(z.string()).optional() }).strict(),
   /** Gives a project conversation to an Orcling, or with null back to its plain model. */
   "orclings.assign": z.object({ threadId: id, orclingId: id.nullable() }).strict(),
+  /** Replaces when the Orcling wakes up on its own; an empty list leaves it waiting for you. */
+  "orclings.wakes.save": z.object({ id, wakes: OrclingWakes }).strict(),
+  /** Every tapback in an Orcling's own conversation. */
+  "orclings.reactions": z.object({ threadId: id }).strict(),
+  /** Your tapback on one bubble of the Orcling's message, replacing your earlier one there; null takes it back. The Orcling hears it on its next turn. */
+  "orclings.react": z.object({ threadId: id, runId: id, messageId: id, part: z.number().int().min(0), reaction: Reaction.nullable() }).strict(),
 };
 
 export interface OrclingRpcResults {
@@ -124,4 +199,7 @@ export interface OrclingRpcResults {
   "orclings.memories": Memory[];
   "orclings.ask": Run;
   "orclings.assign": null;
+  "orclings.wakes.save": Orcling;
+  "orclings.reactions": MessageReaction[];
+  "orclings.react": null;
 }

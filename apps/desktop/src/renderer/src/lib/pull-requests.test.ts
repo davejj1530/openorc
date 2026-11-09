@@ -12,6 +12,7 @@ describe("pull request presentation", () => {
       settings: { agent: "codex", model: "gpt-6-sol", effort: "low", fastMode: false },
       claudeAccountId: "claude-cli",
       permission: "approve",
+      wakes: [],
       threadId: "home",
       createdAt: 1,
       updatedAt: 1,

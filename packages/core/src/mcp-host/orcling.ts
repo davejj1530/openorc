@@ -1,6 +1,7 @@
 import { messages, orclings, projects, retiredTeams, runs, tasks, threads, type Db } from "@openorc/db";
 import type { McpHost, OrclingTools } from "@openorc/mcp";
-import { WORKSPACE_ID, type MemoryType, type Orcling, type Project, type TaskStatus } from "@openorc/protocol";
+import { reactionEmoji, WORKSPACE_ID, type MemoryType, type Orcling, type Project, type TaskStatus } from "@openorc/protocol";
+import { latestPersonMessage } from "../services/orcling-reactions.js";
 import type { MemoryService } from "../services/memory.js";
 import type { OrclingService } from "../services/orclings.js";
 import type { RunService } from "../services/runs.js";
@@ -9,7 +10,7 @@ import type { ThreadService } from "../services/threads.js";
 
 type Dependencies = {
   db: Db;
-  orclings: Pick<OrclingService, "forRun" | "saveInstructions" | "startThread" | "startTask">;
+  orclings: Pick<OrclingService, "forRun" | "saveInstructions" | "startThread" | "startTask" | "react">;
   memory: Pick<MemoryService, "assertEnabled" | "record" | "retrieveOrcling" | "retrieve" | "brief">;
   runs: Pick<RunService, "authorizeAppAction">;
   threads: Pick<ThreadService, "toolThreadRead">;
@@ -47,9 +48,17 @@ export function createOrclingHost(deps: Dependencies): Pick<McpHost, "orcling"> 
   };
 }
 
-/** Its instructions, its memory and what it said before. */
-function selfTools(deps: Dependencies, speaker: Speaker): Pick<OrclingTools, "updateInstructions" | "remember" | "recall" | "history"> {
+/** Its instructions, its memory, what it said before, and its reactions in its own conversation. */
+function selfTools(deps: Dependencies, speaker: Speaker): Pick<OrclingTools, "updateInstructions" | "remember" | "recall" | "history" | "react"> {
   return {
+    react: async (runId, reaction) => {
+      const self = speaker(runId);
+      const target = latestPersonMessage(deps.db, self.threadId);
+      if (!target) return "The person has not written anything to react to yet.";
+      deps.orclings.react({ threadId: self.threadId, runId: target.runId, messageId: target.messageId, part: 0 }, reaction, self.id);
+      const quoted = target.text.replace(/\s+/g, " ").trim().slice(0, 80);
+      return `Reacted ${reactionEmoji[reaction]} to "${quoted}". If that says it all, end your turn without writing.`;
+    },
     updateInstructions: async (runId, { body, reason }) => {
       const self = speaker(runId);
       await deps.runs.authorizeAppAction(runId, "orcling_instructions", {

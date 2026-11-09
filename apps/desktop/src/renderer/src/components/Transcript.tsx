@@ -1,4 +1,4 @@
-import { lazy, memo, Suspense, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type ComponentProps, type RefObject } from "react";
+import { lazy, memo, Suspense, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type ComponentProps, type RefObject } from "react";
 import { useVisited } from "../lib/use-visited";
 import { harnessCatalog, type ActivityRecovery } from "@openorc/protocol";
 import { WorkMessage, WorkAgent, ChevronDown, ChevronRight, Lightbulb, Loader2 } from "./icons";
@@ -28,7 +28,7 @@ import { WorkNow, WorkSteps } from "./WorkSteps";
 import { TurnHead } from "./TurnHead";
 import { TurnReceipt } from "./TurnReceipt";
 import { useTurnSize } from "./TurnFooter";
-import { useTurnAuthor } from "../lib/turn-authors";
+import { ConversationVoice, useTurnAuthor } from "../lib/turn-authors";
 import { ToolRow } from "./ToolRow";
 import { SubagentCards } from "./SubagentCards";
 import { ApprovalCard, pretty } from "./ApprovalCard";
@@ -43,6 +43,7 @@ import { ImageGenerationRow, ImageViewRow, ThreadImage, ThreadMedia, ThreadRichT
 import { CopyMessage, MessageTime, TurnActions } from "./MessageActions";
 import { useMessageReveal, type Reveal } from "../lib/message-reveal";
 import { UserMessage } from "./UserMessage";
+import { OrclingChat } from "./OrclingChat";
 
 const InlineDiff = lazy(() => import("./InlineDiff").then((m) => ({ default: m.InlineDiff })));
 const diffLoading = (
@@ -209,7 +210,7 @@ export function Transcript({
       <div ref={parentRef} data-transcript data-arrivals={arrivals || undefined} className={cn("h-full overflow-y-auto", waiting && "invisible")}>
         <div ref={contentRef} className="max-w-chat mx-auto px-6 py-5">
           {hasOlder ? <div ref={olderRef} aria-hidden /> : null}
-          {children ?? <WorkTranscript runId={run.runId} blocks={run.blocks} live={working || run.turnOpen} onFork={onFork} trailing={trailing} reveal={reveal} />}
+          {children ?? <ConversationBody runId={run.runId} blocks={run.blocks} live={working || run.turnOpen} onFork={onFork} trailing={trailing} reveal={reveal} />}
           {run.blocks.length > 0 ? <AgentPresence working={working} /> : null}
         </div>
       </div>
@@ -380,6 +381,13 @@ type WorkTranscriptProps = ComponentProps<typeof TranscriptContents> & {
 type WorkTurnProps = WorkTranscriptProps & { id?: string; latest?: boolean };
 
 /** The disclosure hierarchy stays consistent across turns and warm sessions. */
+/** An Orcling's own conversation reads as a chat with it; any other as turns of work. */
+function ConversationBody(props: WorkTranscriptProps) {
+  const { chat } = useContext(ConversationVoice);
+  if (!chat) return <WorkTranscript {...props} />;
+  return <OrclingChat orcling={chat} blocks={props.blocks} live={props.live ?? false} card={(block) => <BlockView block={block} runId={block.runId ?? props.runId} taskCards actions={false} />} />;
+}
+
 export function WorkTranscript({ blocks, live = false, onFork, reveal, ...props }: WorkTranscriptProps) {
   const turns = useSteadyTurns(blocks);
   // A fork carries the whole conversation and the agent's latest session, so it is offered only at the latest message.
@@ -615,7 +623,7 @@ function ReplyMessage({ block, actions }: { block: Extract<Block, { kind: "messa
   );
 }
 
-const BlockView = memo(function BlockView({
+export const BlockView = memo(function BlockView({
   block,
   runId,
   onFork,

@@ -1,4 +1,4 @@
-import { useContext, useRef } from "react";
+import { useContext, useRef, type ReactNode } from "react";
 import { isImagePath } from "../../../shared/image-paths";
 import { FileText, GitFork } from "./icons";
 import { MarkedText, MessageMarks, SkillHoverCard, useSkillHover } from "./MarkedText";
@@ -6,8 +6,20 @@ import { CopyMessage, MessageTime } from "./MessageActions";
 import { ThreadImage } from "./ThreadImages";
 import { IconButton } from "./ui";
 
-/** The user's message: what they attached, then their words as the composer drew them, then copy, fork and when. */
-export function UserMessage({ text, at, attachments, onFork }: { text: string; at?: number | undefined; attachments?: string[]; onFork?: (() => void) | undefined }) {
+/** The user's message: what they attached, then their words as the composer drew them, then copy, fork and when. A badge, such as a reaction, rests on the bubble. */
+export function UserMessage({
+  text,
+  at,
+  attachments,
+  onFork,
+  badge,
+}: {
+  text: string;
+  at?: number | undefined;
+  attachments?: string[] | undefined;
+  onFork?: (() => void) | undefined;
+  badge?: ReactNode;
+}) {
   const marks = useContext(MessageMarks);
   const bubble = useRef<HTMLDivElement>(null);
   const skillHover = useSkillHover(bubble);
@@ -23,6 +35,7 @@ export function UserMessage({ text, at, attachments, onFork }: { text: string; a
         ) : null}
         <div ref={bubble} className="message-bubble text-prose whitespace-pre-wrap" onPointerMove={skillHover.onPointerMove} onPointerLeave={skillHover.onPointerLeave}>
           <MarkedText text={text} commands={marks.commands} connectors={marks.connectors} />
+          {badge}
         </div>
         <SkillHoverCard mark={skillHover.hovered} commands={marks.commands} />
         <div className="journal-message-actions">

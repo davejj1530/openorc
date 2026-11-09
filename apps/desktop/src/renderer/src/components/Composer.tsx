@@ -21,7 +21,7 @@ import { useComposerSubmission } from "../lib/composer-submission";
 import { formatBytes } from "../lib/file-imports";
 import { ComposerChoice } from "./ComposerChoice";
 import { ComposerDropZone, useComposerDrop } from "./ComposerDropZone";
-import { ComposerFooter } from "./ComposerFooter";
+import { ComposerChangesBar } from "./ComposerCommitChip";
 import { ComposerInput } from "./ComposerInput";
 import { ComposerSendButton } from "./ComposerSendButton";
 import { ContextUsage } from "./ContextUsage";
@@ -97,13 +97,12 @@ export interface ComposerProps {
   permissionDisabledReason?: string;
   permissionDescriptionId?: string;
   attachmentsDisabledReason?: string | null;
-  /** Where the agent runs: the working folder and Git context share the footer below the input. */
-  /** A caller supplying its own destination control may omit the static label. */
-  /** `cloud` when the agent works in a sandbox and `directory` is the worktree its changes arrive in. */
+  /** Where the agent runs. A caller supplying its own destination control may omit the static label.
+   * `cloud` when the agent works in a sandbox and `directory` is the worktree its changes arrive in. */
   location: { label: string | null; branch: string | null; directory?: string; cloud?: boolean };
   /** Initial execution location is chosen before the conversation starts. */
   hasStarted?: boolean;
-  /** Uncommitted changes and actions beside the working folder. */
+  /** Uncommitted changes, shown as the Commit chip over the composer's left edge. */
   changes?: ComposerChanges | null;
   busy?: boolean;
   disabledReason?: string | null;
@@ -142,7 +141,7 @@ export interface ComposerProps {
   onConnectorsWanted?: () => void;
   autoFocus?: boolean;
   size?: "md" | "lg";
-  /** The landing screen draws the roomier composer and shows where the thread works below it, not in a footer. */
+  /** The landing screen draws the roomier composer and places the Commit chip itself. */
   presentation?: "conversation" | "new-thread";
   error?: string | null;
   children?: ReactNode;
@@ -161,8 +160,8 @@ function useSentGhost(text: string | null) {
  * The one composer, for the landing screen and every conversation. Files
  * paste or drop in and ride along with the prompt, images as thumbnails and
  * everything else as a named card; attach, the model and the mode sit in the
- * bar under the text with the context ring and send at its end; the working
- * folder and Git context share the footer. @ mentions a file, / runs a command.
+ * bar under the text with the context ring and send at its end; uncommitted
+ * changes sit in the Commit chip over its left edge. @ mentions a file, / runs a command.
  */
 /** The system's file chooser, as the attach button opens it. */
 function chooseFiles(add: (files: File[]) => void): void {
@@ -239,6 +238,7 @@ export function Composer(props: ComposerProps) {
 
   return (
     <div className={cn("composer min-w-0", props.size === "lg" && "composer-large", isNewThread && "composer-new-thread")}>
+      {isNewThread ? null : <ComposerChangesBar changes={props.changes} />}
       {interrupt.error || files.error || submission?.error || props.error ? (
         <div role="alert" className="composer-alert">
           {interrupt.error ? `Couldn’t stop the agent. ${interrupt.error.message}` : files.error || submission?.error || props.error}
@@ -363,7 +363,6 @@ export function Composer(props: ComposerProps) {
         </div>
         {drop.dragging ? <ComposerDropZone count={drop.count} /> : null}
       </div>
-      {isNewThread ? null : <ComposerFooter location={props.location} changes={props.changes} />}
     </div>
   );
 }

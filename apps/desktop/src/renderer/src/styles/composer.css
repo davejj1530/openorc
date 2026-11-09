@@ -503,57 +503,18 @@
   background: currentColor;
 }
 
-/* The footer under the surface: the working folder, the branch and the Commit chip. */
-.composer-rail {
+/* Uncommitted changes sit right over the composer, on its left edge. */
+.composer-changes-bar {
   display: flex;
-  align-items: center;
-  gap: 8px;
   min-width: 0;
-  min-height: var(--control-sm);
-  margin-top: 10px;
-  padding: 0 4px 0 8px;
-  color: var(--ink-4);
-  font-size: var(--text-sm);
-  line-height: var(--text-sm--line-height);
-  white-space: nowrap;
+  margin-bottom: 10px;
 }
-.composer-rail svg {
-  flex-shrink: 0;
-}
-.composer-directory {
-  display: inline-flex;
-  flex: 1;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-.composer-directory span,
 .composer-branch {
   min-width: 0;
   overflow: hidden;
+  color: var(--ink-3);
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.composer-git {
-  display: flex;
-  flex: 0 1 auto;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  margin-left: auto;
-}
-.composer-branch-chip {
-  display: inline-flex;
-  flex: 0 1 auto;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  max-width: min(180px, 24cqi);
-  height: var(--control-sm);
-  padding: 0 8px 0 10px;
-}
-.composer-branch {
-  color: var(--ink-3);
 }
 /* The Commit chip sits on the ground beside the composer and takes the composer's own fill, so it
    reads in palettes whose surface matches the ground. */

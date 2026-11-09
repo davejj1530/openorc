@@ -619,7 +619,7 @@ describe("initial execution location", () => {
     expect(screen.queryByText("Local checkout")).toBeNull();
     expect(container.querySelector(".composer-destination")).toBeNull();
     expect(screen.getByRole("button", { name: /^Mode:/ })).toBeTruthy();
-    expect(screen.getByText("main")).toBeTruthy();
+    expect(screen.queryByText("main")).toBeNull();
   });
 });
 

@@ -2,7 +2,7 @@ import type { Commit, FileChange, Project, PushState, RpcMethod, RpcParams, RpcR
 import { QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ComposerCommitChip } from "../components/ComposerFooter";
+import { ComposerCommitChip } from "../components/ComposerCommitChip";
 import { queryClient } from "../lib/client";
 import { useComposerChanges } from "../lib/composer-changes";
 import { core } from "../lib/rpc";

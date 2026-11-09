@@ -1,6 +1,14 @@
-import type { ComposerChanges, ComposerProps } from "./Composer";
-import { Folder, GitBranch } from "./icons";
+import type { ComposerChanges } from "./Composer";
 import { Tooltip } from "./ui";
+
+/** A conversation's Commit chip, over the composer's left edge; the row folds away while there is nothing to commit. */
+export function ComposerChangesBar({ changes }: { changes: ComposerChanges | null | undefined }) {
+  return (
+    <div className="composer-changes-bar empty:hidden">
+      <ComposerCommitChip changes={changes} />
+    </div>
+  );
+}
 
 /** Commit and the diff totals share one pill: Commit opens the commit flow, the totals open the review. */
 export function ComposerCommitChip({ changes }: { changes: ComposerChanges | null | undefined }) {
@@ -33,32 +41,5 @@ export function ComposerCommitChip({ changes }: { changes: ComposerChanges | nul
         )}
       </button>
     </section>
-  );
-}
-
-/** Where the agent works, under the composer: the folder, the checked-out branch and the uncommitted changes. */
-export function ComposerFooter({ location, changes }: Pick<ComposerProps, "location" | "changes">) {
-  const changed = Boolean(changes && changes.files > 0);
-  if (!location.directory && !location.branch && !changed) return null;
-  return (
-    <div className="composer-rail">
-      {location.directory ? (
-        <span className="composer-directory" title={location.directory}>
-          <Folder size={14} />
-          <span>{location.directory}</span>
-        </span>
-      ) : null}
-      {location.branch || changed ? (
-        <div className="composer-git">
-          {location.branch ? (
-            <span className="composer-branch-chip" title={location.branch}>
-              <GitBranch size={13} />
-              <span className="composer-branch">{location.branch}</span>
-            </span>
-          ) : null}
-          <ComposerCommitChip changes={changes} />
-        </div>
-      ) : null}
-    </div>
   );
 }

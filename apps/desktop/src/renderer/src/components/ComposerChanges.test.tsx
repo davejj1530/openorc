@@ -145,7 +145,7 @@ it.each(["project", "thread"] as const)("reviews and commits binary-only %s chan
     params: kind === "thread" ? { threadId: kind, message: "Add image" } : { projectId: kind, message: "Add image" },
   });
   expect(screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" }).value).toBe("Keep my draft");
-  expect(screen.getByText("feature/composer").closest(".composer-rail")).toBeTruthy();
+  expect(screen.queryByText("feature/composer")).toBeNull();
 });
 
 it("keeps the commit message and strip on failure, then refreshes on retry", async () => {

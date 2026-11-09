@@ -13,7 +13,7 @@ import { WORKSPACE_ID, executionMode, type ClaudeAccounts, type Project } from "
 import { useEffect, useRef, useState } from "react";
 import { useCloudSignInGate } from "../components/CloudSignInOffer";
 import { Composer } from "../components/Composer";
-import { ComposerCommitChip } from "../components/ComposerFooter";
+import { ComposerCommitChip } from "../components/ComposerCommitChip";
 import { FolderGit2 } from "../components/icons";
 import { type PickerAccounts } from "../components/ModelPickerAccounts";
 import { ComposerModelPicker, ModelPicker, type ModelChoice, type OrclingPickerChoices } from "../components/ModelPicker";

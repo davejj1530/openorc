@@ -33,6 +33,9 @@
   background-color: transparent;
   padding-left: 0;
 }
+.usage-dashboard-filters select:focus {
+  background-color: transparent;
+}
 .usage-dashboard-views {
   flex-wrap: nowrap;
   margin-left: auto;

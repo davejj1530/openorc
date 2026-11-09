@@ -1,18 +1,20 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { threadStatus } from "@openorc/client";
+import { isHarnessId, type ThreadSummary } from "@openorc/protocol";
 import { useRpc } from "../lib/client";
 import { cn } from "../lib/cn";
 import { focusedProject, useLayout } from "../lib/layout";
 import { useThreadTabs, type ThreadTab } from "../lib/thread-tabs";
 import { useScrollEdges } from "../lib/use-scroll-edges";
 import { useStripHandoff } from "../lib/strip-handoff";
+import { HarnessLogo } from "./HarnessLogo";
 import { MessageSquare, PenSquare, Plus, X } from "./icons";
 import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
 import { IconButton, Tooltip } from "./ui";
 
 /**
- * A tab's glyph and name: a thread's own state while it has one to show, else a speech mark; a new thread's pen. A tab
- * whose thread was deleted closes.
+ * A tab's glyph and name: a thread's own state while it has one to show, else the mark of the agent it runs on, which
+ * follows the thread when its model moves to another agent; a new thread's pen. A tab whose thread was deleted closes.
  */
 function TabFace({ tab, title }: { tab: ThreadTab; title?: ReactNode }) {
   const threadId = tab.route.view === "thread" ? tab.route.threadId : "";
@@ -32,10 +34,18 @@ function TabFace({ tab, title }: { tab: ThreadTab; title?: ReactNode }) {
   const thread = read.data;
   return (
     <>
-      {thread?.session && threadStatus(thread) ? <ThreadStatusIndicator thread={thread} className="work-tab-icon" /> : <MessageSquare size={14} className="work-tab-icon" />}
+      <TabGlyph thread={thread} />
       <span className="work-tab-title">{title ?? thread?.title ?? "Thread"}</span>
     </>
   );
+}
+
+/** The slot stays empty until the thread is read, so a tab never flashes a stand-in before its agent's mark. */
+function TabGlyph({ thread }: { thread: ThreadSummary | null | undefined }) {
+  if (!thread) return <span className="work-tab-icon" />;
+  if (thread.session && threadStatus(thread)) return <ThreadStatusIndicator thread={thread} className="work-tab-icon" />;
+  if (isHarnessId(thread.agent)) return <HarnessLogo id={thread.agent} size={14} className="work-tab-icon" />;
+  return <MessageSquare size={14} className="work-tab-icon" />;
 }
 
 /*

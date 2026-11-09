@@ -1,0 +1,53 @@
+---
+/**
+ * A thread's menu as the app opens it from the header's ⋯ (ThreadActions.tsx, floating.css): where the thread works
+ * on top, its branch marked Worktree or Checkout and then this Mac, each opening the moves away from there; below, the
+ * conversation's own actions. Drawn open in stills.
+ */
+import ProductIcon, { type IconName } from "./ProductIcon.astro";
+
+interface Props {
+  branch: string;
+  place?: "Worktree" | "Checkout";
+}
+const { branch, place = "Worktree" } = Astro.props;
+type Row = { icon: IconName; label: string; tag?: string; more?: boolean; danger?: boolean };
+const groups: Row[][] = [
+  [
+    { icon: "branch", label: branch, tag: place, more: true },
+    { icon: "laptop", label: "This Mac", more: true },
+  ],
+  [
+    { icon: "pencil", label: "Rename" },
+    { icon: "pin", label: "Pin" },
+    { icon: "alarmClock", label: "Snooze", more: true },
+  ],
+  [
+    { icon: "compose", label: "New subthread" },
+    { icon: "gitFork", label: "Fork" },
+    { icon: "appWindow", label: "Open in new window" },
+  ],
+  [
+    { icon: "circleCheck", label: "Resolve" },
+    { icon: "trash", label: "Delete", danger: true },
+  ],
+];
+---
+
+<div class="hs-menu" aria-hidden="true">
+  {
+    groups.map((rows, index) => (
+      <>
+        {index ? <i class="hs-menu-separator" /> : null}
+        {rows.map((row) => (
+          <span class="hs-menu-item" data-danger={row.danger ? "" : undefined}>
+            <ProductIcon name={row.icon} />
+            <span class="hs-menu-label">{row.label}</span>
+            {row.tag ? <span class="hs-menu-tag">{row.tag}</span> : null}
+            {row.more ? <ProductIcon name="chevronRight" class="hs-menu-more" /> : null}
+          </span>
+        ))}
+      </>
+    ))
+  }
+</div>

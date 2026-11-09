@@ -6,6 +6,7 @@
  */
 import ThreadBody from "./ThreadBody.astro";
 import ThreadHeader from "./ThreadHeader.astro";
+import ThreadMenu from "./ThreadMenu.astro";
 import type { Tab } from "./WorkTab.astro";
 import { flagged } from "../../data/hero/timeline";
 import type { ComponentProps } from "astro/types";
@@ -23,12 +24,15 @@ interface Props extends BodyProps {
   tabs?: Tab[];
   /** The pane is split beside the first. */
   split?: boolean;
+  /** The thread's menu is open over the conversation. */
+  menu?: string;
 }
-const { id, title, busy, panel, tabs = [{ label: title, current: true, busy }], split, ...body } = Astro.props;
+const { id, title, busy, panel, menu, tabs = [{ label: title, current: true, busy, harness: Astro.props.model.harness }], split, ...body } = Astro.props;
 const { journey } = body;
 ---
 
 <section class="hs-pane" data-pane={id} {...(busy && journey ? flagged(journey, { busy }) : {})}>
-  <ThreadHeader journey={journey} tabs={split ? undefined : tabs} title={split ? title : undefined} panel={panel} />
+  <ThreadHeader journey={journey} tabs={split ? undefined : tabs} title={split ? title : undefined} panel={panel} menu={Boolean(menu)} />
+  {menu ? <ThreadMenu branch={menu} /> : null}
   <ThreadBody {...body}><slot /></ThreadBody>
 </section>

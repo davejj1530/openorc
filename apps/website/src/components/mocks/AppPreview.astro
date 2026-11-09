@@ -45,9 +45,9 @@ const threadTab = (thread: Thread, label: string, extra: Partial<Tab> = {}): Tab
   ...extra,
 });
 const tabs = [
-  threadTab("search", "A faster command menu", { busy: true, description: "A faster command menu, working" }),
-  threadTab("story", "Tell the product story", { unread: true, description: "Tell the product story, unread" }),
-  threadTab("welcome", "Make the first five minutes count"),
+  threadTab("search", "A faster command menu", { harness: "claude", busy: true, description: "A faster command menu, working" }),
+  threadTab("story", "Tell the product story", { harness: "claude", unread: true, description: "Tell the product story, unread" }),
+  threadTab("welcome", "Make the first five minutes count", { harness: "codex" }),
 ];
 /** A panel page's tab and the page it shows, by thread. */
 const pageTab = (thread: Thread, page: string, tab: Omit<Tab, "id" | "controls" | "value"> & { icon: NonNullable<Tab["icon"]> }) => ({
@@ -112,7 +112,7 @@ const searchChange = { added: 14, removed: 3 };
         </ThreadBody>
       </div>
       <div class="hs-page" id="hero-thread-story" role="tabpanel" aria-labelledby="hero-tab-story" data-for="story" hidden>
-        <ThreadBody model={claude} permission={models.claude.permission} placeholder="Message Claude…" folder="website" changes changeStat={{ added: storyDiff.added, removed: storyDiff.removed }} context={12}>
+        <ThreadBody model={claude} permission={models.claude.permission} placeholder="Message Claude…" changes changeStat={{ added: storyDiff.added, removed: storyDiff.removed }} context={12}>
           <div class="hs-turn">
             <div class="hs-user"><div class="hs-bubble">Rewrite the homepage hero so it says what studio does in one line.</div></div>
             <TurnHead harness="claude" agent="Claude" model={claude.label} took="52s" />

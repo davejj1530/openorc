@@ -804,7 +804,7 @@
   outline: 2px solid var(--hs-ink);
   outline-offset: -2px;
 }
-/* A thread's state stands in for its speech mark: waiting outranks working, which outranks an unread result. */
+/* A thread's state stands in for its agent's mark: waiting outranks working, which outranks an unread result. */
 .hs-tab-icon {
   display: grid;
   flex: none;
@@ -1449,51 +1449,11 @@
   background: var(--hs-accent);
   color: var(--hs-on-accent);
 }
-.hs-rail {
+/* Uncommitted changes sit right over the composer, on its left edge (composer.css). */
+.hs-changes-bar {
   display: flex;
-  align-items: center;
-  gap: calc(8 * var(--u));
-  height: calc(28 * var(--u));
-  margin-top: calc(10 * var(--u));
-  padding: 0 calc(4 * var(--u)) 0 calc(8 * var(--u));
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
-  line-height: calc(16 * var(--u));
-  white-space: nowrap;
-}
-.hs-directory {
-  display: inline-flex;
-  flex: 1;
-  align-items: center;
-  gap: calc(8 * var(--u));
   min-width: 0;
-}
-.hs-directory > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.hs-rail .hs-icon {
-  width: calc(14 * var(--u));
-  height: calc(14 * var(--u));
-}
-.hs-branch {
-  display: inline-flex;
-  align-items: center;
-  gap: calc(6 * var(--u));
-  min-width: 0;
-  max-width: calc(200 * var(--u));
-  padding: 0 calc(8 * var(--u)) 0 calc(10 * var(--u));
-  color: var(--hs-muted);
-}
-.hs-branch .hs-icon {
-  width: calc(13 * var(--u));
-  height: calc(13 * var(--u));
-  color: var(--hs-faint);
-}
-.hs-branch > span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  margin-bottom: calc(10 * var(--u));
 }
 .hs-commit {
   display: inline-flex;
@@ -1512,22 +1472,82 @@
   padding: 0 calc(12 * var(--u)) 0 calc(6 * var(--u));
 }
 
-/* The new-thread page (NewThread.tsx): the question, the large composer and where it works. */
+/* The new-thread page (NewThread.tsx, new-thread.css): the question, the large composer and where it works, centred
+   as if the project's year of activity along the bottom were not there. The activity is 134 units tall and sits 36
+   over the pane's bottom; the column's top takes the same room back. */
 .hs-new-body {
   display: flex;
   flex: 1;
-  justify-content: center;
+  flex-direction: column;
   min-height: 0;
-  padding: 0 calc(48 * var(--u));
+  padding: 0 calc(48 * var(--u)) calc(72 * var(--u));
   overflow: hidden;
 }
 .hs-new-column {
   display: grid;
-  align-content: start;
   gap: calc(18 * var(--u));
   width: 100%;
   max-width: calc(640 * var(--u));
+  margin: auto;
+  padding-top: calc((24 + 134 + 36 - 72) * var(--u));
+}
+.hs-new-activity {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  justify-content: flex-end;
+  gap: calc(10 * var(--u));
+  box-sizing: border-box;
+  width: 100%;
+  max-width: calc(640 * var(--u));
+  height: calc(134 * var(--u));
+  margin: 0 auto calc((36 - 72) * var(--u));
   padding-top: calc(24 * var(--u));
+}
+.hs-new-activity-line {
+  margin: 0;
+  color: var(--hs-faint);
+  font-size: calc(12 * var(--u));
+  line-height: calc(16 * var(--u));
+  white-space: nowrap;
+}
+/* One dot a day, a week to a column; a dot grows and darkens with the day's rank. */
+.hs-new-activity-days {
+  display: grid;
+  grid-template-columns: repeat(var(--weeks), minmax(0, 1fr));
+  grid-template-rows: repeat(7, calc(12 * var(--u)));
+  grid-auto-flow: column;
+}
+.hs-new-activity-days > i {
+  display: grid;
+  place-items: center;
+}
+.hs-new-activity-days > i::before {
+  content: "";
+  width: calc(var(--dot) * var(--u));
+  height: calc(var(--dot) * var(--u));
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--hs-ink) var(--shade), transparent);
+}
+.hs-new-activity-days > [data-level="0"] {
+  --dot: 3;
+  --shade: 10%;
+}
+.hs-new-activity-days > [data-level="1"] {
+  --dot: 5;
+  --shade: 22%;
+}
+.hs-new-activity-days > [data-level="2"] {
+  --dot: 6.5;
+  --shade: 32%;
+}
+.hs-new-activity-days > [data-level="3"] {
+  --dot: 8;
+  --shade: 42%;
+}
+.hs-new-activity-days > [data-level="4"] {
+  --dot: 9;
+  --shade: 54%;
 }
 .hs-new-question {
   font-size: calc(28 * var(--u));
@@ -2634,6 +2654,62 @@
 .hs-round[data-on] {
   background: var(--hs-fill);
   color: var(--hs-ink);
+}
+/* A thread's menu (floating.css): 8 under the header's line, its right edge 8 in from the thread's, r16 on the
+   floating fill with 36 rows of r10, muted glyphs and hairlines between groups. */
+.hs-menu {
+  position: absolute;
+  z-index: 3;
+  top: calc(52 * var(--u));
+  right: calc(8 * var(--u));
+  display: flex;
+  flex-direction: column;
+  gap: calc(2 * var(--u));
+  min-width: calc(192 * var(--u));
+  padding: calc(6 * var(--u));
+  border-radius: calc(16 * var(--u));
+  background: var(--hs-plane);
+  font-size: calc(13 * var(--u));
+  line-height: calc(16 * var(--u));
+  white-space: nowrap;
+}
+.hs-menu-item {
+  display: flex;
+  align-items: center;
+  gap: calc(10 * var(--u));
+  min-height: calc(36 * var(--u));
+  padding: 0 calc(10 * var(--u));
+  border-radius: calc(10 * var(--u));
+  color: var(--hs-ink);
+}
+.hs-menu-item > .hs-icon {
+  flex: none;
+  width: calc(15 * var(--u));
+  height: calc(15 * var(--u));
+  color: var(--hs-muted);
+}
+.hs-menu-item > .hs-menu-more {
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
+  margin-left: auto;
+}
+.hs-menu-tag {
+  margin-left: auto;
+  padding-left: calc(16 * var(--u));
+  color: var(--hs-faint);
+  font-size: calc(12 * var(--u));
+}
+.hs-menu-tag + .hs-menu-more {
+  margin-left: 0;
+}
+.hs-menu-item[data-danger],
+.hs-menu-item[data-danger] > .hs-icon {
+  color: var(--hs-bad);
+}
+.hs-menu-separator {
+  height: 0;
+  margin: calc(4 * var(--u)) calc(10 * var(--u));
+  border-top: var(--hairline) solid var(--hs-line);
 }
 /* Threads that talk, still: one thread whose transcript reads from the top, so the message that reached it leads. */
 .hs-mock-message {

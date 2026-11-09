@@ -9,9 +9,9 @@ import { docHref } from "../../data/docs";
 
 <DocsLayout slug="git">
   <DocsVisual
-    label="OpenOrc with the thread Simplify the design tokens open. It works in its own worktree, and the row under the composer names its branch, openorc/design-tokens-2c91f0, with 12 lines added, 4 removed, and Commit changes. In the sidebar, another thread in the project is still working."
+    label="OpenOrc with the thread Simplify the design tokens open in its own worktree and its menu open. The menu's first row names the branch, openorc/design-tokens-2c91f0, marked Worktree. Over the composer, the Commit chip shows 12 lines added and 4 removed. In the sidebar, another thread in the project is still working."
   >
-    <WorktreeMock />
+    <WorktreeMock menu />
   </DocsVisual>
 
   <section aria-labelledby="where">
@@ -38,7 +38,7 @@ import { docHref } from "../../data/docs";
       <li>Send your first message. A worktree is created now, before the agent starts.</li>
     </ol>
     <p>New threads start with the location set in <strong>Settings</strong> under <strong>General</strong>, <strong>New thread workspace</strong>: <strong>Local checkout</strong> or <strong>Isolated worktree</strong>. Tasks have their own <strong>Execution location</strong>, and schedules a <strong>Works in</strong> field. Forks, subthreads, and threads an agent starts with <code>thread_start</code> work in the same folder as the thread they came from.</p>
-    <p>The row under a thread's composer shows the folder and branch it works on. In the sidebar, each thread's row names its project, then its branch or <strong>worktree</strong>.</p>
+    <p>A thread's menu starts with the branch it works on, marked <strong>Worktree</strong> or <strong>Checkout</strong>. In the sidebar, each thread's row names its project, then its branch or <strong>worktree</strong>.</p>
   </section>
 
   <section aria-labelledby="worktrees">

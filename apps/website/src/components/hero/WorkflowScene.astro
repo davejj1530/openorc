@@ -18,6 +18,7 @@ import TaskProperties from "./TaskProperties.astro";
 import ThreadHeader from "./ThreadHeader.astro";
 import ThreadPane from "./ThreadPane.astro";
 import TurnHead from "./TurnHead.astro";
+import { activity } from "../../data/hero/activity";
 import { busy, workflow, workflowJourney } from "../../data/hero/workflow";
 import { branches, models, project } from "../../data/hero/workspace";
 import { flagged, timed } from "../../data/hero/timeline";
@@ -59,6 +60,10 @@ const comments = [
           <Composer journey={workflowJourney} layout="new" placeholder="Ask OpenOrc to build, fix bugs, explore" model={codex} permission={models.codex.permission} prompt={{ text: thread.prompt, typo: thread.typo, window: "typeStart~typeEnd", typed: "typeStart~aSend" }} />
           <div class="hs-new-location"><ProductIcon name="branch" />Works in the local checkout on {project.branch}<ProductIcon name="chevronDown" /></div>
         </div>
+        <div class="hs-new-activity">
+          <p class="hs-new-activity-line">{activity.summary}</p>
+          <div class="hs-new-activity-days" style={`--weeks: ${activity.weeks}`}>{activity.levels.map((level) => <i data-level={level} />)}</div>
+        </div>
       </div>
     </section>
 
@@ -67,7 +72,7 @@ const comments = [
       journey={workflowJourney}
       title={thread.title}
       busy={busy.a}
-      tabs={[{ label: thread.title, current: true, busy: busy.a, waiting: waiting.a }]}
+      tabs={[{ label: thread.title, harness: "codex", current: true, busy: busy.a, waiting: waiting.a }]}
       model={codex}
       permission={models.codex.permission}
       placeholder="Message Codex…"
@@ -230,7 +235,7 @@ const comments = [
       </section>
     </TaskPane>
 
-    <ThreadPane id="b" journey={workflowJourney} title={work.title} busy={busy.b} model={codex} permission={models.codex.permission} placeholder="Message Codex…" branch={branches.cacheThread} changes=">bDone" changeStat={{ added, removed }}>
+    <ThreadPane id="b" journey={workflowJourney} title={work.title} busy={busy.b} model={codex} permission={models.codex.permission} placeholder="Message Codex…" changes=">bDone" changeStat={{ added, removed }}>
       <div class="hs-turn">
         <div class="hs-user"><div class="hs-bubble">{work.prompt}</div></div>
         <TurnHead {...head} harness="codex" agent="Codex" model={codex.label} clock={{ from: "bStart", writing: "bReplyStart", to: "bDone" }} />

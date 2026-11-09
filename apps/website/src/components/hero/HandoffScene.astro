@@ -125,7 +125,7 @@ const head = { journey: handoff };
       </div>
     </ThreadPane>
 
-    <ThreadPane id="b" split journey={handoff} title={b.title} busy={busy.b} model={{ harness: b.harness, label: b.label, effort: b.effort }} permission={b.permission} placeholder={`Message ${b.agent}…`} branch={branches.plansThread} changes changeStat={b.change}>
+    <ThreadPane id="b" split journey={handoff} title={b.title} busy={busy.b} model={{ harness: b.harness, label: b.label, effort: b.effort }} permission={b.permission} placeholder={`Message ${b.agent}…`} changes changeStat={b.change}>
       <!-- Mid-migration when the scene opens: the message joins this turn, so its steps keep going. -->
       <div class="hs-turn">
         <div class="hs-user"><div class="hs-bubble">{b.request}</div></div>

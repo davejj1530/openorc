@@ -19,8 +19,10 @@ interface Props {
   panel?: boolean;
   /** The new-thread page's header. */
   fresh?: boolean;
+  /** The thread's menu is open, so its ⋯ shows as pressed. */
+  menu?: boolean;
 }
-const { journey, tabs, title, tablist, panel, fresh } = Astro.props;
+const { journey, tabs, title, tablist, panel, fresh, menu } = Astro.props;
 ---
 
 <header class="hs-header" data-kind={tabs ? "tabs" : "title"}>
@@ -40,7 +42,7 @@ const { journey, tabs, title, tablist, panel, fresh } = Astro.props;
   <span class="hs-header-actions" aria-hidden="true">
     {tabs && !fresh ? <span class="hs-facts"><span class="hs-fact-working"><i></i>working</span></span> : null}
     {fresh ? null : <span class="hs-round hs-close-pane"><ProductIcon name="close" /></span>}
-    {fresh ? null : <span class="hs-round hs-more"><ProductIcon name="moreVertical" /></span>}
+    {fresh ? null : <span class="hs-round hs-more" data-on={menu ? "" : undefined}><ProductIcon name="moreVertical" /></span>}
     <span class="hs-tools">
       {panel ? <span class="hs-round"><ProductIcon name="arrowLeftRight" /></span> : null}
       <span class="hs-round" data-on={panel ? "" : undefined}><ProductIcon name="panelRight" /></span>

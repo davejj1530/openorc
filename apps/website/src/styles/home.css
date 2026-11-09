@@ -235,7 +235,7 @@
 .home-page [data-card="review"] .showcase-plane {
   width: 640px;
 }
-/* The worktree thread without its sidebar, down to the branch its composer names. */
+/* The worktree thread without its sidebar, its menu open under the header on the branch it works on. */
 .home-page [data-card="worktrees"] .showcase-plane {
   bottom: 0;
   width: 500px;

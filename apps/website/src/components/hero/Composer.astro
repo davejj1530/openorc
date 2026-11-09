@@ -1,13 +1,11 @@
 ---
 /**
  * The message composer as the app draws it (Composer.tsx): one plane with the prompt over a bar of attach, model and
- * mode pills, the context ring and send; under it, the conversation's folder beside its branch and the Commit chip
- * with the checkout's uncommitted lines. The new-thread page's composer is larger and leaves the project and the
- * folder row to the page.
+ * mode pills, the context ring and send. A conversation with uncommitted lines shows the Commit chip over the plane's
+ * left edge. The new-thread page's composer is larger and leaves the project and where it works to the page.
  */
 import Counts from "./Counts.astro";
 import ProductIcon from "./ProductIcon.astro";
-import { project } from "../../data/hero/workspace";
 import { flagged, timed, type Journey } from "../../data/hero/timeline";
 
 interface Props {
@@ -16,10 +14,7 @@ interface Props {
   placeholder: string;
   model: { label: string; effort: string; harness?: string };
   permission: string;
-  /** The project the conversation works in; studio unless given. */
-  folder?: string;
-  branch?: string;
-  /** Window during which uncommitted changes show beside the branch, with their counts; `true` for the whole scene. */
+  /** Window during which uncommitted changes show in the Commit chip, with their counts; `true` for the whole scene. */
   changes?: string | boolean;
   changeStat?: { added: number; removed: number };
   /** The prompt this composer types, if any. */
@@ -28,12 +23,20 @@ interface Props {
   context?: number | null;
   layout?: "thread" | "new";
 }
-const { journey, placeholder, model, permission, folder = project.name, branch = project.branch, changes, changeStat = { added: 8, removed: 2 }, prompt, context = 18, layout = "thread" } = Astro.props;
+const { journey, placeholder, model, permission, changes, changeStat = { added: 8, removed: 2 }, prompt, context = 18, layout = "thread" } = Astro.props;
 const fresh = layout === "new";
 const ring = 2 * Math.PI * 6;
 ---
 
 <div class="hs-composer" data-layout={layout} {...(prompt && journey ? flagged(journey, { typed: prompt.typed }) : {})}>
+  {!fresh && changes ? (
+    <div class="hs-changes-bar" {...(typeof changes === "string" && journey ? timed(journey, changes) : {})}>
+      <span class="hs-commit">
+        <span class="hs-commit-label">Commit</span>
+        <Counts {...changeStat} />
+      </span>
+    </div>
+  ) : null}
   <div class="hs-shell">
     <div class="hs-prompt">
       <span class="hs-placeholder hs-placeholder-idle">{placeholder}</span>
@@ -65,16 +68,4 @@ const ring = 2 * Math.PI * 6;
       </span>
     </div>
   </div>
-  {fresh ? null : (
-    <div class="hs-rail">
-      <span class="hs-directory"><ProductIcon name="folder" /><span>/Projects/{folder}</span></span>
-      <span class="hs-branch"><ProductIcon name="branch" /><span>{branch}</span></span>
-      {changes ? (
-        <span class="hs-commit" {...(typeof changes === "string" && journey ? timed(journey, changes) : {})}>
-          <span class="hs-commit-label">Commit</span>
-          <Counts {...changeStat} />
-        </span>
-      ) : null}
-    </div>
-  )}
 </div>

@@ -20,6 +20,8 @@ interface Card {
   palette: { light: string[]; dark: string[] };
   /** A still of the part, or a scene that rests on its last moment. */
   visual: typeof TaskListMock;
+  /** What the visual still is given, when it has a state to show. */
+  props?: Record<string, unknown>;
   /** What the visual shows, for anyone who cannot see it. */
   label: string;
   /** The visual is a scene resting on its last moment, and pressing it plays the scene once. */
@@ -49,7 +51,8 @@ const cards: Card[] = [
     body: "Give a thread its own worktree and branch. Agents work side by side without touching each other’s files.",
     palette: { light: ["#f1f4ec", "#d6e0c8", "#e8eedf", "#c7d5b3"], dark: ["#151812", "#2a3223", "#0f110d", "#343f2b"] },
     visual: WorktreeMock,
-    label: "A thread working in its own worktree. Under the composer it names its branch, openorc/design-tokens, with 12 lines added and 4 removed, and offers to commit them.",
+    props: { menu: true },
+    label: "A thread working in its own worktree, its menu open. The menu's first row names the thread's branch, openorc/design-tokens-2c91f0, marked Worktree, then This Mac, then Rename, Pin, Snooze, New subthread, Fork, Open in new window, Resolve and Delete.",
   },
   {
     id: "editor",
@@ -90,14 +93,14 @@ const cards: Card[] = [
   <div class="showcase-track" data-reveal>
     <div class="showcase-row" role="region" aria-label="Parts of OpenOrc" tabindex="0" data-showcase-row data-at-start>
       <ul class="showcase-cards">
-        {cards.map(({ id, title, body, palette, visual: Visual, label, replay }, index) => {
+        {cards.map(({ id, title, body, palette, visual: Visual, props, label, replay }, index) => {
           const Frame = replay ? "button" : "div";
           return (
             <li class="showcase-card" data-card={id}>
               <Frame class="showcase-visual" aria-label={label} {...(replay ? { type: "button", "data-replay": "" } : { role: "img" })}>
                 <MeshGradient class="showcase-ground" colors={palette} distortion={0.8} swirl={0.25} frame={2000 + index * 2600}>
                   <div class="showcase-plane hs-on-plane">
-                    <Visual />
+                    <Visual {...props} />
                   </div>
                 </MeshGradient>
               </Frame>

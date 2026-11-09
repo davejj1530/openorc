@@ -22,14 +22,14 @@ const corner = (state: { open: boolean; lights: boolean; settings?: boolean; nar
   return renderHook(() => useWindowCorner()).result.current;
 };
 
-it("leaves the folded rail's corner to the wordmark only when no traffic lights hold it", () => {
+it("leaves the folded rail's corner to the wordmark only when no traffic lights hold it, else to the lights past the rail", () => {
   expect(corner({ open: false, lights: false })).toBe("wordmark");
-  expect(corner({ open: false, lights: true })).toBeNull();
+  expect(corner({ open: false, lights: true })).toBe("rail-lights");
   expect(corner({ open: true, lights: false })).toBeNull();
 });
 
 it("clears the traffic lights only when nothing of the navigation shows, in a narrow window; Settings keeps the folded rail", () => {
-  expect(corner({ open: false, lights: true, settings: true })).toBeNull();
+  expect(corner({ open: false, lights: true, settings: true })).toBe("rail-lights");
   expect(corner({ open: false, lights: false, settings: true })).toBe("wordmark");
   expect(corner({ open: false, lights: true, narrow: true })).toBe("lights");
   expect(corner({ open: false, lights: false, narrow: true })).toBeNull();

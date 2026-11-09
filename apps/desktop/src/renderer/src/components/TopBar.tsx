@@ -5,7 +5,7 @@ import { cn } from "../lib/cn";
 import { useLayout, type PanelSide } from "../lib/layout";
 import { PanelSideSwitch } from "./PanelSideSwitch";
 import { WindowNav } from "./Sidebar";
-import { useWindowCorner } from "../lib/navigation-column";
+import { cornerInset, useWindowCorner, type HeaderCorner } from "../lib/navigation-column";
 import { IconButton, Tooltip } from "./ui";
 import { useTrafficLights, useWindowsControls } from "../lib/window";
 
@@ -13,11 +13,11 @@ import { useTrafficLights, useWindowsControls } from "../lib/window";
  * The header's side padding. The window's outermost headers clear the native controls; tabs start 8px in, a thread's
  * header otherwise sits 20px in with its round tools 8px from the edge, and page headers keep 12px on both sides.
  */
-function headerInset({ corner, rightmost, besideColumn, thread, tabs }: { corner: "lights" | "wordmark" | null; rightmost: boolean; besideColumn: boolean; thread?: boolean; tabs?: boolean }): string {
+function headerInset({ corner, rightmost, besideColumn, thread, tabs }: { corner: HeaderCorner; rightmost: boolean; besideColumn: boolean; thread?: boolean; tabs?: boolean }): string {
   const left = cn(tabs && "pl-2", !tabs && thread && "pl-5", !tabs && !thread && "pl-3");
   // A thread header keeps 8px at the window's edge, and 12px from the panel or pane beside it.
   const right = thread && !besideColumn ? "pr-2" : "pr-3";
-  return cn(corner === "lights" && "pl-traffic", corner === "wordmark" && "pl-wordmark", !corner && left, rightmost ? "pr-controls" : right);
+  return cn(corner ? cornerInset[corner] : left, rightmost ? "pr-controls" : right);
 }
 
 /**

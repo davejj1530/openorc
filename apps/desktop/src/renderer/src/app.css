@@ -369,7 +369,7 @@
   /* Layout measures, so no screen hardcodes a pixel width. The resizable ones are set on :root by the layout store. */
   --width-sidebar: var(--layout-sidebar, 272px);
   /* The workspace rail sits beside the thread list; the sidebar is both, and only the list resizes. */
-  --width-rail: 60px;
+  --width-rail: 50px;
   --width-navigation: calc(var(--width-rail) + var(--width-sidebar));
   --width-panel: var(--layout-panel, 640px);
   /* The floors the work row keeps: the conversation's, then the panel's. The panel floor is
@@ -395,6 +395,8 @@
   --spacing-well: 8px;
   --spacing-traffic: var(--window-controls-left, calc(86px / var(--window-zoom, 1)));
   --spacing-controls: var(--window-controls-right, calc(140px / var(--window-zoom, 1)));
+  /* What traffic lights reaching past the folded rail take of the first header beside it. */
+  --spacing-rail-lights: max(0px, calc(var(--spacing-traffic) - var(--width-rail) - var(--radius-lg)));
   /* What the folded rail's wordmark takes of the first header in a corner no traffic lights hold (sidebar.css). */
   --spacing-wordmark: 48px;
 }

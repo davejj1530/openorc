@@ -247,7 +247,7 @@
   stroke-linecap: round;
 }
 
-/* Sidebar (Sidebar.tsx, sidebar.css): the window's corner on the top line, over a 60-unit rail of screens beside the
+/* Sidebar (Sidebar.tsx, sidebar.css): the window's corner on the top line, over a 50-unit rail of screens beside the
    272-unit thread list. A hairline seam parts it from the work column: a short stroke beside the corner, then the
    column's full height under the top line. Like the app's, hairlines stay one device pixel at any scale. */
 .hs-sidebar {
@@ -255,7 +255,7 @@
   display: flex;
   flex: none;
   flex-direction: column;
-  width: calc(332 * var(--u));
+  width: calc(322 * var(--u));
   overflow: hidden;
 }
 .hs-sidebar::after,
@@ -336,7 +336,7 @@
   flex-direction: column;
   align-items: center;
   gap: calc(4 * var(--u));
-  width: calc(60 * var(--u));
+  width: calc(50 * var(--u));
   padding: calc(6 * var(--u)) 0 calc(8 * var(--u));
 }
 .hs-rail-button {

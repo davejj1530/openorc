@@ -6,6 +6,7 @@ import { usePanelSessions, type PanelSession } from "../lib/panel-tabs";
 import { PanelSideSwitch } from "./PanelSideSwitch";
 import { PanelTabs } from "./PanelTabs";
 import { WindowCorner } from "./WindowCorner";
+import { cornerInset, type HeaderCorner } from "../lib/navigation-column";
 
 /**
  * The panel's row on the window's chrome line, at the top of its plane: the tabs, the plus that
@@ -32,7 +33,7 @@ export function PanelHeader({
   expanded: boolean;
   sidebarOpen: boolean;
   /** What holds the window's corner beside the panel's header when it comes first: see useWindowCorner. */
-  corner: "lights" | "wordmark" | null;
+  corner: HeaderCorner;
   windowsControls: boolean;
   onClose: (id: string) => void;
 }) {
@@ -43,12 +44,7 @@ export function PanelHeader({
     <header
       data-traffic-clearance={corner === "lights" || undefined}
       // The tabs line up with the page under them, and step past the traffic lights, the wordmark or the Windows controls at the window's edges.
-      className={cn(
-        "panel-header drag-region px-2.5",
-        outerLeft && corner === "lights" && "pl-traffic",
-        outerLeft && corner === "wordmark" && "pl-wordmark",
-        outerRight && windowsControls && "pr-controls",
-      )}
+      className={cn("panel-header drag-region px-2.5", outerLeft && corner && cornerInset[corner], outerRight && windowsControls && "pr-controls")}
     >
       {left ? (
         <span className="workspace-window-nav flex items-center" data-sidebar-open={sidebarOpen}>

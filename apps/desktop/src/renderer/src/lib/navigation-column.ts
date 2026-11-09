@@ -12,15 +12,22 @@ export function useNavigationGone(): boolean {
   return !open && compact;
 }
 
+export type HeaderCorner = "lights" | "rail-lights" | "wordmark" | null;
+
+/** The start padding that clears what holds the window's corner beside a header. */
+export const cornerInset: Record<NonNullable<HeaderCorner>, string> = { lights: "pl-traffic", "rail-lights": "pl-rail-lights", wordmark: "pl-wordmark" };
+
 /**
  * What the first header beside the navigation leaves room for at its start: the traffic lights, when it meets the
- * window's edge; the wordmark, when the folded rail keeps it in a corner no traffic lights hold (full screen, and off
- * macOS), where it overhangs the header just as it sits over the open sidebar; else nothing.
+ * window's edge; the part of them that reaches past the folded rail; the wordmark, when the folded rail keeps it in a
+ * corner no traffic lights hold (full screen, and off macOS), where it overhangs the header just as it sits over the
+ * open sidebar; else nothing.
  */
-export function useWindowCorner(): "lights" | "wordmark" | null {
+export function useWindowCorner(): HeaderCorner {
   const open = useLayout((s) => s.sidebarOpen);
   const gone = useNavigationGone();
   const trafficLights = useTrafficLights();
   if (gone) return trafficLights ? "lights" : null;
-  return !open && !trafficLights ? "wordmark" : null;
+  if (open) return null;
+  return trafficLights ? "rail-lights" : "wordmark";
 }

@@ -15,9 +15,9 @@ import { ClaudeAccountMenu } from "./ClaudeAccountMenu";
 import { AgentTabs } from "./AgentTabs";
 import { sheetList, type SheetList, type SheetModel } from "./model-sheet-list";
 import { recentModels, rememberModel } from "./recent-models";
-import { useSharedSettings, type ComposerSettings } from "./settings-bridge";
+import { useSharedModelSettings, type ModelSettings } from "./settings-bridge";
 
-function FastModeControl({ settings, state }: { settings: ComposerSettings | undefined; state: ReturnType<typeof pickerSettings> }) {
+function FastModeControl({ settings, state }: { settings: ModelSettings | undefined; state: ReturnType<typeof pickerSettings> }) {
   const colors = useColors();
   const choice = settings?.choice;
   const { fast, fastAvailable, fastHint } = state;
@@ -48,7 +48,7 @@ function FastModeControl({ settings, state }: { settings: ComposerSettings | und
   );
 }
 
-function EffortControl({ settings, state }: { settings: ComposerSettings | undefined; state: ReturnType<typeof pickerSettings> }) {
+function EffortControl({ settings, state }: { settings: ModelSettings | undefined; state: ReturnType<typeof pickerSettings> }) {
   const choice = settings?.choice;
   const { efforts, effort } = state;
   return (
@@ -167,7 +167,7 @@ function ModelStatus({ loading, error, empty }: { loading: boolean; error: Error
   return empty ? <Text className="px-3 py-2 text-sm text-ink-4">Enable an agent in Connections on your computer to choose a model.</Text> : null;
 }
 
-function ModelControls({ shown, settings, state }: { shown: AgentKind | null; settings: ComposerSettings | undefined; state: ReturnType<typeof pickerSettings> }) {
+function ModelControls({ shown, settings, state }: { shown: AgentKind | null; settings: ModelSettings | undefined; state: ReturnType<typeof pickerSettings> }) {
   if (shown && settings?.choice?.agent !== shown) return null;
   return (
     <>
@@ -185,7 +185,7 @@ function ModelControls({ shown, settings, state }: { shown: AgentKind | null; se
 export function ModelSheet() {
   const { composerId } = useLocalSearchParams<{ composerId: string }>();
   const insets = useSafeAreaInsets();
-  const settings = useSharedSettings(composerId);
+  const settings = useSharedModelSettings(composerId);
   const models = useComposerModels(settings);
   const account = useClaudeAccountChoice(settings);
   const catalog = pickerCatalog(models.data ?? []);

@@ -5,7 +5,7 @@ import { admitRemoteRequest, remotePush, remoteReplies, remoteReply, type GuardC
 
 /** Threads the guards can see: "team" belongs to a team, "solo" does not, anything else is unknown. */
 const seen: Record<string, { team: boolean }> = { team: { team: true }, solo: { team: false } };
-const context: GuardContext = { attachmentsDir: "/data/attachments", thread: (id) => seen[id] ?? null, task: () => null };
+const context: GuardContext = { attachmentsDir: "/data/attachments", thread: (id) => seen[id] ?? null, task: () => null, orcling: () => null };
 const TOKEN = "ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij12";
 const image = "/data/attachments/0b9f2c1e-7d1a-4b55-9a0e-3f2b8c6d4e10.png";
 
@@ -92,24 +92,49 @@ describe("phone policy", () => {
     }
   });
 
-  it("lets a phone read Orclings' own conversations, open one's profile, set its check-ins and react there, and keeps the rest on the Mac", () => {
+  it("lets a phone read Orclings' own conversations, open one's profile, change it, set its check-ins and react there, and keeps the rest on the Mac", () => {
     expect(admitRemoteRequest("orclings.chats", {}, context)).toEqual({ ok: true });
     expect(admitRemoteRequest("orclings.profile", { id: "o" }, context)).toEqual({ ok: true });
+    expect(admitRemoteRequest("orclings.delete", { id: "o" }, context)).toEqual({ ok: true });
     expect(admitRemoteRequest("orclings.wakes.save", { id: "o", wakes: [{ kind: "startup" }] }, context)).toEqual({ ok: true });
     expect(admitRemoteRequest("orclings.reactions", { threadId: "t" }, context)).toEqual({ ok: true });
     expect(admitRemoteRequest("orclings.react", { threadId: "t", runId: "r", messageId: "m", part: 0, reaction: "heart" }, context)).toEqual({ ok: true });
-    for (const method of [
-      "orclings.list",
-      "orclings.create",
-      "orclings.update",
-      "orclings.delete",
-      "orclings.instructions",
-      "orclings.memories",
-      "orclings.ask",
-      "orclings.assign",
-      "orclings.instructions.save",
-    ])
+    for (const method of ["orclings.list", "orclings.instructions", "orclings.instructions.restore", "orclings.memories", "orclings.ask", "orclings.assign", "orclings.groups.send"])
       expect(admitRemoteRequest(method, {}, context).ok, method).toBe(false);
+  });
+
+  it("makes and saves an Orcling's look, name, model and permission from a phone, but no name that breaks its conversation's title", () => {
+    const draft = {
+      name: "Rini",
+      look: { shape: 3, eyes: 1, texture: 2, glasses: 0, accessory: 4, bodyColor: "#e8a33d", eyeColor: "#1b1c20" },
+      settings: { agent: "codex", model: "gpt-6-terra", effort: "high", fastMode: false },
+      permission: "allow",
+      claudeAccountId: "work",
+    };
+    expect(admitRemoteRequest("orclings.update", { id: "o", draft }, context)).toEqual({ ok: true });
+    expect(admitRemoteRequest("orclings.update", { id: "o", draft: { ...draft, name: "Ri\nni" } }, context)).toEqual({ ok: false, message: "A name must be one line." });
+    expect(admitRemoteRequest("orclings.update", { id: "o", draft: { ...draft, name: "Ri\u202Eni" } }, context)).toEqual({ ok: false, message: "A name must be one line." });
+    expect(admitRemoteRequest("orclings.create", { draft }, context)).toEqual({ ok: true });
+    expect(admitRemoteRequest("orclings.create", { draft: { ...draft, name: "Ri\nni" } }, context)).toEqual({ ok: false, message: "A name must be one line." });
+  });
+
+  it("rewrites an Orcling's instructions from a phone unless the ones it would replace hold a secret the phone read redacted", () => {
+    const stored: Record<string, string | null> = { plain: "Answer in one line.", fresh: null, secret: `Deploy with ${TOKEN}.` };
+    const orclings: GuardContext = { ...context, orcling: (id) => (id in stored ? { instructions: stored[id]! } : null) };
+    expect(admitRemoteRequest("orclings.instructions.save", { id: "plain", body: "Answer in two lines.\n\nThen stop." }, orclings)).toEqual({ ok: true });
+    expect(admitRemoteRequest("orclings.instructions.save", { id: "fresh", body: "Be kind." }, orclings)).toEqual({ ok: true });
+    expect(admitRemoteRequest("orclings.instructions.save", { id: "secret", body: "Deploy with [redacted:github-token]." }, orclings)).toEqual({
+      ok: false,
+      message: "These instructions hold a secret, so edit them on your Mac.",
+    });
+    expect(admitRemoteRequest("orclings.instructions.save", { id: "plain", body: "Be \u001b[31mloud" }, orclings)).toEqual({ ok: false, message: "Instructions must be plain text." });
+    const saved = remoteReply(
+      "orclings.instructions.save",
+      { version: 4, body: `Use ${TOKEN}`, author: "user", note: null, createdAt: 1 },
+      { words: (text: string) => text, roots: () => ({ home: "/Users/me", dataDir: "/Users/me/.openorc", projects: [] }) },
+    );
+    expect(JSON.stringify(saved)).not.toContain(TOKEN);
+    expect(saved.version).toBe(4);
   });
 
   it("opens one task for a phone without the worktree's path on the Mac or a token in its spec, and keeps starting and deleting tasks on the Mac", () => {

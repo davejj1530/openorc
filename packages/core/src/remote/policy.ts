@@ -5,6 +5,7 @@ import {
   REMOTE_ATTACHMENT_BYTES,
   rpcParams,
   supportsSubagents,
+  type OrclingDraft,
   type RemoteMethod,
   type RemotePush,
   type RpcParams,
@@ -28,6 +29,8 @@ export interface GuardContext {
   thread(id: string): { team: boolean; parentRelation?: Thread["parentRelation"] } | null;
   /** A task's description as stored, read synchronously; null when there is no such task. */
   task(id: string): { spec: string | null } | null;
+  /** An Orcling's current instructions as stored, read synchronously; null when there is no such Orcling. */
+  orcling(id: string): { instructions: string | null } | null;
 }
 
 /** Null admits; a string refuses with that message. Guards see params already parsed by the method's schema. */
@@ -145,6 +148,16 @@ function taskUpdate({ id, patch }: RpcParams<"tasks.update">, context: GuardCont
 /** A task as a phone reads it: a worktree's path names the Mac's folders, and a description may hold a token. */
 const phoneTask = <T extends RpcResults["tasks.update"] | null>(task: T): T => (task ? { ...task, worktreePath: null, spec: task.spec === null ? null : redact(task.spec).text } : task);
 
+/** An Orcling's name titles its conversation and its notifications. */
+const orclingName = ({ draft }: { draft: OrclingDraft }): string | null => (TITLE_FORBIDDEN.test(draft.name) ? "A name must be one line." : null);
+
+/** An Orcling's instructions go into every turn it takes, so they are plain text, and ones that hold a secret the phone reads redacted are rewritten on the Mac. */
+function orclingInstructions({ id, body }: RpcParams<"orclings.instructions.save">, { orcling }: GuardContext): string | null {
+  if (MESSAGE_FORBIDDEN.test(body)) return "Instructions must be plain text.";
+  const stored = orcling(id)?.instructions;
+  return stored && redact(stored).redacted ? "These instructions hold a secret, so edit them on your Mac." : null;
+}
+
 const NOT_FROM_PHONE = "This is not available from a phone.";
 
 /** Typed over REMOTE_METHODS: a method listed there without a guard here, or guarded but not listed, fails the build. */
@@ -226,8 +239,13 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   // Faces, names and their own conversations' state; the reply leaves the rest of each Orcling on the Mac.
   "orclings.chats": allow,
   "orclings.profile": allow,
+  // What its designer on the Mac makes and changes, which the schema bounds.
+  "orclings.create": orclingName,
+  "orclings.update": orclingName,
+  "orclings.delete": allow,
   // When it checks in: the schema bounds the list, and nothing there reaches its model, account or instructions.
   "orclings.wakes.save": allow,
+  "orclings.instructions.save": orclingInstructions,
   // The core takes tapbacks only in an Orcling's own conversation, on a message there.
   "orclings.reactions": allow,
   "orclings.react": allow,
@@ -319,7 +337,11 @@ export const remoteReplies: { [M in RemoteMethod]: Reply<M> } = {
     instructions: profile.instructions === null ? null : redact(profile.instructions).text,
     memories: profile.memories.map((memory) => ({ ...memory, title: redact(memory.title).text, body: redact(memory.body).text })),
   }),
+  "orclings.create": same,
+  "orclings.update": same,
+  "orclings.delete": same,
   "orclings.wakes.save": same,
+  "orclings.instructions.save": (version) => ({ ...version, body: redact(version.body).text, note: version.note === null ? null : redact(version.note).text }),
   "orclings.reactions": same,
   "orclings.react": same,
 };

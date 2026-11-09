@@ -105,6 +105,18 @@ const answers: Answers = {
   "orclings.wakes.save": () => {
     throw new Error("The demo Mac has no Orclings.");
   },
+  "orclings.create": () => {
+    throw new Error("The demo Mac makes no Orclings.");
+  },
+  "orclings.update": () => {
+    throw new Error("The demo Mac has no Orclings.");
+  },
+  "orclings.delete": () => {
+    throw new Error("The demo Mac has no Orclings.");
+  },
+  "orclings.instructions.save": () => {
+    throw new Error("The demo Mac has no Orclings.");
+  },
   "orclings.reactions": () => [],
   "orclings.react": () => null,
   // What the picker offers on the demo Mac: the project's own skill first, then one built into the agent.

@@ -92,6 +92,9 @@ export default function RootLayout() {
             <Stack.Screen name="branch" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [0.6, 1] }} />
             <Stack.Screen name="details" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [0.6, 1] }} />
             <Stack.Screen name="orcling" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [1] }} />
+            <Stack.Screen name="orcling-look" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [1] }} />
+            <Stack.Screen name="orcling-instructions" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [1] }} />
+            <Stack.Screen name="orcling-new" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [1] }} />
           </Stack>
         </QueryClientProvider>
       </KeyboardProvider>

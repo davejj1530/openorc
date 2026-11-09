@@ -139,7 +139,7 @@ it("hides child inbox entries and notifications from legacy sessions, preserving
   }
 });
 
-it("lists Orclings to a phone by face, name and conversation, opens one's profile with its text redacted, saves its check-ins, and leaves making or rewriting one to the Mac", async () => {
+it("lists Orclings to a phone by face, name and conversation, opens one's profile with its text redacted, and saves its check-ins", async () => {
   const pip = await core.orclings.create({ name: "Pip", look: defaultOrclingLook, settings: { agent: "codex", model: "fixture", effort: null, fastMode: false }, permission: "allow" });
   const capable = await phone();
   await expect(capable.request("session.negotiate", { capabilities: ["orclings"] })).resolves.toEqual({ capabilities: ["orclings"] });
@@ -149,14 +149,31 @@ it("lists Orclings to a phone by face, name and conversation, opens one's profil
   await expect(capable.call("orclings.reactions", { threadId: pip.threadId })).resolves.toEqual([]);
   core.orclings.saveInstructions(pip.id, "Ping me when CI breaks. Token ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij12", "user", null);
   const profile = await capable.call("orclings.profile", { id: pip.id });
-  expect(Object.keys(profile).sort()).toEqual(["id", "instructions", "look", "memories", "name", "permission", "settings", "wakes"]);
+  expect(Object.keys(profile).sort()).toEqual(["claudeAccountId", "id", "instructions", "look", "memories", "name", "permission", "settings", "wakes"]);
   expect(profile).toMatchObject({ id: pip.id, name: "Pip", permission: "allow", settings: { agent: "codex", model: "fixture" }, wakes: [], memories: [] });
   expect(profile.instructions).toBe("Ping me when CI breaks. Token [redacted:github-token]");
   const saved = await capable.call("orclings.wakes.save", { id: pip.id, wakes: [{ kind: "startup" }, { kind: "time", at: "09:00", days: [1, 2, 3, 4, 5] }] });
   expect(saved.wakes).toEqual([{ kind: "startup" }, { kind: "time", at: "09:00", days: [1, 2, 3, 4, 5] }]);
-  await expect(capable.request("orclings.instructions.save", { id: pip.id, body: "Something else" })).rejects.toThrow();
+  await expect(capable.request("orclings.instructions.save", { id: pip.id, body: "Something else" })).rejects.toThrow("These instructions hold a secret, so edit them on your Mac.");
+  expect(core.orclings.instructions(pip.id)[0]?.body).toContain("ghp_");
   await expect(capable.request("orclings.list", {})).rejects.toThrow();
-  await expect(
-    capable.request("orclings.create", { draft: { name: "Rex", look: defaultOrclingLook, settings: { agent: "codex", model: "fixture", effort: null, fastMode: false }, permission: "allow" } }),
-  ).rejects.toThrow();
+});
+
+it("makes an Orcling for a phone, saves its changes and instructions, and deletes it, as the Mac's designer and panel do", async () => {
+  const capable = await phone();
+  await expect(capable.request("session.negotiate", { capabilities: ["orclings", "orcling-edits"] })).resolves.toEqual({ capabilities: ["orclings", "orcling-edits"] });
+  const rex = await capable.call("orclings.create", {
+    draft: { name: "Rex", look: defaultOrclingLook, settings: { agent: "codex", model: "fixture", effort: null, fastMode: false }, permission: "approve" },
+  });
+  expect(core.orclings.get(rex.id)).toMatchObject({ name: "Rex", permission: "approve", threadId: rex.threadId });
+  expect(core.threads.get(rex.threadId)).toMatchObject({ orclingId: rex.id });
+  const profile = await capable.call("orclings.profile", { id: rex.id });
+  const draft = { name: "Rexy", look: { ...profile.look, shape: 2, bodyColor: "#ec7ba8" }, settings: { ...profile.settings, effort: "high" }, permission: "allow" as const };
+  await expect(capable.call("orclings.update", { id: rex.id, draft })).resolves.toMatchObject({ ...draft, claudeAccountId: profile.claudeAccountId });
+  expect(core.orclings.get(rex.id)).toMatchObject({ ...draft, claudeAccountId: rex.claudeAccountId });
+  await expect(capable.call("orclings.profile", { id: rex.id })).resolves.toMatchObject({ name: "Rexy", permission: "allow" });
+  await expect(capable.call("orclings.instructions.save", { id: rex.id, body: "Keep it short." })).resolves.toMatchObject({ body: "Keep it short.", author: "user" });
+  expect(core.orclings.instructions(rex.id)[0]?.body).toBe("Keep it short.");
+  await expect(capable.call("orclings.delete", { id: rex.id })).resolves.toBeNull();
+  expect(core.orclings.list().map((orcling) => orcling.id)).not.toContain(rex.id);
 });

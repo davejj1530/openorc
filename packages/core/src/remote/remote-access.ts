@@ -1,4 +1,4 @@
-import { projects, refusedMoves, remoteDevices, remotePushTargets, retiredTeams, settings, tasks, threads, type Db, type LedgerWriter, type RemoteDeviceRecord } from "@openorc/db";
+import { orclings, projects, refusedMoves, remoteDevices, remotePushTargets, retiredTeams, settings, tasks, threads, type Db, type LedgerWriter, type RemoteDeviceRecord } from "@openorc/db";
 import {
   acceptLink,
   encodePairingUrl,
@@ -412,6 +412,7 @@ export class RemoteAccess {
           const task = tasks.get(db, id);
           return task ? { spec: task.spec } : null;
         },
+        orcling: (id) => (orclings.get(db, id) ? { instructions: orclings.instructions(db, id)[0]?.body ?? null } : null),
       },
       roots: () => this.macRoots(),
       readAsset: (ref) => readRemoteAsset(ref, { dataDir, db, ledger }),

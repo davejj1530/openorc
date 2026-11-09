@@ -1,7 +1,8 @@
 import type { ClientPush } from "@openorc/client";
 import { LinkCloseCode, type PhoneMessage } from "@openorc/link";
+import { defaultOrclingLook } from "@openorc/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DROPPED, OLDER_MAC_IMAGE, OLDER_MAC_ORCLINGS, OLDER_MAC_SKILLS, OLDER_MAC_SUBTHREADS } from "./link-connection";
+import { DROPPED, OLDER_MAC_IMAGE, OLDER_MAC_ORCLING_EDITS, OLDER_MAC_ORCLINGS, OLDER_MAC_SKILLS, OLDER_MAC_SUBTHREADS } from "./link-connection";
 import { ConnectionManager } from "./manager";
 import { effectsFor, FakeMac, lan, pairedWith } from "./test-fixtures/fake-mac";
 
@@ -40,7 +41,7 @@ describe("calls over the link", () => {
     expect(declaration).toMatchObject({
       t: "rpc",
       method: "session.negotiate",
-      params: { capabilities: ["subagent-threads", "reply-images", "skill-lists", "orclings", "task-details", "subthread-starts"] },
+      params: { capabilities: ["subagent-threads", "reply-images", "skill-lists", "orclings", "task-details", "subthread-starts", "orcling-edits"] },
     });
     if (declaration?.t !== "rpc") throw new Error("no capability declaration");
     mac.send({ t: "rpc.error", id: declaration.id, message: "This is not available from a phone." });
@@ -126,6 +127,22 @@ describe("calls over the link", () => {
     const listed = second.connection.call("orclings.chats", {});
     await advance(10);
     await expect(listed).resolves.toEqual([]);
+  });
+
+  it("changes an Orcling only on a Mac that said it saves a phone's changes, even where it lists Orclings", async () => {
+    const mac = new FakeMac();
+    mac.behave(lan, { kind: "answer" });
+    const { connection } = connect(mac);
+    await advance(10);
+    const declaration = mac.heard.find((message) => message.t === "rpc" && message.method === "session.negotiate");
+    if (declaration?.t !== "rpc") throw new Error("no capability declaration");
+    mac.send({ t: "rpc.result", id: declaration.id, result: { capabilities: ["subagent-threads", "orclings"] } });
+    const draft = { name: "Pip", look: defaultOrclingLook, settings: { agent: "codex" as const, model: "gpt", effort: null, fastMode: false }, permission: "allow" as const };
+    await expect(connection.call("orclings.create", { draft })).rejects.toThrow(OLDER_MAC_ORCLING_EDITS);
+    await expect(connection.call("orclings.update", { id: "o", draft })).rejects.toThrow(OLDER_MAC_ORCLING_EDITS);
+    await expect(connection.call("orclings.delete", { id: "o" })).rejects.toThrow(OLDER_MAC_ORCLING_EDITS);
+    await expect(connection.call("orclings.instructions.save", { id: "o", body: "Be brief." })).rejects.toThrow(OLDER_MAC_ORCLING_EDITS);
+    expect(wire(mac).filter((line) => line.includes("orclings."))).toEqual([]);
   });
 
   it("starts a thread under another only on a Mac that said it can, and says whether a Mac shares a capability", async () => {

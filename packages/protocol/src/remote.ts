@@ -63,11 +63,16 @@ export const REMOTE_METHODS = [
   "tasks.create",
   "tasks.update",
   // Orclings by face, name and their own conversation's state, and tapbacks in that conversation. One Orcling's profile
-  // (model, permission, check-ins, current instructions and memories, text redacted) and its check-in times. Its earlier
-  // instructions stay on the Mac, as do creating, renaming, redrawing and rewriting one.
+  // (model, permission, check-ins, current instructions and memories, text redacted) and every change its designer and
+  // panel on the Mac make: making one, its look, name, model, account and permission, its check-ins and instructions,
+  // and deleting it. Its earlier instructions stay on the Mac.
   "orclings.chats",
   "orclings.profile",
+  "orclings.create",
+  "orclings.update",
+  "orclings.delete",
   "orclings.wakes.save",
+  "orclings.instructions.save",
   "orclings.reactions",
   "orclings.react",
   // Whether the Mac offers cloud threads, and moving a thread to the cloud after the phone's confirm, with the files a

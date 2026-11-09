@@ -1,7 +1,7 @@
 import { offeredAccount, projectAccountChoice } from "@openorc/client";
 import { DEFAULT_CLAUDE_ACCOUNT, type ClaudeAccountConnection, type ThreadSummary } from "@openorc/protocol";
 import { useRpc, useRpcMutation } from "../client";
-import type { ComposerSettings } from "./settings-bridge";
+import type { ComposerSettings, ModelSettings } from "./settings-bridge";
 
 /**
  * A composer's Claude account choice: the Mac's accounts, or the ones its project uses when it uses only some (from
@@ -9,7 +9,7 @@ import type { ComposerSettings } from "./settings-bridge";
  * (the chosen one, else the project's default). A thread already on an account its project stopped using keeps it
  * listed. Null with a single account, until the Mac lists them, and where the account cannot change.
  */
-export function useClaudeAccountChoice(settings: ComposerSettings | undefined) {
+export function useClaudeAccountChoice(settings: ModelSettings | undefined) {
   const list = useRpc("claude.accounts.list", {}, { enabled: Boolean(settings?.claudeAccount) });
   const projects = useRpc("projects.list", {}, { enabled: Boolean(settings?.claudeAccount?.projectId) });
   if (!settings?.claudeAccount || !list.data || list.data.accounts.length < 2) return null;
@@ -62,7 +62,7 @@ export function claudeAccountUnavailable(account: ClaudeAccountConnection): stri
 }
 
 /** The models a composer offers: its thread's or draft's Claude account, else the Mac's default account. */
-export function useComposerModels(settings: ComposerSettings | undefined) {
+export function useComposerModels(settings: ModelSettings | undefined) {
   const claudeAccountId = settings?.claudeAccount?.chosen ?? settings?.claudeAccountId;
   // The last account's list holds while the next one's loads, so the chip keeps its name.
   return useRpc("agents.models", claudeAccountId ? { claudeAccountId } : {}, { staleTime: 5 * 60_000, placeholderData: (previous) => previous });

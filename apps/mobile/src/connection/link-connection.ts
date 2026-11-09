@@ -2,7 +2,7 @@ import type { ClientPush, CoreConnection } from "@openorc/client";
 import type { MacMessage, PhoneSession } from "@openorc/link";
 import type { AssetRef, DeviceMethod, DeviceParams, DeviceRpcResults, RemotePush, RpcMethod, RpcParams, RpcResults, SessionMethod, SessionParams, SessionRpcResults } from "@openorc/protocol";
 import type { Clock } from "./route-race";
-import { PHONE_CAPABILITIES, supportsOrclings, supportsReplyImages, supportsSkillLists, supportsSubthreadStarts, supportsTaskDetails } from "@openorc/protocol";
+import { PHONE_CAPABILITIES, supportsOrclingEdits, supportsOrclings, supportsReplyImages, supportsSkillLists, supportsSubthreadStarts, supportsTaskDetails } from "@openorc/protocol";
 
 /** A watched Preview's newest state, or the end of the watch, which only its screen hears. */
 export type PreviewPush = Extract<RemotePush, { type: "preview" | "preview.ended" }>;
@@ -46,6 +46,7 @@ const NO_MAC = "This phone is not connected to a Mac.";
 export const OLDER_MAC_IMAGE = "Update OpenOrc on your Mac to see this image here.";
 export const OLDER_MAC_SKILLS = "Update OpenOrc on your Mac to pick its skills here.";
 export const OLDER_MAC_ORCLINGS = "Update OpenOrc on your Mac to see its Orclings here.";
+export const OLDER_MAC_ORCLING_EDITS = "Update OpenOrc on your Mac to change its Orclings here.";
 export const OLDER_MAC_TASKS = "Update OpenOrc on your Mac to open its tasks here.";
 export const OLDER_MAC_TASK_EDITS = "Update OpenOrc on your Mac to edit its tasks here.";
 export const OLDER_MAC_TASK_CREATES = "Update OpenOrc on your Mac to add tasks from your phone.";
@@ -60,6 +61,10 @@ const gated: Partial<Record<RpcMethod, Gate>> = {
   "orclings.chats": { supports: supportsOrclings, refusal: OLDER_MAC_ORCLINGS },
   "orclings.profile": { supports: supportsOrclings, refusal: OLDER_MAC_ORCLINGS },
   "orclings.wakes.save": { supports: supportsOrclings, refusal: OLDER_MAC_ORCLINGS },
+  "orclings.create": { supports: supportsOrclingEdits, refusal: OLDER_MAC_ORCLING_EDITS },
+  "orclings.update": { supports: supportsOrclingEdits, refusal: OLDER_MAC_ORCLING_EDITS },
+  "orclings.delete": { supports: supportsOrclingEdits, refusal: OLDER_MAC_ORCLING_EDITS },
+  "orclings.instructions.save": { supports: supportsOrclingEdits, refusal: OLDER_MAC_ORCLING_EDITS },
   "orclings.reactions": { supports: supportsOrclings, refusal: OLDER_MAC_ORCLINGS },
   "orclings.react": { supports: supportsOrclings, refusal: OLDER_MAC_ORCLINGS },
 };

@@ -105,7 +105,8 @@ describe("the phone's Orclings", () => {
     });
     const { OrclingSheet } = await import("./OrclingSheet");
     render(<OrclingSheet />, { wrapper: mac.current.wrapper });
-    expect(await screen.findByText("GPT-6 Astra · Approve")).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Model, GPT-6 Astra" })).toBeTruthy();
+    expect(screen.getByText("Approve")).toBeTruthy();
     expect(screen.getByText("Ping me when CI breaks.")).toBeTruthy();
     expect(screen.getByText("Prefers short texts")).toBeTruthy();
     screen.getByRole("button", { name: "Add a time" }).click();

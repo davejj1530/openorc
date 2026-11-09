@@ -44,6 +44,14 @@ export default defineConfig(({ mode }) => {
       },
     },
     renderer: {
+      build: {
+        rollupOptions: {
+          input: {
+            index: resolve(import.meta.dirname, "src/renderer/index.html"),
+            "appearance-preview": resolve(import.meta.dirname, "src/renderer/appearance-preview.html"),
+          },
+        },
+      },
       // typegpu compiles the shader components' "use gpu" function bodies to WGSL at
       // build time. Without it every orb throws "Missing metadata for tgpu.fn function
       // body" the moment its chunk loads. The shadercn install steps omit this.

@@ -69,6 +69,16 @@
   color: var(--ink-3);
   font-size: var(--text-sm);
 }
+.palette-expand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  margin-top: 12px;
+}
+.palette-expand[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
 @media (prefers-reduced-motion: reduce) {
   .palette-choice {
     transition: none;

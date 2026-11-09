@@ -22,6 +22,40 @@ const rows: HarnessRow[] = [
 ];
 
 describe("HarnessScan", () => {
+  it("lets compact rows toggle from the agent name while keeping sign-in actions separate", () => {
+    const onChange = vi.fn();
+    const onConnect = vi.fn();
+    render(<HarnessScan rows={rows} compact selection={{ mode: "multiple", selectedIds: ["claude"], onChange }} onConnect={onConnect} />);
+    fireEvent.click(screen.getByText("Claude Code"));
+    expect(onChange).toHaveBeenCalledWith("claude");
+    expect(screen.getByRole("checkbox", { name: "Claude Code selected" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.queryByText("Connected with your existing sign-in.")).toBeNull();
+    expect(screen.queryByText("Details")).toBeNull();
+    expect(screen.queryByRole("checkbox", { name: /Codex/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Codex sign-in guide" }));
+    expect(onConnect).toHaveBeenCalledWith("codex");
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps sign-in actions visible while revealing optional installations on demand", () => {
+    const onSetup = vi.fn();
+    const missing: HarnessRow = { id: "opencode", state: "not_found", path: null, version: null, revision: 1 };
+    render(<HarnessScan rows={[...rows, missing]} discloseUnavailable onSetup={onSetup} />);
+    expect(screen.getByRole("button", { name: "Codex sign-in guide" })).toBeTruthy();
+    const additionalAgents = screen.getByText("Add more agents").closest("details");
+    expect(additionalAgents?.open).toBe(false);
+    fireEvent.click(screen.getByText("Add more agents"));
+    expect(additionalAgents?.open).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Install OpenCode" }));
+    expect(onSetup).toHaveBeenCalledWith("opencode");
+  });
+
+  it("shows installation choices immediately when no agents are installed", () => {
+    render(<HarnessScan rows={[{ ...rows[0]!, state: "not_found", path: null, version: null }]} discloseUnavailable />);
+    expect(screen.getByRole("button", { name: "Install Claude Code" })).toBeTruthy();
+    expect(screen.queryByText("Add more agents")).toBeNull();
+  });
+
   it("keeps installation, authentication, and selection as distinct states", () => {
     const onChange = vi.fn();
     render(

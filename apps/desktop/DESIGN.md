@@ -169,11 +169,13 @@ components:
 
 ## Overview
 
+First-run setup pairs a column of controls with a flat illustrated collage. Above 900px, the controls align with the window wordmark and the artwork sits toward the right edge, with a flexible gap between them. Navigation and the three-segment progress track stay in a fixed bottom bar. The illustration yields below 720px; setup content scrolls without moving the footer. Its original artwork has a fixed palette. Appearance starts with six palette choices and an expandable catalog; the selected palette stays visible when the catalog closes. An isolated renderer shows the actual app shell and New thread screen at desktop dimensions, then scales the entire view down. Example data and storage stay inside the preview; the selected palette, mode, and saved custom colors update it. Motion is a brief staggered entrance and a token-timed rearrangement between steps, with a settled reduced-motion state. Recovery remains a single-column screen. First-run agent choices form two columns directly on the page, with a logo, stacked name and status, and checkbox; the whole ready row toggles selection. At 400px and narrower, the choices use one column. The default-agent selector follows the choices, so selection precedes the default choice. Setup actions remain visible, while installation metadata stays in Connections. The content supports wheel, trackpad, and keyboard scrolling without a visible scrollbar.
+
 **Creative North Star: "A calm place to think with coding agents"**
 
 OpenOrc is a compact desktop workspace for several projects at once. The sidebar, the conversation, and the page toolbars share one tile ground. Work that needs its own room (the work panel, the settings sheet, cards in the transcript, the composer) sits on white planes, carved darker than the tile in dark mode. Depth comes from fill steps alone: no borders on persistent surfaces and no shadows on floating ones. Each screen has one ink pill; everything else is quiet. The interface is set in Immaculate Gothic at one regular weight.
 
-This record describes the built desktop interface. It preserves the workflows in [PRODUCT.md](../../PRODUCT.md), including drafts, task authorization, Orcling privacy, and project context. Packaged application artwork is unchanged.
+This record describes the built desktop interface. It preserves the workflows in [PRODUCT.md](../../PRODUCT.md), including drafts, task authorization, Orcling privacy, and project context. Original artwork and provider marks are documented in [artwork provenance](../../docs/artwork-provenance.md).
 
 **Key Characteristics:**
 

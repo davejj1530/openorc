@@ -20,6 +20,10 @@ Provider marks, fonts, and third-party runtime code retain their own terms. Orig
 
 [artwork-manifest.json](artwork-manifest.json) fingerprints the image, SVG, Rive, and icon files curated for the public source. It includes provider marks to identify their bytes, not to classify them as original work. Code-native artwork, and the SVG files exported from it, are referenced above and reviewed with their source code. A hash establishes bytes, not ownership or permission; refresh the record when an asset changes.
 
+## Onboarding illustrations
+
+The three flat illustrations in `apps/desktop/src/renderer/src/assets/onboarding/` are original images generated with OpenAI's built-in image-generation tool on November 9, 2026. They depict abstract ribbons, a graphic flower, and interlocking shapes. No third-party reference images were supplied. Each image is distributed as a 640 × 640 WebP; the adjacent [provenance record](../apps/desktop/src/renderer/src/assets/onboarding/provenance.json) contains the exact prompts, encoding details, and SHA-256 fingerprints. These illustrations are distributed under the project's Apache-2.0 terms. Existing provider marks rendered beside them retain their separate terms.
+
 ## Project framework and language logos
 
 The 24 SVGs in `apps/desktop/src/renderer/src/assets/project-stacks/` are copied byte-for-byte from [Devicon v2.17.0](https://github.com/devicons/devicon/tree/54cfe13ac10eaa1ef817a343ab0a9437eb3c2e08), pinned to commit `54cfe13ac10eaa1ef817a343ab0a9437eb3c2e08`. The adjacent `manifest.json` records each source URL, file size and SHA-256. Use upstream logos for these identifiers; the user explicitly rejected original OpenOrc drawings for framework/language marks.

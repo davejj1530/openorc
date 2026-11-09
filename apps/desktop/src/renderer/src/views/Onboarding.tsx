@@ -1,11 +1,14 @@
-import { useState, type ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import { harnessCatalog, type HarnessId, type Project } from "@openorc/protocol";
+import { overridesFor, resolveAccentColors, themePresets } from "@openorc/client/theme";
 import { ArrowLeft, ArrowRight, Check, FolderGit2, Monitor, Moon, RotateCcw, Settings2, Sun } from "../components/icons";
 import { HarnessScan, type HarnessRow, type HarnessRowState } from "../components/HarnessScan";
-import { OnboardingMascot } from "../components/OnboardingMascot";
+import { OnboardingMascot, type OnboardingMascotMood } from "../components/OnboardingMascot";
+import { OnboardingScene } from "../components/OnboardingScene";
 import { Button, Select, TextButton } from "../components/ui";
 import { type OnboardingStep, type PersistedOnboardingState } from "../lib/onboarding";
 import { useTheme, type ThemeChoice } from "../lib/theme";
+import { toHex } from "../lib/color";
 import { PaletteSelector } from "../components/PaletteSelector";
 import { Wordmark } from "../components/SidebarListHead";
 import { useTrafficLights, useWindowsControls } from "../lib/window";
@@ -111,7 +114,7 @@ function Progress({ step }: { step: OnboardingStep }) {
           data-complete={index < current || undefined}
           key={item.id}
         >
-          <span>{item.label}</span>
+          <span className="sr-only">{item.label}</span>
           {index < current ? <span className="sr-only"> completed</span> : null}
         </li>
       ))}
@@ -196,8 +199,7 @@ function ProjectStep({
 }) {
   return (
     <>
-      <header className="onboarding-heading onboarding-heading-with-mascot">
-        <OnboardingMascot mood={projectMood(importing, loading, Boolean(error || loadFailed), Boolean(selectedId))} reactionKey={selectedId ?? ""} />
+      <header className="onboarding-heading">
         <h1 tabIndex={-1}>Bring in your first project</h1>
         <p>Choose a local Git repository to keep your conversations, tasks, and agent work together.</p>
       </header>
@@ -235,7 +237,7 @@ const appearanceModes = [
   { id: "dark", name: "Dark", icon: Moon },
 ] satisfies { id: ThemeChoice; name: string; icon: typeof Sun }[];
 
-function ThemeStep({ preview, onStorageError }: { preview: boolean; onStorageError: (failed: boolean) => void }) {
+function useOnboardingAppearance(preview: boolean, onStorageError: (failed: boolean) => void) {
   const theme = useTheme();
   const [previewChoice, setPreviewChoice] = useState(theme.choice);
   const [previewPreset, setPreviewPreset] = useState(theme.preset);
@@ -257,13 +259,21 @@ function ThemeStep({ preview, onStorageError }: { preview: boolean; onStorageErr
     }
     onStorageError(!theme.setPreset(next));
   };
+  const colors: CSSProperties = resolveAccentColors(themePresets.find((item) => item.id === preset)!.colors[resolved], overridesFor(theme.custom, preset, resolved), toHex);
+  const resetPreview = () => {
+    setPreviewChoice(theme.choice);
+    setPreviewPreset(theme.preset);
+  };
+  return { choice, preset, resolved, colors, custom: theme.custom, chooseMode, choosePreset, resetPreview };
+}
 
+function ThemeStep({ appearance }: { appearance: ReturnType<typeof useOnboardingAppearance> }) {
+  const { choice, preset, resolved, custom, chooseMode, choosePreset } = appearance;
   return (
     <div className="onboarding-theme">
-      <header className="onboarding-heading onboarding-heading-with-mascot">
-        <OnboardingMascot mood="styling" reactionKey={`${choice}:${preset}`} />
+      <header className="onboarding-heading">
         <h1 tabIndex={-1}>Choose how OpenOrc looks</h1>
-        <p>Pick an appearance and palette for your workspace. You can change either later in Settings.</p>
+        <p>You can change this later in Settings.</p>
       </header>
       <section className="onboarding-theme-section" aria-labelledby="theme-mode-title">
         <h2 className="onboarding-section-title" id="theme-mode-title">
@@ -282,7 +292,7 @@ function ThemeStep({ preview, onStorageError }: { preview: boolean; onStorageErr
         <h2 className="onboarding-section-title" id="theme-palette-title">
           Palette
         </h2>
-        <PaletteSelector preset={preset} mode={resolved} custom={theme.custom} onChange={choosePreset} />
+        <PaletteSelector preset={preset} mode={resolved} custom={custom} onChange={choosePreset} compact />
       </section>
     </div>
   );
@@ -306,7 +316,7 @@ function DefaultHarness({ rows, value, onChange }: { rows: readonly HarnessRow[]
         <label className="onboarding-section-title" htmlFor="onboarding-default">
           Start new threads with
         </label>
-        <p className="onboarding-section-copy" id="onboarding-default-hint">
+        <p className="sr-only" id="onboarding-default-hint">
           You can switch agents in any thread.
         </p>
       </div>
@@ -320,6 +330,151 @@ function DefaultHarness({ rows, value, onChange }: { rows: readonly HarnessRow[]
           </option>
         ))}
       </Select>
+    </div>
+  );
+}
+
+type Flow = ReturnType<typeof useOnboardingFlow>;
+
+/** Setup's progress could not be saved: said under the actions, while it stays true. */
+function SaveFailed({ shown }: { shown: boolean }) {
+  if (!shown) return null;
+  return (
+    <p className="text-sm text-bad mt-3" role="alert">
+      Setup progress could not be saved. Keep this window open and try again.
+    </p>
+  );
+}
+
+/** The scene's mascot for the step in front: the scan's own mood, styling, the project's state, or the finish. */
+function setupMood(
+  step: OnboardingStep,
+  scanMood: OnboardingMascotMood,
+  project: { importing: boolean; loading: boolean; failed: boolean; selected: boolean; storageError: boolean },
+): OnboardingMascotMood {
+  if (step === "theme") return "styling";
+  if (step === "project") return projectMood(project.importing, project.loading, project.failed, project.selected);
+  if (step === "done") return project.storageError ? "reassuring" : "celebrating";
+  return scanMood;
+}
+
+/** The agents step: every agent found, the ready ones to choose, and the default once more than one is chosen. */
+function ScanStep({ agents, preview }: { agents: Flow["agents"]; preview: boolean }) {
+  const { rows, selectedReady, selectedHarnesses, defaultHarness, toggleHarness, chooseDefault, refresh, openSetup, rescanPending, rescanFailed } = agents;
+  return (
+    <>
+      <header className="onboarding-heading">
+        <h1 tabIndex={-1}>Use the agents you already have</h1>
+      </header>
+      <HarnessScan
+        rows={rows}
+        discloseUnavailable
+        compact
+        selection={{ mode: "multiple", selectedIds: selectedHarnesses, onChange: toggleHarness }}
+        refreshing={!preview && rescanPending}
+        onRefresh={refresh}
+        onRetry={refresh}
+        onConnect={openSetup}
+        onSetup={openSetup}
+      />
+      {selectedReady.length > 1 ? (
+        <div className="onboarding-agent-default">
+          <DefaultHarness rows={selectedReady} value={defaultHarness} onChange={chooseDefault} />
+        </div>
+      ) : null}
+      {!preview && rescanFailed ? (
+        <p className="onboarding-feedback" role="alert">
+          Couldn’t refresh agent status. The last results are shown. Try Rescan again.
+        </p>
+      ) : null}
+    </>
+  );
+}
+
+/** Back, the progress track and the step's one action; a step that cannot go on says why on its button. */
+function SetupFooter({
+  step,
+  canContinue,
+  busy,
+  note,
+  onBack,
+  onNext,
+  onComplete,
+}: {
+  step: OnboardingStep;
+  canContinue: boolean;
+  busy: boolean;
+  note: string;
+  onBack: () => void;
+  onNext: () => void;
+  onComplete: () => void;
+}) {
+  return (
+    <footer className="onboarding-actions onboarding-footer" data-complete={step === "done" || undefined}>
+      <div className="onboarding-back">
+        {step !== "scan" && step !== "done" ? (
+          <Button size="xl" onClick={onBack} disabled={busy}>
+            <ArrowLeft size={14} /> Back
+          </Button>
+        ) : null}
+      </div>
+      <Progress step={step} />
+      <div className="onboarding-action-buttons">
+        {step === "done" ? (
+          <Button variant="primary" size="xl" onClick={onComplete}>
+            Start your first thread <ArrowRight size={14} />
+          </Button>
+        ) : (
+          <Button variant="primary" size="xl" disabled={!canContinue} title={!canContinue ? note : undefined} onClick={onNext}>
+            {step === "project" ? "Finish setup" : "Continue"} <ArrowRight size={14} />
+          </Button>
+        )}
+      </div>
+    </footer>
+  );
+}
+
+/** Agents stopped working after setup: the scan again, with Return once one of them is ready. */
+function RecoveryScreen({ page, agents, storageError, onClose, onReturn }: { page: Flow["page"]; agents: Flow["agents"]; storageError: boolean; onClose: () => void; onReturn: () => void }) {
+  const { rows, scanMood, rescanPending, rescanFailed, refresh, openSetup } = agents;
+  const canReturn = rows.some((row) => row.state === "ready");
+  return (
+    <div className="onboarding-root">
+      <OnboardingChrome>
+        <span className="onboarding-brand">
+          <Wordmark />
+        </span>
+        <span className="onboarding-chrome-label" />
+        <TextButton className="onboarding-preview-trigger" tone="muted" onClick={onClose}>
+          Close
+        </TextButton>
+      </OnboardingChrome>
+      <main className="onboarding-surface">
+        <div className="onboarding-scroll">
+          <div className="onboarding-page" ref={page}>
+            <header className="onboarding-heading onboarding-heading-with-mascot">
+              <OnboardingMascot mood={scanMood} />
+              <h1 tabIndex={-1}>Reconnect your coding agent</h1>
+              <p>Your projects and previous setup are still here. Sign in to an agent again, then rescan to start new work.</p>
+            </header>
+            <HarnessScan rows={rows} refreshing={rescanPending} onRefresh={refresh} onRetry={refresh} onConnect={openSetup} onSetup={openSetup} />
+            {rescanFailed ? (
+              <p className="onboarding-feedback" role="alert">
+                Couldn’t refresh agent status. Try Rescan again.
+              </p>
+            ) : null}
+          </div>
+        </div>
+        <footer className="onboarding-actions onboarding-footer">
+          <p className="onboarding-action-note">Your saved preferences will stay in place.</p>
+          <div className="onboarding-action-buttons">
+            <Button variant="primary" size="xl" disabled={!canReturn} onClick={onReturn}>
+              Return to OpenOrc
+            </Button>
+          </div>
+        </footer>
+        <SaveFailed shown={storageError} />
+      </main>
     </div>
   );
 }
@@ -342,8 +497,9 @@ export function Onboarding(props: OnboardingProps) {
 function OnboardingFlow({ mode = "first_run", initialStep, persisted, onPersist, onComplete, preview, onTogglePreview }: OnboardingProps & { preview: boolean; onTogglePreview: () => void }) {
   const flow = useOnboardingFlow({ mode, initialStep, persisted, onPersist, onComplete, preview });
   const { page, progress, agents, project, previewControls, storageError, setStorageError } = flow;
+  const appearance = useOnboardingAppearance(preview, setStorageError);
   const { step, setStep, advance, retreat, complete, completeRecovery, closeRecovery } = progress;
-  const { rows, ready, selectedReady, selectedHarnesses, defaultHarness, toggleHarness, chooseDefault, refresh, openSetup, scanMood, rescanPending, rescanFailed } = agents;
+  const { rows, ready, selectedReady, selectedHarnesses, defaultHarness, scanMood } = agents;
   const {
     list: projectList,
     selectedId: selectedProject,
@@ -356,59 +512,22 @@ function OnboardingFlow({ mode = "first_run", initialStep, persisted, onPersist,
     chooseRepository,
   } = project;
 
-  if (mode === "recovery") {
-    const canReturn = rows.some((row) => row.state === "ready");
-    return (
-      <div className="onboarding-root">
-        <OnboardingChrome>
-          <span className="onboarding-brand">
-            <Wordmark />
-          </span>
-          <span className="onboarding-chrome-label" />
-          <TextButton className="onboarding-preview-trigger" tone="muted" onClick={closeRecovery}>
-            Close
-          </TextButton>
-        </OnboardingChrome>
-        <main className="onboarding-surface">
-          <div className="onboarding-scroll">
-            <div className="onboarding-page" ref={page}>
-              <header className="onboarding-heading onboarding-heading-with-mascot">
-                <OnboardingMascot mood={scanMood} />
-                <h1 tabIndex={-1}>Reconnect your coding agent</h1>
-                <p>Your projects and previous setup are still here. Sign in to an agent again, then rescan to start new work.</p>
-              </header>
-              <HarnessScan rows={rows} refreshing={rescanPending} onRefresh={refresh} onRetry={refresh} onConnect={openSetup} onSetup={openSetup} />
-              {rescanFailed ? (
-                <p className="onboarding-feedback" role="alert">
-                  Couldn’t refresh agent status. Try Rescan again.
-                </p>
-              ) : null}
-            </div>
-          </div>
-          <footer className="onboarding-actions onboarding-footer">
-            <p className="onboarding-action-note">Your saved preferences will stay in place.</p>
-            <div className="onboarding-action-buttons">
-              <Button variant="primary" size="xl" disabled={!canReturn} onClick={completeRecovery}>
-                Return to OpenOrc
-              </Button>
-            </div>
-          </footer>
-          {storageError ? (
-            <p className="text-sm text-bad mt-3" role="alert">
-              Setup progress could not be saved. Keep this window open and try again.
-            </p>
-          ) : null}
-        </main>
-      </div>
-    );
-  }
+  if (mode === "recovery") return <RecoveryScreen page={page} agents={agents} storageError={storageError} onClose={closeRecovery} onReturn={completeRecovery} />;
 
   const scanCanContinue = selectedReady.length > 0 && defaultHarness !== null;
   const projectCanContinue = selectedProject !== null && !importing;
   const canContinue = canContinueSetup(step, scanCanContinue, projectCanContinue);
+  const sceneMood = setupMood(step, scanMood, {
+    importing,
+    loading: !preview && projectLoading,
+    failed: Boolean(importError || (!preview && projectLoadFailed)),
+    selected: Boolean(selectedProject),
+    storageError,
+  });
+  const sceneReaction = step === "theme" ? `${appearance.choice}:${appearance.preset}` : `${selectedHarnesses.join(":")}:${defaultHarness}:${selectedProject}`;
 
   return (
-    <div className="onboarding-root">
+    <div className="onboarding-root onboarding-setup">
       <OnboardingChrome>
         <span className="onboarding-brand">
           <Wordmark />
@@ -422,95 +541,77 @@ function OnboardingFlow({ mode = "first_run", initialStep, persisted, onPersist,
           <span />
         )}
       </OnboardingChrome>
-      {preview ? <PreviewTools step={step} rows={rows} onStep={setStep} onState={previewControls.setRowState} onReplay={() => setStep("scan")} onReset={previewControls.reset} /> : null}
+      {preview ? (
+        <PreviewTools
+          step={step}
+          rows={rows}
+          onStep={setStep}
+          onState={previewControls.setRowState}
+          onReplay={() => setStep("scan")}
+          onReset={() => {
+            previewControls.reset();
+            appearance.resetPreview();
+          }}
+        />
+      ) : null}
       <main className="onboarding-surface">
-        <Progress step={step} />
-        <div className="onboarding-scroll">
-          <div className="onboarding-page" ref={page}>
-            {step === "scan" ? (
-              <>
-                <header className="onboarding-heading onboarding-heading-with-mascot">
-                  <OnboardingMascot mood={scanMood} reactionKey={`${selectedHarnesses.join(":")}:${defaultHarness}`} />
-                  <h1 tabIndex={-1}>Use the agents you already have</h1>
-                  <p>OpenOrc brings your coding agents into one workspace. Choose which agents to use; your existing sign-ins carry over.</p>
-                </header>
-                <HarnessScan
-                  rows={rows}
-                  selection={{
-                    mode: "multiple",
-                    selectedIds: selectedHarnesses,
-                    onChange: toggleHarness,
-                  }}
-                  refreshing={!preview && rescanPending}
-                  onRefresh={refresh}
-                  onRetry={refresh}
-                  onConnect={openSetup}
-                  onSetup={openSetup}
+        <div className="onboarding-body" data-step={step}>
+          <div className="onboarding-scroll">
+            <div className="onboarding-page" ref={page} key={step}>
+              {step === "scan" ? <ScanStep agents={agents} preview={preview} /> : null}
+              {step === "theme" ? <ThemeStep appearance={appearance} /> : null}
+              {step === "project" ? (
+                <ProjectStep
+                  projects={projectList}
+                  selectedId={selectedProject}
+                  importing={importing}
+                  loading={!preview && projectLoading}
+                  loadFailed={!preview && projectLoadFailed}
+                  error={importError}
+                  onRetry={retryProjects}
+                  onSelect={setSelectedProject}
+                  onImport={() => void chooseRepository()}
                 />
-              </>
-            ) : null}
-            {step === "scan" && !preview && rescanFailed ? (
-              <p className="onboarding-feedback" role="alert">
-                Couldn’t refresh agent status. The last results are shown. Try Rescan again.
-              </p>
-            ) : null}
-            {step === "theme" ? <ThemeStep preview={preview} onStorageError={setStorageError} /> : null}
-            {step === "project" ? (
-              <ProjectStep
-                projects={projectList}
-                selectedId={selectedProject}
-                importing={importing}
-                loading={!preview && projectLoading}
-                loadFailed={!preview && projectLoadFailed}
-                error={importError}
-                onRetry={retryProjects}
-                onSelect={setSelectedProject}
-                onImport={() => void chooseRepository()}
-              />
-            ) : null}
-            {step === "done" ? (
-              <div className="onboarding-finish">
-                <div>
-                  <OnboardingMascot mood={storageError ? "reassuring" : "celebrating"} />
-                  <h1 tabIndex={-1}>Ready to work</h1>
-                  <p>
-                    {readyMessage(selectedReady)}
-                    {selectedProject ? " and your first project is connected." : "."}
-                  </p>
-                  <div className="onboarding-action-buttons">
-                    <Button variant="primary" size="xl" onClick={complete}>
-                      Start your first thread <ArrowRight size={14} />
-                    </Button>
+              ) : null}
+              {step === "done" ? (
+                <div className="onboarding-finish">
+                  <div>
+                    <h1 tabIndex={-1}>Ready to work</h1>
+                    <p>
+                      {readyMessage(selectedReady)}
+                      {selectedProject ? " and your first project is connected." : "."}
+                    </p>
                   </div>
                 </div>
-              </div>
-            ) : null}
-          </div>
-        </div>
-        {step !== "done" ? (
-          <footer className="onboarding-actions onboarding-footer">
-            {step === "scan" && selectedReady.length > 1 ? (
-              <DefaultHarness rows={selectedReady} value={defaultHarness} onChange={chooseDefault} />
-            ) : (
-              <p className="onboarding-action-note">{setupActionNote({ step, selectedCount: selectedReady.length, readyCount: ready.length, defaultHarness, preview, selectedProject })}</p>
-            )}
-            <div className="onboarding-action-buttons">
-              {step !== "scan" ? (
-                <Button size="xl" onClick={retreat} disabled={importing}>
-                  <ArrowLeft size={14} /> Back
-                </Button>
               ) : null}
-              <Button variant="primary" size="xl" disabled={!canContinue} onClick={advance}>
-                {step === "project" ? "Finish setup" : "Continue"} <ArrowRight size={14} />
-              </Button>
+              {step !== "done" && step !== "theme" && !(step === "scan" && selectedReady.length > 1) ? (
+                <div className="onboarding-step-note">
+                  <p className="onboarding-action-note">{setupActionNote({ step, selectedCount: selectedReady.length, readyCount: ready.length, defaultHarness, preview, selectedProject })}</p>
+                </div>
+              ) : null}
             </div>
-          </footer>
-        ) : null}
-        {storageError ? (
-          <p className="text-sm text-bad mt-3" role="alert">
-            Setup progress could not be saved. Keep this window open and try again.
-          </p>
-        ) : null}
+          </div>
+          <OnboardingScene
+            step={step}
+            mood={sceneMood}
+            reactionKey={sceneReaction}
+            agents={selectedReady.map((row) => row.id)}
+            projectName={projectList.find((item) => item.id === selectedProject)?.name}
+            colors={appearance.colors}
+            preset={appearance.preset}
+            mode={appearance.resolved}
+          />
+        </div>
+        <SetupFooter
+          step={step}
+          canContinue={canContinue}
+          busy={importing}
+          note={setupActionNote({ step, selectedCount: selectedReady.length, readyCount: ready.length, defaultHarness, preview, selectedProject })}
+          onBack={retreat}
+          onNext={advance}
+          onComplete={complete}
+        />
+        <SaveFailed shown={storageError} />
       </main>
     </div>
   );

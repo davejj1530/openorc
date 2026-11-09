@@ -144,6 +144,21 @@ describe("Onboarding", () => {
     expect(localStorage.getItem("openorc.palette")).toBe("claude");
   });
 
+  it("keeps a palette from the expanded list visible after collapsing and returning to appearance", () => {
+    render(<Onboarding initialStep="theme" />);
+    expect(screen.getAllByRole("button", { name: / palette$/ })).toHaveLength(6);
+    fireEvent.click(screen.getByRole("button", { name: /All \d+ palettes/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Eliron palette" }));
+    fireEvent.click(screen.getByRole("button", { name: "Fewer palettes" }));
+    expect(screen.getAllByRole("button", { name: / palette$/ })).toHaveLength(6);
+    expect(screen.getByRole("button", { name: "Eliron palette" }).getAttribute("aria-pressed")).toBe("true");
+    expect(localStorage.getItem("openorc.palette")).toBe("eliron");
+
+    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(screen.getByRole("button", { name: "Eliron palette" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
   it("keeps preview controls disposable instead of issuing live rescans", () => {
     harnesses = [ready("claude"), ready("codex")];
     render(<Onboarding previewInitially />);
@@ -159,12 +174,28 @@ describe("Onboarding", () => {
     expect(localStorage.getItem("openorc.palette")).toBeNull();
     expect(screen.getByRole("button", { name: "Claude palette" }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByRole("button", { name: "Dark" }).getAttribute("aria-pressed")).toBe("true");
+    expect(document.querySelector(".onboarding-scene-content")?.getAttribute("data-theme")).toBe("dark");
+    expect(useTheme.getState().choice).toBe("system");
     fireEvent.change(screen.getByLabelText(/Step/), {
       target: { value: "done" },
     });
     expect(screen.getByRole("heading", { name: "Ready to work" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /reset preview/i }));
     expect(screen.getByRole("heading", { name: "Use the agents you already have" })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/Step/), { target: { value: "theme" } });
+    expect(screen.getByRole("button", { name: "System" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "Codex palette" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("renders saved custom colors in the workspace preview and restores them after switching appearance", () => {
+    useTheme.setState({ choice: "light", custom: { codex: { light: { "--bg": "#ece8e4" } } } });
+    render(<Onboarding initialStep="theme" />);
+    const preview = () => document.querySelector<HTMLElement>(".onboarding-scene-content");
+    expect(preview()?.style.getPropertyValue("--bg")).toBe("#ece8e4");
+    fireEvent.click(screen.getByRole("button", { name: "Dark" }));
+    expect(preview()?.style.getPropertyValue("--bg")).not.toBe("#ece8e4");
+    fireEvent.click(screen.getByRole("button", { name: "Light" }));
+    expect(preview()?.style.getPropertyValue("--bg")).toBe("#ece8e4");
   });
 
   it("disables Continue when every ready agent is deselected", () => {

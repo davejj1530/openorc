@@ -241,6 +241,21 @@
       "group": "provider-mark",
       "path": "apps/desktop/src/renderer/src/assets/providers/fx.svg",
       "sha256": "3c3a0d2e246571e544d0e7f6a31ace397005ed0a03e0ed37463f2f6b9a00e94b"
+    },
+    {
+      "group": "onboarding",
+      "path": "apps/desktop/src/renderer/src/assets/onboarding/ribbons.webp",
+      "sha256": "f7924ebaf71977af6ec599e995819320ce8d82813db14a0804919fd58aa62052"
+    },
+    {
+      "group": "onboarding",
+      "path": "apps/desktop/src/renderer/src/assets/onboarding/flower.webp",
+      "sha256": "0f68b195011db4080aeeadb6fcdbbcc574a3944e1f3eef8b33cf0809199c981c"
+    },
+    {
+      "group": "onboarding",
+      "path": "apps/desktop/src/renderer/src/assets/onboarding/shapes.webp",
+      "sha256": "3f1713aa8196da595ba9a05eadc9f8addbb41942743d8bb4d4895c16f3457836"
     }
   ]
 }

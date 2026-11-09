@@ -295,27 +295,29 @@
   background: var(--bg);
 }
 
-/* A group's faces, overlapping by a third, each cut out of the ground with a ring of it. */
+/* A group's faces, each standing a third over the one before; the drawing behind is cut away around it (OrclingFaces). */
 .orcling-faces {
   display: inline-flex;
   flex-shrink: 0;
   align-items: center;
 }
-.orcling-faces-face {
-  border-radius: 30%;
-  box-shadow: 0 0 0 1.5px var(--bg);
-}
 .orcling-faces-face + .orcling-faces-face {
   margin-left: calc(var(--face) / -3);
+}
+
+/* A group's members standing in its empty chat. A live figure's body spans about the middle half of its box, so
+   neighbouring boxes overlap by that air, less a 16px gap between the bodies. */
+.orcling-gathering {
+  display: inline-flex;
+}
+.orcling-gathering-figure + .orcling-gathering-figure {
+  margin-left: calc(var(--figure) * -0.52 + 16px);
 }
 
 /* A group's two front faces in the list, in the same slot an Orcling's single face takes. */
 .orcling-contact-faces {
   width: 24px;
   justify-content: center;
-}
-.orcling-contact-faces .orcling-faces-face {
-  box-shadow: 0 0 0 1.5px var(--bg);
 }
 /* The composer's group faces sit where the model picker would, the bar's quiet weight. */
 .composer-orcling-faces {

@@ -47,19 +47,45 @@ function Accessory({ style }: { style: number }) {
   );
 }
 
-/** An Orcling's flat drawing: body, texture, eyes, glasses and accessory, from its look. */
-export function OrclingStill({ look, size, className }: { look: OrclingLook; size: number; className?: string }) {
+/** Another Orcling standing in front, `dx` drawing units to the right, whose outline `ring` units wide is cut out of this one. */
+export interface OrclingCut {
+  look: OrclingLook;
+  dx: number;
+  ring: number;
+}
+
+/** What shows through: all of the drawing but the Orcling in front, widened by the ring, so a real gap parts them over any ground. */
+function CutMask({ id, cut }: { id: string; cut: OrclingCut }) {
+  const body = ORCLING_SHAPES[cut.look.shape]?.path ?? ORCLING_SHAPES[0]!.path;
+  const accessory = orclingAccessory(cut.look.accessory);
+  const outline = { fill: "#000", stroke: "#000", strokeWidth: cut.ring * 2, strokeLinejoin: "round" } as const;
+  return (
+    <mask id={id} maskUnits="userSpaceOnUse" x="-50" y="-50" width="200" height="200">
+      <rect x="-50" y="-50" width="200" height="200" fill="#fff" />
+      <g transform={`translate(${cut.dx} 0)`}>
+        <path d={body} {...outline} />
+        {accessory ? <path d={accessory.path} {...outline} /> : null}
+      </g>
+    </mask>
+  );
+}
+
+/** An Orcling's flat drawing: body, texture, eyes, glasses and accessory, from its look, less any Orcling standing in front. */
+export function OrclingStill({ look, size, className, cut }: { look: OrclingLook; size: number; className?: string; cut?: OrclingCut }) {
   const id = useId().replace(/:/g, "");
   const body = ORCLING_SHAPES[look.shape]?.path ?? ORCLING_SHAPES[0]!.path;
   const eyes = orclingEyes(look.eyes);
   return (
     <svg viewBox="0 0 100 100" width={size} height={size} aria-hidden="true" className={cn("orcling-avatar", className)}>
-      <path d={body} fill={look.bodyColor} />
-      <Texture id={id} body={body} look={look} />
-      <path d={eyes.path} fill={look.eyeColor} />
-      {eyes.glints ? <path d={eyes.glints} fill="#fff" /> : null}
-      <Glasses style={look.glasses} color={look.eyeColor} />
-      <Accessory style={look.accessory} />
+      {cut ? <CutMask id={`${id}-cut`} cut={cut} /> : null}
+      <g mask={cut ? `url(#${id}-cut)` : undefined}>
+        <path d={body} fill={look.bodyColor} />
+        <Texture id={id} body={body} look={look} />
+        <path d={eyes.path} fill={look.eyeColor} />
+        {eyes.glints ? <path d={eyes.glints} fill="#fff" /> : null}
+        <Glasses style={look.glasses} color={look.eyeColor} />
+        <Accessory style={look.accessory} />
+      </g>
     </svg>
   );
 }

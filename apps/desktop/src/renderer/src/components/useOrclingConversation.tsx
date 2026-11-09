@@ -4,7 +4,7 @@ import type { OutgoingMessage } from "@openorc/client";
 import type { MentionEntry } from "../lib/composer-mentions";
 import { mentionedOrcling, orclingById, orclingHome, orclingMentionEntries, useOrclingGroups, useOrclings } from "../lib/orclings";
 import type { ConversationVoice, OrclingChatSpec } from "../lib/turn-authors";
-import { OrclingFaces, memberNames } from "./OrclingFaces";
+import { OrclingFaces, OrclingGathering, memberNames } from "./OrclingFaces";
 import { OrclingPreview } from "./OrclingPreview";
 import { Empty } from "./ui";
 import { useRpcMutation } from "../lib/client";
@@ -58,7 +58,7 @@ function groupParts(chat: OrclingChatSpec, runs: number, send: (params: { thread
   const names = memberNames(chat.members);
   return {
     placeholder: `Message ${names}…`,
-    empty: runs === 0 ? <Empty title={`Say hi to ${names}`} icon={<OrclingFaces members={chat.members} size={96} />} /> : undefined,
+    empty: runs === 0 ? <Empty title={`Say hi to ${names}`} icon={<OrclingGathering members={chat.members} />} /> : undefined,
     mentions: orclingMentionEntries(chat.members, null),
     modelControl: <OrclingFaces members={chat.members} size={22} className="composer-orcling-faces" />,
     route: async ({ text, attachments, messageId }: OutgoingMessage) => {

@@ -10,7 +10,7 @@ const path = require("node:path");
 const http = require("node:http");
 const { createHash } = require("node:crypto");
 const { setTimeout: delay } = require("node:timers/promises");
-const { windows, linux, packagedEnvironment, packagedExecutable } = require("./fixtures/packaged-environment.cjs");
+const { windows, linux, providerCommands, packagedEnvironment, packagedExecutable } = require("./fixtures/packaged-environment.cjs");
 
 const appPath = process.argv[2];
 const keychainOnly = process.argv[3] === "--keychain-only";
@@ -146,9 +146,9 @@ async function launch(empty = true) {
   session.rpc = (method, params = {}) => session.renderer(`window.packagedSmokeRpc(${JSON.stringify(method)},${JSON.stringify(params)})`);
   const info = await session.rpc("system.info");
   assert.equal(info.dataDir, profile);
-  assert.equal(info.harnesses.length, 3);
+  assert.deepEqual(info.harnesses.map((harness) => harness.id).sort(), Object.keys(providerCommands).sort(), "Every agent has a stand-in");
   for (const harness of info.harnesses) {
-    assert.equal(harness.path, path.join(fixtureBin, harness.id + (windows ? ".exe" : "")), "Core login discovery resolves only disposable provider fixtures");
+    assert.equal(harness.path, path.join(fixtureBin, providerCommands[harness.id] + (windows ? ".exe" : "")), "Core login discovery resolves only disposable provider fixtures");
     assert.equal(harness.state, "check_failed", "Provider fixture cannot authenticate or run an agent");
   }
   if (empty) assert.deepEqual(await session.rpc("projects.list"), []);

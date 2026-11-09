@@ -83,7 +83,7 @@ function BranchRow({ row, project = false, children, paging = false, onToggle }:
       if (scale)
         setSize({
           height: node.offsetHeight,
-          mid: center(node.querySelector(".thread-preview-project-icon") ?? node.querySelector(".thread-preview-status")),
+          mid: center(node.querySelector(".thread-preview-project-icon") ?? node.querySelector(".thread-preview-status:not(:empty)") ?? node.querySelector(".thread-preview-heading")),
           title: center(node.querySelector(".thread-preview-heading")),
         });
     };

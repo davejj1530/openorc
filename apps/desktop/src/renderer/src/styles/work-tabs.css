@@ -93,6 +93,17 @@
   width: 14px;
   height: 14px;
 }
+/* An Orcling's face draws its body in the middle three quarters of its box, so it takes 2px more to stand as tall as an
+   agent's mark, without moving the title. A group's faces take the width of the two overlapping. */
+.work-tab-icon.work-tab-orcling {
+  width: 16px;
+  height: 16px;
+  margin: -1px;
+}
+.work-tab-icon.work-tab-orclings {
+  display: inline-flex;
+  width: auto;
+}
 .work-tab-title {
   min-width: 0;
   overflow: hidden;

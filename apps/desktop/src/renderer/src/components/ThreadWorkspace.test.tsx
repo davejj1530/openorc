@@ -12,7 +12,7 @@ const { mutate, planThreads, documents, teamThreads, subagentThreads } = vi.hois
 }));
 vi.mock("../lib/client", async (original) => {
   const rpcData = (method: string, params: { id?: string }) => {
-    if (method === "projects.list") return [];
+    if (method === "projects.list" || method === "orclings.list" || method === "orclings.groups.list") return [];
     if (method === "threads.get")
       return {
         id: params.id,

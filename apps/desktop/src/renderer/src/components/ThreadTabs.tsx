@@ -7,8 +7,11 @@ import { focusedProject, useLayout } from "../lib/layout";
 import { useThreadTabs, type ThreadTab } from "../lib/thread-tabs";
 import { useScrollEdges } from "../lib/use-scroll-edges";
 import { useStripHandoff } from "../lib/strip-handoff";
+import { orclingById, useOrclingGroups, useOrclings } from "../lib/orclings";
 import { HarnessLogo } from "./HarnessLogo";
 import { MessageSquare, PenSquare, Plus, X } from "./icons";
+import { OrclingAvatar } from "./OrclingAvatar";
+import { OrclingFaces } from "./OrclingFaces";
 import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
 import { IconButton, Tooltip } from "./ui";
 
@@ -40,10 +43,19 @@ function TabFace({ tab, title }: { tab: ThreadTab; title?: ReactNode }) {
   );
 }
 
-/** The slot stays empty until the thread is read, so a tab never flashes a stand-in before its agent's mark. */
+/**
+ * The slot stays empty until the thread is read, so a tab never flashes a stand-in before its mark. An Orcling's
+ * conversation carries the Orcling's face and a group chat its members' faces, where another thread shows its agent.
+ */
 function TabGlyph({ thread }: { thread: ThreadSummary | null | undefined }) {
+  const orclings = useOrclings();
+  const groups = useOrclingGroups();
   if (!thread) return <span className="work-tab-icon" />;
   if (thread.session && threadStatus(thread)) return <ThreadStatusIndicator thread={thread} className="work-tab-icon" />;
+  const orcling = orclingById(orclings, thread.orclingId);
+  if (orcling) return <OrclingAvatar orcling={orcling} size={16} className="work-tab-icon work-tab-orcling" />;
+  const group = groups.find((each) => each.threadId === thread.id);
+  if (group) return <OrclingFaces members={orclings.filter((each) => group.memberIds.includes(each.id))} size={14} max={2} className="work-tab-icon work-tab-orclings" />;
   if (isHarnessId(thread.agent)) return <HarnessLogo id={thread.agent} size={14} className="work-tab-icon" />;
   return <MessageSquare size={14} className="work-tab-icon" />;
 }

@@ -7,11 +7,14 @@ import { chatRows, stretchTime, typingBeat, type Block, type ChatRow } from "@op
 import { orclingById, useOrclings } from "../lib/orclings";
 import type { OrclingChatSpec } from "../lib/turn-authors";
 import { SmilePlus } from "./icons";
+import { Tooltip } from "./ui";
 import { OrclingAvatar } from "./OrclingAvatar";
 import { ThreadRichText } from "./ThreadImages";
 import { UserMessage } from "./UserMessage";
 
 type Theirs = Extract<ChatRow, { kind: "theirs" }>;
+/** A tapback and who left it: an Orcling, or the person with null. */
+type Tapback = Pick<MessageReaction, "orclingId" | "reaction">;
 type Group = { kind: "theirs"; id: string; rows: Theirs[] } | { kind: "row"; id: string; row: Exclude<ChatRow, Theirs> };
 
 const reactionKey = (runId: string | undefined, messageId: string, part: number) => `${runId ?? ""}|${messageId}|${part}`;
@@ -78,20 +81,29 @@ function useReactions(threadId: string) {
       return waiting.length === current.size ? current : new Map(waiting);
     });
   }, [byKey]);
+  const person = (key: string) => (chosen.has(key) ? (chosen.get(key) ?? undefined) : (recorded(key) ?? undefined));
   return {
-    person: (key: string) => (chosen.has(key) ? (chosen.get(key) ?? undefined) : (recorded(key) ?? undefined)),
-    orcling: (key: string) => byKey.get(key)?.find((reaction) => reaction.orclingId !== null)?.reaction,
+    person,
+    /** Every tapback on a bubble: the Orclings' in the order they came, then the person's as they last chose it. */
+    on: (key: string): Tapback[] => {
+      const mine = person(key);
+      const theirs = (byKey.get(key) ?? []).filter((reaction) => reaction.orclingId !== null);
+      return mine ? [...theirs, { orclingId: null, reaction: mine }] : theirs;
+    },
     choose: (key: string, reaction: Reaction | null) => setChosen((current) => new Map(current).set(key, reaction)),
   };
 }
 
-/** A tapback resting on a bubble's corner; a new one lands again. */
-function ReactionBadge({ reaction, side }: { reaction: Reaction | undefined; side: "start" | "end" }) {
-  if (!reaction) return null;
+/** The tapbacks resting on a bubble's corner, each kind once, naming who left them on hover; a change lands again. */
+function ReactionBadge({ tapbacks, side }: { tapbacks: Tapback[]; side: "start" | "end" }) {
+  const everyone = useOrclings();
+  if (!tapbacks.length) return null;
+  const kinds = [...new Set(tapbacks.map((tapback) => tapback.reaction))];
+  const who = tapbacks.map((tapback) => `${tapback.orclingId ? (orclingById(everyone, tapback.orclingId)?.name ?? "An Orcling") : "You"} ${reactionEmoji[tapback.reaction]}`).join(", ");
   return (
-    <span key={reaction} className="orcling-reaction" data-side={side} aria-label={`Reacted ${reaction}`}>
-      {reactionEmoji[reaction]}
-    </span>
+    <Tooltip key={kinds.join()} label={who} render={<span className="orcling-reaction" data-side={side} aria-label={who} />}>
+      {kinds.map((kind) => reactionEmoji[kind])}
+    </Tooltip>
   );
 }
 
@@ -128,23 +140,26 @@ function ReactionBar({ open, current, onReact }: { open: boolean; current: React
 function TheirBubble({
   text,
   reaction,
+  tapbacks,
   open,
   onOpen,
   onReact,
 }: {
   text: string;
+  /** The person's own tapback, which the bar shows chosen. */
   reaction: Reaction | undefined;
+  tapbacks: Tapback[];
   open: boolean;
   onOpen: (open: boolean) => void;
   onReact: (reaction: Reaction | null) => void;
 }) {
   return (
     <div className="orcling-bubble-row" data-open={open || undefined}>
-      <div className="orcling-bubble" data-reacted={reaction ? true : undefined}>
+      <div className="orcling-bubble" data-reacted={tapbacks.length ? true : undefined}>
         <div className="text-prose text-ink prose-chat">
           <ThreadRichText mode="static">{text}</ThreadRichText>
         </div>
-        <ReactionBadge reaction={reaction} side="end" />
+        <ReactionBadge tapbacks={tapbacks} side="end" />
       </div>
       <button type="button" className="orcling-react-open" aria-label="React" aria-expanded={open} onClick={() => onOpen(!open)}>
         <SmilePlus size={16} />
@@ -205,6 +220,7 @@ function OrclingRun({
               key={`${row.id}:${part}`}
               text={text}
               reaction={reactions.person(key)}
+              tapbacks={reactions.on(key)}
               open={picking.open === key}
               onOpen={(open) => picking.set(open ? key : null)}
               onReact={(reaction) => onReact(row, part, reaction)}
@@ -307,7 +323,7 @@ export function OrclingChat({ chat, blocks, live, card }: { chat: OrclingChatSpe
                 text={row.block.text}
                 at={row.block.at}
                 attachments={row.block.attachments}
-                badge={<ReactionBadge reaction={reactions.orcling(reactionKey(row.block.runId, row.block.id, 0))} side="start" />}
+                badge={<ReactionBadge tapbacks={reactions.on(reactionKey(row.block.runId, row.block.id, 0))} side="start" />}
               />
             </div>
           );

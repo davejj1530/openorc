@@ -8,7 +8,7 @@ import { defaultOrclingLook, WORKSPACE_ID, type OrclingDraft } from "@openorc/pr
 import { createOrclingHost } from "../mcp-host/orcling.js";
 import { guardContext } from "../remote/policy.js";
 import { OpenOrc } from "../openorc.js";
-import { GROUP_TURNS, ORCLING_MESSAGE_CHAIN, namedIn } from "./orcling-talk.js";
+import { GROUP_TURNS, ORCLING_MESSAGE_CHAIN, askedIn, namedIn } from "./orcling-talk.js";
 
 let root: string | undefined;
 afterEach(async () => {
@@ -87,6 +87,14 @@ it("names Orclings by name or @mention, in the order a message names them", () =
   expect(namedIn("bonjour, piper", [pip, bo])).toEqual([]);
 });
 
+it("hears an Orcling ask another only by @mention, by name or handle, never by its plain name", () => {
+  const pip = { id: "pip", name: "Pip" };
+  const sunny = { id: "sunny", name: "Sunny Day" };
+  expect(askedIn("thanks Pip, @sunny-day can you rerun it?", [pip, sunny])).toEqual(["sunny"]);
+  expect(askedIn("@Sunny Day and @pip, both of you", [pip, sunny])).toEqual(["sunny", "pip"]);
+  expect(askedIn("good catch, Pip. Sunny Day agreed", [pip, sunny])).toEqual([]);
+});
+
 it("delivers a direct message into the other Orcling's own chat as the sender's, quietly unless it answers the person", async () => {
   const { core, say, heard, settled, host, said } = await fixture();
   try {
@@ -156,7 +164,8 @@ it("lets the Orclings a group message names answer in turn, each hearing the oth
     expect(heard[1]!.input).toMatch(/^\(OpenOrc, the group chat\. This conversation began before you joined\./);
     expect(heard[1]!.input).toContain("The person: morning both");
     expect(heard[1]!.input).toContain("Pip: found the flaky test");
-    expect(heard[1]!.input).toMatch(/your turn in the group chat\. Answer if you have something to add; otherwise reply with only NO_REPLY/);
+    expect(heard[1]!.input).toMatch(/your turn in the group chat\. That was for everyone, and Pip took it\. Add a message only to correct something/);
+    expect(heard[1]!.input).toMatch(/Otherwise reply with only NO_REPLY/);
     expect(heard[1]!.handoff).not.toContain("The person: morning both");
     expect(said(group.threadId)).toEqual(["user: morning both", "assistant: found the flaky test", "assistant: nice, I'll rerun CI"]);
 
@@ -169,18 +178,86 @@ it("lets the Orclings a group message names answer in turn, each hearing the oth
   }
 });
 
+it("gives a message for everyone to whoever spoke last, the way a conversation carries on, and lets the rest chime in after", async () => {
+  const { core, say, heard, settled } = await fixture();
+  try {
+    const pip = await core.orclings.create(draft("Pip"));
+    const bo = await core.orclings.create(draft("Bo"));
+    const group = await core.orclings.talk.createGroup([pip.id, bo.id], undefined, null);
+    say("Bo", "CI is green again");
+    await core.orclings.talk.sendToGroup(group.threadId, "@Bo how's CI?", {});
+    await settled(group.threadId, 1);
+
+    say("Bo", "the flaky test, mostly");
+    await core.orclings.talk.sendToGroup(group.threadId, "what broke it?", {});
+    await settled(group.threadId, 3);
+    expect(heard.slice(1).map((entry) => entry.who)).toEqual(["Bo", "Pip"]);
+    expect(heard[1]!.input).toBe("what broke it?");
+    expect(heard[2]!.input).toMatch(/That was for everyone, and Bo took it\./);
+  } finally {
+    await core.close();
+  }
+});
+
+it("lands an Orcling's tapback on another's last bubble in a group, and the others hear it as they catch up", async () => {
+  const { core, say, heard, settled, host } = await fixture();
+  try {
+    const pip = await core.orclings.create(draft("Pip"));
+    const bo = await core.orclings.create(draft("Bo"));
+    const group = await core.orclings.talk.createGroup([pip.id, bo.id], undefined, null);
+    say("Pip", "found it.\n\nthe cache key skipped the branch");
+    await core.orclings.talk.sendToGroup(group.threadId, "@Pip why is CI slow?", {});
+    await settled(group.threadId, 1);
+    say("Bo", "NO_REPLY");
+    await core.orclings.talk.sendToGroup(group.threadId, "@Bo can you fix it?", {});
+    await settled(group.threadId, 2);
+    const boRun = runs.listForThread(core.db, group.threadId).find((run) => run.orclingId === bo.id)!;
+
+    expect(await host().react(boRun.id, { reaction: "eyes", to: "Pip" })).toContain('Reacted 👀 to Pip\'s "the cache key skipped the branch"');
+    expect(await host().react(boRun.id, { reaction: "like" })).toContain('Reacted 👍 to "@Bo can you fix it?"');
+    expect(core.orclings.reactions(group.threadId)).toMatchObject([
+      { orclingId: bo.id, reaction: "eyes", part: 1 },
+      { orclingId: bo.id, reaction: "like", part: 0 },
+    ]);
+    await expect(host().react(boRun.id, { reaction: "heart", to: "Bo" })).rejects.toThrow(/That is you/);
+
+    say("Pip", "thanks");
+    await core.orclings.talk.sendToGroup(group.threadId, "@Pip anything else?", {});
+    await settled(group.threadId, 3);
+    expect(heard.at(-1)!.input).toContain('Reactions since:\nBo reacted 👀 to your "the cache key skipped the branch"\nBo reacted 👍 to the person\'s "@Bo can you fix it?"');
+  } finally {
+    await core.close();
+  }
+});
+
 it("gives an Orcling its turn when another names it in the group, until the group waits for the person", async () => {
   const { core, say, heard, settled } = await fixture();
   try {
     const pip = await core.orclings.create(draft("Pip"));
     const bo = await core.orclings.create(draft("Bo"));
     const group = await core.orclings.talk.createGroup([pip.id, bo.id], "Release", null);
-    say("Pip", ...Array.from({ length: 10 }, (_, i) => `Bo, round ${i}?`));
-    say("Bo", ...Array.from({ length: 10 }, (_, i) => `Pip, round ${i}!`));
+    say("Pip", ...Array.from({ length: 10 }, (_, i) => `@Bo, round ${i}?`));
+    say("Bo", ...Array.from({ length: 10 }, (_, i) => `@Pip, round ${i}!`));
     await core.orclings.talk.sendToGroup(group.threadId, "Pip, start", {});
     await settled(group.threadId, GROUP_TURNS);
     await new Promise((resolve) => setTimeout(resolve, 200));
     expect(heard.map((entry) => entry.who)).toEqual(Array.from({ length: GROUP_TURNS }, (_, i) => (i % 2 ? "Bo" : "Pip")));
+  } finally {
+    await core.close();
+  }
+});
+
+it("hands no turn to an Orcling another only mentions, as in thanks", async () => {
+  const { core, say, heard, settled } = await fixture();
+  try {
+    const pip = await core.orclings.create(draft("Pip"));
+    const bo = await core.orclings.create(draft("Bo"));
+    const group = await core.orclings.talk.createGroup([pip.id, bo.id], undefined, null);
+    say("Pip", "thanks Bo, that fixed it");
+    await core.orclings.talk.sendToGroup(group.threadId, "@Pip did the fix work?", {});
+    await settled(group.threadId, 1);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(heard.map((entry) => entry.who)).toEqual(["Pip"]);
   } finally {
     await core.close();
   }
@@ -241,7 +318,7 @@ it("tells an Orcling who named it and what they said, and lets one with nothing 
     const autumn = await core.orclings.create(draft("Autumn"));
     const vision = await core.orclings.create(draft("Vision"));
     const group = await core.orclings.talk.createGroup([autumn.id, vision.id], undefined, null);
-    say("Autumn", "Vision, quick catch-up: the cloud login is a pasted token, and we want a vault sandbox instead.");
+    say("Autumn", "@Vision quick catch-up: the cloud login is a pasted token, and we want a vault sandbox instead.");
     say("Vision", "NO_REPLY");
     await core.orclings.talk.sendToGroup(group.threadId, "@Autumn explain our problem to the team", {});
     await settled(group.threadId, 2);
@@ -249,12 +326,12 @@ it("tells an Orcling who named it and what they said, and lets one with nothing 
     const turn = heard.at(-1)!;
     expect(turn.who).toBe("Vision");
     expect(turn.input).toContain("The person: @Autumn explain our problem to the team");
-    expect(turn.input).toContain("Autumn: Vision, quick catch-up: the cloud login is a pasted token");
-    expect(turn.input).toMatch(/Autumn named you in what they just said, so answer them/);
+    expect(turn.input).toContain("Autumn: @Vision quick catch-up: the cloud login is a pasted token");
+    expect(turn.input).toMatch(/Autumn asked you something in what they just said, so answer them/);
     // Its quiet reply was dropped: never recorded, never shown.
     expect(said(group.threadId)).toEqual([
       "user: @Autumn explain our problem to the team",
-      "assistant: Vision, quick catch-up: the cloud login is a pasted token, and we want a vault sandbox instead.",
+      "assistant: @Vision quick catch-up: the cloud login is a pasted token, and we want a vault sandbox instead.",
     ]);
   } finally {
     await core.close();

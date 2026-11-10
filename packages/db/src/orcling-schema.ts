@@ -110,3 +110,26 @@ CREATE TABLE orcling_followups (
  created_at INTEGER NOT NULL
 );
 `;
+
+/**
+ * Reactions take any tapback the protocol knows. The table is made again without its list of kinds, since the
+ * protocol checks a reaction where it comes in and reading skips a kind it doesn't know.
+ */
+export const reactionKindsMigration = `
+CREATE TABLE message_reactions_next (
+ thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+ run_id TEXT NOT NULL,
+ message_id TEXT NOT NULL,
+ part INTEGER NOT NULL CHECK(part >= 0),
+ reactor TEXT NOT NULL,
+ reaction TEXT NOT NULL,
+ heard_at INTEGER,
+ created_at INTEGER NOT NULL,
+ PRIMARY KEY(run_id, message_id, part, reactor)
+);
+INSERT INTO message_reactions_next (thread_id, run_id, message_id, part, reactor, reaction, heard_at, created_at)
+  SELECT thread_id, run_id, message_id, part, reactor, reaction, heard_at, created_at FROM message_reactions;
+DROP TABLE message_reactions;
+ALTER TABLE message_reactions_next RENAME TO message_reactions;
+CREATE INDEX message_reactions_thread ON message_reactions(thread_id, created_at);
+`;

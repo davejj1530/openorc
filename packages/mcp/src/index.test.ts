@@ -299,6 +299,7 @@ void test("an Orcling's own conversation has its own tools instead of the genera
   host.orcling = {
     available: () => true,
     ownConversation: (runId) => runId === "home-run",
+    inChat: (runId) => runId === "home-run" || runId === "group-run",
     updateInstructions: answer,
     remember: answer,
     recall: answer,
@@ -346,8 +347,10 @@ void test("an Orcling's own conversation has its own tools instead of the genera
     general.filter((name) => elsewhere.includes(name)),
     general,
   );
-  // A tapback lands on the person's message in the Orcling's own chat; elsewhere there is no chat to react in.
+  // Tapbacks belong to chats, its own or a group's; elsewhere there is no chat to react in.
   assert.ok(!elsewhere.includes("orcling_react"));
+  const group = (await (await connect("group-run")).listTools()).tools.map((tool) => tool.name);
+  assert.ok(group.includes("orcling_react"));
 });
 
 void test("an Orcling starts work on the agent and model it names, or as itself, and names nothing else when it works as itself", async (t) => {
@@ -357,6 +360,7 @@ void test("an Orcling starts work on the agent and model it names, or as itself,
   host.orcling = {
     available: () => true,
     ownConversation: () => true,
+    inChat: () => true,
     updateInstructions: answer,
     remember: answer,
     recall: answer,

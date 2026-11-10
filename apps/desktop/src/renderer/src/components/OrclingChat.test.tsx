@@ -160,6 +160,33 @@ it("draws a group chat with each Orcling's runs under its own name and tint", ()
   expect(runOf("rerunning")!.style.getPropertyValue("--orcling-tint")).toBe("#c46b4d");
 });
 
+it("shows every tapback on a bubble in a group, each kind once, naming who left each", () => {
+  rpc.set("orclings.list", [pip, bo]);
+  reactions.push(
+    { runId: "run-pip", messageId: "u1", part: 0, orclingId: "pip", reaction: "like", at: 3 },
+    { runId: "run-pip", messageId: "u1", part: 0, orclingId: "bo", reaction: "eyes", at: 4 },
+    { runId: "run-pip", messageId: "a1", part: 0, orclingId: "bo", reaction: "like", at: 5 },
+    { runId: "run-pip", messageId: "a1", part: 0, orclingId: null, reaction: "like", at: 6 },
+  );
+  const group = { threadId: "group", members: [pip, bo], speakers: new Map([["run-pip", pip]]), group: true };
+  render(
+    <OrclingChat
+      chat={group}
+      blocks={[
+        { id: "u1", kind: "message", role: "user", text: "can someone fix CI?", streaming: false, at: 1, runId: "run-pip" },
+        { id: "a1", kind: "message", role: "assistant", text: "the cache key skipped the branch", streaming: false, at: 2, runId: "run-pip" },
+      ]}
+      live={false}
+      card={() => null}
+    />,
+  );
+  const [mine, theirs] = [...document.querySelectorAll(".orcling-reaction")];
+  expect(mine!.textContent).toBe("👍👀");
+  expect(mine!.getAttribute("aria-label")).toBe("Pip 👍, Bo 👀");
+  expect(theirs!.textContent).toBe("👍");
+  expect(theirs!.getAttribute("aria-label")).toBe("Bo 👍, You 👍");
+});
+
 it("shows a direct message from another Orcling as that Orcling's, and one this Orcling sent with whom it went to", () => {
   rpc.set("orclings.list", [pip, bo]);
   rpc.set("orclings.origins", [{ messageId: "dm-1", fromOrclingId: "bo", toOrclingId: "pip" }]);

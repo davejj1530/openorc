@@ -2,7 +2,7 @@ import { mkdir, realpath } from "node:fs/promises";
 import { STAY_QUIET } from "./orcling-quiet.js";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { orclingGroups, orclingMessages, orclings, threads, type Db } from "@openorc/db";
+import { listEvents, orclingGroups, orclingMessages, orclings, runs as runRepo, threads, type Db } from "@openorc/db";
 import { orclingHandle, WORKSPACE_ID, type Orcling, type OrclingGroup, type OrclingMessageOrigin, type Run, type Thread } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
 import type { RunService } from "./runs.js";
@@ -14,14 +14,21 @@ export const ORCLING_MESSAGE_CHAIN = 6;
 /** A group's Orclings take this many turns in a row with nobody writing before the group waits for the person. */
 export const GROUP_TURNS = 6;
 
-/** What a group turn is told when someone else's words woke it: the conversation itself reaches it as a catch-up. */
-/** A group member's turn: an answer owed to whoever named it (the person, or another Orcling), or a chance to add something. */
-function groupNudge(namedBy: string | null): string {
-  if (namedBy === PERSON) return "(OpenOrc: your turn in the group chat. The person named you in their message, so answer them.)";
-  if (namedBy) return `(OpenOrc: your turn in the group chat. ${namedBy} named you in what they just said, so answer them, or the person if it was meant for them.)`;
-  return `(OpenOrc: your turn in the group chat. Answer if you have something to add; otherwise ${STAY_QUIET}.)`;
-}
 const PERSON = "the person";
+
+/**
+ * Why a group member gets a turn. One answers each message, as in a team's chat: the one it names, or for a message to
+ * everyone the one already talking. The rest may chime in after, only with something new.
+ */
+type Cue = { kind: "named"; by: string } | { kind: "chime"; lead: string };
+
+/** What a group turn is told about why it is its turn; the conversation itself reaches it as a catch-up. */
+function groupNudge(cue: Cue): string {
+  if (cue.kind === "chime")
+    return `(OpenOrc: your turn in the group chat. That was for everyone, and ${cue.lead} took it. Add a message only to correct something or to say what nobody has, in a line; to agree or thank, react instead. A hello to everyone gets a short hello back. Otherwise ${STAY_QUIET}.)`;
+  if (cue.by === PERSON) return "(OpenOrc: your turn in the group chat. The person named you in their message, so answer them.)";
+  return `(OpenOrc: your turn in the group chat. ${cue.by} asked you something in what they just said, so answer them, or the person if it was meant for them.)`;
+}
 
 interface Turn {
   orclingId: string;
@@ -47,8 +54,20 @@ const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** The Orclings a text names, by name as a word or as an @mention, in the order they appear. */
 export function namedIn(text: string, candidates: readonly Pick<Orcling, "id" | "name">[]): string[] {
+  return mentioned(text, candidates, (orcling) => `@?${escape(orcling.name)}`);
+}
+
+/**
+ * The Orclings a text asks something of: only an @mention, by name or handle. An Orcling's plain name in another's
+ * message is talk about it, like "thanks, Vision", and hands it no turn.
+ */
+export function askedIn(text: string, candidates: readonly Pick<Orcling, "id" | "name">[]): string[] {
+  return mentioned(text, candidates, (orcling) => `@(?:${escape(orcling.name)}|${escape(orclingHandle(orcling.name))})`);
+}
+
+function mentioned(text: string, candidates: readonly Pick<Orcling, "id" | "name">[], pattern: (orcling: Pick<Orcling, "name">) => string): string[] {
   return candidates
-    .map((orcling) => ({ id: orcling.id, at: text.search(new RegExp(`(^|[^\\p{L}\\p{N}])@?${escape(orcling.name)}(?![\\p{L}\\p{N}])`, "iu")) }))
+    .map((orcling) => ({ id: orcling.id, at: text.search(new RegExp(`(^|[^\\p{L}\\p{N}])${pattern(orcling)}(?![\\p{L}\\p{N}])`, "iu")) }))
     .filter((hit) => hit.at >= 0)
     .sort((a, b) => a.at - b.at)
     .map((hit) => hit.id);
@@ -57,8 +76,9 @@ export function namedIn(text: string, candidates: readonly Pick<Orcling, "id" | 
 /**
  * Orclings talking to each other, in the open. A direct message lands in the other Orcling's own chat as that Orcling
  * sees it from the sender, and is answered the same way. A group chat is one Workspace conversation shared by the
- * person and several Orclings: the Orclings a message names answer it in turn, or every one of them when the person
- * names none, and each hears what the others said. Both stop for the person after a short run of Orcling messages.
+ * person and several Orclings, paced like a team's chat: the Orclings a message names answer it, a message naming none
+ * goes to whoever is talking and the rest may chime in, and an Orcling asks another with an @mention. Each hears what
+ * the others said. Both stop for the person after a short run of Orcling messages.
  */
 export class OrclingTalk {
   private readonly groups = new Map<string, { queue: Turn[]; starting: boolean; orclingTurns: number }>();
@@ -203,13 +223,14 @@ export class OrclingTalk {
     orclingMessages.record(this.deps.db, { messageId, threadId: group.threadId, fromOrclingId: fromId, toOrclingId: null });
     this.deps.invalidate([`origins:${group.threadId}`]);
     const [first, ...rest] = others;
-    void this.enqueue(group.threadId, [{ orclingId: first!.id, text, role: "system", record: true, unprompted: true, messageId }, ...rest.map((other) => this.nudge(other.id))], false);
+    const chime: Cue = { kind: "chime", lead: first!.name };
+    void this.enqueue(group.threadId, [{ orclingId: first!.id, text, role: "system", record: true, unprompted: true, messageId }, ...rest.map((other) => this.nudge(other.id, chime))], false);
     return group;
   }
 
   /**
-   * The person's message to a group. With a turn under way it joins that turn, which hears it at once; the Orclings it
-   * names, or every one when it names none, answer after.
+   * The person's message to a group. With a turn under way it joins that turn, which hears it at once. The Orclings it
+   * names answer it; a message naming none goes first to whoever is talking or spoke last, and the rest may chime in.
    */
   async sendToGroup(threadId: string, text: string, options: { messageId?: string; attachments?: string[] }): Promise<void> {
     const group = orclingGroups.get(this.deps.db, threadId);
@@ -220,21 +241,42 @@ export class OrclingTalk {
       text,
       group.memberIds.map((id) => this.orcling(id)),
     );
-    const speakers = named.length ? named : group.memberIds;
-    const nudge = (id: string) => this.nudge(id, named.length ? PERSON : null);
     const runs = this.deps.runs();
     const live = runs.liveRunForThread(threadId);
-    if (live && runs.threadActivity(threadId) !== "idle") {
-      await runs.send(live.id, text, { role: "user", ...options });
-      await this.enqueue(threadId, speakers.filter((id) => id !== live.orclingId).map(nudge), true);
+    const busy = live && runs.threadActivity(threadId) !== "idle" ? live : null;
+    const speakers = named.length ? named : this.answerOrder(threadId, group.memberIds, busy?.orclingId ?? null);
+    const cue: Cue = named.length ? { kind: "named", by: PERSON } : { kind: "chime", lead: this.orcling(speakers[0]!).name };
+    if (busy) {
+      await runs.send(busy.id, text, { role: "user", ...options });
+      await this.enqueue(
+        threadId,
+        speakers.filter((id) => id !== busy.orclingId).map((id) => this.nudge(id, cue)),
+        true,
+      );
       return;
     }
     const [first, ...rest] = speakers;
-    const turns: Turn[] = [{ orclingId: first!, text, role: "user", record: true, unprompted: false, ...options }, ...rest.map(nudge)];
+    const turns: Turn[] = [{ orclingId: first!, text, role: "user", record: true, unprompted: false, ...options }, ...rest.map((id) => this.nudge(id, cue))];
     await this.enqueue(threadId, turns, true);
   }
 
-  /** After any turn: in a group, the Orclings the reply named take their turns, until the group waits for the person. */
+  /** Who takes a message for everyone, in order: whoever is talking, else whoever spoke last, as people carry on with whoever they were talking to. */
+  private answerOrder(threadId: string, memberIds: readonly string[], talking: string | null): string[] {
+    const lead = (talking && memberIds.includes(talking) ? talking : null) ?? this.lastSpeaker(threadId, memberIds) ?? memberIds[0]!;
+    return [lead, ...memberIds.filter((id) => id !== lead)];
+  }
+
+  /** The member who last said something the person saw. A turn that stayed quiet said nothing. */
+  private lastSpeaker(threadId: string, memberIds: readonly string[]): string | null {
+    for (const run of runRepo.listForThread(this.deps.db, threadId).reverse()) {
+      if (!run.orclingId || !memberIds.includes(run.orclingId)) continue;
+      const said = listEvents(this.deps.db, run.id, { kinds: ["message.completed"], newest: true, limit: 50 });
+      if (said.some((event) => event.type === "message.completed" && event.role === "assistant" && event.text.trim())) return run.orclingId;
+    }
+    return null;
+  }
+
+  /** After any turn: in a group, the Orclings the reply asks something of take their turns, until the group waits for the person. */
   turnEnded(thread: Thread, run: Run, reply: string | null): void {
     const group = orclingGroups.get(this.deps.db, thread.id);
     if (!group) return;
@@ -242,19 +284,19 @@ export class OrclingTalk {
     if (run.orclingId && reply?.trim()) {
       state.orclingTurns += 1;
       const others = group.memberIds.filter((id) => id !== run.orclingId).map((id) => this.orcling(id));
-      const named = namedIn(reply, others);
+      const cue: Cue = { kind: "named", by: this.orcling(run.orclingId).name };
       if (state.orclingTurns < GROUP_TURNS)
         return void this.enqueue(
           thread.id,
-          named.map((id) => this.nudge(id, this.orcling(run.orclingId!).name)),
+          askedIn(reply, others).map((id) => this.nudge(id, cue)),
           false,
         );
     }
     void this.next(thread.id);
   }
 
-  private nudge(orclingId: string, namedBy: string | null = null): Turn {
-    return { orclingId, text: groupNudge(namedBy), role: "system", record: false, unprompted: true };
+  private nudge(orclingId: string, cue: Cue): Turn {
+    return { orclingId, text: groupNudge(cue), role: "system", record: false, unprompted: true };
   }
 
   private state(threadId: string) {

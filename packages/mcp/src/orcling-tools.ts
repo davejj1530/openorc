@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { AgentKind, ExecutionMode } from "@openorc/protocol";
+import { AgentKind, ExecutionMode, Reaction } from "@openorc/protocol";
 
 export interface OrclingMemoryEntry {
   type: string;
@@ -40,6 +40,8 @@ export interface OrclingTools {
   available(runId: string): boolean;
   /** Whether the run is the Orcling's own conversation: a chat, where these tools stand in for the general task, thread and memory tools. */
   ownConversation(runId: string): boolean;
+  /** Whether the run speaks in a chat, the Orcling's own or a group it is in, where tapbacks go. */
+  inChat(runId: string): boolean;
   updateInstructions(runId: string, input: { body: string; reason: string }): Promise<string>;
   remember(runId: string, entry: OrclingMemoryEntry): Promise<string>;
   recall(runId: string, query: string, limit: number): Promise<string>;
@@ -66,8 +68,8 @@ export interface OrclingTools {
   message(runId: string, input: { to: string; text: string }): Promise<string>;
   /** A group chat with the person and the Orclings named, opened with these words. */
   startGroup(runId: string, input: { with: string[]; title?: string; text: string }): Promise<string>;
-  /** A tapback on the person's newest message in the Orcling's own conversation. */
-  react(runId: string, reaction: "heart" | "like" | "dislike" | "haha" | "wow" | "sad"): Promise<string>;
+  /** A tapback on the newest message from the person, or from the Orcling named, in the chat the run speaks in. */
+  react(runId: string, input: { reaction: Reaction; to?: string }): Promise<string>;
 }
 
 /** Every Orcling tool, so providers treat them as OpenOrc's own. */
@@ -97,15 +99,18 @@ const text = (value: string) => ({ content: [{ type: "text" as const, text: valu
 
 export function registerOrclingTools(mcp: McpServer, tools: OrclingTools, runId: string): void {
   registerOrclingTalk(mcp, tools, runId);
-  if (tools.ownConversation(runId))
+  if (tools.inChat(runId))
     mcp.registerTool(
       "orcling_react",
       {
         description:
-          "React to the person's newest message with a tapback, the way people do in a chat: heart, like, dislike, haha, wow or sad. Use it when a reaction says it better than words, such as a heart for thanks or haha for a joke. A reaction can be your whole reply: after it, reply with only NO_REPLY, which nobody sees.",
-        inputSchema: { reaction: z.enum(["heart", "like", "dislike", "haha", "wow", "sad"]) },
+          'React to a message with a tapback, the way people do in a chat: heart, like, dislike, haha, wow, sad, or eyes (👀) for "on it". It lands on the newest message from the person, or from the Orcling `to` names. Use it when a reaction says it better than words: a heart for thanks, a like to agree, eyes on something you are picking up. A reaction can be your whole reply: after it, reply with only NO_REPLY, which nobody sees.',
+        inputSchema: {
+          reaction: Reaction,
+          to: z.string().optional().describe("Another Orcling's name, to react to its newest message. Leave it out to react to the person's."),
+        },
       },
-      async ({ reaction }) => text(await tools.react(runId, reaction)),
+      async (input) => text(await tools.react(runId, input)),
     );
   mcp.registerTool(
     "orcling_instructions_update",

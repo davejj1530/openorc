@@ -6,8 +6,8 @@ import { DatabaseSync } from "node:sqlite";
 import { afterEach, expect, it } from "vitest";
 import { Db } from "./database.js";
 import { memories } from "./memories.js";
-import { orclingAccountMigration, orclingMigration } from "./orcling-schema.js";
-import { orclings } from "./orclings.js";
+import { orclingAccountMigration, orclingMigration, reactionKindsMigration } from "./orcling-schema.js";
+import { messageReactions, orclings } from "./orclings.js";
 import { pullReviews } from "./pull-reviews.js";
 import { projects, runs, threads } from "./repos.js";
 import { migrations } from "./schema.js";
@@ -59,6 +59,30 @@ it("upgrades a ledger from before Orclings with its threads, runs and memories u
   expect(runs.get(db, "r")?.orclingId).toBeNull();
   expect(runs.lastSession(db, { threadId: "t" }, "codex")).toBe("s");
   expect(memories.list(db, { projectId: "p" })).toMatchObject([{ id: "m", scope: "project", orclingId: null }]);
+  expect(db.stmt("PRAGMA foreign_key_check").all()).toEqual([]);
+});
+
+it("keeps the tapbacks a ledger had when reactions open to new kinds, and takes eyes after", () => {
+  const folder = mkdtempSync(path.join(os.tmpdir(), "openorc-reaction-kinds-"));
+  folders.push(folder);
+  const file = path.join(folder, "ledger.sqlite");
+  const raw = new DatabaseSync(file);
+  const before = migrations.indexOf(reactionKindsMigration);
+  for (const migration of migrations.slice(0, before)) typeof migration === "string" ? raw.exec(migration) : migration(raw);
+  raw.exec(`PRAGMA user_version=${before}`);
+  raw.exec(`INSERT INTO projects (id,name,root_path,settings,created_at,updated_at) VALUES ('p','App','/tmp/app','{}',1,1)`);
+  raw.exec(`INSERT INTO threads (id,project_id,title,agent,model,created_at,updated_at,last_activity_at) VALUES ('t','p','Chat','codex','fixture',1,1,1)`);
+  raw.exec(`INSERT INTO message_reactions (thread_id,run_id,message_id,part,reactor,reaction,heard_at,created_at) VALUES ('t','r','m',1,'person','heart',NULL,5)`);
+  expect(() => raw.exec(`INSERT INTO message_reactions (thread_id,run_id,message_id,part,reactor,reaction,heard_at,created_at) VALUES ('t','r','m',0,'pip','eyes',NULL,6)`)).toThrow(/CHECK/);
+  raw.close();
+
+  const db = Db.open(file);
+  opened.push(db);
+  messageReactions.set(db, { threadId: "t", runId: "r", messageId: "m", part: 0 }, "pip", "eyes", 6);
+  expect(messageReactions.list(db, "t")).toEqual([
+    { runId: "r", messageId: "m", part: 1, orclingId: null, reaction: "heart", at: 5 },
+    { runId: "r", messageId: "m", part: 0, orclingId: "pip", reaction: "eyes", at: 6 },
+  ]);
   expect(db.stmt("PRAGMA foreign_key_check").all()).toEqual([]);
 });
 

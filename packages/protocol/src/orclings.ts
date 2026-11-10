@@ -122,10 +122,10 @@ export interface OrclingMessageOrigin {
   toOrclingId: string | null;
 }
 
-/** A tapback on one bubble of a message in an Orcling's own conversation. */
-export const Reaction = z.enum(["heart", "like", "dislike", "haha", "wow", "sad"]);
+/** A tapback on one bubble of a message in an Orcling chat. Eyes say "on it", the way people use 👀 in Slack. */
+export const Reaction = z.enum(["heart", "like", "dislike", "haha", "wow", "sad", "eyes"]);
 export type Reaction = z.infer<typeof Reaction>;
-export const reactionEmoji: Record<Reaction, string> = { heart: "❤️", like: "👍", dislike: "👎", haha: "😂", wow: "😮", sad: "😢" };
+export const reactionEmoji: Record<Reaction, string> = { heart: "❤️", like: "👍", dislike: "👎", haha: "😂", wow: "😮", sad: "😢", eyes: "👀" };
 
 export interface MessageReaction {
   runId: string;

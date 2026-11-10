@@ -141,7 +141,7 @@ it("hears the person's reactions once, ahead of its next message, and reacts to 
       },
       invalidate: () => {},
     }).orcling!;
-    expect(await tools.react(run.id, "haha")).toContain('Reacted 😂 to "thanks"');
+    expect(await tools.react(run.id, { reaction: "haha" })).toContain('Reacted 😂 to "thanks"');
     const theirs = core.orclings.reactions(pip.threadId).find((reaction) => reaction.orclingId === pip.id)!;
     expect(theirs).toMatchObject({ reaction: "haha", part: 0 });
 

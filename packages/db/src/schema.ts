@@ -20,13 +20,14 @@ import { taskExecutionMigration } from "./task-execution-schema.js";
 import { conversationReviewCommentsMigration, reviewCommentRangeMigration } from "./review-comments-schema.js";
 import { teamCancellationMigration } from "./team-cancellation-schema.js";
 import { pullRequestReviewMigration } from "./pull-review-schema.js";
-import { orclingAccountMigration, orclingCompanionMigration, orclingFollowupMigration, orclingMigration, orclingTalkMigration } from "./orcling-schema.js";
+import { orclingAccountMigration, orclingCompanionMigration, orclingFollowupMigration, orclingMigration, orclingTalkMigration, reactionKindsMigration } from "./orcling-schema.js";
 import { remoteDeviceMigration } from "./remote-device-schema.js";
 import { remotePushTargetMigration } from "./remote-push-target-schema.js";
 import { cloudWorkspaceMigration, cloudWorkspaceMirrorHeadMigration, cloudWorkspaceRemovedMigration } from "./cloud-workspace-schema.js";
 import { parentThreadMigration, startedByAgentMigration, subagentMigration, subagentIdentityMigration, subagentObservationMigration } from "./subagent-schema.js";
 import { cloudBrainMigrations } from "./cloud-brain-schema.js";
 import { usageHistoryMigration } from "./usage-history-schema.js";
+import { threadsMigration } from "./thread-schema.js";
 /**
  * Migrations run in order; `PRAGMA user_version` records how many applied.
  * Never edit a shipped migration. Append a new one.
@@ -220,74 +221,7 @@ export const migrations: Migration[] = [
     value TEXT NOT NULL
   );
   `,
-  /**
-   * Threads: the conversation a user has with an agent in the project root.
-   * Runs and summaries now belong to a thread or a task; tasks remember the
-   * thread that spawned them. task_id loses NOT NULL, which SQLite can only do
-   * by rebuilding the table, so the runner keeps foreign keys off meanwhile.
-   */
-  (raw) => {
-    raw.exec(`
-      CREATE TABLE threads (
-        id TEXT PRIMARY KEY,
-        project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-        title TEXT NOT NULL,
-        agent TEXT NOT NULL,
-        model TEXT,
-        mode TEXT NOT NULL DEFAULT 'act',
-        permission_mode TEXT NOT NULL DEFAULT 'trusted',
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL,
-        last_activity_at INTEGER NOT NULL,
-        archived_at INTEGER
-      );
-      CREATE INDEX threads_project ON threads(project_id, last_activity_at DESC);
-
-      CREATE TABLE runs_new (
-        id TEXT PRIMARY KEY,
-        task_id TEXT REFERENCES tasks(id) ON DELETE CASCADE,
-        thread_id TEXT REFERENCES threads(id) ON DELETE CASCADE,
-        agent TEXT NOT NULL,
-        model TEXT,
-        mode TEXT NOT NULL DEFAULT 'act',
-        permission_mode TEXT NOT NULL DEFAULT 'trusted',
-        external_session_id TEXT,
-        state TEXT NOT NULL DEFAULT 'starting',
-        started_at INTEGER NOT NULL,
-        ended_at INTEGER,
-        usage TEXT,
-        result_text TEXT
-      );
-      INSERT INTO runs_new (id, task_id, agent, model, mode, permission_mode, external_session_id, state, started_at, ended_at, usage, result_text)
-        SELECT id, task_id, agent, model, mode, permission_mode, external_session_id, state, started_at, ended_at, usage, result_text FROM runs;
-      DROP TABLE runs;
-      ALTER TABLE runs_new RENAME TO runs;
-      CREATE INDEX runs_task ON runs(task_id, started_at);
-      CREATE INDEX runs_thread ON runs(thread_id, started_at);
-
-      CREATE TABLE session_summaries_new (
-        run_id TEXT PRIMARY KEY REFERENCES runs(id) ON DELETE CASCADE,
-        task_id TEXT REFERENCES tasks(id) ON DELETE CASCADE,
-        thread_id TEXT REFERENCES threads(id) ON DELETE CASCADE,
-        project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-        request TEXT NOT NULL,
-        work_done TEXT NOT NULL,
-        outcome TEXT NOT NULL,
-        open_items TEXT NOT NULL DEFAULT '[]',
-        model TEXT,
-        created_at INTEGER NOT NULL
-      );
-      INSERT INTO session_summaries_new (run_id, task_id, project_id, request, work_done, outcome, open_items, model, created_at)
-        SELECT run_id, task_id, project_id, request, work_done, outcome, open_items, model, created_at FROM session_summaries;
-      DROP TABLE session_summaries;
-      ALTER TABLE session_summaries_new RENAME TO session_summaries;
-      CREATE INDEX session_summaries_project ON session_summaries(project_id, created_at DESC);
-
-      ALTER TABLE tasks ADD COLUMN thread_id TEXT REFERENCES threads(id) ON DELETE SET NULL;
-      ALTER TABLE tasks ADD COLUMN origin TEXT NOT NULL DEFAULT 'user';
-      CREATE INDEX tasks_thread ON tasks(thread_id, created_at);
-    `);
-  },
+  threadsMigration,
   `
   -- Reasoning effort travels with the model choice.
   ALTER TABLE runs ADD COLUMN effort TEXT;
@@ -797,4 +731,5 @@ export const migrations: Migration[] = [
   `CREATE INDEX events_steps ON events(run_id, ts) WHERE kind = 'tool.completed';`,
   orclingTalkMigration,
   orclingFollowupMigration,
+  reactionKindsMigration,
 ];

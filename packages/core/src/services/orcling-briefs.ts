@@ -1,5 +1,6 @@
 import { listEvents, runs as runRepo, summaries, type Db } from "@openorc/db";
 import { STAY_QUIET } from "./orcling-quiet.js";
+import { reactionsSince } from "./orcling-reactions.js";
 import type { Orcling, Run, SessionSummary, Thread } from "@openorc/protocol";
 
 const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max).trimEnd()}…` : text);
@@ -65,16 +66,25 @@ const TEXTING = [
   "- React with orcling_react when a reaction says it better than words: a heart for thanks, haha for a joke. A reaction can be the whole reply.",
 ];
 
+/** Texting in a group, paced the way a team talks in Slack. */
+const GROUP_TEXTING = [
+  "## Texting in the group",
+  "Talk the way a team does in Slack: short messages, one of you answering each question, reactions for the small stuff.",
+  "- Keep each message to a sentence or two, with a blank line between messages: each paragraph arrives as its own message. More to say is two or three short messages, never a wall. Something long, like a walkthrough or a plan, is a drawing or a short summary and an offer to say more. Type plain sentences, as people do in chat: no headings, bold labels or tables, and a list only for steps they asked for.",
+  "- One of you answers each message: whoever it names, or for a message to everyone, whoever OpenOrc gives it to first. When someone already answered, add something only to correct it or to say what nobody has, in a line.",
+  "- Never restate what someone just said, theirs or yours, and never sum up the conversation.",
+  '- Agree, thank and acknowledge with orcling_react, not a message, and name whose message with `to`. Eyes (👀) say you are on it, so skip messages like "on it" or "give me a sec": they see you typing while you work.',
+  "- To ask another Orcling something, put @ before its name: that gives it the next turn. Its name without @ gives it no turn, so mention it freely.",
+];
+
 function placeNote(orcling: Orcling, place: OrclingPlace, others: string[]): string {
   switch (place) {
     case "group":
       return [
         `This is a group chat between the person and Orclings: you, ${others.join(", ")}. You work as a team. Each of your turns opens with what was said since you last spoke; read it first, since that is the conversation you are joining. Code changes belong in project threads, as in your own chat.`,
         "",
-        ...TEXTING,
-        `- Answer when the person or another Orcling named you, or when you have something to add. Otherwise ${STAY_QUIET}.`,
-        "- Build on what the others said rather than repeating it, and never repeat yourself: if you already said it, add only what is new.",
-        "- Name whoever you are talking to, the way people do in a group: naming another Orcling gives it a turn after yours.",
+        ...GROUP_TEXTING,
+        `- With nothing to add, ${STAY_QUIET}.`,
       ].join("\n");
     case "home":
       return [
@@ -144,5 +154,6 @@ export function catchUp(db: Db, thread: Thread, orclingId: string | null, names:
   const exchange = others.length ? recentExchange(db, others, names, last ? 10 : 12) : [];
   if (!exchange.length) return "";
   const heading = last ? "Since your last turn in this conversation, others spoke here, most recent last:" : "This conversation began before you joined. What was said, most recent last:";
-  return [heading, ...exchange].join("\n");
+  const reacted = reactionsSince(db, thread.id, last?.startedAt ?? 0, orclingId, names);
+  return [heading, ...exchange, ...(reacted.length ? ["Reactions since:", ...reacted] : [])].join("\n");
 }

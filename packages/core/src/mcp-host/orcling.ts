@@ -1,4 +1,4 @@
-import { claudeAccounts, messages, orclingFollowups, projects, runs, tasks, threads, type Db } from "@openorc/db";
+import { claudeAccounts, messages, orclingFollowups, orclingGroups, projects, runs, tasks, threads, type Db } from "@openorc/db";
 import { STAY_QUIET } from "../services/orcling-quiet.js";
 import type { McpHost, OrclingStartInput, OrclingTools } from "@openorc/mcp";
 import {
@@ -17,7 +17,7 @@ import {
   type Thread,
   type WorkspaceMode,
 } from "@openorc/protocol";
-import { latestPersonMessage } from "../services/orcling-reactions.js";
+import { latestFrom } from "../services/orcling-reactions.js";
 import type { MemoryService } from "../services/memory.js";
 import type { OrclingService } from "../services/orclings.js";
 import type { RunService } from "../services/runs.js";
@@ -60,6 +60,12 @@ export function createOrclingHost(deps: Dependencies): Pick<McpHost, "orcling"> 
         const run = runs.get(deps.db, runId);
         return Boolean(run?.threadId && run.threadId === deps.orclings.forRun(runId)?.threadId);
       },
+      inChat: (runId) => {
+        const threadId = runs.get(deps.db, runId)?.threadId;
+        const self = deps.orclings.forRun(runId);
+        if (!threadId || !self) return false;
+        return threadId === self.threadId || Boolean(orclingGroups.get(deps.db, threadId)?.memberIds.includes(self.id));
+      },
       ...selfTools(deps, speaker),
       ...projectTools(deps, speaker),
       ...talkTools(deps, speaker),
@@ -72,13 +78,15 @@ export function createOrclingHost(deps: Dependencies): Pick<McpHost, "orcling"> 
 /** Its instructions, its memory, what it said before, and its reactions in its own conversation. */
 function selfTools(deps: Dependencies, speaker: Speaker): Pick<OrclingTools, "updateInstructions" | "remember" | "recall" | "history" | "react"> {
   return {
-    react: async (runId, reaction) => {
+    react: async (runId, { reaction, to }) => {
       const self = speaker(runId);
-      const target = latestPersonMessage(deps.db, self.threadId);
-      if (!target) return "The person has not written anything to react to yet.";
-      deps.orclings.react({ threadId: self.threadId, runId: target.runId, messageId: target.messageId, part: 0 }, reaction, self.id);
+      const threadId = runs.get(deps.db, runId)?.threadId ?? self.threadId;
+      const other = to && !/^(the )?person$/i.test(to.trim()) ? deps.orclings.talk.byName(to, self.id) : null;
+      const target = latestFrom(deps.db, threadId, other?.id ?? null);
+      if (!target) return `${other?.name ?? "The person"} has not said anything here to react to yet.`;
+      deps.orclings.react({ threadId, runId: target.runId, messageId: target.messageId, part: target.part }, reaction, self.id);
       const quoted = target.text.replace(/\s+/g, " ").trim().slice(0, 80);
-      return `Reacted ${reactionEmoji[reaction]} to "${quoted}". If that says it all, ${STAY_QUIET}.`;
+      return `Reacted ${reactionEmoji[reaction]} to ${other ? `${other.name}'s ` : ""}"${quoted}". If that says it all, ${STAY_QUIET}.`;
     },
     updateInstructions: async (runId, { body, reason }) => {
       const self = speaker(runId);

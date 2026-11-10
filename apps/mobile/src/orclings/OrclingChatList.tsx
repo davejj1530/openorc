@@ -8,8 +8,10 @@ import Animated, { useReducedMotion, type SharedValue } from "react-native-reani
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Card } from "../thread/cards";
 import { VisualizationRow } from "../thread/VisualizationRow";
+import { ImageTile } from "../thread/images";
 import { Markdown } from "../thread/Markdown";
 import { Prompt } from "../thread/messages";
+import { replySegments } from "../thread/reply-images";
 import { cn } from "../ui/cn";
 import { haptic } from "../ui/haptics";
 import { useMode } from "../ui/mode";
@@ -84,10 +86,22 @@ function TheirBubble({ item, chat, reactions, held, onHold }: { item: Bubble; ch
   const key = reactionKey(item.block.runId, item.block.id, item.part);
   const current = reactions.person(key);
   const runId = item.block.runId;
+  const segments = useMemo(() => replySegments(item.text), [item.text]);
+  const drawn = Boolean(runId) && segments.some((segment) => segment.kind === "image");
+  // A bubble that is only a picture is the picture, as a photo in a messages app; it takes the column's width.
+  if (drawn && segments.length === 1 && segments[0]!.kind === "image")
+    return (
+      <View className="flex-row items-end gap-2" style={{ paddingRight: 48 }}>
+        <View style={{ width: FACE }}>{item.last ? <OrclingFace look={chat.look} size={FACE} /> : null}</View>
+        <View className="flex-1">
+          <ChatImage path={segments[0]!.path} alt={segments[0]!.alt} runId={runId!} messageId={item.block.id} />
+        </View>
+      </View>
+    );
   return (
     <View className="flex-row items-end gap-2" style={{ paddingRight: 48 }}>
       <View style={{ width: FACE }}>{item.last ? <OrclingFace look={chat.look} size={FACE} /> : null}</View>
-      <View className="flex-shrink">
+      <View className={drawn ? "flex-1" : "flex-shrink"}>
         {held && runId ? (
           <ReactionBar
             current={current}
@@ -109,12 +123,29 @@ function TheirBubble({ item, chat, reactions, held, onHold }: { item: Bubble; ch
           className="px-3.5 py-2.5"
           style={{ backgroundColor: bubbleTint(chat.look.bodyColor, mode), ...runCorners(item) }}
         >
-          <Markdown text={item.text} streaming={false} />
+          {drawn ? (
+            <View className="gap-2.5">
+              {segments.map((segment, index) =>
+                segment.kind === "text" ? (
+                  <Markdown key={index} text={segment.text} streaming={false} />
+                ) : (
+                  <ChatImage key={index} path={segment.path} alt={segment.alt} runId={runId!} messageId={item.block.id} />
+                ),
+              )}
+            </View>
+          ) : (
+            <Markdown text={item.text} streaming={false} />
+          )}
         </Pressable>
         <Badge reaction={current} />
       </View>
     </View>
   );
+}
+
+/** A picture the Orcling showed from a file on the Mac, which the Mac serves only to the message that names it. */
+function ChatImage({ path, alt, runId, messageId }: { path: string; alt: string; runId: string; messageId: string }) {
+  return <ImageTile asset={{ kind: "reply-image", runId, messageId, path }} label={alt || path.split(/[\\/]/).pop() || "Image"} />;
 }
 
 const dot = (delay: number) =>

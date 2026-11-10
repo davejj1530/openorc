@@ -12,7 +12,7 @@ import {
 } from "@openorc/protocol";
 import { cn } from "../lib/cn";
 import { defaultChoice, pickerCatalog, type ModelChoice } from "@openorc/client";
-import { useOrclings } from "../lib/orclings";
+import { afterOrclingDeleted, groupsGoingWith, useOrclingGroups, useOrclings } from "../lib/orclings";
 import { ClaudeAccountScope } from "../lib/claude-account";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { openThread, useRouter } from "../lib/router";
@@ -201,16 +201,29 @@ function SaveError({ error }: { error: Error | null }) {
   );
 }
 
+/** What deleting takes: its own things, and its group chats with only one other Orcling, which would be only chats with that one. */
+function deleteConsequence(partners: readonly string[]): string {
+  const names = new Intl.ListFormat("en", { style: "long", type: "conjunction" }).format(partners);
+  let groups = "";
+  if (partners.length === 1) groups = `, and so does its group chat with ${names}`;
+  else if (partners.length > 1) groups = `, and so do its group chats with ${names}`;
+  return `Its conversation, instructions and memories go with it${groups}. Threads it worked in keep their history.`;
+}
+
 function DeleteOrcling({ orcling }: { orcling: Orcling }) {
   const [open, setOpen] = useState(false);
   const remove = useRpcMutation("orclings.delete");
+  const orclings = useOrclings();
+  const partners = groupsGoingWith(useOrclingGroups(), orclings, orcling.id);
+  // Deleting keeps you among your Orclings, on the chat beside the one that went, as a messages app does.
+  const land = afterOrclingDeleted(orclings, orcling.id);
   return (
     <>
       <Button variant="danger" size="xl" onClick={() => setOpen(true)}>
         Delete {orcling.name}
       </Button>
       <Dialog open={open} onOpenChange={setOpen} title={`Delete ${orcling.name}?`}>
-        <p className="text-base text-ink-2">Its conversation, instructions and memories go with it. Threads it worked in keep their history.</p>
+        <p className="text-base text-ink-2">{deleteConsequence(partners)}</p>
         {remove.error ? (
           <p role="alert" className="orcling-designer-error mt-2">
             {remove.error.message}
@@ -218,8 +231,8 @@ function DeleteOrcling({ orcling }: { orcling: Orcling }) {
         ) : null}
         <div className="mt-5 flex justify-end gap-2">
           <Button onClick={() => setOpen(false)}>Cancel</Button>
-          <Button variant="danger" disabled={remove.isPending} onClick={() => remove.mutate({ id: orcling.id }, { onSuccess: () => useRouter.getState().navigate({ view: "newthread" }) })}>
-            Delete
+          <Button variant="danger" disabled={remove.isPending} onClick={() => remove.mutate({ id: orcling.id }, { onSuccess: () => useRouter.getState().navigate(land) })}>
+            {remove.isPending ? "Deleting…" : "Delete"}
           </Button>
         </div>
       </Dialog>

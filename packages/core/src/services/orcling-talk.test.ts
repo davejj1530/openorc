@@ -206,3 +206,25 @@ it("keeps each Orcling's own chat and each group to themselves: other Orclings a
     await core.close();
   }
 });
+
+it("takes a deleted Orcling out of its group chats: a group left with one other goes, a named one takes the names of those left", async () => {
+  const { core } = await fixture();
+  try {
+    const pip = await core.orclings.create(draft("Pip"));
+    const bo = await core.orclings.create(draft("Bo"));
+    const rini = await core.orclings.create(draft("Rini"));
+    const pair = await core.orclings.talk.createGroup([pip.id, bo.id], undefined, null);
+    const trio = await core.orclings.talk.createGroup([pip.id, bo.id, rini.id], undefined, null);
+    const titled = await core.orclings.talk.createGroup([pip.id, bo.id, rini.id], "Release", null);
+
+    await core.orclings.delete(bo.id);
+
+    const left = new Map(core.orclings.talk.groupsList().map((group) => [group.threadId, group]));
+    expect([...left.keys()].sort()).toEqual([trio.threadId, titled.threadId].sort());
+    expect(threads.get(core.db, pair.threadId)).toBeNull();
+    expect(left.get(trio.threadId)).toMatchObject({ title: "Pip and Rini", memberIds: [pip.id, rini.id] });
+    expect(left.get(titled.threadId)).toMatchObject({ title: "Release", memberIds: [pip.id, rini.id] });
+  } finally {
+    await core.close();
+  }
+});

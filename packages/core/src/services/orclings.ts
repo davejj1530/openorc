@@ -173,7 +173,10 @@ export class OrclingService {
     return this.folders.move(home!.workingDirectory!, to);
   }
 
-  /** Removes the Orcling, its instructions, memories and conversation. Threads it worked in keep their history. */
+  /**
+   * Removes the Orcling, its instructions, memories and conversation, and any group chat left with one other Orcling.
+   * Threads it worked in, and its other group chats, keep their history.
+   */
   async delete(id: string): Promise<void> {
     const { db } = this.deps;
     const orcling = this.get(id);
@@ -181,6 +184,7 @@ export class OrclingService {
     const live = this.deps.runs().liveRunForThread(orcling.threadId);
     if (live) await this.deps.runs().closeAndWait(live.id);
     for (const memory of this.deps.memory.listOrcling(id, { limit: 10_000 })) this.deps.memory.remove(memory.id);
+    await this.talk.memberDeleted(id);
     db.transaction(() => {
       orclings.delete(db, id);
       audit.record(db, { actor: "user", action: "orcling.delete", resourceType: "orcling", resourceId: id, metadata: { threadId: orcling.threadId } });

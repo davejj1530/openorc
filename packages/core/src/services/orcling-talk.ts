@@ -29,7 +29,7 @@ interface Turn {
 interface Dependencies {
   db: Db;
   dataDir: string;
-  runs: () => Pick<RunService, "start" | "send" | "liveRunForThread" | "threadActivity" | "agentChain" | "noteAgentMessage">;
+  runs: () => Pick<RunService, "start" | "send" | "liveRunForThread" | "closeAndWait" | "threadActivity" | "agentChain" | "noteAgentMessage">;
   threads: () => Pick<ThreadService, "send">;
   invalidate: (keys: string[]) => void;
   log: Logger;
@@ -165,6 +165,27 @@ export class OrclingTalk {
     this.groups.delete(threadId);
     threads.delete(this.deps.db, threadId);
     this.deps.invalidate(["orcling-groups", "threads", `thread:${threadId}`]);
+  }
+
+  /**
+   * An Orcling's group chats as it is deleted: a group left with one other Orcling goes, being only a chat with that one;
+   * any other keeps its history without it and, if it was named after its Orclings, takes the names of those left. A turn
+   * under way in a group that goes, or the deleted Orcling's own turn in one that stays, ends first.
+   */
+  async memberDeleted(orclingId: string): Promise<void> {
+    const { db } = this.deps;
+    for (const group of orclingGroups.of(db, orclingId)) {
+      const left = group.memberIds.filter((id) => id !== orclingId);
+      const live = this.deps.runs().liveRunForThread(group.threadId);
+      if (live && (left.length < 2 || live.orclingId === orclingId)) await this.deps.runs().closeAndWait(live.id);
+      if (left.length < 2) {
+        this.deleteGroup(group.threadId);
+        continue;
+      }
+      const named = list(group.memberIds.map((id) => this.orcling(id).name));
+      if (group.title === named) threads.update(db, group.threadId, { title: list(left.map((id) => this.orcling(id).name)) });
+    }
+    this.deps.invalidate(["orcling-groups", "threads"]);
   }
 
   /** An Orcling opens a group with the Orclings it names and its first words, which go to each of them in turn. */

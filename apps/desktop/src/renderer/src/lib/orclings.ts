@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import type { Orcling, OrclingGroup } from "@openorc/protocol";
 import type { MentionEntry } from "./composer-mentions";
+import type { Route } from "./router";
 import { useRpc } from "./client";
 
 const NONE: Orcling[] = [];
@@ -46,4 +47,17 @@ export function mentionedOrcling(text: string, orclings: readonly Orcling[]): Or
   const pattern = new RegExp(`(?:^|[^\\w@])@(${names.map((orcling) => escape(orcling.name)).join("|")})(?![\\w-])`, "iu");
   const match = pattern.exec(text);
   return match ? (names.find((orcling) => orcling.name.toLowerCase() === match[1]!.toLowerCase()) ?? null) : null;
+}
+
+/** Where to land once an Orcling is deleted: the chat beside it in the list, below it or else above, or a new Orcling when it was the last. */
+export function afterOrclingDeleted(orclings: readonly Orcling[], id: string): Route {
+  const at = orclings.findIndex((orcling) => orcling.id === id);
+  const beside = orclings[at + 1] ?? orclings[at - 1];
+  return beside ? { view: "thread", threadId: beside.threadId } : { view: "orcling" };
+}
+
+/** The group chats deleting an Orcling takes with it, those left with one other Orcling, named by that one. */
+export function groupsGoingWith(groups: readonly OrclingGroup[], orclings: readonly Orcling[], id: string): string[] {
+  const going = groups.filter((group) => group.memberIds.includes(id) && group.memberIds.length <= 2);
+  return [...new Set(going.flatMap((group) => group.memberIds.filter((member) => member !== id).map((member) => orclingById(orclings, member)?.name ?? "")))].filter(Boolean);
 }

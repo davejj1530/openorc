@@ -226,7 +226,7 @@ export const orclingRpcParams = {
   "orclings.profile": z.object({ id }).strict(),
   "orclings.create": z.object({ draft: OrclingDraft }).strict(),
   "orclings.update": z.object({ id, draft: OrclingDraft }).strict(),
-  /** Removes the Orcling, its instructions, memories and conversation. Threads it helped in keep their history. */
+  /** Removes the Orcling, its instructions, memories and conversation, and any group chat left with one other Orcling. Threads it helped in keep their history. */
   "orclings.delete": z.object({ id }).strict(),
   /** Every version of its instructions, newest first. */
   "orclings.instructions": z.object({ id }).strict(),

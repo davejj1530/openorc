@@ -21,7 +21,7 @@ export function createFilesHandlers({ db, files }: Dependencies): Pick<Handlers,
     },
     "files.list": async ({ scope, path }) => listDirectory((await conversationFolder(db, scope)).root, path),
     "files.search": async ({ scope, query, limit }) => files.search(await conversationFolder(db, scope), query, limit),
-    "files.read": async ({ scope, path }) => files.read(await conversationFolder(db, scope), path),
+    "files.read": async ({ scope, path }) => files.read(await conversationFolder(db, scope), path, { outside: true }),
     "files.write": async ({ scope, path, text, expected }) => {
       const result = await files.write(await conversationFolder(db, scope), { path, text, expected, format: true });
       if (result.kind === "saved") audit.record(db, { actor: "user", action: "files.write", resourceType: scope.kind, resourceId: scope.id, metadata: { path } });

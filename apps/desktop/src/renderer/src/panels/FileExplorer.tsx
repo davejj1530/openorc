@@ -3,7 +3,7 @@ import type { FileEntry, FileScope, FolderPath } from "@openorc/protocol";
 import { FileGlyph } from "../components/FileGlyph";
 import { ChevronRight, Folder, Search } from "../components/icons";
 import { Input } from "../components/ui";
-import { ROOT_FOLDERS, relativeFilePath, useFileExplorer } from "../lib/file-explorer";
+import { isAbsoluteFilePath, ROOT_FOLDERS, relativeFilePath, useFileExplorer } from "../lib/file-explorer";
 import { EMPTY_SEARCH, filesKey, useFilesFocus, useFilesToolState, type FilesTool } from "../lib/files-tool";
 import { useLayout } from "../lib/layout";
 import { useRpc } from "../lib/client";
@@ -150,7 +150,9 @@ export function FileExplorer({ scope, directory, selected = "" }: ExplorerProps)
   const key = filesKey(scope);
   const listing = useRpc("files.list", { scope, path: "" });
   const root = listing.data?.root ?? directory;
-  const path = relativeFilePath(selected, root);
+  // A file outside the folder has no place in the tree to reveal.
+  const inTree = relativeFilePath(selected, root);
+  const path = isAbsoluteFilePath(inTree) ? "" : inTree;
   const expanded = useFileExplorer((state) => state.folders[key]) ?? ROOT_FOLDERS;
   const [focused, focus] = useState("");
   const [search, update] = useExplorerSearch(scope, Boolean(selected));

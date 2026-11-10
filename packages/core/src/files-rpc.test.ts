@@ -161,6 +161,7 @@ it("versions a file by the sha256 of its bytes, byte order mark included, and le
     kind: "file",
     root: checkout,
     path: "notes.md",
+    outside: false,
     absolutePath: path.join(checkout, "notes.md"),
     version: createHash("sha256").update(bytes).digest("hex"),
     text: "# Notes\r\n",
@@ -176,9 +177,9 @@ it("names the folder each read came from, shared by conversations in one checkou
 });
 
 it("answers a file that isn't there with its place in the folder, however the link named it", async () => {
-  expect(await read("src/gone.ts")).toEqual({ kind: "missing", root: checkout, path: "src/gone.ts" });
-  expect(await read(path.join(checkout, "gone.ts"))).toEqual({ kind: "missing", root: checkout, path: "gone.ts" });
-  expect(await read("README.md/child")).toEqual({ kind: "missing", root: checkout, path: "README.md/child" });
+  expect(await read("src/gone.ts")).toEqual({ kind: "missing", root: checkout, path: "src/gone.ts", outside: false });
+  expect(await read(path.join(checkout, "gone.ts"))).toEqual({ kind: "missing", root: checkout, path: "gone.ts", outside: false });
+  expect(await read("README.md/child")).toEqual({ kind: "missing", root: checkout, path: "README.md/child", outside: false });
 });
 
 it("answers a folder, a non-UTF-8 and an oversized file as unreadable, and a binary with a viewer URL, never their contents", async () => {
@@ -186,11 +187,12 @@ it("answers a folder, a non-UTF-8 and an oversized file as unreadable, and a bin
   await writeFile(path.join(checkout, "logo.png"), Buffer.from([0x89, 0x50, 0x00, 0x47]));
   await writeFile(path.join(checkout, "latin1.txt"), Buffer.from("café", "latin1"));
   await writeFile(path.join(checkout, "dump.sql"), Buffer.alloc(2 * 1024 * 1024 + 1, "a"));
-  for (const file of ["src", "latin1.txt", "dump.sql"]) expect(await read(file)).toEqual({ kind: "unreadable", root: checkout, path: file, reason: expect.any(String) });
+  for (const file of ["src", "latin1.txt", "dump.sql"]) expect(await read(file)).toEqual({ kind: "unreadable", root: checkout, path: file, outside: false, reason: expect.any(String) });
   expect(await read("logo.png")).toEqual({
     kind: "binary",
     root: checkout,
     path: "logo.png",
+    outside: false,
     absolutePath: path.join(checkout, "logo.png"),
     size: 4,
     media: "image",
@@ -205,11 +207,15 @@ it("names the file a symlink points at, so a file has one path however it was op
   expect(await read("alias.ts")).toMatchObject({ kind: "file", path: "real.ts", absolutePath: path.join(checkout, "real.ts"), text: "export {};\n" });
 });
 
-it("refuses paths outside the folder, whether absolute, climbing out, through a symlink or missing", async () => {
-  const outside = path.join(root, "secret.txt");
-  await writeFile(outside, "secret");
-  await symlink(outside, path.join(checkout, "leak.txt"));
-  for (const file of [outside, "../secret.txt", "leak.txt", path.join(root, "nowhere.txt")]) await expect(read(file)).rejects.toThrow("outside");
+it("opens files outside the folder read-only in their own folder, whether absolute, climbing out, through a symlink or missing", async () => {
+  const outside = path.join(root, "notes.log");
+  await writeFile(outside, "signed in\n");
+  await symlink(outside, path.join(checkout, "linked.log"));
+  for (const file of [outside, "../notes.log", "linked.log"]) {
+    expect(await read(file)).toMatchObject({ kind: "file", root, path: "notes.log", outside: true, absolutePath: outside, text: "signed in\n", readOnly: expect.stringContaining("outside") });
+  }
+  expect(await read(path.join(root, "nowhere.txt"))).toEqual({ kind: "missing", root, path: "nowhere.txt", outside: true });
+  expect(await read("README.md")).toMatchObject({ kind: "file", root: checkout, path: "README.md", outside: false });
 });
 
 it("reads Git's own files as read-only", async () => {

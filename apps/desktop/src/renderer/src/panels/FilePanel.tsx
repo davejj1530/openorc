@@ -19,7 +19,7 @@ import { useLayout } from "../lib/layout";
 const ExplainView = lazy(() => import("./explain/ExplainView").then((m) => ({ default: m.ExplainView })));
 const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path;
 
-/** A file in the conversation's folder, edited in place. Markdown also renders, and a cited line opens the source there. */
+/** A file in the conversation's folder, edited in place, or one outside it, shown read-only. Markdown also renders, and a cited line opens the source there. */
 export function FilePanel({ selection, directory }: { selection: FileSelection; directory: string }) {
   const buffer = useFileBuffer(selection);
   const [editorActions, setEditorActions] = useState<CodeEditorActions | null>(null);
@@ -34,7 +34,8 @@ export function FilePanel({ selection, directory }: { selection: FileSelection; 
   const treeVisible = compact ? overlayFor === selection.path : visible;
   const explorerStyle: CSSProperties & { "--file-explorer-width": string } = { "--file-explorer-width": `${width}px` };
   const onTree = (show: boolean) => (compact ? setOverlayFor(show ? selection.path : null) : useFileExplorer.getState().setVisible(show));
-  const root = "file" in buffer.view ? buffer.view.file.root : directory;
+  // A file outside the folder keeps the conversation's explorer and history beside it.
+  const root = "file" in buffer.view && !buffer.outside ? buffer.view.file.root : directory;
   const navigationKey = editorNavigationKey(selection.scope, root);
   const history = useEditorNavigation((state) => state.histories[navigationKey]);
   const move = (direction: "back" | "forward") => moveInEditor(navigationKey, direction, editorCaret(selection, editorActions?.point()));
@@ -71,7 +72,7 @@ export function FilePanel({ selection, directory }: { selection: FileSelection; 
         onView={(next) => choose({ selection, view: next })}
         treeVisible={treeVisible}
         onTree={onTree}
-        editorActions={editorLanguage(selection.path) ? editorActions : null}
+        editorActions={editorLanguage(selection.path) && !buffer.outside ? editorActions : null}
         navigation={{ canBack: Boolean(history?.back.length), canForward: Boolean(history?.forward.length), back: () => move("back"), forward: () => move("forward") }}
       />
       <div className="file-editor">

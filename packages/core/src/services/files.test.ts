@@ -33,10 +33,19 @@ async function sparse(name: string, size: number): Promise<string> {
   return file;
 }
 
+it("reads only inside the folder unless the caller opens outside files, as the file panel does", async () => {
+  const outside = join(dir, "elsewhere.txt");
+  await writeFile(outside, "elsewhere\n");
+  await symlink(outside, join(root, "linked.txt"));
+  for (const path of [outside, "../elsewhere.txt", "linked.txt"]) await expect(files.read(folder(), path)).rejects.toThrow("outside");
+  expect(await files.read(folder(), outside, { outside: true })).toMatchObject({ kind: "file", root: dir, path: "elsewhere.txt", outside: true, readOnly: expect.any(String) });
+  await expect(files.read(folder(), "/", { outside: true })).rejects.toThrow("folder");
+});
+
 it("shows known media by extension at any size, with a URL only the key names a path from, without reading the bytes", async () => {
   const image = await sparse("big.PNG", 3 * 1024 * 1024);
   const read = await files.read(folder(), "big.PNG");
-  expect(read).toEqual({ kind: "binary", root, path: "big.PNG", absolutePath: image, size: 3 * 1024 * 1024, media: "image", mime: "image/png", url: expect.any(String) });
+  expect(read).toEqual({ kind: "binary", root, path: "big.PNG", outside: false, absolutePath: image, size: 3 * 1024 * 1024, media: "image", mime: "image/png", url: expect.any(String) });
   if (read.kind !== "binary") throw new Error("not binary");
   expect(verifyFileUrl("test-key", read.url)).toBe(image);
   expect(verifyFileUrl("other-key", read.url)).toBeNull();

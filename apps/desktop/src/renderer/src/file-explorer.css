@@ -47,7 +47,8 @@
 .file-breadcrumbs li {
   white-space: nowrap;
 }
-.file-breadcrumbs button {
+.file-breadcrumbs button,
+.file-breadcrumb-folder {
   border-radius: var(--radius-sm);
   padding: 3px 4px;
 }

@@ -5,13 +5,23 @@ import type { Draft } from "./file-drafts";
 
 const [v1, v2, v3] = ["1", "2", "3"].map((digit) => FileVersion.parse(digit.repeat(64))) as [FileVersion, FileVersion, FileVersion];
 const path = FolderPath.parse("src/cart.ts");
-const file = (version: FileVersion, text: string): FileSnapshot & { kind: "file" } => ({ kind: "file", root: "/repo", path, absolutePath: "/repo/src/cart.ts", version, text, readOnly: null });
-const missing: FileRead = { kind: "missing", root: "/repo", path };
-const latin1: FileRead = { kind: "unreadable", root: "/repo", path, reason: "This file is not UTF-8 text and cannot be shown." };
+const file = (version: FileVersion, text: string): FileSnapshot & { kind: "file" } => ({
+  kind: "file",
+  root: "/repo",
+  path,
+  outside: false,
+  absolutePath: "/repo/src/cart.ts",
+  version,
+  text,
+  readOnly: null,
+});
+const missing: FileRead = { kind: "missing", root: "/repo", path, outside: false };
+const latin1: FileRead = { kind: "unreadable", root: "/repo", path, outside: false, reason: "This file is not UTF-8 text and cannot be shown." };
 const binary: FileRead = {
   kind: "binary",
   root: "/repo",
   path,
+  outside: false,
   absolutePath: "/repo/src/cart.ts",
   size: 3,
   media: "other",
@@ -30,6 +40,7 @@ describe("bufferView", () => {
     ["a draft the disk has caught up with", file(v2, "mine"), mine, "clean"],
     ["a draft on a deleted file", missing, mine, "deleted"],
     ["a deleted file without a draft", missing, null, "missing"],
+    ["a draft on a missing file outside the folder, which is never saved there", { ...missing, outside: true }, mine, "missing"],
     ["a draft on a file that stopped being UTF-8", latin1, mine, "unreadable"],
     ["a draft on a file that turned binary", binary, mine, "binary"],
   ];
@@ -84,7 +95,7 @@ describe("formatRequest", () => {
 });
 
 describe("afterSave", () => {
-  const saved = { kind: "saved", root: "/repo", path, absolutePath: "/repo/src/cart.ts", version: v3, text: null, formatError: null } as const;
+  const saved = { kind: "saved", root: "/repo", path, outside: false, absolutePath: "/repo/src/cart.ts", version: v3, text: null, formatError: null } as const;
 
   it("makes the sent text the file and drops the draft when nothing was typed meanwhile", () => {
     expect(afterSave(saved, "mine", { kind: "dirty", file: file(v1, "disk"), draft: mine })).toEqual({ disk: file(v3, "mine"), draft: null });

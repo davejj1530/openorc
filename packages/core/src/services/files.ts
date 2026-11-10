@@ -1,6 +1,6 @@
 import type { Dirent } from "node:fs";
 import { glob, open, realpath, type FileHandle } from "node:fs/promises";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { git } from "@openorc/git";
 import {
   fileMedia,
@@ -9,6 +9,7 @@ import {
   OTHER_MEDIA,
   type FileExpectation,
   type FileMediaEntry,
+  type FilePlace,
   type FileRead,
   type FileWriteResult,
   type FindQuery,
@@ -98,11 +99,23 @@ function missing(error: NodeJS.ErrnoException): null {
   throw error;
 }
 
-function folderPath(root: string, absolute: string): FolderPath {
+const FOLDER_NOT_FILE = "This path is a folder, not a file.";
+const OUTSIDE_READ_ONLY = "This file is outside this conversation's folder.";
+
+/** Where a file is: its place in the folder, or with `outside` allowed, a file outside it in its own folder. */
+function filePlace(root: string, absolute: string, outside: boolean): FilePlace {
   const local = relative(root, absolute);
-  if (!local) throw new Error("This path is a folder, not a file.");
-  if (local === ".." || local.startsWith(`..${sep}`) || isAbsolute(local)) throw new Error("This file is outside the conversation's workspace.");
-  return FolderPath.parse(local.split(sep).join("/"));
+  if (!local) throw new Error(FOLDER_NOT_FILE);
+  if (local !== ".." && !local.startsWith(`..${sep}`) && !isAbsolute(local)) return { root, path: FolderPath.parse(local.split(sep).join("/")), outside: false };
+  if (!outside) throw new Error("This file is outside the conversation's workspace.");
+  const name = basename(absolute);
+  if (!name) throw new Error(FOLDER_NOT_FILE);
+  return { root: dirname(absolute), path: FolderPath.parse(name), outside: true };
+}
+
+function readOnlyReason(folderReadOnly: string | null, place: FilePlace): string | null {
+  if (place.outside) return OUTSIDE_READ_ONLY;
+  return folderReadOnly ?? (inGitFolder(place.path) ? "Git's own files are read-only here." : null);
 }
 
 /** Whether the first 8000 bytes hold a NUL, as git tells binary from text, so a large binary is known without reading it all. */
@@ -149,21 +162,24 @@ export class FileService {
     this.intelligence = new EditorService(deps.intelligence ?? null);
   }
 
-  async read(folder: Pick<ConversationFolder, "root" | "readOnly">, path: string): Promise<FileRead> {
+  /**
+   * A file in the folder, by its place or absolute path. With `outside`, a path outside the folder reads too, read-only
+   * in its own folder, as the file panel opens any file a reply links; other callers stay inside the folder.
+   */
+  async read(folder: Pick<ConversationFolder, "root" | "readOnly">, path: string, options: { outside?: boolean } = {}): Promise<FileRead> {
     if (path.includes("\0")) throw new Error("Invalid file path.");
     const requested = resolve(folder.root, path);
     const target = await realpath(requested).catch(missing);
-    const local = folderPath(folder.root, target ?? requested);
-    if (!target) return { kind: "missing", root: folder.root, path: local };
-    const unreadable = (reason: string): FileRead => ({ kind: "unreadable", root: folder.root, path: local, reason });
+    const place = filePlace(folder.root, target ?? requested, options.outside ?? false);
+    if (!target) return { kind: "missing", ...place };
+    const unreadable = (reason: string): FileRead => ({ kind: "unreadable", ...place, reason });
     const file = await open(target, "r");
     try {
       const stat = await file.stat();
-      if (!stat.isFile()) return unreadable("This path is a folder, not a file.");
+      if (!stat.isFile()) return unreadable(FOLDER_NOT_FILE);
       const binary = (media: FileMediaEntry): FileRead => ({
         kind: "binary",
-        root: folder.root,
-        path: local,
+        ...place,
         absolutePath: target,
         size: stat.size,
         ...media,
@@ -177,15 +193,7 @@ export class FileService {
       if (bytes.includes(0)) return binary(OTHER_MEDIA);
       const text = utf8(bytes);
       if (text === null) return unreadable("This file is not UTF-8 text and cannot be shown.");
-      return {
-        kind: "file",
-        root: folder.root,
-        path: local,
-        absolutePath: target,
-        version: versionOf(bytes),
-        text,
-        readOnly: folder.readOnly ?? (inGitFolder(local) ? "Git's own files are read-only here." : null),
-      };
+      return { kind: "file", ...place, absolutePath: target, version: versionOf(bytes), text, readOnly: readOnlyReason(folder.readOnly, place) };
     } finally {
       await file.close();
     }

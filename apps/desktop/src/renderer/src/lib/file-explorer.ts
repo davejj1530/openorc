@@ -42,6 +42,9 @@ export const useFileExplorer = create<ExplorerState>()(
   ),
 );
 
+/** Whether a path is absolute, as relativeFilePath leaves a path outside its root. */
+export const isAbsoluteFilePath = (path: string): boolean => /^(?:[\\/]|[a-z]:[\\/])/i.test(path);
+
 export function relativeFilePath(path: string, root: string): string {
   const file = path.replaceAll("\\", "/");
   const prefix = root.replaceAll("\\", "/").replace(/\/$/, "") + "/";

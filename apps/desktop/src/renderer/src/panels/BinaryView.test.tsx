@@ -15,6 +15,7 @@ afterEach(() => {
 const url = (name: string) => `openorc-file://file/?path=%2Frepo%2Fdocs%2F${name}&sig=0123&v=1` as SignedFileUrl;
 const file = (media: BinaryFile["media"], name: string): BinaryFile => ({
   root: "/repo",
+  outside: false,
   path: FolderPath.parse(`docs/${name}`),
   absolutePath: `/repo/docs/${name}`,
   size: 123_456,

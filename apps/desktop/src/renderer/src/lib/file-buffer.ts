@@ -24,7 +24,7 @@ export type EditableView = Extract<BufferView, { kind: "clean" | "dirty" | "conf
 /**
  * - not read yet, or its draft not loaded yet: loading, since typing then could overwrite a stored draft
  * - unreadable or binary: as read, keeping any draft for when the file reads as text again
- * - missing: deleted with a draft, missing without
+ * - missing: deleted with a draft, missing without; a file outside the folder is never saved, so it stays missing
  * - a draft equal to the file is no edit at all: clean, whatever version it began on
  * - a draft begun on this version: dirty; begun on another: conflict
  */
@@ -32,7 +32,7 @@ export function bufferView(disk: FileRead | undefined, draft: Draft | null | und
   if (!disk || draft === undefined) return { kind: "loading" };
   if (disk.kind === "unreadable") return { kind: "unreadable", path: disk.path, reason: disk.reason };
   if (disk.kind === "binary") return { kind: "binary", file: disk };
-  if (disk.kind === "missing") return draft ? { kind: "deleted", path: disk.path, draft } : { kind: "missing", path: disk.path };
+  if (disk.kind === "missing") return draft && !disk.outside ? { kind: "deleted", path: disk.path, draft } : { kind: "missing", path: disk.path };
   if (!draft || draft.text === disk.text) return { kind: "clean", file: disk };
   return draft.base === disk.version ? { kind: "dirty", file: disk, draft } : { kind: "conflict", file: disk, draft };
 }
@@ -91,7 +91,7 @@ export function formatRequest(view: BufferView): { path: FolderPath; text: strin
 export function afterSave(result: FileWriteResult, sent: string, now: BufferView): { disk: FileRead; draft: Draft | null } {
   const draft = "draft" in now ? now.draft : null;
   if (result.kind === "conflict") return { disk: result.current, draft };
-  const disk: FileRead = { kind: "file", root: result.root, path: result.path, absolutePath: result.absolutePath, version: result.version, text: result.text ?? sent, readOnly: null };
+  const disk: FileRead = { kind: "file", root: result.root, path: result.path, outside: false, absolutePath: result.absolutePath, version: result.version, text: result.text ?? sent, readOnly: null };
   const holds = bufferText(now) ?? sent;
   return { disk, draft: holds === sent ? null : { text: holds, base: result.version } };
 }

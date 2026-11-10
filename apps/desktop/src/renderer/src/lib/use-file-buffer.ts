@@ -163,6 +163,8 @@ export interface FileBuffer {
   text: string | null;
   /** Why the file can't be edited, or null. */
   readOnly: string | null;
+  /** Outside the conversation's folder: read-only, and without the folder's code intelligence. */
+  outside: boolean;
   saving: boolean;
   /** The last save's error, until the next edit. */
   error: string | null;
@@ -200,6 +202,7 @@ export function useFileBuffer(selection: FileSelection): FileBuffer {
     view,
     text: bufferText(view),
     readOnly: isEditable(view) && "file" in view ? view.file.readOnly : null,
+    outside: disk?.outside ?? false,
     saving,
     error,
     note,

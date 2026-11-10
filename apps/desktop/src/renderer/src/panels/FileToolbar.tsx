@@ -8,7 +8,7 @@ import { menuItem, menuPopup, menuSeparator } from "../components/menu";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { CoversPreview } from "../lib/browser-preview";
 import { hasUnsavedEdits } from "../lib/file-buffer";
-import { relativeFilePath, useFileExplorer } from "../lib/file-explorer";
+import { isAbsoluteFilePath, relativeFilePath, useFileExplorer } from "../lib/file-explorer";
 import { filesKey } from "../lib/files-tool";
 import type { FileSelection } from "../lib/layout";
 import type { FileBuffer } from "../lib/use-file-buffer";
@@ -60,11 +60,20 @@ interface Props {
   navigation?: { canBack: boolean; canForward: boolean; back: () => boolean; forward: () => boolean };
 }
 
+/**
+ * What the breadcrumb shows: the folder's name, then the file's place in it, and the path Copy path copies. A file
+ * outside the folder isn't in the explorer: its own folder and name instead, as text, and its full path to copy.
+ */
+function fileCrumbs(file: string, directory: string): { root: string; parts: string[]; path: string; outside: boolean } {
+  const path = relativeFilePath(file, directory);
+  if (!isAbsoluteFilePath(path)) return { root: directory.split(/[\\/]/).filter(Boolean).at(-1) ?? "Workspace", parts: path.split("/"), path, outside: false };
+  const segments = path.split(/[\\/]/).filter(Boolean);
+  return { root: segments.at(-2) ?? "/", parts: segments.slice(-1), path: file, outside: true };
+}
+
 export function FileToolbar({ selection, buffer, directory, view, onView, treeVisible, onTree, editorActions, navigation }: Props) {
-  const path = relativeFilePath(selection.path, directory);
+  const { root, parts, path, outside } = fileCrumbs(selection.path, directory);
   const views = fileViews(selection.path, buffer.text !== null);
-  const parts = path.split("/");
-  const root = directory.split(/[\\/]/).filter(Boolean).at(-1) ?? "Workspace";
   const reveal = (folder: string) => {
     useFileExplorer.getState().reveal(filesKey(selection.scope), folder ? `${folder}/_` : "_");
     onTree(true);
@@ -73,9 +82,7 @@ export function FileToolbar({ selection, buffer, directory, view, onView, treeVi
     <header className="file-toolbar">
       <nav aria-label="File path" className="file-breadcrumbs" title={selection.path}>
         <ol>
-          <li>
-            <button onClick={() => reveal("")}>{root}</button>
-          </li>
+          <li>{outside ? <span className="file-breadcrumb-folder">{root}</span> : <button onClick={() => reveal("")}>{root}</button>}</li>
           {parts.map((part, index) => (
             <li key={parts.slice(0, index + 1).join("/")}>
               <ChevronRight size={12} />

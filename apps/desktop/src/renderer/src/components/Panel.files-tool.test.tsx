@@ -2,7 +2,7 @@ import "fake-indexeddb/auto";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { WORKSPACE_ID, type FindResult, type Project, type RpcMethod, type RpcParams, type RpcResults, type ThreadSummary } from "@openorc/protocol";
+import { FileVersion, FolderPath, WORKSPACE_ID, type FileRead, type FindResult, type Project, type RpcMethod, type RpcParams, type RpcResults, type ThreadSummary } from "@openorc/protocol";
 import { NewFileDialog } from "../dialogs/NewFileDialog";
 import { fakeFileDisk } from "../fixtures/file-disk";
 import { useAppShortcuts } from "../lib/app-shortcuts";
@@ -473,6 +473,33 @@ it("starts with a folder tree and keeps it beside file tabs without browser cont
   fireEvent.click(screen.getByRole("button", { name: "File actions" }));
   expect(await screen.findByRole("menuitem", { name: "Refresh" })).toBeTruthy();
   expect(screen.getByRole("menuitem", { name: "Copy path" })).toBeTruthy();
+});
+
+it("shows a file a reply links outside the folder read-only, under its own folder, without touching the tree", async () => {
+  const linked = "/tmp/vault/signin.log";
+  const outside: FileRead = {
+    kind: "file",
+    root: "/private/tmp/vault",
+    path: FolderPath.parse("signin.log"),
+    outside: true,
+    absolutePath: "/private/tmp/vault/signin.log",
+    version: FileVersion.parse("a".repeat(64)),
+    text: "signed in\n",
+    readOnly: "This file is outside this conversation's folder.",
+  };
+  const answer = vi.mocked(core.call).getMockImplementation();
+  vi.mocked(core.call).mockImplementation(async (method, params) => (method === "files.read" && (params as RpcParams<"files.read">).path === linked ? outside : answer?.(method, params)) as never);
+  useLayout.setState({ panelOpen: true });
+  render(<Window />);
+  act(() => useLayout.getState().openFile({ path: linked, scope }));
+  const shown = await editor();
+  expect([shown.value, shown.readOnly]).toEqual(["signed in\n", true]);
+  const crumbs = screen.getByRole("navigation", { name: "File path" });
+  expect(crumbs.textContent).toBe("vaultsignin.log");
+  expect(within(crumbs).queryByRole("button")).toBeNull();
+  expect(screen.getByText("Read-only")).toBeTruthy();
+  await screen.findByRole("treeitem", { name: "src" });
+  expect(Object.values(useFileExplorer.getState().folders).flat()).not.toContainEqual(expect.stringContaining("tmp"));
 });
 
 it("offers a code file's views in its menu, not on screen, and explains it once one is chosen", async () => {

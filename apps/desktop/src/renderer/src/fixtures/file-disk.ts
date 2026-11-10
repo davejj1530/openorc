@@ -15,8 +15,8 @@ export function fakeFileDisk() {
   const read = (path: string): FileRead => {
     const local = FolderPath.parse(path.replace(/^\/repo\//, ""));
     const file = files.get(local);
-    if (!file) return { kind: "missing", root: "/repo", path: local };
-    return { kind: "file", root: "/repo", path: local, absolutePath: `/repo/${local}`, version: file.version, text: file.text, readOnly: file.readOnly ?? null };
+    if (!file) return { kind: "missing", root: "/repo", path: local, outside: false };
+    return { kind: "file", root: "/repo", path: local, outside: false, absolutePath: `/repo/${local}`, version: file.version, text: file.text, readOnly: file.readOnly ?? null };
   };
   return {
     files,

@@ -6,6 +6,7 @@ import { listEvents, runs, threads } from "@openorc/db";
 import { CodexAdapter, RunHandle } from "@openorc/agents";
 import { defaultOrclingLook, type CorePush, type OrclingDraft } from "@openorc/protocol";
 import { createOrclingHost } from "../mcp-host/orcling.js";
+import { guardContext } from "../remote/policy.js";
 import { OpenOrc } from "../openorc.js";
 import { dueWakes, lastDue, wakePrompt } from "./orcling-wakes.js";
 
@@ -132,6 +133,9 @@ it("hears the person's reactions once, ahead of its next message, and reacts to 
       runs: core.runs,
       threads: core.threads,
       settings: core.settings,
+      planLimits: async () => [],
+      guard: guardContext(core.db, root!),
+      call: (method, params) => core.handle({ type: "rpc", id: 0, method, params }).then((reply) => (reply.type === "rpc.result" ? reply.result : Promise.reject(new Error(reply.message)))),
       send: async () => {
         throw new Error("Not sent in this test.");
       },

@@ -313,6 +313,11 @@ void test("an Orcling's own conversation has its own tools instead of the genera
     orclings: answer,
     message: answer,
     startGroup: answer,
+    activity: answer,
+    models: answer,
+    usage: answer,
+    appMethods: answer,
+    app: answer,
   };
   const general = [
     "memory_search",
@@ -343,6 +348,49 @@ void test("an Orcling's own conversation has its own tools instead of the genera
   );
   // A tapback lands on the person's message in the Orcling's own chat; elsewhere there is no chat to react in.
   assert.ok(!elsewhere.includes("orcling_react"));
+});
+
+void test("an Orcling starts work on the agent and model it names, or as itself, and names nothing else when it works as itself", async (t) => {
+  const { host, connect } = await fixture(t);
+  const started: unknown[] = [];
+  const answer = async () => "";
+  host.orcling = {
+    available: () => true,
+    ownConversation: () => true,
+    updateInstructions: answer,
+    remember: answer,
+    recall: answer,
+    history: answer,
+    projects: answer,
+    project: answer,
+    readThread: answer,
+    createTask: answer,
+    startWork: async (_runId, input) => {
+      started.push(input);
+      return "started";
+    },
+    sendThread: answer,
+    react: answer,
+    orclings: answer,
+    message: answer,
+    startGroup: answer,
+    activity: answer,
+    models: answer,
+    usage: answer,
+    appMethods: answer,
+    app: answer,
+  };
+  const client = await connect("home-run");
+  const start = (args: Record<string, unknown>) => client.callTool({ name: "orcling_thread_start", arguments: { project_id: "p1", prompt: "Fix it", ...args } });
+  await start({ model: "opus 5.5", effort: "extra high", claude_account: "Work", access: "autonomous", report_back: true });
+  await start({});
+  await start({ yourself: true });
+  assert.equal((await start({ yourself: true, model: "gpt-6" })).isError, true);
+  assert.deepEqual(started, [
+    { projectId: "p1", prompt: "Fix it", worker: { kind: "agent", model: "opus 5.5", effort: "extra high", claudeAccount: "Work" }, access: "autonomous", reportBack: true },
+    { projectId: "p1", prompt: "Fix it", worker: { kind: "agent" }, reportBack: false },
+    { projectId: "p1", prompt: "Fix it", worker: { kind: "self" }, reportBack: false },
+  ]);
 });
 
 void test("approval decisions preserve denial, answers and edited tool input across the MCP interface", async (t) => {

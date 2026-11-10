@@ -1,4 +1,4 @@
-import { redact, redactValue } from "@openorc/db";
+import { orclings, redact, redactValue, retiredTeams, tasks, threads, type Db } from "@openorc/db";
 import {
   isRemoteMethod,
   phoneEvents,
@@ -31,6 +31,22 @@ export interface GuardContext {
   task(id: string): { spec: string | null } | null;
   /** An Orcling's current instructions as stored, read synchronously; null when there is no such Orcling. */
   orcling(id: string): { instructions: string | null } | null;
+}
+
+/** The guards' view of the ledger: a phone's session and an Orcling acting for the person read the same rows. */
+export function guardContext(db: Db, dataDir: string): GuardContext {
+  return {
+    attachmentsDir: path.join(dataDir, "attachments"),
+    thread: (id) => {
+      const thread = threads.get(db, id);
+      return thread ? { team: retiredTeams.isHidden(db, id), parentRelation: thread.parentRelation } : null;
+    },
+    task: (id) => {
+      const task = tasks.get(db, id);
+      return task ? { spec: task.spec } : null;
+    },
+    orcling: (id) => (orclings.get(db, id) ? { instructions: orclings.instructions(db, id)[0]?.body ?? null } : null),
+  };
 }
 
 /** Null admits; a string refuses with that message. Guards see params already parsed by the method's schema. */

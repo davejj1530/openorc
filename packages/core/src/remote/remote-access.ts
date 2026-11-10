@@ -1,4 +1,4 @@
-import { orclings, projects, refusedMoves, remoteDevices, remotePushTargets, retiredTeams, settings, tasks, threads, type Db, type LedgerWriter, type RemoteDeviceRecord } from "@openorc/db";
+import { projects, refusedMoves, remoteDevices, remotePushTargets, settings, type Db, type LedgerWriter, type RemoteDeviceRecord } from "@openorc/db";
 import {
   acceptLink,
   encodePairingUrl,
@@ -32,7 +32,6 @@ import {
   type Route,
 } from "@openorc/protocol";
 import os from "node:os";
-import path from "node:path";
 import { taskBoard } from "../handlers/brain-sync.js";
 import type { ProtectedSecretStore } from "../services/extraction-credentials.js";
 import { PREVIEW_THREAD_GONE, previewThreadLive } from "../services/preview.js";
@@ -43,7 +42,7 @@ import { removedBrains } from "./removed-brains.js";
 import { listen, type Listener } from "./listener.js";
 import { PairingOffers } from "./offers.js";
 import { remoteError, type MacRoots } from "./phone-words.js";
-import { remotePush } from "./policy.js";
+import { guardContext, remotePush } from "./policy.js";
 import { PreviewCasters } from "./preview-casters.js";
 import { PushKeys } from "./push/keys.js";
 import { PushSender } from "./push/sender.js";
@@ -402,18 +401,7 @@ export class RemoteAccess {
     const role = accepted.value.id;
     const session = new RemoteSession(accepted.value.id, accepted.session, {
       answer,
-      guard: {
-        attachmentsDir: path.join(dataDir, "attachments"),
-        thread: (id) => {
-          const thread = threads.get(db, id);
-          return thread ? { team: retiredTeams.isHidden(db, id), parentRelation: thread.parentRelation } : null;
-        },
-        task: (id) => {
-          const task = tasks.get(db, id);
-          return task ? { spec: task.spec } : null;
-        },
-        orcling: (id) => (orclings.get(db, id) ? { instructions: orclings.instructions(db, id)[0]?.body ?? null } : null),
-      },
+      guard: guardContext(db, dataDir),
       roots: () => this.macRoots(),
       readAsset: (ref) => readRemoteAsset(ref, { dataDir, db, ledger }),
       device: (deviceId, method, params) => this.device(deviceId, method, params),

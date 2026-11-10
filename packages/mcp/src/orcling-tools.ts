@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { AgentKind, ExecutionMode } from "@openorc/protocol";
 
 export interface OrclingMemoryEntry {
   type: string;
@@ -8,11 +9,31 @@ export interface OrclingMemoryEntry {
   topicKey?: string;
 }
 
+/** Who does work an Orcling starts: the Orcling itself on its own model, or an agent picked the way the person picks one. */
+export type OrclingWorker = { kind: "self" } | { kind: "agent"; agent?: AgentKind; model?: string; effort?: string; fast?: boolean; claudeAccount?: string };
+
+export interface OrclingStartInput {
+  /** Where it starts: a project, or under a thread, whose project it is then. */
+  projectId?: string;
+  under?: string;
+  prompt: string;
+  taskId?: string;
+  title?: string;
+  worker: OrclingWorker;
+  /** How freely the work runs; without it, as freely as the conversation that asked. */
+  access?: ExecutionMode;
+  /** A new thread's own worktree and branch, or the project's checkout; without it, the person's default. */
+  worktree?: boolean;
+  /** The Orcling hears once when the thread's turn ends. */
+  reportBack: boolean;
+}
+
 /**
  * What an Orcling can do wherever it works: keep its own instructions and
- * memory, search what it said before, and find the user's projects to read
- * their memory, tasks and threads or hand them work. Each call answers in
- * text the model reads directly.
+ * memory, search what it said before, and act in OpenOrc for the person:
+ * see what runs and what is left of their plans, start work on the agent
+ * and model they want, and follow it up. Each call answers in text the
+ * model reads directly.
  */
 export interface OrclingTools {
   /** Whether the run speaks as an Orcling. */
@@ -27,8 +48,18 @@ export interface OrclingTools {
   project(runId: string, projectId: string, query: string | undefined): Promise<string>;
   readThread(runId: string, threadId: string, limit: number): Promise<string>;
   createTask(runId: string, input: { projectId: string; title: string; spec: string }): Promise<string>;
-  startWork(runId: string, input: { projectId: string; prompt: string; taskId?: string; title?: string }): Promise<string>;
-  sendThread(runId: string, input: { threadId: string; text: string; requestKey?: string }): Promise<string>;
+  startWork(runId: string, input: OrclingStartInput): Promise<string>;
+  sendThread(runId: string, input: { threadId: string; text: string; requestKey?: string; reportBack: boolean }): Promise<string>;
+  /** Threads working, waiting on the person, failed or unread, across every project. */
+  activity(runId: string): Promise<string>;
+  /** The agents the person has turned on, their models and efforts, the default for new threads, and Claude accounts. */
+  models(runId: string, agent: AgentKind | undefined, search?: string): Promise<string>;
+  /** What is left of each plan the person has, per account and usage window. */
+  usage(runId: string): Promise<string>;
+  /** What else the Orcling can do in OpenOrc for the person; with a method, that method's parameters. */
+  appMethods(runId: string, method: string | undefined): Promise<string>;
+  /** One thing the person could do in OpenOrc, done for them. */
+  app(runId: string, method: string, params: unknown): Promise<string>;
   /** The person's other Orclings and the group chats this one is in. */
   orclings(runId: string): Promise<string>;
   /** A direct message to another Orcling, which lands in its own chat as this Orcling's. */
@@ -51,6 +82,11 @@ export const orclingToolNames = [
   "orcling_task_create",
   "orcling_thread_start",
   "orcling_thread_send",
+  "orcling_activity",
+  "orcling_models",
+  "orcling_usage",
+  "orcling_app_methods",
+  "orcling_app",
   "orcling_react",
   "orcling_orclings",
   "orcling_message",
@@ -113,7 +149,8 @@ export function registerOrclingTools(mcp: McpServer, tools: OrclingTools, runId:
   mcp.registerTool(
     "orcling_project",
     {
-      description: "One project at a glance: open tasks, recent threads with their last reply, and its memory. With a query, the project's memory is searched for it instead.",
+      description:
+        "One project at a glance: open tasks, recent threads with their status (working, needs the person, failed, unread) and when each was last active, and the project's memory. With a query, the project's memory is searched for it instead.",
       inputSchema: { project_id: z.string().min(1), query: z.string().min(1).optional() },
     },
     async ({ project_id, query }) => text(await tools.project(runId, project_id, query)),
@@ -132,29 +169,139 @@ export function registerOrclingTools(mcp: McpServer, tools: OrclingTools, runId:
     },
     async ({ project_id, title, spec }) => text(await tools.createTask(runId, { projectId: project_id, title, spec })),
   );
+  registerOrclingWork(mcp, tools, runId);
+  registerOrclingOverview(mcp, tools, runId);
+}
+
+/** Handing out work for the person and steering it: a new thread or task, or a message to one already going. */
+function registerOrclingWork(mcp: McpServer, tools: OrclingTools, runId: string): void {
   mcp.registerTool(
     "orcling_thread_start",
     {
       description:
-        "Start work in one of the person's projects: a new thread there where you do the work yourself, on your own model. The prompt says what to do; with a task_id you take up that saved task (orcling_project lists them). Use it when the person asks you to start or do work in a project, then tell them where it runs. Depending on your permission, the person may be asked first.",
+        'Start work in one of the person\'s projects, as the person would start a thread. It runs on their usual agent and model unless you name others: agent, model and effort take loose names such as "opus 5.5" or "extra high" (orcling_models lists them), fast turns on Fast mode, and claude_account picks the Claude account by name. access sets how freely it works: plan, review (asks before every command or edit), trusted (edits files, asks before commands) or autonomous (runs tools without asking); without it, it works as freely as this conversation, and your own permission caps it either way. Set yourself to do the work as yourself, on your own model, instead. With a task_id it takes up that saved task (orcling_project lists them). With under, it starts as a subthread of that thread, in its folder, and project_id can be left out. worktree: true gives a new thread its own worktree and branch, false puts it on the project checkout; without it, the default the person chose. Set report_back to hear once when its turn ends, so you can follow up or tell the person. Use it when the person asks for work in a project, then tell them where it runs and on what. Depending on your permission, the person may be asked first.',
       inputSchema: {
-        project_id: z.string().min(1),
+        project_id: z.string().min(1).optional(),
+        under: z.string().min(1).optional(),
         prompt: z.string().trim().min(1).max(20_000),
         task_id: z.string().min(1).optional(),
         title: z.string().trim().min(1).max(120).optional(),
+        agent: AgentKind.optional(),
+        model: z.string().trim().min(1).max(120).optional(),
+        effort: z.string().trim().min(1).max(40).optional(),
+        fast: z.boolean().optional(),
+        claude_account: z.string().trim().min(1).max(80).optional(),
+        yourself: z.boolean().optional(),
+        access: ExecutionMode.optional(),
+        worktree: z.boolean().optional(),
+        report_back: z.boolean().optional(),
       },
     },
-    async ({ project_id, prompt, task_id, title }) => text(await tools.startWork(runId, { projectId: project_id, prompt, ...(task_id ? { taskId: task_id } : {}), ...(title ? { title } : {}) })),
+    async (input) =>
+      text(
+        await tools.startWork(runId, {
+          ...(input.project_id ? { projectId: input.project_id } : {}),
+          ...(input.under ? { under: input.under } : {}),
+          prompt: input.prompt,
+          ...(input.task_id ? { taskId: input.task_id } : {}),
+          ...(input.title ? { title: input.title } : {}),
+          worker: workerOf(input),
+          ...(input.access ? { access: input.access } : {}),
+          ...(input.worktree === undefined ? {} : { worktree: input.worktree }),
+          reportBack: input.report_back ?? false,
+        }),
+      ),
   );
   mcp.registerTool(
     "orcling_thread_send",
     {
       description:
-        "Send a short message to a thread in any project, to hand it work or ask what it knows. If its agent is working, the message joins the current turn; otherwise it starts one. A thread in a more permissive mode than yours acts with its own permissions, so the user is asked first. Pass the same request_key when retrying. After 50 agent messages in a row with no one writing, sending stops until a person writes.",
-      inputSchema: { thread_id: z.string().min(1), text: z.string().min(1).max(4000), request_key: z.string().min(1).max(200).optional() },
+        "Send a short message to a thread in any project, to hand it work, steer it or ask what it knows. If its agent is working, the message joins the current turn; otherwise it starts one. Set report_back to hear once when that turn ends. A thread in a more permissive mode than yours acts with its own permissions, so the user is asked first. Pass the same request_key when retrying. After 50 agent messages in a row with no one writing, sending stops until a person writes.",
+      inputSchema: { thread_id: z.string().min(1), text: z.string().min(1).max(4000), request_key: z.string().min(1).max(200).optional(), report_back: z.boolean().optional() },
     },
-    async ({ thread_id, text: message, request_key }) => text(await tools.sendThread(runId, { threadId: thread_id, text: message, ...(request_key ? { requestKey: request_key } : {}) })),
+    async ({ thread_id, text: message, request_key, report_back }) =>
+      text(await tools.sendThread(runId, { threadId: thread_id, text: message, ...(request_key ? { requestKey: request_key } : {}), reportBack: report_back ?? false })),
   );
+}
+
+/** The person's OpenOrc as they would see it: what runs right now, what work can run on, and what is left of their plans. */
+function registerOrclingOverview(mcp: McpServer, tools: OrclingTools, runId: string): void {
+  mcp.registerTool(
+    "orcling_activity",
+    {
+      description:
+        "What is happening right now across all of the person's projects: threads working, waiting on the person and for what, failed, or finished with a reply they haven't read, each with its project, agent, model and exact times. Check it before saying what is running.",
+      inputSchema: {},
+    },
+    async () => text(await tools.activity(runId)),
+  );
+  mcp.registerTool(
+    "orcling_models",
+    {
+      description:
+        "The agents the person has turned on and their models with effort levels, the agent new threads start on and why, and the person's Claude accounts. An agent with many models lists the ones that matter to the person (last used, used lately, its default) and a count per provider; search finds any model by name or provider, older ones too. Use it to choose what work runs on.",
+      inputSchema: { agent: AgentKind.optional(), search: z.string().trim().min(1).max(80).optional() },
+    },
+    async ({ agent, search }) => text(await tools.models(runId, agent, search)),
+  );
+  mcp.registerTool(
+    "orcling_usage",
+    {
+      description:
+        "How much the person has left on each plan: every provider and account, with each usage window's percent used and when it resets. Check it before starting large work, or to pick an account or agent with room.",
+      inputSchema: {},
+    },
+    async () => text(await tools.usage(runId)),
+  );
+  mcp.registerTool(
+    "orcling_app_methods",
+    {
+      description:
+        "Everything else you can do in OpenOrc for the person, as their phone would: read and organize threads, answer approvals, commit, push and open pull requests, review pull requests and post the review, read, edit and comment on tasks, look after Orclings, move threads to the cloud. Without a method, the list of what reads and what changes; with one, its parameters.",
+      inputSchema: { method: z.string().trim().min(1).max(80).optional() },
+    },
+    async ({ method }) => text(await tools.appMethods(runId, method)),
+  );
+  mcp.registerTool(
+    "orcling_app",
+    {
+      description:
+        "Do one thing in OpenOrc the person could do themselves, by method and parameters from orcling_app_methods; it answers as OpenOrc answers them. Reads never ask. A change follows your permission: it may ask the person first, and in Plan it is refused. Prefer your own tools where one fits, such as orcling_thread_start.",
+      inputSchema: { method: z.string().trim().min(1).max(80), params: z.record(z.string(), z.unknown()).optional() },
+    },
+    async ({ method, params }) => text(await tools.app(runId, method, params ?? {})),
+  );
+}
+
+/** Who the call asks to do the work. Yourself is the Orcling on its own model, so it names no other. */
+function workerOf({
+  yourself,
+  agent,
+  model,
+  effort,
+  fast,
+  claude_account,
+}: {
+  yourself?: boolean;
+  agent?: AgentKind;
+  model?: string;
+  effort?: string;
+  fast?: boolean;
+  claude_account?: string;
+}): OrclingWorker {
+  if (yourself) {
+    const named = Object.entries({ agent, model, effort, fast, claude_account }).flatMap(([key, value]) => (value === undefined ? [] : [key]));
+    if (named.length) throw new Error(`yourself works on your own model, so it takes no ${named.join(" or ")}. Leave yourself out to start it on another.`);
+    return { kind: "self" };
+  }
+  return {
+    kind: "agent",
+    ...(agent && { agent }),
+    ...(model && { model }),
+    ...(effort && { effort }),
+    ...(fast !== undefined && { fast }),
+    ...(claude_account && { claudeAccount: claude_account }),
+  };
 }
 
 /** Talking to the person's other Orclings: who they are, a direct message, a group chat. */

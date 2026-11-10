@@ -70,6 +70,7 @@ import { RemoteAccess } from "./remote/remote-access.js";
 import { rememberRemovedBrain } from "./remote/removed-brains.js";
 import { MOVING_WORDS } from "./services/cloud-brain-move.js";
 import { requestOrigin, type RequestOrigin } from "./request-origin.js";
+import { guardContext } from "./remote/policy.js";
 import { forgetKeptSessions } from "./services/agent-sessions.js";
 import type { OpenCodeCloudKeys } from "./services/cloud-opencode.js";
 import { AgentUpdateService } from "./services/agent-updates.js";
@@ -583,6 +584,9 @@ export class OpenOrc {
           threads: this.threads,
           settings: this.settings,
           send: threadsHost.threads.send,
+          planLimits: () => this.planLimits(),
+          guard: guardContext(this.db, this.options.dataDir),
+          call: (method, params) => this.callAsPerson(method, params),
           invalidate: (keys) => this.options.transport.push({ type: "invalidate", keys }),
         }),
         pullReview: this.pullRequests.agentTools(),
@@ -677,6 +681,22 @@ export class OpenOrc {
     return this.options.cloudOnly ? withCloudCodexLogin(info, await this.codexCloudLogin.has()) : info;
   }
 
+  /** One call into the core as the Mac's own windows make it, for an Orcling acting for the person. */
+  private async callAsPerson(method: string, params: unknown): Promise<unknown> {
+    const reply = await this.handle({ type: "rpc", id: 0, method, params });
+    if (reply.type === "rpc.error") throw new Error(reply.message);
+    return reply.result;
+  }
+
+  /** What is left of each plan the person has, as the sidebar, the phone and their Orclings read it. */
+  private planLimits() {
+    return readPlanLimits({
+      db: this.db,
+      usage: this.providerUsage,
+      availability: async () => harnessAvailability(await this.claudeSystemInfo()).filter((row) => this.settings.enabledHarnesses().includes(row.id)),
+    });
+  }
+
   private buildHandlers(invalidate: (keys: string[]) => void): Handlers {
     return composeHandlers(
       createSlackHandlers({ slack: this.slack, invalidate }),
@@ -699,12 +719,7 @@ export class OpenOrc {
         enabledHarnesses: () => this.settings.enabledHarnesses(),
         agentUpdates: this.agentUpdates,
         providerUsage: this.providerUsage,
-        planLimits: () =>
-          readPlanLimits({
-            db: this.db,
-            usage: this.providerUsage,
-            availability: async () => harnessAvailability(await this.claudeSystemInfo()).filter((row) => this.settings.enabledHarnesses().includes(row.id)),
-          }),
+        planLimits: () => this.planLimits(),
         invalidate,
       }),
       createProjectsHandlers({ db: this.db, projectService: this.projects, invalidate, transport: this.options.transport, copies: this.options.cloudOnly ?? false }),

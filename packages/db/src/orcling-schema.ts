@@ -101,3 +101,12 @@ CREATE TABLE orcling_messages (
 );
 CREATE INDEX orcling_messages_thread ON orcling_messages(thread_id, created_at);
 `;
+
+/** A thread an Orcling asked to hear back from: it is told once, when the thread's turn ends. */
+export const orclingFollowupMigration = `
+CREATE TABLE orcling_followups (
+ thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE,
+ orcling_id TEXT NOT NULL REFERENCES orclings(id) ON DELETE CASCADE,
+ created_at INTEGER NOT NULL
+);
+`;

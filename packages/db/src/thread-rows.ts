@@ -39,6 +39,7 @@ export const HOST_TABLES: Record<string, string> = {
   orcling_groups: "a group chat of Orclings is refused, as their own conversations are",
   orcling_group_members: "as orcling_groups",
   orcling_messages: "messages between Orclings live in their own conversations and groups, which are refused",
+  orcling_followups: "the Orcling waiting to hear back stays on its host, wherever the thread goes",
   schedules: "a schedule stays with the host that runs it",
   schedule_firings: "as schedules",
   pull_request_reviews: "a review stays with the Mac's pull request copy",

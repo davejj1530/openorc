@@ -273,3 +273,18 @@ export const orclingMessages = {
     return rows.map((row) => ({ messageId: row.message_id, fromOrclingId: row.from_orcling_id, toOrclingId: row.to_orcling_id }));
   },
 };
+
+/** Threads an Orcling asked to hear back from, once, when their turn ends. A thread waits on one Orcling: the latest to ask. */
+export const orclingFollowups = {
+  arm(db: Db, threadId: string, orclingId: string, now = Date.now()): void {
+    db.stmt("INSERT OR REPLACE INTO orcling_followups (thread_id, orcling_id, created_at) VALUES (?, ?, ?)").run(threadId, orclingId, now);
+  },
+  /** The Orcling waiting on the thread, which stops waiting. */
+  take(db: Db, threadId: string): string | null {
+    const row = db.stmt("DELETE FROM orcling_followups WHERE thread_id = ? RETURNING orcling_id").get(threadId) as { orcling_id: string } | undefined;
+    return row?.orcling_id ?? null;
+  },
+  waiting(db: Db, threadId: string): string | null {
+    return (db.stmt("SELECT orcling_id FROM orcling_followups WHERE thread_id = ?").get(threadId) as { orcling_id: string } | undefined)?.orcling_id ?? null;
+  },
+};

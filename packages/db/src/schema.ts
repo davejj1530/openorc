@@ -20,7 +20,7 @@ import { taskExecutionMigration } from "./task-execution-schema.js";
 import { conversationReviewCommentsMigration, reviewCommentRangeMigration } from "./review-comments-schema.js";
 import { teamCancellationMigration } from "./team-cancellation-schema.js";
 import { pullRequestReviewMigration } from "./pull-review-schema.js";
-import { orclingAccountMigration, orclingCompanionMigration, orclingMigration, orclingTalkMigration } from "./orcling-schema.js";
+import { orclingAccountMigration, orclingCompanionMigration, orclingFollowupMigration, orclingMigration, orclingTalkMigration } from "./orcling-schema.js";
 import { remoteDeviceMigration } from "./remote-device-schema.js";
 import { remotePushTargetMigration } from "./remote-push-target-schema.js";
 import { cloudWorkspaceMigration, cloudWorkspaceMirrorHeadMigration, cloudWorkspaceRemovedMigration } from "./cloud-workspace-schema.js";
@@ -796,4 +796,5 @@ export const migrations: Migration[] = [
   /** A project's steps by day, for the new thread screen, read from this index alone rather than from every event. */
   `CREATE INDEX events_steps ON events(run_id, ts) WHERE kind = 'tool.completed';`,
   orclingTalkMigration,
+  orclingFollowupMigration,
 ];

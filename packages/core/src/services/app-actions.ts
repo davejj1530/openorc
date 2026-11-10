@@ -4,7 +4,7 @@ import type { ExecutionMode } from "@openorc/protocol";
  * OpenOrc's own tools that act beyond the conversation. Reading, searching, questions, and saving task documents
  * and plans are not actions: they change nothing outside OpenOrc's own records, so every mode allows them.
  */
-export type AppAction = "browser_input" | "secret_input" | "memory_write" | "thread_message" | "orcling_instructions" | "work_start" | "device_control";
+export type AppAction = "browser_input" | "secret_input" | "memory_write" | "thread_message" | "orcling_instructions" | "work_start" | "device_control" | "person_action";
 export type AppActionDecision = "allow" | "ask" | "block";
 
 const permissiveness: Record<ExecutionMode, number> = { plan: 0, review: 1, trusted: 2, autonomous: 3 };
@@ -16,25 +16,29 @@ const permissiveness: Record<ExecutionMode, number> = { plan: 0, review: 1, trus
  * it would do what the sender's mode does not allow. An Orcling rewriting its own instructions changes only how it
  * works with the user, so even Plan may ask for it. Starting work in a project sets an agent working there, so only
  * Autonomous starts it without asking. Opening or closing a simulator acts only on the user's own test devices, so
- * every mode but Plan allows it.
+ * every mode but Plan allows it. An Orcling changing anything in OpenOrc for the person, as they would themselves,
+ * goes ahead only in Autonomous.
  */
 export function appActionPolicy(action: AppAction, mode: ExecutionMode, receiver?: ExecutionMode): AppActionDecision {
   if (action === "thread_message" && (!receiver || permissiveness[receiver] <= permissiveness[mode])) return "allow";
   if (mode === "plan") return action === "orcling_instructions" ? "ask" : "block";
-  switch (action) {
-    case "secret_input":
-      return "ask";
-    case "memory_write":
-    case "orcling_instructions":
-      return mode === "review" ? "ask" : "allow";
-    case "device_control":
-      return "allow";
-    case "browser_input":
-    case "thread_message":
-    case "work_start":
-      return mode === "autonomous" ? "allow" : "ask";
-  }
+  return ACTING[action](mode);
 }
+
+const onlyAutonomous = (mode: ExecutionMode): AppActionDecision => (mode === "autonomous" ? "allow" : "ask");
+const askInReview = (mode: ExecutionMode): AppActionDecision => (mode === "review" ? "ask" : "allow");
+
+/** Each action's rule outside Plan. */
+const ACTING: Record<AppAction, (mode: ExecutionMode) => AppActionDecision> = {
+  secret_input: () => "ask",
+  memory_write: askInReview,
+  orcling_instructions: askInReview,
+  device_control: () => "allow",
+  browser_input: onlyAutonomous,
+  thread_message: onlyAutonomous,
+  work_start: onlyAutonomous,
+  person_action: onlyAutonomous,
+};
 
 export const blockedInPlan: Record<AppAction, string> = {
   browser_input: "Clicking, typing and pressing keys in the Preview are blocked in Plan mode. Describe the steps in the plan instead.",
@@ -44,4 +48,5 @@ export const blockedInPlan: Record<AppAction, string> = {
   orcling_instructions: "Rewriting your instructions needs the user's approval in Plan mode.",
   work_start: "Starting work in a project is blocked in Plan mode. Save it as a task with orcling_task_create instead.",
   device_control: "Opening and closing devices is blocked in Plan mode. Use list and screenshot, and put the steps in the plan.",
+  person_action: "Changing things in OpenOrc for the person is blocked in Plan mode. Tell them what you would change instead.",
 };

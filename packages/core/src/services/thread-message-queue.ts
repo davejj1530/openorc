@@ -1,4 +1,4 @@
-import { audit, redact, threadQueue, threads, type Db } from "@openorc/db";
+import { audit, orclings, redact, threadQueue, threads, type Db } from "@openorc/db";
 import type { QueuedMessage, Run, Thread, ThreadMessage } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import type { Logger } from "../transport.js";
@@ -218,10 +218,20 @@ export class ThreadMessageQueue {
   ): Promise<void> {
     const thread = this.thread(id);
     if (thread.archivedAt) throw new Error("the thread is resolved");
-    const body = from ? `Message from the thread "${from.title}" (id ${from.id}):\n\n${text}` : text;
+    const body = from ? `${sender(this.db, from)}:\n\n${text}` : text;
     await this.deliver(thread, body, "system", [], { recordPrompt: record, unprompted, ...(messageId ? { messageId } : {}) });
     audit.record(this.db, { actor: messageActor(from, unprompted), action: "thread.message", resourceType: "thread", resourceId: id, metadata: { from: from?.id ?? null } });
   }
+}
+
+/**
+ * Who a message comes from, as its reader is told. An Orcling writes from its own chat, which no thread can message,
+ * so its reader answers in its own thread, where the Orcling reads it.
+ */
+function sender(db: Db, from: Thread): string {
+  const orcling = orclings.forThread(db, from.id);
+  if (orcling) return `Message from ${orcling.name}, the person's Orcling. It reads your replies in this thread and can't be messaged back, so answer here`;
+  return `Message from the thread "${from.title}" (id ${from.id})`;
 }
 
 function messageActor(from: Thread | null, unprompted: boolean): "openorc" | "agent" | "user" {

@@ -122,7 +122,7 @@ export interface OrclingRunHooks {
   /** What an Orcling's own conversation tells it ahead of the next message it reads there, such as reactions since; empty elsewhere. Heard once. */
   turnNote(threadId: string): string;
   /** Any thread's turn ended, said or quiet; a group chat lets the next Orcling speak. */
-  turnEnded?(thread: Thread, run: Run, reply: string | null): void;
+  turnEnded?(thread: Thread, run: Run, reply: string | null, status: CompletedTurn["status"]): void;
 }
 
 export interface LiveRun {

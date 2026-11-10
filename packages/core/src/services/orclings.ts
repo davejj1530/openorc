@@ -1,4 +1,4 @@
-import { audit, claudeAccounts, messageReactions, orclingGroups, orclings, retiredTeams, runs as runRepo, tasks, threads, type Db, type ReactionTarget } from "@openorc/db";
+import { audit, claudeAccounts, messageReactions, orclingFollowups, orclingGroups, orclings, projects, retiredTeams, runs as runRepo, tasks, threads, type Db, type ReactionTarget } from "@openorc/db";
 import {
   isHarnessId,
   orclingExecution,
@@ -24,6 +24,8 @@ import { catchUp, orclingBrief, rolloverSeed, type OrclingPlace } from "./orclin
 import { OrclingFolders } from "./orcling-folders.js";
 import { messageInThread, reactionNote } from "./orcling-reactions.js";
 import { OrclingTalk } from "./orcling-talk.js";
+import { followupNote, type WorkSettings } from "./orcling-work.js";
+import { startingAccount } from "./project-claude-accounts.js";
 import type { Logger } from "../transport.js";
 import type { OrclingRunHooks, StartRunInput } from "./run-types.js";
 import type { RunService } from "./runs.js";
@@ -49,9 +51,46 @@ interface Dependencies {
   memory: Pick<MemoryService, "orclingBrief" | "listOrcling" | "remove">;
   /** Resolved when used: the run and thread services start after this one, because they launch with its hooks. */
   runs: () => Pick<RunService, "liveRunForThread" | "closeAndWait" | "threadContext" | "threadActivity" | "start" | "send" | "agentChain" | "noteAgentMessage">;
-  threads: () => Pick<ThreadService, "delete" | "start" | "update" | "taskThreadForStart" | "startTaskInThread" | "send">;
+  threads: () => Pick<ThreadService, "delete" | "start" | "startUnder" | "update" | "taskThreadForStart" | "startTaskInThread" | "send">;
   invalidate: (keys: string[]) => void;
   log: Logger;
+}
+
+/** How an Orcling's work starts: on the settings chosen for the person rather than its own, and whether it hears back. */
+export interface StartOptions {
+  on?: WorkSettings;
+  followUp?: boolean;
+  /** The thread it starts under, in that thread's folder and project. */
+  under?: string;
+}
+
+/** Who works on what an Orcling starts: itself, on its own settings and account, or the agent and account chosen. */
+function workerFor(orcling: Orcling, on: WorkSettings | undefined) {
+  if (!on) {
+    const { agent, model, effort, fastMode } = orcling.settings;
+    // An Orcling works on its own account, in a project that uses only some accounts too.
+    return {
+      orclingId: orcling.id,
+      settings: { agent, model, effort: effort ?? undefined, fastMode },
+      account: { claudeAccountId: orcling.claudeAccountId ?? undefined, claudeAccountFrom: "own" as const },
+    };
+  }
+  const { agent, model, effort, fastMode, claudeAccountId } = on;
+  return { orclingId: null, settings: { agent, model, effort, fastMode }, account: { claudeAccountId, claudeAccountFrom: "chosen" as const } };
+}
+
+/** A start's settings without where it works, which a thread started under another takes from its parent. */
+function withoutPlace<T extends { projectId: string; workingDirectory?: unknown; workspaceMode?: unknown; baseRef?: unknown; checkout?: unknown; cloud?: unknown; id?: unknown }>(
+  settings: T,
+): Omit<T, "projectId" | "workingDirectory" | "workspaceMode" | "baseRef" | "checkout" | "cloud" | "id"> {
+  const { projectId: _projectId, workingDirectory: _folder, workspaceMode: _mode, baseRef: _base, checkout: _checkout, cloud: _cloud, id: _id, ...rest } = settings;
+  return rest;
+}
+
+/** The account a task's thread starts on: the Orcling's own, or one chosen for the person, which the project must use, as when they choose it. */
+function taskAccount(db: Db, projectId: string, who: ReturnType<typeof workerFor>): string | undefined {
+  const chosen = who.account.claudeAccountId;
+  return who.orclingId || !chosen ? chosen : startingAccount(db, projectId, chosen, "chosen");
 }
 
 /**
@@ -243,50 +282,61 @@ export class OrclingService {
     this.deps.invalidate([`reactions:${target.threadId}`]);
   }
 
-  /** A project conversation the Orcling works in, from its first message. Its own conversation is where you talk to it outside projects. */
-  async startThread(id: string, input: Omit<StartThreadInput, "agent" | "model" | "effort" | "fastMode">) {
+  /**
+   * Work an Orcling starts in a project, as the person would start it: on the settings chosen for them, or with the
+   * Orcling itself working, on its own model. Either way it runs within the Orcling's permission. A follow-up tells the
+   * Orcling once when the thread's turn ends.
+   */
+  async startThread(id: string, input: Omit<StartThreadInput, "agent" | "model" | "effort" | "fastMode">, options: StartOptions = {}) {
     const orcling = this.get(id);
     if (input.projectId === WORKSPACE_ID) throw new Error(`Talk to ${orcling.name} in its own conversation, or start this in a project.`);
     const ceiling = orclingExecution(orcling);
-    const { agent, model, effort, fastMode } = orcling.settings;
-    return this.deps.threads().start(
-      {
-        ...input,
-        // An Orcling works on its own account, in a project that uses only some accounts too.
-        claudeAccountId: orcling.claudeAccountId,
-        claudeAccountFrom: "own",
-        agent,
-        model,
-        effort: effort ?? undefined,
-        fastMode,
-        mode: ceiling.mode === "plan" ? "plan" : input.mode,
-        permissionMode: stricterPermission(input.permissionMode, ceiling.permissionMode),
-      },
-      { assertCanAdmit: () => undefined, onAdmitted: (thread) => threads.update(this.deps.db, thread.id, { orclingId: id }) },
-    );
+    const who = workerFor(orcling, options.on);
+    let admitted: string | null = null;
+    const onAdmitted = (thread: Thread) => {
+      admitted = thread.id;
+      if (who.orclingId) threads.update(this.deps.db, thread.id, { orclingId: who.orclingId });
+      if (options.followUp) orclingFollowups.arm(this.deps.db, thread.id, id);
+    };
+    const settings = {
+      ...input,
+      ...who.account,
+      ...who.settings,
+      mode: ceiling.mode === "plan" ? "plan" : input.mode,
+      permissionMode: stricterPermission(input.permissionMode, ceiling.permissionMode),
+    };
+    const started = options.under
+      ? this.deps.threads().startUnder(options.under, withoutPlace(settings), onAdmitted)
+      : this.deps.threads().start(settings, { assertCanAdmit: () => undefined, onAdmitted });
+    // A start that fails after admission has no turn to hear about.
+    return started.catch((error: unknown) => {
+      if (admitted) orclingFollowups.take(this.deps.db, admitted);
+      throw error;
+    });
   }
 
   /**
-   * An Orcling takes up a saved task in a thread of its own, on its own model and within its permission. A task
-   * that already has a conversation of someone else's stays there.
+   * An Orcling takes up a saved task in a thread of its own, on the settings chosen or itself on its own model, within
+   * its permission. A task that already has a conversation stays there, unless it is this Orcling's own.
    */
-  async startTask(id: string, taskId: string, input: { mode: RunMode; permissionMode: PermissionPreset; prompt: string; promptRole?: "user" | "system" }): Promise<Run> {
+  async startTask(id: string, taskId: string, input: { mode: RunMode; permissionMode: PermissionPreset; prompt: string; promptRole?: "user" | "system" }, options: StartOptions = {}): Promise<Run> {
     const { db } = this.deps;
     const orcling = this.get(id);
     const task = tasks.get(db, taskId);
     if (!task) throw new Error("No such task.");
+    const who = workerFor(orcling, options.on);
     const current = [task.executionThreadId, task.threadId].map((threadId) => (threadId ? threads.get(db, threadId) : null)).find(Boolean);
-    if (current && current.orclingId !== id) throw new Error(`This task already has a conversation, "${current.title}". Message it with orcling_thread_send instead.`);
+    if (current && (!who.orclingId || current.orclingId !== id)) throw new Error(`This task already has a conversation, "${current.title}". Message it with orcling_thread_send instead.`);
     const ceiling = orclingExecution(orcling);
-    const { agent, model, effort, fastMode } = orcling.settings;
-    // On its own account, in a project that uses only some accounts too.
-    const thread = this.deps.threads().taskThreadForStart(taskId, { agent, model, effort }, orcling.claudeAccountId);
-    if (thread.orclingId !== id || thread.claudeAccountId !== orcling.claudeAccountId) threads.update(db, thread.id, { orclingId: id, claudeAccountId: orcling.claudeAccountId });
+    const { agent, model, effort, fastMode } = who.settings;
+    const thread = this.deps.threads().taskThreadForStart(taskId, { agent, model: model ?? null, effort: effort ?? null }, taskAccount(db, task.projectId, who));
+    if (who.orclingId && (thread.orclingId !== id || thread.claudeAccountId !== orcling.claudeAccountId)) threads.update(db, thread.id, { orclingId: id, claudeAccountId: orcling.claudeAccountId });
+    if (options.followUp) orclingFollowups.arm(db, thread.id, id);
     const images = await new AttachmentService(this.deps.dataDir).forTask(task.spec ?? "");
-    return this.deps.threads().startTaskInThread(taskId, undefined, images, {
+    const started = this.deps.threads().startTaskInThread(taskId, undefined, images, {
       agent,
       model,
-      effort: effort ?? undefined,
+      effort,
       fastMode,
       mode: ceiling.mode === "plan" ? "plan" : input.mode,
       permissionMode: stricterPermission(input.permissionMode, ceiling.permissionMode),
@@ -294,6 +344,26 @@ export class OrclingService {
       ...(input.promptRole ? { promptRole: input.promptRole } : {}),
       attachments: undefined,
     });
+    return started.catch((error: unknown) => {
+      if (options.followUp) orclingFollowups.take(db, thread.id);
+      throw error;
+    });
+  }
+
+  /** A thread an Orcling asked to hear back from ended its turn: the Orcling is told once, in its own chat, and stays quiet unless it matters. */
+  private followUp(thread: Thread, status: string, reply: string | null): void {
+    const { db } = this.deps;
+    const orclingId = orclingFollowups.take(db, thread.id);
+    const orcling = orclingId ? orclings.get(db, orclingId) : null;
+    if (!orcling || orcling.threadId === thread.id) return;
+    // A wake-up is an agent message too, so hearing back and steering again stops at the same cap as messages.
+    const runs = this.deps.runs();
+    runs.noteAgentMessage(orcling.threadId, runs.agentChain(thread.id) + 1);
+    const place = projects.get(db, thread.projectId)?.name ?? "a project";
+    this.deps
+      .threads()
+      .send(orcling.threadId, followupNote(thread, place, status, reply), null, { unprompted: true })
+      .catch((error: unknown) => this.deps.log.warn(`${orcling.name} could not hear back from "${thread.title}": ${error instanceof Error ? error.message : String(error)}`));
   }
 
   /** An Orcling answers in a conversation that belongs to another agent, without taking it over. */
@@ -400,7 +470,10 @@ export class OrclingService {
       if (!orclings.forThread(this.deps.db, threadId)) return "";
       return [reactionNote(this.deps.db, threadId), this.talk.takeNote(threadId)].filter(Boolean).join("\n\n");
     },
-    turnEnded: (thread, run, reply) => this.talk.turnEnded(thread, run, reply),
+    turnEnded: (thread, run, reply, status) => {
+      this.talk.turnEnded(thread, run, reply);
+      this.followUp(thread, status, reply);
+    },
   };
 
   private identity(input: StartRunInput): string | null {

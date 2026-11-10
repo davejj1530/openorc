@@ -37,16 +37,22 @@ export interface ThreadStartInput {
   fast?: boolean;
 }
 
-const squash = (text: string) => text.toLowerCase().replace(/[^a-z0-9.]/g, "");
+export const squash = (text: string) => text.toLowerCase().replace(/[^a-z0-9.]/g, "");
 
 /**
  * The model a name stands for: the one whose id or label it is, else the only one whose id or label contains it, so
  * "6.1 sol" finds "GPT-6.1 Sol". A name that fits none or several is answered with the choices rather than a guess.
  */
-export function pickModel(options: ModelOption[], agent: AgentKind, name: string): ModelOption {
+/** The models a loose name can mean: the one whose id or label it is, else every one whose id or label holds it. */
+export function modelsNamed(options: readonly ModelOption[], agent: AgentKind, name: string): { exact: boolean; models: ModelOption[] } {
   const wanted = squash(name).replace(new RegExp(`^${agent}`), "");
   const exact = options.find((option) => squash(option.id) === wanted || squash(option.label) === wanted);
-  const near = exact ? [exact] : options.filter((option) => wanted && (squash(option.id).includes(wanted) || squash(option.label).includes(wanted)));
+  if (exact) return { exact: true, models: [exact] };
+  return { exact: false, models: options.filter((option) => wanted && (squash(option.id).includes(wanted) || squash(option.label).includes(wanted))) };
+}
+
+export function pickModel(options: ModelOption[], agent: AgentKind, name: string): ModelOption {
+  const near = modelsNamed(options, agent, name).models;
   const model = near.length === 1 ? near[0]! : null;
   if (!model) {
     const choices = options.map((option) => `${option.label} (${option.id})`).join(", ") || "none available";
@@ -367,17 +373,24 @@ export class ThreadAgentTools {
   }
 
   /**
-   * A thread a person starts under another, working in its folder. Nothing limits how many or how deep; a thread an
-   * agent starts with thread_start starts none of its own.
+   * A thread a person, or their Orcling, starts under another, working in its folder. Nothing limits how many or how
+   * deep; a thread an agent starts with thread_start starts none of its own.
    */
-  startUnder(parentId: string, input: Omit<StartThreadInput, "id" | "projectId" | "workingDirectory" | "workspaceMode" | "baseRef" | "checkout" | "cloud">) {
+  startUnder(parentId: string, input: Omit<StartThreadInput, "id" | "projectId" | "workingDirectory" | "workspaceMode" | "baseRef" | "checkout" | "cloud">, admitted?: (child: Thread) => void) {
     const parent = threads.get(this.db, parentId);
     if (!parent || retiredTeams.isHidden(this.db, parent.id)) throw new Error("Thread not found.");
     this.runs.subagents.assertExecutable({ threadId: parent.id });
-    // It goes on with its parent's account, which gives way to the project's default when the project does not use it.
+    // It goes on with its parent's account, which gives way to the project's default when the project does not use it,
+    // unless the starter says where its account came from, as an Orcling does.
     return this.context.start(
-      { ...input, claudeAccountFrom: "inherited", projectId: parent.projectId, ...childFolder(parent) },
-      { assertCanAdmit: () => undefined, onAdmitted: (child) => threads.update(this.db, child.id, { parentThreadId: parent.id }) },
+      { claudeAccountFrom: "inherited", ...input, projectId: parent.projectId, ...childFolder(parent) },
+      {
+        assertCanAdmit: () => undefined,
+        onAdmitted: (child) => {
+          threads.update(this.db, child.id, { parentThreadId: parent.id });
+          admitted?.(child);
+        },
+      },
     );
   }
 

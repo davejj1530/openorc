@@ -6,6 +6,7 @@ import { listEvents, orclingMessages, runs, threads } from "@openorc/db";
 import { CodexAdapter, RunHandle } from "@openorc/agents";
 import { defaultOrclingLook, WORKSPACE_ID, type OrclingDraft } from "@openorc/protocol";
 import { createOrclingHost } from "../mcp-host/orcling.js";
+import { guardContext } from "../remote/policy.js";
 import { OpenOrc } from "../openorc.js";
 import { GROUP_TURNS, ORCLING_MESSAGE_CHAIN, namedIn } from "./orcling-talk.js";
 
@@ -67,6 +68,9 @@ async function fixture() {
       threads: core.threads,
       settings: core.settings,
       send: async () => ({ delivered: false, message: "Not used here." }),
+      planLimits: async () => [],
+      guard: guardContext(core.db, root!),
+      call: (method, params) => core.handle({ type: "rpc", id: 0, method, params }).then((reply) => (reply.type === "rpc.result" ? reply.result : Promise.reject(new Error(reply.message)))),
       invalidate: () => {},
     }).orcling!;
   const said = (threadId: string) =>

@@ -19,7 +19,7 @@ export { threadQueue, type ThreadQueueEntry } from "./thread-queue.js";
 export { digestedEvent, messageText, OMIT_OUTPUT_CHARS, pagedEvent, transcriptPage, type TranscriptPage } from "./transcript-page.js";
 
 export { cloudWorkspaces, type CloudMirrorState, type CloudProviderId, type CloudWorkspaceRecord, type CloudWorkspaceState, type SessionBase } from "./cloud-workspaces.js";
-export { messageReactions, orclingGroups, orclingMessages, orclings, type OrclingInsert, type ReactionTarget } from "./orclings.js";
+export { messageReactions, orclingFollowups, orclingGroups, orclingMessages, orclings, type OrclingInsert, type ReactionTarget } from "./orclings.js";
 export { plans } from "./plans.js";
 export { pullReviews, type DraftCommentInsert, type PullReviewKey, type PullReviewPatch } from "./pull-reviews.js";
 export { remoteDevices, type RemoteDeviceRecord } from "./remote-devices.js";

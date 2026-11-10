@@ -1,23 +1,40 @@
-import { messages, orclingGroups, orclings, projects, retiredTeams, runs, tasks, threads, type Db } from "@openorc/db";
-import type { McpHost, OrclingTools } from "@openorc/mcp";
-import { executionMode, reactionEmoji, WORKSPACE_ID, type MemoryType, type Orcling, type Project, type TaskStatus } from "@openorc/protocol";
+import { claudeAccounts, messages, orclingFollowups, projects, runs, tasks, threads, type Db } from "@openorc/db";
+import type { McpHost, OrclingStartInput, OrclingTools } from "@openorc/mcp";
+import {
+  executionMode,
+  executionModeLabel,
+  executionModeSettings,
+  orclingExecution,
+  reactionEmoji,
+  WORKSPACE_ID,
+  type ExecutionMode,
+  type MemoryType,
+  type Orcling,
+  type Project,
+  type Task,
+  type TaskStatus,
+  type Thread,
+  type WorkspaceMode,
+} from "@openorc/protocol";
 import { latestPersonMessage } from "../services/orcling-reactions.js";
 import type { MemoryService } from "../services/memory.js";
 import type { OrclingService } from "../services/orclings.js";
 import type { RunService } from "../services/runs.js";
-import type { AppSettingsService } from "../services/settings.js";
 import type { ThreadService } from "../services/threads.js";
+import { describeWork, workAccess, workSettings, type WorkCatalog, type WorkSettings } from "../services/orcling-work.js";
+import { appTools, type AppDependencies } from "./orcling-app.js";
+import { accountNames, orclingChatIds, overviewTools, threadTree, type OverviewDependencies } from "./orcling-overview.js";
+import { projectAccountPolicy } from "../services/project-claude-accounts.js";
 
-type Dependencies = {
-  db: Db;
-  orclings: Pick<OrclingService, "forRun" | "saveInstructions" | "startThread" | "startTask" | "react" | "talk">;
-  memory: Pick<MemoryService, "assertEnabled" | "record" | "retrieveOrcling" | "retrieve" | "brief">;
-  runs: Pick<RunService, "authorizeAppAction">;
-  threads: Pick<ThreadService, "toolThreadRead">;
-  settings: Pick<AppSettingsService, "get">;
-  send: NonNullable<McpHost["threads"]>["send"];
-  invalidate: (keys: string[]) => void;
-};
+type Dependencies = OverviewDependencies &
+  Omit<AppDependencies, "db" | "runs"> & {
+    orclings: Pick<OrclingService, "forRun" | "saveInstructions" | "startThread" | "startTask" | "react" | "talk">;
+    memory: Pick<MemoryService, "assertEnabled" | "record" | "retrieveOrcling" | "retrieve" | "brief">;
+    runs: Pick<RunService, "authorizeAppAction">;
+    threads: Pick<ThreadService, "toolThreadRead">;
+    send: NonNullable<McpHost["threads"]>["send"];
+    invalidate: (keys: string[]) => void;
+  };
 
 type Speaker = (runId: string) => Orcling;
 
@@ -45,6 +62,8 @@ export function createOrclingHost(deps: Dependencies): Pick<McpHost, "orcling"> 
       ...selfTools(deps, speaker),
       ...projectTools(deps, speaker),
       ...talkTools(deps, speaker),
+      ...overviewTools(deps, speaker),
+      ...appTools(deps, speaker),
     },
   };
 }
@@ -107,13 +126,17 @@ function workTarget(db: Db, place: Project, input: { taskId?: string; title?: st
   return { task, what: task?.title ?? input.title ?? input.prompt.split("\n")[0]!.slice(0, 120) };
 }
 
-/**
- * New work runs as freely as the conversation that asked, within the Orcling's own permission, and opens with a
- * notice saying who started it rather than words the person did not type.
- */
-function startSettings(db: Db, runId: string, opener: string, prompt: string) {
-  const from = threads.get(db, runs.get(db, runId)?.threadId ?? "");
-  return { mode: from?.mode ?? "act", permissionMode: from?.permissionMode ?? "review", prompt: `${opener}\n\n${prompt}`, promptRole: "system" as const };
+/** New work opens with a notice saying who started it, rather than words the person did not type. */
+function startSettings(opener: string, prompt: string) {
+  return { prompt: `${opener}\n\n${prompt}`, promptRole: "system" as const };
+}
+
+/** Which Claude accounts a project's threads may use, which one new threads start on, and whether a limit moves them on. */
+function projectAccounts(db: Db, projectId: string) {
+  if (!claudeAccounts.list(db).some((account) => account.enabled)) return {};
+  const policy = projectAccountPolicy(db, projectId);
+  const name = accountNames(db);
+  return { claudeAccounts: { uses: policy.allowed.map((id) => name(id) ?? id), newThreadsOn: name(policy.defaultId) ?? null, switchesWhenLimited: policy.autoSwitch } };
 }
 
 /** Every place the person works: their Workspace, then their projects. */
@@ -122,14 +145,98 @@ function places(db: Db): Project[] {
   return [...(workspace ? [workspace] : []), ...projects.list(db)];
 }
 
+/** What the person can start work on: the agents they turned on, the one new threads start on, and each one's models. */
+function catalog(deps: Dependencies): WorkCatalog {
+  return {
+    enabled: () => deps.settings.enabledHarnesses(),
+    defaultAgent: () => deps.settings.get().defaultHarness,
+    models: (agent, claudeAccountId) => deps.runs.models(agent, undefined, undefined, claudeAccountId),
+  };
+}
+
+function placeById(db: Db, id: string): Project {
+  const found = places(db).find((candidate) => candidate.id === id);
+  if (!found) throw new Error(id ? "No such project. Call orcling_projects for the ids." : "Name a project_id, or a thread to start under.");
+  return found;
+}
+
+/** What work an Orcling starts runs on and how freely, chosen before the person is asked, so a refusal comes first. */
+async function planWork(deps: Dependencies, runId: string, self: Orcling, input: OrclingStartInput) {
+  const on = input.worker.kind === "agent" ? await workSettings(deps.db, catalog(deps), input.worker) : undefined;
+  const from = threads.get(deps.db, runs.get(deps.db, runId)?.threadId ?? "");
+  const ceiling = orclingExecution(self);
+  const access = workAccess({
+    asked: input.access,
+    conversation: executionMode(from?.mode ?? "act", from?.permissionMode ?? "review"),
+    ceiling: executionMode(ceiling.mode, ceiling.permissionMode),
+    orcling: self.name,
+    agent: on?.agent ?? self.settings.agent,
+  });
+  const model = on ? describeWork(on, await deps.runs.models(on.agent)) : `${self.name}, on its own model`;
+  return { on, access, runsOn: input.access ? `${model}, ${executionModeLabel[access]}` : model };
+}
+
+/** Work an Orcling starts in a project for the person: a new thread, or a saved task taken up, on what was chosen. */
+/** Where work goes: a project, or under a thread, in that thread's project. */
+function workPlace(db: Db, input: OrclingStartInput): { parent: Thread | null; target: Project } {
+  const parent = input.under ? threads.get(db, input.under) : null;
+  if (input.under && !parent) throw new Error("No such thread to start under. orcling_project and orcling_activity list them.");
+  if (parent && input.taskId) throw new Error("A task's thread starts on its own, not under another thread.");
+  if (input.worktree !== undefined && (parent || input.taskId)) throw new Error(parent ? "A subthread works in its parent's folder." : "A task works where its task says.");
+  if (parent && input.projectId && input.projectId !== parent.projectId) throw new Error("That thread is in another project. Leave project_id out to start under it.");
+  return { parent, target: placeById(db, parent?.projectId ?? input.projectId ?? "") };
+}
+
+/** Work an Orcling starts in a project for the person: a new thread, a subthread, or a saved task taken up, on what was chosen. */
+async function startWork(deps: Dependencies, runId: string, self: Orcling, input: OrclingStartInput): Promise<string> {
+  const { parent, target } = workPlace(deps.db, input);
+  const { task, what } = workTarget(deps.db, target, input);
+  const plan = await planWork(deps, runId, self, input);
+  await deps.runs.authorizeAppAction(runId, "work_start", { toolName: "orcling_thread_start", reason: `${self.name} wants to start work in ${target.name} on ${plan.runsOn}: ${what}`, input });
+  const threadId = await launchWork(deps, self, { input, parent, target, task, what, ...plan });
+  const thread = threads.get(deps.db, threadId ?? "");
+  deps.invalidate(["threads", "tasks"]);
+  return json({
+    ...(task ? { task: { id: task.id, title: task.title } } : {}),
+    thread: { id: thread?.id ?? threadId, title: thread?.title ?? what },
+    project: target.name,
+    ...(parent ? { under: { id: parent.id, title: parent.title } } : {}),
+    runsOn: plan.runsOn,
+    access: executionModeLabel[thread ? executionMode(thread.mode, thread.permissionMode) : plan.access],
+    ...(input.reportBack ? { reportBack: "You'll hear once when its turn ends." } : {}),
+  });
+}
+
+const workspaceFor = (worktree: boolean): WorkspaceMode => (worktree ? "worktree" : "current");
+
+/** Starts the work, opening with a notice of who started it: a task taken up, or a thread in its place. */
+async function launchWork(
+  deps: Dependencies,
+  self: Orcling,
+  work: { input: OrclingStartInput; parent: Thread | null; target: Project; task: Task | null; what: string; on: WorkSettings | undefined; access: ExecutionMode },
+): Promise<string | null> {
+  const { input, parent, target, task, what, on } = work;
+  const kind = task ? "task" : "thread";
+  const settings = {
+    ...startSettings(
+      on
+        ? `${self.name}, the person's Orcling, started this ${kind} for them. It reads your replies here and may message you; answer in this thread, since it can't be messaged back.`
+        : `${self.name} started this ${kind}.`,
+      input.prompt,
+    ),
+    ...executionModeSettings(work.access),
+  };
+  const options = { ...(on ? { on } : {}), ...(parent ? { under: parent.id } : {}), followUp: input.reportBack };
+  if (task) return (await deps.orclings.startTask(self.id, task.id, settings, options)).threadId;
+  const workspaceMode = input.worktree === undefined ? deps.settings.get().defaultWorkspaceMode : workspaceFor(input.worktree);
+  const thread = { ...settings, projectId: target.id, title: input.title ?? what, attachments: undefined, workspaceMode };
+  return (await deps.orclings.startThread(self.id, thread, options)).thread.id;
+}
+
 /** The person's projects and Workspace: what is happening in them, and handing them work. */
 function projectTools(deps: Dependencies, speaker: Speaker): Pick<OrclingTools, "projects" | "project" | "readThread" | "createTask" | "startWork" | "sendThread"> {
   const { db } = deps;
-  const project = (id: string) => {
-    const found = places(db).find((candidate) => candidate.id === id);
-    if (!found) throw new Error("No such project. Call orcling_projects for the ids.");
-    return found;
-  };
+  const project = (id: string) => placeById(db, id);
   return {
     projects: async (runId) => {
       speaker(runId);
@@ -143,13 +250,11 @@ function projectTools(deps: Dependencies, speaker: Speaker): Pick<OrclingTools, 
         .slice(0, 20)
         .map((t) => ({ id: t.id, title: t.title, status: t.status }));
       // Orclings' own conversations sit in the Workspace but are private chats, not its work.
-      const chats = new Set([...orclings.list(db).map((orcling) => orcling.threadId), ...orclingGroups.list(db).map((group) => group.threadId)]);
-      const recent = threads
-        .list(db, { projectId, filter: "active", limit: 10 })
-        .filter((t) => !retiredTeams.isHidden(db, t.id) && !chats.has(t.id))
-        .map((t) => ({ id: t.id, title: t.title, agent: t.agent, active: age(t.lastActivityAt) }));
+      const chats = orclingChatIds(db);
+      const listed = deps.threads.list({ projectIds: [projectId], filter: "active", orderBy: "activity", limit: 10, includeChildren: true }).filter((t) => !chats.has(t.id));
+      const recent = threadTree(listed, (id) => listed.find((t) => t.id === id)?.title ?? threads.get(db, id)?.title, accountNames(db));
       const memory = query ? (await deps.memory.retrieve(projectId, query, 8)).map(({ memory: m }) => ({ title: m.title, body: m.body })) : deps.memory.brief(found);
-      return json({ project: { id: found.id, name: found.name, folder: found.rootPath }, openTasks: open, threads: recent, memory });
+      return json({ project: { id: found.id, name: found.name, folder: found.rootPath }, ...projectAccounts(db, projectId), openTasks: open, threads: recent, memory });
     },
     readThread: async (runId, threadId, limit) => {
       speaker(runId);
@@ -176,29 +281,14 @@ function projectTools(deps: Dependencies, speaker: Speaker): Pick<OrclingTools, 
       deps.invalidate(["tasks"]);
       return json({ task: { id: task.id, title: task.title, status: task.status }, project: target.name, savedBy: self.name, duplicate: false });
     },
-    startWork: async (runId, input) => {
-      const self = speaker(runId);
-      const target = project(input.projectId);
-      const { task, what } = workTarget(db, target, input);
-      await deps.runs.authorizeAppAction(runId, "work_start", { toolName: "orcling_thread_start", reason: `${self.name} wants to start work in ${target.name}: ${what}`, input });
-      const settings = startSettings(db, runId, `${self.name} started this ${task ? "task" : "thread"}.`, input.prompt);
-      const threadId = task
-        ? (await deps.orclings.startTask(self.id, task.id, settings)).threadId
-        : (await deps.orclings.startThread(self.id, { ...settings, projectId: target.id, title: input.title ?? what, attachments: undefined, workspaceMode: deps.settings.get().defaultWorkspaceMode }))
-            .thread.id;
-      const thread = threads.get(db, threadId ?? "");
-      deps.invalidate(["threads", "tasks"]);
-      return json({
-        ...(task ? { task: { id: task.id, title: task.title } } : {}),
-        thread: { id: thread?.id ?? threadId, title: thread?.title ?? what },
-        project: target.name,
-        workingAs: self.name,
-      });
-    },
+    startWork: (runId, input) => startWork(deps, runId, speaker(runId), input),
     sendThread: async (runId, input) => {
-      speaker(runId);
+      const self = speaker(runId);
       if (!threads.get(db, input.threadId)) return "No such thread.";
-      return json(await deps.send(runId, input.threadId, input.text, input.requestKey));
+      const sent = await deps.send(runId, input.threadId, input.text, input.requestKey);
+      // Only once it is delivered, so the turn it hears about is the one the message joined or started.
+      if (input.reportBack && sent.delivered) orclingFollowups.arm(db, input.threadId, self.id);
+      return json({ ...sent, ...(input.reportBack && sent.delivered ? { reportBack: "You'll hear once when that turn ends." } : {}) });
     },
   };
 }

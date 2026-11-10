@@ -123,7 +123,7 @@ export class RunSettlement {
     this.deps.invalidate([...this.deps.keysFor(entry.scope), `checkpoints:${thread.id}`, `threaddiff:${thread.id}`, `projectgit:${project.id}`]);
     // Still a turn's end, so a message the person queued meanwhile goes out; there is no exchange to name the thread from.
     this.deps.hooks.onThreadTurn(thread, quiet ? { prompt: null, reply: null } : { prompt: entry.prompt, reply });
-    this.deps.hooks.orclings?.turnEnded?.(thread, entry.run, reply?.trim() ? reply : entry.reply);
+    this.deps.hooks.orclings?.turnEnded?.(thread, entry.run, reply?.trim() ? reply : entry.reply, turn.status);
     if (quiet) return;
     if (turn.status === "success") this.deps.notifyFor(entry.scope, "finished", thread.title, reply ? noticeBody(reply) : "The agent finished its turn.");
     else if (turn.status !== "cancelled") this.deps.notifyFor(entry.scope, "error", thread.title, entry.failed ?? "The turn failed.");
@@ -188,7 +188,13 @@ export class RunSettlement {
     if (task?.worktreePath) await worktree.unlock(project.rootPath, task.worktreePath).catch(() => undefined);
     if (task) this.reviewFinishedTask(entry, task);
     this.deps.ledger.flush();
-    if (entry.turns === 0 || entry.busy) this.deps.turnSettled(entry.run, entry.scope, project, { status: state === "cancelled" ? "cancelled" : "error", snapshotId: null, error });
+    if (entry.turns === 0 || entry.busy) {
+      const status = state === "cancelled" ? "cancelled" : "error";
+      this.deps.turnSettled(entry.run, entry.scope, project, { status, snapshotId: null, error });
+      // A turn the process never finished still ends, for whoever waits on it.
+      const thread = entry.scope.thread ? (threads.get(this.deps.db, entry.scope.thread.id) ?? entry.scope.thread) : null;
+      if (thread) this.deps.hooks.orclings?.turnEnded?.(thread, entry.run, null, status);
+    }
     this.deps.detach(entry.run.id);
     this.deps.mcpApps.closeRun(entry.run.id);
     entry.workspaceLease.release();

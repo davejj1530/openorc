@@ -599,81 +599,62 @@
   padding: 0 0 0 24px;
 }
 
-/* A permission request: an r18 card with a well, the request in words, and Deny, Allow for this run and Allow. */
+/* A permission request, shaped as a question card is: the ask, the request in a fill the width of the card, and a foot
+   with the raw request on demand and the answers. */
 .approval-card {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 12px;
   min-width: 0;
-  padding: 12px 12px 12px 14px;
-  border-radius: var(--radius-2xl);
+  padding: 16px;
+  border-radius: var(--radius-3xl);
   background: var(--surface);
 }
-.approval-card-request {
+.approval-card-ask {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1;
-  min-width: 0;
-}
-.approval-card-well {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  flex-shrink: 0;
-  border-radius: var(--radius-md);
-  background: var(--surface-2);
-  color: var(--ink-3);
-}
-.approval-card-words {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.approval-card-title {
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
   font-size: var(--text-md);
   line-height: 20px;
   letter-spacing: var(--text-md--letter-spacing);
   color: var(--ink);
   overflow-wrap: anywhere;
 }
+/* On the first line of a reason that wraps: 3px centers a 14px glyph on the 20px line. */
+.approval-card-icon {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--ink-3);
+}
 /* The summary is short (approvalSummary keeps a long request's start and end), so it shows whole and a command's last
    line is read before it is allowed; the raw request can run long and scrolls. */
 .approval-card-detail {
   margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  line-height: 16px;
-  color: var(--ink-4);
+  line-height: 18px;
+  color: var(--ink-2);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 .approval-card-detail[data-raw] {
-  max-height: 10rem;
+  max-height: 12rem;
   overflow: auto;
 }
+.approval-card-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 16px;
+}
 .approval-card-raw {
-  align-self: flex-start;
   font-size: var(--text-xs);
   line-height: 16px;
-}
-.approval-card-actions {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-}
-/* A narrow column stacks the request over full-width answers. */
-@container transcript (max-width: 560px) {
-  .approval-card {
-    flex-direction: column;
-    align-items: stretch;
-    padding: 16px;
-  }
-  .approval-card-actions {
-    flex-direction: column;
-  }
 }
 /* Answered: one 44px line remembers a refusal. An allowed call shows as its tool row instead. */
 .approval-answer-row {

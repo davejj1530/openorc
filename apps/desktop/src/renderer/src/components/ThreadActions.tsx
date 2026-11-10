@@ -5,7 +5,7 @@ import { isSubagentThread, forkUnavailable } from "@openorc/protocol";
 import { useRef, useState } from "react";
 import { CoversPreview } from "../lib/browser-preview";
 import { useRpc, useRpcMutation } from "../lib/client";
-import { orclingHome, useOrclings } from "../lib/orclings";
+import { afterOrclingChatDeleted, orclingHome, useOrclingGroups, useOrclings } from "../lib/orclings";
 import { MAX_THREAD_PANES, newSubthread, openThread, useRouter } from "../lib/router";
 import { useThreadMutationPending } from "../lib/thread-mutations";
 import { useThreadTabs } from "../lib/thread-tabs";
@@ -226,6 +226,8 @@ export function DeleteThreadDialog() {
 
 function DeleteThreadContent({ id, close }: { id: string; close: () => void }) {
   const thread = useRpc("threads.get", { id });
+  const orclings = useOrclings();
+  const groups = useOrclingGroups();
   const team = Boolean(thread.data?.teamInstanceId);
   const remove = useRpcMutation("threads.delete");
   const [failure, setFailure] = useState<string | null>(null);
@@ -244,7 +246,10 @@ function DeleteThreadContent({ id, close }: { id: string; close: () => void }) {
     try {
       await remove.mutateAsync({ id });
       close();
-      useRouter.getState().closeThreadPane(id);
+      const router = useRouter.getState();
+      // A group chat goes the way an Orcling does: you stay among your Orclings, on the chat beside it.
+      if (groups.some((group) => group.threadId === id) && router.threadIds.length <= 1) router.navigate(afterOrclingChatDeleted(orclings, groups, id));
+      else router.closeThreadPane(id);
     } catch (error) {
       setFailure(error instanceof Error ? error.message : String(error));
     } finally {

@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { defaultOrclingLook, type Orcling, type OrclingGroup } from "@openorc/protocol";
-import { afterOrclingDeleted, groupsGoingWith } from "./orclings";
+import { afterOrclingChatDeleted, afterOrclingDeleted, groupsGoingWith } from "./orclings";
 
 const orcling = (id: string) => ({ id, threadId: `${id}-chat`, name: id, look: defaultOrclingLook }) as Orcling;
 
@@ -18,4 +18,14 @@ it("names the group chats a deleted Orcling takes with it: those with only one o
   expect(groupsGoingWith(groups, list, "pip")).toEqual(["bo"]);
   expect(groupsGoingWith(groups, list, "bo")).toEqual(["pip", "rini"]);
   expect(groupsGoingWith([groups[1]!], list, "pip")).toEqual([]);
+});
+
+it("lands on the chat beside a deleted group chat in the Orclings list, and on a new Orcling when none is left", () => {
+  const list = [orcling("pip"), orcling("bo")];
+  const group = (threadId: string) => ({ threadId, title: threadId, memberIds: ["pip", "bo"], createdAt: 0 }) as OrclingGroup;
+  const groups = [group("first-group"), group("last-group")];
+  expect(afterOrclingChatDeleted(list, groups, "first-group")).toEqual({ view: "thread", threadId: "last-group" });
+  expect(afterOrclingChatDeleted(list, groups, "last-group")).toEqual({ view: "thread", threadId: "first-group" });
+  expect(afterOrclingChatDeleted(list, [group("only-group")], "only-group")).toEqual({ view: "thread", threadId: "bo-chat" });
+  expect(afterOrclingChatDeleted([], [group("only-group")], "only-group")).toEqual({ view: "orcling" });
 });

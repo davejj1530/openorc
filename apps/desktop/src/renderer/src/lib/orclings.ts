@@ -61,3 +61,14 @@ export function groupsGoingWith(groups: readonly OrclingGroup[], orclings: reado
   const going = groups.filter((group) => group.memberIds.includes(id) && group.memberIds.length <= 2);
   return [...new Set(going.flatMap((group) => group.memberIds.filter((member) => member !== id).map((member) => orclingById(orclings, member)?.name ?? "")))].filter(Boolean);
 }
+
+/**
+ * Where to land once a chat in the Orclings list is deleted, an Orcling's own or a group's: the chat beside it in the
+ * list as the sidebar shows it, below it or else above, or a new Orcling when none is left.
+ */
+export function afterOrclingChatDeleted(orclings: readonly Orcling[], groups: readonly OrclingGroup[], threadId: string): Route {
+  const chats = [...orclings.map((orcling) => orcling.threadId), ...groups.map((group) => group.threadId)];
+  const at = chats.indexOf(threadId);
+  const beside = at < 0 ? undefined : (chats[at + 1] ?? chats[at - 1]);
+  return beside ? { view: "thread", threadId: beside } : { view: "orcling" };
+}

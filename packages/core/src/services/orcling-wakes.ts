@@ -2,6 +2,7 @@ import { orclings, threadQueue, threads, type Db } from "@openorc/db";
 import { orclingWakeKey, type Orcling, type OrclingWake } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
 import { ORCLING_QUIET_MS } from "./orclings.js";
+import { STAY_QUIET } from "./orcling-quiet.js";
 import type { ThreadService } from "./threads.js";
 
 type TimeWake = Extract<OrclingWake, { kind: "time" }>;
@@ -63,7 +64,7 @@ export function wakePrompt(reasons: WakeReason[], now: number): string {
   return [
     `(OpenOrc: you woke up on your own; nobody wrote to you. ${why} For the person it's ${clock(now)}.)`,
     "",
-    "Look at what matters to them: your memory, their projects, and work you started. If you have something worth texting about, such as a hello with something useful in it, news about work you started, or a question that can't wait, text them the way a friend would. If there's nothing worth saying, end your turn without writing anything.",
+    `Look at what matters to them: your memory, their projects, and work you started. If you have something worth texting about, such as a hello with something useful in it, news about work you started, or a question that can't wait, text them the way a friend would. If there's nothing worth saying, ${STAY_QUIET}.`,
   ].join("\n");
 }
 

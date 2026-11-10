@@ -152,10 +152,12 @@ it("lets the Orclings a group message names answer in turn, each hearing the oth
     expect(heard.map((entry) => entry.who)).toEqual(["Pip", "Bo"]);
     expect(heard[0]!.input).toBe("morning both");
     expect(heard[0]!.handoff).toContain("This is a group chat between the person and Orclings: you, Bo.");
-    // Bo was nudged, not shown a message, and heard what was said before its turn.
-    expect(heard[1]!.input).toMatch(/your turn in the group chat/);
-    expect(heard[1]!.handoff).toContain("The person: morning both");
-    expect(heard[1]!.handoff).toContain("Pip: found the flaky test");
+    // Bo's turn opens with what was said since it last spoke, as messages it reads, not background in its instructions.
+    expect(heard[1]!.input).toMatch(/^\(OpenOrc, the group chat\. This conversation began before you joined\./);
+    expect(heard[1]!.input).toContain("The person: morning both");
+    expect(heard[1]!.input).toContain("Pip: found the flaky test");
+    expect(heard[1]!.input).toMatch(/your turn in the group chat\. Answer if you have something to add; otherwise reply with only NO_REPLY/);
+    expect(heard[1]!.handoff).not.toContain("The person: morning both");
     expect(said(group.threadId)).toEqual(["user: morning both", "assistant: found the flaky test", "assistant: nice, I'll rerun CI"]);
 
     say("Bo", "on it");
@@ -228,6 +230,32 @@ it("takes a deleted Orcling out of its group chats: a group left with one other 
     expect(threads.get(core.db, pair.threadId)).toBeNull();
     expect(left.get(trio.threadId)).toMatchObject({ title: "Pip and Rini", memberIds: [pip.id, rini.id] });
     expect(left.get(titled.threadId)).toMatchObject({ title: "Release", memberIds: [pip.id, rini.id] });
+  } finally {
+    await core.close();
+  }
+});
+
+it("tells an Orcling who named it and what they said, and lets one with nothing to add pass without a word reaching anyone", async () => {
+  const { core, say, heard, settled, said } = await fixture();
+  try {
+    const autumn = await core.orclings.create(draft("Autumn"));
+    const vision = await core.orclings.create(draft("Vision"));
+    const group = await core.orclings.talk.createGroup([autumn.id, vision.id], undefined, null);
+    say("Autumn", "Vision, quick catch-up: the cloud login is a pasted token, and we want a vault sandbox instead.");
+    say("Vision", "NO_REPLY");
+    await core.orclings.talk.sendToGroup(group.threadId, "@Autumn explain our problem to the team", {});
+    await settled(group.threadId, 2);
+    // Vision read Autumn's words in its turn, and that Autumn named it.
+    const turn = heard.at(-1)!;
+    expect(turn.who).toBe("Vision");
+    expect(turn.input).toContain("The person: @Autumn explain our problem to the team");
+    expect(turn.input).toContain("Autumn: Vision, quick catch-up: the cloud login is a pasted token");
+    expect(turn.input).toMatch(/Autumn named you in what they just said, so answer them/);
+    // Its quiet reply was dropped: never recorded, never shown.
+    expect(said(group.threadId)).toEqual([
+      "user: @Autumn explain our problem to the team",
+      "assistant: Vision, quick catch-up: the cloud login is a pasted token, and we want a vault sandbox instead.",
+    ]);
   } finally {
     await core.close();
   }

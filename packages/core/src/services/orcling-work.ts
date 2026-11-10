@@ -1,4 +1,5 @@
 import { claudeAccounts, runs as runRepo, type Db } from "@openorc/db";
+import { STAY_QUIET } from "./orcling-quiet.js";
 import type { OrclingWorker } from "@openorc/mcp";
 import { executionModeAvailable, executionModeLabel, executionModeUnavailable, type AgentKind, type ExecutionMode, type ModelOption, type Thread } from "@openorc/protocol";
 import { modelsNamed, pickModel, squash } from "./thread-agent-tools.js";
@@ -156,6 +157,6 @@ export function followupNote(thread: Thread, project: string, status: string, re
   return [
     `(OpenOrc: "${thread.title}" in ${project}, which you asked to hear back from, ${ended}.${said} Read more with orcling_thread_read, id ${thread.id}.)`,
     "",
-    "If the person should know, or it needs a next step from you, act on it. Otherwise end your turn without writing.",
+    `If the person should know, or it needs a next step from you, act on it. Otherwise ${STAY_QUIET}.`,
   ].join("\n");
 }

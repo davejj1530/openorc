@@ -489,7 +489,10 @@ export class OrclingService {
     const thread = prepared.scope.thread;
     if (!thread || prepared.handoff) return prepared;
     const heard = catchUp(this.deps.db, thread, prepared.orclingId ?? null, (other) => this.name(other));
-    return heard ? { ...prepared, handoff: heard } : prepared;
+    if (!heard) return prepared;
+    // A group member reads what it missed at the start of its turn, as a person reads back through a group chat; elsewhere
+    // it is background in the Orcling's instructions.
+    return orclingGroups.get(this.deps.db, thread.id) ? { ...prepared, turnNote: `(OpenOrc, the group chat. ${heard})` } : { ...prepared, handoff: heard };
   }
 
   /** An Orcling never works more freely than its permission, and its own conversation starts fresh when a session is due. */

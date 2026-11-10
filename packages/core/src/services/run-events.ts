@@ -1,6 +1,7 @@
 import { runs, threads, type Db } from "@openorc/db";
 import { harnessName, type AgentEvent, type Project } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
+import { isQuietReply, mayBeQuiet } from "./orcling-quiet.js";
 import { occupied, working, type CompletedTurn, type LiveRun, type RunHooks, type RunScope } from "./run-types.js";
 import type { SubagentService } from "./subagents.js";
 
@@ -69,7 +70,37 @@ export class RunEvents {
       if (steerable) this.deps.hooks.onSteerable?.(entry.run.id);
       this.deps.invalidate(this.deps.keysFor(entry.scope));
     }
-    this.deps.emit(ev);
+    const shown = this.withoutQuiet(entry, ev);
+    if (shown) this.deps.emit(shown);
+    return shown;
+  }
+
+  /**
+   * An Orcling's quiet reply (see orcling-quiet.ts), held while it streams and dropped once complete, so nobody sees or
+   * records it and the turn counts as quiet. Any other text goes on, with the start that was held.
+   */
+  private withoutQuiet(entry: LiveRun, ev: AgentEvent): AgentEvent | null {
+    if (!entry.run.orclingId) return ev;
+    if (ev.type === "message.delta" && ev.role === "assistant") {
+      const held = (entry.quietHeld ??= new Map());
+      const before = held.get(ev.messageId);
+      if (before === null) return ev;
+      const text = (before ?? "") + ev.text;
+      if (mayBeQuiet(text)) {
+        held.set(ev.messageId, text);
+        return null;
+      }
+      held.set(ev.messageId, null);
+      return { ...ev, text };
+    }
+    if (ev.type === "message.completed" && ev.role === "assistant") {
+      entry.quietHeld?.delete(ev.messageId);
+      return isQuietReply(ev.text) ? null : ev;
+    }
+    if (ev.type === "turn.completed" && isQuietReply(ev.resultText)) {
+      const { resultText: _quiet, ...rest } = ev;
+      return rest;
+    }
     return ev;
   }
 

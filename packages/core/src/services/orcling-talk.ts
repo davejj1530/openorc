@@ -1,4 +1,5 @@
 import { mkdir, realpath } from "node:fs/promises";
+import { STAY_QUIET } from "./orcling-quiet.js";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { orclingGroups, orclingMessages, orclings, threads, type Db } from "@openorc/db";
@@ -14,7 +15,13 @@ export const ORCLING_MESSAGE_CHAIN = 6;
 export const GROUP_TURNS = 6;
 
 /** What a group turn is told when someone else's words woke it: the conversation itself reaches it as a catch-up. */
-const GROUP_NUDGE = "(OpenOrc: your turn in the group chat. Answer if you were named or have something to add; otherwise end your turn without writing anything.)";
+/** A group member's turn: an answer owed to whoever named it (the person, or another Orcling), or a chance to add something. */
+function groupNudge(namedBy: string | null): string {
+  if (namedBy === PERSON) return "(OpenOrc: your turn in the group chat. The person named you in their message, so answer them.)";
+  if (namedBy) return `(OpenOrc: your turn in the group chat. ${namedBy} named you in what they just said, so answer them, or the person if it was meant for them.)`;
+  return `(OpenOrc: your turn in the group chat. Answer if you have something to add; otherwise ${STAY_QUIET}.)`;
+}
+const PERSON = "the person";
 
 interface Turn {
   orclingId: string;
@@ -113,7 +120,7 @@ export class OrclingTalk {
     orclingMessages.record(this.deps.db, { messageId, threadId: to.threadId, fromOrclingId: from.id, toOrclingId: to.id });
     this.notes.set(
       to.threadId,
-      `(OpenOrc: the next message is from ${from.name}, another of the person's Orclings, not from the person. Answer ${from.name} with orcling_message; what you write here goes to the person. If it needs no answer, end your turn without writing anything.)`,
+      `(OpenOrc: the next message is from ${from.name}, another of the person's Orclings, not from the person. Answer ${from.name} with orcling_message; what you write here goes to the person. If it needs no answer, ${STAY_QUIET}.)`,
     );
     try {
       await this.deps.threads().send(to.threadId, text, null, { unprompted: true, record: true, messageId });
@@ -214,19 +221,16 @@ export class OrclingTalk {
       group.memberIds.map((id) => this.orcling(id)),
     );
     const speakers = named.length ? named : group.memberIds;
+    const nudge = (id: string) => this.nudge(id, named.length ? PERSON : null);
     const runs = this.deps.runs();
     const live = runs.liveRunForThread(threadId);
     if (live && runs.threadActivity(threadId) !== "idle") {
       await runs.send(live.id, text, { role: "user", ...options });
-      await this.enqueue(
-        threadId,
-        speakers.filter((id) => id !== live.orclingId).map((id) => this.nudge(id)),
-        true,
-      );
+      await this.enqueue(threadId, speakers.filter((id) => id !== live.orclingId).map(nudge), true);
       return;
     }
     const [first, ...rest] = speakers;
-    const turns: Turn[] = [{ orclingId: first!, text, role: "user", record: true, unprompted: false, ...options }, ...rest.map((id) => this.nudge(id))];
+    const turns: Turn[] = [{ orclingId: first!, text, role: "user", record: true, unprompted: false, ...options }, ...rest.map(nudge)];
     await this.enqueue(threadId, turns, true);
   }
 
@@ -242,15 +246,15 @@ export class OrclingTalk {
       if (state.orclingTurns < GROUP_TURNS)
         return void this.enqueue(
           thread.id,
-          named.map((id) => this.nudge(id)),
+          named.map((id) => this.nudge(id, this.orcling(run.orclingId!).name)),
           false,
         );
     }
     void this.next(thread.id);
   }
 
-  private nudge(orclingId: string): Turn {
-    return { orclingId, text: GROUP_NUDGE, role: "system", record: false, unprompted: true };
+  private nudge(orclingId: string, namedBy: string | null = null): Turn {
+    return { orclingId, text: groupNudge(namedBy), role: "system", record: false, unprompted: true };
   }
 
   private state(threadId: string) {

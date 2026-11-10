@@ -1,4 +1,5 @@
 import { claudeAccounts, messages, orclingFollowups, projects, runs, tasks, threads, type Db } from "@openorc/db";
+import { STAY_QUIET } from "../services/orcling-quiet.js";
 import type { McpHost, OrclingStartInput, OrclingTools } from "@openorc/mcp";
 import {
   executionMode,
@@ -77,7 +78,7 @@ function selfTools(deps: Dependencies, speaker: Speaker): Pick<OrclingTools, "up
       if (!target) return "The person has not written anything to react to yet.";
       deps.orclings.react({ threadId: self.threadId, runId: target.runId, messageId: target.messageId, part: 0 }, reaction, self.id);
       const quoted = target.text.replace(/\s+/g, " ").trim().slice(0, 80);
-      return `Reacted ${reactionEmoji[reaction]} to "${quoted}". If that says it all, end your turn without writing.`;
+      return `Reacted ${reactionEmoji[reaction]} to "${quoted}". If that says it all, ${STAY_QUIET}.`;
     },
     updateInstructions: async (runId, { body, reason }) => {
       const self = speaker(runId);

@@ -102,7 +102,7 @@ export function registerOrclingTools(mcp: McpServer, tools: OrclingTools, runId:
       "orcling_react",
       {
         description:
-          "React to the person's newest message with a tapback, the way people do in a chat: heart, like, dislike, haha, wow or sad. Use it when a reaction says it better than words, such as a heart for thanks or haha for a joke. A reaction can be your whole reply: after it, you may end your turn without writing anything.",
+          "React to the person's newest message with a tapback, the way people do in a chat: heart, like, dislike, haha, wow or sad. Use it when a reaction says it better than words, such as a heart for thanks or haha for a joke. A reaction can be your whole reply: after it, reply with only NO_REPLY, which nobody sees.",
         inputSchema: { reaction: z.enum(["heart", "like", "dislike", "haha", "wow", "sad"]) },
       },
       async ({ reaction }) => text(await tools.react(runId, reaction)),

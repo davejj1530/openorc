@@ -92,6 +92,8 @@ export interface StartRunInput {
   resumeFrom?: { sessionId: string; fork: boolean };
   /** What the previous agent on this thread knew, for a run that switches provider. */
   handoff?: string;
+  /** Read at the start of this turn alone, ahead of its prompt and never recorded: what a group member missed. */
+  turnNote?: string;
   /** Bind durable coordination identity before MCP or provider startup can expose tools. */
   onCreated?: (run: Run) => void;
   /** Revalidate admission after asynchronous preparation and immediately before launch. */
@@ -127,6 +129,8 @@ export interface OrclingRunHooks {
 
 export interface LiveRun {
   questionsInterrupted?: boolean;
+  /** An Orcling's streaming replies that may yet be its quiet word, by message id; null once a reply is shown. */
+  quietHeld?: Map<string, string | null>;
   run: Run;
   internalMcp: NonNullable<RunSpec["internalMcp"]>;
   /** Native permissions remain fixed until resume; OpenOrc can allow requests immediately. */

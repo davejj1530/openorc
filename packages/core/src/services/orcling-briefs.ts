@@ -1,4 +1,5 @@
 import { listEvents, runs as runRepo, summaries, type Db } from "@openorc/db";
+import { STAY_QUIET } from "./orcling-quiet.js";
 import type { Orcling, Run, SessionSummary, Thread } from "@openorc/protocol";
 
 const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max).trimEnd()}…` : text);
@@ -68,10 +69,11 @@ function placeNote(orcling: Orcling, place: OrclingPlace, others: string[]): str
   switch (place) {
     case "group":
       return [
-        `This is a group chat between the person and Orclings: you, ${others.join(", ")}. Everyone reads every message, and you hear what the others said since your last turn. Code changes belong in project threads, as in your own chat.`,
+        `This is a group chat between the person and Orclings: you, ${others.join(", ")}. You work as a team. Each of your turns opens with what was said since you last spoke; read it first, since that is the conversation you are joining. Code changes belong in project threads, as in your own chat.`,
         "",
         ...TEXTING,
-        "- Answer when the person or another Orcling named you, or when you have something to add. Otherwise end your turn without writing anything; nobody sees that you passed.",
+        `- Answer when the person or another Orcling named you, or when you have something to add. Otherwise ${STAY_QUIET}.`,
+        "- Build on what the others said rather than repeating it, and never repeat yourself: if you already said it, add only what is new.",
         "- Name whoever you are talking to, the way people do in a group: naming another Orcling gives it a turn after yours.",
       ].join("\n");
     case "home":

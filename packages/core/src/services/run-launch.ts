@@ -325,7 +325,7 @@ export class RunLaunch {
   }
 
   private withTurnNote(input: StartRunInput): string {
-    const note = input.scope.thread ? this.deps.hooks.orclings?.turnNote(input.scope.thread.id) : "";
+    const note = [input.turnNote, input.scope.thread ? this.deps.hooks.orclings?.turnNote(input.scope.thread.id) : ""].filter(Boolean).join("\n\n");
     return note ? `${note}\n\n${input.prompt}` : input.prompt;
   }
 

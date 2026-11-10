@@ -65,7 +65,8 @@ export function ToolRow({ block, details = false }: { block: ToolBlock; details?
   );
 }
 
-function Visualization({ visualization }: { visualization: NonNullable<ReturnType<typeof visualizationFromTool>> }) {
+/** What a call drew, shown as itself: in a tool row, or in an Orcling's chat. */
+export function Visualization({ visualization }: { visualization: NonNullable<ReturnType<typeof visualizationFromTool>> }) {
   return (
     <Suspense fallback={<p className="text-sm text-ink-2">{visualization.description}</p>}>
       <VisualizationResult visualization={visualization} />

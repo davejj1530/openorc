@@ -4,13 +4,14 @@ type Message = Extract<Block, { kind: "message" }>;
 
 /**
  * One row of an Orcling's chat on the phone: a time over a stretch, the person's message, one bubble of the Orcling's
- * (its face beside the last of a run), a card that needs the person, or the typing dots. `gap` is the space above.
+ * (its face beside the last of a run), something it drew, a card that needs the person, or the typing dots. `gap` is the space above.
  */
 export type ChatItem = { key: string; gap: number } & (
   | { kind: "time"; at: number }
   | { kind: "mine"; block: Message }
   | { kind: "bubble"; block: Message; part: number; text: string; first: boolean; last: boolean }
   | { kind: "card"; block: Block }
+  | { kind: "visualization"; row: Extract<ChatRow, { kind: "visualization" }> }
   | { kind: "typing"; first: boolean }
 );
 
@@ -32,6 +33,9 @@ export function chatItems(rows: readonly ChatRow[], typing: boolean): ChatItem[]
         break;
       case "card":
         items.push({ kind: "card", key: `card:${row.id}`, gap: APART, block: row.block });
+        break;
+      case "visualization":
+        items.push({ kind: "visualization", key: `visualization:${row.id}`, gap: APART, row });
         break;
       case "theirs":
         row.bubbles.forEach((text, part) => {

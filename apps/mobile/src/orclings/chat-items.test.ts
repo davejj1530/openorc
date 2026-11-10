@@ -8,6 +8,20 @@ const outline = (blocks: Block[], typing = false) =>
   chatItems(chatRows(blocks), typing).map((item) => (item.kind === "bubble" ? `bubble${item.first ? "+face" : ""}${item.last ? ".last" : ""}@${item.gap}` : `${item.kind}@${item.gap}`));
 
 describe("chatItems", () => {
+  it("puts what the Orcling drew in its own item, apart from the bubbles around it", () => {
+    const drawn = {
+      id: "v1",
+      kind: "tool",
+      name: "mcp__openorc__visualize",
+      input: { title: "Sign-in flow", description: "Mac sign-in, step by step.", html: "<p>steps</p>" },
+      done: true,
+      status: "success",
+      at: 3,
+      runId: "run",
+    } as Block;
+    expect(outline([message("a", "user", "show me", 1000), drawn, message("b", "assistant", "here", 4000)])).toEqual(["time@8", "mine@14", "visualization@14", "bubble+face.last@14"]);
+  });
+
   it("gives each paragraph of the Orcling's its own bubble, the face beside the first of a run, and runs apart from the person's messages", () => {
     const blocks = [message("a", "user", "Anything new?", 1000), message("b", "assistant", "Two things.\n\nThe build is green.", 2000), message("c", "assistant", "And a review waits.", 3000)];
     expect(outline(blocks)).toEqual(["time@8", "mine@14", "bubble+face@14", "bubble@3", "bubble.last@3"]);

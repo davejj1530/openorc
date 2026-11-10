@@ -63,6 +63,10 @@
   justify-items: start;
 }
 
+/* Something an Orcling drew sits in its bubbles' column, past the face column and gap of .orcling-run. */
+.orcling-chat-drawing {
+  padding-inline-start: calc(28px + 10px);
+}
 .orcling-bubble-row {
   position: relative;
   display: flex;

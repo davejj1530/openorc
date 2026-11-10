@@ -1,14 +1,16 @@
-import { chatBubbles } from "@openorc/protocol";
+import { chatBubbles, type Visualization } from "@openorc/protocol";
 import { startedWorkFromTool, taskIdFromTool } from "./task-progress.js";
 import type { Block } from "./transcript.js";
+import { visualizationFromTool } from "./visualization.js";
 
 type Message = Extract<Block, { kind: "message" }>;
 type Tool = Extract<Block, { kind: "tool" }>;
 
 /**
  * An Orcling's own conversation as a chat shows it: what the person wrote, what the Orcling texted as one message per
- * paragraph, the cards that need the person (approvals, questions, work it started, errors), and the time between
- * stretches. Its tool calls, thoughts and turn statuses stay out of sight; the typing dots stand in for them.
+ * paragraph, what it drew for them, the cards that need the person (approvals, questions, work it started, errors), and
+ * the time between stretches. Its other tool calls, thoughts and turn statuses stay out of sight; the typing dots stand
+ * in for them.
  */
 export type ChatRow =
   | { kind: "time"; id: string; at: number }
@@ -23,7 +25,9 @@ export type ChatRow =
       /** Who it was sent to, when the Orcling texted another Orcling or opened a group. */
       to?: string;
     }
-  | { kind: "card"; id: string; block: Block };
+  | { kind: "card"; id: string; block: Block }
+  /** Something the Orcling drew for the person, such as a diagram or a step-through, shown as itself. */
+  | { kind: "visualization"; id: string; block: Tool; visualization: Visualization };
 
 /** A gap this long between messages starts a new stretch, headed by its time. */
 export const CHAT_STRETCH_MS = 60 * 60_000;
@@ -72,10 +76,18 @@ function sentRow(block: Tool): Extract<ChatRow, { kind: "theirs" }> | null {
   return { kind: "theirs", id: block.id, block: message, bubbles: chatBubbles(sent.text), to: sent.to };
 }
 
+/** A tool call that shows in the chat: a message the Orcling sent another, or something it drew for the person. */
+function toolRow(block: Tool): ChatRow | null {
+  const sent = sentRow(block);
+  if (sent) return sent;
+  const visualization = visualizationFromTool(block);
+  return visualization ? { kind: "visualization", id: block.id, block, visualization } : null;
+}
+
 /** A block's row in the chat, and whether it heads a stretch of time; null for what stays out of sight. */
 function rowOf(block: Block, origins: ReadonlyMap<string, string>): { row: ChatRow; timed: boolean } | null {
-  const sent = block.kind === "tool" ? sentRow(block) : null;
-  if (sent) return { row: sent, timed: true };
+  const own = block.kind === "tool" ? toolRow(block) : null;
+  if (own) return { row: own, timed: true };
   const from = block.kind === "message" && block.role === "system" ? origins.get(block.id) : undefined;
   if (from && block.kind === "message") return { row: { kind: "theirs", id: block.id, block, bubbles: chatBubbles(block.text), from }, timed: true };
   if (card(block)) return { row: { kind: "card", id: block.id, block }, timed: false };

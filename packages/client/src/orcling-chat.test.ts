@@ -28,3 +28,20 @@ it("heads each stretch of the chat with its time", () => {
   const rows = chatRows([message("u1", "user", "hi", 0), message("a1", "assistant", "hey", 1000), message("u2", "user", "back", CHAT_STRETCH_MS + 1000)]);
   expect(rows.filter((row) => row.kind === "time").map((row) => row.id)).toEqual(["time-u1", "time-u2"]);
 });
+
+it("shows what the Orcling drew for the person, while its other tool calls stay out of sight", () => {
+  const drawn = {
+    id: "v1",
+    kind: "tool",
+    name: "mcp__openorc__visualize",
+    input: { title: "Sign-in flow", description: "Mac sign-in, step by step.", html: "<p>steps</p>" },
+    done: true,
+    status: "success",
+    at: 3,
+    runId: "run",
+  } as Block;
+  const read = { id: "r1", kind: "tool", name: "Read", input: { file_path: "a.ts" }, done: true, status: "success", at: 2, runId: "run" } as Block;
+  const rows = chatRows([message("u1", "user", "can you show me?", 1), read, drawn, message("a1", "assistant", "here it is", 4)]);
+  expect(rows.map((row) => row.kind)).toEqual(["time", "mine", "visualization", "theirs"]);
+  expect(rows[2]).toMatchObject({ kind: "visualization", visualization: { title: "Sign-in flow" } });
+});

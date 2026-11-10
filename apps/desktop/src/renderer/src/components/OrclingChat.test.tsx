@@ -178,3 +178,20 @@ it("shows a direct message from another Orcling as that Orcling's, and one this 
   expect(names()).toEqual(["Bo", "Pip to Bo"]);
   expect(bubbles()).toEqual(["the review is done", "thanks, merging now"]);
 });
+
+it("shows a visualization the Orcling drew in the chat, as itself rather than as a tool call", async () => {
+  const drawn = {
+    id: "v1",
+    kind: "tool",
+    name: "mcp__openorc__visualize",
+    input: { title: "Sign-in flow", description: "Mac sign-in, step by step.", html: "<p>steps</p>" },
+    done: true,
+    status: "success",
+    at: 3,
+    runId: "run",
+  } as Block;
+  render(<OrclingChat chat={home} blocks={[said("u1", "user", "show me", 1), drawn]} live={false} card={() => <span data-testid="tool-card" />} />);
+  // While the drawing loads, its description stands in.
+  expect(await screen.findByText("Mac sign-in, step by step.")).toBeTruthy();
+  expect(screen.queryByTestId("tool-card")).toBeNull();
+});

@@ -7,6 +7,7 @@ import { Pressable, View } from "react-native";
 import Animated, { useReducedMotion, type SharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Card } from "../thread/cards";
+import { VisualizationRow } from "../thread/VisualizationRow";
 import { Markdown } from "../thread/Markdown";
 import { Prompt } from "../thread/messages";
 import { cn } from "../ui/cn";
@@ -172,6 +173,8 @@ const ChatRowView = memo(function ChatRowView({
       return <TheirBubble item={item} chat={chat} reactions={reactions} held={held === reactionKey(item.block.runId, item.block.id, item.part)} onHold={onHold} />;
     case "card":
       return <Card block={item.block} runId={item.block.runId ?? runId} />;
+    case "visualization":
+      return <VisualizationRow row={{ kind: "visualization", key: item.key, gap: 0, runId: item.row.block.runId ?? runId, block: item.row.block, visualization: item.row.visualization }} />;
     case "typing":
       return <Typing chat={chat} first={item.first} />;
   }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { Visualization } from "./ToolRow";
 import { Reaction, reactionEmoji, type MessageReaction, type Orcling } from "@openorc/protocol";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { useReducedMotion } from "../lib/motion";
@@ -312,8 +313,8 @@ export function OrclingChat({ chat, blocks, live, card }: { chat: OrclingChatSpe
           );
         }
         return (
-          <div key={row.id} className="orcling-chat-card" data-turn={row.id}>
-            {card(row.block)}
+          <div key={row.id} className={row.kind === "visualization" ? "orcling-chat-card orcling-chat-drawing" : "orcling-chat-card"} data-turn={row.id}>
+            {row.kind === "visualization" ? <Visualization visualization={row.visualization} /> : card(row.block)}
           </div>
         );
       })}

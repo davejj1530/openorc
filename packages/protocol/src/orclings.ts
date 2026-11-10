@@ -34,6 +34,8 @@ export const defaultOrclingLook: OrclingLook = { shape: 0, eyes: 0, texture: 0, 
 /** Allow runs without asking; Approve asks before every command or edit. */
 export const OrclingPermission = z.enum(["allow", "approve"]);
 export type OrclingPermission = z.infer<typeof OrclingPermission>;
+/** A new Orcling works for the person without asking, as they would; Approve is a choice for a careful one. */
+export const defaultOrclingPermission: OrclingPermission = "allow";
 
 /**
  * An Orcling's name as its folder: lowercase letters and numbers joined by dashes. Names that

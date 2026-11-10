@@ -272,10 +272,10 @@ describe("changing an Orcling on the phone", () => {
     expect(mac.calls.find((call) => call.method === "orclings.delete")?.params).toEqual({ id: "pip" });
   });
 
-  it("makes a new Orcling on the Mac's default model, asking first, refusing a name another Orcling has, then opens its chat", async () => {
+  it("makes a new Orcling on the Mac's default model, working without asking, refusing a name another Orcling has, then opens its chat", async () => {
     render(<NewOrclingSheet />, { wrapper: mac.phone.wrapper });
     expect(await screen.findByRole("button", { name: "Model, GPT-6 Astra · High" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Permission, Approve" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Permission, Allow" })).toBeTruthy();
     const name = screen.getByLabelText("Name");
     act(() => (nativeProps.get(name)!["onChangeText"] as (text: string) => void)("rex!"));
     expect(await screen.findByText("You already have an Orcling named Rex.")).toBeTruthy();
@@ -286,7 +286,7 @@ describe("changing an Orcling on the phone", () => {
     await waitFor(() => expect(router.push).toHaveBeenCalledWith({ pathname: "/thread/[id]", params: { id: "home-new" } }));
     expect(router.back).toHaveBeenCalled();
     expect(mac.calls.filter((call) => call.method === "orclings.create").map((call) => call.params)).toEqual([
-      { draft: { name: "Nova", look: { ...defaultOrclingLook, shape: 1 }, settings: { agent: "codex", model: "gpt-6-astra", effort: "high", fastMode: false }, permission: "approve" } },
+      { draft: { name: "Nova", look: { ...defaultOrclingLook, shape: 1 }, settings: { agent: "codex", model: "gpt-6-astra", effort: "high", fastMode: false }, permission: "allow" } },
     ]);
   });
 });

@@ -1,5 +1,15 @@
 import { useState } from "react";
-import { defaultOrclingLook, isHarnessId, orclingHandle, type Orcling, type OrclingDraft, type OrclingLook, type OrclingLookPart, type OrclingPermission } from "@openorc/protocol";
+import {
+  defaultOrclingLook,
+  defaultOrclingPermission,
+  isHarnessId,
+  orclingHandle,
+  type Orcling,
+  type OrclingDraft,
+  type OrclingLook,
+  type OrclingLookPart,
+  type OrclingPermission,
+} from "@openorc/protocol";
 import { cn } from "../lib/cn";
 import { defaultChoice, pickerCatalog, type ModelChoice } from "@openorc/client";
 import { useOrclings } from "../lib/orclings";
@@ -49,7 +59,7 @@ function nameProblem(name: string, orclings: readonly Orcling[], self: Orcling |
 
 /** Where the form starts: the Orcling being changed, or a new one on the default model. */
 function startingPoint(existing: Orcling | undefined, initialModel: ModelChoice | null): { look: OrclingLook; name: string; model: ModelChoice | null; permission: OrclingPermission } {
-  if (!existing) return { look: defaultOrclingLook, name: "", model: initialModel, permission: "approve" };
+  if (!existing) return { look: defaultOrclingLook, name: "", model: initialModel, permission: defaultOrclingPermission };
   return { look: existing.look, name: existing.name, model: { ...existing.settings }, permission: existing.permission };
 }
 

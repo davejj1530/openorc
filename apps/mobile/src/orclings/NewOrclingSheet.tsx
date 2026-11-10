@@ -1,5 +1,5 @@
 import { newThreadChoice, type ModelChoice } from "@openorc/client";
-import { defaultOrclingLook, isHarnessId, type ModelExecutionSettings, type OrclingLook, type OrclingLookPart, type OrclingPermission } from "@openorc/protocol";
+import { defaultOrclingLook, defaultOrclingPermission, isHarnessId, type ModelExecutionSettings, type OrclingLook, type OrclingLookPart, type OrclingPermission } from "@openorc/protocol";
 import { router, Stack } from "expo-router";
 import { useContext, useState } from "react";
 import { Alert, TextInput, View } from "react-native";
@@ -105,7 +105,7 @@ export function NewOrclingSheet() {
   const [name, setName] = useState("");
   const [look, setLook] = useState<OrclingLook>(defaultOrclingLook);
   const [part, setPart] = useState<OrclingLookPart>("shape");
-  const [permission, setPermission] = useState<OrclingPermission>("approve");
+  const [permission, setPermission] = useState<OrclingPermission>(defaultOrclingPermission);
   const model = useStartingModel();
   const [account, setAccount] = useState<string | undefined>();
   const chats = useRpc("orclings.chats", {});
@@ -117,7 +117,7 @@ export function NewOrclingSheet() {
     (chats.data ?? []).map((chat) => chat.name),
   );
   const ready = Boolean(name.trim() && !problem && settings);
-  const dirty = Boolean(name.trim()) || !sameLook(look, defaultOrclingLook) || model.picked || Boolean(account) || permission !== "approve";
+  const dirty = Boolean(name.trim()) || !sameLook(look, defaultOrclingLook) || model.picked || Boolean(account) || permission !== defaultOrclingPermission;
   const creating = create.isPending;
   const close = () =>
     dirty

@@ -8,7 +8,8 @@ import type { ThreadService } from "./threads.js";
 
 export type ScheduleInput = RpcParams<"schedules.create">;
 export interface ScheduleHooks {
-  maintenance?: () => boolean;
+  /** Whether this agent's installation is being replaced. Its timer firings wait for a later tick, so the ones behind them start on time. */
+  updating?: (agent: string) => boolean;
 }
 class FiringCancelled extends Error {}
 class FiringSkipped extends Error {}
@@ -107,18 +108,19 @@ export class ScheduleService {
   }
 
   async tick(): Promise<void> {
-    if (this.closing || this.hooks?.maintenance?.()) return;
+    if (this.closing) return;
     // A crash before admission resumes the same receipt and immutable snapshot.
     for (const pending of scheduleFirings.pending(this.db)) {
-      if (this.closing || this.hooks?.maintenance?.()) return;
+      if (this.closing) return;
+      if (this.hooks?.updating?.(pending.snapshot.agent)) continue;
       await this.process(pending);
     }
     for (const listed of schedules.due(this.db, Date.now())) {
-      if (this.closing || this.hooks?.maintenance?.()) return;
+      if (this.closing) return;
       // An earlier schedule can await readiness while this one is edited or
       // manually fired. Bookkeeping does not change its configuration version.
       const schedule = schedules.get(this.db, listed.id);
-      if (!schedule || schedule.retiredTeam || !schedule.enabled || schedule.nextRunAt > Date.now()) continue;
+      if (!schedule || schedule.retiredTeam || !schedule.enabled || schedule.nextRunAt > Date.now() || this.hooks?.updating?.(schedule.agent)) continue;
       const key = `timer:${schedule.version}:${schedule.nextRunAt}`;
       const firing =
         scheduleFirings.findRequest(this.db, schedule.id, key) ??
@@ -134,7 +136,6 @@ export class ScheduleService {
     }
   }
   trigger(id: string, requestKey: string): Promise<ScheduleRunResult> {
-    if (this.hooks?.maintenance?.()) throw new Error("An agent update is running. Try again when it finishes.");
     if (!requestKey.trim() || requestKey.length > 300) throw new Error("A schedule launch needs a request key of at most 300 characters.");
     if (schedules.get(this.db, id)?.retiredTeam) throw new Error("Schedule not found.");
     const previous = scheduleFirings.findRequest(this.db, id, requestKey);

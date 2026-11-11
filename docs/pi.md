@@ -14,7 +14,7 @@ Run `pi` and use `/login` to connect a provider, or configure one of Pi's suppor
 
 In OpenOrc, rescan agents and enable **Pi** in **Settings → Connections**. Its available models come from Pi's own authenticated catalog. Disabled agents stay out of model pickers and cannot start work. After updating a development build, quit and reopen OpenOrc so its backend and interface run the same version.
 
-Recognized npm global installations can be updated or reinstalled from Connections. Updates wait for agent work to finish; existing conversations resume on the next message. See [coding-agent updates](agent-updates.md).
+Recognized npm global installations can be updated or reinstalled from Connections. Agents keep working during an update; each conversation moves to the new version on its next message. See [coding-agent updates](agent-updates.md).
 
 ## Behavior
 

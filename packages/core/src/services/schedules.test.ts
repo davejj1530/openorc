@@ -27,17 +27,8 @@ let afterAdmissionError: boolean;
 let notifications: ReturnType<typeof vi.fn<ConstructorParameters<typeof ScheduleService>[3]>>;
 let warnings: ReturnType<typeof vi.fn<(message: string) => void>>;
 let invalidations: ReturnType<typeof vi.fn<(keys: string[]) => void>>;
-function freshService(maintenance = () => false) {
-  return new ScheduleService(
-    db,
-    { start: modelStart },
-    invalidations,
-    notifications,
-    { info() {}, warn: warnings, error() {} },
-    {
-      maintenance,
-    },
-  );
+function freshService(updating: (agent: string) => boolean = () => false) {
+  return new ScheduleService(db, { start: modelStart }, invalidations, notifications, { info() {}, warn: warnings, error() {} }, { updating });
 }
 function modelSchedule() {
   return service.create({
@@ -208,20 +199,28 @@ describe("durable scheduled launches", () => {
   });
 });
 
-it("leaves due firings untouched during agent updates and resumes after maintenance", async () => {
-  let updating = true;
-  service = freshService(() => updating);
-  const schedule = modelSchedule();
+it("fires other agents' schedules on time during an agent's update, and that agent's own on the tick after it", async () => {
+  let updating = "codex";
+  service = freshService((agent) => agent === updating);
+  const held = modelSchedule();
+  const other = service.create({ ...modelSchedule(), title: "Scheduled on another agent", agent: "claude" });
+  expect(schedules.get(db, held.id)?.agent).toBe("codex");
   const due = Date.now() - 1000;
-  schedules.update(db, schedule.id, { nextRunAt: due });
+  for (const schedule of [held, other]) schedules.update(db, schedule.id, { nextRunAt: due });
   await service.tick();
-  expect(modelStart).not.toHaveBeenCalled();
-  expect(scheduleFirings.list(db, schedule.id)).toEqual([]);
-  expect(schedules.get(db, schedule.id)?.nextRunAt).toBe(due);
-  expect(() => service.trigger(schedule.id, "during-update")).toThrow("agent update is running");
-  updating = false;
+  expect(modelStart.mock.calls.map(([input]) => input.agent)).toEqual(["claude"]);
+  expect(scheduleFirings.list(db, held.id)).toEqual([]);
+  expect(schedules.get(db, held.id)?.nextRunAt).toBe(due);
+  updating = "";
   await service.tick();
-  expect(modelStart).toHaveBeenCalledTimes(1);
+  expect(modelStart.mock.calls.map(([input]) => input.agent)).toEqual(["claude", "codex"]);
+});
+
+it("starts a schedule by hand during its agent's update", async () => {
+  service = freshService(() => true);
+  const schedule = modelSchedule();
+  expect((await service.trigger(schedule.id, "during-update")).status).toBe("started");
+  expect(modelStart).toHaveBeenCalledOnce();
 });
 
 describe("a project's own Claude accounts", () => {

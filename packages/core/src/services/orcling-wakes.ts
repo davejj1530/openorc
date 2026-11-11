@@ -74,7 +74,8 @@ interface Dependencies {
   /** Where a wake goes: OpenOrc's own nudge into the Orcling's chat, read by its agent, never shown, and quiet if it says nothing. */
   threads: Pick<ThreadService, "send">;
   log: Logger;
-  maintenance?: () => boolean;
+  /** Whether this agent's installation is being replaced. Its Orclings wake on a later pass, so the others wake on time. */
+  updating?: (agent: string) => boolean;
   now?: () => number;
 }
 
@@ -113,11 +114,10 @@ export class OrclingWakeService {
 
   private async pass(opening: boolean): Promise<void> {
     const { db } = this.deps;
-    if (this.deps.maintenance?.()) return;
     const now = this.deps.now?.() ?? Date.now();
     for (const orcling of orclings.list(db)) {
       const home = threads.get(db, orcling.threadId);
-      if (!home || !orcling.wakes.length) continue;
+      if (!home || !orcling.wakes.length || this.deps.updating?.(home.agent)) continue;
       const due = dueWakes(orcling, orclings.wakeState(db, orcling.id), { now, opening, lastActivityAt: home.lastActivityAt });
       if (!due.length) continue;
       for (const { key } of due) orclings.markWakeChecked(db, orcling.id, key, now);

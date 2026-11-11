@@ -257,19 +257,14 @@ export class OpenOrc {
         if (id) this.providerUsage?.forgetClaudeAccount(id);
         invalidate(["claude-accounts", "system", "models", "provider-usage"]);
       },
-      (id) => Boolean(this.agentUpdates?.get().updating || this.memory?.hasPendingWork || this.textGeneration?.hasPendingWork || this.runs?.hasClaudeSessions(id)),
+      (id) => Boolean(this.runs?.agentUpdating("claude") || this.memory?.hasPendingWork || this.textGeneration?.hasPendingWork || this.runs?.hasClaudeSessions(id)),
       (id) => this.runs.retireIdleClaudeSessions(id),
       options.cloudOnly ? (id) => this.claudeCloudTokens.known(id) : undefined,
     );
     this.agentUpdates = new AgentUpdateService({
       info: (refresh) => this.system.info(refresh),
       environment: () => this.environment.current(),
-      reserve: async () => {
-        if (this.claudeAccounts.hasPendingWork || this.connectorService?.hasPendingWork || this.memory.hasPendingWork || this.textGeneration.hasPendingWork || this.schedules.hasPendingWork) {
-          throw new Error("Finish agent work and background processing before updating. Your conversations will be kept.");
-        }
-        return this.runs.reserveAgentUpdate();
-      },
+      reserve: (id) => this.runs.reserveAgentUpdate(id),
       changed: () => invalidate(["agent-updates"]),
       refreshed: () => invalidate(["system", "models"]),
       read: (key) => storedSettings.get(db, key),
@@ -328,11 +323,9 @@ export class OpenOrc {
     this.claudeAccountSwitch = new ClaudeAccountSwitch({ db, settings: this.settings, usage: this.providerUsage, runs: this.runs, threads: this.threads, log: this.log });
     this.claudeSignInRetry = new ClaudeSignInRetry({ db, accounts: this.claudeAccounts, runs: this.runs, threads: this.threads, log: this.log });
     this.lifecycle = new LifecycleService(db, invalidate, this.log);
-    this.schedules = new ScheduleService(db, this.threads, invalidate, notify, this.log, {
-      maintenance: () => this.agentUpdates.get().updating,
-    });
-    const maintenance = () => this.agentUpdates.get().updating;
-    this.orclingWakes = new OrclingWakeService({ db, activity: (id) => this.runs.threadActivity(id), threads: this.threads, log: this.log, maintenance });
+    const updating = (agent: string) => this.runs.agentUpdating(agent);
+    this.schedules = new ScheduleService(db, this.threads, invalidate, notify, this.log, { updating });
+    this.orclingWakes = new OrclingWakeService({ db, activity: (id) => this.runs.threadActivity(id), threads: this.threads, log: this.log, updating });
     this.files = createFileService({ options, writers: this.workspaceWriters, invalidate, environment: () => this.environment.current() });
     this.imports = new ImportService(db, this.ledger, invalidate, this.log, this.toolImages);
     this.reviewerApp = new ReviewerAppService(db, { secrets: options.githubSecrets, invalidate });
@@ -429,7 +422,7 @@ export class OpenOrc {
         ),
       launch: (agent, accountId) => {
         if (!this.settings.enabledHarnesses().includes(agent)) return null;
-        if (this.agentUpdates.get().updating) return null;
+        if (this.runs.agentUpdating(agent)) return null;
         try {
           const snapshot = this.environment.current();
           return captureLaunchEnvironment(agent, agent === "claude" ? this.claudeAccounts.environment(snapshot, accountId) : snapshot);

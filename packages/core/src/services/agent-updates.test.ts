@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { harnessIds, type HarnessId, type SystemInfo } from "@openorc/protocol";
 import { AgentUpdateService } from "./agent-updates.js";
-import { fetchAgentRelease, newerRelease, releaseVersion, type AgentInstallation } from "./agent-update-installation.js";
+import { fetchAgentRelease, newerRelease, releaseVersion, type AgentInstallation, type UpdateRunner } from "./agent-update-installation.js";
 import type { EnvSnapshot } from "./shell-environment.js";
 
 const environment: EnvSnapshot = {
@@ -33,14 +33,24 @@ function setup() {
     message: null,
   }));
   const latest = vi.fn(async (id: string): Promise<string> => (id === "codex" ? "1.1.0" : "2.2.0"));
-  const run = vi.fn(async (command: { binary: string; args: string[] }) => {
+  const run = vi.fn<UpdateRunner>(async (command) => {
     const id = command.args[0] as HarnessId;
     versions[id] = await latest(id);
     failing.delete(id);
     return "";
   });
+  /** Agents whose launches are held right now. */
+  const held = new Set<HarnessId>();
   const release = vi.fn();
-  const reserve = vi.fn(async () => release);
+  const reserve = vi.fn((id: HarnessId) => {
+    held.add(id);
+    return () => {
+      held.delete(id);
+      release(id);
+    };
+  });
+  /** An updater that runs until it is stopped. */
+  const endless: UpdateRunner = (_command, _env, options) => new Promise((_, reject) => options?.signal?.addEventListener("abort", () => reject(new Error("The update was stopped."))));
   const saved = new Map<string, string>();
   const changed = vi.fn();
   const service = new AgentUpdateService({
@@ -56,7 +66,7 @@ function setup() {
       saved.set(key, value);
     },
   });
-  return { service, info, detect, latest, run, reserve, release, versions, failing, saved };
+  return { service, info, detect, latest, run, reserve, release, held, endless, versions, failing, saved };
 }
 afterEach(() => {
   vi.useRealTimers();
@@ -122,7 +132,7 @@ describe("agent release checks", () => {
 });
 
 describe("agent updates", () => {
-  it.each(harnessIds)("updates %s and verifies its new version before releasing the run fence", async (id) => {
+  it.each(harnessIds)("updates %s and verifies its new version before letting it launch again", async (id) => {
     const f = setup();
     const installed = id === "cursor" ? "2026.11.01-abcdef1" : "1.0.0";
     const latest = id === "cursor" ? "2026.11.02-abcdef2" : "1.1.0";
@@ -131,21 +141,32 @@ describe("agent updates", () => {
     const checked = await f.service.check();
     expect(checked.agents.find((a) => a.id === id)).toMatchObject({ status: "available", canUpdate: true });
     expect(f.run).not.toHaveBeenCalled();
+    const probes = f.info.mock.calls.length;
+    let probedBeforeRelease = false;
+    f.release.mockImplementation(() => {
+      probedBeforeRelease = f.info.mock.calls.length === probes + 2;
+    });
     const updated = await f.service.install([id]);
-    expect(f.run).toHaveBeenCalledExactlyOnceWith({ binary: "/fixture/npm", args: [id] }, environment.env);
+    expect(f.run).toHaveBeenCalledExactlyOnceWith({ binary: "/fixture/npm", args: [id] }, environment.env, { signal: expect.any(AbortSignal) });
     expect(updated.agents.find((a) => a.id === id)).toMatchObject({ status: "current", installedVersion: latest });
-    expect(f.reserve).toHaveBeenCalledOnce();
-    expect(f.release).toHaveBeenCalledOnce();
+    expect(f.reserve).toHaveBeenCalledExactlyOnceWith(id);
+    expect(f.release).toHaveBeenCalledExactlyOnceWith(id);
+    expect(probedBeforeRelease).toBe(true);
   });
-  it("refuses active work without executing or changing available releases", async () => {
+  it("holds each agent's launches only while its own updater runs", async () => {
     const f = setup();
-    const before = await f.service.check();
-    f.reserve.mockRejectedValueOnce(new Error("Finish agent work"));
-    await expect(f.service.install(["codex"])).rejects.toThrow("Finish agent work");
-    expect(f.run).not.toHaveBeenCalled();
-    expect(f.service.get()).toMatchObject({ updating: false, agents: before.agents });
+    await f.service.check();
+    const heldDuring: HarnessId[][] = [];
+    const update = f.run.getMockImplementation()!;
+    f.run.mockImplementation(async (command, env) => {
+      heldDuring.push([...f.held]);
+      return update(command, env);
+    });
+    await f.service.install(["codex", "claude"]);
+    expect(heldDuring).toEqual([["codex"], ["claude"]]);
+    expect(f.held.size).toBe(0);
   });
-  it("updates sequentially, verifies versions, and releases admission even when one agent fails", async () => {
+  it("updates sequentially, verifies versions, and lets an agent launch again even when its update fails", async () => {
     const f = setup();
     await f.service.check();
     f.run.mockRejectedValueOnce(new Error("Fixture update failed"));
@@ -153,8 +174,43 @@ describe("agent updates", () => {
     expect(f.run).toHaveBeenCalledTimes(2);
     expect(state.agents[0]).toMatchObject({ status: "error", message: "Fixture update failed" });
     expect(state.agents[1]).toMatchObject({ status: "current", installedVersion: "2.2.0" });
-    expect(f.release).toHaveBeenCalledTimes(1);
+    expect(f.release.mock.calls).toEqual([["codex"], ["claude"]]);
+    expect(f.held.size).toBe(0);
     expect(state.updating).toBe(false);
+  });
+  it("stops the running updater on request and leaves the rest of the batch as it was", async () => {
+    const f = setup();
+    const before = await f.service.check();
+    f.run.mockImplementationOnce(f.endless);
+    const installing = f.service.install(["codex", "claude"]);
+    await vi.waitFor(() => expect(f.service.get().agents[0]?.status).toBe("updating"));
+    await vi.waitFor(() => expect(f.run).toHaveBeenCalledOnce());
+    const state = await f.service.cancel();
+    expect(state).toEqual(await installing);
+    expect(f.run).toHaveBeenCalledOnce();
+    expect(state.updating).toBe(false);
+    expect(state.agents[0]).toEqual({ ...before.agents[0], message: "The update was stopped." });
+    expect(state.agents[1]).toEqual(before.agents[1]);
+    expect(f.held.size).toBe(0);
+    // Both can be updated again.
+    expect((await f.service.install(["codex", "claude"])).agents.slice(0, 2).map((row) => row.status)).toEqual(["current", "current"]);
+  });
+  it("closes promptly while an updater runs", async () => {
+    const f = setup();
+    await f.service.check();
+    f.run.mockImplementationOnce(f.endless);
+    const installing = f.service.install(["codex", "claude"]);
+    await vi.waitFor(() => expect(f.run).toHaveBeenCalledOnce());
+    const waiting = new Promise((resolve) => setTimeout(() => resolve("still waiting"), 2000));
+    expect(await Promise.race([f.service.close().then(() => "closed"), waiting])).toBe("closed");
+    expect((await installing).updating).toBe(false);
+    expect(f.run).toHaveBeenCalledOnce();
+    expect(f.held.size).toBe(0);
+  });
+  it("has nothing to stop when no update runs", async () => {
+    const f = setup();
+    const before = await f.service.check();
+    expect(await f.service.cancel()).toEqual(before);
   });
   it("does not report success just because a command exited successfully", async () => {
     const f = setup();
@@ -169,7 +225,7 @@ describe("agent updates", () => {
     f.detect.mockResolvedValueOnce({ identity: "/other/codex", method: "Manual", releaseUrl: "codex", command: null, repair: null, message: null });
     expect((await f.service.install(["codex"])).agents[0]?.message).toContain("installation changed");
     expect(f.run).not.toHaveBeenCalled();
-    expect(f.release).toHaveBeenCalled();
+    expect(f.reserve).not.toHaveBeenCalled();
   });
   it("rejects manual installs and serializes competing install requests", async () => {
     const f = setup();
@@ -189,7 +245,7 @@ describe("installations that fail to start", () => {
     expect(state.agents[0]).toMatchObject({ status: "broken", installedVersion: null, method: "npm", canUpdate: true, message: null });
     expect(f.latest).toHaveBeenCalledTimes(1);
     const after = await f.service.install(["codex"]);
-    expect(f.run).toHaveBeenCalledWith({ binary: "/fixture/npm", args: ["codex", "repair"] }, expect.anything());
+    expect(f.run).toHaveBeenCalledWith({ binary: "/fixture/npm", args: ["codex", "repair"] }, expect.anything(), expect.anything());
     expect(after.agents[0]).toMatchObject({ status: "unchecked", installedVersion: "1.1.0", canUpdate: false, message: "Reinstalled." });
   });
   it("says when an update leaves the agent unable to start and offers the reinstall", async () => {

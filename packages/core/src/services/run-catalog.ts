@@ -90,9 +90,8 @@ function claudeModelList(list: StaticClaudeModel[], installed: string | null, en
   });
 }
 
-/** Provider catalog discovery and update fencing have one owner. */
+/** Provider catalog discovery has one owner. */
 export class RunCatalog {
-  private pendingCatalogs = 0;
   private readonly modelCache = new ModelCatalogCache();
   /**
    * Fast blocks a Claude turn reported, by account. Claude Code's initialize answer says Fast is on until a request
@@ -107,15 +106,11 @@ export class RunCatalog {
     private readonly opencode: Pick<AcpAdapter, "listModels">,
     private readonly omp: Pick<AcpAdapter, "listModels">,
     private readonly cursor: Pick<AcpAdapter, "listModels">,
-    private readonly assertAvailable: () => void,
+    private readonly updating: (agent: HarnessId) => boolean,
     private readonly pi = { listModels: listPiModels },
     private readonly antigravity: Pick<AcpAdapter, "listModels">,
     private readonly fx: Pick<AcpAdapter, "listModels">,
   ) {}
-
-  get pending(): number {
-    return this.pendingCatalogs;
-  }
 
   assertEnabled(agent: string): void {
     const enabled = this.hooks.enabledHarnesses?.();
@@ -142,29 +137,25 @@ export class RunCatalog {
     claudeAccountId?: string,
     shown = false,
   ): Promise<ModelCatalog> {
-    this.assertAvailable();
-    this.pendingCatalogs++;
-    try {
-      const entries = await Promise.all(
-        (this.hooks.enabledHarnesses?.() ?? harnessIds)
-          .filter((id) => !agent || id === agent)
-          .map((id): Promise<CatalogEntry> => {
-            try {
-              const snapshot = id === "claude" && !admitted ? (this.hooks.claudeEnvironment?.(environment, claudeAccountId) ?? environment) : environment;
-              const account = id === "claude" ? snapshot.claudeAccountId : undefined;
-              if (refresh && account) this.claudeFastBlocks.delete(account);
-              const read = this.modelCache.read(id, snapshot.revision, () => this.modelLists[id](snapshot, admitted), refresh, admitted?.scope ?? snapshot.scope);
-              const block = shown && account ? this.claudeFastBlocks.get(account) : undefined;
-              return block ? read.then((entry) => ({ ...entry, models: withClaudeAccountFastMode(entry, block).models })) : read;
-            } catch (error) {
-              return Promise.resolve({ models: [], provider: { agent: id, status: "error", refreshedAt: null, message: error instanceof Error ? error.message : "This account is unavailable." } });
-            }
-          }),
-      );
-      return { models: entries.flatMap((entry) => entry.models), providers: entries.map((entry) => entry.provider) };
-    } finally {
-      this.pendingCatalogs--;
-    }
+    const entries = await Promise.all(
+      (this.hooks.enabledHarnesses?.() ?? harnessIds)
+        .filter((id) => !agent || id === agent)
+        .map((id): Promise<CatalogEntry> => {
+          try {
+            // Listing models starts the agent, which is being replaced. The list returns when its update ends.
+            if (this.updating(id)) throw new Error(`${harnessCatalog[id].name} is updating.`);
+            const snapshot = id === "claude" && !admitted ? (this.hooks.claudeEnvironment?.(environment, claudeAccountId) ?? environment) : environment;
+            const account = id === "claude" ? snapshot.claudeAccountId : undefined;
+            if (refresh && account) this.claudeFastBlocks.delete(account);
+            const read = this.modelCache.read(id, snapshot.revision, () => this.modelLists[id](snapshot, admitted), refresh, admitted?.scope ?? snapshot.scope);
+            const block = shown && account ? this.claudeFastBlocks.get(account) : undefined;
+            return block ? read.then((entry) => ({ ...entry, models: withClaudeAccountFastMode(entry, block).models })) : read;
+          } catch (error) {
+            return Promise.resolve({ models: [], provider: { agent: id, status: "error", refreshedAt: null, message: error instanceof Error ? error.message : "This account is unavailable." } });
+          }
+        }),
+    );
+    return { models: entries.flatMap((entry) => entry.models), providers: entries.map((entry) => entry.provider) };
   }
 
   private readonly modelLists: Record<HarnessId, (environment: EnvSnapshot, admitted?: AgentLaunchEnvironment) => Promise<DiscoveredModels>> = {

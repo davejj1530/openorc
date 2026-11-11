@@ -8,7 +8,7 @@ import { defaultOrclingLook, type CorePush, type OrclingDraft } from "@openorc/p
 import { createOrclingHost } from "../mcp-host/orcling.js";
 import { guardContext } from "../remote/policy.js";
 import { OpenOrc } from "../openorc.js";
-import { dueWakes, lastDue, wakePrompt } from "./orcling-wakes.js";
+import { dueWakes, lastDue, OrclingWakeService, wakePrompt } from "./orcling-wakes.js";
 
 let root: string | undefined;
 afterEach(async () => {
@@ -181,6 +181,32 @@ it("wakes as OpenOrc opens only after a quiet stretch, so restarting the app doe
   expect(due(0, now - 7 * hour, false)).toEqual([]);
   expect(due(now - hour, now - 7 * hour)).toEqual([]);
   expect(due(0, now - hour)).toEqual([]);
+});
+
+it("wakes an Orcling whose agent is being updated on a later pass, and the others on time", async () => {
+  const { core } = await fixture();
+  try {
+    const pip = await core.orclings.create(draft);
+    const mo = await core.orclings.create({ ...draft, name: "Mo", settings: { ...draft.settings, agent: "claude" } });
+    for (const orcling of [pip, mo]) core.orclings.saveWakes(orcling.id, [{ kind: "startup" }]);
+    let updating = "codex";
+    const send = vi.fn(async (_threadId: string) => {});
+    const wakes = new OrclingWakeService({
+      db: core.db,
+      activity: () => "idle",
+      threads: { send },
+      log: { info() {}, warn() {}, error() {} },
+      updating: (agent) => agent === updating,
+      now: () => Date.now() + 24 * 60 * 60_000,
+    });
+    await wakes.tick(true);
+    expect(send.mock.calls.map(([threadId]) => threadId)).toEqual([mo.threadId]);
+    updating = "";
+    await wakes.tick(true);
+    expect(send.mock.calls.map(([threadId]) => threadId)).toEqual([mo.threadId, pip.threadId]);
+  } finally {
+    await core.close();
+  }
 });
 
 it("keeps a wake quiet when its process has to start again, as after a change of permission", async () => {

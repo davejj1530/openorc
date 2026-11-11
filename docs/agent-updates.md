@@ -23,9 +23,13 @@ Windows, custom launchers, unrecognized Homebrew formulas or channels, and other
 
 ## While an update runs
 
-An update waits for agent turns, approvals, model discovery, and background generation to finish. Once it starts, OpenOrc holds new turns, closes idle agent processes, and lets scheduled runs wait until the update is done. Conversations stay saved and resume on a new process. Agent sessions in other applications are not affected by this.
+An update does not wait for agent work and does not interrupt it. Conversations on other agents carry on as usual. Conversations already open on the agent being updated keep the version they started on and take messages as usual. A new conversation on that agent, or a message that needs a new process, waits for the update and then starts on the new version. Scheduled runs and Orcling check-ins on that agent start once the update is done, and its model list returns then. Agent sessions in other applications are not affected by this.
 
-Update commands run without a shell or administrator rights, with limited output and a three-minute timeout. On macOS and Linux, a failure or timeout stops the updater and any processes it started. Raw package-manager output is not shown in the app because it can contain registry credentials. OpenOrc checks the installation again just before updating and checks the version afterwards. Failed checks and updates stay visible with steps to recover. OpenOrc cannot undo changes a failed package manager made.
+After the update, each conversation that was open on that agent moves to the new version at its next message. A turn, background work, or a command the agent left running keeps the conversation on its process until it ends.
+
+**Stop** on the agent's row ends the update that is running and leaves the remaining agents as they were. Closing OpenOrc stops it as well.
+
+Update commands run without a shell or administrator rights, with limited output and a 30-minute limit, which leaves room for a large download on a slow connection. On macOS and Linux, a failure, a stop, or the limit ends the updater and any processes it started. Raw package-manager output is not shown in the app because it can contain registry credentials. OpenOrc checks the installation again just before updating and checks the version afterwards. Failed checks and updates stay visible with steps to recover. OpenOrc cannot undo changes a failed package manager made.
 
 The OpenOrc app has its own updater; see [desktop releases and updates](desktop-updates.md).
 

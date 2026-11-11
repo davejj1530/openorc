@@ -102,7 +102,7 @@ export function AgentConnections({ info, actions }: { info?: SystemInfo; actions
           onChange={(automatic) => configure.mutate({ automatic })}
         />
       </div>
-      <p className="settings-note">Updates start only when agent work has finished. Idle sessions reconnect on your next message; your conversations stay here.</p>
+      <p className="settings-note">Agents keep working during an update. Each conversation moves to the new version on its next message.</p>
     </Section>
   );
 }
@@ -219,16 +219,22 @@ function AgentLoginInstructions({ id }: { id: HarnessInfo["id"] }) {
 }
 
 const actionLabels: Partial<Record<AgentUpdate["status"], string>> = { available: "Update", broken: "Reinstall" };
-const progressLabels: Partial<Record<AgentUpdate["status"], string>> = { updating: "Updating…", reinstalling: "Reinstalling…" };
+const progressLabels: Partial<Record<AgentUpdate["status"], string>> = { updating: "Updating", reinstalling: "Reinstalling" };
 
-/** The row's one action: run the planned update or reinstall, or show that it is running. */
+/** The row's one action: run the planned update or reinstall, or stop the one that is running. */
 function AgentUpdateAction({ update, name, busy, onUpdate }: { update: AgentUpdate; name: string; busy: boolean; onUpdate: () => void }) {
+  const stop = useRpcMutation("agents.updates.cancel");
   const progress = progressLabels[update.status];
   if (progress)
     return (
-      <span role="status" className="text-sm text-ink-2">
-        {progress}
-      </span>
+      <>
+        <span role="status" className="text-sm text-ink-2">
+          {progress}…
+        </span>
+        <Button size="sm" aria-label={`Stop ${progress.toLowerCase()} ${name}`} disabled={stop.isPending} onClick={() => stop.mutate({})}>
+          Stop
+        </Button>
+      </>
     );
   const action = actionLabels[update.status];
   if (!action || !update.canUpdate) return null;

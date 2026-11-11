@@ -66,21 +66,26 @@ it("returns cancellation errors to the renderer and allows a later successful re
   expect(interrupt).toHaveBeenCalledTimes(2);
 });
 
-it("agent updates refuse active turns, then fence admission while idle sessions close", async () => {
+it("an agent's update leaves its working conversation running, and its next turn starts on the new version", async () => {
   const run = await session(async () => {});
-  await expect(core.runs.reserveAgentUpdate()).rejects.toThrow("Finish agent work");
-  expect(core.runs.isLive(run.id)).toBe(true);
-  const handle = vi.mocked(CodexAdapter.prototype.start).mock.results.at(-1)!.value as RunHandle;
+  const release = core.runs.reserveAgentUpdate("codex");
+  await core.runs.send(run.id, "During the update");
+  expect(core.runs.isBusy(run.id)).toBe(true);
+  release();
+  const start = vi.mocked(CodexAdapter.prototype.start);
+  const handle = start.mock.results.at(-1)!.value as RunHandle;
   handle.emit("event", { type: "turn.completed", runId: run.id, ts: Date.now(), turnId: "update-fixture", status: "success", durationMs: 1 });
   await vi.waitFor(() => expect(core.runs.isBusy(run.id)).toBe(false));
-  const reserved = core.runs.reserveAgentUpdate();
-  await expect(core.runs.send(run.id, "Racing message")).rejects.toThrow("agent update is running");
-  await expect(core.runs.modelCatalog("codex")).rejects.toThrow("agent update is running");
-  await expect(core.runs.compact(run.id)).rejects.toThrow("agent update is running");
-  const release = await reserved;
+  expect(start).toHaveBeenCalledOnce();
+
+  await core.runs.send(run.id, "After the update");
+  expect(start).toHaveBeenCalledTimes(2);
   expect(core.runs.isLive(run.id)).toBe(false);
-  expect(threads.get(core.db, run.threadId!)?.id).toBe(run.threadId);
-  release();
-  // Releasing the fence allows admission again; this specific old process has retired.
-  await expect(core.runs.send(run.id, "Resume later")).rejects.toThrow("not live");
+  const replacement = core.runs.liveRunForThread(run.threadId!)!;
+  live.push(replacement.id);
+  expect(replacement.id).not.toBe(run.id);
+});
+
+it("answers a request to stop agent updates when none is running", async () => {
+  expect(await core.handle({ type: "rpc", id: 903, method: "agents.updates.cancel", params: {} })).toMatchObject({ type: "rpc.result", id: 903, result: { updating: false } });
 });

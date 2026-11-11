@@ -44,7 +44,7 @@ beforeEach(() => {
     if (method === "agents.updates.get" || method === "agents.updates.check") return state;
     if (method === "agents.updates.configure" && "dismissed" in params) state = { ...state, dismissed: params.dismissed ?? null };
     if (method === "agents.updates.configure" && "automatic" in params) state = { ...state, automatic: params.automatic ?? true };
-    if (method === "agents.updates.install") throw new Error("Finish agent work before updating.");
+    if (method === "agents.updates.install") throw new Error("The installation changed. Check for updates again before updating.");
     return state;
   });
 });
@@ -54,11 +54,11 @@ afterEach(() => {
   vi.resetAllMocks();
 });
 const show = (notice = false) => render(<QueryClientProvider client={queryClient}>{notice ? <AgentUpdateNotice /> : <AgentConnections info={info} />}</QueryClientProvider>);
-it("updates only supported available installations and surfaces active-work errors", async () => {
+it("updates only supported available installations and says why an update did not start", async () => {
   show();
   fireEvent.click(await screen.findByRole("button", { name: `Update all (${harnessIds.length - 1})` }));
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("agents.updates.install", { ids: harnessIds.filter((id) => id !== "opencode") }));
-  expect((await screen.findByRole("alert")).textContent).toContain("Finish agent work");
+  expect((await screen.findByRole("alert")).textContent).toContain("The installation changed");
   expect(screen.queryByRole("button", { name: "Update OpenCode" })).toBeNull();
   expect(screen.getByRole("button", { name: "Update instructions" })).toBeTruthy();
 });
@@ -101,6 +101,20 @@ it("disables actions and suppresses the notice while an update is running", asyn
   await screen.findByText("Updating agents…");
   expect((screen.getByRole("button", { name: "Check for updates" }) as HTMLButtonElement).disabled).toBe(true);
   expect((screen.getByRole("button", { name: "Update Claude" }) as HTMLButtonElement).disabled).toBe(true);
+});
+it("stops the update that is running from its own row", async () => {
+  state = { ...state, updating: true, agents: state.agents.map((row) => (row.id === "codex" ? { ...row, status: "updating" } : row)) };
+  show();
+  fireEvent.click(await screen.findByRole("button", { name: "Stop updating Codex" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("agents.updates.cancel", {}));
+  expect(screen.getAllByRole("button", { name: /^Stop / })).toHaveLength(1);
+  expect(screen.queryByRole("button", { name: "Update Codex" })).toBeNull();
+});
+it("stops a reinstall the same way", async () => {
+  state = { ...state, updating: true, agents: state.agents.map((row) => (row.id === "codex" ? { ...row, status: "reinstalling" } : row)) };
+  show();
+  fireEvent.click(await screen.findByRole("button", { name: "Stop reinstalling Codex" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("agents.updates.cancel", {}));
 });
 it("offers a reinstall for an agent that fails to start instead of a login hint", async () => {
   const broken = { status: "broken" as const, installedVersion: null, latestVersion: null };

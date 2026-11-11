@@ -22,6 +22,7 @@ import { randomUUID } from "node:crypto";
 import type { FrameCoalescer } from "../frames.js";
 import type { Logger } from "../transport.js";
 import type { AppAction } from "./app-actions.js";
+import { AgentUpdateGate } from "./agent-update-gate.js";
 import { McpAppService } from "./mcp-apps.js";
 import { RunApprovals } from "./run-approvals.js";
 import { RunBriefs } from "./run-briefs.js";
@@ -49,6 +50,7 @@ import {
   type ThreadPermissionState,
   type TurnSettledOutcome,
 } from "./run-types.js";
+import type { EnvSnapshot } from "./shell-environment.js";
 import { SubagentService } from "./subagents.js";
 import { TurnStartCapture } from "./turn-start-checkpoint.js";
 import { workspaceWriters, type WorkspaceWriters } from "./workspace-writers.js";
@@ -64,41 +66,20 @@ export { versionAtLeast } from "./run-catalog.js";
  * turns snapshot the worktree for review.
  */
 export class RunService {
-  private agentUpdateReserved = false;
-  private pendingSends = 0;
+  private readonly updates = new AgentUpdateGate();
+  /** Threads whose start is waiting for their agent's update to finish. */
+  private readonly awaitingUpdate = new Set<string>();
 
-  /** Fence admission before yielding, then retire idle sessions so the next turn resumes on the new binary. */
-  async reserveAgentUpdate(): Promise<() => void> {
-    if (
-      this.agentUpdateReserved ||
-      this.closing ||
-      this.starting.size ||
-      this.startOperations.size ||
-      this.pendingSends ||
-      this.catalog.pending ||
-      this.finalizations.size ||
-      this.compactions.size ||
-      this.approvals.pendingCount ||
-      [...this.live.values()].some((entry) => working(entry) || entry.exiting || entry.closingRequested)
-    ) {
-      throw new Error("Finish agent work and pending approvals before updating. Your conversations will be kept.");
-    }
-    if (this.backgroundCommandsRunning) throw new Error("Stop the background commands running in your conversations before updating.");
-    this.agentUpdateReserved = true;
-    try {
-      await Promise.all([...this.live.keys()].map((id) => this.closeAndWait(id)));
-      return () => {
-        this.agentUpdateReserved = false;
-      };
-    } catch (error) {
-      this.agentUpdateReserved = false;
-      throw error;
-    }
+  /** Holds new launches of `id` until the returned release runs. Its running sessions carry on with the version they started on. */
+  reserveAgentUpdate(id: HarnessId): () => void {
+    if (this.closing) throw new Error("OpenOrc is closing.");
+    return this.updates.begin(id);
   }
 
-  private assertAgentUpdateIdle(): void {
-    if (this.agentUpdateReserved) throw new Error("An agent update is running. Try again when it finishes.");
+  agentUpdating(agent: string): boolean {
+    return this.updates.settled(agent) !== null;
   }
+
   readonly mcpApps = new McpAppService({
     remember: (runId, toolCallId, mcp) => this.emit({ type: "tool.updated", runId, ts: Date.now(), toolCallId, mcp }),
     call: (runId, callId) => {
@@ -205,12 +186,11 @@ export class RunService {
     this.antigravity = new AcpAdapter({ profile: antigravityAcp, onApproval: (request) => this.approvals.handleAcpApproval(request) });
     const fx = new AcpAdapter({ profile: fxAcp, onApproval: (request) => this.approvals.handleAcpApproval(request) });
     this.adapters = adapters ?? { codex: this.codex, claude: this.claude, opencode: this.opencode, omp: this.omp, cursor: this.cursor, pi: this.pi, antigravity: this.antigravity, fx };
-    this.catalog = new RunCatalog(this.hooks, this.codex, this.opencode, this.omp, this.cursor, () => this.assertAgentUpdateIdle(), this.pi, this.antigravity, fx);
+    this.catalog = new RunCatalog(this.hooks, this.codex, this.opencode, this.omp, this.cursor, (agent) => this.agentUpdating(agent), this.pi, this.antigravity, fx);
     this.briefs = new RunBriefs(this.db, this.hooks);
     this.liveView = new RunLive({
       db: this.db,
       isClosing: () => this.closing,
-      isAgentUpdateReserved: () => this.agentUpdateReserved,
       closeAndWait: (runId) => this.closeAndWait(runId),
       hooks: this.hooks,
       emit: (event) => this.emit(event),
@@ -271,6 +251,7 @@ export class RunService {
       invalidate: this.invalidate,
       keysFor: (scope) => runScopeKeys(scope),
       start: (input) => this.start(input),
+      installation: (agent) => this.updates.generation(agent),
       emit: (event) => this.emit(event),
       validateFastMode: (agent, model, fastMode, id) => this.validateFastMode(agent, model, fastMode, undefined, undefined, id),
       log: this.log,
@@ -346,6 +327,7 @@ export class RunService {
       validateFastMode: (agent, model, fastMode, environment, launch) => this.validateFastMode(agent, model, fastMode, environment, launch),
       liveRunForTask: (id) => this.liveRunForTask(id),
       liveRunForThread: (id) => this.liveRunForThread(id),
+      installation: (agent) => this.updates.generation(agent),
     });
   }
 
@@ -407,7 +389,7 @@ export class RunService {
   threadActivity(threadId: string): "idle" | "running" | "waiting" {
     if (subagents.byThread(this.db, threadId)?.status === "running") return "running";
     const entry = [...this.live.values()].find((e) => e.run.threadId === threadId);
-    if (!entry) return subagents.hasWorkingDescendants(this.db, threadId) ? "running" : "idle";
+    if (!entry) return this.awaitingUpdate.has(threadId) || subagents.hasWorkingDescendants(this.db, threadId) ? "running" : "idle";
     for (const p of this.approvals.pendingEntries) if (p.info.runId === entry.run.id) return "waiting";
     return working(entry) || subagents.hasWorkingDescendants(this.db, threadId) ? "running" : "idle";
   }
@@ -429,7 +411,7 @@ export class RunService {
     await entry.handle.stopCommand(commandId);
   }
 
-  /** An agent left a command running in the background. Closing its process for an update would end it. */
+  /** An agent left a command running in the background. Closing its process would end it. */
   get backgroundCommandsRunning(): boolean {
     return [...this.live.values()].some((entry) => entry.commands.length > 0);
   }
@@ -520,15 +502,18 @@ export class RunService {
     agent: AgentKind,
     model: string | undefined,
     fastMode: boolean | undefined,
-    environment = this.hooks.environment(),
+    environment?: EnvSnapshot,
     launch?: AgentLaunchEnvironment,
     claudeAccountId?: string | null,
   ): Promise<void> {
+    if (!fastMode) return;
+    // A check ahead of a launch reads the agent's models, so it waits like the launch does.
+    if (!environment && this.agentUpdating(agent)) await this.updates.idle(agent);
+    environment ??= this.hooks.environment();
     if (agent === "claude" && claudeAccountId) {
       environment = this.hooks.claudeEnvironment?.(environment, claudeAccountId) ?? environment;
       launch ??= captureLaunchEnvironment("claude", environment);
     }
-    if (!fastMode) return;
     const options = await this.models(agent, environment, launch);
     const selected = model ? options.find((m) => m.id === model) : options.find((m) => m.isDefault);
     if (!selected?.fastMode?.supported || selected.unavailable) {
@@ -559,27 +544,44 @@ export class RunService {
   async start(input: StartRunInput): Promise<Run> {
     this.catalog.assertEnabled(input.agent);
     if (input.scope.thread) this.subagents.assertExecutable({ threadId: input.scope.thread.id });
-    this.assertAgentUpdateIdle();
     input = normalizeModelSettings(input);
     // Only user input resets the chain of messages sent between conversations.
     if ((input.promptRole ?? "user") === "user" && input.scope.thread) this.agentHops.delete(input.scope.thread.id);
     if (this.closing) throw new Error("OpenOrc is closing.");
     input.assertCanStart?.();
-    const captured = this.captureAccount(input);
-    input = captured.input;
     const key = this.startKey(input);
     if (this.starting.has(key)) throw new Error("This conversation is already starting. Wait for it to connect before sending again.");
     this.starting.add(key);
-    const releaseAccount = this.trackAccountStart(input);
-    const operation = this.launcher.startSession(input, captured.environment, captured.launch);
-    this.startOperations.add(operation);
+    let releaseAccount = () => {};
+    let operation: Promise<Run> | undefined;
     try {
+      if (this.agentUpdating(input.agent)) await this.awaitUpdate(input);
+      const captured = this.captureAccount(input);
+      input = captured.input;
+      releaseAccount = this.trackAccountStart(input);
+      operation = this.launcher.startSession(input, captured.environment, captured.launch);
+      this.startOperations.add(operation);
       return await operation;
     } finally {
       releaseAccount();
       this.starting.delete(key);
-      this.startOperations.delete(operation);
+      if (operation) this.startOperations.delete(operation);
     }
+  }
+
+  /** Holds a start until its agent's update ends, so it launches on what the update installed. Its thread reads as at work meanwhile. */
+  private async awaitUpdate(input: StartRunInput): Promise<void> {
+    const threadId = input.scope.thread?.id;
+    if (threadId) this.awaitingUpdate.add(threadId);
+    this.invalidate(runScopeKeys(input.scope));
+    try {
+      await this.updates.idle(input.agent);
+    } finally {
+      if (threadId) this.awaitingUpdate.delete(threadId);
+      this.invalidate(runScopeKeys(input.scope));
+    }
+    if (this.closing) throw new Error("OpenOrc is closing.");
+    input.assertCanStart?.();
   }
 
   private captureAccount(input: StartRunInput) {
@@ -644,13 +646,7 @@ export class RunService {
     const run = this.live.get(runId)?.run ?? runs.get(this.db, runId);
     if (run) this.catalog.assertEnabled(run.agent);
     this.subagents.assertExecutable({ runId });
-    this.assertAgentUpdateIdle();
-    this.pendingSends++;
-    try {
-      await this.turns.sendTurn(runId, text, options);
-    } finally {
-      this.pendingSends--;
-    }
+    await this.turns.sendTurn(runId, text, options);
   }
 
   async interrupt(runId: string): Promise<void> {
@@ -751,7 +747,7 @@ export class RunService {
 
   /** Atomically refuse a restart or fence new turns before the caller begins shutdown. */
   prepareForUpdate(): boolean {
-    if (this.agentUpdateReserved || this.closing || this.busy) return false;
+    if (this.updates.any || this.closing || this.busy) return false;
     this.closing = true;
     return true;
   }

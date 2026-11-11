@@ -80,6 +80,8 @@ interface RunLaunchDependencies {
   validateFastMode: (agent: AgentKind, model: string | undefined, fastMode: boolean | undefined, environment: EnvSnapshot, launch: AgentLaunchEnvironment) => Promise<void>;
   liveRunForTask: (taskId: string) => Run | null;
   liveRunForThread: (threadId: string) => Run | null;
+  /** Which installation of an agent a process started now would run. */
+  installation: (agent: AgentKind) => number;
 }
 
 export class RunLaunch {
@@ -218,6 +220,7 @@ export class RunLaunch {
       internalMcp,
       providerPermissionMode: spec.permissionMode,
       ...(orclingCeiling ? { orclingCeiling } : {}),
+      installation: this.deps.installation(input.agent),
     });
     // The picker can change while catalog discovery or MCP startup is awaiting.
     const thread = input.scope.thread;

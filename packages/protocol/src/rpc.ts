@@ -105,6 +105,7 @@ export const rpcParams = {
   "agents.updates.get": z.object({}),
   "agents.updates.check": z.object({}),
   "agents.updates.install": z.object({ ids: z.array(HarnessId).min(1).max(HarnessId.options.length) }).strict(),
+  "agents.updates.cancel": z.object({}),
   "agents.updates.configure": z.object({ automatic: z.boolean().optional(), dismissed: z.string().max(300).optional() }).strict(),
   "providers.usage": z.object({
     provider: z.enum([...HarnessId.options, "anthropic-api"]),
@@ -582,6 +583,7 @@ export interface RpcResults
   "agents.updates.get": AgentUpdates;
   "agents.updates.check": AgentUpdates;
   "agents.updates.install": AgentUpdates;
+  "agents.updates.cancel": AgentUpdates;
   "agents.updates.configure": AgentUpdates;
   "providers.usage": import("./provider-usage.js").ProviderUsage;
   "providers.limits": import("./provider-usage.js").PlanLimits[];

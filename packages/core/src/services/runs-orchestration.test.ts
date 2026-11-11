@@ -876,12 +876,16 @@ describe("background work", () => {
     await vi.waitFor(() => expect(hooks.onTurnSettled).toHaveBeenCalledOnce());
     expect(service.threadActivity(thread.id)).toBe("idle");
     expect(service.threadBackgroundCommands(thread.id)).toEqual([server]);
-    // Neither the idle clock, another writer nor an update may end the server.
+    // Neither the idle clock, another writer, the app's restart nor an update of its agent may end the server.
     await new Promise((resolve) => setTimeout(resolve, 250));
     await expect(writers.acquire(root, "review commit")).rejects.toThrow(/in use/);
     expect(service.prepareForUpdate()).toBe(false);
-    await expect(service.reserveAgentUpdate()).rejects.toThrow(/background commands/);
+    service.reserveAgentUpdate("claude")();
+    await service.send(run.id, "Is the preview still up?");
+    expect(adapters.claude.start).toHaveBeenCalledOnce();
     expect(service.isLive(run.id)).toBe(true);
+    turnCompleted(run.id, "after-update");
+    await vi.waitFor(() => expect(service.isBusy(run.id)).toBe(false));
 
     await service.stopBackgroundCommand(thread.id, "ended");
     expect(stopTransport).not.toHaveBeenCalled();
@@ -891,6 +895,123 @@ describe("background work", () => {
     await vi.waitFor(() => expect(service.threadBackgroundCommands(thread.id)).toEqual([]));
     await vi.waitFor(() => expect(service.isLive(run.id)).toBe(false), { timeout: 3000 });
     expect(hooks.onThreadIdle).not.toHaveBeenCalled();
+  });
+});
+
+describe("agent updates", () => {
+  function conversation(agent: "codex" | "claude") {
+    const thread = threads.insert(db, { projectId: project.id, title: `On ${agent}`, agent, model: "fixture", mode: "act", permissionMode: "trusted" });
+    const input: StartRunInput = { scope: { task: null, thread }, project, agent, model: "fixture", mode: "act", permissionMode: "trusted", prompt: "Carry on", resume: false };
+    return { thread, input };
+  }
+  async function endTurn(runId: string, turnId: string) {
+    emit(runId, { type: "turn.completed", runId, ts: Date.now(), turnId, status: "success", durationMs: 1 });
+    await vi.waitFor(() => expect(service.isBusy(runId)).toBe(false));
+  }
+
+  it("updates an agent while conversations work, and delivers their messages meanwhile", async () => {
+    const other = await service.start(conversation("claude").input);
+    const own = await service.start(conversation("codex").input);
+    const release = service.reserveAgentUpdate("codex");
+    for (const run of [other, own]) {
+      await service.send(run.id, `During the update, to ${run.agent}`);
+      expect(followupTransport).toHaveBeenLastCalledWith(`During the update, to ${run.agent}`, undefined);
+      expect(service.isBusy(run.id)).toBe(true);
+    }
+    release();
+    for (const start of [adapters.claude.start, adapters.codex.start]) expect(start).toHaveBeenCalledOnce();
+  });
+
+  it("starts another agent's conversation at once during an update", async () => {
+    const release = service.reserveAgentUpdate("codex");
+    const held = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("The start waited for another agent's update.")), 5000));
+    const run = await Promise.race([service.start(conversation("claude").input), held]);
+    expect(service.isBusy(run.id)).toBe(true);
+    release();
+  });
+
+  it("holds a start of the agent being updated, then launches it on the environment the update left", async () => {
+    let current = environmentSnapshot(7);
+    hooks.environment = () => current;
+    const release = service.reserveAgentUpdate("codex");
+    const { thread, input } = conversation("codex");
+    const starting = service.start(input);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(adapters.codex.start).not.toHaveBeenCalled();
+    expect(mcp).not.toHaveBeenCalled();
+    expect(service.threadActivity(thread.id)).toBe("running");
+    expect(invalidations).toHaveBeenCalledWith(expect.arrayContaining([`thread:${thread.id}`]));
+    // The held start counts as work for the app's own restart, and its conversation still starts only once.
+    expect(service.busy).toBe(true);
+    await expect(service.start(input)).rejects.toThrow("already starting");
+
+    current = environmentSnapshot(8);
+    release();
+    const run = await starting;
+    expect(adapters.codex.start).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ runId: run.id }), expect.objectContaining({ revision: 8, binary: "/snapshot/8/codex" }));
+    expect(service.isBusy(run.id)).toBe(true);
+  });
+
+  it("refuses the app's own restart while an agent is being updated", () => {
+    const release = service.reserveAgentUpdate("codex");
+    expect(service.prepareForUpdate()).toBe(false);
+    release();
+    release();
+    expect(service.prepareForUpdate()).toBe(true);
+    expect(() => service.reserveAgentUpdate("codex")).toThrow("closing");
+  });
+
+  it("holds an agent's launches until the update holding them ends, whatever other releases run", async () => {
+    const earlier = service.reserveAgentUpdate("codex");
+    earlier();
+    const release = service.reserveAgentUpdate("codex");
+    expect(() => service.reserveAgentUpdate("codex")).toThrow("already being updated");
+    earlier();
+    service.reserveAgentUpdate("claude")();
+    const starting = service.start(conversation("codex").input);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(adapters.codex.start).not.toHaveBeenCalled();
+    release();
+    await starting;
+    expect(adapters.codex.start).toHaveBeenCalledOnce();
+  });
+
+  it("keeps a conversation on its process through its agent's update, and replaces it at the next turn with nothing running", async () => {
+    const { thread, input } = conversation("codex");
+    const run = await service.start(input);
+    service.reserveAgentUpdate("codex")();
+    expect(service.isBusy(run.id)).toBe(true);
+
+    // The turn ends with a command still running in its process, so the next message goes to that process.
+    emit(run.id, { type: "background.updated", runId: run.id, ts: Date.now(), running: 0, commands: [{ id: "b1", description: "Serve the preview" }] });
+    await endTurn(run.id, "first");
+    await service.send(run.id, "With the server up");
+    expect(followupTransport).toHaveBeenLastCalledWith("With the server up", undefined);
+    expect(adapters.codex.start).toHaveBeenCalledOnce();
+
+    emit(run.id, { type: "background.updated", runId: run.id, ts: Date.now(), running: 0, commands: [] });
+    await endTurn(run.id, "second");
+    await service.send(run.id, "With nothing running");
+    expect(adapters.codex.start).toHaveBeenCalledTimes(2);
+    expect(adapters.codex.start).toHaveBeenLastCalledWith(expect.objectContaining({ prompt: "With nothing running" }), expect.anything());
+    expect(service.isLive(run.id)).toBe(false);
+    const replacement = service.liveRunForThread(thread.id)!;
+    expect(replacement.id).not.toBe(run.id);
+
+    // The replacement started after the update, so it stays.
+    await endTurn(replacement.id, "third");
+    await service.send(replacement.id, "On the new version");
+    expect(adapters.codex.start).toHaveBeenCalledTimes(2);
+    expect(followupTransport).toHaveBeenLastCalledWith("On the new version", undefined);
+  });
+
+  it("leaves another agent's conversation on its process after an update", async () => {
+    const run = await service.start(conversation("claude").input);
+    service.reserveAgentUpdate("codex")();
+    await endTurn(run.id, "first");
+    await service.send(run.id, "Carry on");
+    expect(adapters.claude.start).toHaveBeenCalledOnce();
+    expect(followupTransport).toHaveBeenLastCalledWith("Carry on", undefined);
   });
 });
 

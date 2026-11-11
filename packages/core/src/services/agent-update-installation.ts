@@ -20,13 +20,27 @@ export interface AgentInstallation {
   /** The resolved launcher must still identify the same installation at update time. */
   identity: string;
 }
-export type UpdateRunner = (command: UpdateCommand, env: NodeJS.ProcessEnv) => Promise<string>;
+/** How long the `npm root --global` lookup may take. */
+export const PROBE_LIMIT_MS = 8000;
+/** Long enough for a release archive of a few hundred megabytes on a slow connection. */
+export const INSTALL_LIMIT_MS = 30 * 60_000;
+
+export type UpdateRunner = (command: UpdateCommand, env: NodeJS.ProcessEnv, options?: { limitMs?: number; signal?: AbortSignal }) => Promise<string>;
+
+const ENDINGS = {
+  timeout: `The update took longer than ${INSTALL_LIMIT_MS / 60_000} minutes and was stopped. Check your connection, then try again.`,
+  stopped: "The update was stopped.",
+  failed: "The updater could not finish. Run the update in a terminal to inspect permissions or package-manager errors, then check again.",
+};
 
 /** No shell, sudo, downloaded scripts, or commands supplied by the renderer. */
-export const runUpdateCommand: UpdateRunner = (command, env) =>
+export const runUpdateCommand: UpdateRunner = (command, env, { limitMs = INSTALL_LIMIT_MS, signal } = {}) =>
   new Promise((resolve, reject) => {
-    let timedOut = false;
-    let failed = false;
+    if (signal?.aborted) {
+      reject(new Error(ENDINGS.stopped));
+      return;
+    }
+    let ending: keyof typeof ENDINGS | null = null;
     let bytes = 0;
     let output = "";
     const child = spawn(command.binary, command.args, {
@@ -36,7 +50,7 @@ export const runUpdateCommand: UpdateRunner = (command, env) =>
       windowsHide: true,
       stdio: ["pipe", "pipe", "pipe"],
     });
-    const stop = () => {
+    const kill = () => {
       if (!child.pid) return;
       try {
         if (process.platform === "win32") child.kill("SIGKILL");
@@ -45,38 +59,28 @@ export const runUpdateCommand: UpdateRunner = (command, env) =>
         /* Already exited. */
       }
     };
-    const timer = setTimeout(
-      () => {
-        timedOut = true;
-        stop();
-      },
-      command.args[0] === "root" ? 8000 : 180_000,
-    );
+    const end = (how: keyof typeof ENDINGS) => {
+      ending ??= how;
+      kill();
+    };
+    const timer = setTimeout(() => end("timeout"), limitMs);
+    const stopped = () => end("stopped");
+    signal?.addEventListener("abort", stopped, { once: true });
     const collect = (chunk: Buffer, stdout: boolean) => {
       bytes += chunk.length;
-      if (bytes > 1024 * 1024) {
-        failed = true;
-        stop();
-      } else if (stdout) output += chunk.toString("utf8");
+      if (bytes > 1024 * 1024) end("failed");
+      else if (stdout) output += chunk.toString("utf8");
     };
     child.stdout.on("data", (chunk: Buffer) => collect(chunk, true));
     child.stderr.on("data", (chunk: Buffer) => collect(chunk, false));
-    child.on("error", () => {
-      failed = true;
-      stop();
-    });
+    child.on("error", () => end("failed"));
     child.on("close", (code) => {
       clearTimeout(timer);
+      signal?.removeEventListener("abort", stopped);
       // Package manager output can contain registry credentials. Do not send it to the renderer or ledger.
-      if (failed || timedOut || code !== 0) {
-        stop();
-        reject(
-          new Error(
-            timedOut
-              ? "The update timed out. Check the installation in a terminal, then try again."
-              : "The updater could not finish. Run the update in a terminal to inspect permissions or package-manager errors, then check again.",
-          ),
-        );
+      if (ending || code !== 0) {
+        kill();
+        reject(new Error(ENDINGS[ending ?? "failed"]));
       } else resolve(output.trim());
     });
     child.stdin.end();
@@ -116,7 +120,7 @@ export async function detectAgentInstallation(id: HarnessId, binary: string, sna
   if (pkg && npmRoot && target.includes(`/node_modules/${pkg}/`) && !/[\\/](?:\.pnpm|\.bun|\.yarn)[\\/]/.test(target)) {
     const npm = await resolveBinary("npm", snapshot.path);
     if (npm) {
-      const root = await run({ binary: npm, args: ["root", "--global"] }, { ...snapshot.env });
+      const root = await run({ binary: npm, args: ["root", "--global"] }, { ...snapshot.env }, { limitMs: PROBE_LIMIT_MS });
       if ((await realpath(root).catch(() => root)) === `${npmRoot}/node_modules`) {
         // npm skips a platform package it failed to fetch and still exits 0; installing again restores it.
         const command = { binary: npm, args: ["install", "--global", `${pkg}@latest`] };

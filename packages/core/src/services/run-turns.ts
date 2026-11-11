@@ -3,7 +3,7 @@ import { runs, threads, type Db } from "@openorc/db";
 import { type AgentEvent, type AgentKind, type Run, type Thread } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import type { Logger } from "../transport.js";
-import { working, type ContinueSettings, type LiveRun, type RunHooks, type RunScope, type SendOptions, type StartRunInput } from "./run-types.js";
+import { occupied, working, type ContinueSettings, type LiveRun, type RunHooks, type RunScope, type SendOptions, type StartRunInput } from "./run-types.js";
 import { withOutsideNote, type OutsideChanges, type TurnStartCapture } from "./turn-start-checkpoint.js";
 import { executionProject } from "./workspace-home.js";
 
@@ -33,6 +33,8 @@ interface RunTurnsDependencies {
   invalidate: (keys: string[]) => void;
   keysFor: (scope: RunScope) => string[];
   start: (input: StartRunInput) => Promise<Run>;
+  /** Which installation of an agent a process started now would run. */
+  installation: (agent: AgentKind) => number;
   emit: (event: AgentEvent) => void;
   validateFastMode: (agent: AgentKind, model: string | undefined, fastMode: boolean | undefined, claudeAccountId?: string) => Promise<void>;
   log: Logger;
@@ -63,8 +65,10 @@ export class RunTurns {
   private async shouldRestart(entry: LiveRun, thread: Thread | null): Promise<boolean> {
     if (!thread || entry.busy) return false;
     if (this.mustRestart(entry, thread)) return true;
-    // Background work the agent left running ends with its process, so a message during it keeps the process and any
-    // settings it can't take wait for the next turn with nothing running.
+    // What the agent left running ends with its process, so a message during it keeps the process. An agent updated
+    // since this process started is replaced at the next turn with nothing running, commands included.
+    if (entry.installation !== this.deps.installation(entry.run.agent) && !occupied(entry)) return true;
+    // Settings the process can't take wait for the next turn with no background work.
     return !(await this.applyThreadSettings(entry, thread)) && !working(entry);
   }
 

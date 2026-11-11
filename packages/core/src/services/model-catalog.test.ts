@@ -1,6 +1,6 @@
 import { RunCatalog } from "./run-catalog.js";
 import { describe, expect, it, vi } from "vitest";
-import type { ModelOption } from "@openorc/protocol";
+import type { HarnessId, ModelOption } from "@openorc/protocol";
 import { ModelCatalogCache, type DiscoveredModels } from "./model-catalog.js";
 import { claudeModelLabel, claudeModelsFrom, withClaudeAccountFastMode, withClaudeLegacyModels } from "./claude-model-catalog.js";
 
@@ -173,8 +173,9 @@ describe("Claude account Fast access", () => {
   });
 });
 
-it("keeps other provider models available when the selected Claude account is disabled", async () => {
-  const catalog = new RunCatalog(
+/** A catalog whose agents list no models, apart from Claude, whose account is disabled. */
+function catalogFixture(updating: (agent: HarnessId) => boolean = () => false, opencode = { listModels: async () => [] }) {
+  return new RunCatalog(
     {
       environment: () => ({
         revision: 1,
@@ -189,15 +190,18 @@ it("keeps other provider models available when the selected Claude account is di
       },
     },
     { listModels: async () => [] },
+    opencode,
     { listModels: async () => [] },
     { listModels: async () => [] },
-    { listModels: async () => [] },
-    () => {},
+    updating,
     undefined,
     { listModels: async () => [] },
     { listModels: async () => [] },
   );
-  const result = await catalog.modelCatalog();
+}
+
+it("keeps other provider models available when the selected Claude account is disabled", async () => {
+  const result = await catalogFixture().modelCatalog();
   expect(result.providers.map((provider) => [provider.agent, provider.status])).toEqual([
     ["codex", "ready"],
     ["claude", "error"],
@@ -209,4 +213,18 @@ it("keeps other provider models available when the selected Claude account is di
     ["fx", "error"],
   ]);
   expect(result.providers.find((provider) => provider.agent === "claude")?.message).toBe("Account disabled");
+});
+
+it("lists the other agents' models while one is being updated, without starting that one", async () => {
+  let updating = true;
+  const opencode = { listModels: vi.fn(async () => []) };
+  const catalog = catalogFixture((agent) => updating && agent === "opencode", opencode);
+  const during = await catalog.modelCatalog();
+  expect(opencode.listModels).not.toHaveBeenCalled();
+  expect(during.providers.filter((provider) => provider.status === "ready").map((provider) => provider.agent)).toEqual(["codex", "omp"]);
+  expect(during.providers.find((provider) => provider.agent === "opencode")).toMatchObject({ status: "error", message: "OpenCode is updating." });
+  updating = false;
+  const after = await catalog.modelCatalog();
+  expect(opencode.listModels).toHaveBeenCalledOnce();
+  expect(after.providers.find((provider) => provider.agent === "opencode")).toMatchObject({ status: "ready", message: null });
 });

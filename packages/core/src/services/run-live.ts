@@ -27,7 +27,6 @@ const WORKING_DIFF_REFRESH_MS = 8000;
 interface RunLiveDependencies {
   db: Db;
   isClosing: () => boolean;
-  isAgentUpdateReserved: () => boolean;
   closeAndWait: (runId: string) => Promise<void>;
   hooks: Pick<RunHooks, "idleTimeoutMs" | "syncCloud">;
   emit: (event: AgentEvent) => void;
@@ -54,7 +53,6 @@ export class RunLive {
 
   /** A compacting process stays busy until its provider call settles; sends wait on that same promise. */
   compact(runId: string): Promise<void> {
-    if (this.deps.isAgentUpdateReserved()) return Promise.reject(new Error("An agent update is running. Try again when it finishes."));
     if (this.deps.isClosing()) return Promise.reject(new Error("OpenOrc is closing."));
     const existing = this.pendingCompactions.get(runId);
     if (existing) return existing;

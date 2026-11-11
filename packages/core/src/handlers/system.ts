@@ -10,7 +10,7 @@ type Dependencies = {
   /** The checks for the default Claude account, which a thread started without naming one runs on. */
   defaultAccountInfo: () => ReturnType<SystemService["info"]>;
   enabledHarnesses?: () => readonly HarnessId[];
-  agentUpdates: Pick<AgentUpdateService, "get" | "check" | "install" | "configure">;
+  agentUpdates: Pick<AgentUpdateService, "get" | "check" | "install" | "cancel" | "configure">;
   providerUsage: Pick<ProviderUsageService, "read" | "recent" | "redeemCodex">;
   planLimits: () => Promise<PlanLimits[]>;
   invalidate: (keys: string[]) => void;
@@ -33,6 +33,7 @@ export function createSystemHandlers({
   | "agents.updates.get"
   | "agents.updates.check"
   | "agents.updates.install"
+  | "agents.updates.cancel"
   | "agents.updates.configure"
   | "providers.usage"
   | "providers.limits"
@@ -45,6 +46,7 @@ export function createSystemHandlers({
     "agents.updates.get": () => agentUpdates.get(),
     "agents.updates.check": () => agentUpdates.check(),
     "agents.updates.install": ({ ids }) => agentUpdates.install(ids),
+    "agents.updates.cancel": () => agentUpdates.cancel(),
     "agents.updates.configure": (patch) => agentUpdates.configure(patch),
     "providers.usage": ({ provider, claudeAccountId, maxAgeMs, fxModel }) =>
       maxAgeMs ? providerUsage.recent(provider, claudeAccountId, maxAgeMs, fxModel) : providerUsage.read(provider, claudeAccountId, fxModel),

@@ -143,6 +143,8 @@ export interface LiveRun {
   toolsAllowed?: Set<string>;
   scope: RunScope;
   handle: RunHandle;
+  /** Which installation of its agent this process started from, as AgentUpdateGate counts them. An update since leaves it on the old version. */
+  installation: number;
   workspaceLease: WorkspaceLease;
   usage: Usage | null;
   /**
@@ -198,6 +200,7 @@ export interface LiveProcessBinding {
   internalMcp: NonNullable<RunSpec["internalMcp"]>;
   providerPermissionMode: PermissionPreset;
   orclingCeiling?: PermissionPreset;
+  installation: number;
 }
 
 /** A turn in flight, or background work that will report back: the agent is at work. */

@@ -19,7 +19,7 @@ interface RunProcessDependencies {
 export class RunProcess {
   constructor(private readonly deps: RunProcessDependencies) {}
 
-  bindLiveProcess({ run, input, handle, workspaceLease, internalMcp, providerPermissionMode, orclingCeiling }: LiveProcessBinding): void {
+  bindLiveProcess({ run, input, handle, workspaceLease, internalMcp, providerPermissionMode, orclingCeiling, installation }: LiveProcessBinding): void {
     const runId = run.id;
     const { scope, project } = input;
     let finishFinalization!: () => void;
@@ -37,6 +37,7 @@ export class RunProcess {
       ...(orclingCeiling ? { orclingCeiling } : {}),
       scope,
       handle,
+      installation,
       workspaceLease,
       usage: null,
       turns: 0,

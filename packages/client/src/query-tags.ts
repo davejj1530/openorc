@@ -66,6 +66,8 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "slack.status": ["slack"],
   "cloud.status": ["cloud"],
   "cloud.sandboxes": ["cloud"],
+  // Not "threads": sizing every worktree is slow, and threads change with every message.
+  "worktrees.list": ["worktrees"],
   "cloud.offer": ["cloud"],
   // Asks Vercel, so not "cloud", which a running check or sandbox sends often.
   "cloud.brain.status": ["cloud-brain"],
@@ -189,6 +191,7 @@ const workspaceMutations = new Set<RpcMethod>(["threads.moveWorkspace", "threads
 /** Mutations whose effects never depend on their parameters. */
 const fixedInvalidations: Partial<Record<RpcMethod, readonly string[]>> = {
   "devices.setup": ["devices"],
+  "worktrees.remove": ["worktrees", "threads", "tasks", "workspace-diff"],
   "devices.settings.set": ["devices"],
   "devices.boot": ["devices"],
   "devices.shutdown": ["devices"],

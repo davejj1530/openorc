@@ -56,6 +56,7 @@ import { createThreadQueriesHandlers } from "./handlers/thread-queries.js";
 import { createThreadWorkspaceHandlers } from "./handlers/thread-workspace.js";
 import { composeHandlers, type Handlers } from "./handlers/types.js";
 import { createWorkspaceHandlers } from "./handlers/workspace.js";
+import { createWorktreeHandlers } from "./handlers/worktrees.js";
 import { createBrowserHost } from "./mcp-host/browser.js";
 import { createContextHost } from "./mcp-host/context.js";
 import { createDeviceHost } from "./mcp-host/device.js";
@@ -115,6 +116,7 @@ import { ThreadService } from "./services/threads.js";
 import { ToolImageStore } from "./services/tool-images.js";
 import { ensureWorkspaceHome } from "./services/workspace-home.js";
 import { WorkspaceWriters } from "./services/workspace-writers.js";
+import { WorktreeCleanup } from "./services/worktree-cleanup.js";
 import { WorkspaceService } from "./services/workspace.js";
 import { transportLogger, type Logger, type RpcReply } from "./transport.js";
 
@@ -731,6 +733,7 @@ export class OpenOrc {
       createTaskUpdateHandlers({ threadService: this.threads, db: this.db, runService: this.runs, workspaceWriters: this.workspaceWriters, workspaces: this.workspaces, invalidate }),
       createTaskDeleteHandlers({ workspaces: this.workspaces, comments: this.comments, runService: this.runs, db: this.db, log: this.log, upkeep: this.upkeep, invalidate }),
       createWorkspaceHandlers({ runService: this.runs, workspaces: this.workspaces, db: this.db, invalidate }),
+      createWorktreeHandlers({ worktrees: new WorktreeCleanup({ db: this.db, workspaces: this.workspaces, runs: this.runs, writers: this.workspaceWriters, invalidate }) }),
       createRunsHandlers({ threadService: this.threads, runService: this.runs, db: this.db, dataDir: this.options.dataDir }),
       createAttachmentsHandlers({ db: this.db, dataDir: this.options.dataDir }),
       createEventsHandlers({ frames: this.frames, ledger: this.ledger, db: this.db, runService: this.runs }),

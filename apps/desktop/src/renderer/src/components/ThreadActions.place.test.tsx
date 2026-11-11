@@ -107,3 +107,24 @@ it("holds the folder move while the agent works", async () => {
   fireEvent.click(screen.getByText("fix/menu"));
   expect((await screen.findByText("Move to the checkout")).closest("[role=menuitem]")?.getAttribute("aria-disabled")).toBe("true");
 });
+
+it("offers to remove an idle worktree thread's worktree, through its confirm", async () => {
+  useUi.getState().setRemoveWorktree(null);
+  open({}, { onRename: vi.fn() });
+  fireEvent.click(screen.getByText("fix/menu"));
+  const item = (await screen.findByText("Remove worktree")).closest("[role=menuitem]");
+  expect(item?.getAttribute("aria-disabled")).not.toBe("true");
+  fireEvent.click(item!);
+  expect(useUi.getState().removeWorktreeThreadId).toBe("t1");
+});
+
+it("holds worktree removal while the agent works, and offers none in the checkout", async () => {
+  open({ activity: "running" }, { onRename: vi.fn() });
+  fireEvent.click(screen.getByText("fix/menu"));
+  expect((await screen.findByText("Remove worktree")).closest("[role=menuitem]")?.getAttribute("aria-disabled")).toBe("true");
+  cleanup();
+  open({ workspaceMode: "current", worktreePath: null }, { onRename: vi.fn() });
+  fireEvent.click(screen.getByText("main"));
+  await screen.findByText("Move to a worktree");
+  expect(screen.queryByText("Remove worktree")).toBeNull();
+});

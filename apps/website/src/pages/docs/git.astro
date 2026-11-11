@@ -104,6 +104,12 @@ import { docHref } from "../../data/docs";
     <p><strong>Move to the checkout</strong> puts a worktree's changes in your own files, to keep editing or to commit yourself. You can also commit in the worktree, push the branch and open a pull request (see <a href={docHref("review") + "#push"}>Push and open a pull request</a>), or merge the branch into your checkout with Git, for example <code>git merge openorc/fix-the-login-redirect-3f2a91</code>. Only committed work is on the branch, so commit in the worktree before you merge.</p>
   </section>
 
+  <section aria-labelledby="remove">
+    <h2 id="remove">Remove a worktree</h2>
+    <p>Worktrees take disk space, mostly from installed dependencies and build output. <strong>Remove worktree</strong>, in the branch row's submenu of the thread's menu, removes the folder and keeps the thread. OpenOrc commits the worktree's uncommitted changes to its branch first, as deleting does, and the branch and the conversation stay. The thread's next message makes the worktree again on that branch. Files Git ignores in the folder are deleted, so the project's setup script runs again.</p>
+    <p>To remove many at once, open Settings, then Data, and choose <strong>Clean up…</strong> beside Worktrees. It lists every worktree on this Mac by project with its size, and ticks those whose thread is resolved or whose pull request is merged or closed. A worktree whose agent is working, waiting on you, or running a background command can't be removed until it stops, and neither can one that follows a cloud sandbox or one a legacy task shares.</p>
+  </section>
+
   <section aria-labelledby="delete">
     <h2 id="delete">Delete a thread</h2>
     <p><strong>Delete thread</strong>, in the thread's menu, removes the conversation and its worktree:</p>

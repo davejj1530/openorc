@@ -1,12 +1,12 @@
 import { canMoveToCloud, cloudServiceMissing, offersBrainMove, threadPlace } from "@openorc/client";
-import type { CloudOffer, ThreadSummary } from "@openorc/protocol";
-import { WORKSPACE_ID } from "@openorc/protocol";
+import type { CloudOffer, ThreadSummary, WorktreeBlock } from "@openorc/protocol";
+import { WORKSPACE_ID, WORKTREE_BLOCK_WORDS } from "@openorc/protocol";
 import type { ReactNode } from "react";
 import { CoversPreview } from "../lib/browser-preview";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { useUi } from "../lib/ui";
 import { floatingGround } from "../lib/use-anchor-ground";
-import { ChevronRight, Cloud, Copy, Folder, GitBranch, GitPullRequest, Laptop } from "./icons";
+import { ChevronRight, Cloud, Copy, Folder, GitBranch, GitPullRequest, Laptop, Trash2 } from "./icons";
 import { menuItem, menuPopup, menuSeparator } from "./menu";
 import type { MenuParts } from "./ThreadActions";
 import { machine, revealLabel, ThisComputer, thisComputer } from "../lib/this-computer";
@@ -97,6 +97,7 @@ function BranchRow({ thread, parts: M }: { thread: ThreadSummary; parts: MenuPar
       ) : null}
       {here && above ? <M.Separator className={menuSeparator} /> : null}
       {here ? <MoveFolderItem thread={thread} parts={M} /> : null}
+      {here && thread.workspaceMode === "worktree" && thread.worktreePath && thread.parentRelation !== "subagent" ? <RemoveWorktreeItem thread={thread} parts={M} /> : null}
     </PlaceRow>
   );
 }
@@ -113,6 +114,22 @@ function MoveFolderItem({ thread, parts: M }: { thread: ThreadSummary; parts: Me
       onClick={() => useUi.getState().setMoveThread(thread.id)}
     >
       {toCheckout ? <Laptop size={13} /> : <GitBranch size={13} />} {toCheckout ? "Move to the checkout" : "Move to a worktree"}
+    </M.Item>
+  );
+}
+
+/** What the summary already shows of why the core would refuse the removal; the core decides the rest. */
+function removalBlock(thread: ThreadSummary): WorktreeBlock | null {
+  if (thread.cloud) return "cloud";
+  return thread.activity !== "idle" || thread.backgroundCommands?.length || thread.moving ? "working" : null;
+}
+
+/** Frees the folder on disk; the branch and conversation stay, and the next message makes the worktree again. */
+function RemoveWorktreeItem({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
+  const block = removalBlock(thread);
+  return (
+    <M.Item className={menuItem} disabled={block !== null} data-tip={block ? WORKTREE_BLOCK_WORDS[block] : undefined} onClick={() => useUi.getState().setRemoveWorktree(thread.id)}>
+      <Trash2 size={13} /> Remove worktree
     </M.Item>
   );
 }

@@ -30,6 +30,7 @@ import { SkillsSettings } from "./settings-skills";
 import { SlackSettings } from "./settings-slack";
 import { TextGenerationSettings } from "./settings-text-generation";
 import { UpdateSettingsSection } from "./settings-updates";
+import { WorktreesRow } from "./settings-worktrees";
 import { UsageDashboard } from "./settings-usage-dashboard";
 
 type SettingsRoute = Extract<Route, { view: "settings" }>;
@@ -334,6 +335,7 @@ function DataSettings({ dataDir, error, retry }: { dataDir?: string; error: bool
       <Section title="Local storage" description="Your ledger, memories, and worktrees live in the OpenOrc data folder.">
         <span className="settings-storage-label">Data folder</span>
         {error ? <LoadError retry={retry} /> : <code className="settings-path">{dataDir ?? "Loading data location…"}</code>}
+        <WorktreesRow />
       </Section>
       <Section title="How your data is used">
         <div className="settings-data-note">

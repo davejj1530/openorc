@@ -59,6 +59,7 @@ import { type CommentAttempt, CommentRecipient, type TaskComment, type TaskDiscu
 import { ThreadListParams } from "./thread-list.js";
 import { ThreadStartParams } from "./thread-start.js";
 import { BranchLoss, type ChangePreview, type FileDiff, type RemovalImpact, workspaceChangeRpcParams, type WorkspaceChanges } from "./workspace-changes.js";
+import { worktreeRpcParams, type WorktreeRpcResults } from "./worktrees.js";
 
 /**
  * Renderer to core RPC. Params are validated in the core; results are typed
@@ -85,6 +86,7 @@ export const rpcParams = {
   ...devicePanelRpcParams,
   ...previewRpcParams,
   ...workspaceChangeRpcParams,
+  ...worktreeRpcParams,
   "tasks.comments.list": z.object({ taskId: z.string() }),
   "tasks.comments.post": z
     .object({
@@ -560,6 +562,7 @@ export interface RpcResults
     RemoteRpcResults,
     DevicePanelRpcResults,
     PreviewRpcResults,
+    WorktreeRpcResults,
     CloudRpcResults {
   "tasks.comments.list": TaskDiscussion;
   "tasks.comments.post": TaskComment;

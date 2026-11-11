@@ -261,6 +261,7 @@ export const docGroups: DocGroup[] = [
           { id: "worktrees", title: "How a worktree is made" },
           { id: "move", title: "Move a thread" },
           { id: "merge", title: "Bring the work back" },
+          { id: "remove", title: "Remove a worktree" },
           { id: "delete", title: "Delete a thread" },
           { id: "repository", title: "What OpenOrc adds to your repository" },
           { id: "no-git", title: "Projects without Git" },

@@ -21,6 +21,7 @@ export * from "./task-checkout.js";
 export * from "./task-comments.js";
 export * from "./visualization.js";
 export * from "./workspace-changes.js";
+export * from "./worktrees.js";
 
 export * from "./agent-citations.js";
 export * from "./agent-updates.js";

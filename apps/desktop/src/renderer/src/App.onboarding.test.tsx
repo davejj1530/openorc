@@ -12,6 +12,7 @@ vi.mock("./components/ThreadActions", () => ({
 }));
 vi.mock("./components/TeamMoveDialog", () => ({ TeamMoveDialog: () => null }));
 vi.mock("./components/ThreadMoveDialog", () => ({ ThreadMoveDialog: () => null }));
+vi.mock("./components/RemoveWorktreeDialog", () => ({ RemoveWorktreeDialog: () => null }));
 vi.mock("./dialogs/ImportProjectDialog", () => ({
   ImportProjectDialog: () => null,
 }));

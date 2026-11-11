@@ -5,6 +5,7 @@ import { Sidebar } from "./components/Sidebar";
 import { Wordmark } from "./components/SidebarListHead";
 import { DeleteThreadDialog } from "./components/ThreadActions";
 import { ThreadMoveDialog } from "./components/ThreadMoveDialog";
+import { RemoveWorktreeDialog } from "./components/RemoveWorktreeDialog";
 import { ThreadWorkspace } from "./components/ThreadWorkspace";
 import { TooltipProvider } from "./components/ui";
 import { ImportProjectDialog } from "./dialogs/ImportProjectDialog";
@@ -167,6 +168,7 @@ export function App() {
         <DeleteThreadDialog />
 
         <ThreadMoveDialog />
+        <RemoveWorktreeDialog />
         <NewFileDialog />
       </div>
     </TooltipProvider>

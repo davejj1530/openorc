@@ -174,7 +174,7 @@ function ThreadFacts({ thread: t }: { thread: Thread }) {
       {!t.teamInstanceId && t.activity !== "idle" ? (
         <span className="thread-header-fact">
           <StatusDot tone={t.activity === "waiting" ? "attention" : "live"} />
-          {t.activity === "waiting" ? "needs you" : "working"}
+          {t.activity === "waiting" ? "Needs you" : "Working"}
         </span>
       ) : null}
       {t.prUrl ? (

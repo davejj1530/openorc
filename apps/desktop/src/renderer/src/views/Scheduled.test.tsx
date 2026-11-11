@@ -93,9 +93,9 @@ it("keeps active and paused schedules on separate tabs and filters them by name"
   fireEvent.click(screen.getByRole("radio", { name: "Paused" }));
   await screen.findByText("Nightly docs");
   expect(screen.queryByRole("button", { name: /Review/ })).toBeNull();
-  fireEvent.change(screen.getByRole("textbox", { name: "Filter schedules" }), { target: { value: "weekly" } });
+  fireEvent.change(screen.getByRole("textbox", { name: "Search schedules" }), { target: { value: "weekly" } });
   await screen.findByText("No matching schedules");
-  fireEvent.change(screen.getByRole("textbox", { name: "Filter schedules" }), { target: { value: "" } });
+  fireEvent.change(screen.getByRole("textbox", { name: "Search schedules" }), { target: { value: "" } });
   paused = [];
   await queryClient.invalidateQueries({ queryKey: ["schedules.list", {}] });
   await screen.findByText("No paused schedules");

@@ -79,8 +79,8 @@ export function Scheduled() {
     <>
       <TopBar
         actions={
-          <Button size="lg" onClick={() => setEditing("new")} disabled={!canCreate}>
-            <Plus size={14} className="text-ink-3" /> New schedule
+          <Button variant="primary" size="lg" className="pl-2.5" onClick={() => setEditing("new")} disabled={!canCreate}>
+            <Plus size={14} /> New schedule
           </Button>
         }
       >
@@ -89,7 +89,7 @@ export function Scheduled() {
       <div className="page-column">
         <PageFilters
           tabs={<Segmented label="Schedule filter" value={shelf} onChange={setShelf} options={shelfOptions} />}
-          end={<PageSearch label="Filter schedules" placeholder="Filter schedules…" value={query} onChange={setQuery} />}
+          end={<PageSearch label="Search schedules" placeholder="Search schedules…" value={query} onChange={setQuery} />}
         />
         {list.error || projects.error ? (
           <div className="px-2 pb-3 text-sm text-bad" role="alert">

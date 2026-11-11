@@ -76,7 +76,7 @@ it("preserves the day breakdown across period and agent filters and exposes keyb
   mount();
   await screen.findByRole("region", { name: "Usage breakdown" });
   fireEvent.click(screen.getByRole("radio", { name: "Day" }));
-  fireEvent.click(screen.getByRole("radio", { name: "Past 24h" }));
+  fireEvent.click(screen.getByRole("radio", { name: "24 hours" }));
   await waitFor(() => expect(mocks.call.mock.calls.some(([method, params]) => method === "usage.history" && params.boundaries.length === 25)).toBe(true));
   expect(screen.getByRole("radio", { name: "Hour" }).getAttribute("aria-checked")).toBe("true");
   fireEvent.change(screen.getByRole("combobox", { name: "Filter usage by agent" }), { target: { value: "codex" } });

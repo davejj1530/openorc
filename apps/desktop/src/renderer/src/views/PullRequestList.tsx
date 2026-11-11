@@ -166,7 +166,7 @@ export function PullRequestList() {
       <div className="page-column">
         <PageFilters
           tabs={<Segmented label="Pull request filter" value={filter} onChange={setFilter} options={pullRequestFilters} />}
-          end={<PageSearch label="Filter pull requests" placeholder="Filter pull requests…" value={query} onChange={setQuery} />}
+          end={<PageSearch label="Search pull requests" placeholder="Search pull requests…" value={query} onChange={setQuery} />}
         />
         {body}
       </div>

@@ -3,7 +3,7 @@ import type { HarnessId, UsageTotals } from "@openorc/protocol";
 export type UsagePeriod = "24h" | "7d" | "30d" | "90d";
 export type UsageMetric = "cost" | "tokens";
 export const usagePeriods = [
-  { value: "24h", label: "Past 24h" },
+  { value: "24h", label: "24 hours" },
   { value: "7d", label: "7 days" },
   { value: "30d", label: "30 days" },
   { value: "90d", label: "90 days" },

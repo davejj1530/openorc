@@ -249,8 +249,8 @@ export function TaskListView({ onNewTask }: { onNewTask: () => void }) {
               }}
               onStage={setStage}
             />
-            <Button size="lg" className="ml-1 pl-2.5" onClick={onNewTask}>
-              <Plus size={14} className="text-ink-3" />
+            <Button variant="primary" size="lg" className="ml-1 pl-2.5" onClick={onNewTask}>
+              <Plus size={14} />
               New task
             </Button>
           </>

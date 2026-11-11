@@ -1,7 +1,7 @@
 ---
 /**
  * A conversation pane's header on the window's top line (ThreadHeader.tsx). The first pane holds the work column's
- * tabs and +; a pane split beside it names its thread instead. Then the faint facts ("working" while the agent works),
+ * tabs and +; a pane split beside it names its thread instead. Then the faint facts ("Working" while the agent works),
  * Close pane in a split, the thread's actions as vertical dots, and its tools: the panel's side while the panel is
  * open, and the panel toggle. A new thread's header keeps only its tab and the panel toggle.
  */
@@ -36,11 +36,11 @@ const { journey, tabs, title, tablist, panel, fresh, menu } = Astro.props;
   ) : (
     <>
       <span class="hs-title">{title}</span>
-      <span class="hs-facts" aria-hidden="true"><span class="hs-fact-working"><i></i>working</span></span>
+      <span class="hs-facts" aria-hidden="true"><span class="hs-fact-working"><i></i>Working</span></span>
     </>
   )}
   <span class="hs-header-actions" aria-hidden="true">
-    {tabs && !fresh ? <span class="hs-facts"><span class="hs-fact-working"><i></i>working</span></span> : null}
+    {tabs && !fresh ? <span class="hs-facts"><span class="hs-fact-working"><i></i>Working</span></span> : null}
     {fresh ? null : <span class="hs-round hs-close-pane"><ProductIcon name="close" /></span>}
     {fresh ? null : <span class="hs-round hs-more" data-on={menu ? "" : undefined}><ProductIcon name="more" /></span>}
     <span class="hs-tools">

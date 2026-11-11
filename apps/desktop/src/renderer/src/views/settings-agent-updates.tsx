@@ -17,8 +17,8 @@ import { cn } from "../lib/cn";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { useEnabledHarnesses } from "../lib/enabled-harnesses";
 import { useRouter } from "../lib/router";
-import { ChevronDown, Download, Plus, X } from "../components/icons";
-import { Button, IconButton, Switch, TextButton } from "../components/ui";
+import { ChevronDown, Download, Plus } from "../components/icons";
+import { Button, Switch, TextButton } from "../components/ui";
 import { Section, Status, Toggle } from "./settings-shared";
 import { HarnessLogo } from "../components/HarnessLogo";
 
@@ -278,14 +278,16 @@ export function AgentUpdateNotice() {
         <p className="agent-update-notice-detail">
           {available.length === 1 ? `Version ${available[0]!.latestVersion} is ready to review.` : "New versions of your coding agents are ready to review."}
         </p>
-        <Button size="sm" className="mt-3" onClick={() => useRouter.getState().navigate({ view: "settings", section: "connections" })}>
-          Review updates
-        </Button>
+        <div className="flex flex-wrap items-center gap-2 mt-3">
+          <Button size="sm" onClick={() => useRouter.getState().navigate({ view: "settings", section: "connections" })}>
+            Review updates
+          </Button>
+          <Button size="sm" variant="ghost" disabled={dismiss.isPending} onClick={() => dismiss.mutate({ dismissed: signature })}>
+            Later
+          </Button>
+        </div>
         {dismiss.error ? <p className="text-sm text-bad mt-1">Could not dismiss. Try again.</p> : null}
       </div>
-      <IconButton aria-label="Dismiss agent updates" size="xs" className="-mt-1 -mr-1" disabled={dismiss.isPending} onClick={() => dismiss.mutate({ dismissed: signature })}>
-        <X size={14} />
-      </IconButton>
     </aside>
   );
 }

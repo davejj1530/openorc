@@ -86,7 +86,7 @@ it("routes Review updates to Connections without installing anything", async () 
 });
 it("dismisses only the current release set", async () => {
   show(true);
-  const dismiss = await screen.findByRole("button", { name: "Dismiss agent updates" });
+  const dismiss = await screen.findByRole("button", { name: "Later" });
   expect(isPreviewCovered()).toBe(true);
   fireEvent.click(dismiss);
   await waitFor(() => expect(screen.queryByRole("button", { name: "Review updates" })).toBeNull());

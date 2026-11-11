@@ -1019,7 +1019,9 @@
   padding: 16px;
 }
 /* Update notices are toasts: an r16 card on the floating fill, a 16px glyph, the title in ink and
-   the detail faint, with small pills for what to do. */
+   the detail faint, with small pills for what to do. They sit over a conversation that scrolls
+   its planes beneath them, so like any layer across the tile and a plane a hairline ring draws
+   their edge. */
 .agent-update-notice {
   --control-fill: var(--surface-2);
   pointer-events: auto;
@@ -1029,6 +1031,7 @@
   padding: 14px;
   border-radius: var(--radius-xl);
   background: var(--float-fill);
+  box-shadow: 0 0 0 var(--hairline) var(--line-strong);
   color: var(--ink);
   font-size: var(--text-base);
   line-height: 16px;

@@ -106,6 +106,15 @@
 .orcling-bubble .prose-chat > :last-child {
   margin-bottom: 0;
 }
+/* A list keeps the bubble's own padding above and below it, wherever the reply's markup nests it. */
+.orcling-bubble .prose-chat :where(ul, ol):first-child,
+.orcling-bubble .prose-chat :where(ul, ol):first-child > li:first-child {
+  margin-top: 0;
+}
+.orcling-bubble .prose-chat :where(ul, ol):last-child,
+.orcling-bubble .prose-chat :where(ul, ol):last-child > li:last-child {
+  margin-bottom: 0;
+}
 /* Facing corners close up within a run, the way a chat stacks one sender's texts. */
 .orcling-run-bubbles > :not(:first-child) .orcling-bubble,
 .orcling-run-bubbles > .orcling-typing:not(:first-child) {

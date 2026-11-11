@@ -12,7 +12,7 @@ import { floatingGround } from "../lib/use-anchor-ground";
 import { useScrollEdges } from "../lib/use-scroll-edges";
 import { cn } from "../lib/cn";
 import { markThread, workspaceMarks, workspaceSummary, type WorkspaceMark } from "../lib/workspace-rail";
-import { Check, ChevronDown, Folders, Plus, Settings, X } from "./icons";
+import { Check, ChevronDown, Folders, Orclings, Plus, Settings, X } from "./icons";
 import { menuItem, menuItemDanger, menuPopup, menuSeparator } from "./menu";
 import { ProjectIcon } from "./ProjectIconPicker";
 import { RemoveProjectDialog } from "./ProjectMenu";
@@ -42,6 +42,15 @@ function ScopeName({ icon, name }: { icon: ReactNode; name: string }) {
       <span className="sidebar-workspace-name-icon">{icon}</span>
       <span className="sidebar-workspace-name-label">{name}</span>
     </>
+  );
+}
+
+/** The Orcling list's first row, where the thread list names its project, so Search keeps its place under both. */
+export function OrclingsHeading() {
+  return (
+    <div className="sidebar-workspace-name">
+      <ScopeName icon={<Orclings size={14} />} name="Orclings" />
+    </div>
   );
 }
 

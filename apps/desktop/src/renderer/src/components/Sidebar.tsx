@@ -14,7 +14,7 @@ import { NewOrclingButton, SidebarOrclings } from "./SidebarOrclings";
 import { SidebarSettings } from "./SidebarSettings";
 import { SidebarThreadBrowser, ThreadFilter } from "./SidebarThreadBrowser";
 import { SidebarRail } from "./SidebarRail";
-import { ProjectFilter } from "./SidebarWorkspaces";
+import { OrclingsHeading, ProjectFilter } from "./SidebarWorkspaces";
 import { IconButton, Tooltip } from "./ui";
 import { WindowCorner } from "./WindowCorner";
 
@@ -52,7 +52,7 @@ export function Sidebar() {
             {settings ? <SidebarSettings route={route} /> : null}
             {/* Settings takes the list's place; the list keeps its pages, filters and scroll for the way back. */}
             <div className="sidebar-list-pane" hidden={settings}>
-              {orclings.active ? null : <ProjectFilter onSelect={chooseWorkspace} />}
+              {orclings.active ? <OrclingsHeading /> : <ProjectFilter onSelect={chooseWorkspace} />}
               <SidebarListHead
                 tools={
                   orclings.active ? (

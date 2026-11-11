@@ -13,7 +13,8 @@ import { filesKey } from "../lib/files-tool";
 import type { FileSelection } from "../lib/layout";
 import type { FileBuffer } from "../lib/use-file-buffer";
 import { useWordWrap } from "../lib/word-wrap";
-import { openBinaryFile, revealLabel } from "./BinaryView";
+import { revealLabel } from "../lib/this-computer";
+import { openBinaryFile } from "./BinaryView";
 
 export type FileView = "preview" | "source" | ExplanationView;
 type ViewOption = { value: FileView; label: string };
@@ -206,7 +207,7 @@ function FileMenu({ path, buffer, editorActions, views, view, onView }: MenuProp
                   </Menu.Item>
                   <Menu.Item className={menuItem} onClick={() => window.openorc.revealFile(binary.absolutePath)}>
                     <FolderOpen size={14} />
-                    {revealLabel(window.openorc.platform)}
+                    {revealLabel()}
                   </Menu.Item>
                   <Menu.Separator className={menuSeparator} />
                 </>

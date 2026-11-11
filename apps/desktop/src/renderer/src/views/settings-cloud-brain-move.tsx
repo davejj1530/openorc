@@ -7,6 +7,7 @@ import { RegionSelect, SERVICE_NAMES, placeWords } from "./settings-cloud-place"
 import { Failure } from "./settings-secret-field";
 import { SettingRow, Status } from "./settings-shared";
 import "./settings-cloud-check.css";
+import { thisComputer } from "../lib/this-computer";
 
 type Moving = Extract<CloudBrainStatus, { state: "moving" }>;
 /** The Move mutation, held by the section so its refusal shows under the row. */
@@ -20,7 +21,7 @@ const other = (service: CloudService): CloudService => (service === "vercel" ? "
 function stepLabel(step: CloudBrainMoveStep, to: CloudService): string {
   switch (step) {
     case "home":
-      return "Bring threads to this Mac";
+      return `Bring threads to ${thisComputer}`;
     case "setting-up":
       return `Set up on ${SERVICE_NAMES[to]}`;
     case "removing":
@@ -38,7 +39,7 @@ function stepState(index: number, at: number, stopped: boolean): "done" | "runni
 
 /** What moving does, said before it starts: where the threads go, the phones, and how long. */
 function moveWords(to: CloudService, phones: number): string {
-  const threads = `Its threads come to this Mac first, then go to a new brain on ${SERVICE_NAMES[to]}.`;
+  const threads = `Its threads come to ${thisComputer} first, then go to a new brain on ${SERVICE_NAMES[to]}.`;
   return phones ? `${threads} Phones need pairing again, and it takes a few minutes.` : `${threads} It takes a few minutes.`;
 }
 
@@ -117,7 +118,7 @@ function MoveSteps({ brain }: { brain: Moving }) {
 /** A move under way, step by step; one that stopped goes on from where it stopped. */
 /** What calling a stopped move off does, by where it stopped: before the old brain went it stays; after, threads stay here. */
 function cancelLabel(brain: Moving): string {
-  if (brain.step === "back") return "Leave them on this Mac";
+  if (brain.step === "back") return `Leave them on ${thisComputer}`;
   return brain.step === "removing" ? `Stay on ${SERVICE_NAMES[other(brain.to.service)]}` : "Call it off";
 }
 

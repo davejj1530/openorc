@@ -7,12 +7,13 @@ import { useRouter } from "../lib/router";
 import { CloudEnvButton, ENV_NOTE, EnvEditor, useEnvDraft } from "./settings-cloud-env";
 import { Failure } from "./settings-secret-field";
 import { Section, SettingRow, Status } from "./settings-shared";
+import { ThisComputer, thisComputer } from "../lib/this-computer";
 
 const shown = (projects: CloudBrainProject[]) => queryClient.setQueryData(["cloud.brain.projects", {}], projects);
 
 function hint({ error, kept, branch }: CloudBrainProject) {
   if (error) return <span className="text-bad">{error}</span>;
-  if (kept) return "The cloud copy has commits this Mac doesn't, so it wasn't updated.";
+  if (kept) return `The cloud copy has commits ${thisComputer} doesn't, so it wasn't updated.`;
   return branch ? `Follows ${branch}` : undefined;
 }
 
@@ -28,7 +29,7 @@ function CopyBranch({ copy }: { copy: CloudBrainCopy }) {
       </div>
       {copy.checkedOut ? (
         <p className="text-ink-3">
-          This Mac has <span className="font-mono">{copy.checkedOut}</span> checked out. Its work stays here until it reaches {copy.branch}.
+          {ThisComputer} has <span className="font-mono">{copy.checkedOut}</span> checked out. Its work stays here until it reaches {copy.branch}.
         </p>
       ) : null}
     </div>
@@ -109,7 +110,7 @@ function AddSheet({
       ) : null}
       <p className="text-ink-2">
         Threads you start from your phone work in a copy of {copy ? copy.branch : "its default branch"}, which follows it as it moves. Uncommitted changes and files Git ignores, like .env, stay on
-        this Mac.
+        {thisComputer}.
       </p>
       <p className="text-ink-3">{ENV_NOTE}</p>
       <EnvEditor draft={draft} disabled={save.isPending} />

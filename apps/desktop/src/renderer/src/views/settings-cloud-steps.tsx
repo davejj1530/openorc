@@ -6,6 +6,7 @@ import { SERVICE_NAMES, placeWords } from "./settings-cloud-place";
 import { missingRows, notSignedIn, signInTitle } from "./settings-cloud-sign-ins";
 import { SectionLevel } from "./settings-shared";
 import "./settings-cloud-steps.css";
+import { thisComputer } from "../lib/this-computer";
 
 /** What getting ready for the cloud takes, in order. The cloud brain is optional: cloud threads run without it. */
 export const CLOUD_STEPS = ["service", "signins", "check", "brain"] as const;
@@ -30,7 +31,7 @@ const TITLES: Record<CloudStepId, string> = {
 const FIRST = "Connect a cloud service first.";
 
 /** Where a check runs, said after a verb: "Passed on Agent37". */
-const WHERE: Record<CloudProvider, string> = { vercel: "on Vercel", agent37: "on Agent37", local: "in a sandbox simulated on this Mac" };
+const WHERE: Record<CloudProvider, string> = { vercel: "on Vercel", agent37: "on Agent37", local: `in a sandbox simulated on ${thisComputer}` };
 
 /** The service new cloud threads run on; an older core does not say, so Vercel's once it has a team there. */
 export function serviceOf(status: CloudStatus): CloudService | null {
@@ -69,7 +70,7 @@ function checkStep(check: CloudCheck | null, place: CloudProvider | null): Cloud
   return { state: "failed", summary: failed ? `${CHECK_STEP_LABELS[failed.step]} failed ${where}.` : `Failed ${where}.` };
 }
 
-const BRAIN = "A copy of OpenOrc in the cloud, for your phone while this Mac sleeps.";
+const BRAIN = `A copy of OpenOrc in the cloud, for your phone while ${thisComputer} sleeps.`;
 
 function brainStep(brain: CloudBrainStatus | undefined, service: CloudService | null): CloudStepView {
   if (!service) return { state: "todo", summary: FIRST, locked: true };

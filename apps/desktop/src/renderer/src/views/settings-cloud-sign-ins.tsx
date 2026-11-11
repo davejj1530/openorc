@@ -4,6 +4,7 @@ import { Button, Dialog } from "../components/ui";
 import { queryClient, useRpcMutation } from "../lib/client";
 import { Failure } from "./settings-secret-field";
 import { SettingRow, Status } from "./settings-shared";
+import { thisComputer } from "../lib/this-computer";
 
 const shown = (signIns: CloudSignIns) => queryClient.setQueryData(["cloud.signIns", {}], signIns);
 
@@ -63,7 +64,7 @@ export function BringMissing({ signIns, label = "Sign-ins" }: { signIns: CloudSi
         </Button>
       </SettingRow>
       <Failure error={bringAll.error ?? cancel.error} />
-      <Dialog open={asking} onOpenChange={setAsking} title="Copy from this Mac?">
+      <Dialog open={asking} onOpenChange={setAsking} title={`Copy from ${thisComputer}?`}>
         <div className="space-y-3">
           <p className="text-ink-2">The cloud gets a copy of {listed(copies.map(copyName))}.</p>
           <div className="flex justify-end gap-2">

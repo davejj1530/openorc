@@ -4,6 +4,7 @@ import { Button, Input, Select, TextButton } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { Section, SettingRow, Status } from "./settings-shared";
 import { Failure, TokenField } from "./settings-secret-field";
+import { thisComputer } from "../lib/this-computer";
 
 /** OpenCode's own provider, OpenCode Zen: its free models need no key, its paid ones take one. */
 const FREE = "opencode";
@@ -37,7 +38,7 @@ function ProviderChoice({ here, others, value, onChange }: { here: [string, stri
     ));
   return (
     <Select value={value} onChange={(event) => onChange(event.target.value)}>
-      {here.length ? <optgroup label="On this Mac">{options(here)}</optgroup> : null}
+      {here.length ? <optgroup label={`On ${thisComputer}`}>{options(here)}</optgroup> : null}
       {here.length && others.length ? <optgroup label="Others">{options(others)}</optgroup> : options(others)}
       <option value={TYPED}>Another provider…</option>
     </Select>

@@ -1,6 +1,7 @@
 import type { Device, DevicePlatformSupport } from "@openorc/protocol";
 import type { DeviceOperation } from "./operations";
 import type { StreamStatus } from "./stream";
+import { thisComputer } from "../this-computer";
 
 /** What a device tab shows. Streaming and reconnecting draw the screen; the others draw their state over it. */
 export type ScreenPhase =
@@ -44,7 +45,7 @@ export function screenPhase(facts: ScreenFacts): ScreenPhase {
   const { device, operation, support, stream } = facts;
   if (operation?.kind === "booting") return { kind: "starting" };
   if (operation?.kind === "stopping") return { kind: "stopping" };
-  if (!device) return { kind: "unavailable", reason: support?.available === false && support.reason ? support.reason : "This device is no longer on this Mac." };
+  if (!device) return { kind: "unavailable", reason: support?.available === false && support.reason ? support.reason : `This device is no longer on ${thisComputer}.` };
   if (device.state !== "booted") return fromDevice[device.state];
   if (support?.video?.available === false) return { kind: "unavailable", reason: support.video.reason ?? "Video is unavailable for this device." };
   return fromStream(stream);

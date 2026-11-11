@@ -3,6 +3,7 @@ import { FileRows } from "../panels/FileRows";
 import { Button, Dialog } from "./ui";
 import { useUi } from "../lib/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
+import { machine, thisComputer } from "../lib/this-computer";
 
 /** What a checkout conversation takes with it: the files that leave the checkout, or why it cannot move. */
 function useCheckoutPreview(threadId: string, enabled: boolean): { blocked: string | null; pending: boolean; contents: ReactNode } {
@@ -34,10 +35,10 @@ function useCheckoutPreview(threadId: string, enabled: boolean): { blocked: stri
 function moveWords(fromCheckout: boolean, brain: boolean): string {
   const checkout = "Every uncommitted change in the checkout first moves into a new worktree on its own branch, including changes you or other conversations made. ";
   if (brain)
-    return `${fromCheckout ? checkout : ""}Its history, session, branch and uncommitted changes go to your cloud brain, where it carries on while this Mac sleeps. Its worktree leaves this Mac; Bring to Mac brings it back.`;
+    return `${fromCheckout ? checkout : ""}Its history, session, branch and uncommitted changes go to your cloud brain, where it carries on while ${thisComputer} sleeps. Its worktree leaves ${thisComputer}; Bring to ${machine} brings it back.`;
   return fromCheckout
     ? `${checkout}That worktree and the conversation’s session then go to a sandbox of its own, where its next message runs.`
-    : "Its worktree, uncommitted changes and session go to a sandbox of its own, where its next message runs. The worktree stays on this Mac and follows the sandbox.";
+    : `Its worktree, uncommitted changes and session go to a sandbox of its own, where its next message runs. The worktree stays on ${thisComputer} and follows the sandbox.`;
 }
 
 /**

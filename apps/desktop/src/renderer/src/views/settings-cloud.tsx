@@ -26,6 +26,7 @@ import { CodexCloudSection } from "./settings-cloud-codex";
 import { OpenCodeCloudSection } from "./settings-cloud-opencode";
 import { Failure, StillWorks, TokenField } from "./settings-secret-field";
 import { useRouter } from "../lib/router";
+import { thisComputer } from "../lib/this-computer";
 
 const TOKENS_URL = "https://vercel.com/account/tokens";
 /** Why a token scoped to one team, said on hover. */
@@ -234,10 +235,10 @@ function ClaudeCloudAccounts({ status, active }: { status: CloudStatus; active: 
 function TakeoverSection({ enabled }: { enabled: boolean }) {
   const takeover = useRpcMutation("cloud.takeover");
   return (
-    <Section title="When this Mac sleeps">
+    <Section title={`When ${thisComputer} sleeps`}>
       <Toggle
         label="Carry working threads on in the cloud"
-        hint="While a thread in a worktree works, a sandbox keeps a copy of it. If this Mac sleeps mid-task, the sandbox finishes the task and the thread moves to the cloud."
+        hint={`While a thread in a worktree works, a sandbox keeps a copy of it. If ${thisComputer} sleeps mid-task, the sandbox finishes the task and the thread moves to the cloud.`}
         checked={takeover.isPending && takeover.variables ? takeover.variables.enabled : enabled}
         disabled={takeover.isPending}
         onChange={(next) => takeover.mutate({ enabled: next })}

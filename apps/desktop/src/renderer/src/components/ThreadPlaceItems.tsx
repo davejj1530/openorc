@@ -9,6 +9,7 @@ import { floatingGround } from "../lib/use-anchor-ground";
 import { ChevronRight, Cloud, Copy, Folder, GitBranch, GitPullRequest, Laptop } from "./icons";
 import { menuItem, menuPopup, menuSeparator } from "./menu";
 import type { MenuParts } from "./ThreadActions";
+import { machine, revealLabel, ThisComputer, thisComputer } from "../lib/this-computer";
 
 type Where = "moving" | "cloud" | "mac";
 
@@ -86,7 +87,7 @@ function BranchRow({ thread, parts: M }: { thread: ThreadSummary; parts: MenuPar
     <PlaceRow parts={M} icon={<Icon size={13} />} label={place.label} title={folder ?? undefined} tag={tag}>
       {folder ? (
         <M.Item className={menuItem} onClick={() => window.openorc.revealFile(folder)}>
-          <Folder size={13} /> Show in Finder
+          <Folder size={13} /> {revealLabel()}
         </M.Item>
       ) : null}
       {branch ? (
@@ -123,10 +124,10 @@ function MovingRow({ thread, parts: M }: { thread: ThreadSummary; parts: MenuPar
   const keep = useRpcMutation("cloud.keep");
   const toCloud = thread.moving?.to === "cloud";
   return (
-    <PlaceRow parts={M} icon={<Cloud size={13} />} label={toCloud ? "Moving to the cloud" : "Moving to this Mac"}>
+    <PlaceRow parts={M} icon={<Cloud size={13} />} label={toCloud ? "Moving to the cloud" : `Moving to ${thisComputer}`}>
       <MenuError error={keep.error} />
       <M.Item className={menuItem} disabled={keep.isPending} onClick={() => keep.mutate({ threadId: thread.id })}>
-        {toCloud ? <Laptop size={13} /> : <Cloud size={13} />} {toCloud ? "Keep on this Mac" : "Keep in the cloud"}
+        {toCloud ? <Laptop size={13} /> : <Cloud size={13} />} {toCloud ? `Keep on ${thisComputer}` : "Keep in the cloud"}
       </M.Item>
     </PlaceRow>
   );
@@ -141,10 +142,10 @@ function CloudRow({ thread, parts: M }: { thread: ThreadSummary; parts: MenuPart
     <PlaceRow parts={M} icon={<Cloud size={13} />} label="Cloud">
       <MenuError error={bring.error ?? openCopy.error ?? closeCopy.error} />
       <M.Item className={menuItem} disabled={thread.activity !== "idle" || bring.isPending} onClick={() => bring.mutate({ threadId: thread.id })}>
-        <Laptop size={13} /> Bring to Mac
+        <Laptop size={13} /> Bring to {machine}
       </M.Item>
       <M.Item className={menuItem} disabled={openCopy.isPending || closeCopy.isPending} onClick={() => (mirrored ? closeCopy : openCopy).mutate({ threadId: thread.id })}>
-        <Folder size={13} /> {mirrored ? "Close on Mac" : "Open on Mac"}
+        <Folder size={13} /> {mirrored ? `Close on ${machine}` : `Open on ${machine}`}
       </M.Item>
     </PlaceRow>
   );
@@ -154,7 +155,7 @@ function CloudRow({ thread, parts: M }: { thread: ThreadSummary; parts: MenuPart
 function MacRow({ thread, parts: M, offer }: { thread: ThreadSummary; parts: MenuParts; offer: CloudOffer | undefined }) {
   const missing = cloudServiceMissing(offer);
   return (
-    <PlaceRow parts={M} icon={<Laptop size={13} />} label="This Mac">
+    <PlaceRow parts={M} icon={<Laptop size={13} />} label={ThisComputer}>
       <M.Item className={menuItem} disabled={thread.activity !== "idle" || Boolean(missing)} title={missing ?? undefined} onClick={() => useUi.getState().setMoveThread(thread.id, "cloud")}>
         <Cloud size={13} /> Move to cloud
       </M.Item>

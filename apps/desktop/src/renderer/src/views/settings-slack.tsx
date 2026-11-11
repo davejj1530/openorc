@@ -7,6 +7,7 @@ import { relayClientStatus, relayHostStatus } from "./settings-presentation";
 import { Field, LoadError, Section, Status } from "./settings-shared";
 import { DirectSlackSettings } from "./settings-slack-direct";
 import { useSlackRelaySettings } from "./settings-slack-relay";
+import { computer } from "../lib/this-computer";
 
 export function SlackSettings({ active }: { active: boolean }) {
   const status = useRpc("slack.status", {}, { enabled: active, refetchInterval: active ? 2000 : false });
@@ -168,7 +169,7 @@ function RelaySlackSettings({ active }: { active: boolean }) {
             <Input value={userId} placeholder="U0123456789" onChange={(e) => setUserId(e.target.value)} disabled={disabled} />
           </Field>
           <Field label="Device label">
-            <Input value={deviceLabel} placeholder="Alice's Mac" onChange={(e) => setDeviceLabel(e.target.value)} disabled={disabled} />
+            <Input value={deviceLabel} placeholder={`Alice's ${computer}`} onChange={(e) => setDeviceLabel(e.target.value)} disabled={disabled} />
           </Field>
           <div className="flex justify-end mt-3">
             <Button disabled={disabled || !host?.connected || !userId.trim() || !deviceLabel.trim()} onClick={() => void actions.registerDevice()}>

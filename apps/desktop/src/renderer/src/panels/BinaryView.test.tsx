@@ -2,7 +2,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { FolderPath, type BinaryFile, type SignedFileUrl } from "@openorc/protocol";
 import { noteFile } from "../lib/use-file-buffer";
-import { BinaryView, revealLabel } from "./BinaryView";
+import { revealLabel } from "../lib/this-computer";
+import { BinaryView } from "./BinaryView";
 
 vi.mock("../lib/use-file-buffer", () => ({ noteFile: vi.fn() }));
 const shell = { platform: "darwin", openFile: vi.fn(async () => ""), revealFile: vi.fn() };

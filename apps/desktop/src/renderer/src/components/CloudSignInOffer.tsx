@@ -4,6 +4,7 @@ import { signInKey, signInTarget, type CloudSignIn } from "@openorc/protocol";
 import { queryClient, useRpc, useRpcMutation } from "../lib/client";
 import { core } from "../lib/rpc";
 import { Button, Input, TextButton } from "./ui";
+import { thisComputer } from "../lib/this-computer";
 
 const card = "rounded-xl bg-surface px-3.5 py-1.5 text-base";
 
@@ -46,7 +47,7 @@ function Offer({ row, onCancel }: { row: CloudSignIn; onCancel: () => void }) {
   else if (!working)
     action = (
       <Button variant="primary" disabled={bring.isPending} onClick={() => bring.mutate({ target: signInTarget(row) })}>
-        {row.way === "copy" ? "Copy this Mac's key" : "Sign in"}
+        {row.way === "copy" ? `Copy ${thisComputer}'s key` : "Sign in"}
       </Button>
     );
   const note = bring.error?.message ?? row.error ?? (working ? WAITING[row.way] : null);

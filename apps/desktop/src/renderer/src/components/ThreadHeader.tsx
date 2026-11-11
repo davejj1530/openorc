@@ -16,6 +16,7 @@ import { TopBar } from "./TopBar";
 import { AlarmClock, ArrowLeft, Cloud, GitFork, GitPullRequest, MoreVertical, X } from "./icons";
 import { menuPopup } from "./menu";
 import { IconButton, StatusDot, Tooltip } from "./ui";
+import { thisComputer } from "../lib/this-computer";
 
 /** Whether the header starts or ends the work row, which decides who clears the native window controls. */
 type Placement = { first: boolean; last: boolean; onClose?: () => void };
@@ -141,7 +142,7 @@ const cloudDot = { preparing: "live", failed: "bad", ready: null, removed: null 
 const cloudPlaces = {
   vercel: { label: "Vercel", tip: "Runs in Vercel Sandbox" },
   agent37: { label: "Agent37", tip: "Runs in an Agent37 instance" },
-  local: { label: "Simulated", tip: "Runs in a sandbox simulated on this Mac" },
+  local: { label: "Simulated", tip: `Runs in a sandbox simulated on ${thisComputer}` },
 } as const;
 
 function cloudTip(cloud: CloudThreadState, where: string): string {

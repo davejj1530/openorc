@@ -81,7 +81,7 @@ export function ProjectFilter({ onSelect, crumb = false }: { onSelect: (workspac
     <>
       <Menu.Root>
         <Menu.Trigger
-          className={cn("no-drag", crumb ? "scope-crumb-project" : "sidebar-workspace-name")}
+          className={cn("no-drag", crumb ? "title-crumb-link" : "sidebar-workspace-name")}
           aria-label={crumb ? `Project: ${project?.name ?? ALL_PROJECTS}` : `Threads in ${project?.name ?? "all projects"}`}
         >
           <ScopeName icon={project ? <ProjectIcon rootPath={project.rootPath} /> : <SquareStack size={14} />} name={project?.name ?? ALL_PROJECTS} />

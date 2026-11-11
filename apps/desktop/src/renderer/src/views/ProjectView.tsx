@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { PageTitle } from "../components/PageTitle";
 import { TopBar } from "../components/TopBar";
 import { useRpc } from "../lib/client";
 import { useRouter } from "../lib/router";
@@ -17,7 +18,7 @@ export function ProjectView({ projectId }: { projectId: string }) {
   return (
     <>
       <TopBar>
-        <h1 className="inline-flex h-7 shrink-0 items-center px-1 text-ink">{p.name}</h1>
+        <PageTitle className="shrink-0">{p.name}</PageTitle>
         <span className="text-sm text-ink-4 font-mono truncate">{p.rootPath}</span>
       </TopBar>
       <ProjectSettings projectId={p.id} />

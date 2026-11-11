@@ -256,33 +256,38 @@ button.sidebar-workspace-name:hover,
 button.sidebar-workspace-name[data-popup-open] {
   background-color: var(--surface-2);
 }
-/* A screen's title led by its project while the sidebar is hidden: the name opens the project filter. */
-.scope-crumb {
+/* A title led by what it belongs to, as in "studio / Tasks" or "Tasks / Welcome flow". The leading name is a button
+   whose words sit on the title line, 4px in, with its hover fill reaching 6px either side of them. The slash keeps
+   10px on both sides. */
+.title-crumbs {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
 }
-.scope-crumb-project {
+.title-crumb-divider + * {
+  margin-left: 6px;
+}
+.title-crumb-link {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
   height: 28px;
-  margin-left: -8px;
-  padding: 0 8px;
+  margin-left: -2px;
+  padding: 0 6px;
   border-radius: var(--radius-md);
   color: var(--ink-2);
   transition:
     background-color var(--duration-leave) var(--ease-out),
     color var(--duration-leave) var(--ease-out);
 }
-.scope-crumb-project:hover,
-.scope-crumb-project[data-popup-open] {
+.title-crumb-link:hover,
+.title-crumb-link[data-popup-open] {
   background-color: var(--surface-2);
   color: var(--ink);
 }
-.scope-crumb-divider {
+.title-crumb-divider {
   color: var(--ink-4);
 }
 .sidebar-workspace-name-icon {

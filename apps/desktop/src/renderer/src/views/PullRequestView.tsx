@@ -1,7 +1,8 @@
 import { lazy, Suspense, useMemo, useState } from "react";
 import type { PullRequestDetail, PullRequestReview } from "@openorc/protocol";
 import type { CommentDraft } from "../components/DiffView";
-import { ChevronRight, ExternalLink, RefreshCw } from "../components/icons";
+import { ExternalLink, RefreshCw } from "../components/icons";
+import { PageCrumbs } from "../components/PageTitle";
 import { PullRequestReviewBar } from "../components/PullRequestReviewBar";
 import { PullRequestReviewer } from "../components/PullRequestReviewer";
 import { RichText } from "../components/RichText";
@@ -172,13 +173,9 @@ export function PullRequestView({ projectId, number }: { projectId: string; numb
           </>
         }
       >
-        <span className="inline-flex min-w-0 items-center gap-1 text-ink">
-          <button type="button" className="no-drag h-7 rounded-full px-2 text-ink-3 hover:bg-surface-2 hover:text-ink" onClick={() => navigate({ view: "pulls" })}>
-            Pull requests
-          </button>
-          <ChevronRight size={12} className="shrink-0 text-ink-4" aria-hidden="true" />
-          <span className="truncate px-1">#{number}</span>
-        </span>
+        <PageCrumbs parent="Pull requests" onParent={() => navigate({ view: "pulls" })}>
+          <span className="truncate">#{number}</span>
+        </PageCrumbs>
       </TopBar>
       {body}
     </>

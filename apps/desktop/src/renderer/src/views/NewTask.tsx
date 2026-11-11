@@ -1,11 +1,12 @@
 import { useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, Check, FolderGit2, GitBranch, Plus } from "../components/icons";
+import { Check, FolderGit2, GitBranch, Plus } from "../components/icons";
+import { PageCrumbs } from "../components/PageTitle";
 import type { TaskPriority, WorkspaceMode } from "@openorc/protocol";
 import { DocumentEditor, type DocumentEditorHandle } from "../components/DocumentEditor";
 import { PriorityIcon, StatusIcon, priorityLabel, priorityOrder } from "../components/status";
 import { cn } from "../lib/cn";
 import { TopBar } from "../components/TopBar";
-import { Button, Empty, IconButton, Input, Select, TextButton } from "../components/ui";
+import { Button, Empty, Input, Select, TextButton } from "../components/ui";
 import { readDraft, removeDraft, writeDraft } from "../lib/drafts";
 import { useProjectGit } from "../lib/project-git";
 import { useRpc, useRpcMutation } from "../lib/client";
@@ -123,7 +124,6 @@ export function NewTask({ projectId, threadId }: { projectId?: string; threadId?
     retry: () => void projects.refetch(),
     importProject: () => useUi.getState().setImportProject(true),
   });
-  const back = () => useRouter.getState().back();
   const submit = async () => {
     if (!project || !settings.data || (threadId && !thread.data) || !draft.title.trim() || submitting.current) return;
     submitting.current = true;
@@ -162,16 +162,9 @@ export function NewTask({ projectId, threadId }: { projectId?: string; threadId?
           </span>
         }
       >
-        <IconButton onClick={back} aria-label="Back">
-          <ArrowLeft size={15} />
-        </IconButton>
-        <TextButton tone="muted" onClick={() => useRouter.getState().navigate({ view: "tasks" })}>
-          Tasks
-        </TextButton>
-        <span className="text-ink-4" aria-hidden="true">
-          /
-        </span>
-        <span className="truncate">New task</span>
+        <PageCrumbs parent="Tasks" onParent={() => useRouter.getState().navigate({ view: "tasks" })}>
+          <span className="truncate">New task</span>
+        </PageCrumbs>
       </TopBar>
       {projectGate ?? (
         <form

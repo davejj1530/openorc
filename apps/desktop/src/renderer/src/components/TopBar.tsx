@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { PanelIcon } from "./icons";
 import { cn } from "../lib/cn";
 import { useLayout, type PanelSide } from "../lib/layout";
+import { PageTitle } from "./PageTitle";
 import { PanelSideSwitch } from "./PanelSideSwitch";
 import { WindowNav } from "./Sidebar";
 import { cornerInset, useWindowCorner, type HeaderCorner } from "../lib/navigation-column";
@@ -89,7 +90,7 @@ export function TopBar({
             <WindowNav open={sidebarOpen} />
           </span>
         ) : null}
-        {typeof children === "string" ? <h1 className="inline-flex items-center h-7 px-1 truncate text-ink">{children}</h1> : children}
+        {typeof children === "string" ? <PageTitle>{children}</PageTitle> : children}
       </div>
       {/* A clipped navigation control can still contribute its full native no-drag
           rectangle. Redeclare this gap after the clipped group, before actions. */}

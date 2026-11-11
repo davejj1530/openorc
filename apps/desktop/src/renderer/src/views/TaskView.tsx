@@ -1,11 +1,12 @@
 import { useEffect, useRef, type ReactNode, type RefObject } from "react";
 import type { Project, Task, ThreadSummary } from "@openorc/protocol";
 import { Panel, type PanelContext } from "../components/Panel";
+import { PageCrumbs } from "../components/PageTitle";
 import { StatusIcon } from "../components/status";
 import { TabTrack } from "../components/TabTrack";
 import { TaskActivity } from "../components/TaskActivity";
 import { TopBar } from "../components/TopBar";
-import { Button, Empty, TextButton } from "../components/ui";
+import { Button, Empty } from "../components/ui";
 import { useRpc } from "../lib/client";
 import { useLayout } from "../lib/layout";
 import { openTask, useRouter, type TaskTab } from "../lib/router";
@@ -107,22 +108,18 @@ export function TaskView({ taskId, tab }: { taskId: string; tab: TaskTab }) {
     <TaskDraftProvider key={taskId} taskId={taskId}>
       <main className="task-workspace workspace-main well flex-1 min-w-0 flex flex-col">
         <TopBar panel={tab === "chat" && Boolean(activityContext)}>
-          <TextButton onClick={() => useRouter.getState().navigate({ view: "tasks" })} tone="muted">
-            Tasks
-          </TextButton>
-          <span className="text-ink-4" aria-hidden="true">
-            /
-          </span>
-          {t ? (
-            <>
-              <StatusIcon status={t.status} />
-              <span className="truncate" data-tip={t.title}>
-                {t.title}
-              </span>
-            </>
-          ) : (
-            <span>Loading task…</span>
-          )}
+          <PageCrumbs parent="Tasks" onParent={() => useRouter.getState().navigate({ view: "tasks" })}>
+            {t ? (
+              <>
+                <StatusIcon status={t.status} />
+                <span className="truncate" data-tip={t.title}>
+                  {t.title}
+                </span>
+              </>
+            ) : (
+              <span>Loading task…</span>
+            )}
+          </PageCrumbs>
         </TopBar>
         {t && p ? (
           <>

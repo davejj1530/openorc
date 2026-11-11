@@ -236,7 +236,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
     );
   }
   return (
-    <div className="h-full min-w-0 flex flex-col min-h-0">
+    <div className="conversation-pane h-full min-w-0 flex flex-col min-h-0">
       <div className="flex-1 min-h-0 relative">{renderTranscript()}</div>
       <div className="composer-padding shrink-0 px-6 pb-6 pt-2">
         <div className="max-w-chat w-full min-w-0 mx-auto grid grid-cols-1 gap-2">

@@ -9,6 +9,16 @@
 .app-shell .composer-padding > .max-w-chat {
   max-width: calc(var(--container-chat) - 2 * var(--composer-gutter));
 }
+/* In a narrow thread pane the composer takes the small gutter with the transcript above it, whatever the window's
+   width, so its edges stay on the cards' edges. */
+.conversation-pane {
+  container: conversation / inline-size;
+}
+@container conversation (max-width: 520px) {
+  .app-shell .composer-padding {
+    padding-inline: 12px;
+  }
+}
 
 .composer {
   container: composer / inline-size;

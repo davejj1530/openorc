@@ -124,13 +124,16 @@ it("marks Git ignore rules without marking tracked files or useful dot folders, 
   expect(sourceEntries.filter((entry) => entry.ignored).map((entry) => entry.name)).toEqual(["debug.log"]);
 });
 
-it("searches Git-ignored env files by name, but not other ignored files or anything in an ignored folder", async () => {
-  await mkdir(path.join(checkout, "web"));
-  await mkdir(path.join(checkout, "node_modules", "library"), { recursive: true });
-  await writeFile(path.join(checkout, ".gitignore"), ".env*\nnode_modules/\n");
-  for (const file of [".env", ".envrc", "web/.env.local", "node_modules/library/.env"]) await writeFile(path.join(checkout, file), "SECRET=1\n");
-  const found = await call("files.search", { scope: { kind: "thread", id: thread.id }, query: "env" });
-  expect(found.sort()).toEqual([".env", "web/.env.local"]);
+it("searches Git-ignored files after the files that hold the query, env files among those, and nothing in a dependency folder", async () => {
+  for (const directory of ["web", "notes", "node_modules/library"]) await mkdir(path.join(checkout, directory), { recursive: true });
+  await writeFile(path.join(checkout, ".gitignore"), ".env*\nnode_modules/\nnotes/\n");
+  for (const file of [".env", ".envrc", "web/.env.local", "web/env.ts", "web/env-plain.ts", "notes/envplan.md", "notes/.DS_Store", "node_modules/library/.env"])
+    await writeFile(path.join(checkout, file), "SECRET=1\n");
+  const scope = { kind: "thread", id: thread.id } as const;
+  expect(await call("files.search", { scope, query: "env" })).toEqual(["web/env.ts", "web/env-plain.ts", ".env", "web/.env.local", "notes/envplan.md", ".envrc"]);
+  // An ignored file that holds the query comes before a file that only holds its characters in order.
+  expect(await call("files.search", { scope, query: "envplan" })).toEqual(["notes/envplan.md", "web/env-plain.ts"]);
+  expect(await call("files.search", { scope, query: "store" })).toEqual([]);
 });
 
 it("searches the folder a Workspace conversation chose", async () => {

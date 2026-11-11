@@ -45,7 +45,7 @@ export function ThreadPlaceItems({ thread, parts: M }: { thread: ThreadSummary; 
 function PlaceRow({ parts: M, icon, label, title, tag, children }: { parts: MenuParts; icon: ReactNode; label: string; title?: string; tag?: string; children: ReactNode }) {
   return (
     <M.SubmenuRoot>
-      <M.SubmenuTrigger className={menuItem} title={title}>
+      <M.SubmenuTrigger className={menuItem} data-tip={title}>
         {icon}
         <span className="min-w-0 max-w-56 truncate">{label}</span>
         {tag ? <span className="ml-auto pl-4 text-sm text-ink-4">{tag}</span> : null}
@@ -106,7 +106,12 @@ function MoveFolderItem({ thread, parts: M }: { thread: ThreadSummary; parts: Me
   const team = Boolean(thread.teamInstanceId);
   const toCheckout = thread.workspaceMode === "worktree";
   return (
-    <M.Item className={menuItem} disabled={team || thread.activity !== "idle"} title={team ? "This item is no longer available." : undefined} onClick={() => useUi.getState().setMoveThread(thread.id)}>
+    <M.Item
+      className={menuItem}
+      disabled={team || thread.activity !== "idle"}
+      data-tip={team ? "This item is no longer available." : undefined}
+      onClick={() => useUi.getState().setMoveThread(thread.id)}
+    >
       {toCheckout ? <Laptop size={13} /> : <GitBranch size={13} />} {toCheckout ? "Move to the checkout" : "Move to a worktree"}
     </M.Item>
   );
@@ -156,7 +161,7 @@ function MacRow({ thread, parts: M, offer }: { thread: ThreadSummary; parts: Men
   const missing = cloudServiceMissing(offer);
   return (
     <PlaceRow parts={M} icon={<Laptop size={13} />} label={ThisComputer}>
-      <M.Item className={menuItem} disabled={thread.activity !== "idle" || Boolean(missing)} title={missing ?? undefined} onClick={() => useUi.getState().setMoveThread(thread.id, "cloud")}>
+      <M.Item className={menuItem} disabled={thread.activity !== "idle" || Boolean(missing)} data-tip={missing ?? undefined} onClick={() => useUi.getState().setMoveThread(thread.id, "cloud")}>
         <Cloud size={13} /> Move to cloud
       </M.Item>
     </PlaceRow>

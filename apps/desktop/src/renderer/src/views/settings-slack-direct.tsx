@@ -86,7 +86,7 @@ export function DirectSlackSettings({ active }: { active: boolean }) {
       >
         <Field label="Workspace entrypoint" hint="Find projects inside this folder or among your imported projects.">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-sm text-ink-2 truncate flex-1" title={home.data?.rootPath}>
+            <span className="text-sm text-ink-2 truncate flex-1" data-tip={home.data?.rootPath}>
               {home.data?.rootPath ?? "Loading folder…"}
             </span>
             <Button

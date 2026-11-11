@@ -42,7 +42,7 @@ it("keeps a disabled choice out of reach and says why on hover", () => {
   render(<Harness onChange={onChange} />);
   const archive = screen.getByRole("radio", { name: "Archive" });
   expect(archive).toHaveProperty("disabled", true);
-  expect(archive.getAttribute("title")).toBe("Nothing archived yet");
+  expect(archive.getAttribute("data-tip")).toBe("Nothing archived yet");
   fireEvent.click(archive);
   expect(onChange).not.toHaveBeenCalled();
   expect(screen.getByRole("radio", { name: "Board" }).hasAttribute("title")).toBe(false);

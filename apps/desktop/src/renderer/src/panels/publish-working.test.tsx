@@ -140,7 +140,7 @@ describe("while Codex works", () => {
         <ChangesPanel thread={{ ...base, ...running }} project={project} />
       </QueryClientProvider>,
     );
-    await waitFor(() => expect(titled(view.container, "Commit")?.title).toBe("Wait for Codex to finish."));
+    await waitFor(() => expect(titled(view.container, "Commit")?.dataset.tip).toBe("Wait for Codex to finish."));
     expect(titled(view.container, "Commit")?.disabled).toBe(true);
   });
 
@@ -151,7 +151,7 @@ describe("while Codex works", () => {
         <CommitsPanel source={{ kind: "thread", thread: { ...base, ...running }, project }} />
       </QueryClientProvider>,
     );
-    await waitFor(() => expect(titled(view.container, "Push 1 commit")?.title).toBe("Wait for Codex to finish."));
+    await waitFor(() => expect(titled(view.container, "Push 1 commit")?.dataset.tip).toBe("Wait for Codex to finish."));
     expect(titled(view.container, "Push 1 commit")?.disabled).toBe(true);
     cleanup();
     queryClient.clear();
@@ -161,7 +161,7 @@ describe("while Codex works", () => {
         <CommitsPanel source={{ kind: "thread", thread: { ...base, ...running }, project }} />
       </QueryClientProvider>,
     );
-    await waitFor(() => expect(titled(pr.container, "PR")?.title).toBe("Wait for Codex to finish."));
+    await waitFor(() => expect(titled(pr.container, "PR")?.dataset.tip).toBe("Wait for Codex to finish."));
     expect(titled(pr.container, "PR")?.disabled).toBe(true);
   });
 
@@ -173,7 +173,7 @@ describe("while Codex works", () => {
         <ChangesPanel thread={{ ...base, ...waiting }} project={project} />
       </QueryClientProvider>,
     );
-    await waitFor(() => expect(titled(view.container, "Commit")?.title).toBe("Wait for Claude Code to finish."));
+    await waitFor(() => expect(titled(view.container, "Commit")?.dataset.tip).toBe("Wait for Claude Code to finish."));
     expect(titled(view.container, "Commit")?.disabled).toBe(true);
   });
 

@@ -116,7 +116,7 @@ function AccountRows({ accounts, disabled, moveRowFocus }: { accounts: PickerAcc
             data-picker-row
             className="model-picker-row model-picker-account"
             aria-pressed={current}
-            title={reason ?? usage?.title ?? account.name}
+            data-tip={reason ?? usage?.title ?? account.name}
             disabled={disabled || Boolean(accounts.blocked) || Boolean(reason)}
             onClick={() => accounts.choose(account.id)}
             onKeyDown={moveRowFocus}

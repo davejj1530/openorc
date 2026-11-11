@@ -32,7 +32,7 @@ it("copies each thread message's original text and reports success", async () =>
   expect(buttons).toHaveLength(2);
   const userFooter = screen.getByRole("button", { name: "Fork thread" }).parentElement;
   expect(userFooter?.contains(buttons[0]!)).toBe(true);
-  expect(userFooter?.querySelector("div[title]")?.textContent).toBeTruthy();
+  expect(userFooter?.querySelector("div[data-tip]")?.textContent).toBeTruthy();
   fireEvent.click(buttons[0]!);
   fireEvent.click(buttons[1]!);
   await waitFor(() => expect(writeText).toHaveBeenNthCalledWith(2, "**Done**\n\n- item"));

@@ -89,7 +89,7 @@ function NewSkillForm({ mode, place, onClose, onAdded }: { mode: AddMode; place:
         <WriteFields {...draft} onChange={(patch) => setDraft((current) => ({ ...current, ...patch }))} />
       ) : (
         <Labelled label="Folder">
-          <span className="skill-form-folder" title={mode.folder}>
+          <span className="skill-form-folder" data-tip={mode.folder}>
             {folderName(mode.folder)}
           </span>
         </Labelled>

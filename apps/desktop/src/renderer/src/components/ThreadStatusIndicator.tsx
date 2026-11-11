@@ -28,7 +28,7 @@ export function ThreadStatusIndicator({ thread, subthreads = null, idle = null, 
   const status = threadTreeStatus(threadStatus(thread), subthreads);
   if (!status) return idle;
   return (
-    <span role="img" aria-label={status.label} title={status.label} className={cn("thread-status size-4 shrink-0 inline-flex items-center justify-center", className)}>
+    <span role="img" aria-label={status.label} data-tip={status.label} className={cn("thread-status size-4 shrink-0 inline-flex items-center justify-center", className)}>
       {indicators[status.kind]}
     </span>
   );

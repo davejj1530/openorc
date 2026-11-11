@@ -126,7 +126,7 @@ function UsageCardHeading({
         <HarnessLogo id={provider === "anthropic-api" ? "claude" : provider} size={16} />
         <div>
           <h2>{name}</h2>
-          <p title={context}>{context ?? "Checking account…"}</p>
+          <p data-tip={context}>{context ?? "Checking account…"}</p>
         </div>
       </div>
       <div className="usage-account-status">
@@ -268,7 +268,7 @@ function UsageWindow({ value: w, now, outdated }: { value: AllowanceWindow; now:
           {percent === null ? "Not reported" : `${percent}% left`}
         </span>
         <h3>{w.label}</h3>
-        <p title={w.resetsAt === null ? undefined : formatUsageTime(w.resetsAt)}>{stale ? `Out of date · reported ${formatUsageTime(w.observedAt)}` : usageResetLabel(w.resetsAt, now)}</p>
+        <p data-tip={w.resetsAt === null ? undefined : formatUsageTime(w.resetsAt)}>{stale ? `Out of date · reported ${formatUsageTime(w.observedAt)}` : usageResetLabel(w.resetsAt, now)}</p>
       </div>
     </div>
   );

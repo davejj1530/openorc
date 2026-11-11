@@ -88,7 +88,7 @@ function History({ orcling, versions }: { orcling: Orcling; versions: OrclingIns
       {versions.slice(1).map((version) => (
         <li key={version.version} className="flex items-center gap-2 h-10 px-2.5 text-sm text-ink-3">
           <span className="tabular text-ink-4">v{version.version}</span>
-          <span className="min-w-0 flex-1 truncate" title={version.note ?? undefined}>
+          <span className="min-w-0 flex-1 truncate" data-tip={version.note ?? undefined}>
             {version.author === "orcling" ? orcling.name : "You"}
             {version.note ? ` · ${version.note}` : ""}
           </span>

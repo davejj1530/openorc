@@ -45,7 +45,7 @@ function Fact({ label, title, children }: { label: string; title?: string; child
   return (
     <div>
       <dt>{label}</dt>
-      <dd title={title}>{children}</dd>
+      <dd data-tip={title}>{children}</dd>
     </div>
   );
 }

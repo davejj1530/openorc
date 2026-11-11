@@ -80,8 +80,8 @@ function CommitList({ commits, unpushed }: { commits: Commit[]; unpushed: Readon
         const sent = !unpushed.has(c.sha);
         return (
           <li key={c.sha} className="commit-row">
-            <span className="commit-dot" data-sent={sent || undefined} role="img" aria-label={sent ? "On origin" : "Not pushed"} title={sent ? "On origin" : "Not pushed"} />
-            <span className="commit-subject" title={c.subject}>
+            <span className="commit-dot" data-sent={sent || undefined} role="img" aria-label={sent ? "On origin" : "Not pushed"} data-tip={sent ? "On origin" : "Not pushed"} />
+            <span className="commit-subject" data-tip={c.subject}>
               {c.subject}
             </span>
             <span className="commit-meta">
@@ -173,7 +173,7 @@ function PushBar({
     <>
       <PanelBar title="Commits">
         {step ? (
-          <Button variant="primary" disabled={Boolean(step.reason) || busy} title={step.reason ?? (state?.branch ? `Push ${state.branch} to origin` : undefined)} onClick={pushNow}>
+          <Button variant="primary" disabled={Boolean(step.reason) || busy} data-tip={step.reason ?? (state?.branch ? `Push ${state.branch} to origin` : undefined)} onClick={pushNow}>
             <Upload size={14} /> {step.label}
           </Button>
         ) : null}

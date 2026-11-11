@@ -451,14 +451,14 @@ it("shows the verified version after a refresh, keeps the pinned ID in the toolt
     </QueryClientProvider>,
   );
   const trigger = await screen.findByRole("button", { name: "Opus Low" });
-  expect(trigger.getAttribute("title")).toBe("Opus · claude-opus-4-6");
+  expect(trigger.getAttribute("data-tip")).toBe("Opus · claude-opus-4-6");
   fireEvent.click(trigger);
   await waitFor(() => expect((screen.getByRole("button", { name: "Refresh models" }) as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(screen.getByRole("button", { name: "Refresh models" }));
   await screen.findByRole("button", { name: "Opus 4.6 Low" });
-  expect(screen.getByRole("button", { name: "Opus 4.6 Low" }).getAttribute("title")).toBe("Opus 4.6 · claude-opus-4-6");
+  expect(screen.getByRole("button", { name: "Opus 4.6 Low" }).getAttribute("data-tip")).toBe("Opus 4.6 · claude-opus-4-6");
   fireEvent.change(screen.getByLabelText("Search models"), { target: { value: "opus" } });
-  expect(screen.getByRole("button", { name: "Opus 4.6" }).getAttribute("title")).toBe("claude-opus-4-6");
+  expect(screen.getByRole("button", { name: "Opus 4.6" }).getAttribute("data-tip")).toBe("claude-opus-4-6");
   expect(onChange).not.toHaveBeenCalled();
 });
 

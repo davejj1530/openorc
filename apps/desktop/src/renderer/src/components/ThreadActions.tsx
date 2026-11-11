@@ -173,7 +173,7 @@ function LifecycleItems({ thread, parts: M, disabled, patch }: { thread: ThreadS
       <M.Item className={menuItem} disabled={disabled} closeOnClick onClick={() => patch({ archived: !resolved })}>
         {resolved ? <RotateCcw size={13} /> : <CircleCheck size={13} />} {resolved ? "Reopen" : "Resolve"}
       </M.Item>
-      <M.Item className={menuItemDanger} disabled={team || disabled} title={team ? "This item is no longer available." : undefined} onClick={() => useUi.getState().setDeleteThread(thread.id)}>
+      <M.Item className={menuItemDanger} disabled={team || disabled} data-tip={team ? "This item is no longer available." : undefined} onClick={() => useUi.getState().setDeleteThread(thread.id)}>
         <Trash2 size={13} /> Delete
       </M.Item>
     </>
@@ -184,7 +184,7 @@ function LifecycleItems({ thread, parts: M, disabled, patch }: { thread: ThreadS
 function NewSubthreadItem({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
   const inCloud = thread.owner?.brain === "cloud";
   return (
-    <M.Item className={menuItem} disabled={Boolean(thread.teamInstanceId) || inCloud} title={inCloud ? `Bring it to ${thisComputer} first.` : undefined} onClick={() => newSubthread(thread.id)}>
+    <M.Item className={menuItem} disabled={Boolean(thread.teamInstanceId) || inCloud} data-tip={inCloud ? `Bring it to ${thisComputer} first.` : undefined} onClick={() => newSubthread(thread.id)}>
       <PenSquare size={13} /> New subthread
     </M.Item>
   );
@@ -205,7 +205,7 @@ function ThreadForkActions({ thread, parts: M, header }: { thread: ThreadSummary
       <M.Item
         className={menuItem}
         disabled={Boolean(thread.teamInstanceId) || inCloud || mutating || fork.isPending || Boolean(forkUnavailable(thread.agent))}
-        title={inCloud ? `Bring it to ${thisComputer} first.` : (forkUnavailable(thread.agent) ?? undefined)}
+        data-tip={inCloud ? `Bring it to ${thisComputer} first.` : (forkUnavailable(thread.agent) ?? undefined)}
         onClick={() => fork.mutate({ id: thread.id }, { onSuccess: (t) => openThread(t.id) })}
       >
         <GitFork size={13} /> {fork.isPending ? "Forking…" : "Fork"}

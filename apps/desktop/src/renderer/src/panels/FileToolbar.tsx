@@ -81,7 +81,7 @@ export function FileToolbar({ selection, buffer, directory, view, onView, treeVi
   };
   return (
     <header className="file-toolbar">
-      <nav aria-label="File path" className="file-breadcrumbs" title={selection.path}>
+      <nav aria-label="File path" className="file-breadcrumbs" data-tip={selection.path}>
         <ol>
           <li>{outside ? <span className="file-breadcrumb-folder">{root}</span> : <button onClick={() => reveal("")}>{root}</button>}</li>
           {parts.map((part, index) => (
@@ -163,7 +163,7 @@ function FileMenu({ path, buffer, editorActions, views, view, onView }: MenuProp
   return (
     <>
       <Menu.Root>
-        <Menu.Trigger render={<IconButton size="xs" aria-label="File actions" title="File actions" />}>
+        <Menu.Trigger render={<IconButton size="xs" aria-label="File actions" data-tip="File actions" />}>
           <MoreHorizontal size={15} />
         </Menu.Trigger>
         <Menu.Portal>

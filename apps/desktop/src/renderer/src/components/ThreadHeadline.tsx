@@ -14,7 +14,7 @@ export function useRowHeadline(thread: ThreadSummary): ThreadHeadline | null {
 export function ThreadRowHeadline({ headline, trailing }: { headline: ThreadHeadline; trailing?: ReactNode }) {
   return (
     <span className="thread-preview-headline-line">
-      <span className="thread-preview-headline" data-tone={headline.tone} title={headline.text}>
+      <span className="thread-preview-headline" data-tone={headline.tone} data-tip={headline.text}>
         {headline.text}
       </span>
       {trailing}

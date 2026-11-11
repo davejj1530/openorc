@@ -88,7 +88,7 @@ app.whenReady().then(async () => {
   };
 
   try {
-    const selector = `button[title=${JSON.stringify(title)}]`;
+    const selector = `button[data-tip=${JSON.stringify(title)}]`;
     await until(`document.querySelector(${JSON.stringify(selector)})`, "thread in the sidebar");
     await read(`document.querySelector(${JSON.stringify(selector)}).click()`);
     await until(`document.querySelector('[aria-label="Show panel"]') || document.querySelector('[aria-label="Hide panel"]')`, "panel toggle");

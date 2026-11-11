@@ -175,7 +175,7 @@ function LookOptions({ look, onChange }: { look: OrclingLook; onChange: (look: O
               role="radio"
               aria-checked={look[tab] === index}
               aria-label={option.name}
-              title={option.name}
+              data-tip={option.name}
               className="orcling-designer-tile"
               onClick={() => onChange({ ...look, [tab]: index })}
             >
@@ -250,7 +250,7 @@ function Swatches({ label, colors, value, onChange }: { label: string; colors: r
           role="radio"
           aria-checked={value === color.hex}
           aria-label={color.name}
-          title={color.name}
+          data-tip={color.name}
           className={cn("orcling-designer-swatch", value === color.hex && "orcling-designer-swatch-selected")}
           style={{ backgroundColor: color.hex }}
           onClick={() => onChange(color.hex)}

@@ -93,7 +93,7 @@ function SubthreadComposer({ parent }: { parent: Thread }) {
           <div className="new-thread-column">
             <h1 className="new-thread-question">
               What should we work on under{" "}
-              <button className="new-thread-question-project" title={parent.title} onClick={() => openThread(parent.id)}>
+              <button className="new-thread-question-project" data-tip={parent.title} onClick={() => openThread(parent.id)}>
                 {parent.title}
               </button>
               ?

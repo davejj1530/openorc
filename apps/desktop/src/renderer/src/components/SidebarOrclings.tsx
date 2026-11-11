@@ -59,7 +59,7 @@ function OrclingRow({ orcling, active }: { orcling: Orcling; active: boolean }) 
         dismissCompactNavigation();
       }}
       aria-current={active ? "page" : undefined}
-      title={orcling.name}
+      data-tip={orcling.name}
       className={cn("orcling-contact no-drag min-w-0 text-ink-2", (active || attention) && "text-ink")}
     >
       <OrclingAvatar orcling={orcling} size={24} className="shrink-0" />

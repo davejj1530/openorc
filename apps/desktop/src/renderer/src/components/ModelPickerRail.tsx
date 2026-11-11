@@ -47,7 +47,7 @@ export function ModelPickerRail({
             className="model-picker-rail-button"
             aria-label="Orclings"
             aria-pressed={section === "orclings"}
-            title="Orclings"
+            data-tip="Orclings"
             onClick={() => onSectionChange("orclings")}
           >
             <OrclingIcon size={20} />
@@ -64,7 +64,7 @@ export function ModelPickerRail({
               className="model-picker-rail-button"
               aria-label={label}
               aria-pressed={section === id}
-              title={label}
+              data-tip={label}
               onClick={() => onSectionChange(id)}
             >
               <HarnessLogo id={id} size={20} />
@@ -81,7 +81,7 @@ export function ModelPickerRail({
             aria-pressed={fast.active}
             data-blocked={fast.blocked || undefined}
             aria-describedby={fastDescriptionId}
-            title={`${fast.active ? "Turn off" : "Request"} Fast mode. ${fast.hint}`}
+            data-tip={`${fast.active ? "Turn off" : "Request"} Fast mode. ${fast.hint}`}
             disabled={fast.disabled}
             onClick={fast.onToggle}
           >

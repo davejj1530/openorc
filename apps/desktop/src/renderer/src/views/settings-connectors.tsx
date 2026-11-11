@@ -35,7 +35,7 @@ function AgentLine({ connector, agent }: { connector: Connector; agent: AgentCon
     <div className="connector-agent">
       <HarnessLogo id={agent.agent} size={14} />
       <span className="connector-agent-name">{agentName(agent)}</span>
-      <span className="connector-agent-status" data-ok={(connected && wanted === null) || undefined} title={error ?? status}>
+      <span className="connector-agent-status" data-ok={(connected && wanted === null) || undefined} data-tip={error ?? status}>
         {status}
       </span>
       {agent.switchable ? (

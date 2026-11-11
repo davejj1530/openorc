@@ -20,7 +20,7 @@ export function FileLine({ path, href = path, note, linked = true }: { path: str
   return (
     <div className="tool-view-target">
       <FileGlyph path={path} />
-      <span className="tool-view-link" title={linked ? undefined : href}>
+      <span className="tool-view-link" data-tip={linked ? undefined : href}>
         {linked ? (
           <ThreadLink href={href}>
             <PathText path={path} />
@@ -97,7 +97,7 @@ export function Matches({
             <FileLine path={group.path} href={link} note={matchCount(group)} />
             <ol>
               {(all ? group.lines : firstMatches(group.lines, MATCH_LINES)).map((line, index) => (
-                <li key={index} title={line.text} data-context={line.context || undefined}>
+                <li key={index} data-tip={line.text} data-context={line.context || undefined}>
                   <span className="tool-view-line">{line.line === null ? null : <ThreadLink href={`${link}:${line.line}`}>{line.line}</ThreadLink>}</span>
                   <code>{line.context ? line.text : marked(line.text, highlight)}</code>
                 </li>

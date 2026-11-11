@@ -26,7 +26,7 @@ export function PanelNewTab({ context, onTool, onNavigate, recentUrls }: { conte
           <h2 id="panel-recent-heading">Recent pages</h2>
           <div className="panel-tool-grid">
             {recentUrls.map((url) => (
-              <button key={url} className="panel-recent-page" title={url} onClick={() => onNavigate(url)}>
+              <button key={url} className="panel-recent-page" data-tip={url} onClick={() => onNavigate(url)}>
                 <Globe size={15} />
                 <span>{pageHost(url)}</span>
               </button>

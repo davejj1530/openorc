@@ -59,7 +59,7 @@ function AgentChoice({ agents, missing, onChange }: { agents: HarnessId[]; missi
       <legend>Use with</legend>
       <div className="connector-form-agent-grid">
         {enabled.map((agent) => (
-          <label key={agent} className="connector-form-agent" title={missing.get(agent)} data-disabled={missing.has(agent) || undefined}>
+          <label key={agent} className="connector-form-agent" data-tip={missing.get(agent)} data-disabled={missing.has(agent) || undefined}>
             <HarnessLogo id={agent} size={16} />
             <span>{harnessCatalog[agent].name}</span>
             <Checkbox

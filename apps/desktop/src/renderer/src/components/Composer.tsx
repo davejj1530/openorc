@@ -263,7 +263,7 @@ export function Composer(props: ComposerProps) {
                 {attachment.url ? (
                   <img src={attachment.url} alt={attachment.name} className="composer-thumbnail" />
                 ) : (
-                  <span className="composer-file" title={attachment.name}>
+                  <span className="composer-file" data-tip={attachment.name}>
                     <FileText size={18} className="text-ink-3" />
                     <span className="composer-file-name">{attachment.name}</span>
                     {attachment.bytes ? <span className="composer-file-size tabular">{formatBytes(attachment.bytes)}</span> : null}

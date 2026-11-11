@@ -57,11 +57,11 @@ export function NewThreadOptions(props: {
       <div className="new-thread-location">
         {props.projectId === WORKSPACE_ID ? (
           <>
-            <span className="new-thread-folder" title={props.location.directory}>
+            <span className="new-thread-folder" data-tip={props.location.directory}>
               <Folder size={14} />
               <span>{props.location.directory}</span>
             </span>
-            <Button variant="ghost" size="sm" disabled={props.disabled} title="Choose the folder for this conversation" onClick={() => void chooseFolder()}>
+            <Button variant="ghost" size="sm" disabled={props.disabled} data-tip="Choose the folder for this conversation" onClick={() => void chooseFolder()}>
               Choose folder
             </Button>
           </>

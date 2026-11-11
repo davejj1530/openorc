@@ -148,7 +148,7 @@ export function TaskComments({ taskId, description, beforeSend }: TaskCommentsPr
         {draft.recipients.length ? (
           <div className="task-comment-recipients" aria-label="Reply recipients">
             {draft.recipients.map((r) => (
-              <TextButton key={commentRecipientKey(r)} title="Remove recipient" onClick={() => edit({ kind: "remove-recipient", recipient: r })}>
+              <TextButton key={commentRecipientKey(r)} data-tip="Remove recipient" onClick={() => edit({ kind: "remove-recipient", recipient: r })}>
                 @{recipientName(r)} · Remove
               </TextButton>
             ))}

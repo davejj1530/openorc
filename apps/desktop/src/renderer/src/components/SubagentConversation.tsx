@@ -85,7 +85,7 @@ export function ThreadParent({ id, fact = false }: { id: string | null | undefin
       </Tooltip>
     );
   return (
-    <button className="subagent-parent no-drag" onClick={() => openThread(id)} title={parent.data?.title}>
+    <button className="subagent-parent no-drag" onClick={() => openThread(id)} data-tip={parent.data?.title}>
       {" "}
       {parent.data?.title ?? "Parent"}
       <span aria-hidden> / </span>

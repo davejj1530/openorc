@@ -42,7 +42,7 @@ export function CommandSteps({ steps, cwd }: { steps: CommandStep[]; cwd: string
 
 function Folder({ path }: { path: string }) {
   return (
-    <span className="tool-view-cwd" title={path}>
+    <span className="tool-view-cwd" data-tip={path}>
       <FolderIcon size={12} />
       {shortPath(path)}
     </span>
@@ -68,7 +68,7 @@ function Step({ step }: { step: CommandStep }) {
         type="button"
         className="tool-view-step-row"
         aria-expanded={open}
-        title={open ? undefined : step.text}
+        data-tip={open ? undefined : step.text}
         // Selecting part of the command to copy it is not a press.
         onClick={() => window.getSelection()?.isCollapsed !== false && setOpen((value) => !value)}
       >

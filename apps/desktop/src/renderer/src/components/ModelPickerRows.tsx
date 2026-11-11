@@ -41,7 +41,7 @@ export function OrclingRows({ orclings, models, disabled, closeOnSelect, close, 
             className="model-picker-row model-picker-orcling-row"
             aria-pressed={selected}
             disabled={disabled}
-            title={`${orcling.name} · ${model?.label ?? orcling.settings.model}`}
+            data-tip={`${orcling.name} · ${model?.label ?? orcling.settings.model}`}
             onClick={() => {
               orclings.onSelect(orcling);
               if (closeOnSelect) close();

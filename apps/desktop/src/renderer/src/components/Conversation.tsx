@@ -323,7 +323,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
           {firstTaskRun ? (
             <p
               className="px-1 text-xs text-ink-3 truncate"
-              title={workspaceDestination({ mode: workspaceMode, rootPath: project.rootPath, taskPath: scope.kind === "task" ? scope.task.worktreePath : null })}
+              data-tip={workspaceDestination({ mode: workspaceMode, rootPath: project.rootPath, taskPath: scope.kind === "task" ? scope.task.worktreePath : null })}
             >
               {workspaceDestination({ mode: workspaceMode, rootPath: project.rootPath, taskPath: scope.kind === "task" ? scope.task.worktreePath : null })}
             </p>

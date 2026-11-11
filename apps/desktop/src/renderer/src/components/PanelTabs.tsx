@@ -39,7 +39,7 @@ function PanelTab({ tab, page, active, unsaved, onSelect, onClose, onKeyDown }: 
         aria-label={unsaved ? `${label}, unsaved changes` : label}
         aria-selected={active}
         tabIndex={active ? 0 : -1}
-        title={label}
+        data-tip={label}
         onClick={() => onSelect(tab.id)}
         onAuxClick={(event) => {
           if (event.button === 1) {
@@ -54,7 +54,7 @@ function PanelTab({ tab, page, active, unsaved, onSelect, onClose, onKeyDown }: 
         </span>
         <span className="work-tab-title">{label}</span>
       </button>
-      <button className="work-tab-close" aria-label={`Close ${label}`} title={`Close ${label}`} onClick={() => onClose(tab.id)}>
+      <button className="work-tab-close" aria-label={`Close ${label}`} data-tip={`Close ${label}`} onClick={() => onClose(tab.id)}>
         <X size={12} />
       </button>
     </div>

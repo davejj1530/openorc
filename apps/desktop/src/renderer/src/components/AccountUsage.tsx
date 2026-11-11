@@ -120,7 +120,7 @@ function LimitCell({ window, now }: { window: AllowanceWindow | null; now: numbe
   const reset = resetWords(window, now);
   const tone = limitTone(window, shown, now);
   return (
-    <td className="usage-table-cell" data-tone={tone} title={window.resetsAt === null ? undefined : formatUsageTime(window.resetsAt)}>
+    <td className="usage-table-cell" data-tone={tone} data-tip={window.resetsAt === null ? undefined : formatUsageTime(window.resetsAt)}>
       <span className="usage-table-limit">
         <LeftRing left={left} />
         <span className="usage-table-value tabular">{shown}% left</span>

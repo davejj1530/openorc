@@ -29,7 +29,7 @@ function TaskRowStatus({ task, onMoved }: { task: Task; onMoved: () => void }) {
           render={<IconButton aria-label={`Status for ${task.title}`} size="xs" />}
           aria-describedby={update.error || update.isPending ? feedbackId : undefined}
           aria-busy={update.isPending}
-          title={`Change status · ${statusLabel[task.status]}`}
+          data-tip={`Change status · ${statusLabel[task.status]}`}
           disabled={update.isPending}
         >
           <StatusIcon status={task.status} />
@@ -133,7 +133,7 @@ function TaskRows({ tasks, showProject }: { tasks: Task[]; showProject: boolean 
                     <div data-current={i === cursor || undefined} data-status={t.status} className="task-list-row">
                       <TaskRowStatus task={t} onMoved={() => listRef.current?.focus({ preventScroll: true })} />
                       <button data-task-open onClick={() => openTask(t.id)} tabIndex={i === cursor ? 0 : -1} onFocus={() => setCursor(i)} aria-label={`${t.title}, ${statusLabel[t.status]}`}>
-                        <span className="task-row-title" title={t.title}>
+                        <span className="task-row-title" data-tip={t.title}>
                           {t.title}
                         </span>
                         {t.labels[0] ? <Badge className="task-row-label max-w-24 truncate">{t.labels[0]}</Badge> : null}

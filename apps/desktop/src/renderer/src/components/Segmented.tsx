@@ -45,7 +45,7 @@ export function Segmented<T extends string>({
           role="radio"
           aria-checked={value === option.value}
           disabled={option.disabled}
-          title={option.disabled ? option.reason : option.title}
+          data-tip={option.disabled ? option.reason : option.title}
           onClick={() => onChange(option.value)}
           className={cn("segmented-option", segmentSizes[size])}
         >

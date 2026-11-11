@@ -50,7 +50,7 @@ export function UserMessage({
 
 function ForkButton({ onFork }: { onFork: () => void }) {
   return (
-    <IconButton size="md" onClick={() => onFork()} title="Continue this conversation in a new thread" aria-label="Fork thread" className="message-action">
+    <IconButton size="md" onClick={() => onFork()} data-tip="Continue this conversation in a new thread" aria-label="Fork thread" className="message-action">
       <GitFork size={16} />
     </IconButton>
   );
@@ -65,7 +65,7 @@ function AttachedFile({ path }: { path: string }) {
   const stored = path.split(/[\\/]/).pop() ?? path;
   const name = /^[a-f0-9-]{36}-/.test(stored) ? stored.slice(37) : stored;
   return (
-    <button type="button" onClick={() => window.openorc.revealFile(path)} title={`Show in folder: ${path}`} className="attached-file">
+    <button type="button" onClick={() => window.openorc.revealFile(path)} data-tip={`Show in folder: ${path}`} className="attached-file">
       <FileText size={16} className="shrink-0 text-ink-4" />
       <span className="truncate">{name}</span>
     </button>

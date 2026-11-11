@@ -29,7 +29,7 @@ async function shot(name, window = win) {
 async function run() {
   await until(`document.querySelectorAll('svg[data-icon]').length > 15`);
   assert.equal(await read(`document.querySelectorAll('svg.lucide').length`), 0);
-  const fixtureThread = 'button[title="Make the daily workflow feel effortless"]';
+  const fixtureThread = 'button[data-tip="Make the daily workflow feel effortless"]';
   await until(`Boolean(document.querySelector(${JSON.stringify(fixtureThread)}))`);
   // Opening the seeded thread selects its project before visiting scoped Tasks.
   await read(`document.querySelector(${JSON.stringify(fixtureThread)}).click()`);
@@ -40,7 +40,7 @@ async function run() {
   await click("Tasks");
   await until(`document.querySelector('[data-status-toggle]')`);
   await shot("tasks-dark");
-  await read(`document.querySelector('button[title="Make the daily workflow feel effortless"]').click()`);
+  await read(`document.querySelector('button[data-tip="Make the daily workflow feel effortless"]').click()`);
   await until(`document.querySelector('[aria-label="Show panel"]') || document.querySelector('[role="tab"][aria-label="Changes"]')`);
   await read(`document.querySelector('[aria-label="Show panel"]')?.click()`);
   await until(`document.querySelector('[role="tab"][aria-label="Changes"]')`);

@@ -53,7 +53,7 @@ function PullRequestMark({ thread }: { thread: ThreadSummary }) {
   if (!mark) return null;
   const Icon = pullRequestIcons[mark.state];
   return (
-    <span role="img" aria-label={mark.label} title={mark.label} className="size-4 shrink-0 inline-flex items-center justify-center">
+    <span role="img" aria-label={mark.label} data-tip={mark.label} className="size-4 shrink-0 inline-flex items-center justify-center">
       <Icon size={14} className={pullRequestTone[mark.state]} />
     </span>
   );
@@ -65,7 +65,7 @@ function PullRequestStatus({ thread }: { thread: ThreadSummary }) {
   if (!mark) return null;
   const Icon = pullRequestIcons[mark.state];
   return (
-    <span className={`thread-preview-pull ${pullRequestTone[mark.state]}`} role="img" aria-label={mark.label} title={mark.label}>
+    <span className={`thread-preview-pull ${pullRequestTone[mark.state]}`} role="img" aria-label={mark.label} data-tip={mark.label}>
       <Icon size={12} />
       <span className="tabular">#{pullRequestNumber(thread.prUrl)}</span>
     </span>
@@ -132,7 +132,7 @@ export function ThreadRow({ thread, subthreads = null, active, project, compact 
       >
         {compact ? <SubThreadLines thread={thread} subthreads={subthreads} /> : <ThreadLines thread={thread} subthreads={subthreads} project={project} />}
         <span className="thread-preview-meta flex min-w-0 items-center gap-2 text-xs leading-4 text-ink-3">
-          <span className="flex flex-1 min-w-0 items-center gap-1" title={title}>
+          <span className="flex flex-1 min-w-0 items-center gap-1" data-tip={title}>
             {placeIcons[place.kind]}
             <span className="truncate">{place.label}</span>
           </span>
@@ -143,7 +143,7 @@ export function ThreadRow({ thread, subthreads = null, active, project, compact 
             </span>
           ) : null}
           {orcling ? (
-            <span className="inline-flex shrink-0 items-center gap-1" title={orcling.name}>
+            <span className="inline-flex shrink-0 items-center gap-1" data-tip={orcling.name}>
               <OrclingAvatar orcling={orcling} size={12} />
               <span>{orcling.name}</span>
             </span>
@@ -152,7 +152,7 @@ export function ThreadRow({ thread, subthreads = null, active, project, compact 
               className="inline-flex shrink-0 items-center gap-1.5"
               role="img"
               aria-label={team ? `Agents: ${agentLabel}` : `Agent: ${agentLabel}`}
-              title={team ? `Agents: ${agentLabel}` : agentLabel}
+              data-tip={team ? `Agents: ${agentLabel}` : agentLabel}
             >
               {providers.map(({ agent, count }) => (
                 <span key={agent} className="inline-flex items-center gap-1">
@@ -225,11 +225,11 @@ function ProjectLine({ thread, project, trailing }: { thread: ThreadSummary; pro
   return (
     <span className="thread-preview-project">
       <span className="thread-preview-project-icon">{project.rootPath ? <ProjectIcon rootPath={project.rootPath} /> : <Globe size={14} />}</span>
-      <span className="thread-preview-project-name" title={project.name}>
+      <span className="thread-preview-project-name" data-tip={project.name}>
         {project.name}
       </span>
       {workspace ? (
-        <span className="thread-preview-workspace" title={thread.branch ?? undefined}>
+        <span className="thread-preview-workspace" data-tip={thread.branch ?? undefined}>
           {workspace}
         </span>
       ) : null}
@@ -271,7 +271,7 @@ function SidebarThreadMark({ thread, subthreads, pull }: { thread: ThreadSummary
     <span
       role="img"
       aria-label={subagentStatusLabel[thread.subagent.status]}
-      title={subagentStatusLabel[thread.subagent.status]}
+      data-tip={subagentStatusLabel[thread.subagent.status]}
       className={thread.subagent.status === "failed" ? "text-bad" : undefined}
     >
       <Icon size={13} />

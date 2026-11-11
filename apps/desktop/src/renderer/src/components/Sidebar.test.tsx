@@ -629,7 +629,7 @@ it("says after the project where each thread works, and leaves it to a pull requ
   mountSidebar();
   const workspace = async (name: RegExp) => (await screen.findByRole("button", { name })).querySelector(".thread-preview-workspace");
   expect((await workspace(/Recent notes/))?.textContent).toBe("main");
-  expect(await workspace(/Yesterday's notes/)).toMatchObject({ textContent: "worktree", title: "openorc/notes-a1b2c3" });
+  expect(await workspace(/Yesterday's notes/)).toMatchObject({ textContent: "worktree", dataset: { tip: "openorc/notes-a1b2c3" } });
   expect(await workspace(/This week's notes/)).toBeNull();
   expect((await workspace(/Old notes/))?.textContent).toBe("cloud");
 });

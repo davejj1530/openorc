@@ -20,7 +20,7 @@ export function PanelBar({ title, meta, children, className }: { title: ReactNod
 /** Faint meta beside a bar's title, such as a count. */
 export function PanelBarMeta({ children, className, title }: { children: ReactNode; className?: string; title?: string }) {
   return (
-    <span className={cn("panel-bar-meta", className)} title={title}>
+    <span className={cn("panel-bar-meta", className)} data-tip={title}>
       {children}
     </span>
   );

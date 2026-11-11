@@ -33,7 +33,7 @@ function PullRequestRow({ pull, projectId }: { pull: PullRequestSummary; project
           <StatusDot tone={pullRequestDot[tone]} />
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="truncate text-base text-ink" title={pull.title}>
+          <span className="truncate text-base text-ink" data-tip={pull.title}>
             {pull.title}
           </span>
           <span className="truncate text-sm text-ink-4">

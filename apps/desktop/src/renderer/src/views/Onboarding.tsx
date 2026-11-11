@@ -51,7 +51,7 @@ function projectChoices(input: { projects: readonly Project[]; selectedId: strin
               <FolderGit2 size={20} aria-hidden="true" />
               <span className="min-w-0">
                 <span className="onboarding-project-name">{project.name}</span>
-                <span className="onboarding-project-path" title={project.rootPath}>
+                <span className="onboarding-project-path" data-tip={project.rootPath}>
                   {project.rootPath}
                 </span>
               </span>
@@ -425,7 +425,7 @@ function SetupFooter({
             Start your first thread <ArrowRight size={14} />
           </Button>
         ) : (
-          <Button variant="primary" size="xl" disabled={!canContinue} title={!canContinue ? note : undefined} onClick={onNext}>
+          <Button variant="primary" size="xl" disabled={!canContinue} data-tip={!canContinue ? note : undefined} onClick={onNext}>
             {step === "project" ? "Finish setup" : "Continue"} <ArrowRight size={14} />
           </Button>
         )}

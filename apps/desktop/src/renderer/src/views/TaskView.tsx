@@ -116,7 +116,7 @@ export function TaskView({ taskId, tab }: { taskId: string; tab: TaskTab }) {
           {t ? (
             <>
               <StatusIcon status={t.status} />
-              <span className="truncate" title={t.title}>
+              <span className="truncate" data-tip={t.title}>
                 {t.title}
               </span>
             </>

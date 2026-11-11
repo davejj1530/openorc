@@ -99,7 +99,7 @@ export function ProjectIconChooser({
                   className={cn(menuItem, "min-w-0")}
                 >
                   <IconImage source={candidate.dataUrl} />
-                  <span className="truncate" title={candidate.path}>
+                  <span className="truncate" data-tip={candidate.path}>
                     {candidate.path}
                   </span>
                   {state?.selected?.path === candidate.path ? <Check size={14} className="ml-auto shrink-0" /> : null}

@@ -65,7 +65,7 @@ function RelaySlackSettings({ active }: { active: boolean }) {
         </Field>
         <Field label="Workspace entrypoint" hint="Slack conversations live in Workspace. Requests can select imported projects or folders beneath this entrypoint; follow-ups remember their folder.">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-sm text-ink-2 truncate flex-1" title={home.data?.rootPath}>
+            <span className="text-sm text-ink-2 truncate flex-1" data-tip={home.data?.rootPath}>
               {home.data?.rootPath ?? "Loading folder…"}
             </span>
             <Button size="sm" disabled={disabled || configure.isPending || client?.busy} onClick={() => void actions.chooseEntrypoint()}>

@@ -57,7 +57,7 @@ function ScopeItem({ icon, name, chosen, mark, onSelect }: { icon: ReactNode; na
       <span className="sidebar-scope-icon">{icon}</span>
       <span className="sidebar-scope-name">{name}</span>
       {mark ? (
-        <span className="sidebar-scope-mark" title={summary}>
+        <span className="sidebar-scope-mark" data-tip={summary}>
           <ThreadStatusIndicator thread={markThread(mark.kind)} />
         </span>
       ) : null}

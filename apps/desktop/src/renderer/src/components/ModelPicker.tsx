@@ -232,7 +232,7 @@ function ModelBrowser({
         data-model-row
         className="model-picker-row"
         aria-pressed={selected}
-        title={model.unavailable ?? model.id}
+        data-tip={model.unavailable ?? model.id}
         disabled={disabled || !ready || Boolean(model.unavailable)}
         onClick={() => chooseModel(model)}
         onKeyDown={moveRowFocus}
@@ -286,7 +286,7 @@ function ModelBrowser({
               }
             }}
           />
-          <button type="button" aria-label="Refresh models" title="Refresh models" disabled={models.isFetching} onClick={() => void models.refreshModels()}>
+          <button type="button" aria-label="Refresh models" data-tip="Refresh models" disabled={models.isFetching} onClick={() => void models.refreshModels()}>
             <RotateCcw size={15} />
           </button>
         </div>
@@ -414,7 +414,7 @@ export function ModelPicker({
         ref={popup.trigger}
         disabled={disabled}
         aria-label={ariaLabel}
-        title={selectedLabel ?? modelTitle(current, value?.model) ?? placeholder}
+        data-tip={selectedLabel ?? modelTitle(current, value?.model) ?? placeholder}
         className="inline-flex min-w-0 items-center gap-1.5 h-7 pl-2 pr-1.5 rounded-md text-base text-ink-2 hover:bg-surface-2 hover:text-ink disabled:text-ink-4 disabled:pointer-events-none"
       >
         {chosen ? <OrclingAvatar orcling={chosen} size={14} /> : pickerTriggerIcon(value, 14)}
@@ -520,7 +520,7 @@ export function ComposerModelPicker({
         className="composer-model-trigger"
         aria-label="Model and effort"
         {...warmAccountUsage(accounts)}
-        title={fast && fastBlocked ? `${title} · ${fastStatus(fast, fastBlocked)}${fastHint}` : title}
+        data-tip={fast && fastBlocked ? `${title} · ${fastStatus(fast, fastBlocked)}${fastHint}` : title}
       >
         <ComposerTriggerIcon orcling={chosenOrcling(orclings)} value={value} />
         {fast ? <Zap size={13} aria-label={fastBlocked ? "Fast mode can't run" : "Fast mode requested"} className="composer-fast-indicator shrink-0" data-blocked={fastBlocked || undefined} /> : null}

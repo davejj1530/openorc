@@ -21,10 +21,10 @@ export function StartedThreadCard({ threadId }: { threadId: string }) {
     <div className="surface-card rounded-2xl px-4 py-3 min-w-0">
       <div className="flex items-center gap-2 min-w-0">
         {orcling ? <OrclingAvatar orcling={orcling} size={16} /> : null}
-        <button type="button" onClick={() => openThread(started.id)} className="flex-1 min-w-0 text-left text-base text-ink truncate" title={started.title}>
+        <button type="button" onClick={() => openThread(started.id)} className="flex-1 min-w-0 text-left text-base text-ink truncate" data-tip={started.title}>
           {started.title}
         </button>
-        <TextButton onClick={() => openThread(started.id)} tone="faint" title="Open thread" aria-label={`Open ${started.title}`}>
+        <TextButton onClick={() => openThread(started.id)} tone="faint" data-tip="Open thread" aria-label={`Open ${started.title}`}>
           <ArrowUpRight size={14} />
         </TextButton>
       </div>
@@ -33,7 +33,7 @@ export function StartedThreadCard({ threadId }: { threadId: string }) {
           {activityLabel[started.activity]}
         </span>
         {project ? (
-          <span className="inline-flex items-center gap-1 min-w-0" title={project}>
+          <span className="inline-flex items-center gap-1 min-w-0" data-tip={project}>
             <Folder size={11} className="shrink-0" /> <span className="truncate">{project}</span>
           </span>
         ) : null}

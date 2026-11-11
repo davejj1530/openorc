@@ -84,6 +84,10 @@ export default [
           selector: "JSXElement[openingElement.name.property.name='Portal'][openingElement.name.object.name!='BaseTooltip']:not(:has(JSXIdentifier[name='CoversPreview']))",
           message: "Mount <CoversPreview /> inside this portal, or the browser preview draws over it.",
         },
+        {
+          selector: "JSXOpeningElement:matches([name.name=/^[a-z]/][name.name!='iframe'], [name.name=/^(Button|IconButton|TextButton)$/]) > JSXAttribute[name.name='title']",
+          message: "Say a tip with data-tip, which the app's own tooltip opens (TipLayer). The browser's title tooltip is slow and off the app's look.",
+        },
       ],
     },
   },

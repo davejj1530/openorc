@@ -124,7 +124,7 @@ function TreeEntry({ entry, level, tree }: { entry: FileEntry; level: number; tr
         else useLayout.getState().openFile({ path: entry.path, scope: tree.scope });
       }}
     >
-      <div className={entry.ignored ? "file-tree-row file-tree-ignored" : "file-tree-row"} title={entry.path} style={{ paddingLeft: 8 + (level - 1) * 14 }}>
+      <div className={entry.ignored ? "file-tree-row file-tree-ignored" : "file-tree-row"} data-tip={entry.path} style={{ paddingLeft: 8 + (level - 1) * 14 }}>
         {folder ? <ChevronRight size={12} className={expanded ? "rotate-90" : ""} /> : <span className="w-3 shrink-0" />}
         {folder ? <Folder size={14} className="file-tree-folder" /> : <FileGlyph path={entry.path} size={14} />}
         <span className="truncate">{entry.name}</span>
@@ -218,7 +218,7 @@ export function FileExplorer({ scope, directory, selected = "" }: ExplorerProps)
                   tree.toggle("");
                 }}
               >
-                <div className="file-tree-row file-tree-root" title={root}>
+                <div className="file-tree-row file-tree-root" data-tip={root}>
                   <ChevronRight size={12} className={expanded.includes("") ? "rotate-90" : ""} />
                   <Folder size={14} className="file-tree-folder" />
                   <span className="truncate">{rootName}</span>

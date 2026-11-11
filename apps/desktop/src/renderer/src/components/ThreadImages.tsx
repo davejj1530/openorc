@@ -143,7 +143,7 @@ function ImageViewer({ image }: { image: ImageSelection }) {
         )}
       </div>
       {image.path ? (
-        <footer className="shrink-0 truncate border-t border-line px-4 py-2 text-xs text-ink-3" title={image.path}>
+        <footer className="shrink-0 truncate border-t border-line px-4 py-2 text-xs text-ink-3" data-tip={image.path}>
           {image.path}
         </footer>
       ) : null}
@@ -206,7 +206,7 @@ export function ThreadLink({ href = "", children }: ComponentProps<"a">) {
         event.preventDefault();
         onClick();
       }}
-      title={path && !source ? `${fileScope ? "View code" : "Show in folder"}: ${path}${reference?.line ? `:${reference.line}` : ""}` : href}
+      data-tip={path && !source ? `${fileScope ? "View code" : "Show in folder"}: ${path}${reference?.line ? `:${reference.line}` : ""}` : href}
     >
       {children}
     </a>
@@ -319,7 +319,7 @@ export function ImageViewRow({ block }: { block: Extract<Block, { kind: "activit
         <Image size={16} className="shrink-0" />
         <span className="shrink-0">{label}</span>
         {filename ? (
-          <span className="tool-row-object" title={path}>
+          <span className="tool-row-object" data-tip={path}>
             {filename}
           </span>
         ) : null}

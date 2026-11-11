@@ -29,7 +29,7 @@ export function OrclingGroupRow({ group, orclings, active }: { group: OrclingGro
       type="button"
       onClick={() => openChat(group.threadId)}
       aria-current={active ? "page" : undefined}
-      title={group.title}
+      data-tip={group.title}
       className={cn("orcling-contact no-drag min-w-0 text-ink-2", (active || attention) && "text-ink")}
     >
       <OrclingFaces members={members} size={20} max={2} className="orcling-contact-faces" />

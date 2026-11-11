@@ -111,7 +111,7 @@ describe("slash suggestions", () => {
     expect(screen.queryByRole("status")).toBeNull();
     fireEvent.change(message(), { target: { value: "/review", selectionStart: 7 } });
     expect(screen.getByRole("status").textContent).toBe("Couldn’t load skills");
-    expect(screen.getByRole("status").getAttribute("title")).toBe("repo is missing.");
+    expect(screen.getByRole("status").getAttribute("data-tip")).toBe("repo is missing.");
     fireEvent.keyDown(message(), { key: "Enter" });
     await waitFor(() => expect(submitted).toHaveBeenCalledWith("/review", [], false));
   });
@@ -669,7 +669,7 @@ describe("connector mentions", () => {
     mount({ value: "", connectors: [], connectorsAside: { connectors, reason: "Claude has connectors in Autonomous mode." } });
     typeAt("ask @pa");
     const row = screen.getByRole("option", { name: /@paper/ });
-    expect([row.getAttribute("aria-disabled"), row.title]).toEqual(["true", "Claude has connectors in Autonomous mode."]);
+    expect([row.getAttribute("aria-disabled"), row.dataset.tip]).toEqual(["true", "Claude has connectors in Autonomous mode."]);
     expect(document.querySelector(".composer-suggestion-group")?.textContent).toBe("Claude has connectors in Autonomous mode.");
     fireEvent.mouseDown(row);
     expect(message().value).toBe("ask @pa");

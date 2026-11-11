@@ -175,12 +175,12 @@ function UsageTokenTotals({ total }: { total: UsageTotals }) {
       <dl>
         <div>
           <dt>Processed tokens</dt>
-          <dd title={measured ? count.toLocaleString() : "Not reported"}>{measured ? formatTokens(count) : "—"}</dd>
+          <dd data-tip={measured ? count.toLocaleString() : "Not reported"}>{measured ? formatTokens(count) : "—"}</dd>
         </div>
         {entries.map(({ label, value }) => (
           <div key={label}>
             <dt>{label}</dt>
-            <dd title={measured ? value.toLocaleString() : "Not reported"}>{measured ? formatTokens(value) : "—"}</dd>
+            <dd data-tip={measured ? value.toLocaleString() : "Not reported"}>{measured ? formatTokens(value) : "—"}</dd>
           </div>
         ))}
       </dl>
@@ -245,7 +245,7 @@ function UsageBreakdown({ data, metric, period }: { data: UsageHistory; metric: 
                 <th scope="row">
                   <span>
                     {row.agent && <HarnessLogo id={row.agent} size={16} />}
-                    <span title={row.label}>{row.label}</span>
+                    <span data-tip={row.label}>{row.label}</span>
                   </span>
                 </th>
                 <td>{usageValue(metricValue(row, metric), metric)}</td>

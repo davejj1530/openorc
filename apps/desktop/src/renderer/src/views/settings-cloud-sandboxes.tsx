@@ -56,7 +56,7 @@ function SandboxRow({ sandbox, now }: { sandbox: CloudSandbox; now: number }) {
         <TextButton
           tone="muted"
           disabled={sandbox.working || remove.isPending}
-          title={sandbox.working ? "Its agent is at work there" : undefined}
+          data-tip={sandbox.working ? "Its agent is at work there" : undefined}
           onClick={() => remove.mutate({ name: sandbox.name })}
         >
           Delete sandbox

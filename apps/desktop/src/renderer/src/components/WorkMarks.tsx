@@ -23,7 +23,7 @@ export function CallRow({ chip, calls, renderBlocks, under, children }: { chip: 
   return (
     <>
       <OpenedCall open={open} calls={calls} renderBlocks={renderBlocks}>
-        <button type="button" className="work-chip" data-kind={chip.kind} title={chip.title} aria-pressed={open} onClick={() => setOpen((value) => !value)}>
+        <button type="button" className="work-chip" data-kind={chip.kind} data-tip={chip.title} aria-pressed={open} onClick={() => setOpen((value) => !value)}>
           {children}
         </button>
       </OpenedCall>

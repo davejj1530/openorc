@@ -8,7 +8,7 @@ export function ThreadTitle({ title, editing, onEditingChange, onSave }: { title
       {editing ? (
         <TitleInput title={title} onFinish={() => onEditingChange(false)} onSave={onSave} />
       ) : (
-        <button type="button" onClick={() => onEditingChange(true)} title={title} aria-label="Rename thread">
+        <button type="button" onClick={() => onEditingChange(true)} data-tip={title} aria-label="Rename thread">
           {title}
         </button>
       )}

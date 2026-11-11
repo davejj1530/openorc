@@ -54,7 +54,7 @@ export function BrowserEffortFooter({
           type="button"
           className="model-picker-reset"
           aria-label="Reset effort to model default"
-          title="Reset to model default"
+          data-tip="Reset to model default"
           disabled={disabled || !value || !current || value.effort === defaultEffort}
           onClick={() => {
             if (value && current) onChange({ ...value, effort: defaultEffort });
@@ -125,7 +125,7 @@ export function ComposerEffortPanel({
             aria-pressed={fast}
             data-blocked={fastBlocked || undefined}
             aria-describedby={fastDescriptionId}
-            title={`${fast ? "Turn off" : "Request"} Fast mode. ${fastHint}`}
+            data-tip={`${fast ? "Turn off" : "Request"} Fast mode. ${fastHint}`}
             disabled={fixed}
             onClick={() => {
               if (value) onChange({ ...value, fastMode: !fast });
@@ -141,7 +141,7 @@ export function ComposerEffortPanel({
           type="button"
           className="composer-icon-button"
           aria-label="Reset effort to model default"
-          title="Reset to model default"
+          data-tip="Reset to model default"
           disabled={fixed || !current || value?.effort === defaultEffort}
           onClick={() => {
             if (value && current) onChange({ ...value, effort: defaultEffort });

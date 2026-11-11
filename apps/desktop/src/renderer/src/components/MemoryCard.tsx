@@ -84,16 +84,16 @@ export function MemoryCard({ memory }: { memory: Memory }) {
       )}
       <div className="memory-entry-meta">
         <span>{memorySourceLabel[memory.source]}</span>
-        <time dateTime={new Date(memory.createdAt).toISOString()} title={new Date(memory.createdAt).toLocaleString()}>
+        <time dateTime={new Date(memory.createdAt).toISOString()} data-tip={new Date(memory.createdAt).toLocaleString()}>
           Created {relativeTime(memory.createdAt)}
         </time>
         {memory.updatedAt > memory.createdAt && (
-          <time dateTime={new Date(memory.updatedAt).toISOString()} title={new Date(memory.updatedAt).toLocaleString()}>
+          <time dateTime={new Date(memory.updatedAt).toISOString()} data-tip={new Date(memory.updatedAt).toLocaleString()}>
             Updated {relativeTime(memory.updatedAt)}
           </time>
         )}
         {memory.lastConfirmedAt > memory.createdAt && (
-          <time dateTime={new Date(memory.lastConfirmedAt).toISOString()} title={new Date(memory.lastConfirmedAt).toLocaleString()}>
+          <time dateTime={new Date(memory.lastConfirmedAt).toISOString()} data-tip={new Date(memory.lastConfirmedAt).toLocaleString()}>
             Confirmed {relativeTime(memory.lastConfirmedAt)}
           </time>
         )}

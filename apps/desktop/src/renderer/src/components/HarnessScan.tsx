@@ -213,7 +213,7 @@ function HarnessRows({ rows, selection, onRetry, onConnect, onSetup, compact }: 
                   ) : null}
                   {row.path ? (
                     <span>
-                      <strong>Path</strong> <code title={row.path}>{row.path}</code>
+                      <strong>Path</strong> <code data-tip={row.path}>{row.path}</code>
                     </span>
                   ) : null}
                 </div>

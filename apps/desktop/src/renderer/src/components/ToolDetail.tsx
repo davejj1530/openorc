@@ -129,7 +129,7 @@ function SearchLine({ pattern, scope, flags }: { pattern: string; scope: string 
       <Search size={12} className="tool-view-icon" />
       <code className="tool-view-pattern">{pattern}</code>
       {scope ? (
-        <span className="tool-view-note" title={scope}>
+        <span className="tool-view-note" data-tip={scope}>
           in {shortPath(scope)}
         </span>
       ) : null}
@@ -146,7 +146,7 @@ function WebLine({ target }: { target: string }) {
   return (
     <div className="tool-view-target">
       <Globe size={12} className="tool-view-icon" />
-      <span className="tool-view-link" title={target}>
+      <span className="tool-view-link" data-tip={target}>
         {/^https?:\/\//.test(target) ? <ThreadLink href={target}>{target}</ThreadLink> : target}
       </span>
     </div>

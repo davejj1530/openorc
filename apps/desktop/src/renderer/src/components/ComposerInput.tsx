@@ -147,7 +147,7 @@ export function ComposerInput(props: ComposerInputProps) {
         <ComposerSuggestions anchor={props.suggestionAnchor} side={props.suggestionSide} members={memberList} cursor={cursor} count={suggestions.length} onDismiss={() => setSuggestionsActive(false)}>
           {/* First, where the rows it waits for will land: connectors head the list, above the files that match. */}
           {notice ? (
-            <div role="status" title={notice.reason} className="composer-suggestions-notice">
+            <div role="status" data-tip={notice.reason} className="composer-suggestions-notice">
               {notice.text}
             </div>
           ) : null}
@@ -165,7 +165,7 @@ export function ComposerInput(props: ComposerInputProps) {
                   role="option"
                   aria-selected={index === cursor}
                   aria-disabled={suggestion.unavailable ? true : undefined}
-                  title={suggestion.unavailable}
+                  data-tip={suggestion.unavailable}
                   data-agent-mention={suggestion.mention}
                   onMouseDown={(e) => {
                     e.preventDefault();

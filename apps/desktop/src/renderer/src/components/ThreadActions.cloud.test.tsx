@@ -51,7 +51,7 @@ it.each(["cursor", "antigravity", "fx"] as const)("explains why %s cannot fork b
   open({ agent });
   const item = screen.getByText("Fork").closest("[role=menuitem]");
   expect(item?.getAttribute("aria-disabled")).toBe("true");
-  expect(item?.getAttribute("title")).toContain("does not support forking");
+  expect(item?.getAttribute("data-tip")).toContain("does not support forking");
   fireEvent.click(screen.getByText("Fork"));
   expect(mutations.get("threads.fork")).not.toHaveBeenCalled();
 });
@@ -65,7 +65,7 @@ it("offers Bring to Mac from a cloud thread's place, and no folder moves or fork
   await screen.findByText("Copy branch name");
   expect(screen.queryByText("Move to the checkout")).toBeNull();
   expect(screen.queryByText("Show in Finder")).toBeNull();
-  expect(screen.getByText("Fork").closest("[role=menuitem]")?.getAttribute("title")).toBe("Bring it to this Mac first.");
+  expect(screen.getByText("Fork").closest("[role=menuitem]")?.getAttribute("data-tip")).toBe("Bring it to this Mac first.");
 });
 
 it("offers to keep a moving thread where it was", async () => {
@@ -79,7 +79,7 @@ it("offers Move to cloud for every agent's conversation, the brain checking agai
     open({ agent }, "This Mac");
     const item = (await screen.findByText("Move to cloud")).closest("[role=menuitem]");
     expect(item?.getAttribute("aria-disabled")).not.toBe("true");
-    expect(item?.getAttribute("title")).toBeNull();
+    expect(item?.getAttribute("data-tip")).toBeNull();
     cleanup();
   }
 });
@@ -96,7 +96,7 @@ it("says what to connect when there is no brain and no cloud service to move to"
   open({ agent: "claude" }, "This Mac");
   const item = (await screen.findByText("Move to cloud")).closest("[role=menuitem]");
   expect(item?.getAttribute("aria-disabled")).toBe("true");
-  expect(item?.getAttribute("title")).toBe("Connect Vercel or Agent37 in Settings > Cloud first.");
+  expect(item?.getAttribute("data-tip")).toBe("Connect Vercel or Agent37 in Settings > Cloud first.");
 });
 
 it("leaves out the place for this Mac when the cloud has no move for the thread", () => {

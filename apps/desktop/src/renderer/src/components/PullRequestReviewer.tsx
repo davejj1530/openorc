@@ -47,7 +47,7 @@ function ReviewConversationLink({ conversation, models }: { conversation: Thread
   const orcling = orclingById(useOrclings(), conversation.orclingId);
   const author = orcling?.name ?? draftAuthor({ agent: conversation.agent, model: conversation.model }, models);
   return (
-    <TextButton underline className="inline-flex items-center gap-1.5 text-sm" onClick={() => openThread(conversation.id)} title={conversation.title}>
+    <TextButton underline className="inline-flex items-center gap-1.5 text-sm" onClick={() => openThread(conversation.id)} data-tip={conversation.title}>
       {reviewing ? <LoaderCircle size={13} className="animate-spin" aria-hidden="true" /> : null}
       {reviewing ? `${author} is reviewing` : "Review conversation"}
     </TextButton>

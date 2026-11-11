@@ -169,7 +169,7 @@ export function TaskDocument({ task, project, ref }: { task: Task; project: Proj
                 ))}
               </Select>
             </label>
-            <span className="property-chip truncate" title={project.name}>
+            <span className="property-chip truncate" data-tip={project.name}>
               {project.name}
             </span>
           </div>
@@ -203,7 +203,7 @@ export function TaskDocument({ task, project, ref }: { task: Task; project: Proj
         <div className="text-sm text-ink-3 min-w-0" role="status">
           {taskDraftStatus({ draftStored, saveError, flushError, hasTitle: Boolean(draft.title.trim()), imagesReady, saving, dirty, retry: flush })}
         </div>
-        <span className="hidden sm:inline-flex items-center gap-1.5 min-w-0 max-w-64 text-xs text-ink-3" title={execution.branch ?? undefined}>
+        <span className="hidden sm:inline-flex items-center gap-1.5 min-w-0 max-w-64 text-xs text-ink-3" data-tip={execution.branch ?? undefined}>
           <GitBranch size={12} />
           <span className="truncate">{execution.branch ?? (execution.mode === "worktree" ? "Isolated worktree on start" : "Local checkout")}</span>
         </span>

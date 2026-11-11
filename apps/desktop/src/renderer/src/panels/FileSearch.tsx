@@ -99,7 +99,7 @@ function TreeMatches({ scope, root, paths, query, best }: { scope: FileScope; ro
               className="file-tree-row file-search-file"
               style={indent}
               aria-label={path}
-              title={path}
+              data-tip={path}
               onClick={() => open(scope, path)}
             >
               <span className="w-3 shrink-0" />
@@ -127,7 +127,7 @@ function TreeMatches({ scope, root, paths, query, best }: { scope: FileScope; ro
       });
   return (
     <div role="group" aria-label="In open folders">
-      <div className="file-tree-row file-tree-root file-search-branch" title={root}>
+      <div className="file-tree-row file-tree-root file-search-branch" data-tip={root}>
         <ChevronRight size={12} className="rotate-90" />
         <Folder size={14} className="file-tree-folder" />
         <span className="truncate">{root}</span>
@@ -363,7 +363,7 @@ export function FileSearchResults({
                   data-best={path === best || undefined}
                   className="file-tree-row file-search-file"
                   aria-label={path}
-                  title={path}
+                  data-tip={path}
                   onClick={() => open(scope, path)}
                 >
                   <FileGlyph path={path} size={14} />

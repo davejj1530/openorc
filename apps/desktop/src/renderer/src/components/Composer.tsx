@@ -66,6 +66,8 @@ export interface ComposerChanges {
   onReview: () => void;
   onCommit: () => void;
   commitDisabledReason?: string | null;
+  /** The panel beside the composer shows these changes with its own Commit, so the chip steps aside. */
+  inPanel?: boolean;
   error?: string | null;
   onRetry: () => void;
 }

@@ -10,9 +10,9 @@ export function ComposerChangesBar({ changes }: { changes: ComposerChanges | nul
   );
 }
 
-/** Commit and the diff totals share one pill: Commit opens the commit flow, the totals open the review. */
+/** Commit and the diff totals share one pill: Commit opens the commit flow, the totals open the review. While the panel shows the changes, its Commit is the one. */
 export function ComposerCommitChip({ changes }: { changes: ComposerChanges | null | undefined }) {
-  if (!changes || changes.files === 0) return null;
+  if (!changes || changes.files === 0 || changes.inPanel) return null;
   const fileLabel = changes.files === 1 ? "file" : "files";
   return (
     <section className="composer-changes" aria-label="Uncommitted changes">

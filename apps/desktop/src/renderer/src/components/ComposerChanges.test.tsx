@@ -134,12 +134,14 @@ it.each(["project", "thread"] as const)("reviews and commits binary-only %s chan
   fireEvent.click(await screen.findByRole("button", { name: /Review 1 changed file/ }));
   expect(useLayout.getState().workspaceChanges).toMatchObject({ kind, id: kind, comparison: "head", commit: false });
   expect(await screen.findByText("image.png")).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Commit changes" }));
+  // The panel shows the changes with its own Commit, so the composer's chip steps aside.
+  expect(document.querySelector(".composer-changes")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Commit" }));
   const dialog = await screen.findByRole("dialog", { name: "Commit changes" });
   expect(calls.some(({ method }) => method.startsWith("review.commit"))).toBe(false);
   fireEvent.change(within(dialog).getByRole("textbox"), { target: { value: "Add image" } });
   fireEvent.click(within(dialog).getByRole("button", { name: "Commit" }));
-  await waitFor(() => expect(document.querySelector(".composer-changes")).toBeNull());
+  await waitFor(() => expect(screen.queryByText("image.png")).toBeNull());
   expect(calls).toContainEqual({
     method: kind === "thread" ? "review.commitThread" : "review.commitProject",
     params: kind === "thread" ? { threadId: kind, message: "Add image" } : { projectId: kind, message: "Add image" },
@@ -148,7 +150,7 @@ it.each(["project", "thread"] as const)("reviews and commits binary-only %s chan
   expect(screen.queryByText("feature/composer")).toBeNull();
 });
 
-it("keeps the commit message and strip on failure, then refreshes on retry", async () => {
+it("keeps the commit message on failure, then commits on retry", async () => {
   failCommit = true;
   mount({ kind: "thread", id: "thread" });
   fireEvent.click(await screen.findByRole("button", { name: "Commit changes" }));
@@ -157,10 +159,10 @@ it("keeps the commit message and strip on failure, then refreshes on retry", asy
   fireEvent.click(within(dialog).getByRole("button", { name: "Commit" }));
   expect(await within(dialog).findByRole("alert")).toHaveProperty("textContent", "Commit failed; retry");
   expect(within(dialog).getByRole<HTMLTextAreaElement>("textbox").value).toBe("Preserve this message");
-  expect(document.querySelector(".composer-changes")).toBeTruthy();
+  expect(screen.getByText("image.png")).toBeTruthy();
   failCommit = false;
   fireEvent.click(within(dialog).getByRole("button", { name: "Commit" }));
-  await waitFor(() => expect(document.querySelector(".composer-changes")).toBeNull());
+  await waitFor(() => expect(screen.queryByText("image.png")).toBeNull());
 });
 
 it("blocks team commits while leaving review available", async () => {

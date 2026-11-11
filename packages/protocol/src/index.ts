@@ -1,3 +1,4 @@
+export * from "./account.js";
 export * from "./claude-accounts.js";
 export * from "./connectors.js";
 export * from "./skills.js";

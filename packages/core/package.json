@@ -23,6 +23,7 @@
     "@openorc/cloud": "workspace:*",
     "@openorc/db": "workspace:*",
     "@openorc/git": "workspace:*",
+    "@openorc/hosted": "workspace:*",
     "@openorc/link": "workspace:*",
     "@openorc/mcp": "workspace:*",
     "@openorc/memory": "workspace:*",
@@ -32,6 +33,7 @@
     "image-size": "^2.0.4",
     "marked": "^18.0.13",
     "prettier": "3.9.8",
+    "socket.io-client": "^4.8.4",
     "typescript": "^5.9.3",
     "ws": "^8.21.3",
     "zod": "^4.1.0"

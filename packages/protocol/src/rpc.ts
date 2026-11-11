@@ -2,6 +2,7 @@ import { z } from "zod";
 import { UsageHistoryParams } from "./usage-history.js";
 import { ProjectActivityParams } from "./project-activity.js";
 import type { AgentUpdates } from "./agent-updates.js";
+import { accountRpcParams, type AccountRpcResults } from "./account.js";
 import { ClaudeAccountId, claudeAccountRpcParams, type ClaudeAccountRpcResults } from "./claude-accounts.js";
 import { connectorRpcParams, type ConnectorRpcResults } from "./connectors.js";
 import { skillRpcParams, type SkillRpcResults } from "./skills.js";
@@ -71,6 +72,7 @@ const hasReviewScope = (scope: { threadId?: string; taskId?: string }) => Boolea
 const REVIEW_SCOPE_REQUIRED = "Review comments need a conversation or a task.";
 
 export const rpcParams = {
+  ...accountRpcParams,
   ...claudeAccountRpcParams,
   ...connectorRpcParams,
   ...skillRpcParams,
@@ -456,6 +458,7 @@ export type RpcParams<M extends RpcMethod> = z.infer<(typeof rpcParams)[M]>;
  * diagnostics test fails for a method with a credential field left off.
  */
 const SECRET_PARAMS: ReadonlySet<RpcMethod> = new Set<RpcMethod>([
+  "account.signIn",
   "memory.settings.set",
   "remote.push.setKey",
   "cloud.vercel.connect",
@@ -556,6 +559,7 @@ export interface RpcResults
     FileRpcResults,
     EditorRpcResults,
     CodeExplanationRpcResults,
+    AccountRpcResults,
     ClaudeAccountRpcResults,
     ConnectorRpcResults,
     SkillRpcResults,

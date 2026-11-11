@@ -23,6 +23,8 @@ export const PROTECTED_SECRET_FILES = {
   "cloud-brain.secrets": "cloud-brain.enc",
   /** A new cloud brain's, set up on the other service while the brain moves there. */
   "cloud-brain-move.secrets": "cloud-brain-move.enc",
+  /** The signed-in OpenOrc account's session. Only the core reads it; no window is ever sent it. */
+  "account.secrets": "openorc-account.enc",
 } as const;
 
 export type ProtectedSecretChannel = keyof typeof PROTECTED_SECRET_FILES;

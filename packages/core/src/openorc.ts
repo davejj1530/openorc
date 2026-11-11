@@ -1,5 +1,6 @@
 import { captureLaunchEnvironment, claudeConfigDir, recoverAgentProcesses } from "@openorc/agents";
 import { claudeAccounts as storedClaudeAccounts, Db, LedgerWriter, plans, redact, settings as storedSettings } from "@openorc/db";
+import type { Hosted } from "@openorc/hosted";
 import { startMcpServer, type OpenOrcMcpServer } from "@openorc/mcp";
 import { harnessAvailability, harnessInfo, harnessLoggedIn, rpcParams, type HarnessId, type RpcMethod, type RpcRequest } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
@@ -9,12 +10,14 @@ import { busyReason, fenceForUpdate, type BusyReason } from "./activity.js";
 import { BenchGenerator } from "./bench.js";
 import { DeviceService } from "./devices/service.js";
 import { FrameCoalescer } from "./frames.js";
+import { createAccountHandlers } from "./handlers/account.js";
 import { createAttachmentsHandlers } from "./handlers/attachments.js";
 import { createBenchHandlers } from "./handlers/bench.js";
 import { createCatalogHandlers } from "./handlers/catalog.js";
 import { createClaudeAccountHandlers } from "./handlers/claude-accounts.js";
 import { createConnectorHandlers } from "./handlers/connectors.js";
 import { ConnectorService, type ConnectorPlaces } from "./services/connectors.js";
+import { createAccount } from "./services/openorc-account.js";
 import { rememberedConnectors } from "./services/remembered-connectors.js";
 import { createBrainSyncHandlers } from "./handlers/brain-sync.js";
 import { createCloudHandlers } from "./handlers/cloud.js";
@@ -174,6 +177,7 @@ export class OpenOrc {
   readonly cloudHandoff: CloudHandoff;
   readonly cloudStandby: CloudStandby;
   private routing: BrainRouting | null | undefined;
+  private hosted: Hosted | null | undefined;
   private readonly cloudParts: ReturnType<typeof createCloud>;
   readonly runs: RunService;
   readonly comments: TaskCommentService;
@@ -377,6 +381,15 @@ export class OpenOrc {
     return this.routing;
   }
 
+  /** The OpenOrc account; null on the cloud brain and in a core given no account server. Made at its first use. */
+  get account(): Hosted | null {
+    if (this.hosted !== undefined) return this.hosted;
+    const { options } = this;
+    this.hosted =
+      options.cloudOnly || !options.accountServer ? null : createAccount({ db: this.db, server: options.accountServer, secrets: options.accountSecrets, windows: this.windows, log: this.log });
+    return this.hosted;
+  }
+
   /** The cloud brain is gone: moves to or from it settle now, its kept lists and read-only copies leave this Mac, and phones hear it went. */
   private async brainRemoved(linkKey: string | null): Promise<void> {
     if (linkKey) rememberRemovedBrain(this.db, linkKey);
@@ -540,6 +553,7 @@ export class OpenOrc {
     });
     void core.brainRouting?.refresh();
     if (!options.ephemeral) core.agentUpdates.start();
+    void core.account?.start();
     void core.devices.reapStale();
     // Embed any memories that predate the vector index, off the startup path.
     void core.memory.backfillVectors().catch(() => undefined);
@@ -643,6 +657,7 @@ export class OpenOrc {
     this.cloudParts.move?.close();
     this.cloudParts.coordinator?.close();
     this.brainRouting?.close();
+    this.account?.close();
     await this.remote.close(this.closingForUpdate ? "update" : "shutdown");
     await this.files.intelligence.close();
     this.threads.stopAccepting();
@@ -704,6 +719,7 @@ export class OpenOrc {
       }),
       createCloudCarryHandlers({ db: this.db, env: this.cloudParts.env, skills: this.cloudParts.skills, cloud: this.cloudParts.cloud }),
       createClaudeAccountHandlers(this.claudeAccounts),
+      createAccountHandlers(this.account?.account ?? null),
       createUsageHandlers({ db: this.db, ledger: this.ledger }),
       createConnectorHandlers({ db: this.db, connectors: this.connectors }),
       createBrainSyncHandlers({ db: this.db, memory: this.memory, textGeneration: this.textGeneration, cloudOnly: this.options.cloudOnly ?? false, invalidate }),

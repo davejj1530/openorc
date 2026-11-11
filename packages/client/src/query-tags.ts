@@ -59,6 +59,7 @@ function scopedTask(p: Params): string[] {
 
 /** Reads whose tags never depend on their parameters. */
 const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
+  "account.status": ["account"],
   "claude.accounts.list": ["claude-accounts"],
   "connectors.list": ["connectors"],
   "connectors.spec": ["connectors"],

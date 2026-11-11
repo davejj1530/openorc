@@ -31,6 +31,10 @@ export interface OpenOrcOptions {
   remoteNetwork?: RemoteNetwork;
   /** Keeps the Apple push key phone alerts are signed with. Without it, no key can be added. */
   pushSecrets?: ProtectedSecretStore;
+  /** Keeps the OpenOrc account's session. Without it nobody can sign in, and nothing else changes. */
+  accountSecrets?: ProtectedSecretStore;
+  /** The OpenOrc server. Without one the account reads as signed out, signing in is refused, and nothing reaches a server. */
+  accountServer?: string;
   /** Whether someone is using the Mac, asked once per alert. Without it, the Mac always reads as away. */
   presence?: () => Promise<boolean>;
   /** Moves a file or folder to the system Trash. Without it, nothing the user asks to remove is removed. */

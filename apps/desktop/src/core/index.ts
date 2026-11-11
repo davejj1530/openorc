@@ -79,6 +79,7 @@ const corePromise = OpenOrc.create({
   cloudEnvSecrets: secrets.store("cloud-env.secrets"),
   cloudBrainSecrets: secrets.store("cloud-brain.secrets"),
   cloudBrainMoveSecrets: secrets.store("cloud-brain-move.secrets"),
+  accountSecrets: secrets.store("account.secrets"),
   terminal,
   presence: presence.inUse,
   trash: trash.move,
@@ -150,8 +151,9 @@ process.parentPort.on("message", (e) => {
       .then((core) => {
         // Best effort before sleep: what is new on the chosen projects' branches reaches a brain that is awake.
         if (asleep) return Promise.all([core.cloudStandby.away(), core.brainRouting?.freshen()]).then(() => undefined);
-        // Back from sleep, maybe on another network: the cloud brain is dialed again now, not at the next retry, and woken
-        // if a phone used it meanwhile, so its new threads list here.
+        // Back from sleep, maybe on another network: the cloud brain and the account's server are dialed again now, not at
+        // the next retry, and the brain is woken if a phone used it meanwhile, so its new threads list here.
+        core.account?.awoke();
         if (core.brainRouting?.active) {
           core.brainRouting.link.awoke();
           void core.brainRouting.catchUp();

@@ -13,7 +13,7 @@ import { ThreadTabs } from "./ThreadTabs";
 import { ThreadTitle } from "./ThreadTitle";
 import { ThreadTools } from "./ThreadTools";
 import { TopBar } from "./TopBar";
-import { AlarmClock, ArrowLeft, Cloud, GitFork, GitPullRequest, MoreVertical, X } from "./icons";
+import { AlarmClock, ArrowLeft, Cloud, GitFork, GitPullRequest, MoreHorizontal, X } from "./icons";
 import { menuPopup } from "./menu";
 import { IconButton, StatusDot, Tooltip } from "./ui";
 import { thisComputer } from "../lib/this-computer";
@@ -123,7 +123,7 @@ function ThreadMenu({ thread, renaming, onRename }: { thread: Thread; renaming: 
   return (
     <Menu.Root>
       <Menu.Trigger ref={trigger} render={<IconButton aria-label="Thread actions" className="thread-more" />}>
-        <MoreVertical size={16} />
+        <MoreHorizontal size={16} />
       </Menu.Trigger>
       <Menu.Portal>
         <CoversPreview />

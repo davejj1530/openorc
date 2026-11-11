@@ -1,5 +1,5 @@
 import type { TaskPriority, TaskStatus } from "@openorc/protocol";
-import { Archive, CircleCheck, Minus, Signal, SignalHigh, SignalLow, SignalMedium } from "./icons";
+import { Archive, CircleCheck, Minus } from "./icons";
 import { cn } from "../lib/cn";
 
 export const statusLabel: Record<TaskStatus, string> = {
@@ -61,18 +61,29 @@ function Ring({ className }: { className: string }) {
 export const priorityLabel: Record<TaskPriority, string> = { none: "No priority", low: "Low", medium: "Medium", high: "High", urgent: "Urgent" };
 export const priorityOrder: TaskPriority[] = ["none", "low", "medium", "high", "urgent"];
 
+const priorityBars = ["M5 20v-3", "M10 20v-7", "M15 20V9", "M20 20V5"];
+const priorityLit: Record<Exclude<TaskPriority, "none">, number> = { low: 1, medium: 2, high: 3, urgent: 4 };
+
+/** A task's priority as signal bars: every bar is drawn, faint until its level lights it, so one lit bar still reads as a level. */
 export function PriorityIcon({ priority, className }: { priority: TaskPriority; className?: string }) {
   const c = cn("shrink-0 text-ink-3", className);
-  switch (priority) {
-    case "none":
-      return <Minus size={14} className={cn(c, "text-ink-4")} />;
-    case "low":
-      return <SignalLow size={14} className={c} />;
-    case "medium":
-      return <SignalMedium size={14} className={c} />;
-    case "high":
-      return <SignalHigh size={14} className={c} />;
-    case "urgent":
-      return <Signal size={14} className={cn(c, "text-bad")} />;
-  }
+  if (priority === "none") return <Minus size={14} className={cn(c, "text-ink-4")} />;
+  return (
+    <svg
+      width={14}
+      height={14}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.25}
+      strokeLinecap="round"
+      aria-hidden="true"
+      className={cn("openorc-icon", c, priority === "urgent" && "text-bad")}
+      data-icon="Priority"
+    >
+      {priorityBars.map((bar, index) => (
+        <path key={bar} d={bar} opacity={index < priorityLit[priority] ? 1 : 0.28} />
+      ))}
+    </svg>
+  );
 }

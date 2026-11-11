@@ -12,7 +12,7 @@ import { floatingGround } from "../lib/use-anchor-ground";
 import { useScrollEdges } from "../lib/use-scroll-edges";
 import { cn } from "../lib/cn";
 import { markThread, workspaceMarks, workspaceSummary, type WorkspaceMark } from "../lib/workspace-rail";
-import { Check, ChevronDown, Plus, Settings, SquareStack, X } from "./icons";
+import { Check, ChevronDown, Folders, Plus, Settings, X } from "./icons";
 import { menuItem, menuItemDanger, menuPopup, menuSeparator } from "./menu";
 import { ProjectIcon } from "./ProjectIconPicker";
 import { RemoveProjectDialog } from "./ProjectMenu";
@@ -84,7 +84,7 @@ export function ProjectFilter({ onSelect, crumb = false }: { onSelect: (workspac
           className={cn("no-drag", crumb ? "title-crumb-link" : "sidebar-workspace-name")}
           aria-label={crumb ? `Project: ${project?.name ?? ALL_PROJECTS}` : `Threads in ${project?.name ?? "all projects"}`}
         >
-          <ScopeName icon={project ? <ProjectIcon rootPath={project.rootPath} /> : <SquareStack size={14} />} name={project?.name ?? ALL_PROJECTS} />
+          <ScopeName icon={project ? <ProjectIcon rootPath={project.rootPath} /> : <Folders size={14} />} name={project?.name ?? ALL_PROJECTS} />
           {crumb ? null : <ChevronDown size={14} className="sidebar-workspace-name-chevron" />}
         </Menu.Trigger>
         <Menu.Portal>
@@ -92,7 +92,7 @@ export function ProjectFilter({ onSelect, crumb = false }: { onSelect: (workspac
           <Menu.Positioner sideOffset={6} align="start" className="z-40" collisionPadding={8}>
             <Menu.Popup ref={floatingGround} className={cn(menuPopup, "sidebar-scope-menu")}>
               <div {...edges} className="sidebar-scope-list scroll-edges">
-                <ScopeItem icon={<SquareStack size={13} />} name={ALL_PROJECTS} chosen={!project} onSelect={() => onSelect(ALL_WORKSPACES)} />
+                <ScopeItem icon={<Folders size={13} />} name={ALL_PROJECTS} chosen={!project} onSelect={() => onSelect(ALL_WORKSPACES)} />
                 {(projects.data ?? []).map((each) => (
                   <ScopeItem
                     key={each.id}

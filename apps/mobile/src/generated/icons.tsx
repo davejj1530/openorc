@@ -152,6 +152,10 @@ export const Folder = icon("Folder", <Path d="M3 8V5.5a2 2 0 0 1 2-2h4.5L13 7h6a
 export const FolderGit2 = icon("FolderGit2", <Path d="M3 8V5.5a2 2 0 0 1 2-2h4.5L13 7h6a2 2 0 0 1 2 2v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8h7l2-2" />);
 export const FolderOpen = icon("FolderOpen", <Path d="M3 18V5.5a2 2 0 0 1 2-2h4l3.5 3.5H18a2 2 0 0 1 2 2v1 M3 19l3-8h15l-3 9H5a2 2 0 0 1-2-1Z" />);
 export const FolderPlus = icon("FolderPlus", <Path d="M3 8V5.5a2 2 0 0 1 2-2h4.5L13 7h6a2 2 0 0 1 2 2v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z M12 10.5v6 M9 13.5h6" />);
+export const Folders = icon(
+  "Folders",
+  <Path d="M2.5 11v-1a2 2 0 0 1 2-2h3l2.5 2.5h5a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4.5a2 2 0 0 1-2-2Z M7 5.5a2 2 0 0 1 2-2h3L14.5 6h5a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2" />,
+);
 export const Funnel = icon("Funnel", <Path d="M4 5.5A1 1 0 0 1 5 4.5h14a1 1 0 0 1 .8 1.6L14.5 13v5.4a1 1 0 0 1-.55.9l-2.5 1.25a1 1 0 0 1-1.45-.9V13L4.2 6.1a1 1 0 0 1-.2-.6Z" />);
 export const GitBranch = icon(
   "GitBranch",
@@ -424,7 +428,6 @@ export const SquareSlash = icon(
     <Path d="m8 16 8-8" />
   </>,
 );
-export const SquareStack = icon("SquareStack", <Path d="m12 3 9 5-9 5-9-5Z M3 12l9 5 9-5 M3 16l9 5 9-5" />);
 export const Strikethrough = icon("Strikethrough", <Path d="M18 6c-1-2-3-3-6-3-4 0-6 2-6 4 0 3 4 4 6 5 M6 18c1 2 3 3 6 3 4 0 6-2 6-4 0-2-2-3-4-4 M3 12h18" />);
 export const Sun = icon(
   "Sun",

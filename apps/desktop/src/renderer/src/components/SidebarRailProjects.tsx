@@ -8,7 +8,7 @@ import { useUi } from "../lib/ui";
 import { useScrollEdges } from "../lib/use-scroll-edges";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { markThread, workspaceSummary, type WorkspaceMark } from "../lib/workspace-rail";
-import { Image as ImageIcon, Plus, Settings, SquareStack, X } from "./icons";
+import { Image as ImageIcon, Plus, Settings, Folders, X } from "./icons";
 import { menuItem, menuItemDanger, menuPopup, menuSeparator } from "./menu";
 import { ProjectIcon, ProjectIconChooser } from "./ProjectIconPicker";
 import { RemoveProjectDialog } from "./ProjectMenu";
@@ -93,7 +93,7 @@ export function RailProjects({ onSelect }: { onSelect: (workspace: string) => vo
     <>
       <Tooltip label={label} side="right">
         <button type="button" aria-label={label} aria-expanded={open} className="sidebar-dock-button no-drag" data-open={open || undefined} onClick={() => useLayout.getState().setRailProjects(!open)}>
-          <SquareStack size={RAIL_ICON} />
+          <Folders size={RAIL_ICON} />
         </button>
       </Tooltip>
       {open ? (

@@ -208,7 +208,11 @@ export const Inbox = icon("Inbox", <path d="m3 12 4-8h10l4 8v7a1.5 1.5 0 0 1-1.5
 export const MessageSquare = icon("MessageSquare", <path d="M5.5 4h13A2.5 2.5 0 0 1 21 6.5v10a2.5 2.5 0 0 1-2.5 2.5H9l-6 3V6.5A2.5 2.5 0 0 1 5.5 4Z" />);
 export const MailOpen = icon("MailOpen", <path d="m3 10 9-7 9 7v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 19Z M3 10l9 6 9-6 M3.5 20l5.5-6 M20.5 20 15 14" />);
 export const Brain = icon("Brain", layers);
-export const SquareStack = icon("SquareStack", layers);
+/** Projects: a folder with another behind it. */
+export const Folders = icon(
+  "Folders",
+  <path d="M2.5 11v-1a2 2 0 0 1 2-2h3l2.5 2.5h5a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4.5a2 2 0 0 1-2-2Z M7 5.5a2 2 0 0 1 2-2h3L14.5 6h5a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2" />,
+);
 /** An Orcling: the mascot's soft body and two upright eyes. */
 export const Orcling = icon("Orcling", <path d="M12 4.5c5.6 0 7.5 1.9 7.5 7.5s-1.9 7.5-7.5 7.5-7.5-1.9-7.5-7.5 1.9-7.5 7.5-7.5Z M9.75 10.25v2.5 M14.25 10.25v2.5" />);
 export const Workflow = icon(

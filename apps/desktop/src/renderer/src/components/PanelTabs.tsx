@@ -7,6 +7,7 @@ import { X } from "./icons";
 import { cn } from "../lib/cn";
 import { PANE_MS, prefersReducedMotion } from "../lib/motion";
 import { useStripHandoff } from "../lib/strip-handoff";
+import { useTabReorder, type ReorderTab } from "../lib/use-tab-reorder";
 
 function nextTab(session: PanelSession, index: number, key: string): WorkTab | undefined {
   if (key === "Home") return session.tabs[0];
@@ -105,8 +106,15 @@ function withFolding<T>(tabs: readonly T[], folding: { tab: T; index: number }[]
   return rows;
 }
 
-/** The panel's tabs. The strip scrolls sideways when they outgrow it, keeping the open tab in view. */
-export function PanelTabs({ session, onSelect, onClose }: { session: PanelSession; onSelect: (id: string) => void; onClose: (id: string) => void }) {
+interface PanelTabsProps {
+  session: PanelSession;
+  onSelect: (id: string) => void;
+  onClose: (id: string) => void;
+  onReorder: ReorderTab;
+}
+
+/** The panel's tabs. The strip scrolls sideways when they outgrow it, keeping the open tab in view; dragging a tab along it reorders them. */
+export function PanelTabs({ session, onSelect, onClose, onReorder }: PanelTabsProps) {
   const strip = useRef<HTMLDivElement>(null);
   // Tabs there when the strip first draws appear in place; later ones grow in.
   const known = useRef(new Set(session.tabs.map((tab) => tab.id)));
@@ -122,8 +130,9 @@ export function PanelTabs({ session, onSelect, onClose }: { session: PanelSessio
     revealed.current = true;
     strip.current?.querySelector('[aria-selected="true"]')?.closest(".work-tab")?.scrollIntoView?.({ block: "nearest", inline: "nearest", behavior });
   }, [session.activeId]);
+  const onPointerDown = useTabReorder(strip, onReorder);
   return (
-    <div ref={strip} role="tablist" aria-label="Panel tabs" className="panel-tabs work-tabs no-drag">
+    <div ref={strip} role="tablist" aria-label="Panel tabs" className="panel-tabs work-tabs no-drag" onPointerDown={onPointerDown}>
       {withFolding(session.tabs, folding).map(({ tab, leaving }) => {
         if (leaving) return <FoldingTab key={tab.id} tab={tab} />;
         const index = session.tabs.indexOf(tab);

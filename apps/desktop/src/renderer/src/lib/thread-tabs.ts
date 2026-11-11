@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { PANE_MS, prefersReducedMotion } from "./motion";
 import { useRouter, type Route } from "./router";
+import { movedBefore } from "./tab-order";
 
 /** What a tab holds: a thread, or a new thread being written. */
 export type TabRoute = Extract<Route, { view: "thread" } | { view: "newthread" }>;
@@ -20,6 +21,8 @@ interface ThreadTabsState {
   /** A thread in a tab of its own, or the tab that already holds it. */
   openThread: (threadId: string) => void;
   close: (id: string) => void;
+  /** Puts a tab ahead of another, or last. */
+  reorder: (id: string, beforeId: string | null) => void;
 }
 
 const KEY = "openorc.threadTabs";
@@ -87,6 +90,7 @@ export const useThreadTabs = create<ThreadTabsState>((set, get) => ({
     set({ tabs: rest.includes(next) ? state.tabs : [...state.tabs, next], active: next.id, leaving: [...state.leaving, id] });
     useRouter.getState().show(next.route);
   },
+  reorder: (id, beforeId) => set({ tabs: movedBefore(get().tabs, id, beforeId) }),
 }));
 
 /** The tabs that are not folding away. */

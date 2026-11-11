@@ -102,3 +102,20 @@ it("folds the last tab away while a new thread takes its place", async () => {
   expect(useThreadTabs.getState().tabs.map((tab) => tab.route)).toEqual([{ view: "newthread" }]);
   vi.useRealTimers();
 });
+
+it("puts a dragged tab ahead of another or last, without leaving the open thread, and saves the order", async () => {
+  const { useRouter } = await import("./router");
+  useRouter.setState({ route: { view: "thread", threadId: "first" }, history: [], future: [], threadIds: [] });
+  const { useThreadTabs } = await import("./thread-tabs");
+  useThreadTabs.getState().openThread("second");
+  useThreadTabs.getState().openThread("third");
+  const threads = () => useThreadTabs.getState().tabs.map((tab) => (tab.route.view === "thread" ? tab.route.threadId : null));
+  const [first, , third] = useThreadTabs.getState().tabs.map((tab) => tab.id) as [string, string, string];
+  useThreadTabs.getState().reorder(third, first);
+  expect(threads()).toEqual(["third", "first", "second"]);
+  useThreadTabs.getState().reorder(first, null);
+  expect(threads()).toEqual(["third", "second", "first"]);
+  expect(useThreadTabs.getState().active).toBe(third);
+  expect(useRouter.getState().route).toEqual({ view: "thread", threadId: "third" });
+  expect(JSON.parse(localStorage.getItem("openorc.threadTabs")!).tabs.map((tab: { route: { threadId: string } }) => tab.route.threadId)).toEqual(["third", "second", "first"]);
+});

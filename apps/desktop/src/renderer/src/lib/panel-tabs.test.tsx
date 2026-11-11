@@ -130,3 +130,16 @@ it("gives each further Terminal tab a numbered shell of its own, while opening T
   expect(currentPage(activeTab(session()))).toEqual(terminal);
   expect(session().tabs).toHaveLength(3);
 });
+
+it("puts a dragged tab ahead of another or last, keeping the open tab open", () => {
+  actions().navigate(scope, changes);
+  actions().add(scope);
+  actions().navigate(scope, terminal);
+  actions().add(scope);
+  const [first, second, third] = session().tabs.map((tab) => tab.id) as [string, string, string];
+  actions().reorder(scope, third, first);
+  expect(session().tabs.map((tab) => tab.id)).toEqual([third, first, second]);
+  actions().reorder(scope, third, null);
+  expect(session().tabs.map((tab) => tab.id)).toEqual([first, second, third]);
+  expect(session().activeId).toBe(third);
+});

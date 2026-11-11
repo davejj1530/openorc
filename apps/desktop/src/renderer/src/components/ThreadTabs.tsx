@@ -7,6 +7,7 @@ import { focusedProject, useLayout } from "../lib/layout";
 import { useThreadTabs, type ThreadTab } from "../lib/thread-tabs";
 import { useScrollEdges } from "../lib/use-scroll-edges";
 import { useStripHandoff } from "../lib/strip-handoff";
+import { useTabReorder } from "../lib/use-tab-reorder";
 import { orclingById, useOrclingGroups, useOrclings } from "../lib/orclings";
 import { HarnessLogo } from "./HarnessLogo";
 import { MessageSquare, PenSquare, Plus, X } from "./icons";
@@ -97,14 +98,15 @@ function useStripScroll(strip: RefObject<HTMLDivElement | null>, current: string
 /**
  * The work column's tabs in its title bar: each open thread or new thread, the current one raised on the surface, a
  * close on the current one and on any under the pointer, and + for a new thread in a tab of its own. The tabs scroll
- * sideways once they outgrow the bar, keeping the current one in view; arrow keys, Home and End move between them.
+ * sideways once they outgrow the bar, keeping the current one in view; arrow keys, Home and End move between them,
+ * and dragging a tab along the strip reorders them.
  * `title` stands in for the current tab's name while it is renamed, and `onRename` starts that from a double-click.
  */
 export function ThreadTabs({ title, onRename }: { title?: ReactNode; onRename?: () => void }) {
   const tabs = useThreadTabs((s) => s.tabs);
   const active = useThreadTabs((s) => s.active);
   const leaving = useThreadTabs((s) => s.leaving);
-  const { select, open, close } = useThreadTabs.getState();
+  const { select, open, close, reorder } = useThreadTabs.getState();
   const projectId = useLayout(focusedProject);
   const arriving = new Set(tabs.filter((tab) => !shown.has(tab.id)).map((tab) => tab.id));
   const reachable = tabs.filter((tab) => !leaving.includes(tab.id));
@@ -122,6 +124,7 @@ export function ThreadTabs({ title, onRename }: { title?: ReactNode; onRename?: 
     for (const id of arriving) shown.add(id);
   });
   useStripScroll(strip, `${active}:${tabs.length}`);
+  const onPointerDown = useTabReorder(strip, reorder);
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, id: string) => {
     const index = reachable.findIndex((tab) => tab.id === id);
     const target = { ArrowLeft: index - 1, ArrowRight: index + 1, Home: 0, End: reachable.length - 1 }[event.key];
@@ -139,6 +142,7 @@ export function ThreadTabs({ title, onRename }: { title?: ReactNode; onRename?: 
         className="work-tabs scroll-edges-x"
         role="tablist"
         aria-label="Open threads"
+        onPointerDown={onPointerDown}
         onScroll={(event) => {
           scrolled = event.currentTarget.scrollLeft;
           edges.onScroll();

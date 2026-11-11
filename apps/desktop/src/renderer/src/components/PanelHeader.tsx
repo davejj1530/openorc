@@ -51,7 +51,13 @@ export function PanelHeader({
           <WindowCorner sidebarOpen={sidebarOpen} />
         </span>
       ) : null}
-      <PanelTabs key={scope} session={session} onSelect={(id) => usePanelSessions.getState().select(scope, id)} onClose={onClose} />
+      <PanelTabs
+        key={scope}
+        session={session}
+        onSelect={(id) => usePanelSessions.getState().select(scope, id)}
+        onClose={onClose}
+        onReorder={(id, beforeId) => usePanelSessions.getState().reorder(scope, id, beforeId)}
+      />
       <Tooltip label="New tab">
         <IconButton aria-label="New tab" className="no-drag" onClick={() => usePanelSessions.getState().add(scope)}>
           <Plus size={15} />

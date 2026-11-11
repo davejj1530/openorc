@@ -51,6 +51,22 @@
     max-width var(--duration-resize) var(--ease-out),
     margin var(--duration-resize) var(--ease-out);
 }
+/* A dragged tab rides over the row while the tabs it passes step aside (use-tab-reorder moves them); it follows the
+   pointer exactly, so only the others ease. The fills are tints, so it draws its own over the chrome's colour to hide
+   the names passing under it, and it stacks above the thread header's controls, which sit at 2. */
+.work-tabs[data-reordering] .work-tab {
+  transition: transform var(--duration-arrive) var(--ease-out);
+}
+.work-tabs .work-tab[data-dragged] {
+  z-index: 3;
+  background: linear-gradient(var(--surface-2), var(--surface-2)) var(--bg);
+  color: var(--ink-2);
+  transition: none;
+}
+.work-tabs .work-tab-current[data-dragged] {
+  background-image: linear-gradient(var(--surface-3), var(--surface-3));
+  color: var(--ink);
+}
 .work-tab:hover {
   background-color: var(--surface-2);
   color: var(--ink-2);

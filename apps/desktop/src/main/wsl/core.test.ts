@@ -58,10 +58,12 @@ function preparing() {
   let progress!: (text: string) => void;
   let finish!: (start: WslCoreStart) => void;
   let fail!: (error: Error) => void;
+  let ending!: AbortSignal;
   const log: string[] = [];
   const core = new WslCore(
-    (say) => {
+    (say, signal) => {
       progress = say;
+      ending = signal;
       return new Promise<WslCoreStart>((resolve, reject) => {
         finish = resolve;
         fail = reject;
@@ -69,7 +71,7 @@ function preparing() {
     },
     (line) => log.push(line),
   );
-  return { core, child, log, progress: (text: string) => progress(text), start: () => finish({ child, start: START }), fail: (error: Error) => fail(error) };
+  return { core, child, log, ending: () => ending, progress: (text: string) => progress(text), start: () => finish({ child, start: START }), fail: (error: Error) => fail(error) };
 }
 
 async function running() {
@@ -205,10 +207,13 @@ describe("the core inside a distribution, as main sees it", () => {
   });
 
   it("ends a core that starts after it was told to stop", async () => {
-    const { core, child, start } = preparing();
+    const { core, child, start, ending } = preparing();
     const exits: number[] = [];
     core.on("exit", (code) => exits.push(code));
+    expect(ending().aborted).toBe(false);
     core.kill();
+    // Whatever was making the distribution ready is told to stop, so it installs nothing for nobody.
+    expect(ending().aborted).toBe(true);
     start();
     await settled();
     expect(exits).toEqual([1]);
@@ -223,5 +228,16 @@ describe("the core inside a distribution, as main sees it", () => {
     child.stdout.write("The distribution is shutting down.\n");
     await settled();
     expect(log).toEqual(["[core] [core] up, pid 12", "[core] partial line", "[core] The distribution is shutting down."]);
+  });
+
+  it("keeps the last few lines the core printed, to say why it stopped", async () => {
+    const { core, child } = await running();
+    expect(core.lastWords).toBe("");
+    for (let line = 1; line <= 20; line++) child.stderr.write(`line ${line}\n`);
+    child.stderr.write("\nError: disk I/O error\n");
+    await settled();
+    expect(core.lastWords.split("\n")).toHaveLength(12);
+    expect(core.lastWords.split("\n").at(-1)).toBe("Error: disk I/O error");
+    expect(core.lastWords).not.toContain("line 9\n");
   });
 });

@@ -1,4 +1,4 @@
-import { mkdir, open, rename, rm, stat } from "node:fs/promises";
+import { lstat, mkdir, open, rename, rm, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -27,7 +27,8 @@ async function topOf(file: string, device: number): Promise<string> {
 
 async function trashFor(file: string, home: string, uid: number): Promise<string> {
   const homeTrash = path.join(process.env["XDG_DATA_HOME"] || path.join(home, ".local", "share"), "Trash");
-  const device = (await stat(file)).dev;
+  // The item itself, not what a link points at: a link is moved as a link, and one whose target is gone still goes.
+  const device = (await lstat(file)).dev;
   await mkdir(homeTrash, { recursive: true, mode: 0o700 });
   if ((await stat(homeTrash)).dev === device) return homeTrash;
   return path.join(await topOf(file, device), `.Trash-${uid}`);

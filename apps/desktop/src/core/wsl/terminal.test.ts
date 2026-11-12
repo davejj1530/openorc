@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import { scriptTerminal, terminalLine } from "./terminal";
 
 const SCRIPT = "/usr/bin/script";
+// util-linux's script, which a distribution carries. macOS has a program of the same name that takes other switches.
+const hasScript = process.platform === "linux" && existsSync(SCRIPT);
 
 /** Runs a command to its end in the terminal and gives back what it drew and how it ended. */
 async function run(terminal: ReturnType<typeof scriptTerminal>, binary: string, args: string[]): Promise<{ output: string; code: number | null }> {
@@ -22,7 +24,7 @@ describe("a sign-in terminal inside a distribution", () => {
     expect(terminalLine("/opt/my tools/it's", ["$(rm -rf ~)", "a;b"])).toBe(`stty cols 400 rows 40 2>/dev/null; exec '/opt/my tools/it'\\''s' '$(rm -rf ~)' 'a;b'`);
   });
 
-  it.runIf(existsSync(SCRIPT))("gives the command a real terminal, wide enough for a token, and reports its exit", async () => {
+  it.runIf(hasScript)("gives the command a real terminal, wide enough for a token, and reports its exit", async () => {
     const { output, code } = await run(
       scriptTerminal(async () => SCRIPT),
       "/bin/sh",
@@ -33,7 +35,7 @@ describe("a sign-in terminal inside a distribution", () => {
     expect(code).toBe(7);
   });
 
-  it.runIf(existsSync(SCRIPT))("passes arguments through unread by any shell", async () => {
+  it.runIf(hasScript)("passes arguments through unread by any shell", async () => {
     const { output } = await run(
       scriptTerminal(async () => SCRIPT),
       "/bin/sh",
@@ -52,7 +54,7 @@ describe("a sign-in terminal inside a distribution", () => {
     expect(code).toBe(3);
   });
 
-  it.runIf(existsSync(SCRIPT))("ends a command that waits for a key", async () => {
+  it.runIf(hasScript)("ends a command that waits for a key", async () => {
     const proc = await scriptTerminal(async () => SCRIPT)("/bin/sh", ["-c", "echo waiting; read answer"], { cwd: os.tmpdir(), env: { PATH: process.env["PATH"] ?? "" } });
     const ended = new Promise<number | null>((resolve) => proc.onExit(resolve));
     await new Promise<void>((resolve) => proc.onData((data) => data.includes("waiting") && resolve()));

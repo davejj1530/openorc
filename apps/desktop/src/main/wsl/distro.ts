@@ -21,14 +21,20 @@ export interface Distro {
    * Callers keep each argument to plain words; anything longer goes in on the program's input.
    */
   spawn(argv: readonly string[]): ChildProcessWithoutNullStreams;
-  /** The same, to its end. `input` is written to it whole, such as an archive it unpacks. */
-  run(argv: readonly string[], options?: { input?: Buffer; timeoutMs?: number }): Promise<DistroResult>;
+  /** The same, to its end. `input` is written to it whole, such as an archive it unpacks. `signal` ends it early. */
+  run(argv: readonly string[], options?: RunOptions): Promise<DistroResult>;
   /** A path inside, as main opens it. */
   toHost(inside: string): string;
   /** A path main was given, as the distribution names it; null when it is not inside. */
   toInside(host: string): string | null;
   /** What a Terminal panel starts for a shell in `cwd`, a path inside; with the folder main starts it from, where that matters. */
   terminal(cwd: string): { file: string; args: string[]; cwd?: string };
+}
+
+export interface RunOptions {
+  input?: Buffer;
+  timeoutMs?: number;
+  signal?: AbortSignal;
 }
 
 const OUTPUT_LIMIT = 4 * 1024 * 1024;
@@ -39,12 +45,19 @@ export function decodeWslText(bytes: Buffer): string {
   return (utf16 ? bytes.toString("utf16le") : bytes.toString("utf8")).replace(/^\uFEFF/, "").replace(/\r/g, "");
 }
 
-function runTo(child: ChildProcessWithoutNullStreams, options: { input?: Buffer; timeoutMs?: number } = {}): Promise<DistroResult> {
+function runTo(child: ChildProcessWithoutNullStreams, options: RunOptions = {}): Promise<DistroResult> {
   return new Promise((resolve, reject) => {
     const stdout: Buffer[] = [];
     const stderr: Buffer[] = [];
     let held = 0;
-    const timer = options.timeoutMs ? setTimeout(() => child.kill(), options.timeoutMs) : null;
+    const stop = () => void child.kill();
+    const timer = options.timeoutMs ? setTimeout(stop, options.timeoutMs) : null;
+    const settled = () => {
+      if (timer) clearTimeout(timer);
+      options.signal?.removeEventListener("abort", stop);
+    };
+    if (options.signal?.aborted) stop();
+    else options.signal?.addEventListener("abort", stop, { once: true });
     child.stdout.on("data", (chunk: Buffer) => {
       if ((held += chunk.length) <= OUTPUT_LIMIT) stdout.push(chunk);
     });
@@ -52,11 +65,11 @@ function runTo(child: ChildProcessWithoutNullStreams, options: { input?: Buffer;
       if (stderr.length < 64) stderr.push(chunk);
     });
     child.once("error", (error) => {
-      if (timer) clearTimeout(timer);
+      settled();
       reject(error);
     });
     child.once("close", (code) => {
-      if (timer) clearTimeout(timer);
+      settled();
       // What a program inside wrote is UTF-8; what wsl.exe itself says, such as that no such distribution exists, may not be.
       resolve({ code, stdout: Buffer.concat(stdout), stderr: decodeWslText(Buffer.concat(stderr)).slice(-8000) });
     });
@@ -91,7 +104,8 @@ export function wslDistro(name: string, exe: string = wslExe()): Distro {
 
 /**
  * This machine standing in for a distribution, where there is no wsl.exe: programs start here and paths are their
- * own. Development builds and tests on macOS and Linux run the whole WSL route through it.
+ * own. Development builds and tests run the whole WSL route through it on x64 Linux with glibc, the one machine the
+ * core for a distribution is built for; anywhere else the installer refuses it as it would refuse such a distribution.
  */
 export function standInDistro(name = "stand-in", env: NodeJS.ProcessEnv = process.env): Distro {
   const start = (argv: readonly string[]) => spawn(argv[0]!, argv.slice(1), { stdio: ["pipe", "pipe", "pipe"], env, cwd: env["HOME"] || os.homedir() });

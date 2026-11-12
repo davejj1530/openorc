@@ -75,7 +75,8 @@ export function decodeFrame(line: string): WslFrame | null {
  */
 export class FrameReader {
   private readonly decoder = new TextDecoder("utf-8");
-  private rest = "";
+  /** The pieces of the line still arriving. Kept apart until its newline comes, so a long frame is joined once, not at every piece. */
+  private pieces: string[] = [];
 
   constructor(
     private readonly frame: (frame: WslFrame) => void,
@@ -83,15 +84,21 @@ export class FrameReader {
   ) {}
 
   push(chunk: Uint8Array | string): void {
-    const lines = (this.rest + (typeof chunk === "string" ? chunk : this.decoder.decode(chunk, { stream: true }))).split("\n");
-    this.rest = lines.pop() ?? "";
-    for (const line of lines) this.line(line);
+    const text = typeof chunk === "string" ? chunk : this.decoder.decode(chunk, { stream: true });
+    let from = 0;
+    for (let at = text.indexOf("\n"); at !== -1; at = text.indexOf("\n", from)) {
+      this.pieces.push(text.slice(from, at));
+      this.line(this.pieces.join(""));
+      this.pieces = [];
+      from = at + 1;
+    }
+    if (from < text.length) this.pieces.push(text.slice(from));
   }
 
   /** The stream ended: whatever stood after the last newline was never a whole frame. */
   end(): void {
-    const rest = this.rest + this.decoder.decode();
-    this.rest = "";
+    const rest = this.pieces.join("") + this.decoder.decode();
+    this.pieces = [];
     if (rest.trim()) this.noise(rest);
   }
 

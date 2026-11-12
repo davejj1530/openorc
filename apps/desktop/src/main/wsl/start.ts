@@ -34,7 +34,7 @@ export interface WslCoreInput {
   fileKey: string;
   qa: boolean;
   /** Downloads Node's archive, through the app's own network stack so a proxy the PC uses is honoured. */
-  fetchNode(url: string): Promise<Buffer>;
+  fetchNode(url: string, signal?: AbortSignal): Promise<Buffer>;
   /** Hears where the core keeps its profile inside the distribution, once the distribution has said where home is. */
   profile(dataDir: string): void;
   log?(line: string): void;
@@ -45,10 +45,12 @@ export interface WslCoreInput {
  * there first, then it starts under wsl.exe and is given its start line.
  */
 export function startWslCore(input: WslCoreInput): WslCore {
-  return new WslCore(async (progress) => {
+  return new WslCore(async (progress, signal) => {
     const core = await carriedCore(input.coreDir);
     if (!core) throw new WslSetupError("This build of OpenOrc carries no core for WSL. Build it with pnpm --filter @openorc/desktop bundle:wsl, or install a release.");
-    const runtime = await ensureRuntime(input.distro, { core, brain: await carriedBrain(input.brainDir), fetchNode: input.fetchNode }, progress);
+    const runtime = await ensureRuntime(input.distro, { core, brain: await carriedBrain(input.brainDir), fetchNode: input.fetchNode }, progress, undefined, signal);
+    // Ended while the distribution was made ready: nothing is started there, and main's paths now belong to another core.
+    signal.throwIfAborted();
     input.profile(runtime.dataDir);
     progress(`Starting OpenOrc in ${input.distro.name}…`);
     const child = input.distro.spawn(runtime.command) as unknown as CoreChild;

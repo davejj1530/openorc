@@ -10,6 +10,9 @@ import type { Distro } from "./distro";
  *   ~/.openorc-wsl/app/<version>/core.mjs
  *   ~/.openorc-wsl/brain/                    the cloud brain this app installs, for Settings > Cloud
  *   ~/.openorc-wsl/data/                     the profile: the ledger, attachments and managed workspaces
+ *   ~/.openorc-wsl/core.lock                 held by the core that is running: a profile has one at a time
+ *
+ * The folder is the user's alone, as the application data folder on Windows is.
  */
 
 /** The Node the core runs under, from nodejs.org, checked against the hash its release published. */
@@ -48,12 +51,15 @@ export interface RuntimeSource {
   core: { version: string; read(): Promise<Buffer> };
   /** The cloud brain's archive and its door, copied beside the core for Settings > Cloud; none when the app carries none. */
   brain: CarriedFile[];
-  /** Node's archive for Linux, whole. */
-  fetchNode(url: string): Promise<Buffer>;
+  /** Node's archive for Linux, whole. `signal` ends a download nobody waits for any more. */
+  fetchNode(url: string, signal?: AbortSignal): Promise<Buffer>;
 }
 
 /** Why a distribution cannot run the core, in words for the person who chose it. */
 export class WslSetupError extends Error {}
+
+/** The exit of a core that did not start because another one holds the profile. */
+export const ALREADY_RUNNING = 65;
 
 const MARK = "@@openorc@@";
 /** The script's place, from the home folder every command main runs in the distribution starts in. */
@@ -65,16 +71,18 @@ const SETUP = `${FOLDER}/setup.sh`;
  * nothing main says depends on how a command line survives the trip through wsl.exe.
  *
  *   probe <node> <core>     what is there, each value behind a marker so nothing else printed is read as one
- *   unpack <folder> <strip> the archive on the input, into a folder beside the one named and then swapped in, so a
- *                           folder that exists is always a whole one; older versions beside it go
+ *   unpack <folder> <strip> the archive on the input, into a folder of this run's own beside the one named and then
+ *                           swapped in, so a folder that exists is always a whole one; older versions beside it go
  *   place <name> <keep>     a file of the cloud brain, from the input; the first one clears the folder
  *   start <node> <core>     the core: its frames leave on descriptor 3, where its output was, and its output joins
- *                           its errors
+ *                           its errors. It holds a lock on descriptor 9 for as long as it runs, so a second core
+ *                           never opens the same profile: one whose wsl.exe was ended may still be closing its ledger
  */
 export const SETUP_SCRIPT = [
   `root="\${HOME:-$(getent passwd "$(id -u)" | cut -d: -f6)}/${FOLDER}"`,
   `case "$1" in`,
   `probe)`,
+  `  chmod 700 "$root" 2>/dev/null`,
   `  printf '\\n${MARK}home=%s\\n' "\${root%/${FOLDER}}"`,
   `  printf '${MARK}machine=%s\\n' "$(uname -m)"`,
   `  printf '${MARK}glibc=%s\\n' "$(getconf GNU_LIBC_VERSION 2>/dev/null)"`,
@@ -87,11 +95,12 @@ export const SETUP_SCRIPT = [
   `unpack)`,
   `  set -e`,
   `  dest="$root/$2"`,
-  `  rm -rf "$dest.partial"`,
-  `  mkdir -p "$dest.partial"`,
-  `  tar -xzf - -C "$dest.partial" --strip-components="$3"`,
+  `  partial="$dest.partial.$$"`,
+  `  trap 'rm -rf "$partial"' EXIT`,
+  `  mkdir -p "$partial"`,
+  `  tar -xzf - -C "$partial" --strip-components="$3"`,
   `  rm -rf "$dest"`,
-  `  mv "$dest.partial" "$dest"`,
+  `  mv "$partial" "$dest"`,
   `  for other in "$(dirname "$dest")"/*; do test "$other" = "$dest" || rm -rf "$other"; done`,
   `  ;;`,
   `place)`,
@@ -102,6 +111,8 @@ export const SETUP_SCRIPT = [
   `  mv "$root/brain/$2.partial" "$root/brain/$2"`,
   `  ;;`,
   `start)`,
+  `  exec 9>"$root/core.lock"`,
+  `  if command -v flock >/dev/null 2>&1 && ! flock -n 9; then exit ${ALREADY_RUNNING}; fi`,
   `  exec "$root/node/$2/bin/node" "$root/app/$3/core.mjs" 3>&1 1>&2`,
   `  ;;`,
   `*)`,
@@ -157,10 +168,25 @@ const failed = (what: string, said: string) => new WslSetupError(`${what}${said.
 
 const step = (distro: Distro, name: string, args: string[], options: { input?: Buffer; timeoutMs: number }) => distro.run(["/bin/sh", SETUP, name, ...args], options);
 
+/**
+ * The distribution for a setup that `signal` can end: the command that is running is ended with it, and none is
+ * started after. A setup nobody waits for must not go on installing beside the next one.
+ */
+function endedBy(distro: Distro, signal: AbortSignal | undefined): Distro {
+  if (!signal) return distro;
+  return {
+    ...distro,
+    run: async (argv, options) => {
+      signal.throwIfAborted();
+      return distro.run(argv, { ...options, signal });
+    },
+  };
+}
+
 /** Puts the script in the distribution's home, as it is for this version of the app. Also the first sign the distribution starts at all. */
 async function placeScript(distro: Distro): Promise<void> {
   const unreachable = `${distro.name} did not answer. Check that it starts with "wsl -d ${distro.name}"`;
-  const made = await distro.run(["mkdir", "-p", FOLDER], { timeoutMs: 60_000 });
+  const made = await distro.run(["mkdir", "-p", "-m", "700", FOLDER], { timeoutMs: 60_000 });
   if (made.code !== 0) throw failed(unreachable, made.stderr || made.stdout.toString("utf8"));
   const written = await distro.run(["tee", SETUP], { input: Buffer.from(SETUP_SCRIPT), timeoutMs: 60_000 });
   if (written.code !== 0) throw failed(unreachable, written.stderr);
@@ -178,10 +204,10 @@ async function unpack(distro: Distro, archive: Buffer, folder: string, strip: nu
   if (result.code !== 0) throw failed(`${what} could not be installed in ${distro.name}`, result.stderr);
 }
 
-async function installNode(distro: Distro, source: RuntimeSource, node: NodeRelease): Promise<void> {
+async function installNode(distro: Distro, source: RuntimeSource, node: NodeRelease, signal: AbortSignal | undefined): Promise<void> {
   let archive: Buffer;
   try {
-    archive = await source.fetchNode(node.url);
+    archive = await source.fetchNode(node.url, signal);
   } catch (error) {
     throw new WslSetupError(`Node could not be downloaded from nodejs.org: ${error instanceof Error ? error.message : String(error)}. Check the connection and try again.`);
   }
@@ -198,37 +224,47 @@ async function copyBrain(distro: Distro, files: CarriedFile[]): Promise<void> {
   }
 }
 
+const sameNames = (one: readonly string[], other: readonly string[]) => [...one].sort().join() === [...other].sort().join();
+
 /**
  * Makes the distribution ready to start this app's core and says how to start it. What is there already is left
- * alone, so every start after the first only asks. `progress` hears each slow step before it begins.
+ * alone, so every start after the first only asks. `progress` hears each slow step before it begins. `signal` ends
+ * the setup: the step that is running stops, and no other begins.
  */
-export async function ensureRuntime(distro: Distro, source: RuntimeSource, progress: (text: string) => void = () => undefined, node: NodeRelease = WSL_NODE): Promise<WslRuntime> {
+export async function ensureRuntime(
+  distro: Distro,
+  source: RuntimeSource,
+  progress: (text: string) => void = () => undefined,
+  node: NodeRelease = WSL_NODE,
+  signal?: AbortSignal,
+): Promise<WslRuntime> {
   if (!VERSION.test(source.core.version) || !VERSION.test(node.version)) throw new WslSetupError("This build of OpenOrc carries no core for WSL.");
+  const inside = endedBy(distro, signal);
   progress(`Starting ${distro.name}…`);
-  await placeScript(distro);
-  const found = await probe(distro, node.version, source.core.version);
+  await placeScript(inside);
+  const found = await probe(inside, node.version, source.core.version);
   const reason = unsupported(found, distro.name);
   if (reason) throw new WslSetupError(reason);
   const hasNode = found.node === `v${node.version}`;
   if (!hasNode) {
     progress(`Setting up OpenOrc in ${distro.name}: downloading Node ${node.version}…`);
-    await installNode(distro, source, node);
+    await installNode(inside, source, node, signal);
   }
   if (!found.core) {
     progress(`Setting up OpenOrc in ${distro.name}: installing its core…`);
-    await unpack(distro, await source.core.read(), `app/${source.core.version}`, 0, "OpenOrc's core");
+    await unpack(inside, await source.core.read(), `app/${source.core.version}`, 0, "OpenOrc's core");
   }
   const brain = source.brain.filter((file) => VERSION.test(file.name));
   if (
     brain.length &&
-    brain
-      .map((file) => file.name)
-      .sort()
-      .join() !== [...found.brain].sort().join()
+    !sameNames(
+      brain.map((file) => file.name),
+      found.brain,
+    )
   )
-    await copyBrain(distro, brain);
+    await copyBrain(inside, brain);
   if (!hasNode || !found.core) {
-    const check = await probe(distro, node.version, source.core.version);
+    const check = await probe(inside, node.version, source.core.version);
     if (check.node !== `v${node.version}` || !check.core) throw new WslSetupError(`OpenOrc's core did not install in ${distro.name}. Check the free space in the distribution and try again.`);
   }
   return { command: ["/bin/sh", SETUP, "start", node.version, source.core.version], dataDir: `${found.home}/${FOLDER}/data` };

@@ -48,7 +48,9 @@ export async function listDistros(platform: NodeJS.Platform = process.platform, 
     // Older builds of wsl.exe have no --verbose; the names alone are enough to offer them.
     const verbose = await run(["--list", "--verbose"]).then(decodeWslText, () => "");
     return parseDistros(quiet, verbose).sort((a, b) => Number(b.default) - Number(a.default));
-  } catch {
+  } catch (error) {
+    // A PC without WSL lands here at every look, so this is a line in the log and nothing more.
+    console.warn(`[main] wsl.exe listed no distributions: ${error instanceof Error ? error.message : String(error)}`);
     return [];
   }
 }

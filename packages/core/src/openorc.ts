@@ -5,7 +5,7 @@ import { harnessAvailability, harnessInfo, harnessLoggedIn, rpcParams, type Harn
 import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
-import { busyReason, fenceForUpdate, type BusyReason } from "./activity.js";
+import { busyReason, fenceForSwitch, fenceForUpdate, type BusyReason } from "./activity.js";
 import { BenchGenerator } from "./bench.js";
 import { DeviceService } from "./devices/service.js";
 import { FrameCoalescer } from "./frames.js";
@@ -637,6 +637,11 @@ export class OpenOrc {
     const refusal = fenceForUpdate(this);
     if (refusal === null) this.closingForUpdate = true;
     return refusal;
+  }
+
+  /** The same before the desktop starts its core somewhere else, such as inside a WSL distribution: this one stays closed until someone switches back. */
+  prepareForSwitch(): string | null {
+    return fenceForSwitch(this);
   }
 
   async close(): Promise<void> {

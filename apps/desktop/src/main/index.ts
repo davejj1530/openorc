@@ -2,14 +2,14 @@ import { randomBytes } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { isAbsolute, join, normalize } from "node:path";
-import { protocol, app, BrowserWindow, dialog, ipcMain, MessageChannelMain, session, shell, utilityProcess, type UtilityProcess } from "electron";
+import { protocol, app, BrowserWindow, dialog, ipcMain, MessageChannelMain, session, shell, utilityProcess, type UtilityProcess, type WebContents } from "electron";
 import { appOrigin, isExternalWebUrl, permitted } from "./app-origin";
 import electronUpdater from "electron-updater";
 import { AppUpdates } from "./app-updates";
 import { configureReleaseFeed } from "./release-feed";
 import { installUpdateControls } from "./update-ipc";
 import { installUpdateMenu } from "./update-menu";
-import { closeCoreForUpdate } from "./update-handoff";
+import { closeCore, closeCoreForUpdate } from "./update-handoff";
 import { hostSandboxFrames, isolateSandboxFrames, McpAppSandbox } from "./mcp-app-sandbox";
 import { forgetShellEnv, listenForShellEnv } from "./shell-env";
 import { installProtectedSecrets } from "./protected-secrets";
@@ -35,6 +35,7 @@ import { HostPreferences, hostPaths, localPaths, useHostPaths } from "./host";
 import { connectWindow, hostCores, type CoreProcess } from "./host-core";
 import { closeWhenIdle, importProject, installHostControls } from "./host-controls";
 import { WslCore } from "./wsl/core";
+import { ALREADY_RUNNING } from "./wsl/runtime";
 import { thisComputer } from "../shared/host";
 
 const here = import.meta.dirname;
@@ -60,6 +61,12 @@ let preparingUpdate = false;
 let switchingHost = false;
 /** True while the user is asked what to do about a distribution that could not run the core; nothing starts one meanwhile. */
 let askingAboutHost = false;
+/** Windows that asked for a core while it was closing to switch. A switch that goes through reloads every window; one that is refused reloads these, which were left without a core. */
+const waitingForSwitch = new Set<WebContents>();
+/** A folder chosen where OpenOrc was not running, to add as a project once a core is up where it lives. Kept until that core answers, so a start that fails and is tried again still adds it. */
+let folderToAdd: string | null = null;
+/** How long Node's archive may take to arrive before setup gives up on the download. */
+const NODE_DOWNLOAD_MS = 10 * 60_000;
 // Visual QA and CI switches. A release build compiles them out and ignores these variables.
 const screenshot = __OPENORC_QA__ ? process.env["OPENORC_SCREENSHOT"] : undefined;
 const autoquit = __OPENORC_QA__ && process.env["OPENORC_AUTOQUIT"] === "1";
@@ -110,13 +117,7 @@ const previewHost = createPreviewHost();
 if (__OPENORC_QA__) Object.assign(globalThis, { __openorcPreview: previewHost });
 const mcpAppSandbox = new McpAppSandbox();
 
-/**
- * An app opened from the Dock inherits a bare PATH, and one opened from a
- * tool may inherit an odd one. Either way the user's terminal is the truth,
- * and the core is the process that asks it: the core launches the agents, so
- * Ready has to mean launchable there. Main hears every snapshot the core
- * adopts and keeps the PATH for the Terminal panels it hosts outside macOS.
- */
+/** The core on this computer, in Electron's utility process. */
 function forkCore(): UtilityProcess {
   const child = utilityProcess.fork(join(here, "core.mjs"), [], {
     serviceName: "openorc-core",
@@ -142,27 +143,44 @@ const cores = hostCores({
   qa: __OPENORC_QA__,
   // Through Chromium's network stack, so a proxy this PC uses is honoured, in a session of its own: the windows'
   // session reaches only the hosts the MCP App sandbox lets through.
-  fetchNode: async (url) => {
-    const response = await session.fromPartition("openorc-wsl-runtime").fetch(url);
+  fetchNode: async (url, signal) => {
+    const waited = AbortSignal.timeout(NODE_DOWNLOAD_MS);
+    const response = await session.fromPartition("openorc-wsl-runtime").fetch(url, { signal: signal ? AbortSignal.any([signal, waited]) : waited });
     if (!response.ok) throw new Error(`nodejs.org answered ${response.status}`);
     return Buffer.from(await response.arrayBuffer());
   },
 });
 const currentHost = () => cores.choice(hostPreferences.choice());
 
+/** Why a core inside a distribution stopped by itself, from how it exited and the last things it printed. */
+function stopReason(distro: string, code: number, lastWords: string): string {
+  if (code === ALREADY_RUNNING) return `OpenOrc is already running in ${distro}, or is still closing there. Close any other OpenOrc that runs in ${distro}, then try again.`;
+  const said = lastWords ? `\n\nThe last it said:\n${lastWords}` : "";
+  return `Its core there stopped (exit ${code}). The distribution may have been shut down.${said}`;
+}
+
 /**
  * A distribution that could not run the core, or stopped running it: the user tries again or goes back to this
  * computer. Asked once, and no core starts until they answer, so a window reconnecting meanwhile cannot start a second.
+ * Only a click changes where OpenOrc runs: closing the question quits, and the next start tries the distribution again.
  */
 function stoppedInDistro(distro: string, reason: string): void {
   if (quitting || preparingUpdate || switchingHost || askingAboutHost) return;
   console.error(`[main] the core in WSL: ${distro} stopped: ${reason}`);
   askingAboutHost = true;
-  const buttons = ["Try again", `Run on ${thisComputer(process.platform)}`];
-  void dialog.showMessageBox({ type: "error", message: `OpenOrc could not run in WSL: ${distro}`, detail: reason, buttons, defaultId: 0, cancelId: 1 }).then(({ response }) => {
+  const buttons = ["Try again", `Run on ${thisComputer(process.platform)}`, "Quit OpenOrc"];
+  void dialog.showMessageBox({ type: "error", message: `OpenOrc could not run in WSL: ${distro}`, detail: reason, buttons, defaultId: 0, cancelId: 2 }).then(({ response }) => {
     askingAboutHost = false;
     if (quitting) return;
-    if (response === 1) hostPreferences.set({ kind: "local" });
+    if (response === 2) {
+      app.quit();
+      return;
+    }
+    if (response === 1) {
+      hostPreferences.set({ kind: "local" });
+      // The folder that was waiting lives in the distribution; this computer has no such path.
+      folderToAdd = null;
+    }
     restartCore();
   });
 }
@@ -173,11 +191,18 @@ function startInDistro(distro: string): WslCore {
   child.on("failed", (error: Error) => (failure = error.message));
   // Only the core main holds now: one that was replaced has nothing left to report.
   child.on("exit", (code: number) => {
-    if (core === child) stoppedInDistro(distro, failure ?? `Its core there stopped (exit ${code}). The distribution may have been shut down.`);
+    if (core === child) stoppedInDistro(distro, failure ?? stopReason(distro, code, child.lastWords));
   });
   return child;
 }
 
+/**
+ * An app opened from the Dock inherits a bare PATH, and one opened from a
+ * tool may inherit an odd one. Either way the user's terminal is the truth,
+ * and the core is the process that asks it: the core launches the agents, so
+ * Ready has to mean launchable there. Main hears every snapshot the core
+ * adopts and keeps the PATH for the Terminal panels it hosts outside macOS.
+ */
 function startCore(): CoreProcess {
   const host = currentHost();
   const child: CoreProcess = host.kind === "wsl" ? startInDistro(host.distro) : forkCore();
@@ -196,6 +221,20 @@ function startCore(): CoreProcess {
   return child;
 }
 
+const everyWindow = (): WebContents[] => BrowserWindow.getAllWindows().map((win) => win.webContents);
+
+function reload(windows: Iterable<WebContents>): void {
+  for (const contents of windows) {
+    if (!contents.isDestroyed()) contents.reload();
+  }
+}
+
+/** Says a folder could not be added as a project where OpenOrc now runs. The windows have reloaded and have no request of their own to show it under. */
+function folderNotAdded(folder: string, reason: string): void {
+  console.error(`[main] ${folder} was not added as a project: ${reason}`);
+  void dialog.showMessageBox({ type: "error", message: "OpenOrc could not add this folder as a project", detail: `${folder}\n\n${reason}`, buttons: ["OK"] });
+}
+
 /** Starts the core again, where the preference now says, and reloads every window onto it; then adds `folder` as a project there. */
 function restartCore(folder?: string): void {
   // Shells and pages belong to the place that is being left.
@@ -204,31 +243,47 @@ function restartCore(folder?: string): void {
   closeAllPanes();
   forgetShellEnv();
   switchingHost = false;
+  waitingForSwitch.clear();
+  if (folder) folderToAdd = folder;
   // Never a second core beside one that is still running: both would write the same ledger.
   if (!core) core = startCore();
-  if (folder) importProject(core, folder);
-  for (const win of BrowserWindow.getAllWindows()) {
-    if (!win.isDestroyed()) win.webContents.reload();
+  const adding = folderToAdd;
+  if (adding)
+    importProject(core, adding, (error) => {
+      if (folderToAdd === adding) folderToAdd = null;
+      if (error) folderNotAdded(adding, error);
+    });
+  reload(everyWindow());
+}
+
+/** Ends the core for a switch, or gives its reason for staying, in a switch's own words. */
+async function endCoreToSwitch(closing: CoreProcess | null): Promise<string | null> {
+  try {
+    // A core still being installed in a distribution has started nothing that ending it could cut short.
+    if (closing instanceof WslCore && closing.starting) closing.kill();
+    else if (closing) return await closeWhenIdle(() => closeCore(closing, "switch"));
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
   }
 }
 
-/** Closes the core as an update does, so nothing is cut short: it refuses while agents work, and so does a running shell. */
+/**
+ * Closes the core so it can start somewhere else, cutting nothing short: it refuses while agents work, and so does a
+ * running shell. The core waits for more than an update does, since this place stays closed until someone switches
+ * back.
+ */
 async function closeCoreToSwitch(): Promise<string | null> {
   if (!preparePtysForUpdate()) return "A terminal still has a shell running. Use End shell in each terminal, then switch.";
   switchingHost = true;
-  let blocked: string | null = null;
-  try {
-    // A core still being installed in a distribution has started nothing that ending it could cut short.
-    const closing = core;
-    if (closing instanceof WslCore && closing.starting) closing.kill();
-    else if (closing) blocked = await closeWhenIdle(() => closeCoreForUpdate(closing));
-  } catch (error) {
-    blocked = error instanceof Error ? error.message : String(error);
-  }
-  if (blocked) {
-    switchingHost = false;
-    cancelPtyUpdate();
-  }
+  const closing = core;
+  const blocked = await endCoreToSwitch(closing);
+  if (!blocked) return null;
+  switchingHost = false;
+  cancelPtyUpdate();
+  // Windows turned away meanwhile have no core, and neither has any window if this one ended without closing cleanly.
+  reload(core === closing ? waitingForSwitch : everyWindow());
+  waitingForSwitch.clear();
   return blocked;
 }
 
@@ -375,6 +430,7 @@ app.whenReady().then(async () => {
   // port and steps out of the way: no per-message relay through this process.
   ipcMain.on("bridge:connect", (event) => {
     if (event.senderFrame !== event.sender.mainFrame || !isAppOrigin(event.senderFrame.url)) return;
+    if (switchingHost) waitingForSwitch.add(event.sender);
     if (preparingUpdate || switchingHost || askingAboutHost) return;
     if (!core) core = startCore();
     // The second channel carries device video, so a stream never queues behind RPC replies.
@@ -396,11 +452,11 @@ app.whenReady().then(async () => {
     })),
   }));
 
-  ipcMain.handle("dialog:directory", async (event) => {
+  ipcMain.handle("dialog:directory", async (event, purpose: unknown) => {
     // A QA build can name the repository up front; the native chooser cannot be driven by automation.
     const forced = qaDirectory();
     if (forced) return forced;
-    return hostControls.pickFolder(BrowserWindow.fromWebContents(event.sender));
+    return hostControls.pickFolder(BrowserWindow.fromWebContents(event.sender), purpose === "project");
   });
 
   ipcMain.on("shell:openExternal", (event, url: unknown) => {
@@ -472,7 +528,9 @@ app.on("before-quit", (event) => {
     clearTimeout(timeout);
     app.quit();
   });
-  child.postMessage({ type: "shutdown" });
+  // A core still being installed in a distribution is not there to hear a shutdown, and has nothing to close.
+  if (child instanceof WslCore && child.starting) child.kill();
+  else child.postMessage({ type: "shutdown" });
 });
 
 function updateUnavailableReason(): string | null {

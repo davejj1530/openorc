@@ -1,8 +1,18 @@
 import { randomUUID } from "node:crypto";
 import type { CoreProcess } from "./host-core";
 
-/** A reply alone is not enough: the database and writers must close and the utility process must exit cleanly. */
-export function closeCoreForUpdate(child: Pick<CoreProcess, "postMessage" | "on" | "removeListener">, timeoutMs = 30_000): Promise<string | null> {
+/** Why the core closes: to install an update, or for main to start it somewhere else, such as inside a WSL distribution. */
+export type ClosePurpose = "update" | "switch";
+
+/** Why the core would not close, in its words for what was asked. `retry` marks a refusal that passes by itself: a request caught mid-flight. */
+export interface CloseRefusal {
+  reason: string;
+  retry: boolean;
+}
+
+/** A reply alone is not enough: the database and writers must close and the core's process must exit cleanly. */
+export function closeCore(child: Pick<CoreProcess, "postMessage" | "on" | "removeListener">, purpose: ClosePurpose, timeoutMs = 30_000): Promise<CloseRefusal | null> {
+  const undone = purpose === "update" ? "The update was not installed." : "OpenOrc is still running where it was.";
   return new Promise((resolve, reject) => {
     const id = randomUUID();
     let prepared = false;
@@ -19,22 +29,27 @@ export function closeCoreForUpdate(child: Pick<CoreProcess, "postMessage" | "on"
       if (!value || typeof value !== "object" || !("type" in value) || !("id" in value) || value.id !== id) return;
       if (value.type === "update:blocked" && "reason" in value && typeof value.reason === "string") {
         cleanup();
-        resolve(value.reason);
+        resolve({ reason: value.reason, retry: "retry" in value && value.retry === true });
       } else if (value.type === "update:prepared") prepared = true;
     };
     const exited = (code: number) => {
       cleanup();
       if (prepared && code === 0) resolve(null);
-      else reject(new Error("The core did not confirm a clean shutdown. The update was not installed."));
+      else reject(new Error(`The core did not confirm a clean shutdown. ${undone}`));
     };
     // Never kill the core to meet an installation deadline.
-    const timer = setTimeout(() => fail(new Error("The core is still shutting down. The update was not installed.")), timeoutMs);
+    const timer = setTimeout(() => fail(new Error(`The core is still shutting down. ${undone}`)), timeoutMs);
     child.on("message", message);
     child.on("exit", exited);
     try {
-      child.postMessage({ type: "update:prepare", id });
+      child.postMessage({ type: "update:prepare", id, ...(purpose === "switch" ? { purpose } : {}) });
     } catch (error) {
       fail(error instanceof Error ? error : new Error(String(error)));
     }
   });
+}
+
+/** Closes the core to install an update, or gives the reason it would not close. */
+export async function closeCoreForUpdate(child: Pick<CoreProcess, "postMessage" | "on" | "removeListener">, timeoutMs = 30_000): Promise<string | null> {
+  return (await closeCore(child, "update", timeoutMs))?.reason ?? null;
 }

@@ -93,10 +93,11 @@ export function clampSize(cols: number, rows: number): TerminalSize {
  * three things was wrong, because "could not start" reads the same for a typo
  * and for a worktree that was removed underneath the thread.
  */
-export function validateCwd(cwd: string): string {
+export function validateCwd(cwd: string, folder: (cwd: string) => string = (same) => same): string {
   if (cwd.length === 0 || cwd.includes("\0")) throw new Error("A terminal needs a directory to start in.");
+  // A path inside a WSL distribution starts with a slash, which reads as absolute on Windows too.
   if (!isAbsolute(cwd)) throw new Error(`A terminal needs an absolute directory, and ${cwd} is relative.`);
-  const stat = statSync(cwd, { throwIfNoEntry: false });
+  const stat = statSync(folder(cwd), { throwIfNoEntry: false });
   if (!stat) throw new Error(`${cwd} no longer exists, so no shell can start there.`);
   if (!stat.isDirectory()) throw new Error(`${cwd} is a file, not a directory.`);
   return cwd;
@@ -204,7 +205,7 @@ export class PtyHost {
     private readonly sink: PtySink,
     private readonly flushMs = FLUSH_MS,
     private readonly settleMs = COMMAND_SETTLE_MS,
-    /** Where main looks at a directory the window named. The path itself, except for a shell inside a WSL distribution. */
+    /** Where main looks at a directory the window named, once the name itself has been checked. The path itself, except for a shell inside a WSL distribution. */
     private readonly folder: (cwd: string) => string = (cwd) => cwd,
   ) {}
 
@@ -234,8 +235,8 @@ export class PtyHost {
     // Checked before the lookup: as the right-hand side of a `??` this is
     // skipped on the branch that joins an in-flight start, which is exactly
     // where a directory that went away between two opens shows up.
-    validateCwd(this.folder(input.cwd));
-    const start = this.starting.get(input.id) ?? this.begin(input.id, input.cwd, size);
+    const cwd = validateCwd(input.cwd, this.folder);
+    const start = this.starting.get(input.id) ?? this.begin(input.id, cwd, size);
     const session = await start.session;
     // Killed before it ever ran. Nothing was installed, so there is nothing to
     // replay and nothing to draw beyond saying so.

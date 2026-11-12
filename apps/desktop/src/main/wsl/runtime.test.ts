@@ -1,14 +1,18 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { standInDistro, type Distro } from "./distro";
-import { ensureRuntime, parseProbe, SETUP_SCRIPT, unsupported, WslSetupError, type NodeRelease, type Probe, type RuntimeSource } from "./runtime";
+import { ALREADY_RUNNING, ensureRuntime, parseProbe, SETUP_SCRIPT, unsupported, WslSetupError, type NodeRelease, type Probe, type RuntimeSource } from "./runtime";
 
-// The scripts run in a real /bin/sh with a real tar, against a home made for the test.
-const posix = process.platform !== "win32";
+// The scripts run in a real /bin/sh with a real tar, against a home made for the test. The installer refuses any
+// machine but the one the core is built for, x64 Linux with glibc, so only there is there anything to install into.
+const glibc = (process.report.getReport() as unknown as { header: { glibcVersionRuntime?: string } }).header.glibcVersionRuntime;
+const installable = process.platform === "linux" && process.arch === "x64" && Boolean(glibc);
+// util-linux's flock, which holds the lock of a running core. A distribution without it starts the core unlocked.
+const lockable = installable && spawnSync("/bin/sh", ["-c", "command -v flock"]).status === 0;
 const temporary: string[] = [];
 afterEach(() => {
   for (const dir of temporary.splice(0)) rmSync(dir, { recursive: true, force: true });
@@ -60,7 +64,7 @@ function fixture(coreVersion = "abc123") {
   return { home, distro, node, source, fetched, coreReads: () => coreReads, root: path.join(home, ".openorc-wsl") };
 }
 
-describe.runIf(posix)("installing the core's runtime in a distribution", () => {
+describe.runIf(installable)("installing the core's runtime in a distribution", () => {
   it("installs Node and the core on the first start, and says how to start it", async () => {
     const { distro, source, node, root, fetched } = fixture();
     const steps: string[] = [];
@@ -145,6 +149,54 @@ describe.runIf(posix)("installing the core's runtime in a distribution", () => {
     expect(readdirSync(path.join(root, "brain")).sort()).toEqual(["brain-1.tgz", "door-abc.mjs"]);
     expect(readFileSync(path.join(root, "brain", "door-abc.mjs"), "utf8")).toBe("content of door-abc.mjs");
     expect(reads).toBe(2);
+  });
+
+  it("keeps its folder to the user alone, one an older app made included", async () => {
+    const { distro, source, node, root } = fixture();
+    await ensureRuntime(distro, source, undefined, node.release);
+    expect(statSync(root).mode & 0o777).toBe(0o700);
+    chmodSync(root, 0o755);
+    await ensureRuntime(distro, source, undefined, node.release);
+    expect(statSync(root).mode & 0o777).toBe(0o700);
+  });
+
+  it.runIf(lockable)("refuses a second core on a profile while one runs there, and starts one again once it has gone", async () => {
+    const { distro, source, node, root } = fixture();
+    const runtime = await ensureRuntime(distro, source, undefined, node.release);
+    // Stands in for Node: says it is up on descriptor 3, then runs until its input ends, as the core does.
+    writeFileSync(`${root}/node/24.0.1/bin/node`, "#!/bin/sh\necho up >&3\ncat >/dev/null\n");
+    const running = distro.spawn(runtime.command);
+    await new Promise((resolve) => running.stdout.once("data", resolve));
+    expect((await distro.run(runtime.command)).code).toBe(ALREADY_RUNNING);
+    const gone = new Promise((resolve) => running.once("close", resolve));
+    running.stdin.end();
+    await gone;
+    expect((await distro.run(runtime.command)).code).toBe(0);
+  });
+
+  it("stops between steps once nobody waits for it, and installs nothing more", async () => {
+    const { distro, source, node, root } = fixture();
+    const ending = new AbortController();
+    const steps: string[] = [];
+    // Ended while Node is on its way: the download is the last thing that happens.
+    const ended = {
+      ...source,
+      fetchNode: async (url: string) => {
+        ending.abort();
+        return source.fetchNode(url);
+      },
+    };
+    await expect(ensureRuntime(distro, ended, (text) => steps.push(text), node.release, ending.signal)).rejects.toThrow(/abort/i);
+    expect(steps).toEqual(["Starting Ubuntu…", "Setting up OpenOrc in Ubuntu: downloading Node 24.0.1…"]);
+    expect(existsSync(path.join(root, "node"))).toBe(false);
+    expect(existsSync(path.join(root, "app"))).toBe(false);
+  });
+
+  it("leaves no half-unpacked folder behind when an archive is no archive", async () => {
+    const { distro, source, node, root } = fixture();
+    const broken = { ...source, core: { version: "abc123", read: async () => Buffer.from("not an archive") } };
+    await expect(ensureRuntime(distro, broken, undefined, node.release)).rejects.toThrow("OpenOrc's core could not be installed in Ubuntu");
+    expect(existsSync(path.join(root, "app")) ? readdirSync(path.join(root, "app")) : []).toEqual([]);
   });
 
   it("says so when the distribution does not start", async () => {

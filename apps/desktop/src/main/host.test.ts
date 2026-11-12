@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { distroPaths, HostPreferences, localPaths } from "./host";
 import { hostCores } from "./host-core";
-import { closeWhenIdle, placeFolder, switchWords } from "./host-controls";
+import { closeWhenIdle, placeFolder } from "./host-controls";
 import { wslDistro } from "./wsl/distro";
 
 const temporary: string[] = [];
@@ -121,19 +121,12 @@ describe("a chosen folder", () => {
   });
 });
 
-describe("why a switch is refused", () => {
-  it("says an update's refusal in a switch's words", () => {
-    expect(switchWords("Wait for agent work, approvals, and context maintenance to finish before restarting to update.")).toBe(
-      "Wait for agent work, approvals, and context maintenance to finish first, then switch.",
-    );
-    expect(switchWords("Wait for agent updates to finish before restarting.")).toBe("Wait for agent updates to finish first, then switch.");
-    expect(switchWords("The core is still shutting down. The update was not installed.")).toBe("The core is still shutting down. Try again in a moment.");
-    expect(switchWords("A schedule is starting a thread. Try again when it has started.")).toBe("A schedule is starting a thread. Try again when it has started.");
-    expect(switchWords("OpenOrc is processing a request. Try restarting to update again in a moment.")).toBe("OpenOrc is processing a request. Try again in a moment.");
-  });
+describe("closing the core for a switch", () => {
+  const busy = { reason: "OpenOrc is processing a request. Try again in a moment.", retry: true };
+  const agents = { reason: "Wait for agent work, approvals, and context maintenance to finish first, then switch.", retry: false };
 
   it("waits out a request caught mid-flight, and closes once the core is idle", async () => {
-    const answers = ["OpenOrc is processing a request. Try restarting to update again in a moment.", "OpenOrc is processing a request. Try restarting to update again in a moment.", null];
+    const answers = [busy, busy, null];
     let asked = 0;
     expect(await closeWhenIdle(async () => answers[asked++] ?? null, { waitMs: 1 })).toBeNull();
     expect(asked).toBe(3);
@@ -141,10 +134,8 @@ describe("why a switch is refused", () => {
 
   it("does not wait on a refusal that needs the person, and gives up when requests never pause", async () => {
     let asked = 0;
-    const agents = "Wait for agent work, approvals, and context maintenance to finish before restarting to update.";
-    expect(await closeWhenIdle(async () => (asked++, agents), { waitMs: 1 })).toBe(agents);
+    expect(await closeWhenIdle(async () => (asked++, agents), { waitMs: 1 })).toBe(agents.reason);
     expect(asked).toBe(1);
-    const busy = "OpenOrc is processing a request. Try restarting to update again in a moment.";
-    expect(await closeWhenIdle(async () => busy, { attempts: 3, waitMs: 1 })).toBe(busy);
+    expect(await closeWhenIdle(async () => busy, { attempts: 3, waitMs: 1 })).toBe(busy.reason);
   });
 });

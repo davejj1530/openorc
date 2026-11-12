@@ -15,9 +15,11 @@ function show(state: HostState | undefined, use = vi.fn(async (_host: HostChoice
   );
   return { use, view };
 }
+const bridge = window.openorc;
 afterEach(() => {
   cleanup();
   queryClient.clear();
+  window.openorc = bridge;
 });
 
 const settled = () => new Promise((resolve) => setTimeout(resolve, 20));

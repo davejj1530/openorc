@@ -138,6 +138,9 @@ jobs:
       - run: pnpm build
         env:
           GITHUB_TOKEN: ${{ github.token }}
+      # The core the Windows app runs inside a WSL distribution is built on Linux, and otherwise only by a release:
+      # a change that breaks its bundle would first show there, after the tag is pushed.
+      - run: pnpm --filter @openorc/desktop bundle:wsl
 
   # Linux runs the whole suite too, split like macOS: Linux runners are plentiful where macOS runners are not.
   linux-tests:

@@ -80,6 +80,15 @@ function coreOptions(host: CoreHost, transport: Transport, { secrets, browser, p
   };
 }
 
+/** Why main asks the core to close: to install an update, or to start it somewhere else. */
+type ClosePurpose = "update" | "switch";
+
+/** What a close is told while a request is on its way through the core: true for a moment at a time, as windows ask for lists. */
+const MID_REQUEST: Record<ClosePurpose, string> = {
+  update: "OpenOrc is processing a request. Try restarting to update again in a moment.",
+  switch: "OpenOrc is processing a request. Try again in a moment.",
+};
+
 /** The computer went to sleep or woke: conversations working here carry on in the cloud meanwhile, and come back. */
 function powerChanged(core: OpenOrc, state: unknown): Promise<void> {
   // Best effort before sleep: what is new on the chosen projects' branches reaches a brain that is awake.
@@ -103,6 +112,8 @@ class CoreServer implements CoreSession {
   /** The latest startup or ready push, for a window that connects after it was sent. */
   private lastStatus: Broadcast | null = null;
   private pendingRequests = 0;
+  /** What a request is told once the core is closing. */
+  private closingWords = "OpenOrc is restarting to update. Please wait.";
   private readonly windows = windowPorts((request) => this.answer(request));
   private readonly clients: MainClients;
 
@@ -133,7 +144,7 @@ class CoreServer implements CoreSession {
    * phone's session passes an origin; a window's request has none.
    */
   private async answer(request: RpcRequest, origin?: RequestOrigin): Promise<RpcReply> {
-    if (this.closing) return { type: "rpc.error", id: request.id, message: "OpenOrc is restarting to update. Please wait." };
+    if (this.closing) return { type: "rpc.error", id: request.id, message: this.closingWords };
     this.pendingRequests++;
     try {
       return await (await this.core).handle(request, origin);
@@ -142,17 +153,27 @@ class CoreServer implements CoreSession {
     }
   }
 
-  private async prepareUpdate(id: string): Promise<void> {
-    const core = await this.core;
-    let reason: string | null;
-    if (this.closing) reason = "OpenOrc is already shutting down.";
-    else if (this.pendingRequests > 0) reason = "OpenOrc is processing a request. Try restarting to update again in a moment.";
-    else reason = core.prepareForUpdate();
-    if (reason) {
-      this.host.post({ type: "update:blocked", id, reason });
+  /**
+   * Why the core will not close now, in the words of what was asked, or null once it is fenced for closing. `retry`
+   * marks a refusal that passes by itself: a request caught mid-flight. Never yields, so nothing starts between the
+   * checks and the fence.
+   */
+  private closeRefusal(core: OpenOrc, purpose: ClosePurpose): { reason: string; retry?: true } | null {
+    if (this.closing) return { reason: "OpenOrc is already shutting down." };
+    if (this.pendingRequests > 0) return { reason: MID_REQUEST[purpose], retry: true };
+    const reason = purpose === "update" ? core.prepareForUpdate() : core.prepareForSwitch();
+    return reason ? { reason } : null;
+  }
+
+  /** Closes the core for an update, or for main to start it somewhere else, unless that would cut something short. */
+  private async prepareClose(id: string, purpose: ClosePurpose): Promise<void> {
+    const refusal = this.closeRefusal(await this.core, purpose);
+    if (refusal) {
+      this.host.post({ type: "update:blocked", id, ...refusal });
       return;
     }
     // No await between the admission check and fencing renderer requests.
+    if (purpose === "switch") this.closingWords = "OpenOrc is switching where it runs. Please wait.";
     this.host.post({ type: "update:prepared", id });
     await this.shutdown();
   }
@@ -172,8 +193,8 @@ class CoreServer implements CoreSession {
   receive(message: unknown): boolean {
     const { browser, preview, presence, secrets } = this.clients;
     if (browser.receive(message) || preview.receive(message) || presence.receive(message) || secrets.receive(message)) return true;
-    const { type, id, state } = (message && typeof message === "object" ? message : {}) as { type?: unknown; id?: unknown; state?: unknown };
-    if (type === "update:prepare" && typeof id === "string") void this.prepareUpdate(id);
+    const { type, id, state, purpose } = (message && typeof message === "object" ? message : {}) as { type?: unknown; id?: unknown; state?: unknown; purpose?: unknown };
+    if (type === "update:prepare" && typeof id === "string") void this.prepareClose(id, purpose === "switch" ? "switch" : "update");
     else if (type === "shutdown") void this.shutdown();
     else if (type === "power") void this.core.then((core) => powerChanged(core, state)).catch((error: unknown) => console.error("[core] cloud takeover", error));
     else return false;

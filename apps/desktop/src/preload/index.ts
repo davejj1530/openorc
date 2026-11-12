@@ -28,8 +28,8 @@ const api: OpenOrcApi = {
   report(payload) {
     ipcRenderer.send("report", payload);
   },
-  pickDirectory() {
-    return ipcRenderer.invoke("dialog:directory") as Promise<string | null>;
+  pickDirectory(purpose) {
+    return ipcRenderer.invoke("dialog:directory", purpose) as Promise<string | null>;
   },
   filePath(file) {
     return webUtils.getPathForFile(file);

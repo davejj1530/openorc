@@ -10,9 +10,9 @@ Nothing changes for anyone who does not choose a distribution. The setting appea
 
 On a first run, setup looks for agents where OpenOrc runs. **Look for agents on**, on its first screen, makes the same choice, so someone whose agents are installed only inside a distribution is not left with none found.
 
-Choosing a folder also switches. With OpenOrc on this PC, picking a folder under `\\wsl.localhost\<distribution>\` (or `\\wsl$\`) offers to run inside that distribution and adds the folder as a project there; **Open from Windows** keeps the old behavior of opening the share with Windows' own tools. With OpenOrc in a distribution, the folder chooser opens in your home folder there, and picking a folder outside the distribution offers to switch to where it lives.
+Choosing a folder for a project also switches. With OpenOrc on this PC, picking a project folder under `\\wsl.localhost\<distribution>\` (or `\\wsl$\`) offers to run inside that distribution and adds the folder as a project there; **Open from Windows** keeps the old behavior of opening the share with Windows' own tools. With OpenOrc in a distribution, the folder chooser opens in your home folder there, and picking a project folder outside the distribution offers to switch to where it lives. Only a folder chosen to become a project offers this. Any other folder, such as a skill's or a Slack entry point's, is one the place OpenOrc runs in uses itself: from this PC a folder inside a distribution opens through the share, and from inside a distribution a folder outside it is refused.
 
-A switch waits for work to finish, as an update does: it is refused while agents are working or a terminal has a shell running, and says which.
+A switch waits for work to finish, and for more than an update does, because the place being left stays closed until you switch back: it is refused while agents are working, a terminal has a shell running, a queued message is being delivered, a title is being written or a Claude sign-in is open, and says which. Cloud conversations carry on in their sandboxes meanwhile. What runs only while OpenOrc runs in a place waits until you switch back to it: its schedules, its Slack connection and phone access.
 
 The first start in a distribution installs what the core needs into `~/.openorc-wsl` there:
 
@@ -21,8 +21,11 @@ The first start in a distribution installs what the core needs into `~/.openorc-
 | `node/<version>/` | The core's own Node, downloaded from `nodejs.org` and checked against a SHA-256 pinned in the app. Your own Node is left alone. |
 | `app/<version>/`  | The core this version of the app carries. A newer app replaces it.                                                              |
 | `brain/`          | The cloud brain the app installs, for Settings → Cloud.                                                                         |
-| `data/`           | The profile: the ledger, attachments, and managed workspaces. Private, like the application data folder on Windows.             |
+| `data/`           | The profile: the ledger, attachments, and managed workspaces.                                                                   |
 | `setup.sh`        | The script the app installs and starts the core with. Rewritten at each start.                                                  |
+| `core.lock`       | Held by the core while it runs, so a second one never opens the same profile.                                                   |
+
+The folder is readable by your account alone (mode 700), like the application data folder on Windows.
 
 Removing `~/.openorc-wsl` removes OpenOrc from the distribution, its conversations there included. Secrets the core saves, such as a Slack token, stay on the Windows side under `%APPDATA%\OpenOrc\wsl\<distribution>\`, encrypted for your Windows account, as they are for OpenOrc on this PC.
 
@@ -36,7 +39,8 @@ Things removed from a project go to the distribution's own Trash (`~/.local/shar
 - Phone access listens inside the distribution, which a phone on your network cannot reach under WSL's default networking. Mirrored networking (`networkingMode=mirrored` in `.wslconfig`) makes it reachable.
 - The Device panel has no simulators or emulators inside a distribution.
 - Projects of this PC and of a distribution are separate lists. Showing both at once is not done yet.
-- If the distribution is shut down while OpenOrc runs in it (`wsl --shutdown`), OpenOrc says so and offers to try again or run on this PC.
+- If the distribution is shut down while OpenOrc runs in it (`wsl --shutdown`), OpenOrc says so, with the last lines its core printed, and offers to try again or run on this PC. Only choosing **Run on this PC** changes the setting; closing the question quits, and the next start tries the distribution again.
+- One core runs on a profile at a time. A second app that chooses the same distribution, or a start while the last core is still closing there, is refused with that reason. The lock uses `flock` from util-linux; a distribution without it starts the core unlocked.
 
 ## How it works
 
@@ -52,7 +56,7 @@ The core speaks only Linux paths. Main translates at the few places it opens fil
 
 `pnpm --filter @openorc/desktop bundle:wsl` builds the core for a distribution into `apps/desktop/dist/wsl/wsl-core-<version>.tgz`. It is a Linux x64 bundle with the cloud brain's native modules and is built on Linux or inside WSL, as the brain is. A build run from the repository reads it from there; a Windows package carries it in `resources/wsl`, and packaging for Windows refuses to continue without exactly one. The release workflow builds it once on its Linux job.
 
-Development and QA builds can run the whole route on macOS or Linux, where there is no `wsl.exe`, with this machine standing in for a distribution:
+Development and QA builds can run the whole route on x64 Linux with glibc, where there is no `wsl.exe`, with this machine standing in for a distribution. That is the one machine the core for a distribution is built for; on macOS, or on another processor, the stand-in is offered and then refused as such a distribution would be.
 
 ```sh
 pnpm --filter @openorc/desktop bundle:wsl
@@ -61,4 +65,4 @@ OPENORC_WSL_STANDIN=Ubuntu OPENORC_WSL_STANDIN_HOME=/tmp/standin-home pnpm dev
 
 `OPENORC_WSL_STANDIN` names the stand-in, which then appears under **Runs on**; `OPENORC_WSL_STANDIN_HOME` gives it a home of its own, so nothing is installed into yours. Release builds ignore both.
 
-The unit tests cover the frames, the relay, path translation, the distribution listing, and the installer, whose shell scripts run for real against a temporary home. On a Windows PC, a packaged build has been taken by hand through first-run setup inside Ubuntu and into a conversation there: choosing the distribution, installing the core there, finding the agents installed there, adding a project, and running turns with the distribution's own Claude Code. The Terminal panel and the file panel's viewer have not been checked on Windows yet.
+The unit tests cover the frames, the relay, path translation, the distribution listing, the switch and its folder chooser, and the installer, whose shell scripts run for real against a temporary home on x64 Linux with glibc and are skipped elsewhere. On a Windows PC, a packaged build has been taken by hand through first-run setup inside Ubuntu and into a conversation there: choosing the distribution, installing the core there, finding the agents installed there, adding a project, and running turns with the distribution's own Claude Code. The Terminal panel and the file panel's viewer have not been checked on Windows yet.

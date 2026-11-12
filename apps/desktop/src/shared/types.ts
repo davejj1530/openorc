@@ -161,8 +161,11 @@ export interface OpenOrcApi {
   metrics(): Promise<AppMetrics>;
   /** Hand a measurement to the main process log (and quit when autorun asks). */
   report(payload: unknown): void;
-  /** Native folder picker. Resolves null when cancelled. */
-  pickDirectory(): Promise<string | null>;
+  /**
+   * Native folder picker. Resolves null when cancelled. A folder picked to become a project says so: one that lives
+   * where OpenOrc does not run, such as inside a WSL distribution, then offers to switch there, and is added there.
+   */
+  pickDirectory(purpose?: "project"): Promise<string | null>;
   /** Recover the local path selected by a renderer file input. */
   filePath(file: File): string;
   openExternal(url: string): void;

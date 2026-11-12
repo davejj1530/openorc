@@ -1,12 +1,19 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { moveToTrash } from "./trash";
 
 const temporary: string[] = [];
-afterEach(() => {
+// The Trash is found through XDG_DATA_HOME, so the one this machine has is put aside and given back.
+let dataHome: string | undefined;
+beforeEach(() => {
+  dataHome = process.env["XDG_DATA_HOME"];
   delete process.env["XDG_DATA_HOME"];
+});
+afterEach(() => {
+  if (dataHome === undefined) delete process.env["XDG_DATA_HOME"];
+  else process.env["XDG_DATA_HOME"] = dataHome;
   for (const dir of temporary.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
@@ -52,6 +59,14 @@ describe.runIf(process.platform !== "win32")("the Trash inside a distribution", 
     expect(readdirSync(path.join(trash, "files")).sort()).toEqual(["a.txt", "a.txt.2"]);
     expect(readFileSync(path.join(trash, "files", "a.txt.2"), "utf8")).toBe("second");
     expect(readdirSync(path.join(trash, "info")).sort()).toEqual(["a.txt.2.trashinfo", "a.txt.trashinfo"]);
+  });
+
+  it("moves a link as a link, even one whose target is gone", async () => {
+    const { project, trash, options } = fixture();
+    symlinkSync(path.join(project, "nowhere"), path.join(project, "dangling"));
+    await moveToTrash(path.join(project, "dangling"), options);
+    expect(lstatSync(path.join(trash, "files", "dangling")).isSymbolicLink()).toBe(true);
+    expect(readdirSync(project)).toEqual([]);
   });
 
   it("honours XDG_DATA_HOME", async () => {

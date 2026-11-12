@@ -5,7 +5,8 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { COMMAND_SETTLE_MS } from "../shared/command-settle";
-import { PtyHost, Scrollback, clampSize, ptyEnv, shellLaunch, terminalShell, validateCwd, type PtyProcess, type SpawnPty } from "./pty-host";
+import { PtyHost, Scrollback, clampSize, distroPtyEnv, ptyEnv, shellLaunch, terminalShell, validateCwd, type PtyProcess, type SpawnPty } from "./pty-host";
+import { wslDistro } from "./wsl/distro";
 
 /** A shell that never existed. Every test here asserts on the host's bookkeeping, which is the half that has to be right before a real one is worth spawning. */
 class FakePty implements PtyProcess {
@@ -174,6 +175,47 @@ describe("pty environment", () => {
       null,
     );
     expect(Object.keys(env).sort()).toEqual(["COLORTERM", "HOME", "PNPM_HOME", "TERM", "TERM_PROGRAM"]);
+  });
+});
+
+describe("a panel's shell inside a WSL distribution", () => {
+  it("checks the folder where main can see it, and starts the shell by the name the window gave", async () => {
+    const looked: string[] = [];
+    const started: string[] = [];
+    const host = new PtyHost(
+      async ({ cwd }) => {
+        started.push(cwd);
+        return new FakePty();
+      },
+      { data: () => undefined, exit: () => undefined, settled: () => undefined },
+      16,
+      undefined,
+      (cwd) => {
+        looked.push(cwd);
+        return dir;
+      },
+    );
+    await host.open({ id: "t1", cwd: "/home/me/repo", cols: 80, rows: 24 });
+    expect(looked).toEqual(["/home/me/repo"]);
+    expect(started).toEqual(["/home/me/repo"]);
+    // The name itself is checked before it is translated: a share's root would otherwise stand in for an empty one.
+    await expect(host.open({ id: "t2", cwd: "", cols: 80, rows: 24 })).rejects.toThrow(/needs a directory/);
+    await expect(host.open({ id: "t3", cwd: "relative/dir", cols: 80, rows: 24 })).rejects.toThrow(/absolute/);
+    expect(looked).toHaveLength(1);
+    host.killAll();
+  });
+
+  it("refuses a folder that is gone from the share, in the window's own name for it", () => {
+    expect(() => validateCwd("/home/me/gone", () => join(dir, "gone"))).toThrow("/home/me/gone no longer exists");
+  });
+
+  it("lets the distribution's shell see the terminal's colour variables, beside what the user already shares", () => {
+    expect(distroPtyEnv({ PATH: "C:\\Windows" })["WSLENV"]).toBe("COLORTERM:TERM_PROGRAM");
+    expect(distroPtyEnv({ WSLENV: "FOO/p" })["WSLENV"]).toBe("FOO/p:COLORTERM:TERM_PROGRAM");
+  });
+
+  it("starts the account's own login shell through wsl.exe, in the folder as the distribution names it", () => {
+    expect(wslDistro("Ubuntu", "wsl.exe").terminal("/home/me/my repo")).toEqual({ file: "wsl.exe", args: ["--distribution", "Ubuntu", "--cd", "/home/me/my repo"] });
   });
 });
 

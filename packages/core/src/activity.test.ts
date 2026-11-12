@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Sandbox } from "@openorc/cloud";
-import { busyReason, fenceForUpdate, type BusyReason } from "./activity.js";
+import { busyReason, fenceForSwitch, fenceForUpdate, type BusyReason } from "./activity.js";
 import { OpenOrc } from "./openorc.js";
 import { RemoteTestClient } from "./remote/test-client.js";
 
@@ -95,6 +95,38 @@ describe("an update's fence", () => {
     sources.runs.prepareForUpdate.mockReturnValue(false);
     expect(fenceForUpdate(sources)).toMatch(/agent work/);
     expect(sources.schedules.stopAccepting).not.toHaveBeenCalled();
+  });
+});
+
+describe("a switch's fence", () => {
+  /** What a switch waits for. Cloud work and phones are let through, as an update lets them. */
+  const waited: Record<BusyReason, RegExp | null> = {
+    ...refusals,
+    "queued-messages": /queued message/,
+    "text-generation": /writing text/,
+    "claude-sign-in": /Claude sign-in/,
+  };
+
+  it.each(Object.keys(waited) as BusyReason[])("answers %s in a switch's own words, and waits for what an update lets through", (reason) => {
+    const sources = idle();
+    busySource[reason](sources);
+    const words = waited[reason];
+    if (words) {
+      const refusal = fenceForSwitch(sources);
+      expect(refusal).toMatch(words);
+      expect(refusal).not.toMatch(/restarting/);
+      expect(sources.runs.prepareForUpdate).not.toHaveBeenCalled();
+      expect(sources.schedules.stopAccepting).not.toHaveBeenCalled();
+    } else {
+      expect(fenceForSwitch(sources)).toBeNull();
+      expect(sources.schedules.stopAccepting).toHaveBeenCalledOnce();
+    }
+  });
+
+  it("refuses with the agents' words when runs cannot be fenced", () => {
+    const sources = idle();
+    sources.runs.prepareForUpdate.mockReturnValue(false);
+    expect(fenceForSwitch(sources)).toBe("Wait for agent work, approvals, and context maintenance to finish first, then switch.");
   });
 });
 

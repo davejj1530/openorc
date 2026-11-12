@@ -62,13 +62,14 @@ export function hostCores(input: {
   brainDir: string | null;
   fileKey: string;
   qa: boolean;
-  fetchNode(url: string): Promise<Buffer>;
+  fetchNode(url: string, signal?: AbortSignal): Promise<Buffer>;
   platform?: NodeJS.Platform;
   env?: NodeJS.ProcessEnv;
 }): HostCores {
   const platform = input.platform ?? process.platform;
   const stand = standIn(input.qa, input.env ?? process.env);
-  let profile: string | null = null;
+  /** The profile folder of the core started last, inside its distribution. Each start has its own, so one that was ended cannot name the next one's. */
+  let started: { profile: string | null } = { profile: null };
   return {
     choice(chosen) {
       if (chosen.kind !== "wsl") return chosen;
@@ -78,8 +79,9 @@ export function hostCores(input: {
     distros: async () => (stand ? [{ name: stand.name, default: true, version: null }] : listDistros(platform)),
     start(name) {
       const distro = stand?.name === name ? stand.distro() : wslDistro(name);
-      profile = null;
-      useHostPaths(distroPaths(distro, () => profile, path.join(input.userData, "wsl", "not-started")));
+      const mine: { profile: string | null } = { profile: null };
+      started = mine;
+      useHostPaths(distroPaths(distro, () => mine.profile, path.join(input.userData, "wsl", "not-started")));
       return startWslCore({
         distro,
         coreDir: input.coreDir,
@@ -87,7 +89,7 @@ export function hostCores(input: {
         fileKey: input.fileKey,
         qa: input.qa,
         fetchNode: input.fetchNode,
-        profile: (dataDir) => (profile = dataDir),
+        profile: (dataDir) => (mine.profile = dataDir),
       });
     },
     secretsDir(host) {
@@ -98,6 +100,6 @@ export function hostCores(input: {
       return dir;
     },
     // The profile sits two folders under the home: ~/.openorc-wsl/data.
-    home: () => (profile ? path.posix.dirname(path.posix.dirname(profile)) : null),
+    home: () => (started.profile ? path.posix.dirname(path.posix.dirname(started.profile)) : null),
   };
 }

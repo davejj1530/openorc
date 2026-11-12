@@ -1,9 +1,8 @@
 import { randomUUID } from "node:crypto";
-import type { UtilityProcess } from "electron";
-import type { EventEmitter } from "node:events";
+import type { CoreProcess } from "./host-core";
 
 /** A reply alone is not enough: the database and writers must close and the utility process must exit cleanly. */
-export function closeCoreForUpdate(child: Pick<UtilityProcess, "postMessage"> & Pick<EventEmitter, "on" | "removeListener">, timeoutMs = 30_000): Promise<string | null> {
+export function closeCoreForUpdate(child: Pick<CoreProcess, "postMessage" | "on" | "removeListener">, timeoutMs = 30_000): Promise<string | null> {
   return new Promise((resolve, reject) => {
     const id = randomUUID();
     let prepared = false;

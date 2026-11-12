@@ -29,6 +29,7 @@ import { Field, LoadError, SaveStatus, Section, Toggle, usePreference } from "./
 import { SkillsSettings } from "./settings-skills";
 import { SlackSettings } from "./settings-slack";
 import { TextGenerationSettings } from "./settings-text-generation";
+import { HostSettingsSection } from "./settings-host";
 import { UpdateSettingsSection } from "./settings-updates";
 import { WorktreesRow } from "./settings-worktrees";
 import { UsageDashboard } from "./settings-usage-dashboard";
@@ -170,6 +171,7 @@ function GeneralSettings() {
   return (
     <>
       {s.query.isError && <LoadError retry={() => void s.query.refetch()} />}
+      <HostSettingsSection />
       <Section title="Notifications">
         <Toggle
           label="Desktop notifications"

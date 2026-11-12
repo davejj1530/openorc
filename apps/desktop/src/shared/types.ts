@@ -178,6 +178,12 @@ export interface OpenOrcApi {
   /** Fires on every enter and leave of fullscreen; returns the unsubscribe. */
   onFullscreen(cb: (fullscreen: boolean) => void): () => void;
   platform: string;
+  /** Where the core runs: this computer, or a WSL distribution on Windows. Main owns the choice and starts the core there. */
+  host: {
+    get(): Promise<import("./host").HostState>;
+    /** Runs somewhere else. The window reloads onto the new core when it resolves ok. */
+    use(host: import("./host").HostChoice): Promise<import("./host").HostSwitch>;
+  };
   updates: {
     settings(): Promise<UpdateSettings>;
     setAutomaticChecks(on: boolean): Promise<UpdateSettings>;

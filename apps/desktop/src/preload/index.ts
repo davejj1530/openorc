@@ -61,6 +61,10 @@ const api: OpenOrcApi = {
     return () => ipcRenderer.off("window:fullscreen", listener);
   },
   platform: process.platform,
+  host: {
+    get: () => ipcRenderer.invoke("host:get"),
+    use: (host) => ipcRenderer.invoke("host:use", host),
+  },
   updates: {
     getState: () => ipcRenderer.invoke("updates:getState"),
     check: () => ipcRenderer.invoke("updates:check"),

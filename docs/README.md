@@ -25,6 +25,7 @@
 - [Orclings](orclings.md)
 - [Credential storage](credential-storage.md)
 - [Coding-agent updates](agent-updates.md)
+- [Running inside WSL](wsl.md) (Windows)
 
 ## Contributing and internals
 

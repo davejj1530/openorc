@@ -307,6 +307,26 @@ describe("Onboarding", () => {
     expect(navigate).not.toHaveBeenCalled();
   });
 
+  it("offers no place to look for agents where there is only this computer", () => {
+    render(<Onboarding />);
+    expect(screen.queryByRole("combobox", { name: "Look for agents on" })).toBeNull();
+  });
+
+  it("lets someone whose agents are inside a WSL distribution look for them there", async () => {
+    const use = vi.fn(async () => ({ ok: true as const }));
+    const get = vi.fn(async () => ({ current: { kind: "local" as const }, distros: [{ name: "Ubuntu", default: true }] }));
+    const bridge = window.openorc;
+    window.openorc = { ...bridge, host: { get, use } };
+    render(<Onboarding />);
+    // No agent on Windows: setup cannot go on from here, and this is the way out.
+    expect(screen.getByRole("button", { name: /continue/i })).toHaveProperty("disabled", true);
+    const place = (await screen.findByRole("combobox", { name: "Look for agents on" })) as HTMLSelectElement;
+    expect([...place.options].map((option) => option.textContent)).toEqual([expect.stringMatching(/^This /), "WSL: Ubuntu"]);
+    fireEvent.change(place, { target: { value: "wsl:Ubuntu" } });
+    await waitFor(() => expect(use).toHaveBeenCalledWith({ kind: "wsl", distro: "Ubuntu" }));
+    window.openorc = bridge;
+  });
+
   it("saves the chosen default and project before starting the first thread", async () => {
     harnesses = [ready("codex"), ready("claude")];
     projectList = [project];

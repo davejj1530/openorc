@@ -307,7 +307,7 @@ label:has(input:is([type="checkbox"], [type="radio"]):focus-visible) {
 /* A select's list on Windows and Linux. Chromium draws it there in a window of its own that takes
    nothing but the options' colors, so there the list is drawn in the page (a customizable select)
    and dressed as the menu macOS draws natively: a translucent blurred plane with a hairline edge
-   (and a dark outer one in dark mode), a check column, and the accent under the pointer. macOS
+   (and a dark outer one in dark mode), a check column, and the accent on the focused row. macOS
    keeps its own.
    The closed select keeps its look, through the button Select renders as its first child. */
 :root {
@@ -347,13 +347,22 @@ label:has(input:is([type="checkbox"], [type="radio"]):focus-visible) {
     padding-inline: 4px 12px;
     gap: 5px;
     border-radius: var(--radius-sm);
+    /* No tint of the browser's own under a pointer at rest: the accent is the one mark. */
+    background-color: transparent;
     color: var(--ink);
   }
-  /* One row takes the accent: the one under the pointer, else the one the keyboard is on. */
-  & option:enabled:hover,
-  &:not(:has(option:hover)) option:enabled:focus-visible {
+  /* One row takes the accent: the focused one, which Enter picks. Select moves focus with the pointer,
+     so the row under a pointer that moved is that row, and the arrow keys carry on from it. */
+  & option:enabled:focus {
     background-color: var(--accent);
     color: var(--accent-fg);
+  }
+  /* Forced colors drop the fill, so there the row takes the outline the app's other marks do. */
+  @media (forced-colors: active) {
+    & option:enabled:focus {
+      outline: 2px solid Highlight;
+      outline-offset: -2px;
+    }
   }
   & option:disabled {
     color: var(--ink-4);

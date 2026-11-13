@@ -1,9 +1,16 @@
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { useState } from "react";
-import { afterEach, expect, it, onTestFinished, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, onTestFinished, vi } from "vitest";
 import { Select } from "./ui";
 
-afterEach(cleanup);
+// Windows and Linux, where the list is drawn in the page. The stylesheet keys on the same mark.
+beforeEach(() => {
+  document.documentElement.dataset.platform = "linux";
+});
+afterEach(() => {
+  cleanup();
+  delete document.documentElement.dataset.platform;
+});
 
 const sizerLabels = (container: HTMLElement) => [...container.querySelectorAll('.select-value > [aria-hidden="true"]')].map((span) => span.textContent);
 
@@ -46,7 +53,7 @@ it("counts the options a component draws, and follows them when they change on t
   await waitFor(() => expect(sizerLabels(container)).toEqual(["Claude", "A much longer agent name"]));
 });
 
-it("has the closed select copy its chosen option again when that option's text changes in place", async () => {
+it("shows the chosen option's new text in the closed select when that text changes in place", async () => {
   const change = vi.fn();
   const options = (label: string) => (
     <Select value="" onChange={change}>
@@ -56,12 +63,62 @@ it("has the closed select copy its chosen option again when that option's text c
   );
   const { container, rerender } = render(options("Default (Old model)"));
   const select = container.querySelector("select")!;
-  const chosen = vi.spyOn(HTMLSelectElement.prototype, "selectedIndex", "set");
+  const closed = container.querySelector("selectedcontent")!;
+  expect(closed.textContent).toBe("Default (Old model)");
   rerender(options("Default (New model)"));
-  await waitFor(() => expect(chosen).toHaveBeenCalledWith(0));
-  chosen.mockRestore();
+  await waitFor(() => expect(closed.textContent).toBe("Default (New model)"));
   expect(select.value).toBe("");
   expect(change).not.toHaveBeenCalled();
+});
+
+it("leaves every choice of a select that takes several alone", async () => {
+  const options = (label: string) => (
+    <Select multiple defaultValue={["one", "two"]}>
+      <option value="one">{label}</option>
+      <option value="two">Two</option>
+    </Select>
+  );
+  const { container, rerender } = render(options("One"));
+  rerender(options("One, renamed"));
+  await waitFor(() => expect(sizerLabels(container)).toEqual(["One, renamed", "Two"]));
+  expect([...container.querySelector("select")!.selectedOptions].map((option) => option.value)).toEqual(["one", "two"]);
+});
+
+it("takes focus to the row under a pointer that moved, so the row Enter picks is the one marked", () => {
+  const own = vi.fn();
+  const { container } = render(
+    <Select onPointerMove={own}>
+      <option>One</option>
+      <option>Two</option>
+      <option disabled>Off</option>
+    </Select>,
+  );
+  const [, two, off] = [...container.querySelectorAll("option")];
+  const focused = [two!, off!].map((option) => vi.spyOn(option, "focus"));
+  fireEvent.pointerMove(two!, { clientX: 20, clientY: 40 });
+  expect(focused[0]).toHaveBeenCalledTimes(1);
+  // The same spot again is the list scrolling under a pointer at rest: the keyboard's row keeps focus.
+  fireEvent.pointerMove(two!, { clientX: 20, clientY: 40 });
+  expect(focused[0]).toHaveBeenCalledTimes(1);
+  fireEvent.pointerMove(off!, { clientX: 20, clientY: 60 });
+  expect(focused[1]).not.toHaveBeenCalled();
+  expect(own).toHaveBeenCalledTimes(3);
+});
+
+it("renders the select alone where the OS draws the list itself", () => {
+  document.documentElement.dataset.platform = "darwin";
+  const { container, getByText } = render(
+    <Select defaultValue="one">
+      <option value="one">One</option>
+      <option value="two">Two</option>
+    </Select>,
+  );
+  expect([...container.querySelector("select")!.children].map((child) => child.tagName)).toEqual(["OPTION", "OPTION"]);
+  expect(getByText("One").tagName).toBe("OPTION");
+  const two = container.querySelectorAll("option")[1]!;
+  const focus = vi.spyOn(two, "focus");
+  fireEvent.pointerMove(two, { clientX: 5, clientY: 5 });
+  expect(focus).not.toHaveBeenCalled();
 });
 
 it("keeps Escape from an open list away from what holds the select, and lets it rise once the list is closed", () => {

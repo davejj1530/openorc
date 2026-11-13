@@ -148,19 +148,22 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<H
   return <textarea ref={ref} className={cn(fieldBase, "block w-full px-3 py-2 resize-none", fieldShapes[variant], variant === "sheet" && "py-2.5", className)} {...props} />;
 });
 
+/** Whether this OS has a select's list drawn in the page. The stylesheet keys on the same mark (styles/controls.css). */
+const listDrawnInPage = (): boolean => ["win32", "linux"].includes(document.documentElement.dataset.platform ?? "");
+
 /**
  * The text of every option, read from the rendered select so options a child component draws count too, and kept
- * current as they change. Each change also has the closed select copy its chosen option again: `<selectedcontent>`
- * copies it only when the choice changes, so text rewritten in place would otherwise stay stale.
+ * current as they change. Each change also copies the chosen option into the closed select again, as the browser does
+ * when the choice changes: it copies at no other time, so text rewritten in place would otherwise stay stale.
  */
-function useOptionLabels(select: RefObject<HTMLSelectElement | null>, button: RefObject<HTMLButtonElement | null>): string[] {
+function useOptionLabels(select: RefObject<HTMLSelectElement | null>, button: RefObject<HTMLButtonElement | null>, drawn: boolean): string[] {
   const [labels, setLabels] = useState<string[]>([]);
   useLayoutEffect(() => {
     const element = select.current;
-    if (!element) return;
+    if (!drawn || !element) return;
     const sync = () => {
-      // Choosing the chosen option again copies it afresh, and fires no change event.
-      element.selectedIndex = element.selectedIndex;
+      const chosen = element.selectedOptions[0];
+      button.current?.querySelector("selectedcontent")?.replaceChildren(...Array.from(chosen?.childNodes ?? [], (node) => node.cloneNode(true)));
       const next = Array.from(element.options, (option) => option.text);
       setLabels((current) => (current.length === next.length && current.every((label, index) => label === next[index]) ? current : next));
     };
@@ -171,14 +174,16 @@ function useOptionLabels(select: RefObject<HTMLSelectElement | null>, button: Re
     });
     observer.observe(element, { childList: true, subtree: true, characterData: true });
     return () => observer.disconnect();
-  }, [select, button]);
+  }, [select, button, drawn]);
   return labels;
 }
 
-export function Select({ className, children, variant = "inline", onKeyDown, ...props }: SelectHTMLAttributes<HTMLSelectElement> & { variant?: FieldVariant }) {
+export function Select({ className, children, variant = "inline", onKeyDown, onPointerMove, ...props }: SelectHTMLAttributes<HTMLSelectElement> & { variant?: FieldVariant }) {
   const select = useRef<HTMLSelectElement>(null);
   const button = useRef<HTMLButtonElement>(null);
-  const labels = useOptionLabels(select, button);
+  const pointer = useRef({ x: NaN, y: NaN });
+  const drawn = listDrawnInPage();
+  const labels = useOptionLabels(select, button, drawn);
   return (
     <select
       ref={select}
@@ -193,21 +198,32 @@ export function Select({ className, children, variant = "inline", onKeyDown, ...
         if (event.key === "Escape" && event.currentTarget.matches(":open")) event.stopPropagation();
         onKeyDown?.(event);
       }}
+      onPointerMove={(event) => {
+        // The accent marks the focused row, the one Enter picks. A pointer that moves takes focus to its row, as in a
+        // native list, so the two never part. One that only had the list scroll under it has not moved.
+        const moved = event.clientX !== pointer.current.x || event.clientY !== pointer.current.y;
+        pointer.current = { x: event.clientX, y: event.clientY };
+        const row = drawn && moved && event.target instanceof Element ? event.target.closest("option") : null;
+        if (row && !row.matches(":disabled") && row !== document.activeElement) row.focus({ preventScroll: true });
+        onPointerMove?.(event);
+      }}
       {...props}
     >
       {/* Where the list is drawn in the page (styles/controls.css), the closed select shows this instead of the
           option's text: the chosen option, over every label laid in the same cell, so it keeps the width of
-          the longest as the native control does. macOS never draws it. */}
-      <button ref={button} type="button" className="select-button">
-        <span className="select-value">
-          <selectedcontent />
-          {labels.map((label, index) => (
-            <span key={index} aria-hidden="true">
-              {label}
-            </span>
-          ))}
-        </span>
-      </button>
+          the longest as the native control does. macOS draws its own and gets none of it. */}
+      {drawn && (
+        <button ref={button} type="button" className="select-button">
+          <span className="select-value">
+            <selectedcontent />
+            {labels.map((label, index) => (
+              <span key={index} aria-hidden="true">
+                {label}
+              </span>
+            ))}
+          </span>
+        </button>
+      )}
       {children}
     </select>
   );

@@ -233,7 +233,7 @@ Depth is the fill step. Persistent surfaces have no borders and no shadows. Plan
 
 **The Floating Fill Rule.** Menus, popovers, tooltips, toasts, and dialogs have no border and no shadow. They paint `--float-fill`: the plane when the layer lands on the tile, the tile when it lands on a plane (`use-anchor-ground` sets `data-ground` on the portal). Dialogs also dim their backdrop. A layer that lies across both, such as a composer picker over the conversation or an update toast over the transcript, has no fill step away from both, so a hairline ring in `--line-strong` draws its edge.
 
-A select's list is the one exception. macOS draws it natively; Windows and Linux draw it in the page (`styles/controls.css`), dressed as that native menu so a select reads the same on every OS: `--surface` at 85% behind a blur (solid under Reduce Transparency), a hairline edge, `--shadow-overlay`, and the accent under the pointer or, without one, on the keyboard's row.
+A select's list is the one exception. macOS draws it natively; Windows and Linux draw it in the page (`styles/controls.css`), dressed as that native menu so a select reads the same on every OS: `--surface` at 85% behind a blur (solid under Reduce Transparency), a hairline edge, `--shadow-overlay`, and the accent on one row, the focused one, which the pointer and the arrow keys both move.
 
 **The Opaque Work Plane Rule.** Keep reading, writing, and tool content opaque when Transparent surroundings is on. The setting paints the shell tint once through `--shell-opacity`, from 0% (solid tint) to 100% (native blur), defaulting to 35%. System Reduce Transparency wins.
 

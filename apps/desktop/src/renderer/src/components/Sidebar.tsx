@@ -6,8 +6,6 @@ import { useNavigationGone } from "../lib/navigation-column";
 import { useProjectIconChanges } from "../lib/project-icons";
 import { OrclingsModeContext, useOrclingsMode } from "../lib/orclings-mode";
 import { useOrclings } from "../lib/orclings";
-import { dismissCompactNavigation } from "../lib/compact-navigation";
-import { Plus } from "./icons";
 import { ResizeHandle } from "./ResizeHandle";
 import { SidebarFooter } from "./SidebarFooter";
 import { Wordmark } from "./SidebarListHead";
@@ -15,7 +13,6 @@ import { SidebarNav } from "./SidebarNav";
 import { NewOrclingButton, SidebarOrclings } from "./SidebarOrclings";
 import { SidebarSettings } from "./SidebarSettings";
 import { SidebarThreadBrowser } from "./SidebarThreadBrowser";
-import { Tooltip } from "./ui";
 import { SidebarToggle } from "./WindowCorner";
 
 /**
@@ -37,11 +34,11 @@ export function Sidebar() {
   return (
     <>
       <aside className="sidebar-shell workspace-navigation h-full shrink-0" data-open={open} data-traffic-lights={trafficLights} aria-hidden={gone} inert={gone}>
-        <SidebarHeader projectId={projectId} />
+        <SidebarHeader />
         {settings ? <SidebarSettings route={route} /> : null}
         {/* Settings takes the screens' and threads' place; the list keeps its pages, filters and scroll for the way back. */}
         <div className="sidebar-body" hidden={settings}>
-          <SidebarNav route={route} orclings={{ active: orclings.active, toggle: toggleOrclings, tools: <NewOrclingButton /> }} />
+          <SidebarNav route={route} projectId={projectId} orclings={{ active: orclings.active, toggle: toggleOrclings, tools: <NewOrclingButton /> }} />
           {/* Keep loaded pages and filters while the Orclings take the threads' place. */}
           <div className="sidebar-browser-slot" hidden={orclings.active}>
             <SidebarThreadBrowser />
@@ -61,29 +58,16 @@ export function Sidebar() {
 
 /**
  * The sidebar's header, where the window is dragged from: the traffic lights where the OS draws them, then whose
- * workspace this is, then New thread. Until there are organizations, the workspace is OpenOrc's own mark and name. A
+ * workspace this is, and nothing else. Until there are organizations, the workspace is OpenOrc's own mark and name. A
  * narrow window floats the sidebar over the toggle that shows it, so the header carries its own way to hide it there.
  */
-function SidebarHeader({ projectId }: { projectId: string | null }) {
+function SidebarHeader() {
   return (
     <header className="sidebar-header drag-region h-topbar">
       <SidebarToggle open className="sidebar-header-toggle" />
       <div className="sidebar-identity">
         <Wordmark />
       </div>
-      <Tooltip label="New thread">
-        <button
-          type="button"
-          aria-label="New thread"
-          className="sidebar-new-thread no-drag"
-          onClick={() => {
-            newThread(projectId ?? undefined);
-            dismissCompactNavigation();
-          }}
-        >
-          <Plus size={16} />
-        </button>
-      </Tooltip>
     </header>
   );
 }

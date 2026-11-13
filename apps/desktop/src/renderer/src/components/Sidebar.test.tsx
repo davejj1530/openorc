@@ -245,9 +245,10 @@ it("fetches another child page and keeps rows while loading", async () => {
   }
 });
 
-it("heads the sidebar with OpenOrc's mark and name, then New thread for the focused project, and leaves the window's history to the main header", () => {
+it("heads the sidebar with OpenOrc's mark and name alone, and leads the screens with New thread, lit while its screen is open", () => {
   fixture.projects = [{ id: "notes", name: "notes", rootPath: "/projects/notes" }];
   useLayout.setState({ workspace: "notes" });
+  useRouter.setState({ route: { view: "tasks" } });
   mountSidebar();
   const header = screen.getByRole("img", { name: "OpenOrc" }).closest("header")!;
   expect(screen.getByRole("img", { name: "OpenOrc" }).textContent).toBe("OpenOrc");
@@ -256,9 +257,14 @@ it("heads the sidebar with OpenOrc's mark and name, then New thread for the focu
     within(header)
       .getAllByRole("button")
       .map((button) => button.getAttribute("aria-label")),
-  ).toEqual(["Toggle sidebar", "New thread"]);
-  fireEvent.click(within(header).getByRole("button", { name: "New thread" }));
+  ).toEqual(["Toggle sidebar"]);
+  const screens = screen.getByRole("navigation", { name: "Screens" });
+  const newThread = within(screens).getAllByRole("button")[0]!;
+  expect(newThread.textContent).toBe("New thread");
+  expect(newThread.getAttribute("aria-current")).toBeNull();
+  fireEvent.click(newThread);
   expect(useRouter.getState().route).toEqual({ view: "newthread", projectId: "notes" });
+  expect(newThread.getAttribute("aria-current")).toBe("page");
   act(() => useWindow.setState({ fullscreen: true }));
   expect(screen.getAllByRole("img", { name: "OpenOrc" })).toHaveLength(1);
 });
@@ -305,13 +311,13 @@ it("opens project conversations when Orclings is turned off from an initial Orcl
   expect(screen.queryByRole("region", { name: "Orclings" })).toBeNull();
 });
 
-it("names the app's screens as rows, each with its icon, marking the open one as current", () => {
+it("names the app's screens as rows after New thread, each with its icon, marking the open one as current", () => {
   open("notes");
   expect(
     within(screens())
       .getAllByRole("button")
       .map((button) => button.textContent),
-  ).toEqual(["Tasks", "Pull requests", "Schedules", "Orclings"]);
+  ).toEqual(["New thread", "Tasks", "Pull requests", "Schedules", "Orclings"]);
   expect(
     within(screens())
       .getAllByRole("button")

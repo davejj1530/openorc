@@ -5,21 +5,23 @@ import { useRpc } from "../lib/client";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
 import type { SidebarScreen } from "../lib/layout";
 import { useOrclingChatIds } from "../lib/orclings";
-import { useRouter, type Route } from "../lib/router";
+import { newThread, useRouter, type Route } from "../lib/router";
 import { waitingTaskCount } from "../lib/task-stage-counts";
-import { Orclings } from "./icons";
+import { Orclings, PenSquare } from "./icons";
 import { SCREENS } from "./sidebar-screens";
 
-type NavRowProps = { icon: ReactNode; label: string; count?: number; current?: boolean; pressed?: boolean; onClick: () => void };
+type NavRowProps = { icon: ReactNode; label: string; count?: number; lead?: boolean; current?: boolean; pressed?: boolean; onClick: () => void };
 
-/** One screen the sidebar names: its icon, its name, and how many things there wait on the person, when any do. */
-function NavRow({ icon, label, count = 0, current, pressed, onClick }: NavRowProps) {
+/** One screen the sidebar names: its icon, its name, and how many things there wait on the person, when any do. A lead
+ * row, the one that starts work, keeps full ink at rest. */
+function NavRow({ icon, label, count = 0, lead, current, pressed, onClick }: NavRowProps) {
   return (
     <button
       type="button"
       aria-current={current ? "page" : undefined}
       aria-pressed={pressed}
       aria-label={count ? `${label}, ${count} waiting` : undefined}
+      data-lead={lead || undefined}
       className="sidebar-nav-row no-drag"
       onClick={() => {
         onClick();
@@ -45,16 +47,17 @@ function useWaitingOrclings(): number {
 }
 
 /**
- * The app's screens by name: Tasks, Pull requests and Schedules, then Orclings, which swaps the threads below for the
+ * New thread first, lit while its screen is open, then the app's screens by name: Tasks, Pull requests and Schedules, then Orclings, which swaps the threads below for the
  * Orclings and back, with their tools at its end while it does. A count shows only where something waits on the person;
  * what a thread waits for shows on its own row and its project's label.
  */
-export function SidebarNav({ route, orclings }: { route: Route; orclings: { active: boolean; toggle: () => void; tools: ReactNode } }) {
+export function SidebarNav({ route, projectId, orclings }: { route: Route; projectId: string | null; orclings: { active: boolean; toggle: () => void; tools: ReactNode } }) {
   const tasks = waitingTaskCount(useRpc("tasks.list", {}).data ?? []);
   const counts: Partial<Record<SidebarScreen, number>> = { tasks };
   const waitingOrclings = useWaitingOrclings();
   return (
     <nav className="sidebar-nav" aria-label="Screens">
+      <NavRow icon={<PenSquare size={16} />} label="New thread" lead current={route.view === "newthread"} onClick={() => newThread(projectId ?? undefined)} />
       {SCREENS.map(({ id, label, Icon, route: to, views }) => (
         <NavRow key={id} icon={<Icon size={16} />} label={label} count={counts[id]} current={views.includes(route.view)} onClick={() => useRouter.getState().navigate(to)} />
       ))}

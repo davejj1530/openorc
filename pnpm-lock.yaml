@@ -137,6 +137,12 @@ importers:
       '@fontsource-variable/jetbrains-mono':
         specifier: ^5.2.0
         version: 5.3.0
+      '@lexical/history':
+        specifier: 0.53.0
+        version: 0.53.0(typescript@5.9.3)
+      '@lexical/plain-text':
+        specifier: 0.53.0
+        version: 0.53.0(typescript@5.9.3)
       '@lezer/highlight':
         specifier: 1.2.5
         version: 1.2.5
@@ -245,6 +251,9 @@ importers:
       katex:
         specifier: ^0.18.7
         version: 0.18.7
+      lexical:
+        specifier: 0.53.0
+        version: 0.53.0(typescript@5.9.3)
       marked:
         specifier: ^18.0.13
         version: 18.0.13
@@ -2609,6 +2618,86 @@ packages:
       react-native:
         optional: true
 
+  '@lexical/clipboard@0.53.0':
+    resolution: {integrity: sha512-QkSu7wiLtiNCoHBJzdcwmAD91Xz+Q29gPHcLwgk6NqTk255KBhqMEV2KHa87sJKHU4zBQMmhc52QkoaU3GkDxA==}
+    peerDependencies:
+      typescript: '>=5.2'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
+  '@lexical/dragon@0.53.0':
+    resolution: {integrity: sha512-pulm9Nwg7Cl0tvrJesWGyRFVjUgs0C4gKJ/IBnssYAMP1Sk2Y4vVn5Bw0YJ75ChHa76VNPajUn7jDhLW9BWD2A==}
+    peerDependencies:
+      typescript: '>=5.2'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
+  '@lexical/extension@0.53.0':
+    resolution: {integrity: sha512-+qjF79P6sBCggg/A5jmQRfQK8CEIXiUK7ndWcbm5m6y/ZOafakBhcjj2yfaxxnM+zPrvj7GZeyHbGpc6/lXENQ==}
+    peerDependencies:
+      typescript: '>=5.2'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
+  '@lexical/history@0.53.0':
+    resolution: {integrity: sha512-MyNM9jSVLlloKTrka+3X6tRtjAruzsSKkvezq/R/mvsjlXoxLW/6bi4QE0RZtba8Ma4ZwZs6/gpmN4O1P9T+EQ==}
+    peerDependencies:
+      typescript: '>=5.2'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
+  '@lexical/html@0.53.0':
+    resolution: {integrity: sha512-QTA+r1+7UleNFb3puIBEp2ENL3Qw4VMayYKO0hoDpr+adyzUNZapIlVVkB4no4Bc4ei5wt9EJK7r4g0G1lfEAw==}
+    peerDependencies:
+      typescript: '>=5.2'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
+  '@lexical/internal@0.53.0':
+    resolution: {integrity: sha512-ORSbMXwae0X1SeSsqywx9Lw0Bf8/rJNZzKdQp6uMVGGwgM6Ul+cCAjsKYlG7cnhJILJwYoi2a5+ZK4Y+KFAxlg==}
+    peerDependencies:
+      typescript: '>=5.2'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
+  '@lexical/list@0.53.0':
+    resolution: {integrity: sha512-wW+ufz4W40v+/fk2F98yxS8fXfmP1qOrEf5EPCmmV+lqxZ3FEPgN0JwPv8XUPF6/IaC8SyndT9eZgf4mJ1HCrQ==}
+    peerDependencies:
+      typescript: '>=5.2'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
+  '@lexical/plain-text@0.53.0':
+    resolution: {integrity: sha512-5I1scAnq5Wc6l9a/aFOXuEyw7QA5pFMawD1ATmghI7ybGNciM7iODJTCrZK96RueBs3odpzLtEX2mjwy/PhovQ==}
+    peerDependencies:
+      typescript: '>=5.2'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
+  '@lexical/selection@0.53.0':
+    resolution: {integrity: sha512-K7yTg/7PRZTKZ8UzzTC1tme4WEAz39vg4MqteHqrspmXFM3OubTXcANdXZFvMyzTDJ7g3sIoDkjD73kroDvO2Q==}
+    peerDependencies:
+      typescript: '>=5.2'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
+  '@lexical/utils@0.53.0':
+    resolution: {integrity: sha512-Uq+zEWPnX0eZqRw0gTe3NuPOduePHVmP0dQ3jyoi8JIN3HIQOIn5yTFGejX8j4M3RcYXwgsm89pNWflNWV/8tw==}
+    peerDependencies:
+      typescript: '>=5.2'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
   '@lezer/common@1.5.3':
     resolution: {integrity: sha512-H0iErY4e43LpXbYDyBci5W4v/RwTgGV3YzYOlJPiGZ8RY8w51kVE+xLn1tg3Z6UmSfyETvtsUK3r7YsgDQEI7Q==}
 
@@ -2853,6 +2942,9 @@ packages:
   '@pkgjs/parseargs@0.11.0':
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
     engines: {node: '>=14'}
+
+  '@preact/signals-core@1.14.5':
+    resolution: {integrity: sha512-vcRv7Ityz5JVmeiVqIluLFzT/PDS/AlhHUpw3/aUWqcVUs6bDGIPXE/6RSC4evBNWYvnniozg5Syfj33al3gkg==}
 
   '@radix-ui/primitive@1.1.7':
     resolution: {integrity: sha512-rqWnm76nYT8HoNNqEjpgJ7Pw/DrBj5iBTrmEPo6HTX5+VJyBNOqTdv4g89G63HuR5g0AaENoAcH7Is5fF2kZ8Q==}
@@ -6562,6 +6654,14 @@ packages:
   levn@0.4.1:
     resolution: {integrity: sha512-+bT2uH4E5LGE7h/n3evcS/sQlJXCpIp6ym8OWJ5eV6+67Dsql/LaaT7qJBAt2rzfoa/5QBGBhxDix1dMt2kQKQ==}
     engines: {node: '>= 0.8.0'}
+
+  lexical@0.53.0:
+    resolution: {integrity: sha512-yAJJJsIkkfKVemlxC+akk1hJR+P7Zqzch+uTAJ1Wqq6H0o0TkjjaxCyaELd8M9OzWX07f9WOU6RJSyutcVewUw==}
+    peerDependencies:
+      typescript: '>=5.2'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
 
   lightningcss-android-arm64@1.32.0:
     resolution: {integrity: sha512-YK7/ClTt4kAK0vo6w3X+Pnm0D2cf2vPHbhOXdoNti1Ga0al1P4TBZhwjATvjNwLEBCnKvjJc2jQgHXH0NEwlAg==}
@@ -11498,6 +11598,93 @@ snapshots:
       react-dom: 19.3.0(react@19.3.0)
       react-native: 0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(@react-native/metro-config@0.88.0(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1))(@types/react@19.3.0)(react@19.3.0)(supports-color@8.1.1)
 
+  '@lexical/clipboard@0.53.0(typescript@5.9.3)':
+    dependencies:
+      '@lexical/extension': 0.53.0(typescript@5.9.3)
+      '@lexical/html': 0.53.0(typescript@5.9.3)
+      '@lexical/internal': 0.53.0(typescript@5.9.3)
+      '@lexical/list': 0.53.0(typescript@5.9.3)
+      '@lexical/selection': 0.53.0(typescript@5.9.3)
+      '@lexical/utils': 0.53.0(typescript@5.9.3)
+      '@types/trusted-types': 2.0.7
+      lexical: 0.53.0(typescript@5.9.3)
+    optionalDependencies:
+      typescript: 5.9.3
+
+  '@lexical/dragon@0.53.0(typescript@5.9.3)':
+    dependencies:
+      '@lexical/extension': 0.53.0(typescript@5.9.3)
+      lexical: 0.53.0(typescript@5.9.3)
+    optionalDependencies:
+      typescript: 5.9.3
+
+  '@lexical/extension@0.53.0(typescript@5.9.3)':
+    dependencies:
+      '@lexical/internal': 0.53.0(typescript@5.9.3)
+      '@lexical/utils': 0.53.0(typescript@5.9.3)
+      '@preact/signals-core': 1.14.5
+      lexical: 0.53.0(typescript@5.9.3)
+    optionalDependencies:
+      typescript: 5.9.3
+
+  '@lexical/history@0.53.0(typescript@5.9.3)':
+    dependencies:
+      '@lexical/extension': 0.53.0(typescript@5.9.3)
+      '@lexical/utils': 0.53.0(typescript@5.9.3)
+      lexical: 0.53.0(typescript@5.9.3)
+    optionalDependencies:
+      typescript: 5.9.3
+
+  '@lexical/html@0.53.0(typescript@5.9.3)':
+    dependencies:
+      '@lexical/extension': 0.53.0(typescript@5.9.3)
+      '@lexical/internal': 0.53.0(typescript@5.9.3)
+      '@lexical/selection': 0.53.0(typescript@5.9.3)
+      '@lexical/utils': 0.53.0(typescript@5.9.3)
+      lexical: 0.53.0(typescript@5.9.3)
+    optionalDependencies:
+      typescript: 5.9.3
+
+  '@lexical/internal@0.53.0(typescript@5.9.3)':
+    optionalDependencies:
+      typescript: 5.9.3
+
+  '@lexical/list@0.53.0(typescript@5.9.3)':
+    dependencies:
+      '@lexical/extension': 0.53.0(typescript@5.9.3)
+      '@lexical/html': 0.53.0(typescript@5.9.3)
+      '@lexical/internal': 0.53.0(typescript@5.9.3)
+      '@lexical/utils': 0.53.0(typescript@5.9.3)
+      lexical: 0.53.0(typescript@5.9.3)
+    optionalDependencies:
+      typescript: 5.9.3
+
+  '@lexical/plain-text@0.53.0(typescript@5.9.3)':
+    dependencies:
+      '@lexical/clipboard': 0.53.0(typescript@5.9.3)
+      '@lexical/dragon': 0.53.0(typescript@5.9.3)
+      '@lexical/extension': 0.53.0(typescript@5.9.3)
+      '@lexical/selection': 0.53.0(typescript@5.9.3)
+      '@lexical/utils': 0.53.0(typescript@5.9.3)
+      lexical: 0.53.0(typescript@5.9.3)
+    optionalDependencies:
+      typescript: 5.9.3
+
+  '@lexical/selection@0.53.0(typescript@5.9.3)':
+    dependencies:
+      '@lexical/internal': 0.53.0(typescript@5.9.3)
+      lexical: 0.53.0(typescript@5.9.3)
+    optionalDependencies:
+      typescript: 5.9.3
+
+  '@lexical/utils@0.53.0(typescript@5.9.3)':
+    dependencies:
+      '@lexical/internal': 0.53.0(typescript@5.9.3)
+      '@lexical/selection': 0.53.0(typescript@5.9.3)
+      lexical: 0.53.0(typescript@5.9.3)
+    optionalDependencies:
+      typescript: 5.9.3
+
   '@lezer/common@1.5.3': {}
 
   '@lezer/cpp@1.1.6':
@@ -11757,6 +11944,8 @@ snapshots:
 
   '@pkgjs/parseargs@0.11.0':
     optional: true
+
+  '@preact/signals-core@1.14.5': {}
 
   '@radix-ui/primitive@1.1.7': {}
 
@@ -12951,8 +13140,7 @@ snapshots:
 
   '@types/retry@0.12.5': {}
 
-  '@types/trusted-types@2.0.7':
-    optional: true
+  '@types/trusted-types@2.0.7': {}
 
   '@types/unist@2.0.11': {}
 
@@ -15914,6 +16102,12 @@ snapshots:
     dependencies:
       prelude-ls: 1.2.1
       type-check: 0.4.0
+
+  lexical@0.53.0(typescript@5.9.3):
+    dependencies:
+      '@lexical/internal': 0.53.0(typescript@5.9.3)
+    optionalDependencies:
+      typescript: 5.9.3
 
   lightningcss-android-arm64@1.32.0:
     optional: true

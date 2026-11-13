@@ -48,7 +48,7 @@ export const BRING_FIRST = "Bring it to this Mac first.";
 export const NOT_ON_BRAIN = "Add this project to the cloud brain in Settings > Cloud on the Mac first.";
 /** Why no conversation can start or move in the cloud: no cloud service is connected to run it on. */
 export const NO_CLOUD_SERVICE = "Connect Vercel or Agent37 in Settings > Cloud first.";
-const IN_CLOUD = "This conversation is already in the cloud.";
+const IN_CLOUD = "This conversation is already in your own cloud.";
 
 const byThreadId = { by: "owner", thread: (p: { threadId?: string | undefined }) => p.threadId } as const;
 const byId = { by: "owner", thread: (p: { id: string }) => p.id } as const;

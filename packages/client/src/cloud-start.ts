@@ -154,8 +154,8 @@ export function cloudPlaceLabel(cloud: CloudThreadState): string {
 
 const MOVE_ORDER: Record<"mac" | "cloud", MoveStep[]> = { cloud: ["packing", "waking", "sending"], mac: ["waking", "packing", "sending"] };
 const MOVE_LABELS: Record<"mac" | "cloud", Record<MoveStep, string>> = {
-  cloud: { packing: "Packing the conversation", waking: "Waking the cloud brain", sending: "Sending it to the cloud" },
-  mac: { waking: "Waking the cloud brain", packing: "Packing it in the cloud", sending: "Bringing it to this Mac" },
+  cloud: { packing: "Packing the conversation", waking: "Waking the cloud brain", sending: "Sending it to your own cloud" },
+  mac: { waking: "Waking the cloud brain", packing: "Packing it in your own cloud", sending: "Bringing it to this Mac" },
 };
 
 /** The card a conversation shows about a move: its steps while it moves or its brain wakes, or why the last one did not happen. */
@@ -182,7 +182,7 @@ export function threadMoveCard(thread: Pick<ThreadSummary, "moving" | "owner" | 
   const current = Math.max(0, order.indexOf(moving.step ?? order[0]!));
   return {
     kind: "moving",
-    title: moving.to === "cloud" ? "Moving to the cloud" : "Moving to this Mac",
+    title: moving.to === "cloud" ? "Moving to your own cloud" : "Moving to this Mac",
     steps: order.map((step, index) => ({ step, label: MOVE_LABELS[moving.to][step], state: stepState(index, current) })),
   };
 }

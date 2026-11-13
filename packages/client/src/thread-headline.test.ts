@@ -44,7 +44,7 @@ describe("a cloud thread's row while it is set up or moved", () => {
 
   it("says when it did not start, and reads as any thread once its agent ran", () => {
     expect(threadHeadline({ ...starting, activity: "idle", cloud: { ...cloud, state: "failed", error: "No Agent37 balance." } }, undefined)).toEqual({
-      text: "Didn't start in the cloud",
+      text: "Didn't start in your own cloud",
       tone: "attention",
     });
     expect(threadHeadline({ ...starting, hasStarted: true, cloud: { ...cloud, state: "ready" } }, undefined)).toEqual({ text: "Working", tone: "live" });
@@ -52,7 +52,7 @@ describe("a cloud thread's row while it is set up or moved", () => {
 
   it("says the step of a move, and that a move did not happen", () => {
     expect(threadHeadline({ activity: "idle", unread: false, moving: { to: "cloud", since: 1, step: "sending" }, lastActivityAt: 1 }, undefined)).toEqual({
-      text: "Sending it to the cloud",
+      text: "Sending it to your own cloud",
       tone: "live",
     });
     expect(threadHeadline({ activity: "idle", unread: false, moveRefused: { to: "cloud", reason: "A turn is running.", at: 2 }, lastActivityAt: 1 }, undefined)).toEqual({

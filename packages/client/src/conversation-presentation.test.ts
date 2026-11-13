@@ -29,7 +29,7 @@ describe("sending during a turn", () => {
 it("holds the composer while a conversation moves, in the words for where it goes", () => {
   const ready = { permissionReady: true, historyLoading: false, historyFailed: false, hasModel: true };
   expect(conversationSendDisabledReason(ready)).toBeNull();
-  expect(conversationSendDisabledReason({ ...ready, thread: { moving: { to: "cloud", since: 1 } } })).toBe("This conversation is moving to the cloud.");
+  expect(conversationSendDisabledReason({ ...ready, thread: { moving: { to: "cloud", since: 1 } } })).toBe("This conversation is moving to your own cloud.");
   expect(conversationSendDisabledReason({ ...ready, permissionReady: false, thread: { moving: { to: "mac", since: 1 } } })).toBe("This conversation is moving to your Mac.");
 });
 

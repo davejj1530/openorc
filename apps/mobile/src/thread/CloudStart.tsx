@@ -78,7 +78,7 @@ function Steps({ thread }: { thread: StartingCloudThread }) {
   const doneAtOpen = useRef(new Set(steps.filter((step) => step.state === "done").map((step) => step.step)));
   return (
     <>
-      <Text className="text-md">Setting up the cloud workspace</Text>
+      <Text className="text-md">Setting up your own cloud</Text>
       <View>
         {steps.map(({ step, label, state }) => (
           <View key={step} className="flex-row items-center gap-2.5">

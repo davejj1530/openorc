@@ -21,8 +21,8 @@ const steps = () =>
 
 it("shows a conversation's move to the cloud as steps, the current one running", () => {
   render(<ThreadMoveCard thread={thread({ moving: { to: "cloud", since: 1, step: "sending" } })} />);
-  expect(screen.getByRole("status", { name: "Moving to the cloud" })).toBeTruthy();
-  expect(steps()).toEqual(["Packing the conversation: done", "Waking the cloud brain: done", "Sending it to the cloud: running"]);
+  expect(screen.getByRole("status", { name: "Moving to your own cloud" })).toBeTruthy();
+  expect(steps()).toEqual(["Packing the conversation: done", "Waking the cloud brain: done", "Sending it to your own cloud: running"]);
 });
 
 it("says the cloud brain is waking on an open cloud conversation, and shows nothing once it is live", () => {

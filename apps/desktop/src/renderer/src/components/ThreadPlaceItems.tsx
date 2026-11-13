@@ -147,10 +147,10 @@ function MovingRow({ thread, parts: M }: { thread: ThreadSummary; parts: MenuPar
   const keep = useRpcMutation("cloud.keep");
   const toCloud = thread.moving?.to === "cloud";
   return (
-    <PlaceRow parts={M} icon={<Cloud size={13} />} label={toCloud ? "Moving to the cloud" : `Moving to ${thisComputer}`}>
+    <PlaceRow parts={M} icon={<Cloud size={13} />} label={toCloud ? "Moving to your own cloud" : `Moving to ${thisComputer}`}>
       <MenuError error={keep.error} />
       <M.Item className={menuItem} disabled={keep.isPending} onClick={() => keep.mutate({ threadId: thread.id })}>
-        {toCloud ? <Laptop size={13} /> : <Cloud size={13} />} {toCloud ? `Keep on ${thisComputer}` : "Keep in the cloud"}
+        {toCloud ? <Laptop size={13} /> : <Cloud size={13} />} {toCloud ? `Keep on ${thisComputer}` : "Keep in your own cloud"}
       </M.Item>
     </PlaceRow>
   );
@@ -162,7 +162,7 @@ function CloudRow({ thread, parts: M }: { thread: ThreadSummary; parts: MenuPart
   const closeCopy = useRpcMutation("cloud.closeOnMac");
   const mirrored = Boolean(thread.owner?.mirror);
   return (
-    <PlaceRow parts={M} icon={<Cloud size={13} />} label="Cloud">
+    <PlaceRow parts={M} icon={<Cloud size={13} />} label="Your own cloud">
       <MenuError error={bring.error ?? openCopy.error ?? closeCopy.error} />
       <M.Item className={menuItem} disabled={thread.activity !== "idle" || bring.isPending} onClick={() => bring.mutate({ threadId: thread.id })}>
         <Laptop size={13} /> Bring to {machine}
@@ -180,7 +180,7 @@ function MacRow({ thread, parts: M, offer }: { thread: ThreadSummary; parts: Men
   return (
     <PlaceRow parts={M} icon={<Laptop size={13} />} label={ThisComputer}>
       <M.Item className={menuItem} disabled={thread.activity !== "idle" || Boolean(missing)} data-tip={missing ?? undefined} onClick={() => useUi.getState().setMoveThread(thread.id, "cloud")}>
-        <Cloud size={13} /> Move to cloud
+        <Cloud size={13} /> Move to your own cloud
       </M.Item>
     </PlaceRow>
   );

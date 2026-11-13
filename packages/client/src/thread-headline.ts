@@ -43,7 +43,7 @@ function cloudHeadline(thread: CloudRow): ThreadHeadline | null {
   const { cloud, agent, queued } = thread;
   if (!cloud || !agent || thread.hasStarted || !queued?.length) return null;
   const starting = { cloud, agent, queued, owner: thread.owner };
-  if (cloudStartFailure(starting)) return { text: "Didn't start in the cloud", tone: "attention" };
+  if (cloudStartFailure(starting)) return { text: "Didn't start in your own cloud", tone: "attention" };
   const step = cloudStartSteps(starting).find((each) => each.state === "running");
   return step ? { text: step.label, tone: "live" } : null;
 }

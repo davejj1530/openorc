@@ -952,7 +952,7 @@ describe("calling a move off", () => {
     expect(await holders(threadId)).toEqual([{ name: "brain", ...content }]);
   }, 60_000);
 
-  it("refuses Keep in the cloud once this Mac took the thread, even before the brain heard", async () => {
+  it("refuses Keep in your own cloud once this Mac took the thread, even before the brain heard", async () => {
     const threadId = await macThread();
     await moveUp(threadId);
     await until(settledHere);

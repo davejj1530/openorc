@@ -67,7 +67,7 @@ export function CloudStart({ thread, runs, fallback }: { thread: ThreadSummary |
           <Failed thread={thread} message={message} failure={failure} />
         ) : (
           <>
-            <div className="text-md text-ink">Setting up the cloud workspace</div>
+            <div className="text-md text-ink">Setting up your own cloud</div>
             <ol className="cloud-start-steps">
               {cloudStartSteps(thread).map(({ step, label, state }) => (
                 <li key={step} data-state={state}>

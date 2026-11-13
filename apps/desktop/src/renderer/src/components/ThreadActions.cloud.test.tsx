@@ -57,10 +57,10 @@ it.each(["cursor", "antigravity", "fx"] as const)("explains why %s cannot fork b
 });
 
 it("offers Bring to Mac from a cloud thread's place, and no folder moves or fork", async () => {
-  open({ owner: { brain: "cloud", reach: "live", heardAt: 1 }, branch: "fix/menu" }, "Cloud");
+  open({ owner: { brain: "cloud", reach: "live", heardAt: 1 }, branch: "fix/menu" }, "Your own cloud");
   fireEvent.click(await screen.findByText("Bring to Mac"));
   expect(mutations.get("cloud.bringToMac")).toHaveBeenCalledWith({ threadId: "t1" });
-  expect(screen.queryByText("Move to cloud")).toBeNull();
+  expect(screen.queryByText("Move to your own cloud")).toBeNull();
   fireEvent.click(screen.getByText("fix/menu"));
   await screen.findByText("Copy branch name");
   expect(screen.queryByText("Move to the checkout")).toBeNull();
@@ -69,7 +69,7 @@ it("offers Bring to Mac from a cloud thread's place, and no folder moves or fork
 });
 
 it("offers to keep a moving thread where it was", async () => {
-  open({ moving: { to: "cloud", since: 1 } }, "Moving to the cloud");
+  open({ moving: { to: "cloud", since: 1 } }, "Moving to your own cloud");
   fireEvent.click(await screen.findByText("Keep on this Mac"));
   expect(mutations.get("cloud.keep")).toHaveBeenCalledWith({ threadId: "t1" });
 });
@@ -77,7 +77,7 @@ it("offers to keep a moving thread where it was", async () => {
 it("offers Move to cloud for every agent's conversation, the brain checking again when asked", async () => {
   for (const agent of ["claude", "codex", "opencode"] as const) {
     open({ agent }, "This Mac");
-    const item = (await screen.findByText("Move to cloud")).closest("[role=menuitem]");
+    const item = (await screen.findByText("Move to your own cloud")).closest("[role=menuitem]");
     expect(item?.getAttribute("aria-disabled")).not.toBe("true");
     expect(item?.getAttribute("data-tip")).toBeNull();
     cleanup();
@@ -87,14 +87,14 @@ it("offers Move to cloud for every agent's conversation, the brain checking agai
 it("keeps today's sandbox move without a brain", async () => {
   offer.brain = null;
   open({ agent: "codex" }, "This Mac");
-  expect((await screen.findByText("Move to cloud")).closest("[role=menuitem]")?.getAttribute("aria-disabled")).not.toBe("true");
+  expect((await screen.findByText("Move to your own cloud")).closest("[role=menuitem]")?.getAttribute("aria-disabled")).not.toBe("true");
 });
 
 it("says what to connect when there is no brain and no cloud service to move to", async () => {
   offer.brain = null;
   offer.provider = null;
   open({ agent: "claude" }, "This Mac");
-  const item = (await screen.findByText("Move to cloud")).closest("[role=menuitem]");
+  const item = (await screen.findByText("Move to your own cloud")).closest("[role=menuitem]");
   expect(item?.getAttribute("aria-disabled")).toBe("true");
   expect(item?.getAttribute("data-tip")).toBe("Connect Vercel or Agent37 in Settings > Cloud first.");
 });

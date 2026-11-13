@@ -130,14 +130,14 @@ describe("the card on a conversation that moves", () => {
 
   it("walks a move to the cloud through packing, waking the brain and sending, each step before the current done", () => {
     const card = threadMoveCard(summary("t", 1, { moving: { to: "cloud", since: 1, step: "waking" } }));
-    expect(card?.title).toBe("Moving to the cloud");
-    expect(states(card)).toEqual(["Packing the conversation: done", "Waking the cloud brain: running", "Sending it to the cloud: pending"]);
+    expect(card?.title).toBe("Moving to your own cloud");
+    expect(states(card)).toEqual(["Packing the conversation: done", "Waking the cloud brain: running", "Sending it to your own cloud: pending"]);
   });
 
   it("wakes the brain first when bringing a thread to this Mac, and starts at the first step when none is known", () => {
     expect(states(threadMoveCard(summary("t", 1, { moving: { to: "mac", since: 1, step: "sending" } })))).toEqual([
       "Waking the cloud brain: done",
-      "Packing it in the cloud: done",
+      "Packing it in your own cloud: done",
       "Bringing it to this Mac: running",
     ]);
     expect(states(threadMoveCard(summary("t", 1, { moving: { to: "mac", since: 1 } })))?.[0]).toBe("Waking the cloud brain: running");

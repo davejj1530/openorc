@@ -67,7 +67,7 @@ export function CloudMoveDialog({ threadId }: { threadId: string }) {
   };
   const problem = error ?? preview.blocked;
   return (
-    <Dialog open onOpenChange={(open) => (open ? undefined : close())} title="Move this conversation to the cloud?" width={520}>
+    <Dialog open onOpenChange={(open) => (open ? undefined : close())} title="Move this conversation to your own cloud?" width={520}>
       <div>
         {thread.data ? <p className="text-sm text-ink-3 mb-3 break-words">{thread.data.title}</p> : null}
         <p className="text-base text-ink-2 mb-3">{moveWords(fromCheckout, brain)}</p>

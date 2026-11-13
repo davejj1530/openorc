@@ -46,7 +46,7 @@ export type MoveRefusal = z.infer<typeof MoveRefusal>;
 export type ThreadMoving = z.infer<typeof ThreadMoving>;
 
 export const MOVING_WORDS: Record<MoveTarget, string> = {
-  cloud: "This conversation is moving to the cloud.",
+  cloud: "This conversation is moving to your own cloud.",
   mac: "This conversation is moving to your Mac.",
 };
 

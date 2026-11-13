@@ -43,7 +43,7 @@ afterEach(cleanup);
 
 it("shows a starting cloud thread's setup as steps over the message that waits for it", () => {
   render(<CloudStart thread={starting(cloud())} />, { wrapper: mac.phone!.wrapper });
-  expect(screen.getByText("Setting up the cloud workspace")).toBeTruthy();
+  expect(screen.getByText("Setting up your own cloud")).toBeTruthy();
   for (const label of ["Starting a Vercel sandbox", "Sending your code", "Running the setup script", "Starting Claude"]) expect(screen.getByText(label)).toBeTruthy();
   expect(screen.getByText("Add a footer with the links")).toBeTruthy();
 });
@@ -79,7 +79,7 @@ it("says what failed in a line with Try again beside it, and the sandbox's log o
 it("shows a retried setup's steps rather than the failure before it, while its message still waits marked as not sent", () => {
   const error = "Docker did not start in the sandbox.\nfailed to start daemon";
   render(<CloudStart thread={starting(cloud({ provider: "agent37", state: "preparing", step: "sandbox", setup: false }), { interrupted: true, error })} />, { wrapper: mac.phone!.wrapper });
-  expect(screen.getByText("Setting up the cloud workspace")).toBeTruthy();
+  expect(screen.getByText("Setting up your own cloud")).toBeTruthy();
   expect(screen.getByText("Starting an Agent37 instance")).toBeTruthy();
   expect(screen.queryByText("The cloud workspace did not start")).toBeNull();
 });

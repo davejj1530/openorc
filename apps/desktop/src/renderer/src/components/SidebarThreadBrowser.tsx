@@ -24,7 +24,6 @@ import {
   THREAD_PAGE,
   threadTreeRows,
   threadFoldIds,
-  resolvedBefore,
   resolvedRows,
   threadResolved,
   useChildThreadPages,
@@ -126,7 +125,6 @@ function useThreadList(children: ChildPages) {
   // Resolved reads the threads put there only while it is open.
   const resolved = useRpc("threads.list", { ...listed, filter: "archived", limit: resolvedLimit + 1 }, { ...besides, enabled: besides.enabled && resolvedOpen });
   const resolvedPending = resolvedOpen && !pinnedOnly && resolved.isPending;
-  const resolvedCount = useRpc("threads.resolvedCount", { projectIds, quietBefore: resolvedBefore(Date.now()) }, besides);
   const fetched = queries.map((query, index) => (query.data ? { rows: query.data, limit } : cachedListPage(queryClient, params[index]!)));
   const family = useSelectedFamily(active.data, active.data?.archivedAt ? "archived" : "active", [...fetched.map((page) => page?.rows), resolved.data], children);
   const selected = active.data && projectIds.includes(active.data.projectId) && (!pinnedOnly || active.data.pinnedAt) ? active.data : null;
@@ -147,7 +145,6 @@ function useThreadList(children: ChildPages) {
     pinnedOnly,
     pending: queries.some((query) => query.isPending),
     resolvedPending,
-    resolvedCount: resolvedCount.data,
     limit,
     loadMore: () => setLimit((old) => old + THREAD_PAGE),
     /** Resolved's next page: of the threads put there, and of the list, where its quiet threads come from. */
@@ -294,7 +291,7 @@ function ThreadGroups({ children }: { children: ChildPages }) {
           ) : null}
         </div>
         {pinnedOnly ? null : (
-          <ResolvedDrawer open={resolvedOpen} holding={resolvedShown.length > 0} count={state.resolvedCount} onToggle={toggle(sidebarFoldKey.resolved(SIDEBAR_LIST))} accepts={resolvable(list, now)}>
+          <ResolvedDrawer open={resolvedOpen} holding={resolvedShown.length > 0} onToggle={toggle(sidebarFoldKey.resolved(SIDEBAR_LIST))} accepts={resolvable(list, now)}>
             {rows(resolvedShown, true)}
             {resolvedOpen ? <ResolvedFeedback list={list} pending={state.resolvedPending || pending} onShowMore={state.loadMoreResolved} /> : null}
           </ResolvedDrawer>

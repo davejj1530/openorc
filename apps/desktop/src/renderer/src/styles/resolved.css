@@ -1,11 +1,10 @@
-/* Resolved sits at the list's foot, right above the dock, as quiet as the day headings: "Resolved",
-   then how many it holds and a chevron at the row's end. Open, it rises over the list to its rows'
-   height, up to most of the column, and scrolls on its own; its rows arrive a step apart, and fold
-   away with it. While a thread it would take is dragged, the row grows and draws a dashed ring,
-   with a check in place of the chevron; held over it, the ring turns solid on the current row's
-   fill and the count rolls one up. */
+/* Resolved sits at the list's foot, right above the dock, as a 28px door: "Resolved" and a chevron
+   after it, with no count. Open, it rises over the list to its rows' height, up to most of the
+   column, and scrolls on its own; its rows arrive a step apart, and fold away with it. While a
+   thread it would take is dragged, the row grows and draws a dashed ring, with a check in place of
+   the chevron; held over it, the ring turns solid on the current row's fill. */
 .resolved-drawer {
-  --resolved-head: 36px;
+  --resolved-head: 28px;
   display: flex;
   flex: none;
   flex-direction: column;
@@ -20,14 +19,14 @@
   display: flex;
   flex: none;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   height: var(--resolved-head);
   padding: 0 10px;
   border-radius: var(--radius-md);
   outline: 1px dashed transparent;
   outline-offset: -1px;
   font-size: var(--text-sm);
-  color: var(--ink-4);
+  color: var(--ink-3);
   text-align: left;
   transition:
     height var(--duration-resize) var(--ease-out),
@@ -38,13 +37,10 @@
 .resolved-toggle:hover {
   color: var(--ink);
 }
-.resolved-label {
-  flex: 1;
-  min-width: 0;
-}
 .resolved-mark {
   display: grid;
   place-items: center;
+  margin-right: auto;
 }
 .resolved-mark > * {
   grid-area: 1 / 1;

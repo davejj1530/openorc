@@ -36,7 +36,7 @@ describe("sidebar project groups", () => {
     ]);
   });
 
-  it("counts a question, a failure and an unread result as waiting, never work under way, and a parent once for its sub threads", () => {
+  it("counts a question and a failure as waiting, never an unread result or work under way, and a parent once for its sub threads", () => {
     const roots = [
       thread("ask", "openorc", { activity: "waiting" }),
       thread("run", "openorc", { activity: "running" }),
@@ -45,8 +45,10 @@ describe("sidebar project groups", () => {
       thread("parent", "openorc"),
     ];
     const children = [thread("child", "openorc", { parentThreadId: "parent", activity: "waiting" }), thread("child-2", "openorc", { parentThreadId: "parent", unread: true })];
-    expect(waitingRoots(roots, [...roots, ...children])).toBe(4);
-    expect(projectGroups(projects, roots, roots)[0]!.waiting).toBe(3);
+    expect(waitingRoots(roots, [...roots, ...children])).toBe(3);
+    expect(projectGroups(projects, roots, roots)[0]!.waiting).toBe(2);
+    const onlyUnreadBelow = [thread("child", "openorc", { parentThreadId: "parent", unread: true })];
+    expect(waitingRoots([roots[4]!], [roots[4]!, ...onlyUnreadBelow])).toBe(0);
   });
 
   it("pages a group, keeps the open thread past the page, and folded lists only the open thread's tree", () => {

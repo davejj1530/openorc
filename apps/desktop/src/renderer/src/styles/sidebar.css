@@ -248,13 +248,16 @@ button.sidebar-nav-row:hover {
 .sidebar-nav-row:is([aria-current="page"], [aria-pressed="true"]):not(:focus-visible) {
   background-color: var(--current-row-fill);
 }
-/* What waits on the person, in the faint ink of the list's labels. */
+/* What waits on the person or failed, and nothing else, in amber: centred in a 16px slot on the line row marks
+   share, 28px in from the sidebar's edge. */
 .sidebar-count {
   flex-shrink: 0;
+  min-width: 16px;
   margin-left: auto;
   font-size: var(--text-sm);
   line-height: 16px;
-  color: var(--ink-4);
+  text-align: center;
+  color: var(--warn);
 }
 
 /* The wordmark leads the window's corner, after the traffic lights where the OS draws them, else with
@@ -331,8 +334,9 @@ button.sidebar-nav-row:hover {
 .sidebar-list-fold:hover {
   color: var(--ink);
 }
-.sidebar-list-fold .sidebar-count {
-  margin-right: 4px;
+/* Folded, the head is its name and what waits inside, the count on the row marks' line; its tools wait for it to open. */
+.sidebar-list-head:not([data-open]) .sidebar-list-tools {
+  display: none;
 }
 .sidebar-list-fold:is(:hover, :focus-visible) .sidebar-section-chevron,
 .sidebar-list-head:not([data-open]) .sidebar-section-chevron {

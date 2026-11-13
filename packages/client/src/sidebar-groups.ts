@@ -39,9 +39,12 @@ export function cloudProjects(rows: readonly ThreadSummary[]): GroupProject[] {
 /** One project's part of the list: its threads' roots in the list's order, and how many of them wait on the person. */
 export type ProjectGroup = { project: GroupProject; roots: ThreadSummary[]; waiting: number };
 
-/** A question, a failure or an unread result: what only the person can move. Work under way waits on no one. */
+/**
+ * A question or a failure: what only the person can move, and all a count in the sidebar counts. An unread result is
+ * marked on its row and counted nowhere; work under way waits on no one.
+ */
 export function waitsOnYou(status: ThreadStatus | null): boolean {
-  return status?.kind === "waiting" || status?.kind === "failed" || status?.kind === "unread";
+  return status?.kind === "waiting" || status?.kind === "failed";
 }
 
 /** How many of these roots wait on the person, each counted once with its sub threads. */

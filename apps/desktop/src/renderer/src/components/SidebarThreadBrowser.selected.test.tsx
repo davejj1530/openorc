@@ -22,7 +22,6 @@ vi.mock("../lib/rpc", () => ({
     },
     call: vi.fn(async (method: string, params: Record<string, unknown>) => {
       if (method === "threads.get") return host.threads.find((thread) => thread.id === params["id"]) ?? null;
-      if (method === "threads.resolvedCount") return 0;
       if (method !== "threads.list") return [];
       const list = params as RpcParams<"threads.list">;
       if (list.filter === "archived" || list.pinnedOnly || list.needsYou) return [];

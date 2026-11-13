@@ -10,10 +10,6 @@ const fixture: {
   projects: { id: string; name: string; rootPath: string }[];
   threads: (Pick<ThreadSummary, "id" | "title" | "projectId" | "agent" | "activity" | "unread" | "session" | "pinnedAt" | "snoozedUntil" | "lastActivityAt"> &
     Partial<Pick<ThreadSummary, "createdAt" | "archivedAt" | "parentThreadId" | "parentRelation" | "subagent" | "prUrl" | "prState" | "workspaceMode" | "branch" | "owner">>)[];
-  /** What the host says Resolved holds, when it says. */
-  resolvedCount?: number;
-  /** What Resolved holds in each project, when the count depends on the projects asked about. */
-  resolvedByProject?: Record<string, number>;
   tasks?: { status: string; approval?: string }[];
 } = vi.hoisted(() => ({ projects: [], threads: [] }));
 
@@ -50,11 +46,6 @@ vi.mock("../lib/client", async (original) => {
         }
       );
     if (method === "threads.list") return listThreads(params as RpcParams<"threads.list">);
-    if (method === "threads.resolvedCount") {
-      const counts = fixture.resolvedByProject;
-      if (!counts) return fixture.resolvedCount;
-      return ((params as RpcParams<"threads.resolvedCount">).projectIds ?? []).reduce((sum, id) => sum + (counts[id] ?? 0), 0);
-    }
     return undefined;
   };
   return {
@@ -104,8 +95,6 @@ beforeEach(() => {
   );
   fixture.projects = [];
   fixture.threads = [];
-  fixture.resolvedCount = undefined;
-  fixture.resolvedByProject = undefined;
   fixture.tasks = undefined;
   localStorage.clear();
   useWindow.setState({ fullscreen: false });
@@ -468,7 +457,7 @@ it("pages a long group with Show N more", async () => {
 
 it("folds Workspaces as a whole, counting what waits inside only while folded, and keeps the fold", async () => {
   projectThreads();
-  fixture.threads[3] = { ...fixture.threads[3]!, unread: true };
+  fixture.threads[3] = { ...fixture.threads[3]!, activity: "waiting" };
   const view = mountSidebar();
   await screen.findByRole("button", { name: /Other notes/ });
   const fold = () => within(screen.getByRole("region", { name: "Workspaces" })).getAllByRole("button")[0]!;
@@ -595,7 +584,8 @@ it("keeps a project's waiting threads in its count past the loaded pages", async
   fixture.threads = [
     ...Array.from({ length: 14 }, (_, index) => ({ ...base, id: `yesterday-${index}`, title: `Yesterday's notes ${index}`, projectId: "one", lastActivityAt: ago(1) - index })),
     { ...base, id: "waiting", title: "Waiting on you", projectId: "one", lastActivityAt: ago(1) - 100, activity: "waiting" as const },
-    { ...base, id: "unread", title: "Unread result", projectId: "two", lastActivityAt: ago(1) - 1000, unread: true },
+    { ...base, id: "asks", title: "Asks a question", projectId: "two", lastActivityAt: ago(1) - 1000, activity: "waiting" as const },
+    { ...base, id: "unread", title: "Unread result", projectId: "two", lastActivityAt: ago(1) - 2000, unread: true },
   ];
   useLayout.setState({ collapsed: ["project:one", "project:two"] });
   mountSidebar();
@@ -733,8 +723,9 @@ it("resolves a thread dropped on Resolved and reopens a resolved one dropped on 
   dayThreads();
   useLayout.setState({ collapsed: ["resolved-open:threads"] });
   mountSidebar();
-  fixture.resolvedCount = 2;
-  const drawer = (await screen.findByRole("button", { name: "Resolved, 2" })).parentElement!;
+  const toggle = await screen.findByRole("button", { name: "Resolved" });
+  expect(toggle.textContent).toBe("Resolved");
+  const drawer = toggle.parentElement!;
   await screen.findByRole("button", { name: /Old notes/ });
   const drag = (name: RegExp, onto: Element) => {
     const dataTransfer = dragData();
@@ -748,14 +739,14 @@ it("resolves a thread dropped on Resolved and reopens a resolved one dropped on 
       .mocked(core.call)
       .mock.calls.filter(([method]) => method === "threads.update")
       .map(([, params]) => params);
-  // Held over Resolved, the count takes the thread in before it lands.
+  // Held over Resolved, it lights as the place the thread will land.
   const dataTransfer = dragData();
   fireEvent.dragStart(screen.getByRole("button", { name: /Recent notes/ }), { dataTransfer });
   fireEvent.dragOver(drawer, { dataTransfer });
-  expect(screen.getByRole("button", { name: "Resolved, 3" })).toBeTruthy();
+  expect(drawer.hasAttribute("data-drop")).toBe(true);
   fireEvent.dragLeave(drawer, { dataTransfer, relatedTarget: document.body });
   fireEvent.dragEnd(screen.getByRole("button", { name: /Recent notes/ }), { dataTransfer });
-  expect(screen.getByRole("button", { name: "Resolved, 2" })).toBeTruthy();
+  expect(drawer.hasAttribute("data-drop")).toBe(false);
   drag(/Recent notes/, drawer);
   await waitFor(() => expect(updates()).toEqual([{ id: "recent", patch: { archived: true } }]));
   // Dropped back on Resolved, a resolved thread stays as it is; on the list it comes back.

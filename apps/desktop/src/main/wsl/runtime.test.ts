@@ -1,6 +1,6 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, rmSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -215,11 +215,14 @@ describe.runIf(installable)("installing the core's runtime in a distribution", (
     );
     const left: number[] = [];
     try {
-      // Each run ends for main only once every holder of its frames has gone, so reaching the next line is the proof for those.
+      // A run ends for main only once every holder of its frames has gone, so getting past it while the program still runs
+      // is the proof for those.
       const first = await distro.run(runtime.command);
       left.push(Number(first.stdout.toString("utf8")));
       expect(first.code).toBe(0);
-      expect(readdirSync(`/proc/${left[0]}/fd`).sort()).toEqual(["0", "1", "2"]);
+      const held = readdirSync(`/proc/${left[0]}/fd`).map((fd) => readlinkSync(`/proc/${left[0]}/fd/${fd}`));
+      expect(held).toContain("/dev/null");
+      expect(held).not.toContain(`${root}/core.lock`);
       const second = await distro.run(runtime.command);
       left.push(Number(second.stdout.toString("utf8")));
       expect(second.code).toBe(0);

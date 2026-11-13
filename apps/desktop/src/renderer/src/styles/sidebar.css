@@ -431,8 +431,8 @@ button.sidebar-nav-row:hover {
   background-color: var(--surface-2);
   color: var(--ink);
 }
-/* The project's mark leads its label, centred in the sidebar's 18px lead slot so the name starts at 46 as
-   a screen's does; quiet like the scope's. Rows stay flush with the slot's start. */
+/* The project's mark leads its label in full, centred in the sidebar's 18px lead slot so the name starts at
+   46 as a screen's does. Rows stay flush with the slot's start. */
 .sidebar-project-mark {
   display: inline-flex;
   flex-shrink: 0;
@@ -441,15 +441,10 @@ button.sidebar-nav-row:hover {
   margin-right: 4px;
   align-items: center;
   justify-content: center;
-  opacity: 0.6;
-  transition: opacity var(--duration-quick) var(--ease-out);
 }
 .sidebar-project-mark > * {
   width: 14px;
   height: 14px;
-}
-.sidebar-section-toggle:is(:hover, :focus-visible) .sidebar-project-mark {
-  opacity: 1;
 }
 
 /* Thread rows, 46px apart: the title, with the row's mark at its end, then one quiet line of where the

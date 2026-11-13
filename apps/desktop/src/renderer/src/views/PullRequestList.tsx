@@ -2,6 +2,7 @@ import { useId, useState, type ReactNode } from "react";
 import { useQueries } from "@tanstack/react-query";
 import { type Project, type PullRequestFilter, type PullRequestSummary } from "@openorc/protocol";
 import { RefreshCw } from "../components/icons";
+import { ProjectLogo } from "../components/ProjectIconPicker";
 import { ListGroupHeading } from "../components/ListGroupHeading";
 import { PageFilters, PageSearch } from "../components/PageFilters";
 import { ScopedTitle } from "../components/ScopedTitle";
@@ -82,7 +83,15 @@ function ProjectSection({ entry, query, named }: { entry: ProjectPulls; query: s
   return (
     <section aria-label={`${entry.project.name} pull requests`} className="list-group">
       {named ? (
-        <ListGroupHeading id={`${id}-heading`} controls={`${id}-pulls`} collapsed={collapsed} onToggle={() => setCollapsed((current) => !current)} label={entry.project.name} count={count} />
+        <ListGroupHeading
+          id={`${id}-heading`}
+          controls={`${id}-pulls`}
+          collapsed={collapsed}
+          onToggle={() => setCollapsed((current) => !current)}
+          icon={<ProjectLogo project={entry.project} />}
+          label={entry.project.name}
+          count={count}
+        />
       ) : null}
       <div id={`${id}-pulls`} hidden={collapsed}>
         {body}

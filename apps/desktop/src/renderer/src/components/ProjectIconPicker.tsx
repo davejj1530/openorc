@@ -7,7 +7,7 @@ import { projectIconKey, useProjectIcon } from "../lib/project-icons";
 import { CoversPreview } from "../lib/browser-preview";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { menuItem } from "./menu";
-import { Folder, FolderOpen, Check } from "./icons";
+import { Check, Cloud, Folder, FolderOpen, Globe } from "./icons";
 import { Button, Tooltip } from "./ui";
 import { cn } from "../lib/cn";
 import { ProjectStackIcon } from "./ProjectStackIcon";
@@ -25,6 +25,15 @@ function IconImage({ source, fallback, expanded, size = 16 }: { source: string |
 export function ProjectIcon({ rootPath, size }: { rootPath: string; size?: number }) {
   const { data: state } = useProjectIcon(rootPath);
   return <IconImage source={state?.selected?.dataUrl} fallback={state?.mode === "auto" ? state.fallback : null} {...(size ? { size } : {})} />;
+}
+
+/**
+ * A project's mark wherever the project is named: its chosen or detected icon, the cloud for a project only OpenOrc
+ * Cloud has, else No project's globe.
+ */
+export function ProjectLogo({ project, size = 14 }: { project: { rootPath?: string | null; cloud?: boolean }; size?: number }) {
+  if (project.rootPath) return <ProjectIcon rootPath={project.rootPath} size={size} />;
+  return project.cloud ? <Cloud size={size} /> : <Globe size={size} />;
 }
 
 function DiscoveryStatus({ loading, state }: { loading: boolean; state: ProjectIconState | undefined }) {

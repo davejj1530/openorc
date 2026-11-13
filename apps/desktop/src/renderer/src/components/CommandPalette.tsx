@@ -6,7 +6,8 @@ import { useOrclingChatIds, useOrclings } from "../lib/orclings";
 import { paletteActions } from "../lib/palette-actions";
 import { openTask, openThread, useRouter } from "../lib/router";
 import { useUi } from "../lib/ui";
-import { FolderGit2, MessageSquare, Orclings, Search } from "./icons";
+import { MessageSquare, Orclings, Search } from "./icons";
+import { ProjectLogo } from "./ProjectIconPicker";
 import { StatusIcon } from "./status";
 
 function emptySearchMessage(query: string, messageMode: boolean, fetching: boolean): string {
@@ -147,7 +148,7 @@ function PlaceGroups({ go }: { go: (fn: () => void) => void }) {
       <PlaceGroup
         heading="Projects"
         go={go}
-        places={projects.map((p) => ({ key: p.id, value: `project ${p.name}`, label: p.name, icon: <FolderGit2 size={14} />, open: () => navigate({ view: "project", projectId: p.id }) }))}
+        places={projects.map((p) => ({ key: p.id, value: `project ${p.name}`, label: p.name, icon: <ProjectLogo project={p} />, open: () => navigate({ view: "project", projectId: p.id }) }))}
       />
     </>
   );

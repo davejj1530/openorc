@@ -9,9 +9,9 @@ import { cn } from "../lib/cn";
 import { newThread, openProject } from "../lib/router";
 import { useUi } from "../lib/ui";
 import { floatingGround } from "../lib/use-anchor-ground";
-import { ChevronRight, Cloud, Globe, Image as ImageIcon, MoreHorizontal, PenSquare, Plus, Settings, X } from "./icons";
+import { ChevronRight, Image as ImageIcon, MoreHorizontal, PenSquare, Plus, Settings, X } from "./icons";
 import { menuItem, menuItemDanger, menuPopup, menuSeparator } from "./menu";
-import { ProjectIcon, ProjectIconChooser } from "./ProjectIconPicker";
+import { ProjectIconChooser, ProjectLogo } from "./ProjectIconPicker";
 import { RemoveProjectDialog } from "./ProjectMenu";
 import type { MenuParts } from "./ThreadActions";
 import { Tooltip } from "./ui";
@@ -62,7 +62,7 @@ export function SidebarProjectGroup({
             }}
           >
             <span className="sidebar-project-mark" aria-hidden="true">
-              <ProjectMark project={project} />
+              <ProjectLogo project={project} />
             </span>
             <span className="sidebar-project-name" data-tip={project.name}>
               {project.name}
@@ -93,12 +93,6 @@ export function SidebarProjectGroup({
       {actions.dialogs}
     </section>
   );
-}
-
-/** A project's mark: its chosen or detected icon, the cloud for a project only OpenOrc Cloud has, else No project's globe. */
-function ProjectMark({ project }: { project: GroupProject }) {
-  if (project.rootPath) return <ProjectIcon rootPath={project.rootPath} size={14} />;
-  return project.cloud ? <Cloud size={14} /> : <Globe size={14} />;
 }
 
 type ProjectDialogs = ReturnType<typeof useProjectDialogs>;

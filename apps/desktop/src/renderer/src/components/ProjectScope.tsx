@@ -14,7 +14,7 @@ import { cn } from "../lib/cn";
 import { markThread, projectMarks, projectMarkSummary, type ProjectMark } from "../lib/project-marks";
 import { Check, FolderPlus, Folders, Plus, Settings, X } from "./icons";
 import { menuItem, menuItemDanger, menuPopup, menuSeparator } from "./menu";
-import { ProjectIcon } from "./ProjectIconPicker";
+import { ProjectLogo } from "./ProjectIconPicker";
 import { RemoveProjectDialog } from "./ProjectMenu";
 import { useSidebarProjects } from "./SidebarThreadBrowser";
 import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
@@ -73,7 +73,7 @@ export function ProjectScope() {
     <>
       <Menu.Root>
         <Menu.Trigger className="title-crumb-link no-drag" aria-label={`Project: ${project?.name ?? ALL_PROJECTS}`}>
-          <span className="project-scope-icon">{project ? <ProjectIcon rootPath={project.rootPath} /> : <Folders size={14} />}</span>
+          <span className="project-scope-icon">{project ? <ProjectLogo project={project} /> : <Folders size={14} />}</span>
           <span className="project-scope-name">{project?.name ?? ALL_PROJECTS}</span>
         </Menu.Trigger>
         <Menu.Portal>
@@ -83,14 +83,7 @@ export function ProjectScope() {
               <div {...edges} className="sidebar-scope-list scroll-edges">
                 <ScopeItem icon={<Folders size={13} />} name={ALL_PROJECTS} chosen={!project} onSelect={() => onSelect(ALL_WORKSPACES)} />
                 {(projects.data ?? []).map((each) => (
-                  <ScopeItem
-                    key={each.id}
-                    icon={<ProjectIcon rootPath={each.rootPath} />}
-                    name={each.name}
-                    chosen={each.id === project?.id}
-                    mark={marks.get(each.id)}
-                    onSelect={() => onSelect(each.id)}
-                  />
+                  <ScopeItem key={each.id} icon={<ProjectLogo project={each} />} name={each.name} chosen={each.id === project?.id} mark={marks.get(each.id)} onSelect={() => onSelect(each.id)} />
                 ))}
               </div>
               <Menu.Separator className={menuSeparator} />

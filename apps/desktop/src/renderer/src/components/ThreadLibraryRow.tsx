@@ -201,8 +201,9 @@ function RowTitle({ title, working }: { title: string; working: boolean }) {
  */
 function ThreadLines({ thread, subthreads, project }: { thread: ThreadSummary; subthreads: ThreadStatus | null; project?: RowProject }) {
   const working = threadStatus(thread)?.kind === "running";
-  // The pull request shows beside it, so where the work is stays named even when there is one.
-  const workspace = workspaceLabel({ ...thread, prUrl: null });
+  // The pull request shows beside it, so where the work is stays named even when there is one. A teammate's thread
+  // names who started it there instead; its branch stays on hover.
+  const workspace = thread.owner?.startedBy?.name ?? workspaceLabel({ ...thread, prUrl: null });
   return (
     <>
       <span className="thread-preview-heading">

@@ -94,6 +94,8 @@ export const wireThread = z.object({
   ask: z.object({ id: z.string(), kind: z.string().default("tool"), detail: z.string() }).nullable(),
   pullRequest: z.object({ url: z.string(), state: PrState }).nullable().default(null),
   createdBy: z.string().nullable(),
+  /** Who started the thread, as a teammate's list names them; null once their account is gone. */
+  startedBy: z.object({ id: z.string(), name: z.string(), image: z.string().nullish() }).nullable().default(null),
   createdAt: iso,
   lastActivityAt: iso,
 });
@@ -112,8 +114,15 @@ export type WireEvent = z.infer<typeof wireEvent>;
 export const wireEvents = z.object({ events: z.array(wireEvent), head: seq, fromTurn: seq.optional() });
 export type WireEvents = z.infer<typeof wireEvents>;
 
-/** A project of the person's space: a GitHub repository. */
+/** A project of one of the person's spaces: a GitHub repository. */
 export const wireProject = z.object({ id: z.string(), name: z.string(), fullName: z.string() });
+
+/**
+ * One of the person's spaces: their personal one, whose `personalOf` is their own user id, or a team they are in. Read
+ * as Better Auth lists a person's organizations; the app never says the word.
+ */
+export const wireSpace = z.object({ id: z.string(), personalOf: z.string().nullish() });
+export type WireSpace = z.infer<typeof wireSpace>;
 export type WireProject = z.infer<typeof wireProject>;
 
 /** What a send answers: the message as it now stands, or a refusal to start a turn, with nothing stored. */
@@ -156,6 +165,7 @@ export const ROUTES = {
     route("DELETE", `/agent-sign-ins/${agent === "opencode" ? `opencode/${encodeURIComponent(provider ?? "")}` : agent}`, null),
   startDevice: route("POST", "/agent-sign-ins/codex/device/start", wireDeviceStart),
   finishDevice: route("POST", "/agent-sign-ins/codex/device/finish", wireDeviceFinish),
+  spaces: route("GET", "/api/auth/organization/list", z.array(wireSpace)),
   projects: route("GET", "/projects", z.array(wireProject)),
   threads: route("GET", "/hosted/threads", wireThreadList),
   thread: (id: string) => route("GET", `/hosted/threads/${encodeURIComponent(id)}`, wireThreadDetail),

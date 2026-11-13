@@ -10,6 +10,10 @@
  *
  * The token goes to protected storage, the socket's handshake and the Authorization header, and nowhere else: no error,
  * log line or state carries it.
+ *
+ * A person may be in several spaces (their personal one and teams). A request about a space's threads or projects
+ * names that space (`in`); one about the person alone names none. The socket needs no space: the server puts it in the
+ * rooms of every space the person is in.
  */
 import { ACCOUNT_PROTOCOL_HEADER, ACCOUNT_PROTOCOL_VERSION, type AccountReach } from "@openorc/protocol";
 import { z } from "zod";
@@ -33,11 +37,18 @@ export class Unreadable extends Error {
   }
 }
 
+/** Requests made in one of the person's spaces. */
+export interface Requests {
+  request<T>(route: Route<T>, body?: unknown): Promise<T>;
+}
+
 export type SessionState = { signedIn: false; ended: boolean } | { signedIn: true; email: string; reach: AccountReach };
 
 /** `connected`: a new socket session, so pushes may have been missed and what is shown should be read again. */
 export type SessionChange = "connected" | "changed";
 
+/** The header a request names its space in, by the space's id. */
+const SPACE_HEADER = "x-openorc-space";
 const SIGN_IN_FIRST = "Sign in to OpenOrc first.";
 const ENDED = "Your OpenOrc session ended. Sign in again.";
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -116,10 +127,19 @@ export class Session {
    *   2xx that does not parse         -> Unreadable
    * Never retries by itself.
    */
-  async request<T>(route: Route<T>, body?: unknown): Promise<T> {
+  request<T>(route: Route<T>, body?: unknown): Promise<T> {
+    return this.#request(route, body, null);
+  }
+
+  /** Requests in one space of the person's, whatever space the session has active. */
+  in(space: string): Requests {
+    return { request: (route, body) => this.#request(route, body, space) };
+  }
+
+  async #request<T>(route: Route<T>, body: unknown, space: string | null): Promise<T> {
     const held = this.#held;
     if (!held) throw new Refused(SIGN_IN_FIRST);
-    const response = await this.#send(route, body, held.token);
+    const response = await this.#send(route, body, held.token, space);
     if (response.status === 401) {
       if (this.#held === held) await this.end("server");
       throw new Refused(ENDED);
@@ -225,9 +245,10 @@ export class Session {
     this.#blip = null;
   }
 
-  async #send(route: Route<unknown>, body: unknown, token: string | null): Promise<Response> {
+  async #send(route: Route<unknown>, body: unknown, token: string | null, space: string | null = null): Promise<Response> {
     const headers: Record<string, string> = { [ACCOUNT_PROTOCOL_HEADER]: String(ACCOUNT_PROTOCOL_VERSION) };
     if (token) headers["authorization"] = `Bearer ${token}`;
+    if (space) headers[SPACE_HEADER] = space;
     if (body !== undefined) headers["content-type"] = "application/json";
     try {
       return await this.deps.fetch(new URL(route.path, this.deps.server), {

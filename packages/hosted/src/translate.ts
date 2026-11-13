@@ -72,6 +72,9 @@ export function toImage(image: string | null | undefined): string | null {
  *   a person's message id: a UUID             the window's echo: user-<UUID>        prefixed here, stripped on the way out
  *   an ask waits through turns and restarts   an approval expires with its turn    marked `durable`
  *   messages waiting, or refused later        ThreadSummary.queued                 toQueued
+ *   a thread lives in one of several spaces   no spaces                            threads.ts keeps each row's space and
+ *                                                                                   asks about a thread in it
+ *   startedBy: whoever started the thread     owner.startedBy: a teammate only     starterOf
  */
 
 /** What stands in the transcript for an event this build cannot read, so nothing in the log is hidden without a word. */
@@ -88,6 +91,8 @@ export interface RowContext {
   orphanOf: string | null;
   reach: AccountReach;
   heardAt: number;
+  /** Who started a thread a teammate shares with the person; null for the person's own. */
+  startedBy: { name: string; image: string | null } | null;
   /** Now, so a snooze that ran out reads as none, as this Mac's own snoozes wake. */
   now: number;
 }
@@ -195,7 +200,13 @@ export function toSummary(row: WireThread, context: RowContext): ThreadSummary {
     liveRunId: activity === "idle" ? null : hostedRunId(row.id),
     taskCount: 0,
     openTaskCount: 0,
-    owner: { brain: "hosted", reach: context.reach, heardAt: context.heardAt, ...(context.orphanOf !== null && { project: { name: context.orphanOf } }) },
+    owner: {
+      brain: "hosted",
+      reach: context.reach,
+      heardAt: context.heardAt,
+      ...(context.orphanOf !== null && { project: { name: context.orphanOf } }),
+      ...(context.startedBy && { startedBy: context.startedBy }),
+    },
   };
 }
 
@@ -240,6 +251,15 @@ export function toRuns(row: WireThread, reach: AccountReach): Run[] {
       error: null,
     },
   ];
+}
+
+/**
+ * The teammate who started a thread, as a row names them; null for a thread the person started, and for every thread
+ * while the app does not yet know who the person is.
+ */
+export function starterOf(row: WireThread, me: string | null): { name: string; image: string | null } | null {
+  if (!row.startedBy || me === null || row.startedBy.id === me) return null;
+  return { name: row.startedBy.name, image: toImage(row.startedBy.image) };
 }
 
 /** owner/name, lowercased, from an https or ssh GitHub remote; null for any other remote. */

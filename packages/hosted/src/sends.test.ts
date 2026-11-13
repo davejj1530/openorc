@@ -163,6 +163,7 @@ describe("an OpenOrc Cloud thread's asks", () => {
     const { hosted, thread, run } = await withThread({ status: "working" });
     const ask = stand.ask(thread, { kind: "user_input", input: { questions: [] }, detail: "Which branch?" });
     stand.endTurn(thread);
+    await vi.waitFor(async () => expect(await row(hosted, thread)).toMatchObject({ activity: "waiting" }));
     stand.setBilling(ADA, { ...PRO, monthlyLeftSeconds: 0 });
     await expect(hosted.threads.call("approvals.resolve", { runId: run, approvalId: ask, decision: "allow", answers: { q: ["main"] } })).rejects.toThrow("You're out of cloud hours.");
     expect(await row(hosted, thread)).toMatchObject({ activity: "waiting" });

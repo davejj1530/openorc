@@ -85,4 +85,12 @@ it("marks a thread on OpenOrc Cloud with the cloud, dimmed while OpenOrc Cloud c
     </TooltipProvider>,
   );
   expect(screen.queryByRole("img", { name: "OpenOrc Cloud" })).toBeNull();
+  cleanup();
+  render(
+    <TooltipProvider>
+      <ThreadRow thread={{ ...hosted, owner: { brain: "hosted", reach: "live", heardAt: 0, startedBy: { name: "Ana Lee", image: null } } }} active={false} />
+    </TooltipProvider>,
+  );
+  expect(screen.getByText("Ana Lee")).toBeTruthy();
+  expect(screen.queryByText("worktree")).toBeNull();
 });

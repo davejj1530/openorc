@@ -8,7 +8,7 @@
  * composer. After every write the rows are read again before the answer, so the window's next read sees it.
  */
 import { hostedSendBlock, hostedThreadOf, isHostedAgent, isHostedRefusal, type AccountStatus, type HostedRefusal, type QueuedMessage, type RpcParams } from "@openorc/protocol";
-import { Refused, type Session } from "./session.js";
+import { Refused, type Requests } from "./session.js";
 import { refusalWords, toQueued, wireMessageId } from "./translate.js";
 import { ROUTES, type WireThread } from "./wire.js";
 
@@ -17,9 +17,12 @@ export type TurnSettings = Partial<WireThread["settings"]>;
 
 /** What a write works with, given by threads.ts. */
 export interface Calls {
-  session: Session;
+  /** Requests about a thread, in its space. */
+  on(threadId: string): Requests;
   /** The row, or a rejection in words when the account no longer has it. */
   row(threadId: string): WireThread;
+  /** A teammate's thread, which the person reads and only its starter writes to. */
+  readOnly(threadId: string): boolean;
   /** Reads the rows again, and resolves once they are heard. */
   refresh(): Promise<void>;
   account(): AccountStatus;
@@ -56,7 +59,7 @@ async function post(
   if (message.settings?.agent && !isHostedAgent(message.settings.agent)) throw new Refused(`${message.settings.agent} doesn't run on OpenOrc Cloud.`);
   const id = wireMessageId(message.id) ?? crypto.randomUUID();
   const body = { id, text: message.text, ...(message.settings && { settings: message.settings }), ...(message.after && { delivery: "after" }) };
-  const reply = await calls.session.request(ROUTES.send(threadId), body);
+  const reply = await calls.on(threadId).request(ROUTES.send(threadId), body);
   if (!reply.sent) return refuse(calls, reply.refusal, turnSettings(row, message.settings));
   await calls.refresh();
 }
@@ -93,8 +96,7 @@ export async function queue(calls: Calls, params: RpcParams<"threads.queue">): P
 
 /** threads.unqueue: a waiting message leaves the queue, or a refused one is dismissed. */
 export async function unqueue(calls: Calls, { id, messageId }: RpcParams<"threads.unqueue">): Promise<QueuedMessage[]> {
-  calls.row(id);
-  await calls.session.request(ROUTES.unsend(id, messageId));
+  await calls.on(id).request(ROUTES.unsend(id, messageId));
   await calls.refresh();
   return toQueued(calls.row(id));
 }
@@ -110,8 +112,7 @@ export async function sendQueued(calls: Calls, { id, messageId }: RpcParams<"thr
 /** runs.interrupt: the running turn stops, and messages not taken yet are cancelled, as Stop does on this Mac. */
 export async function stop(calls: Calls, { runId }: RpcParams<"runs.interrupt">): Promise<void> {
   const threadId = threadOf(runId);
-  calls.row(threadId);
-  await calls.session.request(ROUTES.stop(threadId));
+  await calls.on(threadId).request(ROUTES.stop(threadId));
   await calls.refresh();
 }
 
@@ -120,8 +121,9 @@ export async function stop(calls: Calls, { runId }: RpcParams<"runs.interrupt">)
  * be refused like a send; it then stays open.
  */
 export async function answer(calls: Calls, params: RpcParams<"approvals.resolve">): Promise<void> {
-  const row = calls.row(threadOf(params.runId));
-  const reply = await calls.session.request(ROUTES.answer(params.approvalId), { decision: params.decision, ...(params.answers && { answers: params.answers }) });
+  const threadId = threadOf(params.runId);
+  const row = calls.row(threadId);
+  const reply = await calls.on(threadId).request(ROUTES.answer(params.approvalId), { decision: params.decision, ...(params.answers && { answers: params.answers }) });
   if (!reply.answered) return refuse(calls, reply.refusal, turnSettings(row, undefined));
   await calls.refresh();
 }
@@ -129,13 +131,13 @@ export async function answer(calls: Calls, params: RpcParams<"approvals.resolve"
 /**
  * threads.ready: the person is about to write. The thread's machine wakes and its agent starts waiting, so the message
  * finds it running. At most once a minute per thread, never for a working thread, which is ready already, and never
- * for one the account says cannot start a turn with these settings.
+ * for one the account says cannot start a turn with these settings, or a teammate's, which the person only reads.
  */
 export async function ready(calls: Calls, readied: Map<string, number>, { id, settings }: RpcParams<"threads.ready">): Promise<void> {
   const row = calls.row(id);
   if (settings?.agent && !isHostedAgent(settings.agent)) return;
-  if (row.status === "working" || hostedSendBlock(calls.account(), turnSettings(row, settings as TurnSettings | undefined), false)) return;
+  if (row.status === "working" || calls.readOnly(id) || hostedSendBlock(calls.account(), turnSettings(row, settings as TurnSettings | undefined), false)) return;
   if (calls.now() - (readied.get(id) ?? Number.NEGATIVE_INFINITY) < READY_AGAIN_MS) return;
   readied.set(id, calls.now());
-  await calls.session.request(ROUTES.ready(id), settings ? { settings } : {});
+  await calls.on(id).request(ROUTES.ready(id), settings ? { settings } : {});
 }

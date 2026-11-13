@@ -46,7 +46,7 @@ describe("the account", () => {
   it("says a wrong code is wrong in the server's words and keeps nothing", async () => {
     const { account } = await host();
     await account.sendCode(ADA);
-    await expect(account.signIn(ADA, "000000")).rejects.toThrow("Invalid OTP");
+    await expect(account.signIn(ADA, "000000")).rejects.toThrow("That code isn't right. Check the email and type it again.");
     expect(account.status()).toMatchObject({ state: "signed-out" });
     expect(device).toMatchObject({ stored: null, kept: null, threads: null });
   });

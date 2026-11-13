@@ -2,11 +2,13 @@
  * Hosted threads behind the app's own calls: the `HostedThreads` of index.ts.
  *
  * State, written only here and only from what the server answered:
- *   heard   the account's thread rows and its projects, with the address they were read for and when. Kept through
- *           `deps.kept("threads")`, so rows show offline and after a restart, and forgotten on sign-out.
+ *   heard   the thread rows and projects of every space the person is in, each row and project with its space, who
+ *           the person is, the address they were read for and when. Kept through `deps.kept("threads")`, so rows show
+ *           offline and after a restart, and forgotten on sign-out.
  *
  * Each question is one step through it: who owns an id is a lookup in the rows (a run id carries its thread); the
- * sidebar's rows are the rows filtered in memory; one thread is one row. The `threads` topic reads the list again.
+ * sidebar's rows are the rows filtered in memory; one thread is one row, and every request about it is made in its
+ * space (`on`). The `threads`, `projects` and `members` topics read every space again.
  */
 import { harnessShortName, hostedThreadOf, isHostedAgent, type AccountReach, type Project, type RoutedMethod, type RpcParams, type RpcResults, type ThreadSummary } from "@openorc/protocol";
 import { z } from "zod";
@@ -15,9 +17,9 @@ import { READ_LIMIT, type Follower } from "./follow.js";
 import type { Account } from "./account.js";
 import { askNotice, endNotice, noticed } from "./notices.js";
 import * as sends from "./sends.js";
-import { Refused, type Session, type SessionChange } from "./session.js";
-import { CLOUD_PROJECT, listRows, projectPairs, resolvedCount, runsNow, toAppEvent, toRuns, toSummary } from "./translate.js";
-import { ROUTES, SOCKET, wireProject, wireThread, wireTopics, type WireEvent, type WireProject, type WireThread } from "./wire.js";
+import { Refused, type Requests, type Session, type SessionChange } from "./session.js";
+import { CLOUD_PROJECT, listRows, projectPairs, resolvedCount, runsNow, starterOf, toAppEvent, toRuns, toSummary } from "./translate.js";
+import { ROUTES, SOCKET, wireProject, wireThread, wireTopics, type WireEvent, type WireThread } from "./wire.js";
 
 const GONE = "That conversation isn't on OpenOrc Cloud.";
 
@@ -25,7 +27,21 @@ const GONE = "That conversation isn't on OpenOrc Cloud.";
 const kept = z.object({ draft: z.string().nullable().optional() });
 export type KeptHere = z.infer<typeof kept>;
 
-const keptThreads = z.object({ email: z.string(), heardAt: z.number(), rows: z.array(wireThread), projects: z.array(wireProject), here: z.record(z.string(), kept).default({}) });
+/** A row and a project as heard, each with the space it was read in. */
+const heardRow = wireThread.extend({ space: z.string() });
+const heardProject = wireProject.extend({ space: z.string() });
+export type HeardRow = z.infer<typeof heardRow>;
+type HeardProject = z.infer<typeof heardProject>;
+
+/** `me`: the person's own user id, which tells a thread they started from a teammate's; null until a space names it. */
+const keptThreads = z.object({
+  email: z.string(),
+  me: z.string().nullable(),
+  heardAt: z.number(),
+  rows: z.array(heardRow),
+  projects: z.array(heardProject),
+  here: z.record(z.string(), kept).default({}),
+});
 type Heard = z.infer<typeof keptThreads>;
 
 type ThreadsDeps = { session: Session; follower: Follower; account: Pick<Account, "status" | "refused"> } & Pick<HostedDeps, "kept" | "projects" | "push" | "notify" | "now" | "log">;
@@ -162,8 +178,9 @@ export class Threads implements HostedThreads {
 
   constructor(private readonly deps: ThreadsDeps) {
     this.calls = {
-      session: deps.session,
+      on: (threadId) => this.on(threadId),
       row: (threadId) => this.row(threadId),
+      readOnly: (threadId) => starterOf(this.row(threadId), this.#heard?.me ?? null) !== null,
       refresh: () => this.refresh(),
       account: () => deps.account.status(),
       refused: (refusal, settings) => deps.account.refused(refusal, settings),
@@ -172,7 +189,7 @@ export class Threads implements HostedThreads {
     deps.session.onChange((change) => this.#changed(change));
     deps.session.onSocket(SOCKET.changed, (body) => {
       const topics = wireTopics.safeParse(body);
-      if (topics.success && topics.data.topics.some((topic) => topic === "threads" || topic === "projects")) void this.refresh();
+      if (topics.success && topics.data.topics.some((topic) => topic === "threads" || topic === "projects" || topic === "members")) void this.refresh();
     });
   }
 
@@ -245,9 +262,9 @@ export class Threads implements HostedThreads {
     if (agent && !isHostedAgent(agent)) throw new Refused(`${harnessShortName(agent)} doesn't run on OpenOrc Cloud.`);
     const settings = defined({ agent, model, effort, mode, permissionMode });
     if (title !== undefined || Object.keys(settings).length)
-      this.#hearRow(await this.deps.session.request(ROUTES.update(threadId), { ...(title !== undefined && { title }), ...(Object.keys(settings).length && { settings }) }));
+      this.#hearRow(await this.on(threadId).request(ROUTES.update(threadId), { ...(title !== undefined && { title }), ...(Object.keys(settings).length && { settings }) }));
     const mine = defined({ pinned, archived, snoozedUntil: snoozedUntil === undefined ? undefined : isoOf(snoozedUntil), seenSeq: seen === undefined ? undefined : seenUpTo(row, seen) });
-    if (Object.keys(mine).length) this.#hearRow(await this.deps.session.request(ROUTES.mine(threadId), mine));
+    if (Object.keys(mine).length) this.#hearRow(await this.on(threadId).request(ROUTES.mine(threadId), mine));
     if (draft !== undefined) {
       const heard = this.#heard!;
       heard.here[threadId] = { draft };
@@ -259,8 +276,7 @@ export class Threads implements HostedThreads {
 
   /** threads.delete: the thread leaves OpenOrc Cloud, as its maker or a space's admin may ask; the server says who may not. */
   async remove(threadId: string): Promise<null> {
-    this.row(threadId);
-    await this.deps.session.request(ROUTES.remove(threadId));
+    await this.on(threadId).request(ROUTES.remove(threadId));
     const heard = this.#heard;
     if (heard) {
       heard.rows = heard.rows.filter((row) => row.id !== threadId);
@@ -271,20 +287,25 @@ export class Threads implements HostedThreads {
     return null;
   }
 
-  /** A row the server just answered for a write, in place of the one heard. */
+  /** A row the server just answered for a write, in place of the one heard, in the same space. */
   #hearRow(row: WireThread): void {
     const heard = this.#heard;
     if (!heard) return;
-    heard.rows = heard.rows.map((each) => (each.id === row.id ? row : each));
+    heard.rows = heard.rows.map((each) => (each.id === row.id ? { ...row, space: each.space } : each));
     this.deps.kept.save("threads", JSON.stringify(heard));
     this.#tell();
   }
 
   /** One row, or a rejection in words when the account no longer has it. */
-  row(threadId: string): WireThread {
+  row(threadId: string): HeardRow {
     const row = this.#rows().get(threadId);
     if (!row) throw new Error(GONE);
     return row;
+  }
+
+  /** Requests about a thread, made in its space; a rejection in words when the account no longer has it. */
+  on(threadId: string): Requests {
+    return this.deps.session.in(this.row(threadId).space);
   }
 
   summary(threadId: string): ThreadSummary {
@@ -300,13 +321,14 @@ export class Threads implements HostedThreads {
   async page(params: RpcParams<"events.page">): Promise<RpcResults["events.page"]> {
     const threadId = this.#threadOf(params.runId);
     const row = this.row(threadId);
+    const space = this.on(threadId);
     await this.deps.follower.follow(threadId);
     let fromTurn = params.fromTurn ?? 0;
     if (params.fromTurn === undefined && params.turns !== undefined) {
-      const detail = await this.deps.session.request(ROUTES.thread(threadId));
+      const detail = await space.request(ROUTES.thread(threadId));
       fromTurn = Math.max(0, detail.turnEnds.length - params.turns);
     }
-    const first = await this.deps.session.request(ROUTES.events(threadId, { fromTurn }, READ_LIMIT));
+    const first = await space.request(ROUTES.events(threadId, { fromTurn }, READ_LIMIT));
     const events = await this.#readOn(threadId, first.events, first.head);
     return { events: events.map((event) => toAppEvent(threadId, event)), fromTurn: first.fromTurn ?? fromTurn, live: runsNow(row, this.reach) };
   }
@@ -314,17 +336,16 @@ export class Threads implements HostedThreads {
   /** Every event of the run after a seq of its log. */
   async eventsAfter(runId: string, after: number): Promise<RpcResults["events.listForRun"]> {
     const threadId = this.#threadOf(runId);
-    this.row(threadId);
+    const space = this.on(threadId);
     await this.deps.follower.follow(threadId);
-    const first = await this.deps.session.request(ROUTES.events(threadId, { after }, READ_LIMIT));
+    const first = await space.request(ROUTES.events(threadId, { after }, READ_LIMIT));
     const events = await this.#readOn(threadId, first.events, first.head);
     return events.map((event) => toAppEvent(threadId, event));
   }
 
   /** Stops one command the agent left running in the background, as the Stop beside it on this Mac does. */
   async stopCommand(threadId: string, commandId: string): Promise<null> {
-    this.row(threadId);
-    await this.deps.session.request(ROUTES.stopCommand(threadId, commandId));
+    await this.on(threadId).request(ROUTES.stopCommand(threadId, commandId));
     void this.refresh();
     return null;
   }
@@ -334,7 +355,7 @@ export class Threads implements HostedThreads {
     let read = events;
     let all = events;
     while (read.length === READ_LIMIT && (all.at(-1)?.seq ?? head) < head) {
-      read = (await this.deps.session.request(ROUTES.events(threadId, { after: all.at(-1)!.seq }, READ_LIMIT))).events;
+      read = (await this.on(threadId).request(ROUTES.events(threadId, { after: all.at(-1)!.seq }, READ_LIMIT))).events;
       all = [...all, ...read];
     }
     return all;
@@ -347,8 +368,8 @@ export class Threads implements HostedThreads {
   }
 
   /**
-   * Reads the list and the projects again. One read at a time; asks while one runs fold into one more after it. The
-   * windows hear `threads` when anything differs. A failed read keeps what was heard.
+   * Reads the person's spaces, then each space's threads and projects, again. One read at a time; asks while one runs
+   * fold into one more after it. The windows hear `threads` when anything differs. A failed read keeps what was heard.
    */
   refresh(): Promise<void> {
     if (!this.#reading) {
@@ -366,9 +387,9 @@ export class Threads implements HostedThreads {
   async #read(): Promise<void> {
     const state = this.deps.session.state;
     if (!state.signedIn) return;
-    let answers: [{ threads: WireThread[] }, WireProject[]];
+    let read: Pick<Heard, "me" | "rows" | "projects">;
     try {
-      answers = await Promise.all([this.deps.session.request(ROUTES.threads), this.deps.session.request(ROUTES.projects)]);
+      read = await this.#readSpaces();
     } catch (error) {
       this.deps.log.warn(`OpenOrc Cloud threads: ${error instanceof Error ? error.message : String(error)}`);
       return;
@@ -376,28 +397,42 @@ export class Threads implements HostedThreads {
     const now = this.deps.session.state;
     if (this.#closed || !now.signedIn || now.email !== state.email) return;
     const before = JSON.stringify([this.#heard?.rows, this.#heard?.projects]);
-    if (this.#heard?.email === state.email) this.#tellPerson(this.#heard.rows, answers[0].threads);
-    this.#heard = { email: state.email, heardAt: this.deps.now(), rows: answers[0].threads, projects: answers[1], here: this.#heard?.email === state.email ? this.#heard.here : {} };
+    if (this.#heard?.email === state.email) this.#tellPerson(this.#heard.rows, read.rows);
+    this.#heard = { email: state.email, heardAt: this.deps.now(), ...read, here: this.#heard?.email === state.email ? this.#heard.here : {} };
     this.deps.kept.save("threads", JSON.stringify(this.#heard));
     if (JSON.stringify([this.#heard.rows, this.#heard.projects]) !== before) this.#tell();
+  }
+
+  /** Every space's threads and projects, each tagged with its space, and the person's own id from their personal space. */
+  async #readSpaces(): Promise<Pick<Heard, "me" | "rows" | "projects">> {
+    const spaces = await this.deps.session.request(ROUTES.spaces);
+    const read = await Promise.all(
+      spaces.map(async ({ id }) => {
+        const space = this.deps.session.in(id);
+        const [threads, projects] = await Promise.all([space.request(ROUTES.threads), space.request(ROUTES.projects)]);
+        return { rows: threads.threads.map((row) => ({ ...row, space: id })), projects: projects.map((project) => ({ ...project, space: id })) };
+      }),
+    );
+    return { me: spaces.find((space) => space.personalOf)?.personalOf ?? null, rows: read.flatMap((each) => each.rows), projects: read.flatMap((each) => each.projects) };
   }
 
   /**
    * What the person hears of the rows that moved since the last listing: a new ask, or a turn that ended. A turn that
    * ends also wakes a snoozed thread, as on this Mac.
    */
-  #tellPerson(before: readonly WireThread[], after: readonly WireThread[]): void {
+  #tellPerson(before: readonly HeardRow[], after: readonly HeardRow[]): void {
     for (const { row, was } of noticed(before, after)) {
       if (was === "ask") {
         this.deps.notify(askNotice(row));
         continue;
       }
+      const space = this.deps.session.in(row.space);
       if (row.snoozedUntil)
-        void this.deps.session.request(ROUTES.mine(row.id), { snoozedUntil: null }).then(
+        void space.request(ROUTES.mine(row.id), { snoozedUntil: null }).then(
           (woke) => this.#hearRow(woke),
           () => undefined,
         );
-      void endNotice(this.deps.session, row).then(
+      void endNotice(space, row).then(
         (notice) => notice && this.deps.notify(notice),
         (error: unknown) => this.deps.log.warn(`OpenOrc Cloud notice: ${error instanceof Error ? error.message : String(error)}`),
       );
@@ -427,11 +462,11 @@ export class Threads implements HostedThreads {
     this.deps.push({ type: "invalidate", keys: ["threads", "runs"] });
   }
 
-  #rows(): Map<string, WireThread> {
+  #rows(): Map<string, HeardRow> {
     return new Map((this.#heard?.rows ?? []).map((row) => [row.id, row]));
   }
 
-  #cloudProject(id: string): WireProject | null {
+  #cloudProject(id: string): HeardProject | null {
     if (!id.startsWith(CLOUD_PROJECT)) return null;
     return this.#heard?.projects.find((project) => CLOUD_PROJECT + project.id === id) ?? null;
   }
@@ -446,7 +481,14 @@ export class Threads implements HostedThreads {
       const pair = row.projectId ? pairs.get(row.projectId) : undefined;
       const projectId = pair?.macId ?? CLOUD_PROJECT + (row.projectId ?? "none");
       const here = heard.here[row.id];
-      const summary = toSummary(row, { projectId, orphanOf: pair?.macId ? null : (pair?.name ?? "OpenOrc Cloud"), reach: state.reach, heardAt: heard.heardAt, now: this.deps.now() });
+      const summary = toSummary(row, {
+        projectId,
+        orphanOf: pair?.macId ? null : (pair?.name ?? "OpenOrc Cloud"),
+        reach: state.reach,
+        heardAt: heard.heardAt,
+        startedBy: starterOf(row, heard.me),
+        now: this.deps.now(),
+      });
       return here?.draft ? { ...summary, draft: here.draft } : summary;
     });
   }

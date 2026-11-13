@@ -120,8 +120,9 @@ export interface Hosted {
 export function createHosted(deps: HostedDeps): Hosted {
   const session = new Session(deps);
   const account = new Account({ session, kept: deps.kept, push: deps.push, now: deps.now, mintClaudeToken: deps.mintClaudeToken });
-  const follower = new Follower({ session, push: deps.push, log: deps.log });
-  const threads = new Threads({ session, follower, account, kept: deps.kept, projects: deps.projects, push: deps.push, notify: deps.notify, now: deps.now, log: deps.log });
+  // The follower reads a thread's log in the thread's space, which the rows know.
+  const follower: Follower = new Follower({ session, on: (threadId) => threads.on(threadId), push: deps.push, log: deps.log });
+  const threads: Threads = new Threads({ session, follower, account, kept: deps.kept, projects: deps.projects, push: deps.push, notify: deps.notify, now: deps.now, log: deps.log });
   return {
     account,
     threads,

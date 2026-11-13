@@ -9,6 +9,8 @@
  *   every signed-in route answers 401 without `Authorization: Bearer <that token>`
  *   the socket takes the token in its handshake's `auth` and refuses any other with `UNAUTHORIZED`
  *   `revoke()` ends every session, so the next request answers 401, while a socket already open stays open
+ *   a request naming a protocol older than the oldest it answers is 426 with words to update OpenOrc
+ *   a refused code is said in OpenOrc's words, as the real server's library-refusals.ts says it
  */
 import { createHmac, randomBytes, randomInt, randomUUID } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -16,6 +18,7 @@ import type { AddressInfo, Socket } from "node:net";
 import type { LiveSocket } from "../index.js";
 import { engineSession } from "./stand-in-socket.js";
 import { StandInSignIns } from "./stand-in-sign-ins.js";
+import { StandInSpaces } from "./stand-in-spaces.js";
 import { StandInThreads, type Admit, type StandInPeer, type StandInThreadSeed } from "./stand-in-threads.js";
 
 export interface StandIn {
@@ -38,9 +41,11 @@ export interface StandIn {
   requests: { method: string; path: string; authorized: boolean }[];
   /** A socket held in this process under the same rules as the WebSocket one, for packages without a socket client. */
   connect(url: string, token: string): LiveSocket;
-  /** A project of the person's space, for a GitHub repository `owner/name`. Answers its id. */
-  addProject(email: string, project: { name: string; fullName: string }): string;
-  /** A thread the person started. Answers its id. */
+  /** A team of these people, the first its admin. Answers the space's id. */
+  addTeam(name: string, members: string[]): string;
+  /** A project for a GitHub repository `owner/name`, in the person's personal space or the space named. Answers its id. */
+  addProject(email: string, project: { name: string; fullName: string }, space?: string): string;
+  /** A thread the person started, in its project's space. Answers its id. */
   addThread(email: string, seed: StandInThreadSeed): string;
   /** Stores events in a thread's log and sends them to its watchers, unless `quiet` (a frame lost on the way). */
   append(threadId: string, events: Record<string, unknown>[], options?: { by?: string; quiet?: boolean }): void;
@@ -62,6 +67,8 @@ export interface StandIn {
   readies: { threadId: string; settings: unknown }[];
   /** Every message body posted, in order. */
   sent: { threadId: string; body: Record<string, unknown> }[];
+  /** Every POST /hosted/threads body, in order, with the space it was made in. */
+  started: { space: string; body: Record<string, unknown> }[];
   close(): Promise<void>;
 }
 
@@ -77,6 +84,14 @@ export interface StandInSignIn {
 export type StandInBilling = { pro: false } | { pro: true; standing: "live" | "ending" | "grace"; at: string; monthlyLeftSeconds: number | null; packsLeftSeconds: number };
 
 const NOT_INVITED = "This email doesn't belong to any organization yet.";
+/** The real server's words for a refused code, by the code its auth library names. */
+const CODE_REFUSALS = {
+  INVALID_OTP: "That code isn't right. Check the email and type it again.",
+  OTP_EXPIRED: "That code has expired. Send yourself a new one.",
+  TOO_MANY_ATTEMPTS: "That code was tried too many times. Send yourself a new one.",
+} as const;
+const APP_TOO_OLD = "This version of OpenOrc is too old for OpenOrc Cloud. Update OpenOrc to keep using it.";
+const OLDEST_APP_PROTOCOL = 1;
 const CODE_MS = 5 * 60_000;
 const CODE_TRIES = 3;
 const MONTH_SECONDS = 40 * 3600;
@@ -146,18 +161,18 @@ function accounts(options: StandInOptions) {
     "POST /api/auth/sign-in/email-otp": (body) => {
       const email = String(body["email"] ?? "").toLowerCase();
       const sent = codes.get(email);
-      if (!sent) return { status: 400, body: { code: "INVALID_OTP", message: "Invalid OTP" } };
+      if (!sent) return codeRefused(400, "INVALID_OTP");
       if (Date.now() - sent.at > CODE_MS) {
         codes.delete(email);
-        return { status: 400, body: { code: "OTP_EXPIRED", message: "OTP expired" } };
+        return codeRefused(400, "OTP_EXPIRED");
       }
       if (sent.tries >= CODE_TRIES) {
         codes.delete(email);
-        return { status: 403, body: { code: "TOO_MANY_ATTEMPTS", message: "Too many attempts" } };
+        return codeRefused(403, "TOO_MANY_ATTEMPTS");
       }
       if (body["otp"] !== sent.code) {
         sent.tries++;
-        return { status: 400, body: { code: "INVALID_OTP", message: "Invalid OTP" } };
+        return codeRefused(400, "INVALID_OTP");
       }
       codes.delete(email);
       const id = randomUUID().replaceAll("-", "");
@@ -205,7 +220,8 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
   const connections = new Set<Socket>();
   const peers = new Set<Peer>();
   const sockets = new Set<StandInPeer>();
-  const hosted = new StandInThreads(() => [...[...peers].filter((peer) => !peer.waiting), ...sockets], admitTurn);
+  const spaces = new StandInSpaces();
+  const hosted = new StandInThreads(() => [...[...peers].filter((peer) => !peer.waiting), ...sockets], admitTurn, spaces);
   const signInWrites = new StandInSignIns(signIns);
   const socketAnswers: Record<string, (peer: StandInPeer, body: unknown) => unknown> = {
     "hosted:watch": (peer, body) => hosted.watch(peer, body),
@@ -213,7 +229,6 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
   };
   const answerSocket = (peer: StandInPeer, event: string, body: unknown) => socketAnswers[event]?.(peer, body) ?? { ok: false };
   let serving = true;
-  const bearer = (request: IncomingMessage) => /^bearer (.+)$/i.exec(request.headers.authorization ?? "")?.[1]?.trim() ?? null;
 
   const server = createServer((request, response) => void answer(request, response));
   server.on("connection", (socket) => {
@@ -223,28 +238,21 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
   server.on("upgrade", (request, socket) => {
     requests.push({ method: "GET", path: SOCKET_PATH, authorized: false });
     if (!request.url?.startsWith(SOCKET_PATH)) return void socket.destroy();
+    if (tooOld(request.headers["x-openorc-protocol"])) return void socket.destroy();
     engineSession(request, socket as Socket, { holder, joined: (peer) => sockets.add(peer), left: (peer) => sockets.delete(peer), answer: answerSocket });
   });
 
   async function answer(request: IncomingMessage, response: ServerResponse): Promise<void> {
-    const token = bearer(request);
-    const url = new URL(request.url ?? "/", "http://stand-in");
-    const path = url.pathname;
-    requests.push({ method: request.method ?? "GET", path, authorized: holder(token) !== null });
-    const chunks: Buffer[] = [];
-    for await (const chunk of request) chunks.push(chunk as Buffer);
-    const text = Buffer.concat(chunks).toString("utf8");
-    const route = routes[`${request.method} ${path}`];
+    const { method, path, query, body, token, space } = await asked(request);
     const who = holder(token);
-    const body = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+    requests.push({ method, path, authorized: who !== null });
+    const route = routes[`${method} ${path}`];
     const signedInRoute = (): Reply | null => {
-      if (who) return signInWrites.route(request.method ?? "GET", path, who, body) ?? hosted.route(request.method ?? "GET", path, url.searchParams, who, body);
-      return /^\/(projects|hosted|agent-sign-ins)\b/.test(path) ? unauthorized() : null;
+      if (who) return signInWrites.route(method, path, who, body) ?? hosted.route({ method, path, query, space }, who, body);
+      return /^\/(projects|hosted|agent-sign-ins|api\/auth\/organization)\b/.test(path) ? unauthorized() : null;
     };
-    const reply: Reply = (route ? route(body, token) : signedInRoute()) ?? {
-      status: 404,
-      body: { message: `Cannot ${request.method} ${path}`, error: "Not Found", statusCode: 404 },
-    };
+    const old = tooOld(request.headers["x-openorc-protocol"]) ? { status: 426, body: { statusCode: 426, message: APP_TOO_OLD } } : null;
+    const reply: Reply = old ?? (route ? route(body, token) : signedInRoute()) ?? { status: 404, body: { message: `Cannot ${method} ${path}`, error: "Not Found", statusCode: 404 } };
     response.writeHead(reply.status, { "content-type": "application/json", ...(reply.token && { "set-auth-token": reply.token, "access-control-expose-headers": "set-auth-token" }) });
     response.end(reply.body === null && reply.status !== 200 ? undefined : JSON.stringify(reply.body));
   }
@@ -266,6 +274,12 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
     setPerson: (email, person) => void people.set(email.toLowerCase(), person),
     sandboxes,
     ...threadsFace(hosted),
+    addTeam: (name, members) =>
+      spaces.addTeam(
+        name,
+        members.map((email) => email.toLowerCase()),
+      ),
+    addProject: (email, project, space) => spaces.addProject(email.toLowerCase(), project, space),
     setSignIns: (email, rows) => void signIns.set(email.toLowerCase(), rows),
     approveDevice: (email) => signInWrites.approveDevice(email.toLowerCase()),
     signInSecrets: signInWrites.secrets,
@@ -352,9 +366,8 @@ function signInRows(rows: readonly StandInSignIn[]) {
 }
 
 /** What a test does to the stand-in's threads, as an agent's host or another person would. */
-function threadsFace(hosted: StandInThreads): Pick<StandIn, "addProject" | "addThread" | "append" | "set" | "stoppedCommands" | "ask" | "endTurn" | "readies" | "sent"> {
+function threadsFace(hosted: StandInThreads): Pick<StandIn, "addThread" | "append" | "set" | "stoppedCommands" | "ask" | "endTurn" | "readies" | "sent" | "started"> {
   return {
-    addProject: (email, project) => hosted.addProject(email.toLowerCase(), project),
     addThread: (email, seed) => hosted.addThread(email.toLowerCase(), seed),
     append: (threadId, events, options) => hosted.append(threadId, events, options),
     set: (threadId, facts) => hosted.set(threadId, facts),
@@ -363,7 +376,36 @@ function threadsFace(hosted: StandInThreads): Pick<StandIn, "addProject" | "addT
     endTurn: (threadId, status) => hosted.endTurn(threadId, status),
     readies: hosted.readies,
     sent: hosted.sent,
+    started: hosted.started,
   };
+}
+
+/** What a request asks: its method, path and query, its body, its bearer token and the space it names. */
+async function asked(request: IncomingMessage) {
+  const url = new URL(request.url ?? "/", "http://stand-in");
+  const chunks: Buffer[] = [];
+  for await (const chunk of request) chunks.push(chunk as Buffer);
+  const text = Buffer.concat(chunks).toString("utf8");
+  const named = request.headers["x-openorc-space"];
+  return {
+    method: request.method ?? "GET",
+    path: url.pathname,
+    query: url.searchParams,
+    body: text ? (JSON.parse(text) as Record<string, unknown>) : {},
+    token: /^bearer (.+)$/i.exec(request.headers.authorization ?? "")?.[1]?.trim() ?? null,
+    space: typeof named === "string" ? named : null,
+  };
+}
+
+/** Whether a protocol header names a version older than the oldest the server answers, or one it cannot read. None is not an app's. */
+function tooOld(named: string | string[] | undefined): boolean {
+  if (named === undefined) return false;
+  const version = Number(named);
+  return !Number.isInteger(version) || version < OLDEST_APP_PROTOCOL;
+}
+
+function codeRefused(status: number, code: keyof typeof CODE_REFUSALS): Reply {
+  return { status, body: { code, message: CODE_REFUSALS[code] } };
 }
 
 function unauthorized(): Reply {

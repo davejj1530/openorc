@@ -18,7 +18,7 @@
  */
 import { hostedRunId } from "@openorc/protocol";
 import type { HostedDeps } from "./index.js";
-import type { Session } from "./session.js";
+import type { Requests, Session } from "./session.js";
 import { toFrame } from "./translate.js";
 import { ROUTES, SOCKET, wireChange, wireFrame, wireWatched, type WireEvent } from "./wire.js";
 
@@ -34,7 +34,8 @@ export class Follower {
   readonly #held = new Map<string, WireEvent[][]>();
   readonly #healing = new Map<string, Promise<void>>();
 
-  constructor(private readonly deps: { session: Session } & Pick<HostedDeps, "push" | "log">) {
+  /** `on`: requests about a thread, in its space. */
+  constructor(private readonly deps: { session: Session; on(threadId: string): Requests } & Pick<HostedDeps, "push" | "log">) {
     deps.session.onSocket(SOCKET.events, (body) => this.#onFrame(body));
     deps.session.onSocket(SOCKET.threadChanged, (body) => this.#onChanged(body));
     deps.session.onChange((change) => {
@@ -130,7 +131,7 @@ export class Follower {
       for (;;) {
         const after = this.#cursors.get(threadId);
         if (after === undefined) return;
-        const page = await this.deps.session.request(ROUTES.events(threadId, { after }, READ_LIMIT));
+        const page = await this.deps.on(threadId).request(ROUTES.events(threadId, { after }, READ_LIMIT));
         this.#hand(threadId, page.events);
         if (page.events.length < READ_LIMIT || (this.#cursors.get(threadId) ?? 0) >= page.head) return;
       }

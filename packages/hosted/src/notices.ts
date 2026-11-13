@@ -4,7 +4,7 @@
  * every thread of the account is covered without watching each one; a turn's reply is read from the end of its log.
  */
 import { harnessShortName, hostedRunId, type CorePush } from "@openorc/protocol";
-import type { Session } from "./session.js";
+import type { Requests } from "./session.js";
 import { toAppEvent } from "./translate.js";
 import { ROUTES, type WireThread } from "./wire.js";
 
@@ -17,9 +17,9 @@ const TAIL = 40;
 const runs = (row: WireThread) => row.turn !== null || row.status === "working";
 
 /** What changed between two listings that the person hears of: a new ask, or a turn that ended with nothing waiting. */
-export function noticed(before: readonly WireThread[], after: readonly WireThread[]): { row: WireThread; was: "ask" | "ended" }[] {
+export function noticed<Row extends WireThread>(before: readonly Row[], after: readonly Row[]): { row: Row; was: "ask" | "ended" }[] {
   const old = new Map(before.map((row) => [row.id, row]));
-  return after.flatMap((row): { row: WireThread; was: "ask" | "ended" }[] => {
+  return after.flatMap((row): { row: Row; was: "ask" | "ended" }[] => {
     const was = old.get(row.id);
     if (!was) return [];
     if (row.ask && row.ask.id !== was.ask?.id) return [{ row, was: "ask" }];
@@ -40,8 +40,8 @@ export function askNotice(row: WireThread): HostedNotice {
 }
 
 /** The notice for a turn that ended: finished with its reply, or failed; none for a turn the person stopped. */
-export async function endNotice(session: Session, row: WireThread): Promise<HostedNotice | null> {
-  const tail = await session.request(ROUTES.events(row.id, { before: row.head + 1 }, TAIL));
+export async function endNotice(space: Requests, row: WireThread): Promise<HostedNotice | null> {
+  const tail = await space.request(ROUTES.events(row.id, { before: row.head + 1 }, TAIL));
   const events = tail.events.map((event) => toAppEvent(row.id, event));
   const end = events.findLast((event) => event.type === "turn.completed");
   if (end?.type !== "turn.completed" || end.status === "cancelled") return null;

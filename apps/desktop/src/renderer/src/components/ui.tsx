@@ -2,11 +2,14 @@ import {
   createContext,
   forwardRef,
   useContext,
+  useLayoutEffect,
+  useRef,
   useState,
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
   type ReactElement,
   type ReactNode,
+  type RefObject,
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from "react";
@@ -145,16 +148,66 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<H
   return <textarea ref={ref} className={cn(fieldBase, "block w-full px-3 py-2 resize-none", fieldShapes[variant], variant === "sheet" && "py-2.5", className)} {...props} />;
 });
 
-export function Select({ className, children, variant = "inline", ...props }: SelectHTMLAttributes<HTMLSelectElement> & { variant?: FieldVariant }) {
+/**
+ * The text of every option, read from the rendered select so options a child component draws count too, and kept
+ * current as they change. Each change also has the closed select copy its chosen option again: `<selectedcontent>`
+ * copies it only when the choice changes, so text rewritten in place would otherwise stay stale.
+ */
+function useOptionLabels(select: RefObject<HTMLSelectElement | null>, button: RefObject<HTMLButtonElement | null>): string[] {
+  const [labels, setLabels] = useState<string[]>([]);
+  useLayoutEffect(() => {
+    const element = select.current;
+    if (!element) return;
+    const sync = () => {
+      // Choosing the chosen option again copies it afresh, and fires no change event.
+      element.selectedIndex = element.selectedIndex;
+      const next = Array.from(element.options, (option) => option.text);
+      setLabels((current) => (current.length === next.length && current.every((label, index) => label === next[index]) ? current : next));
+    };
+    sync();
+    // The button holds the copy and the labels, which change in answer to this.
+    const observer = new MutationObserver((records) => {
+      if (records.some((record) => !button.current?.contains(record.target))) sync();
+    });
+    observer.observe(element, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
+  }, [select, button]);
+  return labels;
+}
+
+export function Select({ className, children, variant = "inline", onKeyDown, ...props }: SelectHTMLAttributes<HTMLSelectElement> & { variant?: FieldVariant }) {
+  const select = useRef<HTMLSelectElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const labels = useOptionLabels(select, button);
   return (
     <select
-      className={cn(fieldBase, "max-w-full pl-3 pr-7 appearance-none bg-no-repeat", fieldShapes[variant], variant === "sheet" ? "h-10" : "h-8", className)}
+      ref={select}
+      className={cn(fieldBase, "max-w-full pl-3 pr-7 appearance-none bg-no-repeat open:bg-surface-3", fieldShapes[variant], variant === "sheet" ? "h-10" : "h-8", className)}
       style={{
         backgroundImage: `url("${selectChevron}")`,
         backgroundPosition: "right 10px center",
       }}
+      onKeyDown={(event) => {
+        // The list drawn in the page lets keys rise past it, where the native one kept them. Escape closes the list,
+        // and must not go on to close a dialog or popover that holds the select.
+        if (event.key === "Escape" && event.currentTarget.matches(":open")) event.stopPropagation();
+        onKeyDown?.(event);
+      }}
       {...props}
     >
+      {/* Where the list is drawn in the page (styles/controls.css), the closed select shows this instead of the
+          option's text: the chosen option, over every label laid in the same cell, so it keeps the width of
+          the longest as the native control does. macOS never draws it. */}
+      <button ref={button} type="button" className="select-button">
+        <span className="select-value">
+          <selectedcontent />
+          {labels.map((label, index) => (
+            <span key={index} aria-hidden="true">
+              {label}
+            </span>
+          ))}
+        </span>
+      </button>
       {children}
     </select>
   );

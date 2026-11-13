@@ -303,3 +303,85 @@ label:has(input:is([type="checkbox"], [type="radio"]):focus-visible) {
 .scroll-edges-x[data-more-start][data-more-end] {
   mask-image: linear-gradient(to right, transparent, #000 16px, #000 calc(100% - 16px), transparent);
 }
+
+/* A select's list on Windows and Linux. Chromium draws it there in a window of its own that takes
+   nothing but the options' colors, so there the list is drawn in the page (a customizable select)
+   and dressed as the menu macOS draws natively: a translucent blurred plane with a hairline edge
+   (and a dark outer one in dark mode), a check column, and the accent under the pointer. macOS
+   keeps its own.
+   The closed select keeps its look, through the button Select renders as its first child. */
+:root {
+  /* The plane, read here so a card's retint below never reaches it. --surface is opaque in every
+     palette and custom color; --surface-2 is a see-through ink fill. */
+  --select-list-fill: var(--surface);
+}
+:root:is([data-platform="win32"], [data-platform="linux"]) select:not([multiple], [size]) {
+  appearance: base-select;
+  align-items: center;
+  padding-block: 0;
+  white-space: nowrap;
+  /* Chromium dims a disabled select only while it draws the native control; the in-page one fades a
+     text color the field's ink overrides. Dim it as macOS does. */
+  &:disabled {
+    opacity: 0.7;
+  }
+  &::picker(select) {
+    appearance: base-select;
+    margin-block: 4px;
+    padding: 5px;
+    border: 1px solid light-dark(color-mix(in srgb, var(--ink) 12%, transparent), color-mix(in srgb, var(--ink) 30%, transparent));
+    border-radius: var(--radius-lg);
+    background: color-mix(in srgb, var(--select-list-fill) 85%, transparent);
+    backdrop-filter: blur(24px) saturate(1.6);
+    box-shadow:
+      0 0 0 0.5px light-dark(transparent, rgb(0 0 0 / 0.8)),
+      var(--shadow-overlay);
+    color: var(--ink);
+    -webkit-app-region: no-drag;
+    @media (prefers-reduced-transparency: reduce) {
+      background: var(--select-list-fill);
+      backdrop-filter: none;
+    }
+  }
+  & option {
+    padding-inline: 4px 12px;
+    gap: 5px;
+    border-radius: var(--radius-sm);
+    color: var(--ink);
+  }
+  /* One row takes the accent: the one under the pointer, else the one the keyboard is on. */
+  & option:enabled:hover,
+  &:not(:has(option:hover)) option:enabled:focus-visible {
+    background-color: var(--accent);
+    color: var(--accent-fg);
+  }
+  & option:disabled {
+    color: var(--ink-4);
+  }
+  /* A group's label is a muted heading over its options, in the interface's one weight. */
+  & optgroup {
+    color: var(--ink-3);
+    font-weight: inherit;
+  }
+}
+/* Select draws its own chevron as a background. */
+:root:is([data-platform="win32"], [data-platform="linux"]) select::picker-icon {
+  display: none;
+}
+.select-button {
+  all: unset;
+  display: contents;
+}
+.select-value {
+  display: grid;
+  min-width: 0;
+}
+.select-value > * {
+  grid-area: 1 / 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.select-value > [aria-hidden="true"] {
+  visibility: hidden;
+}

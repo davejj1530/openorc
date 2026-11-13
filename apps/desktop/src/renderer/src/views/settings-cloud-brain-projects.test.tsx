@@ -151,7 +151,7 @@ it("opens the sheet for the project a new thread's Cloud choice asked to add, on
   useRouter.setState({ route: { view: "settings", section: "cloud", project: "p3" } });
   show([project("p1", "app"), project("p2", "site", { on: true }), project("p3", "docs")]);
   expect(await screen.findByRole("heading", { name: "Add docs to the cloud brain" })).toBeTruthy();
-  fireEvent.click(within(sheet()).getByRole("button", { name: "Cancel" }));
+  fireEvent.click(await within(sheet()).findByRole("button", { name: "Cancel" }));
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   await new Promise((resolve) => setTimeout(resolve, 50));
   expect(screen.queryByRole("dialog")).toBeNull();

@@ -30,31 +30,16 @@ interface Annotation {
   comment: ReviewComment | null;
 }
 
-/** A run of added or removed lines reads as one r6 block: its first and last rows round their outer corners. */
-function roundedRuns(type: "change-addition" | "change-deletion"): string {
-  const row = `[data-line-type="${type}"]`;
-  const first = `${row}:not(${row} + *)`;
-  const last = `${row}:not(:has(+ ${row}))`;
-  return `
-  [data-column-number]${first} { border-top-left-radius: 6px; }
-  [data-column-number]${last} { border-bottom-left-radius: 6px; }
-  [data-line]${first} { border-top-right-radius: 6px; }
-  [data-line]${last} { border-bottom-right-radius: 6px; }`;
-}
-
 /**
- * Lines read in the diff's own tones rather than the highlighter's: every line in title ink,
- * added lines on --ok-soft and removed ones on --bad-soft, each run rounded, with 2px between a
- * removed run and the added run that replaces it. app.css sets the type and the line numbers.
+ * Lines read in the diff's own tones rather than the highlighter's: every line in title ink, added lines on
+ * --ok-soft and removed ones on --bad-soft, square runs that meet edge to edge. app.css sets the type and the line
+ * numbers.
  */
 const PLAIN_LINES = `
   [data-line] span { color: inherit; }
   [data-line] { color: var(--ink); }
   :is([data-line], [data-column-number], [data-gutter-buffer])[data-line-type="change-addition"] { background-color: var(--ok-soft); }
   :is([data-line], [data-column-number], [data-gutter-buffer])[data-line-type="change-deletion"] { background-color: var(--bad-soft); }
-  ${roundedRuns("change-addition")}
-  ${roundedRuns("change-deletion")}
-  :is([data-line], [data-column-number])[data-line-type="change-deletion"] + [data-line-type="change-addition"] { margin-top: 2px; }
 `;
 
 /** Lines marked with + and -, in the tones above, without word-level emphasis. */
@@ -70,6 +55,8 @@ function viewerOptions(diffStyle: "unified" | "split", wrap: boolean, theme: str
     themeType: theme === "github-dark" ? "dark" : "light",
     // The fold above carries the filename, the letter and the counts.
     disableFileHeader: true,
+    // Unchanged runs fold to a full-width bar, so the diff stays edge to edge between hunks too.
+    hunkSeparators: "line-info-basic",
     onPostRender: applyDiffIcons,
     enableLineSelection: selectsRanges,
   };

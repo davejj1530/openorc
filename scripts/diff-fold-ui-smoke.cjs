@@ -64,7 +64,9 @@ async function checkUI() {
     const chevron = (p) => `getComputedStyle(${header(p)}.querySelector('svg')).rotate`;
     await pause(300); // the chevron rides transition-transform; read it settled
     assert.equal(await read(chevron("README.md")), "none");
-    assert.equal(await read(`getComputedStyle(${header("README.md")}).borderBottomWidth`), "0px");
+    // Every head is a square row on the ground with a hairline under it, folded or open.
+    assert.equal(await read(`getComputedStyle(${header("README.md")}).borderRadius`), "0px");
+    assert.match(await read(`getComputedStyle(${header("README.md")}).boxShadow`), /inset/);
     await shot("folded-light");
 
     // Opening one mounts that file's code and leaves every other file shut.
@@ -80,10 +82,15 @@ async function checkUI() {
     // The header stays on the scroller's top edge while its file passes under it.
     assert.equal(await read(`getComputedStyle(${header("README.md")}).position`), "sticky");
 
-    // An open fold points its chevron down and rules off its own code.
+    // An open fold points its chevron down, and its first line of code starts right under it, edge to edge.
     await pause(300); // settled, not mid-transition
     assert.equal(await read(chevron("README.md")), "90deg");
-    assert.match(await read(`getComputedStyle(${header("README.md")}).borderBottomWidth`), /^1px$/);
+    const firstLineGap = await read(`(() => {
+      const head = ${header("README.md")};
+      const line = head.closest('section').querySelector('diffs-container').shadowRoot.querySelector('[data-column-number]');
+      return [line.getBoundingClientRect().top - head.getBoundingClientRect().bottom, line.getBoundingClientRect().left - head.getBoundingClientRect().left];
+    })()`);
+    assert.deepEqual(firstLineGap, [0, 0], "code starts flush under its head and at the panel's edge");
 
     // Folding it again drops the code.
     await read(`${header("README.md")}.click()`);

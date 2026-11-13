@@ -850,31 +850,23 @@ body[data-resizing] iframe {
   pointer-events: none;
 }
 
-/* Every file in a patch folds to its own row: a 40px r12 fill head that replaces the diff
-   renderer's own, so the path, the change letter and the two counts read in the app's ink
-   ramp. It stays on the top edge of the scroller while its file passes under it, opaque there:
-   the fill is layered over the column's own ground. */
-.diff-view .diffscroll {
-  padding: 0 10px 10px;
-}
+/* Every file in a patch folds to its own row: a 36px head that replaces the diff renderer's own, so the path, the
+   change letter and the two counts read in the app's ink ramp. The diff fills its panel edge to edge: no inset, no
+   card, no corners and no gaps; each head sits on the ground with a hairline under it, right under the row above it,
+   and its first line of code right under it. It stays on the top edge of the scroller while its file passes under
+   it, opaque there: a hover fill is layered over the ground. */
 .diff-file-header {
   position: sticky;
   top: 0;
   z-index: 1;
-  height: 40px;
-  padding: 0 10px;
-  border-radius: var(--radius-lg);
-  background: linear-gradient(var(--surface-2), var(--surface-2)), var(--bg);
+  height: 36px;
+  padding: 0 16px;
+  background: var(--bg);
+  box-shadow: inset 0 calc(-1 * var(--hairline)) 0 var(--line);
   transition: background-color var(--duration-quick) var(--ease-out);
 }
 .diff-file-header:is(:hover, :focus-visible) {
-  background: linear-gradient(var(--surface-3), var(--surface-3)), var(--bg);
-}
-.diff-file + .diff-file {
-  margin-top: 8px;
-}
-.diff-file-header[aria-expanded="true"] {
-  margin-bottom: 10px;
+  background: linear-gradient(var(--surface-2), var(--surface-2)), var(--bg);
 }
 /* The highlighter paints its theme's own ground, and github-dark's #24292e is a grey slab on a
    near-black column. A declaration on the host outranks the renderer's :host theme rule, so
@@ -886,9 +878,11 @@ diffs-container {
   --diffs-font-family: var(--font-mono);
   --diffs-font-size: var(--text-xs);
   --diffs-line-height: 20px;
+  --diffs-gap-block: 0px;
   --diffs-gap-style: none;
   --diffs-bg-context-override: var(--surface);
   --diffs-bg-context-gutter-override: var(--surface);
+  --diffs-bg-separator-override: var(--surface-2);
   --diffs-fg-number-override: var(--line-number);
   --diffs-fg-number-addition-override: var(--line-number);
   --diffs-fg-number-deletion-override: var(--line-number);

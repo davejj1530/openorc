@@ -1,63 +1,94 @@
 import { Popover } from "@base-ui/react/popover";
 import { Button } from "./ui";
-import { cn } from "../lib/cn";
 import { formatTokens } from "@openorc/client";
 import { CoversPreview } from "../lib/browser-preview";
 import { floatingGround } from "../lib/use-anchor-ground";
 
-const CELLS = 20;
-const RING_RADIUS = 6;
-const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
-
-function ringTone(fraction: number): string | undefined {
-  if (fraction > 0.85) return "text-bad";
-  if (fraction > 0.6) return "text-warn";
+/** How full reads as a warning: warn above 60%, bad above 85%. */
+function fullness(fraction: number): "warn" | "bad" | undefined {
+  if (fraction > 0.85) return "bad";
+  if (fraction > 0.6) return "warn";
   return undefined;
 }
 
-/** How full the conversation is, as a bare ring that opens into the figures. Only the explicit action compacts. */
+const SHARE_RADIUS = 6.5;
+
+/**
+ * An amount at 16px and under: its share filled on a faint disc of its own ink, from the top, clockwise. A filled
+ * share cannot be read as the loader's turning arc.
+ */
+export function AmountShare({ fraction, size = 14 }: { fraction: number; size?: number }) {
+  const share = Math.min(1, Math.max(0, fraction));
+  const angle = share * 2 * Math.PI;
+  const x = 8 + SHARE_RADIUS * Math.sin(angle);
+  const y = 8 - SHARE_RADIUS * Math.cos(angle);
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" aria-hidden="true" className="amount-share">
+      <circle cx="8" cy="8" r={SHARE_RADIUS} fill="currentColor" fillOpacity="0.2" />
+      {share >= 1 ? <circle cx="8" cy="8" r={SHARE_RADIUS} fill="currentColor" /> : null}
+      {share > 0 && share < 1 ? <path d={`M8 8V${8 - SHARE_RADIUS}A${SHARE_RADIUS} ${SHARE_RADIUS} 0 ${share > 0.5 ? 1 : 0} 1 ${x.toFixed(3)} ${y.toFixed(3)}Z`} fill="currentColor" /> : null}
+    </svg>
+  );
+}
+
+const RING_RADIUS = 6.125;
+const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
+
+/** An amount above 16px: the whole faint ring under its share. */
+function AmountRing({ fraction }: { fraction: number }) {
+  return (
+    <svg width="32" height="32" viewBox="0 0 16 16" aria-hidden="true" className="composer-context-ring">
+      <circle className="composer-context-track" cx="8" cy="8" r={RING_RADIUS} fill="none" strokeWidth="1.75" />
+      <circle
+        cx="8"
+        cy="8"
+        r={RING_RADIUS}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeDasharray={`${RING_LENGTH * fraction} ${RING_LENGTH}`}
+        strokeLinecap="round"
+        transform="rotate(-90 8 8)"
+      />
+    </svg>
+  );
+}
+
+/** How full the conversation is: its share beside send, opening into the amount, two facts and the one action. */
 export function ContextUsage({ used, window, onCompact, compacting, disabledReason }: { used: number; window: number | null; onCompact?: () => void; compacting?: boolean; disabledReason?: string }) {
   const fraction = window ? Math.min(1, used / window) : 0;
-  const percent = Math.round(fraction * 100);
-  const filled = Math.round(fraction * CELLS);
+  const tone = fullness(fraction);
   return (
     <Popover.Root>
-      <Popover.Trigger aria-label="Context usage" className={cn("composer-context", ringTone(fraction))} data-tone={ringTone(fraction) ? "alert" : undefined}>
-        {window ? (
-          <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
-            <circle className="composer-context-track" cx="8" cy="8" r={RING_RADIUS} fill="none" strokeWidth="2" />
-            <circle
-              cx="8"
-              cy="8"
-              r={RING_RADIUS}
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeDasharray={`${RING_LENGTH * fraction} ${RING_LENGTH}`}
-              strokeLinecap="round"
-              transform="rotate(-90 8 8)"
-            />
-          </svg>
-        ) : null}
-        <span>{window ? `${percent}%` : formatTokens(used)}</span>
+      <Popover.Trigger aria-label="Context usage" className="composer-context" data-tone={tone}>
+        {window ? <AmountShare fraction={fraction} /> : null}
+        <span className="composer-context-number">{window ? `${Math.round(fraction * 100)}%` : formatTokens(used)}</span>
       </Popover.Trigger>
       <Popover.Portal>
         <CoversPreview />
         <Popover.Positioner side="top" align="end" sideOffset={6} collisionPadding={12}>
           <Popover.Popup ref={floatingGround} className="composer-context-popup composer-float">
-            <div className="composer-context-head">
-              <Popover.Title className="composer-context-title">Context</Popover.Title>
-              <span className="tabular">{window ? `${formatTokens(used)} of ${formatTokens(window)}` : formatTokens(used)}</span>
-            </div>
-            {window ? (
-              <div className="composer-context-cells" aria-hidden="true">
-                {Array.from({ length: CELLS }, (_, index) => (
-                  <span key={index} data-filled={index < filled || undefined} />
-                ))}
+            <Popover.Title className="composer-context-amount">
+              {window ? (
+                <span className="composer-context-ring-wrap" data-tone={tone}>
+                  <AmountRing fraction={fraction} />
+                </span>
+              ) : null}
+              <span className="tabular">
+                {formatTokens(used)}
+                {window ? <span className="composer-context-of"> of {formatTokens(window)}</span> : null}
+              </span>
+            </Popover.Title>
+            <dl className="composer-context-stats">
+              <div>
+                <dt>Used</dt>
+                <dd>{used.toLocaleString()} tokens</dd>
               </div>
-            ) : null}
-            <Popover.Description className="composer-context-note">Context is the messages, instructions, and tool results the model can use in this conversation.</Popover.Description>
-            <ContextFigures used={used} window={window} percent={percent} />
+              <div>
+                <dt>Available</dt>
+                <dd>{window ? `${Math.max(0, window - used).toLocaleString()} tokens` : "Not reported"}</dd>
+              </div>
+            </dl>
             <ContextCompact onCompact={onCompact} compacting={compacting} disabledReason={disabledReason} />
           </Popover.Popup>
         </Popover.Positioner>
@@ -66,48 +97,14 @@ export function ContextUsage({ used, window, onCompact, compacting, disabledReas
   );
 }
 
-function ContextFigures({ used, window, percent }: { used: number; window: number | null; percent: number }) {
-  return (
-    <dl className="composer-context-stats">
-      <div>
-        <dt>Used</dt>
-        <dd>
-          {used.toLocaleString()} tokens{window ? ` (${percent}%)` : ""}
-        </dd>
-      </div>
-      {window ? (
-        <>
-          <div>
-            <dt>Available</dt>
-            <dd>{Math.max(0, window - used).toLocaleString()} tokens</dd>
-          </div>
-          <div>
-            <dt>Context window</dt>
-            <dd>{window.toLocaleString()} tokens</dd>
-          </div>
-        </>
-      ) : (
-        <div>
-          <dt>Context window</dt>
-          <dd>Not reported</dd>
-        </div>
-      )}
-    </dl>
-  );
-}
-
-function ContextCompact({ onCompact, compacting, disabledReason }: { onCompact?: () => void; compacting?: boolean; disabledReason?: string }) {
+/** The one action: dimmed with its reason on demand while it cannot run. */
+function ContextCompact({ onCompact, compacting, disabledReason }: { onCompact?: (() => void) | undefined; compacting?: boolean | undefined; disabledReason?: string | undefined }) {
+  const reason = compacting ? undefined : (disabledReason ?? (onCompact ? undefined : "Compacting isn’t available for this conversation."));
   return (
     <div className="composer-context-compact">
-      <p className="composer-context-note">Compacting summarizes earlier messages to free up space. Some detail may be lost.</p>
-      <Button size="sm" variant="secondary" disabled={!onCompact || compacting || Boolean(disabledReason)} onClick={onCompact}>
+      <Button size="sm" variant="secondary" disabled={!onCompact || compacting || Boolean(disabledReason)} data-tip={reason} onClick={onCompact}>
         {compacting ? "Compacting…" : "Compact context"}
       </Button>
-      {compacting || !onCompact || disabledReason ? (
-        <p role="status" className="composer-context-note">
-          {compacting ? "Compacting context. New messages will be queued." : (disabledReason ?? "Compaction is unavailable for this conversation right now.")}
-        </p>
-      ) : null}
     </div>
   );
 }

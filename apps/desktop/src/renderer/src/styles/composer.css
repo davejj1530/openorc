@@ -296,7 +296,8 @@
   text-overflow: ellipsis;
 }
 
-/* The context ring: bare, muted, warn above 60% and bad above 85%. */
+/* The context's share beside send: a filled share on its faint disc, its number in quiet ink; warn above 60%, bad above
+   85%. */
 .composer-context {
   display: inline-flex;
   align-items: center;
@@ -312,85 +313,72 @@
   font-variant-numeric: tabular-nums;
   transition: background-color var(--duration-quick) var(--ease-out);
 }
-.composer-context > span {
+.composer-context > .composer-context-number {
   color: var(--ink-4);
 }
-.composer-context[data-tone] > span {
+.composer-context[data-tone] > .composer-context-number {
   color: inherit;
 }
-.composer-context-track {
-  stroke: var(--surface-3);
+:is(.composer-context, .composer-context-ring-wrap)[data-tone="warn"] {
+  color: var(--warn);
+}
+:is(.composer-context, .composer-context-ring-wrap)[data-tone="bad"] {
+  color: var(--bad);
 }
 .composer-context:hover,
 .composer-context[data-popup-open] {
   background: var(--surface-2);
 }
+/* The card: the amount, two facts and the one action. */
 .composer-context-popup {
-  width: min(300px, calc(100vw - 24px));
+  display: grid;
+  gap: 12px;
+  width: min(280px, calc(100vw - 24px));
   max-height: var(--available-height);
   overflow-y: auto;
-  padding: 18px;
+  padding: 16px;
   border-radius: var(--radius-3xl);
   background: var(--float-fill);
-  color: var(--ink-4);
-  font-size: var(--text-sm);
-  line-height: var(--text-sm--line-height);
-}
-.composer-context-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.composer-context-title {
   color: var(--ink);
   font-size: var(--text-base);
   line-height: 16px;
-  letter-spacing: var(--text-base--letter-spacing);
 }
-.composer-context-cells {
+.composer-context-amount {
   display: flex;
-  gap: 3px;
-  height: 18px;
-  margin-top: 14px;
+  align-items: center;
+  gap: 12px;
+  font-size: 24px;
+  line-height: 32px;
+  letter-spacing: -0.025em;
 }
-.composer-context-cells > span {
-  flex: 1;
-  border-radius: 2px;
-  background: var(--surface-3);
+.composer-context-ring-wrap {
+  display: inline-flex;
+  color: var(--ink);
 }
-.composer-context-cells > span[data-filled] {
-  background: var(--ink);
+.composer-context-track {
+  stroke: color-mix(in srgb, var(--ink-3) 45%, transparent);
 }
-.composer-context-note {
-  margin-top: 14px;
+.composer-context-of {
+  margin-left: 4px;
   color: var(--ink-3);
-}
-.composer-context-stats {
-  display: grid;
-  gap: 4px;
-  margin-block: 12px 14px;
+  font-size: var(--text-sm);
+  letter-spacing: 0;
 }
 .composer-context-stats > div {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 24px;
+  height: 24px;
 }
 .composer-context-stats dt {
   color: var(--ink-3);
 }
 .composer-context-stats dd {
-  color: var(--ink);
-  text-align: right;
   font-variant-numeric: tabular-nums;
 }
 .composer-context-compact {
-  display: grid;
-  justify-items: start;
-  gap: 10px;
-}
-.composer-context-compact > .composer-context-note {
-  margin: 0;
+  display: flex;
 }
 
 /* The send cluster: the column's one ink pill, and beside it mid-turn a white Stop and the other way as a quiet word. */

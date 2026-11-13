@@ -10,12 +10,13 @@
  *
  * `status()` is computed from these and the session each time it is asked. Nothing stores an AccountStatus.
  */
-import { openCodeProvider, type AccountStatus, type HostedRefusal } from "@openorc/protocol";
+import { openCodeProvider, type AccountStatus, type HostedAgent, type HostedRefusal, type RpcParams } from "@openorc/protocol";
 import { z } from "zod";
 import type { HostedAccount, HostedDeps } from "./index.js";
 import { OutOfReach, type Session, type SessionChange } from "./session.js";
 import { signInKey, toImage, toPlan, toSandbox, toSignIns } from "./translate.js";
-import { ROUTES, wireBilling, wireHostedSettings, wireSignIn } from "./wire.js";
+import { SignIns } from "./signins.js";
+import { ROUTES, SOCKET, wireBilling, wireHostedSettings, wireSignIn, wireTopics } from "./wire.js";
 
 /** How long Settings keeps asking for the code it sent; the server's code lasts five minutes. */
 const CODE_REMEMBERED_MS = 10 * 60_000;
@@ -31,16 +32,23 @@ const keptAnswers = z.object({
 });
 type Heard = z.infer<typeof keptAnswers>;
 
-type AccountDeps = { session: Session } & Pick<HostedDeps, "kept" | "push" | "now">;
+type AccountDeps = { session: Session } & Pick<HostedDeps, "kept" | "push" | "now" | "mintClaudeToken">;
 
 export class Account implements HostedAccount {
   #heard: Heard | null = null;
   #codeSent: { email: string; at: number } | null = null;
   #error: string | null = null;
   #announced = "";
+  readonly #signIns: SignIns;
 
   constructor(private readonly deps: AccountDeps) {
+    this.#signIns = new SignIns({ session: deps.session, mintClaudeToken: deps.mintClaudeToken, now: deps.now, changed: () => this.#announce(), landed: () => this.#refresh() });
     deps.session.onChange((change) => this.#changed(change));
+    // The person's own topics: what they pay for, and their sign-ins, changed elsewhere.
+    deps.session.onSocket(SOCKET.changed, (body) => {
+      const topics = wireTopics.safeParse(body);
+      if (topics.success && topics.data.topics.some((topic) => topic === "billing" || topic === "sign-ins")) void this.#refresh();
+    });
   }
 
   /** Reads the stored session, then what was last heard for it. A session that cannot be read is signed out, with words. */
@@ -74,6 +82,7 @@ export class Account implements HostedAccount {
       hours,
       sandbox: heard?.sandbox ? toSandbox(heard.sandbox) : null,
       signIns: heard?.signIns ? toSignIns(heard.signIns, heard.ended) : null,
+      signingIn: this.#signIns.work,
       error: this.#error,
     };
   }
@@ -110,6 +119,18 @@ export class Account implements HostedAccount {
     if (email && this.#signedInAs() === email) this.#hear(email, { sandbox: settings });
   }
 
+  connectSignIn(input: RpcParams<"account.signIns.connect">): Promise<void> {
+    return this.#signIns.connect(input);
+  }
+
+  cancelSignIn(agent: HostedAgent): void {
+    this.#signIns.cancel(agent);
+  }
+
+  removeSignIn({ agent, provider }: RpcParams<"account.signIns.remove">): Promise<void> {
+    return this.#signIns.remove(agent, provider);
+  }
+
   /**
    * The server refused a turn: read the account again, so the card above the composer says why. A sign-in it found
    * signed out is marked ended until it is set again, which the list alone cannot tell.
@@ -127,6 +148,7 @@ export class Account implements HostedAccount {
   #changed(change: SessionChange): void {
     if (!this.deps.session.state.signedIn) {
       // Before the session's own storage is cleared and before the server hears of it.
+      this.#signIns.forget();
       this.#heard = null;
       this.#error = null;
       this.deps.kept.save("account", null);

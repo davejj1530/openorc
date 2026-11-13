@@ -11,6 +11,7 @@ const pro: Extract<AccountStatus, { state: "signed-in" }> = {
   plan: { pro: true, standing: "live", at: 0 },
   hours: { leftSeconds: 3600, monthly: { grantedSeconds: 3600, leftSeconds: 3600, resetsAt: 0 }, packsLeftSeconds: 0 },
   sandbox: null,
+  signingIn: {},
   signIns: [
     { agent: "claude", provider: "anthropic", label: "Claude Max", ended: false },
     { agent: "opencode", provider: "openrouter", label: "API key", ended: false },

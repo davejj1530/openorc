@@ -89,3 +89,14 @@ describe("the OpenOrc account in the core", () => {
     await expect(call("account.setSandbox", { service: "local" })).rejects.toThrow("This server doesn't run threads on this machine.");
   });
 });
+
+describe("agent sign-ins on OpenOrc Cloud through the core", () => {
+  it("hands an agent's key to the server and answers the account with it, and says a refused one in the vendor's words", async () => {
+    await open();
+    await signIn();
+    await expect(call("account.signIns.connect", { way: "key", agent: "codex", key: "bad-key" })).rejects.toThrow("OpenAI refused that API key.");
+    const status = await call("account.signIns.connect", { way: "key", agent: "opencode", provider: "openrouter", key: "sk-or-good" });
+    expect(status).toMatchObject({ state: "signed-in", signIns: [{ agent: "opencode", provider: "openrouter" }], signingIn: {} });
+    expect(JSON.stringify(status)).not.toContain("sk-or-good");
+  });
+});

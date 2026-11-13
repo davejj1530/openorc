@@ -15,6 +15,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import type { AddressInfo, Socket } from "node:net";
 import type { LiveSocket } from "../index.js";
 import { engineSession } from "./stand-in-socket.js";
+import { StandInSignIns } from "./stand-in-sign-ins.js";
 import { StandInThreads, type Admit, type StandInPeer, type StandInThreadSeed } from "./stand-in-threads.js";
 
 export interface StandIn {
@@ -49,6 +50,10 @@ export interface StandIn {
   stoppedCommands(threadId: string): string[];
   /** The person's agent sign-ins, as GET /agent-sign-ins lists them; `ended` ones refuse a turn as signed out. */
   setSignIns(email: string, signIns: StandInSignIn[]): void;
+  /** The person approves the Codex device code they were shown, on OpenAI's page. */
+  approveDevice(email: string): void;
+  /** Every sign-in secret the server was handed, in order. */
+  signInSecrets: { agent: string; secret: string }[];
   /** The agent asks before it acts, or asks a question, in a thread. Answers the ask's id, its `approvalId`. */
   ask(threadId: string, request: { kind: string; toolName?: string; input: unknown; detail: string }): string;
   /** The thread's running turn ends: an open ask parks, and the first waiting message is taken or refused. */
@@ -65,6 +70,8 @@ export interface StandInSignIn {
   provider?: string;
   label?: string;
   ended?: boolean;
+  /** When the vendor last took it; it changes each time the sign-in is set. */
+  checkedAt?: string;
 }
 
 export type StandInBilling = { pro: false } | { pro: true; standing: "live" | "ending" | "grace"; at: string; monthlyLeftSeconds: number | null; packsLeftSeconds: number };
@@ -199,6 +206,7 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
   const peers = new Set<Peer>();
   const sockets = new Set<StandInPeer>();
   const hosted = new StandInThreads(() => [...[...peers].filter((peer) => !peer.waiting), ...sockets], admitTurn);
+  const signInWrites = new StandInSignIns(signIns);
   const socketAnswers: Record<string, (peer: StandInPeer, body: unknown) => unknown> = {
     "hosted:watch": (peer, body) => hosted.watch(peer, body),
     "hosted:unwatch": (peer, body) => hosted.unwatch(peer, body),
@@ -230,8 +238,8 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
     const who = holder(token);
     const body = text ? (JSON.parse(text) as Record<string, unknown>) : {};
     const signedInRoute = (): Reply | null => {
-      if (who) return hosted.route(request.method ?? "GET", path, url.searchParams, who, body);
-      return /^\/(projects|hosted)\b/.test(path) ? unauthorized() : null;
+      if (who) return signInWrites.route(request.method ?? "GET", path, who, body) ?? hosted.route(request.method ?? "GET", path, url.searchParams, who, body);
+      return /^\/(projects|hosted|agent-sign-ins)\b/.test(path) ? unauthorized() : null;
     };
     const reply: Reply = (route ? route(body, token) : signedInRoute()) ?? {
       status: 404,
@@ -259,6 +267,8 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
     sandboxes,
     ...threadsFace(hosted),
     setSignIns: (email, rows) => void signIns.set(email.toLowerCase(), rows),
+    approveDevice: (email) => signInWrites.approveDevice(email.toLowerCase()),
+    signInSecrets: signInWrites.secrets,
     revoke: () => sessions.clear(),
     requests,
     async down() {
@@ -336,7 +346,7 @@ function signInRows(rows: readonly StandInSignIn[]) {
     kind: "subscription",
     provider: row.provider ?? (row.agent === "codex" ? "openai" : "anthropic"),
     label: row.label ?? "Subscription",
-    checkedAt: new Date(0).toISOString(),
+    checkedAt: row.checkedAt ?? new Date(0).toISOString(),
     expiresAt: null,
   }));
 }

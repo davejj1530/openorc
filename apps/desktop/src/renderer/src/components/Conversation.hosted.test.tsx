@@ -68,6 +68,7 @@ const pro: AccountStatus = {
   hours: { leftSeconds: 3600, monthly: { grantedSeconds: 3600, leftSeconds: 3600, resetsAt: 0 }, packsLeftSeconds: 0 },
   sandbox: null,
   signIns: [{ agent: "claude", provider: "anthropic", label: "Claude Max", ended: false }],
+  signingIn: {},
   error: null,
 };
 

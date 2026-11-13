@@ -4,9 +4,12 @@ import { createHosted, type Hosted, type LiveSocket } from "@openorc/hosted";
 import { ACCOUNT_PROTOCOL_HEADER, ACCOUNT_PROTOCOL_VERSION } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import { io } from "socket.io-client";
+import type { OpenOrcOptions } from "../options.js";
 import type { Logger, Transport } from "../transport.js";
 import type { ProtectedSecretStore } from "./extraction-credentials.js";
+import { mintClaudeToken, type ClaudeSignInLaunch } from "./claude-token-mint.js";
 import { noticeLine } from "./notice-text.js";
+import { spawnWithPipes, type SpawnTerminal } from "./terminal-process.js";
 
 /** What the server last said, by part, in the settings table. */
 const KEPT = { account: "hosted.kept", threads: "hosted.threads" } as const;
@@ -27,11 +30,20 @@ export interface AccountDeps {
   windows: Transport;
   /** Whether "Desktop notifications" is on. */
   notices(): boolean;
+  /** This Mac's Claude accounts, which make the token of a Claude sign-in on OpenOrc Cloud with `claude setup-token`. */
+  claude: ClaudeSignInLaunch & { defaultId(): string };
+  terminal: SpawnTerminal | undefined;
   log: Logger;
 }
 
+/** The account for this core: none on the cloud brain, or with no account server. */
+export function accountFor(options: Pick<OpenOrcOptions, "cloudOnly" | "accountServer" | "accountSecrets" | "terminal">, parts: Omit<AccountDeps, "server" | "secrets" | "terminal">): Hosted | null {
+  if (options.cloudOnly || !options.accountServer) return null;
+  return createAccount({ ...parts, server: options.accountServer, secrets: options.accountSecrets, terminal: options.terminal });
+}
+
 /** The account for this Mac. Made only for a core given an account server. */
-export function createAccount(deps: AccountDeps): Hosted {
+function createAccount(deps: AccountDeps): Hosted {
   return createHosted({
     server: deps.server,
     session: sessionStore(deps.secrets),
@@ -46,6 +58,7 @@ export function createAccount(deps: AccountDeps): Hosted {
     notify: (notice) => {
       if (deps.notices()) deps.windows.push({ type: "notify", ...notice, body: noticeLine(notice.body, NOTICE_CHARS), id: randomUUID() });
     },
+    mintClaudeToken: (id) => mintClaudeToken(deps.claude, deps.terminal ?? spawnWithPipes, id ?? deps.claude.defaultId()),
     now: Date.now,
     log: deps.log,
   });

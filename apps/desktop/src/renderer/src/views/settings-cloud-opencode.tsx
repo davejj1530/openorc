@@ -10,16 +10,16 @@ import { thisComputer } from "../lib/this-computer";
 const FREE = "opencode";
 
 /** The providers people most often add a key for, after this Mac's own. */
-const COMMON = ["anthropic", "openai", "openrouter", "google", "groq", "mistral", "xai", "deepseek", FREE];
+export const COMMON = ["anthropic", "openai", "openrouter", "google", "groq", "mistral", "xai", "deepseek", FREE];
 
 /** The choice that takes a provider's name typed in, as OpenCode writes it in a model id. */
-const TYPED = "typed";
+export const TYPED = "typed";
 
 /** The providers whose API keys Oh My Pi takes in the cloud; its sign-ins with an account stay on this Mac. */
 const OMP_KEYED = new Set(["anthropic", "openai", "openrouter", "google", "groq", "mistral", "xai", "deepseek"]);
 
 /** The providers this Mac's OpenCode and Oh My Pi serve models from, by id, with the names they give them. */
-function useProviders(): Map<string, string> {
+export function useProviders(): Map<string, string> {
   const opencode = useRpc("agents.models", { agent: "opencode" }, { staleTime: 5 * 60_000 });
   const omp = useRpc("agents.models", { agent: "omp" }, { staleTime: 5 * 60_000 });
   const listed = [...(opencode.data ?? []).filter((model) => model.provider?.id !== FREE), ...(omp.data ?? []).filter((model) => model.provider && OMP_KEYED.has(model.provider.id))];
@@ -29,7 +29,7 @@ function useProviders(): Map<string, string> {
 }
 
 /** A provider to add a key for: this Mac's own first, then the common ones, then any other typed in. */
-function ProviderChoice({ here, others, value, onChange }: { here: [string, string][]; others: [string, string][]; value: string; onChange: (choice: string) => void }) {
+export function ProviderChoice({ here, others, value, onChange }: { here: [string, string][]; others: [string, string][]; value: string; onChange: (choice: string) => void }) {
   const options = (choices: [string, string][]) =>
     choices.map(([id, label]) => (
       <option key={id} value={id}>

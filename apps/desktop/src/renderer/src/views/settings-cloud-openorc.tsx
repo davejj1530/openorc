@@ -1,8 +1,9 @@
-import { HOSTED_AGENTS, harnessShortName, openCodeProviderName, type AccountSignIn, type AccountStatus, type HostedAgent } from "@openorc/protocol";
+import { HOSTED_AGENTS, type AccountStatus } from "@openorc/protocol";
 import { Select } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { Failure } from "./settings-secret-field";
-import { Field, Section, SettingRow, Status } from "./settings-shared";
+import { AgentSignInRow } from "./settings-cloud-openorc-sign-ins";
+import { Field, Section } from "./settings-shared";
 
 type ProAccount = Extract<AccountStatus, { state: "signed-in" }>;
 
@@ -13,7 +14,7 @@ function proAccount(account: AccountStatus | undefined): ProAccount | null {
 
 /**
  * OpenOrc Cloud for a Pro person: where their threads run, when the server runs them in more than one place, and each
- * agent's sign-in there, as the server last listed them. The server's answers are the state.
+ * agent's sign-in there, with the ways to sign it in. The server's answers are the state.
  */
 export function OpenOrcCloudSection({ active }: { active: boolean }) {
   const choose = useRpcMutation("account.setSandbox");
@@ -33,24 +34,10 @@ export function OpenOrcCloudSection({ active }: { active: boolean }) {
           </Select>
         </Field>
       ) : null}
-      {account.signIns
-        ? HOSTED_AGENTS.map((agent) => (
-            <SettingRow key={agent} label={harnessShortName(agent)}>
-              <SignInState agent={agent} rows={account.signIns!.filter((row) => row.agent === agent)} />
-            </SettingRow>
-          ))
-        : null}
+      {account.signIns ? HOSTED_AGENTS.map((agent) => <AgentSignInRow key={agent} agent={agent} rows={account.signIns!.filter((row) => row.agent === agent)} work={account.signingIn[agent]} />) : null}
       <Failure error={choose.error} />
     </Section>
   );
-}
-
-/** An agent's sign-in on OpenOrc Cloud in a word: its plan or its providers, signed out, or none. */
-function SignInState({ agent, rows }: { agent: HostedAgent; rows: AccountSignIn[] }) {
-  if (!rows.length) return <Status>Not signed in</Status>;
-  if (rows.every((row) => row.ended)) return <Status>Signed out</Status>;
-  const live = rows.filter((row) => !row.ended);
-  return <Status ok>{agent === "opencode" ? live.map((row) => openCodeProviderName(row.provider)).join(", ") : live[0]!.label}</Status>;
 }
 
 /** Whether OpenOrc Cloud has a section in Settings > Cloud, so the person's own cloud service is named apart from it only when both show. */

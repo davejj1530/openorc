@@ -1,20 +1,9 @@
-import { mkdirSync } from "node:fs";
-import { stripAnsi } from "@openorc/agents";
 import type { ClaudeCloudAccess } from "@openorc/protocol";
 import type { ProtectedSecretStore } from "./extraction-credentials.js";
+import { CLAUDE_TOKEN, mintClaudeToken, type ClaudeSignInLaunch } from "./claude-token-mint.js";
 import { spawnWithPipes, type SpawnTerminal } from "./terminal-process.js";
 
 const storageError = "Cannot access protected storage for Claude cloud tokens. Unlock your OS keychain and retry.";
-/** How `claude setup-token` prints the token it made. */
-const TOKEN = /sk-ant-oat\d+-[A-Za-z0-9_-]{20,}/;
-/** What setup-token's screen shows when the sign-in failed, above a hint to press Enter to try again, which it waits for. */
-const FAILED = /OAuth error: ([^\r\n]+)/;
-const RETRY = /Press Enter to retry\./;
-/** The screen setup-token falls back to when the browser cannot hand the sign-in back to it. */
-const PASTE_PROMPT = /Paste code here/;
-const CREATE_TIMEOUT_MS = 5 * 60_000;
-/** More output than a sign-in prints means something else is talking; the token would be in the first part. */
-const OUTPUT_LIMIT = 64 * 1024;
 
 interface Saved {
   token: string;
@@ -22,8 +11,7 @@ interface Saved {
 }
 
 /** What token creation needs from the Claude accounts, and what they hear of a token saved or removed. */
-export interface ClaudeSignIn {
-  signInLaunch(id: string): { binary: string; env: NodeJS.ProcessEnv; directory: string };
+export interface ClaudeSignIn extends ClaudeSignInLaunch {
   cloudTokenChanged?(id: string): void;
 }
 
@@ -102,7 +90,7 @@ export class ClaudeCloudTokens {
 
   /** Saves a token made elsewhere. A pasted `export CLAUDE_CODE_OAUTH_TOKEN=…` line keeps just the token. */
   save(id: string, pasted: string): Promise<void> {
-    const token = TOKEN.exec(pasted)?.[0] ?? pasted.trim();
+    const token = CLAUDE_TOKEN.exec(pasted)?.[0] ?? pasted.trim();
     return this.serialize(async () => {
       await this.write({ ...(await this.read()), [id]: { token, createdAt: Date.now() } });
       this.errors.delete(id);
@@ -120,84 +108,37 @@ export class ClaudeCloudTokens {
   }
 
   /**
-   * Starts `claude setup-token` for the account. Its browser sign-in finishes it: the token is saved as soon as its
-   * screen shows it, and the command is closed then, or as soon as it shows that the sign-in failed.
+   * Starts `claude setup-token` for the account (claude-token-mint.ts). Its browser sign-in finishes it: the token is
+   * saved as soon as its screen shows it, or the attempt ends with the CLI's words for why it failed.
    */
   async create(id: string): Promise<void> {
     if (this.closing) throw new Error("OpenOrc is closing.");
     if (this.creating.has(id)) return;
     let settle = () => undefined as void;
-    const attempt = { stop: () => undefined as void, cancelled: false, done: new Promise<void>((resolve) => (settle = resolve)) };
+    const mint = mintClaudeToken(this.accounts, this.terminal, id);
+    const attempt = { stop: () => mint.cancel(), cancelled: false, done: new Promise<void>((resolve) => (settle = resolve)) };
     this.errors.delete(id);
     this.creating.set(id, attempt);
     this.changed();
-    try {
-      const { binary, env, directory } = this.accounts.signInLaunch(id);
-      mkdirSync(directory, { recursive: true, mode: 0o700 });
-      const proc = await this.terminal(binary, ["--setting-sources", "user", "setup-token"], { cwd: directory, env });
-      attempt.stop = () => proc.kill();
-      if (attempt.cancelled) proc.kill();
-      let screen = "";
-      let token: string | null = null;
-      proc.onData((chunk) => {
-        if (token || screen.length >= OUTPUT_LIMIT) return;
-        screen += chunk;
-        const text = stripAnsi(screen);
-        token = TOKEN.exec(text)?.[0] ?? null;
-        const failure = token ? null : this.failure(text);
-        if (failure) this.errors.set(id, failure);
-        if (token || failure) proc.kill();
-      });
-      const timer = setTimeout(() => proc.kill(), CREATE_TIMEOUT_MS);
-      timer.unref();
-      proc.onExit((code) => {
-        clearTimeout(timer);
+    void mint.token
+      .then(
+        (token) => this.save(id, token),
+        (error: unknown) => {
+          const words = error instanceof Error ? error.message : storageError;
+          if (words && !attempt.cancelled) this.errors.set(id, words);
+        },
+      )
+      .catch((error: unknown) => this.errors.set(id, error instanceof Error ? error.message : storageError))
+      .finally(() => {
         this.creating.delete(id);
-        void this.finish(id, attempt.cancelled, code, token).finally(settle);
+        this.changed();
+        settle();
       });
-    } catch {
-      this.creating.delete(id);
-      this.errors.set(id, "Claude could not start making a token. Check its installation and retry.");
-      this.changed();
-      settle();
-    }
   }
 
   /** Once the account's token in the making is saved, or its attempt ended without one. */
   finished(id: string): Promise<void> {
     return this.creating.get(id)?.done ?? Promise.resolve();
-  }
-
-  /** Why setup-token's screen says the sign-in failed, in its own words; null while it has not. */
-  private failure(screen: string): string | null {
-    const retry = screen.search(RETRY);
-    // Some failures are shown as they are, without the prefix: the line above the hint says why.
-    const failed =
-      FAILED.exec(screen)?.[1]?.trim() ??
-      (retry >= 0
-        ? screen
-            .slice(0, retry)
-            .split(/\r?\n/)
-            .map((line) => line.trim())
-            .filter(Boolean)
-            .at(-1)
-        : null);
-    if (failed) return `The sign-in failed: ${failed.replace(TOKEN, "")}`;
-    if (PASTE_PROMPT.test(screen)) return "The browser could not hand the sign-in back to Claude. Run claude setup-token in Terminal and paste the token.";
-    return null;
-  }
-
-  /** The command's output holds the token, so no error ever repeats it. */
-  private async finish(id: string, cancelled: boolean, code: number | null, token: string | null): Promise<void> {
-    try {
-      if (token && !cancelled) await this.save(id, token);
-      else if (!cancelled && !this.errors.has(id))
-        this.errors.set(id, code === 0 ? "Claude finished without a token. Paste one from claude setup-token instead." : "Making the token did not finish. Retry and complete the browser sign-in.");
-    } catch (error) {
-      this.errors.set(id, error instanceof Error ? error.message : storageError);
-    } finally {
-      this.changed();
-    }
   }
 
   cancel(id: string): void {

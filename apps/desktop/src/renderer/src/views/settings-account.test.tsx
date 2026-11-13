@@ -33,6 +33,7 @@ const pro: AccountStatus = {
     ],
   },
   signIns: [{ agent: "claude", provider: "anthropic", label: "Claude Max", ended: false }],
+  signingIn: {},
   error: null,
 };
 

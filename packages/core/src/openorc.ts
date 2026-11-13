@@ -17,7 +17,7 @@ import { createCatalogHandlers } from "./handlers/catalog.js";
 import { createClaudeAccountHandlers } from "./handlers/claude-accounts.js";
 import { createConnectorHandlers } from "./handlers/connectors.js";
 import { ConnectorService, type ConnectorPlaces } from "./services/connectors.js";
-import { createAccount } from "./services/openorc-account.js";
+import { accountFor } from "./services/openorc-account.js";
 import { PlaceRouter } from "./services/place-router.js";
 import { rememberedConnectors } from "./services/remembered-connectors.js";
 import { createBrainSyncHandlers } from "./handlers/brain-sync.js";
@@ -385,12 +385,8 @@ export class OpenOrc {
 
   /** The OpenOrc account; null on the cloud brain and in a core given no account server. Made at its first use. */
   get account(): Hosted | null {
-    if (this.hosted !== undefined) return this.hosted;
-    const { options } = this;
-    this.hosted =
-      options.cloudOnly || !options.accountServer
-        ? null
-        : createAccount({ db: this.db, server: options.accountServer, secrets: options.accountSecrets, windows: this.windows, notices: () => this.settings.get().notifications, log: this.log });
+    if (this.hosted === undefined)
+      this.hosted = accountFor(this.options, { db: this.db, windows: this.windows, notices: () => this.settings.get().notifications, claude: this.claudeAccounts, log: this.log });
     return this.hosted;
   }
 

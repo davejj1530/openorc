@@ -48,6 +48,17 @@ export interface AccountSignIn {
   ended: boolean;
 }
 
+/**
+ * How an agent signs in on OpenOrc Cloud. `token`: this Mac runs `claude setup-token` and hands the token over. `code`:
+ * the server starts a device code and Settings shows it. `key`: an API key typed in. Settings draws an agent's row from
+ * its ways, never from its name, so every agent goes through the one row.
+ */
+export type SignInWay = "token" | "code" | "key";
+export const SIGN_IN_WAYS: Record<HostedAgent, readonly SignInWay[]> = { claude: ["token", "key"], codex: ["code", "key"], opencode: ["key"] };
+
+/** A sign-in under way for an agent, or the last one that failed, with its words. Never a secret. */
+export type SignInWork = { state: "waiting"; way: "token" } | { state: "waiting"; way: "code"; userCode: string; verificationUrl: string; expiresAt: number } | { state: "failed"; error: string };
+
 /** Everything the app knows about the OpenOrc account, in one answer. Signed out is the whole state of an app with no account. */
 export type AccountStatus =
   | {
@@ -73,10 +84,25 @@ export type AccountStatus =
       sandbox: AccountSandbox | null;
       /** The person's agent sign-ins on OpenOrc Cloud; null until the server first answers. */
       signIns: AccountSignIn[] | null;
+      /** By agent: a sign-in being made, or the last that failed. */
+      signingIn: Partial<Record<HostedAgent, SignInWork>>;
       error: string | null;
     };
 
 const Email = z.string().trim().toLowerCase().pipe(z.email().max(320));
+const Agent = z.enum(HOSTED_AGENTS);
+/** An OpenCode provider as OpenCode names it, as the server takes it. */
+const Provider = z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/, "Name the provider as OpenCode does, such as anthropic or openrouter.");
+
+/** One call per way; the union is the only place a way's inputs are written down. The secret goes to the server and is kept nowhere here. */
+const ConnectSignIn = z.discriminatedUnion("way", [
+  /** Runs `claude setup-token` as this Claude account of the Mac's, its default when none is named. */
+  z.object({ way: z.literal("token"), agent: z.literal("claude"), claudeAccountId: z.string().min(1).max(100).optional() }).strict(),
+  /** Asks the server for a device code, which `account.status` then carries until it connects or runs out. */
+  z.object({ way: z.literal("code"), agent: z.literal("codex") }).strict(),
+  /** `provider` for OpenCode alone. */
+  z.object({ way: z.literal("key"), agent: Agent, provider: Provider.optional(), key: z.string().trim().min(1).max(8192) }).strict(),
+]);
 
 export const accountRpcParams = {
   "account.status": z.object({}),
@@ -96,6 +122,10 @@ export const accountRpcParams = {
   "account.signOut": z.object({}),
   /** Chooses the sandbox service the person's cloud threads run on; null goes back to the server's own choice. */
   "account.setSandbox": z.object({ service: z.string().min(1).max(64).nullable() }).strict(),
+  "account.signIns.connect": ConnectSignIn,
+  /** Calls off a token being made or a code being waited on. */
+  "account.signIns.cancel": z.object({ agent: Agent }).strict(),
+  "account.signIns.remove": z.object({ agent: Agent, provider: Provider.optional() }).strict(),
 };
 
 /** Every call answers the whole status, so a window never reads a stale half. */

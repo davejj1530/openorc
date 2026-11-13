@@ -48,6 +48,10 @@ export type WireHostedSettings = z.infer<typeof wireHostedSettings>;
 export const wireSignIn = z.object({ agent: z.string(), provider: z.string(), label: z.string(), checkedAt: iso.nullable() });
 export type WireSignIn = z.infer<typeof wireSignIn>;
 
+/** A Codex device code the server started with OpenAI: the person enters `userCode` on `verificationUrl`. */
+export const wireDeviceStart = z.object({ id: z.string(), userCode: z.string(), verificationUrl: z.url(), intervalSeconds: z.number().int().positive(), expiresAt: iso });
+export const wireDeviceFinish = z.discriminatedUnion("status", [z.object({ status: z.literal("pending") }), z.object({ status: z.literal("connected") }), z.object({ status: z.literal("expired") })]);
+
 const seq = z.number().int().nonnegative();
 
 /** A message to a thread, as its `waiting` lists it: not taken yet, or refused since. `afterTurn`: sent to wait for the running turn to end. */
@@ -145,6 +149,13 @@ export const ROUTES = {
   hostedSettings: route("GET", "/settings/hosted", wireHostedSettings),
   setHostedSettings: route("PATCH", "/settings/hosted", wireHostedSettings),
   signIns: route("GET", "/agent-sign-ins", z.array(wireSignIn)),
+  /** Keeps a sign-in for an agent, once its vendor takes it; a refusal is 400 in the vendor's words. */
+  setSignIn: (agent: "claude" | "codex" | "opencode", provider?: string) =>
+    route("PUT", `/agent-sign-ins/${agent === "opencode" ? `opencode/${encodeURIComponent(provider ?? "")}` : agent}`, wireSignIn),
+  removeSignIn: (agent: "claude" | "codex" | "opencode", provider?: string) =>
+    route("DELETE", `/agent-sign-ins/${agent === "opencode" ? `opencode/${encodeURIComponent(provider ?? "")}` : agent}`, null),
+  startDevice: route("POST", "/agent-sign-ins/codex/device/start", wireDeviceStart),
+  finishDevice: route("POST", "/agent-sign-ins/codex/device/finish", wireDeviceFinish),
   projects: route("GET", "/projects", z.array(wireProject)),
   threads: route("GET", "/hosted/threads", wireThreadList),
   thread: (id: string) => route("GET", `/hosted/threads/${encodeURIComponent(id)}`, wireThreadDetail),

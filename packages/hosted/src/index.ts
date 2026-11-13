@@ -8,7 +8,7 @@
  * No Node, Electron or React Native import outside testing/. Each host hands in what only it has (`HostedDeps`), so a
  * phone can mount the same package with its own storage.
  */
-import type { AccountStatus, Frame, OwnerReach, Project, RoutedMethod, RpcParams, RpcResults, ThreadSummary } from "@openorc/protocol";
+import type { AccountStatus, Frame, HostedAgent, OwnerReach, Project, RoutedMethod, RpcParams, RpcResults, ThreadSummary } from "@openorc/protocol";
 import { Account } from "./account.js";
 import { Follower } from "./follow.js";
 import type { HostedNotice } from "./notices.js";
@@ -49,6 +49,11 @@ export interface HostedDeps {
   push(push: { type: "invalidate"; keys: string[] } | { type: "frame"; frame: Frame } | { type: "gap"; runIds: string[] }): void;
   /** A notice for the person about a cloud thread: an ask it waits on, or a turn that ended. The host words and shows it as its own. */
   notify(notice: HostedNotice): void;
+  /**
+   * Makes a long-lived Claude token as one of the device's Claude accounts (its default when none is named), as the
+   * Mac's `claude setup-token` does. Absent where the device cannot; the token goes to the server and nowhere else.
+   */
+  mintClaudeToken?(claudeAccountId: string | undefined): { token: Promise<string>; cancel(): void };
   now(): number;
   log: { info(message: string): void; warn(message: string): void };
 }
@@ -64,6 +69,10 @@ export interface HostedAccount {
   signOut(): Promise<void>;
   /** Chooses the sandbox service the person's cloud threads run on; null leaves it to the server. */
   setSandbox(service: string | null): Promise<void>;
+  /** Signs an agent in on OpenOrc Cloud, one of its ways; what goes on after this resolves shows in `status().signingIn`. */
+  connectSignIn(input: RpcParams<"account.signIns.connect">): Promise<void>;
+  cancelSignIn(agent: HostedAgent): void;
+  removeSignIn(input: RpcParams<"account.signIns.remove">): Promise<void>;
 }
 
 export type KeptPart = "account" | "threads";
@@ -110,7 +119,7 @@ export interface Hosted {
 
 export function createHosted(deps: HostedDeps): Hosted {
   const session = new Session(deps);
-  const account = new Account({ session, kept: deps.kept, push: deps.push, now: deps.now });
+  const account = new Account({ session, kept: deps.kept, push: deps.push, now: deps.now, mintClaudeToken: deps.mintClaudeToken });
   const follower = new Follower({ session, push: deps.push, log: deps.log });
   const threads = new Threads({ session, follower, account, kept: deps.kept, projects: deps.projects, push: deps.push, notify: deps.notify, now: deps.now, log: deps.log });
   return {

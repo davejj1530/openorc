@@ -31,14 +31,14 @@ export function SidebarOrclings({ route }: { route: Route }) {
   );
 }
 
-/** Starts a new group chat or a new Orcling; they sit where the thread list keeps its tools. */
+/** Starts a new group chat or a new Orcling, at the end of the Orclings row while their list is open. */
 export function NewOrclingButton() {
   return (
     <>
       <NewOrclingGroupButton orclings={useOrclings()} />
       <Tooltip label="New Orcling">
-        <IconButton onClick={() => useRouter.getState().navigate({ view: "orcling" })} aria-label="New Orcling" size="lg" className="no-drag">
-          <Plus size={16} />
+        <IconButton onClick={() => useRouter.getState().navigate({ view: "orcling" })} aria-label="New Orcling" size="xs" className="no-drag">
+          <Plus size={14} />
         </IconButton>
       </Tooltip>
     </>

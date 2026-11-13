@@ -62,16 +62,24 @@ describe("threadPlace", () => {
 });
 
 describe("workspaceLabel", () => {
-  const checkout = { workspaceMode: "current", branch: "main", prUrl: null } as const;
+  const checkout = { workspaceMode: "current", branch: "main", prUrl: null, projectId: "p", workingDirectory: null } as const;
   const cloud = { provider: "vercel", state: "ready", step: null, setup: false, error: null } as const;
 
   it("names the cloud, else a worktree of its own, else the checkout's branch", () => {
     expect(workspaceLabel(checkout)).toBe("main");
-    expect(workspaceLabel({ ...checkout, branch: null })).toBeNull();
+    expect(workspaceLabel({ ...checkout, branch: null })).toBe("checkout");
     expect(workspaceLabel({ ...checkout, workspaceMode: "worktree", branch: "openorc/sidebar-a1b2c3" })).toBe("worktree");
     expect(workspaceLabel({ ...checkout, workspaceMode: "worktree", cloud })).toBe("cloud");
     expect(workspaceLabel({ ...checkout, owner: { brain: "cloud", reach: "asleep", heardAt: 1 } })).toBe("cloud");
     expect(workspaceLabel({ ...checkout, owner: { brain: "mac", reach: "live", heardAt: 1 } })).toBe("main");
+  });
+
+  it("names the folder of a thread in no project, and nothing when it has none", () => {
+    const loose = { ...checkout, branch: null, projectId: WORKSPACE_ID };
+    expect(workspaceLabel({ ...loose, workingDirectory: "/Users/me/notes" })).toBe("notes");
+    expect(workspaceLabel({ ...loose, workingDirectory: "C:\\Users\\me\\notes\\" })).toBe("notes");
+    expect(workspaceLabel({ ...loose, branch: "main", workingDirectory: "/Users/me/notes" })).toBe("main");
+    expect(workspaceLabel(loose)).toBeNull();
   });
 
   it("leaves a pull request to say where the work is, except that the next turn runs in the cloud", () => {

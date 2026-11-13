@@ -10,7 +10,7 @@ import { Button } from "../../apps/desktop/src/renderer/src/components/ui";
 import { ArrowLeft, ArrowUpRight, Check, Settings } from "../../apps/desktop/src/renderer/src/components/icons";
 import { useLayout } from "../../apps/desktop/src/renderer/src/lib/layout";
 import { useRouter } from "../../apps/desktop/src/renderer/src/lib/router";
-import { OrclingsRailContext } from "../../apps/desktop/src/renderer/src/lib/orclings-rail";
+import { OrclingsModeContext } from "../../apps/desktop/src/renderer/src/lib/orclings-mode";
 import type { ModelChoice } from "../../packages/client/src/index";
 import { OrclingStill } from "../../apps/desktop/src/renderer/src/components/OrclingAvatar";
 import { ORCLING_SHAPES, ORCLING_BODY_COLORS, ORCLING_EYES, ORCLING_GLASSES, ORCLING_ACCESSORIES, ORCLING_TEXTURES } from "../../apps/desktop/src/renderer/src/components/orcling-art";
@@ -68,10 +68,10 @@ export function DesignOrclings({ children }: { children: ReactNode }) {
       useLayout.setState({ sidebarOpen: true });
     },
   };
-  if (!current) return <OrclingsRailContext.Provider value={navigation}>{children}</OrclingsRailContext.Provider>;
+  if (!current) return <OrclingsModeContext.Provider value={navigation}>{children}</OrclingsModeContext.Provider>;
   const update = (patch: Partial<Companion>) => setCompanions((items) => items.map((item) => (item.id === current.id ? { ...item, ...patch } : item)));
   return (
-    <OrclingsRailContext.Provider value={navigation}>
+    <OrclingsModeContext.Provider value={navigation}>
       <div className="app-shell orcling-study h-full flex text-ink">
         {/* The real sidebar lists the Orclings; this study only replaces the conversation beside it. */}
         <Sidebar />
@@ -92,7 +92,7 @@ export function DesignOrclings({ children }: { children: ReactNode }) {
           {profile ? <OrclingProfile key={current.id} companion={current} onChange={update} /> : <OrclingChat key={current.id} companion={current} onChange={update} />}
         </main>
       </div>
-    </OrclingsRailContext.Provider>
+    </OrclingsModeContext.Provider>
   );
 }
 

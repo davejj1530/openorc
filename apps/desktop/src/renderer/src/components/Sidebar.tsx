@@ -4,13 +4,13 @@ import { newThread, useRouter } from "../lib/router";
 import { useTrafficLights } from "../lib/window";
 import { useNavigationGone } from "../lib/navigation-column";
 import { useProjectIconChanges } from "../lib/project-icons";
-import { OrclingsRailContext, useOrclingsRail } from "../lib/orclings-rail";
+import { OrclingsModeContext, useOrclingsMode } from "../lib/orclings-mode";
 import { useOrclings } from "../lib/orclings";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
 import { Plus } from "./icons";
 import { ResizeHandle } from "./ResizeHandle";
 import { SidebarFooter } from "./SidebarFooter";
-import { SidebarListHead, Wordmark } from "./SidebarListHead";
+import { Wordmark } from "./SidebarListHead";
 import { SidebarNav } from "./SidebarNav";
 import { NewOrclingButton, SidebarOrclings } from "./SidebarOrclings";
 import { SidebarSettings } from "./SidebarSettings";
@@ -29,8 +29,8 @@ export function Sidebar() {
   const open = useLayout((s) => s.sidebarOpen);
   const gone = useNavigationGone();
   const trafficLights = useTrafficLights();
-  const nativeOrclings = useOrclingsRail(route, useOrclings());
-  const orclings = useContext(OrclingsRailContext) ?? nativeOrclings;
+  const nativeOrclings = useOrclingsMode(route, useOrclings());
+  const orclings = useContext(OrclingsModeContext) ?? nativeOrclings;
   const projectId = useLayout(focusedProject);
   const toggleOrclings = () => (orclings.active ? nativeOrclings.openThreads(() => newThread(projectId ?? undefined)) : orclings.open());
   const settings = route.view === "settings";
@@ -41,14 +41,13 @@ export function Sidebar() {
         {settings ? <SidebarSettings route={route} /> : null}
         {/* Settings takes the screens' and threads' place; the list keeps its pages, filters and scroll for the way back. */}
         <div className="sidebar-body" hidden={settings}>
-          <SidebarNav route={route} orclings={{ active: orclings.active, toggle: toggleOrclings }} />
+          <SidebarNav route={route} orclings={{ active: orclings.active, toggle: toggleOrclings, tools: <NewOrclingButton /> }} />
           {/* Keep loaded pages and filters while the Orclings take the threads' place. */}
           <div className="sidebar-browser-slot" hidden={orclings.active}>
             <SidebarThreadBrowser />
           </div>
           {orclings.active ? (
             <div className="sidebar-workspaces" data-open>
-              <SidebarListHead label="Orclings" tools={<NewOrclingButton />} />
               <SidebarOrclings route={route} />
             </div>
           ) : null}

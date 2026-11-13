@@ -10,8 +10,10 @@ import { waitingTaskCount } from "../lib/task-stage-counts";
 import { Inbox, Orclings } from "./icons";
 import { SCREENS } from "./sidebar-screens";
 
+type NavRowProps = { icon: ReactNode; label: string; count?: number; current?: boolean; pressed?: boolean; onClick: () => void };
+
 /** One screen the sidebar names: its icon, its name, and how many things there wait on the person, when any do. */
-function NavRow({ icon, label, count = 0, current, pressed, onClick }: { icon: ReactNode; label: string; count?: number; current?: boolean; pressed?: boolean; onClick: () => void }) {
+function NavRow({ icon, label, count = 0, current, pressed, onClick }: NavRowProps) {
   return (
     <button
       type="button"
@@ -44,9 +46,9 @@ function useWaitingOrclings(): number {
 
 /**
  * The app's screens by name: Tasks, Pull requests and Schedules, then Orclings, which swaps the threads below for the
- * Orclings and back, then the Inbox. A count shows only where something waits on the person.
+ * Orclings and back, with their tools at its end while it does, then the Inbox. A count shows only where something waits on the person.
  */
-export function SidebarNav({ route, orclings }: { route: Route; orclings: { active: boolean; toggle: () => void } }) {
+export function SidebarNav({ route, orclings }: { route: Route; orclings: { active: boolean; toggle: () => void; tools: ReactNode } }) {
   const tasks = waitingTaskCount(useRpc("tasks.list", {}).data ?? []);
   const counts: Partial<Record<SidebarScreen, number>> = { tasks };
   const waitingOrclings = useWaitingOrclings();
@@ -57,7 +59,11 @@ export function SidebarNav({ route, orclings }: { route: Route; orclings: { acti
       {SCREENS.map(({ id, label, Icon, route: to, views }) => (
         <NavRow key={id} icon={<Icon size={16} />} label={label} count={counts[id]} current={views.includes(route.view)} onClick={() => useRouter.getState().navigate(to)} />
       ))}
-      <NavRow icon={<Orclings size={16} />} label="Orclings" count={waitingOrclings} pressed={orclings.active} onClick={orclings.toggle} />
+      {/* Pressed, the Orclings take the threads' place under it, and its row's end carries their tools. */}
+      <div className="sidebar-nav-item">
+        <NavRow icon={<Orclings size={16} />} label="Orclings" count={orclings.active ? 0 : waitingOrclings} pressed={orclings.active} onClick={orclings.toggle} />
+        {orclings.active ? <div className="sidebar-nav-tools">{orclings.tools}</div> : null}
+      </div>
       <NavRow icon={<Inbox size={16} />} label="Inbox" count={inbox} current={route.view === "inbox"} onClick={() => useRouter.getState().navigate({ view: "inbox" })} />
     </nav>
   );

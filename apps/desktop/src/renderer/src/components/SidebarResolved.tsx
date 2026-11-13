@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties, type Drag
 import { cn } from "../lib/cn";
 import { useRpcMutation } from "../lib/client";
 import { threadDragId, useDraggedThread } from "../lib/thread-drag";
+import { useScrollEdges } from "../lib/use-scroll-edges";
 import { ChevronRight, CircleCheck } from "./icons";
 import { CountBadge } from "./ui";
 
@@ -129,6 +130,7 @@ export function ResolvedDrawer({
   const shows = open || holding;
   const rows = useFoldingRows(shows, children);
   const { height, measure } = useRowsHeight();
+  const edges = useScrollEdges();
   return (
     <div
       className="resolved-drawer"
@@ -155,7 +157,7 @@ export function ResolvedDrawer({
           <CircleCheck size={14} className="resolved-check" />
         </span>
       </button>
-      <div className="resolved-body" inert={!shows}>
+      <div {...edges} className="resolved-body scroll-edges" inert={!shows}>
         <div ref={measure} className={cn("resolved-list sidebar-thread-list", arriving && "motion-stagger")}>
           {rows}
         </div>

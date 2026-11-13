@@ -166,8 +166,23 @@
   color: var(--ink);
   background: var(--surface-3);
 }
+/* A table has no header of its own to carry its actions, so they sit over the end of its header row, on that row's
+   fill, while the table is hovered or holds focus. */
+[data-streamdown="table-wrapper"] {
+  position: relative;
+}
 [data-streamdown="table-wrapper"] > div:first-child:not(:only-child) {
-  padding: 5px 10px;
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  z-index: 1;
+  padding: 0 0 0 8px;
+  background: var(--surface-2);
+  opacity: 0;
+  transition: opacity var(--duration-quick) var(--ease-out);
+}
+[data-streamdown="table-wrapper"]:is(:hover, :focus-within) > div:first-child:not(:only-child) {
+  opacity: 1;
 }
 [data-streamdown="table-wrapper"] > div:last-child {
   border: 0;
@@ -191,6 +206,9 @@
 }
 [data-streamdown="table"] th {
   color: var(--ink-3);
+}
+[data-streamdown="table"] thead {
+  background: var(--surface-2);
 }
 [data-streamdown="table"] thead :is(th, td) {
   border-top: 0;

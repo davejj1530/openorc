@@ -229,6 +229,25 @@ button.sidebar-nav-row:hover {
   background-color: var(--navigation-hover);
   color: var(--ink);
 }
+/* A row with tools at its end lays them over the row, as a project's label does. */
+.sidebar-nav-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.sidebar-nav-item > * {
+  grid-area: 1 / 1;
+}
+.sidebar-nav-tools {
+  display: flex;
+  align-items: center;
+  align-self: center;
+  justify-self: end;
+  gap: 2px;
+  margin-right: 4px;
+}
+.sidebar-nav-tools button:hover {
+  background-color: var(--surface-3);
+}
 .sidebar-nav-icon {
   display: flex;
   flex-shrink: 0;
@@ -296,6 +315,11 @@ button.sidebar-nav-row:hover {
 }
 .sidebar-workspaces > .conversation-browser[hidden] {
   display: none;
+}
+/* The Orclings have no head of their own (their row above names them and carries their tools), so their list keeps
+   the room a head would leave between the screens and the list. */
+.orcling-browser {
+  margin-top: 18px;
 }
 /* The list's head: its quiet name 20px in, then Search and the filter at the end. */
 .sidebar-list-head {
@@ -390,7 +414,12 @@ button.sidebar-nav-row:hover {
 .sidebar-project-head .sidebar-count {
   transition: opacity var(--duration-quick) var(--ease-out);
 }
-.sidebar-project-new {
+.sidebar-project-tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.sidebar-project-tool {
   display: grid;
   place-items: center;
   width: 24px;
@@ -403,13 +432,14 @@ button.sidebar-nav-row:hover {
     background-color var(--duration-quick) var(--ease-out),
     color var(--duration-quick) var(--ease-out);
 }
-.sidebar-project-head:is(:hover, :focus-within) .sidebar-project-new {
+/* The tools show while the label is hovered or anything in it has focus, and while the actions' menu is open. */
+.sidebar-project-head:is(:hover, :focus-within, :has([data-popup-open])) .sidebar-project-tool {
   opacity: 1;
 }
-.sidebar-project-head:is(:hover, :focus-within) .sidebar-count {
+.sidebar-project-head:is(:hover, :focus-within, :has([data-popup-open])) .sidebar-count {
   opacity: 0;
 }
-.sidebar-project-new:hover {
+.sidebar-project-tool:is(:hover, [data-popup-open]) {
   background-color: var(--surface-2);
   color: var(--ink);
 }
@@ -453,8 +483,8 @@ button.sidebar-nav-row:hover {
     background-color var(--duration-leave) var(--ease-out),
     color var(--duration-leave) var(--ease-out);
 }
-/* A sub thread is one line under its parent. */
-.app-shell .thread-preview.sidebar-thread-child {
+/* A sub thread is one line under its parent, and so is a row with nothing true to say on its quiet line. */
+.app-shell .thread-preview:is(.sidebar-thread-child, :has(> .thread-preview-line:empty)) {
   min-height: var(--control-row);
 }
 .app-shell .thread-preview:hover {

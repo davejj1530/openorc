@@ -293,6 +293,9 @@ it("switches between project threads and Orclings with the Orclings row, remembe
   expect(screen.queryByRole("region", { name: "Workspaces" })).toBeNull();
   expect(screen.getByRole("region", { name: "Orclings" })).toBeTruthy();
   expect(orclings().getAttribute("aria-pressed")).toBe("true");
+  // Their row names them once and carries their tools; the list has no head repeating the name.
+  expect(within(screens()).getByRole("button", { name: "New Orcling" })).toBeTruthy();
+  expect(screen.getAllByText("Orclings")).toHaveLength(1);
   fireEvent.click(orclings());
   expect(useRouter.getState().route).toEqual({ view: "thread", threadId: "notes" });
   expect(screen.getByRole("region", { name: "Workspaces" })).toBeTruthy();
@@ -357,10 +360,10 @@ it("groups the threads under each project in the order projects come, an empty p
   expect(rowTitles(group("Second project"))).toEqual(["Other notes"]);
   expect(rowTitles(group("Third project"))).toEqual([]);
   expect(group("First project").querySelector(".thread-preview-project")).toBeNull();
-  // Pinned threads lead in their own group, naming their project; the Workspace shows only once it holds threads.
+  // Pinned threads lead in their own group, naming their project; No project shows only once it holds threads.
   expect(rowTitles(screen.getByRole("button", { name: "Pinned" }).closest(".sidebar-section") as HTMLElement)).toEqual(["Pinned notes"]);
   expect(screen.getByRole("button", { name: /Pinned notes/ }).querySelector(".thread-preview-project")?.textContent).toBe("First project");
-  expect(screen.queryByRole("region", { name: "Workspace" })).toBeNull();
+  expect(screen.queryByRole("region", { name: "No project" })).toBeNull();
 });
 
 it("starts a new thread in a project from its label, and adds a project from the Workspaces head, its one way in", async () => {
@@ -382,18 +385,31 @@ it("reads No projects yet with no projects, keeping Add project in the head", as
   act(() => useUi.getState().setImportProject(false));
 });
 
-it("leads each project's label with its mark, and the Workspace's with the globe", async () => {
+it("leads each project's label with its mark, and No project's with the globe", async () => {
   projectThreads();
   fixture.threads.push({ ...fixture.threads[0]!, id: "loose", title: "Loose notes", projectId: WORKSPACE_ID, pinnedAt: null });
   mountSidebar();
   await screen.findByRole("button", { name: /Loose notes/ });
-  for (const name of ["First project", "Second project", "Workspace"]) {
+  for (const name of ["First project", "Second project", "No project"]) {
     const mark = label(name).firstElementChild!;
     expect(mark.classList.contains("sidebar-project-mark")).toBe(true);
     expect(mark.querySelector("svg, img")).not.toBeNull();
   }
-  expect(label("Workspace").querySelector('.sidebar-project-mark [data-icon="Globe"]')).not.toBeNull();
+  expect(label("No project").querySelector('.sidebar-project-mark [data-icon="Globe"]')).not.toBeNull();
   expect(label("First project").querySelector('.sidebar-project-mark [data-icon="Folder"]')).not.toBeNull();
+});
+
+it("reaches a project's actions from a button at its label's end, with the keyboard as with a click", async () => {
+  projectThreads();
+  mountSidebar();
+  await screen.findByRole("button", { name: /Other notes/ });
+  const more = screen.getByRole("button", { name: "More for Second project" });
+  more.focus();
+  expect(document.activeElement).toBe(more);
+  fireEvent.click(more);
+  expect((await screen.findAllByRole("menuitem")).map((item) => item.textContent?.trim())).toEqual(["New thread", "New task", "Choose icon…", "Project settings", "Remove project…"]);
+  fireEvent.click(screen.getByRole("menuitem", { name: "Project settings" }));
+  expect(useRouter.getState().route).toEqual({ view: "project", projectId: "two" });
 });
 
 it("opens a project's own actions from a right click on its label", async () => {

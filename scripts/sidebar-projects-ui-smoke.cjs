@@ -51,7 +51,7 @@ async function check() {
     await win.loadFile(path.join(dir, "index.html"));
     await read('window.addEventListener("error", (e) => console.error(e.error?.stack ?? e.message)), true');
     await until('document.querySelectorAll(".sidebar-project").length === 4 && document.querySelectorAll("button[draggable]").length >= 8');
-    assert.deepEqual(await text("section.sidebar-project"), ["studio", "Website", "A project with a very long name that needs to truncate", "Workspace"]);
+    assert.deepEqual(await text("section.sidebar-project"), ["studio", "Website", "A project with a very long name that needs to truncate", "No project"]);
     assert.deepEqual(await text('nav[aria-label="Screens"] .sidebar-nav-label'), ["Tasks", "Pull requests", "Schedules", "Orclings", "Inbox"]);
     assert.deepEqual(await titles(".sidebar-section:not(.sidebar-project)"), ["Redesign the sidebar"]);
     assert.equal((await titles(group("studio"))).length, 4);

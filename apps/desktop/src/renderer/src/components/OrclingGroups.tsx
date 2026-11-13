@@ -64,8 +64,8 @@ export function NewOrclingGroupButton({ orclings }: { orclings: readonly Orcling
   return (
     <>
       <Tooltip label="New group chat">
-        <IconButton onClick={() => setOpen(true)} aria-label="New group chat" size="lg" className="no-drag">
-          <People size={16} />
+        <IconButton onClick={() => setOpen(true)} aria-label="New group chat" size="xs" className="no-drag">
+          <People size={14} />
         </IconButton>
       </Tooltip>
       <Dialog open={open} onOpenChange={close} title="New group chat" width={400}>

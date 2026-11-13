@@ -458,6 +458,8 @@ function addShellStates({ base, projects, threads, tasks, seed }: { base: Record
     { ...base, id: "release", title: "Publish the release notes", activity: "waiting", liveRunId: "release-run" },
     { ...base, id: "audit", title: "Paginate the audit log in Settings", workspaceMode: "worktree", branch: "openorc/audit-log-5e2a1b", lastActivityAt: base.lastActivityAt - 5 * 86400000 },
     { ...base, id: "contrast", projectId: "website", title: "Chart colors fail contrast in dark mode", lastActivityAt: base.lastActivityAt - 9 * 86400000 },
+    { ...base, id: "sketch", title: "Sketch the empty states", branch: null, lastActivityAt: base.lastActivityAt - 2 * 3600000 },
+    { ...base, id: "week", projectId: "openorc-workspace", title: "Plan the week", branch: null, workingDirectory: "/Users/me/notes", lastActivityAt: base.lastActivityAt - 3 * 3600000 },
   );
   const proposed = {
     ...tasks[0]!,

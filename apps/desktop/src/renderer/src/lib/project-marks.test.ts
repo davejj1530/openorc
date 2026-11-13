@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ThreadSummary } from "@openorc/protocol";
 import { threadStatus } from "@openorc/client";
-import { markThread, workspaceMarks, workspaceSummary } from "./workspace-rail";
+import { markThread, projectMarks, projectMarkSummary } from "./project-marks";
 
 const now = Date.now();
 const thread = (id: string, projectId: string, patch: Partial<ThreadSummary> = {}) =>
@@ -22,9 +22,9 @@ const thread = (id: string, projectId: string, patch: Partial<ThreadSummary> = {
     ...patch,
   }) as ThreadSummary;
 
-describe("workspaceMarks", () => {
+describe("projectMarks", () => {
   it("shows a project's most pressing state: needs you, then a failure, then work, then a result waiting", () => {
-    const marks = workspaceMarks(
+    const marks = projectMarks(
       [
         thread("a1", "a", { unread: true }),
         thread("a2", "a", { activity: "running" }),
@@ -48,7 +48,7 @@ describe("workspaceMarks", () => {
 
   it("counts sub threads in their tree, and leaves out resolved trees, hidden threads and a subagent's unread result", () => {
     const old = now - 5 * 86_400_000;
-    const marks = workspaceMarks(
+    const marks = projectMarks(
       [
         thread("parent", "a"),
         thread("child", "a", { parentThreadId: "parent", parentRelation: "started", activity: "waiting" }),
@@ -66,16 +66,16 @@ describe("workspaceMarks", () => {
   });
 
   it("reads nothing into a list that has not arrived", () => {
-    expect(workspaceMarks(undefined, now).size).toBe(0);
+    expect(projectMarks(undefined, now).size).toBe(0);
   });
 });
 
-describe("workspaceSummary", () => {
+describe("projectMarkSummary", () => {
   it("says how many of each, most pressing first, leaving out what has none", () => {
-    expect(workspaceSummary({ kind: "waiting", counts: { unread: 2, waiting: 1 } })).toBe("1 needs you · 2 unread");
-    expect(workspaceSummary({ kind: "failed", counts: { running: 3, failed: 1 } })).toBe("1 failed · 3 working");
-    expect(workspaceSummary({ kind: "unread", counts: { background: 2, unread: 1 } })).toBe("1 unread · 2 with commands running");
-    expect(workspaceSummary(undefined)).toBe("");
+    expect(projectMarkSummary({ kind: "waiting", counts: { unread: 2, waiting: 1 } })).toBe("1 needs you · 2 unread");
+    expect(projectMarkSummary({ kind: "failed", counts: { running: 3, failed: 1 } })).toBe("1 failed · 3 working");
+    expect(projectMarkSummary({ kind: "unread", counts: { background: 2, unread: 1 } })).toBe("1 unread · 2 with commands running");
+    expect(projectMarkSummary(undefined)).toBe("");
   });
 });
 

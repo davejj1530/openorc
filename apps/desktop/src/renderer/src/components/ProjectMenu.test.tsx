@@ -86,9 +86,9 @@ it("keeps errors visible, prevents repeat submission while pending, and allows r
   expect(useLayout.getState().workspace).toBe("other");
 });
 
-it("keeps Workspace permanent", async () => {
-  show(WORKSPACE_ID, "Workspace");
+it("keeps No project permanent", async () => {
+  show(WORKSPACE_ID, "No project");
   expect(screen.queryByRole("button", { name: /Project options/ })).toBeNull();
-  fireEvent.contextMenu(await screen.findByRole("button", { name: "Workspace" }));
+  fireEvent.contextMenu(await screen.findByRole("button", { name: "No project" }));
   expect(screen.queryByRole("menuitem", { name: "Remove project…" })).toBeNull();
 });

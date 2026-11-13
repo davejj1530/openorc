@@ -136,3 +136,35 @@ it("moves from the heading through the other threads with the arrow keys", () =>
   fireEvent.keyDown(screen.getByRole("tab", { selected: true }), { key: "ArrowRight" });
   expect(useThreadTabs.getState().active).toBe("a");
 });
+
+it("keeps the heading's whole name in a narrow header, folding the other threads into a menu that opens them", async () => {
+  for (const id of ["t1", "t2", "t3"]) threads.set(id, thread(id, "codex"));
+  useThreadTabs.setState({
+    tabs: [
+      { id: "a", route: { view: "thread", threadId: "t1" } },
+      { id: "b", route: { view: "thread", threadId: "t2" } },
+      { id: "c", route: { view: "thread", threadId: "t3" } },
+    ],
+    active: "a",
+    leaving: [],
+  });
+  // Room for the heading's whole name and one tab at its narrowest, with the menu after it.
+  const widths: Record<string, Partial<Record<"clientWidth" | "offsetWidth" | "scrollWidth", number>>> = {
+    "thread-tabs-row": { clientWidth: 34 + 4 + 200 + 6 + 124 + 76 },
+    "thread-tab-heading": { offsetWidth: 200 },
+    "work-tab-title": { offsetWidth: 150, scrollWidth: 150 },
+    "work-tabs-new": { offsetWidth: 34 },
+  };
+  const measured = (key: "clientWidth" | "offsetWidth" | "scrollWidth") =>
+    vi.spyOn(HTMLElement.prototype, key, "get").mockImplementation(function (this: HTMLElement) {
+      const own = Object.keys(widths).find((name) => this.classList.contains(name) && !(name === "work-tab-title" && !this.closest(".thread-tab-heading")));
+      return own ? (widths[own]![key] ?? 0) : 0;
+    });
+  const spies = [measured("clientWidth"), measured("offsetWidth"), measured("scrollWidth")];
+  const { container } = render(<ThreadTabs />);
+  expect(order(container)).toEqual(["a", "b"]);
+  fireEvent.click(screen.getByRole("button", { name: "1 more open thread" }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: "t3" }));
+  expect(useThreadTabs.getState().active).toBe("c");
+  for (const spy of spies) spy.mockRestore();
+});

@@ -17,6 +17,7 @@ import { useRpcMutation } from "../lib/client";
 import { cn } from "../lib/cn";
 import { removeAcceptedAttachments, useComposerAttachments } from "../lib/composer-attachments";
 import { type MentionEntry } from "../lib/composer-mentions";
+import { useComposerFit } from "../lib/composer-fit";
 import { useComposerSubmission } from "../lib/composer-submission";
 import { formatBytes } from "../lib/file-imports";
 import { ComposerChoice } from "./ComposerChoice";
@@ -176,9 +177,31 @@ function chooseFiles(add: (files: File[]) => void): void {
   input.click();
 }
 
+/** Why the last send or stop failed, and a failed read of the changes with its retry. */
+function ComposerAlerts({ message, changes }: { message: ReactNode; changes: ComposerProps["changes"] }) {
+  return (
+    <>
+      {message ? (
+        <div role="alert" className="composer-alert">
+          {message}
+        </div>
+      ) : null}
+      {changes?.error ? (
+        <p role="status" className="composer-alert">
+          {changes.error}{" "}
+          <button type="button" className="underline" onClick={changes.onRetry}>
+            Retry
+          </button>
+        </p>
+      ) : null}
+    </>
+  );
+}
+
 export function Composer(props: ComposerProps) {
   const isNewThread = props.presentation === "new-thread";
   const shell = useRef<HTMLDivElement>(null);
+  const fitBar = useComposerFit();
   const files = useComposerAttachments({ draftKey: props.draftKey, disabledReason: props.attachmentsDisabledReason });
   const { attachments, uploading, addFiles, remove: removeAttachments } = files;
   const { value, onChange } = props;
@@ -244,19 +267,7 @@ export function Composer(props: ComposerProps) {
     <div className={cn("composer min-w-0", props.size === "lg" && "composer-large", isNewThread && "composer-new-thread")}>
       {isNewThread ? null : <ComposerChangesBar changes={props.changes} />}
       <div className="mb-2 grid grid-cols-1 gap-2 empty:hidden">{props.notices}</div>
-      {interrupt.error || files.error || submission?.error || props.error ? (
-        <div role="alert" className="composer-alert">
-          {interrupt.error ? `Couldn’t stop the agent. ${interrupt.error.message}` : files.error || submission?.error || props.error}
-        </div>
-      ) : null}
-      {props.changes?.error ? (
-        <p role="status" className="composer-alert">
-          {props.changes.error}{" "}
-          <button type="button" className="underline" onClick={props.changes.onRetry}>
-            Retry
-          </button>
-        </p>
-      ) : null}
+      <ComposerAlerts message={interrupt.error ? `Couldn’t stop the agent. ${interrupt.error.message}` : files.error || submission?.error || props.error} changes={props.changes} />
       <div ref={shell} className="composer-shell" data-dragging={drop.dragging || undefined} {...drop.handlers}>
         {attachments.length > 0 || uploading > 0 ? (
           <div className="composer-attachments">
@@ -311,7 +322,7 @@ export function Composer(props: ComposerProps) {
             </div>
           ) : null}
         </div>
-        <div className="composer-bar">
+        <div ref={fitBar} className="composer-bar">
           {/* Attach, then where and how the agent works. Chips truncate before the end group moves. */}
           <div className="composer-tools">
             <ComposerAttach onAttach={pickFiles} disabledReason={props.attachmentsDisabledReason} />

@@ -11,7 +11,7 @@ import { useUi } from "../lib/ui";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { useScrollEdges } from "../lib/use-scroll-edges";
 import { cn } from "../lib/cn";
-import { markThread, workspaceMarks, workspaceSummary, type WorkspaceMark } from "../lib/workspace-rail";
+import { markThread, projectMarks, projectMarkSummary, type ProjectMark } from "../lib/project-marks";
 import { Check, Folders, Plus, Settings, X } from "./icons";
 import { menuItem, menuItemDanger, menuPopup, menuSeparator } from "./menu";
 import { ProjectIcon } from "./ProjectIconPicker";
@@ -23,7 +23,7 @@ import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
  * Each project's mark, from the read of threads that need you across every project: the same read the list makes
  * while it shows every project, so it costs nothing more there.
  */
-export function useWorkspaceMarks(projectIds: readonly string[], enabled: boolean): Map<string, WorkspaceMark> {
+export function useProjectMarks(projectIds: readonly string[], enabled: boolean): Map<string, ProjectMark> {
   const homes = useOrclingChatIds();
   const now = useSidebarNow();
   const needsYou = useRpc(
@@ -31,7 +31,7 @@ export function useWorkspaceMarks(projectIds: readonly string[], enabled: boolea
     { projectIds: [...projectIds], filter: "active", orderBy: "activity", includeChildren: true, needsYou: true, limit: NEEDS_YOU_PAGE },
     { enabled, refetchInterval: 60_000 },
   );
-  return workspaceMarks(needsYou.data, now, homes);
+  return projectMarks(needsYou.data, now, homes);
 }
 
 const ALL_PROJECTS = "All projects";
@@ -40,8 +40,8 @@ const ALL_PROJECTS = "All projects";
 const inView = (row: HTMLElement | null) => row?.scrollIntoView?.({ block: "center" });
 
 /** One choice of whose threads to list: chosen or not, the project's icon and name, then its most pressing thread's mark. */
-function ScopeItem({ icon, name, chosen, mark, onSelect }: { icon: ReactNode; name: string; chosen: boolean; mark?: WorkspaceMark | undefined; onSelect: () => void }) {
-  const summary = workspaceSummary(mark);
+function ScopeItem({ icon, name, chosen, mark, onSelect }: { icon: ReactNode; name: string; chosen: boolean; mark?: ProjectMark | undefined; onSelect: () => void }) {
+  const summary = projectMarkSummary(mark);
   return (
     <Menu.Item ref={chosen ? inView : undefined} className={menuItem} aria-description={summary || undefined} onClick={onSelect}>
       <Check size={13} className={chosen ? "text-accent-ink" : "text-transparent"} />
@@ -65,7 +65,7 @@ export function ProjectScope() {
   const onSelect = (workspace: string) => useLayout.getState().setWorkspace(workspace);
   const { query: projects, all } = useSidebarProjects();
   const workspace = useLayout((s) => s.workspace);
-  const marks = useWorkspaceMarks(all, Boolean(projects.data));
+  const marks = useProjectMarks(all, Boolean(projects.data));
   const [removing, setRemoving] = useState(false);
   const edges = useScrollEdges();
   const project = workspace === ALL_WORKSPACES ? undefined : projects.data?.find((each) => each.id === workspace);

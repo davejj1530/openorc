@@ -43,14 +43,17 @@ export function threadPlace(thread: Pick<ThreadSummary, "branch" | "prUrl" | "pr
 }
 
 /**
- * The word a root row puts after its project for where its thread works: the cloud, a worktree of its own, or the
- * checkout's branch. A pull request already says where the work is, so beside one only the cloud shows, where the next
- * turn runs.
+ * The word a root row puts after its project for where its thread works: the cloud, a worktree of its own, the
+ * checkout's branch, or the checkout itself when it is on none. A thread in no project names its folder. A pull request
+ * already says where the work is, so beside one only the cloud shows, where the next turn runs.
  */
-export function workspaceLabel(thread: Pick<ThreadSummary, "workspaceMode" | "branch" | "prUrl" | "cloud" | "owner">): string | null {
+export function workspaceLabel(thread: Pick<ThreadSummary, "workspaceMode" | "branch" | "prUrl" | "cloud" | "owner" | "projectId" | "workingDirectory">): string | null {
   if (thread.cloud || thread.owner?.brain === "cloud") return "cloud";
   if (pullRequestNumber(thread.prUrl) !== null) return null;
-  return thread.workspaceMode === "worktree" ? "worktree" : thread.branch;
+  if (thread.workspaceMode === "worktree") return "worktree";
+  if (thread.branch) return thread.branch;
+  if (thread.projectId === WORKSPACE_ID) return thread.workingDirectory?.split(/[\\/]/).filter(Boolean).at(-1) ?? null;
+  return "checkout";
 }
 
 /** The title a rename saves: what was typed, trimmed, or null when it is empty or unchanged and nothing should save. */

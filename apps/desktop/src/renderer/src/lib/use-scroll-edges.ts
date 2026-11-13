@@ -6,7 +6,8 @@ const NONE: Edges = { start: false, end: false };
 
 /**
  * Which ends of a scrolling list have more past them, for `.scroll-edges` (or `.scroll-edges-x` across) to fade there.
- * Spread the result on the list: it measures when the list attaches, scrolls or changes size, and as its rows come and go.
+ * Spread the result on the list: it measures when the list attaches, scrolls, or it or one of its parts changes size, and
+ * as its rows come and go.
  */
 export function useScrollEdges(axis: "x" | "y" = "y") {
   const [edges, setEdges] = useState<Edges>(NONE);
@@ -23,9 +24,14 @@ export function useScrollEdges(axis: "x" | "y" = "y") {
       list.current = element;
       if (!element) return;
       measure();
+      // The list's own size and its parts': a group folding inside it changes what is past an end without resizing the list.
       const resized = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
-      resized?.observe(element);
-      const rows = new MutationObserver(measure);
+      const observe = () => [element, ...element.children].forEach((part) => resized?.observe(part));
+      observe();
+      const rows = new MutationObserver(() => {
+        observe();
+        measure();
+      });
       rows.observe(element, { childList: true });
       return () => {
         resized?.disconnect();

@@ -5,11 +5,11 @@ import { useLayout } from "./layout";
 import { useOrclingChatIds } from "./orclings";
 
 /** A host supplies this destination when it provides an Orcling browser. */
-export type OrclingsRailDestination = { active: boolean; open: () => void };
-export const OrclingsRailContext = createContext<OrclingsRailDestination | null>(null);
+export type OrclingsModeDestination = { active: boolean; open: () => void };
+export const OrclingsModeContext = createContext<OrclingsModeDestination | null>(null);
 
 /** Companion and project conversations occupy the same sidebar, remembering their own selection. */
-export function useOrclingsRail(route: Route, orclings: readonly Orcling[]) {
+export function useOrclingsMode(route: Route, orclings: readonly Orcling[]) {
   const chats = useOrclingChatIds();
   // An Orcling's own chat or a group chat of Orclings; either belongs to the Orclings side.
   const chat = route.view === "thread" && chats.has(route.threadId) ? route.threadId : null;

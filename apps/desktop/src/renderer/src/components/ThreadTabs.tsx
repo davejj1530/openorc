@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
+import { Menu } from "@base-ui/react/menu";
 import { threadStatus } from "@openorc/client";
 import { isHarnessId, type ThreadSummary } from "@openorc/protocol";
 import { useRpc } from "../lib/client";
 import { focusedProject, useLayout } from "../lib/layout";
 import { useThreadTabs, type ThreadTab } from "../lib/thread-tabs";
-import { useScrollEdges } from "../lib/use-scroll-edges";
+import { CoversPreview } from "../lib/browser-preview";
+import { floatingGround } from "../lib/use-anchor-ground";
+import { TAB_MIN, tabsShown } from "../lib/tab-fit";
 import { useStripHandoff } from "../lib/strip-handoff";
 import { useTabReorder } from "../lib/use-tab-reorder";
 import { orclingById, useOrclingGroups, useOrclings } from "../lib/orclings";
@@ -14,6 +17,7 @@ import { OrclingAvatar } from "./OrclingAvatar";
 import { OrclingFaces } from "./OrclingFaces";
 import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
 import { IconButton, Tooltip } from "./ui";
+import { menuItem, menuPopup } from "./menu";
 
 /**
  * A tab's glyph and name: a thread's own state while it has one to show, else the mark of the agent it runs on, which
@@ -62,18 +66,80 @@ function TabGlyph({ thread }: { thread: ThreadSummary | null | undefined }) {
 
 /*
  * A thread and a new thread are different screens, each drawing the strip in its own header, so switching tabs can
- * draw it anew. What it has shown, how wide each tab was and how far it scrolled outlive one drawing: a tab arrives
- * once, when it is first shown, the rest ease from where they were, and the strip opens where it was. Tabs restored at
- * launch were never new.
+ * draw it anew. What it has shown and how wide each tab was outlive one drawing: a tab arrives once, when it is first
+ * shown, and the rest ease from where they were. Tabs restored at launch were never new.
  */
 const shown = new Set(useThreadTabs.getState().tabs.map((tab) => tab.id));
-let scrolled = 0;
+
+/** A tab's margin after it, the strip's padding, and the room the More button takes with the space before it. */
+const TAB_SPACE = 4;
+const STRIP_PADDING = 4;
+const MORE_ROOM = 76;
+const HEADING_GAP = 6;
+
+/**
+ * How many other open threads fit as tabs, measured from the header's room and the heading's whole name, again whenever
+ * the header changes size, a name in it arrives or changes, or the fonts finish loading.
+ */
+function useTabsShown(row: RefObject<HTMLDivElement | null>, count: number): number {
+  const [fitting, setFitting] = useState(count);
+  const measure = useCallback(() => {
+    const element = row.current;
+    if (!element) return;
+    // A header that has not been laid out yet, or is hidden, has no room to measure; it shows every tab until it does.
+    if (!element.clientWidth) return setFitting(count);
+    const heading = element.querySelector<HTMLElement>(".thread-tab-heading");
+    const title = heading?.querySelector<HTMLElement>(".work-tab-title");
+    const plus = element.querySelector<HTMLElement>(".work-tabs-new");
+    const whole = heading && title ? heading.offsetWidth - title.offsetWidth + title.scrollWidth : 0;
+    const room = element.clientWidth - (plus?.offsetWidth ?? 0) - STRIP_PADDING;
+    setFitting(tabsShown({ room, heading: whole, count, tab: TAB_MIN + TAB_SPACE, more: MORE_ROOM, gap: HEADING_GAP }));
+  }, [row, count]);
+  useLayoutEffect(measure);
+  useEffect(() => {
+    const element = row.current;
+    if (!element) return;
+    const resized = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    resized?.observe(element);
+    const names = new MutationObserver(measure);
+    names.observe(element, { childList: true, subtree: true, characterData: true });
+    void document.fonts?.ready.then(measure);
+    return () => {
+      resized?.disconnect();
+      names.disconnect();
+    };
+  }, [row, measure]);
+  return fitting;
+}
+
+/** The open threads past the header's room, as a menu after the tabs: choosing one makes it the heading. */
+function MoreTabs({ tabs, onSelect }: { tabs: ThreadTab[]; onSelect: (id: string) => void }) {
+  return (
+    <Menu.Root>
+      <Menu.Trigger className="thread-tabs-more" aria-label={`${tabs.length} more open ${tabs.length === 1 ? "thread" : "threads"}`}>
+        {tabs.length} more
+      </Menu.Trigger>
+      <Menu.Portal>
+        <CoversPreview />
+        <Menu.Positioner side="bottom" align="start" sideOffset={6} collisionPadding={8} className="z-40">
+          <Menu.Popup ref={floatingGround} className={menuPopup}>
+            {tabs.map((tab) => (
+              <Menu.Item key={tab.id} className={menuItem} onClick={() => onSelect(tab.id)}>
+                <TabFace tab={tab} />
+              </Menu.Item>
+            ))}
+          </Menu.Popup>
+        </Menu.Positioner>
+      </Menu.Portal>
+    </Menu.Root>
+  );
+}
 
 /**
  * The work column's heading and its other open threads. The open thread's name leads the header in title ink, as the
  * column's heading rather than a tab among tabs, with its close on hover. The others follow as tabs on the soft fill,
- * in the order they were opened or dragged to, scrolling sideways once they outgrow the bar; + opens a new thread in a
- * tab of its own. Choosing another tab makes it the heading and puts the one it replaces back in its place among them.
+ * in the order they were opened or dragged to. Short of room they shrink, then the last of them move into a More menu,
+ * and only once all of them are there does the heading's name give way; + opens a new thread in a tab of its own. Choosing another tab makes it the heading and puts the one it replaces back in its place among them.
  * Arrow keys, Home and End move from the heading through the others, and dragging a tab along the strip reorders them.
  * `title` stands in for the heading's name while it is renamed, and `onRename` starts that from a double-click.
  */
@@ -86,18 +152,14 @@ export function ThreadTabs({ title, onRename }: { title?: ReactNode; onRename?: 
   const arriving = new Set(tabs.filter((tab) => !shown.has(tab.id)).map((tab) => tab.id));
   const current = tabs.find((tab) => tab.id === active && !leaving.includes(tab.id));
   const others = tabs.filter((tab) => tab !== current);
-  const reachable = [...(current ? [current] : []), ...others.filter((tab) => !leaving.includes(tab.id))];
+  const staying = others.filter((tab) => !leaving.includes(tab.id));
+  const row = useRef<HTMLDivElement | null>(null);
+  const shownCount = useTabsShown(row, staying.length);
+  const folded = staying.slice(shownCount);
+  const inStrip = others.filter((tab) => !folded.includes(tab));
+  const reachable = [...(current ? [current] : []), ...staying.slice(0, shownCount)];
   const list = useRef<HTMLDivElement | null>(null);
   const strip = useRef<HTMLDivElement | null>(null);
-  const { ref: measureEdges, ...edges } = useScrollEdges("x");
-  const attach = useCallback(
-    (element: HTMLDivElement | null) => {
-      strip.current = element;
-      if (element) element.scrollLeft = scrolled;
-      return measureEdges(element);
-    },
-    [measureEdges],
-  );
   useStripHandoff(strip, (id) => arriving.has(id));
   useEffect(() => {
     for (const id of arriving) shown.add(id);
@@ -137,7 +199,7 @@ export function ThreadTabs({ title, onRename }: { title?: ReactNode; onRename?: 
     </button>
   );
   return (
-    <div className="work-tabs-row thread-tabs-row no-drag">
+    <div ref={row} className="work-tabs-row thread-tabs-row no-drag">
       <div ref={list} className="thread-tabs" role="tablist" aria-label="Open threads">
         {current ? (
           <div key={current.id} data-tab={current.id} className="thread-tab-heading">
@@ -145,19 +207,9 @@ export function ThreadTabs({ title, onRename }: { title?: ReactNode; onRename?: 
             {closeButton(current)}
           </div>
         ) : null}
-        {others.length ? (
-          <div
-            {...edges}
-            ref={attach}
-            className="work-tabs scroll-edges-x"
-            role="presentation"
-            onPointerDown={onPointerDown}
-            onScroll={(event) => {
-              scrolled = event.currentTarget.scrollLeft;
-              edges.onScroll();
-            }}
-          >
-            {others.map((tab) => {
+        {inStrip.length ? (
+          <div ref={strip} className="work-tabs" role="presentation" onPointerDown={onPointerDown}>
+            {inStrip.map((tab) => {
               const folding = leaving.includes(tab.id);
               return (
                 <div key={tab.id} data-tab={tab.id} className="work-tab" data-leaving={folding || undefined} inert={folding}>
@@ -168,6 +220,7 @@ export function ThreadTabs({ title, onRename }: { title?: ReactNode; onRename?: 
             })}
           </div>
         ) : null}
+        {folded.length ? <MoreTabs tabs={folded} onSelect={select} /> : null}
       </div>
       <Tooltip label="New tab">
         <IconButton aria-label="New tab" className="work-tabs-new" onClick={() => open(projectId ?? undefined)}>

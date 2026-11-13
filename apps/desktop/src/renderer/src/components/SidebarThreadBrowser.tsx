@@ -44,6 +44,7 @@ import { ThreadTreeList } from "./ThreadTreeList";
 import { menuItem, menuPopup, menuSeparator } from "./menu";
 import { IconButton, Tooltip } from "./ui";
 import { floatingGround } from "../lib/use-anchor-ground";
+import { useScrollEdges } from "../lib/use-scroll-edges";
 import { cn } from "../lib/cn";
 
 /** Every project, and every project's id with the Workspace's, which the list reads all of. */
@@ -181,9 +182,9 @@ function dayList({ pages, pinPage, needsYouPage, resolvedPage, pinnedOnly, activ
   return sidebarDayList({ pages, pins: pinPage, needsYou: needsYouPage, resolved: resolvedPage, pinnedOnly, activeId, now });
 }
 
-/** The groups' projects in the order projects come, then the Workspace, whose threads belong to no project. */
+/** The groups' projects in the order projects come, then No project, for the Workspace's threads, which belong to none. */
 function groupProjects(projects: readonly { id: string; name: string; rootPath: string }[] | undefined): GroupProject[] {
-  return [...(projects ?? []).map(({ id, name, rootPath }) => ({ id, name, rootPath })), { id: WORKSPACE_ID, name: "Workspace" }];
+  return [...(projects ?? []).map(({ id, name, rootPath }) => ({ id, name, rootPath })), { id: WORKSPACE_ID, name: "No project" }];
 }
 
 /**
@@ -253,12 +254,13 @@ function ThreadGroups({ children }: { children: ChildPages }) {
     <ThreadTreeList childLimits={children.limits} onShowMore={children.showMore} roots={roots} all={list.all} activeId={activeId} projects={mixed ? named : undefined} />
   );
   const toggle = (fold: string) => () => useLayout.getState().toggleCollapsed(fold);
+  const edges = useScrollEdges();
   const waiting = waitingRoots(list.pinned, list.all) + groups.reduce((sum, group) => sum + group.waiting, 0);
   return (
     <section className="sidebar-workspaces" data-open={open || undefined} aria-label="Workspaces">
       <SidebarListHead label="Workspaces" fold={{ open, waiting, onToggle: toggle(WORKSPACES_FOLD) }} tools={<ListTools />} />
       <div className="conversation-browser" hidden={!open}>
-        <div className="browser-threads" data-drop={reopen.over || undefined} {...reopen.props}>
+        <div {...edges} className="browser-threads scroll-edges" data-drop={reopen.over || undefined} {...reopen.props}>
           <ProjectsFailed projects={projects} />
           {list.pinned.length ? (
             <Section label="Pinned" count={list.pinned.length} open={pinsOpen} onToggle={toggle(sidebarFoldKey.pinned(SIDEBAR_LIST))}>

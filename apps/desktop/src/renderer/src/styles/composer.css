@@ -141,55 +141,18 @@
   gap: 8px;
   min-width: 0;
 }
-/* One row that never wraps: when the composer is too narrow for every chip, the row scrolls sideways and fades at
-   the edge that has more. The padding keeps focus rings inside the scroller; the margins put the chips back. */
+/* One row that never wraps and never clips: as the composer narrows, the chips give up words in steps (below), keeping
+   their marks, so everything stays whole down to the narrowest thread pane. The negative margin puts the chips back where the attach button's padding left them. */
 .composer-tools {
   display: flex;
   flex: 1 1 auto;
   align-items: center;
   gap: 6px;
   min-width: 0;
-  margin: -4px 0 -4px -8px;
-  padding: 4px;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scrollbar-width: none;
+  margin-left: -4px;
 }
-/* Chips keep their width here, so a tight composer scrolls the row instead of squeezing every label. */
 .composer-bar .composer-tools > * {
   flex-shrink: 0;
-}
-@property --tools-fade-start {
-  syntax: "<length>";
-  inherits: false;
-  initial-value: 0px;
-}
-@property --tools-fade-end {
-  syntax: "<length>";
-  inherits: false;
-  initial-value: 0px;
-}
-@supports (animation-timeline: scroll()) {
-  .composer-tools {
-    mask-image: linear-gradient(to right, transparent, #000 var(--tools-fade-start), #000 calc(100% - var(--tools-fade-end)), transparent);
-    animation: composer-tools-fade linear both;
-    animation-timeline: scroll(self inline);
-  }
-}
-@keyframes composer-tools-fade {
-  0% {
-    --tools-fade-start: 0px;
-    --tools-fade-end: 24px;
-  }
-  8%,
-  92% {
-    --tools-fade-start: 24px;
-    --tools-fade-end: 24px;
-  }
-  100% {
-    --tools-fade-start: 24px;
-    --tools-fade-end: 0px;
-  }
 }
 .composer-end {
   display: flex;
@@ -1324,10 +1287,20 @@
   color: var(--warn);
 }
 
-/* Narrow: chips truncate first, then the folder; at 440px the end group keeps its row. */
-@container composer (max-width: 440px) {
-  .composer-chip,
-  .composer-model-trigger {
-    max-width: 160px;
-  }
+/* Narrow: the chips give up words a step at a time (lib/composer-fit.ts picks the step); their names stay in their
+   labels and hover titles. */
+.composer-bar:is([data-fit="no-effort"], [data-fit="marks"], [data-fit="logos"]) .composer-model-effort {
+  display: none;
+}
+.composer-bar:is([data-fit="marks"], [data-fit="logos"]) .composer-chip {
+  padding-inline: 8px;
+}
+.composer-bar:is([data-fit="marks"], [data-fit="logos"]) :is(.composer-chip-label, .composer-location > span) {
+  display: none;
+}
+.composer-bar[data-fit="logos"] .composer-model-trigger {
+  padding-inline: 8px;
+}
+.composer-bar[data-fit="logos"] .composer-model-name {
+  display: none;
 }

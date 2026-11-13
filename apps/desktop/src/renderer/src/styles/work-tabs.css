@@ -151,8 +151,12 @@
 }
 
 /* The work column's header: the open thread's name as the column's heading, 15px in title ink with no pill, taking the
-   room its name needs; the other open threads follow as tabs. Their strip gives way first, down to 96px so the next
-   tab always shows; past that the heading truncates too. */
+   room its name needs up to 420px; the other open threads follow as tabs. The tabs give way first, down to their
+   narrowest, and ThreadTabs moves those that still do not fit into the More menu; the heading truncates only once all
+   of them are there. The row takes the header's room so ThreadTabs can measure it; + still follows the last tab. */
+.thread-tabs-row {
+  flex: 1 1 auto;
+}
 .thread-tabs {
   display: flex;
   align-items: center;
@@ -162,10 +166,10 @@
 .thread-tab-heading {
   position: relative;
   display: flex;
-  flex: none;
+  flex: 0 1 auto;
   align-items: center;
-  min-width: 96px;
-  max-width: min(420px, 100%);
+  min-width: 0;
+  max-width: 420px;
   height: var(--control-md);
   color: var(--ink);
 }
@@ -183,12 +187,39 @@
 .thread-tab-heading:is(:hover, :focus-within) .work-tab-close {
   opacity: 1;
 }
-.thread-tab-heading:not(:only-child) {
-  max-width: min(420px, calc(100% - 102px));
-}
+/* While tabs show beside it the heading keeps its whole name and the tabs ThreadTabs left in the strip shrink to their
+   narrowest; with every other thread in the menu, the heading gives way. */
 .thread-tabs .work-tabs {
   flex: 0 1 auto;
-  min-width: 96px;
+  min-width: 0;
+}
+.thread-tabs:has(> .work-tabs) > .thread-tab-heading {
+  flex-shrink: 0;
+}
+/* The narrowest a tab gets beside the heading: TAB_MIN in lib/tab-fit.ts. */
+.thread-tabs .work-tab {
+  min-width: 120px;
+}
+.thread-tabs-more {
+  flex: none;
+  height: var(--control-sm);
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  background-color: var(--surface-2);
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
+}
+.thread-tabs-more:is(:hover, [data-popup-open]) {
+  background-color: var(--surface-3);
+  color: var(--ink-2);
+}
+.thread-tabs-more:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
 .work-tab:is(:hover, .work-tab-current) .work-tab-close,
 .work-tab-close:focus-visible {

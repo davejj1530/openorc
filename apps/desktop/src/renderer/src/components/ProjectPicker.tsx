@@ -14,7 +14,7 @@ type PickerProject = { id: string; name: string; rootPath?: string };
 const FILTER_FROM = 8;
 
 function projectLabel(project: PickerProject): string {
-  return project.id === WORKSPACE_ID ? "Workspace" : project.name;
+  return project.id === WORKSPACE_ID ? "No project" : project.name;
 }
 
 function ProjectOption({ project, selected, onSelect }: { project: PickerProject; selected: boolean; onSelect: () => void }) {

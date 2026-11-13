@@ -2,11 +2,11 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import type { MessagePortMain } from "electron";
 import type { HostChoice } from "../shared/host";
-import { distroPaths, useHostPaths } from "./host";
+import { distroPaths, useHostPaths, wslProfile } from "./host";
 import { WslCore } from "./wsl/core";
 import { standInDistro, wslDistro, type Distro } from "./wsl/distro";
 import { listDistros, type WslDistroInfo } from "./wsl/distros";
-import { startWslCore } from "./wsl/start";
+import { startWslCore, type WslPlace } from "./wsl/start";
 
 /**
  * A core as main holds it, wherever it runs: Electron's utility process on this computer, or the relay to a core
@@ -68,8 +68,8 @@ export function hostCores(input: {
 }): HostCores {
   const platform = input.platform ?? process.platform;
   const stand = standIn(input.qa, input.env ?? process.env);
-  /** The profile folder of the core started last, inside its distribution. Each start has its own, so one that was ended cannot name the next one's. */
-  let started: { profile: string | null } = { profile: null };
+  /** Where the core started last keeps its files, inside its distribution. Each start has its own, so one that was ended cannot name the next one's. */
+  let started: { place: WslPlace | null } = { place: null };
   return {
     choice(chosen) {
       if (chosen.kind !== "wsl") return chosen;
@@ -79,9 +79,9 @@ export function hostCores(input: {
     distros: async () => (stand ? [{ name: stand.name, default: true, version: null }] : listDistros(platform)),
     start(name) {
       const distro = stand?.name === name ? stand.distro() : wslDistro(name);
-      const mine: { profile: string | null } = { profile: null };
+      const mine: { place: WslPlace | null } = { place: null };
       started = mine;
-      useHostPaths(distroPaths(distro, () => mine.profile, path.join(input.userData, "wsl", "not-started")));
+      useHostPaths(distroPaths(distro, () => mine.place?.dataDir ?? null, path.join(input.userData, "wsl", "not-started")));
       return startWslCore({
         distro,
         coreDir: input.coreDir,
@@ -89,7 +89,8 @@ export function hostCores(input: {
         fileKey: input.fileKey,
         qa: input.qa,
         fetchNode: input.fetchNode,
-        profile: (dataDir) => (mine.profile = dataDir),
+        profile: () => wslProfile(path.join(input.userData, "wsl-profile")),
+        placed: (place) => (mine.place = place),
       });
     },
     secretsDir(host) {
@@ -99,7 +100,6 @@ export function hostCores(input: {
       mkdirSync(dir, { recursive: true });
       return dir;
     },
-    // The profile sits two folders under the home: ~/.openorc-wsl/data.
-    home: () => (started.profile ? path.posix.dirname(path.posix.dirname(started.profile)) : null),
+    home: () => started.place?.home ?? null,
   };
 }

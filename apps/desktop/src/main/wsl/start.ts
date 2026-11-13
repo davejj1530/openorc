@@ -2,7 +2,7 @@ import { readFile, readdir, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { WslCore, type CoreChild } from "./core";
 import type { Distro } from "./distro";
-import { ensureRuntime, WslSetupError, type CarriedFile, type RuntimeSource } from "./runtime";
+import { ensureRuntime, profileData, WslSetupError, type CarriedFile, type RuntimeSource } from "./runtime";
 
 /** What `pnpm --filter @openorc/desktop bundle:wsl` writes, named by what it holds. */
 const CORE = /^wsl-core-([A-Za-z0-9._-]{1,64})\.tgz$/;
@@ -24,6 +24,14 @@ export async function carriedBrain(dir: string | null): Promise<CarriedFile[]> {
   return names.map((name) => ({ name, read: () => readFile(join(dir, name)) }));
 }
 
+/** Where a core's files are inside its distribution, as the distribution names them. */
+export interface WslPlace {
+  /** The user's home folder. */
+  home: string;
+  /** The profile the core keeps. */
+  dataDir: string;
+}
+
 export interface WslCoreInput {
   distro: Distro;
   /** The folder the app carries the core's archive in. */
@@ -35,8 +43,10 @@ export interface WslCoreInput {
   qa: boolean;
   /** Downloads Node's archive, through the app's own network stack so a proxy the PC uses is honoured. */
   fetchNode(url: string, signal?: AbortSignal): Promise<Buffer>;
-  /** Hears where the core keeps its profile inside the distribution, once the distribution has said where home is. */
-  profile(dataDir: string): void;
+  /** Names this application data folder's profile inside the distribution. A failure to say is the start's. */
+  profile(): string;
+  /** Hears where the core's files are inside the distribution, once the distribution has said where home is. */
+  placed(place: WslPlace): void;
   log?(line: string): void;
 }
 
@@ -48,12 +58,14 @@ export function startWslCore(input: WslCoreInput): WslCore {
   return new WslCore(async (progress, signal) => {
     const core = await carriedCore(input.coreDir);
     if (!core) throw new WslSetupError("This build of OpenOrc carries no core for WSL. Build it with pnpm --filter @openorc/desktop bundle:wsl, or install a release.");
+    const profile = input.profile();
     const runtime = await ensureRuntime(input.distro, { core, brain: await carriedBrain(input.brainDir), fetchNode: input.fetchNode }, progress, undefined, signal);
     // Ended while the distribution was made ready: nothing is started there, and main's paths now belong to another core.
     signal.throwIfAborted();
-    input.profile(runtime.dataDir);
+    const place: WslPlace = { home: runtime.home, dataDir: profileData(runtime.home, profile) };
+    input.placed(place);
     progress(`Starting OpenOrc in ${input.distro.name}…`);
     const child = input.distro.spawn(runtime.command) as unknown as CoreChild;
-    return { child, start: { t: "start", dataDir: runtime.dataDir, fileKey: input.fileKey, ...(input.qa ? { qa: true } : {}) } };
+    return { child, start: { t: "start", dataDir: place.dataDir, fileKey: input.fileKey, ...(input.qa ? { qa: true } : {}) } };
   }, input.log);
 }

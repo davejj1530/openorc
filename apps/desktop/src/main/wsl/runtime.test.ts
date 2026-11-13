@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { standInDistro, type Distro } from "./distro";
-import { ALREADY_RUNNING, ensureRuntime, parseProbe, SETUP_SCRIPT, unsupported, WslSetupError, type NodeRelease, type Probe, type RuntimeSource } from "./runtime";
+import { ALREADY_RUNNING, ensureRuntime, parseProbe, profileData, SETUP_SCRIPT, unsupported, WslSetupError, type NodeRelease, type Probe, type RuntimeSource } from "./runtime";
 
 // The scripts run in a real /bin/sh with a real tar, against a home made for the test. The installer refuses any
 // machine but the one the core is built for, x64 Linux with glibc, so only there is there anything to install into.
@@ -66,10 +66,11 @@ function fixture(coreVersion = "abc123") {
 
 describe.runIf(installable)("installing the core's runtime in a distribution", () => {
   it("installs Node and the core on the first start, and says how to start it", async () => {
-    const { distro, source, node, root, fetched } = fixture();
+    const { distro, source, node, home, root, fetched } = fixture();
     const steps: string[] = [];
     const runtime = await ensureRuntime(distro, source, (text) => steps.push(text), node.release);
-    expect(runtime).toEqual({ command: ["/bin/sh", ".openorc-wsl/setup.sh", "start", "24.0.1", "abc123"], dataDir: `${root}/data` });
+    expect(runtime).toEqual({ command: ["/bin/sh", ".openorc-wsl/setup.sh", "start", "24.0.1", "abc123"], home });
+    expect(profileData(runtime.home, "0123456789abcdef")).toBe(`${root}/profiles/0123456789abcdef/data`);
     expect(execFileSync(`${root}/node/24.0.1/bin/node`, ["--version"], { encoding: "utf8" }).trim()).toBe("v24.0.1");
     expect(readFileSync(`${root}/app/abc123/core.mjs`, "utf8")).toBe("// core\n");
     expect(readFileSync(`${root}/setup.sh`, "utf8")).toBe(SETUP_SCRIPT);
@@ -106,14 +107,37 @@ describe.runIf(installable)("installing the core's runtime in a distribution", (
     expect(steps).toEqual(["Starting Ubuntu…"]);
   });
 
-  it("replaces the core an older app left, and keeps the profile beside it", async () => {
+  it.runIf(lockable)("removes what an older app left only once its own core starts, and keeps the profiles beside it", async () => {
     const { distro, source, node, root } = fixture("old111");
     await ensureRuntime(distro, source, undefined, node.release);
-    mkdirSync(path.join(root, "data"));
-    writeFileSync(path.join(root, "data", "ledger.db"), "kept");
-    await ensureRuntime(distro, { ...source, core: { ...source.core, version: "new222" } }, undefined, node.release);
-    expect(readdirSync(path.join(root, "app"))).toEqual(["new222"]);
-    expect(readFileSync(path.join(root, "data", "ledger.db"), "utf8")).toBe("kept");
+    const ledger = path.join(profileData(path.dirname(root), "0123456789abcdef"), "ledger.db");
+    mkdirSync(path.dirname(ledger), { recursive: true });
+    writeFileSync(ledger, "kept");
+    // What a setup that was ended mid-unpack left behind, and what one still running is unpacking into.
+    const ended = `gone333.partial.${spawnSync("true").pid}`;
+    const unpacking = `soon444.partial.${process.pid}`;
+    for (const partial of [ended, unpacking]) mkdirSync(path.join(root, "app", partial));
+    const runtime = await ensureRuntime(distro, { ...source, core: { ...source.core, version: "new222" } }, undefined, node.release);
+    expect(readdirSync(path.join(root, "app")).sort()).toEqual([ended, "new222", "old111", unpacking].sort());
+    expect((await distro.run(runtime.command)).code).toBe(0);
+    expect(readdirSync(path.join(root, "app")).sort()).toEqual(["new222", unpacking]);
+    expect(readdirSync(path.join(root, "node"))).toEqual(["24.0.1"]);
+    expect(readFileSync(ledger, "utf8")).toBe("kept");
+  });
+
+  it.runIf(lockable)("leaves a running core's files alone when another app installs its own core and is refused", async () => {
+    const { distro, source, node, root } = fixture("run111");
+    const runtime = await ensureRuntime(distro, source, undefined, node.release);
+    writeFileSync(`${root}/node/24.0.1/bin/node`, "#!/bin/sh\necho up >&3\ncat >/dev/null\n");
+    const running = distro.spawn(runtime.command);
+    await new Promise((resolve) => running.stdout.once("data", resolve));
+    const other = await ensureRuntime(distro, { ...source, core: { ...source.core, version: "new222" } }, undefined, node.release);
+    expect((await distro.run(other.command)).code).toBe(ALREADY_RUNNING);
+    // The running core still loads files from its folder as it goes.
+    expect(readFileSync(`${root}/app/run111/core.mjs`, "utf8")).toBe("// core\n");
+    const gone = new Promise((resolve) => running.once("close", resolve));
+    running.stdin.end();
+    await gone;
   });
 
   it("refuses a Node that is not the one it expects, and leaves nothing installed", async () => {
@@ -160,7 +184,7 @@ describe.runIf(installable)("installing the core's runtime in a distribution", (
     expect(statSync(root).mode & 0o777).toBe(0o700);
   });
 
-  it.runIf(lockable)("refuses a second core on a profile while one runs there, and starts one again once it has gone", async () => {
+  it.runIf(lockable)("refuses a second core in a distribution while one runs there, and starts one again once it has gone", async () => {
     const { distro, source, node, root } = fixture();
     const runtime = await ensureRuntime(distro, source, undefined, node.release);
     // Stands in for Node: says it is up on descriptor 3, then runs until its input ends, as the core does.
@@ -172,6 +196,36 @@ describe.runIf(installable)("installing the core's runtime in a distribution", (
     running.stdin.end();
     await gone;
     expect((await distro.run(runtime.command)).code).toBe(0);
+  });
+
+  it.runIf(lockable)("keeps the lock and the frames from a program the core starts, so one that outlives the core holds neither", async () => {
+    const { distro, source, node, root } = fixture();
+    const runtime = await ensureRuntime(distro, source, undefined, node.release);
+    // A real Node as the core, as in a distribution: it starts a program that outlives it, names it in a frame, and leaves.
+    writeFileSync(`${root}/node/24.0.1/bin/node`, `#!/bin/sh\nexec "${process.execPath}" "$@"\n`);
+    writeFileSync(
+      `${root}/app/abc123/core.mjs`,
+      [
+        'import { spawn } from "node:child_process";',
+        'import { writeSync } from "node:fs";',
+        'const left = spawn("sleep", ["30"], { detached: true, stdio: "ignore" });',
+        "left.unref();",
+        "writeSync(3, `${left.pid}\\n`);",
+      ].join("\n"),
+    );
+    const left: number[] = [];
+    try {
+      // Each run ends for main only once every holder of its frames has gone, so reaching the next line is the proof for those.
+      const first = await distro.run(runtime.command);
+      left.push(Number(first.stdout.toString("utf8")));
+      expect(first.code).toBe(0);
+      expect(readdirSync(`/proc/${left[0]}/fd`).sort()).toEqual(["0", "1", "2"]);
+      const second = await distro.run(runtime.command);
+      left.push(Number(second.stdout.toString("utf8")));
+      expect(second.code).toBe(0);
+    } finally {
+      for (const pid of left) if (pid) process.kill(pid, "SIGKILL");
+    }
   });
 
   it("stops between steps once nobody waits for it, and installs nothing more", async () => {

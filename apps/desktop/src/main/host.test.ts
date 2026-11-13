@@ -1,8 +1,8 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { distroPaths, HostPreferences, localPaths } from "./host";
+import { distroPaths, HostPreferences, localPaths, wslProfile } from "./host";
 import { hostCores } from "./host-core";
 import { closeWhenIdle, placeFolder } from "./host-controls";
 import { wslDistro } from "./wsl/distro";
@@ -59,6 +59,25 @@ describe("where the core runs", () => {
     expect(cores.secretsDir({ kind: "local" })).toBe(userData);
     expect(cores.secretsDir({ kind: "wsl", distro: "Ubuntu" })).toBe(path.join(userData, "wsl", "ubuntu"));
   });
+
+  it("names each application data folder's profile in a distribution once, and differently from another folder's", () => {
+    const file = path.join(folder(), "wsl-profile");
+    const name = wslProfile(file);
+    expect(name).toMatch(/^[0-9a-f]{16}$/);
+    expect(wslProfile(file)).toBe(name);
+    expect(readFileSync(file, "utf8")).toBe(`${name}\n`);
+    expect(wslProfile(path.join(folder(), "wsl-profile"))).not.toBe(name);
+    // A file that names nothing has no profile behind it to lose.
+    writeFileSync(file, "");
+    expect(wslProfile(file)).toMatch(/^[0-9a-f]{16}$/);
+  });
+
+  it("refuses a name it cannot read rather than start a new profile over it", () => {
+    const file = path.join(folder(), "wsl-profile");
+    writeFileSync(file, "../../etc\n");
+    expect(() => wslProfile(file)).toThrow("does not name a profile");
+    expect(readFileSync(file, "utf8")).toBe("../../etc\n");
+  });
 });
 
 describe("paths between main and the core", () => {
@@ -77,8 +96,8 @@ describe("paths between main and the core", () => {
     expect(paths.toCore("\\\\wsl.localhost\\Ubuntu\\home\\me\\repo")).toBe("/home/me/repo");
     expect(paths.toCore("C:\\Users\\me\\repo")).toBeNull();
     expect(paths.dataDir()).toBe("C:\\nowhere");
-    profile = "/home/me/.openorc-wsl/data";
-    expect(paths.dataDir()).toBe("\\\\wsl$\\Ubuntu\\home\\me\\.openorc-wsl\\data");
+    profile = "/home/me/.openorc-wsl/profiles/0123456789abcdef/data";
+    expect(paths.dataDir()).toBe("\\\\wsl$\\Ubuntu\\home\\me\\.openorc-wsl\\profiles\\0123456789abcdef\\data");
   });
 });
 

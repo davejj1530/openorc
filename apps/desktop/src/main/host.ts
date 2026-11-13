@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import type { HostChoice } from "../shared/host";
 import type { Distro } from "./wsl/distro";
@@ -25,6 +26,32 @@ export class HostPreferences {
     writeFileSync(`${this.file}.tmp`, `${JSON.stringify({ host })}\n`);
     renameSync(`${this.file}.tmp`, this.file);
   }
+}
+
+const PROFILE = /^[0-9a-f]{16}$/;
+
+/**
+ * The name of this application data folder's profile inside a distribution, kept in `file` there and made the first
+ * time it is asked for. A folder's secrets for a distribution stay in the folder, so its ledger there has to be its
+ * own too: a second folder on this PC, such as a test's, never opens the first one's conversations.
+ */
+export function wslProfile(file: string): string {
+  let kept = "";
+  try {
+    kept = readFileSync(file, "utf8").trim();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+  if (kept) {
+    // Never a new name over one that cannot be read: that would leave the profile it named behind for good.
+    if (!PROFILE.test(kept)) throw new Error(`${file} does not name a profile.`);
+    return kept;
+  }
+  const name = randomBytes(8).toString("hex");
+  // On disk before it is used: a name lost to a power cut would leave the profile made under it behind.
+  writeFileSync(`${file}.tmp`, `${name}\n`, { flush: true });
+  renameSync(`${file}.tmp`, file);
+  return name;
 }
 
 /**

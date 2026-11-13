@@ -16,18 +16,20 @@ A switch waits for work to finish, and for more than an update does, because the
 
 The first start in a distribution installs what the core needs into `~/.openorc-wsl` there:
 
-| Folder            | Holds                                                                                                                           |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `node/<version>/` | The core's own Node, downloaded from `nodejs.org` and checked against a SHA-256 pinned in the app. Your own Node is left alone. |
-| `app/<version>/`  | The core this version of the app carries. A newer app replaces it.                                                              |
-| `brain/`          | The cloud brain the app installs, for Settings → Cloud.                                                                         |
-| `data/`           | The profile: the ledger, attachments, and managed workspaces.                                                                   |
-| `setup.sh`        | The script the app installs and starts the core with. Rewritten at each start.                                                  |
-| `core.lock`       | Held by the core while it runs, so a second one never opens the same profile.                                                   |
+| Folder                  | Holds                                                                                                                           |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `node/<version>/`       | The core's own Node, downloaded from `nodejs.org` and checked against a SHA-256 pinned in the app. Your own Node is left alone. |
+| `app/<version>/`        | The core this version of the app carries. A newer app's core removes the older one when it starts.                              |
+| `brain/`                | The cloud brain the app installs, for Settings → Cloud.                                                                         |
+| `profiles/<name>/data/` | A profile: the ledger, attachments, and managed workspaces.                                                                     |
+| `setup.sh`              | The script the app installs and starts the core with. Rewritten at each start.                                                  |
+| `core.lock`             | Held by the core while it runs, so a second one never runs beside it.                                                           |
 
 The folder is readable by your account alone (mode 700), like the application data folder on Windows.
 
 Removing `~/.openorc-wsl` removes OpenOrc from the distribution, its conversations there included. Secrets the core saves, such as a Slack token, stay on the Windows side under `%APPDATA%\OpenOrc\wsl\<distribution>\`, encrypted for your Windows account, as they are for OpenOrc on this PC.
+
+A profile belongs to one application data folder on Windows, the one that keeps its secrets. The folder names its profile in a file called `wsl-profile`, written the first time OpenOrc runs in a distribution. A second data folder on the same PC, such as a development build's or a test's, so gets a profile of its own and never opens the first one's conversations.
 
 Things removed from a project go to the distribution's own Trash (`~/.local/share/Trash`, by the freedesktop.org specification), since the Recycle Bin takes nothing from a distribution's disk.
 
@@ -40,7 +42,7 @@ Things removed from a project go to the distribution's own Trash (`~/.local/shar
 - The Device panel has no simulators or emulators inside a distribution.
 - Projects of this PC and of a distribution are separate lists. Showing both at once is not done yet.
 - If the distribution is shut down while OpenOrc runs in it (`wsl --shutdown`), OpenOrc says so, with the last lines its core printed, and offers to try again or run on this PC. Only choosing **Run on this PC** changes the setting; closing the question quits, and the next start tries the distribution again.
-- One core runs on a profile at a time. A second app that chooses the same distribution, or a start while the last core is still closing there, is refused with that reason. The lock uses `flock` from util-linux; a distribution without it starts the core unlocked.
+- One core runs in a distribution at a time, whichever profile it opens. A second app that chooses the same distribution, or a start while the last core is still closing there, is refused with that reason. The lock uses `flock` from util-linux; a distribution without it starts the core unlocked and keeps the older versions of Node and the core it finds.
 
 ## How it works
 
@@ -65,4 +67,4 @@ OPENORC_WSL_STANDIN=Ubuntu OPENORC_WSL_STANDIN_HOME=/tmp/standin-home pnpm dev
 
 `OPENORC_WSL_STANDIN` names the stand-in, which then appears under **Runs on**; `OPENORC_WSL_STANDIN_HOME` gives it a home of its own, so nothing is installed into yours. Release builds ignore both.
 
-The unit tests cover the frames, the relay, path translation, the distribution listing, the switch and its folder chooser, and the installer, whose shell scripts run for real against a temporary home on x64 Linux with glibc and are skipped elsewhere. On a Windows PC, a packaged build has been taken by hand through first-run setup inside Ubuntu and into a conversation there: choosing the distribution, installing the core there, finding the agents installed there, adding a project, and running turns with the distribution's own Claude Code. The Terminal panel and the file panel's viewer have not been checked on Windows yet.
+The unit tests cover the frames, the relay, path translation, the distribution listing, the switch and its folder chooser, the core's lifecycle in main, and the installer, whose shell scripts run for real against a temporary home on x64 Linux with glibc and are skipped elsewhere. On a Windows PC, a packaged build has been taken by hand through first-run setup inside Ubuntu and into a conversation there: choosing the distribution, installing the core there, finding the agents installed there, adding a project, and running turns with the distribution's own Claude Code. The Terminal panel and the file panel's viewer have not been checked on Windows yet.

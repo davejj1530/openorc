@@ -3,14 +3,15 @@ import type { Distro } from "./distro";
 
 /**
  * What the core needs inside a distribution before it can start, kept in one folder of the user's home there: a Node
- * of its own, the core this app carries, and the profile it keeps. The distribution's own Node, if it has one, is
+ * of its own, the core this app carries, and the profiles it keeps. The distribution's own Node, if it has one, is
  * whatever version the user's projects need, so the core never borrows it.
  *
  *   ~/.openorc-wsl/node/<version>/bin/node
  *   ~/.openorc-wsl/app/<version>/core.mjs
  *   ~/.openorc-wsl/brain/                    the cloud brain this app installs, for Settings > Cloud
- *   ~/.openorc-wsl/data/                     the profile: the ledger, attachments and managed workspaces
- *   ~/.openorc-wsl/core.lock                 held by the core that is running: a profile has one at a time
+ *   ~/.openorc-wsl/profiles/<name>/data/     a profile: the ledger, attachments and managed workspaces. Each application
+ *                                            data folder on Windows has one of its own, beside the secrets it keeps for it
+ *   ~/.openorc-wsl/core.lock                 held by the core that is running: a distribution runs one at a time
  *
  * The folder is the user's alone, as the application data folder on Windows is.
  */
@@ -36,9 +37,12 @@ const VERSION = /^[A-Za-z0-9._-]{1,64}$/;
 export interface WslRuntime {
   /** What starts the core inside the distribution, given to it as it stands. */
   command: string[];
-  /** Where the core keeps its profile, as the distribution names it. */
-  dataDir: string;
+  /** The user's home folder there, as the distribution names it. */
+  home: string;
 }
+
+/** Where the profile called `profile` is kept, in a distribution whose user's home is `home`. */
+export const profileData = (home: string, profile: string): string => `${home}/${FOLDER}/profiles/${profile}/data`;
 
 /** A file this app carries for the distribution, read only when it has to be installed. */
 export interface CarriedFile {
@@ -58,7 +62,7 @@ export interface RuntimeSource {
 /** Why a distribution cannot run the core, in words for the person who chose it. */
 export class WslSetupError extends Error {}
 
-/** The exit of a core that did not start because another one holds the profile. */
+/** The exit of a core that did not start because another one runs in the distribution. */
 export const ALREADY_RUNNING = 65;
 
 const MARK = "@@openorc@@";
@@ -72,11 +76,16 @@ const SETUP = `${FOLDER}/setup.sh`;
  *
  *   probe <node> <core>     what is there, each value behind a marker so nothing else printed is read as one
  *   unpack <folder> <strip> the archive on the input, into a folder of this run's own beside the one named and then
- *                           swapped in, so a folder that exists is always a whole one; older versions beside it go
+ *                           swapped in, so a folder that exists is always a whole one. Nothing beside it is touched:
+ *                           a core may be running from another version
  *   place <name> <keep>     a file of the cloud brain, from the input; the first one clears the folder
  *   start <node> <core>     the core: its frames leave on descriptor 3, where its output was, and its output joins
  *                           its errors. It holds a lock on descriptor 9 for as long as it runs, so a second core
- *                           never opens the same profile: one whose wsl.exe was ended may still be closing its ledger
+ *                           never runs beside it: one whose wsl.exe was ended may still be closing its ledger. Holding
+ *                           the lock, it first removes every Node and core but its own, which no core can be running
+ *                           from, and leaves a folder another setup is unpacking into just now. Node keeps both
+ *                           descriptors from the programs it starts, so one that outlives the core holds neither the
+ *                           lock nor the frames
  */
 export const SETUP_SCRIPT = [
   `root="\${HOME:-$(getent passwd "$(id -u)" | cut -d: -f6)}/${FOLDER}"`,
@@ -101,7 +110,6 @@ export const SETUP_SCRIPT = [
   `  tar -xzf - -C "$partial" --strip-components="$3"`,
   `  rm -rf "$dest"`,
   `  mv "$partial" "$dest"`,
-  `  for other in "$(dirname "$dest")"/*; do test "$other" = "$dest" || rm -rf "$other"; done`,
   `  ;;`,
   `place)`,
   `  set -e`,
@@ -111,8 +119,18 @@ export const SETUP_SCRIPT = [
   `  mv "$root/brain/$2.partial" "$root/brain/$2"`,
   `  ;;`,
   `start)`,
+  `  test -n "$2" && test -n "$3" || exit 64`,
   `  exec 9>"$root/core.lock"`,
-  `  if command -v flock >/dev/null 2>&1 && ! flock -n 9; then exit ${ALREADY_RUNNING}; fi`,
+  `  if command -v flock >/dev/null 2>&1; then`,
+  `    flock -n 9 || exit ${ALREADY_RUNNING}`,
+  `    for other in "$root/node"/* "$root/app"/*; do`,
+  `      case "$other" in`,
+  `      "$root/node/$2" | "$root/app/$3") ;;`,
+  `      *.partial.*) kill -0 "\${other##*.}" 2>/dev/null || rm -rf "$other" ;;`,
+  `      *) rm -rf "$other" ;;`,
+  `      esac`,
+  `    done`,
+  `  fi`,
   `  exec "$root/node/$2/bin/node" "$root/app/$3/core.mjs" 3>&1 1>&2`,
   `  ;;`,
   `*)`,
@@ -267,5 +285,5 @@ export async function ensureRuntime(
     const check = await probe(inside, node.version, source.core.version);
     if (check.node !== `v${node.version}` || !check.core) throw new WslSetupError(`OpenOrc's core did not install in ${distro.name}. Check the free space in the distribution and try again.`);
   }
-  return { command: ["/bin/sh", SETUP, "start", node.version, source.core.version], dataDir: `${found.home}/${FOLDER}/data` };
+  return { command: ["/bin/sh", SETUP, "start", node.version, source.core.version], home: found.home };
 }

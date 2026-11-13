@@ -6,7 +6,7 @@ import { PassThrough } from "node:stream";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Distro, DistroResult } from "./distro";
 import { WSL_NODE } from "./runtime";
-import { startWslCore } from "./start";
+import { startWslCore, type WslPlace } from "./start";
 
 const temporary: string[] = [];
 afterEach(() => {
@@ -50,7 +50,7 @@ function installed() {
 }
 
 function start(distro: Distro) {
-  const profiles: string[] = [];
+  const places: WslPlace[] = [];
   const core = startWslCore({
     distro,
     coreDir: carried(),
@@ -58,31 +58,32 @@ function start(distro: Distro) {
     fileKey: "key",
     qa: false,
     fetchNode: async () => Buffer.alloc(0),
-    profile: (dataDir) => profiles.push(dataDir),
+    profile: () => "0123456789abcdef",
+    placed: (place) => places.push(place),
     log: () => undefined,
   });
-  return { core, profiles };
+  return { core, places };
 }
 
 describe("starting the core in a distribution", () => {
-  it("says where its profile is, then starts it there", async () => {
+  it("says where its home and this app data folder's profile are, then starts it there", async () => {
     const { distro, spawned, answer } = installed();
-    const { core, profiles } = start(distro);
+    const { core, places } = start(distro);
     answer();
     await vi.waitFor(() => expect(spawned).toEqual([["/bin/sh", ".openorc-wsl/setup.sh", "start", WSL_NODE.version, "abc123"]]));
-    expect(profiles).toEqual(["/home/me/.openorc-wsl/data"]);
+    expect(places).toEqual([{ home: "/home/me", dataDir: "/home/me/.openorc-wsl/profiles/0123456789abcdef/data" }]);
     expect(core.starting).toBe(false);
     core.kill();
   });
 
   it("starts nothing, and names no profile, once it was ended while the distribution was made ready", async () => {
     const { distro, spawned, probing, answer } = installed();
-    const { core, profiles } = start(distro);
+    const { core, places } = start(distro);
     await probing;
     core.kill();
     answer();
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(spawned).toEqual([]);
-    expect(profiles).toEqual([]);
+    expect(places).toEqual([]);
   });
 });

@@ -4,25 +4,29 @@ import { themePresets } from "./theme-palettes.js";
 const colors = (id: string) => themePresets.find((theme) => theme.id === id)!.colors;
 
 describe("themePresets", () => {
-  it("gives OpenOrc the approved near-white ground, cool sidebar, grey fills, raised planes and two inks", () => {
+  it("gives OpenOrc one near-white ground, pieces set into it with white keys, grey fills and two inks", () => {
     expect(colors("openorc").light).toMatchObject({
       "--bg": "#fafafa",
-      "--sidebar": "#f9fbfd",
+      "--sidebar": "var(--bg)",
       "--surface": "#ffffff",
-      "--surface-2": "#f0f0f0",
+      "--surface-2": "#eeeeee",
+      "--well": "color-mix(in srgb, var(--ink) 4.5%, var(--bg))",
+      "--well-ring": "0 0 #0000",
+      "--key": "#ffffff",
+      "--composer-input": "var(--well)",
       "--bubble": "#f0f0f0",
-      "--navigation-soft": "#eef0f3",
-      "--line": "#ebebeb",
+      "--navigation-soft": "#eaeaea",
+      "--line": "#e8e8e8",
       "--ink": "#252525",
-      "--prose-ink": "#646464",
-      "--ink-4": "#6d6d6e",
-      "--line-number": "#8a8a8a",
-      "--ok-soft": "#e0fae3",
-      "--bad-soft": "#fcecea",
+      "--prose-ink": "#555555",
+      "--ink-4": "#696969",
+      "--line-number": "#808080",
+      "--ok-soft": "#e4f0ea",
+      "--bad-soft": "#f7eae8",
       "--accent": "#252525",
       "--accent-fg": "#ffffff",
     });
-    expect(colors("openorc").light["--raised-shadow"]).toContain("#e4e4e4");
+    expect(colors("openorc").light["--raised-shadow"]).toContain("#dadada");
     expect(colors("openorc").dark).toMatchObject({
       "--bg": "#171717",
       "--sidebar": "#141619",

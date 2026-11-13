@@ -100,7 +100,8 @@ describe("accent colors", () => {
       expect(contrastRatio(colors["--accent"]!, colors["--accent-fg"]!)).toBeGreaterThanOrEqual(4.5);
       const tile = colors["--bg"]!;
       const plane = colors["--surface"]!;
-      const rows = [colors["--sidebar"]!, colors["--navigation-soft"]!, colors["--navigation-hover"]!];
+      // The sidebar sits on the ground; its rows under the pointer and open are their own fills.
+      const rows = [colors["--navigation-soft"]!, colors["--navigation-hover"]!];
       const grounds = [tile, plane, over(colors["--surface-2"]!, tile), over(colors["--surface-2"]!, plane), ...rows];
       for (const ground of grounds) {
         for (const ink of ["--ink", "--ink-2", "--ink-3", "--ink-4", "--prose-ink", "--accent-ink", "--content-ink", "--ok", "--bad"]) {

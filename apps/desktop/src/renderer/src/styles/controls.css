@@ -104,8 +104,8 @@ label:has(input:is([type="checkbox"], [type="radio"]):focus-visible) {
   }
 }
 
-/* A fill track holding a surface knob. On fills the track with --ink rather than --accent,
-   which keeps one hot element per view. The knob springs across with one overshoot. */
+/* A fill track holding a surface knob. On fills the track with the second ink rather than --accent or
+   --ink, which leaves a column's one ink pill its darkest thing. The knob springs across with one overshoot. */
 .settings-switch {
   --switch-width: 38px;
   --switch-height: var(--control-badge);
@@ -132,7 +132,7 @@ label:has(input:is([type="checkbox"], [type="radio"]):focus-visible) {
   transition: background-color var(--duration-arrive) var(--ease-out);
 }
 .settings-switch input:checked {
-  background: var(--ink);
+  background: var(--ink-2);
 }
 .settings-switch input:focus-visible {
   outline: 2px solid var(--ring);

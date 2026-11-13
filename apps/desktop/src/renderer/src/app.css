@@ -85,9 +85,9 @@
      so there is no fill step to give it an edge. */
   --shadow-overlay: 0 0 32px -12px rgb(0 0 0 / 0.24);
   --ring: var(--accent-ink);
-  /* Content planes (transcript cards, provider and memory cards) are planes:
-     one fill step off the tile ground, with no border or shadow. */
-  --plane-fill: var(--surface);
+  /* Pieces (transcript cards, provider and memory cards) are set into the ground: the palette's --well, with its
+     --well-ring (none in light). */
+  --plane-fill: var(--well);
   /* The selected segment of a --surface-2 track, such as the appearance modes. It sits one
      step lighter than the track. */
   --track-2-current: var(--surface);
@@ -105,6 +105,10 @@
   --sidebar: var(--bg);
   --navigation-hover: var(--surface-2);
   --raised-shadow: 0 0 #0000;
+  /* A piece set into the ground, its ring, and a control inside it; each palette sets them per mode. */
+  --well: color-mix(in srgb, var(--ink) 4.5%, var(--bg));
+  --well-ring: 0 0 #0000;
+  --key: var(--surface);
   --prose-ink: var(--ink);
   --line-number: var(--ink-4);
   color-scheme: light;
@@ -114,27 +118,17 @@
     --hairline: 0.5px;
   }
 }
-/* Planes (sheets, menus, popovers, dialogs, the composer) restate the contextual fills
-   one step off their own fill. A tile card inside a plane steps them back to the plane. Mark new
-   planes with data-plane and tile cards with data-plane="tile" rather than growing these lists. */
-:where(
-  [data-plane],
-  .menu-popup,
-  .floating-popover,
-  .project-picker-popup,
-  .composer-context-popup,
-  .model-picker-popup,
-  .composer-effort-popup,
-  .composer-shell,
-  [role="dialog"],
-  .settings-group,
-  .settings-card,
-  .settings-disclosure,
-  .usage-account,
-  .memory-control
-) {
+/* Planes (sheets, menus, popovers, dialogs) restate the contextual fills one step off their own fill. Pieces set
+   into the ground (the composer, Settings' tiles) restate them too, their controls on the palette's --key. A tile
+   card inside a plane steps them back to the plane. Mark new planes with data-plane and tile cards with
+   data-plane="tile" rather than growing these lists. */
+:where([data-plane], .menu-popup, .floating-popover, .project-picker-popup, .composer-context-popup, .model-picker-popup, .composer-effort-popup, [role="dialog"]) {
   --current-row-fill: var(--surface-2);
   --control-fill: var(--surface-2);
+}
+:where(.composer-shell, .settings-group, .settings-card, .settings-disclosure, .usage-account, .memory-control) {
+  --current-row-fill: var(--surface-2);
+  --control-fill: var(--key);
 }
 :where([data-plane="tile"], .harness-list) {
   --current-row-fill: var(--surface);
@@ -168,6 +162,9 @@
     --ring: var(--accent-ink);
     --shadow-overlay: 0 0 32px -8px rgb(0 0 0 / 0.6);
     --track-2-current: var(--surface-3);
+    --well: var(--surface);
+    --well-ring: var(--raised-shadow);
+    --key: var(--surface-2);
     color-scheme: dark;
   }
 }
@@ -198,6 +195,9 @@
   --ring: var(--accent-ink);
   --shadow-overlay: 0 0 32px -8px rgb(0 0 0 / 0.6);
   --track-2-current: var(--surface-3);
+  --well: var(--surface);
+  --well-ring: var(--raised-shadow);
+  --key: var(--surface-2);
   color-scheme: dark;
 }
 
@@ -822,8 +822,8 @@ body[data-resizing] .sidebar-shell {
   flex-shrink: 0;
 }
 
-/* CONTENT. Depth is a fill step, lifted by the palette's --raised-shadow where the step alone is too faint to
-   see. The surfaces a thread grows for a task, a turn's file changes, a question or an MCP app are planes, in the
+/* CONTENT. Depth is a fill step: a piece is set into the ground on the palette's --well, with its --well-ring.
+   The surfaces a thread grows for a task, a turn's file changes, a question or an MCP app are pieces, in the
    transcript and the panel alike.
    Unlayered on purpose, so the fill beats the components' own bg utilities. The loading
    skeleton carries .surface-card too, so a card cannot change depth as it loads. */
@@ -832,7 +832,7 @@ body[data-resizing] .sidebar-shell {
 .question-card,
 .mcp-app-card {
   background: var(--plane-fill);
-  box-shadow: var(--raised-shadow);
+  box-shadow: var(--well-ring);
 }
 /* The user's own plane, in the palette's --bubble tone. */
 .message-bubble {
@@ -1122,7 +1122,7 @@ span.property-chip {
 .settings-shell {
   --settings-content-width: 860px;
   --settings-control-width: 240px;
-  --settings-card-fill: var(--surface);
+  --settings-card-fill: var(--well);
   container-type: inline-size;
   flex: 1;
   min-height: 0;

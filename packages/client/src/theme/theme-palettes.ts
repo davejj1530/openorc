@@ -1,4 +1,5 @@
 // Built-in palettes. Product colors map to OpenOrc roles; custom themes retain their own identity.
+import { pieceTokens } from "./theme-pieces.js";
 export type ThemePreset = "openorc" | "codex" | "conductor" | "linear" | "cursor" | "claude" | "github" | "halcyon" | "kamakura" | "clickup" | "cyberpunk" | "notion" | "eliron";
 export type Mode = "light" | "dark";
 export interface ThemeTemplate {
@@ -32,7 +33,6 @@ function palette(neutrals: Neutrals, accent: string, accentInk: string, accentFo
   return {
     ...Object.fromEntries(Object.entries(neutralTokens).map(([role, token]) => [`--${token}`, neutrals[role as keyof Neutrals]])),
     "--paper": "var(--surface)",
-    "--composer-input": "var(--surface)",
     // The sidebar's own ground, the window's unless a palette tints it.
     "--sidebar": "var(--bg)",
     // A sidebar row under the pointer.
@@ -74,39 +74,40 @@ const statusTokens: Record<Mode, Record<string, string>> = {
   light: { "--ok": "#157447", "--warn": "#8b5c0a", "--bad": "#aa4538", ...statusSoft },
   dark: { "--ok": "#3fae74", "--warn": "#c0973a", "--bad": "#e27d6f", ...statusSoft },
 };
-// OpenOrc: a near-white ground with a cool sidebar beside it, soft grey fills on top, white planes lifted by a faint
-// edge and a 1px shadow, title ink over a softer reading ink, and one ink action. Measured from the approved team
-// workspace mock (Tembo's light theme); dark keeps the same relationships inverted.
+// OpenOrc: one near-white ground under the sidebar, the columns, every header and the panel; pieces set into it a
+// step darker with white keys inside them and no ring or shadow; menus float as white planes on a strong hairline and
+// one soft shadow; title ink over a softer reading ink, and one ink action. Dark keeps the same relationships inverted.
 const openorcColors: ThemeTemplate["colors"] = {
   light: palette(
     {
       sidebar: "#fafafa",
       body: "#ffffff",
-      raised: "#f0f0f0",
-      hover: "#e8e8e8",
-      border: "#ebebeb",
-      borderStrong: "#dcdcdc",
+      raised: "#eeeeee",
+      hover: "#e6e6e6",
+      border: "#e8e8e8",
+      borderStrong: "#dadada",
       text: "#252525",
-      secondaryText: "#646464",
-      mutedText: "#636465",
-      faintText: "#6d6d6e",
+      secondaryText: "#555555",
+      mutedText: "#666666",
+      faintText: "#696969",
       bubble: "#f0f0f0",
     },
     "#252525",
     "#252525",
     "#ffffff",
     {
-      "--sidebar": "#f9fbfd",
-      "--navigation-soft": "#eef0f3",
-      "--navigation-hover": "#f2f4f7",
-      "--raised-shadow": "0 0 0 1px #e4e4e4, 0 1px 2px rgb(0 0 0 / 0.05)",
-      "--prose-ink": "#646464",
-      "--bubble-ink": "#646464",
-      "--line-number": "#8a8a8a",
-      "--ok": "#367b46",
-      "--ok-soft": "#e0fae3",
-      "--bad": "#c03737",
-      "--bad-soft": "#fcecea",
+      "--navigation-soft": "#eaeaea",
+      "--navigation-hover": "#f2f2f2",
+      "--raised-shadow": "0 0 0 var(--hairline) #dadada, 0 8px 24px -12px rgb(0 0 0 / 0.18)",
+      "--prose-ink": "#555555",
+      "--bubble-ink": "#252525",
+      "--line-number": "#808080",
+      "--key": "#ffffff",
+      "--ok": "#1e7359",
+      "--ok-soft": "#e4f0ea",
+      "--warn": "#8f5408",
+      "--bad": "#9b5050",
+      "--bad-soft": "#f7eae8",
       "--attention": "#b26a00",
     },
   ),
@@ -143,7 +144,7 @@ const openorcColors: ThemeTemplate["colors"] = {
     },
   ),
 };
-// Cursor keeps its own grays: a light tile under softer planes, and white writing areas.
+// Cursor keeps its own grays: a light tile under softer planes.
 const cursorColors: ThemeTemplate["colors"] = {
   light: palette(
     {
@@ -165,7 +166,6 @@ const cursorColors: ThemeTemplate["colors"] = {
     {
       "--paper": "#fdfdfd",
       "--navigation-soft": "#e8e8e8",
-      "--composer-input": "#ffffff",
       "--ok": "#1e7359",
       "--ok-soft": "#e6f0eb",
       "--bad": "#9b5050",
@@ -379,7 +379,6 @@ const presets: ThemeTemplate[] = [
           "--mascot-eyes": "#ffffff",
           "--navigation-accent": "#383835",
           "--navigation-soft": "#f0efec",
-          "--composer-input": "#ffffff",
           "--content-accent": "#184f95",
           "--accent-soft": "color-mix(in srgb, #c6613f 10%, #f9f9f7)",
           "--selection": "color-mix(in srgb, #2a78d6 25%, #f9f9f7)",
@@ -446,7 +445,7 @@ const presets: ThemeTemplate[] = [
           "--navigation-soft": "#eff2f5",
           "--ok": "#1a7f37",
           "--ok-soft": "#dafbe1",
-          "--warn": "#9a6700",
+          "--warn": "#8f6000",
           "--warn-soft": "#fff8c5",
         },
       ),
@@ -554,7 +553,7 @@ const presets: ThemeTemplate[] = [
         "#575e51",
         "#454b40",
         "#ffffff",
-        { "--mascot-body": "#a36a4b", "--mascot-eyes": "#ffffff" },
+        { "--mascot-body": "#a36a4b", "--mascot-eyes": "#ffffff", "--warn": "#7e5409" },
       ),
       dark: palette(
         {
@@ -573,7 +572,7 @@ const presets: ThemeTemplate[] = [
         "#575e51",
         "#b5bfaa",
         "#ffffff",
-        { "--mascot-body": "#a08769", "--mascot-eyes": "#1a1d18" },
+        { "--mascot-body": "#a08769", "--mascot-eyes": "#1a1d18", "--warn": "#c8a554" },
       ),
     },
   },
@@ -645,7 +644,7 @@ const presets: ThemeTemplate[] = [
         "#007b8a",
         "#006776",
         "#ffffff",
-        { "--mascot-body": "#bf278e", "--mascot-eyes": "#ffffff" },
+        { "--mascot-body": "#bf278e", "--mascot-eyes": "#ffffff", "--warn": "#7e5409" },
       ),
       dark: palette(
         {
@@ -787,5 +786,5 @@ const presets: ThemeTemplate[] = [
 ];
 export const themePresets: ThemeTemplate[] = presets.map((preset) => ({
   ...preset,
-  colors: { light: { ...statusTokens.light, ...preset.colors.light }, dark: { ...statusTokens.dark, ...preset.colors.dark } },
+  colors: { light: { ...statusTokens.light, ...pieceTokens.light, ...preset.colors.light }, dark: { ...statusTokens.dark, ...pieceTokens.dark, ...preset.colors.dark } },
 }));

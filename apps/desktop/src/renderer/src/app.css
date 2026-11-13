@@ -162,9 +162,9 @@
     --ring: var(--accent-ink);
     --shadow-overlay: 0 0 32px -8px rgb(0 0 0 / 0.6);
     --track-2-current: var(--surface-3);
-    --well: var(--surface);
-    --well-ring: var(--raised-shadow);
-    --key: var(--surface-2);
+    --well: color-mix(in srgb, #000000 56%, var(--bg));
+    --well-ring: 0 0 #0000;
+    --key: color-mix(in srgb, #ffffff 8.5%, var(--well));
     color-scheme: dark;
   }
 }
@@ -195,9 +195,9 @@
   --ring: var(--accent-ink);
   --shadow-overlay: 0 0 32px -8px rgb(0 0 0 / 0.6);
   --track-2-current: var(--surface-3);
-  --well: var(--surface);
-  --well-ring: var(--raised-shadow);
-  --key: var(--surface-2);
+  --well: color-mix(in srgb, #000000 56%, var(--bg));
+  --well-ring: 0 0 #0000;
+  --key: color-mix(in srgb, #ffffff 8.5%, var(--well));
   color-scheme: dark;
 }
 

@@ -47,7 +47,7 @@ it("syncs another window's saved choices and reports a failed save without disca
 
 it.each([
   ["openorc", "light", ["#252525", "#252525", "#252525"]],
-  ["openorc", "dark", ["#ececec", "#ececec", "#ececec"]],
+  ["openorc", "dark", ["#ededed", "#ededed", "#ededed"]],
   ["conductor", "light", ["#413030", "#413030", "#413030"]],
   ["conductor", "dark", ["#f3f2f1", "#eae8e6", "#eae8e6"]],
   ["claude", "light", ["#b95b3b", "#383835", "#184f95"]],

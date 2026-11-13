@@ -74,9 +74,10 @@ const statusTokens: Record<Mode, Record<string, string>> = {
   light: { "--ok": "#157447", "--warn": "#8b5c0a", "--bad": "#aa4538", ...statusSoft },
   dark: { "--ok": "#3fae74", "--warn": "#c0973a", "--bad": "#e27d6f", ...statusSoft },
 };
-// OpenOrc: one near-white ground under the sidebar, the columns, every header and the panel; pieces set into it a
-// step darker with white keys inside them and no ring or shadow; menus float as white planes on a strong hairline and
-// one soft shadow; title ink over a softer reading ink, and one ink action. Dark keeps the same relationships inverted.
+// OpenOrc: one ground under the sidebar, the columns, every header and the panel; pieces set into it with keys inside
+// them and no ring or shadow; menus float on a strong hairline and one soft shadow; title ink over a softer reading
+// ink, and one ink action. Light is near white with grey pieces and white keys; dark is a neutral grey with no blue,
+// pieces carved to near black.
 const openorcColors: ThemeTemplate["colors"] = {
   light: palette(
     {
@@ -114,32 +115,33 @@ const openorcColors: ThemeTemplate["colors"] = {
   dark: palette(
     {
       sidebar: "#171717",
-      body: "#202020",
-      raised: "#262626",
-      hover: "#2e2e2e",
-      border: "#2a2a2a",
-      borderStrong: "#383838",
-      text: "#ececec",
-      secondaryText: "#a3a3a3",
-      mutedText: "#a4a5a7",
-      faintText: "#8e8f91",
-      bubble: "#262626",
+      body: "#0a0a0a",
+      raised: "#272727",
+      hover: "#333333",
+      border: "#2e2e2e",
+      borderStrong: "#414141",
+      text: "#ededed",
+      secondaryText: "#b4b4b4",
+      mutedText: "#9b9b9b",
+      faintText: "#969696",
+      bubble: "#0a0a0a",
     },
-    "#ececec",
-    "#ececec",
+    "#ededed",
+    "#ededed",
     "#171717",
     {
-      "--sidebar": "#141619",
-      "--navigation-soft": "#23262b",
-      "--navigation-hover": "#1d2024",
-      "--raised-shadow": "0 0 0 1px #2e2e2e, 0 1px 2px rgb(0 0 0 / 0.4)",
-      "--prose-ink": "#a3a3a3",
-      "--bubble-ink": "#a6a6a6",
+      "--navigation-soft": "#2c2c2c",
+      "--navigation-hover": "#212121",
+      "--raised-shadow": "0 0 0 var(--hairline) #414141, 0 12px 32px -12px rgb(0 0 0 / 0.7)",
+      "--prose-ink": "#b4b4b4",
+      "--bubble-ink": "#ededed",
       "--line-number": "#6e6e6e",
-      "--ok": "#63c27a",
-      "--ok-soft": "#15291b",
-      "--bad": "#f07878",
-      "--bad-soft": "#301c1b",
+      "--well": "#0a0a0a",
+      "--ok": "#7cc4a2",
+      "--ok-soft": "#19221e",
+      "--warn": "#f0b35a",
+      "--bad": "#e2a3a3",
+      "--bad-soft": "#261e1e",
       "--attention": "#f0b35a",
     },
   ),
@@ -192,7 +194,6 @@ const cursorColors: ThemeTemplate["colors"] = {
     {
       "--paper": "#1e1e1e",
       "--navigation-soft": "#303030",
-      "--composer-input": "#202020",
       "--ok": "#8bc6aa",
       "--ok-soft": "#24372e",
       "--bad": "#e2a3a3",
@@ -295,7 +296,7 @@ const presets: ThemeTemplate[] = [
         "#f3f2f1",
         "#eae8e6",
         "#2c2826",
-        { "--navigation-soft": "#2c2826", "--composer-input": "#211e1c" },
+        { "--navigation-soft": "#2c2826" },
       ),
     },
   },
@@ -340,7 +341,15 @@ const presets: ThemeTemplate[] = [
         "lch(47.918% 59.303 288.421)",
         "lch(57.028% 70 288.421 / 1)",
         "lch(100% 5 288.421 / 1)",
-        { "--mascot-body": "#828fff", "--mascot-eyes": "#0b0c10", "--accent-soft": "lch(12.141% 17.792 286.445 / 1)", "--navigation-accent": "#e6e6e6", "--navigation-soft": "#242424" },
+        {
+          "--mascot-body": "#828fff",
+          "--mascot-eyes": "#0b0c10",
+          "--accent-soft": "lch(12.141% 17.792 286.445 / 1)",
+          "--navigation-accent": "#e6e6e6",
+          "--navigation-soft": "#242424",
+          // The ground is near black, so a carved piece cannot step off it; a hairline draws its edge.
+          "--well-ring": "0 0 0 var(--hairline) var(--line)",
+        },
       ),
     },
   },
@@ -406,7 +415,6 @@ const presets: ThemeTemplate[] = [
           "--mascot-eyes": "#151515",
           "--navigation-accent": "#f9f9f7",
           "--navigation-soft": "#20201f",
-          "--composer-input": "#20201f",
           "--content-accent": "#9ec5f4",
           "--accent-soft": "color-mix(in srgb, #d97757 14%, #151515)",
           "--selection": "color-mix(in srgb, #2a78d6 30%, #151515)",
@@ -474,6 +482,8 @@ const presets: ThemeTemplate[] = [
           "--ok": "#3fb950",
           "--ok-soft": "#2ea04326",
           "--warn": "#d29922",
+          // The ground is near black, so a carved piece cannot step off it; a hairline draws its edge.
+          "--well-ring": "0 0 0 var(--hairline) var(--line)",
           "--warn-soft": "#bb800926",
           "--content-accent": "#4493f8",
         },

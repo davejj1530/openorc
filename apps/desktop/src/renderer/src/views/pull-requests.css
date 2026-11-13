@@ -44,7 +44,6 @@
   justify-content: flex-end;
   gap: 6px;
   margin-left: 12px;
-  color: var(--ink-3);
   font-size: var(--text-sm);
 }
 .pull-row-diff {

@@ -53,13 +53,13 @@ function useReviewerName() {
 function PullStatusCell({ row }: { row: PullRow }) {
   if (row.status.kind === "reviewing")
     return (
-      <span className="pull-row-status">
+      <span className="pull-row-status text-ink-3">
         <OpenOrcMark size={12} working className="text-ink-3" />
         <span className="truncate">{row.status.who} is reviewing</span>
       </span>
     );
   return (
-    <span className={cn("pull-row-status", row.status.tone === "attention" && "text-attention")}>
+    <span className={cn("pull-row-status", row.status.tone === "attention" ? "text-attention" : "text-ink-3")}>
       <StatusDot tone={row.status.tone} />
       <span className="truncate">{row.status.word}</span>
     </span>

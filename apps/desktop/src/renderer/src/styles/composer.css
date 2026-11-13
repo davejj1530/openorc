@@ -296,30 +296,6 @@
   text-overflow: ellipsis;
 }
 
-/* Send now sits beside send while a turn runs: the same send with different timing, so quiet. */
-.composer-send-now {
-  flex-shrink: 0;
-  height: var(--control-sm);
-  padding: 0 10px;
-  border-radius: var(--radius-pill);
-  color: var(--ink-2);
-  font-size: var(--text-sm);
-  white-space: nowrap;
-  transition:
-    background-color var(--duration-quick) var(--ease-out),
-    color var(--duration-quick) var(--ease-out);
-}
-.composer-send-now:hover:not(:disabled) {
-  background-color: var(--surface-2);
-  color: var(--ink);
-}
-/* Only reachable with an empty message, since the control is not rendered at all when
-   the turn cannot take direction. */
-.composer-send-now:disabled {
-  color: var(--ink-4);
-  pointer-events: none;
-}
-
 /* The context ring: bare, muted, warn above 60% and bad above 85%. */
 .composer-context {
   display: inline-flex;
@@ -417,30 +393,81 @@
   margin: 0;
 }
 
-/* Send: the screen's ink pill. Send, Queue and Stop are stacked layers that swap in place. */
-.composer-send {
-  display: grid;
-  place-items: center;
+/* The send cluster: the column's one ink pill, and beside it mid-turn a white Stop and the other way as a quiet word. */
+.composer-send-cluster {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   flex-shrink: 0;
-  width: var(--control-send);
+}
+.composer-send-cluster > :not(.composer-send) {
+  animation: composer-cluster-arrive var(--duration-confirm) var(--ease-overshoot);
+}
+@keyframes composer-cluster-arrive {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+/* One button through every state: the bare arrow, the one Stop, and a pill whose words fold in and out beside the
+   arrow, so a turn starting or ending swaps it in place. */
+.composer-send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: var(--control-send);
   height: var(--control-send);
   border-radius: var(--radius-pill);
   background-color: var(--accent);
   color: var(--accent-fg);
+  font-size: var(--text-md);
+  line-height: 20px;
+  letter-spacing: var(--text-md--letter-spacing);
+  white-space: nowrap;
   transition:
+    padding var(--duration-confirm) var(--ease-out),
     background-color var(--duration-leave) var(--ease-out),
     color var(--duration-leave) var(--ease-out);
+}
+.composer-send[data-words] {
+  padding-inline: 14px 8px;
 }
 .composer-send:hover:not(:disabled) {
   background-image: linear-gradient(color-mix(in srgb, var(--accent-fg) 12%, transparent), color-mix(in srgb, var(--accent-fg) 12%, transparent));
 }
-.composer-send:disabled {
-  background-color: var(--surface-3);
-  color: var(--ink-3);
+/* The bare arrow with nothing to send: a white key. */
+.composer-send:disabled:not([data-words]) {
+  background-color: var(--control-fill);
+  color: var(--ink-4);
 }
-.composer-send[data-state="queue"] {
-  background-color: var(--surface-3);
-  color: var(--ink);
+.composer-send[data-words]:disabled {
+  opacity: 0.4;
+}
+/* The words open to their own width: a grid track from 0fr to 1fr. */
+.composer-send-words {
+  display: grid;
+  grid-template-columns: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-columns var(--duration-confirm) var(--ease-out),
+    margin var(--duration-confirm) var(--ease-out),
+    opacity var(--duration-leave) var(--ease-out);
+}
+.composer-send-words > span {
+  min-width: 0;
+  overflow: hidden;
+}
+.composer-send[data-words] > .composer-send-words {
+  grid-template-columns: 1fr;
+  margin-right: 6px;
+  opacity: 1;
+}
+.composer-send-glyph {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
 }
 .composer-send-layer {
   grid-area: 1 / 1;
@@ -452,9 +479,8 @@
     opacity var(--duration-leave) var(--ease-out),
     transform var(--duration-confirm) var(--ease-overshoot);
 }
-.composer-send[data-state="send"] > [data-layer="send"],
-.composer-send[data-state="queue"] > [data-layer="queue"],
-.composer-send[data-state="stop"] > [data-layer="stop"] {
+.composer-send[data-state="send"] > .composer-send-glyph > [data-layer="send"],
+.composer-send[data-state="stop"] > .composer-send-glyph > [data-layer="stop"] {
   opacity: 1;
   transform: none;
 }
@@ -463,6 +489,45 @@
   height: 10px;
   border-radius: 2px;
   background: currentColor;
+}
+/* Stop beside the words: a white key, as round as the pill is tall. */
+.composer-stop {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: var(--control-send);
+  height: var(--control-send);
+  border-radius: var(--radius-pill);
+  background-color: var(--control-fill);
+  color: var(--ink);
+}
+.composer-stop:hover:not(:disabled) {
+  background-image: linear-gradient(var(--surface-2), var(--surface-2));
+}
+.composer-stop:disabled {
+  color: var(--ink-4);
+}
+/* The other way, a quiet word; dimmed, it keeps the pointer so its reason can open. */
+.composer-send-other {
+  flex-shrink: 0;
+  height: var(--control-sm);
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  color: var(--ink-2);
+  font-size: var(--text-md);
+  line-height: 20px;
+  letter-spacing: var(--text-md--letter-spacing);
+  white-space: nowrap;
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
+}
+.composer-send-other:hover:not(:disabled) {
+  background-color: var(--surface-2);
+  color: var(--ink);
+}
+.composer-send-other:disabled {
+  color: var(--ink-4);
 }
 
 /* Uncommitted changes sit right over the composer, on its left edge. */

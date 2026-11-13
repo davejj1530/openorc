@@ -26,7 +26,7 @@ export {
   type CloudStartStepState,
   type StartingCloudThread,
 } from "./cloud-start.js";
-export { composerActivity, composerSendHint, queueHint } from "./composer-presentation.js";
+export { composerActivity, composerPlaceholder, composerSendBlock, queueHint } from "./composer-presentation.js";
 export type { ClientPush, CoreConnection, Notice } from "./connection.js";
 export { conversationCost, formatCost } from "./conversation-cost.js";
 export { conversationActivity, conversationCanSteer, conversationPlaceholder, heardTranscript, conversationSendDisabledReason, conversationSteerReason } from "./conversation-presentation.js";
@@ -36,7 +36,11 @@ export {
   messageBody,
   planSubmit,
   processFit,
+  sendCluster,
+  sendsNow,
   type ComposerActionsInput,
+  type SendCluster,
+  type SendWay,
   type OutgoingMessage,
   type SubmitInput,
   type SubmitPlan,

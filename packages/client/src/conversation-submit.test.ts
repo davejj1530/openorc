@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RpcMethod } from "@openorc/protocol";
-import { composerActions, planSubmit, sendMessage, type SubmitCalls, type SubmitInput, type SubmitRequest } from "./conversation-submit.js";
+import { composerActions, planSubmit, sendCluster, sendMessage, sendsNow, type SubmitCalls, type SubmitInput, type SubmitRequest } from "./conversation-submit.js";
 
 const codex = { agent: "codex" as const, model: "gpt-5", effort: null };
 const warm = { id: "A", agent: "codex" as const, mode: "act" as const, permissionMode: "trusted" as const };
@@ -70,6 +70,40 @@ describe("composerActions", () => {
     },
   ])("$name", ({ input, actions }) => {
     expect(composerActions(input)).toEqual(actions);
+  });
+});
+
+describe("sendCluster", () => {
+  const typed = { queueing: false, liveByDefault: true, steerable: false, canStop: false, hasDraft: true };
+  it.each([
+    { name: "a bare arrow with nothing running", input: typed, cluster: { kind: "send", stop: false, startsTask: false } },
+    { name: "one ink Stop with nothing typed while a turn runs", input: { ...typed, queueing: true, canStop: true, hasDraft: false }, cluster: { kind: "stop" } },
+    {
+      name: "Send now on the pill and Queue beside it when the turn can take it",
+      input: { ...typed, queueing: true, canStop: true, steerable: true },
+      cluster: { kind: "turn", stop: true, enter: "now", other: { way: "queue", blocked: null } },
+    },
+    {
+      name: "Queue on the pill when the person's default is to queue",
+      input: { ...typed, queueing: true, canStop: true, steerable: true, liveByDefault: false },
+      cluster: { kind: "turn", stop: true, enter: "queue", other: { way: "now", blocked: null } },
+    },
+    {
+      name: "Queue on the pill and Send now dimmed with its reason when the turn cannot take it",
+      input: { ...typed, queueing: true, canStop: true, steerReason: "This agent reads new messages after its turn. It will be queued." },
+      cluster: { kind: "turn", stop: true, enter: "queue", other: { way: "now", blocked: "This agent reads new messages after its turn. It will be queued." } },
+    },
+    { name: "a task's empty first send names that it starts the task", input: { ...typed, hasDraft: false, startsTask: true }, cluster: { kind: "send", stop: false, startsTask: true } },
+  ])("$name", ({ input, cluster }) => {
+    expect(sendCluster(input)).toEqual(cluster);
+  });
+
+  it("sends into the turn by the pill's word, and Command and Enter by the other", () => {
+    const now = sendCluster({ ...typed, queueing: true, canStop: true, steerable: true });
+    expect([sendsNow(now, false), sendsNow(now, true)]).toEqual([true, false]);
+    const queue = sendCluster({ ...typed, queueing: true, canStop: true });
+    expect([sendsNow(queue, false), sendsNow(queue, true)]).toEqual([false, true]);
+    expect(sendsNow(sendCluster(typed), true)).toBe(false);
   });
 });
 

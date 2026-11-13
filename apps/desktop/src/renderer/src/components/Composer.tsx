@@ -1,4 +1,4 @@
-import { composerActions, composerActivity, composerSendHint, type SkillCommand, type SkillListNotice } from "@openorc/client";
+import { composerActivity, composerSendBlock, sendCluster, sendsNow, type SkillCommand, type SkillListNotice } from "@openorc/client";
 import {
   ExecutionMode,
   executionMode,
@@ -25,12 +25,12 @@ import { ComposerChoice } from "./ComposerChoice";
 import { ComposerDropZone, useComposerDrop } from "./ComposerDropZone";
 import { ComposerChangesBar } from "./ComposerCommitChip";
 import { ComposerInput } from "./ComposerInput";
-import { ComposerSendButton } from "./ComposerSendButton";
+import { ComposerSendCluster } from "./ComposerSendButton";
 import { ContextUsage } from "./ContextUsage";
-import { Cloud, FileText, Laptop, Lightbulb, Pencil, Plus, ShieldCheck, Square, Wand, X } from "./icons";
+import { Cloud, FileText, Laptop, Lightbulb, Pencil, Plus, ShieldCheck, Wand, X } from "./icons";
 import { type PickerAccounts } from "./ModelPickerAccounts";
 import { ComposerModelPicker, type ModelChoice } from "./ModelPicker";
-import { Button, Tooltip } from "./ui";
+import { Tooltip } from "./ui";
 
 export const permissionLabel: Record<PermissionPreset, string> = { review: "Review", trusted: "Workspace access", autonomous: "Autonomous" };
 
@@ -120,13 +120,13 @@ export interface ComposerProps {
   live?: { runId: string; working: boolean } | null;
   /** Custom stop controls for a caller that owns execution. */
   stopAction?: { working: boolean; pending: boolean; onStop: () => void };
-  /** Enter queues instead of sending, because the agent is mid-turn. */
+  /** A turn is running, so a message goes into it now or waits for it. */
   queueing?: boolean;
-  /** ⌘↵ reaches the agent mid-turn. */
+  /** The running turn can take a message now. */
   steerable?: boolean;
-  /** Why it cannot, when it cannot. The core words these; showing one beats a control that is simply dim. */
+  /** Why it cannot, when it cannot. The core words these; the dimmed "Send now" says it on demand. */
   steerReason?: string | null;
-  /** A caller can send messages immediately while the agent is working. */
+  /** Mid-turn, Enter sends now when the turn can take it, rather than queueing; Command and Enter does the other. */
   liveByDefault?: boolean;
   /** How full the conversation is; the ring beside send. */
   context?: { used: number; window: number | null } | null;
@@ -228,20 +228,22 @@ export function Composer(props: ComposerProps) {
   const attachmentBlock = attachments.length > 0 ? props.attachmentsDisabledReason : null;
   const canSend = Boolean(props.allowEmpty || props.value.trim() || attachments.length > 0) && !props.busy && !submitting && !props.disabledReason && !attachmentBlock && uploading === 0;
 
-  const queueing = Boolean(props.queueing);
   const canStop = Boolean(props.stopAction?.working || (!props.stopAction && props.live?.working));
-  const actions = composerActions({
-    queueing,
+  const cluster = sendCluster({
+    queueing: Boolean(props.queueing),
     liveByDefault: Boolean(props.liveByDefault),
     steerable: Boolean(props.steerable),
+    steerReason: props.steerReason,
     canStop,
     hasDraft: Boolean(props.value.trim()) || attachments.length > 0 || uploading > 0,
+    startsTask: props.allowEmpty,
   });
-  const submit = (now = actions.sendsNow) => {
+  const submit = (otherWay: boolean) => {
     if (!canSend) return;
     files.clearError();
     const sent = attachments.map((attachment) => attachment.path);
     const text = props.value.trim();
+    const now = sendsNow(cluster, otherWay);
     setSentText(null);
     submitDraft(text, sent, async () => {
       await props.onSubmit(text, sent, now);
@@ -251,17 +253,8 @@ export function Composer(props: ComposerProps) {
 
   const pickFiles = () => chooseFiles((chosen) => void addFiles(chosen));
 
-  const stopInsteadOfSend = actions.primary === "stop";
   const stopping = props.stopAction?.pending ?? interrupt.isPending;
   const activityLabel = composerActivity({ stopping, submitting, generatingImage: Boolean(props.generatingImage) });
-  const sendHint = composerSendHint({
-    disabledReason: props.disabledReason,
-    attachmentBlock,
-    liveByDefault: props.liveByDefault,
-    queueing,
-    steerable: props.steerable,
-    steerReason: props.steerReason,
-  });
   const stop = () => {
     if (stopping) return;
     if (props.stopAction) props.stopAction.onStop();
@@ -299,7 +292,7 @@ export function Composer(props: ComposerProps) {
           <ComposerInput
             value={props.value}
             onChange={props.onChange}
-            onSubmit={(duringTurn) => submit(actions.sendsNow || duringTurn)}
+            onSubmit={submit}
             onFiles={addFiles}
             onReady={props.onReady}
             draftKey={props.draftKey}
@@ -346,36 +339,13 @@ export function Composer(props: ComposerProps) {
             {props.context ? (
               <ContextUsage used={props.context.used} window={props.context.window} onCompact={props.onCompact} compacting={props.compacting} disabledReason={props.compactDisabledReason} />
             ) : null}
-            {actions.stop ? (
-              <Tooltip label="Stop this turn">
-                <button onClick={stop} disabled={stopping} aria-label="Stop" className="composer-icon-button">
-                  <Square size={14} />
-                </button>
-              </Tooltip>
-            ) : null}
-            {/* Send now (also ⌘↵) appears only when the turn can take it.
-                Disabled controls drop their pointer events, so a dim button
-                could never show why it was dim. The reason goes on the queue
-                button instead, which is enabled and therefore hoverable. */}
-            {actions.sendNow ? (
-              <Tooltip label="Say it during this turn">
-                <button onClick={() => void submit(true)} disabled={!canSend} aria-label="Send now" className="composer-send-now">
-                  Send now
-                </button>
-              </Tooltip>
-            ) : null}
-            {actions.queue ? (
-              <Tooltip label="Queue for after this turn">
-                <Button size="sm" variant="ghost" disabled={!canSend} onClick={() => void submit(false)}>
-                  Queue
-                </Button>
-              </Tooltip>
-            ) : null}
-            <ComposerSendButton
-              state={actions.primary}
-              disabled={stopInsteadOfSend ? stopping : !canSend}
-              hint={stopInsteadOfSend ? "Stop this turn" : sendHint}
-              onClick={stopInsteadOfSend ? stop : () => void submit()}
+            <ComposerSendCluster
+              cluster={cluster}
+              canSend={canSend}
+              block={composerSendBlock({ disabledReason: props.disabledReason, attachmentBlock })}
+              stopping={stopping}
+              onSend={submit}
+              onStop={stop}
             />
           </div>
         </div>

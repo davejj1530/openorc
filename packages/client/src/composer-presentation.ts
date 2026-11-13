@@ -1,11 +1,15 @@
+import { defaultHarnessId, harnessShortName, type AgentKind } from "@openorc/protocol";
+
 const COMPOSER_MESSAGES = {
   stopping: "Stopping…",
   sending: "Sending…",
   generatingImage: "Generating image…",
-  send: "Send",
-  liveSend: "Send. Reaches the active turn when supported; otherwise kept in order.",
-  queue: "Queue for after this turn",
 } as const;
+
+/** A thread's composer says who reads the message, in every state; what Enter does is the send's own word. */
+export function composerPlaceholder(agent: AgentKind | undefined): string {
+  return `Message ${harnessShortName(agent ?? defaultHarnessId)}…`;
+}
 
 /** What the composer is doing with the last send or the running turn, in a word or two; null when nothing. */
 export function composerActivity(input: { stopping: boolean; submitting: boolean; generatingImage: boolean }): string | null {
@@ -15,22 +19,9 @@ export function composerActivity(input: { stopping: boolean; submitting: boolean
   return null;
 }
 
-/** Why Send is dim, or what it will do with the message. */
-export function composerSendHint(input: {
-  disabledReason?: string | null;
-  attachmentBlock?: string | null;
-  liveByDefault?: boolean;
-  queueing: boolean;
-  steerable?: boolean;
-  steerReason?: string | null;
-}): string {
-  if (input.disabledReason != null) return input.disabledReason;
-  if (input.attachmentBlock != null) return input.attachmentBlock;
-  if (input.liveByDefault) return COMPOSER_MESSAGES.liveSend;
-  if (!input.queueing) return COMPOSER_MESSAGES.send;
-  if (input.steerable) return COMPOSER_MESSAGES.queue;
-  if (input.steerReason) return `${COMPOSER_MESSAGES.queue}. ${input.steerReason}`;
-  return COMPOSER_MESSAGES.queue;
+/** Why a send cannot go, when it cannot: said on demand by the dimmed send. */
+export function composerSendBlock(input: { disabledReason?: string | null; attachmentBlock?: string | null }): string | null {
+  return input.disabledReason ?? input.attachmentBlock ?? null;
 }
 
 /**

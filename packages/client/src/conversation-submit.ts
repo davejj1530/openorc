@@ -119,6 +119,34 @@ export function composerActions(input: ComposerActionsInput) {
   } as const;
 }
 
+/** How a message goes while a turn runs: into the turn now, or after it. */
+export type SendWay = "now" | "queue";
+
+/** Why the running turn cannot take a message now, when nothing more specific is known. */
+const TURN_TAKES_NOTHING = "This turn can’t take a message now.";
+
+/**
+ * The composer's send cluster, so what it draws and what Enter does never disagree. With nothing typed while something
+ * runs, one ink Stop. With nothing running, the bare arrow, which only ever sends (or, for a task's empty first send,
+ * names that it starts the task). While a turn runs and something is typed, the ink pill carries the word of what Enter
+ * does and a quiet word beside it is the other way; Stop steps aside as a white key.
+ */
+export type SendCluster = { kind: "stop" } | { kind: "send"; stop: boolean; startsTask: boolean } | { kind: "turn"; stop: boolean; enter: SendWay; other: { way: SendWay; blocked: string | null } };
+
+export function sendCluster(input: ComposerActionsInput & { steerReason?: string | null | undefined; startsTask?: boolean }): SendCluster {
+  if (input.canStop && !input.hasDraft) return { kind: "stop" };
+  if (!input.queueing) return { kind: "send", stop: input.canStop, startsTask: Boolean(input.startsTask && !input.hasDraft) };
+  const enter: SendWay = input.liveByDefault && input.steerable ? "now" : "queue";
+  if (enter === "now") return { kind: "turn", stop: input.canStop, enter, other: { way: "queue", blocked: null } };
+  return { kind: "turn", stop: input.canStop, enter, other: { way: "now", blocked: input.steerable ? null : input.steerReason || TURN_TAKES_NOTHING } };
+}
+
+/** Whether a send by this way reaches the running turn, for `planSubmit`'s `now`; Command and Enter takes the other way. */
+export function sendsNow(cluster: SendCluster, otherWay: boolean): boolean {
+  if (cluster.kind !== "turn") return false;
+  return (otherWay ? cluster.other.way : cluster.enter) === "now";
+}
+
 /** A send as the person made it, decided once every setting they chose is saved. */
 export interface SubmitRequest extends SubmitInput {
   /** Resolves once every setting chosen so far is saved, so a message never meets a process with stale ones. */

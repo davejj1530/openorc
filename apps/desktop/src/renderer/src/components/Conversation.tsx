@@ -4,7 +4,7 @@ import {
   cloudTurnOf,
   CONTINUE_PROMPT,
   conversationActivity,
-  conversationPlaceholder,
+  composerPlaceholder,
   heardTranscript,
   placeUnreachable,
   conversationSendDisabledReason,
@@ -229,7 +229,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const location = conversationLocation({ scope, project, mode: workspaceMode, basePath: links ?? project.rootPath, checkoutBranch: checkout.data?.branch, plainFolder: git.state === "none" });
   const emptyHint = conversationEmptyHint({ task: scope.kind === "task", workspace: project.id === WORKSPACE_ID });
   const answersBlocked = placeUnreachable(thread);
-  const placeholder = conversationPlaceholder({ firstTaskRun, working, canSteer, waiting: thread?.activity === "waiting", agent: choice?.agent });
+  const placeholder = composerPlaceholder(choice?.agent);
 
   function renderTranscript() {
     if (optimistic.run && optimistic.run.blocks.length > 0)

@@ -47,8 +47,6 @@ function mount(overrides: Partial<ComposerProps> = {}) {
   );
 }
 
-const sendNow = () => screen.queryByLabelText("Send now");
-
 // Context popover behavior is covered in composer-steering-ui-smoke.cjs with real layout and focus.
 
 describe("slash suggestions", () => {
@@ -246,7 +244,7 @@ describe("slash suggestions", () => {
       expect(messageOf(message())).toBe("/te\n");
       expect(onSubmit).not.toHaveBeenCalled();
       press(message(), { key: "Enter", metaKey: true });
-      await waitFor(() => expect(onSubmit).toHaveBeenCalledWith("/te", [], true));
+      await waitFor(() => expect(onSubmit).toHaveBeenCalledWith("/te", [], false));
     });
   });
 
@@ -350,52 +348,71 @@ describe("slash suggestions", () => {
   });
 });
 
-describe("send now", () => {
-  it("uses the submit position for Stop with an empty draft and restores Send when typing", async () => {
+describe("the send cluster", () => {
+  const ink = () => document.querySelector<HTMLButtonElement>(".composer-send")!;
+  it("stops from the one ink button with nothing typed, and steps Stop aside as a key once something is", () => {
     const onStop = vi.fn();
-    mount({ value: "", liveByDefault: true, queueing: true, stopAction: { working: true, pending: false, onStop } });
-    const stop = screen.getByRole("button", { name: "Stop" });
-    expect(stop.classList.contains("composer-send")).toBe(true);
-    expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+    mount({ value: "", liveByDefault: true, queueing: true, steerable: true, stopAction: { working: true, pending: false, onStop } });
+    expect(ink().getAttribute("aria-label")).toBe("Stop");
     expect(screen.queryByRole("button", { name: "Queue" })).toBeNull();
-    fireEvent.click(stop);
+    fireEvent.click(ink());
     expect(onStop).toHaveBeenCalledOnce();
     type(screen.getByRole("textbox", { name: "Message" }), "A correction");
-    expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Queue" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Stop" }).classList.contains("composer-icon-button")).toBe(true);
+    expect(ink().getAttribute("aria-label")).toBe("Send now");
+    expect(ink().textContent).toBe("Send now");
+    expect(screen.getByRole("button", { name: "Queue" }).classList.contains("composer-send-other")).toBe(true);
+    expect(screen.getByRole("button", { name: "Stop" }).classList.contains("composer-stop")).toBe(true);
     type(screen.getByRole("textbox", { name: "Message" }), "  \n ");
-    expect(screen.getByRole("button", { name: "Stop" }).classList.contains("composer-send")).toBe(true);
+    expect(ink().getAttribute("aria-label")).toBe("Stop");
   });
 
-  it("labels the secondary action Queue and still sends it to the next turn", async () => {
+  it("sends into the turn from the pill and with Enter, and queues from the quiet word and with Command and Enter", async () => {
     const onSubmit = vi.fn(async () => {});
-    mount({ liveByDefault: true, queueing: true, onSubmit });
-    const queue = screen.getByRole("button", { name: "Queue" });
-    expect(queue.textContent).toBe("Queue");
-    fireEvent.click(queue);
-    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith("say something", [], false));
+    mount({ queueing: true, liveByDefault: true, steerable: true, onSubmit });
+    fireEvent.click(ink());
+    await waitFor(() => expect(onSubmit).toHaveBeenLastCalledWith("say something", [], true));
+    cleanup();
+    mount({ queueing: true, liveByDefault: true, steerable: true, onSubmit });
+    press(screen.getByRole("textbox", { name: "Message" }), { key: "Enter", metaKey: true });
+    await waitFor(() => expect(onSubmit).toHaveBeenLastCalledWith("say something", [], false));
   });
 
-  it("appears mid-turn beside a queue button and reaches the running turn rather than queueing, which is the whole point of it", async () => {
+  it("puts Queue on the pill when the person queues by default, with Send now beside it", async () => {
     const onSubmit = vi.fn(async () => {});
-    mount({ queueing: true, steerable: true, onSubmit });
-    expect(sendNow()).toBeTruthy();
-    expect(screen.getByLabelText("Queue")).toBeTruthy();
-    expect(screen.queryByLabelText("Send")).toBeNull();
-    sendNow()?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalled());
-    // The third argument is `now`: true steers, false queues.
-    expect(onSubmit.mock.calls[0]).toEqual(["say something", [], true]);
+    mount({ queueing: true, liveByDefault: false, steerable: true, onSubmit });
+    expect(ink().getAttribute("aria-label")).toBe("Queue");
+    fireEvent.click(screen.getByRole("button", { name: "Send now" }));
+    await waitFor(() => expect(onSubmit).toHaveBeenLastCalledWith("say something", [], true));
   });
 
-  it("stays away when the turn cannot take direction, rather than sitting there dim", () => {
-    // Disabled controls drop their pointer events, so a dim Send now could
-    // never show the reason it was dim. The reason moves to the queue button,
-    // which is enabled and can.
-    mount({ queueing: true, steerable: false, steerReason: "Earlier direction must be handled first. Direction will be queued." });
-    expect(sendNow()).toBeNull();
-    expect(screen.getByLabelText("Queue")).toBeTruthy();
+  it("keeps Send now dimmed with its reason when the turn cannot take a message, and Enter queues", async () => {
+    const onSubmit = vi.fn(async () => {});
+    const reason = "This agent reads new messages after its turn. It will be queued.";
+    mount({ queueing: true, liveByDefault: true, steerable: false, steerReason: reason, onSubmit });
+    expect(ink().getAttribute("aria-label")).toBe("Queue");
+    const now = screen.getByRole("button", { name: "Send now" });
+    expect(now).toHaveProperty("disabled", true);
+    expect(now.getAttribute("data-tip")).toBe(reason);
+    press(screen.getByRole("textbox", { name: "Message" }), { key: "Enter" });
+    await waitFor(() => expect(onSubmit).toHaveBeenLastCalledWith("say something", [], false));
+  });
+
+  it("names a task's empty first send, and keeps the bare arrow once words are typed", () => {
+    mount({ value: "", allowEmpty: true });
+    expect(ink().getAttribute("aria-label")).toBe("Start from the task");
+    cleanup();
+    mount({ allowEmpty: true });
+    expect(ink().getAttribute("aria-label")).toBe("Send");
+    expect(ink().textContent).toBe("");
+  });
+
+  it("says why a send cannot go only on the dimmed send, and names the bare arrow otherwise", () => {
+    mount({ disabledReason: "Sign in to OpenOrc Cloud to start a turn." });
+    expect(ink().getAttribute("data-tip")).toBe("Sign in to OpenOrc Cloud to start a turn.");
+    cleanup();
+    mount({ queueing: true, liveByDefault: true, steerable: true });
+    expect(ink().getAttribute("data-tip")).toBeNull();
+    expect(screen.getByRole("button", { name: "Queue" }).getAttribute("data-tip")).toBeNull();
   });
 });
 
@@ -442,14 +459,14 @@ describe("pending sends across navigation", () => {
           accept = resolve;
         }),
     );
-    const props = { draftKey: "navigation-accept", onSubmit, liveByDefault: true, queueing: true };
+    const props = { draftKey: "navigation-accept", onSubmit, liveByDefault: true, queueing: true, steerable: true };
     mount(props);
-    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send now" }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
     for (let i = 0; i < 6; i++) {
       cleanup();
       mount(props);
-      expect(screen.getByRole("button", { name: "Send" })).toHaveProperty("disabled", true);
+      expect(screen.getByRole("button", { name: "Send now" })).toHaveProperty("disabled", true);
       expect(screen.getByRole("textbox", { name: "Message" }).getAttribute("aria-disabled")).toBe("true");
       expect(screen.getByText("Sending…")).toBeTruthy();
       press(screen.getByRole("textbox", { name: "Message" }), { key: "Enter" });

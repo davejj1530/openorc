@@ -9,7 +9,7 @@ import { cn } from "../lib/cn";
 import { newThread, openProject } from "../lib/router";
 import { useUi } from "../lib/ui";
 import { floatingGround } from "../lib/use-anchor-ground";
-import { ChevronRight, Globe, Image as ImageIcon, MoreHorizontal, PenSquare, Plus, Settings, X } from "./icons";
+import { ChevronRight, Cloud, Globe, Image as ImageIcon, MoreHorizontal, PenSquare, Plus, Settings, X } from "./icons";
 import { menuItem, menuItemDanger, menuPopup, menuSeparator } from "./menu";
 import { ProjectIcon, ProjectIconChooser } from "./ProjectIconPicker";
 import { RemoveProjectDialog } from "./ProjectMenu";
@@ -62,7 +62,7 @@ export function SidebarProjectGroup({
             }}
           >
             <span className="sidebar-project-mark" aria-hidden="true">
-              {project.rootPath ? <ProjectIcon rootPath={project.rootPath} size={14} /> : <Globe size={14} />}
+              <ProjectMark project={project} />
             </span>
             <span className="sidebar-project-name" data-tip={project.name}>
               {project.name}
@@ -71,14 +71,16 @@ export function SidebarProjectGroup({
             {waiting ? <span className="sidebar-count tabular">{waiting}</span> : null}
           </ContextMenu.Trigger>
         </ProjectActions>
-        <div className="sidebar-project-tools">
-          {project.id !== WORKSPACE_ID ? <ProjectMoreMenu project={project} actions={actions} /> : null}
-          <Tooltip label="New thread">
-            <button type="button" aria-label={`New thread in ${project.name}`} className="sidebar-project-tool no-drag" onClick={() => startThread(project.id)}>
-              <Plus size={14} />
-            </button>
-          </Tooltip>
-        </div>
+        {project.cloud ? null : (
+          <div className="sidebar-project-tools">
+            {project.id !== WORKSPACE_ID ? <ProjectMoreMenu project={project} actions={actions} /> : null}
+            <Tooltip label="New thread">
+              <button type="button" aria-label={`New thread in ${project.name}`} className="sidebar-project-tool no-drag" onClick={() => startThread(project.id)}>
+                <Plus size={14} />
+              </button>
+            </Tooltip>
+          </div>
+        )}
       </div>
       <div className={cn("sidebar-thread-list", animate && open && "motion-stagger")}>
         {children}
@@ -91,6 +93,12 @@ export function SidebarProjectGroup({
       {actions.dialogs}
     </section>
   );
+}
+
+/** A project's mark: its chosen or detected icon, the cloud for a project only OpenOrc Cloud has, else No project's globe. */
+function ProjectMark({ project }: { project: GroupProject }) {
+  if (project.rootPath) return <ProjectIcon rootPath={project.rootPath} size={14} />;
+  return project.cloud ? <Cloud size={14} /> : <Globe size={14} />;
 }
 
 type ProjectDialogs = ReturnType<typeof useProjectDialogs>;
@@ -145,7 +153,7 @@ function ProjectMenuItems({ project, parts: M, onChoose, onRemove }: { project: 
 /** The project's actions on its label's right click, or the context menu key while the label has focus. */
 function ProjectActions({ project, actions, children }: { project: GroupProject; actions: ProjectDialogs; children: ReactNode }) {
   return (
-    <ContextMenu.Root>
+    <ContextMenu.Root disabled={project.cloud}>
       {children}
       <ContextMenu.Portal>
         <CoversPreview />

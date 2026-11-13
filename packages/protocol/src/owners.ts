@@ -288,7 +288,8 @@ export function mergeThreadPages(
     .map(([root, tree]) => ({ root, tree, sorted: { ...root.row, lastActivityAt: list.includeChildren ? treeActivity(tree) : root.row.lastActivityAt } }))
     .sort((a, b) => compare(a.sorted, b.sorted));
   const kept = roots.filter((entry, index) => !list.limit || index < list.limit || entry.tree.some((each) => each.row.id === list.selectedId));
-  const stamp = ({ row, page }: Held): ThreadSummary => (page.brain === self ? row : { ...row, owner: { brain: page.brain, reach: page.reach, heardAt: page.heardAt } });
+  // What a place stamped on its own rows about them (an OpenOrc Cloud thread's project) stays; who answered is the page's.
+  const stamp = ({ row, page }: Held): ThreadSummary => (page.brain === self ? row : { ...row, owner: { ...row.owner, brain: page.brain, reach: page.reach, heardAt: page.heardAt } });
   return kept
     .flatMap((entry) => entry.tree)
     .sort((a, b) => compare(a.row, b.row))

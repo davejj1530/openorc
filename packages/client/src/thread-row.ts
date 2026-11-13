@@ -1,4 +1,4 @@
-import { STATUS_PRIORITY, threadStatus, WORKSPACE_ID, type PrState, type ThreadStatus, type ThreadSummary } from "@openorc/protocol";
+import { placeOf, STATUS_PRIORITY, threadStatus, WORKSPACE_ID, type PrState, type ThreadStatus, type ThreadSummary } from "@openorc/protocol";
 
 export { STATUS_PRIORITY, threadStatus, type ThreadStatus };
 
@@ -48,7 +48,7 @@ export function threadPlace(thread: Pick<ThreadSummary, "branch" | "prUrl" | "pr
  * already says where the work is, so beside one only the cloud shows, where the next turn runs.
  */
 export function workspaceLabel(thread: Pick<ThreadSummary, "workspaceMode" | "branch" | "prUrl" | "cloud" | "owner" | "projectId" | "workingDirectory">): string | null {
-  if (thread.cloud || thread.owner?.brain === "cloud") return "cloud";
+  if (thread.cloud || placeOf(thread).brain) return "cloud";
   if (pullRequestNumber(thread.prUrl) !== null) return null;
   if (thread.workspaceMode === "worktree") return "worktree";
   if (thread.branch) return thread.branch;

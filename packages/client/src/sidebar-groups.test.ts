@@ -1,7 +1,7 @@
 import type { ThreadSummary } from "@openorc/protocol";
 import { describe, expect, it } from "vitest";
 import { sidebarGroupsGrow } from "./sidebar-days.js";
-import { groupPage, liveGroupedFold, projectGroups, waitingRoots, WORKSPACES_FOLD } from "./sidebar-groups.js";
+import { cloudProjects, groupPage, liveGroupedFold, projectGroups, waitingRoots, WORKSPACES_FOLD } from "./sidebar-groups.js";
 
 function thread(id: string, projectId: string, values: Partial<ThreadSummary> = {}): ThreadSummary {
   return {
@@ -74,5 +74,16 @@ describe("sidebar project groups", () => {
     expect(liveGroupedFold("resolved-open:threads")).toBe(true);
     expect(liveGroupedFold("day-closed:recent")).toBe(false);
     expect(liveGroupedFold("projects:openorc")).toBe(false);
+  });
+});
+
+describe("cloudProjects", () => {
+  it("names each project only OpenOrc Cloud has once, in the order its rows come", () => {
+    const row = (id: string, projectId: string, name?: string) =>
+      ({ id, projectId, owner: name ? { brain: "hosted", reach: "live", heardAt: 0, project: { name } } : undefined }) as unknown as ThreadSummary;
+    expect(cloudProjects([row("a", "openorc-cloud:web", "website"), row("b", "mac"), row("c", "openorc-cloud:web", "website"), row("d", "openorc-cloud:api", "api")])).toEqual([
+      { id: "openorc-cloud:web", name: "website", cloud: true },
+      { id: "openorc-cloud:api", name: "api", cloud: true },
+    ]);
   });
 });

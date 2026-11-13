@@ -62,6 +62,7 @@ export class Session {
   #blip: ReturnType<typeof setTimeout> | null = null;
   #lastConnect = Number.NEGATIVE_INFINITY;
   readonly #listeners = new Set<(change: SessionChange) => void>();
+  readonly #socketListeners = new Map<string, ((body: unknown) => void)[]>();
 
   constructor(private readonly deps: Pick<HostedDeps, "server" | "session" | "fetch" | "connect" | "now" | "log">) {}
 
@@ -145,6 +146,24 @@ export class Session {
     this.#listeners.add(listener);
   }
 
+  /** A message the server sends on the socket, heard on every socket this session opens. */
+  onSocket(event: string, listener: (body: unknown) => void): void {
+    this.#socketListeners.set(event, [...(this.#socketListeners.get(event) ?? []), listener]);
+    this.#held?.socket?.on(event, listener);
+  }
+
+  /** One message on the socket with its reply, parsed. Rejects as out of reach while the socket is not up. */
+  async ask<T>(event: string, body: unknown, reply: z.ZodType<T>): Promise<T> {
+    const held = this.#held;
+    if (!held?.socket || held.reach !== "live") throw new OutOfReach();
+    const answer = await held.socket.ask(event, body).catch(() => {
+      throw new OutOfReach();
+    });
+    const parsed = reply.safeParse(answer);
+    if (!parsed.success) throw new Unreadable();
+    return parsed.data;
+  }
+
   /** The device woke or the network came back: connect now instead of at the socket's next retry. */
   awoke(): void {
     this.#reconnectSoon();
@@ -170,6 +189,7 @@ export class Session {
     this.#lastConnect = this.deps.now();
     const socket = this.deps.connect(this.deps.server, held.token);
     held.socket = socket;
+    for (const [event, listeners] of this.#socketListeners) for (const listener of listeners) socket.on(event, listener);
     socket.onState((state) => {
       if (this.#held !== held || held.socket !== socket) return;
       if (state === "refused") void this.end("server");

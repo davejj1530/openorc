@@ -1,4 +1,4 @@
-import { WORKSPACE_ID, isDetachedCopy, type Project, type ThreadSummary } from "@openorc/protocol";
+import { WORKSPACE_ID, isDetachedCopy, placeOf, type Project, type ThreadSummary } from "@openorc/protocol";
 
 /** The tools a conversation's side panel holds. Each app draws its own icon for each by name. */
 export type PanelTool = "newtab" | "orcling" | "plan" | "file" | "changes" | "tasks" | "task" | "terminal" | "browser" | "commits" | "checkpoints" | "memory" | "instructions";
@@ -35,8 +35,8 @@ export function tabsFor(context: PanelToolContext): PanelTool[] {
     context.project.id === WORKSPACE_ID
       ? ["terminal", "file", "tasks", "plan", "memory", "instructions"]
       : ["changes", "terminal", "file", "plan", "tasks", "checkpoints", "commits", "memory", "instructions"];
-  // A thread the cloud brain holds has no folder on this Mac: its terminal and files would be this Mac's checkout.
-  if (context.thread.owner?.brain === "cloud" && !context.thread.owner.mirror) return tools.filter((tool) => tool !== "terminal" && tool !== "file" && tool !== "instructions");
+  // A thread held elsewhere has no folder on this Mac: its terminal and files would be this Mac's checkout.
+  if (placeOf(context.thread).elsewhere && !context.thread.owner?.mirror) return tools.filter((tool) => tool !== "terminal" && tool !== "file" && tool !== "instructions");
   if (isDetachedCopy(context.thread)) tools.splice(tools.indexOf("commits"), tools.includes("commits") ? 1 : 0);
   if (context.thread.orclingId) tools.push("orcling");
   return tools;

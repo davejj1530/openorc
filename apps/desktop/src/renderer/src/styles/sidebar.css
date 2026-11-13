@@ -523,6 +523,11 @@ button.sidebar-nav-row:hover {
   content: "·" / "";
   margin-right: 6px;
 }
+/* A thread off this Mac: the quiet cloud after where it works. */
+.thread-preview-place {
+  display: inline-flex;
+  flex-shrink: 0;
+}
 .thread-preview-pull {
   display: inline-flex;
   flex-shrink: 0;

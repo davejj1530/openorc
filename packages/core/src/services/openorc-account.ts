@@ -1,15 +1,18 @@
 /** Mounts `@openorc/hosted` in the Mac's core: hands it what only this Mac has. Handlers call the package's own account. */
-import { settings, type Db } from "@openorc/db";
+import { projects, settings, type Db } from "@openorc/db";
 import { createHosted, type Hosted, type LiveSocket } from "@openorc/hosted";
 import { ACCOUNT_PROTOCOL_HEADER, ACCOUNT_PROTOCOL_VERSION } from "@openorc/protocol";
 import { io } from "socket.io-client";
 import type { Logger, Transport } from "../transport.js";
 import type { ProtectedSecretStore } from "./extraction-credentials.js";
 
-const KEPT = "hosted.kept";
+/** What the server last said, by part, in the settings table. */
+const KEPT = { account: "hosted.kept", threads: "hosted.threads" } as const;
 const STORAGE = "Cannot access protected storage for your OpenOrc account. Unlock your OS keychain and retry.";
 /** How long a socket the server answered with an error other than a refusal waits before trying again. */
 const RETRY_MS = 10_000;
+/** How long the server has to answer a message on the socket. */
+const ASK_MS = 10_000;
 
 export interface AccountDeps {
   db: Db;
@@ -27,9 +30,10 @@ export function createAccount(deps: AccountDeps): Hosted {
     server: deps.server,
     session: sessionStore(deps.secrets),
     kept: {
-      load: () => settings.get(deps.db, KEPT),
-      save: (json) => (json === null ? settings.remove(deps.db, KEPT) : settings.set(deps.db, KEPT, json)),
+      load: (part) => settings.get(deps.db, KEPT[part]),
+      save: (part, json) => (json === null ? settings.remove(deps.db, KEPT[part]) : settings.set(deps.db, KEPT[part], json)),
     },
+    projects: () => projects.list(deps.db).map((project) => ({ id: project.id, remote: project.gitRemote })),
     fetch,
     connect: liveSocket,
     push: (push) => deps.windows.push(push),
@@ -79,6 +83,8 @@ function liveSocket(url: string, token: string): LiveSocket {
   });
   return {
     onState: (listener) => void listeners.push(listener),
+    on: (event, listener) => void socket.on(event, listener),
+    ask: (event, body) => socket.timeout(ASK_MS).emitWithAck(event, body) as Promise<unknown>,
     close: () => {
       if (retry) clearTimeout(retry);
       socket.close();

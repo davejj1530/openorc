@@ -1,6 +1,6 @@
 import { canMoveToCloud, cloudServiceMissing, offersBrainMove, threadPlace } from "@openorc/client";
 import type { CloudOffer, ThreadSummary, WorktreeBlock } from "@openorc/protocol";
-import { WORKSPACE_ID, WORKTREE_BLOCK_WORDS } from "@openorc/protocol";
+import { placeOf, WORKSPACE_ID, WORKTREE_BLOCK_WORDS } from "@openorc/protocol";
 import type { ReactNode } from "react";
 import { CoversPreview } from "../lib/browser-preview";
 import { useRpc, useRpcMutation } from "../lib/client";
@@ -16,8 +16,9 @@ type Where = "moving" | "cloud" | "mac";
 /** Where the next turn runs, when the menu has a move to offer from there: this Mac only when the cloud is an option. */
 function whereKind(thread: ThreadSummary, offer: CloudOffer | undefined): Where | null {
   if (thread.moving) return "moving";
-  if (thread.owner?.brain === "cloud") return "cloud";
-  if (!offer) return null;
+  const place = placeOf(thread);
+  if (place.brain) return "cloud";
+  if (place.elsewhere || !offer) return null;
   return (offer.brain ? offersBrainMove(thread) : canMoveToCloud(thread)) ? "mac" : null;
 }
 
@@ -68,7 +69,7 @@ const placeIcons = { branch: GitBranch, pull: GitPullRequest, folder: Folder } a
 /** The branch the thread works on, read live from the checkout since the checkout can switch under it, and the folder it works in on this Mac. */
 function useBranchPlace(thread: ThreadSummary) {
   const checkout = thread.workspaceMode === "current";
-  const here = thread.owner?.brain !== "cloud";
+  const here = !placeOf(thread).elsewhere;
   const live = useRpc("projects.checkoutBranch", { id: thread.projectId }, { enabled: checkout && here, staleTime: 0 });
   const project = useRpc("projects.get", { id: thread.projectId }, { enabled: checkout && here });
   const place = threadPlace({ ...thread, branch: checkout && live.isSuccess ? live.data : thread.branch });

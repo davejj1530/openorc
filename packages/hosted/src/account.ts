@@ -46,7 +46,7 @@ export class Account implements HostedAccount {
     } catch (error) {
       this.#error = wordsOf(error);
     }
-    const kept = parseKept(this.deps.kept.load());
+    const kept = parseKept(this.deps.kept.load("account"));
     const state = this.deps.session.state;
     if (kept && state.signedIn && kept.email === state.email) this.#heard = kept;
     this.#announce();
@@ -110,7 +110,7 @@ export class Account implements HostedAccount {
       // Before the session's own storage is cleared and before the server hears of it.
       this.#heard = null;
       this.#error = null;
-      this.deps.kept.save(null);
+      this.deps.kept.save("account", null);
     }
     if (change === "connected") void this.#refresh();
     this.#announce();
@@ -142,7 +142,7 @@ export class Account implements HostedAccount {
   #hear(email: string, parts: Partial<Omit<Heard, "email">>): void {
     const before = this.#heard?.email === email ? this.#heard : { email, billing: null, person: null, sandbox: null };
     this.#heard = { ...before, ...parts };
-    if (Object.keys(parts).length) this.deps.kept.save(JSON.stringify(this.#heard));
+    if (Object.keys(parts).length) this.deps.kept.save("account", JSON.stringify(this.#heard));
     this.#announce();
   }
 

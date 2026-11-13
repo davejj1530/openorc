@@ -18,6 +18,7 @@ import { createClaudeAccountHandlers } from "./handlers/claude-accounts.js";
 import { createConnectorHandlers } from "./handlers/connectors.js";
 import { ConnectorService, type ConnectorPlaces } from "./services/connectors.js";
 import { createAccount } from "./services/openorc-account.js";
+import { PlaceRouter } from "./services/place-router.js";
 import { rememberedConnectors } from "./services/remembered-connectors.js";
 import { createBrainSyncHandlers } from "./handlers/brain-sync.js";
 import { createCloudHandlers } from "./handlers/cloud.js";
@@ -178,6 +179,7 @@ export class OpenOrc {
   readonly cloudStandby: CloudStandby;
   private routing: BrainRouting | null | undefined;
   private hosted: Hosted | null | undefined;
+  private placeRouter: PlaceRouter | undefined;
   private readonly cloudParts: ReturnType<typeof createCloud>;
   readonly runs: RunService;
   readonly comments: TaskCommentService;
@@ -614,9 +616,17 @@ export class OpenOrc {
    * request names its origin, which the handler's audit rows can read for as long as it runs.
    */
   async handle(request: RpcRequest, origin?: RequestOrigin): Promise<RpcReply> {
-    // A window's call while a cloud brain is set up may be about a thread the brain holds; a phone's never goes there.
-    if (!origin && this.brainRouting?.active) return this.brainRouting.router.handle(request);
-    return this.dispatch(request, origin);
+    // A window's call may be about a thread OpenOrc Cloud or the cloud brain holds; a phone's never goes there.
+    return origin ? this.dispatch(request, origin) : this.places.handle(request);
+  }
+
+  /** OpenOrc Cloud's threads first, by lookup; then the cloud brain's by absence, while one is set up; then this Mac. */
+  private get places(): PlaceRouter {
+    this.placeRouter ??= new PlaceRouter({
+      place: () => this.account?.threads ?? null,
+      next: (request) => (this.brainRouting?.active ? this.brainRouting.router.handle(request) : this.dispatch(request)),
+    });
+    return this.placeRouter;
   }
 
   private async dispatch(request: RpcRequest, origin?: RequestOrigin): Promise<RpcReply> {

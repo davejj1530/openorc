@@ -8,14 +8,19 @@
  * No Node, Electron or React Native import outside testing/. Each host hands in what only it has (`HostedDeps`), so a
  * phone can mount the same package with its own storage.
  */
-import type { AccountStatus } from "@openorc/protocol";
+import type { AccountStatus, Frame, OwnerReach, Project, RoutedMethod, RpcParams, RpcResults, ThreadSummary } from "@openorc/protocol";
 import { Account } from "./account.js";
 import { Session } from "./session.js";
+import { Threads } from "./threads.js";
 
 /** The server's push socket, as little of it as the package uses. The desktop core builds one from `socket.io-client`. */
 export interface LiveSocket {
   /** `up` on every new session, `down` when it drops, `refused` when the server will not take the token. */
   onState(listener: (state: "up" | "down" | "refused") => void): void;
+  /** A message the server sends. */
+  on(event: string, listener: (body: unknown) => void): void;
+  /** Sends one message and resolves with the server's reply to it. Rejects when the socket is down or drops first. */
+  ask(event: string, body: unknown): Promise<unknown>;
   close(): void;
 }
 
@@ -28,13 +33,18 @@ export interface HostedDeps {
    * it once at start, holds it in memory, and never returns, logs or throws the token. `save(null)` forgets it.
    */
   session: { load(): Promise<string | null>; save(value: string | null): Promise<void> };
-  /** Keeps what the server last said that is no secret (the plan and hours), so it shows offline and after a restart. */
-  kept: { load(): string | null; save(json: string | null): void };
+  /**
+   * Keeps what the server last said that is no secret, in two parts (the account's plan and hours, and its thread
+   * rows), so they show offline and after a restart.
+   */
+  kept: { load(part: KeptPart): string | null; save(part: KeptPart, json: string | null): void };
+  /** This device's projects with their git remotes. Hosted projects are matched to them by GitHub repository. */
+  projects(): readonly { id: string; remote: string | null }[];
   fetch: typeof fetch;
   /** Opens the socket with the token. Called again after each sign-in and each early reconnect; it retries by itself in between. */
   connect(url: string, token: string): LiveSocket;
-  /** What the host's windows hear. Never reaches a paired phone. */
-  push(push: { type: "invalidate"; keys: string[] }): void;
+  /** What the host's windows hear. Frames carry the app's run ids. Never reaches a paired phone. */
+  push(push: { type: "invalidate"; keys: string[] } | { type: "frame"; frame: Frame } | { type: "gap"; runIds: string[] }): void;
   now(): number;
   log: { info(message: string): void; warn(message: string): void };
 }
@@ -52,8 +62,41 @@ export interface HostedAccount {
   setSandbox(service: string | null): Promise<void>;
 }
 
+export type KeptPart = "account" | "threads";
+
+/** The lists every place answers its own rows of, which the asker merges. */
+export type MergedMethod = "threads.list" | "threads.resolvedCount" | "inbox.list";
+
+/** One place's part of a merged list, with how far the place could be reached when it last answered. */
+export interface PlacePage<M extends MergedMethod> {
+  reach: OwnerReach;
+  heardAt: number;
+  rows: RpcResults[M];
+}
+
+/**
+ * Hosted threads, in the app's own calls: the place the core's router asks. Nothing here names a seq, a turn, a room,
+ * a route or a space.
+ */
+export interface HostedThreads {
+  readonly brain: "hosted";
+  /** Signed in and heard from. While false the router asks nothing of this place. */
+  readonly active: boolean;
+  /** Whether a thread, run or project is the account's. A lookup in what the server listed; never a request. */
+  holds(ref: { thread: string } | { run: string } | { project: string }): boolean;
+  /** One of the app's calls about something it holds, in the app's shapes. Rejects with words for the person. */
+  call<M extends RoutedMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]>;
+  /** A project only the server has, as a window reads a project. */
+  project(id: string): Project | null;
+  /** This place's rows of a merged list, from what it last heard, at once. Null with none to add. */
+  listed<M extends MergedMethod>(method: M, params: RpcParams<M>): PlacePage<M> | null;
+}
+
+export type { ThreadSummary };
+
 export interface Hosted {
   readonly account: HostedAccount;
+  readonly threads: HostedThreads;
   /** Reads the stored session and the kept answers, and connects when signed in. Never rejects: no session is signed out. */
   start(): Promise<void>;
   /** The device woke or the network came back: connect now instead of at the next retry. */
@@ -64,10 +107,18 @@ export interface Hosted {
 export function createHosted(deps: HostedDeps): Hosted {
   const session = new Session(deps);
   const account = new Account({ session, kept: deps.kept, push: deps.push, now: deps.now });
+  const threads = new Threads({ session, kept: deps.kept, projects: deps.projects, push: deps.push, now: deps.now, log: deps.log });
   return {
     account,
-    start: () => account.start(),
+    threads,
+    start: async () => {
+      await account.start();
+      threads.start();
+    },
     awoke: () => session.awoke(),
-    close: () => session.close(),
+    close: () => {
+      threads.close();
+      session.close();
+    },
   };
 }

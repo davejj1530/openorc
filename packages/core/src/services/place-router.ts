@@ -1,0 +1,97 @@
+/**
+ * The first stop of every window call: places besides this Mac that hold threads by lookup answer for what they hold,
+ * and add their rows to the lists. OpenOrc Cloud is the one such place. Phones never come here.
+ *
+ * The cloud brain is deliberately not one. It claims by absence ("whatever this Mac's ledger lacks is mine") and merges
+ * its own lists, so it stays behind this router, untouched, as `next`.
+ *
+ * Invariants:
+ *   1. With no active place, `handle` is `next`: the same call, so an app with no account runs the code it ran before.
+ *   2. A place is asked only about ids it said it holds, so a thread of this Mac or of the brain never reaches it, and
+ *      one of its ids never falls through to "absent, so the brain's".
+ *   3. Lists never wait on a place: its rows come from what it last heard.
+ */
+import type { HostedThreads } from "@openorc/hosted";
+import { mergeThreadPages, ownerRoute, rpcParams, type RoutedMethod, type RpcMethod, type RpcParams, type RpcRequest, type ThreadSummary } from "@openorc/protocol";
+import type { RpcReply } from "../transport.js";
+
+export interface PlaceRouterDeps {
+  /** The place, or null while there is none (no account server). */
+  place(): HostedThreads | null;
+  /** What answered every window call before this router existed: the brain router while a brain is set up, else dispatch. */
+  next(request: RpcRequest): Promise<RpcReply>;
+}
+
+export class PlaceRouter {
+  constructor(private readonly deps: PlaceRouterDeps) {}
+
+  handle(request: RpcRequest): Promise<RpcReply> {
+    const place = this.deps.place();
+    if (!place?.active || !Object.hasOwn(rpcParams, request.method)) return this.deps.next(request);
+    const method = request.method as RpcMethod;
+    const parsed = rpcParams[method].safeParse(request.params ?? {});
+    // The Mac words a refusal of params, as before.
+    if (!parsed.success) return this.deps.next(request);
+    const params = parsed.data as Record<string, unknown>;
+    if (method === "projects.get" && place.holds({ project: String(params["id"]) })) return Promise.resolve(result(request, place.project(String(params["id"]))));
+    return this.routed(place, request, method, params);
+  }
+
+  /** A call that names a thread, a run or a list: the place answers what it holds; anything else goes on as before. */
+  private routed(place: HostedThreads, request: RpcRequest, method: RpcMethod, params: Record<string, unknown>): Promise<RpcReply> {
+    const route = ownerRoute(method);
+    if (!route) return this.deps.next(request);
+    const ask = () => this.asked(place, request, method as RoutedMethod, params);
+    switch (route.by) {
+      case "owner":
+      case "owner-only": {
+        const id = route.thread(params as never);
+        return id && place.holds({ thread: id }) ? ask() : this.deps.next(request);
+      }
+      case "run":
+        return place.holds({ run: route.run(params as never) }) ? ask() : this.deps.next(request);
+      case "merge": {
+        const id = route.thread?.(params as never);
+        if (id) return place.holds({ thread: id }) ? ask() : this.deps.next(request);
+        return method === "threads.list" ? this.list(place, request, params as RpcParams<"threads.list">) : this.deps.next(request);
+      }
+      default:
+        return this.deps.next(request);
+    }
+  }
+
+  /** One call to the place as a reply. Never rejects: the place's rejection becomes an error with its words. */
+  private async asked(place: HostedThreads, request: RpcRequest, method: RoutedMethod, params: Record<string, unknown>): Promise<RpcReply> {
+    try {
+      return result(request, await place.call(method, params as RpcParams<typeof method>));
+    } catch (error) {
+      return { type: "rpc.error", id: request.id, message: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  /**
+   * This Mac's rows, with its brain's already merged in, and the place's, through the protocol's own merge. A later page
+   * asks everyone from 0 to its end and slices, as the brain router does, so the merged top `limit` is exact.
+   */
+  private async list(place: HostedThreads, request: RpcRequest, params: RpcParams<"threads.list">): Promise<RpcReply> {
+    const page = place.listed("threads.list", params);
+    if (!page?.rows.length) return this.deps.next(request);
+    const offset = params.offset ?? 0;
+    const asked = { ...params, offset: 0, ...(params.limit !== undefined && { limit: offset + params.limit }) };
+    const base = await this.deps.next({ ...request, params: asked });
+    if (base.type === "rpc.error") return base;
+    const rows = mergeThreadPages(
+      [
+        { brain: "mac", reach: "live", heardAt: Date.now(), rows: base.result as ThreadSummary[] },
+        { brain: "hosted", ...page },
+      ],
+      asked,
+      "mac",
+    );
+    return result(request, rows.slice(offset));
+  }
+}
+
+function result(request: RpcRequest, value: unknown): RpcReply {
+  return { type: "rpc.result", id: request.id, result: value ?? null };
+}

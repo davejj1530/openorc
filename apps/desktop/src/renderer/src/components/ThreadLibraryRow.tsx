@@ -13,7 +13,8 @@ import {
   type ThreadPlace,
   type ThreadStatus,
 } from "@openorc/client";
-import { harnessShortName, isHarnessId, type ThreadSummary } from "@openorc/protocol";
+import { harnessShortName, isHarnessId, placeOf, type ThreadSummary } from "@openorc/protocol";
+import { cn } from "../lib/cn";
 import { useMemo, type ReactNode } from "react";
 import { CoversPreview } from "../lib/browser-preview";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
@@ -221,9 +222,21 @@ function ThreadLines({ thread, subthreads, project }: { thread: ThreadSummary; s
             {workspace}
           </span>
         ) : null}
+        <PlaceIcon thread={thread} />
         <PullRequestStatus thread={thread} />
       </span>
     </>
+  );
+}
+
+/** Where a thread off this Mac lives, as the quiet cloud on its line, dimmed while that place can't be reached. */
+function PlaceIcon({ thread }: { thread: ThreadSummary }) {
+  const place = placeOf(thread);
+  if (!place.rowIcon || !place.mark) return null;
+  return (
+    <span role="img" aria-label={place.mark} className={cn("thread-preview-place", thread.owner?.reach !== "live" && "opacity-60")}>
+      <Cloud size={12} />
+    </span>
   );
 }
 

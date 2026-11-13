@@ -23,8 +23,18 @@ export function liveGroupedFold(key: string): boolean {
   return /^(thread-(open|closed)|project):/.test(key) || GROUPED_FOLDS.has(key);
 }
 
-/** A project as its group heads the list: its id, its name, and its folder for the icon its menu chooses. */
-export type GroupProject = { id: string; name: string; rootPath?: string };
+/**
+ * A project as its group heads the list: its id, its name, and its folder for the icon its menu chooses. `cloud`: a
+ * project of OpenOrc Cloud's that no project on this Mac stands for, which has no folder and no actions here.
+ */
+export type GroupProject = { id: string; name: string; rootPath?: string; cloud?: true };
+
+/** The projects only OpenOrc Cloud has, named by the rows that live in them, in the order those rows come. */
+export function cloudProjects(rows: readonly ThreadSummary[]): GroupProject[] {
+  const named = new Map<string, string>();
+  for (const row of rows) if (row.owner?.project && !named.has(row.projectId)) named.set(row.projectId, row.owner.project.name);
+  return [...named].map(([id, name]) => ({ id, name, cloud: true }));
+}
 
 /** One project's part of the list: its threads' roots in the list's order, and how many of them wait on the person. */
 export type ProjectGroup = { project: GroupProject; roots: ThreadSummary[]; waiting: number };

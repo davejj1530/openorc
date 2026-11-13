@@ -48,3 +48,41 @@ it("keeps a subagent's row to its title and running time, and names its type onc
   await act(async () => vi.advanceTimersByTime(150));
   expect(screen.getByText(/^Subagent · pstack:poteto-agent-high · Claude · /)).toBeTruthy();
 });
+
+it("marks a thread on OpenOrc Cloud with the cloud, dimmed while OpenOrc Cloud can't be reached", () => {
+  const hosted = {
+    ...subagent,
+    id: "hosted",
+    title: "Retry the cloud start",
+    projectId: "studio",
+    workspaceMode: "worktree",
+    branch: "openorc/retry",
+    activity: "idle",
+    session: { status: "idle", message: null },
+    parentThreadId: null,
+    parentRelation: null,
+    subagent: undefined,
+    prUrl: null,
+    owner: { brain: "hosted", reach: "live", heardAt: Date.now() },
+  } as unknown as ThreadSummary;
+  const { rerender } = render(
+    <TooltipProvider>
+      <ThreadRow thread={hosted} active={false} />
+    </TooltipProvider>,
+  );
+  expect(screen.getByText("worktree")).toBeTruthy();
+  expect(screen.getByRole("img", { name: "OpenOrc Cloud" }).className).not.toContain("opacity-60");
+  rerender(
+    <TooltipProvider>
+      <ThreadRow thread={{ ...hosted, owner: { brain: "hosted", reach: "offline", heardAt: 0 } }} active={false} />
+    </TooltipProvider>,
+  );
+  expect(screen.getByRole("img", { name: "OpenOrc Cloud" }).className).toContain("opacity-60");
+  cleanup();
+  render(
+    <TooltipProvider>
+      <ThreadRow thread={{ ...hosted, owner: undefined }} active={false} />
+    </TooltipProvider>,
+  );
+  expect(screen.queryByRole("img", { name: "OpenOrc Cloud" })).toBeNull();
+});

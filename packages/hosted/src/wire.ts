@@ -2,6 +2,7 @@
  * The server's routes and the shapes it answers, parsed where they enter. Nothing outside the package sees a type from
  * this file: translate.ts turns each into the app's own.
  */
+import { AgentKind, BackgroundCommand, PermissionPreset, PrState, RunMode } from "@openorc/protocol";
 import { z } from "zod";
 
 /** A route with the shape of its answer, so a reply is always parsed where it enters. Null: the body is not read. */
@@ -43,6 +44,71 @@ export const wireHostedSettings = z.object({
 });
 export type WireHostedSettings = z.infer<typeof wireHostedSettings>;
 
+const seq = z.number().int().nonnegative();
+
+/** A message to a thread, as its `waiting` lists it. */
+export const wireMessage = z.object({
+  id: z.string(),
+  authorId: z.string().nullable(),
+  text: z.string(),
+  state: z.string(),
+  refusal: z.string().nullable(),
+  createdAt: iso,
+});
+export type WireMessage = z.infer<typeof wireMessage>;
+
+/**
+ * A hosted thread as the person's list shows it. Words the server may add to (`status`, an ask's `kind`) are read as
+ * strings, so a newer server's value reads as the nearest known one instead of failing the whole list.
+ */
+export const wireThread = z.object({
+  id: z.string(),
+  projectId: z.string().nullable(),
+  parentId: z.string().nullable(),
+  title: z.string(),
+  baseBranch: z.string(),
+  branch: z.string(),
+  settings: z.object({ agent: AgentKind, model: z.string().nullable(), effort: z.string().nullable(), mode: RunMode, permissionMode: PermissionPreset }),
+  status: z.string(),
+  head: seq,
+  seenSeq: seq,
+  lastAgentSeq: seq,
+  backgroundCommands: z.array(BackgroundCommand).default([]),
+  waiting: z.array(wireMessage).default([]),
+  ask: z.object({ id: z.string(), detail: z.string() }).nullable(),
+  pullRequest: z.object({ url: z.string(), state: PrState }).nullable().default(null),
+  createdBy: z.string().nullable(),
+  createdAt: iso,
+  lastActivityAt: iso,
+});
+export type WireThread = z.infer<typeof wireThread>;
+
+export const wireThreadList = z.object({ threads: z.array(wireThread) });
+
+/** One thread, with the seq of each `turn.completed` in its log: where its turns end, as the app counts them. */
+export const wireThreadDetail = wireThread.extend({ turnEnds: z.array(z.number().int().positive()) });
+export type WireThreadDetail = z.infer<typeof wireThreadDetail>;
+
+/** One line of a thread's log. `event` is checked against the app's own events where it is translated. */
+export const wireEvent = z.object({ seq: z.number().int().positive(), event: z.record(z.string(), z.unknown()) });
+export type WireEvent = z.infer<typeof wireEvent>;
+
+export const wireEvents = z.object({ events: z.array(wireEvent), head: seq, fromTurn: seq.optional() });
+export type WireEvents = z.infer<typeof wireEvents>;
+
+/** A project of the person's space: a GitHub repository. */
+export const wireProject = z.object({ id: z.string(), name: z.string(), fullName: z.string() });
+export type WireProject = z.infer<typeof wireProject>;
+
+/** Socket messages, server to app: a topic of the person's changed, a stored batch of a thread's log, a row's facts moved. */
+export const wireTopics = z.object({ topics: z.array(z.string()) });
+export const wireFrame = z.object({ threadId: z.string(), events: z.array(wireEvent).min(1) });
+export const wireChange = z.object({ threadId: z.string(), head: seq });
+export const wireWatched = z.object({ ok: z.boolean(), head: seq });
+
+/** The socket's event names. */
+export const SOCKET = { changed: "changed", watch: "hosted:watch", unwatch: "hosted:unwatch", events: "hosted:events", threadChanged: "hosted:changed" } as const;
+
 /** The words a refusal carries, from either Better Auth (`{ code, message }`) or the server's own routes (`{ message }`). */
 export const wireRefusal = z.object({ message: z.string().min(1) });
 
@@ -60,4 +126,15 @@ export const ROUTES = {
   person: route("GET", "/api/auth/get-session", wirePerson),
   hostedSettings: route("GET", "/settings/hosted", wireHostedSettings),
   setHostedSettings: route("PATCH", "/settings/hosted", wireHostedSettings),
+  projects: route("GET", "/projects", z.array(wireProject)),
+  threads: route("GET", "/hosted/threads", wireThreadList),
+  thread: (id: string) => route("GET", `/hosted/threads/${encodeURIComponent(id)}`, wireThreadDetail),
+  /** After a seq, or from a turn, at most `limit` events. */
+  events: (id: string, from: { after: number } | { fromTurn: number }, limit: number) =>
+    route("GET", `/hosted/threads/${encodeURIComponent(id)}/events?${new URLSearchParams({ ...stringsOf(from), limit: String(limit) })}`, wireEvents),
+  stopCommand: (id: string, commandId: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/commands/${encodeURIComponent(commandId)}/stop`, null),
 } as const;
+
+function stringsOf(from: Record<string, number>): Record<string, string> {
+  return Object.fromEntries(Object.entries(from).map(([key, value]) => [key, String(value)]));
+}

@@ -14,6 +14,7 @@ import {
   groupPage,
   NEEDS_YOU_PAGE,
   projectGroups,
+  cloudProjects,
   sidebarDayList,
   sidebarFoldKey,
   sidebarGroupsGrow,
@@ -182,9 +183,12 @@ function dayList({ pages, pinPage, needsYouPage, resolvedPage, pinnedOnly, activ
   return sidebarDayList({ pages, pins: pinPage, needsYou: needsYouPage, resolved: resolvedPage, pinnedOnly, activeId, now });
 }
 
-/** The groups' projects in the order projects come, then No project, for the Workspace's threads, which belong to none. */
-function groupProjects(projects: readonly { id: string; name: string; rootPath: string }[] | undefined): GroupProject[] {
-  return [...(projects ?? []).map(({ id, name, rootPath }) => ({ id, name, rootPath })), { id: WORKSPACE_ID, name: "No project" }];
+/**
+ * The groups' projects in the order projects come, then those only OpenOrc Cloud has, then No project, for the
+ * Workspace's threads, which belong to none.
+ */
+function groupProjects(projects: readonly { id: string; name: string; rootPath: string }[] | undefined, rows: readonly ThreadSummary[]): GroupProject[] {
+  return [...(projects ?? []).map(({ id, name, rootPath }) => ({ id, name, rootPath })), ...cloudProjects(rows), { id: WORKSPACE_ID, name: "No project" }];
 }
 
 /**
@@ -233,7 +237,8 @@ function ThreadGroups({ children }: { children: ChildPages }) {
   const now = useSidebarNow();
   const list = dayList(state, now);
   const open = !collapsed.includes(WORKSPACES_FOLD);
-  const allGroups = useGroupPages(list, groupProjects(projects.data), collapsed);
+  const shownProjects = groupProjects(projects.data, list.all);
+  const allGroups = useGroupPages(list, shownProjects, collapsed);
   const groups = pinnedOnly ? [] : allGroups;
   const pinsOpen = sidebarSectionOpen(collapsed, "pinned", SIDEBAR_LIST);
   const pins = list.shown(list.pinned, pinsOpen);
@@ -247,7 +252,7 @@ function ThreadGroups({ children }: { children: ChildPages }) {
     (id) => resolvedIds.has(id),
     (id) => resolve(id, false),
   );
-  const named = new Map<string, RowProject>(groupProjects(projects.data).map((project) => [project.id, { name: project.name }]));
+  const named = new Map<string, RowProject>(shownProjects.map((project) => [project.id, { name: project.name }]));
   const shownRoots = [...pins, ...groups.flatMap((group) => group.rows), ...snoozed, ...resolvedShown];
   useListUpkeep(state, list, open ? shownRoots : [], children);
   const rows = (roots: ThreadSummary[], mixed = false) => (

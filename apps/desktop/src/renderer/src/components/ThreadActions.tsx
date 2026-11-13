@@ -1,7 +1,7 @@
 import { Menu } from "@base-ui/react/menu";
 import { snoozePresets, threadResolved } from "@openorc/client";
 import type { ThreadSummary } from "@openorc/protocol";
-import { isSubagentThread, forkUnavailable } from "@openorc/protocol";
+import { isSubagentThread, forkUnavailable, placeOf } from "@openorc/protocol";
 import { useRef, useState } from "react";
 import { CoversPreview } from "../lib/browser-preview";
 import { useRpc, useRpcMutation } from "../lib/client";
@@ -180,11 +180,18 @@ function LifecycleItems({ thread, parts: M, disabled, patch }: { thread: ThreadS
   );
 }
 
+/** Why an action that needs the thread's folder on this Mac can't be done: brought back from the cloud brain, or not yet on OpenOrc Cloud. */
+function awayWords(thread: ThreadSummary): string | null {
+  const place = placeOf(thread);
+  if (!place.elsewhere) return null;
+  return place.brain ? `Bring it to ${thisComputer} first.` : "This isn't on OpenOrc Cloud yet.";
+}
+
 /** A sidebar row's menu leads with it; the header's keeps it beside Fork. */
 function NewSubthreadItem({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
-  const inCloud = thread.owner?.brain === "cloud";
+  const away = awayWords(thread);
   return (
-    <M.Item className={menuItem} disabled={Boolean(thread.teamInstanceId) || inCloud} data-tip={inCloud ? `Bring it to ${thisComputer} first.` : undefined} onClick={() => newSubthread(thread.id)}>
+    <M.Item className={menuItem} disabled={Boolean(thread.teamInstanceId) || away !== null} data-tip={away ?? undefined} onClick={() => newSubthread(thread.id)}>
       <PenSquare size={13} /> New subthread
     </M.Item>
   );
@@ -193,7 +200,7 @@ function NewSubthreadItem({ thread, parts: M }: { thread: ThreadSummary; parts: 
 function ThreadForkActions({ thread, parts: M, header }: { thread: ThreadSummary; parts: MenuParts; header?: boolean }) {
   const fork = useRpcMutation("threads.fork");
   const mutating = useThreadMutationPending(thread.id);
-  const inCloud = thread.owner?.brain === "cloud";
+  const away = awayWords(thread);
   return (
     <>
       {fork.error ? (
@@ -204,8 +211,8 @@ function ThreadForkActions({ thread, parts: M, header }: { thread: ThreadSummary
       {header ? <NewSubthreadItem thread={thread} parts={M} /> : null}
       <M.Item
         className={menuItem}
-        disabled={Boolean(thread.teamInstanceId) || inCloud || mutating || fork.isPending || Boolean(forkUnavailable(thread.agent))}
-        data-tip={inCloud ? `Bring it to ${thisComputer} first.` : (forkUnavailable(thread.agent) ?? undefined)}
+        disabled={Boolean(thread.teamInstanceId) || away !== null || mutating || fork.isPending || Boolean(forkUnavailable(thread.agent))}
+        data-tip={away ?? forkUnavailable(thread.agent) ?? undefined}
         onClick={() => fork.mutate({ id: thread.id }, { onSuccess: (t) => openThread(t.id) })}
       >
         <GitFork size={13} /> {fork.isPending ? "Forking…" : "Fork"}

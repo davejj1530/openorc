@@ -48,7 +48,7 @@ describe("the account", () => {
     await account.sendCode(ADA);
     await expect(account.signIn(ADA, "000000")).rejects.toThrow("Invalid OTP");
     expect(account.status()).toMatchObject({ state: "signed-out" });
-    expect(device).toEqual({ stored: null, kept: null });
+    expect(device).toMatchObject({ stored: null, kept: null, threads: null });
   });
 
   it("reads an address nobody invited as words, not as a code name", async () => {
@@ -117,14 +117,14 @@ describe("the account", () => {
     await vi.waitFor(() => expect(seen.timeline).toContain("request /api/auth/sign-out"));
     expect(seen.timeline.indexOf("kept forgotten")).toBeLessThan(seen.timeline.indexOf("request /api/auth/sign-out"));
     expect(seen.timeline.indexOf("session forgotten")).toBeLessThan(seen.timeline.indexOf("request /api/auth/sign-out"));
-    expect(device).toEqual({ stored: null, kept: null });
+    expect(device).toMatchObject({ stored: null, kept: null, threads: null });
     await vi.waitFor(async () => expect((await fetch(`${stand.url}/billing`, { headers: { authorization: `Bearer ${token}` } })).status).toBe(401));
 
     await signIn(account, ADA);
     await stand.down();
     await account.signOut();
     expect(account.status()).toEqual({ state: "signed-out", codeSentTo: null, ended: false, error: null });
-    expect(device).toEqual({ stored: null, kept: null });
+    expect(device).toMatchObject({ stored: null, kept: null, threads: null });
   });
 
   it("signs the first address out when signing in as another", async () => {
@@ -156,7 +156,7 @@ describe("the account", () => {
     stand.revoke();
     const { account } = await host();
     await vi.waitFor(() => expect(account.status()).toEqual({ state: "signed-out", codeSentTo: null, ended: true, error: null }));
-    expect(device).toEqual({ stored: null, kept: null });
+    expect(device).toMatchObject({ stored: null, kept: null, threads: null });
   });
 
   it("says where cloud threads run, in the server's names, and changes it", async () => {

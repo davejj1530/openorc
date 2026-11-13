@@ -8,6 +8,7 @@ import {
   OPENCODE_FREE_PROVIDER,
   openCodeProvider,
   openCodeProviderName,
+  placeOf,
   WORKSPACE_ID,
   type CloudOffer,
   type CloudSignIn,
@@ -58,10 +59,11 @@ export function cloudServiceMissing(offer: Pick<CloudOffer, "brain" | "provider"
 }
 
 /** The quiet word a row shows for where it lives, dimmed while its owner cannot be reached; null for this host's own. */
-export function ownerMark(thread: Pick<ThreadSummary, "owner" | "moving">): { label: "Moving" | "Cloud" | "Mac asleep"; dim: boolean } | null {
+export function ownerMark(thread: Pick<ThreadSummary, "owner" | "moving">): { label: string; dim: boolean } | null {
   if (thread.moving) return { label: "Moving", dim: false };
   if (!thread.owner) return null;
-  if (thread.owner.brain === "cloud") return { label: "Cloud", dim: thread.owner.reach !== "live" };
+  const { mark } = placeOf(thread);
+  if (mark) return { label: mark, dim: thread.owner.reach !== "live" };
   return thread.owner.reach === "live" ? null : { label: "Mac asleep", dim: true };
 }
 
@@ -110,7 +112,7 @@ function currentStep(cloud: CloudThreadState): CloudStartStep {
  * thread on the cloud brain first has the brain woken, and updated when this Mac carries a newer one.
  */
 export function cloudStartSteps(thread: CloudStartThread): { step: CloudStartStep; label: string; state: CloudStartStepState }[] {
-  const order: CloudStartStep[] = [...(thread.owner?.brain === "cloud" ? (["brain"] as const) : []), "sandbox", "code", ...(thread.cloud.setup ? (["setup"] as const) : []), "agent"];
+  const order: CloudStartStep[] = [...(placeOf(thread).brain ? (["brain"] as const) : []), "sandbox", "code", ...(thread.cloud.setup ? (["setup"] as const) : []), "agent"];
   const current = order.indexOf(currentStep(thread.cloud));
   return order.map((step, index) => ({ step, label: stepLabel(step, thread), state: stepState(index, current) }));
 }
@@ -168,7 +170,7 @@ export function threadMoveCard(thread: Pick<ThreadSummary, "moving" | "owner" | 
     return { kind: "refused", title: "Didn't move", reason: refused.reason, retry: refused.to === "cloud" ? "cloud.move" : "cloud.bringToMac" };
   if (!moving) {
     // A thread starting there shows the wake among its start's steps.
-    if (thread.owner?.brain !== "cloud" || thread.owner.reach !== "waking" || thread.cloud?.brain) return null;
+    if (!placeOf(thread).brain || thread.owner?.reach !== "waking" || thread.cloud?.brain) return null;
     return { kind: "moving", title: null, steps: [{ step: "waking", label: "Waking the cloud brain", state: "running" }] };
   }
   const order = MOVE_ORDER[moving.to];
@@ -209,7 +211,7 @@ export function cloudTurnOf(thread: Pick<ThreadSummary, "cloud" | "claudeAccount
     agent: choice.agent,
     claudeAccountId: thread.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT,
     model: choice.model,
-    brain: thread.owner?.brain === "cloud",
+    brain: placeOf(thread).brain,
     local: thread.cloud.provider === "local",
   };
 }

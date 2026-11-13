@@ -5,6 +5,10 @@ import type { StandIn } from "../testing/stand-in.js";
 export interface Device {
   stored: string | null;
   kept: string | null;
+  /** The kept thread rows. */
+  threads: string | null;
+  /** This device's projects, as the core lists them. */
+  projects: { id: string; remote: string | null }[];
 }
 
 /** What a host did that a test reads: every log line, push and socket it opened, and every write in order. */
@@ -15,7 +19,7 @@ export interface Seen {
   sockets: { closed: boolean }[];
 }
 
-export const newDevice = (): Device => ({ stored: null, kept: null });
+export const newDevice = (): Device => ({ stored: null, kept: null, threads: null, projects: [] });
 
 /** The deps a host hands the package, on this device, against the stand-in over real HTTP. */
 export function hostDeps(stand: StandIn, device: Device, overrides: Partial<HostedDeps> = {}): { deps: HostedDeps; seen: Seen } {
@@ -30,12 +34,14 @@ export function hostDeps(stand: StandIn, device: Device, overrides: Partial<Host
       },
     },
     kept: {
-      load: () => device.kept,
-      save: (json) => {
+      load: (part) => (part === "account" ? device.kept : device.threads),
+      save: (part, json) => {
+        if (part === "threads") return void (device.threads = json);
         seen.timeline.push(json === null ? "kept forgotten" : "kept saved");
         device.kept = json;
       },
     },
+    projects: () => device.projects,
     fetch: async (input, init) => {
       seen.timeline.push(`request ${new URL(String(input)).pathname}`);
       return fetch(input, init);
@@ -46,6 +52,8 @@ export function hostDeps(stand: StandIn, device: Device, overrides: Partial<Host
       seen.sockets.push(record);
       return {
         onState: (listener) => socket.onState(listener),
+        on: (event, listener) => socket.on(event, listener),
+        ask: (event, body) => socket.ask(event, body),
         close: () => {
           record.closed = true;
           socket.close();

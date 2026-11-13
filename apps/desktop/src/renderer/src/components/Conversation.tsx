@@ -6,6 +6,7 @@ import {
   conversationActivity,
   conversationPlaceholder,
   heardTranscript,
+  placeUnreachable,
   conversationSendDisabledReason,
   conversationSteerReason,
   messageBody,
@@ -47,7 +48,7 @@ import { useSkillCommands } from "../lib/skill-commands";
 import { ConversationVoice, useRunVoices } from "../lib/turn-authors";
 import { useTurnFooters } from "../lib/turn-footers";
 import { useCloudSignInGate } from "./CloudSignInOffer";
-import { AnswersBlocked, answersBlockedFor } from "./ask-answer";
+import { AnswersBlocked } from "./ask-answer";
 import { useHostedComposer } from "./HostedSendNotice";
 import { CloudPreparing, CloudStart } from "./CloudStart";
 import { Composer, type SlashCommand } from "./Composer";
@@ -227,7 +228,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
 
   const location = conversationLocation({ scope, project, mode: workspaceMode, basePath: links ?? project.rootPath, checkoutBranch: checkout.data?.branch, plainFolder: git.state === "none" });
   const emptyHint = conversationEmptyHint({ task: scope.kind === "task", workspace: project.id === WORKSPACE_ID });
-  const answersBlocked = answersBlockedFor(thread);
+  const answersBlocked = placeUnreachable(thread);
   const placeholder = conversationPlaceholder({ firstTaskRun, working, canSteer, waiting: thread?.activity === "waiting", agent: choice?.agent });
 
   function renderTranscript() {

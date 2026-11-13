@@ -2,9 +2,11 @@
 import { projects, settings, type Db } from "@openorc/db";
 import { createHosted, type Hosted, type LiveSocket } from "@openorc/hosted";
 import { ACCOUNT_PROTOCOL_HEADER, ACCOUNT_PROTOCOL_VERSION } from "@openorc/protocol";
+import { randomUUID } from "node:crypto";
 import { io } from "socket.io-client";
 import type { Logger, Transport } from "../transport.js";
 import type { ProtectedSecretStore } from "./extraction-credentials.js";
+import { noticeLine } from "./notice-text.js";
 
 /** What the server last said, by part, in the settings table. */
 const KEPT = { account: "hosted.kept", threads: "hosted.threads" } as const;
@@ -13,6 +15,8 @@ const STORAGE = "Cannot access protected storage for your OpenOrc account. Unloc
 const RETRY_MS = 10_000;
 /** How long the server has to answer a message on the socket. */
 const ASK_MS = 10_000;
+/** A notice's body, as long as this Mac's own turn notices are. */
+const NOTICE_CHARS = 140;
 
 export interface AccountDeps {
   db: Db;
@@ -21,6 +25,8 @@ export interface AccountDeps {
   secrets: ProtectedSecretStore | undefined;
   /** The windows alone, before the phone tap: nothing of the account reaches a paired phone. */
   windows: Transport;
+  /** Whether "Desktop notifications" is on. */
+  notices(): boolean;
   log: Logger;
 }
 
@@ -37,6 +43,9 @@ export function createAccount(deps: AccountDeps): Hosted {
     fetch,
     connect: liveSocket,
     push: (push) => deps.windows.push(push),
+    notify: (notice) => {
+      if (deps.notices()) deps.windows.push({ type: "notify", ...notice, body: noticeLine(notice.body, NOTICE_CHARS), id: randomUUID() });
+    },
     now: Date.now,
     log: deps.log,
   });

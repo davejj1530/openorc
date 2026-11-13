@@ -1,4 +1,4 @@
-import type { HostedDeps } from "../index.js";
+import type { HostedDeps, HostedNotice } from "../index.js";
 import type { StandIn } from "../testing/stand-in.js";
 
 /** One device's storage, kept across the hosts a test makes on it, as protected storage and the settings table outlive a launch. */
@@ -15,6 +15,7 @@ export interface Device {
 export interface Seen {
   logs: string[];
   pushes: unknown[];
+  notices: HostedNotice[];
   timeline: string[];
   sockets: { closed: boolean }[];
 }
@@ -23,7 +24,7 @@ export const newDevice = (): Device => ({ stored: null, kept: null, threads: nul
 
 /** The deps a host hands the package, on this device, against the stand-in over real HTTP. */
 export function hostDeps(stand: StandIn, device: Device, overrides: Partial<HostedDeps> = {}): { deps: HostedDeps; seen: Seen } {
-  const seen: Seen = { logs: [], pushes: [], timeline: [], sockets: [] };
+  const seen: Seen = { logs: [], pushes: [], notices: [], timeline: [], sockets: [] };
   const deps: HostedDeps = {
     server: stand.url,
     session: {
@@ -61,6 +62,7 @@ export function hostDeps(stand: StandIn, device: Device, overrides: Partial<Host
       };
     },
     push: (push) => void seen.pushes.push(push),
+    notify: (notice) => void seen.notices.push(notice),
     now: Date.now,
     log: { info: (line) => void seen.logs.push(line), warn: (line) => void seen.logs.push(line) },
     ...overrides,

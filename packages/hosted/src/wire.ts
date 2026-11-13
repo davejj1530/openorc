@@ -7,7 +7,7 @@ import { z } from "zod";
 
 /** A route with the shape of its answer, so a reply is always parsed where it enters. Null: the body is not read. */
 export interface Route<T> {
-  method: "GET" | "POST" | "PATCH" | "DELETE";
+  method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   path: string;
   reply: z.ZodType<T> | null;
 }
@@ -78,11 +78,16 @@ export const wireThread = z.object({
   head: seq,
   /** The live turn; null between turns, also while an ask waits after its turn ended. */
   turn: z.object({ id: z.string() }).nullable().default(null),
+  /** The reader's own view: how far they read, and when they pinned, put away or snoozed the thread. */
   seenSeq: seq,
+  pinnedAt: iso.nullable().default(null),
+  archivedAt: iso.nullable().default(null),
+  snoozedUntil: iso.nullable().default(null),
   lastAgentSeq: seq,
   backgroundCommands: z.array(BackgroundCommand).default([]),
   waiting: z.array(wireMessage).default([]),
-  ask: z.object({ id: z.string(), detail: z.string() }).nullable(),
+  /** `kind` is read as a word, so a kind a newer server adds reads as a tool's. */
+  ask: z.object({ id: z.string(), kind: z.string().default("tool"), detail: z.string() }).nullable(),
   pullRequest: z.object({ url: z.string(), state: PrState }).nullable().default(null),
   createdBy: z.string().nullable(),
   createdAt: iso,
@@ -143,15 +148,18 @@ export const ROUTES = {
   projects: route("GET", "/projects", z.array(wireProject)),
   threads: route("GET", "/hosted/threads", wireThreadList),
   thread: (id: string) => route("GET", `/hosted/threads/${encodeURIComponent(id)}`, wireThreadDetail),
-  /** After a seq, or from a turn, at most `limit` events. */
-  events: (id: string, from: { after: number } | { fromTurn: number }, limit: number) =>
+  /** After a seq, before one, or from a turn, at most `limit` events. */
+  events: (id: string, from: { after: number } | { before: number } | { fromTurn: number }, limit: number) =>
     route("GET", `/hosted/threads/${encodeURIComponent(id)}/events?${new URLSearchParams({ ...stringsOf(from), limit: String(limit) })}`, wireEvents),
   /** One message to the thread. Sending the same id again is the same message. */
   send: (id: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/messages`, wireSent),
   /** Cancels a message not taken yet, or dismisses a refused one (assumed of the server: not served today). */
   unsend: (id: string, messageId: string) => route("DELETE", `/hosted/threads/${encodeURIComponent(id)}/messages/${encodeURIComponent(messageId)}`, null),
-  /** The person has read the thread up to `seq`; their position only moves forward. */
-  seen: (id: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/seen`, z.object({ seenSeq: seq })),
+  /** Renames the thread, or changes what its next turns run with, for everyone in it. Answers the row. */
+  update: (id: string) => route("PATCH", `/hosted/threads/${encodeURIComponent(id)}`, wireThread),
+  /** The reader's own view of the thread: how far they read, pinned, put away, snoozed. Answers the row. */
+  mine: (id: string) => route("PUT", `/hosted/threads/${encodeURIComponent(id)}/mine`, wireThread),
+  remove: (id: string) => route("DELETE", `/hosted/threads/${encodeURIComponent(id)}`, null),
   stop: (id: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/stop`, null),
   /** The person is about to write: the thread's machine wakes and its agent starts waiting. Answered with nothing. */
   ready: (id: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/ready`, null),

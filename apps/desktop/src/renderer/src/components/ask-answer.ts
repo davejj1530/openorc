@@ -1,14 +1,9 @@
-import { placeOf, type RpcParams, type ThreadSummary } from "@openorc/protocol";
+import type { RpcParams } from "@openorc/protocol";
 import { createContext, useContext, useState } from "react";
 import { core } from "../lib/rpc";
 
 /** Why the asks in a conversation can't be answered now, as when the thread's place can't be reached; null when they can. */
 export const AnswersBlocked = createContext<string | null>(null);
-
-/** Why a thread's asks can't be answered now: its place can't be reached. */
-export function answersBlockedFor(thread: ThreadSummary | null): string | null {
-  return thread?.owner?.reach === "offline" ? `${placeOf(thread).mark ?? "This thread"} can't be reached.` : null;
-}
 
 /**
  * Answering one ask from its own card: the answer goes once, its card shows it is on its way, and a refusal reads on

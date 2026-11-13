@@ -23,8 +23,6 @@ export interface Calls {
   /** Reads the rows again, and resolves once they are heard. */
   refresh(): Promise<void>;
   account(): AccountStatus;
-  /** The settings the person chose on this device for the thread's next message, if any. */
-  chosen(threadId: string): TurnSettings | undefined;
   /** The server refused a turn for this reason: the account is read again, and a dead sign-in remembered. */
   refused(refusal: HostedRefusal, settings: { agent: string; model: string | null }): void;
   now(): number;
@@ -54,7 +52,6 @@ async function post(
   message: { id?: string | undefined; text: string; attachments?: readonly string[] | undefined; settings?: TurnSettings; after?: boolean },
 ): Promise<void> {
   const row = calls.row(threadId);
-  message = { ...message, settings: message.settings ?? calls.chosen(threadId) };
   if (message.attachments?.length) throw new Refused(FILES);
   if (message.settings?.agent && !isHostedAgent(message.settings.agent)) throw new Refused(`${message.settings.agent} doesn't run on OpenOrc Cloud.`);
   const id = wireMessageId(message.id) ?? crypto.randomUUID();

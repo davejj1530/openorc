@@ -130,8 +130,8 @@ describe("sending to an OpenOrc Cloud thread", () => {
 });
 
 describe("what the composer saves as the person writes", () => {
-  it("keeps the draft on this device, through a restart, and sends the chosen model with the next message", async () => {
-    const { hosted, thread, run } = await withThread({ status: "working" });
+  it("keeps the draft on this device, through a restart, and sets the model for the thread's next turns on the server", async () => {
+    const { hosted, thread } = await withThread({ status: "working" });
     await hosted.threads.call("threads.update", { id: thread, patch: { draft: "Half a thought", model: "sonnet" } });
     expect(await row(hosted, thread)).toMatchObject({ draft: "Half a thought", model: "sonnet" });
     hosted.close();
@@ -140,17 +140,7 @@ describe("what the composer saves as the person writes", () => {
     hosts.push(again);
     await again.start();
     expect(again.threads.listed("threads.list", { projectIds: ["mac-openorc"] })?.rows[0]).toMatchObject({ draft: "Half a thought", model: "sonnet" });
-    await again.threads.call("runs.send", { runId: run, text: "Go on", messageId: `user-${crypto.randomUUID()}` });
-    expect(stand.sent.at(-1)?.body).toMatchObject({ text: "Go on", settings: { model: "sonnet" } });
-  });
-
-  it("marks the thread read on the server, and refuses what waits for the server in words", async () => {
-    const { hosted, thread } = await withThread();
-    stand.append(thread, [{ type: "message.completed", ts: 1, messageId: "a1", role: "assistant", text: "Done" }]);
-    await vi.waitFor(async () => expect(await row(hosted, thread)).toMatchObject({ unread: true }));
-    await hosted.threads.call("threads.update", { id: thread, patch: { seen: true } });
-    expect(await row(hosted, thread)).toMatchObject({ unread: false });
-    await expect(hosted.threads.call("threads.update", { id: thread, patch: { title: "Renamed" } })).rejects.toThrow("This isn't on OpenOrc Cloud yet.");
+    expect(stand.sent).toEqual([]);
   });
 });
 

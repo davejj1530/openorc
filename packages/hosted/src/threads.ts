@@ -13,6 +13,7 @@ import { z } from "zod";
 import type { HostedDeps, HostedThreads, MergedMethod, PlacePage } from "./index.js";
 import { READ_LIMIT, type Follower } from "./follow.js";
 import type { Account } from "./account.js";
+import { askNotice, endNotice, noticed } from "./notices.js";
 import * as sends from "./sends.js";
 import { Refused, type Session, type SessionChange } from "./session.js";
 import { CLOUD_PROJECT, listRows, projectPairs, resolvedCount, runsNow, toAppEvent, toRuns, toSummary } from "./translate.js";
@@ -20,17 +21,14 @@ import { ROUTES, SOCKET, wireProject, wireThread, wireTopics, type WireEvent, ty
 
 const GONE = "That conversation isn't on OpenOrc Cloud.";
 
-/**
- * What this device keeps of a thread for itself: the half-written message, and the settings the person chose for the
- * next one, which go with it as the message's own (`sends.ts`). Never sent to the server as the thread's.
- */
-const kept = z.object({ draft: z.string().nullable().optional(), settings: wireThread.shape.settings.partial().optional() });
+/** What this device keeps of a thread for itself: the half-written message, which never leaves it. */
+const kept = z.object({ draft: z.string().nullable().optional() });
 export type KeptHere = z.infer<typeof kept>;
 
 const keptThreads = z.object({ email: z.string(), heardAt: z.number(), rows: z.array(wireThread), projects: z.array(wireProject), here: z.record(z.string(), kept).default({}) });
 type Heard = z.infer<typeof keptThreads>;
 
-type ThreadsDeps = { session: Session; follower: Follower; account: Pick<Account, "status" | "refused"> } & Pick<HostedDeps, "kept" | "projects" | "push" | "now" | "log">;
+type ThreadsDeps = { session: Session; follower: Follower; account: Pick<Account, "status" | "refused"> } & Pick<HostedDeps, "kept" | "projects" | "push" | "notify" | "now" | "log">;
 
 type Answer<M extends RoutedMethod> = (threads: Threads, params: RpcParams<M>) => Promise<RpcResults[M]> | RpcResults[M];
 
@@ -77,7 +75,7 @@ const ANSWERS: { [M in RoutedMethod]: Answer<M> | ReturnType<typeof refused> | t
   // The server keeps a thread's changes (GET /hosted/threads/:id/changes); they are drawn here once translated.
   "review.threadDiff": () => ({ baseSha: null, patch: "", files: [], since: null }),
 
-  "threads.delete": NOT_YET,
+  "threads.delete": (threads, { id }) => threads.remove(id),
   "threads.implementPlan": NOT_YET,
   "threads.exportPlan": NOT_YET,
   "threads.switchClaudeAccount": refused("An OpenOrc Cloud thread runs on your Claude sign-in there."),
@@ -168,7 +166,6 @@ export class Threads implements HostedThreads {
       row: (threadId) => this.row(threadId),
       refresh: () => this.refresh(),
       account: () => deps.account.status(),
-      chosen: (threadId) => this.#heard?.here[threadId]?.settings,
       refused: (refusal, settings) => deps.account.refused(refusal, settings),
       now: deps.now,
     };
@@ -232,29 +229,55 @@ export class Threads implements HostedThreads {
   listed<M extends MergedMethod>(method: M, params: RpcParams<M>): PlacePage<M> | null {
     if (!this.active || method === "inbox.list") return null;
     const summaries = this.#summaries();
-    const rows = method === "threads.list" ? listRows(summaries, params as RpcParams<"threads.list">) : resolvedCount(summaries, params as RpcParams<"threads.resolvedCount">);
+    const rows = method === "threads.list" ? listRows(summaries, params as RpcParams<"threads.list">) : resolvedCount(summaries, params as RpcParams<"threads.resolvedCount">, this.deps.now());
     return { reach: this.reach, heardAt: this.#heard!.heardAt, rows } as PlacePage<M>;
   }
 
   /**
-   * threads.update. What the composer saves as the person writes stays on this device: the draft, and the settings
-   * chosen for the next message. Marking it read moves the person's own seen position on the server. Anything else
-   * waits for the server (unit 5) and is refused in words.
+   * threads.update, as on this Mac: the title and what the next turns run with are the thread's, for everyone in it;
+   * read, pinned, resolved and snoozed are the reader's own; the half-written message stays on this device. Each
+   * write answers the row, which replaces the one heard, so the lists move at once.
    */
   async update(threadId: string, patch: RpcParams<"threads.update">["patch"]): Promise<ThreadSummary> {
     const row = this.row(threadId);
-    const { draft, model, effort, mode, permissionMode, agent, fastMode, seen, ...rest } = patch;
-    if (Object.values(rest).some((value) => value !== undefined) || fastMode || seen === false) throw new Refused(NOT_YET.refused);
+    const { draft, title, agent, model, effort, mode, permissionMode, fastMode, pinned, archived, snoozedUntil, seen, done: _settled, ...rest } = patch;
+    if (Object.values(rest).some((value) => value !== undefined) || fastMode) throw new Refused(NOT_YET.refused);
     if (agent && !isHostedAgent(agent)) throw new Refused(`${harnessShortName(agent)} doesn't run on OpenOrc Cloud.`);
-    if (seen) await this.deps.session.request(ROUTES.seen(threadId), { seq: row.head });
-    const heard = this.#heard!;
-    const before = heard.here[threadId] ?? {};
-    const settings = { ...before.settings, ...defined({ agent, model, effort, mode, permissionMode }) };
-    heard.here[threadId] = { ...before, ...(draft !== undefined && { draft }), ...(Object.keys(settings).length && { settings }) };
-    this.deps.kept.save("threads", JSON.stringify(heard));
-    if (seen) await this.refresh();
-    this.#tell();
+    const settings = defined({ agent, model, effort, mode, permissionMode });
+    if (title !== undefined || Object.keys(settings).length)
+      this.#hearRow(await this.deps.session.request(ROUTES.update(threadId), { ...(title !== undefined && { title }), ...(Object.keys(settings).length && { settings }) }));
+    const mine = defined({ pinned, archived, snoozedUntil: snoozedUntil === undefined ? undefined : isoOf(snoozedUntil), seenSeq: seen === undefined ? undefined : seenUpTo(row, seen) });
+    if (Object.keys(mine).length) this.#hearRow(await this.deps.session.request(ROUTES.mine(threadId), mine));
+    if (draft !== undefined) {
+      const heard = this.#heard!;
+      heard.here[threadId] = { draft };
+      this.deps.kept.save("threads", JSON.stringify(heard));
+      this.#tell();
+    }
     return this.summary(threadId);
+  }
+
+  /** threads.delete: the thread leaves OpenOrc Cloud, as its maker or a space's admin may ask; the server says who may not. */
+  async remove(threadId: string): Promise<null> {
+    this.row(threadId);
+    await this.deps.session.request(ROUTES.remove(threadId));
+    const heard = this.#heard;
+    if (heard) {
+      heard.rows = heard.rows.filter((row) => row.id !== threadId);
+      delete heard.here[threadId];
+      this.deps.kept.save("threads", JSON.stringify(heard));
+      this.#tell();
+    }
+    return null;
+  }
+
+  /** A row the server just answered for a write, in place of the one heard. */
+  #hearRow(row: WireThread): void {
+    const heard = this.#heard;
+    if (!heard) return;
+    heard.rows = heard.rows.map((each) => (each.id === row.id ? row : each));
+    this.deps.kept.save("threads", JSON.stringify(heard));
+    this.#tell();
   }
 
   /** One row, or a rejection in words when the account no longer has it. */
@@ -353,9 +376,32 @@ export class Threads implements HostedThreads {
     const now = this.deps.session.state;
     if (this.#closed || !now.signedIn || now.email !== state.email) return;
     const before = JSON.stringify([this.#heard?.rows, this.#heard?.projects]);
+    if (this.#heard?.email === state.email) this.#tellPerson(this.#heard.rows, answers[0].threads);
     this.#heard = { email: state.email, heardAt: this.deps.now(), rows: answers[0].threads, projects: answers[1], here: this.#heard?.email === state.email ? this.#heard.here : {} };
     this.deps.kept.save("threads", JSON.stringify(this.#heard));
     if (JSON.stringify([this.#heard.rows, this.#heard.projects]) !== before) this.#tell();
+  }
+
+  /**
+   * What the person hears of the rows that moved since the last listing: a new ask, or a turn that ended. A turn that
+   * ends also wakes a snoozed thread, as on this Mac.
+   */
+  #tellPerson(before: readonly WireThread[], after: readonly WireThread[]): void {
+    for (const { row, was } of noticed(before, after)) {
+      if (was === "ask") {
+        this.deps.notify(askNotice(row));
+        continue;
+      }
+      if (row.snoozedUntil)
+        void this.deps.session.request(ROUTES.mine(row.id), { snoozedUntil: null }).then(
+          (woke) => this.#hearRow(woke),
+          () => undefined,
+        );
+      void endNotice(this.deps.session, row).then(
+        (notice) => notice && this.deps.notify(notice),
+        (error: unknown) => this.deps.log.warn(`OpenOrc Cloud notice: ${error instanceof Error ? error.message : String(error)}`),
+      );
+    }
   }
 
   /** The host is closing: an answer still on its way is dropped. */
@@ -400,12 +446,7 @@ export class Threads implements HostedThreads {
       const pair = row.projectId ? pairs.get(row.projectId) : undefined;
       const projectId = pair?.macId ?? CLOUD_PROJECT + (row.projectId ?? "none");
       const here = heard.here[row.id];
-      const summary = toSummary(here?.settings ? { ...row, settings: { ...row.settings, ...here.settings } } : row, {
-        projectId,
-        orphanOf: pair?.macId ? null : (pair?.name ?? "OpenOrc Cloud"),
-        reach: state.reach,
-        heardAt: heard.heardAt,
-      });
+      const summary = toSummary(row, { projectId, orphanOf: pair?.macId ? null : (pair?.name ?? "OpenOrc Cloud"), reach: state.reach, heardAt: heard.heardAt, now: this.deps.now() });
       return here?.draft ? { ...summary, draft: here.draft } : summary;
     });
   }
@@ -420,6 +461,15 @@ function parseKept(json: string | null): Heard | null {
     return null;
   }
 }
+
+/** A moment as the server takes it; null stays null. */
+const isoOf = (ms: number | null): string | null => (ms === null ? null : new Date(ms).toISOString());
+
+/**
+ * The reader's seen position for read or unread, as the server keeps it: read is the head; unread is just before the
+ * agent's last event, so the thread reads unread as it does when the agent writes past what the person saw.
+ */
+const seenUpTo = (row: WireThread, seen: boolean): number => (seen ? row.head : Math.max(0, row.lastAgentSeq - 1));
 
 /** The fields a patch set, without the ones it left out. */
 function defined<T extends Record<string, unknown>>(fields: T): Partial<T> {

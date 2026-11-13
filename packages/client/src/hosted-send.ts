@@ -1,4 +1,4 @@
-import { hostedSendBlock, sendBlockWords, type AccountStatus, type SendBlockWhy, type ThreadSummary } from "@openorc/protocol";
+import { hostedSendBlock, placeOf, sendBlockWords, type AccountStatus, type SendBlockWhy, type ThreadSummary } from "@openorc/protocol";
 
 /**
  * Where the card above a cloud thread's composer leads: the Settings section that holds what is missing. Paying opens
@@ -34,4 +34,9 @@ export function threadSendBlock(thread: Pick<ThreadSummary, "owner" | "activity"
   if (thread?.owner?.brain !== "hosted") return null;
   const why = hostedSendBlock(account, settings, thread.activity === "running");
   return why ? { why, words: sendBlockWords(why, settings.agent), action: ACTIONS[why] } : null;
+}
+
+/** Why nothing can be done to a thread now: its place can't be reached. Null when it can, and for this Mac's own threads. */
+export function placeUnreachable(thread: Pick<ThreadSummary, "owner"> | null): string | null {
+  return thread?.owner?.reach === "offline" ? `${placeOf(thread).mark ?? "This thread"} can't be reached.` : null;
 }

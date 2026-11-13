@@ -11,6 +11,7 @@
 import type { AccountStatus, Frame, OwnerReach, Project, RoutedMethod, RpcParams, RpcResults, ThreadSummary } from "@openorc/protocol";
 import { Account } from "./account.js";
 import { Follower } from "./follow.js";
+import type { HostedNotice } from "./notices.js";
 import { Session } from "./session.js";
 import { Threads } from "./threads.js";
 
@@ -46,6 +47,8 @@ export interface HostedDeps {
   connect(url: string, token: string): LiveSocket;
   /** What the host's windows hear. Frames carry the app's run ids. Never reaches a paired phone. */
   push(push: { type: "invalidate"; keys: string[] } | { type: "frame"; frame: Frame } | { type: "gap"; runIds: string[] }): void;
+  /** A notice for the person about a cloud thread: an ask it waits on, or a turn that ended. The host words and shows it as its own. */
+  notify(notice: HostedNotice): void;
   now(): number;
   log: { info(message: string): void; warn(message: string): void };
 }
@@ -93,7 +96,7 @@ export interface HostedThreads {
   listed<M extends MergedMethod>(method: M, params: RpcParams<M>): PlacePage<M> | null;
 }
 
-export type { ThreadSummary };
+export type { HostedNotice, ThreadSummary };
 
 export interface Hosted {
   readonly account: HostedAccount;
@@ -109,7 +112,7 @@ export function createHosted(deps: HostedDeps): Hosted {
   const session = new Session(deps);
   const account = new Account({ session, kept: deps.kept, push: deps.push, now: deps.now });
   const follower = new Follower({ session, push: deps.push, log: deps.log });
-  const threads = new Threads({ session, follower, account, kept: deps.kept, projects: deps.projects, push: deps.push, now: deps.now, log: deps.log });
+  const threads = new Threads({ session, follower, account, kept: deps.kept, projects: deps.projects, push: deps.push, notify: deps.notify, now: deps.now, log: deps.log });
   return {
     account,
     threads,

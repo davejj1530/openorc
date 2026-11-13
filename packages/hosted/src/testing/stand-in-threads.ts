@@ -13,9 +13,9 @@
  *   so it is admitted like a send; a second answer is a 409
  *   Stop cancels the messages not taken yet and ends the running turn as cancelled
  *   a ready ask from someone who could not start a turn stores nothing
- *   a person's seen position only moves forward, and never past the head
- *
- * Where the real server has nothing yet, it answers as the app's design assumes (app-side/sketch/server-additions.md 4):
+ *   the reader's view (PUT /mine) takes `seenSeq` as given, up to the head, so a lower one marks the thread unread;
+ *   a person's own message moves their seen position forward; pinned, archived and snoozed are theirs alone
+ *   PATCH renames the thread or changes its settings for everyone; DELETE is the maker's alone, else refused in words
  *   `delivery: "after"` waits, unlogged, in `waiting` with `afterTurn: true`, and is taken when the turn ends
  *   a pending message sent again with delivery "now" steers at once; a refused one sent again is admitted again
  *   DELETE /hosted/threads/:id/messages/:messageId cancels a pending message or dismisses a refused one
@@ -77,6 +77,10 @@ interface Thread {
   agent: string;
   status: string;
   seenSeq: number;
+  pinnedAt: string | null;
+  archivedAt: string | null;
+  snoozedUntil: string | null;
+  settings: { model: string | null; effort: string | null; mode: string; permissionMode: string };
   backgroundCommands: { id: string; description: string }[];
   stopped: string[];
   events: Stored[];
@@ -106,10 +110,14 @@ function rowOf(thread: Thread) {
     title: thread.title,
     baseBranch: "main",
     branch: thread.branch,
-    settings: { agent: thread.agent, model: null, effort: null, mode: "act", permissionMode: "trusted" },
+    settings: { agent: thread.agent, ...thread.settings },
     status: thread.status,
     head: headOf(thread),
+    turns: turnEnds(thread).length,
     seenSeq: thread.seenSeq,
+    pinnedAt: thread.pinnedAt,
+    archivedAt: thread.archivedAt,
+    snoozedUntil: thread.snoozedUntil,
     lastAgentSeq: lastAgentSeq(thread),
     turn: thread.turn ? { id: `turn-${thread.id}`, startedBy: `user-${thread.turn}`, startedAt: thread.lastActivityAt, state: "running" } : null,
     backgroundCommands: thread.backgroundCommands,
@@ -145,6 +153,11 @@ function pageOf(thread: Thread, query: URLSearchParams) {
   const limit = Number(query.get("limit") ?? 500);
   const ends = turnEnds(thread);
   const fromTurn = query.has("fromTurn") ? Math.min(Number(query.get("fromTurn")), ends.length) : undefined;
+  if (query.has("before")) {
+    const before = Number(query.get("before"));
+    const events = thread.events.filter((stored) => stored.seq < before).slice(-limit);
+    return { events: events.map((stored) => wire(thread, stored)), head: headOf(thread) };
+  }
   const after = fromTurn === undefined ? Number(query.get("after") ?? 0) : (ends[fromTurn - 1] ?? 0);
   const events = thread.events
     .filter((stored) => stored.seq > after)
@@ -171,13 +184,13 @@ export class StandInThreads {
   route(method: string, path: string, query: URLSearchParams, who: string, body: Record<string, unknown> = {}): Reply | null {
     const asked = /^\/hosted\/asks\/([^/]+)\/answer$/.exec(path);
     if (asked && method === "POST") return this.#answer(who, decodeURIComponent(asked[1]!), body);
-    const write = /^\/hosted\/threads\/([^/]+)\/(messages|stop|ready|seen)(?:\/([^/]+))?$/.exec(path);
+    const write = /^\/hosted\/threads\/([^/]+)\/(messages|stop|ready|mine)(?:\/([^/]+))?$/.exec(path);
     if (write) return this.#write(method, write, who, body);
-    return this.#read(method, path, query, who);
+    return this.#read(method, path, query, who, body);
   }
 
-  /** The lists, one thread, its log, and a background command's stop. */
-  #read(method: string, path: string, query: URLSearchParams, who: string): Reply | null {
+  /** The lists, one thread, its log, its title and settings, its removal, and a background command's stop. */
+  #read(method: string, path: string, query: URLSearchParams, who: string, body: Record<string, unknown>): Reply | null {
     if (method === "GET" && path === "/projects") return { status: 200, body: (this.#projects.get(who) ?? []).map((project) => ({ ...project, repoId: 1, defaultBranch: "main", connected: true })) };
     if (method === "GET" && path === "/hosted/threads") {
       const mine = [...this.#threads.values()].filter((thread) => thread.owner === who).sort((a, b) => b.lastActivityAt.localeCompare(a.lastActivityAt));
@@ -187,11 +200,19 @@ export class StandInThreads {
     if (!match) return null;
     const thread = this.#readable(who, decodeURIComponent(match[1]!));
     if (!thread) return missing();
-    if (method === "GET" && !match[2]) return { status: 200, body: { ...rowOf(thread), turnEnds: turnEnds(thread) } };
     if (method === "GET" && match[2] === "/events") return { status: 200, body: pageOf(thread, query) };
+    if (!match[2]) return this.#one(method, thread, who, body);
     if (method !== "POST" || !match[3]) return null;
     thread.stopped.push(decodeURIComponent(match[3]));
     return { status: 204, body: null };
+  }
+
+  /** One thread by its own path: read, renamed or deleted. */
+  #one(method: string, thread: Thread, who: string, body: Record<string, unknown>): Reply | null {
+    if (method === "GET") return { status: 200, body: { ...rowOf(thread), turnEnds: turnEnds(thread) } };
+    if (method === "PATCH") return this.#rename(thread, body);
+    if (method === "DELETE") return this.#delete(thread, who);
+    return null;
   }
 
   /** A thread's messages, its Stop and its ready ask: `[path, threadId, verb, messageId?]`. */
@@ -203,12 +224,37 @@ export class StandInThreads {
     if (key === "DELETE messages/:id") return this.#unsend(thread, decodeURIComponent(messageId!));
     if (key === "POST stop") return this.#stop(thread);
     if (key === "POST ready") return this.#ready(thread, who, body);
-    if (key === "POST seen") {
-      thread.seenSeq = Math.max(thread.seenSeq, Math.min(Number(body["seq"] ?? 0), headOf(thread)));
-      this.#changed(thread);
-      return { status: 200, body: { seenSeq: thread.seenSeq } };
-    }
+    if (key === "PUT mine") return this.#view(thread, body);
     return null;
+  }
+
+  /** The reader's own view: each part given is set, the rest left as they are. Answers the row. */
+  #view(thread: Thread, body: Record<string, unknown>): Reply {
+    const now = new Date().toISOString();
+    if (typeof body["seenSeq"] === "number") thread.seenSeq = Math.min(body["seenSeq"], headOf(thread));
+    if (typeof body["pinned"] === "boolean") thread.pinnedAt = body["pinned"] ? now : null;
+    if (typeof body["archived"] === "boolean") thread.archivedAt = body["archived"] ? now : null;
+    if (body["snoozedUntil"] !== undefined) thread.snoozedUntil = (body["snoozedUntil"] as string | null) ?? null;
+    this.#tellOwner(thread);
+    return { status: 200, body: rowOf(thread) };
+  }
+
+  /** The thread's title and what its next turns run with, for everyone in it. Answers the row. */
+  #rename(thread: Thread, body: Record<string, unknown>): Reply {
+    const settings = (body["settings"] ?? {}) as Partial<Thread["settings"]> & { agent?: string };
+    if (typeof body["title"] === "string") thread.title = body["title"].trim();
+    const { agent, ...rest } = settings;
+    if (agent) thread.agent = agent;
+    thread.settings = { ...thread.settings, ...rest };
+    this.#changed(thread);
+    return { status: 200, body: rowOf(thread) };
+  }
+
+  #delete(thread: Thread, who: string): Reply {
+    if (thread.owner !== who) return { status: 403, body: { message: "Only the person who made this thread, or an admin, can delete it.", statusCode: 403 } };
+    this.#threads.delete(thread.id);
+    this.#tellOwner(thread);
+    return { status: 204, body: null };
   }
 
   #send(thread: Thread, who: string, body: Record<string, unknown>): Reply {
@@ -249,6 +295,8 @@ export class StandInThreads {
     if (starts) thread.turn = message.author;
     thread.status = "working";
     this.append(thread.id, [{ type: "message.completed", runId: message.id, ts: Date.now(), messageId: message.id, role: "user", text: message.text }], { by: `user-${message.author}` });
+    // A person's own message is read by them.
+    thread.seenSeq = Math.max(thread.seenSeq, headOf(thread));
     if (starts) this.append(thread.id, [{ type: "turn.started", ts: Date.now(), turnId: `turn-${thread.id}-${thread.events.length}` }]);
   }
 
@@ -291,7 +339,7 @@ export class StandInThreads {
   }
 
   #settings(thread: Thread): { agent: string; model: string | null } {
-    return { agent: thread.agent, model: null };
+    return { agent: thread.agent, model: thread.settings.model };
   }
 
   /** The agent asks before it acts, or asks a question: the thread waits on the person. Answers the ask's id. */
@@ -355,6 +403,10 @@ export class StandInThreads {
       agent: seed.agent ?? "claude",
       status: seed.status ?? "idle",
       seenSeq: 0,
+      pinnedAt: null,
+      archivedAt: null,
+      snoozedUntil: null,
+      settings: { model: null, effort: null, mode: "act", permissionMode: "trusted" },
       backgroundCommands: seed.backgroundCommands ?? [],
       stopped: [],
       events: [],

@@ -388,7 +388,9 @@ export class OpenOrc {
     if (this.hosted !== undefined) return this.hosted;
     const { options } = this;
     this.hosted =
-      options.cloudOnly || !options.accountServer ? null : createAccount({ db: this.db, server: options.accountServer, secrets: options.accountSecrets, windows: this.windows, log: this.log });
+      options.cloudOnly || !options.accountServer
+        ? null
+        : createAccount({ db: this.db, server: options.accountServer, secrets: options.accountSecrets, windows: this.windows, notices: () => this.settings.get().notifications, log: this.log });
     return this.hosted;
   }
 

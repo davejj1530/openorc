@@ -104,3 +104,18 @@ it("leaves out the place for this Mac when the cloud has no move for the thread"
   open({ agent: "claude", owner: { brain: "mac", reach: "live", heardAt: 1 } });
   expect(screen.queryByText("This Mac")).toBeNull();
 });
+
+it("pins, snoozes, resolves and deletes an OpenOrc Cloud row like any row, and takes none of it while it can't be reached", () => {
+  open({ owner: { brain: "hosted", reach: "live", heardAt: 1 } });
+  fireEvent.click(screen.getByText("Pin"));
+  expect(mutations.get("threads.update")).toHaveBeenLastCalledWith({ id: "t1", patch: { pinned: true } });
+  cleanup();
+  open({ owner: { brain: "hosted", reach: "offline", heardAt: 1 } });
+  for (const name of ["Pin", "Snooze", /^(Resolve|Reopen)$/, "Delete"]) {
+    const item = screen.getByText(name).closest("[role=menuitem]");
+    expect(item?.getAttribute("aria-disabled")).toBe("true");
+    expect(item?.getAttribute("data-tip") ?? "OpenOrc Cloud can't be reached.").toBe("OpenOrc Cloud can't be reached.");
+  }
+  fireEvent.click(screen.getByText("Pin"));
+  expect(mutations.get("threads.update")).toHaveBeenCalledTimes(1);
+});

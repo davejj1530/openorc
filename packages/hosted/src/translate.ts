@@ -88,6 +88,8 @@ export interface RowContext {
   orphanOf: string | null;
   reach: AccountReach;
   heardAt: number;
+  /** Now, so a snooze that ran out reads as none, as this Mac's own snoozes wake. */
+  now: number;
 }
 
 const ACTIVITY: Record<string, ThreadActivity> = { idle: "idle", working: "running", needs_answer: "waiting" };
@@ -167,10 +169,10 @@ export function toSummary(row: WireThread, context: RowContext): ThreadSummary {
     worktreePath: null,
     baseSha: null,
     baseBranch: row.baseBranch,
-    pinnedAt: null,
+    pinnedAt: at(row.pinnedAt),
     seenAt: null,
     doneAt: null,
-    snoozedUntil: null,
+    snoozedUntil: snoozedUntil(row, context.now),
     prUrl: row.pullRequest?.url ?? null,
     prState: row.pullRequest?.state ?? null,
     forkedFromId: null,
@@ -181,7 +183,7 @@ export function toSummary(row: WireThread, context: RowContext): ThreadSummary {
     createdAt: Date.parse(row.createdAt),
     updatedAt: lastActivityAt,
     lastActivityAt,
-    archivedAt: null,
+    archivedAt: at(row.archivedAt),
     hasStarted: row.head > 0,
     activity,
     backgroundCommands: context.reach === "live" ? row.backgroundCommands : [],
@@ -255,20 +257,39 @@ export function projectPairs(projects: readonly WireProject[], local: readonly {
 /** Whether a row belongs to a list across these Mac projects: its own project, or the cloud's own, which none here stands for. */
 const inProjects = (row: ThreadSummary, projectIds: readonly string[]) => projectIds.includes(row.projectId) || row.projectId.startsWith(CLOUD_PROJECT);
 
+const at = (iso: string | null): number | null => (iso === null ? null : Date.parse(iso));
+
+/** A snooze still running; one that ran out reads as none. */
+function snoozedUntil(row: WireThread, now: number): number | null {
+  const until = at(row.snoozedUntil);
+  return until !== null && until > now ? until : null;
+}
+
 /**
- * How many of the rows Resolved holds, counted as the sidebar files them: roots quiet since before `quietBefore` that
- * wait on nobody. The account never puts a cloud thread there by hand yet, and pins and snoozes are not kept for it.
+ * How many of the rows Resolved holds, counted as this Mac's list counts its own: roots put there, and the unpinned,
+ * unsnoozed ones quiet since before `quietBefore` that wait on nobody.
  */
-export function resolvedCount(rows: readonly ThreadSummary[], params: RpcParams<"threads.resolvedCount">): number {
-  return rows.filter((row) => !row.parentThreadId && inProjects(row, params.projectIds) && row.activity !== "waiting" && row.lastActivityAt < params.quietBefore).length;
+export function resolvedCount(rows: readonly ThreadSummary[], params: RpcParams<"threads.resolvedCount">, now: number): number {
+  return rows.filter((row) => {
+    if (row.parentThreadId || !inProjects(row, params.projectIds)) return false;
+    if (row.archivedAt !== null) return true;
+    return !row.pinnedAt && !(row.snoozedUntil && row.snoozedUntil > now) && row.activity !== "waiting" && row.lastActivityAt < params.quietBefore;
+  }).length;
+}
+
+/** Whether a row is in a list's part: the active rows, the ones put away, or all. Conversations stay continuable, so "done" holds none, as on this Mac. */
+function inFilter(row: ThreadSummary, filter: NonNullable<RpcParams<"threads.list">["filter"]>): boolean {
+  if (filter === "all") return true;
+  if (filter === "archived") return row.archivedAt !== null;
+  return filter === "active" && row.archivedAt === null;
 }
 
 /** The rows a list asked for, from every row the account has: the same filters the Mac's list applies, in memory. */
 export function listRows(rows: readonly ThreadSummary[], params: RpcParams<"threads.list">): ThreadSummary[] {
   return rows.filter((row) => {
     if (params.projectIds ? !inProjects(row, params.projectIds) : params.projectId && row.projectId !== params.projectId) return false;
-    if (params.filter === "archived" || params.filter === "done") return false;
-    if (params.pinnedOnly) return false;
+    if (!inFilter(row, params.filter ?? "active")) return false;
+    if (params.pinnedOnly && !row.pinnedAt) return false;
     if (!params.includeChildren && row.parentThreadId) return false;
     if (params.needsYou && !row.unread && row.activity === "idle") return false;
     return true;

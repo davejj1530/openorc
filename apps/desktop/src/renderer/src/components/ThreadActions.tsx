@@ -1,7 +1,7 @@
 import { Menu } from "@base-ui/react/menu";
-import { snoozePresets, threadResolved } from "@openorc/client";
+import { placeUnreachable, snoozePresets, threadResolved } from "@openorc/client";
 import type { ThreadSummary } from "@openorc/protocol";
-import { isSubagentThread, forkUnavailable, placeOf } from "@openorc/protocol";
+import { isSubagentThread, forkUnavailable, placeOf, PLACES } from "@openorc/protocol";
 import { useRef, useState } from "react";
 import { CoversPreview } from "../lib/browser-preview";
 import { useRpc, useRpcMutation } from "../lib/client";
@@ -54,9 +54,9 @@ export function ThreadMenuItems({ thread, parts: M, header, onRename }: ItemsPro
   return <ThreadMenuContent key={thread.id} thread={thread} parts={M} header={header} onRename={onRename} />;
 }
 
-function RenameItem({ parts: M, onRename }: { parts: MenuParts; onRename: () => void }) {
+function RenameItem({ parts: M, onRename, away = null }: { parts: MenuParts; onRename: () => void; away?: string | null }) {
   return (
-    <M.Item className={menuItem} onClick={onRename}>
+    <M.Item className={menuItem} disabled={away !== null} data-tip={away ?? undefined} onClick={onRename}>
       <Pencil size={13} /> Rename
     </M.Item>
   );
@@ -87,8 +87,10 @@ function OpenItems({ thread, parts: M }: { thread: ThreadSummary; parts: MenuPar
 function ThreadMenuContent({ thread, parts: M, header, onRename }: ItemsProps) {
   const update = useRpcMutation("threads.update");
   const patch = (p: Parameters<typeof update.mutate>[0]["patch"]) => update.mutate({ id: thread.id, patch: p });
-  // Mutations can outlive a closed menu. Reopening it must not enable sibling writes.
-  const mutating = useThreadMutationPending(thread.id);
+  // Mutations can outlive a closed menu. Reopening it must not enable sibling writes. A thread out of reach takes none.
+  const away = placeUnreachable(thread);
+  const mutating = useThreadMutationPending(thread.id) || away !== null;
+  const tip = away ?? undefined;
 
   return (
     <>
@@ -105,13 +107,13 @@ function ThreadMenuContent({ thread, parts: M, header, onRename }: ItemsProps) {
           {update.error.message}
         </div>
       ) : null}
-      {onRename ? <RenameItem parts={M} onRename={onRename} /> : null}
-      <M.Item className={menuItem} disabled={mutating} onClick={() => patch({ pinned: !thread.pinnedAt })}>
+      {onRename ? <RenameItem parts={M} onRename={onRename} away={away} /> : null}
+      <M.Item className={menuItem} disabled={mutating} data-tip={tip} onClick={() => patch({ pinned: !thread.pinnedAt })}>
         {thread.pinnedAt ? <PinOff size={13} /> : <Pin size={13} />} {thread.pinnedAt ? "Unpin" : "Pin"}
       </M.Item>
       <SnoozeItem thread={thread} parts={M} disabled={mutating} patch={patch} />
       {header ? null : (
-        <M.Item className={menuItem} disabled={mutating} onClick={() => patch({ seen: thread.unread })}>
+        <M.Item className={menuItem} disabled={mutating} data-tip={tip} onClick={() => patch({ seen: thread.unread })}>
           <MailOpen size={13} /> {thread.unread ? "Mark as read" : "Mark as unread"}
         </M.Item>
       )}
@@ -119,7 +121,7 @@ function ThreadMenuContent({ thread, parts: M, header, onRename }: ItemsProps) {
       <ThreadForkActions thread={thread} parts={M} header={header} />
       {header ? <OpenWindowItem thread={thread} parts={M} /> : null}
       <M.Separator className={menuSeparator} />
-      <LifecycleItems thread={thread} parts={M} disabled={mutating} patch={patch} />
+      <LifecycleItems thread={thread} parts={M} disabled={mutating} tip={tip} patch={patch} />
     </>
   );
 }
@@ -165,15 +167,15 @@ function SnoozeItem({ thread, parts: M, disabled, patch }: { thread: ThreadSumma
   );
 }
 
-function LifecycleItems({ thread, parts: M, disabled, patch }: { thread: ThreadSummary; parts: MenuParts; disabled: boolean; patch: Patch }) {
+function LifecycleItems({ thread, parts: M, disabled, tip, patch }: { thread: ThreadSummary; parts: MenuParts; disabled: boolean; tip: string | undefined; patch: Patch }) {
   const resolved = threadResolved(thread, Date.now());
   const team = Boolean(thread.teamInstanceId);
   return (
     <>
-      <M.Item className={menuItem} disabled={disabled} closeOnClick onClick={() => patch({ archived: !resolved })}>
+      <M.Item className={menuItem} disabled={disabled} data-tip={tip} closeOnClick onClick={() => patch({ archived: !resolved })}>
         {resolved ? <RotateCcw size={13} /> : <CircleCheck size={13} />} {resolved ? "Reopen" : "Resolve"}
       </M.Item>
-      <M.Item className={menuItemDanger} disabled={team || disabled} data-tip={team ? "This item is no longer available." : undefined} onClick={() => useUi.getState().setDeleteThread(thread.id)}>
+      <M.Item className={menuItemDanger} disabled={team || disabled} data-tip={team ? "This item is no longer available." : tip} onClick={() => useUi.getState().setDeleteThread(thread.id)}>
         <Trash2 size={13} /> Delete
       </M.Item>
     </>
@@ -221,6 +223,13 @@ function ThreadForkActions({ thread, parts: M, header }: { thread: ThreadSummary
   );
 }
 
+/** What deleting removes, for the thread's place. */
+function deleteCopy(thread: ThreadSummary | null | undefined): string {
+  if (isSubagentThread(thread ?? undefined)) return "This saved conversation and its nested subagents are removed. The parent conversation and shared files stay.";
+  if (thread && placeOf(thread) === PLACES.hosted) return "The conversation and its work on OpenOrc Cloud are removed, for everyone in it.";
+  return "The conversation is removed, and its worktree with it. Tasks it created stay, with their worktrees and branches.";
+}
+
 /** One confirm for every delete entry point. Tasks the thread created stay. */
 export function DeleteThreadDialog() {
   const id = useUi((s) => s.deleteThreadId);
@@ -240,9 +249,7 @@ function DeleteThreadContent({ id, close }: { id: string; close: () => void }) {
   const remove = useRpcMutation("threads.delete");
   const [failure, setFailure] = useState<string | null>(null);
   const inFlight = useRef(false);
-  const copy = isSubagentThread(thread.data)
-    ? "This saved conversation and its nested subagents are removed. The parent conversation and shared files stay."
-    : "The conversation is removed, and its worktree with it. Tasks it created stay, with their worktrees and branches.";
+  const copy = deleteCopy(thread.data);
   let blocked: string | null = null;
   if (thread.isPending) blocked = "Checking this thread…";
   else if (!thread.data) blocked = "This thread no longer exists.";

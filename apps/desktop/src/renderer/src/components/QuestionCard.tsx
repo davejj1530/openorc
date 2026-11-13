@@ -1,7 +1,7 @@
 import { useState, type CSSProperties, type ReactNode } from "react";
 import { type Question, readQuestions } from "@openorc/client";
 import { harnessShortName, isHarnessId } from "@openorc/protocol";
-import { core } from "../lib/rpc";
+import { useAskAnswer } from "./ask-answer";
 import { useRunVoice } from "../lib/turn-authors";
 import { Button, Input } from "./ui";
 import { cn } from "../lib/cn";
@@ -101,6 +101,7 @@ export function QuestionCard({
   const voice = useRunVoice(runId);
   const [picked, setPicked] = useState<Record<string, string[]>>({});
   const [other, setOther] = useState<Record<string, string>>({});
+  const reply = useAskAnswer(runId, approvalId);
 
   const answerFor = (q: Question): string[] => {
     const chosen = (picked[q.key] ?? []).filter((v) => v !== "__other");
@@ -119,10 +120,10 @@ export function QuestionCard({
     });
 
   const submit = () => {
-    if (!complete) return;
+    if (!complete || reply.pending || reply.blocked) return;
     const answers: Record<string, string[]> = {};
     for (const q of questions) answers[q.key] = answerFor(q);
-    void core.call("approvals.resolve", { runId, approvalId, decision: "allow", answers });
+    reply.answer("allow", answers);
   };
   const chosen = (q: Question): string[] => {
     if (!decided) return picked[q.key] ?? [];
@@ -161,8 +162,9 @@ export function QuestionCard({
         hint={askHint(questions)}
         agent={voice ? harnessShortName(voice.agent) : null}
         complete={complete}
+        reply={reply}
         onSubmit={submit}
-        onDecline={() => void core.call("approvals.resolve", { runId, approvalId, decision: "deny" })}
+        onDecline={() => reply.answer("deny")}
       />
     </div>
   );
@@ -181,6 +183,7 @@ function QuestionFoot({
   hint,
   agent,
   complete,
+  reply,
   onSubmit,
   onDecline,
 }: {
@@ -188,6 +191,7 @@ function QuestionFoot({
   hint: string;
   agent: string | null;
   complete: boolean;
+  reply: Pick<ReturnType<typeof useAskAnswer>, "pending" | "blocked" | "error">;
   onSubmit: () => void;
   onDecline: () => void;
 }) {
@@ -200,11 +204,17 @@ function QuestionFoot({
     );
   return (
     <div className="question-foot">
-      <span className="min-w-0 flex-1">{hint}</span>
-      <Button size="md" variant="ghost" onClick={onDecline}>
+      {reply.error ? (
+        <span role="alert" className="min-w-0 flex-1 text-bad">
+          {reply.error}
+        </span>
+      ) : (
+        <span className="min-w-0 flex-1">{hint}</span>
+      )}
+      <Button size="md" variant="ghost" disabled={reply.pending || Boolean(reply.blocked)} data-tip={reply.blocked ?? undefined} onClick={onDecline}>
         Decline
       </Button>
-      <Button size="md" variant="primary" disabled={!complete} onClick={onSubmit}>
+      <Button size="md" variant="primary" disabled={!complete || reply.pending || Boolean(reply.blocked)} data-tip={reply.blocked ?? undefined} onClick={onSubmit}>
         Answer
       </Button>
     </div>

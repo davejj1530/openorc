@@ -54,20 +54,47 @@ export function conversationSendDisabledReason(input: {
  * Whether a conversation's newest process is attached, and whether the conversation is busy: a turn, background work,
  * an image being made, a compaction. A thread says for itself; a task's conversation is busy while a reply streams.
  * A run that ended is not attached even when its transcript never heard the end, as a cloud run's last frames are not
- * relayed once no window has read it for a while.
+ * relayed once no window has read it for a while. A thread whose place can't be reached has nothing attached: what it
+ * last said stands as it was.
+ *
+ * A thread waiting on the person is busy only while its turn is open, as on this Mac, where the agent waits mid-turn.
+ * An ask that outlived its turn (OpenOrc Cloud parks one) waits on nothing running, so a message starts a turn.
  */
-export function conversationActivity(input: { thread: Pick<ThreadSummary, "activity"> | null; activeRun: Run | undefined; liveTranscript: RunTranscript | undefined; compacting: boolean }) {
-  const { liveTranscript } = input;
-  const live = Boolean(input.activeRun && input.activeRun.endedAt === null && liveTranscript?.live);
-  const generatingImage = Boolean(liveTranscript?.blocks.some((b) => isImageGeneration(b) && b.kind === "activity" && b.status === "running"));
+export function conversationActivity(input: { thread: Pick<ThreadSummary, "activity" | "owner"> | null; activeRun: Run | undefined; liveTranscript: RunTranscript | undefined; compacting: boolean }) {
+  const { liveTranscript, activeRun } = input;
+  const reachable = input.thread?.owner?.reach !== "offline";
+  const live = reachable && Boolean(activeRun && activeRun.endedAt === null && liveTranscript?.live);
+  const generatingImage = live && Boolean(liveTranscript?.blocks.some((b) => isImageGeneration(b) && b.kind === "activity" && b.status === "running"));
   const replying = live && Boolean(liveTranscript?.blocks.some((b) => b.kind === "message" && b.role === "assistant" && b.streaming));
-  const working = generatingImage || input.compacting || (input.thread ? input.thread.activity !== "idle" : replying);
+  const busy = (activity: ThreadSummary["activity"]) => activity === "running" || (activity === "waiting" && activeRun?.endedAt === null);
+  const working = generatingImage || input.compacting || (input.thread ? busy(input.thread.activity) : replying);
   return { live, working, generatingImage };
 }
 
-/** What the empty prompt invites: a message to the agent, one for the running turn, or one for after it. */
-export function conversationPlaceholder({ firstTaskRun, working, canSteer, agent }: { firstTaskRun: boolean; working: boolean; canSteer: boolean; agent: AgentKind | undefined }): string {
+/** A transcript as the conversation shows it: a thread out of reach shows its last turn as heard, not as running now. */
+export function heardTranscript<T extends Pick<RunTranscript, "live" | "turnOpen">>(run: T, thread: Pick<ThreadSummary, "owner"> | null): T {
+  return thread?.owner?.reach === "offline" && (run.live || run.turnOpen) ? { ...run, live: false, turnOpen: false } : run;
+}
+
+/**
+ * What the empty prompt invites: a message to the agent, one for the running turn, or one for after it. While the
+ * agent waits on an answer mid-turn, a queued message goes once the person answered and the turn ended.
+ */
+export function conversationPlaceholder({
+  firstTaskRun,
+  working,
+  canSteer,
+  waiting = false,
+  agent,
+}: {
+  firstTaskRun: boolean;
+  working: boolean;
+  canSteer: boolean;
+  waiting?: boolean;
+  agent: AgentKind | undefined;
+}): string {
   if (firstTaskRun) return "Add direction, or send to start this task…";
-  if (working) return canSteer ? "Say it during this turn…" : "Queue a message for when it finishes…";
+  if (working && canSteer) return "Say it during this turn…";
+  if (working) return waiting ? "Queue a message for after your answer…" : "Queue a message for when it finishes…";
   return `Message ${harnessShortName(agent ?? defaultHarnessId)}…`;
 }

@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { core } from "../lib/rpc";
 import { approvalDetail, approvalSummary, type Block } from "@openorc/client";
 import { Hammer, Terminal, X } from "./icons";
+import { useAskAnswer } from "./ask-answer";
 import { Button, TextButton } from "./ui";
 
 type ApprovalBlock = Extract<Block, { kind: "approval" }>;
@@ -43,7 +43,6 @@ function askFor(block: ApprovalBlock, label: string): string {
  * of the card, then a foot with the raw request on demand and Deny, Allow for this run and Allow.
  */
 export function ApprovalCard({ block, runId }: { block: ApprovalBlock; runId: string }) {
-  const decide = (decision: "allow" | "allow_for_run" | "deny") => void core.call("approvals.resolve", { runId, approvalId: block.approvalId, decision });
   const [raw, setRaw] = useState(false);
   const label = block.toolName ?? block.approvalKind;
   if (block.decision && block.decision !== "deny") return null;
@@ -63,24 +62,43 @@ export function ApprovalCard({ block, runId }: { block: ApprovalBlock; runId: st
           {raw ? pretty(block.input, 800) : approvalSummary(block)}
         </pre>
       ) : null}
-      <div className="approval-card-foot">
+      <ApprovalFoot block={block} runId={runId} toggle={toggleLabel(raw, command || !block.reason)} onToggle={() => setRaw((v) => !v)} />
+    </div>
+  );
+}
+
+/** The card's foot: the raw request's switch, or why the answer was refused, then the answers, held while one goes. */
+function ApprovalFoot({ block, runId, toggle, onToggle }: { block: ApprovalBlock; runId: string; toggle: string; onToggle: () => void }) {
+  const reply = useAskAnswer(runId, block.approvalId);
+  const answer = (decision: "allow" | "allow_for_run" | "deny") => ({
+    disabled: reply.pending || Boolean(reply.blocked),
+    "data-tip": reply.blocked ?? undefined,
+    onClick: () => reply.answer(decision),
+  });
+  return (
+    <div className="approval-card-foot">
+      {reply.error ? (
+        <span role="alert" className="min-w-0 flex-1 text-bad">
+          {reply.error}
+        </span>
+      ) : (
         <span className="min-w-0 flex-1">
-          <TextButton tone="faint" onClick={() => setRaw((v) => !v)} className="approval-card-raw">
-            {toggleLabel(raw, command || !block.reason)}
+          <TextButton tone="faint" onClick={onToggle} className="approval-card-raw">
+            {toggle}
           </TextButton>
         </span>
-        <Button size="md" variant="ghost" onClick={() => decide("deny")}>
-          Deny
+      )}
+      <Button size="md" variant="ghost" {...answer("deny")}>
+        Deny
+      </Button>
+      {block.onceOnly ? null : (
+        <Button size="md" variant="secondary" {...answer("allow_for_run")}>
+          Allow for this run
         </Button>
-        {block.onceOnly ? null : (
-          <Button size="md" variant="secondary" onClick={() => decide("allow_for_run")}>
-            Allow for this run
-          </Button>
-        )}
-        <Button size="md" variant="primary" onClick={() => decide("allow")}>
-          Allow
-        </Button>
-      </div>
+      )}
+      <Button size="md" variant="primary" {...answer("allow")}>
+        Allow
+      </Button>
     </div>
   );
 }

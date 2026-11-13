@@ -117,6 +117,12 @@ describe("sending to an OpenOrc Cloud thread", () => {
     expect(await said(hosted, run)).toEqual([]);
   });
 
+  it("refuses in words what a cloud thread does not take", async () => {
+    const { hosted, thread } = await withThread();
+    await expect(hosted.threads.call("threads.fork", { id: thread })).rejects.toThrow("This isn't on OpenOrc Cloud yet.");
+    await expect(hosted.threads.call("git.threadLog", { threadId: thread })).rejects.toThrow("An OpenOrc Cloud thread's files aren't on this Mac.");
+  });
+
   it("refuses files in words until the server takes them", async () => {
     const { hosted, run } = await withThread({ status: "working" });
     await expect(hosted.threads.call("runs.send", { runId: run, text: "See this", attachments: ["/tmp/shot.png"] })).rejects.toThrow("Files can't be sent to OpenOrc Cloud yet.");
@@ -156,6 +162,9 @@ describe("an OpenOrc Cloud thread's asks", () => {
     await vi.waitFor(async () => expect(await row(hosted, thread)).toMatchObject({ activity: "waiting" }));
     const page = await hosted.threads.call("events.page", { runId: run, turns: 4 });
     expect(page.events.find((event) => event.type === "approval.requested")).toMatchObject({ approvalId: ask, durable: true });
+    // Parked, the ask waits on nothing running: the run is not live, so the composer sends rather than queues or stops.
+    expect(page.live).toBe(false);
+    expect(await hosted.threads.call("runs.listForThread", { threadId: thread })).toMatchObject([{ state: "success" }]);
     await hosted.threads.call("approvals.resolve", { runId: run, approvalId: ask, decision: "allow" });
     expect(await row(hosted, thread)).toMatchObject({ activity: "running" });
   });

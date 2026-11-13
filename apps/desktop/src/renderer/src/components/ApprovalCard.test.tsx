@@ -13,10 +13,15 @@ afterEach(() => {
 
 it("shows a command to read before it runs, and answers with the choice pressed", () => {
   const command = "rm -rf build && npm run build";
-  render(<ApprovalCard runId="r1" block={{ id: "a", kind: "approval", approvalId: "a", approvalKind: "tool", toolName: "Bash", input: { command } }} />);
-  expect(screen.getByText("Run this command?")).toBeTruthy();
-  expect(screen.getByText(command)).toBeTruthy();
-  for (const name of ["Deny", "Allow for this run", "Allow"]) fireEvent.click(screen.getByRole("button", { name }));
+  for (const name of ["Deny", "Allow for this run", "Allow"]) {
+    render(<ApprovalCard runId="r1" block={{ id: "a", kind: "approval", approvalId: "a", approvalKind: "tool", toolName: "Bash", input: { command } }} />);
+    expect(screen.getByText("Run this command?")).toBeTruthy();
+    expect(screen.getByText(command)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name }));
+    // The card takes one answer at a time.
+    expect(screen.getByRole("button", { name: "Allow" }).hasAttribute("disabled")).toBe(true);
+    cleanup();
+  }
   expect(calls.map((call) => (call as { params: { decision: string } }).params.decision)).toEqual(["deny", "allow_for_run", "allow"]);
 });
 

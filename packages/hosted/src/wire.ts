@@ -50,17 +50,14 @@ export type WireSignIn = z.infer<typeof wireSignIn>;
 
 const seq = z.number().int().nonnegative();
 
-/**
- * A message to a thread, as its `waiting` lists it: not taken yet, or refused since. `after`: sent to wait for the
- * running turn to end (assumed of the server: today it answers no such field, and every message is one sent "now").
- */
+/** A message to a thread, as its `waiting` lists it: not taken yet, or refused since. `afterTurn`: sent to wait for the running turn to end. */
 export const wireMessage = z.object({
   id: z.string(),
   authorId: z.string().nullable(),
   text: z.string(),
   state: z.string(),
   refusal: z.string().nullable(),
-  after: z.boolean().default(false),
+  afterTurn: z.boolean().default(false),
   createdAt: iso,
 });
 export type WireMessage = z.infer<typeof wireMessage>;
@@ -79,6 +76,8 @@ export const wireThread = z.object({
   settings: z.object({ agent: AgentKind, model: z.string().nullable(), effort: z.string().nullable(), mode: RunMode, permissionMode: PermissionPreset }),
   status: z.string(),
   head: seq,
+  /** The live turn; null between turns, also while an ask waits after its turn ended. */
+  turn: z.object({ id: z.string() }).nullable().default(null),
   seenSeq: seq,
   lastAgentSeq: seq,
   backgroundCommands: z.array(BackgroundCommand).default([]),

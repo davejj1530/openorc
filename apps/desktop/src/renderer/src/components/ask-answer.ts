@@ -1,0 +1,28 @@
+import { placeOf, type RpcParams, type ThreadSummary } from "@openorc/protocol";
+import { createContext, useContext, useState } from "react";
+import { core } from "../lib/rpc";
+
+/** Why the asks in a conversation can't be answered now, as when the thread's place can't be reached; null when they can. */
+export const AnswersBlocked = createContext<string | null>(null);
+
+/** Why a thread's asks can't be answered now: its place can't be reached. */
+export function answersBlockedFor(thread: ThreadSummary | null): string | null {
+  return thread?.owner?.reach === "offline" ? `${placeOf(thread).mark ?? "This thread"} can't be reached.` : null;
+}
+
+/**
+ * Answering one ask from its own card: the answer goes once, its card shows it is on its way, and a refusal reads on
+ * the card that was acted on. `blocked` is why no answer can go now.
+ */
+export function useAskAnswer(runId: string, approvalId: string) {
+  const [state, setState] = useState<{ pending: boolean; error: string | null }>({ pending: false, error: null });
+  const blocked = useContext(AnswersBlocked);
+  const answer = (decision: RpcParams<"approvals.resolve">["decision"], answers?: Record<string, string[]>) => {
+    setState({ pending: true, error: null });
+    Promise.resolve(core.call("approvals.resolve", { runId, approvalId, decision, ...(answers && { answers }) })).then(
+      () => setState({ pending: false, error: null }),
+      (error: unknown) => setState({ pending: false, error: error instanceof Error ? error.message : String(error) }),
+    );
+  };
+  return { answer, pending: state.pending, blocked, error: state.error };
+}

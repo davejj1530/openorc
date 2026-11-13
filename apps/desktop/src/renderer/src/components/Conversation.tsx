@@ -5,6 +5,7 @@ import {
   CONTINUE_PROMPT,
   conversationActivity,
   conversationPlaceholder,
+  heardTranscript,
   conversationSendDisabledReason,
   conversationSteerReason,
   messageBody,
@@ -46,6 +47,7 @@ import { useSkillCommands } from "../lib/skill-commands";
 import { ConversationVoice, useRunVoices } from "../lib/turn-authors";
 import { useTurnFooters } from "../lib/turn-footers";
 import { useCloudSignInGate } from "./CloudSignInOffer";
+import { AnswersBlocked, answersBlockedFor } from "./ask-answer";
 import { useHostedComposer } from "./HostedSendNotice";
 import { CloudPreparing, CloudStart } from "./CloudStart";
 import { Composer, type SlashCommand } from "./Composer";
@@ -127,8 +129,10 @@ function TranscriptContext({
   marks,
   footers,
   threadId,
+  answersBlocked = null,
   children,
 }: {
+  answersBlocked?: string | null;
   voice: ComponentProps<typeof ConversationVoice.Provider>["value"];
   marks: ComponentProps<typeof MessageMarks.Provider>["value"];
   footers: ComponentProps<typeof TurnChangesProvider>["footers"];
@@ -139,7 +143,7 @@ function TranscriptContext({
     <ConversationVoice.Provider value={voice}>
       <MessageMarks.Provider value={marks}>
         <TurnChangesProvider footers={footers} threadId={threadId}>
-          {children}
+          <AnswersBlocked.Provider value={answersBlocked}>{children}</AnswersBlocked.Provider>
         </TurnChangesProvider>
       </MessageMarks.Provider>
     </ConversationVoice.Provider>
@@ -214,24 +218,26 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const restart = () => submitter.submit({ ...request, now: false, restart: true }, { text: RESTART_PROMPT, attachments: [] }).then(clearDraft);
   const continueWith = (claudeAccountId: string) => submitter.submit({ ...request, now: false, claudeAccountId }, { text: CONTINUE_PROMPT, attachments: [] }).then(clearDraft);
 
-  const skills = useSkillCommands(conversation, choice?.agent);
-  const connectorMentions = useConnectorMentions(conversation, choice?.agent, executionMode(mode, permission));
+  const suggestScope = cloud.hosted ? null : conversation;
+  const skills = useSkillCommands(suggestScope, choice?.agent);
+  const connectorMentions = useConnectorMentions(suggestScope, choice?.agent, executionMode(mode, permission));
   const onFork = thread && !forkUnavailable(thread.agent) && !placeOf(thread).elsewhere ? forkConversation : undefined;
   const commands: SlashCommand[] = [...threadCommands({ thread, working, compact: cloud.hosted ? undefined : compact.mutate, fork: onFork }), ...skills.commands];
   const marks = useMessageMarks(skills.commands, connectorMentions);
 
   const location = conversationLocation({ scope, project, mode: workspaceMode, basePath: links ?? project.rootPath, checkoutBranch: checkout.data?.branch, plainFolder: git.state === "none" });
   const emptyHint = conversationEmptyHint({ task: scope.kind === "task", workspace: project.id === WORKSPACE_ID });
-  const placeholder = conversationPlaceholder({ firstTaskRun, working, canSteer, agent: choice?.agent });
+  const answersBlocked = answersBlockedFor(thread);
+  const placeholder = conversationPlaceholder({ firstTaskRun, working, canSteer, waiting: thread?.activity === "waiting", agent: choice?.agent });
 
   function renderTranscript() {
     if (optimistic.run && optimistic.run.blocks.length > 0)
       return (
-        <TranscriptContext voice={voice} marks={marks} footers={footers} threadId={threadId}>
+        <TranscriptContext voice={voice} marks={marks} footers={footers} threadId={threadId} answersBlocked={answersBlocked}>
           <Transcript
             working={working}
             media={links ? { basePath: links, fileScope: conversation } : { fileLinks: "cite" }}
-            run={optimistic.run}
+            run={heardTranscript(optimistic.run, thread)}
             scrollKey={conversation.id}
             followKey={sends}
             onFork={onFork}
@@ -316,7 +322,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
             commandsNotice={skills.commandsNotice}
             {...connectorMentions}
             {...cloud.limits}
-            error={(submitter.error ?? controls.error ?? compact.error ?? fork.error ?? settings.error ?? draftError)?.message ?? permissionError}
+            error={cloud.shown((submitter.error ?? controls.error ?? compact.error ?? fork.error ?? settings.error ?? draftError)?.message ?? permissionError)}
           >
             {firstTaskRun && scope.kind === "task" ? (
               <ComposerChoice

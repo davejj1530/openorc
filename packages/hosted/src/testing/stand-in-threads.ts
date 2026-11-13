@@ -16,7 +16,7 @@
  *   a person's seen position only moves forward, and never past the head
  *
  * Where the real server has nothing yet, it answers as the app's design assumes (app-side/sketch/server-additions.md 4):
- *   `delivery: "after"` waits, unlogged, in `waiting` with `after: true`, and is taken when the turn ends
+ *   `delivery: "after"` waits, unlogged, in `waiting` with `afterTurn: true`, and is taken when the turn ends
  *   a pending message sent again with delivery "now" steers at once; a refused one sent again is admitted again
  *   DELETE /hosted/threads/:id/messages/:messageId cancels a pending message or dismisses a refused one
  *   a waiting message the host refuses when its turn comes stays in `waiting` as refused
@@ -135,7 +135,7 @@ function messageOf(message: Message) {
     state: message.state,
     delivery: message.state === "delivered" ? "started" : null,
     refusal: message.refusal,
-    after: message.after,
+    afterTurn: message.after,
     createdAt: message.createdAt,
   };
 }

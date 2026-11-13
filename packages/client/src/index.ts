@@ -29,7 +29,7 @@ export {
 export { composerActivity, composerSendHint, queueHint } from "./composer-presentation.js";
 export type { ClientPush, CoreConnection, Notice } from "./connection.js";
 export { conversationCost, formatCost } from "./conversation-cost.js";
-export { conversationActivity, conversationCanSteer, conversationPlaceholder, conversationSendDisabledReason, conversationSteerReason } from "./conversation-presentation.js";
+export { conversationActivity, conversationCanSteer, conversationPlaceholder, heardTranscript, conversationSendDisabledReason, conversationSteerReason } from "./conversation-presentation.js";
 export type { SavedThreadSettings } from "./conversation-settings.js";
 export {
   composerActions,

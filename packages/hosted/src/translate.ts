@@ -129,7 +129,7 @@ function appSide(event: AgentEvent): AgentEvent {
 export function toQueued(row: WireThread): QueuedMessage[] {
   return row.waiting.flatMap((message) => {
     const refused = message.state === "refused";
-    if (!refused && !(message.after && message.state === "pending")) return [];
+    if (!refused && !(message.afterTurn && message.state === "pending")) return [];
     const words = refused ? refusalWords(message.refusal, row.settings.agent) : null;
     return [{ id: message.id, text: message.text, attachments: [], queuedAt: Date.parse(message.createdAt), error: words }];
   });
@@ -206,10 +206,18 @@ function activityOf(row: WireThread, reach: AccountReach): ThreadActivity {
   return reach === "live" || activity !== "running" ? activity : "idle";
 }
 
-/** The thread's one run: running while the thread is not idle. None for a thread whose log is empty. */
+/**
+ * Whether the thread's log is being written now: a turn is live, or work its agent left reporting back still runs. An
+ * ask whose turn ended runs nothing, and out of reach the app cannot vouch for anything running.
+ */
+export function runsNow(row: WireThread, reach: AccountReach): boolean {
+  return reach === "live" && (row.turn !== null || row.status === "working");
+}
+
+/** The thread's one run: running while its log is being written. None for a thread whose log is empty. */
 export function toRuns(row: WireThread, reach: AccountReach): Run[] {
   if (row.head === 0) return [];
-  const idle = activityOf(row, reach) === "idle";
+  const idle = !runsNow(row, reach);
   return [
     {
       id: hostedRunId(row.id),

@@ -25,6 +25,8 @@ const CLOUD_LIMITS: CloudComposerLimits = { accounts: undefined, onCompact: unde
  *   blocked    the same words, as the reason Send is disabled
  *   limits     the composer's controls a cloud thread leaves out, spread over its props
  *   onFocus    on the composer's surroundings: writing begins, so the thread is made ready for the message
+ *   shown      the composer's error line, without a refusal the card already says in the same words
+ *   hosted     a cloud thread runs elsewhere, so this Mac's skills and connectors are not offered in it
  *
  * The block is derived once from `account.status`, the read Settings makes, so when a sign-in or a purchase lands the
  * card goes by itself. The thread is made ready when the message box takes focus, and when a draft starts from empty;
@@ -34,7 +36,14 @@ export function useHostedComposer(
   thread: ThreadSummary | null,
   settings: { choice: ModelChoice | null; mode: RunMode; permission: PermissionPreset },
   prompt: string,
-): { hosted: boolean; notice: ReactNode; blocked: string | null; limits: CloudComposerLimits | object; onFocus?: (event: FocusEvent) => void } {
+): {
+  hosted: boolean;
+  notice: ReactNode;
+  blocked: string | null;
+  limits: CloudComposerLimits | object;
+  onFocus?: (event: FocusEvent) => void;
+  shown: (error: string | null | undefined) => string | null | undefined;
+} {
   const hosted = thread?.owner?.brain === "hosted";
   const account = useRpc("account.status", {}, { enabled: hosted });
   const ready = useRpcMutation("threads.ready");
@@ -52,12 +61,13 @@ export function useHostedComposer(
     wasEmpty.current = empty;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- Asked as a draft starts; what it asks with is read then.
   }, [prompt]);
-  if (!hosted) return { hosted, notice: null, blocked: null, limits: {} };
+  if (!hosted) return { hosted, notice: null, blocked: null, limits: {}, shown: (error) => error };
   return {
     hosted,
     notice: block ? <SendBlockCard block={block} /> : null,
     blocked: block?.words ?? null,
     limits: CLOUD_LIMITS,
+    shown: (error) => (error === block?.words ? undefined : error),
     onFocus: (event) => (event.target instanceof HTMLTextAreaElement ? readyNow() : undefined),
   };
 }

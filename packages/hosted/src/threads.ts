@@ -15,10 +15,9 @@ import { READ_LIMIT, type Follower } from "./follow.js";
 import type { Account } from "./account.js";
 import * as sends from "./sends.js";
 import { Refused, type Session, type SessionChange } from "./session.js";
-import { CLOUD_PROJECT, listRows, projectPairs, resolvedCount, toAppEvent, toRuns, toSummary } from "./translate.js";
+import { CLOUD_PROJECT, listRows, projectPairs, resolvedCount, runsNow, toAppEvent, toRuns, toSummary } from "./translate.js";
 import { ROUTES, SOCKET, wireProject, wireThread, wireTopics, type WireEvent, type WireProject, type WireThread } from "./wire.js";
 
-const NOT_YET = "This isn't on OpenOrc Cloud yet.";
 const GONE = "That conversation isn't on OpenOrc Cloud.";
 
 /**
@@ -33,10 +32,22 @@ type Heard = z.infer<typeof keptThreads>;
 
 type ThreadsDeps = { session: Session; follower: Follower; account: Pick<Account, "status" | "refused"> } & Pick<HostedDeps, "kept" | "projects" | "push" | "now" | "log">;
 
-/** What a hosted thread answers for one of the app's calls, from its row; methods not here are refused in words. */
-type Answers = { [M in RoutedMethod]?: (threads: Threads, params: RpcParams<M>) => Promise<RpcResults[M]> | RpcResults[M] };
+type Answer<M extends RoutedMethod> = (threads: Threads, params: RpcParams<M>) => Promise<RpcResults[M]> | RpcResults[M];
 
-const ANSWERS: Answers = {
+/** A call a hosted thread does not take, with the words the person reads. */
+const refused = (words: string) => ({ refused: words }) as const;
+/** A call the core's router never asks a place: it names a task, which no place holds, or is this Mac's own to answer. */
+const NOT_ASKED = { notAsked: true } as const;
+
+const NOT_YET = refused("This isn't on OpenOrc Cloud yet.");
+const NO_FILES = refused("An OpenOrc Cloud thread's files aren't on this Mac.");
+const STAYS = refused("An OpenOrc Cloud thread stays on OpenOrc Cloud.");
+
+/**
+ * What a hosted thread does with each of the app's calls that name a thread, a run or a task: answers it, refuses it in
+ * words, or is never asked it. Total over `RoutedMethod`, so a new such call does not compile until someone decides.
+ */
+const ANSWERS: { [M in RoutedMethod]: Answer<M> | ReturnType<typeof refused> | typeof NOT_ASKED } = {
   "threads.get": (threads, { id }) => threads.summary(id),
   "runs.listForThread": (threads, { threadId }) => toRuns(threads.row(threadId), threads.reach),
   "events.page": (threads, params) => threads.page(params),
@@ -65,6 +76,79 @@ const ANSWERS: Answers = {
   "tasks.list": () => [],
   // The server keeps a thread's changes (GET /hosted/threads/:id/changes); they are drawn here once translated.
   "review.threadDiff": () => ({ baseSha: null, patch: "", files: [], since: null }),
+
+  "threads.delete": NOT_YET,
+  "threads.implementPlan": NOT_YET,
+  "threads.exportPlan": NOT_YET,
+  "threads.switchClaudeAccount": refused("An OpenOrc Cloud thread runs on your Claude sign-in there."),
+  "threads.compact": NOT_YET,
+  "threads.send": NOT_YET,
+  "threads.turnChanges": NOT_YET,
+  "threads.fork": NOT_YET,
+  "subagents.stop": NOT_YET,
+  "runs.close": NOT_YET,
+  "events.toolOutput": NOT_YET,
+  "tasks.create": NOT_YET,
+  "orclings.ask": NOT_YET,
+  "orclings.assign": NOT_YET,
+  "orclings.react": NOT_YET,
+  "orclings.origins": NOT_YET,
+  "orclings.groups.send": NOT_YET,
+  "orclings.groups.delete": NOT_YET,
+  "review.comments.add": NOT_YET,
+  "review.comments.remove": NOT_YET,
+  "review.comments.send": NOT_YET,
+  "review.threadChanges": NOT_YET,
+  "review.threadFileDiff": NOT_YET,
+  "review.commitThread": NOT_YET,
+  "review.pushThread": NOT_YET,
+  "review.createThreadPr": NOT_YET,
+  "review.threadPrTemplate": NOT_YET,
+  "git.threadLog": NO_FILES,
+  "git.commitRange": NO_FILES,
+  "git.threadPushState": NO_FILES,
+  "threads.moveWorkspace": NO_FILES,
+  "threads.movePreview": NO_FILES,
+  "threads.restore": NO_FILES,
+  "threads.restorePreview": NO_FILES,
+  "cloud.move": STAYS,
+
+  "threads.start": NOT_ASKED,
+  "cloud.bringToMac": NOT_ASKED,
+  "cloud.keep": NOT_ASKED,
+  "cloud.openOnMac": NOT_ASKED,
+  "cloud.closeOnMac": NOT_ASKED,
+  "threads.snapshot": NOT_ASKED,
+  "instructions.list": NOT_ASKED,
+  "instructions.save": NOT_ASKED,
+  "preview.state": NOT_ASKED,
+  "mcpApps.open": NOT_ASKED,
+  "tasks.get": NOT_ASKED,
+  "tasks.update": NOT_ASKED,
+  "tasks.delete": NOT_ASKED,
+  "tasks.start": NOT_ASKED,
+  "tasks.openThread": NOT_ASKED,
+  "tasks.executionThread": NOT_ASKED,
+  "tasks.prepareWorkspace": NOT_ASKED,
+  "tasks.comments.list": NOT_ASKED,
+  "tasks.comments.post": NOT_ASKED,
+  "tasks.comments.retry": NOT_ASKED,
+  "tasks.comments.cancel": NOT_ASKED,
+  "tasks.comments.execute": NOT_ASKED,
+  "runs.listForTask": NOT_ASKED,
+  "memory.forTask": NOT_ASKED,
+  "workspace.cleanup": NOT_ASKED,
+  "workspace.removalImpact": NOT_ASKED,
+  "workspace.usage": NOT_ASKED,
+  "review.diff": NOT_ASKED,
+  "review.snapshots": NOT_ASKED,
+  "review.markReviewed": NOT_ASKED,
+  "review.commit": NOT_ASKED,
+  "review.checkoutState": NOT_ASKED,
+  "review.exportPatch": NOT_ASKED,
+  "review.push": NOT_ASKED,
+  "review.createPr": NOT_ASKED,
+  "git.log": NOT_ASKED,
 };
 
 export class Threads implements HostedThreads {
@@ -123,9 +207,9 @@ export class Threads implements HostedThreads {
   }
 
   async call<M extends RoutedMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> {
-    const answer = ANSWERS[method] as ((threads: Threads, params: RpcParams<M>) => Promise<RpcResults[M]> | RpcResults[M]) | undefined;
-    if (!answer) throw new Error(NOT_YET);
-    return answer(this, params);
+    const entry = ANSWERS[method] as Answer<M> | ReturnType<typeof refused> | typeof NOT_ASKED;
+    if (typeof entry === "function") return entry(this, params);
+    throw new Refused("refused" in entry ? entry.refused : GONE);
   }
 
   /** A project only the server has, as this Mac's windows read a project; null for any other id. */
@@ -160,7 +244,7 @@ export class Threads implements HostedThreads {
   async update(threadId: string, patch: RpcParams<"threads.update">["patch"]): Promise<ThreadSummary> {
     const row = this.row(threadId);
     const { draft, model, effort, mode, permissionMode, agent, fastMode, seen, ...rest } = patch;
-    if (Object.values(rest).some((value) => value !== undefined) || fastMode || seen === false) throw new Refused(NOT_YET);
+    if (Object.values(rest).some((value) => value !== undefined) || fastMode || seen === false) throw new Refused(NOT_YET.refused);
     if (agent && !isHostedAgent(agent)) throw new Refused(`${harnessShortName(agent)} doesn't run on OpenOrc Cloud.`);
     if (seen) await this.deps.session.request(ROUTES.seen(threadId), { seq: row.head });
     const heard = this.#heard!;
@@ -201,7 +285,7 @@ export class Threads implements HostedThreads {
     }
     const first = await this.deps.session.request(ROUTES.events(threadId, { fromTurn }, READ_LIMIT));
     const events = await this.#readOn(threadId, first.events, first.head);
-    return { events: events.map((event) => toAppEvent(threadId, event)), fromTurn: first.fromTurn ?? fromTurn, live: row.status !== "idle" };
+    return { events: events.map((event) => toAppEvent(threadId, event)), fromTurn: first.fromTurn ?? fromTurn, live: runsNow(row, this.reach) };
   }
 
   /** Every event of the run after a seq of its log. */

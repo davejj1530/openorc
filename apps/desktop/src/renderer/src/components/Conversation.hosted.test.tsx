@@ -158,3 +158,36 @@ it("makes the thread ready as the person starts writing, and not for a thread th
   await act(async () => void (await new Promise((resolve) => setTimeout(resolve, 0))));
   expect(vi.mocked(core.call).mock.calls.map(([method]) => method)).not.toContain("threads.ready");
 });
+
+it("offers none of this Mac's skills or connectors in a cloud thread, which runs elsewhere", async () => {
+  const skill = { name: "review-pr", description: "Review a pull request", source: "user", enabled: true };
+  const answers: Record<string, unknown> = { "events.page": { events: [], fromTurn: 0, live: false }, "skills.list": [skill] };
+  vi.mocked(core.call).mockImplementation((async (method: string) => answers[method]) as never);
+  await open({ owner: undefined });
+  await waitFor(() => expect(composer.props!.commands?.map((command) => command.name)).toContain("review-pr"));
+  cleanup();
+  await open();
+  expect(composer.props!.commands?.map((command) => command.name)).not.toContain("review-pr");
+  expect(composer.props!.connectors).toEqual([]);
+});
+
+it("says a refused send once, on the card above the composer", async () => {
+  const noHours = { ...pro, hours: { leftSeconds: 0, monthly: { grantedSeconds: 3600, leftSeconds: 0, resetsAt: 0 }, packsLeftSeconds: 0 } };
+  await open();
+  vi.mocked(core.call).mockImplementation((async (method: string) => {
+    if (method === "events.page") return { events: [], fromTurn: 0, live: false };
+    if (method !== "runs.start") return undefined;
+    queries.set("account.status", noHours);
+    throw new Error("You're out of cloud hours.");
+  }) as never);
+  await act(async () => void (await composer.props!.onSubmit("Run the export", [], false).catch(() => undefined)));
+  await waitFor(() => expect(screen.getByRole("status", { name: "OpenOrc Cloud" }).textContent).toContain("You're out of cloud hours."));
+  expect(composer.props!.error).toBeUndefined();
+});
+
+it("sends rather than queues on a thread whose ask outlived its turn, since nothing runs", async () => {
+  await open({ activity: "waiting" });
+  expect(composer.props!.queueing).toBe(false);
+  expect(composer.props!.live).toBeNull();
+  expect(composer.props!.placeholder).toBe("Message Claude…");
+});

@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { acceptsLiveInput, conversationActivity, conversationCanSteer, conversationPlaceholder, conversationSendDisabledReason, conversationSteerReason } from "./conversation-presentation.js";
+import {
+  acceptsLiveInput,
+  conversationActivity,
+  conversationCanSteer,
+  conversationPlaceholder,
+  conversationSendDisabledReason,
+  conversationSteerReason,
+  heardTranscript,
+} from "./conversation-presentation.js";
 import { emptyRun, type Block } from "./transcript.js";
 
 describe("sending during a turn", () => {
@@ -29,6 +37,7 @@ it("puts first task direction before active-turn placeholder states", () => {
   expect(conversationPlaceholder({ firstTaskRun: true, working: true, canSteer: true, agent: undefined })).toBe("Add direction, or send to start this task…");
   expect(conversationPlaceholder({ firstTaskRun: false, working: true, canSteer: false, agent: undefined })).toBe("Queue a message for when it finishes…");
   expect(conversationPlaceholder({ firstTaskRun: false, working: false, canSteer: false, agent: "claude" })).toBe("Message Claude…");
+  expect(conversationPlaceholder({ firstTaskRun: false, working: true, canSteer: false, waiting: true, agent: "claude" })).toBe("Queue a message for after your answer…");
 });
 
 describe("conversationActivity", () => {
@@ -40,6 +49,18 @@ describe("conversationActivity", () => {
   it("takes a thread's own word for whether it is busy", () => {
     expect(conversationActivity({ thread: { activity: "running" }, activeRun: run, liveTranscript: live([]), compacting: false })).toEqual({ live: true, working: true, generatingImage: false });
     expect(conversationActivity({ thread: { activity: "idle" }, activeRun: run, liveTranscript: live([replying]), compacting: false }).working).toBe(false);
+  });
+
+  it("counts a thread waiting on an answer as busy only while its turn is open", () => {
+    expect(conversationActivity({ thread: { activity: "waiting" }, activeRun: run, liveTranscript: live([]), compacting: false }).working).toBe(true);
+    expect(conversationActivity({ thread: { activity: "waiting" }, activeRun: { ...run, endedAt: 5 }, liveTranscript: live([]), compacting: false }).working).toBe(false);
+  });
+
+  it("calls nothing live in a thread whose place can't be reached, and shows its last turn as heard", () => {
+    const offline = { activity: "idle" as const, owner: { brain: "hosted" as const, reach: "offline" as const, heardAt: 1 } };
+    expect(conversationActivity({ thread: offline, activeRun: run, liveTranscript: live([replying]), compacting: false })).toMatchObject({ live: false, working: false });
+    expect(heardTranscript({ ...live([replying]), turnOpen: true }, offline)).toMatchObject({ live: false, turnOpen: false });
+    expect(heardTranscript({ ...live([replying]), turnOpen: true }, { owner: { ...offline.owner, reach: "live" } })).toMatchObject({ live: true, turnOpen: true });
   });
 
   it("never calls a run live once it ended, even when its transcript missed the end", () => {

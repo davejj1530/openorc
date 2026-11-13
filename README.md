@@ -25,7 +25,7 @@ Choose an agent for each job while keeping the work connected through shared con
 
 Let a Claude Code thread building your interface ask a Codex thread about an API decision. Agents can find, read, and message other OpenOrc threads in the same project, and start a helper thread in the same folder when you ask, saving you from copying context between conversations.
 
-An idle thread starts a new turn to read a message; a busy thread receives it during its current turn. Agents can send up to 20 messages in a row across threads, and an exchange ends when one agent doesn't reply. After 20, a person has to write before they can send more.
+An idle thread starts a new turn to read a message; a busy thread receives it during its current turn. Agents can send up to 50 messages in a row across threads, and an exchange ends when one agent doesn't reply. After 50, a person has to write before they can send more.
 
 When an agent hands work to subagents of its own, such as Claude Code subagents and workflows, Codex collaboration agents, or OpenCode child sessions, each one becomes a read-only thread under the thread that started it, so you can follow what it did.
 
@@ -54,22 +54,22 @@ Get a second perspective before you build. Request implementation when you're re
 
 ### Keep working from your phone
 
-Pair the OpenOrc iPhone app with the desktop in **Settings → Phone**. The phone shows your threads live, answers approvals and questions, sends and steers messages, starts new threads, and commits, pushes, and opens pull requests. It connects straight to the desktop over your local network or Tailscale, encrypted end to end, with no OpenOrc server in between.
+Get [OpenOrc for iPhone](https://apps.apple.com/app/openorc/id6827221510) from the App Store and pair it with the desktop in **Settings → Phone**. The phone shows your threads live, answers approvals and questions, sends and steers messages, starts new threads and subthreads, and commits, pushes, and opens pull requests. It opens, adds, and edits tasks, and you can text your Orclings from it. It connects straight to the desktop over your local network or Tailscale, encrypted end to end, with no OpenOrc server in between. With a cloud brain on your own Vercel or Agent37 account, it keeps working while the computer sleeps.
 
 ## Project status
 
-OpenOrc was initially built in private and is now open source. It is in active beta development.
+OpenOrc was initially built in private and is now open source. It is in active beta development, with releases for macOS, Windows, and Linux in regular use.
 
-| Platform             | Status                                                                                                                                                                                                                     |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| macOS, Apple Silicon | Supported. CI runs the full test suite here.                                                                                                                                                                               |
-| macOS, Intel         | Released, but not fully validated. Release builds pass the packaged startup and update checks; the test suite runs only on Apple Silicon.                                                                                  |
-| Windows x64          | Released, but not fully validated. Release builds are installed and smoke-tested; the test suite does not run on Windows. A beta installer can be unsigned; its release notes say so.                                      |
-| Linux x64            | Released, but not fully validated. Release builds ship as an rpm, a deb and an AppImage; the deb and AppImage are installed and smoke-tested, and CI runs the test suite on Ubuntu. Installs do not update themselves yet. |
+| Platform             | Status                                                                                                                                                                                        |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| macOS, Apple Silicon | Supported. CI runs the full test suite here.                                                                                                                                                  |
+| macOS, Intel         | Supported. Each release is built on an Intel Mac and passes the packaged startup and update checks.                                                                                           |
+| Windows x64          | Supported. Each release is installed and smoke-tested on Windows, and CI typechecks and builds there. A beta installer can be unsigned; its release notes say so.                             |
+| Linux x64            | Supported. Releases ship as an rpm, a deb and an AppImage; the deb and AppImage are installed and smoke-tested, and CI runs the full test suite on Ubuntu. Install each new version yourself. |
 
-The iPhone app in `apps/mobile` is built and tested against the desktop app on a Mac. Cloud threads, which run in a sandbox on your own Vercel or Agent37 account, ship in release builds, and each release carries the cloud brain it installs there.
+The iPhone app in `apps/mobile` is on the App Store. Cloud threads, which run in a sandbox on your own Vercel or Agent37 account, ship in release builds, and each release carries the cloud brain it installs there.
 
-See the [release guide](docs/desktop-updates.md) and [roadmap](ROADMAP.md).
+See the [release guide](docs/desktop-updates.md), the [roadmap](ROADMAP.md), and each platform's [known issues](https://openorc.app/docs/known-issues/).
 
 On Linux, install the rpm on Fedora or openSUSE (`sudo dnf install ./OpenOrc-….rpm`) and the deb on Debian or Ubuntu (`sudo apt install ./OpenOrc-….deb`). Both add OpenOrc to your applications and an `openorc` command. The AppImage runs anywhere else; like other AppImages, it needs FUSE 2 (`fuse-libs` on Fedora, `libfuse2t64` on Ubuntu). Linux packages are not code-signed, so check your download against the release's `SHA256SUMS.txt`.
 

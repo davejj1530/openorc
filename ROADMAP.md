@@ -1,13 +1,15 @@
 # Roadmap
 
-OpenOrc is under active development. The desktop supports conversations, task documents, provider integrations, local memory, and Git review, and the iPhone app drives the same threads from a paired phone. Cloud threads and the cloud brain run on the user's own Vercel or Agent37 account. See the [README](README.md) for setup and the [product model](PRODUCT.md) for behavior.
+OpenOrc is under active development. The desktop runs on macOS, Windows, and Linux, with conversations, task documents, Orclings, provider integrations, local memory, and Git review. The iPhone app, on the App Store, drives the same threads, tasks, and Orclings from a paired phone. Cloud threads and the cloud brain run on the user's own Vercel or Agent37 account. See the [README](README.md) for setup and the [product model](PRODUCT.md) for behavior.
 
 ## Reliability and platform support
 
 - Keep contributor installation and automated checks reproducible with disposable provider and repository fixtures.
 - Exercise onboarding, task editing, streaming/replay, keyboard navigation, and narrow layouts with the production renderer.
 - Complete signed/notarized macOS installation and upgrade checks, including OS-protected credential storage.
-- Validate Intel macOS, Windows and Linux runtime behavior beyond the release workflow's packaged checks, including installation on Fedora and native Wayland sessions.
+- Run the test suite on Windows. Its POSIX-only fixtures keep it on macOS and Linux today.
+- Bring Windows level with macOS and Linux: Plan and Accept edits for Claude Code, project setup scripts, agent updates from Settings, and signed installers.
+- Add Fedora installs and native Wayland sessions to the Linux release checks, and exercise Intel macOS beyond packaged startup.
 - Let installed Linux builds update themselves, starting with the AppImage.
 - Review dependency notices and provider-asset presentation whenever versions or artwork change.
 

@@ -30,14 +30,19 @@ export function closeCore(child: Pick<CoreProcess, "postMessage" | "on" | "remov
       if (value.type === "update:blocked" && "reason" in value && typeof value.reason === "string") {
         cleanup();
         resolve({ reason: value.reason, retry: "retry" in value && value.retry === true });
-      } else if (value.type === "update:prepared") prepared = true;
+      } else if (value.type === "update:prepared") {
+        prepared = true;
+        // The core has said it is closing, and it will. A switch waits for that however long the ledger takes: giving
+        // up here would report a place as still running that is on its way out.
+        if (purpose === "switch") clearTimeout(timer);
+      }
     };
     const exited = (code: number) => {
       cleanup();
       if (prepared && code === 0) resolve(null);
       else reject(new Error(`The core did not confirm a clean shutdown. ${undone}`));
     };
-    // Never kill the core to meet an installation deadline.
+    // Never kill the core to meet an installation deadline. For a switch the deadline is for the core's answer alone.
     const timer = setTimeout(() => fail(new Error(`The core is still shutting down. ${undone}`)), timeoutMs);
     child.on("message", message);
     child.on("exit", exited);

@@ -70,6 +70,27 @@ describe("update shutdown handoff", () => {
     await expect(update).resolves.toBeNull();
   });
 
+  it("waits for a switch's core to exit however long it takes, once it has said it is closing", async () => {
+    vi.useFakeTimers();
+    const child = new Child();
+    const settled = vi.fn();
+    const result = closeCore(child, "switch", 100).then(settled);
+    child.reply("update:prepared");
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(settled).not.toHaveBeenCalled();
+    child.emit("exit", 0);
+    await result;
+    expect(settled).toHaveBeenCalledWith(null);
+  });
+
+  it("gives up on a switch whose core never answers", async () => {
+    vi.useFakeTimers();
+    const child = new Child();
+    const result = expect(closeCore(child, "switch", 100)).rejects.toThrow("The core is still shutting down. OpenOrc is still running where it was.");
+    await vi.advanceTimersByTimeAsync(100);
+    await result;
+  });
+
   it("says a switch that could not close left OpenOrc where it was", async () => {
     const child = new Child();
     const result = closeCore(child, "switch");

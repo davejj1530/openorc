@@ -8,6 +8,7 @@ import { useLayout, type WorkspaceChangesTarget } from "../lib/layout";
 import { core } from "../lib/rpc";
 import { ChangesPanel } from "../panels/ChangesPanel";
 import { Composer } from "./Composer";
+import { messageOf } from "./composer-editor/testing";
 
 vi.mock("./DiffView", () => ({ DiffView: () => <div>Diff viewer</div> }));
 const project: Project = {
@@ -146,7 +147,7 @@ it.each(["project", "thread"] as const)("reviews and commits binary-only %s chan
     method: kind === "thread" ? "review.commitThread" : "review.commitProject",
     params: kind === "thread" ? { threadId: kind, message: "Add image" } : { projectId: kind, message: "Add image" },
   });
-  expect(screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" }).value).toBe("Keep my draft");
+  expect(messageOf(screen.getByRole("textbox", { name: "Message" }))).toBe("Keep my draft");
   expect(screen.queryByText("feature/composer")).toBeNull();
 });
 

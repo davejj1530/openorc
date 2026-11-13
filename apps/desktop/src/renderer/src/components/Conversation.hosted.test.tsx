@@ -148,14 +148,14 @@ it("lets a message into a running turn go whatever the hours, since the turn's s
   expect(composer.props!.disabledReason).toBeNull();
 });
 
-it("makes the thread ready as the person starts writing, and not for a thread that cannot start a turn", async () => {
+it("makes the thread ready as the composer says the person is about to write, and not for a thread that cannot start a turn", async () => {
   await open();
-  act(() => composer.props!.onChange("Check the sleeping case"));
+  act(() => composer.props!.onReady!());
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("threads.ready", { id: "cloud", settings: expect.objectContaining({ agent: "claude", mode: "act", permissionMode: "trusted" }) }));
   cleanup();
   vi.mocked(core.call).mockClear();
   await open({}, { ...pro, plan: { pro: false }, hours: null });
-  act(() => composer.props!.onChange("Check the sleeping case"));
+  act(() => composer.props!.onReady!());
   await act(async () => void (await new Promise((resolve) => setTimeout(resolve, 0))));
   expect(vi.mocked(core.call).mock.calls.map(([method]) => method)).not.toContain("threads.ready");
 });

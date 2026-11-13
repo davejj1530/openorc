@@ -46,8 +46,8 @@
   box-shadow: var(--raised-shadow);
 }
 
-/* The prompt. The textarea and its highlight mirror agree on geometry to the character, or the
-   skill highlight drifts off the word it belongs to. */
+/* The prompt: the editor's words, with the placeholder stacked in the same cell, so a placeholder that
+   wraps grows the box as words would. */
 .composer-prompt {
   position: relative;
   display: grid;
@@ -55,12 +55,19 @@
 }
 .composer-input-shell {
   position: relative;
-  isolation: isolate;
+  display: grid;
   grid-area: 1 / 1;
   min-width: 0;
 }
+.composer-input-shell > * {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+.composer-input-shell > :not(.composer-input) {
+  pointer-events: none;
+}
 .composer-input,
-.composer-input-mirror {
+.composer-placeholder {
   box-sizing: border-box;
   width: 100%;
   margin: 0;
@@ -72,42 +79,23 @@
   white-space: pre-wrap;
   overflow-wrap: break-word;
   tab-size: 4;
+  /* Both keep room for a scrollbar, so their lines wrap alike whether one shows or not. */
+  scrollbar-gutter: stable;
 }
-/* The mirror beneath draws the letters, so a skill can take its own color; the textarea keeps the caret, the selection
-   and input. Both reserve the same scrollbar gutter, so their lines wrap alike when a scrollbar takes room. */
 .composer-input {
-  field-sizing: content;
   display: block;
-  position: relative;
-  z-index: 1;
   min-height: 20px;
   max-height: var(--composer-max-height);
   overflow-y: auto;
-  scrollbar-gutter: stable;
-  background: transparent;
-  color: transparent;
   caret-color: var(--ink);
-}
-/* The selection is opaque, so the textarea paints the letters it covers itself. */
-.composer-input::selection {
-  color: var(--ink);
 }
 .composer-large .composer-input {
   min-height: 40px;
 }
-.composer-input::placeholder {
-  color: var(--ink-4);
-}
-/* Decorative only: it never takes the pointer, and it is hidden from the accessibility
-   tree because the textarea beside it already carries the same text. */
-.composer-input-mirror {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
+.composer-placeholder {
+  display: block;
   overflow: hidden;
-  scrollbar-gutter: stable;
-  color: var(--ink);
-  pointer-events: none;
+  color: var(--ink-4);
   user-select: none;
 }
 /* The text just sent lifts away as the prompt clears. */
@@ -732,8 +720,8 @@
   white-space: nowrap;
 }
 /* A "/name" the provider will resolve, marked in the message in blue and semibold. The weight is a
-   stroke around the regular letters, not a bolder face: a bolder face is wider, and every letter
-   after the mark would slide away from where the textarea keeps the caret. */
+   stroke around the regular letters, not a bolder face, so a mark keeps the width its words have
+   unmarked and the line never reflows as a name lands. */
 .skill-token {
   background: none;
   color: var(--mention-ink);
@@ -744,8 +732,8 @@
   -webkit-text-stroke: 0;
 }
 /* A connector named in the message: its image takes the place of the @, within the @'s own width so
-   the letters stay where the textarea has them, and never past its start, where a line's edge would
-   clip it. The end of that width is the gap before the name. */
+   the letters keep their places, and never past its start, where a line's edge would clip it. The
+   end of that width is the gap before the name. */
 .connector-token {
   background: none;
   color: var(--mention-ink);

@@ -62,11 +62,12 @@ const offeredAccounts = () =>
 
 import type { PickerAccounts } from "../components/ModelPickerAccounts";
 import { NewSubthread } from "./NewSubthread";
+import { type } from "../components/composer-editor/testing";
 
 const claudeParent = { ...codexParent, agent: "claude", model: "claude-model", claudeAccountId: "work" } as Thread;
 const send = (text: string) => {
-  const message = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" });
-  fireEvent.change(message, { target: { value: text } });
+  const message = screen.getByRole("textbox", { name: "Message" });
+  type(message, text);
   fireEvent.keyDown(message, { key: "Enter", code: "Enter" });
 };
 
@@ -90,8 +91,8 @@ it("starts the subthread under its parent on the parent's settings, then opens i
     </StrictMode>,
   );
   expect(screen.getByRole("heading").textContent).toBe("What should we work on under Landing page?");
-  const message = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" });
-  fireEvent.change(message, { target: { value: "Fix the flaky signup test" } });
+  const message = screen.getByRole("textbox", { name: "Message" });
+  type(message, "Fix the flaky signup test");
   fireEvent.keyDown(message, { key: "Enter", code: "Enter" });
   await waitFor(() => expect(useRouter.getState().route).toEqual({ view: "thread", threadId: "sub-1" }));
   expect(start).toHaveBeenCalledWith({

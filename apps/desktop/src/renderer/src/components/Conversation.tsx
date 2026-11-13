@@ -187,7 +187,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const { live, working, generatingImage } = conversationActivity({ thread, activeRun, liveTranscript, compacting: compact.isPending });
   const { sameAgent, settingsPending, canSteer } = processFit({ live, activeRun, choice, mode, permission, compacting: compact.isPending });
   const steerReason = conversationSteerReason({ canSteer, compacting: compact.isPending, settingsPending, sameAgent, agent: activeRun?.agent });
-  const cloud = useHostedComposer(thread, { choice, mode, permission }, prompt);
+  const cloud = useHostedComposer(thread, { choice, mode, permission });
   const controls = useThreadControls(thread, runs.length, { canSteer, reason: steerReason, blocked: cloud.blocked, onSent: () => setSends((count) => count + 1) });
   const sendDisabledReason = conversationSendDisabledReason({ permissionReady, historyLoading: runsQuery.isLoading, historyFailed: Boolean(runsQuery.error), hasModel: Boolean(choice), thread });
   const turnFooter = useTurnFooter({ footers, threadId, working });
@@ -259,13 +259,14 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   return (
     <div className="conversation-pane h-full min-w-0 flex flex-col min-h-0">
       <div className="flex-1 min-h-0 relative">{renderTranscript()}</div>
-      <div className="composer-padding shrink-0 px-6 pb-6 pt-2" onFocus={cloud.onFocus}>
+      <div className="composer-padding shrink-0 px-6 pb-6 pt-2">
         <div className="max-w-chat w-full min-w-0 mx-auto grid grid-cols-1 gap-2">
           <Composer
             draftKey={`${draftKey}.attachments`}
             value={prompt}
             onChange={setPrompt}
             onSubmit={submit}
+            onReady={cloud.onReady}
             placeholder={orclings.placeholder ?? placeholder}
             mentions={orclings.mentions}
             modelControl={orclings.modelControl}

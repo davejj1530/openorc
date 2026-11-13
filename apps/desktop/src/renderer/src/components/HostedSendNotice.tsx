@@ -1,6 +1,6 @@
 import { threadSendBlock, type SendBlock } from "@openorc/client";
 import { HOSTED_AGENTS, type HarnessId, type PermissionPreset, type RunMode, type ThreadSummary } from "@openorc/protocol";
-import { useEffect, useRef, type FocusEvent, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { useRouter } from "../lib/router";
 import type { ModelChoice } from "./ModelPicker";
@@ -24,7 +24,7 @@ const CLOUD_LIMITS: CloudComposerLimits = { accounts: undefined, onCompact: unde
  *   notice     the card above the composer when a send cannot start a turn, with its words and its way on
  *   blocked    the same words, as the reason Send is disabled
  *   limits     the composer's controls a cloud thread leaves out, spread over its props
- *   onFocus    on the composer's surroundings: writing begins, so the thread is made ready for the message
+ *   onReady    the composer's ready signal: writing begins, so the thread is made ready for the message
  *   shown      the composer's error line, without a refusal the card already says in the same words
  *   hosted     a cloud thread runs elsewhere, so this Mac's skills and connectors are not offered in it
  *
@@ -35,13 +35,12 @@ const CLOUD_LIMITS: CloudComposerLimits = { accounts: undefined, onCompact: unde
 export function useHostedComposer(
   thread: ThreadSummary | null,
   settings: { choice: ModelChoice | null; mode: RunMode; permission: PermissionPreset },
-  prompt: string,
 ): {
   hosted: boolean;
   notice: ReactNode;
   blocked: string | null;
   limits: CloudComposerLimits | object;
-  onFocus?: (event: FocusEvent) => void;
+  onReady?: () => void;
   shown: (error: string | null | undefined) => string | null | undefined;
 } {
   const hosted = thread?.owner?.brain === "hosted";
@@ -54,13 +53,6 @@ export function useHostedComposer(
     const { choice, mode, permission } = settings;
     ready.mutate({ id: thread.id, settings: { ...(choice && { agent: choice.agent, model: choice.model, effort: choice.effort ?? null }), mode, permissionMode: permission } });
   };
-  const wasEmpty = useRef(!prompt.trim());
-  useEffect(() => {
-    const empty = !prompt.trim();
-    if (wasEmpty.current && !empty) readyNow();
-    wasEmpty.current = empty;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- Asked as a draft starts; what it asks with is read then.
-  }, [prompt]);
   if (!hosted) return { hosted, notice: null, blocked: null, limits: {}, shown: (error) => error };
   return {
     hosted,
@@ -68,7 +60,7 @@ export function useHostedComposer(
     blocked: block?.words ?? null,
     limits: CLOUD_LIMITS,
     shown: (error) => (error === block?.words ? undefined : error),
-    onFocus: (event) => (event.target instanceof HTMLTextAreaElement ? readyNow() : undefined),
+    onReady: readyNow,
   };
 }
 

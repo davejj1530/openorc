@@ -1,10 +1,11 @@
 import { Tooltip as BaseTooltip } from "@base-ui/react/tooltip";
-import { createContext, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent, type RefObject } from "react";
-import { skillNames, skillSegments } from "@openorc/client";
+import { createContext, useEffect, useMemo, useRef, useState, type PointerEvent, type RefObject } from "react";
 import type { UsableConnector } from "@openorc/protocol";
-import { connectorSpans, type ConnectorMentions } from "../lib/connector-mentions";
+import { type ConnectorMentions } from "../lib/connector-mentions";
+import { markPieces } from "../lib/message-marks";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { ConnectorLogo } from "./ConnectorLogo";
+import { MessageMark } from "./MessageMark";
 
 /** What a message's words may name: the agent's skills, and the connectors `@` can name. */
 export interface MarkSources {
@@ -26,51 +27,21 @@ export function useMessageMarks(commands: MarkSources["commands"], mentions: Con
   return useMemo(() => ({ commands, connectors: [...connectors, ...(connectorsAside?.connectors ?? [])] }), [commands, connectors, connectorsAside]);
 }
 
-/** Text with each connector's `@` drawn as its image, within the width of the `@`, so the letters after it keep their places. */
-function ConnectorText({ text, connectors }: { text: string; connectors: readonly UsableConnector[] }) {
-  return connectorSpans(text, [...connectors]).map((span, index) =>
-    span.connector ? (
-      <mark key={index} className="connector-token">
-        <span
-          className="connector-token-at"
-          style={span.connector.logo ? ({ "--token-logo": `url("${span.connector.logo}")` } as CSSProperties) : undefined}
-          data-letter={span.connector.logo ? undefined : span.connector.title.slice(0, 1).toUpperCase()}
-        >
-          @
-        </span>
-        {span.text.slice(1)}
-      </mark>
-    ) : (
-      <span key={index}>{span.text}</span>
-    ),
-  );
-}
-
 /**
  * A message's words as the composer draws them: each skill it names in blue, at the regular letters' width, and each
- * connector's `@` as its image. The composer lays this under its textarea; a sent message shows it as it is.
+ * connector's `@` as its image. A sent message shows them as the composer drew them.
  */
 export function MarkedText({ text, commands, connectors }: { text: string } & MarkSources) {
-  const names = useMemo(() => skillNames(commands ?? []), [commands]);
-  const prefix = commands?.find((command) => command.insert)?.prefix ?? "/";
-  const segments = useMemo(() => skillSegments(text, names, prefix), [text, names, prefix]);
-  return segments.map((segment, index) =>
-    segment.skill ? (
-      <mark key={index} className="skill-token" data-skill={segment.text.slice(1)}>
-        {segment.text}
-      </mark>
-    ) : (
-      <ConnectorText key={index} text={segment.text} connectors={connectors ?? []} />
-    ),
-  );
+  const pieces = useMemo(() => markPieces(text, { commands, connectors }), [text, commands, connectors]);
+  return pieces.map((piece, index) => (piece.mark ? <MessageMark key={index} text={piece.text} mark={piece.mark} /> : <span key={index}>{piece.text}</span>));
 }
 
 /** How long the pointer rests on a skill before it says what it is for. */
 const HOVER_MS = 350;
 
 /**
- * The skill mark under the pointer in `marks`, found by where the marks are drawn, since in the composer the textarea
- * over them takes the pointer. Spread the handlers on the element the pointer moves over.
+ * The skill mark under the pointer in `marks`, found by where the marks are drawn, so the pointer may move over
+ * whatever sits on top of them. Spread the handlers on the element the pointer moves over.
  */
 export function useSkillHover(marks: RefObject<HTMLElement | null>) {
   const [hovered, setHovered] = useState<HTMLElement | null>(null);

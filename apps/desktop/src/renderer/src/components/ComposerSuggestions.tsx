@@ -4,7 +4,7 @@ import { CoversPreview } from "../lib/browser-preview";
 import { cn } from "../lib/cn";
 import { floatingGround } from "../lib/use-anchor-ground";
 
-/** Keep suggestions outside scrolling columns, without moving focus out of the textarea. */
+/** Keep suggestions outside scrolling columns, without moving focus out of the message. */
 export function ComposerSuggestions({
   anchor,
   side,
@@ -35,8 +35,10 @@ export function ComposerSuggestions({
     <Popover.Root
       open
       modal={false}
-      onOpenChange={(open) => {
-        if (!open) onDismiss();
+      onOpenChange={(open, details) => {
+        // A press in the composer moves the caret the list follows; leaving the composer closes it by blur.
+        const inside = details.reason === "outside-press" && details.event.target instanceof Node && anchor.current?.contains(details.event.target);
+        if (!open && !inside) onDismiss();
       }}
     >
       <Popover.Portal>
@@ -58,7 +60,7 @@ export function ComposerSuggestions({
             }}
             initialFocus={false}
             finalFocus={false}
-            // Pressing the scrollbar or the padding must not blur the textarea, which would close the list.
+            // Pressing the scrollbar or the padding must not blur the message, which would close the list.
             onMouseDown={(e) => e.preventDefault()}
             className={cn("composer-suggestions floating-popover", members && "min-w-56 max-w-full")}
             style={{ maxHeight: "min(320px, var(--available-height))" }}

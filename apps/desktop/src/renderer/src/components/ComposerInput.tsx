@@ -3,18 +3,22 @@ import type { FileScope, UsableConnector } from "@openorc/protocol";
 import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
 import { useRpc } from "../lib/client";
 import { cn } from "../lib/cn";
-import { filterMentions, insertMention, mentionQueryAt, type MentionEntry } from "../lib/composer-mentions";
+import { filterMentions, insertMention, mentionQueryAt, usePickedFiles, type MentionEntry } from "../lib/composer-mentions";
 import type { SlashCommand } from "./Composer";
 import { asideMatching, commandRows, firstPickable, matchingCommands, matchingConnectors, mentionRows, nextPickable, suggestionKey, useConnectorWord, type SuggestionRow } from "./composer-commands";
 import { ComposerSuggestions } from "./ComposerSuggestions";
 import { ConnectorLogo } from "./ConnectorLogo";
-import { MarkedText, SkillHoverCard, useSkillHover } from "./MarkedText";
+import { ComposerEditor, type ComposerEditorHandle, type DraftChange } from "./composer-editor/ComposerEditor";
+import { SkillHoverCard, useSkillHover } from "./MarkedText";
 
 interface ComposerInputProps {
   value: string;
   onChange: (text: string) => void;
   onSubmit: (duringTurn: boolean) => void;
   onFiles: (files: File[]) => Promise<void>;
+  onReady?: (() => void) | undefined;
+  /** Where the draft's picked files are kept beside its attachments. */
+  draftKey?: string | undefined;
   disabled: boolean;
   placeholder: string;
   autoFocus?: boolean;
@@ -60,18 +64,17 @@ function suggestionLabel(members: boolean, mention: boolean): string {
   return "Commands";
 }
 
-/** Owns text interaction: suggestions, selection, focus and the highlight mirror. */
+/** Owns text interaction: suggestions, the caret and focus, around the editor that holds the words. */
 export function ComposerInput(props: ComposerInputProps) {
   const { value, onChange, onSubmit, onFiles, disabled, placeholder, autoFocus, fileSearch, mentions, commands, onCommandsWanted, connectors, onConnectorsWanted } = props;
   const [caret, setCaret] = useState(0);
   const [cursor, setCursor] = useState(0);
   const [suggestionsActive, setSuggestionsActive] = useState(true);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const mirrorRef = useRef<HTMLDivElement>(null);
+  const editor = useRef<ComposerEditorHandle>(null);
+  const root = useRef<HTMLDivElement>(null);
   const listId = useId();
-  useEffect(() => {
-    if (autoFocus) textareaRef.current?.focus();
-  }, [autoFocus]);
+  const picked = usePickedFiles(props.draftKey, value);
+  const sources = useMemo(() => ({ commands, connectors, members: mentions, files: picked.files }), [commands, connectors, mentions, picked.files]);
   const token = useMemo(() => tokenAtCaret(value, caret), [value, caret]);
   const memberQuery = useMemo(() => (mentions?.length ? mentionQueryAt(value, caret) : null), [mentions, value, caret]);
   const memberMatches = useMemo(() => (memberQuery ? filterMentions(mentions ?? [], memberQuery.query) : []), [memberQuery, mentions]);
@@ -86,24 +89,7 @@ export function ComposerInput(props: ComposerInputProps) {
   const files = useRpc("files.search", { scope: fileSearch ?? NO_SEARCH, query: mentionQuery ?? "", limit: 8 }, { enabled: mentionQuery !== null, staleTime: 10_000 });
   // Skills insert into the prompt; actions clear it, so only offer actions at the start.
   const commandMatches = useMemo(() => matchingCommands(commands, commandQuery, commandPrefix, token?.start), [commandPrefix, commandQuery, commands, token?.start]);
-  const caretFrame = useRef<number | null>(null);
-  const placeCaret = useCallback((at: number) => {
-    if (caretFrame.current !== null) cancelAnimationFrame(caretFrame.current);
-    caretFrame.current = requestAnimationFrame(() => {
-      caretFrame.current = null;
-      const input = textareaRef.current;
-      if (!input) return;
-      input.setSelectionRange(at, at);
-      setCaret(at);
-      input.focus();
-    });
-  }, []);
-  useEffect(
-    () => () => {
-      if (caretFrame.current !== null) cancelAnimationFrame(caretFrame.current);
-    },
-    [],
-  );
+  const write = useCallback((text: string, at: number) => editor.current?.write(text, at), []);
   const suggestions: SuggestionRow[] = useMemo(() => {
     if (memberQuery && memberMatches.length) {
       return memberMatches.map((entry) => ({
@@ -113,19 +99,18 @@ export function ComposerInput(props: ComposerInputProps) {
         mention: entry.key,
         pick: () => {
           const next = insertMention(value, memberQuery.start, caret, entry.name);
-          onChange(next.text);
-          placeCaret(next.caret);
+          write(next.text, next.caret);
         },
       }));
     }
     if (atQuery !== null) {
-      const draft = { token, caret, value, onChange, placeCaret };
+      const draft = { token, caret, value, write, onFile: picked.pick };
       return mentionRows({ usable: connectorMatches, aside: asideMatches, files: mentionQuery !== null ? (files.data ?? []) : [] }, draft);
     }
-    return commandRows(commandMatches, { query: commandQuery, token, caret, value, onChange, placeCaret });
-  }, [memberQuery, memberMatches, atQuery, connectorMatches, asideMatches, mentionQuery, files.data, commandMatches, commandQuery, token, caret, value, onChange, placeCaret]);
-  // The skill under the pointer says what it is for; the marks sit under the textarea, so they are found by place.
-  const skillHover = useSkillHover(mirrorRef);
+    return commandRows(commandMatches, { query: commandQuery, token, caret, value, write });
+  }, [memberQuery, memberMatches, atQuery, connectorMatches, asideMatches, mentionQuery, files.data, commandMatches, commandQuery, token, caret, value, write, picked.pick]);
+  // The skill under the pointer says what it is for.
+  const skillHover = useSkillHover(root);
   // Whether the arrow keys chose the row, which is what lets Enter pick one in the middle of a message.
   const [chosen, setChosen] = useState(false);
   // The list as it now stands, for the reset below, which runs only when a new list opens.
@@ -191,67 +176,49 @@ export function ComposerInput(props: ComposerInputProps) {
         </ComposerSuggestions>
       ) : null}
       <SkillHoverCard mark={skillHover.hovered} commands={commands} />
-      <div className="composer-input-shell">
-        <div ref={mirrorRef} aria-hidden="true" className="composer-input-mirror">
-          {/* Only a name this project actually has is marked, from the same commands the popover offers. */}
-          <MarkedText text={value} commands={commands} connectors={connectors} />
-          {/* A trailing newline collapses without something after it, and the
-              mirror would then scroll a line short of the textarea. */}
-          {"\n"}
-        </div>
-        <textarea
-          ref={textareaRef}
-          onScroll={(e) => {
-            if (mirrorRef.current) mirrorRef.current.scrollTop = e.currentTarget.scrollTop;
-          }}
-          rows={1}
-          onPointerMove={skillHover.onPointerMove}
-          onPointerLeave={skillHover.onPointerLeave}
-          aria-label="Message"
-          aria-autocomplete="list"
-          {...listAria}
-          disabled={disabled}
-          value={value}
-          onFocus={() => setSuggestionsActive(true)}
-          onBlur={() => setSuggestionsActive(false)}
-          onChange={(e) => {
-            onChange(e.target.value);
-            setCaret(e.target.selectionStart);
-            setSuggestionsActive(true);
-          }}
-          onSelect={(e) => setCaret(e.currentTarget.selectionStart)}
-          onPaste={(e) => {
-            const files = Array.from(e.clipboardData.files);
-            if (files.length > 0) {
-              e.preventDefault();
-              void onFiles(files);
-            }
-          }}
-          onKeyDown={(e) => {
-            const endsMessage = (token?.start ?? 0) > 0 && value.slice(caret).trim() === "";
-            const action = suggestionsOpen ? suggestionKey({ ...e, isComposing: e.nativeEvent.isComposing }, suggestions[cursor], { chosen, endsMessage }) : "pass";
-            if (action === "down" || action === "up") {
-              e.preventDefault();
-              setChosen(true);
-              setCursor((current) => nextPickable(suggestions, current, action === "down" ? 1 : -1));
-              return;
-            }
-            if (action === "pick" || action === "close") {
-              e.preventDefault();
-              if (action === "pick") suggestions[cursor]?.pick();
-              else setSuggestionsActive(false);
-              return;
-            }
-            if (action === "send") setSuggestionsActive(false);
-            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              onSubmit(e.metaKey || e.ctrlKey);
-            }
-          }}
-          placeholder={placeholder}
-          className="composer-input min-w-0 resize-none border-0 outline-none text-ink"
-        />
-      </div>
+      <ComposerEditor
+        handle={editor}
+        rootRef={root}
+        value={value}
+        onChange={({ text, caret: at, edited }: DraftChange) => {
+          if (at !== null) setCaret(at);
+          if (!edited) return;
+          onChange(text);
+          setSuggestionsActive(true);
+        }}
+        sources={sources}
+        onKeyDown={(e) => {
+          const endsMessage = (token?.start ?? 0) > 0 && value.slice(caret).trim() === "";
+          const action = suggestionsOpen ? suggestionKey(e, suggestions[cursor], { chosen, endsMessage }) : "pass";
+          if (action === "down" || action === "up") {
+            e.preventDefault();
+            setChosen(true);
+            setCursor((current) => nextPickable(suggestions, current, action === "down" ? 1 : -1));
+            return true;
+          }
+          if (action === "pick" || action === "close") {
+            e.preventDefault();
+            if (action === "pick") suggestions[cursor]?.pick();
+            else setSuggestionsActive(false);
+            return true;
+          }
+          if (action === "send") setSuggestionsActive(false);
+          if (e.key !== "Enter" || e.shiftKey) return false;
+          e.preventDefault();
+          onSubmit(e.metaKey || e.ctrlKey);
+          return true;
+        }}
+        onFiles={(dropped) => void onFiles(dropped)}
+        onReady={props.onReady}
+        disabled={disabled}
+        placeholder={placeholder}
+        autoFocus={autoFocus}
+        completion={listAria}
+        onFocus={() => setSuggestionsActive(true)}
+        onBlur={() => setSuggestionsActive(false)}
+        onPointerMove={skillHover.onPointerMove}
+        onPointerLeave={skillHover.onPointerLeave}
+      />
     </>
   );
 }

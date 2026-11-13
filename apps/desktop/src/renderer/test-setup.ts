@@ -32,3 +32,14 @@ if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
 if (typeof Range !== "undefined" && !("getClientRects" in Range.prototype)) {
   Object.assign(Range.prototype, { getClientRects: () => [], getBoundingClientRect: () => new DOMRect() });
 }
+
+/*
+ * jsdom has no ClipboardEvent. Editors tell a paste, copy or cut from a key press by its class, so tests that fire one
+ * need the class to exist; the clipboard data comes from the test, as it does from the page.
+ */
+if (typeof window !== "undefined" && !("ClipboardEvent" in window)) {
+  class ClipboardEvent extends Event {
+    clipboardData: DataTransfer | null = null;
+  }
+  Object.assign(window, { ClipboardEvent });
+}

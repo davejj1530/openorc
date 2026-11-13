@@ -34,12 +34,14 @@ interface Draft {
   token: { start: number } | null;
   caret: number;
   value: string;
-  onChange: (text: string) => void;
-  placeCaret: (at: number) => void;
+  /** Writes the message with the caret at `caret`, as one step to undo. */
+  write: (text: string, caret: number) => void;
+  /** A file was picked, so its path in the message is a mention rather than words. */
+  onFile?: (path: string) => void;
 }
 
 /** The rows for the commands that match: a skill goes into the message, an app action runs. */
-export function commandRows(matches: SlashCommand[], { query, token, caret, value, onChange, placeCaret }: Draft): SuggestionRow[] {
+export function commandRows(matches: SlashCommand[], { query, token, caret, value, write }: Draft): SuggestionRow[] {
   return matches.map((command) => ({
     // A project may have a command named like one of the app's own actions, and both are offered.
     key: `${command.insert ? `skill:${command.prefix}` : "action:/"}${command.name}`,
@@ -53,12 +55,12 @@ export function commandRows(matches: SlashCommand[], { query, token, caret, valu
       if (command.insert) {
         if (!token) return;
         const next = insertSkill(value, token, caret, command);
-        onChange(next.text);
-        placeCaret(next.caret);
+        write(next.text, next.caret);
         return;
       }
       // An action starts the message, and what was written after it stays for the next one.
-      onChange(rest.replace(/^\s+/, ""));
+      const kept = rest.replace(/^\s+/, "");
+      write(kept, kept.length);
       command.run();
     },
   }));
@@ -72,7 +74,7 @@ export function matchingConnectors(connectors: UsableConnector[] | undefined, qu
 }
 
 /** The rows for the connectors that match: picking one puts `@name ` in place of the word. */
-export function connectorRows(matches: UsableConnector[], { token, caret, value, onChange, placeCaret }: Omit<Draft, "query">): SuggestionRow[] {
+export function connectorRows(matches: UsableConnector[], { token, caret, value, write }: Omit<Draft, "query">): SuggestionRow[] {
   return matches.map((connector) => ({
     key: `connector:${connector.name}`,
     label: `@${connector.name}`,
@@ -81,8 +83,7 @@ export function connectorRows(matches: UsableConnector[], { token, caret, value,
     pick: () => {
       if (!token) return;
       const next = insertMention(value, token.start, caret, connector.name);
-      onChange(next.text);
-      placeCaret(next.caret);
+      write(next.text, next.caret);
     },
   }));
 }
@@ -122,14 +123,14 @@ export function asideMatching(aside: { connectors: UsableConnector[]; reason: st
 }
 
 /** The rows for files whose path matches the `@` word: picking one puts the path in its place. */
-export function fileRows(paths: string[], { token, caret, value, onChange, placeCaret }: Omit<Draft, "query">): SuggestionRow[] {
+export function fileRows(paths: string[], { token, caret, value, write, onFile }: Omit<Draft, "query">): SuggestionRow[] {
   return paths.map((filePath) => ({
     key: filePath,
     label: filePath,
     pick: () => {
       if (!token) return;
-      onChange(`${value.slice(0, token.start)}${filePath} ${value.slice(caret)}`);
-      placeCaret(token.start + filePath.length + 1);
+      onFile?.(filePath);
+      write(`${value.slice(0, token.start)}${filePath} ${value.slice(caret)}`, token.start + filePath.length + 1);
     },
   }));
 }

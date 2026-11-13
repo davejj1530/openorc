@@ -148,6 +148,8 @@ export interface ComposerProps {
   connectorsLoading?: boolean | undefined;
   onConnectorsWanted?: () => void;
   autoFocus?: boolean;
+  /** The person is about to write: they focused the message or started one. */
+  onReady?: (() => void) | undefined;
   size?: "md" | "lg";
   /** The landing screen draws the roomier composer and places the Commit chip itself. */
   presentation?: "conversation" | "new-thread";
@@ -293,17 +295,14 @@ export function Composer(props: ComposerProps) {
             {uploading > 0 ? <div className="composer-thumbnail composer-uploading" /> : null}
           </div>
         ) : null}
-        {/* A textarea cannot colour part of its own value, so the highlight is
-            painted underneath it. The mirror holds the same text in the same
-            box with transparent ink, and only the skill tokens carry a fill;
-            the real characters come from the textarea sitting on top, which
-            stays the only thing the caret, selection and IME ever touch. */}
         <div className="composer-prompt">
           <ComposerInput
             value={props.value}
             onChange={props.onChange}
             onSubmit={(duringTurn) => submit(actions.sendsNow || duringTurn)}
             onFiles={addFiles}
+            onReady={props.onReady}
+            draftKey={props.draftKey}
             disabled={Boolean(props.busy || submitting)}
             placeholder={props.placeholder}
             autoFocus={props.autoFocus}

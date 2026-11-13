@@ -1,3 +1,6 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { readDraft, writeDraft } from "./drafts";
+
 /** A member the composer can address with `@`. `name` is what gets inserted; `key` only identifies it. */
 export interface MentionEntry {
   key: string;
@@ -23,4 +26,20 @@ export function filterMentions<T extends Pick<MentionEntry, "key" | "name">>(ent
 export function insertMention(text: string, start: number, caret: number, name: string): { text: string; caret: number } {
   const mention = `@${name} `;
   return { text: `${text.slice(0, start)}${mention}${text.slice(caret)}`, caret: start + mention.length };
+}
+
+/**
+ * The files picked from the `@` list for a draft, kept with its saved attachments so a draft that comes back still
+ * reads their paths as mentions. A path no longer in the message is forgotten.
+ */
+export function usePickedFiles(draftKey: string | undefined, text: string): { files: string[]; pick: (path: string) => void } {
+  const [picked, setPicked] = useState<string[]>(() => (draftKey ? readDraft(draftKey, { files: [] as string[] }).files : []));
+  const files = useMemo(() => picked.filter((path) => text.includes(path)), [picked, text]);
+  useEffect(() => {
+    if (!draftKey) return;
+    const saved = readDraft<Record<string, unknown>>(draftKey, {});
+    if (JSON.stringify(saved["files"] ?? []) !== JSON.stringify(files)) writeDraft(draftKey, { ...saved, files });
+  }, [draftKey, files]);
+  const pick = useCallback((path: string) => setPicked((now) => (now.includes(path) ? now : [...now, path])), []);
+  return { files, pick };
 }

@@ -1,0 +1,101 @@
+import { HISTORY_PUSH_TAG } from "lexical";
+import { useEffect, useImperativeHandle, type AriaAttributes, type FocusEventHandler, type PointerEventHandler, type Ref } from "react";
+import type { MarkSources } from "../../lib/message-marks";
+import { $writeDraft } from "./draft";
+import { EditorBox, EditorPlaceholder, EditorProvider, useEditor } from "./editor";
+import { MARK_NODES } from "./nodes";
+import { ClipboardPlugin } from "./plugins/ClipboardPlugin";
+import { DraftPlugin, type DraftChange } from "./plugins/DraftPlugin";
+import { FocusPlugin } from "./plugins/FocusPlugin";
+import { KeyboardPlugin } from "./plugins/KeyboardPlugin";
+import { MarksPlugin } from "./plugins/MarksPlugin";
+import { ReadyPlugin } from "./plugins/ReadyPlugin";
+
+export type { DraftChange } from "./plugins/DraftPlugin";
+
+/** What the composer does to its draft: a pick writes the message with the caret where it belongs, as one step to undo. */
+export interface ComposerEditorHandle {
+  write: (text: string, caret: number) => void;
+}
+
+export interface ComposerEditorProps {
+  /** The message, as its owner keeps it. */
+  value: string;
+  onChange: (change: DraftChange) => void;
+  /** What its words may name, each drawn as its own mark. */
+  sources: MarkSources;
+  /** Keys the composer answers ahead of the editor: true for each it took. */
+  onKeyDown: (event: KeyboardEvent) => boolean;
+  onFiles: (files: File[]) => void;
+  onReady?: (() => void) | undefined;
+  disabled: boolean;
+  placeholder: string;
+  autoFocus?: boolean | undefined;
+  /** The list completing the word at the caret, for a screen reader. */
+  completion: Pick<AriaAttributes, "aria-controls" | "aria-activedescendant">;
+  onFocus: FocusEventHandler<HTMLDivElement>;
+  onBlur: FocusEventHandler<HTMLDivElement>;
+  onPointerMove?: PointerEventHandler<HTMLDivElement>;
+  onPointerLeave?: PointerEventHandler<HTMLDivElement>;
+  handle: Ref<ComposerEditorHandle>;
+  /** The element the words are in, which marks are found in by where they are drawn. */
+  rootRef?: Ref<HTMLDivElement>;
+}
+
+/** The composer's handle and its editable state, which belong to the editor rather than to any one concern. */
+function EditorControls({ handle, disabled }: Pick<ComposerEditorProps, "handle" | "disabled">) {
+  const editor = useEditor();
+  useEffect(() => editor.setEditable(!disabled), [editor, disabled]);
+  useImperativeHandle(
+    handle,
+    () => ({
+      write: (text, caret) => {
+        editor.update(() => $writeDraft(text, caret), { discrete: true, tag: HISTORY_PUSH_TAG });
+        editor.getRootElement()?.focus({ preventScroll: true });
+      },
+    }),
+    [editor],
+  );
+  return null;
+}
+
+/**
+ * The message box every composer writes in: plain words with each skill, connector, member and picked file as a mark
+ * of its own. Each concern is one plugin: the message in and out (Draft), marks (Marks), keys (Keyboard), the clipboard
+ * and drops (Clipboard), the ready signal (Ready) and focus on mount (Focus); plain text editing and undo come with the
+ * editor itself.
+ */
+export function ComposerEditor(props: ComposerEditorProps) {
+  return (
+    <EditorProvider namespace="composer" nodes={MARK_NODES}>
+      <div className="composer-input-shell">
+        <EditorBox
+          ref={props.rootRef}
+          aria-label="Message"
+          aria-multiline
+          aria-autocomplete="list"
+          aria-controls={props.completion["aria-controls"]}
+          aria-activedescendant={props.completion["aria-activedescendant"]}
+          aria-placeholder={props.placeholder}
+          spellCheck
+          onFocus={props.onFocus}
+          onBlur={props.onBlur}
+          onPointerMove={props.onPointerMove}
+          onPointerLeave={props.onPointerLeave}
+          className="composer-input min-w-0 outline-none text-ink"
+        />
+        <EditorPlaceholder>
+          <span className="composer-placeholder">{props.placeholder}</span>
+        </EditorPlaceholder>
+      </div>
+      {/* Marks registers how it reads the words before Draft writes the first message in. */}
+      <MarksPlugin sources={props.sources} />
+      <DraftPlugin value={props.value} onChange={props.onChange} />
+      <KeyboardPlugin onKeyDown={props.onKeyDown} />
+      <ClipboardPlugin onFiles={props.onFiles} />
+      {props.onReady ? <ReadyPlugin onReady={props.onReady} /> : null}
+      <FocusPlugin autoFocus={Boolean(props.autoFocus)} />
+      <EditorControls handle={props.handle} disabled={props.disabled} />
+    </EditorProvider>
+  );
+}

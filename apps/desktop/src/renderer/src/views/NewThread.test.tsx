@@ -82,6 +82,7 @@ const offeredAccounts = () =>
 
 import type { PickerAccounts } from "../components/ModelPickerAccounts";
 import { NewThread } from "./NewThread";
+import { messageOf, type } from "../components/composer-editor/testing";
 
 const makeProject = (id: string): Project => ({
   id,
@@ -171,8 +172,8 @@ describe("NewThread", () => {
   it("starts a recovered draft from the keyboard and opens the accepted thread", async () => {
     saveModelDraft("p1", "Recovered request");
     render(<NewThread projectId="p1" />);
-    const message = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" });
-    expect(message.value).toBe("Recovered request");
+    const message = screen.getByRole("textbox", { name: "Message" });
+    expect(messageOf(message)).toBe("Recovered request");
     fireEvent.keyDown(message, { key: "Enter", code: "Enter" });
     await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ projectId: "p1", agent: "codex", model: "codex-model", prompt: "Recovered request" })));
     await waitFor(() => expect(useRouter.getState().route).toEqual({ view: "thread", threadId: "thread-1" }));
@@ -183,10 +184,10 @@ describe("NewThread", () => {
     saveModelDraft("p1", "First project");
     saveModelDraft("p2", "Second project");
     const view = render(<NewThread projectId="p1" />);
-    expect(screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" }).value).toBe("First project");
+    expect(messageOf(screen.getByRole("textbox", { name: "Message" }))).toBe("First project");
     expect(view.container.querySelector(".composer-branch")?.textContent).toBe("prod");
     view.rerender(<NewThread projectId="p2" />);
-    expect(screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" }).value).toBe("Second project");
+    expect(messageOf(screen.getByRole("textbox", { name: "Message" }))).toBe("Second project");
     expect(view.container.querySelector(".composer-branch")?.textContent).toBe("release");
     expect(readNewThreadDraft("p1").prompt).toBe("First project");
   });
@@ -200,8 +201,8 @@ describe("NewThread", () => {
     expect(screen.getByRole("heading").textContent).toBe("What should we work on in p1?");
     fireEvent.click(await screen.findByRole("button", { name: "p2" }));
     await screen.findByRole("button", { name: "Project: p2" });
-    const message = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" });
-    expect(message.value).toBe("Second project");
+    const message = screen.getByRole("textbox", { name: "Message" });
+    expect(messageOf(message)).toBe("Second project");
     expect(useLayout.getState().workspace).toBe("p2");
     fireEvent.keyDown(message, { key: "Enter", code: "Enter" });
     await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ projectId: "p2", prompt: "Second project" })));
@@ -304,8 +305,8 @@ describe("NewThread", () => {
     saveModelDraft("p1", "Retain this request");
     models = [];
     render(<NewThread projectId="p1" />);
-    const message = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" });
-    expect(message.value).toBe("Retain this request");
+    const message = screen.getByRole("textbox", { name: "Message" });
+    expect(messageOf(message)).toBe("Retain this request");
     expect(screen.getByRole("status").textContent).toContain("selected model is unavailable");
     fireEvent.keyDown(message, { key: "Enter", code: "Enter" });
     expect(start).not.toHaveBeenCalled();
@@ -365,7 +366,7 @@ it.each([
   settings = { ...settings, defaultHarness };
   if (onboarding) localStorage.setItem("openorc.onboarding", JSON.stringify({ version: 1, step: "done", completedAt: 1, selectedHarnesses: ["codex", "claude"], defaultHarness: onboarding }));
   render(<NewThread projectId="p1" />);
-  fireEvent.change(screen.getByRole("textbox", { name: "Message" }), { target: { value: "Fix the build" } });
+  type(screen.getByRole("textbox", { name: "Message" }), "Fix the build");
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
   await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ agent, prompt: "Fix the build" })));
 });
@@ -409,7 +410,7 @@ it("keeps the message when the person calls a waiting cloud start off", async ()
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
   fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
   await waitFor(() => expect(screen.queryByText("Claude account “Work” has no sign-in for the cloud.")).toBeNull());
-  expect(screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" }).value).toBe("Run this in the cloud");
+  expect(messageOf(screen.getByRole("textbox", { name: "Message" }))).toBe("Run this in the cloud");
   expect(screen.queryByRole("alert")).toBeNull();
   expect(start).not.toHaveBeenCalled();
 });

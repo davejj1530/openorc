@@ -6,6 +6,7 @@ import { Composer, type ComposerProps } from "./Composer";
 import { readDraft, writeDraft } from "../lib/drafts";
 import { core } from "../lib/rpc";
 import { isPreviewCovered } from "../lib/browser-preview";
+import { act$, caretOf, messageOf, placeCaret, press, type } from "./composer-editor/testing";
 
 afterEach(cleanup);
 
@@ -55,17 +56,12 @@ describe("slash suggestions", () => {
     { name: "compact", hint: "Summarize", run: vi.fn() },
     { name: "code-review", hint: "Review code", insert: true, prefix: "/" },
   ];
-  const message = () => screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" });
-  const selectAt = (caret: number) => {
-    const input = message();
-    input.focus();
-    input.setSelectionRange(caret, caret);
-    fireEvent.select(input);
-  };
+  const message = () => screen.getByRole("textbox", { name: "Message" });
+  const selectAt = (caret: number) => placeCaret(message(), caret);
 
   it.each(["please\n/", " /"])("offers inline skills for %j", (value) => {
     mount({ commands, value: "" });
-    fireEvent.change(message(), { target: { value, selectionStart: value.length } });
+    type(message(), value);
     expect(screen.getByRole("option", { name: "/code-review Review code" })).toBeTruthy();
     expect(screen.queryByRole("option", { name: "/compact Summarize" })).toBeNull();
   });
@@ -73,11 +69,11 @@ describe("slash suggestions", () => {
   it("asks for the list again once as each command word starts, even with no skills to offer yet", () => {
     const wanted = vi.fn();
     mount({ commands: [], onCommandsWanted: wanted, value: "" });
-    fireEvent.change(message(), { target: { value: "/", selectionStart: 1 } });
-    fireEvent.change(message(), { target: { value: "/co", selectionStart: 3 } });
+    type(message(), "/", 1);
+    type(message(), "/co", 3);
     expect(wanted).toHaveBeenCalledTimes(1);
-    fireEvent.change(message(), { target: { value: "/co and", selectionStart: 7 } });
-    fireEvent.change(message(), { target: { value: "/co and $", selectionStart: 9 } });
+    type(message(), "/co and", 7);
+    type(message(), "/co and $", 9);
     expect(wanted).toHaveBeenCalledTimes(2);
   });
 
@@ -98,7 +94,7 @@ describe("slash suggestions", () => {
         <Changing />
       </QueryClientProvider>,
     );
-    fireEvent.change(message(), { target: { value: "/", selectionStart: 1 } });
+    type(message(), "/", 1);
     fireEvent.click(screen.getByText("Read ended"));
     fireEvent.click(screen.getByText("Read ended"));
     expect(wanted).toHaveBeenCalledTimes(1);
@@ -107,35 +103,35 @@ describe("slash suggestions", () => {
   it("says the skills could not be loaded when their prefix starts a word, and still sends on Enter", async () => {
     const submitted = vi.fn(async () => {});
     mount({ commands: [], commandsNotice: { prefix: "/", text: "Couldn’t load skills", reason: "repo is missing." }, onSubmit: submitted, value: "" });
-    fireEvent.change(message(), { target: { value: "costs $5", selectionStart: 8 } });
+    type(message(), "costs $5", 8);
     expect(screen.queryByRole("status")).toBeNull();
-    fireEvent.change(message(), { target: { value: "/review", selectionStart: 7 } });
+    type(message(), "/review", 7);
     expect(screen.getByRole("status").textContent).toBe("Couldn’t load skills");
     expect(screen.getByRole("status").getAttribute("data-tip")).toBe("repo is missing.");
-    fireEvent.keyDown(message(), { key: "Enter" });
+    press(message(), { key: "Enter" });
     await waitFor(() => expect(submitted).toHaveBeenCalledWith("/review", [], false));
   });
 
   it("keeps the thread's own commands beside the notice", () => {
     mount({ commands: [{ name: "compact", hint: "Summarize", run: vi.fn() }], commandsNotice: { prefix: "/", text: "Couldn’t load skills", reason: "repo is missing." }, value: "" });
-    fireEvent.change(message(), { target: { value: "/", selectionStart: 1 } });
+    type(message(), "/", 1);
     expect(screen.getByRole("option", { name: "/compact Summarize" })).toBeTruthy();
     expect(screen.getByRole("status").textContent).toBe("Couldn’t load skills");
-    fireEvent.keyDown(message(), { key: "Escape" });
+    press(message(), { key: "Escape" });
     expect(screen.queryByRole("status")).toBeNull();
   });
 
   it("tells a screen reader which list it controls and which row the arrows chose, with focus kept in the message", () => {
     mount({ commands, value: "" });
     expect(message().getAttribute("aria-activedescendant")).toBeNull();
-    fireEvent.change(message(), { target: { value: "/", selectionStart: 1 } });
+    type(message(), "/", 1);
     const [first, second] = screen.getAllByRole("option");
     expect(message().getAttribute("aria-controls")).toBe(screen.getByRole("listbox").id);
     expect(message().getAttribute("aria-activedescendant")).toBe(first!.id);
-    fireEvent.keyDown(message(), { key: "ArrowDown" });
+    press(message(), { key: "ArrowDown" });
     expect(message().getAttribute("aria-activedescendant")).toBe(second!.id);
     expect(second!.getAttribute("aria-selected")).toBe("true");
-    fireEvent.keyDown(message(), { key: "Escape" });
+    press(message(), { key: "Escape" });
     expect(message().getAttribute("aria-activedescendant")).toBeNull();
     expect(message().getAttribute("aria-controls")).toBeNull();
   });
@@ -143,15 +139,15 @@ describe("slash suggestions", () => {
   it("offers every skill rather than stopping at a page, matching names in any case", () => {
     const many: ComposerProps["commands"] = [...Array.from({ length: 30 }, (_, index) => `skill-${index}`), "COMMAND_CHEATSHEET"].map((name) => ({ name, hint: "A skill", insert: true, prefix: "/" }));
     mount({ commands: many, value: "" });
-    fireEvent.change(message(), { target: { value: "/", selectionStart: 1 } });
+    type(message(), "/", 1);
     expect(screen.getAllByRole("option")).toHaveLength(31);
-    fireEvent.change(message(), { target: { value: "/command", selectionStart: 8 } });
+    type(message(), "/command", 8);
     expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual(["/COMMAND_CHEATSHEETA skill"]);
   });
 
   it("selects a row when the pointer moves over it, not when a row scrolls under a still pointer", () => {
     mount({ commands, value: "" });
-    fireEvent.change(message(), { target: { value: "/", selectionStart: 1 } });
+    type(message(), "/", 1);
     const [first, second] = screen.getAllByRole("option");
     fireEvent.mouseEnter(second!);
     expect(first?.getAttribute("aria-selected")).toBe("true");
@@ -159,9 +155,9 @@ describe("slash suggestions", () => {
     expect(second?.getAttribute("aria-selected")).toBe("true");
   });
 
-  it("keeps the textarea focused when the list itself is pressed, so its scrollbar can be dragged", () => {
+  it("keeps the message focused when the list itself is pressed, so its scrollbar can be dragged", () => {
     mount({ commands, value: "" });
-    fireEvent.change(message(), { target: { value: "/", selectionStart: 1 } });
+    type(message(), "/", 1);
     expect(fireEvent.mouseDown(screen.getByRole("listbox"))).toBe(false);
     fireEvent.mouseUp(screen.getByRole("listbox"));
   });
@@ -173,10 +169,10 @@ describe("slash suggestions", () => {
     try {
       const many: ComposerProps["commands"] = Array.from({ length: 30 }, (_, index) => ({ name: `skill-${index}`, hint: "A skill", insert: true, prefix: "/" }));
       mount({ commands: many, value: "" });
-      fireEvent.change(message(), { target: { value: "/", selectionStart: 1 } });
+      type(message(), "/", 1);
       // The pointer scrolls the list; the first row stays selected, so only the narrower list can bring it back.
       scrolled.mockClear();
-      fireEvent.change(message(), { target: { value: "/skill-2", selectionStart: 8 } });
+      type(message(), "/skill-2", 8);
       const [first] = screen.getAllByRole("option");
       expect(first?.getAttribute("aria-selected")).toBe("true");
       expect(scrolled.mock.contexts).toContain(first);
@@ -194,10 +190,10 @@ describe("slash suggestions", () => {
       mount({ commands: [skill("code-review:code-review"), skill("review-strict"), skill("code-review", ["review"])], value: "/code-review", onSubmit });
       selectAt("/code-review".length);
       expect(offered()).toEqual(["/code-review", "/code-review:code-review"]);
-      fireEvent.change(message(), { target: { value: "/review", selectionStart: 7 } });
+      type(message(), "/review", 7);
       expect(offered()?.[0]).toBe("/code-review");
-      fireEvent.change(message(), { target: { value: "/code-review", selectionStart: 12 } });
-      fireEvent.keyDown(message(), { key: "Enter" });
+      type(message(), "/code-review", 12);
+      press(message(), { key: "Enter" });
       await waitFor(() => expect(onSubmit).toHaveBeenCalledWith("/code-review", [], false));
     });
 
@@ -211,7 +207,7 @@ describe("slash suggestions", () => {
       const onSubmit = vi.fn(async () => {});
       mount({ commands: [skill("test-all")], value: "see /test", onSubmit });
       selectAt("see /test".length);
-      fireEvent.keyDown(message(), { key: "Enter" });
+      press(message(), { key: "Enter" });
       await waitFor(() => expect(onSubmit).toHaveBeenCalledWith("see /test", [], false));
     });
 
@@ -219,17 +215,17 @@ describe("slash suggestions", () => {
       const onSubmit = vi.fn(async () => {});
       mount({ commands: [skill("test-all")], value: "see /test", onSubmit });
       selectAt("see /test".length);
-      fireEvent.keyDown(message(), { key: "ArrowDown" });
-      fireEvent.keyDown(message(), { key: "Enter" });
-      expect(message().value).toBe("see /test-all ");
+      press(message(), { key: "ArrowDown" });
+      press(message(), { key: "Enter" });
+      expect(messageOf(message())).toBe("see /test-all ");
       expect(onSubmit).not.toHaveBeenCalled();
     });
 
     it("closes the list on Esc and keeps what was typed", () => {
       mount({ commands: [skill("test-all")], value: "look at /te" });
       selectAt("look at /te".length);
-      fireEvent.keyDown(message(), { key: "Escape" });
-      expect(message().value).toBe("look at /te");
+      press(message(), { key: "Escape" });
+      expect(messageOf(message())).toBe("look at /te");
       expect(screen.queryByRole("listbox")).toBeNull();
     });
 
@@ -237,19 +233,19 @@ describe("slash suggestions", () => {
       const run = vi.fn();
       mount({ commands: [{ name: "compact", hint: "Summarize", run }], value: "/comp keep this long draft" });
       selectAt(5);
-      fireEvent.keyDown(message(), { key: "Enter" });
+      press(message(), { key: "Enter" });
       expect(run).toHaveBeenCalledOnce();
-      expect(message().value).toBe("keep this long draft");
+      expect(messageOf(message())).toBe("keep this long draft");
     });
 
     it("leaves Shift+Enter and Cmd+Enter their own meaning while the list is open", async () => {
       const onSubmit = vi.fn(async () => {});
       mount({ commands: [skill("test-all")], value: "/te", onSubmit });
       selectAt(3);
-      expect(fireEvent.keyDown(message(), { key: "Enter", shiftKey: true })).toBe(true);
-      expect(message().value).toBe("/te");
+      press(message(), { key: "Enter", shiftKey: true });
+      expect(messageOf(message())).toBe("/te\n");
       expect(onSubmit).not.toHaveBeenCalled();
-      fireEvent.keyDown(message(), { key: "Enter", metaKey: true });
+      press(message(), { key: "Enter", metaKey: true });
       await waitFor(() => expect(onSubmit).toHaveBeenCalledWith("/te", [], true));
     });
   });
@@ -268,18 +264,17 @@ describe("slash suggestions", () => {
 
   it.each(["mouse", "Tab"])("inserts an inline skill using %s and preserves text, highlight and caret", async (method) => {
     const onSubmit = vi.fn(async () => {});
-    const { container } = mount({ commands, value: "please /co afterward", onSubmit });
+    mount({ commands, value: "please /co afterward", onSubmit });
     selectAt("please /co".length);
     const option = screen.getByRole("option", { name: "/code-review Review code" });
     if (method === "mouse") {
       fireEvent.mouseDown(option);
       fireEvent.mouseUp(message());
-    } else fireEvent.keyDown(message(), { key: method });
-    expect(message().value).toBe("please /code-review afterward");
-    expect(container.querySelector(".composer-input-mirror mark")?.textContent).toBe("/code-review");
+    } else press(message(), { key: method });
+    expect(messageOf(message())).toBe("please /code-review afterward");
+    expect(message().querySelector("mark")?.textContent).toBe("/code-review");
     await waitFor(() => {
-      expect(message().selectionStart).toBe("please /code-review ".length);
-      expect(message().selectionEnd).toBe(message().selectionStart);
+      expect(caretOf(message())).toBe("please /code-review ".length);
       expect(document.activeElement).toBe(message());
     });
     expect(onSubmit).not.toHaveBeenCalled();
@@ -289,13 +284,13 @@ describe("slash suggestions", () => {
     const run = vi.fn();
     mount({ commands: [{ name: "compact", hint: "Summarize", run }], value: "/comp" });
     selectAt(5);
-    fireEvent.keyDown(message(), { key: "Enter" });
+    press(message(), { key: "Enter" });
     expect(run).toHaveBeenCalledOnce();
-    expect(message().value).toBe("");
+    expect(messageOf(message())).toBe("");
   });
 
   it("inserts a Codex skill with its dollar prefix without offering slash actions", () => {
-    const { container } = mount({
+    mount({
       commands: [
         { name: "compact", hint: "Summarize", run: vi.fn() },
         { name: "code-review", hint: "Review code", insert: true, prefix: "$" },
@@ -304,9 +299,9 @@ describe("slash suggestions", () => {
     });
     selectAt("Please $co".length);
     expect(screen.queryByRole("option", { name: "/compact Summarize" })).toBeNull();
-    fireEvent.keyDown(message(), { key: "Tab" });
-    expect(message().value).toBe("Please $code-review ");
-    expect(container.querySelector(".composer-input-mirror mark")?.textContent).toBe("$code-review");
+    press(message(), { key: "Tab" });
+    expect(messageOf(message())).toBe("Please $code-review ");
+    expect(message().querySelector("mark")?.textContent).toBe("$code-review");
   });
 
   it.each([
@@ -316,20 +311,20 @@ describe("slash suggestions", () => {
     ["new-thread", "mouse"],
   ] as const)("offers Codex skills from / in the %s composer and selects with %s", async (presentation, method) => {
     const onSubmit = vi.fn(async () => {});
-    const { container } = mount({
+    mount({
       commands: [{ name: "code-review", hint: "Review code", insert: true, prefix: "$" }],
       presentation,
       value: "",
       onSubmit,
     });
-    fireEvent.change(message(), { target: { value: "/", selectionStart: 1 } });
+    type(message(), "/", 1);
     expect(screen.getByRole("option", { name: "$code-review Review code" })).toBeTruthy();
-    fireEvent.change(message(), { target: { value: "Please /co afterward", selectionStart: "Please /co".length } });
+    type(message(), "Please /co afterward", "Please /co".length);
     if (method === "mouse") fireEvent.mouseDown(screen.getByRole("option", { name: "$code-review Review code" }));
-    else fireEvent.keyDown(message(), { key: method });
-    expect(message().value).toBe("Please $code-review afterward");
-    expect(container.querySelector(".composer-input-mirror mark")?.textContent).toBe("$code-review");
-    await waitFor(() => expect(message().selectionStart).toBe("Please $code-review ".length));
+    else press(message(), { key: method });
+    expect(messageOf(message())).toBe("Please $code-review afterward");
+    expect(message().querySelector("mark")?.textContent).toBe("$code-review");
+    await waitFor(() => expect(caretOf(message())).toBe("Please $code-review ".length));
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
@@ -342,14 +337,14 @@ describe("slash suggestions", () => {
   it("dismisses suggestions when focus leaves the composer and releases the Preview", async () => {
     mount({ commands, value: "" });
     act(() => message().focus());
-    fireEvent.change(message(), { target: { value: "/co", selectionStart: 3 } });
+    type(message(), "/co", 3);
     expect(screen.getByRole("listbox", { name: "Commands" })).toBeTruthy();
     expect(isPreviewCovered()).toBe(true);
     const mode = screen.getByRole("button", { name: /^Mode:/ });
     act(() => mode.focus());
     await waitFor(() => expect(screen.queryByRole("listbox", { name: "Commands" })).toBeNull());
     expect(isPreviewCovered()).toBe(false);
-    expect(message().value).toBe("/co");
+    expect(messageOf(message())).toBe("/co");
     act(() => message().focus());
     expect(screen.getByRole("listbox", { name: "Commands" })).toBeTruthy();
   });
@@ -365,11 +360,11 @@ describe("send now", () => {
     expect(screen.queryByRole("button", { name: "Queue" })).toBeNull();
     fireEvent.click(stop);
     expect(onStop).toHaveBeenCalledOnce();
-    fireEvent.change(screen.getByRole("textbox", { name: "Message" }), { target: { value: "A correction" } });
+    type(screen.getByRole("textbox", { name: "Message" }), "A correction");
     expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Queue" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Stop" }).classList.contains("composer-icon-button")).toBe(true);
-    fireEvent.change(screen.getByRole("textbox", { name: "Message" }), { target: { value: "  \n " } });
+    type(screen.getByRole("textbox", { name: "Message" }), "  \n ");
     expect(screen.getByRole("button", { name: "Stop" }).classList.contains("composer-send")).toBe(true);
   });
 
@@ -422,7 +417,8 @@ describe("pending sends across navigation", () => {
     const props = { draftKey: "pending-import-send", onSubmit };
     try {
       mount(props);
-      fireEvent.paste(screen.getByRole("textbox", { name: "Message" }), { clipboardData: { files: [new File(["notes"], "notes.txt", { type: "text/plain" })] } });
+      const field = screen.getByRole("textbox", { name: "Message" });
+      act$(field, () => fireEvent.paste(field, { clipboardData: { files: [new File(["notes"], "notes.txt", { type: "text/plain" })] } }));
       await waitFor(() => expect(save).toHaveBeenCalledOnce());
       cleanup();
       mount(props);
@@ -454,14 +450,14 @@ describe("pending sends across navigation", () => {
       cleanup();
       mount(props);
       expect(screen.getByRole("button", { name: "Send" })).toHaveProperty("disabled", true);
-      expect(screen.getByRole("textbox", { name: "Message" })).toHaveProperty("disabled", true);
+      expect(screen.getByRole("textbox", { name: "Message" }).getAttribute("aria-disabled")).toBe("true");
       expect(screen.getByText("Sending…")).toBeTruthy();
-      fireEvent.keyDown(screen.getByRole("textbox", { name: "Message" }), { key: "Enter" });
+      press(screen.getByRole("textbox", { name: "Message" }), { key: "Enter" });
       fireEvent.click(screen.getByRole("button", { name: "Queue" }));
     }
     expect(onSubmit).toHaveBeenCalledOnce();
     await act(async () => accept());
-    expect(screen.getByRole("textbox", { name: "Message" })).toHaveProperty("value", "");
+    expect(messageOf(screen.getByRole("textbox", { name: "Message" }))).toBe("");
     expect(screen.queryByText("Sending…")).toBeNull();
   });
 
@@ -524,10 +520,10 @@ describe("pending sends across navigation", () => {
     await act(async () => reject(new Error("Provider rejected this input")));
     mount(props);
     expect(screen.getByRole("alert").textContent).toContain("Provider rejected this input");
-    expect(screen.getByRole("textbox", { name: "Message" })).toHaveProperty("value", "say something");
+    expect(messageOf(screen.getByRole("textbox", { name: "Message" }))).toBe("say something");
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(2));
-    await waitFor(() => expect(screen.getByRole("textbox", { name: "Message" })).toHaveProperty("value", ""));
+    await waitFor(() => expect(messageOf(screen.getByRole("textbox", { name: "Message" }))).toBe(""));
   });
 });
 
@@ -555,7 +551,7 @@ describe("Stop delivery", () => {
       expect(interrupt).toHaveBeenCalledTimes(1);
       await act(async () => reject(new Error("Provider refused cancellation")));
       await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Provider refused cancellation"));
-      expect(screen.getByRole("textbox", { name: "Message" })).toHaveProperty("value", value);
+      expect(messageOf(screen.getByRole("textbox", { name: "Message" }))).toBe(value);
       expect(screen.getByRole("button", { name: "Stop" })).toHaveProperty("disabled", false);
       fireEvent.click(screen.getByRole("button", { name: "Stop" }));
       await waitFor(() => expect(interrupt).toHaveBeenCalledTimes(2));
@@ -567,7 +563,7 @@ describe("Stop delivery", () => {
 });
 
 describe("file mentions", () => {
-  const message = () => screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" });
+  const message = () => screen.getByRole("textbox", { name: "Message" });
 
   it("searches the conversation's own folder, and nowhere without one", async () => {
     const searched: unknown[] = [];
@@ -579,12 +575,12 @@ describe("file mentions", () => {
     });
     try {
       mount({ value: "", fileSearch: { kind: "thread", id: "worktree-thread" } });
-      fireEvent.change(message(), { target: { value: "@app", selectionStart: 4 } });
+      type(message(), "@app", 4);
       expect(await screen.findByRole("option", { name: "src/app.ts" })).toBeTruthy();
       expect(searched).toEqual([{ scope: { kind: "thread", id: "worktree-thread" }, query: "app", limit: 8 }]);
       cleanup();
       mount({ value: "" });
-      fireEvent.change(message(), { target: { value: "@app", selectionStart: 4 } });
+      type(message(), "@app", 4);
       expect(screen.queryByRole("option", { name: "src/app.ts" })).toBeNull();
       expect(searched).toHaveLength(1);
     } finally {
@@ -639,30 +635,30 @@ describe("mode pill", () => {
 
 describe("connector mentions", () => {
   const connectors: ComposerProps["connectors"] = [{ name: "paper", title: "Paper", logo: null }];
-  const message = () => screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" });
+  const message = () => screen.getByRole("textbox", { name: "Message" });
   const typeAt = (text: string) => {
-    fireEvent.change(message(), { target: { value: text, selectionStart: text.length, selectionEnd: text.length } });
+    type(message(), text, text.length);
     fireEvent.select(message());
   };
 
   it("offers a connector for an @ word and Enter picks it, even at the end of the message", () => {
     const onSubmit = vi.fn(async () => {});
     const onConnectorsWanted = vi.fn();
-    const { container } = mount({ value: "", connectors, onConnectorsWanted, onSubmit });
+    mount({ value: "", connectors, onConnectorsWanted, onSubmit });
     typeAt("do you see @pa");
     expect(onConnectorsWanted).toHaveBeenCalled();
     expect(screen.getByRole("option", { name: "@paper Paper" })).toBeTruthy();
-    fireEvent.keyDown(message(), { key: "Enter" });
+    press(message(), { key: "Enter" });
     expect(onSubmit).not.toHaveBeenCalled();
-    expect(message().value).toBe("do you see @paper ");
-    const mark = container.querySelector(".composer-input-mirror mark.connector-token");
+    expect(messageOf(message())).toBe("do you see @paper ");
+    const mark = message().querySelector("mark.connector-token");
     expect(mark?.textContent).toBe("@paper");
     expect(mark?.querySelector(".connector-token-at")?.getAttribute("data-letter")).toBe("P");
   });
 
   it("leaves an @ word that names no connector unmarked", () => {
-    const { container } = mount({ value: "mail me@paper.com or @papers", connectors });
-    expect(container.querySelector(".composer-input-mirror mark.connector-token")).toBeNull();
+    mount({ value: "mail me@paper.com or @papers", connectors });
+    expect(message().querySelector("mark.connector-token")).toBeNull();
   });
 
   it("lists the connectors the agent goes without in this mode, dimmed under why, and picking one leaves the message", () => {
@@ -672,15 +668,15 @@ describe("connector mentions", () => {
     expect([row.getAttribute("aria-disabled"), row.dataset.tip]).toEqual(["true", "Claude has connectors in Autonomous mode."]);
     expect(document.querySelector(".composer-suggestion-group")?.textContent).toBe("Claude has connectors in Autonomous mode.");
     fireEvent.mouseDown(row);
-    expect(message().value).toBe("ask @pa");
+    expect(messageOf(message())).toBe("ask @pa");
   });
 
   it("sends on Enter when only dimmed connectors match, since none of them can be picked", async () => {
     const onSubmit = vi.fn(async () => {});
     mount({ value: "", connectors: [], connectorsAside: { connectors, reason: "Claude has connectors in Autonomous mode." }, onSubmit });
     typeAt("ask @pa");
-    fireEvent.keyDown(message(), { key: "ArrowDown" });
-    fireEvent.keyDown(message(), { key: "Enter" });
+    press(message(), { key: "ArrowDown" });
+    press(message(), { key: "Enter" });
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
   });
 

@@ -333,7 +333,7 @@ html[data-transparent-shell="true"] .app-shell :is(.app-topbar, .browser-toolbar
 
 /* Text entry uses a change of surface and the caret, without a focus ring. Fields from ui.tsx
    already rest on a fill and deepen it to --surface-3 themselves. */
-.app-shell :is(input:not([type="checkbox"]):not([type="range"]):not([type="color"]), textarea:not(.composer-input)):where(:not(.native-field)):focus {
+.app-shell :is(input:not([type="checkbox"]):not([type="range"]):not([type="color"]), textarea):where(:not(.native-field)):focus {
   outline: none;
   box-shadow: none;
   background-color: var(--surface-2);

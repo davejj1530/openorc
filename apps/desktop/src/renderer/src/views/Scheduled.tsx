@@ -13,7 +13,7 @@ import { useState, type ReactNode } from "react";
 import { ClaudeAccountPicker } from "../components/ClaudeAccountPicker";
 import { Plus } from "../components/icons";
 import { ComposerModelPicker, ModelPicker } from "../components/ModelPicker";
-import { PageFilters, PageSearch } from "../components/PageFilters";
+import { PageFilters } from "../components/PageFilters";
 import { ScopedTitle } from "../components/ScopedTitle";
 import { TopBar } from "../components/TopBar";
 import { Button, Dialog, Empty, Field, Input, Segmented, Select, Textarea } from "../components/ui";
@@ -22,6 +22,7 @@ import { useRpc } from "../lib/client";
 import { focusedProject, useLayout } from "../lib/layout";
 import { useScheduleEditor } from "../lib/use-schedule-editor";
 import { intervalLabel, intervals, ScheduleRow } from "./schedule-row";
+import "./pages.css";
 
 function scheduleSubmitLabel(pending: boolean, existing: boolean): string {
   if (pending) return "Saving…";
@@ -35,32 +36,13 @@ const shelfOptions = [
 
 type ScheduleShelf = (typeof shelfOptions)[number]["value"];
 
-/** The list area: loading, an empty state that fits the tab or search, or the rows. A failed load keeps its rows. */
-function scheduleListBody(input: {
-  loading: boolean;
-  failed: boolean;
-  total: number;
-  shown: Schedule[];
-  shelf: ScheduleShelf;
-  query: string;
-  canCreate: boolean;
-  onNew: () => void;
-  row: (schedule: Schedule) => ReactNode;
-}): ReactNode {
+/** The list area: loading, an empty state that fits the tab, or the rows in one tile. A failed load keeps its rows. */
+function scheduleListBody(input: { loading: boolean; failed: boolean; total: number; shown: Schedule[]; shelf: ScheduleShelf; row: (schedule: Schedule) => ReactNode }): ReactNode {
   if (input.loading) return <p className="px-2 py-3 text-sm text-ink-3">Loading schedules…</p>;
-  if (input.shown.length > 0 || input.failed) return <div className="schedule-list flex-1 min-h-0 overflow-y-auto pb-4">{input.shown.map(input.row)}</div>;
-  if (input.query) return <Empty title="No matching schedules">Try a different name.</Empty>;
+  if (input.shown.length > 0 || input.failed)
+    return <div className="schedule-list flex-1 min-h-0 overflow-y-auto pb-4">{input.shown.length > 0 ? <div className="schedule-tile">{input.shown.map(input.row)}</div> : null}</div>;
   if (input.total > 0) return <Empty title={input.shelf === "active" ? "No active schedules" : "No paused schedules"} />;
-  return (
-    <Empty title="Nothing scheduled">
-      A schedule starts a new thread with a prompt on a timer: a nightly review, a dependency check, a daily summary.
-      <div className="mt-3">
-        <Button onClick={input.onNew} disabled={!input.canCreate}>
-          <Plus size={13} /> New schedule
-        </Button>
-      </div>
-    </Empty>
-  );
+  return <Empty title="No schedules yet" />;
 }
 
 /** Prompts that start a thread on a timer with a saved model. */
@@ -70,9 +52,8 @@ export function Scheduled() {
   const list = useRpc("schedules.list", projectId ? { projectId } : {});
   const [editing, setEditing] = useState<Schedule | "new" | null>(null);
   const [shelf, setShelf] = useState<ScheduleShelf>("active");
-  const [query, setQuery] = useState("");
   const items = (list.data ?? []).filter((schedule) => !schedule.retiredTeam);
-  const shown = items.filter((schedule) => schedule.enabled === (shelf === "active") && schedule.title.toLowerCase().includes(query.toLowerCase()));
+  const shown = items.filter((schedule) => schedule.enabled === (shelf === "active"));
   const canCreate = (projects.data?.length ?? 0) > 0;
   const projectName = (schedule: Schedule) => (projectId ? undefined : projects.data?.find((project) => project.id === schedule.projectId)?.name);
   return (
@@ -86,11 +67,8 @@ export function Scheduled() {
       >
         <ScopedTitle>Schedules</ScopedTitle>
       </TopBar>
-      <div className="page-column">
-        <PageFilters
-          tabs={<Segmented label="Schedule filter" value={shelf} onChange={setShelf} options={shelfOptions} />}
-          end={<PageSearch label="Search schedules" placeholder="Search schedules…" value={query} onChange={setQuery} />}
-        />
+      <div className="page-column list-page schedules-page">
+        <PageFilters tabs={<Segmented label="Schedule filter" value={shelf} onChange={setShelf} options={shelfOptions} />} />
         {list.error || projects.error ? (
           <div className="px-2 pb-3 text-sm text-bad" role="alert">
             {list.error?.message ?? projects.error?.message}{" "}
@@ -111,9 +89,6 @@ export function Scheduled() {
           total: items.length,
           shown,
           shelf,
-          query,
-          canCreate,
-          onNew: () => setEditing("new"),
           row: (schedule) => <ScheduleRow key={schedule.id} schedule={schedule} projectName={projectName(schedule)} onEdit={() => setEditing(schedule)} />,
         })}
       </div>

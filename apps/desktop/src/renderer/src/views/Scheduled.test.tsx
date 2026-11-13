@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { queryClient } from "../lib/client";
 import { useLayout } from "../lib/layout";
 import { core } from "../lib/rpc";
+import { useRouter } from "../lib/router";
 import { Scheduled } from "./Scheduled";
 
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
@@ -80,7 +81,7 @@ afterEach(() => {
   vi.resetAllMocks();
 });
 
-it("keeps active and paused schedules on separate tabs and filters them by name", async () => {
+it("keeps active and paused schedules on separate tabs", async () => {
   schedule = savedSchedule();
   paused = [{ ...savedSchedule(), id: "paused", title: "Nightly docs", enabled: false }];
   render(
@@ -93,12 +94,61 @@ it("keeps active and paused schedules on separate tabs and filters them by name"
   fireEvent.click(screen.getByRole("radio", { name: "Paused" }));
   await screen.findByText("Nightly docs");
   expect(screen.queryByRole("button", { name: /Review/ })).toBeNull();
-  fireEvent.change(screen.getByRole("textbox", { name: "Search schedules" }), { target: { value: "weekly" } });
-  await screen.findByText("No matching schedules");
-  fireEvent.change(screen.getByRole("textbox", { name: "Search schedules" }), { target: { value: "" } });
+  expect(screen.getAllByText("Paused")).toHaveLength(2);
   paused = [];
   await queryClient.invalidateQueries({ queryKey: ["schedules.list", {}] });
   await screen.findByText("No paused schedules");
+});
+
+it("says the last run as a dot and a word, and opens the thread a failed run left", async () => {
+  const failed = {
+    id: "f",
+    state: "failed",
+    trigger: "timer",
+    scheduledFor: null,
+    threadId: "run-thread",
+    executionId: null,
+    reason: "The agent stopped.",
+    createdAt: Date.now() - 3_600_000,
+    finishedAt: null,
+  } as const;
+  schedule = { ...savedSchedule(), lastFire: failed };
+  paused = [{ ...savedSchedule(), id: "quiet", title: "Nightly docs", enabled: true, lastRunAt: Date.now() - 7_200_000 }];
+  render(
+    <QueryClientProvider client={queryClient}>
+      <Scheduled />
+    </QueryClientProvider>,
+  );
+  await screen.findByText("Failed 1h ago");
+  expect(screen.getByText("Ran 2h ago")).toBeTruthy();
+  expect(screen.queryByText("The agent stopped.")).toBeNull();
+  expect(screen.getAllByRole("button", { name: "Open run" })).toHaveLength(1);
+  fireEvent.click(screen.getByRole("button", { name: "Open run" }));
+  expect(useRouter.getState().route).toMatchObject({ view: "thread", threadId: "run-thread" });
+});
+
+it("keeps the reason of a failed run that left no thread under its row", async () => {
+  schedule = {
+    ...savedSchedule(),
+    lastFire: {
+      id: "f",
+      state: "failed",
+      trigger: "timer",
+      scheduledFor: null,
+      threadId: null,
+      executionId: null,
+      reason: "The project folder is gone.",
+      createdAt: Date.now() - 60_000,
+      finishedAt: null,
+    },
+  };
+  render(
+    <QueryClientProvider client={queryClient}>
+      <Scheduled />
+    </QueryClientProvider>,
+  );
+  await screen.findByText("The project folder is gone.");
+  expect(screen.queryByRole("button", { name: "Open run" })).toBeNull();
 });
 
 it("retains an edited schedule when a newer version arrives and reloads only on request", async () => {

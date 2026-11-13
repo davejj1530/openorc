@@ -2,7 +2,7 @@ import { relativeTime, untilTime } from "@openorc/client";
 import { harnessName, type ModelOption, type Schedule } from "@openorc/protocol";
 import { useEffect, useRef, useState } from "react";
 import { ArrowUpRight, CalendarClock, RefreshCw, Trash2, Zap } from "../components/icons";
-import { IconButton, Switch, Tooltip } from "../components/ui";
+import { Button, IconButton, StatusDot, Switch, Tooltip } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { cn } from "../lib/cn";
 import { modelLabel } from "../lib/model-effort-label";
@@ -27,21 +27,19 @@ function scheduleTargetLabel(schedule: Schedule, models: readonly ModelOption[] 
   return models?.find((model) => model.agent === schedule.agent && model.id === schedule.model)?.label ?? schedule.model;
 }
 
-function scheduleFireLabel(fire: Schedule["lastFire"]): string | null {
-  switch (fire?.state) {
-    case "pending":
-      return "Run request pending";
-    case "started":
-      return "Thread started";
-    case "skipped":
-      return "Run skipped";
-    case "cancelled":
-      return "Run cancelled";
-    case "failed":
-      return "Run failed";
-    default:
-      return null;
+/** The last run as a dot and a word, and the thread to open when it failed in one. */
+export function scheduleLastRun(s: Pick<Schedule, "lastFire" | "lastRunAt">, now = Date.now()): { word: string; tone: "ok" | "bad" | "muted"; failedIn: string | null } {
+  const fire = s.lastFire;
+  const ago = (at: number) => relativeTime(at, now);
+  if (fire) {
+    const at = fire.finishedAt ?? fire.createdAt;
+    if (fire.state === "pending") return { word: "Starting", tone: "muted", failedIn: null };
+    if (fire.state === "failed") return { word: `Failed ${ago(at)}`, tone: "bad", failedIn: fire.threadId };
+    if (fire.state === "skipped") return { word: `Skipped ${ago(at)}`, tone: "muted", failedIn: null };
+    if (fire.state === "cancelled") return { word: `Cancelled ${ago(at)}`, tone: "muted", failedIn: null };
+    return { word: `Ran ${ago(at)}`, tone: "ok", failedIn: null };
   }
+  return s.lastRunAt ? { word: `Ran ${ago(s.lastRunAt)}`, tone: "ok", failedIn: null } : { word: "Never run", tone: "muted", failedIn: null };
 }
 
 /** Run now, with a request key saved first so a retry after a crash confirms the same run instead of starting another. */
@@ -88,22 +86,10 @@ function useRunNow(id: string) {
   return { runNow, pending: trigger.isPending, pendingKey, error, setError };
 }
 
-/**
- * When the schedule runs, said in place: the next run while it is on, or that it is paused. Flipping the switch swaps
- * one line for the other.
- */
+/** How often it runs, on which model, and, across projects, in which project. */
 function ScheduleWhen({ schedule: s, projectName }: { schedule: Schedule; projectName?: string | undefined }) {
   const models = useRpc("agents.models", {}, { staleTime: 5 * 60_000 }).data;
-  const details = [scheduleTargetLabel(s, models), projectName, s.lastRunAt ? `last ${relativeTime(s.lastRunAt)}` : "never run"];
-  return (
-    <span className="schedule-when">
-      <span className="motion-swap shrink-0">
-        <span aria-hidden={!s.enabled}>{`${intervalLabel(s.everyMinutes)}, next ${untilTime(s.nextRunAt)}`}</span>
-        <span aria-hidden={s.enabled}>{`${intervalLabel(s.everyMinutes)}, paused`}</span>
-      </span>
-      <span className="truncate">{`· ${details.filter(Boolean).join(" · ")}`}</span>
-    </span>
-  );
+  return <span className="schedule-when truncate">{[intervalLabel(s.everyMinutes), scheduleTargetLabel(s, models), projectName].filter(Boolean).join(" · ")}</span>;
 }
 
 /** Open the last thread, run now (or retry a saved run request) and delete. They show on hover. */
@@ -143,20 +129,19 @@ function ScheduleTools({ threadId, run, busy, retired, onDelete }: { threadId: s
   );
 }
 
-/** What happened to the last run, a run request waiting to be confirmed, and any error, under the row. */
+/** Why the last run failed when it left no thread to open, a run request waiting to be confirmed, and any error, under the row. */
 function ScheduleNotes({ fire, pending, error }: { fire: Schedule["lastFire"]; pending: boolean; error: string | null | undefined }) {
-  const firingLabel = scheduleFireLabel(fire);
+  const failedHere = fire?.state === "failed" && !fire.threadId && fire.reason;
   return (
     <>
-      {firingLabel ? (
-        <p className={cn("schedule-card-note", fire?.state === "failed" && "text-bad")} role="status" data-schedule-firing={fire?.state}>
-          {firingLabel}
-          {fire?.reason ? ` · ${fire.reason}` : ""}
+      {failedHere ? (
+        <p className="schedule-row-note text-bad" role="status" data-schedule-firing="failed">
+          {fire.reason}
         </p>
       ) : null}
-      {pending ? <p className="schedule-card-note">A saved run request is awaiting confirmation. Retry checks that request, including its original settings.</p> : null}
+      {pending ? <p className="schedule-row-note text-ink-3">A saved run request is awaiting confirmation. Retry checks that request, including its original settings.</p> : null}
       {error ? (
-        <p className="schedule-card-note text-bad" role="alert">
+        <p className="schedule-row-note text-bad" role="alert">
           {error}
         </p>
       ) : null}
@@ -164,25 +149,30 @@ function ScheduleNotes({ fire, pending, error }: { fire: Schedule["lastFire"]; p
   );
 }
 
+/**
+ * A schedule's row in the page's one tile: its name and how it runs, then the next run, the last run as a dot and a word,
+ * the move when the last run failed in a thread, and the switch. The tools come on hover.
+ */
 export function ScheduleRow({ schedule: s, projectName, onEdit }: { schedule: Schedule; projectName?: string | undefined; onEdit: () => void }) {
   const update = useRpcMutation("schedules.update");
   const remove = useRpcMutation("schedules.delete");
   const run = useRunNow(s.id);
   const busy = run.pending || update.isPending || remove.isPending;
+  const last = scheduleLastRun(s);
   return (
-    <div data-schedule={s.id} data-plane className="schedule-row schedule-card">
-      <div className="flex items-center gap-3">
-        <button type="button" onClick={onEdit} className="schedule-card-open">
-          <span className="schedule-card-well" aria-hidden="true">
+    <div data-schedule={s.id} className="schedule-row">
+      <div className="schedule-row-line">
+        <button type="button" onClick={onEdit} className="schedule-row-open">
+          <span className="schedule-row-well" aria-hidden="true">
             <CalendarClock size={16} />
           </span>
           <span className="flex min-w-0 flex-col gap-0.5">
-            <span className="schedule-card-name truncate">{s.title}</span>
+            <span className="schedule-row-name truncate">{s.title}</span>
             <ScheduleWhen schedule={s} projectName={projectName} />
           </span>
         </button>
         <ScheduleTools
-          threadId={s.lastFire?.threadId ?? s.lastThreadId}
+          threadId={last.failedIn ? null : (s.lastFire?.threadId ?? s.lastThreadId)}
           run={run}
           busy={busy}
           retired={Boolean(s.retiredTeam)}
@@ -191,6 +181,18 @@ export function ScheduleRow({ schedule: s, projectName, onEdit }: { schedule: Sc
             remove.mutate({ id: s.id });
           }}
         />
+        <span className="schedule-row-next tabular text-ink-3">{s.enabled ? `Next ${untilTime(s.nextRunAt)}` : "Paused"}</span>
+        <span className={cn("schedule-row-last tabular", last.tone === "bad" ? "text-bad" : "text-ink-3")}>
+          <StatusDot tone={last.tone} />
+          {last.word}
+        </span>
+        <span className="schedule-row-move">
+          {last.failedIn ? (
+            <Button size="sm" onClick={() => openThread(last.failedIn!)}>
+              Open run
+            </Button>
+          ) : null}
+        </span>
         <Switch
           aria-label={s.enabled ? "Pause schedule" : "Resume schedule"}
           checked={s.enabled}

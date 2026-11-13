@@ -1,72 +1,99 @@
-/* Schedules: one r16 plane card per schedule on the tile, a filled well for its glyph, the name and
-   when it runs in place, its tools on hover and a switch that turns it on and off. */
+/* Schedules: 860 wide at the shared column's left edge. One tile set into the ground holds every schedule, rows split by
+   hairlines: a well for the glyph, the name and how it runs, then fixed columns for the next run, the last run as a dot
+   and a word, the move, and the switch. Tools arrive on hover. */
+.schedules-page > * {
+  width: 100%;
+  max-width: 860px;
+}
+
 .schedule-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
 }
 
-.schedule-card {
-  container-type: inline-size;
-  padding: 14px;
+.schedule-tile {
   border-radius: var(--radius-xl);
-  background: var(--surface);
+  background: var(--surface-2);
 }
 
-.schedule-card-open {
-  flex: 1;
-  min-width: 0;
+.schedule-row {
+  container-type: inline-size;
+  padding: 12px 14px;
+}
+.schedule-row + .schedule-row {
+  border-top: var(--hairline) solid var(--line);
+}
+
+.schedule-row-line {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.schedule-row-open {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  border-radius: var(--radius-md);
   text-align: left;
-  border-radius: var(--radius-md);
 }
 
-.schedule-card-well {
-  width: 36px;
-  height: 36px;
-  flex-shrink: 0;
+.schedule-row-well {
   display: grid;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
   place-items: center;
-  border-radius: var(--radius-md);
-  background: var(--surface-2);
-  color: var(--ink);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--ink-2);
 }
 
-.schedule-card-name {
+.schedule-row-name {
+  color: var(--ink);
   font-size: var(--text-base);
   line-height: 16px;
   letter-spacing: var(--text-base--letter-spacing);
-  color: var(--ink);
 }
 
 .schedule-when {
-  display: flex;
-  gap: 0.3em;
   min-width: 0;
+  color: var(--ink-3);
   font-size: var(--text-sm);
   line-height: var(--text-sm--line-height);
-  color: var(--ink-4);
-  font-variant-numeric: tabular-nums;
+}
+
+.schedule-row-next,
+.schedule-row-last {
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+  text-align: right;
   white-space: nowrap;
 }
-
-/* The line leaving overlays the one arriving, so the details that follow sit right after the
-   words on show instead of after the longer of the two. */
-.schedule-when > .motion-swap {
-  position: relative;
+.schedule-row-next {
+  width: 104px;
 }
-.schedule-when > .motion-swap > [aria-hidden="true"] {
-  position: absolute;
-  inset: 0 auto auto 0;
+.schedule-row-last {
+  display: inline-flex;
+  width: 128px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+/* Wide enough for Open run; empty on a row whose last run did not fail in a thread. */
+.schedule-row-move {
+  display: flex;
+  width: 84px;
+  flex-shrink: 0;
+  justify-content: flex-end;
 }
 
-.schedule-card-note {
-  margin: 8px 0 0 48px;
+.schedule-row-note {
+  margin: 8px 0 0 44px;
   font-size: var(--text-sm);
   line-height: var(--text-sm--line-height);
-  color: var(--ink-3);
   overflow-wrap: anywhere;
 }
 
@@ -79,11 +106,11 @@
   flex-shrink: 0;
   transition: opacity var(--duration-leave) var(--ease-out);
 }
-.schedule-card:not(:hover, :focus-within) .schedule-tools:not(.schedule-tools-shown) {
+.schedule-row:not(:hover, :focus-within) .schedule-tools:not(.schedule-tools-shown) {
   opacity: 0;
 }
 @media (hover: none) {
-  .schedule-card .schedule-tools {
+  .schedule-row .schedule-tools {
     opacity: 1;
   }
 }

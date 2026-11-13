@@ -18,7 +18,7 @@ import type { Account } from "./account.js";
 import { askNotice, endNotice, noticed } from "./notices.js";
 import * as sends from "./sends.js";
 import { Refused, type Requests, type Session, type SessionChange } from "./session.js";
-import { CLOUD_PROJECT, listRows, projectPairs, resolvedCount, runsNow, starterOf, toAppEvent, toRuns, toSummary } from "./translate.js";
+import { CLOUD_PROJECT, githubRepoOf, listRows, projectPairs, resolvedCount, runsNow, starterOf, toAppEvent, toRuns, toSummary } from "./translate.js";
 import { ROUTES, SOCKET, wireProject, wireThread, wireTopics, type WireEvent, type WireThread } from "./wire.js";
 
 const GONE = "That conversation isn't on OpenOrc Cloud.";
@@ -37,6 +37,8 @@ type HeardProject = z.infer<typeof heardProject>;
 const keptThreads = z.object({
   email: z.string(),
   me: z.string().nullable(),
+  /** The person's personal space, where a new thread on a repository they have in several spaces starts. */
+  personal: z.string().nullable().default(null),
   heardAt: z.number(),
   rows: z.array(heardRow),
   projects: z.array(heardProject),
@@ -68,6 +70,8 @@ const ANSWERS: { [M in RoutedMethod]: Answer<M> | ReturnType<typeof refused> | t
   "events.listForRun": (threads, { runId, afterSeq }) => threads.eventsAfter(runId, afterSeq ?? 0),
   "threads.stopCommand": (threads, { id, commandId }) => threads.stopCommand(id, commandId),
   "threads.update": (threads, { id, patch }) => threads.update(id, patch),
+  // Asked only of a start that chose OpenOrc Cloud.
+  "threads.start": (threads, params) => threads.startThread(params),
   // The composer's sends, the queue, Stop and the answers to asks: sends.ts.
   "runs.start": async (threads, params) => {
     await sends.start(threads.calls, params);
@@ -127,7 +131,6 @@ const ANSWERS: { [M in RoutedMethod]: Answer<M> | ReturnType<typeof refused> | t
   "threads.restorePreview": NO_FILES,
   "cloud.move": STAYS,
 
-  "threads.start": NOT_ASKED,
   "cloud.bringToMac": NOT_ASKED,
   "cloud.keep": NOT_ASKED,
   "cloud.openOnMac": NOT_ASKED,
@@ -287,6 +290,46 @@ export class Threads implements HostedThreads {
     return null;
   }
 
+  /**
+   * threads.start on OpenOrc Cloud: a new thread on the server project with the Mac project's repository, in the
+   * person's personal space when they have it in several, with the prompt as its first message. A first message the
+   * server refuses makes no thread; the start then fails with the words the card above a composer shows.
+   */
+  async startThread(params: RpcParams<"threads.start">): Promise<RpcResults["threads.start"]> {
+    const settings = startSettings(params);
+    if (!isHostedAgent(settings.agent)) throw new Refused(`${harnessShortName(settings.agent)} doesn't run on OpenOrc Cloud.`);
+    if (params.attachments?.length) throw new Refused("Files can't be sent to OpenOrc Cloud yet.");
+    const project = this.#projectFor(params.projectId);
+    if (!project) throw new Refused("Add this project to OpenOrc Cloud in Settings first.");
+    const body = { projectId: project.id, ...(params.title && { title: params.title }), settings, first: { id: crypto.randomUUID(), text: params.prompt }, ready: true };
+    const reply = await this.deps.session.in(project.space).request(ROUTES.start, body);
+    if (!reply.thread) return sends.refuse(this.calls, reply.first?.sent === false ? reply.first.refusal : "", settings);
+    const row = { ...reply.thread, space: project.space };
+    const heard = this.#heard;
+    if (heard && !heard.rows.some((each) => each.id === row.id)) {
+      heard.rows = [row, ...heard.rows];
+      this.deps.kept.save("threads", JSON.stringify(heard));
+      this.#tell();
+    }
+    void this.refresh();
+    return { thread: this.summary(row.id), run: toRuns(row, this.reach)[0] ?? null };
+  }
+
+  /** The server project with a Mac project's repository: the personal space's first, then any other space's. */
+  #projectFor(macId: string): HeardProject | null {
+    const heard = this.#heard;
+    const remote = this.deps.projects().find((project) => project.id === macId)?.remote ?? null;
+    const repo = githubRepoOf(remote);
+    if (!heard || !repo) return null;
+    const matching = heard.projects.filter((project) => project.fullName.toLowerCase() === repo);
+    return matching.find((project) => project.space === heard.personal) ?? matching[0] ?? null;
+  }
+
+  /** The repositories every space of the person's has as projects, owner/name in lower case. */
+  cloudRepos(): ReadonlySet<string> {
+    return new Set((this.#heard?.projects ?? []).map((project) => project.fullName.toLowerCase()));
+  }
+
   /** A row the server just answered for a write, in place of the one heard, in the same space. */
   #hearRow(row: WireThread): void {
     const heard = this.#heard;
@@ -387,7 +430,7 @@ export class Threads implements HostedThreads {
   async #read(): Promise<void> {
     const state = this.deps.session.state;
     if (!state.signedIn) return;
-    let read: Pick<Heard, "me" | "rows" | "projects">;
+    let read: Pick<Heard, "me" | "personal" | "rows" | "projects">;
     try {
       read = await this.#readSpaces();
     } catch (error) {
@@ -397,14 +440,17 @@ export class Threads implements HostedThreads {
     const now = this.deps.session.state;
     if (this.#closed || !now.signedIn || now.email !== state.email) return;
     const before = JSON.stringify([this.#heard?.rows, this.#heard?.projects]);
+    const projectsBefore = JSON.stringify(this.#heard?.projects);
     if (this.#heard?.email === state.email) this.#tellPerson(this.#heard.rows, read.rows);
     this.#heard = { email: state.email, heardAt: this.deps.now(), ...read, here: this.#heard?.email === state.email ? this.#heard.here : {} };
     this.deps.kept.save("threads", JSON.stringify(this.#heard));
     if (JSON.stringify([this.#heard.rows, this.#heard.projects]) !== before) this.#tell();
+    // Settings shows which of this Mac's projects are on OpenOrc Cloud, read off these.
+    if (JSON.stringify(this.#heard.projects) !== projectsBefore) this.deps.push({ type: "invalidate", keys: ["account"] });
   }
 
   /** Every space's threads and projects, each tagged with its space, and the person's own id from their personal space. */
-  async #readSpaces(): Promise<Pick<Heard, "me" | "rows" | "projects">> {
+  async #readSpaces(): Promise<Pick<Heard, "me" | "personal" | "rows" | "projects">> {
     const spaces = await this.deps.session.request(ROUTES.spaces);
     const read = await Promise.all(
       spaces.map(async ({ id }) => {
@@ -413,7 +459,8 @@ export class Threads implements HostedThreads {
         return { rows: threads.threads.map((row) => ({ ...row, space: id })), projects: projects.map((project) => ({ ...project, space: id })) };
       }),
     );
-    return { me: spaces.find((space) => space.personalOf)?.personalOf ?? null, rows: read.flatMap((each) => each.rows), projects: read.flatMap((each) => each.projects) };
+    const personal = spaces.find((space) => space.personalOf);
+    return { me: personal?.personalOf ?? null, personal: personal?.id ?? null, rows: read.flatMap((each) => each.rows), projects: read.flatMap((each) => each.projects) };
   }
 
   /**
@@ -517,3 +564,18 @@ const seenUpTo = (row: WireThread, seen: boolean): number => (seen ? row.head : 
 function defined<T extends Record<string, unknown>>(fields: T): Partial<T> {
   return Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined)) as Partial<T>;
 }
+
+/** The settings a start runs with, as the server names them: its execution target's model, or the fields older callers send. */
+function startSettings(params: RpcParams<"threads.start">): {
+  agent: HostedAgentOrOther;
+  model: string | null;
+  effort: string | null;
+  mode: RpcParams<"threads.start">["mode"];
+  permissionMode: RpcParams<"threads.start">["permissionMode"];
+} {
+  const chosen = params.executionTarget?.kind === "model" ? params.executionTarget.settings : null;
+  const agent = chosen?.agent ?? params.agent ?? "claude";
+  return { agent, model: (chosen ? chosen.model : params.model) ?? null, effort: (chosen ? chosen.effort : params.effort) ?? null, mode: params.mode, permissionMode: params.permissionMode };
+}
+
+type HostedAgentOrOther = NonNullable<RpcParams<"threads.start">["agent"]>;

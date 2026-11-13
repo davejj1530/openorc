@@ -8,6 +8,7 @@ import type { OpenOrcOptions } from "../options.js";
 import type { Logger, Transport } from "../transport.js";
 import type { ProtectedSecretStore } from "./extraction-credentials.js";
 import { mintClaudeToken, type ClaudeSignInLaunch } from "./claude-token-mint.js";
+import { awaitBrowserReturn } from "./browser-return.js";
 import { noticeLine } from "./notice-text.js";
 import { spawnWithPipes, type SpawnTerminal } from "./terminal-process.js";
 
@@ -33,13 +34,17 @@ export interface AccountDeps {
   /** This Mac's Claude accounts, which make the token of a Claude sign-in on OpenOrc Cloud with `claude setup-token`. */
   claude: ClaudeSignInLaunch & { defaultId(): string };
   terminal: SpawnTerminal | undefined;
+  openBrowser: ((url: string) => void) | undefined;
   log: Logger;
 }
 
 /** The account for this core: none on the cloud brain, or with no account server. */
-export function accountFor(options: Pick<OpenOrcOptions, "cloudOnly" | "accountServer" | "accountSecrets" | "terminal">, parts: Omit<AccountDeps, "server" | "secrets" | "terminal">): Hosted | null {
+export function accountFor(
+  options: Pick<OpenOrcOptions, "cloudOnly" | "accountServer" | "accountSecrets" | "terminal" | "openBrowser">,
+  parts: Omit<AccountDeps, "server" | "secrets" | "terminal" | "openBrowser">,
+): Hosted | null {
   if (options.cloudOnly || !options.accountServer) return null;
-  return createAccount({ ...parts, server: options.accountServer, secrets: options.accountSecrets, terminal: options.terminal });
+  return createAccount({ ...parts, server: options.accountServer, secrets: options.accountSecrets, terminal: options.terminal, openBrowser: options.openBrowser });
 }
 
 /** The account for this Mac. Made only for a core given an account server. */
@@ -59,6 +64,7 @@ function createAccount(deps: AccountDeps): Hosted {
       if (deps.notices()) deps.windows.push({ type: "notify", ...notice, body: noticeLine(notice.body, NOTICE_CHARS), id: randomUUID() });
     },
     mintClaudeToken: (id) => mintClaudeToken(deps.claude, deps.terminal ?? spawnWithPipes, id ?? deps.claude.defaultId()),
+    ...(deps.openBrowser && { browser: { awaitReturn: awaitBrowserReturn, open: deps.openBrowser } }),
     now: Date.now,
     log: deps.log,
   });

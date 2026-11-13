@@ -59,6 +59,32 @@ export const SIGN_IN_WAYS: Record<HostedAgent, readonly SignInWay[]> = { claude:
 /** A sign-in under way for an agent, or the last one that failed, with its words. Never a secret. */
 export type SignInWork = { state: "waiting"; way: "token" } | { state: "waiting"; way: "code"; userCode: string; verificationUrl: string; expiresAt: number } | { state: "failed"; error: string };
 
+/**
+ * The person's GitHub as OpenOrc Cloud knows it, for their own space: whether the server has a GitHub app at all, the
+ * GitHub account they linked (their commits and pull requests carry it), the GitHub accounts the app is installed on,
+ * and the repositories those let OpenOrc read, as owner/name.
+ */
+export interface AccountGithub {
+  configured: boolean;
+  login: string | null;
+  installedOn: string[];
+  repositories: string[];
+}
+
+/** A trip through GitHub's pages in the browser, under way, or the last one's words when it did not connect. */
+export type GithubWork = { state: "waiting" } | { state: "failed"; error: string };
+
+/**
+ * Where a project of this Mac stands on OpenOrc Cloud, by its GitHub repository, which is how the two are matched and
+ * never stored. `added`: one of the person's spaces has it as a cloud project. `addable`: GitHub lets OpenOrc read it.
+ * `unreadable`: not yet, so GitHub is connected first.
+ */
+export interface AccountProject {
+  projectId: string;
+  repo: string;
+  cloud: "added" | "addable" | "unreadable";
+}
+
 /** Everything the app knows about the OpenOrc account, in one answer. Signed out is the whole state of an app with no account. */
 export type AccountStatus =
   | {
@@ -86,6 +112,12 @@ export type AccountStatus =
       signIns: AccountSignIn[] | null;
       /** By agent: a sign-in being made, or the last that failed. */
       signingIn: Partial<Record<HostedAgent, SignInWork>>;
+      /** Null until the server first answers. */
+      github: AccountGithub | null;
+      /** Connecting GitHub under way, or the last that failed. */
+      connectingGithub: GithubWork | null;
+      /** This Mac's projects that have a GitHub repository, each with where it stands on OpenOrc Cloud. */
+      projects: AccountProject[];
       error: string | null;
     };
 
@@ -126,6 +158,13 @@ export const accountRpcParams = {
   /** Calls off a token being made or a code being waited on. */
   "account.signIns.cancel": z.object({ agent: Agent }).strict(),
   "account.signIns.remove": z.object({ agent: Agent, provider: Provider.optional() }).strict(),
+  /** Links the person's GitHub account and installs OpenOrc's GitHub app, through as many browser trips as GitHub asks for. */
+  "account.github.connect": z.object({}).strict(),
+  "account.github.cancel": z.object({}).strict(),
+  /** Unlinks the person's GitHub account. What the app reaches on GitHub is changed on GitHub. */
+  "account.github.disconnect": z.object({}).strict(),
+  /** Adds this Mac project's GitHub repository to the person's space as a cloud project. */
+  "account.projects.add": z.object({ projectId: z.string().min(1).max(200) }).strict(),
 };
 
 /** Every call answers the whole status, so a window never reads a stale half. */

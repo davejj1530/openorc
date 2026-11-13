@@ -69,6 +69,9 @@ const pro: AccountStatus = {
   sandbox: null,
   signIns: [{ agent: "claude", provider: "anthropic", label: "Claude Max", ended: false }],
   signingIn: {},
+  github: null,
+  connectingGithub: null,
+  projects: [],
   error: null,
 };
 

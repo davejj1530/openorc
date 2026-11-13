@@ -128,6 +128,25 @@ export type WireProject = z.infer<typeof wireProject>;
 /** What a send answers: the message as it now stands, or a refusal to start a turn, with nothing stored. */
 export const wireSent = z.discriminatedUnion("sent", [z.object({ sent: z.literal(true), message: wireMessage }), z.object({ sent: z.literal(false), refusal: z.string() })]);
 
+/** A new thread with what became of its first message; a first message refused makes no thread. */
+export const wireCreated = z.object({ thread: wireThread.nullable(), first: wireSent.nullable() });
+
+/** The GitHub accounts OpenOrc's GitHub app is installed on for the space, and whether the server has the app at all. */
+export const wireGithub = z.object({ configured: z.boolean(), installations: z.array(z.object({ id: z.string(), accountLogin: z.string() })) });
+/** The GitHub account the person linked. */
+export const wireGithubLink = z.object({ configured: z.boolean(), account: z.object({ login: z.string() }).nullable() });
+/** A repository an installation lets OpenOrc read, which can be made a project. */
+export const wireGithubRepository = z.object({ installationId: z.string(), repoId: z.number(), fullName: z.string() });
+export type WireGithubRepository = z.infer<typeof wireGithubRepository>;
+/** Starting a GitHub step for an app waiting on a loopback port: GitHub's page to go through, or how it went with none. */
+export const wireGithubStart = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("github"), step: z.enum(["link", "install"]), url: z.url(), expiresInMs: z.number() }),
+  z.object({ kind: z.literal("settled"), outcome: z.string() }),
+]);
+export type WireGithubStart = z.infer<typeof wireGithubStart>;
+/** How a GitHub step the app finished went, as a word the server may add to. */
+export const wireGithubOutcome = z.object({ outcome: z.string() });
+
 /** What an answer to an ask answers: taken, or refused because it would start a turn the person cannot start. */
 export const wireAnswered = z.discriminatedUnion("answered", [z.object({ answered: z.literal(true) }), z.object({ answered: z.literal(false), refusal: z.string() })]);
 
@@ -167,6 +186,18 @@ export const ROUTES = {
   finishDevice: route("POST", "/agent-sign-ins/codex/device/finish", wireDeviceFinish),
   spaces: route("GET", "/api/auth/organization/list", z.array(wireSpace)),
   projects: route("GET", "/projects", z.array(wireProject)),
+  /** Makes repositories projects of the session's active space, its personal one unless the person chose another. */
+  addProjects: route("POST", "/projects", z.array(wireProject)),
+  github: route("GET", "/github", wireGithub),
+  githubLink: route("GET", "/github/account", wireGithubLink),
+  githubRepositories: route("GET", "/github/repositories", z.array(wireGithubRepository)),
+  /** Starts installing OpenOrc's GitHub app, or linking the person's account first when the install needs it. */
+  githubStart: route("POST", "/github/install/start", wireGithubStart),
+  githubLinkFinish: route("POST", "/github/link/finish", wireGithubOutcome),
+  githubInstallFinish: route("POST", "/github/install/finish", wireGithubOutcome),
+  githubUnlink: route("DELETE", "/github/account", null),
+  /** A new thread on a project of the space, with its first message. */
+  start: route("POST", "/hosted/threads", wireCreated),
   threads: route("GET", "/hosted/threads", wireThreadList),
   thread: (id: string) => route("GET", `/hosted/threads/${encodeURIComponent(id)}`, wireThreadDetail),
   /** After a seq, before one, or from a turn, at most `limit` events. */

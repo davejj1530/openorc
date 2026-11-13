@@ -225,7 +225,8 @@ export class Session {
   }
 
   #down(held: Held): void {
-    if (held.reach !== "live" || this.#blip) return;
+    // A socket closed with the host says nothing more: the host is gone.
+    if (this.#closed || held.reach !== "live" || this.#blip) return;
     this.#blip = setTimeout(() => {
       this.#blip = null;
       if (this.#held !== held) return;

@@ -85,6 +85,7 @@ const corePromise = OpenOrc.create({
   terminal,
   presence: presence.inUse,
   trash: trash.move,
+  openBrowser: (url) => process.parentPort.postMessage({ type: "open-browser", url }),
   // The embedding model runs in its own thread, so loading it and embedding memories never stall the core.
   embedder: new WorkerEmbedder(() => new Worker(join(import.meta.dirname, "embedder-worker.mjs"), { workerData: { cacheDir: dataDir } })),
   // Prettier formats in its own thread too, so a large file never stalls the core.

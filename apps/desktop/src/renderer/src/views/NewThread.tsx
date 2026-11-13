@@ -27,7 +27,7 @@ import { TopBar } from "../components/TopBar";
 import { Button, TextButton } from "../components/ui";
 import { ClaudeAccountScope } from "../lib/claude-account";
 import { usePermissionSelection, useRpc, useRpcMutation } from "../lib/client";
-import { useNewThreadCloud, type NewThreadCloud } from "../lib/cloud-offered";
+import { useNewThreadCloud, useNewThreadHosted, type NewThreadCloud } from "../lib/cloud-offered";
 import { useCloudWarm } from "../lib/cloud-warm";
 import { usePublishComposerAccount } from "../lib/composer-account";
 import { useComposerChanges } from "../lib/composer-changes";
@@ -180,7 +180,14 @@ function NewThreadProject({
   // skills do: they belong to the project, or the Workspace folder, chosen on this screen.
   const suggestions = useComposerSuggestions(projectScope(projectId, draft.workingDirectory), choice?.agent, executionMode(draft.mode, permission), claudeAccountId);
   const cloud = useNewThreadCloud(target, projectId);
-  const workspaceMode = newThreadWorkspaceMode({ canBranch: !isWorkspace && !git.cannotBranch, canCloud: cloud.can, chosen: draft.workspace, preferred: settings.data?.defaultWorkspaceMode });
+  const hosted = useNewThreadHosted(target, projectId);
+  const workspaceMode = newThreadWorkspaceMode({
+    canBranch: !isWorkspace && !git.cannotBranch,
+    canCloud: cloud.can,
+    canHosted: hosted.can,
+    chosen: draft.workspace,
+    preferred: settings.data?.defaultWorkspaceMode,
+  });
   const signIn = useCloudSignInGate(newCloudTurn(workspaceMode, choice, claudeAccountId, cloud));
   useCloudWarm(workspaceMode === "cloud" && cloud.can ? projectId : null, choice?.agent, draft.prompt);
 
@@ -302,6 +309,7 @@ function NewThreadProject({
                   projectId={projectId}
                   mode={workspaceMode}
                   cloud={cloud}
+                  hosted={hosted}
                   location={location}
                   blocked={branchingReason(git.state, "Worktrees")}
                   disabled={start.isPending}

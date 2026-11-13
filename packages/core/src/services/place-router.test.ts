@@ -132,6 +132,23 @@ describe("OpenOrc Cloud threads in the window's calls", () => {
     await vi.waitFor(async () => expect(await call("account.status", {})).toMatchObject({ plan: { pro: false } }), { timeout: 5_000 });
   });
 
+  it("starts a thread on OpenOrc Cloud when the start asks for it, and never on this Mac, signed in or not", async () => {
+    const opened = await open();
+    const project = macProject(opened);
+    const asked = { projectId: project.id, agent: "codex", mode: "act", permissionMode: "trusted", prompt: "Add a health check", hosted: true } as const;
+    await expect(call("threads.start", asked)).rejects.toThrow("Sign in to OpenOrc to start a thread on OpenOrc Cloud.");
+    stand.addProject(EMAIL, { name: "openorc", fullName: "altalogy/openorc" });
+    stand.setBilling(EMAIL, { pro: true, standing: "live", at: new Date(Date.now() + 86_400_000).toISOString(), monthlyLeftSeconds: 3600, packsLeftSeconds: 0 });
+    stand.setSignIns(EMAIL, [{ agent: "codex" }]);
+    await signIn();
+    await vi.waitFor(async () => expect(await call("account.status", {})).toMatchObject({ projects: [{ projectId: project.id, cloud: "added" }] }), { timeout: 5_000 });
+    const { thread } = await call("threads.start", asked);
+    expect(thread).toMatchObject({ projectId: project.id, agent: "codex", owner: { brain: "hosted" } });
+    expect((await list([project.id])).map((row) => row.title)).toContain("On this Mac");
+    expect(threads.list(opened.db, { projectId: project.id })).toHaveLength(1);
+    await expect(call("threads.get", { id: thread.id })).resolves.toMatchObject({ id: thread.id, owner: { brain: "hosted" } });
+  });
+
   it("answers every call as before, and asks no server, with nobody signed in", async () => {
     const opened = await open();
     const project = macProject(opened);

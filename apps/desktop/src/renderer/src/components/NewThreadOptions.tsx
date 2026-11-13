@@ -4,7 +4,7 @@ import type { ComposerProps } from "./Composer";
 import { ComposerChoice } from "./ComposerChoice";
 import { Cloud, Folder, GitBranch, Laptop } from "./icons";
 import { Button } from "./ui";
-import type { NewThreadCloud } from "../lib/cloud-offered";
+import type { NewThreadCloud, NewThreadHosted } from "../lib/cloud-offered";
 import { useRouter } from "../lib/router";
 
 /** Why Cloud can't be chosen, as the menu says it, and the way to Settings that makes it possible. */
@@ -16,7 +16,16 @@ function cloudBlock(cloud: NewThreadCloud, projectId: string) {
     : { blocked: cloud.blocked, fix: { label: "Open Cloud settings", run: () => settings() } };
 }
 
-const workspaceOptions = (cloud: NewThreadCloud, projectId: string) => [
+/** Why OpenOrc Cloud can't be chosen, and the way to the Settings section, or the project's row, that fixes it. */
+function hostedBlock(hosted: NewThreadHosted) {
+  const action = hosted.blocked?.action;
+  const fix = action
+    ? { label: action.label, run: () => useRouter.getState().navigate({ view: "settings", section: action.section, ...(action.project ? { project: action.project } : {}) }) }
+    : undefined;
+  return { blocked: hosted.blocked?.words ?? null, fix };
+}
+
+const workspaceOptions = (cloud: NewThreadCloud, hosted: NewThreadHosted, projectId: string) => [
   { value: "current" as const, label: "Local checkout", hint: "The repository as it is checked out now", icon: Laptop },
   { value: "worktree" as const, label: "Worktree", hint: "A branch and folder of its own, so other threads never collide with it", icon: GitBranch },
   {
@@ -27,11 +36,13 @@ const workspaceOptions = (cloud: NewThreadCloud, projectId: string) => [
     hidden: !cloud.shown,
     ...cloudBlock(cloud, projectId),
   },
+  { value: "hosted" as const, label: "OpenOrc Cloud", hint: "On OpenOrc Cloud, from the project's repository on GitHub", icon: Cloud, hidden: !hosted.shown, ...hostedBlock(hosted) },
 ];
 
 /** Where the thread will work, said as a sentence. */
 function LocationSentence({ mode, branch }: { mode: NewThreadPlace; branch: string | null }) {
   const name = branch ? <span className="composer-branch">{branch}</span> : null;
+  if (mode === "hosted") return <span className="new-thread-sentence">Runs on OpenOrc Cloud on a new branch</span>;
   if (mode === "cloud") return <span className="new-thread-sentence">Runs in the cloud on a new branch{name ? <> from {name}</> : null}</span>;
   if (mode === "worktree") return <span className="new-thread-sentence">Starts on a new branch{name ? <> from {name}</> : null}</span>;
   return <span className="new-thread-sentence">Works in the local checkout{name ? <> on {name}</> : null}</span>;
@@ -42,6 +53,7 @@ export function NewThreadOptions(props: {
   projectId: string;
   mode: NewThreadPlace;
   cloud: NewThreadCloud;
+  hosted: NewThreadHosted;
   location: ComposerProps["location"];
   blocked: string | null;
   disabled: boolean;
@@ -70,10 +82,10 @@ export function NewThreadOptions(props: {
             ariaLabel="Where the thread works"
             look="text"
             value={props.mode}
-            options={workspaceOptions(props.cloud, props.projectId)}
+            options={workspaceOptions(props.cloud, props.hosted, props.projectId)}
             trigger={
               <>
-                {props.mode === "cloud" ? <Cloud size={14} /> : <GitBranch size={14} />}
+                {props.mode === "cloud" || props.mode === "hosted" ? <Cloud size={14} /> : <GitBranch size={14} />}
                 <LocationSentence mode={props.mode} branch={props.location.branch} />
               </>
             }

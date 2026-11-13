@@ -18,6 +18,7 @@ import type { AddressInfo, Socket } from "node:net";
 import type { LiveSocket } from "../index.js";
 import { engineSession } from "./stand-in-socket.js";
 import { StandInSignIns } from "./stand-in-sign-ins.js";
+import { StandInGithub } from "./stand-in-github.js";
 import { StandInSpaces } from "./stand-in-spaces.js";
 import { StandInThreads, type Admit, type StandInPeer, type StandInThreadSeed } from "./stand-in-threads.js";
 
@@ -69,6 +70,8 @@ export interface StandIn {
   sent: { threadId: string; body: Record<string, unknown> }[];
   /** Every POST /hosted/threads body, in order, with the space it was made in. */
   started: { space: string; body: Record<string, unknown> }[];
+  /** GitHub as the server reaches it: what an install grants, and where its pages send the browser back. */
+  github: Pick<StandInGithub, "grant" | "returnFor" | "configured">;
   close(): Promise<void>;
 }
 
@@ -223,6 +226,9 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
   const spaces = new StandInSpaces();
   const hosted = new StandInThreads(() => [...[...peers].filter((peer) => !peer.waiting), ...sockets], admitTurn, spaces);
   const signInWrites = new StandInSignIns(signIns);
+  const github = new StandInGithub(spaces, (who) => {
+    for (const peer of [...peers, ...sockets]) if (peer.who() === who) peer.send("changed", { organizationId: `personal-${who}`, topics: ["projects", "github"] });
+  });
   const socketAnswers: Record<string, (peer: StandInPeer, body: unknown) => unknown> = {
     "hosted:watch": (peer, body) => hosted.watch(peer, body),
     "hosted:unwatch": (peer, body) => hosted.unwatch(peer, body),
@@ -248,8 +254,8 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
     requests.push({ method, path, authorized: who !== null });
     const route = routes[`${method} ${path}`];
     const signedInRoute = (): Reply | null => {
-      if (who) return signInWrites.route(method, path, who, body) ?? hosted.route({ method, path, query, space }, who, body);
-      return /^\/(projects|hosted|agent-sign-ins|api\/auth\/organization)\b/.test(path) ? unauthorized() : null;
+      if (who) return signInWrites.route(method, path, who, body) ?? github.route(method, path, who, body) ?? hosted.route({ method, path, query, space }, who, body);
+      return /^\/(projects|hosted|github|agent-sign-ins|api\/auth\/organization)\b/.test(path) ? unauthorized() : null;
     };
     const old = tooOld(request.headers["x-openorc-protocol"]) ? { status: 426, body: { statusCode: 426, message: APP_TOO_OLD } } : null;
     const reply: Reply = old ?? (route ? route(body, token) : signedInRoute()) ?? { status: 404, body: { message: `Cannot ${method} ${path}`, error: "Not Found", statusCode: 404 } };
@@ -274,6 +280,7 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
     setPerson: (email, person) => void people.set(email.toLowerCase(), person),
     sandboxes,
     ...threadsFace(hosted),
+    github,
     addTeam: (name, members) =>
       spaces.addTeam(
         name,

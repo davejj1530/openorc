@@ -10,6 +10,8 @@
  *   2. A place is asked only about ids it said it holds, so a thread of this Mac or of the brain never reaches it, and
  *      one of its ids never falls through to "absent, so the brain's".
  *   3. Lists never wait on a place: its rows come from what it last heard.
+ *   4. A start that asks for OpenOrc Cloud goes to it, and never to this Mac or the brain, which would start the
+ *      thread somewhere the person did not choose.
  */
 import type { HostedThreads } from "@openorc/hosted";
 import { mergeThreadPages, ownerRoute, rpcParams, type RoutedMethod, type RpcMethod, type RpcParams, type RpcRequest, type ThreadSummary } from "@openorc/protocol";
@@ -34,6 +36,7 @@ export class PlaceRouter {
     if (!parsed.success) return this.deps.next(request);
     const params = parsed.data as Record<string, unknown>;
     if (method === "projects.get" && place.holds({ project: String(params["id"]) })) return Promise.resolve(result(request, place.project(String(params["id"]))));
+    if (method === "threads.start" && params["hosted"]) return this.asked(place, request, "threads.start", params);
     return this.routed(place, request, method, params);
   }
 

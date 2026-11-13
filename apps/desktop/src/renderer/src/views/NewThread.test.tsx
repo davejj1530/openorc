@@ -1,4 +1,4 @@
-import { NO_CLOUD_SERVICE, WORKSPACE_ID, harnessIds, type CloudSignIns, type Project, type RpcResults } from "@openorc/protocol";
+import { NO_CLOUD_SERVICE, WORKSPACE_ID, harnessIds, type AccountStatus, type CloudSignIns, type Project, type RpcResults } from "@openorc/protocol";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readNewThreadDraft, readNewThreadProject, rememberNewThreadProject, writeNewThreadDraft } from "../lib/new-thread-draft";
@@ -16,6 +16,7 @@ let accounts: RpcResults["claude.accounts.list"] | undefined;
 let settings: Partial<RpcResults["app.settings.get"]>;
 let offer: RpcResults["cloud.offer"] | undefined;
 let signIns: CloudSignIns;
+let account: AccountStatus | undefined;
 const mutated: [string, unknown][] = [];
 /** A project's git read held open by a test; any other project's is already in. */
 const gitReads: Record<string, Promise<unknown>> = {};
@@ -34,6 +35,7 @@ vi.mock("../lib/client", async (original) => ({
       "app.settings.get": settings,
       "cloud.offer": offer,
       "cloud.signIns": signIns,
+      "account.status": account,
       "orchestration.availability": { enabled: true, reason: null, maxHierarchyDepth: 3 },
     };
     return { data: data[method], isError: method === "projects.checkoutBranch" && branchError, isPending: false, isLoading: false, error: null, refetch: vi.fn() };
@@ -107,6 +109,7 @@ beforeEach(() => {
   };
   settings = { defaultWorkspaceMode: "current", defaultHarness: null };
   offer = undefined;
+  account = undefined;
   signIns = { rows: [], bringing: false };
   mutated.length = 0;
   models = [{ id: "codex-model", label: "Codex", agent: "codex", isDefault: true, efforts: ["medium"], defaultEffort: "medium" }];
@@ -120,6 +123,26 @@ beforeEach(() => {
   resetStart.mockReset();
   useRouter.setState({ route: { view: "newthread", projectId: "p1" }, threadIds: [], history: [], future: [] });
 });
+
+/** A Pro account with Codex signed in on OpenOrc Cloud, and project p1's repository where it stands there. */
+function openOrcCloud(cloud: "added" | "addable"): AccountStatus {
+  return {
+    state: "signed-in",
+    email: "ada@example.com",
+    name: "Ada",
+    image: null,
+    reach: "live",
+    plan: { pro: true, standing: "live", at: 0 },
+    hours: { leftSeconds: 3600, monthly: null, packsLeftSeconds: 3600 },
+    sandbox: null,
+    signIns: [{ agent: "codex", provider: "openai", label: "ChatGPT Plus", ended: false }],
+    signingIn: {},
+    github: { configured: true, login: "ada", installedOn: ["acme"], repositories: ["acme/p1"] },
+    connectingGithub: null,
+    projects: [{ projectId: "p1", repo: "acme/p1", cloud }],
+    error: null,
+  };
+}
 
 function saveModelDraft(projectId: string, prompt: string) {
   const draft = { ...readNewThreadDraft(projectId), prompt, target: { kind: "model" as const, choice: { agent: "codex" as const, model: "codex-model", effort: "medium", fastMode: false } } };
@@ -299,6 +322,36 @@ describe("NewThread", () => {
     expect(await screen.findByRole("menuitem", { name: `Cloud ${NO_CLOUD_SERVICE}` })).toBeTruthy();
     fireEvent.click(screen.getByRole("menuitem", { name: "Open Cloud settings" }));
     expect(useRouter.getState().route).toEqual({ view: "settings", section: "cloud" });
+  });
+
+  it("starts a thread on OpenOrc Cloud for a project there, with no folder on this Mac", async () => {
+    account = openOrcCloud("added");
+    saveModelDraft("p1", "Add a health check");
+    render(<NewThread projectId="p1" />);
+    fireEvent.click(screen.getByRole("button", { name: /^Where the thread works/ }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /^OpenOrc Cloud On OpenOrc Cloud/ }));
+    expect(screen.getByText("Runs on OpenOrc Cloud on a new branch")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ projectId: "p1", hosted: true, prompt: "Add a health check" })));
+    expect(start).toHaveBeenCalledWith(expect.not.objectContaining({ workspaceMode: expect.anything() }));
+  });
+
+  it("offers OpenOrc Cloud disabled with why for a project not added yet, leading to its row in Cloud settings", async () => {
+    account = openOrcCloud("addable");
+    render(<NewThread projectId="p1" />);
+    fireEvent.click(screen.getByRole("button", { name: /^Where the thread works/ }));
+    const choice = await screen.findByRole("menuitem", { name: "OpenOrc Cloud Add acme/p1 to OpenOrc Cloud first." });
+    expect(choice.getAttribute("aria-disabled")).toBe("true");
+    fireEvent.click(screen.getByRole("menuitem", { name: "Add this project" }));
+    expect(useRouter.getState().route).toEqual({ view: "settings", section: "cloud", project: "p1" });
+  });
+
+  it("never offers OpenOrc Cloud to someone with no account", async () => {
+    account = { state: "signed-out", codeSentTo: null, ended: false, error: null };
+    render(<NewThread projectId="p1" />);
+    fireEvent.click(screen.getByRole("button", { name: /^Where the thread works/ }));
+    await screen.findByRole("menuitem", { name: /^Worktree / });
+    expect(screen.queryByRole("menuitem", { name: /^OpenOrc Cloud/ })).toBeNull();
   });
 
   it("keeps the recovered prompt when its saved solo model is unavailable", () => {

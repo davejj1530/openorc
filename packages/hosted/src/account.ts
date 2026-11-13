@@ -2,21 +2,23 @@
  * The account behind `HostedAccount`: who is signed in and what they pay for.
  *
  * State, written only here:
- *   heard       what the server last answered about the person, their billing, where their cloud threads run and their
- *               agents' sign-ins, with the address it was for, and the sign-ins it refused a turn on as signed out.
+ *   heard       what the server last answered about the person, their billing, where their cloud threads run, their
+ *               agents' sign-ins and their GitHub, with the address it was for, and the sign-ins it refused a turn on
+ *               as signed out.
  *               Kept in `deps.kept`. Each part is replaced only by an answer for it.
  *   codeSent    the address a code was last sent to, and when.
  *   error       words for the last read that failed for a reason other than reach.
  *
  * `status()` is computed from these and the session each time it is asked. Nothing stores an AccountStatus.
  */
-import { openCodeProvider, type AccountStatus, type HostedAgent, type HostedRefusal, type RpcParams } from "@openorc/protocol";
+import { openCodeProvider, type AccountProject, type AccountStatus, type HostedAgent, type HostedRefusal, type RpcParams } from "@openorc/protocol";
 import { z } from "zod";
 import type { HostedAccount, HostedDeps } from "./index.js";
-import { OutOfReach, type Session, type SessionChange } from "./session.js";
-import { signInKey, toImage, toPlan, toSandbox, toSignIns } from "./translate.js";
+import { OutOfReach, Refused, type Session, type SessionChange } from "./session.js";
+import { githubRepoOf, signInKey, toImage, toPlan, toSandbox, toSignIns } from "./translate.js";
+import { GithubConnect } from "./github.js";
 import { SignIns } from "./signins.js";
-import { ROUTES, SOCKET, wireBilling, wireHostedSettings, wireSignIn, wireTopics } from "./wire.js";
+import { ROUTES, SOCKET, wireBilling, wireGithubRepository, wireHostedSettings, wireSignIn, wireTopics } from "./wire.js";
 
 /** How long Settings keeps asking for the code it sent; the server's code lasts five minutes. */
 const CODE_REMEMBERED_MS = 10 * 60_000;
@@ -29,10 +31,15 @@ const keptAnswers = z.object({
   signIns: z.array(wireSignIn).nullable().default(null),
   /** Sign-ins the server refused a turn on as signed out, by agent and provider, with the `checkedAt` it had then. */
   ended: z.array(z.object({ key: z.string(), checkedAt: z.string().nullable() })).default([]),
+  github: z
+    .object({ configured: z.boolean(), login: z.string().nullable(), installedOn: z.array(z.string()), repositories: z.array(wireGithubRepository) })
+    .nullable()
+    .default(null),
 });
 type Heard = z.infer<typeof keptAnswers>;
 
-type AccountDeps = { session: Session } & Pick<HostedDeps, "kept" | "push" | "now" | "mintClaudeToken">;
+/** `cloud`: the repositories the person's spaces have as projects, and a read of them again. */
+type AccountDeps = { session: Session; cloud: { repos(): ReadonlySet<string>; reread(): Promise<void> } } & Pick<HostedDeps, "kept" | "push" | "now" | "mintClaudeToken" | "browser" | "projects">;
 
 export class Account implements HostedAccount {
   #heard: Heard | null = null;
@@ -40,14 +47,16 @@ export class Account implements HostedAccount {
   #error: string | null = null;
   #announced = "";
   readonly #signIns: SignIns;
+  readonly #github: GithubConnect;
 
   constructor(private readonly deps: AccountDeps) {
     this.#signIns = new SignIns({ session: deps.session, mintClaudeToken: deps.mintClaudeToken, now: deps.now, changed: () => this.#announce(), landed: () => this.#refresh() });
+    this.#github = new GithubConnect({ session: deps.session, browser: deps.browser, changed: () => this.#announce(), landed: () => this.#landed() });
     deps.session.onChange((change) => this.#changed(change));
-    // The person's own topics: what they pay for, and their sign-ins, changed elsewhere.
+    // The person's own topics: what they pay for, their sign-ins and their GitHub, changed elsewhere.
     deps.session.onSocket(SOCKET.changed, (body) => {
       const topics = wireTopics.safeParse(body);
-      if (topics.success && topics.data.topics.some((topic) => topic === "billing" || topic === "sign-ins")) void this.#refresh();
+      if (topics.success && topics.data.topics.some((topic) => topic === "billing" || topic === "sign-ins" || topic === "github")) void this.#refresh();
     });
   }
 
@@ -83,8 +92,23 @@ export class Account implements HostedAccount {
       sandbox: heard?.sandbox ? toSandbox(heard.sandbox) : null,
       signIns: heard?.signIns ? toSignIns(heard.signIns, heard.ended) : null,
       signingIn: this.#signIns.work,
+      github: heard?.github ? { ...heard.github, repositories: heard.github.repositories.map((repository) => repository.fullName) } : null,
+      connectingGithub: this.#github.work,
+      projects: this.#projects(heard?.github?.repositories ?? []),
       error: this.#error,
     };
+  }
+
+  /** This Mac's projects with a GitHub repository, each with where it stands on OpenOrc Cloud. */
+  #projects(readable: readonly { fullName: string }[]): AccountProject[] {
+    const cloud = this.deps.cloud.repos();
+    const reads = new Set(readable.map((repository) => repository.fullName.toLowerCase()));
+    return this.deps.projects().flatMap((project): AccountProject[] => {
+      const repo = githubRepoOf(project.remote);
+      if (!repo) return [];
+      if (cloud.has(repo)) return [{ projectId: project.id, repo, cloud: "added" }];
+      return [{ projectId: project.id, repo, cloud: reads.has(repo) ? "addable" : "unreadable" }];
+    });
   }
 
   /** The server's refusals read as its words: not invited, too many codes. */
@@ -131,6 +155,35 @@ export class Account implements HostedAccount {
     return this.#signIns.remove(agent, provider);
   }
 
+  connectGithub(): Promise<void> {
+    return this.#github.connect();
+  }
+
+  cancelGithub(): void {
+    this.#github.cancel();
+  }
+
+  disconnectGithub(): Promise<void> {
+    return this.#github.disconnect();
+  }
+
+  /** The repository goes to the session's active space, the personal one unless the person chose another; the projects are read again. */
+  async addProject(projectId: string): Promise<void> {
+    const repo = githubRepoOf(this.deps.projects().find((project) => project.id === projectId)?.remote ?? null);
+    if (!repo) throw new Refused("This project has no GitHub repository.");
+    const found = this.#heard?.github?.repositories.find((repository) => repository.fullName.toLowerCase() === repo);
+    if (!found) throw new Refused(`GitHub doesn't let OpenOrc read ${repo} yet.`);
+    await this.deps.session.request(ROUTES.addProjects, { repositories: [{ installationId: found.installationId, repoId: found.repoId }] });
+    await this.deps.cloud.reread();
+    this.#announce();
+  }
+
+  /** A GitHub trip settled: its part and the projects are read again. */
+  async #landed(): Promise<void> {
+    await Promise.all([this.#refresh(), this.deps.cloud.reread()]);
+    this.#announce();
+  }
+
   /**
    * The server refused a turn: read the account again, so the card above the composer says why. A sign-in it found
    * signed out is marked ended until it is set again, which the list alone cannot tell.
@@ -149,6 +202,7 @@ export class Account implements HostedAccount {
     if (!this.deps.session.state.signedIn) {
       // Before the session's own storage is cleared and before the server hears of it.
       this.#signIns.forget();
+      this.#github.forget();
       this.#heard = null;
       this.#error = null;
       this.deps.kept.save("account", null);
@@ -164,11 +218,12 @@ export class Account implements HostedAccount {
   async #refresh(): Promise<void> {
     const email = this.#signedInAs();
     if (!email) return;
-    const [person, billing, sandbox, signIns] = await Promise.allSettled([
+    const [person, billing, sandbox, signIns, github] = await Promise.allSettled([
       this.deps.session.request(ROUTES.person),
       this.deps.session.request(ROUTES.billing),
       this.deps.session.request(ROUTES.hostedSettings),
       this.deps.session.request(ROUTES.signIns),
+      this.#readGithub(),
     ]);
     if (this.#signedInAs() !== email) return;
     if (person.status === "fulfilled" && person.value === null) return void this.deps.session.end("server");
@@ -178,12 +233,31 @@ export class Account implements HostedAccount {
       ...(billing.status === "fulfilled" && { billing: billing.value }),
       ...(sandbox.status === "fulfilled" && { sandbox: sandbox.value }),
       ...(signIns.status === "fulfilled" && { signIns: signIns.value }),
+      ...(github.status === "fulfilled" && { github: github.value }),
     });
+  }
+
+  /**
+   * The person's GitHub for their space: the app's installations and the account they linked, and the repositories
+   * those let OpenOrc read. What only an admin of the space may read reads as none for anyone else.
+   */
+  async #readGithub(): Promise<NonNullable<Heard["github"]>> {
+    const adminOnly = <T>(read: Promise<T>, none: T) =>
+      read.catch((error: unknown) => {
+        if (error instanceof Refused) return none;
+        throw error;
+      });
+    const [installed, link, repositories] = await Promise.all([
+      adminOnly(this.deps.session.request(ROUTES.github), { configured: true, installations: [] }),
+      this.deps.session.request(ROUTES.githubLink),
+      adminOnly(this.deps.session.request(ROUTES.githubRepositories), []),
+    ]);
+    return { configured: installed.configured, login: link.account?.login ?? null, installedOn: installed.installations.map((each) => each.accountLogin), repositories };
   }
 
   /** Puts what the server just answered for `email` beside what it said before, keeps it, and tells the windows. */
   #hear(email: string, parts: Partial<Omit<Heard, "email">>): void {
-    const before = this.#heard?.email === email ? this.#heard : { email, billing: null, person: null, sandbox: null, signIns: null, ended: [] };
+    const before = this.#heard?.email === email ? this.#heard : { email, billing: null, person: null, sandbox: null, signIns: null, ended: [], github: null };
     this.#heard = { ...before, ...parts };
     if (Object.keys(parts).length) this.deps.kept.save("account", JSON.stringify(this.#heard));
     this.#announce();

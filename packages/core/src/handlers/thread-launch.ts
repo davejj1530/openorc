@@ -9,8 +9,9 @@ type Dependencies = {
   imports: Pick<ImportService, "import">;
 };
 
-/** A cloud conversation runs one model; Orclings start on this Mac. */
-function assertCloudTarget(cloud: boolean | undefined, target: RpcParams<"threads.start">["executionTarget"]): void {
+/** A cloud conversation runs one model; Orclings start on this Mac. One for OpenOrc Cloud reaches this Mac only signed out of it. */
+function assertCloudTarget({ cloud, hosted, executionTarget: target }: Pick<RpcParams<"threads.start">, "cloud" | "hosted" | "executionTarget">): void {
+  if (hosted) throw new Error("Sign in to OpenOrc to start a thread on OpenOrc Cloud.");
   if (cloud && target && target.kind !== "model") throw new Error("Cloud conversations run one model.");
 }
 
@@ -43,13 +44,14 @@ export function createThreadLaunchHandlers({
       permissionMode,
       workspaceMode,
       cloud,
+      hosted,
       baseRef,
       prompt,
       attachments,
       title,
       parentThreadId,
     }) => {
-      assertCloudTarget(cloud, executionTarget);
+      assertCloudTarget({ cloud, hosted, executionTarget });
       if (executionTarget?.kind === "orcling") {
         return orclings.startThread(executionTarget.orclingId, {
           projectId,

@@ -24,8 +24,8 @@ export type NewThreadTarget =
   | { kind: "orcling"; orclingId: string; name: string; settings: ModelExecutionSettings }
   | { kind: "unavailable"; label: string; reason: string };
 
-/** Where a new thread works: the checkout, a worktree, or a cloud sandbox mirrored by a worktree. */
-export type NewThreadPlace = WorkspaceMode | "cloud";
+/** Where a new thread works: the checkout, a worktree, a cloud sandbox mirrored by a worktree, or OpenOrc Cloud. */
+export type NewThreadPlace = WorkspaceMode | "cloud" | "hosted";
 
 export interface NewThreadDraft {
   claudeAccountId?: string;
@@ -53,7 +53,7 @@ export function decodeNewThreadDraft(projectId: string, value: unknown, legacyPr
   };
 }
 
-const places: readonly NewThreadPlace[] = ["current", "worktree", "cloud"];
+const places: readonly NewThreadPlace[] = ["current", "worktree", "cloud", "hosted"];
 const decodePlace = (value: unknown): NewThreadPlace | null => places.find((place) => place === value) ?? null;
 
 /** A saved target that no longer reads as one keeps the message and asks for the choice again. */
@@ -102,12 +102,12 @@ export function newThreadChoice(models: ModelOption[], input: { preferred: Harne
 }
 
 /**
- * Where a new thread works. Workspace, and a project that can't branch yet, always use the folder itself. A cloud
- * choice the thread can't take, because of its target or this app, works in a worktree instead.
+ * Where a new thread works. Workspace, and a project that can't branch yet, always use the folder itself. A cloud or
+ * OpenOrc Cloud choice the thread can't take, because of its target or this app, works in a worktree instead.
  */
-export function newThreadWorkspaceMode(input: { canBranch: boolean; canCloud?: boolean; chosen: NewThreadPlace | null; preferred: WorkspaceMode | undefined }): NewThreadPlace {
+export function newThreadWorkspaceMode(input: { canBranch: boolean; canCloud?: boolean; canHosted?: boolean; chosen: NewThreadPlace | null; preferred: WorkspaceMode | undefined }): NewThreadPlace {
   if (!input.canBranch) return "current";
-  if (input.chosen === "cloud" && !input.canCloud) return "worktree";
+  if ((input.chosen === "cloud" && !input.canCloud) || (input.chosen === "hosted" && !input.canHosted)) return "worktree";
   return input.chosen ?? input.preferred ?? "current";
 }
 
@@ -123,11 +123,18 @@ export function newThreadStartInput(
     projectId: draft.projectId,
     mode: draft.mode,
     ...rest,
-    ...(place === "cloud" ? { workspaceMode: "worktree", cloud: true } : { workspaceMode: place }),
+    ...placeParams(place),
     prompt: input.prompt || "See the attached image.",
     ...startTarget(draft.target, choice),
     ...(draft.claudeAccountId ? { claudeAccountId: draft.claudeAccountId } : {}),
   };
+}
+
+/** What a start says of its place: a worktree mirroring a cloud sandbox, OpenOrc Cloud with no folder here, or a folder. */
+function placeParams(place: NewThreadPlace): Pick<RpcParams<"threads.start">, "workspaceMode" | "cloud" | "hosted"> {
+  if (place === "cloud") return { workspaceMode: "worktree", cloud: true };
+  if (place === "hosted") return { hosted: true };
+  return { workspaceMode: place };
 }
 
 function startTarget(target: Exclude<NewThreadTarget, { kind: "unavailable" }>, choice: ModelChoice): Partial<RpcParams<"threads.start">> {

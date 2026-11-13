@@ -54,6 +54,14 @@ export interface HostedDeps {
    * Mac's `claude setup-token` does. Absent where the device cannot; the token goes to the server and nowhere else.
    */
   mintClaudeToken?(claudeAccountId: string | undefined): { token: Promise<string>; cancel(): void };
+  /**
+   * The person's browser, for GitHub's pages: waits on this device's loopback for one return to `path` (its query, or a
+   * rejection on timeout or `close`), and opens a page. Absent where the device has neither.
+   */
+  browser?: {
+    awaitReturn(path: string, timeoutMs: number): Promise<{ port: number; query: Promise<string>; close(): void }>;
+    open(url: string): void;
+  };
   now(): number;
   log: { info(message: string): void; warn(message: string): void };
 }
@@ -73,6 +81,13 @@ export interface HostedAccount {
   connectSignIn(input: RpcParams<"account.signIns.connect">): Promise<void>;
   cancelSignIn(agent: HostedAgent): void;
   removeSignIn(input: RpcParams<"account.signIns.remove">): Promise<void>;
+  /** Connects the person's GitHub through as many browser trips as it takes; resolves once the first page is open, the rest shows in `status().connectingGithub`. */
+  connectGithub(): Promise<void>;
+  cancelGithub(): void;
+  /** Unlinks the person's GitHub account. */
+  disconnectGithub(): Promise<void>;
+  /** Adds a Mac project's GitHub repository to the person's space as a cloud project. Rejects in words when GitHub doesn't let OpenOrc read it. */
+  addProject(projectId: string): Promise<void>;
 }
 
 export type KeptPart = "account" | "threads";
@@ -119,7 +134,9 @@ export interface Hosted {
 
 export function createHosted(deps: HostedDeps): Hosted {
   const session = new Session(deps);
-  const account = new Account({ session, kept: deps.kept, push: deps.push, now: deps.now, mintClaudeToken: deps.mintClaudeToken });
+  // The account says which of this Mac's projects are on OpenOrc Cloud, from the projects the thread rows were read with.
+  const cloud = { repos: () => threads.cloudRepos(), reread: () => threads.refresh() };
+  const account = new Account({ session, kept: deps.kept, push: deps.push, now: deps.now, mintClaudeToken: deps.mintClaudeToken, browser: deps.browser, projects: deps.projects, cloud });
   // The follower reads a thread's log in the thread's space, which the rows know.
   const follower: Follower = new Follower({ session, on: (threadId) => threads.on(threadId), push: deps.push, log: deps.log });
   const threads: Threads = new Threads({ session, follower, account, kept: deps.kept, projects: deps.projects, push: deps.push, notify: deps.notify, now: deps.now, log: deps.log });

@@ -37,6 +37,9 @@ it("shows the signed-in person with their plan and cloud hours, and opens Settin
     sandbox: null,
     signIns: null,
     signingIn: {},
+    github: null,
+    connectingGithub: null,
+    projects: [],
     error: null,
   });
   const button = await screen.findByRole("button", { name: "Theo Laurent Pro · 41 h left" });

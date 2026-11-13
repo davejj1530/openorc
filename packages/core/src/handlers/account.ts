@@ -11,7 +11,18 @@ export function createAccountHandlers(
   account: HostedAccount | null,
 ): Pick<
   Handlers,
-  "account.status" | "account.sendCode" | "account.signIn" | "account.signOut" | "account.setSandbox" | "account.signIns.connect" | "account.signIns.cancel" | "account.signIns.remove"
+  | "account.status"
+  | "account.sendCode"
+  | "account.signIn"
+  | "account.signOut"
+  | "account.setSandbox"
+  | "account.signIns.connect"
+  | "account.signIns.cancel"
+  | "account.signIns.remove"
+  | "account.github.connect"
+  | "account.github.cancel"
+  | "account.github.disconnect"
+  | "account.projects.add"
 > {
   const after = async (work: (account: HostedAccount) => Promise<void>): Promise<AccountStatus> => {
     if (!account) throw new Error(UNAVAILABLE);
@@ -27,5 +38,9 @@ export function createAccountHandlers(
     "account.signIns.connect": (input) => after((a) => a.connectSignIn(input)),
     "account.signIns.cancel": ({ agent }) => after(async (a) => a.cancelSignIn(agent)),
     "account.signIns.remove": (input) => after((a) => a.removeSignIn(input)),
+    "account.github.connect": () => after((a) => a.connectGithub()),
+    "account.github.cancel": () => after(async (a) => a.cancelGithub()),
+    "account.github.disconnect": () => after((a) => a.disconnectGithub()),
+    "account.projects.add": ({ projectId }) => after((a) => a.addProject(projectId)),
   };
 }

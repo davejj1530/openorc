@@ -34,6 +34,9 @@ const pro: AccountStatus = {
   },
   signIns: [{ agent: "claude", provider: "anthropic", label: "Claude Max", ended: false }],
   signingIn: {},
+  github: null,
+  connectingGithub: null,
+  projects: [],
   error: null,
 };
 
@@ -42,6 +45,7 @@ function fakeCore(start: AccountStatus, signedIn: AccountStatus = pro) {
   let status = start;
   vi.mocked(core.call).mockImplementation(async (method: string, params: unknown) => {
     const p = params as { email?: string; code?: string; service?: string };
+    if (method === "projects.list") return [];
     if (method === "account.sendCode") status = { ...signedOut, codeSentTo: p.email! };
     if (method === "account.signIn") {
       if (p.code !== "123456") throw new Error("Invalid OTP");

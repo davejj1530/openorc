@@ -39,6 +39,8 @@ export interface OpenOrcOptions {
   presence?: () => Promise<boolean>;
   /** Moves a file or folder to the system Trash. Without it, nothing the user asks to remove is removed. */
   trash?: (file: string) => Promise<void>;
+  /** Opens a web page in the person's browser, as a GitHub sign-in the core waits on needs. Absent where nothing can. */
+  openBrowser?: (url: string) => void;
   /** Where memory's embedding model runs. Defaults to the core's own thread, where loading it and each batch block everything else. */
   embedder?: TextEmbedder;
   /** The bundled Prettier, run off the core's thread. Without it, files format only with the project's own formatter. */

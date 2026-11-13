@@ -189,9 +189,11 @@ function awayWords(thread: ThreadSummary): string | null {
   return place.brain ? `Bring it to ${thisComputer} first.` : "This isn't on OpenOrc Cloud yet.";
 }
 
-/** A sidebar row's menu leads with it; the header's keeps it beside Fork. */
+/** A sidebar row's menu leads with it; the header's keeps it beside Fork. OpenOrc Cloud starts no thread under another, so it has none. */
 function NewSubthreadItem({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
   const away = awayWords(thread);
+  const place = placeOf(thread);
+  if (place.elsewhere && !place.brain) return null;
   return (
     <M.Item className={menuItem} disabled={Boolean(thread.teamInstanceId) || away !== null} data-tip={away ?? undefined} onClick={() => newSubthread(thread.id)}>
       <PenSquare size={13} /> New subthread

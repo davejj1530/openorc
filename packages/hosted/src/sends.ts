@@ -65,7 +65,7 @@ async function post(
 }
 
 /** A refusal: the account is read again, and the write fails with the words the card above the composer shows. */
-function refuse(calls: Calls, refusal: string, settings: { agent: string; model: string | null }): never {
+export function refuse(calls: Calls, refusal: string, settings: { agent: string; model: string | null }): never {
   if (isHostedRefusal(refusal)) calls.refused(refusal, settings);
   throw new Refused(refusalWords(refusal, settings.agent));
 }

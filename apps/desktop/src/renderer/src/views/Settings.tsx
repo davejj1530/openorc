@@ -14,6 +14,7 @@ import { useLayout } from "../lib/layout";
 import { useRouter, type Route, type SettingsSection } from "../lib/router";
 import { settingsSection, settingsSections } from "../lib/settings-sections";
 import { floatingGround } from "../lib/use-anchor-ground";
+import { AccountSettings } from "./settings-account";
 import { AgentConnections } from "./settings-agent-updates";
 import { useEnabledHarnesses } from "../lib/enabled-harnesses";
 import { AppearanceSettings } from "./settings-appearance";
@@ -113,6 +114,8 @@ function SectionSettings({ id, active, info, description }: { id: SettingsSectio
       return <UsageDashboard active={active} />;
     case "connections":
       return <ConnectionsSettings active={active} info={info} />;
+    case "account":
+      return <AccountSettings active={active} />;
     case "cloud":
       return <CloudSettings active={active} />;
     case "slack":

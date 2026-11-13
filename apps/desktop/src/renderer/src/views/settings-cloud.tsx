@@ -27,6 +27,7 @@ import { OpenCodeCloudSection } from "./settings-cloud-opencode";
 import { Failure, StillWorks, TokenField } from "./settings-secret-field";
 import { useRouter } from "../lib/router";
 import { thisComputer } from "../lib/this-computer";
+import { OpenOrcCloudSection } from "./settings-cloud-openorc";
 
 const TOKENS_URL = "https://vercel.com/account/tokens";
 /** Why a token scoped to one team, said on hover. */
@@ -321,6 +322,7 @@ export function CloudSettings({ active }: { active: boolean }) {
   );
   return (
     <>
+      <OpenOrcCloudSection active={active} />
       {status.data.error ? (
         <p role="alert" className="text-bad my-3">
           {status.data.error}

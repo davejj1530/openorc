@@ -22,6 +22,10 @@ export interface StandIn {
   codeFor(email: string): string | undefined;
   /** What the next GET /billing answers for a person. */
   setBilling(email: string, billing: StandInBilling): void;
+  /** The person's name and picture, as the server keeps them; a new person's name is made from their address. */
+  setPerson(email: string, person: { name: string; image: string | null }): void;
+  /** The sandbox service each person chose in Settings, by address. */
+  sandboxes: Map<string, string | null>;
   /** Ends every session, so the next request is refused. */
   revoke(): void;
   /** Stops answering and drops every connection, as an unreachable server does. `up()` brings it back on the same port. */
@@ -42,6 +46,8 @@ const CODE_TRIES = 3;
 const MONTH_SECONDS = 40 * 3600;
 const PACK_SECONDS = 20 * 3600;
 const SOCKET_PATH = "/socket.io/";
+/** What the real server calls each sandbox service it can run threads on. */
+const SERVICE_NAMES: Record<string, string> = { local: "this machine", vercel: "Vercel", agent37: "Agent37" };
 
 interface Peer {
   token: string;
@@ -52,12 +58,37 @@ interface Peer {
 
 type Reply = { status: number; body: unknown; token?: string };
 
+export interface StandInOptions {
+  signup?: "open" | "invite";
+  invited?: string[];
+  /** The sandbox services it runs threads on, its default first. The real server's default alone when unset. */
+  services?: string[];
+}
+
+/** "sam.lee@acme.com" becomes "Sam Lee", as the real server names a person who signed up with a code. */
+function nameFromEmail(email: string): string {
+  return email
+    .split("@")[0]!
+    .split(/[._-]+/)
+    .filter(Boolean)
+    .map((part) => part[0]!.toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 /** The server's sign-in and billing rules, held in memory: codes by address, sessions by id, billing by address. */
-function accounts(options: { signup?: "open" | "invite"; invited?: string[] }) {
+function accounts(options: StandInOptions) {
   const secret = randomBytes(32);
   const codes = new Map<string, { code: string; at: number; tries: number }>();
   const sessions = new Map<string, string>();
   const billing = new Map<string, StandInBilling>();
+  const people = new Map<string, { name: string; image: string | null }>();
+  const sandboxes = new Map<string, string | null>();
+  const services = options.services ?? ["local"];
+  const hostedSettings = (email: string) => ({
+    service: sandboxes.get(email) ?? null,
+    served: services.map((service) => ({ service, name: SERVICE_NAMES[service] ?? service })),
+    defaultService: services[0]!,
+  });
   const sign = (id: string) => createHmac("sha256", secret).update(id).digest("base64url");
   /** The address a signed token's session is for, or null for a bare id, a forged one or an ended session. */
   const holder = (token: string | null | undefined): string | null => {
@@ -103,12 +134,31 @@ function accounts(options: { signup?: "open" | "invite"; invited?: string[] }) {
       const who = holder(token);
       return who ? { status: 200, body: billingState(billing.get(who) ?? { pro: false }) } : unauthorized();
     },
+    // Better Auth answers null, not a 401, for a token whose session it no longer holds.
+    "GET /api/auth/get-session": (_body, token) => {
+      const who = holder(token);
+      if (!who) return { status: 200, body: null };
+      const person = people.get(who) ?? { name: nameFromEmail(who), image: null };
+      return { status: 200, body: { session: { activeOrganizationId: `personal-${who}` }, user: { id: `user-${who}`, email: who, emailVerified: true, ...person } } };
+    },
+    "GET /settings/hosted": (_body, token) => {
+      const who = holder(token);
+      return who ? { status: 200, body: hostedSettings(who) } : unauthorized();
+    },
+    "PATCH /settings/hosted": (body, token) => {
+      const who = holder(token);
+      if (!who) return unauthorized();
+      const service = body["service"] === null ? null : String(body["service"] ?? "");
+      if (service && !services.includes(service)) return { status: 400, body: { message: `This server doesn't run threads on ${SERVICE_NAMES[service] ?? service}.`, statusCode: 400 } };
+      sandboxes.set(who, service);
+      return { status: 200, body: hostedSettings(who) };
+    },
   };
-  return { codes, sessions, billing, holder, routes };
+  return { codes, sessions, billing, people, sandboxes, holder, routes };
 }
 
-export async function standIn(options: { signup?: "open" | "invite"; invited?: string[] } = {}): Promise<StandIn> {
-  const { codes, sessions, billing, holder, routes } = accounts(options);
+export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
+  const { codes, sessions, billing, people, sandboxes, holder, routes } = accounts(options);
   const requests: StandIn["requests"] = [];
   const connections = new Set<Socket>();
   const peers = new Set<Peer>();
@@ -154,6 +204,8 @@ export async function standIn(options: { signup?: "open" | "invite"; invited?: s
     url: `http://127.0.0.1:${port}`,
     codeFor: (email) => codes.get(email.toLowerCase())?.code,
     setBilling: (email, state) => void billing.set(email.toLowerCase(), state),
+    setPerson: (email, person) => void people.set(email.toLowerCase(), person),
+    sandboxes,
     revoke: () => sessions.clear(),
     requests,
     async down() {

@@ -191,6 +191,10 @@ const workspaceMutations = new Set<RpcMethod>(["threads.moveWorkspace", "threads
 
 /** Mutations whose effects never depend on their parameters. */
 const fixedInvalidations: Partial<Record<RpcMethod, readonly string[]>> = {
+  "account.sendCode": ["account"],
+  "account.signIn": ["account"],
+  "account.signOut": ["account"],
+  "account.setSandbox": ["account"],
   "devices.setup": ["devices"],
   "worktrees.remove": ["worktrees", "threads", "tasks", "workspace-diff"],
   "devices.settings.set": ["devices"],

@@ -459,6 +459,14 @@ export const ThumbsUp = icon(
 export const SignalLow = icon("SignalLow", <path d="M5 20v-3" />);
 export const SignalMedium = icon("SignalMedium", <path d="M5 20v-3 M10 20v-7" />);
 export const SignalHigh = icon("SignalHigh", <path d="M5 20v-3 M10 20v-7 M15 20V9" />);
+export const CircleUser = icon(
+  "CircleUser",
+  <>
+    <circle cx="12" cy="12" r="8.5" />
+    <circle cx="12" cy="10" r="3" />
+    <path d="M6.6 18.4a6.5 6.5 0 0 1 10.8 0" />
+  </>,
+);
 export const Signal = icon("Signal", <path d="M5 20v-3 M10 20v-7 M15 20V9 M20 20V5" />);
 export const List = icon("List", <path d="M4 6h1 M9 6h11 M4 12h1 M9 12h11 M4 18h1 M9 18h11" />);
 export const ListChecks = icon("ListChecks", <path d="m3 6 1.5 1.5L7 5 M11 6h9 M3 12l1.5 1.5L7 11 M11 12h9 M3 18l1.5 1.5L7 17 M11 18h9" />);

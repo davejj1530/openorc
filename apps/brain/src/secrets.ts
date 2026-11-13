@@ -26,6 +26,8 @@ export const BRAIN_SECRETS = {
   // The Mac keeps the key to its cloud brain; a brain sets up none, and moves none.
   cloudBrainSecrets: null,
   cloudBrainMoveSecrets: null,
+  // The OpenOrc account is the Mac's; a brain signs in to none.
+  accountSecrets: null,
 } as const satisfies Record<SecretOption, string | null>;
 
 type Sealed = { [K in keyof typeof BRAIN_SECRETS as (typeof BRAIN_SECRETS)[K] extends string ? K : never]: ProtectedSecretStore };

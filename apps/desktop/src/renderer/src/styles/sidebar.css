@@ -697,6 +697,63 @@ button.browser-empty:hover,
   padding: 0 10px;
   border-top: var(--hairline) solid var(--line);
 }
+/* The signed-in person at the foot's start: a 26px face, the name in ink, the plan in one quiet line. */
+.sidebar-account {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  height: 40px;
+  margin-right: auto;
+  padding: 0 8px 0 6px;
+  border-radius: var(--radius-md);
+  text-align: left;
+  transition: background-color var(--duration-leave) var(--ease-out);
+}
+.sidebar-account:hover {
+  background-color: var(--navigation-hover);
+}
+.sidebar-account:active {
+  background-color: var(--surface-3);
+}
+.sidebar-account-face {
+  width: 26px;
+  height: 26px;
+  font-size: 11px;
+}
+.sidebar-account-words {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.sidebar-account-name,
+.sidebar-account-plan {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar-account-name {
+  font-size: 14px;
+  line-height: 18px;
+  color: var(--ink);
+}
+.sidebar-account-plan {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-3);
+}
+/* A face with no picture: the initials on the control fill. */
+.account-face {
+  display: inline-grid;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background-color: var(--surface-3);
+  color: var(--ink-2);
+  object-fit: cover;
+  line-height: 1;
+}
 .sidebar-tool {
   position: relative;
   display: grid;

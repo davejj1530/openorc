@@ -136,4 +136,62 @@ describe("the account", () => {
     await vi.waitFor(async () => expect((await fetch(`${stand.url}/billing`, { headers: { authorization: `Bearer ${first}` } })).status).toBe(401));
     expect((await fetch(`${stand.url}/billing`, { headers: { authorization: `Bearer ${storedToken(device)}` } })).status).toBe(200);
   });
+
+  it("names the person as the server does, and keeps a picture only when a window can draw it", async () => {
+    const { account } = await host();
+    await signIn(account, "ada.lovelace@example.com");
+    expect(account.status()).toMatchObject({ name: "Ada Lovelace", image: null });
+    stand.setPerson(GRACE, { name: "Grace Hopper", image: "https://example.com/grace.png" });
+    await signIn(account, GRACE);
+    expect(account.status()).toMatchObject({ name: "Grace Hopper", image: null });
+    stand.setPerson(ADA, { name: "Ada", image: "data:image/png;base64,iVBORw0KGgo=" });
+    await signIn(account, ADA);
+    expect(account.status()).toMatchObject({ name: "Ada", image: "data:image/png;base64,iVBORw0KGgo=" });
+  });
+
+  it("signs out when the server no longer holds the session it was asked about", async () => {
+    const first = await host();
+    await signIn(first.account, ADA);
+    first.hosted.close();
+    stand.revoke();
+    const { account } = await host();
+    await vi.waitFor(() => expect(account.status()).toEqual({ state: "signed-out", codeSentTo: null, ended: true, error: null }));
+    expect(device).toEqual({ stored: null, kept: null });
+  });
+
+  it("says where cloud threads run, in the server's names, and changes it", async () => {
+    await stand.close();
+    stand = await standIn({ signup: "open", services: ["vercel", "agent37"] });
+    const { account } = await host();
+    await signIn(account, ADA);
+    expect(account.status()).toMatchObject({
+      sandbox: {
+        chosen: null,
+        fallback: "vercel",
+        services: [
+          { id: "vercel", name: "Vercel" },
+          { id: "agent37", name: "Agent37" },
+        ],
+      },
+    });
+    await account.setSandbox("agent37");
+    expect(account.status()).toMatchObject({ sandbox: { chosen: "agent37" } });
+    expect(stand.sandboxes.get(ADA)).toBe("agent37");
+    await expect(account.setSandbox("local")).rejects.toThrow("This server doesn't run threads on this machine.");
+    expect(account.status()).toMatchObject({ sandbox: { chosen: "agent37" } });
+    await account.setSandbox(null);
+    expect(account.status()).toMatchObject({ sandbox: { chosen: null, fallback: "vercel" } });
+  });
+
+  it("shows where threads run offline after a restart, as last heard", async () => {
+    await stand.close();
+    stand = await standIn({ signup: "open", services: ["vercel", "agent37"] });
+    const first = await host();
+    await signIn(first.account, ADA);
+    await first.account.setSandbox("agent37");
+    first.hosted.close();
+    await stand.down();
+    const { account } = await host();
+    expect(account.status()).toMatchObject({ reach: "offline", name: "Ada", sandbox: { chosen: "agent37" } });
+  });
 });

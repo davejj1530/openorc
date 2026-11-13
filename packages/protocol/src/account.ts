@@ -20,6 +20,16 @@ export interface CloudHours {
   packsLeftSeconds: number;
 }
 
+/**
+ * Where the person's cloud threads run: the sandbox service they chose, or none and the server's `fallback`, among the
+ * services the server runs threads on, each by the name the server gives it.
+ */
+export interface AccountSandbox {
+  chosen: string | null;
+  fallback: string;
+  services: { id: string; name: string }[];
+}
+
 /** Everything the app knows about the OpenOrc account, in one answer. Signed out is the whole state of an app with no account. */
 export type AccountStatus =
   | {
@@ -33,10 +43,16 @@ export type AccountStatus =
   | {
       state: "signed-in";
       email: string;
+      /** The person's name as the server keeps it; null until it first answers. */
+      name: string | null;
+      /** Their picture as a data URL; null for their initials. */
+      image: string | null;
       reach: AccountReach;
       plan: AccountPlan;
       /** Null for a person who is not Pro. */
       hours: CloudHours | null;
+      /** Null until the server first answers. */
+      sandbox: AccountSandbox | null;
       error: string | null;
     };
 
@@ -58,6 +74,8 @@ export const accountRpcParams = {
     .strict(),
   /** Forgets the session here first, then tells the server. */
   "account.signOut": z.object({}),
+  /** Chooses the sandbox service the person's cloud threads run on; null goes back to the server's own choice. */
+  "account.setSandbox": z.object({ service: z.string().min(1).max(64).nullable() }).strict(),
 };
 
 /** Every call answers the whole status, so a window never reads a stale half. */

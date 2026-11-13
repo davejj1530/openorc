@@ -80,6 +80,8 @@ const corePromise = OpenOrc.create({
   cloudBrainSecrets: secrets.store("cloud-brain.secrets"),
   cloudBrainMoveSecrets: secrets.store("cloud-brain-move.secrets"),
   accountSecrets: secrets.store("account.secrets"),
+  // No address is built in yet: a development build talks to the server this names, and to none without it.
+  accountServer: __OPENORC_QA__ ? process.env["OPENORC_ACCOUNT_SERVER"] || undefined : undefined,
   terminal,
   presence: presence.inUse,
   trash: trash.move,

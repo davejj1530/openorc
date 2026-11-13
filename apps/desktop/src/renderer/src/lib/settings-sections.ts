@@ -1,10 +1,11 @@
-import { BookText, Brain, Cloud, Laptop, Link2, MessageSquare, Plug, Signal, SlidersHorizontal, Smartphone, SunMoon, Tablet } from "../components/icons";
+import { BookText, Brain, CircleUser, Cloud, Laptop, Link2, MessageSquare, Plug, Signal, SlidersHorizontal, Smartphone, SunMoon, Tablet } from "../components/icons";
 import { SETTINGS_SECTIONS, type Route, type SettingsSection } from "./router";
 
 /** Each section's name and icon, and the line that leads it; Skills fills the body edge to edge, with none. */
 const presentation: Record<SettingsSection, { label: string; description?: string; Icon: typeof Brain }> = {
   usage: { label: "Usage", Icon: Signal },
   connections: { label: "Connections", description: "The agents and tools connected to OpenOrc.", Icon: Link2 },
+  account: { label: "Account", Icon: CircleUser },
   cloud: { label: "Cloud", description: "Where cloud threads run.", Icon: Cloud },
   slack: { label: "Slack", description: "Bring requests from Slack to this computer.", Icon: MessageSquare },
   phone: { label: "Phone", description: "Your threads, from your phone.", Icon: Smartphone },

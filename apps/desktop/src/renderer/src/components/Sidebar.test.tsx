@@ -483,7 +483,7 @@ it("lists Settings' sections in place of the screens and threads, then goes back
     within(sections)
       .getAllByRole("button")
       .map((row) => row.textContent),
-  ).toEqual(["Usage", "Connections", "Cloud", "Slack", "Phone", "Skills", "Connectors", "Devices", "Appearance", "General", "Memory & models", "Data"]);
+  ).toEqual(["Usage", "Connections", "Account", "Cloud", "Slack", "Phone", "Skills", "Connectors", "Devices", "Appearance", "General", "Memory & models", "Data"]);
   expect(within(sections).getByRole("button", { name: "Slack" }).getAttribute("aria-current")).toBe("page");
   expect(screen.queryByRole("navigation", { name: "Screens" })).toBeNull();
   expect(screen.getByRole("button", { name: "Settings" }).getAttribute("aria-current")).toBe("page");

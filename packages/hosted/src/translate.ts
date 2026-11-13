@@ -1,6 +1,6 @@
 /** Where the server's answers become the app's shapes. Pure functions, no I/O. */
-import type { AccountPlan, CloudHours } from "@openorc/protocol";
-import type { WireBilling } from "./wire.js";
+import type { AccountPlan, AccountSandbox, CloudHours } from "@openorc/protocol";
+import type { WireBilling, WireHostedSettings } from "./wire.js";
 
 /** The plan and the hours left. Free carries no hours; a Pro month not paid for yet carries packs alone. */
 export function toPlan(billing: WireBilling): { plan: AccountPlan; hours: CloudHours | null } {
@@ -13,4 +13,14 @@ export function toPlan(billing: WireBilling): { plan: AccountPlan; hours: CloudH
     plan: { pro: true, standing: pro.standing, at },
     hours: { leftSeconds: (month?.leftSeconds ?? 0) + packsLeftSeconds, monthly: month, packsLeftSeconds },
   };
+}
+
+/** Where cloud threads run, in the server's own names for its services. */
+export function toSandbox(settings: WireHostedSettings): AccountSandbox {
+  return { chosen: settings.service, fallback: settings.defaultService, services: settings.served.map(({ service, name }) => ({ id: service, name })) };
+}
+
+/** A picture a window can draw: only an image held in a data URL, since a window loads nothing from the network. */
+export function toImage(image: string | null | undefined): string | null {
+  return image && /^data:image\/(png|jpeg|webp);base64,/.test(image) ? image : null;
 }

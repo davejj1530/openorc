@@ -48,6 +48,8 @@ export interface HostedAccount {
   signIn(email: string, code: string): Promise<void>;
   /** Forgets the session and the kept answers first, then tells the server, so a server out of reach still signs out here. */
   signOut(): Promise<void>;
+  /** Chooses the sandbox service the person's cloud threads run on; null leaves it to the server. */
+  setSandbox(service: string | null): Promise<void>;
 }
 
 export interface Hosted {

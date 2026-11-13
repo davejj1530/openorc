@@ -7,7 +7,7 @@ const NO_ACCOUNT: AccountStatus = { state: "signed-out", codeSentTo: null, ended
 const UNAVAILABLE = "OpenOrc accounts aren't available here.";
 
 /** Every call answers the whole status. The package tells the windows itself when the status changes later. */
-export function createAccountHandlers(account: HostedAccount | null): Pick<Handlers, "account.status" | "account.sendCode" | "account.signIn" | "account.signOut"> {
+export function createAccountHandlers(account: HostedAccount | null): Pick<Handlers, "account.status" | "account.sendCode" | "account.signIn" | "account.signOut" | "account.setSandbox"> {
   const after = async (work: (account: HostedAccount) => Promise<void>): Promise<AccountStatus> => {
     if (!account) throw new Error(UNAVAILABLE);
     await work(account);
@@ -18,5 +18,6 @@ export function createAccountHandlers(account: HostedAccount | null): Pick<Handl
     "account.sendCode": ({ email }) => after((a) => a.sendCode(email)),
     "account.signIn": ({ email, code }) => after((a) => a.signIn(email, code)),
     "account.signOut": () => after((a) => a.signOut()),
+    "account.setSandbox": ({ service }) => after((a) => a.setSandbox(service)),
   };
 }

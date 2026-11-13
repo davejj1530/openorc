@@ -13,9 +13,11 @@ import {
   RESTART_PROMPT,
   type SubmitRequest,
 } from "@openorc/client";
-import { WORKSPACE_ID, defaultHarnessId, harnessShortName, isSubagentThread, type Project, type Run, type Task, type ThreadSummary, type WorkspaceMode } from "@openorc/protocol";
-import { useCallback, useState } from "react";
+import { WORKSPACE_ID, executionMode, forkUnavailable, harnessShortName, isSubagentThread, type Project, type Run, type Task, type ThreadSummary, type WorkspaceMode } from "@openorc/protocol";
+import { useCallback, useState, type ComponentProps, type ReactNode } from "react";
 import { useConversationSettings, useConversationTranscript, useRpc, useRpcMutation, useSubmit } from "../lib/client";
+import { useThreadAccounts } from "../lib/use-thread-accounts";
+import { MessageMarks, useMessageMarks } from "./MarkedText";
 import { useConversationDraft } from "../lib/conversation-draft";
 import {
   conversationEmptyHint,
@@ -27,16 +29,15 @@ import {
   workspaceDestination,
 } from "../lib/conversation-status-presentation";
 import { openThread, useRouter, type MessageTarget } from "../lib/router";
+import { useConnectorMentions } from "../lib/connector-mentions";
 import { useSkillCommands } from "../lib/skill-commands";
 import { ConversationVoice, useRunVoices } from "../lib/turn-authors";
 import { useTurnFooters } from "../lib/turn-footers";
-import { BackgroundCommands } from "./BackgroundCommands";
 import { useCloudSignInGate } from "./CloudSignInOffer";
-import { CloudPreparing, CloudStart, queueAfterStart } from "./CloudStart";
+import { CloudPreparing, CloudStart } from "./CloudStart";
 import { Composer, type SlashCommand } from "./Composer";
 import { ComposerChoice } from "./ComposerChoice";
 import { GitBranch, Laptop } from "./icons";
-import { MessageQueue } from "./MessageQueue";
 import { SessionRecovery } from "./SessionRecovery";
 import { SubagentConversation } from "./SubagentConversation";
 import { ThreadMoveCard } from "./ThreadMoveCard";
@@ -44,6 +45,8 @@ import { Transcript } from "./Transcript";
 import { TurnChangesProvider, useTurnFooter } from "./TurnFooter";
 import { Button, Empty } from "./ui";
 import { useOrclingConversation } from "./useOrclingConversation";
+import { useOptimisticSend } from "./useOptimisticSend";
+import { useThreadControls } from "./useThreadControls";
 
 export type ConversationScope = { kind: "task"; task: Task } | { kind: "thread"; thread: ThreadSummary };
 
@@ -87,8 +90,47 @@ function useMessageTarget(scope: ConversationScope): MessageTarget | undefined {
 }
 
 /** A thread's own `/` commands; compacting waits for the turn to finish. */
-function threadCommands({ working, compact, fork }: { working: boolean; compact: () => void; fork: () => void }): SlashCommand[] {
-  return [...(!working ? [{ name: "compact", hint: "Fold the conversation so far into a summary", run: compact }] : []), { name: "fork", hint: "Continue in a new thread from here", run: fork }];
+function threadCommands({
+  thread,
+  working,
+  compact,
+  fork,
+}: {
+  thread: ThreadSummary | null;
+  working: boolean;
+  compact: (input: { id: string }) => void;
+  fork: (() => void) | undefined;
+}): SlashCommand[] {
+  if (!thread) return [];
+  return [
+    ...(!working ? [{ name: "compact", hint: "Fold the conversation so far into a summary", run: () => compact({ id: thread.id }) }] : []),
+    ...(fork ? [{ name: "fork", hint: "Continue in a new thread from here", run: fork }] : []),
+  ];
+}
+
+/** What a conversation's transcript reads from around it: whose voice each turn is, the marks its messages are drawn with, and its turns' change footers. */
+function TranscriptContext({
+  voice,
+  marks,
+  footers,
+  threadId,
+  children,
+}: {
+  voice: ComponentProps<typeof ConversationVoice.Provider>["value"];
+  marks: ComponentProps<typeof MessageMarks.Provider>["value"];
+  footers: ComponentProps<typeof TurnChangesProvider>["footers"];
+  threadId: ComponentProps<typeof TurnChangesProvider>["threadId"];
+  children: ReactNode;
+}) {
+  return (
+    <ConversationVoice.Provider value={voice}>
+      <MessageMarks.Provider value={marks}>
+        <TurnChangesProvider footers={footers} threadId={threadId}>
+          {children}
+        </TurnChangesProvider>
+      </MessageMarks.Provider>
+    </ConversationVoice.Provider>
+  );
 }
 
 function IndividualConversation({ scope, project }: { scope: ConversationScope; project: Project }) {
@@ -100,6 +142,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const thread = scope.kind === "thread" ? scope.thread : null;
   const conversation = { kind: scope.kind, id: scope.kind === "thread" ? scope.thread.id : scope.task.id };
   const { checkout, changes: composerChanges, git } = useCheckout(thread, project);
+  const accounts = useThreadAccounts(thread, project);
 
   const activeRun: Run | undefined = runs[runs.length - 1];
   const links = linkFolder(scope, project);
@@ -109,15 +152,12 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
 
   const settings = useConversationSettings({ thread, activeRun });
   const { choice, mode, permission, permissionReady, permissionError } = settings;
-  const orclings = useOrclingConversation({ thread, runs, choice, onModel: settings.selectModel });
+  const orclings = useOrclingConversation({ thread, runs, choice, onModel: settings.selectModel, accounts });
   const voice = useRunVoices(orclings.voice, runs, thread);
   const draftKey = `conversation.${conversation.id}`;
   const { prompt, setPrompt, clearDraft, error: draftError } = useConversationDraft({ draftKey, threadId: thread?.id ?? null, initialText: thread?.draft ?? "" });
   const submitter = useSubmit();
   const [sends, setSends] = useState(0);
-  const unqueue = useRpcMutation("threads.unqueue");
-  const sendQueued = useRpcMutation("threads.sendQueued");
-  const stopCommand = useRpcMutation("threads.stopCommand");
   const compact = useRpcMutation("threads.compact");
   const fork = useRpcMutation("threads.fork");
   const forkThread = fork.mutate;
@@ -129,8 +169,8 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const { live, working, generatingImage } = conversationActivity({ thread, activeRun, liveTranscript, compacting: compact.isPending });
   const { sameAgent, settingsPending, canSteer } = processFit({ live, activeRun, choice, mode, permission, compacting: compact.isPending });
   const steerReason = conversationSteerReason({ canSteer, compacting: compact.isPending, settingsPending, sameAgent, agent: activeRun?.agent });
+  const controls = useThreadControls(thread, runs.length, { canSteer, reason: steerReason, onSent: () => setSends((count) => count + 1) });
   const sendDisabledReason = conversationSendDisabledReason({ permissionReady, historyLoading: runsQuery.isLoading, historyFailed: Boolean(runsQuery.error), hasModel: Boolean(choice), thread });
-  const busy = submitter.pending;
   const turnFooter = useTurnFooter({ footers, threadId, working });
   const switching = Boolean(thread && choice && runs.length > 0 && !runs.some((r) => r.agent === choice.agent));
   const signIn = useCloudSignInGate(cloudTurnOf(thread, choice, live || working));
@@ -148,43 +188,45 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
     compacting: compact.isPending,
     waitForSave: settings.waitForSave,
   };
+  const optimistic = useOptimisticSend({ submitter, request, run: merged, attachmentsKey: `${draftKey}.attachments`, restore: setPrompt, route: orclings.route });
   const submit = async (text: string, attachments: string[], now: boolean) => {
     setSends((count) => count + 1);
     // A message to an Orcling goes to the Orcling, not to this conversation's agent.
     if (await orclings.ask(messageBody(text, attachments), attachments)) return clearDraft();
     await signIn.ready();
-    await submitter.submit({ ...request, now }, { text, attachments });
+    await optimistic.send({ ...request, now }, { text, attachments });
     clearDraft();
   };
   const restart = () => submitter.submit({ ...request, now: false, restart: true }, { text: RESTART_PROMPT, attachments: [] }).then(clearDraft);
   const continueWith = (claudeAccountId: string) => submitter.submit({ ...request, now: false, claudeAccountId }, { text: CONTINUE_PROMPT, attachments: [] }).then(clearDraft);
 
   const skills = useSkillCommands(conversation, choice?.agent);
-  const commands: SlashCommand[] = [...(thread ? threadCommands({ working, compact: () => compact.mutate({ id: thread.id }), fork: forkConversation }) : []), ...skills.commands];
+  const connectorMentions = useConnectorMentions(conversation, choice?.agent, executionMode(mode, permission));
+  const onFork = thread && !forkUnavailable(thread.agent) ? forkConversation : undefined;
+  const commands: SlashCommand[] = [...threadCommands({ thread, working, compact: compact.mutate, fork: onFork }), ...skills.commands];
+  const marks = useMessageMarks(skills.commands, connectorMentions);
 
   const location = conversationLocation({ scope, project, mode: workspaceMode, basePath: links ?? project.rootPath, checkoutBranch: checkout.data?.branch, plainFolder: git.state === "none" });
   const emptyHint = conversationEmptyHint({ task: scope.kind === "task", workspace: project.id === WORKSPACE_ID });
   const placeholder = conversationPlaceholder({ firstTaskRun, working, canSteer, agent: choice?.agent });
 
   function renderTranscript() {
-    if (merged && merged.blocks.length > 0)
+    if (optimistic.run && optimistic.run.blocks.length > 0)
       return (
-        <ConversationVoice.Provider value={voice}>
-          <TurnChangesProvider footers={footers} threadId={threadId}>
-            <Transcript
-              working={working}
-              media={links ? { basePath: links, fileScope: conversation } : { fileLinks: "cite" }}
-              run={merged}
-              scrollKey={conversation.id}
-              followKey={sends}
-              onFork={thread ? forkConversation : undefined}
-              hasOlder={hasOlder}
-              onLoadOlder={loadOlder}
-              reveal={target}
-              trailing={turnFooter}
-            />
-          </TurnChangesProvider>
-        </ConversationVoice.Provider>
+        <TranscriptContext voice={voice} marks={marks} footers={footers} threadId={threadId}>
+          <Transcript
+            working={working}
+            media={links ? { basePath: links, fileScope: conversation } : { fileLinks: "cite" }}
+            run={optimistic.run}
+            scrollKey={conversation.id}
+            followKey={sends}
+            onFork={onFork}
+            hasOlder={hasOlder}
+            onLoadOlder={loadOlder}
+            reveal={target}
+            trailing={turnFooter}
+          />
+        </TranscriptContext>
       );
     if (runsQuery.isLoading) return null;
     return (
@@ -194,37 +236,10 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
     );
   }
   return (
-    <div className="h-full min-w-0 flex flex-col min-h-0">
+    <div className="conversation-pane h-full min-w-0 flex flex-col min-h-0">
       <div className="flex-1 min-h-0 relative">{renderTranscript()}</div>
       <div className="composer-padding shrink-0 px-6 pb-6 pt-2">
         <div className="max-w-chat w-full min-w-0 mx-auto grid grid-cols-1 gap-2">
-          <ThreadMoveCard thread={thread} />
-          <CloudPreparing thread={preparingCloud(thread, runs.length)} />
-          {thread ? (
-            <MessageQueue
-              messages={queueAfterStart(thread, runs.length)}
-              canSend={canSteer}
-              pending={sendQueued.isPending || unqueue.isPending}
-              sendReason={steerReason}
-              agentName={harnessShortName(thread.agent ?? defaultHarnessId)}
-              onSend={(messageId) => {
-                setSends((count) => count + 1);
-                sendQueued.mutate({ id: thread.id, messageId });
-              }}
-              onRemove={(messageId) => unqueue.mutate({ id: thread.id, messageId })}
-            />
-          ) : null}
-          {thread ? <BackgroundCommands commands={thread.backgroundCommands ?? []} pending={stopCommand.isPending} onStop={(commandId) => stopCommand.mutate({ id: thread.id, commandId })} /> : null}
-          {thread?.session && !working ? (
-            <SessionRecovery thread={thread} disabled={!choice || busy} onRestart={() => void restart().catch(() => {})} onContinueWith={(id) => void continueWith(id).catch(() => {})} />
-          ) : null}
-          {signIn.offer}
-          <SwitchingNote agent={switching && choice ? choice.agent : null} />
-          {settingsPending && activeRun && thread && activeRun.mode === "act" && permission === "autonomous" && activeRun.permissionMode !== permission ? (
-            <div role="status" className="text-xs text-ink-3 px-1">
-              {settings.error ? "Could not apply Autonomous. Select it again to retry." : "Applying Autonomous to the current turn…"}
-            </div>
-          ) : null}
           <Composer
             draftKey={`${draftKey}.attachments`}
             value={prompt}
@@ -233,6 +248,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
             placeholder={orclings.placeholder ?? placeholder}
             mentions={orclings.mentions}
             modelControl={orclings.modelControl}
+            accounts={accounts}
             model={choice}
             onModel={settings.selectModel}
             onExecutionMode={settings.selectExecutionMode}
@@ -243,7 +259,30 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
             location={location}
             hasStarted={thread?.hasStarted ?? (runs.length > 0 || Boolean(thread?.forkedAtRunId))}
             changes={composerChanges}
-            busy={busy}
+            notices={
+              <>
+                <ThreadMoveCard thread={thread} />
+                <CloudPreparing thread={preparingCloud(thread, runs.length)} />
+                {controls.queue}
+                {controls.commands}
+                {thread?.session && !working ? (
+                  <SessionRecovery
+                    thread={thread}
+                    disabled={!choice || optimistic.busy}
+                    onRestart={() => void restart().catch(() => {})}
+                    onContinueWith={(id) => void continueWith(id).catch(() => {})}
+                  />
+                ) : null}
+                {signIn.offer}
+                <SwitchingNote agent={switching && choice ? choice.agent : null} />
+                {settingsPending && activeRun && thread && activeRun.mode === "act" && permission === "autonomous" && activeRun.permissionMode !== permission ? (
+                  <div role="status" className="text-xs text-ink-3 px-1">
+                    {settings.error ? "Could not apply Autonomous. Select it again to retry." : "Applying Autonomous to the current turn…"}
+                  </div>
+                ) : null}
+              </>
+            }
+            busy={optimistic.busy}
             allowEmpty={firstTaskRun}
             disabledReason={sendDisabledReason}
             live={live && activeRun ? { runId: activeRun.id, working } : null}
@@ -260,7 +299,8 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
             commands={commands}
             onCommandsWanted={skills.onCommandsWanted}
             commandsNotice={skills.commandsNotice}
-            error={(submitter.error ?? sendQueued.error ?? stopCommand.error ?? compact.error ?? unqueue.error ?? fork.error ?? settings.error ?? draftError)?.message ?? permissionError}
+            {...connectorMentions}
+            error={(submitter.error ?? controls.error ?? compact.error ?? fork.error ?? settings.error ?? draftError)?.message ?? permissionError}
           >
             {firstTaskRun && scope.kind === "task" ? (
               <ComposerChoice
@@ -276,14 +316,14 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
                   },
                 ]}
                 onChange={setWorkspace}
-                disabled={busy || Boolean(scope.task.worktreePath) || !runsQuery.data}
+                disabled={optimistic.busy || Boolean(scope.task.worktreePath) || !runsQuery.data}
               />
             ) : null}
           </Composer>
           {firstTaskRun ? (
             <p
               className="px-1 text-xs text-ink-3 truncate"
-              title={workspaceDestination({ mode: workspaceMode, rootPath: project.rootPath, taskPath: scope.kind === "task" ? scope.task.worktreePath : null })}
+              data-tip={workspaceDestination({ mode: workspaceMode, rootPath: project.rootPath, taskPath: scope.kind === "task" ? scope.task.worktreePath : null })}
             >
               {workspaceDestination({ mode: workspaceMode, rootPath: project.rootPath, taskPath: scope.kind === "task" ? scope.task.worktreePath : null })}
             </p>

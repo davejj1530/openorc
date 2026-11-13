@@ -17,15 +17,17 @@ import { teamLocalStartMigration } from "./team-local-start-schema.js";
 import { teamHarnessMigration } from "./team-harness-schema.js";
 import { teamJournalMigration } from "./team-journal-schema.js";
 import { taskExecutionMigration } from "./task-execution-schema.js";
-import { conversationReviewCommentsMigration } from "./review-comments-schema.js";
+import { conversationReviewCommentsMigration, reviewCommentRangeMigration } from "./review-comments-schema.js";
 import { teamCancellationMigration } from "./team-cancellation-schema.js";
 import { pullRequestReviewMigration } from "./pull-review-schema.js";
-import { orclingAccountMigration, orclingMigration } from "./orcling-schema.js";
+import { orclingAccountMigration, orclingCompanionMigration, orclingFollowupMigration, orclingMigration, orclingTalkMigration, reactionKindsMigration } from "./orcling-schema.js";
 import { remoteDeviceMigration } from "./remote-device-schema.js";
 import { remotePushTargetMigration } from "./remote-push-target-schema.js";
-import { cloudWorkspaceMigration, cloudWorkspaceRemovedMigration } from "./cloud-workspace-schema.js";
-import { startedByAgentMigration, subagentMigration, subagentIdentityMigration, subagentObservationMigration } from "./subagent-schema.js";
+import { cloudWorkspaceMigration, cloudWorkspaceMirrorHeadMigration, cloudWorkspaceRemovedMigration } from "./cloud-workspace-schema.js";
+import { parentThreadMigration, startedByAgentMigration, subagentMigration, subagentIdentityMigration, subagentObservationMigration } from "./subagent-schema.js";
 import { cloudBrainMigrations } from "./cloud-brain-schema.js";
+import { usageHistoryMigration } from "./usage-history-schema.js";
+import { threadsMigration } from "./thread-schema.js";
 /**
  * Migrations run in order; `PRAGMA user_version` records how many applied.
  * Never edit a shipped migration. Append a new one.
@@ -219,74 +221,7 @@ export const migrations: Migration[] = [
     value TEXT NOT NULL
   );
   `,
-  /**
-   * Threads: the conversation a user has with an agent in the project root.
-   * Runs and summaries now belong to a thread or a task; tasks remember the
-   * thread that spawned them. task_id loses NOT NULL, which SQLite can only do
-   * by rebuilding the table, so the runner keeps foreign keys off meanwhile.
-   */
-  (raw) => {
-    raw.exec(`
-      CREATE TABLE threads (
-        id TEXT PRIMARY KEY,
-        project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-        title TEXT NOT NULL,
-        agent TEXT NOT NULL,
-        model TEXT,
-        mode TEXT NOT NULL DEFAULT 'act',
-        permission_mode TEXT NOT NULL DEFAULT 'trusted',
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL,
-        last_activity_at INTEGER NOT NULL,
-        archived_at INTEGER
-      );
-      CREATE INDEX threads_project ON threads(project_id, last_activity_at DESC);
-
-      CREATE TABLE runs_new (
-        id TEXT PRIMARY KEY,
-        task_id TEXT REFERENCES tasks(id) ON DELETE CASCADE,
-        thread_id TEXT REFERENCES threads(id) ON DELETE CASCADE,
-        agent TEXT NOT NULL,
-        model TEXT,
-        mode TEXT NOT NULL DEFAULT 'act',
-        permission_mode TEXT NOT NULL DEFAULT 'trusted',
-        external_session_id TEXT,
-        state TEXT NOT NULL DEFAULT 'starting',
-        started_at INTEGER NOT NULL,
-        ended_at INTEGER,
-        usage TEXT,
-        result_text TEXT
-      );
-      INSERT INTO runs_new (id, task_id, agent, model, mode, permission_mode, external_session_id, state, started_at, ended_at, usage, result_text)
-        SELECT id, task_id, agent, model, mode, permission_mode, external_session_id, state, started_at, ended_at, usage, result_text FROM runs;
-      DROP TABLE runs;
-      ALTER TABLE runs_new RENAME TO runs;
-      CREATE INDEX runs_task ON runs(task_id, started_at);
-      CREATE INDEX runs_thread ON runs(thread_id, started_at);
-
-      CREATE TABLE session_summaries_new (
-        run_id TEXT PRIMARY KEY REFERENCES runs(id) ON DELETE CASCADE,
-        task_id TEXT REFERENCES tasks(id) ON DELETE CASCADE,
-        thread_id TEXT REFERENCES threads(id) ON DELETE CASCADE,
-        project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-        request TEXT NOT NULL,
-        work_done TEXT NOT NULL,
-        outcome TEXT NOT NULL,
-        open_items TEXT NOT NULL DEFAULT '[]',
-        model TEXT,
-        created_at INTEGER NOT NULL
-      );
-      INSERT INTO session_summaries_new (run_id, task_id, project_id, request, work_done, outcome, open_items, model, created_at)
-        SELECT run_id, task_id, project_id, request, work_done, outcome, open_items, model, created_at FROM session_summaries;
-      DROP TABLE session_summaries;
-      ALTER TABLE session_summaries_new RENAME TO session_summaries;
-      CREATE INDEX session_summaries_project ON session_summaries(project_id, created_at DESC);
-
-      ALTER TABLE tasks ADD COLUMN thread_id TEXT REFERENCES threads(id) ON DELETE SET NULL;
-      ALTER TABLE tasks ADD COLUMN origin TEXT NOT NULL DEFAULT 'user';
-      CREATE INDEX tasks_thread ON tasks(thread_id, created_at);
-    `);
-  },
+  threadsMigration,
   `
   -- Reasoning effort travels with the model choice.
   ALTER TABLE runs ADD COLUMN effort TEXT;
@@ -758,9 +693,7 @@ export const migrations: Migration[] = [
   `CREATE INDEX team_room_events_execution ON team_room_events(instance_id, execution_id, seq);`,
   taskExecutionMigration,
   conversationReviewCommentsMigration,
-  /** A review comment can cover a range of lines, as a pull request review does; one line leaves both empty. */
-  `ALTER TABLE review_comments ADD COLUMN start_line INTEGER;
-  ALTER TABLE review_comments ADD COLUMN start_side TEXT;`,
+  reviewCommentRangeMigration,
   teamCancellationMigration,
   /** Removing a project from navigation preserves its files and historical records. */
   `ALTER TABLE projects ADD COLUMN removed_at INTEGER;`,
@@ -772,9 +705,7 @@ export const migrations: Migration[] = [
   orclingMigration,
   /** The Orcling that drafted a pull request review comment, so the draft names it beside its model. */
   `ALTER TABLE pull_request_review_comments ADD COLUMN author_orcling_id TEXT REFERENCES orclings(id) ON DELETE SET NULL;`,
-  /** The thread that started this one with thread_start. A parent counts its working children by it. */
-  `ALTER TABLE threads ADD COLUMN parent_thread_id TEXT REFERENCES threads(id) ON DELETE SET NULL;
-  CREATE INDEX threads_parent ON threads(parent_thread_id) WHERE parent_thread_id IS NOT NULL;`,
+  parentThreadMigration,
   claudeAccountMigration,
   /** A checkpoint saved as a turn starts marks files changed outside turns, and whether only the user could have changed them. */
   `ALTER TABLE thread_checkpoints ADD COLUMN outside TEXT CHECK (outside IN ('user', 'unknown'));
@@ -785,8 +716,7 @@ export const migrations: Migration[] = [
   remotePushTargetMigration,
   orclingAccountMigration,
   cloudWorkspaceMigration,
-  /** The commit a cloud conversation's worktree was on after its last sync, so commits made on the Mac reach the sandbox. */
-  `ALTER TABLE cloud_workspaces ADD COLUMN mirror_head TEXT;`,
+  cloudWorkspaceMirrorHeadMigration,
   cloudWorkspaceRemovedMigration,
   subagentMigration,
   subagentIdentityMigration,
@@ -794,4 +724,12 @@ export const migrations: Migration[] = [
   retireTeamSchedulesMigration,
   ...cloudBrainMigrations,
   startedByAgentMigration,
+  `CREATE INDEX events_usage_history ON events(ts, id) WHERE kind IN ('turn.completed', 'usage.updated');`,
+  usageHistoryMigration,
+  orclingCompanionMigration,
+  /** A project's steps by day, for the new thread screen, read from this index alone rather than from every event. */
+  `CREATE INDEX events_steps ON events(run_id, ts) WHERE kind = 'tool.completed';`,
+  orclingTalkMigration,
+  orclingFollowupMigration,
+  reactionKindsMigration,
 ];

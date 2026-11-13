@@ -16,9 +16,10 @@ const SWEEP_MS = 2000;
 const SPAN = 2.5;
 
 /**
- * One line of text that lights up left to right while something works, as the desktop's working titles do: a band of
- * full ink sweeps across the muted words. The words are a mask over a moving gradient, so they keep their own shape and
- * truncation. Without `sweeping`, or under reduced motion, it is plain text in its classes.
+ * One line of text that shimmers left to right while something works, as the desktop's working titles do: a faint
+ * band sweeps across words in full ink, the ink the phone's list titles are in. The words are a mask over a moving
+ * gradient, so they keep their own shape and truncation. Without `sweeping`, or under reduced motion, it is plain text
+ * in its classes.
  */
 export function SweepText({ text, className, sweeping }: { text: string; className: string; sweeping: boolean }) {
   const still = useReducedMotion();
@@ -62,11 +63,11 @@ function Sweep({ text, className }: { text: string; className: string }) {
         <Svg width="100%" height="100%">
           <Defs>
             <LinearGradient id="sweep" x1="0" y1="0" x2="1" y2="0">
-              <Stop offset="0" stopColor={colors["ink-3"]} stopOpacity={1} />
-              <Stop offset="0.36" stopColor={colors["ink-3"]} stopOpacity={1} />
-              <Stop offset="0.5" stopColor={colors.ink} stopOpacity={1} />
-              <Stop offset="0.64" stopColor={colors["ink-3"]} stopOpacity={1} />
-              <Stop offset="1" stopColor={colors["ink-3"]} stopOpacity={1} />
+              <Stop offset="0" stopColor={colors.ink} stopOpacity={1} />
+              <Stop offset="0.36" stopColor={colors.ink} stopOpacity={1} />
+              <Stop offset="0.5" stopColor={colors["ink-4"]} stopOpacity={1} />
+              <Stop offset="0.64" stopColor={colors.ink} stopOpacity={1} />
+              <Stop offset="1" stopColor={colors.ink} stopOpacity={1} />
             </LinearGradient>
           </Defs>
           <Rect width="100%" height="100%" fill="url(#sweep)" />

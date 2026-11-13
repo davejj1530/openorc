@@ -1,9 +1,10 @@
 import { renamedTitle } from "@openorc/client";
 import type { ThreadSummary } from "@openorc/protocol";
 import { router } from "expo-router";
-import { useMemo } from "react";
+import { useContext, useMemo } from "react";
 import { Alert } from "react-native";
 import { hostLink, useRpcMutation } from "../client";
+import { HostContext } from "../connection/host-context";
 import { openInApp } from "../ui/web";
 import type { OrganizePatch, ThreadAction } from "./thread-actions";
 
@@ -34,6 +35,7 @@ function promptRename(title: string, save: (title: string) => void): void {
  */
 export function useThreadActions(thread: ThreadSummary | null, { onUnread }: { onUnread?: () => void } = {}) {
   const { mutate } = useRpcMutation("threads.update");
+  const host = useContext(HostContext);
   // Stable while the thread is, so a native menu built from `run` is not set again on every render.
   return useMemo(() => {
     const save = (patch: OrganizePatch | { title: string }) => {
@@ -50,12 +52,12 @@ export function useThreadActions(thread: ThreadSummary | null, { onUnread }: { o
       else if (action.kind === "rename") rename();
       else if (action.kind === "open") openInApp(action.url);
       else if (action.kind === "parent") router.push({ pathname: "/thread/[id]", params: { id: action.threadId } });
-      else if (action.kind === "screen") router.push({ pathname: action.pathname, params: { threadId: thread.id } });
+      else if (action.kind === "screen") router.push({ pathname: action.pathname, params: host ? { threadId: thread.id, host } : { threadId: thread.id } });
       else if (action.kind === "move")
         hostLink(action.mac)
           .connection.call(action.method, { threadId: thread.id })
           .catch((failure: Error) => Alert.alert("Couldn’t move this thread", failure.message));
     };
     return { run, save, rename };
-  }, [thread, mutate, onUnread]);
+  }, [thread, mutate, onUnread, host]);
 }

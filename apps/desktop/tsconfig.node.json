@@ -8,5 +8,5 @@
     "lib": ["ES2023", "DOM"],
     "types": ["node", "electron-vite/node"]
   },
-  "include": ["electron.vite.config.ts", "src/main", "src/preload", "src/core", "src/shared"]
+  "include": ["electron.vite.config.ts", "src/electron-binary.global-setup.ts", "src/electron-binary.global-setup.test.ts", "src/main", "src/preload", "src/core", "src/shared"]
 }

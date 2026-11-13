@@ -25,7 +25,7 @@ export function ImportProjectDialog({ open, onOpenChange }: { open: boolean; onO
   }, [open]);
 
   const chooseFolder = async () => {
-    const picked = await window.openorc.pickDirectory();
+    const picked = await window.openorc.pickDirectory("project");
     if (picked) setPath(picked);
   };
 
@@ -44,7 +44,7 @@ export function ImportProjectDialog({ open, onOpenChange }: { open: boolean; onO
           queryClient.setQueryData<Project[]>(["projects.list", {}], (list) => (list && !list.some((known) => known.id === p.id) ? [...list, p] : list));
           onOpenChange(false);
           const open = () => {
-            useLayout.getState().setProject(p.id);
+            useLayout.getState().followProject(p.id);
             newThread(p.id);
           };
           // Added from the new thread screen, the project swaps in as if chosen in its question.

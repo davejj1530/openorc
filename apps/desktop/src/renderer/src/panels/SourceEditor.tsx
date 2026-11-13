@@ -65,20 +65,21 @@ function useEditorFeatures({ selection, root, path, text, buffer }: Props) {
       endLine: location.endLine,
       endColumn: location.endColumn,
     });
-  const intelligence: EditorIntelligence | undefined = editorLanguage(path)
-    ? {
-        query: (query, currentText) => queryEditor({ scope: selection.scope, root, path, text: currentText, query }),
-        navigate,
-        locations: (title, locations, truncated) => setInsight({ kind: "locations", title, locations, truncated }),
-        analysis: setAnalysis,
-        fixes: (fixes) => setInsight({ kind: "fixes", fixes }),
-        outline: () => setInsight((current) => (current?.kind === "outline" ? null : { kind: "outline" })),
-        problems: () => setInsight((current) => (current?.kind === "problems" ? null : { kind: "problems" })),
-        error: setError,
-        back: () => moveInEditor(key, "back", current()),
-        forward: () => moveInEditor(key, "forward", current()),
-      }
-    : undefined;
+  const intelligence: EditorIntelligence | undefined =
+    editorLanguage(path) && !buffer.outside
+      ? {
+          query: (query, currentText) => queryEditor({ scope: selection.scope, root, path, text: currentText, query }),
+          navigate,
+          locations: (title, locations, truncated) => setInsight({ kind: "locations", title, locations, truncated }),
+          analysis: setAnalysis,
+          fixes: (fixes) => setInsight({ kind: "fixes", fixes }),
+          outline: () => setInsight((current) => (current?.kind === "outline" ? null : { kind: "outline" })),
+          problems: () => setInsight((current) => (current?.kind === "problems" ? null : { kind: "problems" })),
+          error: setError,
+          back: () => moveInEditor(key, "back", current()),
+          forward: () => moveInEditor(key, "forward", current()),
+        }
+      : undefined;
   const close = () => {
     setInsight(null);
     actions.current?.focus();

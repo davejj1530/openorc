@@ -29,7 +29,7 @@ export interface Usage extends HostRead {
 const BEAT_MS = 30_000;
 const NO_LIMITS: readonly PlanLimits[] = [];
 
-const hasLimits = (host: Pick<HostRead, "accounts">) => host.accounts.some((account) => account.windows.length > 0);
+const hasLimits = (host: Pick<HostRead, "accounts">) => host.accounts.some((account) => account.windows.length > 0 || Boolean(account.credits?.length));
 
 /**
  * Whose limits to show of a Mac and its cloud brain, which run on the same accounts: a host that answers now, the Mac

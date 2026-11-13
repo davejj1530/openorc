@@ -69,10 +69,12 @@ function Stopped({ thread, request, disabled, onSent }: RecoveryProps) {
   const submitter = useHostClient().useSubmit();
   const offered = canContinueWithAnother(thread) && request.choice?.agent === "claude";
   const list = useRpc("claude.accounts.list", {}, { enabled: canContinueWithAnother(thread) });
+  // From the cached list: a project that uses only some accounts goes on with one of those.
+  const project = useRpc("projects.list", {}, { enabled: offered }).data?.find((each) => each.id === thread.projectId);
   const limits = useRpc("providers.limits", {}, { enabled: offered, staleTime: 60_000, gcTime: Infinity });
   const now = Date.now();
   const accounts = list.data?.accounts ?? [];
-  const choices = offered ? continueChoices(accountsToContinueWith(thread, accounts), limits.data ?? [], now) : [];
+  const choices = offered ? continueChoices(accountsToContinueWith(thread, accounts, project), limits.data ?? [], now) : [];
   const own = accounts.find((account) => account.id === (thread.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT))?.name;
   const words = stoppedWords(thread, thread.agent === "claude" && accounts.length > 1 ? own : undefined);
   const start = (key: string, how: Pick<SubmitRequest, "restart" | "claudeAccountId">, prompt: string) => {

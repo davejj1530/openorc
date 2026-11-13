@@ -7,8 +7,8 @@ import { docHref } from "../../data/docs";
 
 <DocsLayout slug="settings">
   <p>
-    Open <strong>Settings</strong> at the end of the sidebar's footer, or choose <strong>Settings</strong> in the command palette (<kbd>⌘K</kbd>). The sidebar then lists the sections, under <strong>Back to app</strong>. The section's title at
-    the top of the page is also a menu of every section.
+    Open <strong>Settings</strong> at the foot of the sidebar's rail, or choose <strong>Settings</strong> in the command palette (<kbd>⌘K</kbd>). The sidebar then lists the sections, under <strong>Back to app</strong>. With the sidebar
+    hidden, the section's title at the top of the page is a menu of every section.
   </p>
   <p>
     Most choices save as soon as you make them, and the page shows <strong>Saving…</strong> and then <strong>Saved</strong>. If a save fails, the page says <strong>Could not save. Your change is still here.</strong> and offers <strong
@@ -19,8 +19,12 @@ import { docHref } from "../../data/docs";
   <section aria-labelledby="usage">
     <h2 id="usage">Usage</h2>
     <p>
-      Usage shows a card for each account's allowances: Codex, OpenCode, and each Claude account you use, named such as <strong>Claude · Work</strong>. An <strong>Anthropic API</strong> card joins them when you choose or save an Anthropic API
-      key under Memory &amp; models. The sidebar's footer shows the same numbers for the account your next message would use.
+      <strong>Cost</strong> and <strong>Tokens</strong> show recorded activity for this OpenOrc installation. Filter by agent and choose the past 24 hours, 7 days, 30 days, or 90 days. The chart shows the trend; the table breaks it down by model or day.
+      Costs are API estimates, including on subscription plans. Codex estimates use recorded tokens and published model prices, including cached-input discounts and recorded Fast mode; other agents supply their own estimates. Unknown prices stay unavailable.
+    </p>
+    <p>
+      <strong>Limits</strong> lists your enabled agents and Claude accounts, named such as <strong>Claude · Work</strong>. Codex, Claude Code, and signed-in Antigravity accounts report allowances; other agents link to their provider's usage page. An <strong>Anthropic API</strong> card joins them when you choose or save an Anthropic API
+      key under Memory &amp; models. The usage ring on the sidebar's rail shows the same numbers for the account your next message would use.
     </p>
     <div class="docs-table">
       <table>
@@ -58,7 +62,8 @@ import { docHref } from "../../data/docs";
         </tbody>
       </table>
     </div>
-    <p>OpenCode bills each model through the provider account you signed in to it with, so its report has no limits. Check that provider's own dashboard.</p>
+    <p>fx reports AI Gateway balances and budgets, or Codex and Grok plan allowances, through its native usage commands. A balance without a defined budget shows an amount instead of a percentage. Custom fx connections use their provider's dashboard.</p>
+    <p>OpenCode, Oh My Pi, and Pi bill their configured model providers. Their account limits stay on those providers' dashboards. Cursor links to its own dashboard; Antigravity API-key usage links to Google AI Studio.</p>
     <Callout>A limit belongs to the provider account, so it can include work you did outside OpenOrc. Reset times use your device's time zone.</Callout>
   </section>
 
@@ -66,6 +71,7 @@ import { docHref } from "../../data/docs";
     <h2 id="connections">Connections</h2>
     <p>Connections lists the coding agents, your Claude accounts, and the GitHub tools OpenOrc found on this computer. <strong>Refresh connections</strong> checks each agent again, so it picks up an agent you just installed or signed in to.</p>
     <h3>Coding agents</h3>
+    <p>Enable the agents you want to use. Enabled agents appear in model pickers and can start work. Turning one off keeps its conversation history but removes it from choices for new work. <strong>Add agents</strong> lists the others; choose <strong>Enable</strong> to bring one back. See <a href={docHref("agents")}>all eight supported agents</a>.</p>
     <div class="docs-table">
       <table>
         <thead>
@@ -85,30 +91,31 @@ import { docHref } from "../../data/docs";
           </tr>
           <tr>
             <td>Sign-in hint</td>
-            <td>For an agent that is installed but signed out: <strong>Connect in a terminal</strong> with <code>codex login</code>, <code>claude auth login</code>, or <code>opencode auth login</code>.</td>
+            <td>For an agent that is installed but signed out: <strong>Connect in a terminal</strong> shows its own sign-in command. Agents that accept API keys also use keys from their native configuration or launch environment.</td>
           </tr>
           <tr>
             <td>Install button</td>
-            <td>For an agent that is not installed, <strong>Install Codex</strong>, <strong>Install Claude Code</strong>, or <strong>Install OpenCode</strong> opens its setup guide.</td>
+            <td>For an agent that is not installed, its install button opens that agent's setup guide.</td>
           </tr>
           <tr>
             <td><strong>Check for updates</strong></td>
             <td>
-              Looks for newer agent versions now. <strong>Update all</strong> installs every update found, and each row has its own button, such as <strong>Update Claude</strong>. A broken installation shows a reinstall button instead,
+              Looks for newer agent versions now. <strong>Update all</strong> installs supported updates for enabled agents, and each row has its own button, such as <strong>Update Claude</strong>. A broken installation shows a reinstall button when its package manager can repair it,
               such as <strong>Reinstall Codex</strong>. When OpenOrc can't update an agent itself, the row links to instructions instead.
             </td>
           </tr>
           <tr>
             <td><strong>Check for agent updates automatically</strong></td>
-            <td>On by default. Checks every six hours while OpenOrc is open, asking npm or Homebrew for public version numbers. Nothing installs until you press a button.</td>
+            <td>On by default. Checks every six hours while OpenOrc is open, asking npm, Homebrew, or the agent's official release service for public version numbers. Nothing installs until you press a button.</td>
           </tr>
         </tbody>
       </table>
     </div>
-    <p>Updates start only when agent work has finished. Idle agents close for the update and reconnect with your next message.</p>
+    <p>Agents keep working during an update. Each conversation moves to the new version on its next message. <strong>Stop</strong> on an agent's row ends the update that is running.</p>
+    <p>All eight agents support in-app updates through recognized installers. This includes Oh My Pi's stable Homebrew tap, Pi's npm installation, and the native installers for Cursor, Antigravity, and fx. OpenOrc keeps the installation's package manager and release channel. Pinned or custom installations show an explanation when an update needs to be done in a terminal.</p>
     <h3>Claude accounts</h3>
     <p>
-      Each Claude account has a card with its name, email, status, and buttons such as <strong>Make default</strong>, <strong>Sign in again</strong>, and <strong>Disable</strong>. Your existing Claude Code login is listed as <strong>Existing CLI login</strong>. To add one, type a name
+      Each Claude account has a row with its name, email, status, and buttons such as <strong>Make default</strong>, <strong>Sign in again</strong>, and <strong>Disable</strong>. Your existing Claude Code login is listed as <strong>Existing CLI login</strong>. To add one, type a name
       and click <strong>Add account and sign in</strong>. The default account is the one new threads start with. <strong>Refresh accounts</strong> checks each sign-in again. See <a href={docHref("agents") + "#claude-accounts"}>Use several Claude accounts</a>.
     </p>
     <h3>GitHub</h3>
@@ -177,7 +184,7 @@ import { docHref } from "../../data/docs";
           </tr>
           <tr>
             <td><strong>OpenCode</strong></td>
-            <td>A key for each provider OpenCode uses in sandboxes. <strong>Add a key</strong> adds one.</td>
+            <td>Provider keys for OpenCode and Oh My Pi in sandboxes. <strong>Add a key</strong> adds one.</td>
           </tr>
           <tr>
             <td><strong>Cloud brain</strong></td>
@@ -284,11 +291,11 @@ import { docHref } from "../../data/docs";
     <p>Skills lists the skills each agent can use in a project. It only reads them; nothing here changes or runs a skill.</p>
     <ul>
       <li><strong>Project</strong> chooses which project's skills you see. Each agent also has personal and plugin skills that apply in every project.</li>
-      <li>The <strong>Codex</strong>, <strong>Claude Code</strong>, and <strong>OpenCode</strong> buttons switch agents and show how many skills each one has.</li>
+      <li>The agent buttons switch between your enabled agents and show how many skills each one has.</li>
       <li>Skills are grouped as <strong>Project skills</strong>, <strong>Your skills</strong>, <strong>Plugin skills</strong>, and <strong>Built-in skills</strong>. Open one to see its location.</li>
       <li><strong>Search skills</strong> filters by name, description, or path. <strong>Refresh skills</strong> reads the folders again.</li>
     </ul>
-    <p>To use a skill, type <code>$name</code> in a Codex message or <code>/name</code> in a Claude Code message. OpenCode loads skills with its own skill tool, so ask it to use one by name. See <a href={docHref("skills")}>Skills</a>.</p>
+    <p>Use <code>$name</code> for Codex or fx, <code>/name</code> for Claude Code, Cursor, or Antigravity, and <code>/skill:name</code> for Pi or Oh My Pi. OpenCode loads skills with its own skill tool, so ask it to use one by name. See <a href={docHref("skills")}>Skills</a>.</p>
   </section>
 
   <section aria-labelledby="devices">
@@ -407,8 +414,8 @@ import { docHref } from "../../data/docs";
           <tr>
             <td><strong>Check for updates automatically</strong></td>
             <td>
-              Checks for a new OpenOrc release shortly after launch and every six hours, then shows a notice. Nothing downloads until you choose to. With it off, use <strong>Check for updates…</strong> in the OpenOrc menu on macOS, or the
-              Help menu on Windows. Linux releases don't update themselves.
+              Checks for a new OpenOrc release shortly after launch and every six hours, then shows a notice. Nothing downloads until you choose to. With it off, use the update button above <strong>Settings</strong> on the sidebar's rail, or
+              <strong>Check for updates…</strong> in the OpenOrc menu on macOS or the Help menu on Windows. Linux releases don't update themselves.
             </td>
             <td>On</td>
           </tr>
@@ -466,7 +473,7 @@ import { docHref } from "../../data/docs";
           <tr>
             <td><strong>Harness</strong>, under <strong>Text generation</strong></td>
             <td>
-              Which agent names new threads and <a href={docHref("files") + "#explain"}>explains code</a>. <strong>Automatic · per conversation</strong> uses a small model from the conversation's own agent; choosing <strong>Codex</strong>, <strong>Claude Code</strong>, or <strong>OpenCode</strong> uses that agent every time; <strong>Off · use opening message</strong> keeps the first line of your message and turns explanations off.
+              Which agent names new threads and <a href={docHref("files") + "#explain"}>explains code</a>. <strong>Automatic · per conversation</strong> uses a small model from the conversation's own agent; choosing an available harness uses it every time; <strong>Off · use opening message</strong> keeps the first line of your message and turns explanations off.
             </td>
             <td>Automatic · per conversation</td>
           </tr>
@@ -478,6 +485,7 @@ import { docHref } from "../../data/docs";
         </tbody>
       </table>
     </div>
+    <p>Background text generation supports Codex, Claude Code, OpenCode, and Oh My Pi. In Automatic, other agents keep the opening message as the thread title and cannot explain code. Choose a supported harness to enable those features for every conversation.</p>
     <p>Learning is paused while OpenOrc memory is off. With memory on and the provider set to Off, agents can still save memories themselves.</p>
     <Callout>An Anthropic API key is billed separately from a Claude subscription. OpenOrc keeps it in your system's protected storage; <strong>Remove API key</strong> deletes it.</Callout>
   </section>
@@ -485,7 +493,7 @@ import { docHref } from "../../data/docs";
   <section aria-labelledby="data">
     <h2 id="data">Data</h2>
     <p>
-      Data shows the path of the <strong>Data folder</strong>, where OpenOrc keeps its database, memories, and worktrees. Below it, <strong>How your data is used</strong> summarizes where requests go: memory search runs on this device, each agent's
+      Data shows the path of the <strong>Data folder</strong>, where OpenOrc keeps its database, memories, and worktrees, and how much space the worktrees take, with <strong>Clean up…</strong> to remove the ones you no longer need (see <a href={docHref("git") + "#remove"}>Remove a worktree</a>). Below it, <strong>How your data is used</strong> summarizes where requests go: memory search runs on this device, each agent's
       requests go to its own provider, and background models use the same agent unless you chose another under Memory &amp; models. <a href={docHref("storage")}>Data and storage</a> lists everything in the folder.
     </p>
   </section>

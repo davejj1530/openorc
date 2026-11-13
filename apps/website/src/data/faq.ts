@@ -16,7 +16,7 @@ export const questions: Question[] = [
     id: "existing-agents",
     question: "Can I use my existing agents?",
     answer:
-      "Yes. OpenOrc works with the Codex, Claude Code, and OpenCode tools you already have installed, through their own sign-in and configuration. Provider subscriptions and API usage stay separate.",
+      "Yes. OpenOrc works with the Codex, Claude Code, OpenCode, Oh My Pi, Cursor, Pi, Antigravity, and fx tools you already have installed, through their own sign-in and configuration. Provider subscriptions and API usage stay separate.",
   },
   {
     id: "where-work-lives",
@@ -49,6 +49,6 @@ export const questions: Question[] = [
     id: "cloud",
     question: "Can agents keep working while my computer sleeps?",
     answer:
-      "Yes, in a cloud thread. It runs in a sandbox on your own Vercel or Agent37 account, which bills you for it, and its changes sync back to a worktree on your computer. Set up the cloud brain too, and your phone can follow and start cloud threads while the computer sleeps.",
+      "Yes, with Codex, Claude Code, OpenCode, or Oh My Pi in a cloud thread. Cursor, Pi, Antigravity, and fx run on your connected computer. A cloud thread runs in a sandbox on your own Vercel or Agent37 account, which bills you for it, and its changes sync back to a worktree on your computer. Set up the cloud brain too, and your phone can follow and start cloud threads while the computer sleeps.",
   },
 ];

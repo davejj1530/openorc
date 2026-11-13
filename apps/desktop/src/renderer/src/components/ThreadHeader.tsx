@@ -1,20 +1,22 @@
 import { Menu } from "@base-ui/react/menu";
 import { snoozeWakeLabel } from "@openorc/client";
-import type { CloudThreadState, Project, ThreadSummary as Thread } from "@openorc/protocol";
+import type { CloudThreadState, ThreadSummary as Thread } from "@openorc/protocol";
 import { isSubagentThread } from "@openorc/protocol";
+import { useCallback, useRef } from "react";
 import { CoversPreview } from "../lib/browser-preview";
 import { openThread, useRouter } from "../lib/router";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { ThreadOrcling } from "./OrclingAvatar";
 import { ThreadParent } from "./SubagentConversation";
 import { ThreadMenuItems } from "./ThreadActions";
-import { ThreadClaudeAccount } from "./ThreadClaudeAccount";
+import { ThreadTabs } from "./ThreadTabs";
 import { ThreadTitle } from "./ThreadTitle";
 import { ThreadTools } from "./ThreadTools";
 import { TopBar } from "./TopBar";
 import { AlarmClock, ArrowLeft, Cloud, GitFork, GitPullRequest, MoreHorizontal, X } from "./icons";
-import { menuItem, menuPopup } from "./menu";
+import { menuPopup } from "./menu";
 import { IconButton, StatusDot, Tooltip } from "./ui";
+import { thisComputer } from "../lib/this-computer";
 
 /** Whether the header starts or ends the work row, which decides who clears the native window controls. */
 type Placement = { first: boolean; last: boolean; onClose?: () => void };
@@ -37,7 +39,7 @@ function ClosePane({ onClose }: { onClose?: () => void }) {
 export function ThreadHeaderPlaceholder({ loading, first, last, onClose }: Placement & { loading: boolean }) {
   const back = useRouter((s) => s.back);
   return (
-    <TopBar windowDragSurface showProject={false} inSplit={!first} rightmost={last} actions={<ClosePane onClose={onClose} />}>
+    <TopBar windowDragSurface inSplit={!first} rightmost={last} actions={<ClosePane onClose={onClose} />}>
       <Tooltip label="Back">
         <IconButton onClick={back} aria-label="Back">
           <ArrowLeft size={16} />
@@ -49,12 +51,12 @@ export function ThreadHeaderPlaceholder({ loading, first, last, onClose }: Place
 }
 
 /**
- * A quiet thread header: the title, then a faint run of facts (project, Claude account, activity, pull request,
- * snooze), then More, the thread's tools and Close pane as round buttons. The header never activates a pane.
+ * A quiet thread header: the title, then a faint run of facts (activity, pull request, snooze), then More, the
+ * thread's tools and Close pane as round buttons. The project is the sidebar filter's, the Claude account the model picker's. The first pane's header holds the work
+ * column's tabs in place of the title, its facts moving beside the buttons. The header never activates a pane.
  */
 export function ThreadHeader({
   thread: t,
-  project: p,
   renaming,
   onRenamingChange,
   onRename,
@@ -63,53 +65,75 @@ export function ThreadHeader({
   onClose,
 }: Placement & {
   thread: Thread;
-  project: Project;
   renaming: boolean;
   onRenamingChange: (renaming: boolean) => void;
   onRename: (title: string) => void;
 }) {
+  // Before a split pane's title the parent reads as a crumb; among the first pane's facts, as a fact of its own.
+  const lineage = (fact: boolean) => (
+    <>
+      {t.parentThreadId ? <ThreadParent id={t.parentThreadId} fact={fact} /> : <ForkParent parent={t.forkedFromId} />}
+      <ThreadOrcling threadId={t.id} orclingId={t.orclingId} />
+    </>
+  );
+  const facts = (
+    <span className="thread-header-facts">
+      {first ? lineage(true) : null}
+      <ThreadFacts thread={t} />
+    </span>
+  );
   return (
     <TopBar
       windowDragSurface
-      showProject={false}
+      tabs={first}
       inSplit={!first}
       rightmost={last}
       actions={
         <>
+          {first ? facts : null}
           <ClosePane onClose={onClose} />
-          <Menu.Root>
-            <Menu.Trigger render={<IconButton aria-label="Thread actions" />}>
-              <MoreHorizontal size={16} />
-            </Menu.Trigger>
-            <Menu.Portal>
-              <CoversPreview />
-              <Menu.Positioner sideOffset={6} align="end" className="z-40" collisionPadding={8}>
-                <Menu.Popup ref={floatingGround} className={menuPopup} finalFocus={renaming ? false : undefined}>
-                  {!isSubagentThread(t) ? (
-                    <Menu.Item className={menuItem} onClick={() => onRenamingChange(true)}>
-                      Rename
-                    </Menu.Item>
-                  ) : null}
-                  <ThreadMenuItems thread={t} parts={Menu} />
-                </Menu.Popup>
-              </Menu.Positioner>
-            </Menu.Portal>
-          </Menu.Root>
+          <ThreadMenu thread={t} renaming={renaming} {...(isSubagentThread(t) ? {} : { onRename: () => onRenamingChange(true) })} />
           {!isSubagentThread(t) ? <ThreadTools threadId={t.id} /> : null}
         </>
       }
     >
-      {t.parentThreadId ? <ThreadParent id={t.parentThreadId} /> : <ForkParent parent={t.forkedFromId} />}
-      <ThreadOrcling threadId={t.id} orclingId={t.orclingId} />
-      {isSubagentThread(t) ? <span className="truncate text-sm">{t.title}</span> : <ThreadTitle title={t.title} editing={renaming} onEditingChange={onRenamingChange} onSave={onRename} />}
-      <span className="thread-header-facts">
-        <span className="thread-header-project" title={p.rootPath}>
-          {p.name}
-        </span>
-        {t.agent === "claude" && !isSubagentThread(t) ? <ThreadClaudeAccount thread={t} /> : null}
-        <ThreadFacts thread={t} />
-      </span>
+      {first ? (
+        <ThreadTabs
+          title={renaming ? <ThreadTitle title={t.title} editing onEditingChange={onRenamingChange} onSave={onRename} /> : undefined}
+          {...(isSubagentThread(t) ? {} : { onRename: () => onRenamingChange(true) })}
+        />
+      ) : (
+        <>
+          {lineage(false)}
+          {isSubagentThread(t) ? <span className="truncate text-sm">{t.title}</span> : <ThreadTitle title={t.title} editing={renaming} onEditingChange={onRenamingChange} onSave={onRename} />}
+          {facts}
+        </>
+      )}
     </TopBar>
+  );
+}
+
+/**
+ * The header's thread menu. It hangs from the header rather than its button: 8px under the header's hairline, its right
+ * edge in line with the header's last round tool, 8px in from the thread's edge.
+ */
+function ThreadMenu({ thread, renaming, onRename }: { thread: Thread; renaming: boolean; onRename?: () => void }) {
+  const trigger = useRef<HTMLButtonElement>(null);
+  const header = useCallback(() => trigger.current?.closest("header") ?? null, []);
+  return (
+    <Menu.Root>
+      <Menu.Trigger ref={trigger} render={<IconButton aria-label="Thread actions" className="thread-more" />}>
+        <MoreHorizontal size={16} />
+      </Menu.Trigger>
+      <Menu.Portal>
+        <CoversPreview />
+        <Menu.Positioner anchor={header} side="bottom" sideOffset={8} align="end" alignOffset={8} collisionAvoidance={{ side: "flip", align: "shift" }} className="z-40" collisionPadding={8}>
+          <Menu.Popup ref={floatingGround} className={menuPopup} finalFocus={renaming ? false : undefined}>
+            <ThreadMenuItems thread={thread} parts={Menu} header onRename={onRename} />
+          </Menu.Popup>
+        </Menu.Positioner>
+      </Menu.Portal>
+    </Menu.Root>
   );
 }
 
@@ -118,7 +142,7 @@ const cloudDot = { preparing: "live", failed: "bad", ready: null, removed: null 
 const cloudPlaces = {
   vercel: { label: "Vercel", tip: "Runs in Vercel Sandbox" },
   agent37: { label: "Agent37", tip: "Runs in an Agent37 instance" },
-  local: { label: "Simulated", tip: "Runs in a sandbox simulated on this Mac" },
+  local: { label: "Simulated", tip: `Runs in a sandbox simulated on ${thisComputer}` },
 } as const;
 
 function cloudTip(cloud: CloudThreadState, where: string): string {
@@ -150,7 +174,7 @@ function ThreadFacts({ thread: t }: { thread: Thread }) {
       {!t.teamInstanceId && t.activity !== "idle" ? (
         <span className="thread-header-fact">
           <StatusDot tone={t.activity === "waiting" ? "attention" : "live"} />
-          {t.activity === "waiting" ? "needs you" : "working"}
+          {t.activity === "waiting" ? "Needs you" : "Working"}
         </span>
       ) : null}
       {t.prUrl ? (

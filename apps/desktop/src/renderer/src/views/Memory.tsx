@@ -3,11 +3,13 @@ import type { MemorySource, MemoryType } from "@openorc/protocol";
 import { memorySourceLabel } from "../components/MemoryCard";
 import { memoryTypeLabel, memoryTypeOrder } from "../components/memory";
 import { PageFilters, PageSearch } from "../components/PageFilters";
+import { ProjectPicker } from "../components/ProjectPicker";
+import { ScopedTitle } from "../components/ScopedTitle";
 import { TopBar } from "../components/TopBar";
 import { Button, Empty, Select, TextButton } from "../components/ui";
-import { useLayout } from "../lib/layout";
+import { focusedProject, useLayout } from "../lib/layout";
 import { useRpc } from "../lib/client";
-import { newThread, useRouter } from "../lib/router";
+import { useRouter } from "../lib/router";
 import { MemoryResults } from "./memory-results";
 
 function MemoryBrowser({ projectId }: { projectId: string }) {
@@ -82,9 +84,10 @@ function MemoryBrowser({ projectId }: { projectId: string }) {
 /** A project's saved memories. Turning memory on or off lives in Settings. */
 export function Memory() {
   const projects = useRpc("projects.list", {});
-  const railProject = useLayout((s) => s.projectId);
-  const [selection, setSelection] = useState(railProject ?? "");
-  const selectedProject = projects.data?.find((p) => p.id === selection) ?? projects.data?.[0];
+  // Memory belongs to one project at a time: the sidebar's, else the one chosen here, else the first.
+  const focused = useLayout(focusedProject);
+  const [chosen, setChosen] = useState<string | null>(null);
+  const selectedProject = projects.data?.find((p) => p.id === (focused ?? chosen)) ?? projects.data?.[0];
   const projectId = selectedProject?.id ?? "";
   let status: ReactNode = null;
   if (projects.error)
@@ -102,15 +105,16 @@ export function Memory() {
   else if (!projectId) status = <Empty title="No project yet">Import a project to browse its saved knowledge.</Empty>;
   return (
     <>
-      <TopBar
-        projectId={projectId || undefined}
-        projectName={selectedProject?.name}
-        onProjectChange={(id) => {
-          if (id && projects.data?.some((p) => p.id === id)) setSelection(id);
-          else newThread(id ?? undefined);
-        }}
-      >
-        Memory
+      <TopBar>
+        {selectedProject ? (
+          <ScopedTitle
+            open={<span className="truncate">Memory in {focused ? selectedProject.name : <ProjectPicker projectId={selectedProject.id} projects={projects.data} onProject={setChosen} />}</span>}
+          >
+            Memory
+          </ScopedTitle>
+        ) : (
+          "Memory"
+        )}
       </TopBar>
       <div className="page-column">{status ?? <MemoryBrowser key={projectId} projectId={projectId} />}</div>
     </>

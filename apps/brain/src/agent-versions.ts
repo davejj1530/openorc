@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import path from "node:path";
-import type { AgentVersions } from "@openorc/cloud";
+import { PREBUILT_INSTALL, type AgentVersions } from "@openorc/cloud";
 import { harnessCatalog, harnessIds } from "@openorc/protocol";
 
 const releaseOf = (output: string): string | null => /(\d+\.\d+\.\d+)/.exec(output)?.[1] ?? null;
@@ -25,10 +25,14 @@ export async function alignAgents(npmPrefix: string, wanted: AgentVersions, exec
     return answer.code === 0 ? releaseOf(answer.stdout) : null;
   };
   for (const id of harnessIds) {
-    const { npm, bin } = harnessCatalog[id].cli;
+    if (!harnessCatalog[id].cloud) continue;
+    const { npm, bin, prebuilt } = harnessCatalog[id].cli;
     const version = wanted[id];
-    if (version && (await has(bin)) !== version) await exec("npm", ["install", "--global", "--no-audit", "--no-fund", `${npm}@${version}`], { ...process.env, NPM_CONFIG_PREFIX: npmPrefix });
+    if ((!npm && !prebuilt) || !version || (await has(bin)) === version) continue;
+    // A prebuilt CLI goes beside the npm ones, from its maker's build service and checked against its sha256.
+    if (prebuilt) await exec(process.execPath, ["-e", PREBUILT_INSTALL, prebuilt, version, path.posix.join(npmPrefix, "bin", bin)]);
+    else await exec("npm", ["install", "--global", "--no-audit", "--no-fund", `${npm}@${version}`], { ...process.env, NPM_CONFIG_PREFIX: npmPrefix });
   }
-  const versions = Object.fromEntries(await Promise.all(harnessIds.map(async (id) => [id, await has(harnessCatalog[id].cli.bin)] as const)));
+  const versions = Object.fromEntries(await Promise.all(harnessIds.map(async (id) => [id, harnessCatalog[id].cloud ? await has(harnessCatalog[id].cli.bin) : null] as const)));
   return { versions: versions as AgentVersions };
 }

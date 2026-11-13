@@ -1,6 +1,9 @@
 export * from "./claude-accounts.js";
+export * from "./connectors.js";
+export * from "./skills.js";
 export * from "./diff-lines.js";
 export * from "./domain.js";
+export * from "./thread-status.js";
 export * from "./events.js";
 export * from "./execution-target.js";
 export * from "./harness.js";
@@ -8,6 +11,8 @@ export * from "./mcp-apps.js";
 export * from "./model-catalog.js";
 export * from "./orclings.js";
 export * from "./provider-usage.js";
+export * from "./usage-history.js";
+export * from "./project-activity.js";
 export * from "./pull-requests.js";
 export * from "./review-comments.js";
 export * from "./rpc.js";
@@ -16,6 +21,7 @@ export * from "./task-checkout.js";
 export * from "./task-comments.js";
 export * from "./visualization.js";
 export * from "./workspace-changes.js";
+export * from "./worktrees.js";
 
 export * from "./agent-citations.js";
 export * from "./agent-updates.js";

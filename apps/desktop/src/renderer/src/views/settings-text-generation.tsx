@@ -1,6 +1,7 @@
 import { textGenerationStatus } from "./settings-presentation";
 import { useId } from "react";
-import { harnessCatalog, harnessIds, isHarnessId, type TextGenerationSettings as Preferences } from "@openorc/protocol";
+import { harnessName, isHarnessId, textGenerationHarnessIds, type TextGenerationSettings as Preferences } from "@openorc/protocol";
+import { EnabledAgentOptions } from "../components/EnabledAgentOptions";
 import { Button, Select } from "../components/ui";
 import { ModelPicker } from "../components/ModelPicker";
 import { Field, LoadError, SaveStatus, Section, usePreference } from "./settings-shared";
@@ -22,11 +23,12 @@ export function TextGenerationSettings() {
         >
           <Select value={provider} disabled={s.disabled} onChange={(event) => void s.commit({ provider: event.target.value as Preferences["provider"] })}>
             <option value="auto">Automatic · per conversation</option>
-            {harnessIds.map((id) => (
-              <option key={id} value={id}>
-                {harnessCatalog[id].name}
+            <EnabledAgentOptions harnesses={textGenerationHarnessIds} />
+            {explicitProvider && !textGenerationHarnessIds.includes(explicitProvider) ? (
+              <option value={explicitProvider} disabled>
+                {harnessName(explicitProvider)} · unavailable
               </option>
-            ))}
+            ) : null}
             <option value="off">Off · use opening message</option>
           </Select>
         </Field>
@@ -40,6 +42,7 @@ export function TextGenerationSettings() {
             </span>
             <div className="flex min-w-0 flex-col items-end gap-1">
               <ModelPicker
+                harnesses={textGenerationHarnessIds}
                 value={v.model ? { agent: explicitProvider, model: v.model, effort: null } : null}
                 placeholder="Low-cost default"
                 ariaLabel="Text generation model"

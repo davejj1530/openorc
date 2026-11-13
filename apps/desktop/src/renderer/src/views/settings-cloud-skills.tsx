@@ -2,6 +2,7 @@ import { useState } from "react";
 import { harnessCatalog, type CloudSkills } from "@openorc/protocol";
 import { Dialog, Input, Switch, TextButton } from "../components/ui";
 import { queryClient, useRpc, useRpcMutation } from "../lib/client";
+import { useEnabledHarnesses } from "../lib/enabled-harnesses";
 import { Failure } from "./settings-secret-field";
 import { Section, SettingRow } from "./settings-shared";
 
@@ -69,9 +70,10 @@ function AgentSkills({ agent, choose }: { agent: Agent; choose: Choose }) {
 
 /** The user's own skills, each agent's, chosen to go to cloud threads too. Shown once an agent has any. */
 export function CloudSkillsSection({ active }: { active: boolean }) {
+  const enabled = useEnabledHarnesses();
   const skills = useRpc("cloud.skills", {}, { enabled: active });
   const choose = useRpcMutation("cloud.skills.choose");
-  const agents = (skills.data?.agents ?? []).filter((agent) => agent.skills.length || agent.error);
+  const agents = (skills.data?.agents ?? []).filter((agent) => enabled.includes(agent.agent) && (agent.skills.length || agent.error));
   if (skills.error) return <Failure error={skills.error} />;
   if (!agents.length) return null;
   return (

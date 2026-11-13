@@ -1,6 +1,6 @@
 import type { ThreadSummary } from "@openorc/protocol";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { threadAncestors, threadBranchPath, threadPageBranchPath, threadChildren, threadTreeRows, type ThreadTreeRow } from "@openorc/client";
+import { subthreadStatuses, threadAncestors, threadBranchPath, threadPageBranchPath, threadChildren, threadTreeRows, type ThreadTreeRow } from "@openorc/client";
 import { useLayout } from "../lib/layout";
 import { ChevronDown } from "./icons";
 import { ThreadRow, type RowProject } from "./ThreadLibraryRow";
@@ -28,6 +28,7 @@ export function ThreadTreeList({
   }, [activeId, ancestorsKey]);
   const rows = new Map(threadTreeRows(roots, all, saved, activeId ? [activeId] : [], childLimits).map((row) => [row.thread.id, row]));
   const children = threadChildren(all);
+  const subthreads = subthreadStatuses(all);
   const visited = new Set<string>();
   const render = (thread: ThreadSummary): ReactNode => {
     const row = rows.get(thread.id);
@@ -38,7 +39,7 @@ export function ThreadTreeList({
     return (
       <div key={thread.id} className="sidebar-tree-node" data-child={depth > 0 || undefined}>
         <BranchRow row={row} project={Boolean(project)} onToggle={hasChildren ? () => toggle(thread.id, expanded) : undefined}>
-          <ThreadRow thread={thread} active={activeId === thread.id} compact={depth > 0} project={project} />
+          <ThreadRow thread={thread} subthreads={subthreads.get(thread.id) ?? null} active={activeId === thread.id} compact={depth > 0} project={project} />
         </BranchRow>
         {expanded && hasChildren ? (
           <div className="sidebar-tree-children" data-capped={depth >= 3 || undefined}>
@@ -83,7 +84,7 @@ function BranchRow({ row, project = false, children, paging = false, onToggle }:
       if (scale)
         setSize({
           height: node.offsetHeight,
-          mid: center(node.querySelector(".thread-preview-project-icon") ?? node.querySelector(".thread-preview-status")),
+          mid: center(node.querySelector(".thread-preview-project-icon") ?? node.querySelector(".thread-preview-status:not(:empty)") ?? node.querySelector(".thread-preview-heading")),
           title: center(node.querySelector(".thread-preview-heading")),
         });
     };

@@ -1,0 +1,26 @@
+{
+  "generator": "OpenAI image generation (built-in tool)",
+  "created": "2026-11-09",
+  "license": "Apache-2.0",
+  "derivation": "Original generated illustrations resized to 640 × 640 and encoded as WebP at quality 88. No third-party reference images were used.",
+  "assets": [
+    {
+      "file": "ribbons.webp",
+      "bytes": 13878,
+      "sha256": "f7924ebaf71977af6ec599e995819320ce8d82813db14a0804919fd58aa62052",
+      "prompt": "Use case: stylized-concept\nAsset type: original flat editorial illustration tile for desktop app onboarding, square.\nPrimary request: a striking TWO-DIMENSIONAL abstract composition of three broad flat ribbons connecting a few simple rounded geometric shapes. Deep cobalt blue, muted powder blue, warm ivory, and one small burnt-orange circle. Inspired only by classic cut-paper graphic design, not any brand. Graphic shapes overlap with sharp, perfectly flat color boundaries. Off-center crop with generous powder-blue negative space; bold enough to read at 120 pixels.\nStyle: minimalist vector-like paper-cut illustration. Absolutely flat solid colors, no volumetric objects, no photorealism, no isometric perspective, no bevels, no lighting, no shadows, no highlights, no gradients, no extrusion, no 3D. No text, letters, logos, UI controls, frames or watermarks. A full-bleed square artwork, not an app icon. 1024x1024."
+    },
+    {
+      "file": "flower.webp",
+      "bytes": 18964,
+      "sha256": "0f68b195011db4080aeeadb6fcdbbcc574a3944e1f3eef8b33cf0809199c981c",
+      "prompt": "Use case: stylized-concept\nAsset type: original flat editorial illustration tile for desktop app onboarding, square.\nPrimary request: a single oversized stylized burnt-orange flower with broad irregular petals, a small dark-blue center, a curved dark-green stem and two graphic green leaves, against a solid powder-blue background. Beautiful asymmetrical crop, flower in the upper half and stem extending off the lower edge. A graphic botanical composition, expressive but restrained, readable at 120 pixels.\nStyle: minimalist TWO-DIMENSIONAL cut-paper vector-like illustration with perfectly flat solid-color shapes and crisp edges. Limited palette: burnt orange, powder blue, deep cobalt, muted forest green. Absolutely no 3D, perspective, photorealism, shadows, lighting, shading, gradients, texture, glass, vase, extrusion or bevels. No text, lettering, logos, UI controls, frames or watermarks. Full-bleed square artwork, not an app icon. 1024x1024."
+    },
+    {
+      "file": "shapes.webp",
+      "bytes": 10202,
+      "sha256": "3f1713aa8196da595ba9a05eadc9f8addbb41942743d8bb4d4895c16f3457836",
+      "prompt": "Use case: stylized-concept\nAsset type: original flat editorial illustration tile for desktop app onboarding, square.\nPrimary request: a balanced abstract TWO-DIMENSIONAL cut-paper composition of interlocking arches, rectangles, a semicircle, and a small circle. The forms feel like pieces coming together into a project. Warm ivory, deep cobalt blue, muted powder blue, a small burnt-orange accent, and a forest-green rectangle. Solid powder-blue background. Strong large shapes and a few intentional gaps, bold asymmetry, contemporary editorial illustration, readable at 120 pixels.\nStyle: completely FLAT vector-like graphic, crisp edges and solid colors only. The arches are flat graphic silhouettes, not architecture or physical objects. Absolutely no 3D, isometric view, perspective, shadows, lighting, volumetric shading, gradients, texture, bevels, extrusion, photorealism. No text, letters, logos, UI controls, frames or watermarks. Full-bleed square artwork, not an app icon. 1024x1024."
+    }
+  ]
+}

@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import type { NewThreadPlace } from "@openorc/client";
 import { NOT_ON_BRAIN, WORKSPACE_ID } from "@openorc/protocol";
 import type { ComposerProps } from "./Composer";
@@ -38,7 +37,7 @@ function LocationSentence({ mode, branch }: { mode: NewThreadPlace; branch: stri
   return <span className="new-thread-sentence">Works in the local checkout{name ? <> on {name}</> : null}</span>;
 }
 
-/** Under the New thread composer: where the thread works (a menu or the Workspace folder), then the Claude account at the row's end. */
+/** Under the New thread composer: where the thread works, a menu or the Workspace folder. The Claude account is in the model picker. */
 export function NewThreadOptions(props: {
   projectId: string;
   mode: NewThreadPlace;
@@ -48,7 +47,6 @@ export function NewThreadOptions(props: {
   disabled: boolean;
   onFolder: (folder: string) => void;
   onMode: (mode: NewThreadPlace) => void;
-  account?: ReactNode;
 }) {
   const chooseFolder = async () => {
     const folder = await window.openorc.pickDirectory();
@@ -59,11 +57,11 @@ export function NewThreadOptions(props: {
       <div className="new-thread-location">
         {props.projectId === WORKSPACE_ID ? (
           <>
-            <span className="new-thread-folder" title={props.location.directory}>
+            <span className="new-thread-folder" data-tip={props.location.directory}>
               <Folder size={14} />
               <span>{props.location.directory}</span>
             </span>
-            <Button variant="ghost" size="sm" disabled={props.disabled} title="Choose the folder for this conversation" onClick={() => void chooseFolder()}>
+            <Button variant="ghost" size="sm" disabled={props.disabled} data-tip="Choose the folder for this conversation" onClick={() => void chooseFolder()}>
               Choose folder
             </Button>
           </>
@@ -87,7 +85,6 @@ export function NewThreadOptions(props: {
           />
         )}
       </div>
-      {props.account}
     </div>
   );
 }

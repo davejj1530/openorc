@@ -2,12 +2,14 @@ import { audit, projects, retiredTeams, scheduleFirings, schedules, threads as t
 import { normalizeModelSettings, ScheduleLaunchSnapshot, type RpcParams, type Schedule, type ScheduleFiringRecord, type ScheduleRunResult, type Thread } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import type { Logger } from "../transport.js";
+import { startingAccount } from "./project-claude-accounts.js";
 import type { Notification } from "./runs.js";
 import type { ThreadService } from "./threads.js";
 
 export type ScheduleInput = RpcParams<"schedules.create">;
 export interface ScheduleHooks {
-  maintenance?: () => boolean;
+  /** Whether this agent's installation is being replaced. Its timer firings wait for a later tick, so the ones behind them start on time. */
+  updating?: (agent: string) => boolean;
 }
 class FiringCancelled extends Error {}
 class FiringSkipped extends Error {}
@@ -19,6 +21,8 @@ export class ScheduleService {
   private closing = false;
   private readonly inFlight = new Map<string, Promise<ScheduleRunResult>>();
   private readonly legacyFlights = new Map<string, Promise<Thread>>();
+  /** Each schedule's account fallback the log has told of, so it says so once rather than at every firing. */
+  private readonly accountFallbacks = new Set<string>();
 
   constructor(
     private readonly db: Db,
@@ -71,8 +75,16 @@ export class ScheduleService {
     if (!agent) throw new Error("Choose a model for this schedule.");
     return ScheduleLaunchSnapshot.parse({ ...input, executionTarget: target, ...normalizeModelSettings({ agent, model, effort }), workspaceMode });
   }
+  /**
+   * A Claude account a person chose for a schedule must be one its project uses; with none chosen, the project's default.
+   * Another agent's schedule only carries one along.
+   */
+  private chosenAccount(input: Pick<ScheduleInput, "projectId" | "claudeAccountId">, agent: string | undefined): string {
+    return startingAccount(this.db, input.projectId, input.claudeAccountId, agent === "claude" ? "chosen" : "unused");
+  }
   create(input: ScheduleInput): Schedule {
-    const schedule = schedules.insert(this.db, this.normalize(input));
+    const normalized = this.normalize(input);
+    const schedule = schedules.insert(this.db, { ...normalized, claudeAccountId: this.chosenAccount(input, normalized.agent) });
     audit.record(this.db, { actor: "user", action: "schedule.create", resourceType: "schedule", resourceId: schedule.id, metadata: { everyMinutes: schedule.everyMinutes } });
     this.invalidate(["schedules"]);
     return schedule;
@@ -82,10 +94,11 @@ export class ScheduleService {
     if (!current) throw new Error(`schedule ${id} not found`);
     if (current.retiredTeam) throw new Error("Schedule not found.");
     const normalized = this.normalize({ ...current, ...patch });
+    const account = patch.claudeAccountId ? this.chosenAccount({ projectId: current.projectId, claudeAccountId: patch.claudeAccountId }, normalized.agent) : undefined;
     // A changed interval or re-enabled timer starts a new cadence, never a backlog.
     const nextRunAt = (patch.everyMinutes && patch.everyMinutes !== current.everyMinutes) || (patch.enabled && !current.enabled) ? Date.now() + normalized.everyMinutes * 60_000 : patch.nextRunAt;
     const { projectId: _projectId, ...configuration } = normalized;
-    const schedule = schedules.update(this.db, id, { ...patch, ...configuration, ...(nextRunAt !== undefined ? { nextRunAt } : {}) });
+    const schedule = schedules.update(this.db, id, { ...patch, ...configuration, ...(account ? { claudeAccountId: account } : {}), ...(nextRunAt !== undefined ? { nextRunAt } : {}) });
     this.invalidate(["schedules"]);
     return schedule;
   }
@@ -95,18 +108,19 @@ export class ScheduleService {
   }
 
   async tick(): Promise<void> {
-    if (this.closing || this.hooks?.maintenance?.()) return;
+    if (this.closing) return;
     // A crash before admission resumes the same receipt and immutable snapshot.
     for (const pending of scheduleFirings.pending(this.db)) {
-      if (this.closing || this.hooks?.maintenance?.()) return;
+      if (this.closing) return;
+      if (this.hooks?.updating?.(pending.snapshot.agent)) continue;
       await this.process(pending);
     }
     for (const listed of schedules.due(this.db, Date.now())) {
-      if (this.closing || this.hooks?.maintenance?.()) return;
+      if (this.closing) return;
       // An earlier schedule can await readiness while this one is edited or
       // manually fired. Bookkeeping does not change its configuration version.
       const schedule = schedules.get(this.db, listed.id);
-      if (!schedule || schedule.retiredTeam || !schedule.enabled || schedule.nextRunAt > Date.now()) continue;
+      if (!schedule || schedule.retiredTeam || !schedule.enabled || schedule.nextRunAt > Date.now() || this.hooks?.updating?.(schedule.agent)) continue;
       const key = `timer:${schedule.version}:${schedule.nextRunAt}`;
       const firing =
         scheduleFirings.findRequest(this.db, schedule.id, key) ??
@@ -122,7 +136,6 @@ export class ScheduleService {
     }
   }
   trigger(id: string, requestKey: string): Promise<ScheduleRunResult> {
-    if (this.hooks?.maintenance?.()) throw new Error("An agent update is running. Try again when it finishes.");
     if (!requestKey.trim() || requestKey.length > 300) throw new Error("A schedule launch needs a request key of at most 300 characters.");
     if (schedules.get(this.db, id)?.retiredTeam) throw new Error("Schedule not found.");
     const previous = scheduleFirings.findRequest(this.db, id, requestKey);
@@ -193,8 +206,20 @@ export class ScheduleService {
     if (thread) schedules.update(this.db, current.id, { lastRunAt: Date.now(), nextRunAt: Date.now() + firing.snapshot.everyMinutes * 60_000, lastThreadId: thread.id });
     else if (firing.trigger === "timer") schedules.update(this.db, current.id, { nextRunAt: Date.now() + firing.snapshot.everyMinutes * 60_000 });
   }
-  private firingAccount(snapshot: { claudeAccountId?: string }): string {
-    return snapshot.claudeAccountId ?? "claude-cli";
+  /**
+   * The account a firing starts on: the one the schedule was saved with, or its project's default once the project no
+   * longer uses that one, so the schedule goes on firing. The log says so the first time, and again only if the accounts
+   * involved change.
+   */
+  private firingAccount({ scheduleId, snapshot }: ScheduleFiringRecord): string {
+    const saved = snapshot.claudeAccountId ?? "claude-cli";
+    const account = startingAccount(this.db, snapshot.projectId, saved, snapshot.agent === "claude" ? "inherited" : "unused");
+    const fallback = `${scheduleId}:${saved}:${account}`;
+    if (account !== saved && snapshot.agent === "claude" && !this.accountFallbacks.has(fallback)) {
+      this.accountFallbacks.add(fallback);
+      this.log.warn(`Schedule "${snapshot.title}" runs on its project's default Claude account; its project no longer uses the one it was saved with.`);
+    }
+    return account;
   }
 
   private async execute(firing: ScheduleFiringRecord): Promise<ScheduleRunResult> {
@@ -221,7 +246,8 @@ export class ScheduleService {
       const when = new Date(firing.scheduledFor ?? firing.createdAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
       const common = {
         projectId: snapshot.projectId,
-        claudeAccountId: this.firingAccount(snapshot),
+        claudeAccountId: this.firingAccount(firing),
+        claudeAccountFrom: "inherited" as const,
         mode: snapshot.mode,
         permissionMode: snapshot.permissionMode,
         workspaceMode: snapshot.workspaceMode,

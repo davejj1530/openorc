@@ -6,6 +6,7 @@ import { memories, projects, runs, settings, summaries, tasks, threads } from "@
 import { ClaudeAdapter, CodexAdapter, RunHandle } from "@openorc/agents";
 import { WORKSPACE_ID, defaultOrclingLook, orclingExecution, type OrclingDraft, type RunSpec } from "@openorc/protocol";
 import { createOrclingHost } from "../mcp-host/orcling.js";
+import { guardContext } from "../remote/policy.js";
 import { OpenOrc } from "../openorc.js";
 
 let root: string | undefined;
@@ -166,6 +167,9 @@ it("keeps its own conversation a private chat: no Workspace memory in its prompt
       runs: core.runs,
       threads: core.threads,
       settings: core.settings,
+      planLimits: async () => [],
+      guard: guardContext(core.db, root!),
+      call: (method, params) => core.handle({ type: "rpc", id: 0, method, params }).then((reply) => (reply.type === "rpc.result" ? reply.result : Promise.reject(new Error(reply.message)))),
       send: async () => {
         throw new Error("Not sent in this test.");
       },
@@ -210,7 +214,7 @@ it("starts work in a project as itself, from a prompt or a saved task, and asks 
     await idle(gloop.threadId);
     const url = (await core.mcpServer()).urlForRun(runs.listForThread(core.db, gloop.threadId).at(-1)!.id);
 
-    const fresh = await toolCall(url, "orcling_thread_start", { project_id: project.id, prompt: "Build the landing page", title: "Landing page" });
+    const fresh = await toolCall(url, "orcling_thread_start", { yourself: true, project_id: project.id, prompt: "Build the landing page", title: "Landing page" });
     const started = JSON.parse(fresh.text) as { thread: { id: string } };
     expect(threads.get(core.db, started.thread.id)).toMatchObject({ projectId: project.id, orclingId: gloop.id, title: "Landing page" });
     await idle(started.thread.id);
@@ -232,7 +236,7 @@ it("starts work in a project as itself, from a prompt or a saved task, and asks 
       parentTaskId: null,
       threadId: null,
     });
-    const takenUp = JSON.parse((await toolCall(url, "orcling_thread_start", { project_id: project.id, task_id: task.id, prompt: "Start on this now" })).text) as {
+    const takenUp = JSON.parse((await toolCall(url, "orcling_thread_start", { yourself: true, project_id: project.id, task_id: task.id, prompt: "Start on this now" })).text) as {
       task: { id: string };
       thread: { id: string };
     };
@@ -255,15 +259,15 @@ it("starts work in a project as itself, from a prompt or a saved task, and asks 
       parentTaskId: null,
       threadId: theirs.id,
     });
-    expect((await toolCall(url, "orcling_thread_start", { project_id: project.id, task_id: owned.id, prompt: "Take it" })).text).toMatch(/already has a conversation, "Theirs"/);
-    expect((await toolCall(url, "orcling_thread_start", { project_id: WORKSPACE_ID, prompt: "Anything" })).text).toMatch(/Start work in a project/);
+    expect((await toolCall(url, "orcling_thread_start", { yourself: true, project_id: project.id, task_id: owned.id, prompt: "Take it" })).text).toMatch(/already has a conversation, "Theirs"/);
+    expect((await toolCall(url, "orcling_thread_start", { yourself: true, project_id: WORKSPACE_ID, prompt: "Anything" })).text).toMatch(/Start work in a project/);
 
     // An Approve Orcling asks first; declining starts nothing.
     const careful = await core.orclings.create(draft({ name: "Careful", permission: "approve" }));
     await core.threads.continueThread(careful.threadId, { ...turn, mode: "act", permissionMode: "review", prompt: "Hi" });
     await idle(careful.threadId);
     const carefulRun = runs.listForThread(core.db, careful.threadId).at(-1)!.id;
-    const asking = toolCall((await core.mcpServer()).urlForRun(carefulRun), "orcling_thread_start", { project_id: project.id, prompt: "Refactor everything" });
+    const asking = toolCall((await core.mcpServer()).urlForRun(carefulRun), "orcling_thread_start", { yourself: true, project_id: project.id, prompt: "Refactor everything" });
     await vi.waitFor(() => expect(core.runs.pending().some((approval) => approval.runId === carefulRun)).toBe(true));
     const approval = core.runs.pending().find((pending) => pending.runId === carefulRun)!;
     core.runs.resolveApproval(carefulRun, approval.approvalId, "deny");

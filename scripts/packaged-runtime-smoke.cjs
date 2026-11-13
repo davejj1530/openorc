@@ -10,7 +10,7 @@ const path = require("node:path");
 const http = require("node:http");
 const { createHash } = require("node:crypto");
 const { setTimeout: delay } = require("node:timers/promises");
-const { windows, linux, packagedEnvironment, packagedExecutable } = require("./fixtures/packaged-environment.cjs");
+const { windows, linux, providerCommands, packagedEnvironment, packagedExecutable } = require("./fixtures/packaged-environment.cjs");
 
 const appPath = process.argv[2];
 const keychainOnly = process.argv[3] === "--keychain-only";
@@ -109,12 +109,13 @@ async function launch(empty = true) {
   session.inspector = await inspector(stderr.match(/Debugger listening on (ws:\/\/127\.0\.0\.1:\d+\/[^\s]+)/)[1]);
   session.main = (expression, timeout) => session.inspector.evaluate(expression, timeout);
   // The inspector can accept requests before Electron installs its built-in
-  // module loader. Wait for that boundary, not just the inspector's socket.
+  // module loader and sets its resources path. Wait for that boundary, not
+  // just the inspector's socket.
   await until(
     () =>
       session.main(`(() => {
         const module = process.getBuiltinModule('module');
-        if (typeof module.createRequire !== 'function') return false;
+        if (typeof module.createRequire !== 'function' || !process.resourcesPath) return false;
         const require = module.createRequire(process.resourcesPath + '/app.asar/package.json');
         try {
           // The explicit main entry cannot resolve the npm electron launcher
@@ -146,9 +147,9 @@ async function launch(empty = true) {
   session.rpc = (method, params = {}) => session.renderer(`window.packagedSmokeRpc(${JSON.stringify(method)},${JSON.stringify(params)})`);
   const info = await session.rpc("system.info");
   assert.equal(info.dataDir, profile);
-  assert.equal(info.harnesses.length, 3);
+  assert.deepEqual(info.harnesses.map((harness) => harness.id).sort(), Object.keys(providerCommands).sort(), "Every agent has a stand-in");
   for (const harness of info.harnesses) {
-    assert.equal(harness.path, path.join(fixtureBin, harness.id + (windows ? ".exe" : "")), "Core login discovery resolves only disposable provider fixtures");
+    assert.equal(harness.path, path.join(fixtureBin, providerCommands[harness.id] + (windows ? ".exe" : "")), "Core login discovery resolves only disposable provider fixtures");
     assert.equal(harness.state, "check_failed", "Provider fixture cannot authenticate or run an agent");
   }
   if (empty) assert.deepEqual(await session.rpc("projects.list"), []);
@@ -211,7 +212,8 @@ function killOwnedGroup(session) {
   try {
     process.kill(-session.child.pid, "SIGKILL");
   } catch (error) {
-    if (error.code !== "ESRCH") throw error;
+    // macOS answers EPERM, not ESRCH, while the group's only members are helpers that exited and await reaping.
+    if (error.code !== "ESRCH" && error.code !== "EPERM") throw error;
   }
 }
 
@@ -507,5 +509,6 @@ verify()
         process.exitCode = 1;
       });
     clearTimeout(deadline);
-    fs.rmSync(root, { recursive: true, force: true });
+    // Windows keeps an exited app's files locked for a moment while its helpers finish; Node retries EPERM and EBUSY.
+    fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   });

@@ -11,12 +11,12 @@ import {
   workDuration,
   workspaceLabel,
   type ThreadPlace,
+  type ThreadStatus,
 } from "@openorc/client";
 import { harnessShortName, isHarnessId, type ThreadSummary } from "@openorc/protocol";
 import { useMemo, type ReactNode } from "react";
 import { CoversPreview } from "../lib/browser-preview";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
-import { useLayout } from "../lib/layout";
 import { orclingById, useOrclings } from "../lib/orclings";
 import { useRouter } from "../lib/router";
 import { endThreadDrag, startThreadDrag } from "../lib/thread-drag";
@@ -29,6 +29,7 @@ import { ThreadRowHeadline, useRowHeadline } from "./ThreadHeadline";
 import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
 import { CircleCheck, CircleDashed, Cloud, Folder, GitBranch, GitMerge, GitPullRequest, GitPullRequestClosed, Globe, X } from "./icons";
 import { menuPopup } from "./menu";
+import { Tooltip } from "./ui";
 
 const placeIcons: Record<ThreadPlace["kind"], ReactNode> = {
   branch: <GitBranch size={11} className="shrink-0" />,
@@ -52,7 +53,7 @@ function PullRequestMark({ thread }: { thread: ThreadSummary }) {
   if (!mark) return null;
   const Icon = pullRequestIcons[mark.state];
   return (
-    <span role="img" aria-label={mark.label} title={mark.label} className="size-4 shrink-0 inline-flex items-center justify-center">
+    <span role="img" aria-label={mark.label} data-tip={mark.label} className="size-4 shrink-0 inline-flex items-center justify-center">
       <Icon size={14} className={pullRequestTone[mark.state]} />
     </span>
   );
@@ -64,7 +65,7 @@ function PullRequestStatus({ thread }: { thread: ThreadSummary }) {
   if (!mark) return null;
   const Icon = pullRequestIcons[mark.state];
   return (
-    <span className={`thread-preview-pull ${pullRequestTone[mark.state]}`} role="img" aria-label={mark.label} title={mark.label}>
+    <span className={`thread-preview-pull ${pullRequestTone[mark.state]}`} role="img" aria-label={mark.label} data-tip={mark.label}>
       <Icon size={12} />
       <span className="tabular">#{pullRequestNumber(thread.prUrl)}</span>
     </span>
@@ -74,12 +75,15 @@ function PullRequestStatus({ thread }: { thread: ThreadSummary }) {
 /** The project a sidebar row belongs to. Workspace has no folder of its own. */
 export type RowProject = { name: string; rootPath?: string };
 
+type ThreadRowProps = { thread: ThreadSummary; subthreads?: ThreadStatus | null; active: boolean; project?: RowProject; compact?: boolean };
+
 /**
  * A thread row: its title with what it needs from you at the end, what its agent is doing while it works, then its
- * project and pull request. A sub thread keeps its mark ahead of its title, where the tree's lines reach it.
- * ⌘-click opens it in the split; right-click gives every action.
+ * project and pull request. A sub thread keeps its mark ahead of its title, where the tree's lines reach it. A parent's
+ * mark also tells of its sub threads (`subthreads`) while they need you or work. ⌘-click opens it in the split;
+ * right-click gives every action.
  */
-export function ThreadRow({ thread, active, project, compact = false }: { thread: ThreadSummary; active: boolean; project?: RowProject; compact?: boolean }) {
+export function ThreadRow({ thread, subthreads = null, active, project, compact = false }: ThreadRowProps) {
   const navigate = useRouter((s) => s.navigate);
   const addPane = useRouter((s) => s.addThreadPane);
   // Every thread open in a pane is marked alike; aria-current names only the focused one.
@@ -94,30 +98,41 @@ export function ThreadRow({ thread, active, project, compact = false }: { thread
   const mark = ownerMark(thread);
   return (
     <ContextMenu.Root>
-      <ContextMenu.Trigger
+      <Tooltip
+        side="right"
+        label={
+          <>
+            <span className="block">{thread.title}</span>
+            <span className="block text-ink-3">
+              {rowAbout(thread, place.label)} · {agentLabel} · {relativeTime(thread.lastActivityAt)}
+            </span>
+          </>
+        }
         render={
-          <button
-            draggable
-            onDragStart={(event) => startThreadDrag(event.dataTransfer, thread.id)}
-            onDragEnd={endThreadDrag}
-            onClick={(e) => {
-              if (e.metaKey || e.ctrlKey) addPane(thread.id);
-              else {
-                if (useLayout.getState().projectId !== null) useLayout.getState().setProject(thread.projectId);
-                dismissCompactNavigation();
-                navigate({ view: "thread", threadId: thread.id });
-              }
-            }}
-            aria-current={active ? "page" : undefined}
-            data-open={open || undefined}
-            className={`sidebar-thread-row thread-preview no-drag${compact ? " sidebar-thread-child" : ""}`}
-            title={`${thread.title}\n${place.label} · ${agentLabel} · ${relativeTime(thread.lastActivityAt)}`}
+          <ContextMenu.Trigger
+            render={
+              <button
+                draggable
+                onDragStart={(event) => startThreadDrag(event.dataTransfer, thread.id)}
+                onDragEnd={endThreadDrag}
+                onClick={(e) => {
+                  if (e.metaKey || e.ctrlKey) addPane(thread.id);
+                  else {
+                    dismissCompactNavigation();
+                    navigate({ view: "thread", threadId: thread.id });
+                  }
+                }}
+                aria-current={active ? "page" : undefined}
+                data-open={open || undefined}
+                className={`sidebar-thread-row thread-preview no-drag${compact ? " sidebar-thread-child" : ""}`}
+              />
+            }
           />
         }
       >
-        {compact ? <SubThreadLines thread={thread} /> : <ThreadLines thread={thread} project={project} />}
+        {compact ? <SubThreadLines thread={thread} subthreads={subthreads} /> : <ThreadLines thread={thread} subthreads={subthreads} project={project} />}
         <span className="thread-preview-meta flex min-w-0 items-center gap-2 text-xs leading-4 text-ink-3">
-          <span className="flex flex-1 min-w-0 items-center gap-1" title={title}>
+          <span className="flex flex-1 min-w-0 items-center gap-1" data-tip={title}>
             {placeIcons[place.kind]}
             <span className="truncate">{place.label}</span>
           </span>
@@ -128,7 +143,7 @@ export function ThreadRow({ thread, active, project, compact = false }: { thread
             </span>
           ) : null}
           {orcling ? (
-            <span className="inline-flex shrink-0 items-center gap-1" title={orcling.name}>
+            <span className="inline-flex shrink-0 items-center gap-1" data-tip={orcling.name}>
               <OrclingAvatar orcling={orcling} size={12} />
               <span>{orcling.name}</span>
             </span>
@@ -137,7 +152,7 @@ export function ThreadRow({ thread, active, project, compact = false }: { thread
               className="inline-flex shrink-0 items-center gap-1.5"
               role="img"
               aria-label={team ? `Agents: ${agentLabel}` : `Agent: ${agentLabel}`}
-              title={team ? `Agents: ${agentLabel}` : agentLabel}
+              data-tip={team ? `Agents: ${agentLabel}` : agentLabel}
             >
               {providers.map(({ agent, count }) => (
                 <span key={agent} className="inline-flex items-center gap-1">
@@ -149,7 +164,7 @@ export function ThreadRow({ thread, active, project, compact = false }: { thread
           )}
           <span className="thread-preview-date">{relativeTime(thread.lastActivityAt)}</span>
         </span>
-      </ContextMenu.Trigger>
+      </Tooltip>
       <ContextMenu.Portal>
         <CoversPreview />
         <ContextMenu.Positioner className="z-40" collisionPadding={8}>
@@ -160,6 +175,12 @@ export function ThreadRow({ thread, active, project, compact = false }: { thread
       </ContextMenu.Portal>
     </ContextMenu.Root>
   );
+}
+
+/** What a row's tooltip says it is: a subagent by the kind its agent started, any other thread by where it works. */
+function rowAbout(thread: ThreadSummary, place: string): string {
+  if (!thread.subagent) return place;
+  return thread.subagent.agentType ? `Subagent · ${thread.subagent.agentType}` : "Subagent";
 }
 
 /** How long one sweep of a working title takes; every working row sweeps on the same clock. */
@@ -177,13 +198,13 @@ function RowTitle({ title, working }: { title: string; working: boolean }) {
 
 /**
  * A thread's visible lines: its title, swept while it works; what its agent is doing; then its project and pull
- * request. Its mark (the spinner, what it needs from you, a failure or an unread dot) sits at the end of the line under
- * the title, in one column under a parent's chevron. A row with no line under its title keeps the mark at its end.
+ * request. Its mark (the spinner, what it or a sub thread needs from you, a failure or an unread dot) sits at the end of
+ * the line under the title, in one column under a parent's chevron. A row with no line under its title keeps the mark at its end.
  */
-function ThreadLines({ thread, project }: { thread: ThreadSummary; project?: RowProject }) {
+function ThreadLines({ thread, subthreads, project }: { thread: ThreadSummary; subthreads: ThreadStatus | null; project?: RowProject }) {
   const working = threadStatus(thread)?.kind === "running";
   const headline = useRowHeadline(thread);
-  const mark = <SidebarThreadMark thread={thread} pull={!project} />;
+  const mark = <SidebarThreadMark thread={thread} subthreads={subthreads} pull={!project} />;
   const below = Boolean(headline || project);
   const trailing = below ? <span className="thread-preview-mark">{mark}</span> : null;
   return (
@@ -204,11 +225,11 @@ function ProjectLine({ thread, project, trailing }: { thread: ThreadSummary; pro
   return (
     <span className="thread-preview-project">
       <span className="thread-preview-project-icon">{project.rootPath ? <ProjectIcon rootPath={project.rootPath} /> : <Globe size={14} />}</span>
-      <span className="thread-preview-project-name" title={project.name}>
+      <span className="thread-preview-project-name" data-tip={project.name}>
         {project.name}
       </span>
       {workspace ? (
-        <span className="thread-preview-workspace" title={thread.branch ?? undefined}>
+        <span className="thread-preview-workspace" data-tip={thread.branch ?? undefined}>
           {workspace}
         </span>
       ) : null}
@@ -218,45 +239,44 @@ function ProjectLine({ thread, project, trailing }: { thread: ThreadSummary; pro
   );
 }
 
-/** A sub thread's one line: its mark where the tree's line reaches it, its title, then its agent's kind and time. */
-function SubThreadLines({ thread }: { thread: ThreadSummary }) {
+/** A sub thread's one line: its mark where the tree's line reaches it, its title, then how long a subagent has been running. */
+function SubThreadLines({ thread, subthreads }: { thread: ThreadSummary; subthreads: ThreadStatus | null }) {
   return (
     <span className="thread-preview-heading">
       <span className="thread-preview-status">
-        <SidebarThreadMark thread={thread} pull />
+        <SidebarThreadMark thread={thread} subthreads={subthreads} pull />
       </span>
       <span className="thread-preview-title">{thread.title}</span>
-      {thread.subagent ? <SubagentRowMeta thread={thread} /> : null}
+      {thread.subagent ? <SubagentRunTime thread={thread} /> : null}
     </span>
   );
 }
 
-function SubagentRowMeta({ thread }: { thread: ThreadSummary }) {
+function SubagentRunTime({ thread }: { thread: ThreadSummary }) {
   const child = thread.subagent;
-  const now = useTicking(child?.status === "running");
-  return child ? (
-    <span className="sidebar-child-meta">
-      {child.agentType ? <span>{child.agentType}</span> : null}
-      {child.status === "running" ? <span className="tabular">{workDuration(now - child.startedAt)}</span> : null}
-    </span>
-  ) : null;
+  const running = child?.status === "running";
+  const now = useTicking(running);
+  return child && running ? <span className="sidebar-child-meta tabular">{workDuration(now - child.startedAt)}</span> : null;
 }
 
-/** What a thread needs from you, a sub thread's outcome, or at rest its pull request when no project line shows it. */
-function SidebarThreadMark({ thread, pull }: { thread: ThreadSummary; pull: boolean }) {
+/**
+ * What a thread or its sub threads need from you or are doing, a finished subagent's outcome, or at rest its pull request
+ * when no project line shows it.
+ */
+function SidebarThreadMark({ thread, subthreads, pull }: { thread: ThreadSummary; subthreads: ThreadStatus | null; pull: boolean }) {
   let Icon = X;
   if (thread.subagent?.status === "completed") Icon = CircleCheck;
   if (thread.subagent?.status === "no_updates") Icon = CircleDashed;
-  return thread.subagent && thread.activity === "idle" ? (
+  return thread.subagent && thread.activity === "idle" && !subthreads ? (
     <span
       role="img"
       aria-label={subagentStatusLabel[thread.subagent.status]}
-      title={subagentStatusLabel[thread.subagent.status]}
+      data-tip={subagentStatusLabel[thread.subagent.status]}
       className={thread.subagent.status === "failed" ? "text-bad" : undefined}
     >
       <Icon size={13} />
     </span>
   ) : (
-    <ThreadStatusIndicator thread={thread} idle={pull ? <PullRequestMark thread={thread} /> : null} />
+    <ThreadStatusIndicator thread={thread} subthreads={subthreads} idle={pull ? <PullRequestMark thread={thread} /> : null} />
   );
 }

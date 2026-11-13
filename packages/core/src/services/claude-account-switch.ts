@@ -2,6 +2,7 @@ import { claudeAccounts, threads, type Db } from "@openorc/db";
 import { DEFAULT_CLAUDE_ACCOUNT, percentLeft, sessionWindow, weeklyWindow, type AllowanceWindow, type AppSettings, type ProviderUsage, type Run, type Thread } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
 import { PLAN_LIMITS_MAX_AGE_MS } from "./plan-limits.js";
+import { projectAccountPolicy, type ProjectAccountPolicy } from "./project-claude-accounts.js";
 import type { ProviderUsageService } from "./provider-usage.js";
 import type { RunService } from "./runs.js";
 import type { RunScope, TurnSettledOutcome } from "./run-types.js";
@@ -43,19 +44,23 @@ interface Dependencies {
   log: Pick<Logger, "warn">;
 }
 
-/** With the setting on, a conversation its Claude account's usage limit stopped goes on with the account that has the most left. */
+/**
+ * With the setting on, a conversation its Claude account's usage limit stopped goes on with the account that has the
+ * most left. A project with its own accounts decides with its own setting, among its own accounts.
+ */
 export class ClaudeAccountSwitch {
   private readonly moving = new Set<string>();
 
   constructor(private readonly deps: Dependencies) {}
 
-  private get on(): boolean {
-    return this.deps.settings.get().claudeAccountAutoSwitch;
+  /** The thread's project's accounts and whether it switches, as they stand now. */
+  private policy(thread: Pick<Thread, "projectId">): ProjectAccountPolicy {
+    return projectAccountPolicy(this.deps.db, thread.projectId, this.deps.settings.get());
   }
 
   settled(run: Run, scope: RunScope, outcome: TurnSettledOutcome): void {
     const thread = scope.thread;
-    if (!thread || outcome.status !== "error" || run.agent !== "claude" || run.orclingId || !this.on) return;
+    if (!thread || outcome.status !== "error" || run.agent !== "claude" || run.orclingId || !this.policy(thread).autoSwitch) return;
     if (!this.stoppedAtLimit(thread.id) || this.moving.has(thread.id)) return;
     this.moving.add(thread.id);
     void this.move(thread.id, run.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT)
@@ -70,12 +75,13 @@ export class ClaudeAccountSwitch {
 
   private async move(threadId: string, from: string): Promise<void> {
     const { db, usage } = this.deps;
-    const others = claudeAccounts.list(db).filter((account) => account.enabled && account.id !== from);
+    const current = threads.get(db, threadId);
+    const others = current ? this.policy(current).allowed.filter((id) => id !== from) : [];
     if (!others.length) return;
     const reports = await Promise.all(
-      others.map((account) =>
-        usage.recent("claude", account.id, PLAN_LIMITS_MAX_AGE_MS).then(
-          (report): AccountReport => ({ id: account.id, usage: report }),
+      others.map((id) =>
+        usage.recent("claude", id, PLAN_LIMITS_MAX_AGE_MS).then(
+          (report): AccountReport => ({ id, usage: report }),
           () => null,
         ),
       ),
@@ -85,8 +91,10 @@ export class ClaudeAccountSwitch {
       Date.now(),
     );
     const thread = threads.get(db, threadId);
-    // While usage was read, the person may have moved the conversation, or written to it, themselves.
-    if (!to || !thread || thread.agent !== "claude" || (thread.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT) !== from || !this.stoppedAtLimit(threadId) || !this.on) return;
+    // While usage was read, the person may have moved the conversation, or written to it, or changed what its project allows.
+    if (!to || !thread || thread.agent !== "claude" || (thread.claudeAccountId ?? DEFAULT_CLAUDE_ACCOUNT) !== from || !this.stoppedAtLimit(threadId)) return;
+    const policy = this.policy(thread);
+    if (!policy.autoSwitch || !policy.allowed.includes(to)) return;
     await this.deps.threads.continueThread(
       threadId,
       continuation(thread, to, `Moved to the Claude account ${name(db, to)} after ${name(db, from)} reached its usage limit. Continue where you left off.`),
@@ -98,8 +106,8 @@ function name(db: Db, id: string): string {
   return claudeAccounts.get(db, id).name;
 }
 
-/** The conversation's next turn as it stood, on another account, opened by OpenOrc's notice. */
-function continuation(thread: Thread, claudeAccountId: string, prompt: string): Parameters<ThreadService["continueThread"]>[1] {
+/** The conversation's next turn as it stood, on the given account, opened by OpenOrc's notice. */
+export function continuation(thread: Thread, claudeAccountId: string, prompt: string): Parameters<ThreadService["continueThread"]>[1] {
   return {
     agent: thread.agent,
     model: thread.model ?? undefined,

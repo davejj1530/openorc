@@ -1,5 +1,5 @@
 import { claudeConfigDir, RunHandle, type AgentLaunchEnvironment } from "@openorc/agents";
-import { Db, LedgerWriter, projects, runs, threads } from "@openorc/db";
+import { claudeAccounts, Db, LedgerWriter, projects, runs, tasks, threads } from "@openorc/db";
 import { git } from "@openorc/git";
 import { DEFAULT_CLAUDE_ACCOUNT, type AllowanceWindow, type Project, type ProviderUsage, type RunSpec } from "@openorc/protocol";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -9,6 +9,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { FrameCoalescer } from "../frames.js";
 import { ClaudeAccountSwitch } from "./claude-account-switch.js";
 import { ClaudeAccountService } from "./claude-accounts.js";
+import { ClaudeSignInRetry } from "./claude-sign-in-retry.js";
 import { claudeRunAccount } from "./claude-run-account.js";
 import type { RunHooks } from "./run-types.js";
 import { RunService } from "./runs.js";
@@ -83,7 +84,7 @@ beforeEach(async () => {
       notify() {},
       claudeVersion: async () => null,
     },
-    { codex: { start }, claude: { start }, opencode: { start } },
+    { codex: { start }, claude: { start }, opencode: { start }, omp: { start }, cursor: { start }, pi: { start }, antigravity: { start }, fx: { start } },
     writers,
   );
   workspace = new WorkspaceService(db, { dataDir: root }, quiet, writers);
@@ -319,6 +320,42 @@ it("leaves a stopped conversation alone when no account has 5-hour usage left, o
   expect([start.mock.calls.length, threads.get(db, thread.id)?.claudeAccountId]).toEqual([1, personal]);
 });
 
+it("goes on once on the same account when Claude starts up signed out but the account's CLI then finds its login", async () => {
+  const work = accounts.add("Work").id;
+  let signedIn = true;
+  const asked = vi.fn(async (_id: string) => signedIn);
+  const retry = new ClaudeSignInRetry({ db, accounts: { signedIn: asked }, runs: service, threads: conversations, log: quiet });
+  turnSettled = (run, scope, _project, outcome) => retry.settled(run, scope, outcome);
+  const notLoggedIn = (handle: RunHandle, runId: string) => {
+    const ts = Date.now();
+    handle.emit("event", { type: "activity.updated", runId, ts, activityId: "sign-in", label: "Claude is signed out", status: "error", recovery: { kind: "sign_in", provider: "claude" } });
+    handle.emit("event", { type: "turn.completed", runId, ts, turnId: "fixture", status: "error", resultText: "Not logged in · Please run /login", durationMs: 1 });
+  };
+
+  const { thread, run } = await conversations.start({ ...input, projectId: project.id, claudeAccountId: work });
+  runs.update(db, run!.id, { externalSessionId: "work-session" });
+  notLoggedIn(start.mock.results[0]!.value, run!.id);
+  await vi.waitFor(() => expect(start).toHaveBeenCalledTimes(2));
+  const [spec, launch] = start.mock.lastCall!;
+  expect([spec.resumeSessionId, spec.forkSession ?? false, path.basename(launch.env.CLAUDE_CONFIG_DIR!), asked.mock.calls]).toEqual(["work-session", false, work, [[work]]]);
+  expect(spec.prompt.split("\n")[0]).toBe("Claude Code could not read the sign-in for Work as it started. The account is signed in, so OpenOrc tried again. Continue where you left off.");
+
+  // The run it started stops signed out too: that one keeps its sign-in.
+  const retried = service.liveRunForThread(thread.id)!;
+  notLoggedIn(start.mock.results[1]!.value, retried.id);
+  await vi.waitFor(() => expect(service.threadSession(thread.id).recovery?.kind).toBe("sign_in"));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect([start.mock.calls.length, asked.mock.calls.length]).toEqual([2, 1]);
+
+  // A later message that stops signed out is asked about again, and an account that really signed out keeps its sign-in.
+  signedIn = false;
+  const next = await conversations.continueThread(thread.id, { ...input, prompt: "Next" });
+  notLoggedIn(start.mock.results[2]!.value, next.id);
+  await vi.waitFor(() => expect(asked).toHaveBeenCalledTimes(2));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect([start.mock.calls.length, service.threadSession(thread.id).recovery?.kind]).toEqual([3, "sign_in"]);
+});
+
 it("captures the default on new threads and records the account even if a launch fails", async () => {
   const account = accounts.add("Work");
   accounts.update({ id: account.id, makeDefault: true });
@@ -342,4 +379,149 @@ it("retires idle sessions for sign-in while leaving other accounts running", asy
   await service.retireIdleClaudeSessions(work.id);
   expect(service.hasClaudeSessions(work.id)).toBe(false);
   expect(service.hasClaudeSessions(personal.id)).toBe(true);
+});
+
+/** The project uses only these accounts from now on, with this default. */
+const onlyUse = (accountIds: string[], defaultId: string, autoSwitch = false) => projects.updateSettings(db, project.id, { claudeAccounts: { only: true, accountIds, defaultId, autoSwitch } });
+
+it("starts a project's threads on its default account, refuses one it does not use, and leaves other projects alone", async () => {
+  const [work, personal, client] = ["Work", "Personal", "Client"].map((name) => accounts.add(name).id) as [string, string, string];
+  accounts.update({ id: client, makeDefault: true });
+  onlyUse([work, personal], personal);
+  const started = await conversations.start({ ...input, projectId: project.id });
+  expect([started.thread.claudeAccountId, started.run!.claudeAccountId]).toEqual([personal, personal]);
+  expect(path.basename(start.mock.lastCall![1].env.CLAUDE_CONFIG_DIR!)).toBe(personal);
+  expect((await conversations.start({ ...input, projectId: project.id, claudeAccountId: work })).thread.claudeAccountId).toBe(work);
+  const launches = start.mock.calls.length;
+  await expect(conversations.start({ ...input, projectId: project.id, claudeAccountId: client })).rejects.toThrow(/This project only uses these Claude accounts: .*(Work|Personal).*\./);
+  expect(start).toHaveBeenCalledTimes(launches);
+  const otherRoot = path.join(root, "other");
+  await mkdir(otherRoot);
+  await git(otherRoot, ["init", "-q", "-b", "main"]);
+  const other = projects.insert(db, { name: "Other", rootPath: otherRoot, gitRemote: null, defaultBranch: "main", settings: {} });
+  expect((await conversations.start({ ...input, projectId: other.id })).thread.claudeAccountId).toBe(client);
+  // With none of its accounts enabled, the project starts nothing.
+  onlyUse([work], work);
+  // Straight to the record: the service waits for the account's open sessions first.
+  claudeAccounts.update(db, { id: work, enabled: false });
+  await expect(conversations.start({ ...input, projectId: project.id })).rejects.toThrow("None of this project's Claude accounts are enabled. Choose one in the project's settings.");
+});
+
+it("keeps an existing thread on an account its project stopped using, while its sub threads, forks and task threads take the project's default", async () => {
+  const [work, personal, client] = ["Work", "Personal", "Client"].map((name) => accounts.add(name).id) as [string, string, string];
+  const { thread, run } = await conversations.start({ ...input, mode: "act", projectId: project.id, claudeAccountId: client });
+  onlyUse([work, personal], personal);
+  const child = await conversations.startUnder(thread.id, { ...input, claudeAccountId: client });
+  expect(child.thread.claudeAccountId).toBe(personal);
+  const started = await conversations.toolThreadStart(run!.id, { prompt: "Check the tests" });
+  expect(threads.get(db, started.thread.id)?.claudeAccountId).toBe(personal);
+  expect(conversations.fork(thread.id).claudeAccountId).toBe(personal);
+  const task = tasks.insert(db, { projectId: project.id, title: "Ship it", spec: null, priority: "none", labels: [], workspaceMode: "current", baseRef: null, parentTaskId: null });
+  runs.insert(db, { id: "task-run", taskId: task.id, threadId: null, agent: "claude", model: "fixture", mode: "act", permissionMode: "review", claudeAccountId: client });
+  expect(conversations.taskThreadForStart(task.id, { agent: "claude", model: "fixture", effort: null }).claudeAccountId).toBe(personal);
+
+  await service.closeAndWait(run!.id);
+  const resumed = await conversations.continueThread(thread.id, input);
+  expect([resumed.claudeAccountId, threads.get(db, thread.id)?.claudeAccountId]).toEqual([client, client]);
+  await service.closeAndWait(resumed.id);
+  await expect(conversations.continueThread(thread.id, { ...input, claudeAccountId: personal })).resolves.toMatchObject({ claudeAccountId: personal });
+});
+
+it("forks a thread onto its project's default account carrying the parent's session there, once the project stopped using the parent's", async () => {
+  const [personal, client] = ["Personal", "Client"].map((name) => accounts.add(name).id) as [string, string];
+  const { thread, run } = await conversations.start({ ...input, projectId: project.id, claudeAccountId: client });
+  await service.closeAndWait(run!.id);
+  runs.update(db, run!.id, { externalSessionId: "client-session", state: "success" });
+  const sessions = path.join(folder(client), "projects", "-fixture");
+  await mkdir(sessions, { recursive: true });
+  await writeFile(path.join(sessions, "client-session.jsonl"), '{"type":"user"}\n');
+  onlyUse([personal], personal);
+
+  const fork = conversations.fork(thread.id);
+  expect(fork.claudeAccountId).toBe(personal);
+  await conversations.continueThread(fork.id, { ...input, prompt: "Go on from here" });
+  const [spec, launch] = start.mock.lastCall!;
+  expect([spec.resumeSessionId, spec.forkSession, path.basename(launch.env.CLAUDE_CONFIG_DIR!)]).toEqual(["client-session", true, personal]);
+  expect(await readFile(path.join(folder(personal), "projects", "-fixture", "client-session.jsonl"), "utf8")).toBe('{"type":"user"}\n');
+  expect(threads.get(db, thread.id)?.claudeAccountId).toBe(client);
+});
+
+it("starts a task's thread on its starter's own account, as an Orcling's, even when none of the project's accounts is enabled", async () => {
+  const [work, orcling] = ["Work", "Orcling"].map((name) => accounts.add(name).id) as [string, string];
+  onlyUse([work], work);
+  claudeAccounts.update(db, { id: work, enabled: false });
+  const task = () => tasks.insert(db, { projectId: project.id, title: "Ship it", spec: null, priority: "none", labels: [], workspaceMode: "current", baseRef: null, parentTaskId: null });
+  const target = { agent: "claude" as const, model: "fixture", effort: null };
+  expect(() => conversations.taskThreadForStart(task().id, target)).toThrow("None of this project's Claude accounts are enabled. Choose one in the project's settings.");
+  expect(conversations.taskThreadForStart(task().id, target, orcling).claudeAccountId).toBe(orcling);
+});
+
+it("moves a thread only to accounts its project uses, by hand or with its next message", async () => {
+  const [work, personal, client] = ["Work", "Personal", "Client"].map((name) => accounts.add(name).id) as [string, string, string];
+  const { thread, run } = await conversations.start({ ...input, projectId: project.id, claudeAccountId: work });
+  await service.closeAndWait(run!.id);
+  onlyUse([work, personal], work);
+  await expect(conversations.switchClaudeAccount(thread.id, client)).rejects.toThrow("This project doesn't use that Claude account.");
+  await expect(conversations.continueThread(thread.id, { ...input, claudeAccountId: client })).rejects.toThrow("This project doesn't use that Claude account.");
+  expect(threads.get(db, thread.id)?.claudeAccountId).toBe(work);
+  expect((await conversations.switchClaudeAccount(thread.id, personal)).claudeAccountId).toBe(personal);
+});
+
+/** The turn on this run stops at its Claude account's 5-hour limit. */
+function stopAtLimit(handle: RunHandle, runId: string) {
+  const ts = Date.now();
+  handle.emit("event", { type: "activity.updated", runId, ts, activityId: "rate-limit", label: "Rate limit reached", status: "error", recovery: { kind: "usage", provider: "claude" } });
+  handle.emit("event", { type: "turn.completed", runId, ts, turnId: "fixture", status: "error", resultText: "You've hit your 5-hour limit", durationMs: 1 });
+}
+
+it("switches a project's threads among its own accounts by its own setting, with the app's off", async () => {
+  const [work, personal, client] = ["Work", "Personal", "Client"].map((name) => accounts.add(name).id) as [string, string, string];
+  // Client has the most left, but the project does not use it.
+  const reports: Record<string, ProviderUsage> = { [personal]: fiveHourReport(70), [client]: fiveHourReport(10) };
+  const recent = vi.fn(async (_provider: string, id: string | undefined) => reports[id!] ?? signedOut());
+  const switcher = new ClaudeAccountSwitch({ db, settings: { get: () => ({ claudeAccountAutoSwitch: false }) }, usage: { recent }, runs: service, threads: conversations, log: quiet });
+  turnSettled = (run, scope, _project, outcome) => switcher.settled(run, scope, outcome);
+  onlyUse([work, personal], work, true);
+  const { thread, run } = await conversations.start({ ...input, projectId: project.id });
+  stopAtLimit(start.mock.results[0]!.value, run!.id);
+  await vi.waitFor(() => expect(start).toHaveBeenCalledTimes(2));
+  expect(recent.mock.calls.map(([, id]) => id)).toEqual([personal]);
+  expect(threads.get(db, thread.id)?.claudeAccountId).toBe(personal);
+  expect(start.mock.lastCall![0].prompt.split("\n")[0]).toBe("Moved to the Claude account Personal after Work reached its usage limit. Continue where you left off.");
+});
+
+it("leaves a project's threads where they stopped when its own setting is off, or turns off while usage is read, with the app's on", async () => {
+  const [work, personal] = ["Work", "Personal"].map((name) => accounts.add(name).id) as [string, string];
+  const recent = vi.fn(async (_provider: string, id: string | undefined) => (id === personal ? fiveHourReport(10) : signedOut()));
+  const switcher = new ClaudeAccountSwitch({ db, settings: { get: () => ({ claudeAccountAutoSwitch: true }) }, usage: { recent }, runs: service, threads: conversations, log: quiet });
+  turnSettled = (run, scope, _project, outcome) => switcher.settled(run, scope, outcome);
+  onlyUse([work, personal], work, false);
+  const { thread, run } = await conversations.start({ ...input, projectId: project.id });
+  stopAtLimit(start.mock.results[0]!.value, run!.id);
+  await vi.waitFor(() => expect(service.threadSession(thread.id).recovery?.kind).toBe("usage"));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect([recent.mock.calls.length, start.mock.calls.length, threads.get(db, thread.id)?.claudeAccountId]).toEqual([0, 1, work]);
+
+  // On when the limit is reached, off by the time Personal's usage is read: it stays.
+  onlyUse([work, personal], work, true);
+  recent.mockImplementation(async (_provider, id) => {
+    onlyUse([work, personal], work, false);
+    return id === personal ? fiveHourReport(10) : signedOut();
+  });
+  switcher.settled(runs.get(db, run!.id)!, { task: null, thread: threads.get(db, thread.id)! }, { status: "error", snapshotId: null, error: "You've hit your 5-hour limit" });
+  await vi.waitFor(() => expect(recent).toHaveBeenCalledTimes(1));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect([start.mock.calls.length, threads.get(db, thread.id)?.claudeAccountId]).toEqual([1, work]);
+});
+
+it("switches a project that follows the app's accounts by the app's setting, as before", async () => {
+  const [work, personal] = ["Work", "Personal"].map((name) => accounts.add(name).id) as [string, string];
+  const recent = vi.fn(async (_provider: string, id: string | undefined) => (id === personal ? fiveHourReport(10) : signedOut()));
+  const switcher = new ClaudeAccountSwitch({ db, settings: { get: () => ({ claudeAccountAutoSwitch: true }) }, usage: { recent }, runs: service, threads: conversations, log: quiet });
+  turnSettled = (run, scope, _project, outcome) => switcher.settled(run, scope, outcome);
+  // Turned off, the project's own switch no longer counts.
+  projects.updateSettings(db, project.id, { claudeAccounts: { only: false, accountIds: [work], defaultId: work, autoSwitch: false } });
+  const { thread, run } = await conversations.start({ ...input, projectId: project.id, claudeAccountId: work });
+  stopAtLimit(start.mock.results[0]!.value, run!.id);
+  await vi.waitFor(() => expect(threads.get(db, thread.id)?.claudeAccountId).toBe(personal));
 });

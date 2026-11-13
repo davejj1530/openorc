@@ -153,7 +153,7 @@ export class StdioJsonRpc extends EventEmitter<StdioJsonRpcEvents> {
       if (msg["error"] !== undefined) {
         const error = msg["error"];
         if (!isRecord(error)) p.reject(new Error("invalid rpc error response"));
-        else p.reject(new Error(`rpc error ${error["code"] ?? "?"}: ${error["message"] ?? "unknown"}`));
+        else p.reject(rpcError(error));
       } else {
         p.resolve(msg["result"]);
       }
@@ -163,6 +163,13 @@ export class StdioJsonRpc extends EventEmitter<StdioJsonRpcEvents> {
       this.emit("notification", { method, params: msg["params"] });
     }
   }
+}
+
+/** An error answer as an Error, with the details some agents give in its data, as Oh My Pi says which model it could not restore. */
+function rpcError(error: Record<string, unknown>): Error {
+  const data = error["data"];
+  const details = isRecord(data) && typeof data["details"] === "string" ? ` (${data["details"]})` : "";
+  return new Error(`rpc error ${error["code"] ?? "?"}: ${error["message"] ?? "unknown"}${details}`);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

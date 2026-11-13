@@ -1,10 +1,6 @@
 /*
- * The search's one continuous morph, ported from Immaculate's site search (use-morph.ts there) to the Web Animations
- * API. The field's box runs between the header's pill and its slot; the panel keeps the field's width and grows down
- * from under it, its contents clipped to it and riding its left edge. As Immaculate drives every part from shared
- * motion values, one animation here moves a few custom properties on the column and search.css lays every part out
- * from them, so the field, the panel and its clip can never drift apart. Every move starts from where things are now,
- * so a toggle mid-flight turns the search around instead of restarting it.
+ * Shared animated properties keep the search field, results panel and clipping bounds aligned.
+ * Each transition starts from the current shape, so toggling mid-animation reverses it smoothly.
  */
 
 export interface MorphParts {
@@ -28,7 +24,7 @@ type Shape = Record<"--search-x" | "--search-y" | "--search-width" | "--search-h
 const still = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const ms = (duration: number) => (still() ? 1 : duration);
 
-/** Motion's spring with a 0.3s visual duration and no bounce, which Immaculate's search moves on: critically damped at 2π / 0.36s. */
+/** A critically damped spring at 2π / 0.36s, sampled over 500ms. */
 const springMs = 500;
 const springEase = (() => {
   const omega = (2 * Math.PI) / 0.36;

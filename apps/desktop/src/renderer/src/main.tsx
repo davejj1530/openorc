@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { App } from "./App";
 import { StartupNotice } from "./components/StartupNotice";
+import { TipLayer } from "./components/TipLayer";
 import { core } from "./lib/rpc";
 import { queryClient } from "./lib/client";
 import { installAutorun } from "./lib/autorun";
@@ -25,6 +26,7 @@ createRoot(document.getElementById("root") as HTMLElement).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <App />
+      <TipLayer />
       <StartupNotice />
     </QueryClientProvider>
   </StrictMode>,

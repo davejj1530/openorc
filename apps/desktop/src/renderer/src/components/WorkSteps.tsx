@@ -177,7 +177,7 @@ function Elapsed({ since }: { since: number | undefined }) {
 function LiveWords({ headline, elapsed = false }: { headline: LiveHeadline; elapsed?: boolean }) {
   return (
     <>
-      <span key={headline.label} className="work-line-text motion-arrive" title={headline.label}>
+      <span key={headline.label} className="work-line-text motion-arrive" data-tip={headline.label}>
         {headline.label}
       </span>
       {elapsed ? <Elapsed since={headline.since} /> : null}
@@ -299,7 +299,7 @@ function PhaseWords({ phase, objects, headline, open }: { phase: WorkPhase; obje
   const meta = outcome?.text ?? (!open && phase.origin !== "summary" ? phaseMeta(phase) : "");
   return (
     <>
-      <span className="work-line-text" title={title}>
+      <span className="work-line-text" data-tip={title}>
         {title}
       </span>
       {meta ? (
@@ -327,7 +327,7 @@ function PhaseBody({ phase, objects, live, renderBlocks }: { phase: WorkPhase; o
       {phase.thoughts.length ? (
         <ol className="work-thoughts">
           {phase.thoughts.map((thought, index) => (
-            <li key={index} title={thought.body || undefined}>
+            <li key={index} data-tip={thought.body || undefined}>
               {thought.title}
             </li>
           ))}
@@ -430,12 +430,12 @@ function ChipView({ chip, live, picked, onPick }: { chip: WorkChip; live: boolea
   // A file read opens the file; an edit, like any other call, opens below the chips to show what it did.
   if (chip.kind === "file" && chip.path)
     return (
-      <span className="work-chip" data-kind={chip.kind} data-live={live || undefined} title={chip.title}>
+      <span className="work-chip" data-kind={chip.kind} data-live={live || undefined} data-tip={chip.title}>
         <ThreadLink href={fileHref(chip)}>{content}</ThreadLink>
       </span>
     );
   return (
-    <button type="button" className="work-chip" data-kind={chip.kind} data-live={live || undefined} title={chip.title} aria-pressed={picked} onClick={onPick}>
+    <button type="button" className="work-chip" data-kind={chip.kind} data-live={live || undefined} data-tip={chip.title} aria-pressed={picked} onClick={onPick}>
       {content}
     </button>
   );

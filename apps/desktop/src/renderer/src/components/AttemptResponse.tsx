@@ -55,7 +55,7 @@ export function AttemptResponse({
     <article id={`comment-${item.id}`} className="task-comment-response" aria-label={`${recipientName(item.recipient)} response`}>
       <div className="task-comment-meta">
         <ReplyAuthor recipient={item.recipient} models={models} />
-        <time title={new Date(item.createdAt).toLocaleString()}>{relativeTime(item.createdAt)}</time>
+        <time data-tip={new Date(item.createdAt).toLocaleString()}>{relativeTime(item.createdAt)}</time>
       </div>
       {item.body ? (
         <div className="task-comment-body">

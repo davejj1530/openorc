@@ -1,5 +1,5 @@
 import type { MemoryType } from "@openorc/protocol";
-import { BookText, Check, FileCode2, GitBranch, Lightbulb, ListChecks, Settings2, SquareStack, Terminal } from "./icons";
+import { BookText, Brain, Check, FileCode2, GitBranch, Lightbulb, ListChecks, Settings2, Terminal } from "./icons";
 import type { ReactNode } from "react";
 
 export const memoryTypeLabel: Record<MemoryType, string> = {
@@ -29,7 +29,7 @@ export function MemoryTypeIcon({ type, size = 14 }: { type: MemoryType; size?: n
     case "convention":
       return <ListChecks size={size} className={c} />;
     case "preference":
-      return <SquareStack size={size} className={c} />;
+      return <Brain size={size} className={c} />;
     case "spec":
       return <BookText size={size} className={c} />;
     case "ownership":

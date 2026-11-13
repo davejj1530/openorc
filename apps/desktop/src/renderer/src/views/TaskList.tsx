@@ -5,13 +5,14 @@ import { Check, Cloud, Funnel, Plus } from "../components/icons";
 import { ListGroupHeading } from "../components/ListGroupHeading";
 import { HeaderSearch } from "../components/PageFilters";
 import { PriorityIcon, StatusIcon, groupLabel, groupOrder, statusLabel, statusOrder } from "../components/status";
+import { ScopedTitle } from "../components/ScopedTitle";
 import { TopBar } from "../components/TopBar";
 import { TaskStart } from "../components/TaskStart";
 import { menuItem, menuPopup, menuSeparator } from "../components/menu";
 import { Badge, Button, Empty, IconButton, metaSlot } from "../components/ui";
 import { CoversPreview } from "../lib/browser-preview";
 import { cn } from "../lib/cn";
-import { useLayout } from "../lib/layout";
+import { focusedProject, useLayout } from "../lib/layout";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { openTask } from "../lib/router";
 import { ownerMark, relativeTime } from "@openorc/client";
@@ -28,7 +29,7 @@ function TaskRowStatus({ task, onMoved }: { task: Task; onMoved: () => void }) {
           render={<IconButton aria-label={`Status for ${task.title}`} size="xs" />}
           aria-describedby={update.error || update.isPending ? feedbackId : undefined}
           aria-busy={update.isPending}
-          title={`Change status · ${statusLabel[task.status]}`}
+          data-tip={`Change status · ${statusLabel[task.status]}`}
           disabled={update.isPending}
         >
           <StatusIcon status={task.status} />
@@ -72,7 +73,7 @@ function TaskRowStatus({ task, onMoved }: { task: Task; onMoved: () => void }) {
  * Grouped rows with keyboard navigation: j/k or arrows move, Enter opens.
  * The list owns focus so the shortcuts work without clicking first.
  */
-export function TaskRows({ tasks, showProject }: { tasks: Task[]; showProject: boolean }) {
+function TaskRows({ tasks, showProject }: { tasks: Task[]; showProject: boolean }) {
   const projects = useRpc("projects.list", {}, { enabled: showProject });
   const nameOf = (id: string) => projects.data?.find((p) => p.id === id)?.name ?? "";
   const groupId = useId();
@@ -132,7 +133,7 @@ export function TaskRows({ tasks, showProject }: { tasks: Task[]; showProject: b
                     <div data-current={i === cursor || undefined} data-status={t.status} className="task-list-row">
                       <TaskRowStatus task={t} onMoved={() => listRef.current?.focus({ preventScroll: true })} />
                       <button data-task-open onClick={() => openTask(t.id)} tabIndex={i === cursor ? 0 : -1} onFocus={() => setCursor(i)} aria-label={`${t.title}, ${statusLabel[t.status]}`}>
-                        <span className="task-row-title" title={t.title}>
+                        <span className="task-row-title" data-tip={t.title}>
                           {t.title}
                         </span>
                         {t.labels[0] ? <Badge className="task-row-label max-w-24 truncate">{t.labels[0]}</Badge> : null}
@@ -220,7 +221,7 @@ function taskListBody(input: {
 }
 
 export function TaskListView({ onNewTask }: { onNewTask: () => void }) {
-  const projectId = useLayout((s) => s.projectId);
+  const projectId = useLayout(focusedProject);
   const tasks = useRpc("tasks.list", projectId ? { projectId } : {});
   const [query, setQuery] = useState("");
   const [shelf, setShelf] = useState<TaskShelf>("active");
@@ -248,14 +249,14 @@ export function TaskListView({ onNewTask }: { onNewTask: () => void }) {
               }}
               onStage={setStage}
             />
-            <Button size="lg" className="ml-1 pl-2.5" onClick={onNewTask}>
-              <Plus size={14} className="text-ink-3" />
+            <Button variant="primary" size="lg" className="ml-1 pl-2.5" onClick={onNewTask}>
+              <Plus size={14} />
               New task
             </Button>
           </>
         }
       >
-        Tasks
+        <ScopedTitle>Tasks</ScopedTitle>
       </TopBar>
       <div className="task-page flex-1 min-h-0 flex flex-col">
         {taskListBody({ error: tasks.error, loading: tasks.isLoading, list, query, shelf, stage, showProject: !projectId, retry: () => void tasks.refetch(), onNewTask })}

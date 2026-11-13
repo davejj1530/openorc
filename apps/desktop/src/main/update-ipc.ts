@@ -51,6 +51,7 @@ export function installUpdateControls(updates: AppUpdates, file: string, isAppOr
       if (!isUpdateDismissal(request)) throw new Error("Invalid update dismissal.");
       return notices.dismiss(request);
     },
+    "updates:check": () => updates.check(),
     "updates:download": () => updates.download(),
     "updates:install": () => updates.install(),
   };

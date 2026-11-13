@@ -43,11 +43,12 @@ const cases: { chord: string; does: string; given?: () => void; then: () => unkn
   { chord: "\\", does: "closes the other thread panes", then: () => expect(useRouter.getState().threadIds).toEqual(["t10"]) },
   {
     chord: "p",
-    does: "opens the Files tool on the focused thread's panel, finding by name",
-    given: () => useFilesTool.setState({ tools: { "thread:t10": { mode: "contents", names: "", contents: { text: "", regex: false, caseSensitive: false } } } }),
+    does: "opens the Files tool on the focused thread's panel, its search box asked for, the search kept",
+    given: () => useFilesTool.setState({ focus: null, tools: { "thread:t10": { query: "app", regex: false, caseSensitive: false } } }),
     then: () => {
       expect(useLayout.getState()).toMatchObject({ panelThreadId: "t10", panelOpen: true, panelRequest: { tab: "file" }, selectedFile: null });
-      expect(useFilesTool.getState().tools["thread:t10"]?.mode).toBe("names");
+      expect(useFilesTool.getState().focus).not.toBeNull();
+      expect(useFilesTool.getState().tools["thread:t10"]?.query).toBe("app");
     },
   },
   {
@@ -66,10 +67,11 @@ const cases: { chord: string; does: string; given?: () => void; then: () => unkn
   { chord: "f", does: "opens message search", then: () => expect(useUi.getState()).toMatchObject({ palette: true, paletteMode: "messages" }) },
   {
     chord: "⇧f",
-    does: "opens the focused thread's Files tool on what files contain",
+    does: "opens the focused thread's Files tool, its search box asked for",
+    given: () => useFilesTool.setState({ focus: null }),
     then: () => {
       expect(useLayout.getState()).toMatchObject({ panelThreadId: "t10", panelOpen: true, panelRequest: { tab: "file" } });
-      expect(useFilesTool.getState().tools["thread:t10"]?.mode).toBe("contents");
+      expect(useFilesTool.getState().focus).not.toBeNull();
       expect(useUi.getState().palette).toBe(false);
     },
   },

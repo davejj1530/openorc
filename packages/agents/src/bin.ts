@@ -1,4 +1,4 @@
-import { harnessBinaryVariable, type HarnessId } from "@openorc/protocol";
+import { harnessBinaryVariable, harnessCatalog, type HarnessId } from "@openorc/protocol";
 
 /**
  * The harness binary to spawn: the file the user's login shell resolves,
@@ -6,5 +6,5 @@ import { harnessBinaryVariable, type HarnessId } from "@openorc/protocol";
  * find.
  */
 export function agentBinary(kind: HarnessId): string {
-  return process.env[harnessBinaryVariable(kind)] || kind;
+  return process.env[harnessBinaryVariable(kind)] || harnessCatalog[kind].cli.bin;
 }

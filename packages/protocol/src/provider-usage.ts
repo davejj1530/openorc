@@ -4,11 +4,21 @@ import type { HarnessId } from "./harness.js";
 export interface AllowanceWindow {
   id: string;
   label: string;
+  /** Model families that share this allowance, when the provider reports separate pools. */
+  group?: string;
   usedPercent: number | null;
   remainingPercent: number | null;
   resetsAt: number | null;
   observedAt: number;
   exhausted: boolean;
+}
+
+export interface ProviderCredit {
+  label: string;
+  balance: string | null;
+  unlimited: boolean;
+  /** Omitted when the provider denominates the balance in credits rather than money. */
+  currency?: "USD";
 }
 
 export interface ProviderUsage {
@@ -23,27 +33,28 @@ export interface ProviderUsage {
   refreshedAt: number | null;
   message: string | null;
   windows: AllowanceWindow[];
-  credits: { label: string; balance: string | null; unlimited: boolean }[];
+  credits: ProviderCredit[];
   accountUrl: string;
   localRuns: number | null;
   resets?: ResetInventory;
 }
 
 /**
- * One account's plan limits as a phone draws them, from `providers.limits`: the shares and when they reset, and
+ * One account's allowances and balances as a phone draws them, from `providers.limits`, and
  * nothing of who the account belongs to (email, organization), how it signs in (tokens, config folders), what the CLI
  * said, or how to reset it.
  */
 export interface PlanLimits {
-  /** "codex", or "claude:" and the Claude account's id: stable from one read to the next. */
+  /** The provider, or "claude:" and the Claude account's id: stable from one read to the next. */
   id: string;
-  provider: "codex" | "claude";
-  /** "Codex" or "Claude", followed by the account's own name when the Mac has more than one Claude account on. */
+  provider: "codex" | "claude" | "antigravity" | "fx";
+  /** The provider name, followed by the account's own name when the Mac has more than one Claude account on. */
   name: string;
   plan: string | null;
   status: ProviderUsage["status"];
   /** Labels name the window alone ("5-hour window"); the card already names the provider and the plan. */
   windows: AllowanceWindow[];
+  credits?: ProviderCredit[];
   refreshedAt: number | null;
 }
 

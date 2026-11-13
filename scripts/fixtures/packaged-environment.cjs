@@ -9,6 +9,9 @@ const path = require("node:path");
 const windows = process.platform === "win32";
 const linux = process.platform === "linux";
 
+/** Every agent OpenOrc drives, by id, with the command its CLI installs; each gets an inert stand-in. */
+const providerCommands = { codex: "codex", claude: "claude", opencode: "opencode", omp: "omp", cursor: "cursor-agent", pi: "pi", antigravity: "agy", fx: "fx" };
+
 function packagedEnvironment() {
   assert.ok(windows || linux || process.platform === "darwin", "This launcher validates macOS, Windows and Linux packages");
   if (!windows) assert.ok(["/bin/zsh", "/bin/bash", "/bin/sh"].includes(os.userInfo().shell), "Disposable shell fixtures currently support zsh/bash/sh logins only");
@@ -19,7 +22,7 @@ function packagedEnvironment() {
   const fixtureBin = path.join(root, "bin");
   fs.mkdirSync(fixtureBin);
   const systemRoot = process.env.SystemRoot || process.env.SYSTEMROOT;
-  for (const name of ["codex", "claude", "opencode"]) {
+  for (const name of Object.values(providerCommands)) {
     if (windows) fs.copyFileSync(path.join(systemRoot, "System32/where.exe"), path.join(fixtureBin, `${name}.exe`));
     else fs.symlinkSync("/usr/bin/false", path.join(fixtureBin, name));
   }
@@ -53,9 +56,7 @@ function packagedEnvironment() {
     ...(linux ? displayEnvironment() : {}),
     LANG: "en_US.UTF-8",
     OPENORC_USER_DATA: profile,
-    OPENORC_CODEX_BIN: windows ? path.join(fixtureBin, "codex.exe") : "/usr/bin/false",
-    OPENORC_CLAUDE_BIN: windows ? path.join(fixtureBin, "claude.exe") : "/usr/bin/false",
-    OPENORC_OPENCODE_BIN: windows ? path.join(fixtureBin, "opencode.exe") : "/usr/bin/false",
+    ...Object.fromEntries(Object.entries(providerCommands).map(([id, name]) => [`OPENORC_${id.toUpperCase()}_BIN`, windows ? path.join(fixtureBin, `${name}.exe`) : "/usr/bin/false"])),
     OPENORC_RENDERER_LOG: "1",
   };
   // Windows resolves known folders only when they exist. Model a real user
@@ -126,4 +127,4 @@ function packagedExecutable(appPath) {
   return executable;
 }
 
-module.exports = { windows, linux, packagedEnvironment, packagedExecutable };
+module.exports = { windows, linux, providerCommands, packagedEnvironment, packagedExecutable };

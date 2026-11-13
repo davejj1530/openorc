@@ -1,0 +1,21 @@
+---
+/**
+ * A conversation under its header (ThreadView.tsx): the transcript, pinned to its newest line and ending in the
+ * OpenOrc cube, then the composer.
+ */
+import Composer from "./Composer.astro";
+import PresenceMark from "./PresenceMark.astro";
+import type { ComponentProps } from "astro/types";
+
+type Props = Omit<ComponentProps<typeof Composer>, "layout">;
+---
+
+<div class="hs-transcript">
+  <div class="hs-column">
+    <slot />
+    <PresenceMark />
+  </div>
+</div>
+<div class="hs-composer-area" aria-hidden="true">
+  <Composer {...Astro.props} />
+</div>

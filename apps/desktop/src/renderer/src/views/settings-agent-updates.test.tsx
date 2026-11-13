@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { harnessIds, type AgentUpdates, type SystemInfo } from "@openorc/protocol";
+import { harnessIds, type AgentUpdates, type HarnessId, type SystemInfo } from "@openorc/protocol";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { AgentConnections, AgentUpdateNotice } from "./settings-agent-updates";
 import { isPreviewCovered } from "../lib/browser-preview";
@@ -9,12 +9,15 @@ import { core } from "../lib/rpc";
 import { useRouter } from "../lib/router";
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
 let state: AgentUpdates;
+let enabled: HarnessId[] | null;
 const info: SystemInfo = {
   dataDir: "/fixture",
   gh: { installed: false, path: null },
   harnesses: harnessIds.map((id) => ({ id, path: `/fixture/${id}`, state: "ready", version: "1.0.0", revision: 1 })),
 };
 beforeEach(() => {
+  enabled = null;
+  localStorage.clear();
   state = {
     checking: false,
     updating: false,
@@ -33,10 +36,15 @@ beforeEach(() => {
   };
   useRouter.setState({ route: { view: "newthread" }, history: [], future: [] });
   vi.mocked(core.call).mockImplementation(async (method, params) => {
+    if (method === "app.settings.get") return { enabledHarnesses: enabled };
+    if (method === "app.settings.set" && "enabledHarnesses" in params) {
+      enabled = params.enabledHarnesses ?? null;
+      return { enabledHarnesses: enabled };
+    }
     if (method === "agents.updates.get" || method === "agents.updates.check") return state;
     if (method === "agents.updates.configure" && "dismissed" in params) state = { ...state, dismissed: params.dismissed ?? null };
     if (method === "agents.updates.configure" && "automatic" in params) state = { ...state, automatic: params.automatic ?? true };
-    if (method === "agents.updates.install") throw new Error("Finish agent work before updating.");
+    if (method === "agents.updates.install") throw new Error("The installation changed. Check for updates again before updating.");
     return state;
   });
 });
@@ -46,11 +54,11 @@ afterEach(() => {
   vi.resetAllMocks();
 });
 const show = (notice = false) => render(<QueryClientProvider client={queryClient}>{notice ? <AgentUpdateNotice /> : <AgentConnections info={info} />}</QueryClientProvider>);
-it("updates only supported available installations and surfaces active-work errors", async () => {
+it("updates only supported available installations and says why an update did not start", async () => {
   show();
-  fireEvent.click(await screen.findByRole("button", { name: "Update all (2)" }));
-  await waitFor(() => expect(core.call).toHaveBeenCalledWith("agents.updates.install", { ids: ["codex", "claude"] }));
-  expect((await screen.findByRole("alert")).textContent).toContain("Finish agent work");
+  fireEvent.click(await screen.findByRole("button", { name: `Update all (${harnessIds.length - 1})` }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("agents.updates.install", { ids: harnessIds.filter((id) => id !== "opencode") }));
+  expect((await screen.findByRole("alert")).textContent).toContain("The installation changed");
   expect(screen.queryByRole("button", { name: "Update OpenCode" })).toBeNull();
   expect(screen.getByRole("button", { name: "Update instructions" })).toBeTruthy();
 });
@@ -59,7 +67,15 @@ it("checks manually and exposes installed and available versions", async () => {
   await screen.findByRole("button", { name: "Update Codex" });
   fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("agents.updates.check", {}));
-  expect(screen.getAllByText("Version 1.1.0 available")).toHaveLength(3);
+  expect(screen.getAllByText("Version 1.1.0 available")).toHaveLength(harnessIds.length);
+});
+it("updates Homebrew Oh My Pi in the app instead of linking to instructions", async () => {
+  enabled = ["omp"];
+  state.agents = state.agents.map((row) => (row.id === "omp" ? { ...row, method: "Homebrew", installedVersion: "18.18.1", latestVersion: "18.18.2" } : row));
+  show();
+  fireEvent.click(await screen.findByRole("button", { name: "Update Oh My Pi" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("agents.updates.install", { ids: ["omp"] }));
+  expect(screen.queryByRole("button", { name: "Update instructions" })).toBeNull();
 });
 it("routes Review updates to Connections without installing anything", async () => {
   show(true);
@@ -70,7 +86,7 @@ it("routes Review updates to Connections without installing anything", async () 
 });
 it("dismisses only the current release set", async () => {
   show(true);
-  const dismiss = await screen.findByRole("button", { name: "Dismiss agent updates" });
+  const dismiss = await screen.findByRole("button", { name: "Later" });
   expect(isPreviewCovered()).toBe(true);
   fireEvent.click(dismiss);
   await waitFor(() => expect(screen.queryByRole("button", { name: "Review updates" })).toBeNull());
@@ -86,6 +102,20 @@ it("disables actions and suppresses the notice while an update is running", asyn
   expect((screen.getByRole("button", { name: "Check for updates" }) as HTMLButtonElement).disabled).toBe(true);
   expect((screen.getByRole("button", { name: "Update Claude" }) as HTMLButtonElement).disabled).toBe(true);
 });
+it("stops the update that is running from its own row", async () => {
+  state = { ...state, updating: true, agents: state.agents.map((row) => (row.id === "codex" ? { ...row, status: "updating" } : row)) };
+  show();
+  fireEvent.click(await screen.findByRole("button", { name: "Stop updating Codex" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("agents.updates.cancel", {}));
+  expect(screen.getAllByRole("button", { name: /^Stop / })).toHaveLength(1);
+  expect(screen.queryByRole("button", { name: "Update Codex" })).toBeNull();
+});
+it("stops a reinstall the same way", async () => {
+  state = { ...state, updating: true, agents: state.agents.map((row) => (row.id === "codex" ? { ...row, status: "reinstalling" } : row)) };
+  show();
+  fireEvent.click(await screen.findByRole("button", { name: "Stop reinstalling Codex" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("agents.updates.cancel", {}));
+});
 it("offers a reinstall for an agent that fails to start instead of a login hint", async () => {
   const broken = { status: "broken" as const, installedVersion: null, latestVersion: null };
   state = {
@@ -93,10 +123,11 @@ it("offers a reinstall for an agent that fails to start instead of a login hint"
     agents: state.agents.map((row) => {
       if (row.id === "codex") return { ...row, ...broken, message: null };
       if (row.id === "opencode") return { ...row, ...broken, message: "Reinstall using the tool that installed this agent, then check again." };
+      if (row.id === "omp") return { ...row, status: "current" as const, latestVersion: "1.0.0" };
       return row;
     }),
   };
-  const failing: SystemInfo = { ...info, harnesses: info.harnesses.map((row) => (row.id === "claude" ? row : { ...row, state: "check_failed", version: null })) };
+  const failing: SystemInfo = { ...info, harnesses: info.harnesses.map((row) => (row.id === "codex" || row.id === "opencode" ? { ...row, state: "check_failed", version: null } : row)) };
   render(
     <QueryClientProvider client={queryClient}>
       <AgentConnections info={failing} />
@@ -108,5 +139,31 @@ it("offers a reinstall for an agent that fails to start instead of a login hint"
   expect(screen.queryByText(/Connect in a terminal/)).toBeNull();
   expect(screen.queryByRole("button", { name: "Reinstall OpenCode" })).toBeNull();
   expect(screen.getByRole("button", { name: "Reinstall instructions" })).toBeTruthy();
-  expect(screen.getByRole("button", { name: "Update all" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: `Update all (${harnessIds.length - 3})` })).toBeTruthy();
+});
+
+it("hides disabled agents until Add agents is opened and saves enabling and disabling", async () => {
+  enabled = ["codex"];
+  show();
+  await screen.findByRole("switch", { name: "Enable Codex" });
+  await waitFor(() => expect(screen.queryByRole("heading", { name: "Claude Code" })).toBeNull());
+  expect(screen.queryByRole("button", { name: "Update Cursor" })).toBeNull();
+  fireEvent.click(screen.getByLabelText(`Add agents (${harnessIds.length - 1})`));
+  fireEvent.click(screen.getByRole("button", { name: "Enable Cursor" }));
+  await screen.findByRole("switch", { name: "Enable Cursor" });
+  expect(enabled).toEqual(["codex", "cursor"]);
+  fireEvent.click(screen.getByRole("switch", { name: "Enable Codex" }));
+  await waitFor(() => expect(enabled).toEqual(["cursor"]));
+  await waitFor(() => expect(screen.queryByRole("heading", { name: "Codex" })).toBeNull());
+});
+
+it("explains when an older running core ignores an agent selection", async () => {
+  enabled = ["codex"];
+  show();
+  const addAgents = await screen.findByLabelText(`Add agents (${harnessIds.length - 1})`);
+  vi.mocked(core.call).mockResolvedValueOnce({});
+  fireEvent.click(addAgents);
+  fireEvent.click(screen.getByRole("button", { name: "Enable Cursor" }));
+  expect((await screen.findByRole("alert")).textContent).toContain("Quit and reopen OpenOrc");
+  expect(screen.queryByRole("switch", { name: "Enable Cursor" })).toBeNull();
 });

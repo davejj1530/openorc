@@ -1,0 +1,60 @@
+/* Local storage's Worktrees row sits under the data folder's well, a hairline between them. */
+.settings-worktrees {
+  margin-top: 16px;
+  border-top: var(--hairline) solid var(--line);
+}
+.settings-worktrees > .settings-field {
+  border-bottom: 0;
+}
+
+/* The cleanup list: one fill card per project under a quiet heading, hairlines between rows. */
+.worktree-cleanup-list {
+  display: grid;
+  gap: 16px;
+  max-height: min(52vh, 480px);
+  overflow-y: auto;
+}
+.worktree-cleanup-project h3 {
+  margin-bottom: 6px;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+.worktree-cleanup-rows {
+  overflow: hidden;
+  border-radius: var(--radius-xl);
+  background: var(--surface-2);
+}
+.worktree-cleanup-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 8px 14px;
+  border-bottom: var(--hairline) solid var(--line);
+}
+.worktree-cleanup-row:last-child {
+  border-bottom: 0;
+}
+.worktree-cleanup-row[data-blocked] {
+  color: var(--ink-3);
+}
+.worktree-cleanup-name {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-base);
+}
+.worktree-cleanup-name > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.worktree-cleanup-meta {
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+}
+.worktree-cleanup-size {
+  flex-shrink: 0;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}

@@ -1,27 +1,56 @@
 import { agentUpdateStatus, agentConnectionStatus } from "./settings-presentation";
-import { agentUpdateNoticeKey, harnessCatalog, harnessFailsToStart, harnessIds, harnessInstalled, harnessLoggedIn, type AgentUpdate, type HarnessInfo, type SystemInfo } from "@openorc/protocol";
+import { useState, type ReactNode } from "react";
+import {
+  agentUpdateNoticeKey,
+  harnessCatalog,
+  harnessFailsToStart,
+  harnessIds,
+  harnessInstalled,
+  harnessLoggedIn,
+  type AgentUpdate,
+  type HarnessId,
+  type HarnessInfo,
+  type SystemInfo,
+} from "@openorc/protocol";
 import { CoversPreview } from "../lib/browser-preview";
 import { cn } from "../lib/cn";
 import { useRpc, useRpcMutation } from "../lib/client";
+import { useEnabledHarnesses } from "../lib/enabled-harnesses";
 import { useRouter } from "../lib/router";
-import { Download, X } from "../components/icons";
-import { Button, IconButton, TextButton } from "../components/ui";
+import { ChevronDown, Download, Plus } from "../components/icons";
+import { Button, Switch, TextButton } from "../components/ui";
 import { Section, Status, Toggle } from "./settings-shared";
 import { HarnessLogo } from "../components/HarnessLogo";
 
 /** The shared core state survives navigation and keeps every window in agreement. */
-export function AgentConnections({ info }: { info?: SystemInfo }) {
+export function AgentConnections({ info, actions }: { info?: SystemInfo; actions?: ReactNode }) {
+  const enabled = useEnabledHarnesses();
+  const settings = useRpc("app.settings.get", {});
+  const selection = useRpcMutation("app.settings.set");
+  const [selectionError, setSelectionError] = useState<string | null>(null);
+  const select = (enabledHarnesses: HarnessId[]) => {
+    setSelectionError(null);
+    selection.mutate(
+      { enabledHarnesses },
+      {
+        onSuccess: (saved) => {
+          if (saved.enabledHarnesses == null) setSelectionError("Quit and reopen OpenOrc to change enabled agents. The app is still running an older version.");
+        },
+      },
+    );
+  };
+  const disabled = harnessIds.filter((id) => !enabled.includes(id));
   const updates = useRpc("agents.updates.get", {});
   const check = useRpcMutation("agents.updates.check");
   const install = useRpcMutation("agents.updates.install");
   const configure = useRpcMutation("agents.updates.configure");
   const state = updates.data;
   const busy = Boolean(state?.checking || state?.updating || check.isPending || install.isPending);
-  const available = state?.agents.filter((row) => row.status === "available" && row.canUpdate) ?? [];
-  const error = install.error ?? check.error ?? configure.error ?? updates.error;
+  const available = state?.agents.filter((row) => enabled.includes(row.id) && row.status === "available" && row.canUpdate) ?? [];
+  const error = [selection.error, settings.error, install.error, check.error, configure.error, updates.error].find(Boolean);
   const checked = state?.agents.map((row) => row.checkedAt ?? 0).reduce((a, b) => Math.max(a, b), 0);
   return (
-    <Section title="Coding agents" description="Agents use your CLI login. OpenOrc does not read their credential files." flush>
+    <Section title="Coding agents" flush actions={actions}>
       <div className="settings-toolbar">
         <p className="text-sm text-ink-2" role="status">
           {agentUpdateStatus({ updating: Boolean(state?.updating), checking: Boolean(state?.checking || check.isPending), checked })}
@@ -44,13 +73,13 @@ export function AgentConnections({ info }: { info?: SystemInfo }) {
           ) : null}
         </div>
       </div>
-      {error ? (
+      {selectionError || error ? (
         <p role="alert" className="text-sm text-bad my-3">
-          {error.message} {updates.isError ? <TextButton onClick={() => void updates.refetch()}>Try again</TextButton> : null}
+          {selectionError ?? error?.message} {updates.isError ? <TextButton onClick={() => void updates.refetch()}>Try again</TextButton> : null}
         </p>
       ) : null}
-      <div className="settings-cards">
-        {harnessIds.map((id) => (
+      <div className="settings-agent-list" data-plane aria-description="Enabled agents appear in model pickers and can start work. Agents use your CLI login.">
+        {enabled.map((id) => (
           <AgentConnection
             key={id}
             id={id}
@@ -58,66 +87,130 @@ export function AgentConnections({ info }: { info?: SystemInfo }) {
             update={state?.agents.find((row) => row.id === id)}
             busy={busy}
             onUpdate={() => install.mutate({ ids: [id] })}
+            selectionDisabled={!settings.data || selection.isPending}
+            onDisable={() => select(enabled.filter((agent) => agent !== id))}
           />
         ))}
+        <AddAgents ids={disabled} disabled={!settings.data || selection.isPending} onEnable={(id) => select([...enabled, id])} />
       </div>
-      <div className="settings-group">
+      <div className="settings-group settings-agent-preferences">
         <Toggle
           label="Check for agent updates automatically"
-          hint="Every six hours while OpenOrc is open. Checks contact npm or Homebrew for public version information."
+          hint="Every six hours while OpenOrc is open. Checks public version information from each agent’s publisher."
           checked={state?.automatic ?? true}
           disabled={!state || configure.isPending}
           onChange={(automatic) => configure.mutate({ automatic })}
         />
       </div>
-      <p className="settings-note">Updates start only when agent work has finished. Idle sessions reconnect on your next message; your conversations stay here.</p>
+      <p className="settings-note">Agents keep working during an update. Each conversation moves to the new version on its next message.</p>
     </Section>
   );
 }
 
-function AgentConnection({ id, info, update, busy, onUpdate }: { id: HarnessInfo["id"]; info?: HarnessInfo; update?: AgentUpdate; busy: boolean; onUpdate: () => void }) {
+function AddAgents({ ids, disabled, onEnable }: { ids: readonly HarnessId[]; disabled: boolean; onEnable: (id: HarnessId) => void }) {
+  if (!ids.length) return null;
+  return (
+    <details className="settings-agent-add">
+      <summary aria-label={`Add agents (${ids.length})`}>
+        <Plus size={16} />
+        <span>
+          Add agents <span className="text-ink-3">({ids.length})</span>
+        </span>
+        <ChevronDown size={14} className="settings-agent-chevron" />
+      </summary>
+      <div>
+        {ids.map((id) => (
+          <div className="settings-agent-available" key={id}>
+            <span className="inline-flex items-center gap-3.5">
+              <HarnessLogo id={id} size={22} />
+              {harnessCatalog[id].name}
+            </span>
+            <Button size="sm" aria-label={`Enable ${harnessCatalog[id].name}`} disabled={disabled} onClick={() => onEnable(id)}>
+              Enable
+            </Button>
+          </div>
+        ))}
+      </div>
+    </details>
+  );
+}
+
+function AgentConnection({
+  id,
+  info,
+  update,
+  busy,
+  onUpdate,
+  selectionDisabled,
+  onDisable,
+}: {
+  id: HarnessInfo["id"];
+  info?: HarnessInfo;
+  update?: AgentUpdate;
+  busy: boolean;
+  onUpdate: () => void;
+  selectionDisabled: boolean;
+  onDisable: () => void;
+}) {
   const harness = harnessCatalog[id];
   const installed = info ? harnessInstalled(info) : false;
   const loggedIn = info ? harnessLoggedIn(info) : false;
   return (
-    <div className="settings-card">
-      <div className="settings-card-head">
-        <HarnessLogo id={id} size={20} />
-        <h3>{harness.name}</h3>
-        <Status ok={loggedIn}>{agentConnectionStatus({ info, installed, loggedIn })}</Status>
+    <div className="settings-agent-row">
+      <details className="settings-agent-details">
+        <summary aria-label={`${harness.name} details`}>
+          <HarnessLogo id={id} size={22} />
+          <div className="min-w-0">
+            <div className="settings-agent-title">
+              <h3>{harness.name}</h3>
+              <ChevronDown size={12} className="settings-agent-chevron" />
+            </div>
+            <div className="settings-agent-meta">
+              <Status ok={loggedIn}>{agentConnectionStatus({ info, installed, loggedIn })}</Status>
+              {installed ? <span>{update?.installedVersion ?? info?.version ?? "Version unknown"}</span> : null}
+              {update?.status === "available" ? <span className="text-ink">Version {update.latestVersion} available</span> : null}
+            </div>
+          </div>
+        </summary>
+        <AgentInstallation info={info} update={update} />
+      </details>
+      <div className="settings-agent-actions">
+        {update ? <AgentUpdateAction update={update} name={harness.shortName} busy={busy} onUpdate={onUpdate} /> : null}
+        {info && !loggedIn && !installed && !harnessFailsToStart(info) ? (
+          <Button size="sm" aria-label={`Install ${harness.name}`} onClick={() => void window.openorc.openExternal(harness.setupUrl)}>
+            Install
+          </Button>
+        ) : null}
+        <Switch aria-label={`Enable ${harness.name}`} checked disabled={selectionDisabled} onChange={onDisable} />
       </div>
-      {installed ? (
-        <p className="settings-card-meta">
-          {update?.installedVersion ?? info?.version ?? "Version unknown"}
-          {update?.method ? ` · ${update.method}` : ""}
-        </p>
-      ) : null}
       {update ? <AgentUpdateDetails update={update} setupUrl={harness.setupUrl} /> : null}
       {info && !loggedIn && !harnessFailsToStart(info) && installed ? (
-        <p className="settings-card-meta">
+        <p className="settings-agent-feedback">
           <AgentLoginInstructions id={id} />
         </p>
       ) : null}
-      {info?.path ? (
-        <details className="settings-agent-location">
-          <summary>Installation location</summary>
-          <code>{info.path.replace(/^\/Users\/[^/]+/, "~")}</code>
-        </details>
-      ) : null}
-      <div className="settings-card-actions">
-        {update ? <AgentUpdateAction update={update} name={harness.shortName} busy={busy} onUpdate={onUpdate} /> : null}
-        {info && !loggedIn && !installed && !harnessFailsToStart(info) ? (
-          <Button size="sm" onClick={() => void window.openorc.openExternal(harness.setupUrl)}>
-            Install {harness.name}
-          </Button>
-        ) : null}
-      </div>
+    </div>
+  );
+}
+
+function AgentInstallation({ info, update }: { info?: HarnessInfo; update?: AgentUpdate }) {
+  return (
+    <div className="settings-agent-installation">
+      {update?.method ? <p>Installation: {update.method}</p> : null}
+      {info?.path ? <code>{info.path.replace(/^\/Users\/[^/]+/, "~")}</code> : null}
+      {update?.status === "current" ? <p>{update.message ?? "Up to date"}</p> : null}
     </div>
   );
 }
 
 function AgentLoginInstructions({ id }: { id: HarnessInfo["id"] }) {
   if (id === "claude") return <>Manage your Claude accounts below.</>;
+  if (id === "pi")
+    return (
+      <>
+        Run <code>pi</code> in a terminal, then enter <code>/login</code> to connect a provider.
+      </>
+    );
   return (
     <>
       Connect in a terminal: <code>{harnessCatalog[id].loginCommand}</code>
@@ -126,22 +219,28 @@ function AgentLoginInstructions({ id }: { id: HarnessInfo["id"] }) {
 }
 
 const actionLabels: Partial<Record<AgentUpdate["status"], string>> = { available: "Update", broken: "Reinstall" };
-const progressLabels: Partial<Record<AgentUpdate["status"], string>> = { updating: "Updating…", reinstalling: "Reinstalling…" };
+const progressLabels: Partial<Record<AgentUpdate["status"], string>> = { updating: "Updating", reinstalling: "Reinstalling" };
 
-/** The row's one action: run the planned update or reinstall, or show that it is running. */
+/** The row's one action: run the planned update or reinstall, or stop the one that is running. */
 function AgentUpdateAction({ update, name, busy, onUpdate }: { update: AgentUpdate; name: string; busy: boolean; onUpdate: () => void }) {
+  const stop = useRpcMutation("agents.updates.cancel");
   const progress = progressLabels[update.status];
   if (progress)
     return (
-      <span role="status" className="text-sm text-ink-2">
-        {progress}
-      </span>
+      <>
+        <span role="status" className="text-sm text-ink-2">
+          {progress}…
+        </span>
+        <Button size="sm" aria-label={`Stop ${progress.toLowerCase()} ${name}`} disabled={stop.isPending} onClick={() => stop.mutate({})}>
+          Stop
+        </Button>
+      </>
     );
   const action = actionLabels[update.status];
   if (!action || !update.canUpdate) return null;
   return (
-    <Button size="sm" disabled={busy} onClick={onUpdate}>
-      {action} {name}
+    <Button size="sm" aria-label={`${action} ${name}`} disabled={busy} onClick={onUpdate}>
+      {action}
     </Button>
   );
 }
@@ -152,15 +251,13 @@ function AgentUpdateDetails({ update, setupUrl }: { update: AgentUpdate; setupUr
   const action = actionLabels[status];
   return (
     <>
-      {status === "available" && <p className="settings-card-meta text-ink">Version {update.latestVersion} available</p>}
-      {status === "current" && <p className="settings-card-meta">Up to date</p>}
-      {update.message ? (
-        <p className={cn("settings-card-meta", alert && "text-bad")} role={alert ? "alert" : undefined}>
+      {status !== "current" && update.message ? (
+        <p className={cn("settings-agent-feedback", alert && "text-bad")} role={alert ? "alert" : undefined}>
           {update.message}
         </p>
       ) : null}
       {action && !update.canUpdate ? (
-        <TextButton className="settings-card-meta" onClick={() => void window.openorc.openExternal(setupUrl)}>
+        <TextButton className="settings-agent-feedback" onClick={() => void window.openorc.openExternal(setupUrl)}>
           {action} instructions
         </TextButton>
       ) : null}
@@ -170,12 +267,14 @@ function AgentUpdateDetails({ update, setupUrl }: { update: AgentUpdate; setupUr
 
 /** A quiet workspace notice; installing stays in Connections where versions and results are visible. */
 export function AgentUpdateNotice() {
+  const enabled = useEnabledHarnesses();
   const { data } = useRpc("agents.updates.get", {});
   const dismiss = useRpcMutation("agents.updates.configure");
   const route = useRouter((state) => state.route);
-  const signature = agentUpdateNoticeKey(data?.agents ?? []);
+  const agents = data?.agents.filter((row) => enabled.includes(row.id)) ?? [];
+  const signature = agentUpdateNoticeKey(agents);
   if (!data || data.checking || data.updating || !signature || data.dismissed === signature || (route.view === "settings" && route.section === "connections")) return null;
-  const available = data.agents.filter((row) => row.status === "available");
+  const available = agents.filter((row) => row.status === "available");
   return (
     <aside className="agent-update-notice" aria-label="Agent updates" role="status">
       <CoversPreview />
@@ -185,14 +284,16 @@ export function AgentUpdateNotice() {
         <p className="agent-update-notice-detail">
           {available.length === 1 ? `Version ${available[0]!.latestVersion} is ready to review.` : "New versions of your coding agents are ready to review."}
         </p>
-        <Button size="sm" className="mt-3" onClick={() => useRouter.getState().navigate({ view: "settings", section: "connections" })}>
-          Review updates
-        </Button>
+        <div className="flex flex-wrap items-center gap-2 mt-3">
+          <Button size="sm" onClick={() => useRouter.getState().navigate({ view: "settings", section: "connections" })}>
+            Review updates
+          </Button>
+          <Button size="sm" variant="ghost" disabled={dismiss.isPending} onClick={() => dismiss.mutate({ dismissed: signature })}>
+            Later
+          </Button>
+        </div>
         {dismiss.error ? <p className="text-sm text-bad mt-1">Could not dismiss. Try again.</p> : null}
       </div>
-      <IconButton aria-label="Dismiss agent updates" size="xs" className="-mt-1 -mr-1" disabled={dismiss.isPending} onClick={() => dismiss.mutate({ dismissed: signature })}>
-        <X size={14} />
-      </IconButton>
     </aside>
   );
 }

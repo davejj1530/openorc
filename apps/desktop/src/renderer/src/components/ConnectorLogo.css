@@ -1,0 +1,13 @@
+/* A connector's or skill's image, or its first letter on a small tile. */
+.connector-logo {
+  flex-shrink: 0;
+  border-radius: 5px;
+  object-fit: contain;
+}
+.connector-logo-letter {
+  display: inline-grid;
+  place-items: center;
+  background: var(--surface-3);
+  color: var(--ink-2);
+  line-height: 1;
+}

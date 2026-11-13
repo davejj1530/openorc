@@ -1,0 +1,159 @@
+/* Tabs on the window's chrome line, the work column's and the panel's alike: 30px tabs up to
+   220px wide that share their row, down to 136px (room for a name to read) before the strip
+   scrolls sideways. The current tab is raised on the surface; the rest are bare until the pointer
+   fills them. A tab's close shows on the current one and under the pointer. */
+.work-tabs-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+.work-tabs {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.work-tabs::-webkit-scrollbar {
+  display: none;
+}
+.work-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 1 220px;
+  min-width: 136px;
+  max-width: 220px;
+  height: 30px;
+  margin-inline-end: 2px;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  color: var(--ink-3);
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out),
+    opacity var(--duration-arrive) var(--ease-out),
+    min-width var(--duration-resize) var(--ease-out),
+    max-width var(--duration-resize) var(--ease-out),
+    margin var(--duration-resize) var(--ease-out);
+}
+/* A tab opens out of nothing, the others giving it room as it grows (ThreadTabs starts it there), and a closed one
+   folds back into nothing while they close over it. Either way the row moves as one, never jumping a whole tab. */
+.work-tabs .work-tab[data-leaving] {
+  min-width: 0;
+  max-width: 0;
+  margin-inline-end: 0;
+  opacity: 0;
+  transition:
+    opacity var(--duration-leave) var(--ease-out),
+    min-width var(--duration-resize) var(--ease-out),
+    max-width var(--duration-resize) var(--ease-out),
+    margin var(--duration-resize) var(--ease-out);
+}
+/* A dragged tab rides over the row while the tabs it passes step aside (use-tab-reorder moves them); it follows the
+   pointer exactly, so only the others ease. The fills are tints, so it draws its own over the chrome's colour to hide
+   the names passing under it, and it stacks above the thread header's controls, which sit at 2. */
+.work-tabs[data-reordering] .work-tab {
+  transition: transform var(--duration-arrive) var(--ease-out);
+}
+.work-tabs .work-tab[data-dragged] {
+  z-index: 3;
+  background: linear-gradient(var(--surface-2), var(--surface-2)) var(--bg);
+  color: var(--ink-2);
+  transition: none;
+}
+.work-tabs .work-tab-current[data-dragged] {
+  background-image: linear-gradient(var(--surface-3), var(--surface-3));
+  color: var(--ink);
+}
+.work-tab:hover {
+  background-color: var(--surface-2);
+  color: var(--ink-2);
+}
+.work-tab-current,
+.work-tab-current:hover {
+  background-color: var(--surface-3);
+  color: var(--ink);
+}
+.work-tab-face {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 28px 0 10px;
+  border-radius: inherit;
+  font-size: var(--text-base);
+  /* The current tab's room for its close comes and goes with the tab, so a tab sized to its name eases too. */
+  transition: padding var(--duration-resize) var(--ease-out);
+  text-align: left;
+}
+/* Only the current tab keeps room for its close; another tab's name runs to its end, and its close
+   fades in over the last letters under the pointer. */
+.work-tab:not(.work-tab-current) .work-tab-face {
+  padding-right: 10px;
+}
+.work-tab:not(.work-tab-current):hover .work-tab-title {
+  mask-image: linear-gradient(to left, transparent 14px, #000 30px);
+}
+.work-tab-face:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.work-tab-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+}
+/* An Orcling's face draws its body in the middle three quarters of its box, so it takes 2px more to stand as tall as an
+   agent's mark, without moving the title. A group's faces take the width of the two overlapping. */
+.work-tab-icon.work-tab-orcling {
+  width: 16px;
+  height: 16px;
+  margin: -1px;
+}
+.work-tab-icon.work-tab-orclings {
+  display: inline-flex;
+  width: auto;
+}
+.work-tab-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.work-tab-close {
+  position: absolute;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-pill);
+  color: var(--ink-3);
+  opacity: 0;
+  transition:
+    opacity var(--duration-quick) var(--ease-out),
+    background-color var(--duration-quick) var(--ease-out);
+}
+/* The thread header lifts its controls above the window's drag plane with position: relative; a tab's close keeps
+   its place over the tab's end rather than taking room from the name. */
+.thread-header .work-tab .work-tab-close {
+  position: absolute;
+}
+.work-tab:is(:hover, .work-tab-current) .work-tab-close,
+.work-tab-close:focus-visible {
+  opacity: 1;
+}
+.work-tab-close:hover {
+  background-color: var(--surface-2);
+  color: var(--ink);
+}
+.work-tabs-new {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}

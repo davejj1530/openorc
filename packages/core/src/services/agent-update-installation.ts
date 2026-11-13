@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { harnessCatalog, type HarnessId } from "@openorc/protocol";
 import { resolveBinary, type EnvSnapshot } from "./shell-environment.js";
+import { homebrewInstallation, OMP_FORMULA } from "./agent-update-homebrew.js";
 
 export interface UpdateCommand {
   binary: string;
@@ -19,13 +20,27 @@ export interface AgentInstallation {
   /** The resolved launcher must still identify the same installation at update time. */
   identity: string;
 }
-export type UpdateRunner = (command: UpdateCommand, env: NodeJS.ProcessEnv) => Promise<string>;
+/** How long the `npm root --global` lookup may take. */
+export const PROBE_LIMIT_MS = 8000;
+/** Long enough for a release archive of a few hundred megabytes on a slow connection. */
+export const INSTALL_LIMIT_MS = 30 * 60_000;
+
+export type UpdateRunner = (command: UpdateCommand, env: NodeJS.ProcessEnv, options?: { limitMs?: number; signal?: AbortSignal }) => Promise<string>;
+
+const ENDINGS = {
+  timeout: `The update took longer than ${INSTALL_LIMIT_MS / 60_000} minutes and was stopped. Check your connection, then try again.`,
+  stopped: "The update was stopped.",
+  failed: "The updater could not finish. Run the update in a terminal to inspect permissions or package-manager errors, then check again.",
+};
 
 /** No shell, sudo, downloaded scripts, or commands supplied by the renderer. */
-export const runUpdateCommand: UpdateRunner = (command, env) =>
+export const runUpdateCommand: UpdateRunner = (command, env, { limitMs = INSTALL_LIMIT_MS, signal } = {}) =>
   new Promise((resolve, reject) => {
-    let timedOut = false;
-    let failed = false;
+    if (signal?.aborted) {
+      reject(new Error(ENDINGS.stopped));
+      return;
+    }
+    let ending: keyof typeof ENDINGS | null = null;
     let bytes = 0;
     let output = "";
     const child = spawn(command.binary, command.args, {
@@ -35,7 +50,7 @@ export const runUpdateCommand: UpdateRunner = (command, env) =>
       windowsHide: true,
       stdio: ["pipe", "pipe", "pipe"],
     });
-    const stop = () => {
+    const kill = () => {
       if (!child.pid) return;
       try {
         if (process.platform === "win32") child.kill("SIGKILL");
@@ -44,45 +59,44 @@ export const runUpdateCommand: UpdateRunner = (command, env) =>
         /* Already exited. */
       }
     };
-    const timer = setTimeout(
-      () => {
-        timedOut = true;
-        stop();
-      },
-      command.args[0] === "root" ? 8000 : 180_000,
-    );
+    const end = (how: keyof typeof ENDINGS) => {
+      ending ??= how;
+      kill();
+    };
+    const timer = setTimeout(() => end("timeout"), limitMs);
+    const stopped = () => end("stopped");
+    signal?.addEventListener("abort", stopped, { once: true });
     const collect = (chunk: Buffer, stdout: boolean) => {
       bytes += chunk.length;
-      if (bytes > 1024 * 1024) {
-        failed = true;
-        stop();
-      } else if (stdout) output += chunk.toString("utf8");
+      if (bytes > 1024 * 1024) end("failed");
+      else if (stdout) output += chunk.toString("utf8");
     };
     child.stdout.on("data", (chunk: Buffer) => collect(chunk, true));
     child.stderr.on("data", (chunk: Buffer) => collect(chunk, false));
-    child.on("error", () => {
-      failed = true;
-      stop();
-    });
+    child.on("error", () => end("failed"));
     child.on("close", (code) => {
       clearTimeout(timer);
+      signal?.removeEventListener("abort", stopped);
       // Package manager output can contain registry credentials. Do not send it to the renderer or ledger.
-      if (failed || timedOut || code !== 0) {
-        stop();
-        reject(
-          new Error(
-            timedOut
-              ? "The update timed out. Check the installation in a terminal, then try again."
-              : "The updater could not finish. Run the update in a terminal to inspect permissions or package-manager errors, then check again.",
-          ),
-        );
+      if (ending || code !== 0) {
+        kill();
+        reject(new Error(ENDINGS[ending ?? "failed"]));
       } else resolve(output.trim());
     });
     child.stdin.end();
   });
 
 const npmPackage = (id: HarnessId) => harnessCatalog[id].cli.npm;
-const registry = (id: HarnessId, channel = "latest") => `https://registry.npmjs.org/${npmPackage(id)}/${channel}`;
+function registry(id: HarnessId, channel = "latest"): string {
+  if (id === "fx") return "https://releases.fx.sh/latest.txt";
+  if (id === "cursor") return "https://cursor.com/install";
+  if (id === "antigravity") {
+    const platform = process.platform === "win32" ? "windows" : process.platform;
+    const arch = process.arch === "x64" ? "amd64" : process.arch;
+    return `https://antigravity-cli-auto-updater-974169037036.us-central1.run.app/manifests/${platform}_${arch}.json`;
+  }
+  return `https://registry.npmjs.org/${npmPackage(id)}/${channel}`;
+}
 
 /** Recognize only installations whose owner can be proved; wrappers/custom package managers stay manual. */
 export async function detectAgentInstallation(id: HarnessId, binary: string, snapshot: EnvSnapshot, run: UpdateRunner = runUpdateCommand): Promise<AgentInstallation> {
@@ -97,33 +111,19 @@ export async function detectAgentInstallation(id: HarnessId, binary: string, sna
   };
   if (process.platform === "win32") return manual;
 
-  const brewMatch = /^(.*)\/(Caskroom|Cellar)\/(codex|claude-code(?:@latest)?|opencode)\//.exec(target);
-  if (brewMatch) {
-    const [, prefix, kind, name] = brewMatch;
-    // Only known casks use the Homebrew API. A formula may belong to a third-party tap.
-    if (kind !== "Caskroom" || id === "opencode" || (id === "codex" ? name !== "codex" : !name?.startsWith("claude-code")))
-      return { ...manual, method: "Homebrew", message: `Update this installation with Homebrew, then check again.` };
-    const brew = await resolveBinary("brew", `${prefix}/bin`);
-    const cask = (verb: string): UpdateCommand | null => (brew ? { binary: brew, args: [verb, "--cask", name!] } : null);
-    return {
-      ...manual,
-      method: "Homebrew",
-      releaseUrl: `https://formulae.brew.sh/api/cask/${name}.json`,
-      command: cask("upgrade"),
-      repair: cask("reinstall"),
-      message: brew ? null : "Homebrew could not be found. Update in a terminal, then check again.",
-    };
-  }
+  const brew = await homebrewInstallation(id, manual);
+  if (brew) return brew;
 
   // npm's actual global root must own this exact binary, excluding pnpm, bun and project-local installs.
-  const npmRoot = target.slice(0, target.lastIndexOf(`/node_modules/${npmPackage(id)}/`));
-  if (npmRoot && target.includes(`/node_modules/${npmPackage(id)}/`) && !/[\\/](?:\.pnpm|\.bun|\.yarn)[\\/]/.test(target)) {
+  const pkg = npmPackage(id);
+  const npmRoot = pkg ? target.slice(0, target.lastIndexOf(`/node_modules/${pkg}/`)) : null;
+  if (pkg && npmRoot && target.includes(`/node_modules/${pkg}/`) && !/[\\/](?:\.pnpm|\.bun|\.yarn)[\\/]/.test(target)) {
     const npm = await resolveBinary("npm", snapshot.path);
     if (npm) {
-      const root = await run({ binary: npm, args: ["root", "--global"] }, { ...snapshot.env });
+      const root = await run({ binary: npm, args: ["root", "--global"] }, { ...snapshot.env }, { limitMs: PROBE_LIMIT_MS });
       if ((await realpath(root).catch(() => root)) === `${npmRoot}/node_modules`) {
         // npm skips a platform package it failed to fetch and still exits 0; installing again restores it.
-        const command = { binary: npm, args: ["install", "--global", `${npmPackage(id)}@latest`] };
+        const command = { binary: npm, args: ["install", "--global", `${pkg}@latest`] };
         return { ...manual, method: "npm", command, repair: command, message: null };
       }
     }
@@ -133,10 +133,14 @@ export async function detectAgentInstallation(id: HarnessId, binary: string, sna
 }
 
 async function detectNativeInstallation(id: HarnessId, binary: string, env: NodeJS.ProcessEnv, manual: AgentInstallation): Promise<AgentInstallation> {
-  if (id === "codex") return detectStandaloneCodex(binary, env, manual);
+  const detect = nativeInstallers[id];
+  if (detect) return detect(binary, env, manual);
   const home = env["HOME"] ?? os.homedir();
   const target = manual.identity;
-  if (id === "claude" && target.startsWith(path.join(home, ".local/share/claude/versions") + path.sep) && binary === path.join(home, ".local/bin/claude")) {
+  if (ownsNativeVersion("cursor", id, binary, target, home)) {
+    return { ...manual, method: "Native", command: { binary, args: ["update"] }, message: null };
+  }
+  if (ownsNativeVersion("claude", id, binary, target, home)) {
     let channel = "latest";
     try {
       const config = JSON.parse(await readFile(path.join(env["CLAUDE_CONFIG_DIR"] ?? path.join(home, ".claude"), "settings.json"), "utf8"));
@@ -150,7 +154,40 @@ async function detectNativeInstallation(id: HarnessId, binary: string, env: Node
   if (id === "opencode" && target === path.join(home, ".opencode/bin/opencode")) {
     return { ...manual, method: "Native", command: { binary, args: ["upgrade", "--method", "curl"] }, message: null };
   }
+  // Oh My Pi's installer puts its prebuilt binary here, which `omp update` replaces in place.
+  if (id === "omp" && target === path.join(env["PI_INSTALL_DIR"] || path.join(home, ".local/bin"), "omp")) {
+    return { ...manual, method: "Native", command: { binary, args: ["update"] }, message: null };
+  }
   return manual;
+}
+
+const nativeInstallers: Partial<Record<HarnessId, (binary: string, env: NodeJS.ProcessEnv, manual: AgentInstallation) => AgentInstallation | Promise<AgentInstallation>>> = {
+  codex: detectStandaloneCodex,
+  antigravity: detectAntigravity,
+  fx: detectFx,
+};
+
+function detectAntigravity(binary: string, env: NodeJS.ProcessEnv, manual: AgentInstallation): AgentInstallation {
+  const installed = path.join(env["HOME"] ?? os.homedir(), ".local/bin/agy");
+  return binary === installed && manual.identity === binary ? { ...manual, method: "Native", command: { binary, args: ["update"] }, message: null } : manual;
+}
+
+async function detectFx(binary: string, env: NodeJS.ProcessEnv, manual: AgentInstallation): Promise<AgentInstallation> {
+  const home = env["HOME"] || os.homedir();
+  if (binary !== path.join(env["FX_INSTALL_DIR"] || path.join(home, ".local/bin"), "fx") || manual.identity !== binary) return manual;
+  try {
+    const config: unknown = JSON.parse(await readFile(path.join(env["FX_HOME"] || path.join(home, ".fx"), "settings.json"), "utf8"));
+    if (config && typeof config === "object" && "update_channel" in config && config.update_channel !== "stable")
+      return { ...manual, message: "fx uses a development release channel. Run fx upgrade in a terminal." };
+  } catch (error) {
+    if (!(error && typeof error === "object" && "code" in error && error.code === "ENOENT")) return { ...manual, message: "fx's release channel could not be read. Run fx upgrade in a terminal." };
+  }
+  return { ...manual, method: "Native", command: { binary, args: ["upgrade"] }, message: null };
+}
+
+function ownsNativeVersion(expected: "claude" | "cursor", id: HarnessId, binary: string, target: string, home: string): boolean {
+  const name = expected === "cursor" ? "cursor-agent" : "claude";
+  return id === expected && target.startsWith(path.join(home, ".local/share", name, "versions") + path.sep) && binary === path.join(home, ".local/bin", name);
 }
 
 async function detectStandaloneCodex(binary: string, env: NodeJS.ProcessEnv, manual: AgentInstallation): Promise<AgentInstallation> {
@@ -172,10 +209,16 @@ async function detectStandaloneCodex(binary: string, env: NodeJS.ProcessEnv, man
 
 /** Strict release numbers prevent malformed metadata and prereleases from becoming update prompts. */
 export function releaseVersion(value: string | null): string | null {
-  const match = value?.match(/(?:^|\s|v)(\d+\.\d+\.\d+)(?![\w.+-])/);
+  const cursor = value?.match(/(?:^|\s)(\d{4}\.\d{2}\.\d{2}-[a-f0-9]+)(?=\s|$)/);
+  if (cursor) return cursor[1] ?? null;
+  // Oh My Pi says "omp/18.18.1".
+  const match = value?.match(/(?:^|[\s/]|v)(\d+\.\d+\.\d+)(?![\w.+-])/);
   return match?.[1] ?? null;
 }
 export function newerRelease(latest: string, installed: string): boolean {
+  if (/^\d{4}\.\d{2}\.\d{2}-/.test(latest) && /^\d{4}\.\d{2}\.\d{2}-/.test(installed)) {
+    return latest.slice(0, 10) > installed.slice(0, 10) || (latest.slice(0, 10) === installed.slice(0, 10) && latest !== installed);
+  }
   const a = latest.split(".").map(Number),
     b = installed.split(".").map(Number);
   for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i]! > b[i]!;
@@ -186,9 +229,26 @@ export async function fetchAgentRelease(url: string): Promise<string> {
   if (!response.ok) throw new Error("The release service could not be reached. Try checking again later.");
   // npm and Homebrew answer with JSON metadata; Claude's native channel answers with a bare version.
   const body = (await response.text()).trim();
-  const data: unknown = body.startsWith("{") ? JSON.parse(body) : { version: body };
-  const raw = typeof data === "object" && data !== null && "version" in data ? data.version : null;
+  if (url === OMP_FORMULA) {
+    const version = /^\s*version "(\d+\.\d+\.\d+)"\s*$/m.exec(body)?.[1];
+    if (!version) throw new Error("Oh My Pi's Homebrew formula did not identify its current release. Try checking again later.");
+    return version;
+  }
+  if (url === "https://cursor.com/install") {
+    const version = /https:\/\/downloads\.cursor\.com\/lab\/(\d{4}\.\d{2}\.\d{2}-[a-f0-9]+)\//.exec(body)?.[1];
+    if (!version) throw new Error("Cursor's installer did not identify its current release. Run cursor-agent update in a terminal.");
+    return version;
+  }
+  const data: unknown = body.startsWith("{") ? JSON.parse(body) : { version: url === "https://releases.fx.sh/latest.txt" ? body.replace(/^v/, "") : body };
+  const raw = releaseField(data);
   const version = typeof raw === "string" ? releaseVersion(raw) : null;
   if (!version || raw !== version) throw new Error("The release service returned an unrecognized version. Try checking again later.");
   return version;
+}
+
+function releaseField(data: unknown): unknown {
+  if (!data || typeof data !== "object") return null;
+  if ("version" in data) return data.version;
+  if ("versions" in data && data.versions && typeof data.versions === "object" && "stable" in data.versions) return data.versions.stable;
+  return null;
 }

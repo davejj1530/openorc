@@ -28,6 +28,7 @@ export function useComposerChanges(source: ComposerSource | null): ComposerChang
   const pending = useThreadMutationPending(threadId);
   const diff = source?.kind === "thread" ? threadDiff : projectDiff;
   const counts = useMemo(() => patchStat(diff.data?.patch ?? ""), [diff.data?.patch]);
+  const inPanel = useLayout((s) => s.panelOpen && s.panelTab === "changes" && (!threadId || !s.panelThreadId || s.panelThreadId === threadId));
   if (!source) return null;
   const files = diff.data?.files.length ?? 0;
   const commitDisabledReason = commitReason(source, { failed: diff.isError, files, team: threadGitActions(Boolean(source.thread?.teamInstanceId)), pending });
@@ -42,5 +43,6 @@ export function useComposerChanges(source: ComposerSource | null): ComposerChang
     onReview: () => withFileScope(source, () => useLayout.getState().openWorkspaceChanges({ kind: source.kind, id: source.id })),
     onCommit: () => withFileScope(source, () => useLayout.getState().openWorkspaceChanges({ kind: source.kind, id: source.id }, "commit")),
     commitDisabledReason,
+    inPanel,
   };
 }

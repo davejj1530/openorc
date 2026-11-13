@@ -27,10 +27,23 @@ export {
 } from "./cloud-start.js";
 export { composerActivity, composerSendHint, queueHint } from "./composer-presentation.js";
 export type { ClientPush, CoreConnection, Notice } from "./connection.js";
+export { conversationCost, formatCost } from "./conversation-cost.js";
 export { conversationActivity, conversationCanSteer, conversationPlaceholder, conversationSendDisabledReason, conversationSteerReason } from "./conversation-presentation.js";
 export type { SavedThreadSettings } from "./conversation-settings.js";
-export { composerActions, messageBody, planSubmit, processFit, type ComposerActionsInput, type SubmitInput, type SubmitPlan, type SubmitRequest, type SubmitTarget } from "./conversation-submit.js";
+export {
+  composerActions,
+  messageBody,
+  planSubmit,
+  processFit,
+  type ComposerActionsInput,
+  type OutgoingMessage,
+  type SubmitInput,
+  type SubmitPlan,
+  type SubmitRequest,
+  type SubmitTarget,
+} from "./conversation-submit.js";
 export { accountsToContinueWith, canContinueWithAnother, CONTINUE_PROMPT, RESTART_PROMPT } from "./session-recovery.js";
+export { offeredAccount, projectAccountChoice, type AccountsProject, type ProjectAccountChoice } from "./project-claude-accounts.js";
 export {
   commandWordAt,
   insertSkill,
@@ -78,6 +91,7 @@ export {
   multiProviderAgents,
   pickerCatalog,
   pickerSettings,
+  providerChoice,
   providerGroups,
   type ModelChoice,
 } from "./model-picker-selection.js";
@@ -85,7 +99,7 @@ export { decodeNewThreadDraft, newThreadChoice, newThreadStartInput, newThreadWo
 export { noticeVisible, type NoticePresence, type NoticeTarget } from "./notice-visible.js";
 export { panelToolLabels, tabsFor, type PanelTool, type PanelToolContext } from "./panel-tools.js";
 export { projectGitView, type ProjectGitView } from "./project-git.js";
-export { allowanceState, formatUsageTime, usageResetLabel } from "./provider-usage.js";
+export { creditBalanceLabel, allowanceState, formatUsageTime, usageResetLabel } from "./provider-usage.js";
 export { invalidatesFor, tagsFor } from "./query-tags.js";
 export type { RpcQueryOptions } from "./query.js";
 export type { LoadRequest, RunStore } from "./run-store.js";
@@ -129,8 +143,22 @@ export { snoozePresets, snoozePresetsChangeAt, snoozeWakeLabel } from "./snooze.
 export { startedWorkFromTool, taskActivity, taskCardStatusLabel, taskIdFromTool, taskStepLabel, uniqueTaskCards } from "./task-progress.js";
 export { pruneThreadFolds, threadFoldIds } from "./thread-folds.js";
 export { threadHeadline, type ThreadHeadline } from "./thread-headline.js";
-export { pullRequestMark, pullRequestNumber, renamedTitle, threadMark, threadPlace, threadStatus, workspaceLabel, type ThreadMark, type ThreadPlace, type ThreadStatus } from "./thread-row.js";
 export {
+  pullRequestMark,
+  pullRequestNumber,
+  renamedTitle,
+  STATUS_PRIORITY,
+  threadMark,
+  threadPlace,
+  threadStatus,
+  threadTreeStatus,
+  workspaceLabel,
+  type ThreadMark,
+  type ThreadPlace,
+  type ThreadStatus,
+} from "./thread-row.js";
+export {
+  subthreadStatuses,
   threadAncestors,
   threadBranchPath,
   threadPageBranchPath,
@@ -205,3 +233,17 @@ export {
 } from "./work-steps.js";
 export { workDuration, workParts, workTiming, workTurns } from "./work-transcript.js";
 export { useChildThreadPages, cachedChildPage, cachedListPage } from "./thread-child-pages.js";
+export {
+  ORCLING_ACCESSORIES,
+  ORCLING_BODY_COLORS,
+  ORCLING_EYE_COLORS,
+  ORCLING_EYES,
+  ORCLING_GLASSES,
+  ORCLING_INKS,
+  ORCLING_SHAPES,
+  ORCLING_TEXTURES,
+  orclingAccessory,
+  orclingEyes,
+  orclingGlasses,
+} from "./orcling-art.js";
+export { CHAT_STRETCH_MS, chatRows, stretchTime, typingBeat, type ChatRow } from "./orcling-chat.js";

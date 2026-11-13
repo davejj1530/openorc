@@ -11,6 +11,7 @@ import { useRouter } from "../lib/router";
 import { relativeTime } from "@openorc/client";
 import { modelLabel } from "../lib/model-effort-label";
 import { useModelCatalog } from "../lib/use-model-catalog";
+import { OrclingWakes } from "./OrclingWakes";
 
 /** An Orcling's profile beside a conversation it works in: its instructions, with every earlier version, and what it remembers. */
 export function OrclingPanel({ orclingId }: { orclingId: string }) {
@@ -31,6 +32,7 @@ export function OrclingPanel({ orclingId }: { orclingId: string }) {
           <Pencil size={14} /> Edit
         </Button>
       </header>
+      <OrclingWakes orcling={orcling} />
       <Instructions orcling={orcling} />
       <Memories orcling={orcling} />
     </div>
@@ -86,7 +88,7 @@ function History({ orcling, versions }: { orcling: Orcling; versions: OrclingIns
       {versions.slice(1).map((version) => (
         <li key={version.version} className="flex items-center gap-2 h-10 px-2.5 text-sm text-ink-3">
           <span className="tabular text-ink-4">v{version.version}</span>
-          <span className="min-w-0 flex-1 truncate" title={version.note ?? undefined}>
+          <span className="min-w-0 flex-1 truncate" data-tip={version.note ?? undefined}>
             {version.author === "orcling" ? orcling.name : "You"}
             {version.note ? ` · ${version.note}` : ""}
           </span>

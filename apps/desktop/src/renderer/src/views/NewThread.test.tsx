@@ -1,7 +1,7 @@
 import { NO_CLOUD_SERVICE, WORKSPACE_ID, harnessIds, type CloudSignIns, type Project, type RpcResults } from "@openorc/protocol";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { readNewThreadDraft, writeNewThreadDraft } from "../lib/new-thread-draft";
+import { readNewThreadDraft, readNewThreadProject, rememberNewThreadProject, writeNewThreadDraft } from "../lib/new-thread-draft";
 import { useLayout } from "../lib/layout";
 import { useRouter } from "../lib/router";
 
@@ -17,8 +17,8 @@ let settings: Partial<RpcResults["app.settings.get"]>;
 let offer: RpcResults["cloud.offer"] | undefined;
 let signIns: CloudSignIns;
 const mutated: [string, unknown][] = [];
-/** A project's reads held open by a test; any other project's are already in. */
-const arrivalReads: Record<string, Promise<unknown>> = {};
+/** A project's git read held open by a test; any other project's is already in. */
+const gitReads: Record<string, Promise<unknown>> = {};
 
 vi.mock("../lib/client", async (original) => ({
   ...(await original<object>()),
@@ -47,20 +47,40 @@ vi.mock("../lib/client", async (original) => ({
 vi.mock("../lib/rpc", () => ({ core: { call: async (method: string) => (method === "cloud.signIns" ? signIns : null), onReady: () => () => {}, onPush: () => () => {} } }));
 vi.mock("../lib/skill-commands", () => ({ projectScope: () => null, useSkillCommands: () => ({ commands: [], onCommandsWanted: () => {} }) }));
 vi.mock("../lib/composer-changes", () => ({ useComposerChanges: () => null }));
-vi.mock("../components/NewThreadActivity", () => ({
-  useArrivalActivity: () => ({ any: false }),
-  NewThreadRecent: () => null,
-  loadArrivalActivity: (id: string) => arrivalReads[id] ?? Promise.resolve(),
+vi.mock("../lib/project-git", async (original) => ({
+  ...(await original<object>()),
+  loadProjectGit: (id: string) => gitReads[id] ?? Promise.resolve(),
 }));
 vi.mock("../components/NewThreadMascot", () => ({ NewThreadMascot: () => null }));
 vi.mock("../components/Panel", () => ({ Panel: () => null }));
 vi.mock("../components/ProjectIconPicker", () => ({ ProjectIconPicker: () => null, ProjectIcon: () => null }));
 vi.mock("../components/TopBar", () => ({ TopBar: ({ children }: { children: React.ReactNode }) => <header>{children}</header> }));
+// The picker's own rows are its tests'; here, the Claude accounts the screen hands it, and what choosing one does.
 vi.mock("../components/ModelPicker", () => ({
   ModelPicker: () => <button type="button">Choose model</button>,
-  ComposerModelPicker: () => <button type="button">Choose model</button>,
+  ComposerModelPicker: ({ accounts }: { accounts?: PickerAccounts }) => (
+    <>
+      <button type="button">Choose model</button>
+      {accounts ? (
+        <div role="group" aria-label="Claude account">
+          {accounts.accounts.map((account) => (
+            <button key={account.id} type="button" aria-pressed={account.id === accounts.current} onClick={() => accounts.choose(account.id)}>
+              {account.name}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </>
+  ),
 }));
+const accountGroup = () => within(screen.getByRole("group", { name: "Claude account" }));
+const chosenAccount = () => accountGroup().getByRole("button", { pressed: true }).textContent;
+const offeredAccounts = () =>
+  accountGroup()
+    .getAllByRole("button")
+    .map((button) => button.textContent);
 
+import type { PickerAccounts } from "../components/ModelPickerAccounts";
 import { NewThread } from "./NewThread";
 
 const makeProject = (id: string): Project => ({
@@ -174,6 +194,7 @@ describe("NewThread", () => {
   it("switches projects from the question, restores that draft, and sends to the chosen project", async () => {
     saveModelDraft("p1", "First project");
     saveModelDraft("p2", "Second project");
+    useLayout.setState({ workspace: "p1" });
     render(<NewThread projectId="p1" />);
     fireEvent.click(screen.getByRole("button", { name: "Project: p1" }));
     expect(screen.getByRole("heading").textContent).toBe("What should we work on in p1?");
@@ -181,7 +202,7 @@ describe("NewThread", () => {
     await screen.findByRole("button", { name: "Project: p2" });
     const message = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" });
     expect(message.value).toBe("Second project");
-    expect(useLayout.getState().projectId).toBe("p2");
+    expect(useLayout.getState().workspace).toBe("p2");
     fireEvent.keyDown(message, { key: "Enter", code: "Enter" });
     await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ projectId: "p2", prompt: "Second project" })));
     expect(readNewThreadDraft("p1").prompt).toBe("First project");
@@ -201,7 +222,8 @@ describe("NewThread", () => {
   it("lands on the last project chosen when an earlier switch is still reading", async () => {
     projects = ["p1", "p2", "p3"].map(makeProject);
     let finishP2Reads = () => {};
-    arrivalReads.p2 = new Promise<void>((resolve) => (finishP2Reads = resolve));
+    gitReads.p2 = new Promise<void>((resolve) => (finishP2Reads = resolve));
+    useLayout.setState({ workspace: "p1" });
     render(<NewThread projectId="p1" />);
     fireEvent.click(screen.getByRole("button", { name: "Project: p1" }));
     fireEvent.click(await screen.findByRole("button", { name: "p2" }));
@@ -210,8 +232,23 @@ describe("NewThread", () => {
     await screen.findByRole("button", { name: "Project: p3" });
     await act(async () => finishP2Reads());
     expect(screen.getByRole("button", { name: "Project: p3" })).toBeTruthy();
-    expect(useLayout.getState().projectId).toBe("p3");
-    delete arrivalReads.p2;
+    expect(useLayout.getState().workspace).toBe("p3");
+    delete gitReads.p2;
+  });
+
+  it("starts in the project the sidebar's filter focuses, and follows the filter while open", async () => {
+    useLayout.setState({ workspace: "p2" });
+    render(<NewThread />);
+    await screen.findByRole("button", { name: "Project: p2" });
+    act(() => useLayout.getState().setWorkspace("p1"));
+    await screen.findByRole("button", { name: "Project: p1" });
+  });
+
+  it("gives a remembered project that was removed way to Workspace on All projects", async () => {
+    useLayout.setState({ workspace: "all" });
+    rememberNewThreadProject("removed");
+    render(<NewThread />);
+    await waitFor(() => expect(readNewThreadProject()).toBe(WORKSPACE_ID));
   });
 
   it("chooses a worktree above the prompt and uses it for the first turn", async () => {
@@ -275,44 +312,45 @@ describe("NewThread", () => {
   });
 });
 
-it("prepares a starter as an editable plan without starting a run", () => {
-  saveModelDraft("p1", "");
-  render(<NewThread projectId="p1" />);
-  fireEvent.click(screen.getByRole("button", { name: "Explore this project" }));
-  const message = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Message" });
-  expect(message.value).toContain("Walk me through this project");
-  expect(document.activeElement).toBe(message);
-  expect(screen.queryByRole("group", { name: "Suggested prompts" })).toBeNull();
-  expect(readNewThreadDraft("p1").mode).toBe("plan");
-  expect(start).not.toHaveBeenCalled();
-  fireEvent.change(message, { target: { value: "Explore just the renderer" } });
-  expect(readNewThreadDraft("p1").prompt).toBe("Explore just the renderer");
-});
-
-it("offers starters only for an empty draft", () => {
-  saveModelDraft("p1", "Keep my current request");
-  render(<NewThread projectId="p1" />);
-  expect(screen.queryByRole("group", { name: "Suggested prompts" })).toBeNull();
-  fireEvent.change(screen.getByRole("textbox", { name: "Message" }), { target: { value: "" } });
-  expect(screen.getByRole("button", { name: "Explore this project" })).toBeTruthy();
-  expect(start).not.toHaveBeenCalled();
-});
-
 it("keeps a chosen third Claude account in the draft and sends it when starting", async () => {
   models = [{ id: "claude-fixture", label: "Claude", agent: "claude", isDefault: true, efforts: [], defaultEffort: null }];
   system.harnesses = system.harnesses.map((row) => ({ ...row, state: "ready" }));
   writeNewThreadDraft({ ...readNewThreadDraft("p1"), prompt: "Use the client account", target: { kind: "model", choice: { agent: "claude", model: "claude-fixture", effort: null } } });
   const view = render(<NewThread projectId="p1" />);
-  const picker = screen.getByRole<HTMLSelectElement>("combobox", { name: "Claude account" });
-  expect(picker.value).toBe("work");
-  expect(picker.options).toHaveLength(3);
-  fireEvent.change(picker, { target: { value: "client" } });
+  expect(chosenAccount()).toBe("work");
+  expect(offeredAccounts()).toHaveLength(3);
+  fireEvent.click(accountGroup().getByRole("button", { name: "client" }));
   expect(readNewThreadDraft("p1").claudeAccountId).toBe("client");
   accounts!.defaultId = "personal";
   view.rerender(<NewThread projectId="p1" />);
-  expect(picker.value).toBe("client");
+  expect(chosenAccount()).toBe("client");
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
   await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ agent: "claude", claudeAccountId: "client", prompt: "Use the client account" })));
+});
+
+it("offers only the Claude accounts its project uses, starting on the project's default when the draft's is not one of them", async () => {
+  models = [{ id: "claude-fixture", label: "Claude", agent: "claude", isDefault: true, efforts: [], defaultEffort: null }];
+  system.harnesses = system.harnesses.map((row) => ({ ...row, state: "ready" }));
+  projects[0]!.settings.claudeAccounts = { only: true, accountIds: ["personal", "client"], defaultId: "client", autoSwitch: false };
+  // Chosen before the project narrowed its accounts.
+  writeNewThreadDraft({
+    ...readNewThreadDraft("p1"),
+    claudeAccountId: "work",
+    prompt: "Use the project's account",
+    target: { kind: "model", choice: { agent: "claude", model: "claude-fixture", effort: null } },
+  });
+  render(<NewThread projectId="p1" />);
+  expect(chosenAccount()).toBe("client");
+  expect(offeredAccounts()).toEqual(["personal", "client"]);
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ claudeAccountId: "client", prompt: "Use the project's account" })));
+  cleanup();
+  start.mockClear();
+
+  // A draft's account the project uses stays chosen.
+  writeNewThreadDraft({ ...readNewThreadDraft("p1"), claudeAccountId: "personal", prompt: "Use personal" });
+  render(<NewThread projectId="p1" />);
+  expect(chosenAccount()).toBe("personal");
 });
 
 it.each([

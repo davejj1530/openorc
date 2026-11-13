@@ -404,7 +404,7 @@ require('node:readline').createInterface({ input: process.stdin }).on('line', li
       const thread = threads.update(core.db, planThread().id, { mode: "act", model: "fixture" });
       const run = await core.runs.start({ scope: { thread, task: null }, project, agent: "codex", model: "fixture", mode: "act", permissionMode: "trusted", prompt: "Fixture only", resume: false });
       runId = run.id;
-      await vi.waitFor(() => expect(core.runs.pending().some((p) => p.runId === run.id && p.approvalId === "901")).toBe(true));
+      await vi.waitFor(() => expect(core.runs.pending().some((p) => p.runId === run.id && p.approvalId === "901")).toBe(true), { timeout: 5000 });
       expect(core.runs.threadActivity(thread.id)).toBe("waiting");
       core.threads.update(thread.id, { permissionMode: "autonomous" });
       await vi.waitFor(() => expect(core.runs.threadActivity(thread.id)).toBe("idle"));
@@ -972,6 +972,13 @@ describe("thread lifecycle", () => {
     ins.run("f-1", fork.id, 4, "sess-4");
     expect(core.threads.conversationRuns(fork.id).map((r) => r.id)).toEqual(["p-1", "p-2", "f-1"]);
     expect(core.threads.conversationRuns(parent.id).map((r) => r.id)).toEqual(["p-1", "p-2", "p-3"]);
+  });
+
+  it.each(["cursor", "antigravity", "fx"] as const)("does not create a broken %s fork", (agent) => {
+    const parent = threads.insert(core.db, { projectId: project.id, title: "Native session", agent, model: null, mode: "act", permissionMode: "autonomous" });
+    const before = threads.list(core.db, { projectId: project.id, filter: "all" }).map((thread) => thread.id);
+    expect(() => core.threads.fork(parent.id)).toThrow(/does not support forking/);
+    expect(threads.list(core.db, { projectId: project.id, filter: "all" }).map((thread) => thread.id)).toEqual(before);
   });
 
   it("keeps failed queued messages and prevents concurrent double delivery", async () => {

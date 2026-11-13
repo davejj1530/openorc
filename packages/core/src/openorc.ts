@@ -1,11 +1,11 @@
 import { captureLaunchEnvironment, claudeConfigDir, recoverAgentProcesses } from "@openorc/agents";
-import { Db, LedgerWriter, plans, redact, settings as storedSettings } from "@openorc/db";
+import { claudeAccounts as storedClaudeAccounts, Db, LedgerWriter, plans, redact, settings as storedSettings } from "@openorc/db";
 import { startMcpServer, type OpenOrcMcpServer } from "@openorc/mcp";
 import { harnessAvailability, harnessInfo, harnessLoggedIn, rpcParams, type HarnessId, type RpcMethod, type RpcRequest } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
-import { busyReason, fenceForUpdate, type BusyReason } from "./activity.js";
+import { busyReason, fenceForSwitch, fenceForUpdate, type BusyReason } from "./activity.js";
 import { BenchGenerator } from "./bench.js";
 import { DeviceService } from "./devices/service.js";
 import { FrameCoalescer } from "./frames.js";
@@ -13,6 +13,9 @@ import { createAttachmentsHandlers } from "./handlers/attachments.js";
 import { createBenchHandlers } from "./handlers/bench.js";
 import { createCatalogHandlers } from "./handlers/catalog.js";
 import { createClaudeAccountHandlers } from "./handlers/claude-accounts.js";
+import { createConnectorHandlers } from "./handlers/connectors.js";
+import { ConnectorService, type ConnectorPlaces } from "./services/connectors.js";
+import { rememberedConnectors } from "./services/remembered-connectors.js";
 import { createBrainSyncHandlers } from "./handlers/brain-sync.js";
 import { createCloudHandlers } from "./handlers/cloud.js";
 import { createCloudCarryHandlers } from "./handlers/cloud-carry.js";
@@ -22,6 +25,7 @@ import { createDeviceHandlers } from "./handlers/devices.js";
 import { invalidParamsMessage, rpcLogLine } from "./handlers/diagnostics.js";
 import { createEventsHandlers } from "./handlers/events.js";
 import { createFilesHandlers } from "./handlers/files.js";
+import { createSkillsHandlers } from "./handlers/skills.js";
 import { createInboxHandlers } from "./handlers/inbox.js";
 import { createInstructionsHandlers } from "./handlers/instructions.js";
 import { createMcpAppsHandlers } from "./handlers/mcp-apps.js";
@@ -41,6 +45,7 @@ import { createSchedulesHandlers } from "./handlers/schedules.js";
 import { createSettingsHandlers } from "./handlers/settings.js";
 import { createSlackHandlers } from "./handlers/slack.js";
 import { createSystemHandlers } from "./handlers/system.js";
+import { createUsageHandlers } from "./handlers/usage.js";
 import { createTaskCreateHandlers } from "./handlers/task-create.js";
 import { createTaskDeleteHandlers } from "./handlers/task-delete.js";
 import { createTaskQueriesHandlers } from "./handlers/task-queries.js";
@@ -51,6 +56,7 @@ import { createThreadQueriesHandlers } from "./handlers/thread-queries.js";
 import { createThreadWorkspaceHandlers } from "./handlers/thread-workspace.js";
 import { composeHandlers, type Handlers } from "./handlers/types.js";
 import { createWorkspaceHandlers } from "./handlers/workspace.js";
+import { createWorktreeHandlers } from "./handlers/worktrees.js";
 import { createBrowserHost } from "./mcp-host/browser.js";
 import { createContextHost } from "./mcp-host/context.js";
 import { createDeviceHost } from "./mcp-host/device.js";
@@ -65,11 +71,13 @@ import { RemoteAccess } from "./remote/remote-access.js";
 import { rememberRemovedBrain } from "./remote/removed-brains.js";
 import { MOVING_WORDS } from "./services/cloud-brain-move.js";
 import { requestOrigin, type RequestOrigin } from "./request-origin.js";
+import { guardContext } from "./remote/policy.js";
 import { forgetKeptSessions } from "./services/agent-sessions.js";
 import type { OpenCodeCloudKeys } from "./services/cloud-opencode.js";
 import { AgentUpdateService } from "./services/agent-updates.js";
 import { AttachmentService } from "./services/attachments.js";
 import { ClaudeAccountSwitch } from "./services/claude-account-switch.js";
+import { ClaudeSignInRetry } from "./services/claude-sign-in-retry.js";
 import { ClaudeAccountService } from "./services/claude-accounts.js";
 import { claudeRunAccount } from "./services/claude-run-account.js";
 import { withCloudCodexLogin } from "./services/cloud-codex.js";
@@ -96,8 +104,9 @@ import { ReviewService } from "./services/review.js";
 import { ReviewerAppService } from "./services/reviewer-app.js";
 import { RunService, type Notification, type RunHooks } from "./services/runs.js";
 import { ScheduleService } from "./services/schedules.js";
+import { OrclingWakeService } from "./services/orcling-wakes.js";
 import { AppSettingsService } from "./services/settings.js";
-import { ShellEnvironment, inheritedProbe } from "./services/shell-environment.js";
+import { ShellEnvironment, inheritedProbe, type EnvSnapshot } from "./services/shell-environment.js";
 import { SlackService } from "./services/slack/service.js";
 import { SystemService } from "./services/system.js";
 import { TaskCheckoutService } from "./services/task-checkout.js";
@@ -107,6 +116,7 @@ import { ThreadService } from "./services/threads.js";
 import { ToolImageStore } from "./services/tool-images.js";
 import { ensureWorkspaceHome } from "./services/workspace-home.js";
 import { WorkspaceWriters } from "./services/workspace-writers.js";
+import { WorktreeCleanup } from "./services/worktree-cleanup.js";
 import { WorkspaceService } from "./services/workspace.js";
 import { transportLogger, type Logger, type RpcReply } from "./transport.js";
 
@@ -115,6 +125,35 @@ import { transportLogger, type Logger, type RpcReply } from "./transport.js";
  * The renderer talks to it only through `handle`, so every capability is a
  * validated method and every push is a typed message.
  */
+/** Where each agent answers about connectors: Codex, OpenCode, Oh My Pi and every enabled Claude account. A cloud-only host has none. */
+function connectorPlaces(db: Db, cloudOnly: boolean, environment: () => EnvSnapshot, accounts: ClaudeAccountService): ConnectorPlaces {
+  const onTheMac = <T>(read: () => T): T => {
+    if (cloudOnly) throw new Error("Connectors are set up on your Mac.");
+    return read();
+  };
+  return {
+    claudeAccounts: () =>
+      onTheMac(() =>
+        storedClaudeAccounts.list(db).flatMap((account) => {
+          if (!account.enabled) return [];
+          try {
+            return [{ id: account.id, name: account.name, launch: captureLaunchEnvironment("claude", accounts.environment(environment(), account.id)) }];
+          } catch {
+            return [];
+          }
+        }),
+      ),
+    claudeLogin: () => onTheMac(() => captureLaunchEnvironment("claude", environment())),
+    codex: () => onTheMac(() => captureLaunchEnvironment("codex", environment())),
+    opencode: () => onTheMac(() => captureLaunchEnvironment("opencode", environment())),
+    omp: () => onTheMac(() => captureLaunchEnvironment("omp", environment())),
+    cursor: () => onTheMac(() => captureLaunchEnvironment("cursor", environment())),
+    pi: () => onTheMac(() => captureLaunchEnvironment("pi", environment())),
+    antigravity: () => onTheMac(() => captureLaunchEnvironment("antigravity", environment())),
+    fx: () => onTheMac(() => captureLaunchEnvironment("fx", environment())),
+  };
+}
+
 export class OpenOrc {
   readonly slack: SlackService;
   readonly db: Db;
@@ -144,9 +183,11 @@ export class OpenOrc {
   readonly agentUpdates: AgentUpdateService;
   /** The environment agents launch with. Runs capture `current()` at admission; Rescan calls `refresh()`. */
   readonly claudeAccounts: ClaudeAccountService;
+  private connectorService: ConnectorService | null = null;
   readonly environment: ShellEnvironment;
   readonly providerUsage: ProviderUsageService;
   private readonly claudeAccountSwitch: ClaudeAccountSwitch;
+  private readonly claudeSignInRetry: ClaudeSignInRetry;
   readonly memory: MemoryService;
   readonly orclings: OrclingService;
   readonly textGeneration: TextGenerationService;
@@ -156,6 +197,7 @@ export class OpenOrc {
   readonly pullRequests: PullRequestService;
   readonly reviewerApp: ReviewerAppService;
   readonly schedules: ScheduleService;
+  readonly orclingWakes: OrclingWakeService;
   readonly files: FileService;
   readonly imports: ImportService;
   readonly devices: DeviceService;
@@ -217,19 +259,14 @@ export class OpenOrc {
         if (id) this.providerUsage?.forgetClaudeAccount(id);
         invalidate(["claude-accounts", "system", "models", "provider-usage"]);
       },
-      (id) => Boolean(this.agentUpdates?.get().updating || this.memory?.hasPendingWork || this.textGeneration?.hasPendingWork || this.runs?.hasClaudeSessions(id)),
+      (id) => Boolean(this.runs?.agentUpdating("claude") || this.memory?.hasPendingWork || this.textGeneration?.hasPendingWork || this.runs?.hasClaudeSessions(id)),
       (id) => this.runs.retireIdleClaudeSessions(id),
       options.cloudOnly ? (id) => this.claudeCloudTokens.known(id) : undefined,
     );
     this.agentUpdates = new AgentUpdateService({
       info: (refresh) => this.system.info(refresh),
       environment: () => this.environment.current(),
-      reserve: async () => {
-        if (this.claudeAccounts.hasPendingWork || this.memory.hasPendingWork || this.textGeneration.hasPendingWork || this.schedules.hasPendingWork) {
-          throw new Error("Finish agent work and background processing before updating. Your conversations will be kept.");
-        }
-        return this.runs.reserveAgentUpdate();
-      },
+      reserve: (id) => this.runs.reserveAgentUpdate(id),
       changed: () => invalidate(["agent-updates"]),
       refreshed: () => invalidate(["system", "models"]),
       read: (key) => storedSettings.get(db, key),
@@ -262,22 +299,10 @@ export class OpenOrc {
     this.cloudHandoff = cloud.handoff;
     this.cloudStandby = cloud.standby;
     this.workspaces = new WorkspaceService(db, { dataDir: options.dataDir, cloud: this.cloud }, this.log, this.workspaceWriters);
-    const backgroundProviders: ProviderInfo = {
-      models: (agent, accountId) => this.runs.models(agent, undefined, undefined, accountId),
-      loggedIn: (accountId) => this.claudeSystemInfo(accountId).then((info) => Object.fromEntries(info.harnesses.map((row) => [row.id, harnessLoggedIn(row)])) as Record<HarnessId, boolean>),
-      launch: (agent, accountId) => {
-        if (this.agentUpdates.get().updating) return null;
-        try {
-          const snapshot = this.environment.current();
-          return captureLaunchEnvironment(agent, agent === "claude" ? this.claudeAccounts.environment(snapshot, accountId) : snapshot);
-        } catch {
-          return null;
-        }
-      },
-    };
+    const backgroundProviders = this.backgroundProviders();
     this.memory = new MemoryService(db, { dataDir: options.dataDir, secrets: options.memorySecrets, embedder: options.embedder }, backgroundProviders, invalidate, this.log);
     this.textGeneration = new TextGenerationService(db, backgroundProviders, invalidate);
-    this.orclings = new OrclingService({ db, dataDir: options.dataDir, memory: this.memory, runs: () => this.runs, threads: () => this.threads, invalidate });
+    this.orclings = new OrclingService({ db, dataDir: options.dataDir, memory: this.memory, runs: () => this.runs, threads: () => this.threads, invalidate, log: this.log });
     this.memory.extractionOwner = (run, thread) => this.orclings.memoryOwner(run, thread);
     this.runs = new RunService(db, this.ledger, this.frames, () => this.mcpServer(), invalidate, this.log, this.runHooks(notify), undefined, this.workspaceWriters);
     this.threads = new ThreadService(
@@ -298,10 +323,11 @@ export class OpenOrc {
       id ? this.claudeAccounts.environment(this.environment.current(), id) : this.environment.current(),
     );
     this.claudeAccountSwitch = new ClaudeAccountSwitch({ db, settings: this.settings, usage: this.providerUsage, runs: this.runs, threads: this.threads, log: this.log });
+    this.claudeSignInRetry = new ClaudeSignInRetry({ db, accounts: this.claudeAccounts, runs: this.runs, threads: this.threads, log: this.log });
     this.lifecycle = new LifecycleService(db, invalidate, this.log);
-    this.schedules = new ScheduleService(db, this.threads, invalidate, notify, this.log, {
-      maintenance: () => this.agentUpdates.get().updating,
-    });
+    const updating = (agent: string) => this.runs.agentUpdating(agent);
+    this.schedules = new ScheduleService(db, this.threads, invalidate, notify, this.log, { updating });
+    this.orclingWakes = new OrclingWakeService({ db, activity: (id) => this.runs.threadActivity(id), threads: this.threads, log: this.log, updating });
     this.files = createFileService({ options, writers: this.workspaceWriters, invalidate, environment: () => this.environment.current() });
     this.imports = new ImportService(db, this.ledger, invalidate, this.log, this.toolImages);
     this.reviewerApp = new ReviewerAppService(db, { secrets: options.githubSecrets, invalidate });
@@ -389,11 +415,32 @@ export class OpenOrc {
     this.options.preview?.threadGone(threadId);
   }
 
+  private backgroundProviders(): ProviderInfo {
+    return {
+      models: (agent, accountId) => this.runs.models(agent, undefined, undefined, accountId),
+      loggedIn: (accountId) =>
+        this.claudeSystemInfo(accountId).then(
+          (info) => Object.fromEntries(info.harnesses.map((row) => [row.id, this.settings.enabledHarnesses().includes(row.id) && harnessLoggedIn(row)])) as Record<HarnessId, boolean>,
+        ),
+      launch: (agent, accountId) => {
+        if (!this.settings.enabledHarnesses().includes(agent)) return null;
+        if (this.runs.agentUpdating(agent)) return null;
+        try {
+          const snapshot = this.environment.current();
+          return captureLaunchEnvironment(agent, agent === "claude" ? this.claudeAccounts.environment(snapshot, accountId) : snapshot);
+        } catch {
+          return null;
+        }
+      },
+    };
+  }
+
   /** What the run module asks of the rest of the app: briefs, permissions, the environment, and what to do as turns end. */
   private runHooks(notify: (n: Omit<Notification, "type">) => void): RunHooks {
     const { options, db } = this;
     return {
       browserAvailable: Boolean(options.browser),
+      enabledHarnesses: () => this.settings.enabledHarnesses(),
       processRegistry: path.join(options.dataDir, "agent-processes"),
       idleTimeoutMs: (thread) => {
         const minutes = this.settings.get().idleProcessMinutes;
@@ -401,6 +448,7 @@ export class OpenOrc {
         return thread && this.cloud.get(thread.id) ? Math.min(setting ?? CLOUD_IDLE_PROCESS_MS, CLOUD_IDLE_PROCESS_MS) : setting;
       },
       claudeUserMcpServers: () => this.settings.get().claudeUserMcpServers,
+      claudeConnectorsOff: () => this.settings.get().claudeConnectorsOff,
       orclings: this.orclings.runHooks,
       taskImages: (spec) => new AttachmentService(options.dataDir).forTask(spec),
       inlineToolImages: (output) => this.toolImages.inline(output),
@@ -436,6 +484,7 @@ export class OpenOrc {
         this.comments?.settled(run, outcome);
         if (scope.comment) return;
         this.claudeAccountSwitch.settled(run, scope, outcome);
+        this.claudeSignInRetry.settled(run, scope, outcome);
         this.slack?.settled(run.id, outcome);
       },
       onThreadTurn: (thread, exchange) => {
@@ -479,6 +528,7 @@ export class OpenOrc {
     options.transport.push({ type: "ready", pid: process.pid, mcpPort: mcp.port });
     core.lifecycle.start();
     core.schedules.start();
+    core.orclingWakes.start();
     core.threads.recoverQueue();
     core.upkeep.start();
     core.cloudParts.brain.opened();
@@ -495,6 +545,17 @@ export class OpenOrc {
     void core.memory.backfillVectors().catch(() => undefined);
     return core;
   }
+  /** Every agent's connectors, made on first use: reading them starts the agents' servers. */
+  get connectors(): ConnectorService {
+    this.connectorService ??= new ConnectorService(
+      connectorPlaces(this.db, this.options.cloudOnly ?? false, () => this.environment.current(), this.claudeAccounts),
+      this.settings,
+      () => this.options.transport.push({ type: "invalidate", keys: ["connectors"] }),
+      { remembered: rememberedConnectors(this.db) },
+    );
+    return this.connectorService;
+  }
+
   async mcpServer(): Promise<OpenOrcMcpServer> {
     if (!this.mcp) {
       const { assertRunAvailable, taskFor, projectFor } = createContextHost({ db: this.db });
@@ -518,6 +579,9 @@ export class OpenOrc {
           threads: this.threads,
           settings: this.settings,
           send: threadsHost.threads.send,
+          planLimits: () => this.planLimits(),
+          guard: guardContext(this.db, this.options.dataDir),
+          call: (method, params) => this.callAsPerson(method, params),
           invalidate: (keys) => this.options.transport.push({ type: "invalidate", keys }),
         }),
         pullReview: this.pullRequests.agentTools(),
@@ -575,6 +639,11 @@ export class OpenOrc {
     return refusal;
   }
 
+  /** The same before the desktop starts its core somewhere else, such as inside a WSL distribution: this one stays closed until someone switches back. */
+  prepareForSwitch(): string | null {
+    return fenceForSwitch(this);
+  }
+
   async close(): Promise<void> {
     this.cloudParts.move?.close();
     this.cloudParts.coordinator?.close();
@@ -590,6 +659,7 @@ export class OpenOrc {
     this.lifecycle.stop();
     this.reviewerApp.shutdown();
     await this.upkeep.stop();
+    this.orclingWakes.stop();
     await this.schedules.shutdown();
     await this.workspaces.shutdown();
     this.cloudStandby.close();
@@ -611,6 +681,22 @@ export class OpenOrc {
     return this.options.cloudOnly ? withCloudCodexLogin(info, await this.codexCloudLogin.has()) : info;
   }
 
+  /** One call into the core as the Mac's own windows make it, for an Orcling acting for the person. */
+  private async callAsPerson(method: string, params: unknown): Promise<unknown> {
+    const reply = await this.handle({ type: "rpc", id: 0, method, params });
+    if (reply.type === "rpc.error") throw new Error(reply.message);
+    return reply.result;
+  }
+
+  /** What is left of each plan the person has, as the sidebar, the phone and their Orclings read it. */
+  private planLimits() {
+    return readPlanLimits({
+      db: this.db,
+      usage: this.providerUsage,
+      availability: async () => harnessAvailability(await this.claudeSystemInfo()).filter((row) => this.settings.enabledHarnesses().includes(row.id)),
+    });
+  }
+
   private buildHandlers(invalidate: (keys: string[]) => void): Handlers {
     return composeHandlers(
       createSlackHandlers({ slack: this.slack, invalidate }),
@@ -623,14 +709,17 @@ export class OpenOrc {
       }),
       createCloudCarryHandlers({ db: this.db, env: this.cloudParts.env, skills: this.cloudParts.skills, cloud: this.cloudParts.cloud }),
       createClaudeAccountHandlers(this.claudeAccounts),
+      createUsageHandlers({ db: this.db, ledger: this.ledger }),
+      createConnectorHandlers({ db: this.db, connectors: this.connectors }),
       createBrainSyncHandlers({ db: this.db, memory: this.memory, textGeneration: this.textGeneration, cloudOnly: this.options.cloudOnly ?? false, invalidate }),
       createSystemHandlers({
         system: this.system,
         accountInfo: (refresh, id) => (id ? this.claudeSystemInfo(id, refresh) : this.system.info(refresh)),
         defaultAccountInfo: () => this.claudeSystemInfo(),
+        enabledHarnesses: () => this.settings.enabledHarnesses(),
         agentUpdates: this.agentUpdates,
         providerUsage: this.providerUsage,
-        planLimits: () => readPlanLimits({ db: this.db, usage: this.providerUsage, availability: async () => harnessAvailability(await this.claudeSystemInfo()) }),
+        planLimits: () => this.planLimits(),
         invalidate,
       }),
       createProjectsHandlers({ db: this.db, projectService: this.projects, invalidate, transport: this.options.transport, copies: this.options.cloudOnly ?? false }),
@@ -649,6 +738,7 @@ export class OpenOrc {
       createTaskUpdateHandlers({ threadService: this.threads, db: this.db, runService: this.runs, workspaceWriters: this.workspaceWriters, workspaces: this.workspaces, invalidate }),
       createTaskDeleteHandlers({ workspaces: this.workspaces, comments: this.comments, runService: this.runs, db: this.db, log: this.log, upkeep: this.upkeep, invalidate }),
       createWorkspaceHandlers({ runService: this.runs, workspaces: this.workspaces, db: this.db, invalidate }),
+      createWorktreeHandlers({ worktrees: new WorktreeCleanup({ db: this.db, workspaces: this.workspaces, runs: this.runs, writers: this.workspaceWriters, invalidate }) }),
       createRunsHandlers({ threadService: this.threads, runService: this.runs, db: this.db, dataDir: this.options.dataDir }),
       createAttachmentsHandlers({ db: this.db, dataDir: this.options.dataDir }),
       createEventsHandlers({ frames: this.frames, ledger: this.ledger, db: this.db, runService: this.runs }),
@@ -656,11 +746,13 @@ export class OpenOrc {
       createReviewThreadHandlers({ review: this.review, db: this.db, invalidate }),
       createReviewCommentsHandlers({ review: this.review, invalidate }),
       createReviewWorkspaceHandlers({ review: this.review, db: this.db, taskCheckout: this.taskCheckout, invalidate }),
-      createFilesHandlers({
+      createFilesHandlers({ db: this.db, files: this.files }),
+      createSkillsHandlers({
         db: this.db,
         files: this.files,
         claudeEnvironment: (id) => this.claudeAccounts.environment(this.environment.current(), id).env,
         claudeLaunch: (id) => captureLaunchEnvironment("claude", this.claudeAccounts.environment(this.environment.current(), id)),
+        trash: this.options.trash,
       }),
       createCodeExplanationHandlers({ db: this.db, files: this.files, textGeneration: this.textGeneration, settings: this.settings, dataDir: this.options.dataDir }),
       createInstructionsHandlers({ db: this.db, files: this.files, claudeEnvironment: (id) => this.claudeAccounts.environment(this.environment.current(), id).env }),
@@ -668,7 +760,7 @@ export class OpenOrc {
       createSchedulesHandlers({ schedules: this.schedules }),
       createCatalogHandlers({ runService: this.runs, invalidate }),
       createMemoryHandlers({ memory: this.memory, db: this.db, files: this.files, keyChanged: () => this.cloudParts.brain.signInsChanged() }),
-      createOrclingHandlers({ orclings: this.orclings }),
+      createOrclingHandlers({ orclings: this.orclings, threads: this.threads, db: this.db, ledger: this.ledger }),
       createDeviceHandlers({ devices: this.devices }),
       createInboxHandlers({ runService: this.runs, db: this.db }),
       createRemoteHandlers({ remote: this.remote, pushKeyChanged: () => this.cloudParts.brain.signInsChanged() }),

@@ -191,6 +191,11 @@ export class ClaudeAccountService {
     return { accounts, defaultId: this.defaultId() };
   }
 
+  /** Whether the account's CLI finds its login when asked now, not from an earlier answer. */
+  async signedIn(id: string): Promise<boolean> {
+    return (await this.connection(claudeAccounts.get(this.db, id), this.snapshot(), true)).status === "ready";
+  }
+
   add(name: string): ClaudeAccount {
     const account = claudeAccounts.add(this.db, name);
     this.changed();

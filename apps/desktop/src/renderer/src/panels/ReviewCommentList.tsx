@@ -46,7 +46,7 @@ export function ReviewCommentList({
                   tone="danger"
                   className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 shrink-0"
                   aria-label="Remove comment"
-                  title={state?.reason ?? "Remove"}
+                  data-tip={state?.reason ?? "Remove"}
                 >
                   <X size={11} />
                 </TextButton>

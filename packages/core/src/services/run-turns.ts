@@ -3,7 +3,7 @@ import { runs, threads, type Db } from "@openorc/db";
 import { type AgentEvent, type AgentKind, type Run, type Thread } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import type { Logger } from "../transport.js";
-import { working, type ContinueSettings, type LiveRun, type RunHooks, type RunScope, type SendOptions, type StartRunInput } from "./run-types.js";
+import { occupied, working, type ContinueSettings, type LiveRun, type RunHooks, type RunScope, type SendOptions, type StartRunInput } from "./run-types.js";
 import { withOutsideNote, type OutsideChanges, type TurnStartCapture } from "./turn-start-checkpoint.js";
 import { executionProject } from "./workspace-home.js";
 
@@ -33,6 +33,8 @@ interface RunTurnsDependencies {
   invalidate: (keys: string[]) => void;
   keysFor: (scope: RunScope) => string[];
   start: (input: StartRunInput) => Promise<Run>;
+  /** Which installation of an agent a process started now would run. */
+  installation: (agent: AgentKind) => number;
   emit: (event: AgentEvent) => void;
   validateFastMode: (agent: AgentKind, model: string | undefined, fastMode: boolean | undefined, claudeAccountId?: string) => Promise<void>;
   log: Logger;
@@ -63,8 +65,10 @@ export class RunTurns {
   private async shouldRestart(entry: LiveRun, thread: Thread | null): Promise<boolean> {
     if (!thread || entry.busy) return false;
     if (this.mustRestart(entry, thread)) return true;
-    // Background work the agent left running ends with its process, so a message during it keeps the process and any
-    // settings it can't take wait for the next turn with nothing running.
+    // What the agent left running ends with its process, so a message during it keeps the process. An agent updated
+    // since this process started is replaced at the next turn with nothing running, commands included.
+    if (entry.installation !== this.deps.installation(entry.run.agent) && !occupied(entry)) return true;
+    // Settings the process can't take wait for the next turn with no background work.
     return !(await this.applyThreadSettings(entry, thread)) && !working(entry);
   }
 
@@ -88,6 +92,8 @@ export class RunTurns {
       prompt: text,
       promptRole: options.role ?? "user",
       recordPrompt: options.recordPrompt ?? true,
+      unprompted: options.unprompted,
+      promptMessageId: options.messageId,
       attachments: options.attachments,
       resume: true,
     });
@@ -96,7 +102,7 @@ export class RunTurns {
   private async sendExisting(entry: LiveRun, text: string, options: SendOptions): Promise<void> {
     const { role = "user", attachments, recordPrompt = true } = options;
     const runId = entry.run.id;
-    const previous = { busy: entry.busy, prompt: entry.prompt, reply: entry.reply, turns: entry.turns, questionsInterrupted: entry.questionsInterrupted };
+    const previous = { busy: entry.busy, prompt: entry.prompt, reply: entry.reply, turns: entry.turns, questionsInterrupted: entry.questionsInterrupted, unprompted: entry.unprompted };
     // Only a message to a resting process starts a turn. One to a busy process steers the running turn, and one
     // during background work joins work the agent has in hand, so neither captures the folder.
     const startsTurn = !working(entry);
@@ -107,10 +113,11 @@ export class RunTurns {
       entry.prompt = text;
       entry.reply = null;
     }
+    markUnprompted(entry, startsTurn, options.unprompted);
     this.deps.invalidate(this.deps.keysFor(entry.scope));
     try {
       const outside = startsTurn ? await this.captureTurnStart(entry) : null;
-      await entry.handle.send(withOutsideNote(text, outside), attachments);
+      await entry.handle.send(withOutsideNote(this.withTurnNote(entry, text), outside), attachments);
     } catch (error) {
       this.restoreRejectedSend(entry, previous);
       throw error;
@@ -124,9 +131,17 @@ export class RunTurns {
         throw error;
       }
     }
-    if (recordPrompt) this.deps.emit({ type: "message.completed", runId, ts: Date.now(), messageId: `${role}-${randomUUID()}`, role, text, ...(attachments?.length ? { attachments } : {}) });
-    if (entry.scope.thread) threads.touch(this.deps.db, entry.scope.thread.id);
+    if (recordPrompt) {
+      const messageId = options.messageId ?? `${role}-${randomUUID()}`;
+      this.deps.emit({ type: "message.completed", runId, ts: Date.now(), messageId, role, text, ...(attachments?.length ? { attachments } : {}) });
+    }
+    if (entry.scope.thread) touchUnlessUnprompted(this.deps.db, entry, entry.scope.thread.id);
     this.deps.invalidate(this.deps.keysFor(entry.scope));
+  }
+
+  private withTurnNote(entry: LiveRun, text: string): string {
+    const note = entry.scope.thread ? this.deps.hooks.orclings?.turnNote(entry.scope.thread.id) : "";
+    return note ? `${note}\n\n${text}` : text;
   }
 
   /** The folder as this thread's turn begins, before the provider can touch it. The transcript records the message alone. */
@@ -138,7 +153,10 @@ export class RunTurns {
     return this.deps.turnStarts.capture({ thread, project: executionProject(this.deps.db, thread), cwd: entry.workspaceLease.paths[0]! });
   }
 
-  private restoreRejectedSend(entry: LiveRun, previous: { busy: boolean; prompt: string | null; reply: string | null; turns: number; questionsInterrupted?: boolean }): void {
+  private restoreRejectedSend(
+    entry: LiveRun,
+    previous: { busy: boolean; prompt: string | null; reply: string | null; turns: number; questionsInterrupted?: boolean; unprompted?: boolean | undefined },
+  ): void {
     // A rejected steer is not a delivered message or a new working turn.
     if (entry.turns === previous.turns) {
       entry.busy = previous.busy;
@@ -147,6 +165,7 @@ export class RunTurns {
     if (!entry.busy) this.deps.armIdle(entry);
     entry.prompt = previous.prompt;
     entry.reply = previous.reply;
+    entry.unprompted = previous.unprompted;
     this.deps.invalidate(this.deps.keysFor(entry.scope));
   }
 
@@ -198,4 +217,16 @@ export class RunTurns {
       text: `Switched to ${entry.run.model ?? "the default model"}${entry.run.effort ? ` at ${entry.run.effort} effort` : ""}${fast}.`,
     });
   }
+}
+
+/** A message joining an unprompted turn makes it someone's; a new unprompted turn starts with nothing said. */
+function markUnprompted(entry: LiveRun, startsTurn: boolean, unprompted = false): void {
+  if (startsTurn) entry.unprompted = unprompted;
+  else if (!unprompted) entry.unprompted = false;
+  if (entry.unprompted) entry.reply = null;
+}
+
+/** A sent message is activity in the thread, unless it is OpenOrc's own nudge that nobody has answered yet. */
+function touchUnlessUnprompted(db: Db, entry: LiveRun, threadId: string): void {
+  if (!entry.unprompted) threads.touch(db, threadId);
 }

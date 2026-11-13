@@ -1,12 +1,12 @@
-import { audit, checkpoints, claudeAccounts, messages, plans, retiredTeams, runs as runRepo, settings, tasks, threadQueue, threads, type CloudProviderId, type Db } from "@openorc/db";
+import { audit, checkpoints, messages, plans, retiredTeams, runs as runRepo, settings, tasks, threadQueue, threads, type CloudProviderId, type Db } from "@openorc/db";
 import { diffStat, git, pinObject, switchFiles, treeHash, workspaceTransfer } from "@openorc/git";
 import {
   THREAD_EXISTS,
   WORKSPACE_ID,
   executionModeUnavailable,
+  forkUnavailable,
   normalizeModelEffort,
   normalizeModelSettings,
-  type AgentKind,
   type ChangePreview,
   type PermissionPreset,
   type RpcParams,
@@ -28,7 +28,7 @@ import { executionFolder } from "./conversation-folder.js";
 import { inUnvettedCopy } from "./review-copies.js";
 import type { RunService } from "./runs.js";
 import { ThreadAgentTools } from "./thread-agent-tools.js";
-import { titleFromPrompt, type StartThreadInput, type ThreadPatch, type ThreadTitler } from "./thread-inputs.js";
+import { startAccount, titleFromPrompt, type ContinueThreadInput, type StartThreadInput, type ThreadPatch, type ThreadTitler } from "./thread-inputs.js";
 import { ThreadMessageQueue } from "./thread-message-queue.js";
 import { ThreadMoves, fileChanges } from "./thread-moves.js";
 import { assertMutableThread } from "./thread-mutations.js";
@@ -143,7 +143,7 @@ export class ThreadService {
   /** A cloud thread returns at once with no run: its first message waits in the queue while its sandbox gets ready. */
   async start(input: StartThreadInput, internal?: ThreadAdmission): Promise<{ thread: Thread; run: Run | null }> {
     assertStaying(this.db);
-    input = { ...normalizeModelSettings(input), claudeAccountId: input.claudeAccountId ?? claudeAccounts.defaultId(this.db) };
+    input = { ...normalizeModelSettings(input), claudeAccountId: startAccount(this.db, input) };
     await this.runs.validateFastMode(input.agent, input.model, input.fastMode, undefined, undefined, input.claudeAccountId);
     internal?.assertCanAdmit();
     if (input.workingDirectory && input.projectId !== WORKSPACE_ID) throw new Error("Only Workspace conversations can choose a working folder.");
@@ -322,28 +322,7 @@ export class ThreadService {
     return { path: file };
   }
 
-  async continueThread(
-    id: string,
-    input: {
-      agent: AgentKind;
-      model: string | undefined;
-      effort: string | undefined;
-      fastMode?: boolean | undefined;
-      mode: RunMode;
-      permissionMode: PermissionPreset;
-      prompt: string;
-      attachments: string[] | undefined;
-      promptRole?: "user" | "system";
-      recordPrompt?: boolean;
-      fresh?: boolean;
-      /** Another Claude account the conversation goes on with from this turn. */
-      claudeAccountId?: string | undefined;
-      workingDirectory?: string;
-      baseRef?: string;
-      onCreated?: (run: Run) => void;
-      assertCanStart?: () => void;
-    },
-  ): Promise<Run> {
+  async continueThread(id: string, input: ContinueThreadInput): Promise<Run> {
     input = normalizeModelSettings(input);
     this.rejectRetiredThread(id);
     const thread = this.thread(id);
@@ -397,6 +376,8 @@ export class ThreadService {
           permissionMode: input.permissionMode,
           prompt: input.prompt,
           recordPrompt: input.recordPrompt,
+          unprompted: input.unprompted,
+          promptMessageId: input.promptMessageId,
           onCreated: input.onCreated,
           assertCanStart: input.assertCanStart,
           ...(input.promptRole ? { promptRole: input.promptRole } : {}),
@@ -525,8 +506,7 @@ export class ThreadService {
   }
 
   /**
-   * A new thread that carries this whole conversation forward, leaving the
-   * original as it is. Same settings, same workspace; the first message resumes
+   * A new thread with the same conversation, settings and workspace; its first message resumes
    * the parent's latest session as a fork. There is no earlier cut point: the
    * provider's session holds every turn, so the fork would remember turns its
    * transcript leaves out.
@@ -536,12 +516,14 @@ export class ThreadService {
     this.runs.subagents.assertExecutable({ threadId: id });
     this.rejectRetiredThread(id);
     const parent = this.thread(id);
+    const unavailable = forkUnavailable(parent.agent);
+    if (unavailable) throw new Error(unavailable);
     const at = runRepo.listForThread(this.db, id).at(-1);
     const forked = threads.insert(this.db, {
       projectId: parent.projectId,
       title: `${parent.title} (fork)`,
       agent: parent.agent,
-      claudeAccountId: parent.claudeAccountId,
+      claudeAccountId: startAccount(this.db, { projectId: parent.projectId, claudeAccountId: parent.claudeAccountId ?? undefined, claudeAccountFrom: "inherited", agent: parent.agent }),
       model: parent.model,
       effort: parent.effort,
       fastMode: parent.fastMode,
@@ -619,12 +601,7 @@ export class ThreadService {
 
   /* Compaction */
 
-  /**
-   * Codex compacts a live session in place. Claude Code has no such call in
-   * print mode, so its threads get a fresh session seeded with a brief of the
-   * conversation so far, which is what compaction amounts to. An idle Claude
-   * process is closed by the fresh start.
-   */
+  /** Compact natively when the live harness supports it, otherwise start a fresh session with a conversation brief. */
   async compact(id: string): Promise<void> {
     const thread = this.thread(id);
     const live = this.runs.liveRunForThread(id);

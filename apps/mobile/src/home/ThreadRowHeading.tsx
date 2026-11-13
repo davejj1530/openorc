@@ -40,7 +40,7 @@ export function RowStatus({ thread, mark }: { thread: ThreadSummary; mark: Threa
 }
 
 /**
- * A row's title line: the muted title at reading size, lighting up left to right while its agent works. A root row's
+ * A row's title line: the title in ink, a root's at the list's largest size, shimmering while its agent works. A root row's
  * status sits on the line under it (ThreadRow's RowMark), so the title line's end stays clear for a parent's chevron.
  * A sub thread keeps its status in the lead column, where the tree's line reaches it, and says one fact at the end,
  * whole: for how long it has worked while it runs, then what kind of agent it was.
@@ -54,13 +54,13 @@ export function ThreadRowHeading({ thread, compact, mark, working = false }: { t
   if (!compact)
     return (
       <View className="flex-row items-center gap-3">
-        <SweepText text={thread.title} className="flex-1 text-lg text-ink-3" sweeping={working} />
+        <SweepText text={thread.title} className="flex-1 text-xl text-ink" sweeping={working} />
       </View>
     );
   return (
     <View className="flex-row items-center gap-3">
       <RowStatus thread={thread} mark={mark} />
-      <Text numberOfLines={1} className="flex-1 text-lg text-ink-3">
+      <Text numberOfLines={1} className="flex-1 text-lg text-ink">
         {thread.title}
       </Text>
       {fact ? <Text className="shrink-0 text-detail text-ink-4 tabular-nums">{fact}</Text> : null}

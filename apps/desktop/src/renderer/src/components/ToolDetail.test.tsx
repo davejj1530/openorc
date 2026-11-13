@@ -25,7 +25,7 @@ it("shows a command as its step in plain words and a printed file as numbered, h
   );
   expect(container.querySelector(".tool-view-step-label")?.textContent).toBe("Read Transcript.tsxlines 60–61");
   expect(container.querySelector(".tool-view-step-command")?.textContent).toBe("sed -n 60,61p components/Transcript.tsx");
-  expect(screen.getByTitle("/repo/apps/desktop/src").textContent).toBe("…/desktop/src");
+  expect(document.querySelector('[data-tip="/repo/apps/desktop/src"]')?.textContent).toBe("…/desktop/src");
   const code = screen.getByTestId("rich");
   expect(code.textContent).toBe("```tsx startLine=60\n  run: RunTranscript;\n  scrollKey?: string;\n```");
   expect(code.dataset.lineNumbers).toBe("true");

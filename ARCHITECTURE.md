@@ -32,6 +32,8 @@ flowchart LR
 - **Cloud sandboxes** run a cloud thread's agent. The core uploads the runner from `packages/cloud/src/runner` into a Vercel Sandbox or an Agent37 instance, starts agents through it, and moves the checkout both ways as Git bundles.
 - **Cloud brain** (`apps/brain`) runs the core headless in a Linux sandbox, so paired phones keep working while the computer sleeps. Each thread has one owner, the desktop or the brain. The desktop's `BrainRouter` sends a window's calls about brain threads to the brain and merges both hosts' lists. Phones dial the brain themselves, through the TLS proxy in front of its sandbox; on Vercel, a small door function deployed beside it wakes a sleeping brain for a paired phone.
 
+On Windows the core can instead run inside a WSL distribution, under a Node of its own there, so agents, Git and paths are the distribution's. Main then starts it through `wsl.exe` and relays each window's channel and its own private one over that process's pipes. The core's wiring is the same in both places; see [running inside WSL](docs/wsl.md).
+
 Entry points: [`main/index.ts`](apps/desktop/src/main/index.ts), [`preload/index.ts`](apps/desktop/src/preload/index.ts), [`core/index.ts`](apps/desktop/src/core/index.ts), [`renderer/src/main.tsx`](apps/desktop/src/renderer/src/main.tsx), [`apps/mobile/index.ts`](apps/mobile/index.ts), and [`apps/brain/src/main.ts`](apps/brain/src/main.ts).
 
 Every build offers cloud threads and the brain. A packaged app carries the brain's archive and its door function in its resources folder, under `brain/`, which `electron-builder.yml` copies from `apps/brain/dist`. Main passes that folder to the core as `OPENORC_BRAIN_DIR`. A build run from the repository uses `apps/brain/dist` directly. The release workflow builds the brain once on Linux, and every platform's package carries that same brain.
@@ -105,7 +107,7 @@ Depth means that callers get substantial behavior through a small interface. A u
 - Keep composition in `OpenOrc`, but move domain policy into its owning workflow when it can be exercised through a smaller interface.
 - Treat provider model discovery and revision-aware caching as a coherent candidate module, separate from live-run ownership.
 - Keep transport adapters thin; domain tests should exercise the same interface used by callers with a fake transport or provider.
-- Put agent-specific state, such as sessions, sign-ins, and CLI files, behind one per-agent interface that Claude Code, Codex, and OpenCode each implement, as `SessionSlot` in `agents` and `CloudSignIn` in `core` do for cloud threads.
+- Put agent-specific state, such as sessions, sign-ins, and CLI files, behind one per-agent interface that Claude Code, Codex, OpenCode, and Oh My Pi each implement, as `SessionSlot` in `agents` and `CloudSignIn` in `core` do for cloud threads.
 - Test database upgrades using historical fixtures and the real current open/migration path.
 - Preserve replay behavior when changing streaming events or transcript projection.
 

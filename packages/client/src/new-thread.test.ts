@@ -195,7 +195,7 @@ const rows: (Row & { expected: Record<string, unknown> })[] = [
     project: "repo",
     models: "full",
     signedIn: both,
-    expected: { agent: "codex", model: "gpt-main", effort: "high", fastMode: false, mode: "act", permissionMode: "trusted", execution: "trusted", workspaceMode: "current" },
+    expected: { agent: "codex", model: "gpt-main", effort: "high", fastMode: false, mode: "act", permissionMode: "autonomous", execution: "autonomous", workspaceMode: "current" },
   },
   {
     name: "worktree and review from settings",
@@ -366,7 +366,7 @@ function start(row: Row, app: keyof typeof harnessesOf): Record<string, unknown>
   try {
     const params = newThreadStartInput(draft, {
       workspaceMode,
-      permissionMode: row.settings?.defaultPermissionMode ?? "trusted",
+      permissionMode: row.settings?.defaultPermissionMode ?? "autonomous",
       prompt: row.text ?? "Fix the flaky test",
       attachments: row.attachments ?? [],
     });

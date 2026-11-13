@@ -1,6 +1,7 @@
 import { spawnAgentProcess } from "../process-recovery.js";
 import { withCodexConnection } from "./connection.js";
 import { mapNotification } from "./notifications.js";
+import { codexUsageContext } from "./usage-context.js";
 import { codexMcpApps } from "./mcp-apps.js";
 import { CodexSubagents } from "./subagents.js";
 import { modelEfforts, normalizeModelEffort, normalizeModelSettings } from "@openorc/protocol";
@@ -11,7 +12,7 @@ import { RunHandle } from "../run-handle.js";
 import { stopProcess, waitForProcessGroup } from "../process-lifetime.js";
 import { partitionAttachments, withAttachedFiles } from "../attachments.js";
 import type { AgentLaunchEnvironment } from "../launch-environment.js";
-import { definedEnv } from "../agent-host.js";
+import { definedEnv, type AgentHost } from "../agent-host.js";
 
 /**
  * A turn's input items. Codex has one attachment slot and it takes pictures,
@@ -23,6 +24,31 @@ function attachmentInput(text: string, attachments: string[] | undefined): unkno
   const input: unknown[] = [{ type: "text", text: withAttachedFiles(text, files, "open them to read") }];
   for (const path of images) input.push({ type: "localImage", path });
   return input;
+}
+
+/** A message as Codex reads it. Attachments are files on this Mac; a host gets copies, and the input names those. */
+function turnInputReader(rpc: StdioJsonRpc, spec: RunSpec, host: AgentHost | undefined): (text: string, attachments?: string[]) => Promise<unknown[]> {
+  const mentions = mentionReader(rpc, spec);
+  return async (text, attachments) => [...attachmentInput(text, host && attachments?.length ? await host.upload(attachments) : attachments), ...(await mentions(text))];
+}
+
+/** A message's mentions for one session. Codex's servers are read once, the first time a message names something with `@`; Plan runs without them. */
+function mentionReader(rpc: StdioJsonRpc, spec: RunSpec): (text: string) => Promise<ReturnType<typeof serverMentions>> {
+  let servers: Promise<Set<string>> | null = null;
+  return async (text) => {
+    if (spec.mode === "plan" || !/(?:^|\s)@[A-Za-z0-9_-]/.test(text)) return [];
+    servers ??= rpc
+      .request<{ config: { mcp_servers?: Record<string, unknown> } }>("config/read", { cwd: spec.cwd, includeLayers: false })
+      .then(({ config }) => new Set(Object.keys(config.mcp_servers ?? {})))
+      .catch(() => new Set<string>());
+    return serverMentions(text, await servers);
+  };
+}
+
+/** Every `@name` that starts a word in `text` and names one of Codex's MCP servers, as the mention Codex reads for it. */
+export function serverMentions(text: string, servers: ReadonlySet<string>): { type: "mention"; name: string; path: string }[] {
+  const named = new Set([...text.matchAll(/(?:^|\s)@([A-Za-z0-9_-]+)(?![\w-])/g)].map((match) => match[1]!).filter((name) => servers.has(name)));
+  return [...named].map((name) => ({ type: "mention", name, path: `mcp://${name}` }));
 }
 
 export interface CodexApprovalRequest {
@@ -41,7 +67,7 @@ export interface CodexAdapterOptions {
   env?: NodeJS.ProcessEnv;
   mcpServerName?: string;
   clientVersion?: string;
-  /** The UI answers these. Spikes auto-allow. */
+  /** Resolves tool permission requests through OpenOrc's approval policy. */
   onApproval: (request: CodexApprovalRequest) => Promise<ApprovalDecision | ApprovalResolution>;
 }
 
@@ -190,9 +216,8 @@ export class CodexAdapter {
     const proc = host
       ? host.spawn(binary, args, { runId: spec.runId, cwd: spec.cwd, env: definedEnv(env), files: [], dirs: [] })
       : spawnAgentProcess(binary, args, { cwd: spec.cwd, env, registry: launch.processRegistry });
-    /** Attachments are files on this Mac; a host gets copies, and the input names those. */
-    const turnInput = async (text: string, attachments?: string[]): Promise<unknown[]> => attachmentInput(text, host && attachments?.length ? await host.upload(attachments) : attachments);
     const rpc = new StdioJsonRpc(proc);
+    const turnInput = turnInputReader(rpc, spec, host);
 
     let handle: RunHandle;
     let resolvedModel = spec.model;
@@ -235,7 +260,7 @@ export class CodexAdapter {
     };
     let turns = 0;
     const notificationState = { summaryIndex: new Map<string, number>(), buffering: new Set<string>() };
-    const emit = (ev: AgentEvent) => handle.emit("event", ev);
+    const emit = (ev: AgentEvent) => handle.emit("event", codexUsageContext(ev, resolvedModel, serviceTier === "priority"));
     const now = () => Date.now();
     let interrupting = false;
     const subagents = new CodexSubagents({

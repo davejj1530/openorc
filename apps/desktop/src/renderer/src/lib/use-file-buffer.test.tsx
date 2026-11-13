@@ -12,7 +12,7 @@ import { formatFile, saveFile, useFileBuffer } from "./use-file-buffer";
 const [v1, v2] = ["1", "2"].map((digit) => FileVersion.parse(digit.repeat(64))) as [FileVersion, FileVersion];
 const path = FolderPath.parse("src/cart.ts");
 const selection = { scope: { kind: "thread", id: "t1" }, path: "src/cart.ts" } as const;
-const onDisk = (version: FileVersion, text: string): FileRead => ({ kind: "file", root: "/repo", path, absolutePath: "/repo/src/cart.ts", version, text, readOnly: null });
+const onDisk = (version: FileVersion, text: string): FileRead => ({ kind: "file", root: "/repo", path, outside: false, absolutePath: "/repo/src/cart.ts", version, text, readOnly: null });
 const saved: FileWriteResult = { kind: "saved", root: "/repo", path, absolutePath: "/repo/src/cart.ts", version: v2, text: null, formatError: null };
 let disk: FileRead;
 let answer: () => Promise<FileWriteResult>;

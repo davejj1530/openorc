@@ -28,8 +28,8 @@ const api: OpenOrcApi = {
   report(payload) {
     ipcRenderer.send("report", payload);
   },
-  pickDirectory() {
-    return ipcRenderer.invoke("dialog:directory") as Promise<string | null>;
+  pickDirectory(purpose) {
+    return ipcRenderer.invoke("dialog:directory", purpose) as Promise<string | null>;
   },
   filePath(file) {
     return webUtils.getPathForFile(file);
@@ -61,8 +61,13 @@ const api: OpenOrcApi = {
     return () => ipcRenderer.off("window:fullscreen", listener);
   },
   platform: process.platform,
+  host: {
+    get: () => ipcRenderer.invoke("host:get"),
+    use: (host) => ipcRenderer.invoke("host:use", host),
+  },
   updates: {
     getState: () => ipcRenderer.invoke("updates:getState"),
+    check: () => ipcRenderer.invoke("updates:check"),
     download: () => ipcRenderer.invoke("updates:download"),
     install: () => ipcRenderer.invoke("updates:install"),
     dismiss: (request) => ipcRenderer.invoke("updates:dismiss", request),

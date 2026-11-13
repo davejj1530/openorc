@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { ClaudeAccountConnection, ModelOption, RpcMethod, RpcParams, ThreadSummary } from "@openorc/protocol";
+import { harnessIds, harnessShortName, type ClaudeAccountConnection, type ModelOption, type RpcMethod, type RpcParams, type ThreadSummary } from "@openorc/protocol";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -168,13 +168,12 @@ it.each(["claude", "codex"] as const)("starts a %s thread with Fast requested fr
 it.each([
   { capability: { supported: false, reason: "Usage credits are off for this account." }, reason: "Usage credits are off for this account." },
   { capability: undefined, reason: "Fast mode availability was not reported. Try Refresh models." },
-])("keeps Fast off and explains why when the catalog says $reason", async ({ capability, reason }) => {
+])("leaves Fast out when the catalog says $reason", async ({ capability, reason }) => {
   macState({ accounts: [mac.account("claude-cli", "Claude")] });
   mac.reads["agents.models"] = [{ ...mac.claude, fastMode: capability }];
   await open();
-  expect(screen.getByRole("switch", { name: "Fast mode" }).hasAttribute("disabled")).toBe(true);
-  expect(screen.getByText(reason)).toBeTruthy();
-  fireEvent.click(screen.getByRole("switch", { name: "Fast mode" }));
+  expect(screen.queryByRole("switch", { name: "Fast mode" })).toBeNull();
+  expect(screen.queryByText(reason)).toBeNull();
   expect(screen.queryByRole("button", { name: /Fast mode requested/ })).toBeNull();
 });
 
@@ -189,8 +188,33 @@ it("clears Fast when choosing a model that cannot run it", async () => {
   await screen.findByRole("button", { name: /Fast mode requested/ });
   fireEvent.click(screen.getByRole("radio", { name: "Standard" }));
   await screen.findByRole("button", { name: "Model, Standard" });
-  expect(screen.getByRole("switch", { name: "Fast mode" }).getAttribute("aria-checked")).toBe("false");
-  expect(screen.getByRole("switch", { name: "Fast mode" }).hasAttribute("disabled")).toBe(true);
+  expect(screen.queryByRole("switch", { name: "Fast mode" })).toBeNull();
+});
+
+it("offers all eight agents as named icon tabs and keeps model controls scoped to the selected agent", async () => {
+  macState({ accounts: [mac.account("claude-cli", "Claude")] });
+  mac.reads["skills.list"] = [];
+  mac.reads["agents.models"] = [
+    { ...mac.claude, fastMode: { supported: true } },
+    ...harnessIds
+      .filter((agent) => agent !== "claude")
+      .map((agent): ModelOption => ({ id: `${agent}-model`, label: `${harnessShortName(agent)} model`, agent, isDefault: true, efforts: [], defaultEffort: null })),
+  ];
+  await open();
+  expect(screen.getAllByRole("tab")).toHaveLength(8);
+  for (const agent of harnessIds) {
+    const tab = screen.getByRole("tab", { name: harnessShortName(agent) });
+    expect(tab.textContent).toBe("");
+  }
+  expect(screen.getByRole("switch", { name: "Fast mode" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("tab", { name: "fx" }));
+  expect(nativeProps.get(screen.getByRole("tab", { name: "fx" }))?.accessibilityState).toEqual({ selected: true });
+  expect(nativeProps.get(screen.getByLabelText("Search models"))?.placeholder).toBe("Search fx models");
+  expect(screen.queryByRole("radio", { name: "Opus" })).toBeNull();
+  expect(screen.queryByText("Effort")).toBeNull();
+  expect(screen.queryByRole("switch", { name: "Fast mode" })).toBeNull();
+  fireEvent.click(screen.getByRole("radio", { name: "fx model" }));
+  await screen.findByRole("button", { name: "Model, fx model" });
 });
 
 it("waits for the chosen account's Fast eligibility instead of using the previous account's", async () => {
@@ -202,11 +226,11 @@ it("waits for the chosen account's Fast eligibility instead of using the previou
   mac.reads["agents.models"] = work.promise;
   fireEvent.click(screen.getByRole("button", { name: "Claude account, Claude" }));
   fireEvent.click(screen.getByRole("menuitemradio", { name: "Work" }));
-  await screen.findByText("Loading Fast mode availability…");
-  expect(screen.getByRole("switch", { name: "Fast mode" }).hasAttribute("disabled")).toBe(true);
+  await waitFor(() => expect(screen.queryByRole("switch", { name: "Fast mode" })).toBeNull());
   await act(async () => work.resolve([{ ...mac.claude, fastMode: { supported: false, reason: "Fast is turned off for Work." } }]));
-  await screen.findByText("Fast is turned off for Work.");
-  expect(screen.getByRole("switch", { name: "Fast mode" }).hasAttribute("disabled")).toBe(true);
+  await screen.findByRole("button", { name: "Model, Opus" });
+  expect(screen.queryByRole("switch", { name: "Fast mode" })).toBeNull();
+  expect(screen.queryByText("Fast is turned off for Work.")).toBeNull();
 });
 
 /** An existing thread uses the same settings hook as ThreadScreen, keeping its own account. */
@@ -256,15 +280,16 @@ it("uses an existing thread's account and lets its saved Fast request be turned 
   const toggle = screen.getByRole("switch", { name: "Fast mode" });
   expect(toggle.getAttribute("aria-checked")).toBe("true");
   expect(toggle.hasAttribute("disabled")).toBe(false);
+  expect(screen.getByText("Work has no Fast credits.")).toBeTruthy();
   fireEvent.click(toggle);
   await screen.findByRole("button", { name: "Model, Opus" });
   await waitFor(() => expect(mac.calls).toContainEqual({ method: "threads.update", params: { id: "saved", patch: { agent: "claude", model: "opus", effort: "high", fastMode: false } } }));
-  expect(toggle.hasAttribute("disabled")).toBe(true);
+  expect(screen.queryByRole("switch", { name: "Fast mode" })).toBeNull();
 });
 
 /** An open Claude thread on Work, its settings built as ThreadScreen builds them. */
-function OpenThread({ activity = "idle" }: { activity?: ThreadSummary["activity"] }) {
-  const thread = { id: "open", agent: "claude", model: "opus", effort: "high", fastMode: false, mode: "act", permissionMode: "trusted", claudeAccountId: "work", activity } as ThreadSummary;
+function OpenThread({ activity = "idle", projectId = "openorc" }: { activity?: ThreadSummary["activity"]; projectId?: string }) {
+  const thread = { id: "open", projectId, agent: "claude", model: "opus", effort: "high", fastMode: false, mode: "act", permissionMode: "trusted", claudeAccountId: "work", activity } as ThreadSummary;
   const settings = { ...client.useConversationSettings({ thread, activeRun: undefined }), claudeAccountId: "work", claudeAccount: useThreadClaudeAccount(thread) };
   useShareSettings("new-thread", settings);
   return <ComposerChips composerId="new-thread" settings={settings} />;
@@ -309,4 +334,81 @@ it("holds an open thread's account while its turn runs", async () => {
   fireEvent.click(menu);
   expect(screen.queryByRole("menuitemradio")).toBeNull();
   expect(mac.switchAccount).not.toHaveBeenCalled();
+});
+
+/** The project uses only these accounts, as the Mac's project list says. */
+function projectUses(accountIds: string[], defaultId: string) {
+  mac.reads["projects.list"] = [{ id: "openorc", name: "openorc", defaultBranch: "main", settings: { claudeAccounts: { only: true, accountIds, defaultId, autoSwitch: false } } }];
+}
+
+it("offers a new thread only the accounts its project uses, on the project's default until one is chosen", async () => {
+  macState({ accounts: [mac.account("claude-cli", "Existing CLI login"), mac.account("work", "Work"), mac.account("personal", "Personal")] });
+  projectUses(["work", "personal"], "personal");
+  await open();
+  fireEvent.click(await screen.findByRole("button", { name: "Claude account, Personal" }));
+  expect(screen.getAllByRole("menuitemradio").map((item) => item.textContent)).toEqual(["Work", "Personal"]);
+  fireEvent.click(screen.getByRole("menuitemradio", { name: "Work" }));
+  await screen.findByRole("button", { name: "Claude account, Work" });
+  write("Fix the build");
+  mac.start.mockResolvedValue({ thread: { id: "thread-1" } });
+  await waitFor(() => expect((screen.getByRole("button", { name: "Start" }) as HTMLButtonElement).disabled).toBe(false));
+  await start();
+  expect(mac.start.mock.calls[0]![0]).toMatchObject({ claudeAccountId: "work" });
+});
+
+it("offers an open thread its project's accounts, keeping its own listed while it is not one of them", async () => {
+  macState({ accounts: [mac.account("claude-cli", "Existing CLI login"), mac.account("work", "Work"), mac.account("personal", "Personal")] });
+  projectUses(["claude-cli", "personal"], "personal");
+  render(
+    <>
+      <OpenThread />
+      <ModelSheet />
+    </>,
+    { wrapper: mac.phone!.wrapper },
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "Claude account, Work" }));
+  await waitFor(() => expect(screen.getAllByRole("menuitemradio").map((item) => item.textContent)).toEqual(["Existing CLI login", "Personal", "Work"]));
+  fireEvent.click(screen.getByRole("menuitemradio", { name: "Personal" }));
+  await waitFor(() => expect(mac.switchAccount.mock.calls.map(([params]) => params)).toEqual([{ id: "open", claudeAccountId: "personal" }]));
+});
+
+it("shows one agent's models at a time, and an agent with many by provider, with search and the models picked recently", async () => {
+  macState({ accounts: [mac.account("claude-cli", "Claude")] });
+  const provider = (label: string) => ({ id: label.toLowerCase(), label });
+  const opencode = (id: string, label: string, from: string, more: Partial<ModelOption> = {}): ModelOption => ({
+    id,
+    label,
+    agent: "opencode",
+    isDefault: false,
+    efforts: [],
+    defaultEffort: null,
+    provider: provider(from),
+    ...more,
+  });
+  mac.reads["agents.models"] = [
+    mac.claude,
+    mac.codex,
+    ...Array.from({ length: 14 }, (_, index) => opencode(`openrouter/m${index}`, `Router ${index}`, "OpenRouter")),
+    opencode("zen/pickle", "Big Pickle", "Zen", { isDefault: true }),
+    opencode("zen/old", "Old Zen", "Zen", { legacy: true }),
+  ];
+  await open();
+  expect(screen.getAllByRole("tab").map((tab) => tab.getAttribute("aria-label"))).toEqual(["Claude", "Codex", "OpenCode"]);
+  expect(screen.getAllByRole("radio", { name: "Opus" })).toHaveLength(1);
+  expect(screen.queryByRole("radio", { name: "GPT" })).toBeNull();
+
+  fireEvent.click(screen.getByRole("tab", { name: "OpenCode" }));
+  expect(screen.getByRole("radio", { name: "Big Pickle" })).toBeTruthy();
+  expect(screen.queryByRole("radio", { name: "Router 3" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "OpenRouter, 14 models" }));
+  fireEvent.click(screen.getByRole("radio", { name: "Router 3" }));
+  await screen.findByRole("button", { name: "Model, Router 3" });
+
+  // Back at the providers, the pick is current and remembered; a search finds older models too.
+  fireEvent.click(screen.getByRole("button", { name: "All providers" }));
+  expect(screen.getByText("Current · OpenRouter")).toBeTruthy();
+  expect(mac.phone!.saved.get("models.recent.mac-1")).toBe(JSON.stringify(["opencode:openrouter/m3"]));
+  act(() => (nativeProps.get(screen.getByLabelText("Search models"))!.onChangeText as (text: string) => void)("old zen"));
+  expect(screen.getByRole("radio", { name: "Old Zen" })).toBeTruthy();
+  expect(screen.queryByRole("radio", { name: "Big Pickle" })).toBeNull();
 });

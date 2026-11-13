@@ -64,7 +64,7 @@ export function createPermissionDefault(connection: CoreConnection, queries: Cli
     }, [saved]);
     const [error, setError] = useState<string | null>(null);
     return {
-      permission: selection ?? saved ?? defaultPermission ?? "trusted",
+      permission: selection ?? saved ?? defaultPermission ?? "autonomous",
       ready: (selection ?? saved ?? defaultPermission) != null,
       error,
       select(permission: PermissionPreset) {

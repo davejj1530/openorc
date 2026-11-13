@@ -1,60 +1,27 @@
-import { Plus } from "../components/icons";
-import { useState } from "react";
+import { useEffect } from "react";
+import { PageTitle } from "../components/PageTitle";
 import { TopBar } from "../components/TopBar";
-import { Button, Empty, Segmented } from "../components/ui";
 import { useRpc } from "../lib/client";
-import { newThread, useRouter } from "../lib/router";
-import { WORKSPACE_ID } from "@openorc/protocol";
-import { TaskRows } from "./TaskList";
+import { useRouter } from "../lib/router";
 import { ProjectSettings } from "./project-settings";
 
-const projectTabs = [
-  { value: "tasks", label: "Tasks" },
-  { value: "settings", label: "Settings" },
-] as const;
-
-export function ProjectView({ projectId, onNewTask }: { projectId: string; onNewTask: () => void }) {
+/** A project's settings under its name and folder. Its tasks are on the Tasks screen, under the sidebar's project filter. */
+export function ProjectView({ projectId }: { projectId: string }) {
   const project = useRpc("projects.get", { id: projectId });
-  const tasks = useRpc("tasks.list", { projectId });
-  const [tab, setTab] = useState<"tasks" | "settings">("tasks");
   const p = project.data;
+  const removed = project.isSuccess && !p;
+  // A project removed while its page shows gives way to a new thread, leaving no blank page or step back to it.
+  useEffect(() => {
+    if (removed) useRouter.getState().show({ view: "newthread" });
+  }, [removed]);
   if (!p) return null;
-  const taskContent =
-    (tasks.data ?? []).length === 0 && !tasks.isLoading ? (
-      <Empty title="No tasks in this project">
-        Create one to start an agent in a fresh worktree.
-        <div className="mt-3">
-          <Button size="lg" onClick={onNewTask}>
-            <Plus size={14} className="text-ink-3" /> New task
-          </Button>
-        </div>
-      </Empty>
-    ) : (
-      <TaskRows tasks={tasks.data ?? []} showProject={false} />
-    );
-
   return (
     <>
-      <TopBar
-        projectId={p.id}
-        projectName={p.name}
-        onProjectChange={(id) => {
-          if (id && id !== WORKSPACE_ID) useRouter.getState().navigate({ view: "project", projectId: id });
-          else newThread(id ?? undefined);
-        }}
-        actions={
-          <span className="flex items-center gap-2">
-            <Segmented label="Project section" size="sm" value={tab} onChange={setTab} options={projectTabs} />
-            <Button size="lg" onClick={onNewTask}>
-              <Plus size={14} className="text-ink-3" /> New task
-            </Button>
-          </span>
-        }
-      >
-        <span className="inline-flex h-7 shrink-0 items-center px-1 text-ink">Project</span>
+      <TopBar>
+        <PageTitle className="shrink-0">{p.name}</PageTitle>
         <span className="text-sm text-ink-4 font-mono truncate">{p.rootPath}</span>
       </TopBar>
-      {tab === "tasks" ? taskContent : <ProjectSettings projectId={p.id} />}
+      <ProjectSettings projectId={p.id} />
     </>
   );
 }

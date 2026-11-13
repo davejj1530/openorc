@@ -204,16 +204,15 @@
   flex-shrink: 0;
 }
 
-/* Agents and projects are cards: a plane with no edge, rows parted by hairlines. */
+/* Recovery and Settings use a shared surface with hairlines between agents. */
 .harness-list {
   overflow: hidden;
   border-radius: var(--radius-3xl);
   background: var(--plane-fill);
 }
 
-/* Settings sets the list on its sheet as a tile card; onboarding sets it on the tile as a plane,
-   so its pills and the chosen row take the plane's fill step. */
-.onboarding-root .harness-list {
+/* Recovery places the list on a plane, so its controls use the next fill step. */
+.onboarding-root:not(.onboarding-setup) .harness-list {
   --control-fill: var(--surface-2);
   --current-row-fill: var(--surface-2);
 }
@@ -373,11 +372,13 @@
     color var(--duration-arrive) var(--ease-out);
 }
 
-.harness-choice[data-selection-mode="multiple"] .harness-choice-mark {
+.harness-choice[data-selection-mode="multiple"] .harness-choice-mark,
+.harness-row-choice[data-selection-mode="multiple"] .harness-choice-mark {
   border-radius: var(--radius-sm);
 }
 
 .harness-choice[aria-checked="true"] .harness-choice-mark,
+.harness-row-choice[aria-checked="true"] .harness-choice-mark,
 .onboarding-project-row[data-selected="true"] .harness-choice-mark {
   background: var(--ink);
   color: var(--surface);
@@ -617,11 +618,11 @@
 }
 .onboarding-default {
   display: flex;
+  flex: 1 1 400px;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: var(--spacing-md);
-  margin-top: var(--spacing-xl);
 }
 .onboarding-default select {
   min-width: 180px;
@@ -703,5 +704,382 @@
     width: 80px;
     height: 80px;
     align-self: start;
+  }
+}
+
+/* First-run setup keeps the controls and artwork beside each other, with navigation
+   outside the scroll region. Recovery retains its compact, single-column layout. */
+.onboarding-setup {
+  --onboarding-content-start: var(--spacing-lg);
+}
+
+.onboarding-setup:has(> .onboarding-chrome[data-traffic-lights="true"]) {
+  --onboarding-content-start: var(--spacing-traffic);
+}
+
+.onboarding-setup .onboarding-surface {
+  margin: 0;
+  border-radius: 0;
+}
+
+.onboarding-body {
+  display: grid;
+  grid-template-columns: minmax(0, 400px) minmax(0, 480px);
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(40px, 7vw, 104px);
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  align-self: center;
+  /* Offset the scroll region's focus inset so content starts at the wordmark. */
+  padding: 24px clamp(24px, 7vw, 96px) 24px calc(var(--onboarding-content-start) - 4px);
+}
+
+.onboarding-setup .onboarding-scroll {
+  max-height: 100%;
+  padding: 4px;
+  scrollbar-width: none;
+}
+
+.onboarding-setup .onboarding-page {
+  width: 100%;
+  min-height: 0;
+  margin: 0;
+  animation: onboarding-page-arrive var(--duration-arrive) var(--ease-out) both;
+}
+
+.onboarding-setup .onboarding-heading {
+  margin-bottom: 24px;
+}
+.onboarding-setup .onboarding-heading h1 {
+  max-width: 20ch;
+  text-wrap: balance;
+}
+.onboarding-setup .onboarding-heading p {
+  max-width: 44ch;
+  margin-top: 12px;
+  text-wrap: pretty;
+}
+.onboarding-setup .harness-scan-heading {
+  align-items: center;
+}
+.onboarding-setup .harness-scan-heading h2 {
+  font-size: var(--text-sm);
+}
+.onboarding-setup .harness-scan-heading p {
+  display: none;
+}
+.onboarding-setup .harness-list {
+  overflow: visible;
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+.onboarding-setup .harness-list,
+.onboarding-setup .harness-more-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 8px 16px;
+}
+.onboarding-setup .harness-row {
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: 8px;
+  min-height: 56px;
+  padding: 8px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  transition: background-color var(--duration-quick) var(--ease-out);
+}
+.onboarding-setup .harness-row[data-selected="true"] {
+  background: transparent;
+}
+.onboarding-setup .harness-row:not(.harness-row-choice) {
+  grid-template-columns: 24px minmax(0, 1fr);
+}
+.onboarding-setup .harness-action {
+  grid-column: 2;
+  justify-self: start;
+}
+.onboarding-setup .harness-action:empty {
+  display: none;
+}
+.onboarding-setup .harness-provider-mark {
+  width: 24px;
+  height: 24px;
+}
+.onboarding-setup .harness-provider-logo {
+  width: 22px;
+  height: 22px;
+}
+.onboarding-setup .harness-identity {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+}
+.onboarding-setup .harness-identity h3,
+.onboarding-setup .harness-name {
+  color: var(--ink);
+  font-size: var(--text-base);
+  line-height: var(--text-base--line-height);
+}
+.onboarding-setup .harness-state {
+  font-size: var(--text-xs);
+}
+.onboarding-setup .harness-row-choice {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+.onboarding-setup .harness-row-choice:hover {
+  background: var(--surface-2);
+}
+.onboarding-setup .harness-row-choice:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.onboarding-setup .harness-row-choice > .harness-choice-mark {
+  width: 18px;
+  height: 18px;
+  border: var(--hairline) solid var(--ink-3);
+  background: transparent;
+}
+.onboarding-setup .harness-row-choice[aria-checked="true"] > .harness-choice-mark {
+  border-color: var(--ink);
+  background: var(--ink);
+}
+.onboarding-setup .harness-action > button:not(.harness-choice) {
+  padding-inline: 10px;
+}
+.onboarding-setup .onboarding-agent-default {
+  margin-top: 24px;
+}
+.onboarding-setup .harness-more {
+  grid-column: 1 / -1;
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+}
+.onboarding-setup .harness-more > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  min-height: 36px;
+  padding-inline: 12px;
+  border-radius: var(--radius-pill);
+  list-style: none;
+  cursor: pointer;
+}
+.onboarding-setup .harness-more > summary::-webkit-details-marker {
+  display: none;
+}
+.onboarding-setup .harness-more > summary:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.onboarding-setup .harness-more > summary:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.onboarding-setup .harness-more > summary svg {
+  transition: transform var(--duration-quick) var(--ease-out);
+}
+.onboarding-setup .harness-more[open] > summary svg {
+  transform: rotate(180deg);
+}
+.onboarding-setup .harness-more-list {
+  margin-top: 4px;
+}
+.onboarding-setup .onboarding-step-note {
+  margin-top: 24px;
+}
+.onboarding-setup .onboarding-default {
+  gap: 12px;
+}
+.onboarding-setup .onboarding-default > div {
+  flex: 1 1 150px;
+}
+.onboarding-setup .onboarding-default .onboarding-section-title {
+  font-size: var(--text-sm);
+}
+.onboarding-setup .onboarding-default select {
+  min-width: 148px;
+  max-width: 100%;
+}
+.onboarding-setup .onboarding-project-empty {
+  padding-top: 0;
+}
+.onboarding-setup .onboarding-project-list {
+  border-radius: var(--radius-xl);
+}
+.onboarding-setup .onboarding-project-row {
+  padding: 14px;
+}
+.onboarding-setup .onboarding-theme-section:has(.appearance-modes) {
+  display: block;
+}
+.onboarding-setup .onboarding-theme .onboarding-heading {
+  margin-bottom: 32px;
+}
+.onboarding-setup .onboarding-theme-section + .onboarding-theme-section {
+  margin-top: 32px;
+}
+.onboarding-setup .appearance-modes {
+  margin-top: 12px;
+}
+.onboarding-setup .palette-choices {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.onboarding-setup .palette-choice {
+  background: transparent;
+  padding: 8px;
+  gap: 8px;
+  border-radius: var(--radius-md);
+}
+.onboarding-setup .palette-swatches {
+  height: 24px;
+}
+.onboarding-setup .palette-choice:hover {
+  background: var(--surface-2);
+}
+.onboarding-setup .palette-choice[aria-pressed="true"] {
+  background: var(--surface);
+}
+.onboarding-setup .palette-choice-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.onboarding-setup .onboarding-finish {
+  display: block;
+  text-align: left;
+}
+.onboarding-setup .onboarding-finish h1 {
+  text-wrap: balance;
+}
+.onboarding-setup .onboarding-finish p {
+  margin-top: 12px;
+  max-width: 36ch;
+}
+
+.onboarding-setup .onboarding-footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-height: 80px;
+  padding: 20px 32px;
+  border-top: var(--hairline) solid var(--line);
+}
+.onboarding-setup .onboarding-back {
+  justify-self: start;
+}
+.onboarding-setup .onboarding-action-buttons {
+  width: auto;
+  margin: 0;
+  justify-self: end;
+}
+.onboarding-setup .onboarding-progress {
+  width: auto;
+  padding: 0;
+  gap: 6px;
+}
+.onboarding-setup .onboarding-progress-item {
+  width: 32px;
+  gap: 0;
+}
+.onboarding-setup .onboarding-progress-item::after {
+  height: 4px;
+}
+.onboarding-setup .onboarding-footer > .onboarding-progress {
+  align-self: center;
+}
+.onboarding-setup .onboarding-footer .onboarding-action-buttons > button {
+  min-width: 112px;
+}
+
+@keyframes onboarding-page-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (min-width: 901px) {
+  .onboarding-body[data-step="theme"] {
+    grid-template-columns: minmax(0, 360px) minmax(0, 480px);
+  }
+}
+
+@media (max-width: 900px) {
+  .onboarding-body {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
+    gap: 24px;
+    padding: 24px;
+  }
+  .onboarding-scene-agents,
+  .onboarding-scene-project {
+    padding: 18px;
+    width: 74%;
+  }
+}
+
+@media (max-width: 720px) {
+  .onboarding-body {
+    display: flex;
+    padding: 24px;
+  }
+  .onboarding-setup .onboarding-scroll {
+    width: min(100%, 440px);
+    margin: auto;
+    flex: 0 1 440px;
+  }
+  .onboarding-setup .onboarding-scene {
+    display: none;
+  }
+  .onboarding-setup .onboarding-footer {
+    min-height: 72px;
+    padding: 16px 24px;
+  }
+}
+
+@media (max-width: 400px) {
+  .onboarding-body {
+    padding: 20px 12px;
+  }
+  .onboarding-setup .harness-list,
+  .onboarding-setup .harness-more-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .onboarding-setup .palette-choices {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .onboarding-setup .onboarding-footer {
+    gap: 8px;
+    padding-inline: 12px;
+  }
+  .onboarding-setup .onboarding-progress-item {
+    width: 20px;
+  }
+  .onboarding-setup .onboarding-footer[data-complete="true"] {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .onboarding-setup .onboarding-footer[data-complete="true"] .onboarding-back {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onboarding-setup .onboarding-page {
+    animation: none;
   }
 }

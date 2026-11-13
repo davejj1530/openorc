@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { createRoot } from "react-dom/client";
 import { useRouter } from "../../apps/desktop/src/renderer/src/lib/router";
 import type { Block, RunTranscript } from "../../packages/client/src/index";
+import type { UpdateState } from "../../apps/desktop/src/shared/app-updates";
 import { defaultOrclingLook } from "../../packages/protocol/src/index";
 import { createDesignSettingsRpc } from "./design-settings";
 // main.tsx stamps the saved typefaces on <html>; the panel crops render without App, which would otherwise skip them.
@@ -11,6 +12,10 @@ import "../../apps/desktop/src/renderer/src/lib/app-font";
 import "../../apps/desktop/src/renderer/src/lib/code-font";
 
 let automaticChecks = false;
+/** OpenOrc's own update as a release build reports it: up to date, or the phase `?update=` names. */
+const updatePhase = new URLSearchParams(location.search).get("update") ?? "current";
+const updateState = (["available", "downloading", "ready", "installing"].includes(updatePhase) ? { phase: updatePhase, version: "0.42.0", percent: 64 } : { phase: updatePhase }) as UpdateState;
+
 Object.assign(window, {
   openorc: {
     platform: "darwin",
@@ -18,7 +23,13 @@ Object.assign(window, {
     openWindow() {},
     onTheme: () => () => {},
     setTheme() {},
-    updates: { settings: async () => ({ automaticChecks }), setAutomaticChecks: async (value: boolean) => ({ automaticChecks: (automaticChecks = value) }) },
+    updates: {
+      settings: async () => ({ automaticChecks }),
+      setAutomaticChecks: async (value: boolean) => ({ automaticChecks: (automaticChecks = value) }),
+      getState: async () => ({ state: updateState, dismissed: true }),
+      onState: () => () => {},
+      check: async () => {},
+    },
     assetUrl: (p: string) => p,
     revealFile() {},
     ...panelBridges(),
@@ -109,7 +120,7 @@ async function main() {
     { ...base, id: "onboarding-branch", title: "Build a thoughtful onboarding", ...yesterday(17) },
     { ...base, id: "search", title: "A faster command menu", agent: "claude", model: "claude-opus-5-5[1m]", activity: "running", ...minutesAgo(0) },
     { ...base, id: "tokens", title: "Simplify the design tokens", workspaceMode: "worktree", branch: "openorc/design-tokens-2c91f0", ...earlierToday },
-    { ...base, id: "welcome", projectId: "website", title: "Tell the product story", ...minutesAgo(38) },
+    { ...base, id: "welcome", projectId: "website", title: "Tell the product story", agent: "claude", model: "claude-opus-5-5[1m]", ...minutesAgo(38) },
     { ...base, id: "perf", projectId: "atlas", title: "Review the search endpoint", agent: "claude", model: "claude-opus-5-5[1m]", ...yesterday(11) },
   ];
   const orclings = ["Rini", "Atlas", "Pip"].map((name, index) => ({
@@ -166,7 +177,7 @@ async function main() {
       ...state,
     });
   const shell = mode === "shell" || mode === "inbox" ? addShellStates({ base, projects, threads, tasks, seed: seedTranscript }) : null;
-  const working = mode === "working" ? addWorkingStates({ base, threads, now, response: messages[1]!.text, seed: seedTranscript }) : null;
+  const working = mode === "working" || mode === "review" ? addWorkingStates({ base, threads, now, response: messages[1]!.text, seed: seedTranscript, running: mode === "working" }) : null;
   const models = [
     { agent: "codex", id: "gpt-6-astra", label: "GPT-6-Astra", efforts: ["high"], defaultEffort: "high", isDefault: true },
     { agent: "claude", id: "claude-opus-5-5[1m]", label: "Opus 5.5 (1M context)", efforts: ["high"], defaultEffort: "high" },
@@ -235,6 +246,7 @@ async function main() {
     if (method === "threads.lastMessage") return messages[1];
     if (method === "orclings.instructions") return [{ version: 1, body: "Help me make clear decisions. Keep project work and personal memory separate.", author: "user", note: null, createdAt: now }];
     if (method === "projects.list") return projects;
+    if (method === "projects.activity") return sampleActivity((params.boundaries as number[]).length - 1);
     if (method === "projects.git") return "ready";
     if (method === "projects.get")
       return params.id === "openorc-workspace" ? { ...project, id: "openorc-workspace", name: "Workspace", rootPath: "/Projects" } : (projects.find((p) => p.id === params.id) ?? project);
@@ -269,6 +281,8 @@ async function main() {
           { id: "codex", state: "ready" },
           { id: "claude", state: "ready" },
           { id: "opencode", state: "not_found" },
+          { id: "omp", state: "not_found" },
+          { id: "cursor", state: "not_found" },
         ],
         codex: { installed: true, loggedIn: true },
         gh: { installed: true, loggedIn: true },
@@ -326,6 +340,7 @@ async function main() {
   else if (mode === "orclings") useRouter.getState().navigate({ view: "thread", threadId: "orcling-rini" });
   else if (mode === "document") useRouter.getState().navigate({ view: "task", taskId: "welcome", tab: "spec" });
   else useRouter.getState().navigate({ view: "thread", threadId: "onboarding" });
+  if (query.get("tabs")) await openThreadTabs(query.get("tabs")!);
   if (mode === "review") useLayout.getState().openWorkspaceChanges({ kind: "thread", id: "onboarding" });
   if (query.get("panel")) await openPanelTabs(query.get("panel")!, mode === "orclings" ? "thread:orcling-rini" : "thread:onboarding");
   const { App } = await import("../../apps/desktop/src/renderer/src/App");
@@ -418,7 +433,7 @@ type Row = Record<string, unknown>;
 type Seed = (runId: string, blocks: Block[], state?: Partial<RunTranscript>) => void;
 
 /**
- * ?view=shell and ?view=inbox: the workspace data plus the sidebar and inbox states the redesign restyles. In the open
+ * ?view=shell and ?view=inbox: workspace data with varied sidebar and inbox states. In the open
  * project, threads run, wait on an approval, failed, finished unread, or carry a merged pull request, and a title runs
  * long. Folded, website waits on a question and atlas-api runs. The last project, with a long name, has no threads.
  * A thread with a second line gets a seeded live run, as the app holds one while the thread is live. The inbox lists
@@ -483,24 +498,26 @@ function addShellStates({ base, projects, threads, tasks, seed }: { base: Record
 }
 
 /**
- * ?view=working: the conversation the transcript restyle needs. A finished turn with thinking, reads, an edit, a
+ * ?view=working: a finished turn with thinking, reads, an edit, a
  * passing test run, its reply and a change card, then a live turn with a plan on step 3 of 3, a running command, a
- * pending approval and a pending question, two queued messages and a background command.
+ * pending approval and a pending question, two queued messages and a background command. ?view=review shows the
+ * finished turn alone.
  */
-function addWorkingStates({ base, threads, now, response, seed }: { base: Row; threads: Row[]; now: number; response: string; seed: Seed }) {
+function addWorkingStates({ base, threads, now, response, seed, running }: { base: Row; threads: Row[]; now: number; response: string; seed: Seed; running: boolean }) {
   const at = (secondsAgo: number) => now - secondsAgo * 1000;
-  Object.assign(
-    threads.find((row) => row.id === "onboarding")!,
-    {
-      activity: "running",
-      liveRunId: "working-live",
-      queued: [
-        { id: "queued-1", text: "Then add a short tour for returning people.", attachments: [], queuedAt: at(20) },
-        { id: "queued-2", text: "Keep the copy under two lines.", attachments: [], queuedAt: at(10) },
-      ],
-      backgroundCommands: [{ id: "dev", description: "pnpm dev --port 5173" }],
-    },
-  );
+  if (running)
+    Object.assign(
+      threads.find((row) => row.id === "onboarding")!,
+      {
+        activity: "running",
+        liveRunId: "working-live",
+        queued: [
+          { id: "queued-1", text: "Then add a short tour for returning people.", attachments: [], queuedAt: at(20) },
+          { id: "queued-2", text: "Keep the copy under two lines.", attachments: [], queuedAt: at(10) },
+        ],
+        backgroundCommands: [{ id: "dev", description: "pnpm dev --port 5173" }],
+      },
+    );
   const run = (id: string, startedAt: number, state: string) => ({
     ...base,
     id,
@@ -516,6 +533,15 @@ function addWorkingStates({ base, threads, now, response, seed }: { base: Row; t
     error: null,
   });
   const read = (id: string, file: string): Block => ({ id, kind: "tool", name: "Read", input: { file_path: `/Projects/studio/src/${file}` }, done: true, at: at(590) });
+  /** Codex titles each stretch of its reasoning; the app opens a step at every title. */
+  const thought = (id: string, title: string, text: string, from: number, to: number): Block => ({
+    id,
+    kind: "thinking",
+    text: `**${title}**\n\n${text}`,
+    startedAt: at(from),
+    endedAt: at(to),
+    at: at(from),
+  });
   const finished: Block[] = [
     {
       id: "w-request",
@@ -525,16 +551,10 @@ function addWorkingStates({ base, threads, now, response, seed }: { base: Row; t
       streaming: false,
       at: at(600),
     },
-    {
-      id: "w-thinking",
-      kind: "thinking",
-      text: "**Planning the welcome**\n\nThe empty state competes with the picker. Lead with one action and keep the keyboard path obvious.",
-      startedAt: at(599),
-      endedAt: at(587),
-      at: at(599),
-    },
+    thought("w-thinking", "Reading the onboarding flow", "Start from the current empty state and the picker it sits beside.", 599, 594),
     read("w-read-1", "Welcome.tsx"),
     read("w-read-2", "ProjectPicker.tsx"),
+    thought("w-thinking-2", "Writing the welcome screen", "The empty state competes with the picker. Lead with one action and keep the keyboard path obvious.", 588, 583),
     {
       id: "w-edit",
       kind: "tool",
@@ -543,6 +563,7 @@ function addWorkingStates({ base, threads, now, response, seed }: { base: Row; t
       done: true,
       at: at(570),
     },
+    thought("w-thinking-3", "Running the tests", "Check that the welcome still renders the picker.", 566, 564),
     { id: "w-tests", kind: "tool", name: "Bash", input: { command: "pnpm test", description: "Run the tests" }, output: "42 passed in 8.2s", done: true, at: at(560) },
     { id: "w-reply", kind: "message", role: "assistant", text: response, streaming: false, at: at(530) },
     { id: "w-end", kind: "status", text: "turn finished in 72.0s", tone: "ok", boundary: "turn", durationMs: 72000, outcome: "success", at: at(528) },
@@ -575,34 +596,31 @@ function addWorkingStates({ base, threads, now, response, seed }: { base: Row; t
     },
     { id: "l-question", kind: "approval", approvalId: "l-question", approvalKind: "user_input", input: { questions: [question] }, at: at(8) },
   ];
-  seed("working-live", live, { live: true, pendingApprovals: 2 });
+  if (running) seed("working-live", live, { live: true, pendingApprovals: 2 });
   const checkpoint = (id: string, turn: number, runId: string | null) => ({
     id,
     threadId: "onboarding",
     runId,
     turn,
     treeSha: id,
-    diffStat: { files: 2, insertions: 8, deletions: 2, untracked: 0 },
+    diffStat: { files: 1, insertions: 8, deletions: 2, untracked: 0 },
     note: null,
     root: "/Projects/studio",
     outside: null,
     createdAt: at(528),
   });
   return {
-    runs: [run("working-done", at(600), "success"), run("working-live", at(48), "running")],
+    runs: [run("working-done", at(600), "success"), ...(running ? [run("working-live", at(48), "running")] : [])],
     checkpoints: [checkpoint("cp-0", 0, null), checkpoint("cp-1", 1, "working-done")],
     turnChanges: {
-      files: [
-        { path: "src/Welcome.tsx", added: 6, removed: 2 },
-        { path: "src/ui/KeyboardHint.tsx", added: 2, removed: 0 },
-      ],
+      files: [{ path: "src/Welcome.tsx", added: 8, removed: 2 }],
       patch: null,
     },
   };
 }
 
 /**
- * Unit 9.0: the pages the redesign restyles that no other view reaches. project is the Project view (its Settings tab
+ * Standalone page fixtures. project is the Project view (its Settings tab
  * reads the real settings shape), orcling and orcling-edit are the Orcling designer new and editing Rini, onboarding is
  * first-run setup with one agent in each scan state, pulls and pull are the pull request list and one pull request,
  * memory-page is the Memory page. notices is the conversation with both update toasts:
@@ -675,7 +693,9 @@ function pageStates({ mode, now, project, orclings, patch }: { mode: string; now
   const harnesses = [
     { id: "claude", state: "ready", path: "/usr/local/bin/claude", version: "2.1.296", revision: 1 },
     { id: "codex", state: "sign_in", path: "/usr/local/bin/codex", version: "0.81.0", revision: 1 },
-    // ?scan=failed swaps OpenCode's missing row for a failed check: three agents carry four states.
+    { id: "omp", state: "not_found", path: null, version: null, revision: 1 },
+    { id: "cursor", state: "sign_in", path: "/usr/local/bin/cursor-agent", version: "2026.11.05-86047df", revision: 1 },
+    // ?scan=failed swaps OpenCode's missing row for a failed check.
     new URLSearchParams(location.search).get("scan") === "failed"
       ? { id: "opencode", state: "check_failed", path: "/usr/local/bin/opencode", version: null, revision: 1 }
       : { id: "opencode", state: "not_found", path: null, version: null, revision: 1 },
@@ -739,6 +759,49 @@ function panelBridges() {
       kill: noop,
     },
   };
+}
+
+/**
+ * A project that started about seven months ago: busy weekdays, quiet weekends, a few days off. Seeded, so every capture
+ * draws the same year.
+ */
+function sampleActivity(count: number) {
+  let seed = 7;
+  const random = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+  const started = count - 210;
+  return {
+    days: Array.from({ length: count }, (_, index) => {
+      const weekend = index % 7 >= 5;
+      const roll = random();
+      const turns = index < started || roll < (weekend ? 0.6 : 0.12) ? 0 : Math.round((weekend ? 4 : 10) + random() * (weekend ? 8 : 34) * Math.min(1, (index - started) / 90 + 0.4));
+      const codex = Math.round(turns * (0.4 + random() * 0.3));
+      return {
+        turns,
+        steps: turns * (18 + Math.round(random() * 14)),
+        threads: Math.ceil(turns / 5),
+        agents: turns
+          ? [
+              { agent: "codex" as const, turns: codex },
+              { agent: "claude" as const, turns: turns - codex },
+            ].filter((share) => share.turns)
+          : [],
+      };
+    }),
+  };
+}
+
+/**
+ * ?tabs=<thread>[,<thread>...]: those threads in tabs of their own ahead of the view's, which stays selected. Thread ids
+ * are the sample threads' (search, tokens, welcome, perf, ...).
+ */
+async function openThreadTabs(spec: string) {
+  const { useThreadTabs } = await import("../../apps/desktop/src/renderer/src/lib/thread-tabs");
+  const tabs = useThreadTabs.getState();
+  const current = useRouter.getState().route;
+  useThreadTabs.setState({ tabs: [], active: null });
+  for (const threadId of spec.split(",")) tabs.openThread(threadId);
+  if (current.view === "thread") tabs.openThread(current.threadId);
+  else useRouter.getState().navigate(current);
 }
 
 /**

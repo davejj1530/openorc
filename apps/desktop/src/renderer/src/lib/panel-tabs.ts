@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { ChangeSelection, FileSelection, PanelTab } from "./layout";
+import { movedBefore } from "./tab-order";
 
 export type PanelPage =
   | { kind: "newtab" }
@@ -88,6 +89,8 @@ interface PanelSessions {
   add: (scope: string) => void;
   select: (scope: string, id: string) => void;
   close: (scope: string, id: string) => void;
+  /** Puts a tab ahead of another, or last. */
+  reorder: (scope: string, id: string, beforeId: string | null) => void;
   navigate: (scope: string, page: PanelPage) => void;
   open: (scope: string, page: PanelPage, id?: string) => void;
   move: (scope: string, delta: number) => void;
@@ -119,6 +122,11 @@ export const usePanelSessions = create<PanelSessions>()(
           }),
         select: (scope, id) => change(scope, (session) => ({ ...session, activeId: id })),
         close: (scope, id) => change(scope, (session) => withoutTab(session, id, scope)),
+        reorder: (scope, id, beforeId) =>
+          change(scope, (session) => {
+            const [first, ...rest] = movedBefore(session.tabs, id, beforeId);
+            return first ? { ...session, tabs: [first, ...rest] } : session;
+          }),
         navigate: (scope, page) => change(scope, (session) => updateTab(session, session.activeId, (tab) => navigateTab(tab, withOwnShell(session, tab.id, page)))),
         open: (scope, page, id) =>
           change(scope, (session) => {

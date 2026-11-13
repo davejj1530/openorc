@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ClaudeAccountId } from "./claude-accounts.js";
-import type { Memory, PermissionPreset, Run, RunMode } from "./domain.js";
+import type { Memory, PermissionPreset, Run, RunMode, ThreadMessage, ThreadSummary } from "./domain.js";
 import { executionModeAvailable, executionModeSettings } from "./execution-mode.js";
 import { ModelExecutionSettings } from "./execution-target.js";
 
@@ -34,6 +34,8 @@ export const defaultOrclingLook: OrclingLook = { shape: 0, eyes: 0, texture: 0, 
 /** Allow runs without asking; Approve asks before every command or edit. */
 export const OrclingPermission = z.enum(["allow", "approve"]);
 export type OrclingPermission = z.infer<typeof OrclingPermission>;
+/** A new Orcling works for the person without asking, as they would; Approve is a choice for a careful one. */
+export const defaultOrclingPermission: OrclingPermission = "allow";
 
 /**
  * An Orcling's name as its folder: lowercase letters and numbers joined by dashes. Names that
@@ -64,14 +66,136 @@ export const OrclingDraft = z
   .strict();
 export type OrclingDraft = z.infer<typeof OrclingDraft>;
 
+/**
+ * When an Orcling wakes up on its own to see whether there is anything worth texting about: as OpenOrc opens, or at
+ * a time of day on chosen weekdays (0 is Sunday). A time missed while OpenOrc was closed wakes it once when it opens.
+ */
+export const OrclingWake = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("startup") }).strict(),
+  z
+    .object({
+      kind: z.literal("time"),
+      at: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+      days: z.array(z.number().int().min(0).max(6)).min(1).max(7),
+    })
+    .strict(),
+]);
+export type OrclingWake = z.infer<typeof OrclingWake>;
+export const OrclingWakes = z
+  .array(OrclingWake)
+  .max(12)
+  .refine((wakes) => wakes.filter((wake) => wake.kind === "startup").length <= 1, "Waking when OpenOrc opens is one choice.");
+
+/** One rule's identity: the same time on the same days is the same wake, however it was listed. */
+export function orclingWakeKey(wake: OrclingWake): string {
+  return wake.kind === "startup" ? "startup" : `time@${wake.at}:${[...new Set(wake.days)].sort().join("")}`;
+}
+
 /** A saved identity: the same Orcling in its own thread and wherever it is asked to help. */
 export interface Orcling extends OrclingDraft {
   id: string;
   claudeAccountId: string;
   /** Its one personal conversation. */
   threadId: string;
+  wakes: OrclingWake[];
   createdAt: number;
   updatedAt: number;
+}
+
+/** A group chat: one Workspace conversation shared by the person and several Orclings. */
+export interface OrclingGroup {
+  threadId: string;
+  title: string;
+  /** Its Orclings, in the order they answer a message that names none of them. */
+  memberIds: string[];
+  createdAt: number;
+}
+
+/**
+ * A message one Orcling sent into another conversation: a direct message into another Orcling's own chat, or the
+ * words that opened a group chat. The conversation shows it as that Orcling's.
+ */
+export interface OrclingMessageOrigin {
+  messageId: string;
+  fromOrclingId: string;
+  /** The Orcling a direct message went to; null when it went to a group. */
+  toOrclingId: string | null;
+}
+
+/** A tapback on one bubble of a message in an Orcling chat. Eyes say "on it", the way people use 👀 in Slack. */
+export const Reaction = z.enum(["heart", "like", "dislike", "haha", "wow", "sad", "eyes"]);
+export type Reaction = z.infer<typeof Reaction>;
+export const reactionEmoji: Record<Reaction, string> = { heart: "❤️", like: "👍", dislike: "👎", haha: "😂", wow: "😮", sad: "😢", eyes: "👀" };
+
+export interface MessageReaction {
+  runId: string;
+  messageId: string;
+  /** Which bubble of the message, as chatBubbles splits it. */
+  part: number;
+  /** The Orcling that reacted, or null for the person. */
+  orclingId: string | null;
+  reaction: Reaction;
+  at: number;
+}
+
+const LIST_ITEM = /^\s*(?:[-*+]|\d+[.)])\s/;
+
+/**
+ * A text in an Orcling's own conversation as the messages it arrives as: one per paragraph, the way people text. A
+ * code block stays whole, and a list stays one message even when its items are spaced apart.
+ */
+export function chatBubbles(text: string): string[] {
+  const bubbles: string[] = [];
+  let current: string[] = [];
+  let fenced = false;
+  const flush = () => {
+    const bubble = current.join("\n").trim();
+    current = [];
+    if (!bubble) return;
+    const previous = bubbles.at(-1);
+    if (previous !== undefined && LIST_ITEM.test(bubble) && LIST_ITEM.test(previous.split("\n").at(-1) ?? "")) bubbles[bubbles.length - 1] = `${previous}\n\n${bubble}`;
+    else bubbles.push(bubble);
+  };
+  for (const line of text.split("\n")) {
+    if (/^\s*(```|~~~)/.test(line)) fenced = !fenced;
+    if (!fenced && !line.trim()) flush();
+    else current.push(line);
+  }
+  flush();
+  return bubbles;
+}
+
+/**
+ * An Orcling as a phone lists it: how it looks and where its own conversation stands, without its model, account,
+ * permission, wakes or instructions.
+ */
+export interface OrclingChatSummary {
+  id: string;
+  name: string;
+  look: OrclingLook;
+  threadId: string;
+  /** Its own conversation, whose marks say whether it works, waits on the person or has texts unread. */
+  thread: ThreadSummary | null;
+  /** The newest message there, cut to a preview. */
+  last: ThreadMessage | null;
+}
+
+/**
+ * One Orcling as a phone shows it when you open it from its chat: who it is, what it runs on, when it checks in, its
+ * current instructions and what it remembers. Earlier instruction versions stay on the Mac.
+ */
+export interface OrclingProfile {
+  id: string;
+  name: string;
+  look: OrclingLook;
+  settings: ModelExecutionSettings;
+  permission: OrclingPermission;
+  /** The Claude account it runs on whenever its model is Claude's. */
+  claudeAccountId: string;
+  wakes: OrclingWake[];
+  /** The newest version's text; null before any was written. */
+  instructions: string | null;
+  memories: { id: string; title: string; body: string; updatedAt: number }[];
 }
 
 export interface OrclingInstructionsVersion {
@@ -96,9 +220,13 @@ export function orclingExecution(o: Pick<OrclingDraft, "permission" | "settings"
 const id = z.string().min(1);
 export const orclingRpcParams = {
   "orclings.list": z.object({}).strict(),
+  /** Every Orcling with its own conversation's state and newest message, for a phone's list. */
+  "orclings.chats": z.object({}).strict(),
+  /** One Orcling for a phone's sheet: its model, permission, check-ins, current instructions and memories. */
+  "orclings.profile": z.object({ id }).strict(),
   "orclings.create": z.object({ draft: OrclingDraft }).strict(),
   "orclings.update": z.object({ id, draft: OrclingDraft }).strict(),
-  /** Removes the Orcling, its instructions, memories and conversation. Threads it helped in keep their history. */
+  /** Removes the Orcling, its instructions, memories and conversation, and any group chat left with one other Orcling. Threads it helped in keep their history. */
   "orclings.delete": z.object({ id }).strict(),
   /** Every version of its instructions, newest first. */
   "orclings.instructions": z.object({ id }).strict(),
@@ -111,10 +239,27 @@ export const orclingRpcParams = {
   "orclings.ask": z.object({ id, threadId: id, prompt: z.string().min(1), attachments: z.array(z.string()).optional() }).strict(),
   /** Gives a project conversation to an Orcling, or with null back to its plain model. */
   "orclings.assign": z.object({ threadId: id, orclingId: id.nullable() }).strict(),
+  /** Replaces when the Orcling wakes up on its own; an empty list leaves it waiting for you. */
+  "orclings.wakes.save": z.object({ id, wakes: OrclingWakes }).strict(),
+  /** Every tapback in an Orcling's own conversation. */
+  "orclings.reactions": z.object({ threadId: id }).strict(),
+  /** Your tapback on one bubble of the Orcling's message, replacing your earlier one there; null takes it back. The Orcling hears it on its next turn. */
+  "orclings.react": z.object({ threadId: id, runId: id, messageId: id, part: z.number().int().min(0), reaction: Reaction.nullable() }).strict(),
+  /** Which messages in a conversation came from another Orcling, and from whom. */
+  "orclings.origins": z.object({ threadId: id }).strict(),
+  "orclings.groups.list": z.object({}).strict(),
+  /** A group chat with these Orclings and you; without a title it is named after them. */
+  "orclings.groups.create": z.object({ memberIds: z.array(id).min(2).max(8), title: z.string().trim().min(1).max(60).optional() }).strict(),
+  /** Your message to a group: the Orclings it names answer, or every one of them when it names none. */
+  "orclings.groups.send": z.object({ threadId: id, text: z.string().min(1), attachments: z.array(z.string()).optional(), messageId: z.string().min(1).max(100).optional() }).strict(),
+  /** Removes a group chat and its history. Its Orclings and their own conversations stay. */
+  "orclings.groups.delete": z.object({ threadId: id }).strict(),
 };
 
 export interface OrclingRpcResults {
   "orclings.list": Orcling[];
+  "orclings.chats": OrclingChatSummary[];
+  "orclings.profile": OrclingProfile;
   "orclings.create": Orcling;
   "orclings.update": Orcling;
   "orclings.delete": null;
@@ -124,4 +269,12 @@ export interface OrclingRpcResults {
   "orclings.memories": Memory[];
   "orclings.ask": Run;
   "orclings.assign": null;
+  "orclings.wakes.save": Orcling;
+  "orclings.reactions": MessageReaction[];
+  "orclings.react": null;
+  "orclings.origins": OrclingMessageOrigin[];
+  "orclings.groups.list": OrclingGroup[];
+  "orclings.groups.create": OrclingGroup;
+  "orclings.groups.send": null;
+  "orclings.groups.delete": null;
 }

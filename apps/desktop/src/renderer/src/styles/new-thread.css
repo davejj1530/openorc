@@ -1,11 +1,17 @@
-/* New thread: one question over a roomy composer on the tile ground, where the thread works
-   under it, the starters and the threads worth picking up again. */
+/* New thread: one question over a roomy composer on the tile ground, where the thread works under it,
+   and the project's year of activity along the bottom. */
 
 .app-shell .new-thread-body {
-  container: new-thread / inline-size;
+  container: new-thread / size;
+  /* The activity is --new-thread-activity-h tall and sits --new-thread-activity-floor over the pane's
+     bottom. Where it shows, the column's top takes the same room back, so the column centres where it
+     would without it. */
+  --new-thread-bottom: 72px;
+  --new-thread-activity-h: 134px;
+  --new-thread-activity-floor: 36px;
   display: flex;
   flex-direction: column;
-  padding: 0 48px 72px;
+  padding: 0 48px var(--new-thread-bottom);
 }
 .new-thread-column {
   display: flex;
@@ -15,7 +21,10 @@
   max-width: 640px;
   /* Centred while it fits; once it is taller than the pane it scrolls from its top. */
   margin: auto;
-  padding-top: 24px;
+  padding-top: calc(24px + var(--new-thread-reserve, 0px));
+}
+.app-shell .new-thread-body:has(> .new-thread-activity) {
+  --new-thread-reserve: calc(var(--new-thread-activity-h) + var(--new-thread-activity-floor) - var(--new-thread-bottom));
 }
 .new-thread-question {
   color: var(--ink);
@@ -64,11 +73,8 @@
 :root:active-view-transition-type(project) .new-thread-options {
   view-transition-name: new-thread-options;
 }
-:root:active-view-transition-type(project) .thread-starters {
-  view-transition-name: new-thread-starters;
-}
-:root:active-view-transition-type(project) .new-thread-recent {
-  view-transition-name: new-thread-recent;
+:root:active-view-transition-type(project) .new-thread-activity {
+  view-transition-name: new-thread-activity;
 }
 :root:active-view-transition-type(project) .panel-shell {
   view-transition-name: new-thread-panel;
@@ -95,21 +101,6 @@
     translate: 0 calc(var(--arrive-rise) * -1);
   }
 }
-/* The list's rows swap apart from its heading, so the heading holds still. Another project's threads never
-   share a line with the last one's: the old rows leave, and the new ones, which arrive by themselves, start
-   as the old ones are nearly gone. */
-:root:active-view-transition-type(project) .new-thread-recent > .motion-stagger {
-  view-transition-name: new-thread-recent-rows;
-  --stagger-from: calc(var(--duration-leave) / 2);
-}
-:root:active-view-transition-type(project)::view-transition-old(new-thread-recent-rows) {
-  animation-name: swap-leave;
-  animation-duration: var(--duration-leave);
-}
-:root:active-view-transition-type(project)::view-transition-new(new-thread-recent-rows),
-:root:active-view-transition-type(project)::view-transition-new(new-thread-recent-rows):only-child {
-  animation: none;
-}
 .new-thread-empty {
   padding: 18px 20px;
   border-radius: var(--radius-3xl);
@@ -126,7 +117,6 @@
 
 /* The composer: r24 on the writing-area role, a 15px prompt and one bar with a 34px send. */
 .composer-new-thread .composer-shell {
-  min-height: 156px;
   gap: 18px;
   padding: 18px 14px 14px 20px;
   border-radius: var(--radius-5xl);
@@ -140,9 +130,6 @@
 }
 .composer-new-thread .composer-input {
   min-height: 24px;
-}
-.composer-new-thread .composer-bar {
-  margin-top: auto;
 }
 .composer-new-thread .composer-tools {
   margin-left: -6px;
@@ -198,80 +185,128 @@
   flex-shrink: 0;
 }
 
-/* Starters prepare a draft (in plan mode); they are fill pills. */
-.thread-starters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 0 2px;
-}
-.thread-starters button {
-  height: var(--control-sm);
-  padding: 0 12px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-2);
-  color: var(--ink-3);
-  font-size: var(--text-sm);
-}
-.thread-starters button:hover:not(:disabled) {
-  background: var(--surface-3);
-  color: var(--ink);
-}
-.thread-starters button:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-}
-
-/* "Pick up where you left off": a flat list of 42px rows, the title flush left and the status beside the time. */
-.new-thread-recent {
+/* Activity: one dot a day, a week to a column, the week's first day on top. A dot grows and darkens with
+   the day's turns, a halftone of the year in the ink the dither uses. The line above swaps between the
+   year's count and the day under the pointer. */
+.new-thread-activity {
   display: flex;
   flex-direction: column;
-  margin-top: 26px;
-}
-.new-thread-recent-label {
-  padding: 0 12px 8px;
-  color: var(--ink-4);
-  font-size: var(--text-sm);
-  line-height: var(--text-sm--line-height);
-}
-.new-thread-recent > div {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.new-thread-recent-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  height: 42px;
-  padding: 0 12px;
-  border-radius: var(--radius-lg);
-  color: var(--ink);
-  text-align: left;
-}
-.new-thread-recent-row:hover {
-  background: var(--surface-2);
-}
-.new-thread-recent-title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--text-base);
-  line-height: 16px;
-  letter-spacing: var(--text-base--letter-spacing);
-}
-.new-thread-recent-meta {
-  display: flex;
   flex-shrink: 0;
-  align-items: center;
-  gap: 6px;
+  justify-content: flex-end;
+  gap: 10px;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 640px;
+  height: var(--new-thread-activity-h);
+  padding-top: 24px;
+  margin: 0 auto calc(var(--new-thread-activity-floor) - var(--new-thread-bottom));
+}
+.new-thread-activity-readout {
   color: var(--ink-4);
   font-size: var(--text-sm);
   line-height: var(--text-sm--line-height);
   white-space: nowrap;
+}
+.new-thread-activity-detail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.new-thread-activity-date {
+  color: var(--ink-2);
+}
+.new-thread-activity-agents {
+  display: flex;
+  gap: 12px;
+  margin-left: auto;
+}
+.new-thread-activity-agents > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.new-thread-activity-days {
+  display: grid;
+  grid-template-columns: repeat(var(--weeks), minmax(0, 1fr));
+  grid-template-rows: repeat(7, 12px);
+  grid-auto-flow: column;
+  isolation: isolate;
+}
+.new-thread-activity-day {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+.new-thread-activity-day::before {
+  content: "";
+  width: var(--dot);
+  height: var(--dot);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ink) var(--shade), transparent);
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    scale var(--duration-arrive) var(--ease-out) var(--dot-delay, 0ms),
+    opacity var(--duration-arrive) var(--ease-out) var(--dot-delay, 0ms);
+}
+.new-thread-activity-day[data-level="0"] {
+  --dot: 3px;
+  --shade: 10%;
+}
+.new-thread-activity-day[data-level="1"] {
+  --dot: 5px;
+  --shade: 22%;
+}
+.new-thread-activity-day[data-level="2"] {
+  --dot: 6.5px;
+  --shade: 32%;
+}
+.new-thread-activity-day[data-level="3"] {
+  --dot: 8px;
+  --shade: 42%;
+}
+.new-thread-activity-day[data-level="4"] {
+  --dot: 9px;
+  --shade: 54%;
+}
+/* The day under the pointer turns ink on a soft disc. */
+.new-thread-activity-day::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  width: 12px;
+  height: 12px;
+  margin: auto;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  opacity: 0;
+  transition: opacity var(--duration-quick) var(--ease-out);
+}
+.new-thread-activity-day[data-hovered]::before {
+  background: var(--ink);
+}
+.new-thread-activity-day[data-hovered]::after {
+  opacity: 1;
+}
+/* A read that lands after the screen shows sweeps the dots in a week at a time, oldest first. */
+.new-thread-activity-days[data-arrive] .new-thread-activity-day {
+  --dot-delay: calc(var(--week) * var(--duration-arrive) / 28);
+}
+@starting-style {
+  .new-thread-activity-days[data-arrive] .new-thread-activity-day::before {
+    scale: 0;
+    opacity: 0;
+  }
+}
+/* A pane too short for both keeps the composer where it was and leaves the activity out. */
+@container new-thread (max-height: 600px) {
+  .new-thread-column {
+    --new-thread-reserve: 0px;
+  }
+  .new-thread-activity {
+    display: none;
+  }
 }
 
 @container new-thread (max-width: 480px) {
@@ -282,11 +317,57 @@
 }
 @media (max-width: 900px) {
   .app-shell .new-thread-body {
-    padding: 0 24px 48px;
+    --new-thread-bottom: 48px;
+    --new-thread-activity-floor: 28px;
+    padding: 0 24px var(--new-thread-bottom);
   }
 }
 @media (max-width: 520px) {
   .app-shell .new-thread-body {
-    padding: 0 12px 32px;
+    --new-thread-bottom: 32px;
+    --new-thread-activity-floor: 20px;
+    padding: 0 12px var(--new-thread-bottom);
   }
+}
+
+/* The dither behind the screen sits under its content. A pattern is densest at the top-left and gone
+   well before the composer. */
+.new-thread-body {
+  position: relative;
+  isolation: isolate;
+}
+/* Folded to its rail, the sidebar runs --radius-lg past the seam for the seam's turn into the top
+   bar, and the work column starts after the turn. Beside it, the body reaches back under the turn,
+   its content where it was, so the backdrop meets the seam and rounds its corner with the turn. The
+   sidebar draws its lines above it. A narrow window floats the sidebar and keeps no rail. */
+@media (min-width: 901px) {
+  body:has(.sidebar-shell[data-open="false"]) .work-row:not(:has(> .panel-shell[data-side="left"][data-open="true"])) > .well:first-child > .new-thread-body {
+    margin-left: calc(-1 * var(--radius-lg));
+    padding-left: calc(48px + var(--radius-lg));
+  }
+  body:has(.sidebar-shell[data-open="false"]) .work-row:not(:has(> .panel-shell[data-side="left"][data-open="true"])) > .well:first-child > .new-thread-body > .dither-backdrop {
+    overflow: hidden;
+    border-top-left-radius: var(--radius-lg);
+  }
+}
+.dither-backdrop {
+  /* The dots' ink, a step from the ground toward the text in any palette. DitherBackdrop reads it
+     for the shader. */
+  --dither-ink: color-mix(in srgb, var(--ink) 12%, var(--bg));
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  mask-image: radial-gradient(110% 90% at 0% 0%, #000 0%, rgb(0 0 0 / 0.55) 35%, transparent 70%);
+}
+/* The canvas holds whole CSS pixels, so its scale to the screen is whole too: square dots, not blurred ones. */
+.dither-backdrop canvas {
+  image-rendering: pixelated;
+}
+/* An image is a picture rather than a texture: it spans the screen's width and fades out under the
+   composer, leaving the activity on the plain ground. Half strength keeps the title readable over
+   its darkest and lightest parts in either theme. */
+.dither-backdrop[data-style="image"] {
+  opacity: 0.5;
+  mask-image: linear-gradient(#000, rgb(0 0 0 / 0.75) 25%, transparent 58%);
 }

@@ -3,12 +3,8 @@ import type { BinaryFile } from "@openorc/protocol";
 import { FilePlain } from "../components/icons";
 import { Button } from "../components/ui";
 import { formatBytes } from "../lib/file-imports";
+import { revealLabel } from "../lib/this-computer";
 import { noteFile } from "../lib/use-file-buffer";
-
-export function revealLabel(platform: string): string {
-  if (platform === "darwin") return "Show in Finder";
-  return platform === "win32" ? "Show in Explorer" : "Show in folder";
-}
 
 /** Opens the file in its default app. When it could not, the file's quiet line says why. */
 export async function openBinaryFile(file: BinaryFile): Promise<void> {
@@ -51,7 +47,7 @@ export function BinaryView({ file }: { file: BinaryFile }) {
             Open
           </Button>
           <Button size="sm" onClick={() => window.openorc.revealFile(file.absolutePath)}>
-            {revealLabel(window.openorc.platform)}
+            {revealLabel()}
           </Button>
         </div>
       )}

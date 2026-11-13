@@ -60,4 +60,12 @@ describe("OpenCode signing in to a sandbox", () => {
     expect(JSON.parse(turn.env["OPENCODE_CONFIG_CONTENT"]!)).toEqual({ provider: { together: { options: { apiKey: "sk-tg" } } } });
     expect(turn.headers).toEqual([]);
   });
+
+  it("hands OpenCode Zen a key saved for its paid models, and still needs none without one", async () => {
+    const zen = new OpenCodeCloudSignIn(new OpenCodeCloudKeys(store(JSON.stringify({ opencode: { key: "zen-key", createdAt: 1 } }))));
+    const turn = await zen.prepare(async () => null, "vercel", who("opencode/claude-opus-5-5"), true);
+    expect(JSON.parse(turn.env["OPENCODE_CONFIG_CONTENT"]!)).toEqual({ provider: { opencode: { options: { apiKey: "zen-key" } } } });
+    const keyless = new OpenCodeCloudSignIn(new OpenCodeCloudKeys(store()));
+    expect(await keyless.prepare(async () => null, "vercel", who("opencode/big-pickle"), true)).toEqual({ env: {}, headers: [] });
+  });
 });

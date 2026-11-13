@@ -2,7 +2,7 @@ import type { ClientPush, CoreConnection } from "@openorc/client";
 import type { MacMessage, PhoneSession } from "@openorc/link";
 import type { AssetRef, DeviceMethod, DeviceParams, DeviceRpcResults, RemotePush, RpcMethod, RpcParams, RpcResults, SessionMethod, SessionParams, SessionRpcResults } from "@openorc/protocol";
 import type { Clock } from "./route-race";
-import { PHONE_CAPABILITIES, supportsReplyImages, supportsSkillLists } from "@openorc/protocol";
+import { PHONE_CAPABILITIES, supportsOrclingEdits, supportsOrclings, supportsReplyImages, supportsSkillLists, supportsSubthreadStarts, supportsTaskDetails } from "@openorc/protocol";
 
 /** A watched Preview's newest state, or the end of the watch, which only its screen hears. */
 export type PreviewPush = Extract<RemotePush, { type: "preview" | "preview.ended" }>;
@@ -45,6 +45,37 @@ const NO_ANSWER = "Your Mac did not answer in time.";
 const NO_MAC = "This phone is not connected to a Mac.";
 export const OLDER_MAC_IMAGE = "Update OpenOrc on your Mac to see this image here.";
 export const OLDER_MAC_SKILLS = "Update OpenOrc on your Mac to pick its skills here.";
+export const OLDER_MAC_ORCLINGS = "Update OpenOrc on your Mac to see its Orclings here.";
+export const OLDER_MAC_ORCLING_EDITS = "Update OpenOrc on your Mac to change its Orclings here.";
+export const OLDER_MAC_TASKS = "Update OpenOrc on your Mac to open its tasks here.";
+export const OLDER_MAC_TASK_EDITS = "Update OpenOrc on your Mac to edit its tasks here.";
+export const OLDER_MAC_TASK_CREATES = "Update OpenOrc on your Mac to add tasks from your phone.";
+export const OLDER_MAC_SUBTHREADS = "Update OpenOrc on your Mac to start subthreads from your phone.";
+
+/** Methods an older Mac refuses as not available from a phone, each with what it takes to have them. */
+const gated: Partial<Record<RpcMethod, Gate>> = {
+  "skills.list": { supports: supportsSkillLists, refusal: OLDER_MAC_SKILLS },
+  "tasks.get": { supports: supportsTaskDetails, refusal: OLDER_MAC_TASKS },
+  "tasks.create": { supports: supportsTaskDetails, refusal: OLDER_MAC_TASK_CREATES },
+  "tasks.update": { supports: supportsTaskDetails, refusal: OLDER_MAC_TASK_EDITS },
+  "orclings.chats": { supports: supportsOrclings, refusal: OLDER_MAC_ORCLINGS },
+  "orclings.profile": { supports: supportsOrclings, refusal: OLDER_MAC_ORCLINGS },
+  "orclings.wakes.save": { supports: supportsOrclings, refusal: OLDER_MAC_ORCLINGS },
+  "orclings.create": { supports: supportsOrclingEdits, refusal: OLDER_MAC_ORCLING_EDITS },
+  "orclings.update": { supports: supportsOrclingEdits, refusal: OLDER_MAC_ORCLING_EDITS },
+  "orclings.delete": { supports: supportsOrclingEdits, refusal: OLDER_MAC_ORCLING_EDITS },
+  "orclings.instructions.save": { supports: supportsOrclingEdits, refusal: OLDER_MAC_ORCLING_EDITS },
+  "orclings.reactions": { supports: supportsOrclings, refusal: OLDER_MAC_ORCLINGS },
+  "orclings.react": { supports: supportsOrclings, refusal: OLDER_MAC_ORCLINGS },
+};
+
+type Gate = { supports: (capabilities?: readonly string[]) => boolean; refusal: string };
+
+/** A call's gate: its method's, or, for a start under another thread, what that needs. */
+function gateOf(method: RpcMethod, params: unknown): Gate | undefined {
+  if (method === "threads.start" && (params as RpcParams<"threads.start">).parentThreadId !== undefined) return { supports: supportsSubthreadStarts, refusal: OLDER_MAC_SUBTHREADS };
+  return gated[method];
+}
 
 /** The capabilities a Mac shares in its answer to `session.negotiate`; an older Mac refuses the call and shares none. */
 const shared = (result: unknown): readonly string[] => {
@@ -100,12 +131,18 @@ export class LinkConnection implements CoreConnection {
   ) {}
 
   call<M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> {
-    if (method !== "skills.list") return this.rpc(method, params) as Promise<RpcResults[M]>;
+    const gate = gateOf(method, params);
+    if (!gate) return this.rpc(method, params) as Promise<RpcResults[M]>;
     // An older Mac refuses the method as not available from a phone; this says what would make it available.
     return this.withSession(async (session) => {
-      if (!supportsSkillLists(await this.capabilities.get(session))) throw new Error(OLDER_MAC_SKILLS);
+      if (!gate.supports(await this.capabilities.get(session))) throw new Error(gate.refusal);
       return this.ask(session, method, params) as Promise<RpcResults[M]>;
     });
+  }
+
+  /** Whether the Mac this phone talks to shares `capability`; an older Mac shares none. */
+  shares(capability: string): Promise<boolean> {
+    return this.withSession(async (session) => ((await this.capabilities.get(session)) ?? []).includes(capability));
   }
 
   /** A method about this phone itself, which the Mac's session answers for this phone alone. */

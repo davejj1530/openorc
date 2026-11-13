@@ -13,7 +13,16 @@ vi.mock("./client", async () => {
 });
 const scope = { kind: "thread", id: "thread" } as const;
 const version = FileVersion.parse("1".repeat(64));
-const file = (path: string, text: string, root = "/repo"): FileRead => ({ kind: "file", root, path: FolderPath.parse(path), absolutePath: `${root}/${path}`, text, version, readOnly: null });
+const file = (path: string, text: string, root = "/repo"): FileRead => ({
+  kind: "file",
+  root,
+  path: FolderPath.parse(path),
+  outside: false,
+  absolutePath: `${root}/${path}`,
+  text,
+  version,
+  readOnly: null,
+});
 let disk: Map<string, FileRead>;
 beforeEach(() => {
   queryClient.clear();

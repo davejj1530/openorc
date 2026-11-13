@@ -8,7 +8,7 @@ import { relativeTime } from "@openorc/client";
 export function MessageTime({ at, className }: { at: number | undefined; className?: string }) {
   if (at === undefined) return null;
   return (
-    <div className={cn("message-time", className)} title={new Date(at).toLocaleString()}>
+    <div className={cn("message-time", className)} data-tip={new Date(at).toLocaleString()}>
       {relativeTime(at)}
     </div>
   );
@@ -33,7 +33,7 @@ export function CopyMessage({ text }: { text: string }) {
     <button
       type="button"
       aria-label={label}
-      title={label}
+      data-tip={label}
       data-state={state}
       className="copy-action message-action"
       onClick={() => {
@@ -61,7 +61,7 @@ export function TurnActions({ text, at, onFork, resting }: { text: string | unde
     <div className="group turn-actions" data-resting={resting || undefined}>
       {text ? <CopyMessage text={text} /> : null}
       {onFork ? (
-        <IconButton size="md" onClick={() => onFork()} title="Continue this conversation in a new thread" aria-label="Fork thread" className="message-action">
+        <IconButton size="md" onClick={() => onFork()} data-tip="Continue this conversation in a new thread" aria-label="Fork thread" className="message-action">
           <GitFork size={16} />
         </IconButton>
       ) : null}

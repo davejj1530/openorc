@@ -24,7 +24,7 @@ export {
 export { LINK_VERSION, type ClosingReason, type LinkMessage, type MacHello, type MacMessage, type PhoneHello, type PhoneMessage, type Refusal } from "./messages.js";
 export { decodePairingUrl, encodePairingUrl, PAIRING_SECRET_BYTES, PairingCodeError, type PairingOffer } from "./pairing.js";
 export { createNodeStyleCrypto, type NodeStyleCrypto } from "./node-style.js";
-export { collapseId, openPush, PUSH_VERSION, pushKeys, sealPush, type PushEnvelope, type PushNotice } from "./push.js";
+export { collapseId, openFace, openPush, PUSH_VERSION, pushKeys, sealFace, sealPush, type PushEnvelope, type PushNotice } from "./push.js";
 export { MAX_MESSAGE_BYTES } from "./records.js";
 export { LINK_PATH, linkPath, linkUrl } from "./routes.js";
 export { LinkCloseCode, LinkSession, type LinkSocket } from "./session.js";

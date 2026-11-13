@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { defaultOrclingLook, WORKSPACE_ID, type RpcParams, type ThreadSummary } from "@openorc/protocol";
 
 vi.hoisted(() => Object.assign(window, { openorc: { platform: "darwin" } }));
@@ -12,6 +12,11 @@ const fixture: {
     Partial<Pick<ThreadSummary, "createdAt" | "archivedAt" | "parentThreadId" | "parentRelation" | "subagent" | "prUrl" | "prState" | "workspaceMode" | "branch" | "owner">>)[];
   /** What the host says Resolved holds, when it says. */
   resolvedCount?: number;
+  /** What Resolved holds in each project, when the count depends on the projects asked about. */
+  resolvedByProject?: Record<string, number>;
+  tasks?: { status: string }[];
+  /** Approvals waiting in the runs loaded here. */
+  approvals?: number;
 } = vi.hoisted(() => ({ projects: [], threads: [] }));
 
 /** The core's answer to a thread list, as the fixture's threads read. */
@@ -32,6 +37,7 @@ vi.mock("../lib/client", async (original) => {
   const rpcData = (method: string, params: { id?: string }) => {
     if (method === "threads.get" && !params.id) return null;
     if (method === "projects.list") return fixture.projects;
+    if (method === "tasks.list") return fixture.tasks;
     if (method === "orclings.list") return [{ id: "rini", name: "Rini", threadId: "rini-home", look: defaultOrclingLook }];
     if (method === "threads.get")
       return (
@@ -46,13 +52,17 @@ vi.mock("../lib/client", async (original) => {
         }
       );
     if (method === "threads.list") return listThreads(params as RpcParams<"threads.list">);
-    if (method === "threads.resolvedCount") return fixture.resolvedCount;
+    if (method === "threads.resolvedCount") {
+      const counts = fixture.resolvedByProject;
+      if (!counts) return fixture.resolvedCount;
+      return ((params as RpcParams<"threads.resolvedCount">).projectIds ?? []).reduce((sum, id) => sum + (counts[id] ?? 0), 0);
+    }
     return undefined;
   };
   return {
     ...(await original<object>()),
     useRpc: (method: string, params: { id?: string }, options?: { enabled?: boolean }) => ({ data: options?.enabled === false ? undefined : rpcData(method, params) }),
-    usePendingApprovals: () => 0,
+    usePendingApprovals: () => fixture.approvals ?? 0,
     useRun: () => undefined,
   };
 });
@@ -67,12 +77,15 @@ vi.mock("../lib/rpc", () => ({
   },
 }));
 vi.mock("../lib/browser-preview", () => ({ CoversPreview: () => null }));
-vi.mock("./ui", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("./ui")>()),
-  Tooltip: ({ children }: { children: ReactNode }) => children,
-}));
+vi.mock("./ui", async (importOriginal) => {
+  const { cloneElement } = await import("react");
+  return {
+    ...(await importOriginal<typeof import("./ui")>()),
+    Tooltip: ({ children, render }: { children: ReactNode; render?: ReactElement }) => (render ? cloneElement(render, undefined, children) : children),
+  };
+});
 
-import { useLayout } from "../lib/layout";
+import { ALL_WORKSPACES, useLayout } from "../lib/layout";
 import { useRouter } from "../lib/router";
 import { useUi } from "../lib/ui";
 import { useWindow } from "../lib/window";
@@ -95,9 +108,12 @@ beforeEach(() => {
   fixture.projects = [];
   fixture.threads = [];
   fixture.resolvedCount = undefined;
+  fixture.resolvedByProject = undefined;
+  fixture.tasks = undefined;
+  fixture.approvals = undefined;
   localStorage.clear();
   useWindow.setState({ fullscreen: false });
-  useLayout.setState({ collapsed: [], projectId: null, sidebarOpen: true, pinnedOnly: false });
+  useLayout.setState({ collapsed: [], workspace: ALL_WORKSPACES, sidebarOpen: true, pinnedOnly: false, railProjects: false });
   useRouter.setState({ route: { view: "newthread" }, history: [], future: [], threadIds: [] });
 });
 
@@ -242,7 +258,7 @@ it("leads the window corner with the OpenOrc wordmark, in and out of fullscreen,
     within(screen.getByRole("group", { name: "Window" }))
       .getAllByRole("button")
       .map((button) => button.getAttribute("aria-label")),
-  ).toEqual(["Inbox", "Toggle sidebar"]);
+  ).toEqual(["Back", "Forward", "Toggle sidebar"]);
   act(() => useWindow.setState({ fullscreen: true }));
   expect(screen.getAllByRole("img", { name: "OpenOrc" })).toHaveLength(1);
   expect(screen.getByRole("img", { name: "OpenOrc" }).closest("header")).toBe(corner());
@@ -275,14 +291,14 @@ it("opens project conversations when Orclings is turned off from an initial Orcl
   expect(screen.queryByRole("region", { name: "Orclings" })).toBeNull();
 });
 
-it("reaches the app's screens from the footer, marking the open one as current", () => {
+it("reaches the app's screens from the rail, marking the open one as current", () => {
   open("notes");
   const dock = screen.getByRole("navigation", { name: "Screens" });
   expect(
     within(dock)
       .getAllByRole("button")
       .map((button) => button.getAttribute("aria-label")),
-  ).toEqual(["Tasks", "Pull requests", "Schedules", "Orclings", "Settings"]);
+  ).toEqual(["New thread", "Tasks", "Pull requests", "Schedules", "Orclings", "Show projects", "Inbox", "Settings"]);
   fireEvent.click(within(dock).getByRole("button", { name: "Schedules" }));
   expect(useRouter.getState().route).toEqual({ view: "scheduled" });
   expect(within(dock).getByRole("button", { name: "Schedules" }).getAttribute("aria-current")).toBe("page");
@@ -290,14 +306,157 @@ it("reaches the app's screens from the footer, marking the open one as current",
   expect(screen.queryByRole("button", { name: "More" })).toBeNull();
 });
 
-it("starts a new thread from the list head, leaving Add project to the new thread's question", () => {
-  open("notes");
-  fireEvent.click(screen.getByRole("button", { name: "New thread" }));
-  expect(useRouter.getState().route).toMatchObject({ view: "newthread" });
-  expect(screen.queryByRole("button", { name: "Add project" })).toBeNull();
+it("opens the Inbox from the rail, under Projects, counting what waits in it", () => {
+  fixture.tasks = [{ status: "review" }, { status: "proposed" }, { status: "backlog" }];
+  fixture.approvals = 2;
+  mountSidebar();
+  const rail = screen.getByRole("navigation", { name: "Screens" });
+  const inbox = within(rail).getByRole("button", { name: "Inbox, 4" });
+  expect(inbox.textContent).toBe("4");
+  expect(inbox.getAttribute("aria-current")).toBeNull();
+  fireEvent.click(inbox);
+  expect(useRouter.getState().route).toEqual({ view: "inbox" });
+  expect(within(rail).getByRole("button", { name: "Inbox, 4" }).getAttribute("aria-current")).toBe("page");
+  expect(within(screen.getByRole("group", { name: "Window" })).queryByRole("button", { name: /^Inbox/ })).toBeNull();
 });
 
-it("lists Settings' sections in place of the app's navigation, then goes back to the screen Settings was opened from", () => {
+it("caps the rail's Inbox count at 99+", () => {
+  fixture.tasks = Array.from({ length: 120 }, () => ({ status: "review" }));
+  fixture.approvals = 2;
+  mountSidebar();
+  expect(within(screen.getByRole("navigation", { name: "Screens" })).getByRole("button", { name: "Inbox, 122" }).textContent).toBe("99+");
+});
+
+const openFilter = () => fireEvent.click(screen.getByRole("button", { name: /^Threads in / }));
+const scope = (name: string) => screen.getAllByRole("menuitem").find((item) => item.querySelector(".sidebar-scope-name")?.textContent === name)!;
+const chosen = (name: string) => scope(name).querySelector("[data-icon=Check]")?.classList.contains("text-accent-ink") ?? false;
+/** The list head's New thread, beside the filter; the rail holds the other. */
+const listNewThread = () => screen.getAllByRole("button", { name: "New thread" }).find((button) => !button.closest("nav"))!;
+
+it("starts a new thread from the list head, and adds a project from the project filter", () => {
+  open("notes");
+  fireEvent.click(listNewThread());
+  expect(useRouter.getState().route).toMatchObject({ view: "newthread" });
+  openFilter();
+  fireEvent.click(screen.getByRole("menuitem", { name: "Add project" }));
+  expect(useUi.getState().importProject).toBe(true);
+  act(() => useUi.getState().setImportProject(false));
+});
+
+it("offers All projects, then each project in the order projects come, with All projects chosen at first", () => {
+  fixture.projects = [
+    { id: "b8", name: "block8-workspace", rootPath: "/projects/b8" },
+    { id: "gk", name: "gradekit", rootPath: "/projects/gk" },
+    { id: "sma", name: "sma-2-mobile", rootPath: "/projects/sma" },
+  ];
+  mountSidebar();
+  expect(screen.getByText("All projects", { selector: ".sidebar-workspace-name-label" })).toBeTruthy();
+  openFilter();
+  expect(screen.getAllByRole("menuitem").map((item) => item.querySelector(".sidebar-scope-name")?.textContent ?? item.textContent?.trim())).toEqual([
+    "All projects",
+    "block8-workspace",
+    "gradekit",
+    "sma-2-mobile",
+    "Add project",
+  ]);
+  expect(["All projects", "block8-workspace", "gradekit", "sma-2-mobile"].map(chosen)).toEqual([true, false, false, false]);
+  expect(screen.queryByRole("menuitem", { name: /Project settings/ })).toBeNull();
+});
+
+it("lists only the chosen project's threads, remembers the choice, starts new threads there, and counts its own Resolved", async () => {
+  projectThreads();
+  fixture.resolvedByProject = { one: 4, two: 2 };
+  mountSidebar();
+  await screen.findByRole("button", { name: /Other notes/ });
+  expect(screen.getByRole("button", { name: "Resolved, 6" })).toBeTruthy();
+  openFilter();
+  fireEvent.click(scope("Second project"));
+  expect(useLayout.getState().workspace).toBe("two");
+  expect(JSON.parse(localStorage.getItem("openorc.layout") ?? "{}")).toMatchObject({ workspace: "two" });
+  await waitFor(() => expect(screen.queryByRole("button", { name: /Regular notes/ })).toBeNull());
+  expect(screen.getByRole("button", { name: /Other notes/ })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Resolved, 2" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Threads in Second project" })).toBeTruthy();
+  fireEvent.click(listNewThread());
+  expect(useRouter.getState().route).toEqual({ view: "newthread", projectId: "two" });
+  openFilter();
+  expect([chosen("Second project"), chosen("All projects")]).toEqual([true, false]);
+  fireEvent.click(scope("All projects"));
+  expect(useLayout.getState().workspace).toBe(ALL_WORKSPACES);
+  await screen.findByRole("button", { name: /Regular notes/ });
+});
+
+it("opens the chosen project's settings from the project filter", () => {
+  projectThreads();
+  useLayout.setState({ workspace: "two" });
+  mountSidebar();
+  openFilter();
+  fireEvent.click(screen.getByRole("menuitem", { name: "Project settings" }));
+  expect(useRouter.getState().route).toEqual({ view: "project", projectId: "two" });
+});
+
+it("lists the projects in the rail under Projects, and chooses one there, the chosen one again going back to all of them", async () => {
+  projectThreads();
+  mountSidebar();
+  const rail = () => screen.getByRole("navigation", { name: "Screens" });
+  expect(within(rail()).queryByRole("list", { name: "Projects" })).toBeNull();
+  fireEvent.click(within(rail()).getByRole("button", { name: "Show projects" }));
+  expect(useLayout.getState().railProjects).toBe(true);
+  const projects = () => within(rail()).getByRole("list", { name: "Projects" });
+  await waitFor(() =>
+    expect(
+      within(projects())
+        .getAllByRole("button")
+        .map((tile) => tile.getAttribute("aria-label")),
+    ).toEqual(["First project", "Second project"]),
+  );
+  // Add project sits under the projects' well, not among them.
+  expect(within(rail()).getByRole("button", { name: "Add project" })).toBeTruthy();
+  fireEvent.click(within(projects()).getByRole("button", { name: "Second project" }));
+  expect(useLayout.getState().workspace).toBe("two");
+  expect(within(projects()).getByRole("button", { name: "Second project" }).getAttribute("aria-current")).toBe("true");
+  expect(screen.getByRole("button", { name: "Threads in Second project" })).toBeTruthy();
+  fireEvent.click(within(projects()).getByRole("button", { name: "Second project" }));
+  expect(useLayout.getState().workspace).toBe(ALL_WORKSPACES);
+  fireEvent.click(within(rail()).getByRole("button", { name: "Hide projects" }));
+  expect(within(rail()).queryByRole("list", { name: "Projects" })).toBeNull();
+});
+
+it("goes back to All when the chosen project is no longer listed", async () => {
+  projectThreads();
+  useLayout.setState({ workspace: "gone" });
+  mountSidebar();
+  await waitFor(() => expect(useLayout.getState().workspace).toBe(ALL_WORKSPACES));
+});
+
+it("marks each project in the filter with its most pressing open thread, sub threads included, and says what is there", async () => {
+  fixture.projects = ["one", "two", "three", "four", "five"].map((id) => ({ id, name: `${id}-project`, rootPath: `/projects/${id}` }));
+  const base = { agent: "codex", activity: "idle", unread: false, session: { status: "idle", message: null }, pinnedAt: null, snoozedUntil: null, lastActivityAt: Date.now() } as const;
+  const failed = { status: "error", message: "Boom" } as const;
+  fixture.threads = [
+    { ...base, id: "one-unread", title: "One unread", projectId: "one", unread: true },
+    { ...base, id: "one-parent", title: "One parent", projectId: "one", activity: "running" as const },
+    { ...base, id: "one-child", title: "One child", projectId: "one", activity: "waiting" as const, parentThreadId: "one-parent", parentRelation: "started" as const },
+    { ...base, id: "two-failed", title: "Two failed", projectId: "two", unread: true, session: failed },
+    { ...base, id: "two-running", title: "Two running", projectId: "two", activity: "running" as const },
+    { ...base, id: "three-running", title: "Three running", projectId: "three", activity: "running" as const },
+    { ...base, id: "three-unread", title: "Three unread", projectId: "three", unread: true },
+    { ...base, id: "four-unread", title: "Four unread", projectId: "four", unread: true },
+    // Quiet since before yesterday: Resolved holds it, so its project stays unmarked.
+    { ...base, id: "five-old", title: "Five old", projectId: "five", unread: true, lastActivityAt: ago(5) },
+  ];
+  mountSidebar();
+  openFilter();
+  const mark = (name: string) => scope(name).querySelector(".sidebar-scope-mark [role=img]")?.getAttribute("aria-label") ?? null;
+  await waitFor(() => expect(mark("one-project")).toBe("Needs you"));
+  expect(["two-project", "three-project", "four-project", "five-project"].map(mark)).toEqual(["Failed", "Working", "Unread", null]);
+  expect(scope("All projects").querySelector(".sidebar-scope-mark")).toBeNull();
+  expect(scope("one-project").getAttribute("aria-description")).toBe("1 needs you · 1 working · 1 unread");
+  expect(scope("two-project").getAttribute("aria-description")).toBe("1 failed · 1 working");
+  expect(scope("five-project").getAttribute("aria-description")).toBeNull();
+});
+
+it("lists Settings' sections in place of the thread list beside the rail, then goes back to the screen Settings was opened from", () => {
   useRouter.setState({ route: { view: "settings", section: "slack" }, history: [{ view: "tasks" }, { view: "settings" }] });
   mountSidebar();
   const sections = screen.getByRole("navigation", { name: "Settings" });
@@ -305,9 +464,17 @@ it("lists Settings' sections in place of the app's navigation, then goes back to
     within(sections)
       .getAllByRole("button")
       .map((row) => row.textContent),
-  ).toEqual(["Usage", "Connections", "Cloud", "Slack", "Phone", "Skills", "Devices", "Appearance", "General", "Memory & models", "Data"]);
+  ).toEqual(["Usage", "Connections", "Cloud", "Slack", "Phone", "Skills", "Connectors", "Devices", "Appearance", "General", "Memory & models", "Data"]);
   expect(within(sections).getByRole("button", { name: "Slack" }).getAttribute("aria-current")).toBe("page");
-  expect(screen.queryByRole("button", { name: "New thread" })).toBeNull();
+  // The rail stays, with the New thread the list's head would hold, and Settings as the current screen.
+  const rail = screen.getByRole("navigation", { name: "Screens" });
+  expect(
+    within(rail)
+      .getAllByRole("button")
+      .map((button) => button.getAttribute("aria-label"))
+      .slice(0, 2),
+  ).toEqual(["New thread", "Tasks"]);
+  expect(within(rail).getByRole("button", { name: "Settings" }).getAttribute("aria-current")).toBe("page");
   expect(screen.queryByRole("button", { name: "Add project" })).toBeNull();
   // The thread list waits underneath, so its loaded pages and scroll survive the visit.
   expect(screen.getByRole("region", { name: "Thread browser", hidden: true })).toBeTruthy();
@@ -320,8 +487,8 @@ it("lists Settings' sections in place of the app's navigation, then goes back to
   fireEvent.click(screen.getByRole("button", { name: "Back to app" }));
   expect(useRouter.getState().route).toEqual({ view: "tasks" });
   expect(screen.queryByRole("navigation", { name: "Settings" })).toBeNull();
-  expect(screen.getByRole("button", { name: "New thread" })).toBeTruthy();
-  expect(screen.getByRole("button", { name: "Settings" })).toBeTruthy();
+  expect(within(screen.getByRole("navigation", { name: "Screens" })).getByRole("button", { name: "New thread" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Settings" }).getAttribute("aria-current")).toBeNull();
 });
 
 it("goes back to a new thread when Settings was opened first", () => {
@@ -462,7 +629,7 @@ it("says after the project where each thread works, and leaves it to a pull requ
   mountSidebar();
   const workspace = async (name: RegExp) => (await screen.findByRole("button", { name })).querySelector(".thread-preview-workspace");
   expect((await workspace(/Recent notes/))?.textContent).toBe("main");
-  expect(await workspace(/Yesterday's notes/)).toMatchObject({ textContent: "worktree", title: "openorc/notes-a1b2c3" });
+  expect(await workspace(/Yesterday's notes/)).toMatchObject({ textContent: "worktree", dataset: { tip: "openorc/notes-a1b2c3" } });
   expect(await workspace(/This week's notes/)).toBeNull();
   expect((await workspace(/Old notes/))?.textContent).toBe("cloud");
 });
@@ -616,4 +783,31 @@ it("prunes deleted thread folds while keeping live and project folds", async () 
   await waitFor(() => expect(useLayout.getState().collapsed).not.toContain("thread-open:deleted"));
   expect(useLayout.getState().collapsed).toContain(`thread-closed:${kept}`);
   expect(useLayout.getState().collapsed).toContain("project:kept");
+});
+
+it("keeps the rail while the sidebar is hidden, with New thread at its top for the focused project", () => {
+  fixture.projects = [{ id: "notes", name: "notes", rootPath: "/projects/notes" }];
+  useLayout.setState({ sidebarOpen: false, workspace: "notes" });
+  useRouter.setState({ route: { view: "tasks" }, history: [], future: [], threadIds: [] });
+  mountSidebar();
+  const rail = screen.getByRole("navigation", { name: "Screens" });
+  expect(rail.closest("[inert]")).toBeNull();
+  const buttons = within(rail)
+    .getAllByRole("button")
+    .map((button) => button.getAttribute("aria-label"));
+  expect(buttons.slice(0, 2)).toEqual(["New thread", "Tasks"]);
+  fireEvent.click(within(rail).getByRole("button", { name: "New thread" }));
+  expect(useRouter.getState().route).toMatchObject({ view: "newthread", projectId: "notes" });
+});
+
+it("keeps New thread on the rail and beside the filter at the end of the list's head", () => {
+  mountSidebar();
+  expect(within(screen.getByRole("navigation", { name: "Screens" })).getByRole("button", { name: "New thread" })).toBeTruthy();
+  expect(screen.getAllByRole("button", { name: "New thread" })).toHaveLength(2);
+  const head = screen.getByRole("button", { name: "Search" }).parentElement!;
+  expect(
+    within(head)
+      .getAllByRole("button")
+      .map((button) => button.getAttribute("aria-label") ?? button.textContent),
+  ).toEqual(["Search", "Filter threads", "New thread"]);
 });

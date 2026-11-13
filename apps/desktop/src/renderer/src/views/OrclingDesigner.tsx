@@ -1,8 +1,18 @@
 import { useState } from "react";
-import { defaultOrclingLook, isHarnessId, orclingHandle, type Orcling, type OrclingDraft, type OrclingLook, type OrclingLookPart, type OrclingPermission } from "@openorc/protocol";
+import {
+  defaultOrclingLook,
+  defaultOrclingPermission,
+  isHarnessId,
+  orclingHandle,
+  type Orcling,
+  type OrclingDraft,
+  type OrclingLook,
+  type OrclingLookPart,
+  type OrclingPermission,
+} from "@openorc/protocol";
 import { cn } from "../lib/cn";
 import { defaultChoice, pickerCatalog, type ModelChoice } from "@openorc/client";
-import { useOrclings } from "../lib/orclings";
+import { afterOrclingDeleted, groupsGoingWith, useOrclingGroups, useOrclings } from "../lib/orclings";
 import { ClaudeAccountScope } from "../lib/claude-account";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { openThread, useRouter } from "../lib/router";
@@ -12,7 +22,7 @@ import { ArrowLeft } from "../components/icons";
 import { ModelPicker } from "../components/ModelPicker";
 import { OrclingSilhouette, OrclingStill } from "../components/OrclingAvatar";
 import { OrclingPreview } from "../components/OrclingPreview";
-import { ORCLING_ACCESSORIES, ORCLING_BODY_COLORS, ORCLING_EYE_COLORS, ORCLING_EYES, ORCLING_GLASSES, ORCLING_SHAPES, ORCLING_TEXTURES } from "../components/orcling-art";
+import { ORCLING_ACCESSORIES, ORCLING_BODY_COLORS, ORCLING_EYE_COLORS, ORCLING_EYES, ORCLING_GLASSES, ORCLING_SHAPES, ORCLING_TEXTURES } from "@openorc/client";
 import { TopBar } from "../components/TopBar";
 import { Button, Dialog, IconButton, Segmented, Select } from "../components/ui";
 import "./OrclingDesigner.css";
@@ -49,7 +59,7 @@ function nameProblem(name: string, orclings: readonly Orcling[], self: Orcling |
 
 /** Where the form starts: the Orcling being changed, or a new one on the default model. */
 function startingPoint(existing: Orcling | undefined, initialModel: ModelChoice | null): { look: OrclingLook; name: string; model: ModelChoice | null; permission: OrclingPermission } {
-  if (!existing) return { look: defaultOrclingLook, name: "", model: initialModel, permission: "approve" };
+  if (!existing) return { look: defaultOrclingLook, name: "", model: initialModel, permission: defaultOrclingPermission };
   return { look: existing.look, name: existing.name, model: { ...existing.settings }, permission: existing.permission };
 }
 
@@ -165,7 +175,7 @@ function LookOptions({ look, onChange }: { look: OrclingLook; onChange: (look: O
               role="radio"
               aria-checked={look[tab] === index}
               aria-label={option.name}
-              title={option.name}
+              data-tip={option.name}
               className="orcling-designer-tile"
               onClick={() => onChange({ ...look, [tab]: index })}
             >
@@ -191,16 +201,29 @@ function SaveError({ error }: { error: Error | null }) {
   );
 }
 
+/** What deleting takes: its own things, and its group chats with only one other Orcling, which would be only chats with that one. */
+function deleteConsequence(partners: readonly string[]): string {
+  const names = new Intl.ListFormat("en", { style: "long", type: "conjunction" }).format(partners);
+  let groups = "";
+  if (partners.length === 1) groups = `, and so does its group chat with ${names}`;
+  else if (partners.length > 1) groups = `, and so do its group chats with ${names}`;
+  return `Its conversation, instructions and memories go with it${groups}. Threads it worked in keep their history.`;
+}
+
 function DeleteOrcling({ orcling }: { orcling: Orcling }) {
   const [open, setOpen] = useState(false);
   const remove = useRpcMutation("orclings.delete");
+  const orclings = useOrclings();
+  const partners = groupsGoingWith(useOrclingGroups(), orclings, orcling.id);
+  // Deleting keeps you among your Orclings, on the chat beside the one that went, as a messages app does.
+  const land = afterOrclingDeleted(orclings, orcling.id);
   return (
     <>
       <Button variant="danger" size="xl" onClick={() => setOpen(true)}>
         Delete {orcling.name}
       </Button>
       <Dialog open={open} onOpenChange={setOpen} title={`Delete ${orcling.name}?`}>
-        <p className="text-base text-ink-2">Its conversation, instructions and memories go with it. Threads it worked in keep their history.</p>
+        <p className="text-base text-ink-2">{deleteConsequence(partners)}</p>
         {remove.error ? (
           <p role="alert" className="orcling-designer-error mt-2">
             {remove.error.message}
@@ -208,8 +231,8 @@ function DeleteOrcling({ orcling }: { orcling: Orcling }) {
         ) : null}
         <div className="mt-5 flex justify-end gap-2">
           <Button onClick={() => setOpen(false)}>Cancel</Button>
-          <Button variant="danger" disabled={remove.isPending} onClick={() => remove.mutate({ id: orcling.id }, { onSuccess: () => useRouter.getState().navigate({ view: "newthread" }) })}>
-            Delete
+          <Button variant="danger" disabled={remove.isPending} onClick={() => remove.mutate({ id: orcling.id }, { onSuccess: () => useRouter.getState().navigate(land) })}>
+            {remove.isPending ? "Deleting…" : "Delete"}
           </Button>
         </div>
       </Dialog>
@@ -227,7 +250,7 @@ function Swatches({ label, colors, value, onChange }: { label: string; colors: r
           role="radio"
           aria-checked={value === color.hex}
           aria-label={color.name}
-          title={color.name}
+          data-tip={color.name}
           className={cn("orcling-designer-swatch", value === color.hex && "orcling-designer-swatch-selected")}
           style={{ backgroundColor: color.hex }}
           onClick={() => onChange(color.hex)}

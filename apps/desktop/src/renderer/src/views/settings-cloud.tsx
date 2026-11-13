@@ -11,6 +11,7 @@ import {
 } from "@openorc/protocol";
 import { Button, Select, TextButton, Tooltip } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
+import { useEnabledHarnesses } from "../lib/enabled-harnesses";
 import { Agent37Settings, CloudServiceChoice } from "./settings-cloud-agent37";
 import { CloudBrain } from "./settings-cloud-brain";
 import { BrainCodexRow, BrainGitHubSection } from "./settings-cloud-brain-signins";
@@ -25,6 +26,7 @@ import { CodexCloudSection } from "./settings-cloud-codex";
 import { OpenCodeCloudSection } from "./settings-cloud-opencode";
 import { Failure, StillWorks, TokenField } from "./settings-secret-field";
 import { useRouter } from "../lib/router";
+import { thisComputer } from "../lib/this-computer";
 
 const TOKENS_URL = "https://vercel.com/account/tokens";
 /** Why a token scoped to one team, said on hover. */
@@ -233,10 +235,10 @@ function ClaudeCloudAccounts({ status, active }: { status: CloudStatus; active: 
 function TakeoverSection({ enabled }: { enabled: boolean }) {
   const takeover = useRpcMutation("cloud.takeover");
   return (
-    <Section title="When this Mac sleeps">
+    <Section title={`When ${thisComputer} sleeps`}>
       <Toggle
         label="Carry working threads on in the cloud"
-        hint="While a thread in a worktree works, a sandbox keeps a copy of it. If this Mac sleeps mid-task, the sandbox finishes the task and the thread moves to the cloud."
+        hint={`While a thread in a worktree works, a sandbox keeps a copy of it. If ${thisComputer} sleeps mid-task, the sandbox finishes the task and the thread moves to the cloud.`}
         checked={takeover.isPending && takeover.variables ? takeover.variables.enabled : enabled}
         disabled={takeover.isPending}
         onChange={(next) => takeover.mutate({ enabled: next })}
@@ -266,7 +268,8 @@ function ServiceStep({ status }: { status: CloudStatus }) {
  * brain's own Codex login and GitHub among them once there is a brain.
  */
 function SignInsStep({ status, signIns, brain, active }: { status: CloudStatus; signIns: CloudSignIns | undefined; brain: CloudBrainStatus | undefined; active: boolean }) {
-  const onBrain = signIns?.rows.some((row) => row.kind === "brain-codex") ?? false;
+  const enabled = useEnabledHarnesses();
+  const onBrain = signIns?.rows.some((row) => row.kind === "brain-codex" || row.kind === "github") ?? false;
   const busy = brain?.state === "ready" && brain.working !== null;
   return (
     <>
@@ -275,9 +278,9 @@ function SignInsStep({ status, signIns, brain, active }: { status: CloudStatus; 
           <BringMissing signIns={signIns} />
         </div>
       ) : null}
-      <ClaudeCloudAccounts status={status} active={active} />
-      <CodexCloudSection codex={status.codex} brain={onBrain ? <BrainCodexRow active={active} busy={busy} /> : undefined} />
-      <OpenCodeCloudSection opencode={status.opencode} />
+      {enabled.includes("claude") ? <ClaudeCloudAccounts status={status} active={active} /> : null}
+      {enabled.includes("codex") ? <CodexCloudSection codex={status.codex} brain={onBrain ? <BrainCodexRow active={active} busy={busy} /> : undefined} /> : null}
+      {enabled.includes("opencode") || enabled.includes("omp") ? <OpenCodeCloudSection opencode={status.opencode} /> : null}
       {onBrain ? <BrainGitHubSection active={active} busy={busy} /> : null}
     </>
   );

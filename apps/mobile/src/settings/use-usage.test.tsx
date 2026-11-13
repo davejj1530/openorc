@@ -190,3 +190,24 @@ it("chooses a host that answers with limits, else the newest last read, else whi
   expect(usageSource([nothing, empty])).toBe(empty);
   expect(usageSource([nothing])).toBe(nothing);
 });
+
+it("prefers a connected host reporting only an fx balance over a host with no limits", async () => {
+  mac.partnerState = answering("cloud", "Cloud");
+  mac.group = { primary: "studio", partner: "cloud" };
+  mac.saved = [{ id: "studio", kind: "mac" }];
+  const fx: PlanLimits = {
+    id: "fx",
+    provider: "fx",
+    name: "fx",
+    plan: null,
+    status: "available",
+    refreshedAt: now,
+    windows: [],
+    credits: [{ label: "AI Gateway balance", balance: "12.50", unlimited: false, currency: "USD" }],
+  };
+  mac.limits.mockResolvedValue([]);
+  mac.partnerLimits.mockResolvedValue([fx]);
+  const usage = open();
+  await waitFor(() => expect(usage.result.current.accounts).toEqual([fx]));
+  expect(usage.result.current.live).toBe(true);
+});

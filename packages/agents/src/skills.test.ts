@@ -247,6 +247,14 @@ describe("listSkills", () => {
     expect(withoutClaude.some((entry) => entry.name === "paired")).toBe(false);
   });
 
+  it("leaves OpenCode the staging copies Claude keeps in hidden folders", async () => {
+    await skill(path.join(home, ".claude", "skills", "synced", "account", ".staging", "20339"), ".replaced-20339-abc", "---\ndescription: A staged copy.\n---\n");
+    await skill(path.join(home, ".claude", "skills", "synced", "account"), "pptx", "---\ndescription: Slides.\n---\n");
+    const found = await listSkills({ projectRoot, home, agent: "opencode", env: {}, nativeDiscovery: false });
+    expect(found.some((entry) => entry.name.startsWith(".replaced"))).toBe(false);
+    expect(found.find((entry) => entry.name === "pptx")?.description).toBe("Slides.");
+  });
+
   it("reads a configured OpenCode HTTP catalog", async () => {
     const server = createServer((request, response) => {
       if (request.url === "/catalog/index.json") response.end(JSON.stringify({ skills: [{ name: "remote", version: "1", files: ["remote.md"] }] }));
@@ -264,7 +272,9 @@ describe("listSkills", () => {
       await mkdir(path.join(root, ".git"));
       await writeFile(path.join(root, "opencode.json"), JSON.stringify({ skills: [`http://127.0.0.1:${address.port}/catalog/`] }));
       const found = await listSkills({ projectRoot: root, home: root, agent: "opencode", env: {}, nativeDiscovery: false });
-      expect(found).toEqual([{ name: "remote", description: "From the HTTP catalog.", source: "project", path: `http://127.0.0.1:${address.port}/catalog/remote/remote.md` }]);
+      expect(found).toEqual([
+        { name: "remote", description: "From the HTTP catalog.", source: "project", path: `http://127.0.0.1:${address.port}/catalog/remote/remote.md`, enabled: true, editable: false },
+      ]);
     } finally {
       await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
     }

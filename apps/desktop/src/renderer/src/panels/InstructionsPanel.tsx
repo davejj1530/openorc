@@ -109,7 +109,7 @@ function InstructionEditor({
         <span className="flex-1" />
         <SavePill disabled={!dirty || stale || save.isPending} pending={save.isPending} savedAt={savedAt} onSave={submit} />
       </header>
-      <p className="instructions-head" title={file.path}>
+      <p className="instructions-head" data-tip={file.path}>
         <span className="text-ink-4">{file.path.slice(0, file.path.length - name.length)}</span>
         <span className="text-ink">{name}</span>
       </p>

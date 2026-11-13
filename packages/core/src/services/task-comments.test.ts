@@ -2,10 +2,10 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it, vi } from "vitest";
-import { CodexAdapter, ClaudeAdapter, RunHandle } from "@openorc/agents";
+import { CodexAdapter, ClaudeAdapter, AcpAdapter, PiAdapter, RunHandle } from "@openorc/agents";
 import { taskComments, runs, threads, tasks, settings } from "@openorc/db";
 import { git, commitAll } from "@openorc/git";
-import type { RunSpec, CommentRecipient, AgentEvent } from "@openorc/protocol";
+import { isHarnessId, type RunSpec, type CommentRecipient, type AgentEvent } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
 import { inheritedProbe } from "./shell-environment.js";
 import { rpcClient } from "../rpc-test-client.js";
@@ -18,7 +18,11 @@ async function post(body: string, recipients = [recipient], key = crypto.randomU
   return call("tasks.comments.post", { taskId, body, recipients, requestKey: key, source: "comment", replyTo });
 }
 async function response(commentId: string, index = 0) {
-  await vi.waitFor(() => expect(taskComments.list(core.db, taskId).attempts.filter((a) => a.commentId === commentId)[index]?.runId).toBeTruthy());
+  await vi.waitFor(() => {
+    const attempt = taskComments.list(core.db, taskId).attempts.filter((a) => a.commentId === commentId)[index];
+    expect(attempt?.error).toBeNull();
+    expect(attempt?.runId).toBeTruthy();
+  });
   return taskComments.list(core.db, taskId).attempts.filter((a) => a.commentId === commentId)[index]!;
 }
 async function executionStarted(attemptId: string) {
@@ -52,7 +56,7 @@ async function openCore() {
   core = await OpenOrc.create({ dataDir, shellProbe: inheritedProbe(), transport: { push: () => {} } });
   settings.set(core.db, "extraction.provider", "off");
   vi.spyOn(core.runs, "models").mockImplementation(async (agent) =>
-    agent === "codex" || agent === "claude" ? [{ agent, id: "test-model", label: "Test", isDefault: true, efforts: ["high", "low"], defaultEffort: "high" }] : [],
+    isHarnessId(agent) ? [{ agent, id: "test-model", label: "Test", isDefault: true, efforts: ["high", "low"], defaultEffort: "high" }] : [],
   );
 }
 beforeAll(async () => {
@@ -89,6 +93,8 @@ beforeEach(async () => {
   };
   vi.spyOn(CodexAdapter.prototype, "start").mockImplementation(spawn);
   vi.spyOn(ClaudeAdapter.prototype, "start").mockImplementation(spawn);
+  vi.spyOn(AcpAdapter.prototype, "start").mockImplementation(spawn);
+  vi.spyOn(PiAdapter.prototype, "start").mockImplementation(spawn);
   dataDir = path.join(root, crypto.randomUUID());
   await openCore();
   const project = await call("projects.import", { rootPath: root });
@@ -114,6 +120,25 @@ it("keeps notes inert and persists discussion runs separately from task executio
   expect(runs.listForTask(core.db, taskId)).toEqual([]);
   expect(core.db.stmt("SELECT count(*) AS n FROM thread_checkpoints").get()?.n).toBe(0);
   expect(core.db.stmt("SELECT count(*) AS n FROM snapshots").get()?.n).toBe(0);
+});
+
+it.each(["omp", "cursor", "pi", "antigravity"] as const)("lets %s participate in task discussions and resume its own reply", async (agent) => {
+  const target = { ...recipient, agent };
+  const comment = await post("Compare the options", [target]);
+  const first = await response(comment.id);
+  const sessionId = announceSession(first.runId!);
+  expect(sessions.get(first.runId!)!.spec).toMatchObject({ agent, mode: "plan", permissionMode: "review" });
+  await finish(first.runId!);
+  const follow = await post("Explain the tradeoff", [target], crypto.randomUUID(), first.id);
+  const next = await response(follow.id);
+  expect(sessions.get(next.runId!)!.spec.resumeSessionId).toBe(sessionId);
+  await finish(next.runId!);
+});
+
+it("explains an unsupported discussion mode before saving a comment or launching an agent", async () => {
+  await expect(post("Compare the options", [{ ...recipient, agent: "fx" }])).rejects.toThrow("fx does not expose a read-only Plan mode");
+  expect(taskComments.list(core.db, taskId).comments).toHaveLength(0);
+  expect(sessions.size).toBe(0);
 });
 
 it("deduplicates submissions and recipients, streams replies, and does not dispatch output mentions", async () => {

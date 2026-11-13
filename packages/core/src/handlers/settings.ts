@@ -16,7 +16,10 @@ export function createSettingsHandlers({
     "app.settings.get": () => settings.get(),
     "app.settings.set": (patch) => {
       const next = settings.set(patch);
-      invalidate(["settings"]);
+      invalidate([
+        "settings",
+        ...(patch.enabledHarnesses === undefined ? [] : ["models", "system", "agent-updates", "connectors", "text-generation", "provider-usage", "cloud-sign-ins", "cloud-skills"]),
+      ]);
       return next;
     },
     "textGeneration.settings.get": () => textGeneration.settings(),

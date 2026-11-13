@@ -95,7 +95,9 @@ export function targetModel(target: NewThreadTarget): ModelChoice | null {
  * those of `agents.availability`, the same checks without the Mac's paths.
  */
 export function newThreadChoice(models: ModelOption[], input: { preferred: HarnessId | null; harnesses: readonly HarnessAvailability[] }): ModelChoice | null {
-  const signedIn = [...(input.preferred ? [input.preferred] : []), ...harnessIds].find((id) => input.harnesses.some((row) => row.id === id && harnessLoggedIn(row)));
+  const signedIn = [...(input.preferred ? [input.preferred] : []), ...harnessIds].find(
+    (id) => models.some((model) => model.agent === id) && input.harnesses.some((row) => row.id === id && harnessLoggedIn(row)),
+  );
   return defaultChoice(models, signedIn ?? null);
 }
 

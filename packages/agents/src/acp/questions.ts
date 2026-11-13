@@ -19,5 +19,5 @@ export function questionConfig(content: string | undefined): string {
 }
 
 export function questionInstructions(serverName: string): string {
-  return `When you need an answer from the user, call ${serverName}_ask_user (the ask_user tool on MCP server ${serverName}; in Code Mode, discover ask_user with search first, then return await tools.${serverName}.ask_user). It displays an interactive question card in OpenOrc and waits for the user, including in Autonomous mode. Use unique question ids and read answers by id. The native question tool is unsupported by this ACP client. If ask_user returns cancelled, the user has not answered or granted consent; do not repeat the question automatically.`;
+  return `When you need an answer from the user, call ${serverName}_ask_user (the ask_user tool on MCP server ${serverName}; in Code Mode, discover ask_user with search first, then return await tools.${serverName}.ask_user). It displays an interactive question card in OpenOrc and waits for the user, including in Autonomous mode. Use unique question ids and read answers by id. Use this tool instead of native questions or asking for a text reply. If ask_user returns cancelled, the user has not answered or granted consent; do not repeat the question automatically.`;
 }

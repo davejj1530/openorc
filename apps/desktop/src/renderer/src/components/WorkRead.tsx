@@ -66,7 +66,7 @@ function FileRow({ chip }: { chip: WorkChip }) {
   const link = chip.path ? <ThreadLink href={href}>{content}</ThreadLink> : content;
   if (!chip.path || !fileScope || failed(chip))
     return (
-      <span className="work-chip" data-kind={chip.kind} title={chip.title}>
+      <span className="work-chip" data-kind={chip.kind} data-tip={chip.title}>
         {link}
       </span>
     );
@@ -100,7 +100,7 @@ function ReadPeek({ chip, href, scope }: { chip: WorkChip; href: string; scope: 
   const read = useRpc("files.read", { scope, path }, { enabled: path !== "" });
   return (
     <>
-      <div className="read-peek-head" title={chip.path}>
+      <div className="read-peek-head" data-tip={chip.path}>
         <FileGlyph path={chip.label} size={14} className="work-chip-icon" />
         <span className="read-peek-name">{chip.label}</span>
         <span className="read-peek-folder">{chip.detail}</span>
@@ -143,7 +143,7 @@ function FolderRow({ chip, renderBlocks }: { chip: WorkChip; renderBlocks: Rende
   const { basePath, fileScope } = useThreadMedia();
   const folder = chip.path === undefined ? null : folderInside(chip.path, basePath);
   const row = (
-    <button type="button" className="work-chip" data-kind={chip.kind} title={chip.title} aria-pressed={open} aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+    <button type="button" className="work-chip" data-kind={chip.kind} data-tip={chip.title} aria-pressed={open} aria-expanded={open} onClick={() => setOpen((value) => !value)}>
       <Folder size={14} className="work-chip-icon" />
       <span className="work-chip-label">{chip.label}</span>
       <span className="work-chip-detail">{chip.detail}</span>

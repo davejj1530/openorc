@@ -52,7 +52,7 @@ async function open(options: Partial<OpenOrcOptions>): Promise<OpenOrc> {
     dataDir: path.join(root, `data-${Math.random().toString(36).slice(2)}`),
     ephemeral: true,
     transport: { push() {} },
-    shellProbe: async () => ({ path: process.env["PATH"] ?? "", binaries: { claude, codex: null, opencode: null } }),
+    shellProbe: async () => ({ path: process.env["PATH"] ?? "", binaries: { claude, codex: null, opencode: null, omp: null, cursor: null, pi: null, antigravity: null, fx: null } }),
     claudeCloudSecrets: tokenStore(),
     cloudSandboxes: fakeVercel,
     cloudOffered: true,

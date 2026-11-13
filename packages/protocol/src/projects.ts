@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Project, ProjectGit } from "./domain.js";
+import { ProjectClaudeAccounts, type Project, type ProjectGit } from "./domain.js";
 
 export const projectRpcParams = {
   "workspace.get": z.object({}),
@@ -12,9 +12,15 @@ export const projectRpcParams = {
   /** True only when nothing exists at an absolute rootPath yet, so importing it with create makes the folder. */
   "projects.folderMissing": z.object({ rootPath: z.string() }),
   "projects.remove": z.object({ id: z.string().min(1) }).strict(),
+  /** Not strict: a patch from an older client leaves out keys it does not know, which the host keeps as they are. */
   "projects.updateSettings": z.object({
     id: z.string(),
-    settings: z.object({ setupScript: z.string().nullable().optional(), worktreeInclude: z.array(z.string()).optional(), branchPrefix: z.string().optional() }),
+    settings: z.object({
+      setupScript: z.string().nullable().optional(),
+      worktreeInclude: z.array(z.string()).optional(),
+      branchPrefix: z.string().optional(),
+      claudeAccounts: ProjectClaudeAccounts.nullable().optional(),
+    }),
   }),
 };
 

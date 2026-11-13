@@ -1,7 +1,7 @@
-import { lazy, memo, Suspense, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type ComponentProps, type RefObject } from "react";
+import { lazy, memo, Suspense, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type ComponentProps, type RefObject } from "react";
 import { useVisited } from "../lib/use-visited";
 import { harnessCatalog, type ActivityRecovery } from "@openorc/protocol";
-import { WorkMessage, WorkAgent, ChevronDown, ChevronRight, FileText, GitFork, Lightbulb, Loader2 } from "./icons";
+import { WorkMessage, WorkAgent, ChevronDown, ChevronRight, Lightbulb, Loader2 } from "./icons";
 import {
   workTurns,
   type Block,
@@ -28,7 +28,7 @@ import { WorkNow, WorkSteps } from "./WorkSteps";
 import { TurnHead } from "./TurnHead";
 import { TurnReceipt } from "./TurnReceipt";
 import { useTurnSize } from "./TurnFooter";
-import { useTurnAuthor } from "../lib/turn-authors";
+import { ConversationVoice, useTurnAuthor } from "../lib/turn-authors";
 import { ToolRow } from "./ToolRow";
 import { SubagentCards } from "./SubagentCards";
 import { ApprovalCard, pretty } from "./ApprovalCard";
@@ -38,11 +38,12 @@ import { TaskCard } from "./TaskCard";
 import { UsageRecovery } from "./UsageRecovery";
 import { SignInRecovery } from "./SignInRecovery";
 import { TranscriptErrorCard } from "./TranscriptErrorCard";
-import { IconButton, TextButton } from "./ui";
+import { TextButton } from "./ui";
 import { ImageGenerationRow, ImageViewRow, ThreadImage, ThreadMedia, ThreadRichText, type MediaScope } from "./ThreadImages";
-import { isImagePath } from "../../../shared/image-paths";
 import { CopyMessage, MessageTime, TurnActions } from "./MessageActions";
 import { useMessageReveal, type Reveal } from "../lib/message-reveal";
+import { UserMessage } from "./UserMessage";
+import { OrclingChat } from "./OrclingChat";
 
 const InlineDiff = lazy(() => import("./InlineDiff").then((m) => ({ default: m.InlineDiff })));
 const diffLoading = (
@@ -209,7 +210,7 @@ export function Transcript({
       <div ref={parentRef} data-transcript data-arrivals={arrivals || undefined} className={cn("h-full overflow-y-auto", waiting && "invisible")}>
         <div ref={contentRef} className="max-w-chat mx-auto px-6 py-5">
           {hasOlder ? <div ref={olderRef} aria-hidden /> : null}
-          {children ?? <WorkTranscript runId={run.runId} blocks={run.blocks} live={working || run.turnOpen} onFork={onFork} trailing={trailing} reveal={reveal} />}
+          {children ?? <ConversationBody runId={run.runId} blocks={run.blocks} live={working || run.turnOpen} onFork={onFork} trailing={trailing} reveal={reveal} />}
           {run.blocks.length > 0 ? <AgentPresence working={working} /> : null}
         </div>
       </div>
@@ -380,6 +381,13 @@ type WorkTranscriptProps = ComponentProps<typeof TranscriptContents> & {
 type WorkTurnProps = WorkTranscriptProps & { id?: string; latest?: boolean };
 
 /** The disclosure hierarchy stays consistent across turns and warm sessions. */
+/** An Orcling's own conversation reads as a chat with it; any other as turns of work. */
+function ConversationBody(props: WorkTranscriptProps) {
+  const { chat } = useContext(ConversationVoice);
+  if (!chat) return <WorkTranscript {...props} />;
+  return <OrclingChat chat={chat} blocks={props.blocks} live={props.live ?? false} card={(block) => <BlockView block={block} runId={block.runId ?? props.runId} taskCards actions={false} />} />;
+}
+
 export function WorkTranscript({ blocks, live = false, onFork, reveal, ...props }: WorkTranscriptProps) {
   const turns = useSteadyTurns(blocks);
   // A fork carries the whole conversation and the agent's latest session, so it is offered only at the latest message.
@@ -615,7 +623,7 @@ function ReplyMessage({ block, actions }: { block: Extract<Block, { kind: "messa
   );
 }
 
-const BlockView = memo(function BlockView({
+export const BlockView = memo(function BlockView({
   block,
   runId,
   onFork,
@@ -663,52 +671,6 @@ const BlockView = memo(function BlockView({
       return block.tone === "bad" && !/^(turn|session) /.test(block.text) ? <TranscriptErrorCard text={block.text} /> : null;
   }
 });
-
-function UserMessage({ text, at, attachments, onFork }: { text: string; at?: number | undefined; attachments?: string[]; onFork?: (() => void) | undefined }) {
-  return (
-    <div className="group journal-message journal-prompt">
-      <div className="journal-message-body grid gap-2">
-        {attachments && attachments.length > 0 ? (
-          <div className="flex flex-wrap gap-2 justify-end">
-            {attachments.map((a) =>
-              isImagePath(a) ? <ThreadImage key={a} src={`openorc-asset://attachments/${a.split("/").pop() ?? ""}`} alt="Attached image" compact /> : <AttachedFile key={a} path={a} />,
-            )}
-          </div>
-        ) : null}
-        <div className="message-bubble text-prose whitespace-pre-wrap">{text}</div>
-        <div className="journal-message-actions">
-          {text ? <CopyMessage text={text} /> : null}
-          {onFork ? <ForkButton onFork={onFork} /> : null}
-          <MessageTime at={at} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ForkButton({ onFork }: { onFork: () => void }) {
-  return (
-    <IconButton size="md" onClick={() => onFork()} title="Continue this conversation in a new thread" aria-label="Fork thread" className="message-action">
-      <GitFork size={16} />
-    </IconButton>
-  );
-}
-
-/**
- * An attachment with nothing to preview. The stored name keeps the one the
- * user gave it after the id that makes it unique, so the chip prints that and
- * opens the file where it lives.
- */
-function AttachedFile({ path }: { path: string }) {
-  const stored = path.split(/[\\/]/).pop() ?? path;
-  const name = /^[a-f0-9-]{36}-/.test(stored) ? stored.slice(37) : stored;
-  return (
-    <button type="button" onClick={() => window.openorc.revealFile(path)} title={`Show in folder: ${path}`} className="attached-file">
-      <FileText size={16} className="shrink-0 text-ink-4" />
-      <span className="truncate">{name}</span>
-    </button>
-  );
-}
 
 /** A tool call that saved or started work shows that work as a live card; any other call is a row. */
 function ToolBlock({ block, cards, details = false }: { block: Extract<Block, { kind: "tool" }>; cards: boolean; details?: boolean }) {

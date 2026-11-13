@@ -67,11 +67,17 @@ export function toolCallPresentation(name: string, input: unknown): ToolPresenta
 type McpCall = { server: string; tool: string };
 
 /**
- * An MCP tool call in each provider's naming: Claude Code's `mcp__server__tool`, Codex's `server.tool`, and OpenCode's
- * `server_tool`, which only splits reliably for OpenOrc's own `openorc_<id>` server.
+ * An MCP tool call in each provider's naming: Claude Code's `mcp__server__tool`, Codex's `server.tool`, OpenCode's
+ * `server_tool` and Oh My Pi's `mcp__server_tool`. A single underscore only splits reliably for OpenOrc's own
+ * `openorc_<id>` server; another server of Oh My Pi's is read as its name's first word.
  */
 function mcpCall(name: string): McpCall | null {
-  const match = /^mcp__(.+?)__(.+)$/.exec(name) ?? /^([^.]+)\.(.+)$/.exec(name) ?? /^(openorc_[0-9a-f]{32})_(.+)$/.exec(name);
+  const match =
+    /^mcp__(.+?)__(.+)$/.exec(name) ??
+    /^mcp__(openorc_[0-9a-f]{32})_(.+)$/.exec(name) ??
+    /^mcp__([a-z0-9]+)_(.+)$/.exec(name) ??
+    /^([^.]+)\.(.+)$/.exec(name) ??
+    /^(openorc_[0-9a-f]{32})_(.+)$/.exec(name);
   return match ? { server: match[1]!, tool: match[2]! } : null;
 }
 

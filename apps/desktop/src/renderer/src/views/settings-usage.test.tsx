@@ -150,3 +150,15 @@ it("keeps unknown amounts unknown and marks retained quota values out of date af
   expect(meter.getAttribute("aria-valuenow")).toBe("82");
   expect(meter.getAttribute("aria-valuetext")).toBe("82% remaining, out of date");
 });
+
+it("shows fx balances without an empty-limits message or a fabricated percentage", async () => {
+  mocks.call.mockImplementation(async (method, input) => {
+    if (method === "memory.settings.get") return {};
+    return { ...report, provider: input.provider, context: "Vercel AI Gateway", resets: undefined, credits: [{ label: "AI Gateway balance", balance: "12.50", unlimited: false, currency: "USD" }] };
+  });
+  mount(<ProviderUsageOverview active />);
+  const fx = screen.getByRole("region", { name: "fx usage" });
+  expect(await within(fx).findByText("$12.50")).toBeTruthy();
+  expect(within(fx).queryByText("No limits reported.")).toBeNull();
+  expect(within(fx).queryByRole("progressbar")).toBeNull();
+});

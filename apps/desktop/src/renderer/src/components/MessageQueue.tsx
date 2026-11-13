@@ -57,12 +57,12 @@ export function MessageQueue({
                   size="sm"
                   variant="ghost"
                   disabled={(!canSend && !message.interrupted) || pending}
-                  title={message.interrupted ? "Retry delivery after checking the conversation." : (sendReason ?? "Reaches the agent in its current turn.")}
+                  data-tip={message.interrupted ? "Retry delivery after checking the conversation." : (sendReason ?? "Reaches the agent in its current turn.")}
                   onClick={() => onSend(message.id)}
                 >
                   {message.interrupted ? "Retry" : "Send now"}
                 </Button>
-                <IconButton size="xs" disabled={pending} onClick={() => onRemove(message.id)} aria-label={`Remove queued message ${index + 1}`} title="Remove from queue">
+                <IconButton size="xs" disabled={pending} onClick={() => onRemove(message.id)} aria-label={`Remove queued message ${index + 1}`} data-tip="Remove from queue">
                   <X size={13} />
                 </IconButton>
               </div>

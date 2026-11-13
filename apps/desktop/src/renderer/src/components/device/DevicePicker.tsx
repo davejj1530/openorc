@@ -6,6 +6,7 @@ import { Button, StatusDot, TextButton, Tooltip } from "../ui";
 import { DeviceGlyph } from "./DeviceGlyph";
 import { DeviceLoadError } from "./DeviceLoadError";
 import "./device.css";
+import { thisComputer } from "../../lib/this-computer";
 
 function DeviceState({ state }: { state: RowState }) {
   const word = (
@@ -82,7 +83,7 @@ export function DevicePicker({ status, onOpen }: { status: DeviceStatus; onOpen:
       ))}
       {groups.length === 0 || notes.length > 0 ? (
         <div className="device-notes">
-          {groups.length === 0 ? <p>No simulators or emulators on this Mac.</p> : null}
+          {groups.length === 0 ? <p>No simulators or emulators on {thisComputer}.</p> : null}
           {notes.map((note) => (
             <p key={note}>{note}</p>
           ))}

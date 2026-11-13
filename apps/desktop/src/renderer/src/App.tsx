@@ -5,6 +5,7 @@ import { Sidebar } from "./components/Sidebar";
 import { Wordmark } from "./components/SidebarListHead";
 import { DeleteThreadDialog } from "./components/ThreadActions";
 import { ThreadMoveDialog } from "./components/ThreadMoveDialog";
+import { RemoveWorktreeDialog } from "./components/RemoveWorktreeDialog";
 import { ThreadWorkspace } from "./components/ThreadWorkspace";
 import { TooltipProvider } from "./components/ui";
 import { ImportProjectDialog } from "./dialogs/ImportProjectDialog";
@@ -12,8 +13,8 @@ import { ImportSessionsDialog } from "./dialogs/ImportSessionsDialog";
 import { NewFileDialog } from "./dialogs/NewFileDialog";
 import { useAppShortcuts } from "./lib/app-shortcuts";
 import { useRpc } from "./lib/client";
-import { useOnboardingDefaultHarness } from "./lib/default-harness";
-import { useLayout } from "./lib/layout";
+import { useOnboardingAgents } from "./lib/default-harness";
+import { focusedProject, useLayout } from "./lib/layout";
 import { useLookHandover } from "./lib/mac-look";
 import { readOnboardingState, resolveOnboarding, writeOnboardingState, type PersistedOnboardingState } from "./lib/onboarding";
 import { useRouter, type Route } from "./lib/router";
@@ -57,11 +58,14 @@ export function App() {
   const trafficLights = useTrafficLights();
   const route = useRouter((s) => s.route);
   const ui = useUi();
-  const projectId = useLayout((s) => s.projectId);
+  const projectId = useLayout(focusedProject);
   const system = useRpc("system.info", { refresh: false });
   const projects = useRpc("projects.list", {});
-  const [onboardingState, setOnboardingState] = useState(readOnboardingState);
-  const recordDefaultHarness = useOnboardingDefaultHarness();
+  const [savedOnboarding, setOnboardingState] = useState(readOnboardingState);
+  const settings = useRpc("app.settings.get", {});
+  const onboardingState =
+    settings.data?.enabledHarnesses == null ? savedOnboarding : { ...savedOnboarding, selectedHarnesses: settings.data.enabledHarnesses, defaultHarness: settings.data.defaultHarness };
+  const recordAgents = useOnboardingAgents();
   useLookHandover();
   const [onboardingSession, setOnboardingSession] = useState<"first_run" | "recovery" | "dismissed" | null>(null);
   const currentProject = projectForRoute(route, projectId);
@@ -96,7 +100,7 @@ export function App() {
   const persistOnboarding = (next: PersistedOnboardingState): boolean => {
     if (!writeOnboardingState(next)) return false;
     setOnboardingState(next);
-    recordDefaultHarness(next.defaultHarness);
+    recordAgents(next);
     return true;
   };
 
@@ -164,6 +168,7 @@ export function App() {
         <DeleteThreadDialog />
 
         <ThreadMoveDialog />
+        <RemoveWorktreeDialog />
         <NewFileDialog />
       </div>
     </TooltipProvider>
@@ -202,7 +207,7 @@ function MainScreen({ route, currentProject }: { route: Route; currentProject: s
       screen = <PullRequestView key={`${route.projectId}:${route.number}`} projectId={route.projectId} number={route.number} />;
       break;
     case "project":
-      screen = <ProjectView projectId={route.projectId} onNewTask={() => openNewTask(route.projectId)} />;
+      screen = <ProjectView projectId={route.projectId} />;
       break;
     case "memory":
       screen = <Memory />;

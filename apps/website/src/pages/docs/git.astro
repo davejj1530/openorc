@@ -9,9 +9,9 @@ import { docHref } from "../../data/docs";
 
 <DocsLayout slug="git">
   <DocsVisual
-    label="OpenOrc with the thread Simplify the design tokens open. It works in its own worktree, and the row under the composer names its branch, openorc/design-tokens-2c91f0, with 12 lines added, 4 removed, and Commit changes. In the sidebar, another thread in the project is still working."
+    label="OpenOrc with the thread Simplify the design tokens open in its own worktree and its menu open. The menu's first row names the branch, openorc/design-tokens-2c91f0, marked Worktree. Over the composer, the Commit chip shows 12 lines added and 4 removed. In the sidebar, another thread in the project is still working."
   >
-    <WorktreeMock />
+    <WorktreeMock menu />
   </DocsVisual>
 
   <section aria-labelledby="where">
@@ -38,7 +38,7 @@ import { docHref } from "../../data/docs";
       <li>Send your first message. A worktree is created now, before the agent starts.</li>
     </ol>
     <p>New threads start with the location set in <strong>Settings</strong> under <strong>General</strong>, <strong>New thread workspace</strong>: <strong>Local checkout</strong> or <strong>Isolated worktree</strong>. Tasks have their own <strong>Execution location</strong>, and schedules a <strong>Works in</strong> field. Forks, subthreads, and threads an agent starts with <code>thread_start</code> work in the same folder as the thread they came from.</p>
-    <p>The row under a thread's composer shows the folder and branch it works on. In the sidebar, each thread's row names its project, then its branch or <strong>worktree</strong>.</p>
+    <p>A thread's menu starts with the branch it works on, marked <strong>Worktree</strong> or <strong>Checkout</strong>. In the sidebar, each thread's row names its project, then its branch or <strong>worktree</strong>.</p>
   </section>
 
   <section aria-labelledby="worktrees">
@@ -91,7 +91,7 @@ import { docHref } from "../../data/docs";
 
   <section aria-labelledby="move">
     <h2 id="move">Move a thread</h2>
-    <p>Open the thread's menu, from the three-dot button in its header or by right-clicking it in the sidebar, and choose <strong>Move to a worktree</strong> or <strong>Move to the checkout</strong>. A dialog lists every file that will move. Moving doesn't start an agent, and you can't move a thread while its agent is working.</p>
+    <p>Open the thread's menu, from the three-dot button in its header or by right-clicking it in the sidebar. Its first row names the thread's branch, marked <strong>Worktree</strong> or <strong>Checkout</strong>. Point at it and choose <strong>Move to a worktree</strong> or <strong>Move to the checkout</strong>. A dialog lists every file that will move. Moving doesn't start an agent, and you can't move a thread while its agent is working.</p>
     <ul>
       <li><strong>Move to a worktree</strong> takes every uncommitted change in the checkout, including yours and other threads', into a new worktree on its own branch. The worktree starts at the checkout's current commit. Those files in the checkout then go back to its last commit.</li>
       <li><strong>Move to the checkout</strong> merges everything the worktree changed since it started, committed or not, into your checkout's files, unstaged. Then the worktree is removed. Its branch stays, with any commits made on it.</li>
@@ -102,6 +102,12 @@ import { docHref } from "../../data/docs";
   <section aria-labelledby="merge">
     <h2 id="merge">Bring the work back</h2>
     <p><strong>Move to the checkout</strong> puts a worktree's changes in your own files, to keep editing or to commit yourself. You can also commit in the worktree, push the branch and open a pull request (see <a href={docHref("review") + "#push"}>Push and open a pull request</a>), or merge the branch into your checkout with Git, for example <code>git merge openorc/fix-the-login-redirect-3f2a91</code>. Only committed work is on the branch, so commit in the worktree before you merge.</p>
+  </section>
+
+  <section aria-labelledby="remove">
+    <h2 id="remove">Remove a worktree</h2>
+    <p>Worktrees take disk space, mostly from installed dependencies and build output. <strong>Remove worktree</strong>, in the branch row's submenu of the thread's menu, removes the folder and keeps the thread. OpenOrc commits the worktree's uncommitted changes to its branch first, as deleting does, and the branch and the conversation stay. The thread's next message makes the worktree again on that branch. Files Git ignores in the folder are deleted, so the project's setup script runs again.</p>
+    <p>To remove many at once, open Settings, then Data, and choose <strong>Clean up…</strong> beside Worktrees. It lists every worktree on this Mac by project with its size, and ticks those whose thread is resolved or whose pull request is merged or closed. A worktree whose agent is working, waiting on you, or running a background command can't be removed until it stops, and neither can one that follows a cloud sandbox or one a legacy task shares.</p>
   </section>
 
   <section aria-labelledby="delete">

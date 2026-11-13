@@ -108,6 +108,17 @@ it("uses the in-app notice without a desktop notification when any app window is
   expect(f.call("getState")).toMatchObject({ state: { phase: "available" }, dismissed: false });
 });
 
+it("checks for an update when the window asks, with automatic checks off", async () => {
+  const f = fixture();
+  native.windows.mockReturnValue([f.win]);
+  f.call("setAutomaticChecks", false);
+  await vi.advanceTimersByTimeAsync(30_000);
+  expect(f.updater.checkForUpdates).not.toHaveBeenCalled();
+  await f.call("check");
+  expect(f.updater.checkForUpdates).toHaveBeenCalledTimes(1);
+  expect(f.call("getState")).toMatchObject({ state: { phase: "available", version: "0.2.0" } });
+});
+
 it("remembers Later across restarts and settings changes, and prompts for a newer version", async () => {
   const first = fixture();
   await first.updates.check();

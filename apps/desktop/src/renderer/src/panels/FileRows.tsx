@@ -20,7 +20,7 @@ export function FileRows({ files, commented }: { files: FileChange[]; commented?
           {files.map((f) => (
             <div key={f.path} className="flex items-center gap-2 h-7 px-5 text-sm">
               <span className={cn("w-3 font-mono text-xs", toneClass[fileMarks[f.status].tone])}>{fileMarks[f.status].letter}</span>
-              <span className="font-mono truncate text-ink" title={f.path}>
+              <span className="font-mono truncate text-ink" data-tip={f.path}>
                 {f.path}
               </span>
               {commented?.has(f.path) ? <MessageSquare size={11} className="ml-auto text-ink-4 shrink-0" /> : null}

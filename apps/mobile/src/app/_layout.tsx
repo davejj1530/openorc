@@ -68,23 +68,33 @@ export default function RootLayout() {
             {/* The back button's long-press menu and VoiceOver name Home by this title. */}
             <Stack.Screen name="index" options={{ title: "Threads" }} />
             <Stack.Screen name="thread/[id]" dangerouslySingular={onePerThread} options={pushed} />
+            <Stack.Screen name="task/[id]" dangerouslySingular={onePerThread} options={pushed} />
+            <Stack.Screen name="task-description" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [1] }} />
+            <Stack.Screen name="subthreads" dangerouslySingular={onePerPanel} options={pushed} />
             <Stack.Screen name="changes" dangerouslySingular={onePerPanel} options={pushed} />
             <Stack.Screen name="preview" dangerouslySingular={onePerPanel} options={pushed} />
             <Stack.Screen name="diff" options={pushed} />
             <Stack.Screen name="new" dangerouslySingular options={pushed} />
-            <Stack.Screen name="tasks" dangerouslySingular options={pushed} />
+            <Stack.Screen name="new-subthread" dangerouslySingular={onePerPanel} options={pushed} />
+            <Stack.Screen name="new-task" dangerouslySingular options={pushed} />
             <Stack.Screen name="pair" dangerouslySingular options={{ presentation: "modal" }} />
             <Stack.Screen name="settings" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [1] }} />
             <Stack.Screen name="filter" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: "fitToContents" }} />
+            <Stack.Screen name="connection" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: "fitToContents" }} />
             <Stack.Screen name="tool" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [0.6, 1] }} />
             <Stack.Screen name="model" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [0.6, 1] }} />
             <Stack.Screen name="mode" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: "fitToContents" }} />
             <Stack.Screen name="place" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: "fitToContents" }} />
+            <Stack.Screen name="project" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [0.6, 1], contentStyle: { backgroundColor: colors.surface } }} />
             <Stack.Screen name="move-to-cloud" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: "fitToContents" }} />
             <Stack.Screen name="commit" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: "fitToContents" }} />
             <Stack.Screen name="pull-request" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [1] }} />
             <Stack.Screen name="branch" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [0.6, 1] }} />
             <Stack.Screen name="details" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [0.6, 1] }} />
+            <Stack.Screen name="orcling" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [1] }} />
+            <Stack.Screen name="orcling-look" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [1] }} />
+            <Stack.Screen name="orcling-instructions" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [1] }} />
+            <Stack.Screen name="orcling-new" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [1] }} />
           </Stack>
         </QueryClientProvider>
       </KeyboardProvider>

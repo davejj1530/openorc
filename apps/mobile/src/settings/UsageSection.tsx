@@ -1,4 +1,4 @@
-import { allowanceState, usageResetLabel } from "@openorc/client";
+import { creditBalanceLabel, allowanceState, usageResetLabel } from "@openorc/client";
 import { percentLeft, type AllowanceWindow, type PlanLimits } from "@openorc/protocol";
 import { Fragment } from "react";
 import { View } from "react-native";
@@ -22,8 +22,8 @@ const emptyWords: Record<PlanLimits["status"], string> = {
 };
 
 /** One limit: its ring, its label and the share left on one line, and when it resets under them. Only the share warns. */
-function LimitRow({ window, now }: { window: AllowanceWindow; now: number }) {
-  const stale = allowanceState(window, now).stale;
+function LimitRow({ window, now, outdated }: { window: AllowanceWindow; now: number; outdated: boolean }) {
+  const stale = outdated || allowanceState(window, now).stale;
   const left = percentLeft(window);
   const reset = stale ? `Out of date · reported ${time.format(window.observedAt)}` : usageResetLabel(window.resetsAt, now);
   const value = left === null ? "Not reported" : `${Math.round(left)}% left`;
@@ -48,7 +48,7 @@ function AccountCard({ limits, now, dim }: { limits: PlanLimits; now: number; di
         <View accessible accessibilityRole="header" accessibilityLabel={[limits.name, limits.plan].filter(Boolean).join(", ")} className={rowClass}>
           <RowLines lead={<HarnessLogo agent={limits.provider} size={16} />} label={limits.name} trailing={limits.plan ? <Text className="text-sm text-ink-4">{limits.plan}</Text> : null} />
         </View>
-        {limits.windows.length === 0 ? (
+        {limits.windows.length === 0 && !limits.credits?.length ? (
           <>
             <Divider />
             <View className={rowClass}>
@@ -59,10 +59,18 @@ function AccountCard({ limits, now, dim }: { limits: PlanLimits; now: number; di
           limits.windows.map((window) => (
             <Fragment key={window.id}>
               <Divider />
-              <LimitRow window={window} now={now} />
+              <LimitRow window={window} now={now} outdated={limits.status === "error" || limits.status === "disconnected"} />
             </Fragment>
           ))
         )}
+        {limits.credits?.map((credit, index) => (
+          <Fragment key={`${credit.label}:${index}`}>
+            <Divider />
+            <View className={rowClass}>
+              <RowLines label={credit.label} labelClassName="text-ink-3" trailing={<Text className="text-md tabular-nums text-ink">{creditBalanceLabel(credit)}</Text>} />
+            </View>
+          </Fragment>
+        ))}
       </View>
     </Card>
   );
@@ -96,7 +104,7 @@ function noCardsWords({ state, live, hostName }: Pick<Usage, "state" | "live" | 
 }
 
 /**
- * The Claude and Codex limits of the shown host's group, read only, as the desktop's Settings > Usage shows them. While
+ * The account limits of the shown host's group, read only, as the desktop's Settings > Usage shows them. While
  * neither host is connected the last read stays, dimmed and held still, with the time it was read under the label.
  */
 export function UsageSection() {

@@ -11,6 +11,7 @@ import type { Project, Thread } from "@openorc/protocol";
 import { cloudAgents, SANDBOX_OWN } from "./cloud-agents.js";
 import { CodexCloudSignIn } from "./cloud-codex.js";
 import { OpenCodeCloudKeys, OpenCodeCloudSignIn } from "./cloud-opencode.js";
+import { OmpCloudSignIn } from "./cloud-omp.js";
 import { readSkills } from "./cloud-skills.js";
 import { CloudWorkspaceService, cloudSandboxProviders, LOCAL_LAUNCH_REFUSED, NOTHING_CONNECTED } from "./cloud-workspaces.js";
 import { WorkspaceService } from "./workspace.js";
@@ -273,7 +274,16 @@ describe("an agent in a sandbox for a turn", () => {
 
   describe("with its sign-in kept outside the sandbox", () => {
     const keys = { load: async () => JSON.stringify({ openrouter: { key: "sk-or-real", createdAt: 1 } }), save: async () => undefined };
-    const agents = cloudAgents({ claude: SANDBOX_OWN, codex: new CodexCloudSignIn(undefined), opencode: new OpenCodeCloudSignIn(new OpenCodeCloudKeys(keys)) });
+    const agents = cloudAgents({
+      cursor: SANDBOX_OWN,
+      pi: SANDBOX_OWN,
+      antigravity: SANDBOX_OWN,
+      fx: SANDBOX_OWN,
+      claude: SANDBOX_OWN,
+      codex: new CodexCloudSignIn(undefined),
+      opencode: new OpenCodeCloudSignIn(new OpenCodeCloudKeys(keys)),
+      omp: new OmpCloudSignIn(new OpenCodeCloudKeys(keys)),
+    });
     const brokering = (refuse = false) => {
       const applied: BrokeredHeader[][] = [];
       const sandbox = {

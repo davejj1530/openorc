@@ -16,6 +16,10 @@ export interface SendOptions {
   role?: "user" | "system";
   attachments?: string[];
   recordPrompt?: boolean;
+  /** OpenOrc's own idea rather than anyone's message, such as an Orcling waking up: the turn counts as activity only once the agent says something. */
+  unprompted?: boolean;
+  /** The id the message is recorded under, when a window already shows it as sent. */
+  messageId?: string | undefined;
   /** Called once the provider has taken the input, with the run and the process's turn index. Throwing closes the process. */
   onAccepted?: (run: Run, processTurn: number) => void;
 }
@@ -79,11 +83,17 @@ export interface StartRunInput {
   promptRole?: "user" | "system";
   /** A delivered task report may already be visible in the thread ledger. */
   recordPrompt?: boolean;
+  /** See SendOptions.unprompted. */
+  unprompted?: boolean;
+  /** See SendOptions.messageId. */
+  promptMessageId?: string | undefined;
   resume: boolean;
   /** Where the session to resume comes from, when it is not this scope's own last session (a fork continues its parent's). */
   resumeFrom?: { sessionId: string; fork: boolean };
   /** What the previous agent on this thread knew, for a run that switches provider. */
   handoff?: string;
+  /** Read at the start of this turn alone, ahead of its prompt and never recorded: what a group member missed. */
+  turnNote?: string;
   /** Bind durable coordination identity before MCP or provider startup can expose tools. */
   onCreated?: (run: Run) => void;
   /** Revalidate admission after asynchronous preparation and immediately before launch. */
@@ -111,10 +121,16 @@ export interface OrclingRunHooks {
   rolloverDue(thread: Thread): boolean;
   /** The loosest permission an Orcling may work with anywhere. */
   ceiling(orclingId: string): PermissionPreset;
+  /** What an Orcling's own conversation tells it ahead of the next message it reads there, such as reactions since; empty elsewhere. Heard once. */
+  turnNote(threadId: string): string;
+  /** Any thread's turn ended, said or quiet; a group chat lets the next Orcling speak. */
+  turnEnded?(thread: Thread, run: Run, reply: string | null, status: CompletedTurn["status"]): void;
 }
 
 export interface LiveRun {
   questionsInterrupted?: boolean;
+  /** An Orcling's streaming replies that may yet be its quiet word, by message id; null once a reply is shown. */
+  quietHeld?: Map<string, string | null>;
   run: Run;
   internalMcp: NonNullable<RunSpec["internalMcp"]>;
   /** Native permissions remain fixed until resume; OpenOrc can allow requests immediately. */
@@ -127,8 +143,15 @@ export interface LiveRun {
   toolsAllowed?: Set<string>;
   scope: RunScope;
   handle: RunHandle;
+  /** Which installation of its agent this process started from, as AgentUpdateGate counts them. An update since leaves it on the old version. */
+  installation: number;
   workspaceLease: WorkspaceLease;
   usage: Usage | null;
+  /**
+   * The provider session's running cost as this run's last completed turn reported it. Kept apart from `usage`, which
+   * a usage update during the turn already moves to the new total before the turn ends.
+   */
+  costAtLastTurn?: number;
   turns: number;
   /** A turn is in progress. Sessions stay open between turns, so live alone does not mean working. */
   busy: boolean;
@@ -144,6 +167,8 @@ export interface LiveRun {
   /** The user's latest message and the agent's latest reply, for naming the thread after its first exchange. */
   prompt: string | null;
   reply: string | null;
+  /** The turn under way is OpenOrc's own idea: until the agent says something, nothing happened in the thread. */
+  unprompted?: boolean;
   /** The provider announced its session. Without it, a run that exits early never had one. */
   started: boolean;
   stderr: string[];
@@ -175,6 +200,7 @@ export interface LiveProcessBinding {
   internalMcp: NonNullable<RunSpec["internalMcp"]>;
   providerPermissionMode: PermissionPreset;
   orclingCeiling?: PermissionPreset;
+  installation: number;
 }
 
 /** A turn in flight, or background work that will report back: the agent is at work. */
@@ -206,6 +232,7 @@ export interface ThreadPermissionState {
 export type Notification = Extract<CorePush, { type: "notify" }>;
 
 export interface RunHooks {
+  enabledHarnesses?(): readonly HarnessId[];
   claudeEnvironment?(snapshot: EnvSnapshot, accountId?: string): EnvSnapshot;
   claudeAccountFor?(input: StartRunInput): string;
   processRegistry?: string;
@@ -254,6 +281,8 @@ export interface RunHooks {
   idleTimeoutMs?(thread: Thread | null): number | null;
   /** Whether Claude Code should also connect the user's own MCP servers; each one adds to its start-up time. */
   claudeUserMcpServers?(): boolean;
+  /** Claude MCP servers the user turned off in Connectors. */
+  claudeConnectorsOff?(): string[];
   orclings?: OrclingRunHooks;
   /** Folder-relative paths the editor saved under `root` since `since`, for crediting changes between turns to the user. */
   editorSaves?(root: string, since: number): string[];

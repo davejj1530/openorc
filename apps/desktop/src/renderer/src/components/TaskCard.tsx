@@ -89,7 +89,7 @@ export function TaskCard({ taskId, compact = false }: { taskId: string; compact?
     <div data-task-activity={taskId} className={taskCardClass(compact)}>
       <div className="flex items-center gap-2 min-w-0">
         {taskActivityIcon({ waiting: Boolean(waiting), failed, working, finished, successful: liveRun?.state === "success" })}
-        <button onClick={() => openTask(t.id)} className="flex-1 min-w-0 text-left text-base text-ink truncate hover:text-ink" title={t.title}>
+        <button onClick={() => openTask(t.id)} className="flex-1 min-w-0 text-left text-base text-ink truncate hover:text-ink" data-tip={t.title}>
           {t.title}
         </button>
         {proposed ? (
@@ -110,7 +110,7 @@ export function TaskCard({ taskId, compact = false }: { taskId: string; compact?
             <Play size={11} /> Start
           </Button>
         ) : (
-          <TextButton onClick={() => openTask(t.id, t.status === "review" ? "files" : "spec")} tone="faint" title="Open task" aria-label={`Open ${t.title}`}>
+          <TextButton onClick={() => openTask(t.id)} tone="faint" data-tip="Open task" aria-label={`Open ${t.title}`}>
             <ArrowUpRight size={14} />
           </TextButton>
         )}
@@ -120,7 +120,7 @@ export function TaskCard({ taskId, compact = false }: { taskId: string; compact?
           {stateLabel}
         </span>
         {t.branch ? (
-          <span className="inline-flex items-center gap-1 font-mono flex-1 min-w-0" title={t.branch}>
+          <span className="inline-flex items-center gap-1 font-mono flex-1 min-w-0" data-tip={t.branch}>
             <GitBranch size={11} className="shrink-0" /> <span className="truncate">{t.branch}</span>
           </span>
         ) : null}

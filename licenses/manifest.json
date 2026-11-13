@@ -213,6 +213,16 @@
       "website": "licenses/opencode-MIT.txt"
     },
     {
+      "id": "oh-my-pi-MIT",
+      "input": "licenses/vendor/oh-my-pi-MIT.txt",
+      "source": "https://raw.githubusercontent.com/can1357/oh-my-pi/b16bfbe0f9cf953d9a37fc17284967ed18fae015/LICENSE",
+      "sha256": "545636e19386d3d4e0ae6d77354527499999c3ebfbca61b9fa5aa4ead7c0b308",
+      "desktop": {
+        "resource": "licenses/vendor/oh-my-pi-MIT.txt"
+      },
+      "website": "licenses/oh-my-pi-MIT.txt"
+    },
+    {
       "id": "rive-harfbuzz-COPYING",
       "input": "licenses/vendor/rive-harfbuzz-COPYING.txt",
       "source": "https://raw.githubusercontent.com/rive-app/harfbuzz/08d34675f64b1ac4880f4f10c9fd474a56dd4399/COPYING",
@@ -676,16 +686,28 @@
     {
       "id": "typescript-Apache",
       "input": "apps/desktop/node_modules/typescript/LICENSE.txt",
-      "source": { "package": "typescript", "version": "5.9.3", "path": "LICENSE.txt" },
+      "source": {
+        "package": "typescript",
+        "version": "5.9.3",
+        "path": "LICENSE.txt"
+      },
       "sha256": "a7d00bfd54525bc694b6e32f64c7ebcf5e6b7ae3657be5cc12767bce74654a47",
-      "desktop": { "asar": "node_modules/typescript/LICENSE.txt" }
+      "desktop": {
+        "asar": "node_modules/typescript/LICENSE.txt"
+      }
     },
     {
       "id": "typescript-third-party",
       "input": "apps/desktop/node_modules/typescript/ThirdPartyNoticeText.txt",
-      "source": { "package": "typescript", "version": "5.9.3", "path": "ThirdPartyNoticeText.txt" },
+      "source": {
+        "package": "typescript",
+        "version": "5.9.3",
+        "path": "ThirdPartyNoticeText.txt"
+      },
       "sha256": "1af3c68039c57e539422da82a4faada506ce6d0ea6f90e0b699d02dbcdb7a90c",
-      "desktop": { "asar": "node_modules/typescript/ThirdPartyNoticeText.txt" }
+      "desktop": {
+        "asar": "node_modules/typescript/ThirdPartyNoticeText.txt"
+      }
     },
     {
       "id": "devicon-MIT",
@@ -695,6 +717,16 @@
       "desktop": {
         "resource": "licenses/vendor/devicon-MIT.txt"
       }
+    },
+    {
+      "id": "pi-MIT",
+      "input": "licenses/vendor/pi-MIT.txt",
+      "source": "https://raw.githubusercontent.com/earendil-works/pi/main/LICENSE",
+      "sha256": "4f6a1985796db5225e3b1e59972bd47e07a27a0748427cb3d3c8fbf39f9311f0",
+      "desktop": {
+        "resource": "licenses/vendor/pi-MIT.txt"
+      },
+      "website": "licenses/pi-MIT.txt"
     }
   ],
   "unresolved": [

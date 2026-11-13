@@ -4,7 +4,8 @@ import type { Project, ThreadSummary } from "@openorc/protocol";
 import { useLayout } from "../lib/layout";
 import { ThreadMedia, ThreadLink, ThreadRichText, type MediaScope } from "./ThreadImages";
 import { useRunVoice } from "../lib/turn-authors";
-import { SubagentConversation } from "./SubagentConversation";
+import { useRouter } from "../lib/router";
+import { SubagentConversation, ThreadParent } from "./SubagentConversation";
 
 const rows = vi.hoisted(() => ({ parent: null as ThreadSummary | null }));
 vi.mock("../lib/client", () => ({
@@ -66,4 +67,14 @@ it("opens a cloud subagent's file links in its parent's copy on this Mac, and re
   render(<SubagentConversation thread={child} project={{ rootPath: "/repo" } as Project} />);
   fireEvent.click(await screen.findByText("the footer"));
   expect(revealFile).toHaveBeenCalledExactlyOnceWith("/mirrors/footer/src/footer.tsx");
+});
+
+it("stands among a header's facts as the thread it started from, and opens it", () => {
+  rows.parent = { id: "parent", title: "Cloud Sandbox Provider Evaluation" } as ThreadSummary;
+  useRouter.setState({ route: { view: "thread", threadId: "child" }, history: [], future: [], threadIds: ["child"] });
+  render(<ThreadParent id="parent" fact />);
+  const link = screen.getByRole("button", { name: "Cloud Sandbox Provider Evaluation" });
+  expect(link.textContent).not.toContain("/");
+  fireEvent.click(link);
+  expect(useRouter.getState().route).toEqual({ view: "thread", threadId: "parent" });
 });

@@ -119,7 +119,7 @@ export function CheckpointsPanel({ thread }: { thread: ThreadSummary }) {
                   <span className="ml-auto tabular text-ink-4">{relativeTime(c.createdAt)}</span>
                 </div>
               </div>
-              <Button disabled={Boolean(blockedReason) || busy} title={blockedReason ?? undefined} onClick={() => select(c.id)}>
+              <Button disabled={Boolean(blockedReason) || busy} data-tip={blockedReason ?? undefined} onClick={() => select(c.id)}>
                 {"Restore"}
               </Button>
             </div>

@@ -1,5 +1,5 @@
 import { settings, type Db } from "@openorc/db";
-import { AppSettings } from "@openorc/protocol";
+import { AppSettings, enabledHarnessIds, type HarnessId } from "@openorc/protocol";
 
 const defaults: AppSettings = {
   notifications: true,
@@ -8,11 +8,13 @@ const defaults: AppSettings = {
   autoDoneOnPrMerge: true,
   autoArchiveDoneDays: 14,
   defaultWorkspaceMode: "current",
-  defaultPermissionMode: "trusted",
+  defaultPermissionMode: "autonomous",
   defaultHarness: null,
+  enabledHarnesses: null,
   look: null,
   idleProcessMinutes: 10,
   claudeUserMcpServers: true,
+  claudeConnectorsOff: [],
   claudeAccountAutoSwitch: false,
 };
 
@@ -34,7 +36,15 @@ export class AppSettingsService {
 
   set(patch: Partial<AppSettings>): AppSettings {
     const next = AppSettings.parse({ ...this.get(), ...patch });
+    if (next.enabledHarnesses != null) {
+      next.enabledHarnesses = [...enabledHarnessIds(next)];
+      if (next.defaultHarness && !next.enabledHarnesses.includes(next.defaultHarness)) next.defaultHarness = next.enabledHarnesses[0] ?? null;
+    }
     settings.set(this.db, KEY, JSON.stringify(next));
     return next;
+  }
+
+  enabledHarnesses(): readonly HarnessId[] {
+    return enabledHarnessIds(this.get());
   }
 }

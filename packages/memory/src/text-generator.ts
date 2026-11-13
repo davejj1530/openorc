@@ -62,6 +62,11 @@ export class TextGenerator {
       claude: () => this.runClaude(prompt),
       codex: () => this.runCodex(prompt, schema),
       opencode: () => this.runOpenCode(prompt),
+      omp: () => this.runOmp(prompt),
+      cursor: () => Promise.resolve(null),
+      pi: () => Promise.resolve(null),
+      antigravity: () => Promise.resolve(null),
+      fx: () => Promise.resolve(null),
     };
     return runners[this.options.provider ?? "claude"]();
   }
@@ -142,6 +147,33 @@ export class TextGenerator {
       },
       stdin: prompt,
     });
+  }
+
+  /**
+   * Oh My Pi's print mode with no tools, extensions, skills, rules or context files, and no saved session: the prompt
+   * in, the answer out. An explicit model avoids using an expensive default.
+   */
+  private runOmp(prompt: string): Promise<string | null> {
+    if (!this.options.model) return Promise.resolve(null);
+    const binary = this.options.binary ?? agentBinary("omp");
+    const system = this.options.system ?? "Return only the text requested by the user. Do not use tools.";
+    const args = [
+      "-p",
+      "--no-session",
+      "--model",
+      this.options.model,
+      "--no-tools",
+      "--no-extensions",
+      "--no-skills",
+      "--no-rules",
+      "--no-context-files",
+      "--no-lsp",
+      "--no-title",
+      "--system-prompt",
+      system,
+    ];
+    if (this.options.effort) args.push("--thinking", this.options.effort);
+    return this.spawn({ binary, args, env: { ...(this.options.env ?? process.env), NO_COLOR: "1" }, read: (stdout) => stdout.trim() || null, stdin: prompt });
   }
 
   /**

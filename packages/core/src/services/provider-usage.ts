@@ -1,5 +1,5 @@
 import { CodexResetService, type ResetInput } from "./provider-resets.js";
-import { captureLaunchEnvironment, readClaudeUsage, readCodexUsage, consumeCodexReset } from "@openorc/agents";
+import { captureLaunchEnvironment, readClaudeUsage, readCodexUsage, consumeCodexReset, readAntigravityUsage, readFxUsage, type AntigravityQuotaGroup } from "@openorc/agents";
 import { settings, runs, claudeAccounts, type Db } from "@openorc/db";
 import {
   DEFAULT_CLAUDE_ACCOUNT,
@@ -18,6 +18,8 @@ import {
 } from "@openorc/protocol";
 import type { SystemService } from "./system.js";
 import type { EnvSnapshot } from "./shell-environment.js";
+
+import { normalizeFx } from "./fx-usage.js";
 
 const record = (v: unknown): Record<string, unknown> => (v !== null && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
 const text = (v: unknown): string | null => (typeof v === "string" && v.length > 0 ? v.slice(0, 160) : null);
@@ -42,7 +44,6 @@ const claudeLabels: Record<string, string> = {
   seven_day_sonnet: "7-day window · Sonnet",
   overage: "Extra usage window",
 };
-const claudePlans: Record<string, string> = { pro: "Pro", max: "Max", team: "Team", enterprise: "Enterprise" };
 const capitalized = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);
 
 function allowanceWindow({ id, label, used, resets, at, exhausted = false }: { id: string; label: string; used: unknown; resets: unknown; at: number; exhausted?: boolean }): AllowanceWindow {
@@ -178,10 +179,31 @@ export function normalizeClaudeAccount(payload: unknown, at: number): Pick<Provi
   return { windows, credits: [], message: null };
 }
 
+/** Each native bucket is its own limit. Missing fractions and reset times stay unknown. */
+export function normalizeAntigravity(groups: AntigravityQuotaGroup[], at: number): AllowanceWindow[] {
+  return groups.flatMap((group) =>
+    group.buckets.map((bucket) => {
+      const remaining = fraction(bucket.remaining_fraction);
+      return {
+        id: bucket.id,
+        label: `${bucket.name.replace(/\s+remaining$/i, "")} · ${group.name}`,
+        group: group.name,
+        usedPercent: remaining === null ? null : Math.round((100 - remaining) * 100) / 100,
+        remainingPercent: remaining,
+        resetsAt: timestamp(bucket.reset_time),
+        observedAt: at,
+        exhausted: bucket.remaining_fraction === 0,
+      };
+    }),
+  );
+}
+
 export interface ProviderUsageReaders {
   codex?: typeof readCodexUsage;
   consumeReset?: typeof consumeCodexReset;
   claude?: typeof readClaudeUsage;
+  antigravity?: typeof readAntigravityUsage;
+  fx?: typeof readFxUsage;
   apiKey?: () => Promise<Pick<MemorySettings, "hasApiKey" | "apiKeyError">>;
 }
 
@@ -190,7 +212,7 @@ interface HarnessUsageReader {
   /** Where the numbers come from, shown on the report. */
   source: string;
   /** Fills in the report for an installed harness; `row` is its current probe result. */
-  read(result: ProviderUsage, at: number, row: HarnessInfo, snapshot: EnvSnapshot | undefined): Promise<ProviderUsage>;
+  read(result: ProviderUsage, at: number, row: HarnessInfo, snapshot: EnvSnapshot | undefined, fxModel?: string): Promise<ProviderUsage>;
   /** Drops anything remembered from the account once the harness is gone. */
   forget?(accountId?: string): void;
 }
@@ -207,7 +229,37 @@ export class ProviderUsageService {
   private readonly resets: CodexResetService;
   private readonly apiKey: NonNullable<ProviderUsageReaders["apiKey"]>;
   private readonly claudeAccount: typeof readClaudeUsage;
+  private readonly fxAccount: typeof readFxUsage;
+  private readonly antigravityAccount: typeof readAntigravityUsage;
   private readonly harnesses: Record<HarnessId, HarnessUsageReader> = {
+    fx: {
+      source: "fx CLI · account usage",
+      read: async (result, at, _row, snapshot, model) => {
+        const launch = snapshot ? captureLaunchEnvironment("fx", snapshot) : undefined;
+        const live = await this.fxAccount({ ...(launch ? { binary: launch.binary, env: launch.env } : {}), model });
+        return { ...result, ...normalizeFx(live, at) };
+      },
+    },
+    antigravity: {
+      source: "Antigravity CLI · account usage",
+      read: (result, at, _row, snapshot) => this.readAntigravity(result, at, snapshot),
+    },
+    pi: {
+      source: "Pi provider accounts",
+      read: (result) => {
+        result.context = "Pi provider accounts";
+        result.message = "Pi reports token usage and cost in each conversation. Check your model provider for account limits.";
+        return Promise.resolve(result);
+      },
+    },
+    cursor: {
+      source: "Cursor account",
+      read: (result) => {
+        result.context = "Cursor account";
+        result.message = "Cursor's CLI does not report account allowances here. Open the Cursor dashboard for usage and limits.";
+        return Promise.resolve(result);
+      },
+    },
     codex: { source: "Codex app-server · account usage", read: (result, _at, _row, snapshot) => this.readCodex(result, snapshot) },
     claude: {
       source: "Claude Code · account usage",
@@ -228,6 +280,14 @@ export class ProviderUsageService {
         return Promise.resolve(result);
       },
     },
+    omp: {
+      source: "Oh My Pi provider accounts",
+      read: (result) => {
+        result.context = "Provider accounts signed into Oh My Pi";
+        result.message = "Oh My Pi bills each model through the provider account it was signed into. Run omp usage in a terminal, or open that provider's own dashboard, for allowances and spend.";
+        return Promise.resolve(result);
+      },
+    },
   };
 
   constructor(
@@ -241,6 +301,8 @@ export class ProviderUsageService {
     this.codex = readers.codex ?? readCodexUsage;
     this.resets = new CodexResetService(db, readers.consumeReset, this.now);
     this.claudeAccount = readers.claude ?? readClaudeUsage;
+    this.fxAccount = readers.fx ?? readFxUsage;
+    this.antigravityAccount = readers.antigravity ?? readAntigravityUsage;
   }
 
   /** Claude Code's stream carries the account's rate limits; no other harness reports them this way. */
@@ -254,14 +316,14 @@ export class ProviderUsageService {
     settings.set(this.db, this.windowsKey(id), JSON.stringify([...saved.values()]));
   }
 
-  read(provider: ProviderUsage["provider"], claudeAccountId?: string): Promise<ProviderUsage> {
+  read(provider: ProviderUsage["provider"], claudeAccountId?: string, fxModel?: string): Promise<ProviderUsage> {
     const id = this.accountId(provider, claudeAccountId);
-    const key = usageKey(provider, id);
+    const key = usageKey(provider, id, fxModel);
     const pending = this.inFlight.get(key);
     if (pending) return pending;
     const revision = this.environment?.().revision;
     const login = this.logins.get(key);
-    const next = this.fetch(provider, id)
+    const next = this.fetch(provider, id, fxModel)
       .then((usage) => (this.logins.get(key) === login ? this.remember(key, revision, usage) : usage))
       .finally(() => {
         if (this.inFlight.get(key) === next) this.inFlight.delete(key);
@@ -271,10 +333,10 @@ export class ProviderUsageService {
   }
 
   /** The account's last report while it is younger than `maxAgeMs` and from the current environment, or a fresh read. */
-  recent(provider: ProviderUsage["provider"], claudeAccountId: string | undefined, maxAgeMs: number): Promise<ProviderUsage> {
-    const kept = this.latest.get(usageKey(provider, this.accountId(provider, claudeAccountId)));
+  recent(provider: ProviderUsage["provider"], claudeAccountId: string | undefined, maxAgeMs: number, fxModel?: string): Promise<ProviderUsage> {
+    const kept = this.latest.get(usageKey(provider, this.accountId(provider, claudeAccountId), fxModel));
     const fresh = kept && this.now() - kept.usage.checkedAt < maxAgeMs && kept.revision === this.environment?.().revision;
-    return fresh ? Promise.resolve(kept.usage) : this.read(provider, claudeAccountId);
+    return fresh ? Promise.resolve(kept.usage) : this.read(provider, claudeAccountId, fxModel);
   }
 
   async redeemCodex(input: ResetInput): Promise<ResetResult> {
@@ -332,7 +394,7 @@ export class ProviderUsageService {
     if (live.status === "ok") {
       Object.assign(result, normalizeClaudeAccount(live.usage, at));
       result.source = "Claude Code · live account usage";
-      result.plan = live.subscriptionType ? (claudePlans[live.subscriptionType] ?? live.subscriptionType) : null;
+      result.plan = live.plan;
       result.context = result.plan ? `Claude ${result.plan}` : "Claude Code login";
       result.refreshedAt = at;
       result.status = result.windows.length ? "available" : "unavailable";
@@ -354,6 +416,33 @@ export class ProviderUsageService {
         ? `Claude Code did not report live usage: ${live.detail}. Refresh to try again.${fallback}`
         : `Could not fetch live usage. Check your connection, then refresh.${fallback}`;
     return result;
+  }
+
+  private async readAntigravity(result: ProviderUsage, at: number, snapshot: EnvSnapshot | undefined): Promise<ProviderUsage> {
+    const launch = snapshot ? captureLaunchEnvironment("antigravity", snapshot) : undefined;
+    const live = await this.antigravityAccount(launch ? { binary: launch.binary, env: launch.env } : undefined);
+    result.context = "Google Antigravity account";
+    switch (live.status) {
+      case "ok":
+        result.windows = normalizeAntigravity(live.groups, at);
+        result.refreshedAt = at;
+        result.status = result.windows.length ? "available" : "unavailable";
+        result.message = result.windows.length ? null : "Antigravity returned no model quotas for this account.";
+        return result;
+      case "unsupported":
+        result.context = "Gemini API key";
+        result.accountUrl = "https://aistudio.google.com/usage";
+        result.message = "This connection uses a Gemini API key. Check Google AI Studio for its usage and limits; Antigravity plan quotas do not apply.";
+        return result;
+      case "disconnected":
+        result.status = "disconnected";
+        result.message = "Sign in with agy acp --login, then refresh usage.";
+        return result;
+      case "unavailable":
+        result.status = "error";
+        result.message = "Could not read Antigravity usage. Check your connection and CLI login, update Antigravity if needed, then refresh.";
+        return result;
+    }
   }
 
   private async readCodex(result: ProviderUsage, snapshot: EnvSnapshot | undefined): Promise<ProviderUsage> {
@@ -408,7 +497,7 @@ export class ProviderUsageService {
     };
   }
 
-  private async fetch(provider: ProviderUsage["provider"], claudeAccountId?: string): Promise<ProviderUsage> {
+  private async fetch(provider: ProviderUsage["provider"], claudeAccountId?: string, fxModel?: string): Promise<ProviderUsage> {
     // Capture before the first await. Provider checks and the usage process
     // must agree even if a Rescan publishes the next revision midway.
     const snapshot = this.environment?.(claudeAccountId);
@@ -456,7 +545,7 @@ export class ProviderUsageService {
         result.message = `${harnessCatalog[provider].name} fails to start. Reinstall it in Settings → Connections, then refresh.`;
         return result;
       }
-      return await reader.read(result, at, row, snapshot);
+      return await reader.read(result, at, row, snapshot, fxModel);
     } catch {
       // Never forward CLI stderr, authentication payloads, or provider errors.
       return { ...result, status: "error", message: "Could not refresh usage. Check your connection and CLI login, update the CLI if needed, then try Refresh." };
@@ -464,7 +553,8 @@ export class ProviderUsageService {
   }
 }
 
-function usageKey(provider: ProviderUsage["provider"], claudeAccountId: string | undefined): string {
+function usageKey(provider: ProviderUsage["provider"], claudeAccountId: string | undefined, fxModel?: string): string {
+  if (provider === "fx" && fxModel) return `fx:${fxModel.split("/")[0]}`;
   return claudeAccountId ? `${provider}:${claudeAccountId}` : provider;
 }
 

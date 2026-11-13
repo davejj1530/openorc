@@ -4,6 +4,7 @@ import { Button, Dialog } from "../components/ui";
 import { queryClient, useRpcMutation } from "../lib/client";
 import { Failure } from "./settings-secret-field";
 import { SettingRow, Status } from "./settings-shared";
+import { thisComputer } from "../lib/this-computer";
 
 const shown = (signIns: CloudSignIns) => queryClient.setQueryData(["cloud.signIns", {}], signIns);
 
@@ -25,10 +26,10 @@ export function missingRows(signIns: CloudSignIns | undefined): CloudSignIn[] {
 /** How many sign-ins are still missing, said the same in the step's summary and on its Bring them row. */
 export const notSignedIn = (count: number) => `${count} not signed in`;
 
-/** A row names its agent where the name alone could be another's: Claude's accounts beside OpenCode's providers. */
+/** A row names its agent where the name alone could be another's: Claude's accounts beside the provider keys OpenCode and Oh My Pi share. */
 export function signInTitle(row: CloudSignIn): string {
   if (row.kind === "claude") return `Claude · ${row.label}`;
-  return row.kind === "opencode" ? `OpenCode · ${row.label}` : row.label;
+  return row.kind === "opencode" ? `${row.label} key` : row.label;
 }
 
 /**
@@ -63,7 +64,7 @@ export function BringMissing({ signIns, label = "Sign-ins" }: { signIns: CloudSi
         </Button>
       </SettingRow>
       <Failure error={bringAll.error ?? cancel.error} />
-      <Dialog open={asking} onOpenChange={setAsking} title="Copy from this Mac?">
+      <Dialog open={asking} onOpenChange={setAsking} title={`Copy from ${thisComputer}?`}>
         <div className="space-y-3">
           <p className="text-ink-2">The cloud gets a copy of {listed(copies.map(copyName))}.</p>
           <div className="flex justify-end gap-2">

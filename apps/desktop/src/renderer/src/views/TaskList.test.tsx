@@ -126,7 +126,7 @@ it("disables only the saving row, retains its status on failure and lets the use
   expect(screen.getByRole("button", { name: "Status for Review copy" }).hasAttribute("disabled")).toBe(false);
   reject(new Error("Connection lost"));
   expect((await screen.findByRole("alert")).textContent).toContain("Connection lost");
-  expect(trigger.getAttribute("title")).toBe("Change status · Backlog");
+  expect(trigger.getAttribute("data-tip")).toBe("Change status · Backlog");
   expect(trigger.hasAttribute("disabled")).toBe(false);
   update = async () => {};
   await moveStatus("in_progress");

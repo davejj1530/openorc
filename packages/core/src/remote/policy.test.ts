@@ -1,11 +1,11 @@
-import { deviceRpcParams, isRemoteMethod, REMOTE_ATTACHMENT_BYTES, REMOTE_METHODS, remoteRpcParams, rpcParams, type FileDiff } from "@openorc/protocol";
+import { deviceRpcParams, isRemoteMethod, type Task, REMOTE_ATTACHMENT_BYTES, REMOTE_METHODS, remoteRpcParams, rpcParams, type FileDiff } from "@openorc/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { remoteError, type MacRoots } from "./phone-words.js";
 import { admitRemoteRequest, remotePush, remoteReplies, remoteReply, type GuardContext } from "./policy.js";
 
 /** Threads the guards can see: "team" belongs to a team, "solo" does not, anything else is unknown. */
 const seen: Record<string, { team: boolean }> = { team: { team: true }, solo: { team: false } };
-const context: GuardContext = { attachmentsDir: "/data/attachments", thread: (id) => seen[id] ?? null };
+const context: GuardContext = { attachmentsDir: "/data/attachments", thread: (id) => seen[id] ?? null, task: () => null, orcling: () => null };
 const TOKEN = "ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij12";
 const image = "/data/attachments/0b9f2c1e-7d1a-4b55-9a0e-3f2b8c6d4e10.png";
 
@@ -49,6 +49,33 @@ describe("phone policy", () => {
     ]);
   });
 
+  it("offers a phone only the skills its agent uses, without their images, and none of the Skills page's changes", () => {
+    const listed = remoteReply(
+      "skills.list",
+      [
+        {
+          name: "deploy",
+          description: "Ship it.",
+          shortDescription: `Uses ${TOKEN}`,
+          source: "user",
+          path: "/Users/me/.claude/skills/deploy/SKILL.md",
+          icon: "data:image/png;base64,AAAA",
+          enabled: true,
+          editable: true,
+        },
+        { name: "drafts", description: "Off.", source: "user", path: "/Users/me/.claude/skills/drafts/SKILL.md", enabled: false, editable: true },
+      ],
+      { words: (text: string) => text, roots: () => ({ home: "/Users/me", dataDir: "/Users/me/.openorc", projects: [] }) },
+    );
+    expect(listed.map((skill) => skill.name)).toEqual(["deploy"]);
+    expect(Object.keys(listed[0]!).sort()).toEqual(["description", "name", "path", "shortDescription", "source"]);
+    expect(JSON.stringify(listed)).not.toContain(TOKEN);
+    for (const method of ["skills.files", "skills.readFile", "skills.writeFile", "skills.setEnabled", "skills.setIcon", "skills.create", "skills.import", "skills.remove"]) {
+      expect(isRemoteMethod(method), method).toBe(false);
+      expect(admitRemoteRequest(method, {}, context).ok, method).toBe(false);
+    }
+  });
+
   it("lets only the brain's own Mac name a new thread's id", () => {
     const named = { id: "5b0e7a52-1c3f-4d8e-9a6b-2f4c8e1d7a90", projectId: "p", agent: "claude", mode: "act", permissionMode: "autonomous", cloud: true, prompt: "x" };
     expect(admitRemoteRequest("threads.start", named, context)).toEqual({ ok: false, message: "This is not available from a phone." });
@@ -63,6 +90,121 @@ describe("phone policy", () => {
       expect(admitRemoteRequest(method, params, context)).toEqual({ ok: false, message: "This is not available from a phone." });
       expect(admitRemoteRequest(method, params, context, "owner")).toEqual({ ok: true });
     }
+  });
+
+  it("lets a phone read Orclings' own conversations, open one's profile, change it, set its check-ins and react there, and keeps the rest on the Mac", () => {
+    expect(admitRemoteRequest("orclings.chats", {}, context)).toEqual({ ok: true });
+    expect(admitRemoteRequest("orclings.profile", { id: "o" }, context)).toEqual({ ok: true });
+    expect(admitRemoteRequest("orclings.delete", { id: "o" }, context)).toEqual({ ok: true });
+    expect(admitRemoteRequest("orclings.wakes.save", { id: "o", wakes: [{ kind: "startup" }] }, context)).toEqual({ ok: true });
+    expect(admitRemoteRequest("orclings.reactions", { threadId: "t" }, context)).toEqual({ ok: true });
+    expect(admitRemoteRequest("orclings.react", { threadId: "t", runId: "r", messageId: "m", part: 0, reaction: "heart" }, context)).toEqual({ ok: true });
+    for (const method of ["orclings.list", "orclings.instructions", "orclings.instructions.restore", "orclings.memories", "orclings.ask", "orclings.assign", "orclings.groups.send"])
+      expect(admitRemoteRequest(method, {}, context).ok, method).toBe(false);
+  });
+
+  it("makes and saves an Orcling's look, name, model and permission from a phone, but no name that breaks its conversation's title", () => {
+    const draft = {
+      name: "Rini",
+      look: { shape: 3, eyes: 1, texture: 2, glasses: 0, accessory: 4, bodyColor: "#e8a33d", eyeColor: "#1b1c20" },
+      settings: { agent: "codex", model: "gpt-6-terra", effort: "high", fastMode: false },
+      permission: "allow",
+      claudeAccountId: "work",
+    };
+    expect(admitRemoteRequest("orclings.update", { id: "o", draft }, context)).toEqual({ ok: true });
+    expect(admitRemoteRequest("orclings.update", { id: "o", draft: { ...draft, name: "Ri\nni" } }, context)).toEqual({ ok: false, message: "A name must be one line." });
+    expect(admitRemoteRequest("orclings.update", { id: "o", draft: { ...draft, name: "Ri\u202Eni" } }, context)).toEqual({ ok: false, message: "A name must be one line." });
+    expect(admitRemoteRequest("orclings.create", { draft }, context)).toEqual({ ok: true });
+    expect(admitRemoteRequest("orclings.create", { draft: { ...draft, name: "Ri\nni" } }, context)).toEqual({ ok: false, message: "A name must be one line." });
+  });
+
+  it("rewrites an Orcling's instructions from a phone unless the ones it would replace hold a secret the phone read redacted", () => {
+    const stored: Record<string, string | null> = { plain: "Answer in one line.", fresh: null, secret: `Deploy with ${TOKEN}.` };
+    const orclings: GuardContext = { ...context, orcling: (id) => (id in stored ? { instructions: stored[id]! } : null) };
+    expect(admitRemoteRequest("orclings.instructions.save", { id: "plain", body: "Answer in two lines.\n\nThen stop." }, orclings)).toEqual({ ok: true });
+    expect(admitRemoteRequest("orclings.instructions.save", { id: "fresh", body: "Be kind." }, orclings)).toEqual({ ok: true });
+    expect(admitRemoteRequest("orclings.instructions.save", { id: "secret", body: "Deploy with [redacted:github-token]." }, orclings)).toEqual({
+      ok: false,
+      message: "These instructions hold a secret, so edit them on your Mac.",
+    });
+    expect(admitRemoteRequest("orclings.instructions.save", { id: "plain", body: "Be \u001b[31mloud" }, orclings)).toEqual({ ok: false, message: "Instructions must be plain text." });
+    const saved = remoteReply(
+      "orclings.instructions.save",
+      { version: 4, body: `Use ${TOKEN}`, author: "user", note: null, createdAt: 1 },
+      { words: (text: string) => text, roots: () => ({ home: "/Users/me", dataDir: "/Users/me/.openorc", projects: [] }) },
+    );
+    expect(JSON.stringify(saved)).not.toContain(TOKEN);
+    expect(saved.version).toBe(4);
+  });
+
+  it("opens one task for a phone without the worktree's path on the Mac or a token in its spec, and keeps starting and deleting tasks on the Mac", () => {
+    expect(admitRemoteRequest("tasks.get", { id: "task-1" }, context)).toEqual({ ok: true });
+    for (const method of ["tasks.start", "tasks.delete"]) expect(admitRemoteRequest(method, {}, context).ok, method).toBe(false);
+    const task = {
+      id: "task-1",
+      projectId: "p",
+      title: "Ship it",
+      spec: `Use ${TOKEN}`,
+      status: "in_progress",
+      priority: "medium",
+      labels: [],
+      workspaceMode: "worktree",
+      baseRef: null,
+      baseSha: null,
+      branch: "task/ship",
+      worktreePath: "/Users/me/.openorc/worktrees/ship",
+      parentTaskId: null,
+      threadId: "t",
+      executionThreadId: "t2",
+      origin: "user",
+      reviewedSnapshotId: null,
+      costUsd: 0,
+      createdAt: 1,
+      updatedAt: 2,
+      completedAt: null,
+    } satisfies Task;
+    const shaped = remoteReply("tasks.get", task, { words: (text: string) => text, roots: () => ({ home: "/Users/me", dataDir: "/Users/me/.openorc", projects: [] }) });
+    expect(shaped).toMatchObject({ title: "Ship it", branch: "task/ship", executionThreadId: "t2", worktreePath: null });
+    expect(shaped?.spec).toContain("[redacted:github-token]");
+    expect(remoteReply("tasks.get", null, { words: (text: string) => text, roots: () => ({ home: "/Users/me", dataDir: "/Users/me/.openorc", projects: [] }) })).toBeNull();
+    const saved = remoteReply("tasks.update", task, { words: (text: string) => text, roots: () => ({ home: "/Users/me", dataDir: "/Users/me/.openorc", projects: [] }) });
+    expect(remoteReply("tasks.create", task, { words: (text: string) => text, roots: () => ({ home: "/Users/me", dataDir: "/Users/me/.openorc", projects: [] }) })).toMatchObject({
+      worktreePath: null,
+    });
+    expect(saved).toMatchObject({ worktreePath: null, spec: expect.stringContaining("[redacted:github-token]") });
+  });
+
+  it("starts a thread under another from a phone, in the parent's folder, never in one the phone names", () => {
+    const start = { projectId: "p", agent: "codex", mode: "act", permissionMode: "review", prompt: "Look into it", parentThreadId: "solo" };
+    expect(admitRemoteRequest("threads.start", start, context)).toEqual({ ok: true });
+    // The start's own schema refuses a folder beside a parent, and the core words that refusal.
+    expect(rpcParams["threads.start"].safeParse({ ...start, workingDirectory: "/etc" }).success).toBe(false);
+  });
+
+  it("saves a new task from a phone in a project, never under a thread, from a branch or in a folder it names", () => {
+    const task = { projectId: "p", title: "Ship the badge", spec: "## Goal\nShow it.", priority: "high", labels: ["ui"], useWorktree: true };
+    expect(admitRemoteRequest("tasks.create", task, context)).toEqual({ ok: true });
+    expect(admitRemoteRequest("tasks.create", { projectId: "p", title: "Just a title" }, context)).toEqual({ ok: true });
+    for (const extra of [{ threadId: "solo" }, { baseRef: "main" }, { workspaceMode: "worktree" }])
+      expect(admitRemoteRequest("tasks.create", { ...task, ...extra }, context)).toEqual({ ok: false, message: "Make this change on your Mac." });
+    expect(admitRemoteRequest("tasks.create", { ...task, title: "Two\nlines" }, context).ok).toBe(false);
+    expect(admitRemoteRequest("tasks.create", { ...task, spec: "x".repeat(100_001) }, context).ok).toBe(false);
+    expect(admitRemoteRequest("tasks.create", { ...task, labels: ["x".repeat(51)] }, context).ok).toBe(false);
+  });
+
+  it("saves what a phone's task screen edits, keeping the workspace and any description that holds a secret on the Mac", () => {
+    const specs: Record<string, string | null> = { plain: "Ship the badge.", secret: `Use ${TOKEN}`, empty: null };
+    const tasks: GuardContext = { ...context, task: (id) => (id in specs ? { spec: specs[id]! } : null) };
+    const update = (id: string, patch: Record<string, unknown>) => admitRemoteRequest("tasks.update", { id, patch }, tasks);
+    expect(update("secret", { title: "Ship it", status: "done", priority: "urgent", labels: ["ui", "phone"] })).toEqual({ ok: true });
+    expect(update("plain", { spec: "## Goal\n- [ ] Ship the badge." })).toEqual({ ok: true });
+    expect(update("empty", { spec: "Start here." })).toEqual({ ok: true });
+    expect(update("secret", { spec: "Use the token." })).toEqual({ ok: false, message: "This description holds a secret, so edit it on your Mac." });
+    expect(update("plain", { workspaceMode: "current" })).toEqual({ ok: false, message: "Make this change on your Mac." });
+    expect(update("plain", { title: "Two\nlines" }).ok).toBe(false);
+    expect(update("plain", { labels: ["x".repeat(51)] }).ok).toBe(false);
+    expect(update("plain", { labels: Array.from({ length: 21 }, (_, at) => `l${at}`) }).ok).toBe(false);
+    expect(update("plain", { spec: "x".repeat(100_001) }).ok).toBe(false);
   });
 
   it("keeps phone access and its push key out of a phone's reach", () => {

@@ -9,6 +9,7 @@
  *   apps/desktop/resources/icon.svg, the Dock icon the home-screen icon is drawn from
  *   the Shiki code themes RichText.tsx names
  *   apps/desktop/src/renderer/src/assets/fonts/*.woff2
+ *   @openorc/client's orcling-art, for the faces the notification extension draws
  *
  * `design:sync` writes the outputs below; `design:check` regenerates them in memory and fails when any is stale.
  */
@@ -22,6 +23,7 @@ import { renderAppIcon } from "./design-sync/app-icon.mts";
 import { renderHarnessLogos } from "./design-sync/harness-logos.mts";
 import { renderIcons } from "./design-sync/icons.mts";
 import { renderOpenOrcMark } from "./design-sync/openorc-mark.mts";
+import { renderOrclingArt } from "./design-sync/orcling-art.mts";
 import { readSyntax } from "./design-sync/syntax.mts";
 import { readStylesheet, type Scales } from "./design-sync/stylesheet.mts";
 
@@ -147,6 +149,8 @@ async function outputs(): Promise<Output[]> {
     await formatted(resolve(generated, "openorc-mark.ts"), `// ${header}\n${openOrcMark}`),
     await formatted(resolve(iconDocument, "icon.json"), appIcon.document),
     { path: resolve(iconDocument, "Assets/cube.svg"), contents: appIcon.cube },
+    // The notification extension draws an Orcling's face in a text from the same art the app's faces use.
+    { path: resolve(app, "targets/notification-service/OrclingArt.swift"), contents: renderOrclingArt(header) },
     ...faces,
   ];
 }

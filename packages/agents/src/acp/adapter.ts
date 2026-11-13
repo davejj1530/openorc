@@ -2,39 +2,53 @@ import { spawnAgentProcess } from "../process-recovery.js";
 import { executionMode, executionModeUnavailable } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import { spawn, type ChildProcess } from "node:child_process";
-import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import os from "node:os";
-import path, { extname } from "node:path";
+import { extname } from "node:path";
 import readline from "node:readline";
 import { Readable, Writable } from "node:stream";
 import {
   client,
   ndJsonStream,
   PROTOCOL_VERSION,
+  type ClientCapabilities,
   type ContentBlock,
+  type InitializeResponse,
   type McpServer,
+  type NewSessionRequest,
   type PermissionOptionKind,
   type PromptResponse,
   type RequestPermissionRequest,
   type RequestPermissionResponse,
   type SessionConfigOption,
-  type StopReason,
+  type SessionUpdate,
   type Usage as AcpUsage,
 } from "@agentclientprotocol/sdk";
 import type { AgentEvent, ApprovalDecision, ApprovalKind, ApprovalResolution, RunSpec, RunStatus, Usage } from "@openorc/protocol";
-import { definedEnv, type AgentHost } from "../agent-host.js";
+import { definedEnv, launchPlace, type AgentHost, type LaunchPlace } from "../agent-host.js";
 import { agentBinary } from "../bin.js";
+import { emitProviderFailure, providerErrorActivity } from "../provider-errors.js";
 import { launchCommand } from "../command-launch.js";
 import { inFolder, type AgentLaunchEnvironment } from "../launch-environment.js";
 import { partitionAttachments, withAttachedFiles } from "../attachments.js";
 import { stopProcess, waitForProcessGroup } from "../process-lifetime.js";
-import { RunHandle } from "../run-handle.js";
+import { RunHandle, LiveInputUnavailable, type RunControls } from "../run-handle.js";
 import { stripAnsi } from "../jsonrpc.js";
 import { AcpUpdateMapper, type ContextReport } from "./updates.js";
 import { AcpSubagents, childUpdate } from "./subagents.js";
-import { planConfig } from "./plan-config.js";
-import { questionConfig, questionInstructions } from "./questions.js";
+import { agentCommand, SubagentSpend } from "./subagent-spend.js";
+import { questionInstructions } from "./questions.js";
+import { answerForm, AutoCompactions, type FormRun, type PendingRequest } from "./forms.js";
+import type { AcpProfile, AcpRunContext, AgentCommand, OwnTurns } from "./profile.js";
+import { openCodeAcp } from "../opencode/acp.js";
+import { readModels } from "./models.js";
+import { acpControl } from "./control.js";
+import { promptOutcome } from "./outcome.js";
+import { OwnTurnWatcher, type OwnTurnHost } from "./own-turns.js";
+import { AcpSettings, selectedModel, setModelOption } from "./settings.js";
+export { modelsFrom } from "./models.js";
+import { cursorPlan, cursorQuestion, answerCursorQuestion, presentCursorPlan } from "../cursor/interactions.js";
+import { CursorTodos, cursorTodos } from "../cursor/todos.js";
 
 /** A permission the agent asked for, in the app's terms. The host announces it and answers it. */
 export interface AcpApprovalRequest {
@@ -50,14 +64,20 @@ export interface AcpApprovalRequest {
 }
 
 export interface AcpAdapterOptions {
+  /** Which agent: OpenCode unless told. */
+  profile?: AcpProfile;
   binary?: string;
   env?: NodeJS.ProcessEnv;
   mcpServerName?: string;
   clientVersion?: string;
   /** Where a throwaway session is opened to read the model list. Defaults to the home directory. */
   modelsCwd?: string;
-  /** The UI answers these. Spikes auto-allow. */
+  /** Resolves tool permission requests through OpenOrc's approval policy. */
   onApproval: (request: AcpApprovalRequest) => Promise<ApprovalDecision | ApprovalResolution>;
+  /** Reads the agent's models some other way than a throwaway session's model option. */
+  listModels?: (launch: AgentLaunchEnvironment) => Promise<AcpModel[]>;
+  /** Runs the agent's command line for reads beside a session, such as its subagents' cost, some other way than a process of its own. */
+  runCommand?: AgentCommand;
 }
 
 /** One model an ACP agent offers, as its `model` configuration option lists it. */
@@ -73,13 +93,219 @@ export interface AcpModel {
 
 const imageMimeTypes: Record<string, string> = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp" };
 
-const statusFor: Record<StopReason, RunStatus> = {
-  end_turn: "success",
-  cancelled: "cancelled",
-  max_tokens: "error",
-  max_turn_requests: "max_turns",
-  refusal: "error",
-};
+type Connection = ReturnType<ReturnType<typeof client>["connect"]>;
+
+async function setSessionOption(connection: Connection, sessionId: string | null, profile: AcpProfile, configId: string, value: string): Promise<SessionConfigOption[] | null | undefined> {
+  if (!sessionId) throw new Error(`${profile.name} has no session yet.`);
+  const set = async (configId: string, value: string) =>
+    (
+      await acpControl(
+        profile.name,
+        () => connection.agent.request("session/set_config_option", { sessionId, configId, value }),
+        () => connection.close(),
+      )
+    ).configOptions;
+  return configId === "model" ? setModelOption(value, profile, set) : set(configId, value);
+}
+
+/** Says what OpenOrc handles; answers whether the agent takes a message into a running turn. */
+async function initialize(connection: Connection, profile: AcpProfile, version: string, env: NodeJS.ProcessEnv): Promise<boolean> {
+  return acpControl(
+    profile.name,
+    async () => {
+      const clientCapabilities: ClientCapabilities = { fs: { readTextFile: false, writeTextFile: false }, terminal: false };
+      if (profile.elicitation) clientCapabilities.elicitation = { form: {} };
+      if (profile.clientMeta) clientCapabilities._meta = profile.clientMeta;
+      const initialized = await connection.agent.request<InitializeResponse>("initialize", { protocolVersion: PROTOCOL_VERSION, clientCapabilities, clientInfo: clientInfo(version) });
+      const methodId = typeof profile.authMethod === "function" ? profile.authMethod(env) : profile.authMethod;
+      if (methodId) await connection.agent.request("authenticate", { methodId });
+      return steers(initialized._meta);
+    },
+    () => connection.close(),
+  );
+}
+
+/** The run's session: a fork of the one it resumes, that one itself, or a new one. */
+async function openSession(connection: Connection, spec: RunSpec, mcpServers: McpServer[], profile: AcpProfile): Promise<{ sessionId: string; options: SessionConfigOption[] | null | undefined }> {
+  return acpControl(
+    profile.name,
+    async () => {
+      const params: NewSessionRequest = { cwd: spec.cwd, mcpServers, ...(profile.sessionMeta ? { _meta: profile.sessionMeta(spec) } : {}) };
+      if (spec.resumeSessionId && spec.forkSession) {
+        const forked = await connection.agent.request("session/fork", { sessionId: spec.resumeSessionId, ...params });
+        return { sessionId: forked.sessionId, options: forked.configOptions };
+      }
+      if (spec.resumeSessionId) {
+        const resumed = await connection.agent.request(profile.loadSession ? "session/load" : "session/resume", { sessionId: spec.resumeSessionId, ...params });
+        return { sessionId: spec.resumeSessionId, options: resumed.configOptions };
+      }
+      const created = await connection.agent.request("session/new", params);
+      return { sessionId: created.sessionId, options: created.configOptions };
+    },
+    () => connection.close(),
+  );
+}
+
+/** Through the agent's own way in: pictures as files where it runs, uploaded first for a host; other files named in the text. */
+async function steerOwnWay(
+  steerVia: NonNullable<AcpProfile["steer"]>,
+  command: AgentCommand,
+  sessionId: string,
+  text: string,
+  attachments: string[] | undefined,
+  host: AgentHost | undefined,
+): Promise<"accepted" | "unavailable"> {
+  const { images, files } = partitionAttachments(attachments);
+  const [pictures, named] = host ? await Promise.all([images.length ? host.upload(images) : images, files.length ? host.upload(files) : files]) : [images, files];
+  return steerVia(command, sessionId, withAttachedFiles(text, named, "open them to read"), pictures);
+}
+
+/** The agent folds the message into the turn it is running, or says a prompt is needed, having taken nothing. */
+async function steer(connection: Connection, sessionId: string, prompt: ContentBlock[], profile: AcpProfile): Promise<"accepted" | "unavailable"> {
+  if (profile.promptSteering) {
+    if (profile.textOnlySteering && prompt.some((block) => block.type !== "text")) return "unavailable";
+    const response = await connection.agent.request("session/prompt", { sessionId, prompt, ...(profile.steeringMeta ? { _meta: profile.steeringMeta } : {}) });
+    return profile.steeringOutcome?.(response) ?? "accepted";
+  }
+  const answer = await connection.agent.request<{ outcome?: unknown; reason?: unknown }>("_session/steering", { sessionId, prompt });
+  if (answer?.outcome === "injected") return "accepted";
+  if (answer?.outcome === "failed") throw new Error(typeof answer.reason === "string" && answer.reason ? answer.reason : `${profile.name} did not take the message.`);
+  return "unavailable";
+}
+
+/**
+ * The turn that handed its plan over is stopped once the answer to it is on its way: the agent would otherwise be told
+ * to keep refining and propose again. One that ended meanwhile is left alone.
+ */
+function stopAfterPlan<T extends { planShown?: boolean }>(planning: T | null, current: () => T | null, cancel: () => void): void {
+  if (planning) planning.planShown = true;
+  setImmediate(() => {
+    if (planning && current() === planning) cancel();
+  });
+}
+
+/** The agent's own /compact, run as a turn of its own that resolves when the summary is in place. */
+function compactAsTurn(
+  runId: string,
+  activityId: string,
+  emit: (event: AgentEvent) => void,
+  prompt: (maintenance: { activityId: string; resolve: () => void; reject: (error: Error) => void }) => Promise<void>,
+): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    emit({ type: "activity.updated", runId, ts: Date.now(), activityId, label: "Compacting context", status: "running", detail: { mode: "manual" } });
+    prompt({ activityId, resolve, reject }).catch((error: unknown) => {
+      emit({ type: "activity.updated", runId, ts: Date.now(), activityId, label: "Compacting context", status: "error" });
+      reject(error instanceof Error ? error : new Error(String(error)));
+    });
+  });
+}
+
+/** The user's servers beside OpenOrc's; a broken saved configuration must be reported rather than silently omitted. */
+async function sessionServers(profile: AcpProfile, context: AcpRunContext, own: McpServer[], env: NodeJS.ProcessEnv): Promise<McpServer[]> {
+  if (context.host || !profile.userServers) return own;
+  return [...own, ...(await profile.userServers(env)).filter((server) => server.name !== context.serverName)];
+}
+
+/** A prompt in flight, including a maintenance turn or a plan awaiting handover. */
+interface AcpTurn {
+  id: string;
+  startedAt: number;
+  maintenance: { activityId: string; resolve: () => void; reject: (error: Error) => void } | null;
+  planShown?: boolean;
+  /** The answer is kept while the subagents' cost is read. */
+  answer?: PromptResponse;
+  /** A turn the agent started itself, read from its session rather than streamed. */
+  own?: boolean;
+}
+
+/** Resolve a maintenance request only after its activity has a final state. */
+function finishMaintenance(maintenance: NonNullable<AcpTurn["maintenance"]>, ok: boolean, message: string | null, runId: string, ts: number, emit: (event: AgentEvent) => void): void {
+  emit({ type: "activity.updated", runId, ts, activityId: maintenance.activityId, label: "Compacting context", status: ok ? "success" : "error", ...(message ? { text: message } : {}) });
+  if (ok) maintenance.resolve();
+  else maintenance.reject(new Error(message ?? "Context compaction did not finish. Your draft has not been sent."));
+}
+
+/** Only offer compaction when the agent has a native command for it. */
+function compactionControls(
+  profile: AcpProfile,
+  runId: string,
+  current: () => AcpTurn | null,
+  emit: (event: AgentEvent) => void,
+  prompt: (text: string, attachments: string[] | undefined, appendix?: string, maintenance?: AcpTurn["maintenance"]) => Promise<void>,
+): Pick<RunControls, "compact"> {
+  if (profile.compactCommand === null) return {};
+  let count = 0;
+  return {
+    compact: () => {
+      const turn = current();
+      if (turn?.maintenance) return Promise.resolve();
+      if (turn) return Promise.reject(new Error("Wait for the current turn to finish before compacting."));
+      return compactAsTurn(runId, `manual-compaction-${++count}`, emit, (maintenance) => prompt(profile.compactCommand ?? "/compact", undefined, undefined, maintenance));
+    },
+  };
+}
+
+/**
+ * The turns an agent starts itself, followed beside its ACP stream when its profile can read them: they open, take
+ * updates and close as a prompt's turn does. Tool calls that leave a job running are noted as the stream maps them.
+ */
+function trackOwnTurns(
+  source: OwnTurns | undefined,
+  runId: string,
+  run: AgentCommand,
+  env: NodeJS.ProcessEnv,
+  mapper: AcpUpdateMapper,
+  emit: (event: AgentEvent) => void,
+  state: { session(): string | null; current(): AcpTurn | null; set(turn: AcpTurn | null): void; counted(): void },
+) {
+  const now = () => Date.now();
+  const report = (event: AgentEvent) => {
+    emit(event);
+    watcher?.observe(event);
+  };
+  const close = (status: RunStatus) => {
+    const turn = state.current();
+    if (!turn?.own) return;
+    state.set(null);
+    const ended = mapper.endTurn(now());
+    for (const ev of ended.events) emit(ev);
+    state.counted();
+    emit({ type: "turn.completed", runId, ts: now(), turnId: turn.id, status, ...(ended.text ? { resultText: ended.text } : {}), durationMs: now() - turn.startedAt });
+  };
+  const host: OwnTurnHost = {
+    runId,
+    run,
+    env,
+    session: state.session,
+    emit,
+    now,
+    prompting: () => Boolean(state.current() && !state.current()?.own),
+    answering: () => Boolean(state.current()?.own),
+    open: () => {
+      const turn = { id: randomUUID(), startedAt: now(), maintenance: null, own: true };
+      state.set(turn);
+      emit({ type: "turn.started", runId, ts: now(), turnId: turn.id });
+    },
+    feed: (update) => {
+      for (const ev of mapper.map(update, now())) report(ev);
+    },
+    close,
+  };
+  const watcher = source ? new OwnTurnWatcher(source, host) : null;
+  return {
+    watcher,
+    /** An update the ACP stream sent, mapped onto the app's events. */
+    stream: (update: SessionUpdate) => {
+      watcher?.saw(update);
+      for (const ev of mapper.map(update, now())) report(ev);
+    },
+    /** The process is gone: nothing more is read, and a turn still open ends with it. */
+    close: (status: RunStatus) => {
+      watcher?.close();
+      close(status);
+    },
+  };
+}
 
 /** Which option kinds satisfy each app decision, best first. */
 const optionKindsFor: Record<ApprovalDecision, readonly PermissionOptionKind[]> = {
@@ -88,7 +314,7 @@ const optionKindsFor: Record<ApprovalDecision, readonly PermissionOptionKind[]> 
   deny: ["reject_once", "reject_always"],
 };
 
-function observeProcess(proc: ReturnType<typeof spawnAgentProcess>, runId: string, emit: (event: AgentEvent) => void): void {
+function observeProcess(proc: ReturnType<typeof spawnAgentProcess>, runId: string, emit: (event: AgentEvent) => void, closing: () => boolean): void {
   proc.once("exit", () => {
     try {
       stopProcess(proc);
@@ -102,52 +328,16 @@ function observeProcess(proc: ReturnType<typeof spawnAgentProcess>, runId: strin
     if (!proc.pid) proc.emit("exit", null, null);
   });
   readline.createInterface({ input: proc.stderr, crlfDelay: Infinity }).on("line", (line) => {
+    // What the agent says on its way out once told to stop, as how to resume the session, is not a problem.
+    if (closing() || !line.trim()) return;
     emit({ type: "error", runId: runId, ts: Date.now(), message: stripAnsi(line), fatal: false });
   });
 }
 
 const cancelledOutcome: RequestPermissionResponse = { outcome: { outcome: "cancelled" } };
-type PendingPermission = { sessionId: string; respond: (response: RequestPermissionResponse) => void };
+type PendingPermission = PendingRequest;
 
 const clientInfo = (version: string) => ({ name: "openorc", title: "OpenOrc", version });
-
-/**
- * Drives an agent that speaks the Agent Client Protocol over stdio. OpenCode
- * is the first; the protocol is the same for any other. The agent keeps its
- * own session store, so a run is one process holding one session, prompted
- * once per turn.
- */
-function planInstructions(mode: RunSpec["mode"], mcpUrl: string | undefined, serverName: string): string {
-  if (mode !== "plan") return "";
-  const delivery = mcpUrl
-    ? `Save the complete proposed plan as Markdown with the ${serverName}_plan_write tool; to revise it, call the tool again with the full document. OpenOrc shows it to the user, who implements it from OpenOrc.`
-    : "Return the complete proposed plan as Markdown in your final response.";
-  return `${delivery} Use read, glob and grep for investigation; shell, edits and native subagents are blocked in Plan.`;
-}
-
-/**
- * Whether a folder holds OpenCode settings of its own. OpenCode 2 skips them in an unvetted checkout when told to, but
- * earlier releases load .opencode plugins regardless, so a run there refuses rather than trust the installed version.
- */
-function carriesOpenCodeConfig(cwd: string): boolean {
-  return ["opencode.json", "opencode.jsonc", ".opencode"].some((name) => existsSync(path.join(cwd, name)));
-}
-
-/** OpenCode's environment for a run: the app's question tool and Plan agent, and nothing from an unvetted checkout. */
-function openCodeEnv(base: NodeJS.ProcessEnv, spec: RunSpec, askUser: boolean): NodeJS.ProcessEnv {
-  const env = { ...base };
-  if (askUser) env["OPENCODE_CONFIG_CONTENT"] = questionConfig(env["OPENCODE_CONFIG_CONTENT"]);
-  if (spec.mode === "plan") env["OPENCODE_CONFIG_CONTENT"] = planConfig(env["OPENCODE_CONFIG_CONTENT"], spec.internalMcp);
-  // A folder's opencode.json and .opencode plugins are code: an unvetted checkout's never load.
-  if (spec.untrustedCheckout) env["OPENCODE_DISABLE_PROJECT_CONFIG"] = "true";
-  return env;
-}
-
-/** A host's folder cannot be looked into from here, so an unvetted checkout there is refused rather than trusted. */
-function assertVetted(spec: RunSpec, host: AgentHost | undefined): void {
-  if (spec.untrustedCheckout && (host || carriesOpenCodeConfig(spec.cwd)))
-    throw new Error("OpenCode could load this pull request's own OpenCode settings and plugins, which can run commands. Review it with a Claude model instead.");
-}
 
 /** OpenOrc's tools, at the address that reaches them from where the agent runs: on a host, such as a cloud sandbox, the host's. */
 function toolsAddress(spec: RunSpec, host: AgentHost | undefined): string | undefined {
@@ -156,119 +346,184 @@ function toolsAddress(spec: RunSpec, host: AgentHost | undefined): string | unde
 }
 
 /** The agent's ACP process, on its host when the run has one, as the Codex adapter starts its own. */
-function acpProcess(launch: AgentLaunchEnvironment, spec: RunSpec, env: NodeJS.ProcessEnv) {
-  if (launch.host) return launch.host.spawn(launch.binary, ["acp"], { runId: spec.runId, cwd: spec.cwd, env: definedEnv(env), files: [], dirs: [] });
-  return spawnAgentProcess(launch.binary, ["acp"], { cwd: spec.cwd, env, registry: launch.processRegistry });
+function acpProcess(launch: AgentLaunchEnvironment, spec: RunSpec, place: LaunchPlace, args: string[], env: NodeJS.ProcessEnv, cwd = spec.cwd) {
+  if (launch.host) return launch.host.spawn(launch.binary, args, { runId: spec.runId, cwd, env: definedEnv(env), files: place.files, dirs: place.dirs });
+  return spawnAgentProcess(launch.binary, args, { cwd, env, registry: launch.processRegistry });
 }
 
+/** An extension notification's parameters, read as a plain object. */
+const notice = (value: unknown): Record<string, unknown> => (value !== null && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {});
+
+/** The path and text of a plan file a tool call writes, as Oh My Pi's agent writes its plan in Plan mode. */
+function planWrite(update: { rawInput?: unknown }): string | null {
+  const input = update.rawInput && typeof update.rawInput === "object" ? (update.rawInput as Record<string, unknown>) : null;
+  if (!input || typeof input["path"] !== "string" || typeof input["content"] !== "string") return null;
+  return /-plan\.md$|(^|\/)PLAN\.md$/.test(input["path"]) ? input["content"] : null;
+}
+
+/** Whether the agent takes a message into a running turn, as `initialize` says. Claude's and Codex's ACP adapters say it the same way. */
+function steers(meta: unknown): boolean {
+  const steering = meta && typeof meta === "object" ? (meta as Record<string, unknown>)["steering"] : undefined;
+  return Boolean(steering && typeof steering === "object" && (steering as Record<string, unknown>)["supported"] === true);
+}
+
+/**
+ * Drives an agent that speaks the Agent Client Protocol over stdio: OpenCode and Oh My Pi, each through its profile;
+ * the protocol is the same for any other. The agent keeps its own session store, so a run is one process holding one
+ * session, prompted once per turn.
+ */
 export class AcpAdapter {
-  constructor(private readonly options: AcpAdapterOptions) {}
+  private readonly profile: AcpProfile;
+
+  constructor(private readonly options: AcpAdapterOptions) {
+    this.profile = options.profile ?? openCodeAcp;
+  }
 
   /** Models the installed agent can run, read from the configuration a throwaway session reports. */
   async listModels(launch?: AgentLaunchEnvironment): Promise<AcpModel[]> {
-    const binary = launch?.binary ?? this.options.binary ?? agentBinary("opencode");
+    const binary = launch?.binary ?? this.options.binary ?? agentBinary(this.profile.agent);
+    if (this.options.listModels) return this.options.listModels(launch ?? { revision: 0, binary, env: { ...process.env, ...this.options.env } });
     const env = launch ? { ...launch.env, ...this.options.env } : { ...process.env, ...this.options.env };
-    const cwd = this.options.modelsCwd ?? os.homedir();
+    await this.profile.checkReady?.(launch ?? { revision: 0, binary, env });
+    const cwd = this.options.modelsCwd ?? env["HOME"] ?? os.homedir();
     const command = launchCommand(binary, ["acp"]);
-    const proc = spawn(command.file, command.args, { ...command.options, cwd, env: inFolder(env, cwd), stdio: ["pipe", "pipe", "pipe"] });
+    const proc = spawn(command.file, command.args, { ...command.options, cwd, env: inFolder(env, cwd), stdio: ["pipe", "pipe", "pipe"], detached: process.platform !== "win32" });
+    const closed = new Promise<void>((resolve) => proc.once("close", () => resolve()));
+    proc.stderr.resume();
     const connection = client({ name: "openorc" }).connect(streamOf(proc));
+    proc.once("error", () => connection.close());
+    const timeout = setTimeout(() => {
+      connection.close();
+      stopProcess(proc);
+    }, 30_000);
     let sessionId: string | undefined;
     try {
-      await connection.agent.request("initialize", { protocolVersion: PROTOCOL_VERSION, clientCapabilities: {}, clientInfo: clientInfo(this.version) });
+      await initialize(connection, this.profile, this.version, env);
       const created = await connection.agent.request("session/new", { cwd, mcpServers: [] });
       sessionId = created.sessionId;
-      const models: AcpModel[] = [];
-      // ACP's effort option describes only the selected model. Query each in
-      // this disposable session; never copy one model's levels to its peers.
-      for (const model of modelsFrom(created.configOptions)) {
-        const options = model.isDefault ? created.configOptions : (await connection.agent.request("session/set_config_option", { sessionId, configId: "model", value: model.id })).configOptions;
-        const option = options?.find((option) => option.id === "effort");
-        const effort = option?.type === "select" ? option : undefined;
-        const efforts = effort?.options.flatMap((entry) => ("options" in entry ? entry.options : [entry])).map((entry) => entry.value) ?? [];
-        // "default" clears the variant override; a current value can otherwise
-        // have been inherited from the previously selected model.
-        let defaultEffort: string | null = null;
-        if (efforts.includes("default")) defaultEffort = "default";
-        else if (efforts.length === 1) defaultEffort = efforts[0]!;
-        models.push({ ...model, efforts, defaultEffort });
-      }
-      return models;
+      return await readModels(connection, this.profile, created.configOptions, sessionId);
     } finally {
       // Also delete after a failed capability query; discovery never sends a prompt.
       if (sessionId) await connection.agent.request("session/delete", { sessionId }).catch(() => undefined);
       connection.close();
-      proc.kill("SIGTERM");
+      stopProcess(proc);
+      await closed;
+      await waitForProcessGroup(proc);
+      clearTimeout(timeout);
     }
   }
 
   start(spec: RunSpec, launch: AgentLaunchEnvironment): RunHandle {
     const unavailable = executionModeUnavailable(spec.agent, executionMode(spec.mode ?? "act", spec.permissionMode));
     if (unavailable) throw new Error(unavailable);
+    const { profile } = this;
+    const name = profile.name;
     const host = launch.host;
-    assertVetted(spec, host);
     const serverName = spec.internalMcp?.serverName ?? this.options.mcpServerName ?? "openorc";
     const mcpUrl = toolsAddress(spec, host);
-    const mcpServers: McpServer[] = mcpUrl ? [{ type: "http", name: serverName, url: mcpUrl, headers: [] }] : [];
+    const ownServers: McpServer[] = mcpUrl && !profile.ownServerInLaunch ? [{ type: "http", name: serverName, url: mcpUrl, headers: [] }] : [];
     const askUser = Boolean(mcpUrl && spec.internalMcp?.toolNames.includes("ask_user"));
-    const env = openCodeEnv({ ...launch.env, ...this.options.env }, spec, askUser);
+    const place = launchPlace(host);
+    const context: AcpRunContext = { host, place, mcpUrl, serverName, askUser };
+    const { args, env, cwd: processCwd, privateDir } = profile.launch(spec, { ...launch.env, ...this.options.env }, context);
     const startedAt = Date.now();
-    const proc = acpProcess(launch, spec, env);
+    const proc = acpProcess(launch, spec, place, args, env, processCwd);
     const mapper = new AcpUpdateMapper(spec.runId);
     let handle: RunHandle;
     let sessionId: string | null = null;
-    /** The prompt in flight. A maintenance turn compacts the session and is not an answer. */
-    let turn: { id: string; startedAt: number; maintenance: { activityId: string; resolve: () => void; reject: (error: Error) => void } | null } | null = null;
+    let turn: AcpTurn | null = null;
+    /** The text of the plan file the agent last wrote whole, for when its file cannot be read here. */
+    let lastPlan: string | null = null;
     let turns = 0;
-    let compactions = 0;
+    /** The agent said in `initialize` that it takes a message into a running turn. */
+    let steering = false;
+    /** OpenOrc ended the process itself. */
+    let closing = false;
     /** Permission requests the agent is waiting on; a cancelled turn answers them all. */
     const pendingPermissions = new Map<string, PendingPermission>();
     const emit = (ev: AgentEvent) => handle.emit("event", ev);
     const now = () => Date.now();
     const exited = () => proc.exitCode !== null || proc.signalCode !== null;
     const subagents = trackChildren(spec.runId, () => sessionId, emit, pendingPermissions);
+    const autoCompactions = new AutoCompactions(spec.runId, () => sessionId, emit);
+    const todos = new CursorTodos(spec.runId);
+    const forms: FormRun = {
+      runId: spec.runId,
+      agentName: name,
+      planning: spec.mode === "plan",
+      session: () => sessionId,
+      pending: pendingPermissions,
+      ask: (request) => this.options.onApproval(request),
+      emit,
+      planText: async () => (!host && sessionId && profile.planText ? await profile.planText(sessionId, env) : null) ?? lastPlan,
+      planShown: () =>
+        stopAfterPlan(
+          turn,
+          () => turn,
+          () => void (sessionId && connection.agent.notify("session/cancel", { sessionId }).catch(() => undefined)),
+        ),
+    };
+    const command = this.options.runCommand ?? agentCommand(launch, spec.runId, env);
+    const subagentSpend = new SubagentSpend(profile.subagentCosts?.(command), Boolean(spec.resumeSessionId && !spec.forkSession));
+    const own = trackOwnTurns(profile.ownTurns, spec.runId, command, env, mapper, emit, { session: () => sessionId, current: () => turn, set: (next) => (turn = next), counted: () => (turns += 1) });
 
     const app = client({ name: "openorc" })
       .onNotification("session/update", ({ params }) => {
         // Replayed history and child sessions belong to other transcripts.
         if (!sessionId || params.sessionId !== sessionId) return;
-        emit({ type: "raw", runId: spec.runId, ts: now(), agent: "opencode", payload: params.update });
-        if (subagents.legacy(params.update, now())) return;
+        emit({ type: "raw", runId: spec.runId, ts: now(), agent: profile.agent, payload: params.update });
+        if (params.update.sessionUpdate === "usage_update" && params.update.cost) subagentSpend.reported();
+        if (subagents.legacy(params.update, now())) {
+          subagentSpend.seen();
+          return;
+        }
         subagents.observe(sessionId, params.update, now());
-        for (const ev of mapper.map(params.update, now())) emit(ev);
+        if (params.update.sessionUpdate === "tool_call" || params.update.sessionUpdate === "tool_call_update") lastPlan = planWrite(params.update) ?? lastPlan;
+        own.stream(params.update);
       })
+      .onNotification("_omp/compaction/start", notice, ({ params }) => autoCompactions.started(params))
+      .onNotification("_omp/compaction/end", notice, ({ params }) => autoCompactions.ended(params))
+      .onNotification(
+        "cursor/update_todos",
+        (value) => cursorTodos.parse(value),
+        ({ params }) => {
+          if (sessionId) emit(todos.update(params));
+        },
+      )
       .onNotification("opencode/session/child_update", childUpdate, ({ params }) => {
-        emit({ type: "raw", runId: spec.runId, ts: now(), agent: "opencode", payload: { method: "opencode/session/child_update", params } });
+        emit({ type: "raw", runId: spec.runId, ts: now(), agent: profile.agent, payload: { method: "opencode/session/child_update", params } });
+        if (params.rootSessionId === sessionId) subagentSpend.seen();
         subagents.route(params, now());
       })
-      .onRequest("session/request_permission", ({ params }) => this.requestPermission(spec.runId, params, pendingPermissions, emit, subagents.permissionSession(params.sessionId)));
+      .onRequest("session/request_permission", ({ params }) => this.requestPermission(spec.runId, params, pendingPermissions, emit, subagents.permissionSession(params.sessionId)))
+      .onRequest("elicitation/create", ({ params }) => answerForm(params, forms))
+      .onRequest(
+        "cursor/ask_question",
+        (value) => cursorQuestion.parse(value),
+        ({ params }) => answerCursorQuestion(params, forms),
+      )
+      .onRequest(
+        "cursor/create_plan",
+        (value) => cursorPlan.parse(value),
+        ({ params }) => presentCursorPlan(params, forms),
+      );
     const connection = app.connect(streamOf(proc));
 
-    const settle = (id: string, response: PromptResponse | null, error?: unknown): void => {
-      if (!turn || turn.id !== id) return;
-      const { startedAt: turnStartedAt, maintenance } = turn;
+    const settle = (id: string, response: PromptResponse | null, error?: unknown, subagentCostUsd = subagentSpend.last): void => {
+      if (!turn || turn.id !== id || turn.own) return;
+      const { startedAt: turnStartedAt, maintenance, planShown } = turn;
       turn = null;
       subagents.endParentTurn(now());
       const ended = mapper.endTurn(now());
       for (const ev of ended.events) emit(ev);
-      const message = error ? promptFailure(error, spec.model) : null;
+      const outcome = promptOutcome(profile, response, error, ended.text, planShown, settings.model ?? spec.model);
       if (maintenance) {
-        const ok = !error && response?.stopReason === "end_turn";
-        emit({
-          type: "activity.updated",
-          runId: spec.runId,
-          ts: now(),
-          activityId: maintenance.activityId,
-          label: "Compacting context",
-          status: ok ? "success" : "error",
-          ...(message ? { text: message } : {}),
-        });
-        if (ok) maintenance.resolve();
-        else maintenance.reject(new Error(message ?? "Context compaction did not finish. Your draft has not been sent."));
+        finishMaintenance(maintenance, outcome.status === "success", outcome.message, spec.runId, now(), emit);
         return;
       }
-      // A failed turn says why in the conversation itself, the way a Codex provider error does.
-      if (message) emit({ type: "activity.updated", runId: spec.runId, ts: now(), activityId: `error-${id}`, label: "Provider error", status: "error", text: message });
-      const usage = usageFor(response?.usage, ended.context);
+      // Keep the failure reason in the conversation transcript.
+      if (outcome.message) emit(providerErrorActivity(spec.runId, profile.agent, `error-${id}`, outcome.error, outcome.message));
+      const usage = usageFor(response?.usage, ended.context, subagentCostUsd, settings.model ?? spec.model);
       if (usage) emit({ type: "usage.updated", runId: spec.runId, ts: now(), usage });
       turns += 1;
       emit({
@@ -276,30 +531,58 @@ export class AcpAdapter {
         runId: spec.runId,
         ts: now(),
         turnId: id,
-        status: error ? "error" : statusFor[response?.stopReason ?? "end_turn"],
+        status: outcome.status,
         ...(ended.text ? { resultText: ended.text } : {}),
         ...(usage ? { usage } : {}),
         durationMs: now() - turnStartedAt,
       });
+      own.watcher?.promptEnded(ended.text);
     };
 
-    /** One session setting, applied by the agent and answered with the full option list. */
-    const setOption = async (configId: "mode" | "model" | "effort", value: string): Promise<SessionConfigOption[] | null | undefined> => {
-      if (!sessionId) throw new Error("OpenCode has no session yet.");
-      return (await connection.agent.request("session/set_config_option", { sessionId, configId, value })).configOptions;
+    const settings = new AcpSettings(
+      profile,
+      (configId, value) => setSessionOption(connection, sessionId, profile, configId, value),
+      () => stopProcess(proc),
+    );
+
+    /**
+     * A message can join the running turn when the agent says it takes one. Not while it waits on an approval: Oh My Pi
+     * drops the request then, and the card would stay open over nothing, so the message waits in the queue instead.
+     */
+    const canSteer = () =>
+      steering &&
+      Boolean(sessionId && turn && !turn.maintenance && !turn.own) &&
+      !exited() &&
+      !autoCompactions.active &&
+      !mapper.compacting &&
+      ![...pendingPermissions.values()].some((pending) => pending.sessionId === sessionId);
+    /** Into the running turn: the agent's own way when its ACP server has none, else the protocol extension it offers. */
+    const steerNow = async (text: string, attachments: string[] | undefined): Promise<"accepted" | "unavailable"> => {
+      if (!canSteer() || !sessionId) return "unavailable";
+      if (profile.steer) return steerOwnWay(profile.steer, command, sessionId, text, attachments, host);
+      const current = turn;
+      const blocks = await promptBlocks(text, attachments, host, undefined);
+      return turn === current && canSteer() ? steer(connection, sessionId, blocks, profile) : "unavailable";
     };
 
     /** One prompt is one turn. The agent answers the request when the turn ends, so nothing else may prompt meanwhile. */
     const prompt = async (text: string, attachments: string[] | undefined, appendix?: string, maintenance?: NonNullable<typeof turn>["maintenance"]): Promise<void> => {
-      if (!sessionId) throw new Error("OpenCode has no session yet.");
-      if (turn) throw new Error("OpenCode is still answering. Wait for the turn to finish.");
-      if (exited()) throw new Error("The OpenCode process is no longer running.");
-      const blocks = await promptBlocks(text, attachments, host, [appendix, askUser ? questionInstructions(serverName) : undefined].filter(Boolean).join("\n\n") || undefined);
+      if (!sessionId) throw new Error(`${name} has no session yet.`);
+      if (exited()) throw new Error(`The ${name} process is no longer running.`);
+      if (!turn && own.watcher?.active) await own.watcher.sync();
+      if (turn || settings.busy) throw new LiveInputUnavailable(`${name} is still answering or changing settings. Wait for it to finish.`);
+      const blocks = await promptBlocks(text, attachments, host, [appendix, askUser && !profile.elicitation ? questionInstructions(serverName) : undefined].filter(Boolean).join("\n\n") || undefined);
+      if (turn || settings.busy || exited()) throw new Error(`${name} cannot start another turn right now.`);
       const id = randomUUID();
       turn = { id, startedAt: now(), maintenance: maintenance ?? null };
+      subagentSpend.turnStarted();
       if (!maintenance) emit({ type: "turn.started", runId: spec.runId, ts: now(), turnId: id });
       void connection.agent.request("session/prompt", { sessionId, prompt: blocks }).then(
-        (response) => settle(id, response),
+        async (response) => {
+          const answered = turn?.id === id ? turn : null;
+          if (answered) answered.answer = response;
+          settle(id, response, undefined, await subagentSpend.afterTurn(answered && !answered.maintenance && !exited() ? sessionId : null));
+        },
         (error: unknown) => settle(id, null, error),
       );
     };
@@ -307,85 +590,68 @@ export class AcpAdapter {
     const done = new Promise<number | null>((resolve) => {
       proc.on("close", async (code) => {
         await waitForProcessGroup(proc);
+        if (privateDir) place.remove(privateDir);
         connection.close();
         subagents.close(now());
-        if (turn) settle(turn.id, null, new Error("OpenCode exited before the turn finished."));
-        emit({ type: "session.completed", runId: spec.runId, ts: now(), status: code === 0 || code === null ? "success" : "error", durationMs: now() - startedAt, turns });
+        own.close(closing ? "cancelled" : "error");
+        // A turn the agent had answered, its subagents' cost still being read, ended as it answered.
+        if (turn) settle(turn.id, turn.answer ?? null, turn.answer ? undefined : new Error(`${name} exited before the turn finished.`));
+        // Oh My Pi exits with the signal's code when stopped; a stop OpenOrc asked for is a clean end.
+        const stopped = closing && (code === 128 + 15 || code === 128 + 2);
+        emit({ type: "session.completed", runId: spec.runId, ts: now(), status: code === 0 || code === null || stopped ? "success" : "error", durationMs: now() - startedAt, turns });
         handle.emit("exit", code);
         resolve(code);
       });
     });
 
     handle = new RunHandle(spec.runId, {
-      interrupt: () => {
-        if (!sessionId || !turn || exited()) return;
+      interrupt: async () => {
+        if (!sessionId || (!turn && !autoCompactions.active && !mapper.compacting) || exited()) return;
         // The protocol requires every open permission request to be answered as cancelled first.
-        for (const pending of pendingPermissions.values()) if (pending.sessionId === sessionId) pending.respond(cancelledOutcome);
-        void connection.agent.notify("session/cancel", { sessionId }).catch(() => undefined);
+        for (const pending of [...pendingPermissions.values()]) if (pending.sessionId === sessionId) pending.cancel();
+        await connection.agent.notify("session/cancel", { sessionId });
       },
-      close: () => stopProcess(proc),
+      close: () => {
+        closing = true;
+        stopProcess(proc);
+      },
       canStopSubagent: (id) => !exited() && subagents.canStop(id),
       stopSubagent: async (id) => {
-        for (const pending of pendingPermissions.values()) if (pending.sessionId === id) pending.respond(cancelledOutcome);
+        for (const pending of [...pendingPermissions.values()]) if (pending.sessionId === id) pending.cancel();
         await connection.agent.notify("session/cancel", { sessionId: id });
         subagents.cancelled(id, now());
       },
-      send: (text, attachments) => prompt(text, attachments),
+      // Steer the running turn when supported; otherwise prompt rejects until it finishes.
+      send: async (text, attachments) => {
+        if (turn && (await steerNow(text, attachments)) === "accepted") return;
+        await prompt(text, attachments);
+      },
+      canSteer: () => canSteer(),
+      steer: (text, attachments) => steerNow(text, attachments),
       // The same options the session was opened with, changed in place; the next prompt uses them.
-      applySettings: async ({ model, effort, fastMode }) => {
-        if (turn) throw new Error("Wait for the current turn to finish before changing its settings.");
-        if (exited()) throw new Error("The OpenCode process is no longer running.");
-        if (fastMode !== undefined) throw new Error("OpenOrc does not expose a separate Fast mode control for OpenCode.");
-        if (model !== undefined) await setOption("model", model);
-        if (effort !== undefined) await setOption("effort", effort);
+      applySettings: async (change) => {
+        if (turn || autoCompactions.active || mapper.compacting) throw new Error("Wait for the current turn to finish before changing its settings.");
+        if (exited()) throw new Error(`The ${name} process is no longer running.`);
+        await settings.apply(change);
       },
-      compacting: () => Boolean(turn?.maintenance),
-      // OpenCode summarises the session when asked to /compact; it runs as a turn of its own.
-      compact: () => {
-        if (turn?.maintenance) return Promise.resolve();
-        if (turn) return Promise.reject(new Error("Wait for the current turn to finish before compacting."));
-        const activityId = `manual-compaction-${++compactions}`;
-        return new Promise<void>((resolve, reject) => {
-          emit({ type: "activity.updated", runId: spec.runId, ts: now(), activityId, label: "Compacting context", status: "running", detail: { mode: "manual" } });
-          prompt("/compact", undefined, undefined, { activityId, resolve, reject }).catch((error: unknown) => {
-            emit({ type: "activity.updated", runId: spec.runId, ts: now(), activityId, label: "Compacting context", status: "error" });
-            reject(error instanceof Error ? error : new Error(String(error)));
-          });
-        });
-      },
+      compacting: () => Boolean(turn?.maintenance) || autoCompactions.active || mapper.compacting,
+      ...compactionControls(profile, spec.runId, () => turn, emit, prompt),
       done,
     });
 
-    observeProcess(proc, spec.runId, emit);
+    observeProcess(proc, spec.runId, emit, () => closing);
 
     void (async () => {
       try {
-        await connection.agent.request("initialize", {
-          protocolVersion: PROTOCOL_VERSION,
-          clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false, _meta: { "opencode/child-session-updates": true } },
-          clientInfo: clientInfo(this.version),
-        });
-        let options: SessionConfigOption[] | null | undefined;
-        if (spec.resumeSessionId && spec.forkSession) {
-          const forked = await connection.agent.request("session/fork", { sessionId: spec.resumeSessionId, cwd: spec.cwd, mcpServers });
-          sessionId = forked.sessionId;
-          options = forked.configOptions;
-        } else if (spec.resumeSessionId) {
-          const resumed = await connection.agent.request("session/resume", { sessionId: spec.resumeSessionId, cwd: spec.cwd, mcpServers });
-          sessionId = spec.resumeSessionId;
-          options = resumed.configOptions;
-        } else {
-          const created = await connection.agent.request("session/new", { cwd: spec.cwd, mcpServers });
-          sessionId = created.sessionId;
-          options = created.configOptions;
-        }
-        if (spec.mode) options = await setOption("mode", spec.mode === "plan" ? "plan" : "build");
-        if (spec.model) options = await setOption("model", spec.model);
-        if (spec.effort) options = await setOption("effort", spec.effort);
-        emit({ type: "session.started", runId: spec.runId, ts: now(), agent: "opencode", externalSessionId: sessionId, model: currentModel(options) ?? spec.model ?? null });
-        await prompt(spec.prompt, spec.attachments, [spec.systemPromptAppendix, planInstructions(spec.mode, mcpUrl, serverName)].filter(Boolean).join("\n\n"));
+        await profile.checkReady?.({ ...launch, env }, spec.cwd);
+        steering = (await initialize(connection, profile, this.version, env)) || Boolean(profile.steer || profile.promptSteering);
+        const opened = await openSession(connection, spec, await sessionServers(profile, context, ownServers, env), profile);
+        sessionId = opened.sessionId;
+        const options = await settings.initialize(opened.options, spec);
+        emit({ type: "session.started", runId: spec.runId, ts: now(), agent: profile.agent, externalSessionId: sessionId, model: selectedModel(options, profile) ?? spec.model ?? null });
+        await prompt(spec.prompt, spec.attachments, [spec.systemPromptAppendix, profile.briefing(spec, context)].filter(Boolean).join("\n\n"));
       } catch (error) {
-        emit({ type: "error", runId: spec.runId, ts: now(), message: error instanceof Error ? error.message : String(error), fatal: true });
+        emitProviderFailure(emit, spec.runId, profile.agent, error);
         stopProcess(proc);
       }
     })();
@@ -416,7 +682,7 @@ export class AcpAdapter {
         pending.delete(approvalId);
         resolve(response);
       };
-      pending.set(approvalId, { sessionId: params.sessionId, respond });
+      pending.set(approvalId, { sessionId: params.sessionId, cancel: () => respond(cancelledOutcome) });
       const onceOnly = !params.options.some((option) => option.kind === "allow_always");
       void this.options.onApproval({ runId, approvalId, kind, toolName, detail, input, onceOnly, ...(subagentId ? { subagentId } : {}) }).then(
         (answer) => {
@@ -430,16 +696,6 @@ export class AcpAdapter {
       );
     });
   }
-}
-
-/** The agent's own wording, except for the refusals a user can act on. */
-function promptFailure(error: unknown, model: string | undefined): string {
-  const message = error instanceof Error ? error.message : String(error);
-  if (/model unavailable/i.test(message)) {
-    const name = model ?? message.replace(/^.*model unavailable:\s*/i, "");
-    return `OpenCode reports ${name} is unavailable. Check the model ID, provider configuration and account access, or choose another model. Provider detail: ${message}`;
-  }
-  return message;
 }
 
 function streamOf(proc: ChildProcess) {
@@ -457,28 +713,6 @@ function toolNameForKind(kind: string | null): string {
   return kind ?? "tool";
 }
 
-/** The `model` option lists every model the agent can run and which one is current. */
-export function modelsFrom(options: SessionConfigOption[] | null | undefined): Omit<AcpModel, "efforts" | "defaultEffort">[] {
-  const option = options?.find((candidate) => candidate.id === "model");
-  if (!option || option.type !== "select") return [];
-  // Options come flat or grouped by provider; either way each entry is one model.
-  const entries = option.options.flatMap((entry) => ("options" in entry ? entry.options : [entry]));
-  return entries.map((entry) => {
-    const slash = entry.value.indexOf("/");
-    const providerId = slash === -1 ? entry.value : entry.value.slice(0, slash);
-    const labelSlash = entry.name.indexOf("/");
-    const providerLabel = labelSlash === -1 ? providerId : entry.name.slice(0, labelSlash);
-    const label = labelSlash === -1 ? entry.name : entry.name.slice(labelSlash + 1);
-    return { id: entry.value, label, provider: { id: providerId, label: providerLabel }, isDefault: entry.value === option.currentValue };
-  });
-}
-
-function currentModel(options: SessionConfigOption[] | null | undefined): string | null {
-  const option = options?.find((candidate) => candidate.id === "model");
-  return option?.type === "select" ? option.currentValue : null;
-}
-
-/** Pictures go in as image blocks; other files are named for the agent to open. */
 /** Images travel inline from this Mac; other files are named by path, so a host gets copies and the text names those. */
 async function promptBlocks(text: string, attachments: string[] | undefined, host: AgentHost | undefined, appendix: string | undefined): Promise<ContentBlock[]> {
   const { images, files } = partitionAttachments(attachments);
@@ -493,23 +727,25 @@ async function promptBlocks(text: string, attachments: string[] | undefined, hos
   return blocks;
 }
 
-function usageFor(usage: AcpUsage | null | undefined, context: ContextReport | null): Usage | undefined {
+/** The turn's usage; the session's cost includes its subagents' when the agent reports them apart. */
+function usageFor(usage: AcpUsage | null | undefined, context: ContextReport | null, subagentCostUsd: number, model?: string): Usage | undefined {
   if (!usage && !context) return undefined;
   return {
+    ...(model ? { model } : {}),
     inputTokens: usage?.inputTokens ?? 0,
     outputTokens: usage?.outputTokens ?? 0,
     ...(usage?.cachedReadTokens ? { cacheReadTokens: usage.cachedReadTokens } : {}),
     ...(usage?.cachedWriteTokens ? { cacheWriteTokens: usage.cachedWriteTokens } : {}),
-    ...(context?.costUsd !== undefined ? { costUsd: context.costUsd } : {}),
+    ...(context?.costUsd !== undefined ? { costUsd: context.costUsd + subagentCostUsd } : {}),
     ...(context ? { contextTokens: context.used, contextWindow: context.size } : {}),
   };
 }
 
 function trackChildren(runId: string, root: () => string | null, emit: (event: AgentEvent) => void, pending: Map<string, PendingPermission>): AcpSubagents {
   return new AcpSubagents(runId, root, emit, (id) => {
-    for (const [approvalId, request] of pending)
+    for (const [approvalId, request] of [...pending])
       if (request.sessionId === id) {
-        request.respond(cancelledOutcome);
+        request.cancel();
         emit({ type: "approval.resolved", runId, ts: Date.now(), approvalId, decision: "deny" });
       }
   });

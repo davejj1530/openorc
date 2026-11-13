@@ -164,7 +164,7 @@ export function useOnboardingFlow({ mode, initialStep, persisted, onPersist, onC
         setSelectedProject(project.id);
         return;
       }
-      const rootPath = await window.openorc.pickDirectory();
+      const rootPath = await window.openorc.pickDirectory("project");
       if (!rootPath) return;
       const project = await importProject.mutateAsync({ rootPath });
       setAddedProject(project);

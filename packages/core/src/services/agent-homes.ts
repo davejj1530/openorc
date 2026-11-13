@@ -2,7 +2,7 @@ import os from "node:os";
 import path from "node:path";
 import { hostHome, sessionSlots, type AgentHome } from "@openorc/agents";
 import type { AgentVersions, Sandbox } from "@openorc/cloud";
-import { harnessIds, type HarnessId } from "@openorc/protocol";
+import { harnessCatalog, harnessIds, type HarnessId } from "@openorc/protocol";
 import type { AgentHomes, HomeOwner } from "./agent-sessions.js";
 import type { CloudAgents } from "./cloud-agents.js";
 import { RelocationRefused } from "./relocation-package.js";
@@ -25,7 +25,7 @@ export function agentHomes(deps: AgentHomeDeps): AgentHomes {
         agent: thread.agent,
         userHome: snapshot.env["HOME"] || os.homedir(),
         env: hostFolders(thread, snapshot.env, deps),
-        binary: snapshot.binaries[thread.agent] ?? thread.agent,
+        binary: snapshot.binaries[thread.agent] ?? harnessCatalog[thread.agent].cli.bin,
         processEnv: snapshot.env,
       });
     },
@@ -52,7 +52,7 @@ export function hostVersions(homes: AgentHomes, everyMs = 60_000): (agent: Harne
 
 /** Every agent CLI's version on this host, as the brain is brought to them. */
 export async function everyVersion(versions: (agent: HarnessId) => Promise<string | null>): Promise<AgentVersions> {
-  return Object.fromEntries(await Promise.all(harnessIds.map(async (id) => [id, await versions(id)] as const))) as AgentVersions;
+  return Object.fromEntries(await Promise.all(harnessIds.map(async (id) => [id, harnessCatalog[id].cloud ? await versions(id) : null] as const))) as AgentVersions;
 }
 
 function hostFolders(thread: HomeOwner, env: NodeJS.ProcessEnv, deps: AgentHomeDeps): Record<string, string> {
@@ -62,6 +62,7 @@ function hostFolders(thread: HomeOwner, env: NodeJS.ProcessEnv, deps: AgentHomeD
     return { CLAUDE_CONFIG_DIR: folder };
   }
   if (thread.agent === "codex") return { CODEX_HOME: env["CODEX_HOME"] || path.join(env["HOME"] || os.homedir(), ".codex") };
+  if (thread.agent === "pi") return env["PI_CODING_AGENT_DIR"] ? { PI_CODING_AGENT_DIR: env["PI_CODING_AGENT_DIR"] } : {};
   return env["XDG_DATA_HOME"] ? { XDG_DATA_HOME: env["XDG_DATA_HOME"] } : {};
 }
 
@@ -75,7 +76,7 @@ export async function sandboxHome(sandbox: Sandbox, agent: HarnessId, env: Recor
     machine: "sandbox",
     userHome,
     env,
-    binary: agent,
+    binary: harnessCatalog[agent].cli.bin,
     read: (file) => sandbox.readFile(file),
     async write(file, bytes) {
       await sandbox.writeFile(file, bytes);
@@ -89,7 +90,7 @@ export async function sandboxHome(sandbox: Sandbox, agent: HarnessId, env: Recor
     },
     realpath: async (file) => (await sh('realpath -m -- "$1"', file)).stdout.toString("utf8").trim() || file,
     async run(args, options) {
-      const result = await sandbox.exec(agent, [...args], { ...(options?.cwd ? { cwd: options.cwd } : {}), env });
+      const result = await sandbox.exec(harnessCatalog[agent].cli.bin, [...args], { ...(options?.cwd ? { cwd: options.cwd } : {}), env });
       return { code: result.code ?? -1, stdout: result.stdout, stderr: result.stderr };
     },
   };

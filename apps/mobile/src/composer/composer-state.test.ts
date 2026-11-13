@@ -54,7 +54,7 @@ describe("composerControls", () => {
   it("queues from the main pill when the turn cannot take a message", () => {
     const busy = { ...idle, text: "After this", working: true, stoppable: true, steerable: false };
     expect(press(busy, "primary", { live: false })).toBe("queue");
-    expect(press(busy, "primary", { activeRun: { ...run, agent: "opencode" }, choice: { agent: "opencode", model: "m", effort: null } })).toBe("queue");
+    expect(press(busy, "primary", { activeRun: { ...run, agent: "opencode" }, choice: { agent: "codex", model: "m", effort: null } })).toBe("queue");
   });
 
   it("holds the send while an image uploads, a send is on its way, or a reason blocks it", () => {

@@ -6,6 +6,7 @@ import { useChangesCount } from "./use-changes-count";
 import { usePreviewPanel } from "./use-preview-panel";
 import { Link, Stack } from "expo-router";
 import { useMemo, type ReactElement } from "react";
+import { useSubthreads } from "./subthreads";
 import { threadMenu, type ThreadAction } from "./thread-actions";
 
 type Run = (action: ThreadAction) => void;
@@ -79,5 +80,9 @@ export function useThreadHeaderMenu(thread: ThreadSummary | null, now: Date, run
   // Not while the Mac has nowhere to run it: no brain, and no cloud service connected.
   const toCloud = Boolean(cloudOffer.data?.offered && !cloudServiceMissing(cloudOffer.data) && actionable && canMoveToCloud(actionable));
   const moves = useMover();
-  return useMemo(() => thread && headerMenu(threadMenu(thread, "header", now, { uncommitted, preview, toCloud, moves }), run), [thread, run, now, uncommitted, preview, toCloud, moves]);
+  const subthreads = useSubthreads(actionable).subthreads.length;
+  return useMemo(
+    () => thread && headerMenu(threadMenu(thread, "header", now, { uncommitted, preview, toCloud, moves, subthreads }), run),
+    [thread, run, now, uncommitted, preview, toCloud, moves, subthreads],
+  );
 }

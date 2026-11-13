@@ -17,7 +17,9 @@ describe("extractionSummary", () => {
         { provider: "claude", model: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5", viaApiKey: false },
       ],
     });
-    expect(summary).toBe("Each finished run is summarized by the agent that ran it: Codex runs by GPT-5.3-Codex-Spark and Claude Code runs by Claude Haiku 4.5. OpenCode runs are not summarized.");
+    expect(summary).toBe(
+      "Each finished run is summarized by the agent that ran it: Codex runs by GPT-5.3-Codex-Spark and Claude Code runs by Claude Haiku 4.5. OpenCode, Oh My Pi, Cursor, Pi, Antigravity, and fx runs are not summarized.",
+    );
   });
 
   it("says when one provider summarizes every agent's runs", () => {

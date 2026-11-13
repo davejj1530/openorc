@@ -58,3 +58,12 @@ export const SANDBOX_OWN: CloudSignIn = {
   prepare: async () => held({}),
   keep: async () => undefined,
 };
+
+function localOnly(name: string): CloudSignIn {
+  const unavailable = async (): Promise<never> => {
+    throw new Error(`${name} runs on the connected computer. Cloud execution is not supported yet.`);
+  };
+  return { assertCanRun: unavailable, homeEnv: unavailable, prepare: unavailable, keep: async () => undefined };
+}
+export const LOCAL_ONLY_SIGN_INS = { cursor: localOnly("Cursor"), pi: localOnly("Pi"), antigravity: localOnly("Antigravity"), fx: localOnly("fx") };
+export const { cursor: CURSOR_LOCAL_ONLY, pi: PI_LOCAL_ONLY, antigravity: ANTIGRAVITY_LOCAL_ONLY } = LOCAL_ONLY_SIGN_INS;

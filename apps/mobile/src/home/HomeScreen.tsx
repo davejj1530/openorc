@@ -1,7 +1,7 @@
 import { AnimatedLegendList } from "@legendapp/list/reanimated";
 import type { ThreadSummary } from "@openorc/protocol";
 import { router, useGlobalSearchParams, usePathname } from "expo-router";
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Pressable, RefreshControl, View } from "react-native";
 import { LinearTransition, useSharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -18,8 +18,11 @@ import { FootFade } from "../ui/ScrollFade";
 import { swipes } from "../ui/swipe";
 import { Text } from "../ui/Text";
 import { rowMotion, useFoldMotion, type RowMotion } from "./fold-motion";
+import { BOTTOM_BAR_ROOM, BottomBar, homeTabs, type HomeTab } from "./BottomBar";
+import { useNewAction } from "./new-action";
+import { TabLayers } from "./TabLayers";
 import { HOME_BAR_HEIGHT, HomeBar } from "./header/HomeBar";
-import { MacLine, lineOverRows, type HomeScroll, type HostKind } from "./header/MacLine";
+import type { HomeScroll } from "./header/MacLine";
 import { HomeHeading, RetryRow, SectionToggle, ShowMore, ShowMoreChildren, type HeadingRoom } from "./HomeHeading";
 import { newThreadRoute } from "./out-of-reach";
 import { owned, type HomeItem } from "./home-items";
@@ -28,6 +31,12 @@ import { ThreadRow } from "./ThreadRow";
 import { Unpaired } from "./Unpaired";
 import { useHomeItems } from "./use-home-items";
 import { UpdateReady } from "./UpdateReady";
+import { useOrclingFaces } from "../orclings/face-row";
+import { byRecent, needsYou, useOrclingChats } from "../orclings/orcling-chats";
+import { OrclingFaces } from "../orclings/OrclingFaces";
+import { OrclingList } from "../orclings/OrclingList";
+import { TaskList } from "../tasks/TaskList";
+import { useTaskBoard } from "../tasks/use-task-board";
 
 type Paired = Exclude<LinkState, { kind: "unpaired" }>;
 type Home = ReturnType<typeof useHomeItems>;
@@ -97,16 +106,8 @@ function useShownAway(state: Paired): NonNullable<ThreadSummary["owner"]> | null
   return { brain: brain ? "cloud" : "mac", reach: brain ? "asleep" : "offline", heardAt: Date.now() };
 }
 
-/** What the shown host is, while its Mac or cloud brain is listed with it; null when it is listed alone. */
-function useShownKind(group: { primary: string | null; partner: string | null }): HostKind | null {
-  const brain = useSavedMacs().find((host) => host.id === group.primary)?.kind === "brain";
-  if (!group.partner) return null;
-  return brain ? "brain" : "mac";
-}
-
-function Threads({ state, scrollY, lineBottom }: HomeScroll & { state: Paired }) {
+function Threads({ state, scrollY, header }: HomeScroll & { state: Paired; header: ReactNode }) {
   const insets = useSafeAreaInsets();
-  const group = useHostGroup();
   // One host at a time, as the switch chose it: the other's threads are its own to show.
   const shown = useHomeItems(state.kind === "connected", { selectedId: useSelectedThreadId() });
   const away = useShownAway(state);
@@ -114,7 +115,6 @@ function Threads({ state, scrollY, lineBottom }: HomeScroll & { state: Paired })
   const folds = useHomeFolds(home);
   const still = useReducedMotion();
   const refresh = useRefresh();
-  const shownKind = useShownKind(group);
   // One object for the list's life: a new one each render would make the list resubscribe and rewrite the offset.
   const sharedValues = useMemo(() => ({ scrollOffset: scrollY }), [scrollY]);
   return (
@@ -127,8 +127,7 @@ function Threads({ state, scrollY, lineBottom }: HomeScroll & { state: Paired })
         itemLayoutAnimation={still ? undefined : slide}
         extraData={folds.motions}
         renderItem={({ item, index }) => <HomeRow item={item} home={home} index={index} motion={rowMotion(folds.motions, item.key)} fold={folds.toggle} />}
-        ListHeaderComponent={<MacLine state={state} host={shownKind} scrollY={scrollY} lineBottom={lineBottom} />}
-        ListHeaderComponentStyle={lineOverRows}
+        ListHeaderComponent={<>{header}</>}
         ListFooterComponent={<View className="h-24" />}
         sharedValues={sharedValues}
         contentContainerStyle={{ paddingTop: insets.top + HOME_BAR_HEIGHT, paddingBottom: insets.bottom }}
@@ -139,8 +138,8 @@ function Threads({ state, scrollY, lineBottom }: HomeScroll & { state: Paired })
   );
 }
 
-/** The pill's 48 pt and the 8 under it, and the fade above it that rows pass into. */
-const PILL_ROOM = 48 + 8 + 32;
+/** The bar and the 8 under it, and the fade above it that rows pass into. */
+const PILL_ROOM = BOTTOM_BAR_ROOM + 32;
 
 /** New thread on the shown host, or on its cloud brain while the shown Mac cannot be reached. */
 function useNewThread(state: Paired): () => void {
@@ -156,25 +155,42 @@ function useNewThread(state: Paired): () => void {
 function PairedHome({ state }: { state: Paired }) {
   const insets = useSafeAreaInsets();
   const scrollY = useSharedValue(0);
-  // Until the line lays out, where its words end at the default text size.
-  const lineBottom = useSharedValue(16);
-  const scroll = useMemo(() => ({ scrollY, lineBottom }), [scrollY, lineBottom]);
+  const scroll = useMemo(() => ({ scrollY }), [scrollY]);
   const newThread = useNewThread(state);
+  const orclings = useOrclingChats();
+  const faces = useOrclingFaces();
+  const tasks = useTaskBoard().available;
+  const tabs = homeTabs({ orclings: orclings.supported, tasks });
+  const [chosen, setTab] = useState<HomeTab>("threads");
+  // A Mac too old for Orclings and task lists keeps Home as it was: threads alone, under the New thread pill.
+  const tab = tabs.includes(chosen) ? chosen : "threads";
+  const action = useNewAction(tab, newThread);
   return (
     <View className="flex-1 bg-bg" onMagicTap={newThread} onTouchStart={swipes.touched}>
       <View pointerEvents="box-none" className="absolute inset-x-0 bottom-0 z-10 items-center" style={{ paddingBottom: insets.bottom }}>
         <FootFade height={insets.bottom + PILL_ROOM} />
         <UpdateReady />
-        <Pressable accessibilityRole="button" onPress={newThread} className="mb-2 h-12 flex-row items-center gap-2 rounded-full bg-accent pl-5 pr-6 active:opacity-80">
-          <Plus size={18} className="text-accent-fg" />
-          <Text className="text-lg text-accent-fg">New thread</Text>
-        </Pressable>
+        {tabs.length > 1 ? (
+          <BottomBar tab={tab} tabs={tabs} onTab={setTab} badge={faces ? 0 : orclings.chats.filter(needsYou).length} action={action} />
+        ) : (
+          <Pressable accessibilityRole="button" onPress={newThread} className="mb-2 h-12 flex-row items-center gap-2 rounded-full bg-accent pl-5 pr-6 active:opacity-80">
+            <Plus size={18} className="text-accent-fg" />
+            <Text className="text-lg text-accent-fg">New thread</Text>
+          </Pressable>
+        )}
       </View>
       {/* The bar over the status bar's room, so rows scroll under it. */}
       <View className="absolute inset-x-0 top-0 z-10 bg-bg" style={{ paddingTop: insets.top }}>
-        <HomeBar state={state} scroll={scroll} />
+        <HomeBar state={state} scroll={scroll} tab={tab} />
       </View>
-      <Threads state={state} {...scroll} />
+      <TabLayers
+        tab={tab}
+        render={(each) => {
+          if (each === "orclings") return <OrclingList chats={byRecent(orclings.chats)} top={HOME_BAR_HEIGHT} bottom={PILL_ROOM} shown={tab === "orclings"} />;
+          if (each === "tasks") return <TaskList top={HOME_BAR_HEIGHT} bottom={PILL_ROOM} />;
+          return <Threads state={state} {...scroll} header={faces ? <OrclingFaces chats={orclings.chats} /> : null} />;
+        }}
+      />
     </View>
   );
 }

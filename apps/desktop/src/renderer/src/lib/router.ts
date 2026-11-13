@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { HarnessId } from "@openorc/protocol";
 import { useLayout } from "./layout";
 
 export type TaskTab = "chat" | "spec" | "files" | "commits" | "memory";
@@ -7,7 +8,7 @@ export type TaskTab = "chat" | "spec" | "files" | "commits" | "memory";
 export type MessageTarget = { runId: string; turn: number; messageId: string };
 
 /** The sections Settings is divided into, in the order it lists them. */
-export const SETTINGS_SECTIONS = ["usage", "connections", "cloud", "slack", "phone", "skills", "devices", "appearance", "general", "memory", "data"] as const;
+export const SETTINGS_SECTIONS = ["usage", "connections", "cloud", "slack", "phone", "skills", "connectors", "devices", "appearance", "general", "memory", "data"] as const;
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
 const settingsSections: ReadonlySet<string> = new Set<SettingsSection>(SETTINGS_SECTIONS);
 
@@ -23,6 +24,7 @@ export type Route =
   | { view: "tasks" }
   | { view: "pulls" }
   | { view: "pull"; projectId: string; number: number }
+  /** A project's settings. */
   | { view: "project"; projectId: string }
   | { view: "task"; taskId: string; tab: TaskTab; message?: MessageTarget }
   | { view: "memory" }
@@ -30,7 +32,7 @@ export type Route =
   /** The Orcling designer: a new Orcling, or one being changed. */
   | { view: "orcling"; orclingId?: string }
   /** A section, optionally with what to bring into view there: a provider's usage, or a project to add to the cloud brain. */
-  | { view: "settings"; section?: SettingsSection; provider?: "codex" | "claude"; project?: string }
+  | { view: "settings"; section?: SettingsSection; provider?: HarnessId; project?: string }
   | { view: "diagnostics" };
 
 interface RouterState {
@@ -44,6 +46,8 @@ interface RouterState {
   history: Route[];
   future: Route[];
   navigate: (route: Route) => void;
+  /** A route alone in the window with no history entry: switching tabs is not a step to go back over. */
+  show: (route: Route) => void;
   back: () => void;
   forward: () => void;
 }
@@ -79,6 +83,11 @@ export const useRouter = create<RouterState>((set, get) => {
     history: [],
     future: [],
     navigate: (route) => set({ ...applyRoute(route), history: [...get().history.slice(-49), get().route], future: [] }),
+    show: (route) => {
+      const threadIds = route.view === "thread" ? [route.threadId] : [];
+      if (get().route.view === "thread" || route.view === "thread") reconcilePanel(threadIds, route.view === "thread" ? route.threadId : null);
+      set({ route, threadIds });
+    },
     back: () => {
       const { history: h, future, route } = get();
       const prev = h[h.length - 1];
@@ -123,6 +132,11 @@ export function openTask(taskId: string, tab: TaskTab = "spec", message?: Messag
   useRouter.getState().navigate({ view: "task", taskId, tab, ...(message ? { message } : {}) });
 }
 
+/** A project's settings: its worktree setup, Claude accounts and the rest. Its tasks are the Tasks screen's, under the sidebar's filter. */
+export function openProject(projectId: string): void {
+  useRouter.getState().navigate({ view: "project", projectId });
+}
+
 export function openPullRequest(projectId: string, number: number): void {
   useRouter.getState().navigate({ view: "pull", projectId, number });
 }
@@ -140,7 +154,7 @@ function isPlainView(view: string | undefined): view is PlainView {
 }
 
 /** Screens a spec names by one id. */
-const idViews: Readonly<Record<string, (id: string) => Route>> = {
+const idViews: Readonly<Record<string, (id: string, tab: string | undefined) => Route>> = {
   thread: (threadId) => ({ view: "thread", threadId }),
   project: (projectId) => ({ view: "project", projectId }),
   newsubthread: (parentId) => ({ view: "newsubthread", parentId }),
@@ -155,7 +169,7 @@ export function routeFromSpec(spec: string): Route | null {
       ...(id === "recovery" ? { mode: "recovery" as const } : {}),
       ...(id === "preview" || tab === "preview" ? { preview: true } : {}),
     };
-  if (view && id && Object.hasOwn(idViews, view)) return idViews[view]!(id);
+  if (view && id && Object.hasOwn(idViews, view)) return idViews[view]!(id, tab);
   if (view === "newtask") return { view: "newtask", ...(id ? { projectId: id } : {}) };
   if (view === "task" && id)
     return {

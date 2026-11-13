@@ -1,6 +1,7 @@
 import type { ModelOption, Orcling } from "@openorc/protocol";
 import type { KeyboardEvent } from "react";
 import { useRouter } from "../lib/router";
+import { useEnabledHarnesses } from "../lib/enabled-harnesses";
 import { Check, Plus } from "./icons";
 import { OrclingAvatar } from "./OrclingAvatar";
 
@@ -17,8 +18,10 @@ export type RowProps = { disabled?: boolean | undefined; closeOnSelect: boolean;
 
 /** Orclings the picker offers, each with the model it brings. */
 export function OrclingRows({ orclings, models, disabled, closeOnSelect, close, moveRowFocus }: RowProps & { orclings: OrclingPickerChoices | undefined; models: ModelOption[] }) {
+  const enabled = useEnabledHarnesses();
+  const options = orclings?.options.filter((orcling) => enabled.includes(orcling.settings.agent)) ?? [];
   if (orclings?.unavailable) return <p className="model-picker-message">{orclings.unavailable}</p>;
-  if (!orclings?.options.length) {
+  if (!orclings || !options.length) {
     return (
       <button type="button" className="model-picker-text-action" onClick={() => useRouter.getState().navigate({ view: "orcling" })}>
         <Plus size={14} /> Create an Orcling
@@ -27,7 +30,7 @@ export function OrclingRows({ orclings, models, disabled, closeOnSelect, close, 
   }
   return (
     <>
-      {orclings.options.map((orcling) => {
+      {options.map((orcling) => {
         const model = models.find((option) => option.agent === orcling.settings.agent && option.id === orcling.settings.model);
         const selected = orclings.selectedId === orcling.id;
         return (
@@ -38,7 +41,7 @@ export function OrclingRows({ orclings, models, disabled, closeOnSelect, close, 
             className="model-picker-row model-picker-orcling-row"
             aria-pressed={selected}
             disabled={disabled}
-            title={`${orcling.name} · ${model?.label ?? orcling.settings.model}`}
+            data-tip={`${orcling.name} · ${model?.label ?? orcling.settings.model}`}
             onClick={() => {
               orclings.onSelect(orcling);
               if (closeOnSelect) close();

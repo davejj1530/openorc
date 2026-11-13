@@ -3,6 +3,7 @@ import type { CloudSandbox } from "@openorc/protocol";
 import { TextButton } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { Section, SettingRow } from "./settings-shared";
+import { thisComputer } from "../lib/this-computer";
 
 /** Costs and states change slowly; a running sandbox's awake time is counted here between refreshes. */
 const REFRESH_MS = 30_000;
@@ -35,7 +36,7 @@ function usd(amount: number): string {
 }
 
 /** Where a sandbox runs, so a row from one connected service is never taken for the other's. */
-const places: Record<CloudSandbox["provider"], string> = { local: "Simulated on this Mac", agent37: "On Agent37", vercel: "On Vercel" };
+const places: Record<CloudSandbox["provider"], string> = { local: `Simulated on ${thisComputer}`, agent37: "On Agent37", vercel: "On Vercel" };
 
 /** Awake now and for how long, or asleep and how long it ran in all; then its size, and where it runs. */
 function details(sandbox: CloudSandbox, now: number): string {
@@ -55,7 +56,7 @@ function SandboxRow({ sandbox, now }: { sandbox: CloudSandbox; now: number }) {
         <TextButton
           tone="muted"
           disabled={sandbox.working || remove.isPending}
-          title={sandbox.working ? "Its agent is at work there" : undefined}
+          data-tip={sandbox.working ? "Its agent is at work there" : undefined}
           onClick={() => remove.mutate({ name: sandbox.name })}
         >
           Delete sandbox

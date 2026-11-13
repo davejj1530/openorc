@@ -7,7 +7,7 @@ import { MemoryPanel } from "../panels/MemoryPanel";
 import { OrclingPanel } from "../panels/OrclingPanel";
 import { TaskDetailsPanel } from "../panels/TaskDetailsPanel";
 import { ThreadTasksPanel } from "../panels/ThreadTasksPanel";
-import { FilesPanel } from "../panels/FilesPanel";
+import { FileExplorer } from "../panels/FileExplorer";
 import { panelDirectory, panelFileScope, panelScope, terminalId, type PanelContext } from "./panel-tools";
 
 const ConversationPlan = lazy(() => import("./ConversationPlan").then((m) => ({ default: m.ConversationPlan })));
@@ -25,7 +25,7 @@ function commitSource(context: PanelContext): CommitSource | null {
 
 function FileContent({ context, page }: ContentProps & { page: Extract<PanelPage, { kind: "file" }> }) {
   if (page.selection) return <FilePanel selection={page.selection} directory={panelDirectory(context)} />;
-  return <FilesPanel scope={panelFileScope(context)} directory={panelDirectory(context)} />;
+  return <FileExplorer scope={panelFileScope(context)} directory={panelDirectory(context)} />;
 }
 
 function ChangesContent({ context, page }: ContentProps & { page: Extract<PanelPage, { kind: "changes" }> }) {

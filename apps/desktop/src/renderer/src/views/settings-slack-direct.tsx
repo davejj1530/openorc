@@ -1,18 +1,9 @@
-import {
-  ExecutionMode,
-  executionMode,
-  executionModeAvailable,
-  executionModeNote,
-  executionModePresentation,
-  executionModeSettings,
-  harnessCatalog,
-  harnessIds,
-  type SlackDirectConfig,
-} from "@openorc/protocol";
+import { ExecutionMode, executionMode, executionModeAvailable, executionModeNote, executionModePresentation, executionModeSettings, type SlackDirectConfig } from "@openorc/protocol";
 import { useState } from "react";
 import { Button, Input, Select } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { core } from "../lib/rpc";
+import { EnabledAgentOptions } from "../components/EnabledAgentOptions";
 import { directSlackStatus } from "./settings-presentation";
 import { Field, LoadError, Section, Status } from "./settings-shared";
 import { SlackSetupGuide } from "./settings-slack-guide";
@@ -95,7 +86,7 @@ export function DirectSlackSettings({ active }: { active: boolean }) {
       >
         <Field label="Workspace entrypoint" hint="Find projects inside this folder or among your imported projects.">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-sm text-ink-2 truncate flex-1" title={home.data?.rootPath}>
+            <span className="text-sm text-ink-2 truncate flex-1" data-tip={home.data?.rootPath}>
               {home.data?.rootPath ?? "Loading folder…"}
             </span>
             <Button
@@ -114,11 +105,7 @@ export function DirectSlackSettings({ active }: { active: boolean }) {
         </Field>
         <Field label="Default coding agent">
           <Select disabled={locked} value={config.agent} onChange={(e) => setDraft({ ...draft, agent: e.target.value as SlackDirectConfig["agent"] })}>
-            {harnessIds.map((id) => (
-              <option key={id} value={id}>
-                {harnessCatalog[id].name}
-              </option>
-            ))}
+            <EnabledAgentOptions />
           </Select>
         </Field>
         <Field label="Default model" hint="Leave blank for the agent default. You can request a different model in Slack.">

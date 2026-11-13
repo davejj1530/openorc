@@ -1,8 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { ContextMenu } from "@base-ui/react/context-menu";
-import { WORKSPACE_ID } from "@openorc/protocol";
 import { CoversPreview } from "../lib/browser-preview";
-import { useLayout } from "../lib/layout";
 import { useRpcMutation } from "../lib/client";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { X } from "./icons";
@@ -46,7 +44,8 @@ export function ProjectMenu({ project, children }: { project: { id: string; name
   );
 }
 
-function RemoveProjectDialog({ project, onClose }: { project: { id: string; name: string }; onClose: () => void }) {
+/** Asks before taking a project off the list; files, worktrees and history stay. */
+export function RemoveProjectDialog({ project, onClose }: { project: { id: string; name: string }; onClose: () => void }) {
   const remove = useRpcMutation("projects.remove");
   return (
     <Dialog
@@ -76,11 +75,8 @@ function RemoveProjectDialog({ project, onClose }: { project: { id: string; name
             remove.mutate(
               { id: project.id },
               {
-                onSuccess: () => {
-                  const layout = useLayout.getState();
-                  if (layout.projectId === project.id) layout.setProject(WORKSPACE_ID);
-                  onClose();
-                },
+                // The sidebar's filter lets go of a removed project on its own.
+                onSuccess: onClose,
               },
             )
           }

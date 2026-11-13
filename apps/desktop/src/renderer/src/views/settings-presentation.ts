@@ -107,12 +107,6 @@ export function usageReportStatus({
   if (report.status === "unavailable") return "Metrics unavailable";
   return "Usage reported";
 }
-export function creditBalanceLabel(credit: { unlimited: boolean; balance: string | null }): string {
-  if (credit.unlimited) return "Unlimited";
-  const balance = credit.balance === null ? NaN : Number(credit.balance);
-  if (Number.isFinite(balance)) return `${balance.toLocaleString(undefined, { maximumFractionDigits: 2 })} credits`;
-  return "Balance unavailable";
-}
 export function resetTimeLabel(resetsAt: number | null, expired: boolean): string {
   if (resetsAt === null) return "Reset time unavailable";
   if (expired) return `Reported reset ${formatUsageTime(resetsAt)} has passed. Refresh for a new report.`;

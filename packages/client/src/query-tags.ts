@@ -42,6 +42,11 @@ function each(methods: RpcMethod[], rule: (p: Params) => string[]): MethodRules 
   return Object.fromEntries(methods.map((method) => [method, rule]));
 }
 
+/** One skill's files, by the path its listing gives. */
+function skillTag(p: Params): string {
+  return `skill:${String(p["skill"])}`;
+}
+
 /** The task a write names, by its own id or the task it belongs to. */
 function taskTag(p: Params): string {
   return `task:${String(p["taskId"] ?? p["id"])}`;
@@ -55,10 +60,14 @@ function scopedTask(p: Params): string[] {
 /** Reads whose tags never depend on their parameters. */
 const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "claude.accounts.list": ["claude-accounts"],
+  "connectors.list": ["connectors"],
+  "connectors.spec": ["connectors"],
   "workspace.get": ["workspace"],
   "slack.status": ["slack"],
   "cloud.status": ["cloud"],
   "cloud.sandboxes": ["cloud"],
+  // Not "threads": sizing every worktree is slow, and threads change with every message.
+  "worktrees.list": ["worktrees"],
   "cloud.offer": ["cloud"],
   // Asks Vercel, so not "cloud", which a running check or sandbox sends often.
   "cloud.brain.status": ["cloud-brain"],
@@ -78,6 +87,9 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "agents.availability": ["system", "claude-accounts"],
   "agents.updates.get": ["agent-updates"],
   "providers.usage": ["provider-usage", "system", "settings"],
+  "usage.history": ["usage-history"],
+  // A turn ends with its thread's activity changing, which every thread read already follows.
+  "projects.activity": ["threads"],
   // Not "settings": a palette changed on the Mac must not start its CLIs again for a phone.
   "providers.limits": ["provider-usage", "claude-accounts", "system"],
   "agents.models": ["models"],
@@ -86,7 +98,8 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "app.settings.get": ["settings"],
   "textGeneration.settings.get": ["text-generation", "system", "models"],
   "schedules.list": ["schedules"],
-  "projects.list": ["projects"],
+  // Ordered by thread activity, so it follows the thread list.
+  "projects.list": ["projects", "threads"],
   "projects.checkoutBranch": ["projects", "workspace-diff"],
   "threads.list": ["threads"],
   "threads.resolvedCount": ["threads"],
@@ -101,8 +114,13 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "reviewerApp.get": ["reviewer-app"],
   // Orclings, their instructions and what they remember.
   "orclings.list": ["orclings"],
+  // Each Orcling's own conversation with its newest message, which a turn or a read there changes.
+  "orclings.chats": ["orclings", "threads"],
+  "orclings.profile": ["orclings", "memory"],
   "orclings.instructions": ["orclings"],
   "orclings.memories": ["orclings", "memory"],
+  // A group's title is its thread's, and deleting the thread removes the group.
+  "orclings.groups.list": ["orclings", "orcling-groups", "threads"],
   // The Device panel's status and device list. The core invalidates "devices" whenever either changes.
   "devices.status": ["devices"],
   "devices.list": ["devices"],
@@ -115,6 +133,8 @@ const idReadTags: MethodRules = {
     const scope = p["scope"] as { kind?: unknown; id?: unknown } | undefined;
     return ["skills", ...(scope?.kind === "project" ? [`project:${String(scope.id)}`] : [])];
   },
+  // A skill's folder changes with its own writes; the agent's edits to it show the next time it is opened.
+  ...each(["skills.files", "skills.readFile"], (p) => ["skills", skillTag(p)]),
   "tasks.executionThread": (p) => ["tasks", "threads", `task:${String(p["taskId"])}`],
   "projects.get": (p) => ["projects", `project:${String(p["id"])}`],
   // Git can appear in a turn, a commit, the terminal or outside the app; focus and settled commands refresh workspace-diff.
@@ -145,6 +165,8 @@ const idReadTags: MethodRules = {
   "workspace.usage": (p) => [`task:${String(p["taskId"])}`],
   ...each(["memory.list", "memory.search"], (p) => ["memory", `memory:${String(p["projectId"])}`]),
   "memory.forTask": (p) => ["memory", `memory:task:${String(p["taskId"])}`],
+  "orclings.reactions": (p) => [`reactions:${String(p["threadId"])}`],
+  "orclings.origins": (p) => [`origins:${String(p["threadId"])}`, `thread:${String(p["threadId"])}`],
 };
 
 /**
@@ -169,6 +191,7 @@ const workspaceMutations = new Set<RpcMethod>(["threads.moveWorkspace", "threads
 /** Mutations whose effects never depend on their parameters. */
 const fixedInvalidations: Partial<Record<RpcMethod, readonly string[]>> = {
   "devices.setup": ["devices"],
+  "worktrees.remove": ["worktrees", "threads", "tasks", "workspace-diff"],
   "devices.settings.set": ["devices"],
   "devices.boot": ["devices"],
   "devices.shutdown": ["devices"],
@@ -177,6 +200,13 @@ const fixedInvalidations: Partial<Record<RpcMethod, readonly string[]>> = {
   "claude.accounts.update": ["claude-accounts", "system", "models", "provider-usage"],
   "claude.accounts.login": ["claude-accounts"],
   "claude.accounts.cancelLogin": ["claude-accounts"],
+  "connectors.list": ["connectors"],
+  "connectors.save": ["connectors"],
+  "connectors.remove": ["connectors"],
+  "connectors.setOn": ["connectors"],
+  "connectors.signIn": ["connectors"],
+  "connectors.cancelSignIn": ["connectors"],
+  "connectors.signOut": ["connectors"],
   "providers.codex.reset": ["provider-usage"],
   "agents.models.refresh": ["models"],
   "workspace.configure": ["workspace", "projects"],
@@ -209,10 +239,19 @@ const fixedInvalidations: Partial<Record<RpcMethod, readonly string[]>> = {
   "orclings.instructions.restore": ["orclings"],
   "orclings.ask": ["threads"],
   "orclings.assign": ["orclings", "threads"],
+  "orclings.wakes.save": ["orclings"],
+  "orclings.groups.create": ["orclings", "orcling-groups", "threads"],
+  "orclings.groups.delete": ["orcling-groups", "threads"],
   "remote.configure": ["remote"],
   "remote.pairing.begin": ["remote"],
   "remote.pairing.cancel": ["remote"],
   "remote.devices.remove": ["remote"],
+  // A skill's switch, image or folder shows in every agent's listing that reads the same folders; the cloud's copy follows.
+  "skills.setEnabled": ["skills", "cloud-skills"],
+  "skills.setIcon": ["skills"],
+  "skills.create": ["skills", "cloud-skills"],
+  "skills.import": ["skills", "cloud-skills"],
+  "skills.remove": ["skills", "cloud-skills"],
 };
 
 function workspaceMutationTags(id: string): string[] {
@@ -221,6 +260,8 @@ function workspaceMutationTags(id: string): string[] {
 
 /** Writes whose effects follow the ids in their parameters. */
 const idInvalidations: MethodRules = {
+  "orclings.react": (p) => [`reactions:${String(p["threadId"])}`],
+  "orclings.groups.send": (p) => ["threads", `thread:${String(p["threadId"])}`, `runs:thread:${String(p["threadId"])}`],
   ...each(["tasks.create", "tasks.update", "tasks.delete", "tasks.prepareWorkspace", "tasks.start", "tasks.openThread"], (p) => ["tasks", "inbox", "threads", taskTag(p)]),
   "threads.delete": (p) => ["threads", "tasks", "inbox", `thread:${String(p["id"])}`, `importable:${String(p["projectId"])}`],
   ...each(["threads.start", "threads.fork", "threads.import"], (p) => ["threads", "tasks", "inbox", `thread:${String(p["id"])}`, `importable:${String(p["projectId"])}`]),
@@ -241,6 +282,7 @@ const idInvalidations: MethodRules = {
     `thread:${String(p["threadId"])}`,
     `runs:thread:${String(p["threadId"])}`,
   ]),
+  "skills.writeFile": (p) => ["skills", skillTag(p)],
   ...each(["workspace.cleanup", "review.markReviewed"], (p) => ["tasks", taskTag(p), `diff:${String(p["taskId"])}`]),
   "review.commitProject": (p) => ["workspace-diff", `projectdiff:${String(p["projectId"])}`],
   "review.pushProject": (p) => ["workspace-diff", `projectlog:${String(p["projectId"])}`, "threads"],
@@ -249,6 +291,8 @@ const idInvalidations: MethodRules = {
 };
 
 export function invalidatesFor<M extends RpcMethod>(method: M, params: RpcParams<M>): string[] {
+  if (method === "app.settings.set" && "enabledHarnesses" in params)
+    return ["settings", "models", "system", "agent-updates", "connectors", "text-generation", "provider-usage", "cloud-sign-ins", "cloud-skills"];
   const fixed = fixedInvalidations[method];
   if (fixed) return [...fixed];
   const rule = mutationRules[method];

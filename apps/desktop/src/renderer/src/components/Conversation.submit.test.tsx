@@ -20,7 +20,7 @@ vi.mock("./Composer", async (original) => ({
   ...(await original<object>()),
   Composer: (props: ComposerProps) => {
     composer.props = props;
-    return null;
+    return props.notices;
   },
 }));
 vi.mock("./AgentOrb", () => ({ AgentOrb: () => null }));
@@ -83,8 +83,17 @@ async function submit(options: { thread?: Partial<ThreadSummary>; runs?: RunSpec
   } catch (error) {
     return { error: (error as Error).message };
   }
-  // What reached the core, whichever hook made the call.
-  return vi.mocked(core.call).mock.calls.filter(([method]) => sends.has(method));
+  // What reached the core, whichever hook made the call. A thread's next message carries the id it already shows under
+  // while on its way, and a queued one does not; each case below is about the rest of the call.
+  return vi
+    .mocked(core.call)
+    .mock.calls.filter(([method]) => sends.has(method))
+    .map(([method, params]) => {
+      const { messageId, ...rest } = params as { messageId?: string };
+      if (method === "threads.queue") expect(messageId).toBeUndefined();
+      else expect(messageId).toMatch(/^user-[0-9a-f-]{36}$/);
+      return [method, rest];
+    });
 }
 const sends = new Set(["runs.start", "runs.send", "threads.queue"]);
 
@@ -133,11 +142,25 @@ it.each([
     expected: [["threads.queue", { id: "thread", text: "hello", attachments: [], requestKey: expect.any(String) }]],
   },
   {
-    name: "queues when the agent reads messages only between turns",
+    name: "steers OpenCode's running turn when asked for now",
     thread: { activity: "running", agent: "opencode", model: "o" },
     runs: [{ id: "A", agent: "opencode", live: true }],
     now: true,
-    expected: [["threads.queue", { id: "thread", text: "hello", attachments: [], requestKey: expect.any(String) }]],
+    expected: [["runs.send", { runId: "A", text: "hello", attachments: [] }]],
+  },
+  {
+    name: "steers Pi's running turn through the normal send endpoint",
+    thread: { activity: "running", agent: "pi", model: "fixture/model" },
+    runs: [{ id: "A", agent: "pi", live: true }],
+    now: true,
+    expected: [["runs.send", { runId: "A", text: "hello", attachments: [] }]],
+  },
+  {
+    name: "steers Antigravity's running turn through the normal send endpoint",
+    thread: { activity: "running", agent: "antigravity", model: "gemini-3.8-flash" },
+    runs: [{ id: "A", agent: "antigravity", live: true }],
+    now: true,
+    expected: [["runs.send", { runId: "A", text: "hello", attachments: [] }]],
   },
   {
     name: "queues when the running process has other settings",
@@ -172,6 +195,32 @@ it("offers the other signed-in Claude accounts after a usage limit, and goes on 
   );
 });
 
+it("offers only the accounts the thread's project uses after a usage limit, and says when every one of them is at its limit", async () => {
+  const { useRouter } = await import("../lib/router");
+  const account = (id: string, name: string, status: string) => ({ id, name, kind: "managed", enabled: true, createdAt: 1, status, email: null, organization: null, message: null });
+  const accounts = (client: string) => ({ defaultId: "work", accounts: [account("work", "Work", "ready"), account("personal", "Personal", "ready"), account("client", "Client", client)] });
+  const claudeAccounts = { only: true, accountIds: ["work", "client"], defaultId: "work", autoSwitch: false };
+  queries.set("projects.get", { ...project, settings: { setupScript: null, worktreeInclude: [], branchPrefix: "openorc", detectedConfigs: [], claudeAccounts } });
+  const session = { status: "error", message: "You've hit your 5-hour limit", recovery: { kind: "usage", provider: "claude" } } as const;
+  try {
+    queries.set("claude.accounts.list", accounts("ready"));
+    await open({ thread: { agent: "claude", model: "opus", claudeAccountId: "work", session }, runs: [{ id: "A", agent: "claude", live: false }] });
+    expect(screen.getByRole("button", { name: "Continue with Client" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Personal/ })).toBeNull();
+    expect(screen.queryByText(/Every account this project uses/)).toBeNull();
+    cleanup();
+
+    queries.set("claude.accounts.list", accounts("signed_out"));
+    await open({ thread: { agent: "claude", model: "opus", claudeAccountId: "work", session }, runs: [{ id: "A", agent: "claude", live: false }] });
+    expect(screen.queryByRole("button", { name: /Continue with/ })).toBeNull();
+    expect(screen.getByText(/Every account this project uses is at its limit\./)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Project accounts" }));
+    expect(useRouter.getState().route).toEqual({ view: "project", projectId: "project" });
+  } finally {
+    queries.delete("projects.get");
+  }
+});
+
 it("holds a cloud turn whose sign-in the cloud lacks, offers that sign-in in place, and sends once it is ready", async () => {
   const cloud = { provider: "vercel", state: "ready", step: null, setup: false, error: null } as const;
   const codex = { kind: "codex", label: "Codex", way: "browser", error: null } as const;
@@ -191,7 +240,7 @@ it("holds a cloud turn whose sign-in the cloud lacks, offers that sign-in in pla
   expect(sent()).toEqual([]);
   act(heard);
   await act(() => sending);
-  await waitFor(() => expect(sent()).toEqual(start(true)));
+  await waitFor(() => expect(sent()).toEqual(start(true, { messageId: expect.stringMatching(/^user-/) })));
   expect(screen.queryByText("Codex has no sign-in for the cloud.")).toBeNull();
 });
 

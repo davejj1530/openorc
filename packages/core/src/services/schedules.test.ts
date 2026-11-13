@@ -1,4 +1,4 @@
-import { Db, projects, runs, scheduleFirings, schedules, threads } from "@openorc/db";
+import { claudeAccounts, Db, projects, runs, scheduleFirings, schedules, threads } from "@openorc/db";
 import { type Project } from "@openorc/protocol";
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -27,17 +27,8 @@ let afterAdmissionError: boolean;
 let notifications: ReturnType<typeof vi.fn<ConstructorParameters<typeof ScheduleService>[3]>>;
 let warnings: ReturnType<typeof vi.fn<(message: string) => void>>;
 let invalidations: ReturnType<typeof vi.fn<(keys: string[]) => void>>;
-function freshService(maintenance = () => false) {
-  return new ScheduleService(
-    db,
-    { start: modelStart },
-    invalidations,
-    notifications,
-    { info() {}, warn: warnings, error() {} },
-    {
-      maintenance,
-    },
-  );
+function freshService(updating: (agent: string) => boolean = () => false) {
+  return new ScheduleService(db, { start: modelStart }, invalidations, notifications, { info() {}, warn: warnings, error() {} }, { updating });
 }
 function modelSchedule() {
   return service.create({
@@ -208,18 +199,68 @@ describe("durable scheduled launches", () => {
   });
 });
 
-it("leaves due firings untouched during agent updates and resumes after maintenance", async () => {
-  let updating = true;
-  service = freshService(() => updating);
-  const schedule = modelSchedule();
+it("fires other agents' schedules on time during an agent's update, and that agent's own on the tick after it", async () => {
+  let updating = "codex";
+  service = freshService((agent) => agent === updating);
+  const held = modelSchedule();
+  const other = service.create({ ...modelSchedule(), title: "Scheduled on another agent", agent: "claude" });
+  expect(schedules.get(db, held.id)?.agent).toBe("codex");
   const due = Date.now() - 1000;
-  schedules.update(db, schedule.id, { nextRunAt: due });
+  for (const schedule of [held, other]) schedules.update(db, schedule.id, { nextRunAt: due });
   await service.tick();
-  expect(modelStart).not.toHaveBeenCalled();
-  expect(scheduleFirings.list(db, schedule.id)).toEqual([]);
-  expect(schedules.get(db, schedule.id)?.nextRunAt).toBe(due);
-  expect(() => service.trigger(schedule.id, "during-update")).toThrow("agent update is running");
-  updating = false;
+  expect(modelStart.mock.calls.map(([input]) => input.agent)).toEqual(["claude"]);
+  expect(scheduleFirings.list(db, held.id)).toEqual([]);
+  expect(schedules.get(db, held.id)?.nextRunAt).toBe(due);
+  updating = "";
   await service.tick();
-  expect(modelStart).toHaveBeenCalledTimes(1);
+  expect(modelStart.mock.calls.map(([input]) => input.agent)).toEqual(["claude", "codex"]);
+});
+
+it("starts a schedule by hand during its agent's update", async () => {
+  service = freshService(() => true);
+  const schedule = modelSchedule();
+  expect((await service.trigger(schedule.id, "during-update")).status).toBe("started");
+  expect(modelStart).toHaveBeenCalledOnce();
+});
+
+describe("a project's own Claude accounts", () => {
+  const claudeSchedule = (claudeAccountId?: string) =>
+    service.create({
+      projectId: project.id,
+      title: "Scheduled Claude",
+      prompt: "Check the project",
+      agent: "claude",
+      model: null,
+      effort: null,
+      mode: "plan",
+      permissionMode: "trusted",
+      workspaceMode: "current",
+      everyMinutes: 30,
+      ...(claudeAccountId ? { claudeAccountId } : {}),
+    });
+  const onlyUse = (accountIds: string[], defaultId: string) => projects.updateSettings(db, project.id, { claudeAccounts: { only: true, accountIds, defaultId, autoSwitch: false } });
+
+  it("saves a schedule on an account the project uses, or its default, and refuses one it does not", () => {
+    const [work, personal] = ["Work", "Personal"].map((name) => claudeAccounts.add(db, name).id) as [string, string];
+    onlyUse([work], work);
+    expect(claudeSchedule().claudeAccountId).toBe(work);
+    expect(() => claudeSchedule(personal)).toThrow(/only uses these Claude accounts/);
+    const saved = claudeSchedule(work);
+    expect(() => service.update(saved.id, { claudeAccountId: personal })).toThrow(/only uses these Claude accounts/);
+    expect(schedules.get(db, saved.id)?.claudeAccountId).toBe(work);
+  });
+
+  it("keeps firing on the project's default once the project stops using the schedule's account, and says so", async () => {
+    const [work, personal] = ["Work", "Personal"].map((name) => claudeAccounts.add(db, name).id) as [string, string];
+    const schedule = claudeSchedule(work);
+    onlyUse([personal], personal);
+    await service.trigger(schedule.id, "after-the-change");
+    expect(modelStart).toHaveBeenCalledWith(expect.objectContaining({ claudeAccountId: personal }), expect.anything());
+    expect(warnings).toHaveBeenCalledWith(expect.stringContaining("runs on its project's default Claude account"));
+    expect(schedules.get(db, schedule.id)?.claudeAccountId).toBe(work);
+    // Said once, not at every firing.
+    await service.trigger(schedule.id, "and-again");
+    expect(modelStart).toHaveBeenCalledTimes(2);
+    expect(warnings.mock.calls.filter(([message]) => message.includes("default Claude account"))).toHaveLength(1);
+  });
 });

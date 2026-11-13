@@ -54,7 +54,7 @@ export function ColorRow({
         }}
       />
       {changed && (
-        <button type="button" className="color-row-reset" title={`Reset ${label} to the palette`} aria-label={`Reset ${label} to the palette`} onClick={onReset}>
+        <button type="button" className="color-row-reset" data-tip={`Reset ${label} to the palette`} aria-label={`Reset ${label} to the palette`} onClick={onReset}>
           <RotateCcw size={13} />
         </button>
       )}

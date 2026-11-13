@@ -20,7 +20,7 @@ describe("sidebar thread status", () => {
   ] as const)("shows %s ahead of failure, unread and completion", (activity, label, icon) => {
     const html = render({ activity, session: { status: "error", message: "Previous failure" }, unread: true, doneAt: 1 });
     expect(html).toContain(`aria-label="${label}"`);
-    expect(html).toContain(`title="${label}"`);
+    expect(html).toContain(`data-tip="${label}"`);
     expect(html).toContain(`data-icon="${icon}"`);
     expect(html.match(/role="img"/g)).toHaveLength(1);
     expect(html).not.toContain("Previous failure");
@@ -29,7 +29,7 @@ describe("sidebar thread status", () => {
   it.each([["lost", "Session lost"]] as const)("shows %s ahead of unread and completion, including the failure reason", (status, label) => {
     const html = render({ session: { status, message: "Provider unavailable" }, unread: true, doneAt: 1 });
     expect(html).toContain(`aria-label="${label}: Provider unavailable"`);
-    expect(html).toContain(`title="${label}: Provider unavailable"`);
+    expect(html).toContain(`data-tip="${label}: Provider unavailable"`);
     expect(html).toContain('data-icon="AlertCircle"');
   });
 
@@ -40,7 +40,7 @@ describe("sidebar thread status", () => {
   it("shows unread ahead of completion", () => {
     const html = render({ unread: true, doneAt: 1 });
     expect(html).toContain('aria-label="Unread"');
-    expect(html).toContain('title="Unread"');
+    expect(html).toContain('data-tip="Unread"');
     expect(html).not.toContain('data-icon="Check"');
   });
 
@@ -52,7 +52,7 @@ describe("sidebar thread status", () => {
       ],
     });
     expect(html).toContain('aria-label="2 background commands are running"');
-    expect(html).toContain('title="2 background commands are running"');
+    expect(html).toContain('data-tip="2 background commands are running"');
     expect(html).toContain('data-icon="Terminal"');
     expect(render({ backgroundCommands: [{ id: "b1", description: "pnpm dev" }], unread: true })).toContain('aria-label="Unread"');
   });

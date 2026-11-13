@@ -22,7 +22,7 @@ import { registerPullReviewTools, type PullReviewTools } from "./pull-review.js"
 import { UserInput, type UserInputResult } from "./questions.js";
 import { registerVisualizationTool } from "./visualization.js";
 export type { ExecutionSwitchInput, ExecutionTools } from "./execution-tools.js";
-export type { OrclingMemoryEntry, OrclingTools } from "./orcling-tools.js";
+export type { OrclingMemoryEntry, OrclingStartInput, OrclingTools, OrclingWorker } from "./orcling-tools.js";
 export type { PullReviewComment, PullReviewTools } from "./pull-review.js";
 export { UserInput, validateUserAnswers, type UserInputResult } from "./questions.js";
 
@@ -536,7 +536,7 @@ function buildServer(host: McpHost, runId: string): McpServer {
     "thread_start",
     {
       description:
-        "Start a new thread in this project that works beside you, in your folder, with you as its parent. Use it when the user asks you to hand work to another agent or have something done alongside your own, such as generating assets while you code. Don't ask the user for permission when they asked for this; ask first only when it's unclear what to start or with which agent. The prompt is the new thread's first message, after a note that you started it. It works in your mode with your permissions, on your agent and model unless you name others; on another agent with no model named, it uses the model last used with that agent. An unknown model name is answered with the available models. It keeps your Fast mode only on your own model; set fast to choose it. Talk to it with thread_send, and it can reach you the same way. Up to 3 threads you started can work at once, and a thread you started can't start its own.",
+        "Start a new thread in this project that works beside you, in your folder, with you as its parent. Use it when the user asks you to hand work to another agent or have something done alongside your own, such as generating assets while you code. Don't ask the user for permission when they asked for this; ask first only when it's unclear what to start or with which agent. The prompt is the new thread's first message, after a note that you started it. It works in your mode with your permissions, on your agent and model unless you name others; on another agent with no model named, it uses the model last used with that agent. An unknown model name is answered with the available models. It keeps your Fast mode only on your own model; set fast to choose it. Talk to it with thread_send, and it can reach you the same way. A thread you started can't start its own.",
       inputSchema: {
         prompt: z.string().min(1).max(20000),
         title: z.string().min(1).max(120).optional(),

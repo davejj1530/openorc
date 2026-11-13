@@ -4,7 +4,8 @@ import { CoversPreview } from "../lib/browser-preview";
 import { Download } from "./icons";
 import { Button } from "./ui";
 
-function useAppUpdate() {
+/** The app's update state from the main process, as it changes. */
+export function useAppUpdate() {
   const [snapshot, setSnapshot] = useState<UpdateSnapshot | null>(null);
   useEffect(() => {
     const api = window.openorc?.updates;

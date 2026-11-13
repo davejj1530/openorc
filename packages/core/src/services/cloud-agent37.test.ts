@@ -62,7 +62,10 @@ beforeEach(async () => {
   const tokenStore = { load: async () => saved, save: async (value: string) => void (saved = value) };
   // This host's Claude is the instance's own stand-in, so its version is the one wanted there: an instance here runs
   // its commands on this machine, where a version of its own would install a real Claude.
-  const shellProbe = async () => ({ path: process.env["PATH"] ?? "", binaries: { claude: path.join(bin, "claude"), codex: null, opencode: null } });
+  const shellProbe = async () => ({
+    path: process.env["PATH"] ?? "",
+    binaries: { claude: path.join(bin, "claude"), codex: null, opencode: null, omp: null, cursor: null, pi: null, antigravity: null, fx: null },
+  });
   core = await OpenOrc.create({ dataDir: path.join(root, "data"), ephemeral: true, transport: { push: () => {} }, cloudSandboxes: provider, claudeCloudSecrets: tokenStore, shellProbe });
   settings.set(core.db, "extraction.provider", "off");
   vi.spyOn(core.textGeneration, "title").mockResolvedValue(null);

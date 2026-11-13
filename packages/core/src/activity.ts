@@ -46,6 +46,24 @@ const UPDATE_WORDS: { readonly [R in BusyReason]: string | null } = {
   phones: null,
 };
 
+/**
+ * What a refused switch of where the app runs says. A switch leaves this place closed until someone switches back, so
+ * what an update lets through because the same core returns at once is waited for here: a message caught mid-delivery,
+ * a title being written, a sign-in. Cloud work still carries on in its VM, and a phone reconnects on the way back.
+ */
+const SWITCH_WORDS: { readonly [R in BusyReason]: string | null } = {
+  "agent-updates": "Wait for agent updates to finish first, then switch.",
+  memory: "Wait for memory processing to finish first, then switch.",
+  schedules: UPDATE_WORDS.schedules,
+  "background-commands": "Stop the background commands running in your conversations first, then switch.",
+  agents: "Wait for agent work, approvals, and context maintenance to finish first, then switch.",
+  "queued-messages": "A queued message is being delivered. Try again in a moment.",
+  "cloud-sandboxes": null,
+  "text-generation": "OpenOrc is still writing text in the background, such as a title. Try again in a moment.",
+  "claude-sign-in": "Finish or cancel the Claude sign-in first, then switch.",
+  phones: null,
+};
+
 const REASONS = Object.keys(CHECKS) as BusyReason[];
 
 /** Why closing the core now would cut something short, or null when nothing would. Read when asked, never stored. */
@@ -53,14 +71,24 @@ export function busyReason(sources: ActivitySources): BusyReason | null {
   return REASONS.find((reason) => CHECKS[reason](sources)) ?? null;
 }
 
+/** Refuses with the first blocking reason's words, or fences new turns and schedules. Never yields between the two. */
+function fence(sources: ActivitySources, words: { readonly [R in BusyReason]: string | null }): string | null {
+  const blocking = REASONS.find((reason) => words[reason] !== null && CHECKS[reason](sources));
+  if (blocking) return words[blocking];
+  if (!sources.runs.prepareForUpdate()) return words.agents;
+  sources.schedules.stopAccepting();
+  return null;
+}
+
 /**
  * Refuses a restart for an update with the first blocking reason's words, or fences new turns and schedules for it.
  * Runs without yielding, so nothing starts between the checks and the fence.
  */
 export function fenceForUpdate(sources: ActivitySources): string | null {
-  const blocking = REASONS.find((reason) => UPDATE_WORDS[reason] !== null && CHECKS[reason](sources));
-  if (blocking) return UPDATE_WORDS[blocking];
-  if (!sources.runs.prepareForUpdate()) return UPDATE_WORDS.agents;
-  sources.schedules.stopAccepting();
-  return null;
+  return fence(sources, UPDATE_WORDS);
+}
+
+/** The same for a switch of where the app runs, which waits for more: see SWITCH_WORDS. */
+export function fenceForSwitch(sources: ActivitySources): string | null {
+  return fence(sources, SWITCH_WORDS);
 }

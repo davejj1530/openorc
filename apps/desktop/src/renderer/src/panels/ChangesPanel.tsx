@@ -129,7 +129,7 @@ export function ChangesPanel({ thread, project, task }: { thread?: ThreadSummary
               if (!busy) setCommitOpen(open);
             }}
             trigger={
-              <Button variant="primary" disabled={!canCommit} title={step?.reason ?? undefined}>
+              <Button variant="primary" disabled={!canCommit} data-tip={step?.reason ?? undefined}>
                 Commit
               </Button>
             }

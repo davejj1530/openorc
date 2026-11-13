@@ -1,4 +1,4 @@
-import { audit, redact, threadQueue, threads, type Db } from "@openorc/db";
+import { audit, orclings, redact, threadQueue, threads, type Db } from "@openorc/db";
 import type { QueuedMessage, Run, Thread, ThreadMessage } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import type { Logger } from "../transport.js";
@@ -176,11 +176,17 @@ export class ThreadMessageQueue {
   }
 
   /** Puts a message into the thread: on the live session when there is one, else on a run that resumes it. */
-  async deliver(thread: Thread, text: string, role: "user" | "system", attachments: string[] = [], recordPrompt = true): Promise<void> {
+  async deliver(
+    thread: Thread,
+    text: string,
+    role: "user" | "system",
+    attachments: string[] = [],
+    { recordPrompt = true, unprompted = false, messageId }: { recordPrompt?: boolean; unprompted?: boolean; messageId?: string } = {},
+  ): Promise<void> {
     this.rejectRetiredThread(thread.id);
     const live = this.runs.liveRunForThread(thread.id);
     if (live && live.agent === thread.agent) {
-      await this.runs.send(live.id, text, { role, attachments, recordPrompt });
+      await this.runs.send(live.id, text, { role, attachments, recordPrompt, unprompted, messageId });
       return;
     }
     await this.continueThread(thread.id, {
@@ -194,15 +200,41 @@ export class ThreadMessageQueue {
       attachments,
       promptRole: role,
       recordPrompt,
+      unprompted,
+      promptMessageId: messageId,
     });
   }
 
-  /** A message into a thread from the outside: another thread, or the user relaying between them. */
-  async send(id: string, text: string, from: Thread | null): Promise<void> {
+  /**
+   * A message into a thread from the outside: another thread, or the user relaying between them. Unprompted, it is
+   * OpenOrc's own: a nudge the agent reads and the transcript does not show, such as an Orcling waking up, or a message
+   * from another Orcling that the transcript shows under its own id. Either way the turn is quiet unless the agent answers.
+   */
+  async send(
+    id: string,
+    text: string,
+    from: Thread | null,
+    { unprompted = false, record = !unprompted, messageId }: { unprompted?: boolean; record?: boolean; messageId?: string } = {},
+  ): Promise<void> {
     const thread = this.thread(id);
     if (thread.archivedAt) throw new Error("the thread is resolved");
-    const body = from ? `Message from the thread "${from.title}" (id ${from.id}):\n\n${text}` : text;
-    await this.deliver(thread, body, "system");
-    audit.record(this.db, { actor: from ? "agent" : "user", action: "thread.message", resourceType: "thread", resourceId: id, metadata: { from: from?.id ?? null } });
+    const body = from ? `${sender(this.db, from)}:\n\n${text}` : text;
+    await this.deliver(thread, body, "system", [], { recordPrompt: record, unprompted, ...(messageId ? { messageId } : {}) });
+    audit.record(this.db, { actor: messageActor(from, unprompted), action: "thread.message", resourceType: "thread", resourceId: id, metadata: { from: from?.id ?? null } });
   }
+}
+
+/**
+ * Who a message comes from, as its reader is told. An Orcling writes from its own chat, which no thread can message,
+ * so its reader answers in its own thread, where the Orcling reads it.
+ */
+function sender(db: Db, from: Thread): string {
+  const orcling = orclings.forThread(db, from.id);
+  if (orcling) return `Message from ${orcling.name}, the person's Orcling. It reads your replies in this thread and can't be messaged back, so answer here`;
+  return `Message from the thread "${from.title}" (id ${from.id})`;
+}
+
+function messageActor(from: Thread | null, unprompted: boolean): "openorc" | "agent" | "user" {
+  if (unprompted) return "openorc";
+  return from ? "agent" : "user";
 }

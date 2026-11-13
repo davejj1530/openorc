@@ -11,7 +11,10 @@ afterEach(() => {
   Object.defineProperty(process, "platform", { value: platform });
 });
 
-const answer = (path: string, claude: string | null = null, codex: string | null = null): ShellProbeResult => ({ path, binaries: { claude, codex, opencode: null } });
+const answer = (path: string, claude: string | null = null, codex: string | null = null): ShellProbeResult => ({
+  path,
+  binaries: { claude, codex, opencode: null, omp: null, cursor: null, pi: null, antigravity: null, fx: null },
+});
 
 /** A probe whose answers resolve when the test says so, in the order the test says. */
 function controlledProbe() {
@@ -31,7 +34,10 @@ describe("parseShellProbe", () => {
       "@@openorc@@codex=",
       "",
     ].join("\n");
-    expect(parseShellProbe(stdout)).toEqual({ path: "/Users/d/.local/bin:/opt/homebrew/bin:/usr/bin", binaries: { claude: "/Users/d/.local/bin/claude", codex: null, opencode: null } });
+    expect(parseShellProbe(stdout)).toEqual({
+      path: "/Users/d/.local/bin:/opt/homebrew/bin:/usr/bin",
+      binaries: { claude: "/Users/d/.local/bin/claude", codex: null, opencode: null, omp: null, cursor: null, pi: null, antigravity: null, fx: null },
+    });
   });
 
   it("gives up without a path rather than guessing", () => {
@@ -160,7 +166,10 @@ describe("Windows", () => {
       // npm writes a shell script beside its launcher, and only Windows Script Host runs a .js file.
       for (const file of ["codex", "codex.cmd", "opencode.js"]) await writeFile(path.join(dir, file), "", { mode: 0o755 });
       const env: NodeJS.ProcessEnv = { PATH: dir, OPENORC_CLAUDE_BIN: "C:\\Tools\\claude.exe" };
-      expect(await pathProbe(env)("cmd.exe")).toEqual({ path: dir, binaries: { claude: "C:\\Tools\\claude.exe", codex: path.join(dir, "codex.cmd"), opencode: null } });
+      expect(await pathProbe(env)("cmd.exe")).toEqual({
+        path: dir,
+        binaries: { claude: "C:\\Tools\\claude.exe", codex: path.join(dir, "codex.cmd"), opencode: null, omp: null, cursor: null, pi: null, antigravity: null, fx: null },
+      });
 
       const shellEnv = new ShellEnvironment({ env: { PATH: dir }, shell: () => "cmd.exe" });
       await shellEnv.refresh();

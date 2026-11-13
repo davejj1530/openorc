@@ -1,6 +1,10 @@
 import { z } from "zod";
+import { UsageHistoryParams } from "./usage-history.js";
+import { ProjectActivityParams } from "./project-activity.js";
 import type { AgentUpdates } from "./agent-updates.js";
 import { ClaudeAccountId, claudeAccountRpcParams, type ClaudeAccountRpcResults } from "./claude-accounts.js";
+import { connectorRpcParams, type ConnectorRpcResults } from "./connectors.js";
+import { skillRpcParams, type SkillRpcResults } from "./skills.js";
 import { cloudRpcParams, type CloudRpcResults } from "./cloud.js";
 import { codeExplanationRpcParams, type CodeExplanationRpcResults } from "./code-explanations.js";
 import { editorRpcParams, type EditorRpcResults } from "./code-intelligence.js";
@@ -55,6 +59,7 @@ import { type CommentAttempt, CommentRecipient, type TaskComment, type TaskDiscu
 import { ThreadListParams } from "./thread-list.js";
 import { ThreadStartParams } from "./thread-start.js";
 import { BranchLoss, type ChangePreview, type FileDiff, type RemovalImpact, workspaceChangeRpcParams, type WorkspaceChanges } from "./workspace-changes.js";
+import { worktreeRpcParams, type WorktreeRpcResults } from "./worktrees.js";
 
 /**
  * Renderer to core RPC. Params are validated in the core; results are typed
@@ -67,6 +72,8 @@ const REVIEW_SCOPE_REQUIRED = "Review comments need a conversation or a task.";
 
 export const rpcParams = {
   ...claudeAccountRpcParams,
+  ...connectorRpcParams,
+  ...skillRpcParams,
   ...slackRpcParams,
   ...pullRequestRpcParams,
   ...orclingRpcParams,
@@ -79,6 +86,7 @@ export const rpcParams = {
   ...devicePanelRpcParams,
   ...previewRpcParams,
   ...workspaceChangeRpcParams,
+  ...worktreeRpcParams,
   "tasks.comments.list": z.object({ taskId: z.string() }),
   "tasks.comments.post": z
     .object({
@@ -98,11 +106,32 @@ export const rpcParams = {
   "system.gh": z.object({}).strict(),
   "agents.updates.get": z.object({}),
   "agents.updates.check": z.object({}),
-  "agents.updates.install": z.object({ ids: z.array(HarnessId).min(1).max(3) }).strict(),
+  "agents.updates.install": z.object({ ids: z.array(HarnessId).min(1).max(HarnessId.options.length) }).strict(),
+  "agents.updates.cancel": z.object({}),
   "agents.updates.configure": z.object({ automatic: z.boolean().optional(), dismissed: z.string().max(300).optional() }).strict(),
-  "providers.usage": z.object({ provider: z.enum([...HarnessId.options, "anthropic-api"]), claudeAccountId: ClaudeAccountId.optional() }),
+  "providers.usage": z.object({
+    provider: z.enum([...HarnessId.options, "anthropic-api"]),
+    claudeAccountId: ClaudeAccountId.optional(),
+    fxModel: z
+      .string()
+      .trim()
+      .min(3)
+      .max(500)
+      .regex(/^[^/]+\/.+$/)
+      .optional(),
+    /** A report this young, from any reader, answers at once instead of asking the CLI again; none means a live read. */
+    maxAgeMs: z
+      .number()
+      .int()
+      .positive()
+      .max(15 * 60_000)
+      .optional(),
+  }),
   /** The Mac's plan limits for a phone: Codex, then each enabled Claude account. Takes nothing, so a phone cannot force a fresh read. */
   "providers.limits": z.object({}).strict(),
+  "usage.history": UsageHistoryParams,
+  /** Turns finished per day in a project's own conversations, for the new thread screen. */
+  "projects.activity": ProjectActivityParams,
   "providers.codex.reset": z.object({ attemptId: z.string().uuid(), creditId: z.string().min(1).optional(), confirmationToken: z.string().min(1) }),
   /** Active threads by default; every project when none is named. Offset pages older threads in. */
   "threads.list": ThreadListParams,
@@ -235,8 +264,10 @@ export const rpcParams = {
     resume: z.boolean().optional(),
     /** A conversation goes on with another Claude account: this turn and the next ones run there, resuming its session. */
     claudeAccountId: ClaudeAccountId.optional(),
+    /** The id the prompt is recorded under, so a window that already shows it as sent sees the same message land. */
+    messageId: z.string().min(1).max(100).optional(),
   }),
-  "runs.send": z.object({ runId: z.string(), text: z.string().min(1), attachments: z.array(z.string()).optional() }),
+  "runs.send": z.object({ runId: z.string(), text: z.string().min(1), attachments: z.array(z.string()).optional(), messageId: z.string().min(1).max(100).optional() }),
   "runs.interrupt": z.object({ runId: z.string() }),
   "runs.close": z.object({ runId: z.string() }),
   "runs.listForTask": z.object({ taskId: z.string() }),
@@ -435,6 +466,7 @@ const SECRET_PARAMS: ReadonlySet<RpcMethod> = new Set<RpcMethod>([
   "cloud.env.set",
   "cloud.brain.codex.apiKey",
   "providers.codex.reset",
+  "connectors.save",
 ]);
 
 export const secretParams = (method: string): boolean => method.startsWith("slack.") || SECRET_PARAMS.has(method as RpcMethod);
@@ -525,9 +557,12 @@ export interface RpcResults
     EditorRpcResults,
     CodeExplanationRpcResults,
     ClaudeAccountRpcResults,
+    ConnectorRpcResults,
+    SkillRpcResults,
     RemoteRpcResults,
     DevicePanelRpcResults,
     PreviewRpcResults,
+    WorktreeRpcResults,
     CloudRpcResults {
   "tasks.comments.list": TaskDiscussion;
   "tasks.comments.post": TaskComment;
@@ -551,9 +586,12 @@ export interface RpcResults
   "agents.updates.get": AgentUpdates;
   "agents.updates.check": AgentUpdates;
   "agents.updates.install": AgentUpdates;
+  "agents.updates.cancel": AgentUpdates;
   "agents.updates.configure": AgentUpdates;
   "providers.usage": import("./provider-usage.js").ProviderUsage;
   "providers.limits": import("./provider-usage.js").PlanLimits[];
+  "usage.history": import("./usage-history.js").UsageHistory;
+  "projects.activity": import("./project-activity.js").ProjectActivity;
   "providers.codex.reset": import("./provider-usage.js").ResetResult;
   "threads.list": ThreadSummary[];
   "threads.resolvedCount": number;

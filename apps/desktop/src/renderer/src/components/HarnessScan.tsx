@@ -28,6 +28,8 @@ interface HarnessScanProps {
   onConnect?: (id: HarnessId) => void;
   onSetup?: (id: HarnessId) => void;
   refreshing?: boolean;
+  discloseUnavailable?: boolean;
+  compact?: boolean;
   className?: string;
 }
 
@@ -117,21 +119,21 @@ function RowAction({
   }
   if (row.state === "sign_in") {
     return (
-      <Button aria-label={`${harnessCatalog[row.id].name} sign-in guide`} onClick={() => onConnect?.(row.id)}>
+      <Button aria-label={`${harnessCatalog[row.id].name} sign-in guide`} aria-description={stateGuidance.sign_in} onClick={() => onConnect?.(row.id)}>
         Sign-in guide <ExternalLink size={13} />
       </Button>
     );
   }
   if (row.state === "not_found") {
     return (
-      <Button aria-label={`Install ${harnessCatalog[row.id].name}`} onClick={() => onSetup?.(row.id)}>
+      <Button aria-label={`Install ${harnessCatalog[row.id].name}`} aria-description={stateGuidance.not_found} onClick={() => onSetup?.(row.id)}>
         Install <ExternalLink size={13} />
       </Button>
     );
   }
   if (row.state === "check_failed") {
     return (
-      <Button aria-label={`Retry ${harnessCatalog[row.id].name} check`} onClick={() => onRetry?.(row.id)}>
+      <Button aria-label={`Retry ${harnessCatalog[row.id].name} check`} aria-description={stateGuidance.check_failed} onClick={() => onRetry?.(row.id)}>
         Retry
       </Button>
     );
@@ -139,11 +141,99 @@ function RowAction({
   return null;
 }
 
+/** Whether the scan's selection holds this agent: one of several, or the default. */
+function isSelected(id: HarnessId, selection: HarnessScanProps["selection"]): boolean {
+  if (selection?.mode === "multiple") return selection.selectedIds.includes(id);
+  if (selection?.mode === "default") return selection.selectedId === id;
+  return false;
+}
+
+/** A ready agent in the compact scan, chosen by its whole row: a checkbox among several, or a radio for the default. */
+function HarnessChoice({ row, selection, selected }: { row: HarnessRow; selection: NonNullable<HarnessScanProps["selection"]>; selected: boolean }) {
+  const name = harnessCatalog[row.id].name;
+  const several = selection.mode === "multiple";
+  return (
+    <button
+      type="button"
+      role={several ? "checkbox" : "radio"}
+      aria-checked={selected}
+      aria-label={several ? `${name} ${selected ? "selected" : "not selected"}` : `Use ${name} by default`}
+      aria-description={stateGuidance.ready}
+      className="harness-row harness-row-choice"
+      data-selected={selected || undefined}
+      data-selection-mode={selection.mode}
+      data-state={row.state}
+      onClick={() => selection.onChange(row.id)}
+    >
+      <span className="harness-provider-mark">
+        <img className="harness-provider-logo" data-provider={row.id} src={harnessLogos[row.id]} alt="" />
+      </span>
+      <span className="harness-identity">
+        <span className="harness-name">{name}</span>
+        <HarnessState state={row.state} />
+      </span>
+      <span className="harness-choice-mark" aria-hidden="true">
+        {selected ? <Check size={13} /> : null}
+      </span>
+    </button>
+  );
+}
+
+function HarnessRows({ rows, selection, onRetry, onConnect, onSetup, compact }: Pick<HarnessScanProps, "rows" | "selection" | "onRetry" | "onConnect" | "onSetup" | "compact">) {
+  return (
+    <>
+      {rows.map((row) => {
+        const selected = isSelected(row.id, selection);
+        if (compact && row.state === "ready" && selection) return <HarnessChoice key={row.id} row={row} selection={selection} selected={selected} />;
+        return (
+          <div className="harness-row" data-selected={selected || undefined} data-state={row.state} key={row.id}>
+            <span className="harness-provider-mark">
+              <img className="harness-provider-logo" data-provider={row.id} src={harnessLogos[row.id]} alt={`${harnessCatalog[row.id].name} logo`} />
+            </span>
+            <div className="harness-content">
+              <div className="harness-identity">
+                <h3>{harnessCatalog[row.id].name}</h3>
+                <HarnessState state={row.state} />
+              </div>
+              {!compact ? <p className="harness-guidance">{stateGuidance[row.state]}</p> : null}
+            </div>
+            <div className="harness-action">
+              <RowAction row={row} selection={selection} onRetry={onRetry} onConnect={onConnect} onSetup={onSetup} />
+            </div>
+            {!compact && (row.version || row.path) ? (
+              <details className="harness-details">
+                <summary>
+                  <span className="sr-only">{harnessCatalog[row.id].name} </span>Details <ChevronDown size={12} />
+                </summary>
+                <div className="harness-meta">
+                  {row.version ? (
+                    <span>
+                      <strong>Version</strong> {row.version}
+                    </span>
+                  ) : null}
+                  {row.path ? (
+                    <span>
+                      <strong>Path</strong> <code data-tip={row.path}>{row.path}</code>
+                    </span>
+                  ) : null}
+                </div>
+              </details>
+            ) : null}
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
 /**
  * The shared harness capability list. Onboarding, recovery, and Settings pass
  * the same normalized rows so a green Ready state always carries one meaning.
  */
-export function HarnessScan({ rows, onRefresh, onRetry, onConnect, onSetup, refreshing = false, selection, className }: HarnessScanProps) {
+export function HarnessScan({ rows, onRefresh, onRetry, onConnect, onSetup, refreshing = false, discloseUnavailable = false, compact = false, selection, className }: HarnessScanProps) {
+  const groupUninstalled = discloseUnavailable && rows.some((row) => row.state !== "not_found");
+  const primaryRows = groupUninstalled ? rows.filter((row) => row.state !== "not_found") : rows;
+  const otherRows = groupUninstalled ? rows.filter((row) => row.state === "not_found") : [];
   let selectionLabel = "Coding agent availability";
   if (selection?.mode === "default") selectionLabel = "Default coding agent";
   else if (selection?.mode === "multiple") selectionLabel = "Selected coding agents";
@@ -167,47 +257,17 @@ export function HarnessScan({ rows, onRefresh, onRetry, onConnect, onSetup, refr
         aria-label={selectionLabel}
         aria-busy={refreshing || rows.some((row) => row.state === "checking") || undefined}
       >
-        {rows.map((row) => {
-          let selected = false;
-          if (selection?.mode === "multiple") selected = selection.selectedIds.includes(row.id);
-          else if (selection?.mode === "default") selected = selection.selectedId === row.id;
-          return (
-            <div className="harness-row" data-selected={selected || undefined} data-state={row.state} key={row.id}>
-              <span className="harness-provider-mark">
-                <img className="harness-provider-logo" data-provider={row.id} src={harnessLogos[row.id]} alt={`${harnessCatalog[row.id].name} logo`} />
-              </span>
-              <div className="harness-content">
-                <div className="harness-identity">
-                  <h3>{harnessCatalog[row.id].name}</h3>
-                  <HarnessState state={row.state} />
-                </div>
-                <p className="harness-guidance">{stateGuidance[row.state]}</p>
-              </div>
-              <div className="harness-action">
-                <RowAction row={row} selection={selection} onRetry={onRetry} onConnect={onConnect} onSetup={onSetup} />
-              </div>
-              {row.version || row.path ? (
-                <details className="harness-details">
-                  <summary>
-                    <span className="sr-only">{harnessCatalog[row.id].name} </span>Details <ChevronDown size={12} />
-                  </summary>
-                  <div className="harness-meta">
-                    {row.version ? (
-                      <span>
-                        <strong>Version</strong> {row.version}
-                      </span>
-                    ) : null}
-                    {row.path ? (
-                      <span>
-                        <strong>Path</strong> <code title={row.path}>{row.path}</code>
-                      </span>
-                    ) : null}
-                  </div>
-                </details>
-              ) : null}
+        <HarnessRows rows={primaryRows} selection={selection} onRetry={onRetry} onConnect={onConnect} onSetup={onSetup} compact={compact} />
+        {otherRows.length > 0 ? (
+          <details className="harness-more">
+            <summary>
+              Add more agents <ChevronDown size={12} />
+            </summary>
+            <div className="harness-more-list">
+              <HarnessRows rows={otherRows} selection={selection} onRetry={onRetry} onConnect={onConnect} onSetup={onSetup} compact={compact} />
             </div>
-          );
-        })}
+          </details>
+        ) : null}
       </div>
       {refreshing ? (
         <p className="harness-refresh-note" role="status">

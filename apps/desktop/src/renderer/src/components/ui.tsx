@@ -1,7 +1,21 @@
-import { createContext, forwardRef, useContext, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import {
+  createContext,
+  forwardRef,
+  useContext,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ButtonHTMLAttributes,
+  type InputHTMLAttributes,
+  type ReactElement,
+  type ReactNode,
+  type RefObject,
+  type SelectHTMLAttributes,
+  type TextareaHTMLAttributes,
+} from "react";
 import { Tooltip as BaseTooltip } from "@base-ui/react/tooltip";
 import { Dialog as BaseDialog } from "@base-ui/react/dialog";
-import { X } from "./icons";
+import { Check, X } from "./icons";
 import selectChevron from "./icons-select.svg?url";
 import { cn } from "../lib/cn";
 import { CoversPreview } from "../lib/browser-preview";
@@ -134,16 +148,82 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<H
   return <textarea ref={ref} className={cn(fieldBase, "block w-full px-3 py-2 resize-none", fieldShapes[variant], variant === "sheet" && "py-2.5", className)} {...props} />;
 });
 
-export function Select({ className, children, variant = "inline", ...props }: SelectHTMLAttributes<HTMLSelectElement> & { variant?: FieldVariant }) {
+/** Whether this OS has a select's list drawn in the page. The stylesheet keys on the same mark (styles/controls.css). */
+const listDrawnInPage = (): boolean => ["win32", "linux"].includes(document.documentElement.dataset.platform ?? "");
+
+/**
+ * The text of every option, read from the rendered select so options a child component draws count too, and kept
+ * current as they change. Each change also copies the chosen option into the closed select again, as the browser does
+ * when the choice changes: it copies at no other time, so text rewritten in place would otherwise stay stale.
+ */
+function useOptionLabels(select: RefObject<HTMLSelectElement | null>, button: RefObject<HTMLButtonElement | null>, drawn: boolean): string[] {
+  const [labels, setLabels] = useState<string[]>([]);
+  useLayoutEffect(() => {
+    const element = select.current;
+    if (!drawn || !element) return;
+    const sync = () => {
+      const chosen = element.selectedOptions[0];
+      button.current?.querySelector("selectedcontent")?.replaceChildren(...Array.from(chosen?.childNodes ?? [], (node) => node.cloneNode(true)));
+      const next = Array.from(element.options, (option) => option.text);
+      setLabels((current) => (current.length === next.length && current.every((label, index) => label === next[index]) ? current : next));
+    };
+    sync();
+    // The button holds the copy and the labels, which change in answer to this.
+    const observer = new MutationObserver((records) => {
+      if (records.some((record) => !button.current?.contains(record.target))) sync();
+    });
+    observer.observe(element, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
+  }, [select, button, drawn]);
+  return labels;
+}
+
+export function Select({ className, children, variant = "inline", onKeyDown, onPointerMove, ...props }: SelectHTMLAttributes<HTMLSelectElement> & { variant?: FieldVariant }) {
+  const select = useRef<HTMLSelectElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const pointer = useRef({ x: NaN, y: NaN });
+  const drawn = listDrawnInPage();
+  const labels = useOptionLabels(select, button, drawn);
   return (
     <select
-      className={cn(fieldBase, "max-w-full pl-3 pr-7 appearance-none bg-no-repeat", fieldShapes[variant], variant === "sheet" ? "h-10" : "h-8", className)}
+      ref={select}
+      className={cn(fieldBase, "max-w-full pl-3 pr-7 appearance-none bg-no-repeat open:bg-surface-3", fieldShapes[variant], variant === "sheet" ? "h-10" : "h-8", className)}
       style={{
         backgroundImage: `url("${selectChevron}")`,
         backgroundPosition: "right 10px center",
       }}
+      onKeyDown={(event) => {
+        // The list drawn in the page lets keys rise past it, where the native one kept them. Escape closes the list,
+        // and must not go on to close a dialog or popover that holds the select.
+        if (event.key === "Escape" && event.currentTarget.matches(":open")) event.stopPropagation();
+        onKeyDown?.(event);
+      }}
+      onPointerMove={(event) => {
+        // The accent marks the focused row, the one Enter picks. A pointer that moves takes focus to its row, as in a
+        // native list, so the two never part. One that only had the list scroll under it has not moved.
+        const moved = event.clientX !== pointer.current.x || event.clientY !== pointer.current.y;
+        pointer.current = { x: event.clientX, y: event.clientY };
+        const row = drawn && moved && event.target instanceof Element ? event.target.closest("option") : null;
+        if (row && !row.matches(":disabled") && row !== document.activeElement) row.focus({ preventScroll: true });
+        onPointerMove?.(event);
+      }}
       {...props}
     >
+      {/* Where the list is drawn in the page (styles/controls.css), the closed select shows this instead of the
+          option's text: the chosen option, over every label laid in the same cell, so it keeps the width of
+          the longest as the native control does. macOS draws its own and gets none of it. */}
+      {drawn && (
+        <button ref={button} type="button" className="select-button">
+          <span className="select-value">
+            <selectedcontent />
+            {labels.map((label, index) => (
+              <span key={index} aria-hidden="true">
+                {label}
+              </span>
+            ))}
+          </span>
+        </button>
+      )}
       {children}
     </select>
   );
@@ -253,6 +333,16 @@ export const Switch = forwardRef<HTMLInputElement, Omit<InputHTMLAttributes<HTML
   );
 });
 
+/** A box that is ticked or not, drawn like the switch: a fill when clear, an ink fill with the plane's check when ticked. */
+export const Checkbox = forwardRef<HTMLInputElement, Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "size">>(function Checkbox({ className, ...props }, ref) {
+  return (
+    <span className={cn("settings-checkbox", className)}>
+      <input ref={ref} type="checkbox" {...props} />
+      <Check size={12} className="settings-checkbox-mark" />
+    </span>
+  );
+});
+
 const TooltipGroup = createContext(false);
 
 /**
@@ -267,14 +357,17 @@ export function TooltipProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/** Names a control on hover. Outside a TooltipProvider it keeps its own 400ms delay. */
-export function Tooltip({ label, children }: { label: string; children: ReactNode }) {
+/**
+ * Names a control on hover, above it unless `side` says otherwise. It wraps the control in a span, or with `render` the
+ * given element is the trigger itself. Outside a TooltipProvider it keeps its own 400ms delay.
+ */
+export function Tooltip({ label, side, render, children }: { label: ReactNode; side?: "top" | "right" | "bottom" | "left"; render?: ReactElement; children: ReactNode }) {
   const grouped = useContext(TooltipGroup);
   const tooltip = (
     <BaseTooltip.Root>
-      <BaseTooltip.Trigger render={<span className="inline-flex" />}>{children}</BaseTooltip.Trigger>
+      <BaseTooltip.Trigger render={render ?? <span className="inline-flex" />}>{children}</BaseTooltip.Trigger>
       <BaseTooltip.Portal>
-        <BaseTooltip.Positioner sideOffset={6}>
+        <BaseTooltip.Positioner sideOffset={6} {...(side ? { side } : {})}>
           <BaseTooltip.Popup ref={floatingGround} className="tooltip-popup">
             {label}
           </BaseTooltip.Popup>
@@ -289,13 +382,27 @@ export function Tooltip({ label, children }: { label: string; children: ReactNod
  * A modal sheet: r20 over a dimmed backdrop, a 14px title with no divider and a round close. Base
  * UI returns focus to the control that opened it.
  */
-export function Dialog({ open, onOpenChange, title, children, width = 480 }: { open: boolean; onOpenChange: (open: boolean) => void; title: string; children: ReactNode; width?: number }) {
+export function Dialog({
+  open,
+  onOpenChange,
+  title,
+  children,
+  width = 480,
+  className,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  children: ReactNode;
+  width?: number;
+  className?: string;
+}) {
   return (
     <BaseDialog.Root open={open} onOpenChange={onOpenChange}>
       <BaseDialog.Portal>
         <CoversPreview />
         <BaseDialog.Backdrop className="dialog-backdrop fixed inset-0" />
-        <BaseDialog.Popup className="dialog-sheet fixed inset-x-0 top-1/5 mx-auto" style={{ width }}>
+        <BaseDialog.Popup className={cn("dialog-sheet fixed inset-x-0 top-1/5 mx-auto", className)} style={{ width }}>
           <div className="dialog-sheet-head">
             <BaseDialog.Title className="dialog-sheet-title">{title}</BaseDialog.Title>
             <BaseDialog.Close render={<IconButton aria-label="Close" size="sm" />}>

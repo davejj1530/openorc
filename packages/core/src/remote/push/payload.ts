@@ -15,21 +15,24 @@ export function clip(text: string, max: number): string {
   return max < 1 ? "" : `${points.slice(0, max - 1).join("")}…`;
 }
 
-function apnsJson(envelope: PushEnvelope, plan: AlertPlan, host: AlertHost): string {
+function apnsJson(envelope: PushEnvelope, plan: AlertPlan, host: AlertHost, face: PushEnvelope | null): string {
   const aps = {
     alert: { body: OUTER_TEXT[host] },
     "mutable-content": 1,
     ...(plan.kind === "ring" && plan.sound ? { sound: "default" } : {}),
     ...(plan.kind === "quiet" ? { "interruption-level": "passive" } : {}),
   };
-  return JSON.stringify({ aps, o: envelope });
+  return JSON.stringify({ aps, o: envelope, ...(face ? { f: face } : {}) });
 }
 
-/** The APNs JSON for a notice, its body halved until the whole thing fits Apple's limit. Null when even no body is too much. */
-export function fitPayload(notice: PushNotice, plan: AlertPlan, seal: (notice: PushNotice) => PushEnvelope, host: AlertHost = "mac"): string | null {
+/**
+ * The APNs JSON for a notice, with an Orcling's sealed face beside it when it has one, its body halved until the whole
+ * thing fits Apple's limit. Null when even no body is too much.
+ */
+export function fitPayload(notice: PushNotice, plan: AlertPlan, seal: (notice: PushNotice) => PushEnvelope, host: AlertHost = "mac", face: PushEnvelope | null = null): string | null {
   let fitted: PushNotice = { ...notice, title: clip(notice.title, TITLE_MAX), body: clip(notice.body, BODY_MAX) };
   for (;;) {
-    const payload = apnsJson(seal(fitted), plan, host);
+    const payload = apnsJson(seal(fitted), plan, host, face);
     if (Buffer.byteLength(payload) <= PAYLOAD_MAX_BYTES) return payload;
     const length = Array.from(fitted.body).length;
     if (length === 0) return null;

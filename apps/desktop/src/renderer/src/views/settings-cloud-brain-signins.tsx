@@ -5,6 +5,7 @@ import { queryClient, useRpc, useRpcMutation } from "../lib/client";
 import { codexWho, OpenAIKeyField } from "./settings-cloud-codex";
 import { Failure, StillWorks, type RevokedAt } from "./settings-secret-field";
 import { Section, SettingRow, Status } from "./settings-shared";
+import { thisComputer } from "../lib/this-computer";
 
 const shown = (signIns: SignIns) => queryClient.setQueryData(["cloud.brain.signIns", {}], signIns);
 
@@ -158,7 +159,7 @@ export function BrainGitHubSection({ active, busy }: { active: boolean; busy: bo
   const signIns = useRpc("cloud.brain.signIns", {}, { enabled: active });
   if (!signIns.data) return null;
   return (
-    <Section title="GitHub" description="Threads on the cloud brain push and open pull requests with this Mac's GitHub sign-in.">
+    <Section title="GitHub" description={`Threads on the cloud brain push and open pull requests with ${thisComputer}'s GitHub sign-in.`}>
       <BrainGitHub github={signIns.data.github} busy={busy} />
     </Section>
   );

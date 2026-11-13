@@ -9,6 +9,7 @@
   height: var(--height-topbar);
   min-width: 0;
   flex-shrink: 0;
+  border-bottom: var(--hairline) solid var(--line);
 }
 /* The thread header's panel toggle hides a docked panel; the panel's own Hide is for when it covers that toggle.
    Its tooltip's wrapper goes with it, so no empty gap stays at the end of the row. */
@@ -19,105 +20,21 @@
   display: inline-flex;
 }
 
-/* The tabs: plain labels at their natural width, the open one in full ink and the rest faint.
-   Tabs keep their full names; the strip scrolls sideways when they outgrow the header. */
+/* The tabs strip takes the room left of the plus; the tabs themselves are work-tabs.css's, here at
+   their names' width up to the same 220px, since a panel's tool names are short. */
 .panel-tabs {
-  display: flex;
-  align-items: center;
-  gap: 2px;
   flex: 0 1 auto;
-  width: fit-content;
+}
+.panel-tabs .work-tab {
+  flex: 0 0 auto;
   min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.panel-tabs::-webkit-scrollbar {
-  display: none;
-}
-.panel-tab {
-  position: relative;
-  display: flex;
-  flex-shrink: 0;
-  height: 28px;
-  overflow: hidden;
-  border-radius: var(--radius-md);
-  color: var(--ink-4);
-  transition:
-    color var(--duration-arrive) var(--ease-out),
-    width var(--duration-swap) var(--ease-out),
-    opacity var(--duration-arrive) var(--ease-out);
-}
-/* A tab added after the strip settled widens from nothing. The strip remounts per conversation,
-   so restored tabs never animate. */
-@starting-style {
-  .panel-tabs[data-settled] .panel-tab {
-    width: 0;
-    opacity: 0;
-  }
-}
-.panel-tab:hover {
-  color: var(--ink);
-}
-.panel-tab[data-active="true"] {
-  color: var(--navigation-ink);
-}
-.panel-tab > [role="tab"] {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 100%;
-  padding: 0 10px 0 8px;
-  border-radius: inherit;
-  font-size: var(--text-base);
-  line-height: 16px;
-  letter-spacing: var(--text-base--letter-spacing);
-  white-space: nowrap;
-}
-.panel-tab > [role="tab"]:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: -2px;
-}
-.panel-tab-mark {
-  display: grid;
-  place-items: center;
-  width: 14px;
-  height: 14px;
-  flex-shrink: 0;
+  max-width: 220px;
 }
 .panel-tab-dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
   background: currentColor;
-}
-/* The close control sits over the tab's mark and takes its place under the pointer or focus. */
-.panel-tab-close {
-  position: absolute;
-  top: 50%;
-  left: 5px;
-  display: grid;
-  place-items: center;
-  width: 20px;
-  height: 20px;
-  margin-top: -10px;
-  border-radius: var(--radius-pill);
-  color: var(--ink-3);
-  opacity: 0;
-  transition: opacity var(--duration-quick) var(--ease-out);
-}
-.panel-tab:is(:hover, :focus-within) .panel-tab-close {
-  opacity: 1;
-}
-.panel-tab:is(:hover, :focus-within) .panel-tab-mark {
-  visibility: hidden;
-}
-.panel-tab-close:hover {
-  background: var(--surface-3);
-  color: var(--ink);
-}
-.panel-tab-close:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: -2px;
 }
 
 /* The browser bar: the page's own Back and Forward, an address pill holding Reload, then Tools. */
@@ -139,11 +56,12 @@
   margin: 0 4px;
   padding: 0 4px 0 0;
   border-radius: var(--radius-pill);
-  background: var(--surface-2);
-  transition: background-color var(--duration-quick) var(--ease-out);
+  background: var(--control-fill);
+  transition: box-shadow var(--duration-quick) var(--ease-out);
 }
+/* A field on the ground: the control's own fill at rest, its edge drawn while typing. */
 .panel-address:focus-within {
-  background: var(--surface-3);
+  box-shadow: 0 0 0 var(--hairline) var(--line);
 }
 .panel-address input {
   flex: 1;

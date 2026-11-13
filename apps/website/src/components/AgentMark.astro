@@ -1,0 +1,25 @@
+---
+import type { AgentId } from "../data/agents";
+import codex from "../../../desktop/src/renderer/src/assets/providers/openai.svg?raw";
+import claude from "../../../desktop/src/renderer/src/assets/providers/claude.svg?raw";
+import opencode from "../../../desktop/src/renderer/src/assets/providers/opencode.svg?raw";
+import omp from "../../../desktop/src/renderer/src/assets/providers/omp.svg?raw";
+import cursor from "../../../desktop/src/renderer/src/assets/providers/cursor.svg?raw";
+import pi from "../../../desktop/src/renderer/src/assets/providers/pi.svg?raw";
+import antigravity from "../../../desktop/src/renderer/src/assets/providers/antigravity.svg?raw";
+import fx from "../../../desktop/src/renderer/src/assets/providers/fx.svg?raw";
+
+interface Props { id: AgentId; size?: number }
+const { id, size = 16 } = Astro.props;
+const marks = { codex, claude, opencode, omp, cursor, pi, antigravity, fx };
+const svg = id === "opencode" ? marks[id].replace(/viewBox="[^"]*"/, 'viewBox="96 64 320 384"') : marks[id];
+const invert = ["codex", "opencode", "omp", "pi", "fx"].includes(id);
+---
+
+<span class="agent-mark" data-invert={invert || undefined} style={`--mark-size: ${size}px`} aria-hidden="true" set:html={svg} />
+
+<style>
+  .agent-mark { display: inline-flex; flex: none; width: var(--mark-size); height: var(--mark-size); vertical-align: -2px; }
+  .agent-mark :global(svg) { width: 100%; height: 100%; }
+  :global(:root[data-theme="dark"]) .agent-mark[data-invert] { filter: invert(1); }
+</style>

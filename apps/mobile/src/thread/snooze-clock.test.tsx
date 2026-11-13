@@ -19,7 +19,9 @@ function rowMenu() {
   let builds = 0;
   const view = renderHook(() => {
     builds++;
-    const snooze = threadMenu(plan, "row", useSnoozeClock())[0]!.find((action) => action.kind === "menu");
+    const snooze = threadMenu(plan, "row", useSnoozeClock())
+      .flat()
+      .find((action) => action.kind === "menu");
     return snooze?.kind === "menu" ? snooze.actions.map((action) => action.label) : [];
   });
   return { presets: () => view.result.current, builds: () => builds };

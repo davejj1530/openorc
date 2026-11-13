@@ -20,6 +20,7 @@ vi.mock("./lib/client", async (original) => {
     "workspace.get": null,
     "system.info": { harnesses: [{ id: "codex", state: "ready" }], gh: { installed: false } },
     "app.settings.get": { defaultPermissionMode: "review", defaultWorkspaceMode: "current" },
+    "agents.updates.get": undefined,
     "orchestration.availability": { enabled: false },
     "review.projectDiff": { files: [], patch: "" },
   };
@@ -40,7 +41,7 @@ afterEach(cleanup);
 
 it("keeps the new-thread panel outside the conversation's rounded frame", () => {
   useRouter.setState({ route: { view: "newthread", projectId: "project" }, history: [], future: [] });
-  useLayout.setState({ projectId: "project", panelOpen: true, panelTab: "changes" });
+  useLayout.setState({ workspace: "project", panelOpen: true, panelTab: "changes" });
   render(
     <QueryClientProvider client={new QueryClient()}>
       <App />

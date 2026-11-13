@@ -33,6 +33,8 @@ export interface OpenOrcOptions {
   pushSecrets?: ProtectedSecretStore;
   /** Whether someone is using the Mac, asked once per alert. Without it, the Mac always reads as away. */
   presence?: () => Promise<boolean>;
+  /** Moves a file or folder to the system Trash. Without it, nothing the user asks to remove is removed. */
+  trash?: (file: string) => Promise<void>;
   /** Where memory's embedding model runs. Defaults to the core's own thread, where loading it and each batch block everything else. */
   embedder?: TextEmbedder;
   /** The bundled Prettier, run off the core's thread. Without it, files format only with the project's own formatter. */

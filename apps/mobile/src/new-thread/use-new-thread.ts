@@ -5,6 +5,7 @@ import { hostLink, useRpc, useRpcMutation } from "../client";
 import { HostContext } from "../connection/host-context";
 import { composerControls } from "../composer/composer-state";
 import { useDimReason } from "../composer/dim-reason";
+import { useNewThreadClaudeAccount } from "../composer/claude-account";
 import type { ComposerSettings } from "../composer/settings-bridge";
 import { useEmptiedPrompt } from "../composer/keyboard-leftover";
 import { useImageAttach } from "../composer/use-image-attach";
@@ -39,6 +40,7 @@ export function useNewThread(projectId: string) {
   const { uploading, chooseImages } = useImageAttach({ onImage: (image) => setDraft((current) => ({ ...current, images: [...current.images, image] })), onError: setError });
 
   const cloud = useCloudPlace(projectId, draft, change);
+  const claudeAccountId = useNewThreadClaudeAccount(projectId, draft.claudeAccountId);
   const host = useContext(HostContext);
   const settings: ComposerSettings = {
     choice: targetModel(draft.target),
@@ -49,7 +51,7 @@ export function useNewThread(projectId: string) {
       change({ mode: next.mode });
       permission.select(next.permissionMode);
     },
-    claudeAccount: { chosen: draft.claudeAccountId, select: (claudeAccountId) => change({ claudeAccountId }) },
+    claudeAccount: { chosen: claudeAccountId, select: (claudeAccountId) => change({ claudeAccountId }), projectId },
     ...cloud,
   };
   const blocker = startBlocker(draft, { permissionReady: permission.ready });
@@ -82,7 +84,7 @@ export function useNewThread(projectId: string) {
       const toCloud = cloud.place?.chosen === "cloud";
       if (toCloud && !branchable) throw new Error("A cloud thread starts on a branch of its own, and this project has no commit to branch from yet.");
       const workspaceMode = toCloud ? "cloud" : newThreadWorkspaceMode({ canBranch: branchable, chosen: null, preferred: appSettings?.defaultWorkspaceMode });
-      const { thread } = await start.mutateAsync(newThreadStartInput(draft, { workspaceMode, permissionMode: permission.permission, ...sent }));
+      const { thread } = await start.mutateAsync(newThreadStartInput({ ...draft, claudeAccountId }, { workspaceMode, permissionMode: permission.permission, ...sent }));
       haptic.confirm();
       return thread.id;
     } catch (error) {
@@ -128,7 +130,7 @@ function useCloudPlace(projectId: string, draft: SheetDraft, change: (patch: Par
 }
 
 /** The desktop's first choice, made from the same reads once they are in and kept with the draft. Returns the Mac's settings. */
-function useDefaultChoice(draft: SheetDraft, setDraft: ReturnType<typeof useSheetDraft>[1]) {
+export function useDefaultChoice(draft: SheetDraft, setDraft: ReturnType<typeof useSheetDraft>[1]) {
   const models = useRpc("agents.models", {}, { staleTime: 5 * 60_000 });
   const harnesses = useRpc("agents.availability", {});
   const appSettings = useRpc("app.settings.get", {});

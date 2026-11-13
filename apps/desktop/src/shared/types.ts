@@ -161,8 +161,11 @@ export interface OpenOrcApi {
   metrics(): Promise<AppMetrics>;
   /** Hand a measurement to the main process log (and quit when autorun asks). */
   report(payload: unknown): void;
-  /** Native folder picker. Resolves null when cancelled. */
-  pickDirectory(): Promise<string | null>;
+  /**
+   * Native folder picker. Resolves null when cancelled. A folder picked to become a project says so: one that lives
+   * where OpenOrc does not run, such as inside a WSL distribution, then offers to switch there, and is added there.
+   */
+  pickDirectory(purpose?: "project"): Promise<string | null>;
   /** Recover the local path selected by a renderer file input. */
   filePath(file: File): string;
   openExternal(url: string): void;
@@ -178,12 +181,19 @@ export interface OpenOrcApi {
   /** Fires on every enter and leave of fullscreen; returns the unsubscribe. */
   onFullscreen(cb: (fullscreen: boolean) => void): () => void;
   platform: string;
+  /** Where the core runs: this computer, or a WSL distribution on Windows. Main owns the choice and starts the core there. */
+  host: {
+    get(): Promise<import("./host").HostState>;
+    /** Runs somewhere else. The window reloads onto the new core when it resolves ok. */
+    use(host: import("./host").HostChoice): Promise<import("./host").HostSwitch>;
+  };
   updates: {
     settings(): Promise<UpdateSettings>;
     setAutomaticChecks(on: boolean): Promise<UpdateSettings>;
     getState(): Promise<import("./app-updates").UpdateSnapshot>;
     onState(callback: (snapshot: import("./app-updates").UpdateSnapshot) => void): () => void;
     dismiss(request: import("./app-updates").UpdateDismissal): Promise<import("./app-updates").UpdateSnapshot>;
+    check(): Promise<void>;
     download(): Promise<void>;
     install(): Promise<void>;
   };

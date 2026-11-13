@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act as reactAct, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import type { Memory as MemoryEntry, MemorySettings } from "@openorc/protocol";
 import { rpcParams } from "@openorc/protocol";
@@ -6,17 +6,11 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { Memory } from "./Memory";
 import { core } from "../lib/rpc";
 import { queryClient } from "../lib/client";
+import { useLayout } from "../lib/layout";
 import { useRouter } from "../lib/router";
 
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
-// The title bar's project chip is the page's only project picker.
-vi.mock("../components/TopBar", () => ({
-  TopBar: ({ onProjectChange }: { onProjectChange?: (id: string | null) => void }) => (
-    <button type="button" onClick={() => onProjectChange?.("other")}>
-      Switch to Other project
-    </button>
-  ),
-}));
+vi.mock("../components/TopBar", () => ({ TopBar: () => null }));
 let saved: MemorySettings;
 let entries: MemoryEntry[];
 let failSave: boolean;
@@ -24,6 +18,7 @@ let failList: boolean;
 let failSettings: boolean;
 beforeEach(() => {
   queryClient.setDefaultOptions({ queries: { retry: false } });
+  useLayout.setState({ workspace: "all" });
   saved = { enabled: false, provider: "off", model: null, hasApiKey: false, resolved: null, automatic: [], reason: null };
   entries = [
     {
@@ -174,7 +169,8 @@ it("finds browse filter matches beyond the old 500-entry cap and resets paging",
 
 it.each([
   { change: "memory type", act: () => fireEvent.change(screen.getByLabelText("Memory type"), { target: { value: "lesson" } }), first: "Memory 1" },
-  { change: "project", act: () => fireEvent.click(screen.getByRole("button", { name: "Switch to Other project" })), first: "Other project memory" },
+  // The sidebar's project filter chooses whose memory the page shows.
+  { change: "project", act: () => reactAct(() => useLayout.getState().setWorkspace("other")), first: "Other project memory" },
 ])("resets to the first page when the $change changes", async ({ act, first }) => {
   fillEntries(55);
   entries.push({ ...entries[0]!, id: "other-entry", projectId: "other", title: "Other project memory" });

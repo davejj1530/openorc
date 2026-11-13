@@ -280,7 +280,7 @@ function FileHeader({ file, open, onToggle, commentCount }: { file: DiffFile; op
       type="button"
       onClick={(event) => onToggle(event.currentTarget)}
       aria-expanded={open}
-      title={`${statusLabel[file.status]} · ${file.path}`}
+      data-tip={`${statusLabel[file.status]} · ${file.path}`}
       className="diff-file-header group flex w-full items-center gap-2 text-left"
     >
       <ChevronRight size={14} className={cn("shrink-0 text-ink-4 transition-transform group-hover:text-ink-3", open && "rotate-90")} />
@@ -452,7 +452,7 @@ function CommentAnnotation({ comment, state, onRemove, outdated = false }: { com
         {range ? <span className="text-ink-2">{range}</span> : null}
         <span>{state?.label ?? (reviewCommentSent(comment) ? "sent to the agent" : "not sent yet")}</span>
         {outdated ? <span>· {changedLabel(comment)}</span> : null}
-        <TextButton onClick={onRemove} disabled={state?.removeDisabled} tone="danger" className="ml-auto shrink-0" aria-label="Remove comment" title={state?.reason ?? "Remove comment"}>
+        <TextButton onClick={onRemove} disabled={state?.removeDisabled} tone="danger" className="ml-auto shrink-0" aria-label="Remove comment" data-tip={state?.reason ?? "Remove comment"}>
           <X size={12} />
         </TextButton>
       </div>

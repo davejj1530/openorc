@@ -31,7 +31,7 @@ export function TaskCommentDiscussion({
           <li key={comment.id} className="task-comment" id={`comment-${comment.id}`}>
             <div className="task-comment-meta">
               <strong>You</strong>
-              <time title={new Date(comment.createdAt).toLocaleString()}>{relativeTime(comment.createdAt)}</time>
+              <time data-tip={new Date(comment.createdAt).toLocaleString()}>{relativeTime(comment.createdAt)}</time>
               {comment.replyTo ? (
                 <a href={`#comment-${comment.replyTo}`} className="text-ink-3">
                   In reply

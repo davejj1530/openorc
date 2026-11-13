@@ -10,6 +10,8 @@ const define = { __OPENORC_QA__: "false" };
 
 export default defineConfig({
   test: {
+    // Electron's binary, fetched once before any worker asks for it.
+    globalSetup: ["./src/electron-binary.global-setup.ts"],
     projects: [
       {
         define: { ...define },

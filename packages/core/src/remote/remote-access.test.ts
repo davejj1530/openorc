@@ -137,7 +137,7 @@ describe("phone access", () => {
   it("tells a phone which harnesses can run, and nothing of where they are installed", async () => {
     const phone = await pairPhone();
     const availability = await phone.call("agents.availability", {});
-    expect(availability.map((row) => row.id)).toEqual(["codex", "claude", "opencode"]);
+    expect(availability.map((row) => row.id)).toEqual(["codex", "claude", "opencode", "omp", "cursor", "pi", "antigravity", "fx"]);
     expect(JSON.stringify(availability)).not.toMatch(/path|version|\//);
   });
 
@@ -151,6 +151,7 @@ describe("phone access", () => {
       revision: 0,
     }));
     const system = vi.spyOn(core.system, "infoFor").mockResolvedValue({ dataDir, harnesses, gh: { installed: false, path: null } });
+    const plans: Record<string, string> = { codex: "Pro", claude: "Max" };
     // The reports as the Mac's own Settings > Usage gets them: an email, a reset token, the CLI's words, a config folder.
     const usage = vi.spyOn(core.providerUsage, "read").mockImplementation(async (provider, claudeAccountId) => ({
       provider,
@@ -158,11 +159,22 @@ describe("phone access", () => {
       status: "available",
       source: "Codex app-server · account usage",
       context: "ChatGPT · pro · someone@example.com",
-      plan: provider === "codex" ? "Pro" : "Max",
+      plan: plans[provider] ?? null,
       checkedAt: Date.now(),
       refreshedAt: Date.now(),
       message: `Run codex login with CLAUDE_CONFIG_DIR=${dataDir}/claude-accounts/${work.id}`,
-      windows: [{ id: "codex:primary", label: `${provider} · 5-hour window`, usedPercent: 12, remainingPercent: 88, resetsAt: Date.now() + 3_600_000, observedAt: Date.now(), exhausted: false }],
+      windows: [
+        {
+          id: provider === "antigravity" ? "gemini-weekly" : "codex:primary",
+          label: provider === "antigravity" ? "Weekly Limit · Gemini Models" : `${provider} · 5-hour window`,
+          ...(provider === "antigravity" ? { group: "Gemini Models" } : {}),
+          usedPercent: 12,
+          remainingPercent: 88,
+          resetsAt: Date.now() + 3_600_000,
+          observedAt: Date.now(),
+          exhausted: false,
+        },
+      ],
       credits: [{ label: "codex · workspace credits", balance: "12", unlimited: false }],
       accountUrl: "https://chatgpt.com/codex/settings/usage",
       localRuns: 3,
@@ -175,10 +187,14 @@ describe("phone access", () => {
         ["Codex", "Pro", "5-hour window"],
         ["Claude · Existing CLI login", "Max", "5-hour window"],
         ["Claude · Work", "Max", "5-hour window"],
+        ["Antigravity", null, "Weekly Limit · Gemini Models"],
+        ["fx", null, "5-hour window"],
       ]);
-      expect(JSON.stringify(limits)).not.toMatch(/@|\/|token|hash|attempt|CLAUDE_CONFIG_DIR|claude-accounts|ChatGPT|credits/);
+      expect(JSON.stringify(limits)).not.toMatch(/@|\/|token|hash|attempt|CLAUDE_CONFIG_DIR|claude-accounts|ChatGPT/);
+      expect(limits[0]?.credits).toEqual([{ label: "codex · workspace credits", balance: "12", unlimited: false }]);
       await expect(phone.call("providers.limits", { refresh: true } as never)).rejects.toThrow();
-      expect(usage).toHaveBeenCalledTimes(3);
+      expect(limits.find((account) => account.name === "Antigravity")?.windows[0]?.group).toBe("Gemini Models");
+      expect(usage).toHaveBeenCalledTimes(5);
     } finally {
       usage.mockRestore();
       system.mockRestore();

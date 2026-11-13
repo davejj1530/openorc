@@ -63,7 +63,7 @@ export function ComposerChoice<T extends string>({
         disabled={disabled}
         aria-label={`${ariaLabel}: ${current?.label ?? value}`}
         aria-describedby={describedBy}
-        title={disabled ? disabledReason : current?.hint}
+        data-tip={disabled ? disabledReason : current?.hint}
         className={cn(chip ? "composer-chip" : "composer-text-choice", className)}
       >
         {display ?? (

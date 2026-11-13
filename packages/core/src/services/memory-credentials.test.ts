@@ -20,7 +20,7 @@ function fixture(db = Db.memory()) {
     }),
   };
   const providers: ProviderInfo = {
-    loggedIn: async () => ({ claude: true, codex: true, opencode: false }),
+    loggedIn: async () => ({ claude: true, codex: true, opencode: false, omp: false, cursor: false, pi: false, antigravity: false, fx: false }),
     models: async () => [],
     launch: (agent) => ({ revision: 1, binary: agent, env: Object.freeze({ PATH: "/fixture" }) }),
   };
@@ -94,7 +94,7 @@ describe("memory credential integration", () => {
 
   it("uses a protected key only when chosen, and stops using it after clearing", async () => {
     const { providers, memory, make } = fixture();
-    providers.loggedIn = async () => ({ claude: false, codex: false, opencode: false });
+    providers.loggedIn = async () => ({ claude: false, codex: false, opencode: false, omp: false, cursor: false, pi: false, antigravity: false, fx: false });
     const saved = await memory.updateSettings({ apiKey: "protected-fixture" });
     expect(saved).toMatchObject({ provider: "auto", hasApiKey: true, resolved: null, automatic: [] });
     expect(JSON.stringify(saved)).not.toContain("protected-fixture");

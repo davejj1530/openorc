@@ -127,7 +127,7 @@ it("opens an edited file's chip to its diff, not the file", async () => {
   render(<WorkTranscript runId="run" blocks={[patch, reply, end]} />);
   fireEvent.click(receipt());
   fireEvent.click(screen.getByRole("button", { name: "Edited 2 files" }));
-  const chip = screen.getByTitle("src/a.ts");
+  const chip = document.querySelector<HTMLElement>('[data-tip="src/a.ts"]')!;
   expect(chip.tagName).toBe("BUTTON");
   fireEvent.click(chip);
   expect(chip.getAttribute("aria-pressed")).toBe("true");

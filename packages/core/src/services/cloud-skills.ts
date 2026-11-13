@@ -4,7 +4,7 @@ import path from "node:path";
 import { listSkills } from "@openorc/agents";
 import type { Sandbox } from "@openorc/cloud";
 import { settings, type Db } from "@openorc/db";
-import { harnessIds, type AgentSkill, type CloudSkills as CloudSkillsView, type HarnessId } from "@openorc/protocol";
+import { harnessCatalog, harnessIds, type AgentSkill, type CloudSkills as CloudSkillsView, type HarnessId } from "@openorc/protocol";
 
 /** One file of a skill, by its path inside the skill's folder. */
 export interface SkillFile {
@@ -139,7 +139,7 @@ export class CloudSkills implements CloudSkillSource {
     if (!fresh && last && Date.now() - last.at < LISTED_MS) return last.skills;
     const list = this.deps.list ?? listSkills;
     const env = agent === "claude" && this.deps.claudeEnv ? { env: this.deps.claudeEnv() } : {};
-    const skills = list({ projectRoot: this.deps.root, agent, ...env }).then((all) => all.filter((skill) => skill.source === "user"));
+    const skills = list({ projectRoot: this.deps.root, agent, ...env }).then((all) => all.filter((skill) => skill.source === "user" && skill.enabled !== false));
     this.listed.set(agent, { at: Date.now(), skills });
     skills.catch(() => this.listed.delete(agent));
     return skills;
@@ -149,19 +149,22 @@ export class CloudSkills implements CloudSkillSource {
   async catalog(): Promise<CloudSkillsView> {
     const chosen = this.chosen();
     const agents = await Promise.all(
-      harnessIds.map(async (agent) => {
-        try {
-          const skills = (await this.own(agent, true)).map(({ name, description }) => ({ name, description, chosen: chosen[agent].includes(name) }));
-          return { agent, skills, error: null };
-        } catch (error) {
-          return { agent, skills: [], error: error instanceof Error ? error.message : String(error) };
-        }
-      }),
+      harnessIds
+        .filter((agent) => harnessCatalog[agent].cloud)
+        .map(async (agent) => {
+          try {
+            const skills = (await this.own(agent, true)).map(({ name, description }) => ({ name, description, chosen: chosen[agent].includes(name) }));
+            return { agent, skills, error: null };
+          } catch (error) {
+            return { agent, skills: [], error: error instanceof Error ? error.message : String(error) };
+          }
+        }),
     );
     return { agents };
   }
 
   async choose(agent: HarnessId, name: string, on: boolean): Promise<CloudSkillsView> {
+    if (!harnessCatalog[agent].cloud) throw new Error(`${harnessCatalog[agent].name} does not run in cloud workspaces yet.`);
     const chosen = this.chosen();
     const rest = chosen[agent].filter((each) => each !== name);
     settings.set(this.deps.db, SETTING, JSON.stringify({ ...chosen, [agent]: on ? [...rest, name].sort() : rest }));
@@ -171,6 +174,7 @@ export class CloudSkills implements CloudSkillSource {
 
   /** The chosen skills of `agent` that it still has here. */
   async bundle(agent: HarnessId): Promise<SkillBundle> {
+    if (!harnessCatalog[agent].cloud) return EMPTY;
     const chosen = this.chosen()[agent];
     if (!chosen.length) return EMPTY;
     const own = await this.own(agent, false).catch(() => []);
@@ -295,9 +299,14 @@ export async function placeSkills(sandbox: Sandbox, target: string, bundle: Skil
 
 /** Where each agent finds its user's skills, in a shell given its turn's folders. */
 const SKILLS_DIR: Record<HarnessId, string> = {
+  cursor: '"$HOME/.cursor/skills"',
+  pi: '"${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}/skills"',
+  antigravity: '"$HOME/.gemini/config/skills"',
+  fx: '"${FX_HOME:-$HOME/.fx}/skills"',
   claude: '"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills"',
   codex: '"${CODEX_HOME:-$HOME/.codex}/skills"',
   opencode: '"${XDG_CONFIG_HOME:-$HOME/.config}/opencode/skills"',
+  omp: '"${PI_CODING_AGENT_DIR:-$HOME/.omp/agent}/skills"',
 };
 
 /** The folder the agent in a sandbox finds its user's skills in, with `env` its turn's folders. */

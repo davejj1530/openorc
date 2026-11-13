@@ -56,7 +56,13 @@ export class DeviceMachine {
 
   snapshot(): EnvSnapshot {
     const env = { PATH: this.bin, HOME: this.root };
-    return Object.freeze({ revision: 1, shell: "/bin/zsh", path: this.bin, binaries: { claude: null, codex: null, opencode: null }, env: Object.freeze(env) }) as EnvSnapshot;
+    return Object.freeze({
+      revision: 1,
+      shell: "/bin/zsh",
+      path: this.bin,
+      binaries: { claude: null, codex: null, opencode: null, omp: null, cursor: null, pi: null, antigravity: null, fx: null },
+      env: Object.freeze(env),
+    }) as EnvSnapshot;
   }
 
   /** `simctl` calls that changed or booted a simulator. */

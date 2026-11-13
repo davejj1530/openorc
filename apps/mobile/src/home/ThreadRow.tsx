@@ -42,8 +42,8 @@ const pullIcons: Record<PrState, ComponentType<IconProps>> = { open: GitPullRequ
 const pullTones: Record<PrState, string> = { open: "text-ink-4", merged: "text-ok", closed: "text-bad" };
 /** How far a project glyph reaches below its line's center, for the tree's line leaving it. */
 const NODE_REACH = 6;
-/** Where a root row's project line is centered before it lays out: the 8 pt padding, the title's 22 pt line, the 4 pt gap and half an 18 pt line. */
-const NODE_MID = 8 + 22 + 4 + 9;
+/** Where a root row's project line is centered before it lays out: the 8 pt padding, the title's 24 pt line, the 4 pt gap and half an 18 pt line. */
+const NODE_MID = 8 + 24 + 4 + 9;
 // The desktop's headline tones (ThreadHeadline.css).
 const headlineTones: Record<ThreadHeadline["tone"], string> = { live: "text-ink-4", attention: "text-warn", done: "text-ink-4" };
 
@@ -158,7 +158,7 @@ function AsleepRow({ label, className, style, indent, children }: { label: strin
 }
 
 /**
- * The desktop sidebar's thread row at touch size: the status lead, the muted title, and a second line. That line is the
+ * The desktop sidebar's thread row at touch size: the status lead, the title in ink, and a faint second line. That line is the
  * live headline while there is something to say (the step the agent is on, what it waits for, what a finished turn
  * came to), and otherwise where the thread works. The row holds the thread's live run, so the run's frames arrive.
  * Tapping it pushes the thread; holding it opens the thread's menu; swiping marks it read or unread, or archives it.

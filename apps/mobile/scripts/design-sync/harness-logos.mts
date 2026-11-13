@@ -2,9 +2,17 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 /** The SVG features the provider marks use; anything else fails, so a new mark cannot render wrong on the phone. */
-const pathAttributes: Record<string, string> = { d: "d", fill: "fill", "fill-rule": "fillRule", "clip-rule": "clipRule" };
+const pathAttributes: Record<string, string> = {
+  d: "d",
+  fill: "fill",
+  "fill-rule": "fillRule",
+  "clip-rule": "clipRule",
+};
 
-type Mark = { viewBox: string; paths: Record<string, string>[]; invertsInDark: boolean };
+type Mark = { kind: "paths"; viewBox: string; paths: Record<string, string>[]; invertsInDark: boolean } | { kind: "svg"; xml: string };
+
+/** Native SVG supports the masks and blur filters in Google's full-color mark. */
+const nativeTags = new Set(["path", "g", "mask", "ellipse", "defs", "filter", "feGaussianBlur"]);
 
 function attributesOf(text: string): Record<string, string> {
   return Object.fromEntries([...text.matchAll(/([a-zA-Z:-]+)="([^"]*)"/g)].map(([, key, value]) => [key!, value!]));
@@ -23,9 +31,13 @@ function readMark(svg: string, name: string, invertsInDark: boolean): Mark {
       .map(([match]) => match)
       .join("")
       .replace(/\s/g, "") !== elements.replace(/\s/g, "")
-  )
-    throw new Error(`${name}: only <path> elements are supported`);
+  ) {
+    if (invertsInDark) throw new Error(`${name}: complex SVG marks cannot be inverted`);
+    for (const [, tag] of elements.matchAll(/<([\w:-]+)(?:\s|\/?>)/g)) if (!nativeTags.has(tag!)) throw new Error(`${name}: unsupported native SVG element ${tag}`);
+    return { kind: "svg", xml: body };
+  }
   return {
+    kind: "paths",
     viewBox,
     invertsInDark,
     paths: paths.map(([, text]) =>
@@ -41,7 +53,7 @@ function readMark(svg: string, name: string, invertsInDark: boolean): Mark {
 }
 
 /**
- * The harness marks from the desktop's assets/providers, as path data the phone draws with react-native-svg. Marks the
+ * The harness marks from the desktop's assets/providers, as paths or full SVG for react-native-svg. Marks the
  * desktop inverts in dark themes (its `.harness-logo[data-provider=…]` rules in app.css) are flagged to invert too.
  */
 export async function renderHarnessLogos(renderer: string, appCss: string): Promise<string> {
@@ -59,6 +71,7 @@ export async function renderHarnessLogos(renderer: string, appCss: string): Prom
   return [
     'import type { HarnessId } from "@openorc/protocol";',
     "",
-    `export const harnessMarks = ${JSON.stringify(marks)} as const satisfies Record<HarnessId, { viewBox: string; paths: readonly Record<string, string>[]; invertsInDark: boolean }>;`,
+    'type HarnessMark = { kind: "paths"; viewBox: string; paths: readonly Record<string, string>[]; invertsInDark: boolean } | { kind: "svg"; xml: string };',
+    `export const harnessMarks = ${JSON.stringify(marks)} as const satisfies Record<HarnessId, HarnessMark>;`,
   ].join("\n");
 }

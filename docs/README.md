@@ -14,12 +14,18 @@
 - [Interactive MCP Apps](mcp-apps.md)
 - [Fast mode](fast-mode.md)
 - [Multiple Claude Code accounts](claude-accounts.md)
+- [Oh My Pi](oh-my-pi.md)
+- [Cursor](cursor.md)
+- [Pi](pi.md)
+- [Antigravity](antigravity.md)
+- [fx](fx.md)
 - [Visual explanations in conversations](visualizations.md)
 - [Appearance and rich thread output](appearance-rich-output.md)
 - [Slack](slack.md)
 - [Orclings](orclings.md)
 - [Credential storage](credential-storage.md)
 - [Coding-agent updates](agent-updates.md)
+- [Running inside WSL](wsl.md) (Windows)
 
 ## Contributing and internals
 

@@ -76,7 +76,7 @@ function TaskReview({ task, project }: { task: Task; project: Project }) {
           onClick={() => setSinceReviewed((v) => !v)}
           disabled={!task.reviewedSnapshotId}
           className={cn(sinceReviewed && "bg-control-fill text-navigation-ink hover:bg-control-fill")}
-          title={task.reviewedSnapshotId ? "Only what changed since you last marked this reviewed" : "Mark reviewed first"}
+          data-tip={task.reviewedSnapshotId ? "Only what changed since you last marked this reviewed" : "Mark reviewed first"}
         >
           Since last review
         </Button>

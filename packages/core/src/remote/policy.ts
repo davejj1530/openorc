@@ -1,10 +1,11 @@
-import { redact, redactValue } from "@openorc/db";
+import { orclings, redact, redactValue, retiredTeams, tasks, threads, type Db } from "@openorc/db";
 import {
   isRemoteMethod,
   phoneEvents,
   REMOTE_ATTACHMENT_BYTES,
   rpcParams,
   supportsSubagents,
+  type OrclingDraft,
   type RemoteMethod,
   type RemotePush,
   type RpcParams,
@@ -26,6 +27,26 @@ export interface GuardContext {
   attachmentsDir: string;
   /** A thread as the guards need it, read synchronously; null when there is no such thread. */
   thread(id: string): { team: boolean; parentRelation?: Thread["parentRelation"] } | null;
+  /** A task's description as stored, read synchronously; null when there is no such task. */
+  task(id: string): { spec: string | null } | null;
+  /** An Orcling's current instructions as stored, read synchronously; null when there is no such Orcling. */
+  orcling(id: string): { instructions: string | null } | null;
+}
+
+/** The guards' view of the ledger: a phone's session and an Orcling acting for the person read the same rows. */
+export function guardContext(db: Db, dataDir: string): GuardContext {
+  return {
+    attachmentsDir: path.join(dataDir, "attachments"),
+    thread: (id) => {
+      const thread = threads.get(db, id);
+      return thread ? { team: retiredTeams.isHidden(db, id), parentRelation: thread.parentRelation } : null;
+    },
+    task: (id) => {
+      const task = tasks.get(db, id);
+      return task ? { spec: task.spec } : null;
+    },
+    orcling: (id) => (orclings.get(db, id) ? { instructions: orclings.instructions(db, id)[0]?.body ?? null } : null),
+  };
 }
 
 /** Null admits; a string refuses with that message. Guards see params already parsed by the method's schema. */
@@ -41,6 +62,11 @@ const PHONE_THREAD_PATCH = new Set(["seen", "agent", "model", "effort", "fastMod
 /** A snooze from the phone wakes within this long. */
 const SNOOZE_HORIZON_MS = 366 * 24 * 60 * 60 * 1000;
 const TITLE_MAX = 200;
+/** What the phone's task screen changes: the title, status, priority, labels and description, never the workspace. */
+const PHONE_TASK_PATCH = new Set(["title", "spec", "status", "priority", "labels"]);
+const TASK_LABELS_MAX = 20;
+const TASK_LABEL_MAX = 50;
+const TASK_SPEC_MAX = 100_000;
 /** Control characters, line and paragraph breaks, and bidi overrides and isolates: a title goes into briefs, logs and notifications. */
 const TITLE_FORBIDDEN = /[\p{Cc}\p{Zl}\p{Zp}\u202A-\u202E\u2066-\u2069]/u;
 /** A commit message keeps tabs and line feeds, and nothing else that moves a terminal or reorders text. */
@@ -97,6 +123,55 @@ function prBody(body: string): string | null {
 function threadUpdate({ patch }: RpcParams<"threads.update">): string | null {
   if (!Object.keys(patch).every((key) => PHONE_THREAD_PATCH.has(key))) return "Make this change on your Mac.";
   return phoneTitle(patch.title) ?? phoneSnooze(patch.snoozedUntil);
+}
+
+function taskLabels(labels: readonly string[] | undefined): string | null {
+  if (labels === undefined) return null;
+  const fits = labels.length <= TASK_LABELS_MAX && labels.every((label) => label.trim() && [...label].length <= TASK_LABEL_MAX && !TITLE_FORBIDDEN.test(label));
+  return fits ? null : `A task takes up to ${TASK_LABELS_MAX} labels of up to ${TASK_LABEL_MAX} characters each.`;
+}
+
+/**
+ * A phone reads a description with its secrets redacted, so a description it saves over one that holds a secret would
+ * lose the secret: that description is edited on the Mac.
+ */
+function plainSpec(spec: string | null | undefined): string | null {
+  if (spec === undefined || spec === null) return null;
+  return [...spec].length > TASK_SPEC_MAX || MESSAGE_FORBIDDEN.test(spec) ? `A description must be plain text of up to ${TASK_SPEC_MAX.toLocaleString("en-US")} characters.` : null;
+}
+
+function taskSpec(id: string, spec: string | null | undefined, { task }: GuardContext): string | null {
+  if (spec === undefined) return null;
+  if (plainSpec(spec)) return plainSpec(spec);
+  const stored = task(id)?.spec;
+  return stored && redact(stored).redacted ? "This description holds a secret, so edit it on your Mac." : null;
+}
+
+/** What the phone's New task screen sends: a project, title, description, priority and labels, and whether it works in a worktree. */
+const PHONE_TASK_CREATE = new Set(["projectId", "title", "spec", "priority", "labels", "useWorktree"]);
+
+/** A task a phone saves: on its own in a project, never under a thread, from a branch or in a folder the phone names. */
+function taskCreate(params: RpcParams<"tasks.create">): string | null {
+  if (!Object.keys(params).every((key) => PHONE_TASK_CREATE.has(key))) return "Make this change on your Mac.";
+  return phoneTitle(params.title) ?? taskLabels(params.labels) ?? plainSpec(params.spec);
+}
+
+function taskUpdate({ id, patch }: RpcParams<"tasks.update">, context: GuardContext): string | null {
+  if (!Object.keys(patch).every((key) => PHONE_TASK_PATCH.has(key))) return "Make this change on your Mac.";
+  return phoneTitle(patch.title) ?? taskLabels(patch.labels) ?? taskSpec(id, patch.spec, context);
+}
+
+/** A task as a phone reads it: a worktree's path names the Mac's folders, and a description may hold a token. */
+const phoneTask = <T extends RpcResults["tasks.update"] | null>(task: T): T => (task ? { ...task, worktreePath: null, spec: task.spec === null ? null : redact(task.spec).text } : task);
+
+/** An Orcling's name titles its conversation and its notifications. */
+const orclingName = ({ draft }: { draft: OrclingDraft }): string | null => (TITLE_FORBIDDEN.test(draft.name) ? "A name must be one line." : null);
+
+/** An Orcling's instructions go into every turn it takes, so they are plain text, and ones that hold a secret the phone reads redacted are rewritten on the Mac. */
+function orclingInstructions({ id, body }: RpcParams<"orclings.instructions.save">, { orcling }: GuardContext): string | null {
+  if (MESSAGE_FORBIDDEN.test(body)) return "Instructions must be plain text.";
+  const stored = orcling(id)?.instructions;
+  return stored && redact(stored).redacted ? "These instructions hold a secret, so edit them on your Mac." : null;
 }
 
 const NOT_FROM_PHONE = "This is not available from a phone.";
@@ -173,6 +248,23 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   "review.createThreadPr": (params, context) => teamWork(params.threadId, context) ?? prTitle(params.title) ?? prBody(params.body),
   // One page's state; the handler answers closed for a missing or retired thread.
   "preview.state": allow,
+  // Reads one task by id, saves a new one and edits what its screen shows; starting, moving or deleting one stays on the Mac.
+  "tasks.get": allow,
+  "tasks.create": taskCreate,
+  "tasks.update": taskUpdate,
+  // Faces, names and their own conversations' state; the reply leaves the rest of each Orcling on the Mac.
+  "orclings.chats": allow,
+  "orclings.profile": allow,
+  // What its designer on the Mac makes and changes, which the schema bounds.
+  "orclings.create": orclingName,
+  "orclings.update": orclingName,
+  "orclings.delete": allow,
+  // When it checks in: the schema bounds the list, and nothing there reaches its model, account or instructions.
+  "orclings.wakes.save": allow,
+  "orclings.instructions.save": orclingInstructions,
+  // The core takes tapbacks only in an Orcling's own conversation, on a message there.
+  "orclings.reactions": allow,
+  "orclings.react": allow,
 };
 
 /** What a reply's shaping needs besides the result: how an error or a reason reads on a phone, and the Mac's folders. */
@@ -203,8 +295,18 @@ export const remoteReplies: { [M in RemoteMethod]: Reply<M> } = {
   }),
   "agents.models": same,
   "agents.availability": same,
-  // Where each skill's file lives on the Mac stays there; a description is the skill author's text and may hold a token.
-  "skills.list": (skills) => skills.map((skill) => ({ ...skill, path: "", description: redact(skill.description).text })),
+  // Where each skill's file lives on the Mac stays there, and its image, which can be large; a description is the skill
+  // author's text and may hold a token. A phone offers what the agent uses, so a skill turned off is left out, and it
+  // changes no skill, so whether one could be changed stays too.
+  "skills.list": (skills) =>
+    skills
+      .filter((skill) => skill.enabled !== false)
+      .map(({ icon: _icon, enabled: _enabled, editable: _editable, ...skill }) => ({
+        ...skill,
+        path: "",
+        description: redact(skill.description).text,
+        ...(skill.shortDescription === undefined ? {} : { shortDescription: redact(skill.shortDescription).text }),
+      })),
   // A sign-in's email and organization, and the CLI's own words, stay on the Mac.
   "claude.accounts.list": ({ accounts, defaultId }) => ({ defaultId, accounts: accounts.map((account) => ({ ...account, email: null, organization: null, message: null })) }),
   "providers.limits": same,
@@ -241,6 +343,23 @@ export const remoteReplies: { [M in RemoteMethod]: Reply<M> } = {
   "review.pushThread": same,
   "review.createThreadPr": same,
   "preview.state": (state, context) => previewReply(state, context),
+  "tasks.get": phoneTask,
+  "tasks.create": phoneTask,
+  "tasks.update": phoneTask,
+  "orclings.chats": same,
+  // Instructions and memories are text that may hold a token.
+  "orclings.profile": (profile) => ({
+    ...profile,
+    instructions: profile.instructions === null ? null : redact(profile.instructions).text,
+    memories: profile.memories.map((memory) => ({ ...memory, title: redact(memory.title).text, body: redact(memory.body).text })),
+  }),
+  "orclings.create": same,
+  "orclings.update": same,
+  "orclings.delete": same,
+  "orclings.wakes.save": same,
+  "orclings.instructions.save": (version) => ({ ...version, body: redact(version.body).text, note: version.note === null ? null : redact(version.note).text }),
+  "orclings.reactions": same,
+  "orclings.react": same,
 };
 
 /** One result shaped for a phone by its method's entry in remoteReplies. */

@@ -72,18 +72,23 @@ export async function listNativeOpenCodeSkills(projectRoot: string): Promise<Ope
     const authorization = `Basic ${Buffer.from(`opencode:${connection.password}`).toString("base64")}`;
     const url = `${connection.base}/api/skill?${new URLSearchParams({ "location[directory]": projectRoot })}`;
     const deadline = Date.now() + 7000;
+    let last: OpenCodeSkill[] | null = null;
     while (Date.now() < deadline) {
       try {
         const response = await fetch(url, { headers: { Authorization: authorization }, signal: AbortSignal.timeout(2000) });
-        if (!response.ok) return null;
+        if (!response.ok) return last;
         const catalog = (await response.json()) as OpenCodeSkillsResponse;
-        if (Array.isArray(catalog.data) && catalog.data.length) return catalog.data;
+        // The registry answers with its built-ins before it has read the skill folders, so a list counts once it holds still.
+        if (Array.isArray(catalog.data) && catalog.data.length) {
+          if (last && last.length === catalog.data.length) return catalog.data;
+          last = catalog.data;
+        }
       } catch {
         // The service accepts connections before its skill registry is ready.
       }
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, 250));
     }
-    return null;
+    return last;
   } catch {
     return null;
   } finally {

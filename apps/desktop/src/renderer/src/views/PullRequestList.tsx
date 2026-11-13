@@ -1,13 +1,14 @@
 import { useId, useState, type ReactNode } from "react";
 import { useQueries } from "@tanstack/react-query";
-import { WORKSPACE_ID, type Project, type PullRequestFilter, type PullRequestSummary } from "@openorc/protocol";
+import { type Project, type PullRequestFilter, type PullRequestSummary } from "@openorc/protocol";
 import { RefreshCw } from "../components/icons";
 import { ListGroupHeading } from "../components/ListGroupHeading";
 import { PageFilters, PageSearch } from "../components/PageFilters";
+import { ScopedTitle } from "../components/ScopedTitle";
 import { TopBar } from "../components/TopBar";
 import { Badge, Button, Empty, IconButton, metaSlot, Segmented, StatusDot, Tooltip } from "../components/ui";
 import { cn } from "../lib/cn";
-import { useLayout } from "../lib/layout";
+import { focusedProject, useLayout } from "../lib/layout";
 import { matchesPullRequest, onGitHub, pullRequestFilters, pullRequestDot, pullRequestTone, pullRequestToneLabel, reviewDecisionLabel } from "../lib/pull-requests";
 import { tagsFor, relativeTime } from "@openorc/client";
 import { useRpc } from "../lib/client";
@@ -32,7 +33,7 @@ function PullRequestRow({ pull, projectId }: { pull: PullRequestSummary; project
           <StatusDot tone={pullRequestDot[tone]} />
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="truncate text-base text-ink" title={pull.title}>
+          <span className="truncate text-base text-ink" data-tip={pull.title}>
             {pull.title}
           </span>
           <span className="truncate text-sm text-ink-4">
@@ -91,9 +92,8 @@ function ProjectSection({ entry, query, named }: { entry: ProjectPulls; query: s
 }
 
 /** Why the list is empty before any project is asked, or null when it can load. */
-function unavailable(input: { ghInstalled: boolean | undefined; projectId: string | null; projects: Project[] }): { title: string; body: string } | null {
+function unavailable(input: { ghInstalled: boolean | undefined; projects: Project[] }): { title: string; body: string } | null {
   if (input.ghInstalled === false) return { title: "GitHub CLI not found", body: "Pull requests load through gh. Install it, then sign in with gh auth login." };
-  if (input.projectId === WORKSPACE_ID) return { title: "Workspace has no pull requests", body: "Choose a project from the header." };
   if (input.projects.length === 0) return { title: "No GitHub projects", body: "Import a project whose remote is on GitHub." };
   return null;
 }
@@ -103,13 +103,13 @@ function unavailable(input: { ghInstalled: boolean | undefined; projectId: strin
  * on GitHub. Everything is read through the user's own gh.
  */
 export function PullRequestList() {
-  const projectId = useLayout((s) => s.projectId);
+  const projectId = useLayout(focusedProject);
   const system = useRpc("system.info", {});
   const projectList = useRpc("projects.list", {});
   const [filter, setFilter] = useState<PullRequestFilter>("open");
   const [query, setQuery] = useState("");
   const scoped = (projectList.data ?? []).filter((project) => (projectId ? project.id === projectId : onGitHub(project.gitRemote)));
-  const reason = unavailable({ ghInstalled: system.data?.gh.installed, projectId, projects: projectList.data ? scoped : [] });
+  const reason = unavailable({ ghInstalled: system.data?.gh.installed, projects: projectList.data ? scoped : [] });
   const results = useQueries({
     queries: scoped.map((project) => {
       const params = { projectId: project.id, filter };
@@ -161,12 +161,12 @@ export function PullRequestList() {
           </Tooltip>
         }
       >
-        Pull requests
+        <ScopedTitle>Pull requests</ScopedTitle>
       </TopBar>
       <div className="page-column">
         <PageFilters
           tabs={<Segmented label="Pull request filter" value={filter} onChange={setFilter} options={pullRequestFilters} />}
-          end={<PageSearch label="Filter pull requests" placeholder="Filter pull requests…" value={query} onChange={setQuery} />}
+          end={<PageSearch label="Search pull requests" placeholder="Search pull requests…" value={query} onChange={setQuery} />}
         />
         {body}
       </div>

@@ -10,15 +10,14 @@ import { docHref } from "../../data/docs";
 
   <section aria-labelledby="open">
     <h2 id="open">Open a file</h2>
-    <p>Press <kbd>⌘J</kbd> to show the side panel, click <strong>New tab</strong> (+), and choose <strong>Files</strong>. (On Windows and Linux, use <kbd>Ctrl</kbd> wherever this page shows <kbd>⌘</kbd>.) The explorer lists the folder as a tree. Type in <strong>Filter files…</strong> to narrow it. The tree shows every file, including <code>.env</code> files, and leaves out only repository and system files such as <code>.git</code> and <code>.DS_Store</code>.</p>
+    <p>Press <kbd>⌘J</kbd> to show the side panel, click <strong>New tab</strong> (+), and choose <strong>Files</strong>. (On Windows and Linux, use <kbd>Ctrl</kbd> wherever this page shows <kbd>⌘</kbd>.) The explorer lists the folder as a tree. Type in <strong>Search files…</strong> to narrow it. Matching files in open folders stay where they are, matching files elsewhere in the project are listed under <strong>More in the project</strong>, and once you type three letters, the lines that contain the text are listed under <strong>In files</strong>, grouped by file, with <strong>Match case</strong> and <strong>Regex</strong> beside the heading. A line opens its file at that line. The tree shows every file, including <code>.env</code> files, and leaves out only repository and system files such as <code>.git</code> and <code>.DS_Store</code>.</p>
     <p>There are other ways to open a file:</p>
     <ul>
-      <li>Press <kbd>⌘P</kbd> and type part of a file's name.</li>
-      <li>Press <kbd>⌘⇧F</kbd> to search the text of every file. A result opens its file at the matching line.</li>
+      <li>Press <kbd>⌘P</kbd> or <kbd>⌘⇧F</kbd> to go straight to <strong>Search files…</strong>, then press <kbd>Return</kbd> to open the first result.</li>
       <li>Click a file the agent read in the conversation's <a href={docHref("work")}>work steps</a>, or a file link in a reply.</li>
     </ul>
     <p>Each file opens in a tab of its own, named after the file. Markdown files open rendered, with <strong>Preview</strong> and <strong>Source</strong> on the toolbar. Images, PDFs, video, and audio play in the panel. For another kind of file, the <strong>File actions</strong> menu (⋯) has <strong>Open</strong>, which uses its usual app, and an item that shows it in Finder or your file manager.</p>
-    <p>The panel opens on the right of the conversation. To move it to the left, click <strong>Move panel left</strong> in the thread's header. <strong>Expand panel</strong> gives it more room.</p>
+    <p>The panel opens on the right of the conversation. To move it to the left, click <strong>Move panel left</strong> in the thread's header; <strong>Move panel right</strong> in the panel's header moves it back. <strong>Expand panel</strong> gives it more room.</p>
   </section>
 
   <section aria-labelledby="edit">

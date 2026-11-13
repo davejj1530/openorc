@@ -4,6 +4,7 @@ import { signInKey, signInTarget, type CloudSignIn } from "@openorc/protocol";
 import { queryClient, useRpc, useRpcMutation } from "../lib/client";
 import { core } from "../lib/rpc";
 import { Button, Input, TextButton } from "./ui";
+import { thisComputer } from "../lib/this-computer";
 
 const card = "rounded-xl bg-surface px-3.5 py-1.5 text-base";
 
@@ -18,7 +19,7 @@ function asked(row: CloudSignIn): string {
   if (row.kind === "claude") return `Claude account “${row.label}” has no sign-in for the cloud.`;
   if (row.kind === "codex") return "Codex has no sign-in for the cloud.";
   if (row.kind === "brain-codex") return "Codex has no sign-in on the cloud brain.";
-  return `OpenCode has no ${row.label} key for the cloud.`;
+  return `There is no ${row.label} key for the cloud.`;
 }
 
 const WAITING: Partial<Record<CloudSignIn["way"], string>> = { browser: "Sign in in your browser.", "private-window": "Sign in in the private window that opened." };
@@ -46,7 +47,7 @@ function Offer({ row, onCancel }: { row: CloudSignIn; onCancel: () => void }) {
   else if (!working)
     action = (
       <Button variant="primary" disabled={bring.isPending} onClick={() => bring.mutate({ target: signInTarget(row) })}>
-        {row.way === "copy" ? "Copy this Mac's key" : "Sign in"}
+        {row.way === "copy" ? `Copy ${thisComputer}'s key` : "Sign in"}
       </Button>
     );
   const note = bring.error?.message ?? row.error ?? (working ? WAITING[row.way] : null);

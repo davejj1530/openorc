@@ -5,6 +5,24 @@ import { AcpUpdateMapper } from "./updates.js";
 const text = (t: string) => ({ type: "text" as const, text: t });
 
 describe("AcpUpdateMapper", () => {
+  it("settles a tool already completed in its first notification and ignores repeats", () => {
+    const mapper = new AcpUpdateMapper("run");
+    const update: SessionUpdate = { sessionUpdate: "tool_call", toolCallId: "read", title: "Read file", kind: "read", status: "completed", rawOutput: "contents" };
+    expect(mapper.map(update, 1)).toMatchObject([{ type: "tool.started" }, { type: "tool.completed", output: "contents", status: "success" }]);
+    expect(mapper.map(update, 2)).toEqual([]);
+  });
+
+  it("retains streamed output when completion carries only a status", () => {
+    const mapper = new AcpUpdateMapper("run");
+    mapper.map({ sessionUpdate: "tool_call", toolCallId: "run", title: "Build", status: "in_progress", content: [{ type: "content", content: text("Build passed") }] }, 1);
+    expect(mapper.map({ sessionUpdate: "tool_call_update", toolCallId: "run", status: "completed" }, 2)).toMatchObject([{ type: "tool.completed", output: "Build passed" }]);
+  });
+
+  it("does not label another currency as dollars", () => {
+    const mapper = new AcpUpdateMapper("run");
+    mapper.map({ sessionUpdate: "usage_update", used: 1, size: 100, cost: { currency: "EUR", amount: 4 } }, 1);
+    expect(mapper.endTurn(2).context).toEqual({ used: 1, size: 100 });
+  });
   it("streams assistant text as one message per id and closes it when the turn ends", () => {
     const mapper = new AcpUpdateMapper("run");
     const first = mapper.map({ sessionUpdate: "agent_message_chunk", messageId: "m1", content: text("Hel") }, 1);

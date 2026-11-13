@@ -9,6 +9,8 @@ export default Animated;
 export const useReducedMotion = () => motion.reduced;
 export const cubicBezier = (x1: number, y1: number, x2: number, y2: number) => ({ x1, y1, x2, y2 });
 export const Easing = { bezier: cubicBezier };
+/** A layout transition, which nothing plays here: its settings chain as Reanimated's do. */
+export const LinearTransition = { duration: () => LinearTransition, easing: () => LinearTransition };
 export const useSharedValue = <T,>(value: T) => ({ value });
 export const useAnimatedStyle = (style: () => object) => style();
 export const useFrameCallback = () => undefined;

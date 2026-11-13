@@ -687,8 +687,18 @@ export const runs = {
     return (db.stmt("SELECT * FROM runs WHERE state IN ('starting', 'running') ORDER BY started_at").all() as unknown as RunRow[]).map(runFromRow);
   },
   /** The models this provider's runs used, the latest first. */
-  recentModels(db: Db, agent: Run["agent"], limit = 5): string[] {
-    const rows = db.stmt("SELECT model FROM runs WHERE agent = ? AND model IS NOT NULL GROUP BY model ORDER BY MAX(started_at) DESC LIMIT ?").all(agent, limit) as unknown as { model: string }[];
+  /** The agents people ran their own work on lately, the most used first; an Orcling's own runs don't count. */
+  peopleAgents(db: Db, recent = 100): Run["agent"][] {
+    const rows = db
+      .stmt("SELECT agent FROM (SELECT agent, started_at FROM runs WHERE orcling_id IS NULL ORDER BY started_at DESC LIMIT ?) GROUP BY agent ORDER BY COUNT(*) DESC, MAX(started_at) DESC")
+      .all(recent) as unknown as { agent: Run["agent"] }[];
+    return rows.map((row) => row.agent);
+  },
+  /** Models newest first. With `people`, only those someone chose for their own work, not an Orcling's own runs. */
+  recentModels(db: Db, agent: Run["agent"], limit = 5, options: { people?: boolean } = {}): string[] {
+    const rows = db
+      .stmt(`SELECT model FROM runs WHERE agent = ? AND model IS NOT NULL${options.people ? " AND orcling_id IS NULL" : ""} GROUP BY model ORDER BY MAX(started_at) DESC LIMIT ?`)
+      .all(agent, limit) as unknown as { model: string }[];
     return rows.map((row) => row.model);
   },
   /** The thread whose run produced a provider session, so the CLI's copy is not offered for import twice. */

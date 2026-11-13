@@ -185,11 +185,39 @@ function turnParts(turn: { id: string; blocks: Block[] }, live: boolean, fallbac
     const writing = after.some((block) => block.kind === "message" && block.role === "assistant" && block.streaming);
     rows.push({ kind: "head", key: `head:${turn.id}`, runId, live: timing.live, writing, startedAt: timing.startedAt, durationMs: timing.durationMs, outcome: timing.outcome });
   }
-  if (work.length) rows.push({ kind: "work", key: `work:${turn.id}`, turnId: turn.id, runId, work, live: timing.live, now: workNow(turn.blocks, after, timing.live) });
-  rows.push(...afterTurnRows(after, runId));
+  const cards = after.filter((block) => block.kind === "approval");
+  const segments = workSegments(turn.blocks, work, cards);
+  const last = segments.findLastIndex((segment) => segment.length > 0);
+  segments.forEach((segment, index) => {
+    if (segment.length) {
+      const key = index ? `${turn.id}:${index}` : turn.id;
+      const live = timing.live && index === last;
+      rows.push({ kind: "work", key: `work:${key}`, turnId: key, runId, work: segment, live, now: index === last ? workNow(turn.blocks, after, timing.live) : null });
+    }
+    const card = cards[index];
+    if (card) rows.push(...afterRows(card, runId));
+  });
+  const rest = after.filter((block) => block.kind !== "approval");
+  rows.push(...afterTurnRows(rest, runId));
   const reply = turnReply(after);
   if (spoke && !timing.live && reply) rows.push({ kind: "actions", key: `actions:${turn.id}`, text: reply.text });
   return rows;
+}
+
+/**
+ * The work in the order it ran, cut at each question or approval card: what the agent did after an answer reads below
+ * the card rather than joining the steps above it, so the newest step stays at the end of the conversation.
+ */
+function workSegments(blocks: Block[], work: Block[], cards: Block[]): Block[][] {
+  if (!cards.length) return [work];
+  const inWork = new Set(work);
+  const cuts = new Set(cards);
+  const segments: Block[][] = [[]];
+  for (const block of blocks) {
+    if (cuts.has(block)) segments.push([]);
+    else if (inWork.has(block)) segments.at(-1)!.push(block);
+  }
+  return segments;
 }
 
 /**

@@ -9,3 +9,4 @@ export const Ellipse = Nothing;
 export const G = Nothing;
 export const Path = Nothing;
 export const Rect = Nothing;
+export const SvgXml = Nothing;

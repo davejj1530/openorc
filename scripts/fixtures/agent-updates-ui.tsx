@@ -36,7 +36,7 @@ core.call = async <M extends RpcMethod>(method: M, input: RpcParams<M>): Promise
   if (method === "agents.updates.configure") state = { ...state, ...input };
   if (method === "agents.updates.install") {
     const { ids } = input as RpcParams<"agents.updates.install">;
-    if (params.has("error")) throw new Error("Finish agent work and pending approvals before updating. Your conversations will be kept.");
+    if (params.has("error")) throw new Error("Check for updates and select agents that can be updated here.");
     state = { ...state, updating: true, agents: state.agents.map((row) => (ids.includes(row.id) ? { ...row, status: "updating" } : row)) };
     await queryClient.invalidateQueries({ queryKey: ["agents.updates.get"] });
     await new Promise((resolve) => setTimeout(resolve, 1500));

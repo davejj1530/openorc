@@ -1,4 +1,15 @@
-import { commentMentionOptions, commentRecipientKey, harnessName, orclingMentionOptions, type CommentAttempt, type CommentRecipient, type ModelOption, type TaskComment } from "@openorc/protocol";
+import {
+  commentMentionOptions,
+  commentRecipientKey,
+  executionModeAvailable,
+  harnessName,
+  orclingMentionOptions,
+  type CommentAttempt,
+  type CommentMentionOption,
+  type CommentRecipient,
+  type ModelOption,
+  type TaskComment,
+} from "@openorc/protocol";
 import { useMemo, useRef, useState } from "react";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { insertMention, mentionQueryAt } from "../lib/composer-mentions";
@@ -52,6 +63,10 @@ export function TaskComments({ taskId, description, beforeSend }: TaskCommentsPr
   const choose = (index: number) => {
     const match = matches[index];
     if (!match || !query) return;
+    if (!executionModeAvailable(match.recipient.agent, "plan")) {
+      setActionError(`${harnessName(match.recipient.agent)} cannot join task discussions because it does not support read-only Plan mode. Choose another agent.`);
+      return;
+    }
     const result = insertMention(draft.body, query.start, caret, match.name);
     edit({ kind: "mention", body: result.text });
     setCaret(result.caret);
@@ -133,7 +148,7 @@ export function TaskComments({ taskId, description, beforeSend }: TaskCommentsPr
         {draft.recipients.length ? (
           <div className="task-comment-recipients" aria-label="Reply recipients">
             {draft.recipients.map((r) => (
-              <TextButton key={commentRecipientKey(r)} title="Remove recipient" onClick={() => edit({ kind: "remove-recipient", recipient: r })}>
+              <TextButton key={commentRecipientKey(r)} data-tip="Remove recipient" onClick={() => edit({ kind: "remove-recipient", recipient: r })}>
                 @{recipientName(r)} · Remove
               </TextButton>
             ))}
@@ -174,12 +189,7 @@ export function TaskComments({ taskId, description, beforeSend }: TaskCommentsPr
         />
         {query ? (
           <div className="task-comment-mentions" role="listbox" id={`comment-models-${taskId}`} aria-label="Mention a model">
-            {matches.map((o, i) => (
-              <button type="button" role="option" aria-selected={selected === i} id={`comment-model-${taskId}-${i}`} key={o.token} onMouseDown={(e) => e.preventDefault()} onClick={() => choose(i)}>
-                <span>@{o.name}</span>
-                <span>{harnessName(o.recipient.agent)}</span>
-              </button>
-            ))}
+            <MentionOptions matches={matches} selected={selected} taskId={taskId} choose={choose} />
             {!matches.length ? (
               <p>
                 {modelSearchMessage(models.isPending, Boolean(models.error))} <TextButton onClick={() => void models.refetch()}>Refresh models</TextButton>
@@ -206,4 +216,28 @@ export function TaskComments({ taskId, description, beforeSend }: TaskCommentsPr
       ) : null}
     </section>
   );
+}
+
+function MentionOptions({ matches, selected, taskId, choose }: { matches: CommentMentionOption[]; selected: number; taskId: string; choose: (index: number) => void }) {
+  return matches.map((option, index) => {
+    const available = executionModeAvailable(option.recipient.agent, "plan");
+    return (
+      <button
+        type="button"
+        role="option"
+        aria-selected={selected === index}
+        aria-disabled={!available}
+        id={`comment-model-${taskId}-${index}`}
+        key={option.token}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => choose(index)}
+      >
+        <span>@{option.name}</span>
+        <span>
+          {harnessName(option.recipient.agent)}
+          {available ? "" : " · No read-only Plan mode"}
+        </span>
+      </button>
+    );
+  });
 }

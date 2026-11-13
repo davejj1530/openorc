@@ -1,0 +1,71 @@
+---
+/**
+ * One tab on the window's top line, drawn as work-tabs.css draws the work column's tabs and the panel's alike: its
+ * glyph and name in a 30-unit tab, raised on the fill while current, the close only on the current one. A thread's
+ * tab shows the mark of the agent it runs on, and its state in place of that mark: a spinner while its agent works,
+ * an amber question while it waits on you, an amber dot while a finished turn is unread. A file page with unsaved
+ * edits shows a dot instead of its glyph. Scenes pass windows for those states and stills pass `true`. A tab given an `id` is one the visitor can pick.
+ */
+import FileGlyph from "./FileGlyph.astro";
+import ProductIcon, { type IconName } from "./ProductIcon.astro";
+import { flagged, type Journey } from "../../data/hero/timeline";
+
+export interface Tab {
+  label: string;
+  /** The glyph at rest, for a tab that is not a thread's. */
+  icon?: IconName;
+  /** A thread's tab: the agent whose mark it shows at rest. */
+  harness?: string;
+  /** A file page's tab shows the file's own glyph. */
+  file?: string;
+  unsaved?: boolean;
+  current?: boolean;
+  busy?: string | true;
+  waiting?: string | true;
+  unread?: boolean;
+  /** A tab the visitor can pick: its id, the ids of what it shows, and the key of what it picks. */
+  id?: string;
+  controls?: string;
+  value?: string;
+  /** What a screen reader hears for a pickable tab, when the name alone says too little. */
+  description?: string;
+}
+
+interface Props extends Tab {
+  journey?: Journey;
+}
+const { label, icon, harness, file, unsaved, current, busy, waiting, unread, id, controls, value, description, journey } = Astro.props;
+const windows = Object.fromEntries(Object.entries({ busy, waiting }).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+const states = {
+  ...(busy === true ? { "data-busy": "" } : {}),
+  ...(waiting === true ? { "data-waiting": "" } : {}),
+  ...(unread ? { "data-unread": "" } : {}),
+  ...(journey && Object.keys(windows).length ? flagged(journey, windows) : {}),
+};
+const Face = id ? "button" : "span";
+const selected: "true" | "false" = current ? "true" : "false";
+const pickable = id
+  ? { type: "button" as const, role: "tab" as const, id, "aria-selected": selected, "aria-controls": controls, "aria-label": description, tabindex: current ? 0 : -1, "data-value": value }
+  : {};
+---
+
+<div class="hs-tab" data-current={current ? "" : undefined} {...states}>
+  <Face class="hs-tab-face" {...pickable}>
+    <span class="hs-tab-icon" aria-hidden="true">
+      {unsaved ? (
+        <i class="hs-tab-dot" />
+      ) : file ? (
+        <FileGlyph path={file} />
+      ) : harness && !icon ? (
+        <svg class="hs-logo" data-provider={harness}><use href={`#hs-logo-${harness}`} /></svg>
+      ) : (
+        <ProductIcon name={icon ?? "messageSquare"} />
+      )}
+      {busy ? <ProductIcon name="loader" class="hs-tab-busy" /> : null}
+      {waiting ? <ProductIcon name="circleHelp" class="hs-tab-waiting" /> : null}
+      {unread ? <i class="hs-tab-unread" /> : null}
+    </span>
+    <span class="hs-tab-title">{label}</span>
+  </Face>
+  <span class="hs-tab-close" aria-hidden="true"><ProductIcon name="close" /></span>
+</div>

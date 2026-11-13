@@ -67,10 +67,10 @@ function TerminalBar({ cwd, running, onStop, onRestart }: { cwd: string; running
         </PanelBarMeta>
       }
     >
-      <IconButton onClick={onStop} aria-label="End shell" disabled={!running} title="End this shell and forget its output">
+      <IconButton onClick={onStop} aria-label="End shell" disabled={!running} data-tip="End this shell and forget its output">
         <Square size={14} />
       </IconButton>
-      <IconButton onClick={onRestart} aria-label="Restart shell" title="Start a new shell here">
+      <IconButton onClick={onRestart} aria-label="Restart shell" data-tip="Start a new shell here">
         <RotateCcw size={14} />
       </IconButton>
     </PanelBar>

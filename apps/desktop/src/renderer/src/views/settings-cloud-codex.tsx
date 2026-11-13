@@ -4,6 +4,7 @@ import { Button, TextButton } from "../components/ui";
 import { useRpcMutation } from "../lib/client";
 import { Section, SettingRow, Status } from "./settings-shared";
 import { Failure, StillWorks, TokenField, type RevokedAt } from "./settings-secret-field";
+import { ThisComputer, thisComputer } from "../lib/this-computer";
 
 const KEYS_URL = "https://platform.openai.com/api-keys";
 
@@ -85,9 +86,9 @@ function Controls({ codex, act }: { codex: CodexCloudAccess; act: Mutations }) {
   );
 }
 
-const ALONE = "Codex signs in to sandboxes with a ChatGPT sign-in of its own, never this Mac's, or an API key.";
+const ALONE = `Codex signs in to sandboxes with a ChatGPT sign-in of its own, never ${thisComputer}'s, or an API key.`;
 /** Why there are two rows once there is a cloud brain: a ChatGPT login's refresh works in one place. */
-const WITH_BRAIN = "A ChatGPT sign-in works in one place at a time, so this Mac's cloud threads and the cloud brain each need their own. An API key works for both.";
+const WITH_BRAIN = `A ChatGPT sign-in works in one place at a time, so ${thisComputer}'s cloud threads and the cloud brain each need their own. An API key works for both.`;
 
 /**
  * How Codex signs in to sandboxes: a ChatGPT sign-in of its own, so a sandbox never shares this Mac's login, or an
@@ -120,7 +121,7 @@ export function CodexCloudSection({ codex, brain }: { codex: CodexCloudAccess; b
   };
   return (
     <Section title="Codex" description={brain ? WITH_BRAIN : ALONE}>
-      <SettingRow label={brain ? "This Mac's cloud threads" : "Sign-in"} hint={hint(codex)}>
+      <SettingRow label={brain ? `${ThisComputer}'s cloud threads` : "Sign-in"} hint={hint(codex)}>
         <Controls codex={codex} act={act} />
       </SettingRow>
       {pasting && !codex.mode && !codex.signingIn ? <OpenAIKeyField busy={busy} onSave={(key) => apiKey.mutate({ key }, { onSuccess: () => setPasting(false) })} /> : null}

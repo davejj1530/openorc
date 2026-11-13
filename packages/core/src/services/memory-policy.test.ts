@@ -21,7 +21,11 @@ function fixture(enabled = true) {
   if (enabled) settings.set(db, "memory.enabled", "true");
   vi.spyOn(Embedder.prototype, "embed").mockResolvedValue(null);
   vi.spyOn(Embedder.prototype, "embedQuery").mockResolvedValue(null);
-  const providers = { loggedIn: async () => ({ claude: true, codex: true, opencode: false }), models: async () => [], launch: () => ({ revision: 1, binary: "fixture", env: {} }) };
+  const providers = {
+    loggedIn: async () => ({ claude: true, codex: true, opencode: false, omp: false, cursor: false, pi: false, antigravity: false, fx: false }),
+    models: async () => [],
+    launch: () => ({ revision: 1, binary: "fixture", env: {} }),
+  };
   const make = () => new MemoryService(db, { dataDir: "/tmp", secrets: { load: async () => null, save: async () => {} } }, providers, () => {}, { info() {}, warn() {}, error() {} });
   const memory = make();
   const project = projects.insert(db, { name: "Fixture", rootPath: "/tmp/memory-policy", gitRemote: null, defaultBranch: null, settings: {} });

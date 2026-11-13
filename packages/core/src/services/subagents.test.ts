@@ -64,7 +64,17 @@ async function setup() {
   const writers = new WorkspaceWriters();
   const frames: Frame[] = [];
   const coalescer = new FrameCoalescer((frame) => frames.push(frame));
-  const service = new RunService(db, ledger, coalescer, mcp, () => {}, quiet, hooks, { codex: { start }, claude: { start }, opencode: { start } }, writers);
+  const service = new RunService(
+    db,
+    ledger,
+    coalescer,
+    mcp,
+    () => {},
+    quiet,
+    hooks,
+    { codex: { start }, claude: { start }, opencode: { start }, omp: { start }, cursor: { start }, pi: { start }, antigravity: { start }, fx: { start } },
+    writers,
+  );
   const conversations = new ThreadService(
     db,
     service,

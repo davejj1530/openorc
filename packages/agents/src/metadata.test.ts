@@ -20,12 +20,18 @@ async function fixture(mode = "ok") {
     `#!${process.execPath}
 const fs = require("node:fs");
 fs.writeFileSync(${JSON.stringify(calls)}, JSON.stringify({args:process.argv.slice(2)})+"\\n");
+let asks=0;
 require("node:readline").createInterface({input:process.stdin}).on("line",line=>{
  const request=JSON.parse(line); fs.appendFileSync(${JSON.stringify(calls)},line+"\\n");
  const send=(value)=>process.stdout.write(JSON.stringify(value)+"\\n");
  if(request.type==="control_request") {
   if(${JSON.stringify(mode)}==="timeout") return;
   if(${JSON.stringify(mode)}==="exit") return process.exit(1);
+  // Claude Code says Fast is on until its account check lands; "eligible" accounts stay on.
+  if(${JSON.stringify(mode)}==="settles"||${JSON.stringify(mode)}==="eligible") {
+   const fast=${JSON.stringify(mode)}==="settles"&&++asks>1?{fast_mode_state:"off",fast_mode_disabled_reason:"extra_usage_disabled"}:{fast_mode_state:"on"};
+   return send({type:"control_response",response:{subtype:"success",request_id:request.request_id,response:{models:[{value:"opus",displayName:"Opus",supportsFastMode:true}],...fast}}});
+  }
   return send({type:"control_response",response:{subtype:"success",request_id:request.request_id,response:{models:[{value:"sonnet",resolvedModel:"claude-sonnet-9",displayName:"Sonnet 9",supportsEffort:true,supportedEffortLevels:["low","xhigh"],supportsFastMode:true}],fast_mode_state:"off",fast_mode_disabled_reason:"extra_usage_disabled"}}});
  }
  if(request.id===undefined) return;
@@ -70,6 +76,16 @@ describe.skipIf(process.platform === "win32")("metadata-only CLI connections", (
       expect.arrayContaining(["--no-session-persistence", "--strict-mcp-config", JSON.stringify({ mcpServers: {} }), JSON.stringify({ disableAllHooks: true, fastMode: true })]),
     );
     expect(calls[0].args[calls[0].args.indexOf("--tools") + 1]).toBe("");
+  });
+  it("asks again when Claude Code reports Fast on before its account check lands", async () => {
+    const f = await fixture("settles");
+    expect((await listClaudeModels(f)).fastModeDisabledReason).toBe("extra_usage_disabled");
+    expect((await f.calls()).filter((call) => call.request?.subtype === "initialize")).toHaveLength(2);
+  });
+  it("offers Fast when the account still has it after the check's time", async () => {
+    const f = await fixture("eligible");
+    expect(await listClaudeModels(f, 15_000, 600)).toEqual({ models: [{ value: "opus", displayName: "Opus", supportsFastMode: true }] });
+    expect((await f.calls()).filter((call) => call.request?.subtype === "initialize").length).toBeGreaterThan(1);
   });
   it("bounds Claude probes and reports early exit", async () => {
     await expect(listClaudeModels(await fixture("timeout"), 100)).rejects.toThrow("timed out");

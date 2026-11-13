@@ -16,8 +16,8 @@ import type { EnvSnapshot } from "./shell-environment.js";
 interface Dependencies {
   info(refresh: boolean): Promise<SystemInfo>;
   environment(): EnvSnapshot;
-  /** Atomically fences new work and closes only idle sessions; release reopens admission. */
-  reserve(): Promise<() => void>;
+  /** Holds new launches of this agent until the returned release runs. Work already running carries on. */
+  reserve(id: HarnessId): () => void;
   changed(): void;
   refreshed?(): void;
   read(key: string): string | null;
@@ -59,6 +59,8 @@ export class AgentUpdateService {
   private rows = harnessIds.map(blank);
   private checking: Promise<AgentUpdates> | null = null;
   private installing: Promise<AgentUpdates> | null = null;
+  /** Aborted to stop the updater that is running and skip the rest of its batch. */
+  private batch: AbortController | null = null;
   private plans = new Map<HarnessId, AgentInstallation>();
   private timer: ReturnType<typeof setTimeout> | null = null;
   private stopped = false;
@@ -93,6 +95,7 @@ export class AgentUpdateService {
   async close(): Promise<void> {
     this.stopped = true;
     if (this.timer) clearTimeout(this.timer);
+    this.batch?.abort();
     await Promise.allSettled([this.checking, this.installing]);
   }
   check(): Promise<AgentUpdates> {
@@ -157,35 +160,43 @@ export class AgentUpdateService {
     if (this.installing || this.checking) return Promise.reject(new Error("An agent update or check is already running. Wait for it to finish."));
     const selected = [...new Set(ids)].map((id) => this.rows.find((row) => row.id === id)!);
     if (selected.some((row) => !actionable.has(row.status) || !row.canUpdate)) return Promise.reject(new Error("Check for updates and select agents that can be updated here."));
+    const batch = new AbortController();
+    this.batch = batch;
     this.installing = Promise.resolve()
-      .then(() => this.apply(selected))
+      .then(() => this.apply(selected, batch.signal))
       .finally(() => {
         this.installing = null;
+        this.batch = null;
         this.deps.changed();
       })
       .then(() => this.get());
     this.deps.changed();
     return this.installing;
   }
-  private async apply(selected: AgentUpdate[]): Promise<void> {
-    const release = await this.deps.reserve();
+  /** Stops the updater that is running. Its agent and the ones still waiting their turn keep the versions they have. */
+  cancel(): Promise<AgentUpdates> {
+    this.batch?.abort();
+    return this.installing ?? Promise.resolve(this.get());
+  }
+  private async apply(selected: AgentUpdate[], stop: AbortSignal): Promise<void> {
     try {
       // Serial execution avoids racing shared package managers; a failure does not hide the other results.
       for (const row of selected) {
+        if (stop.aborted) break;
         this.patch(row.id, { status: row.status === "broken" ? "reinstalling" : "updating", message: null });
         try {
-          this.patch(row.id, await this.execute(row));
+          this.patch(row.id, await this.execute(row, stop));
         } catch (error) {
-          this.patch(row.id, { status: "error", message: error instanceof Error ? error.message : "The update failed. Check again to retry." });
+          const message = error instanceof Error ? error.message : "The update failed. Check again to retry.";
+          this.patch(row.id, { status: stop.aborted ? row.status : "error", message });
         }
       }
     } finally {
-      release();
       this.deps.refreshed?.();
     }
   }
   /** Runs the update, or the reinstall for a broken row, that the last check planned for this installation. */
-  private async execute(row: AgentUpdate): Promise<Partial<AgentUpdate>> {
+  private async execute(row: AgentUpdate, stop: AbortSignal): Promise<Partial<AgentUpdate>> {
     const repair = row.status === "broken";
     const harness = harnessInfo(await this.deps.info(true), row.id);
     if (!harness.path) throw new Error("This agent is no longer installed. Check for updates again.");
@@ -195,8 +206,14 @@ export class AgentUpdateService {
     const command = repair ? plan.repair : plan.command;
     if (!command || plan.identity !== previous?.identity || JSON.stringify(command) !== JSON.stringify(repair ? previous.repair : previous.command))
       throw new Error("The installation changed. Check for updates again before updating.");
-    await (this.deps.run ?? runUpdateCommand)(command, { ...environment.env });
-    return outcome(row, plan, harnessInfo(await this.deps.info(true), row.id));
+    // Held through the version probe, so a launch that waited starts on the environment as the update left it.
+    const release = this.deps.reserve(row.id);
+    try {
+      await (this.deps.run ?? runUpdateCommand)(command, { ...environment.env }, { signal: stop });
+      return outcome(row, plan, harnessInfo(await this.deps.info(true), row.id));
+    } finally {
+      release();
+    }
   }
   private patch(id: HarnessId, patch: Partial<AgentUpdate>): void {
     this.rows = this.rows.map((row) => (row.id === id ? { ...row, ...patch } : row));

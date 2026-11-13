@@ -74,6 +74,11 @@
     },
     {
       "group": "provider-marks",
+      "path": "apps/desktop/src/renderer/src/assets/providers/omp.svg",
+      "sha256": "08d46fc9147fad73f6a5430ba2e8603901310db7a2bcfcc6bfbf0ee6bfa13996"
+    },
+    {
+      "group": "provider-marks",
       "path": "apps/website/public/claude.svg",
       "sha256": "f5d03d6785b5b01c79cb427145cec717d64257c6205a428608012f9dc3ffcdcf"
     },
@@ -90,7 +95,7 @@
     {
       "group": "readme-product",
       "path": "docs/images/readme/workspace.png",
-      "sha256": "4112d040bc868aa3dff2ed0636016a8ac2d48d02b36654c96b4a6ac5077dda4a"
+      "sha256": "0c4b07673b470cb1b8df5607bb981880cf10b54a2b65c40882d1899d2b882ea0"
     },
     {
       "group": "readme-product",
@@ -216,6 +221,41 @@
       "group": "project-stack-logos",
       "path": "apps/desktop/src/renderer/src/assets/project-stacks/cplusplus.svg",
       "sha256": "7ff8253551235e3a6b002a7c2bd6e3190d85113a64fcb40f2254473caeb025d4"
+    },
+    {
+      "group": "provider-mark",
+      "path": "apps/desktop/src/renderer/src/assets/providers/cursor.svg",
+      "sha256": "ac79abd8559a1733be015e94b4173ed33f38579909c7503958b67713dcd06634"
+    },
+    {
+      "group": "provider-marks",
+      "path": "apps/desktop/src/renderer/src/assets/providers/pi.svg",
+      "sha256": "642758cc94d133fc14625221e3f5068bf9246c4772371a7ab9976a44c308d8c1"
+    },
+    {
+      "group": "provider-mark",
+      "path": "apps/desktop/src/renderer/src/assets/providers/antigravity.svg",
+      "sha256": "d775965ea1f8060538c15f758a3e22487317211fcb6051333b5e023f35aa726f"
+    },
+    {
+      "group": "provider-mark",
+      "path": "apps/desktop/src/renderer/src/assets/providers/fx.svg",
+      "sha256": "3c3a0d2e246571e544d0e7f6a31ace397005ed0a03e0ed37463f2f6b9a00e94b"
+    },
+    {
+      "group": "onboarding",
+      "path": "apps/desktop/src/renderer/src/assets/onboarding/ribbons.webp",
+      "sha256": "f7924ebaf71977af6ec599e995819320ce8d82813db14a0804919fd58aa62052"
+    },
+    {
+      "group": "onboarding",
+      "path": "apps/desktop/src/renderer/src/assets/onboarding/flower.webp",
+      "sha256": "0f68b195011db4080aeeadb6fcdbbcc574a3944e1f3eef8b33cf0809199c981c"
+    },
+    {
+      "group": "onboarding",
+      "path": "apps/desktop/src/renderer/src/assets/onboarding/shapes.webp",
+      "sha256": "3f1713aa8196da595ba9a05eadc9f8addbb41942743d8bb4d4895c16f3457836"
     }
   ]
 }

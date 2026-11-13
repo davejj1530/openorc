@@ -12,17 +12,17 @@ interface Props extends Record<string, unknown> {
   journey?: Journey;
   /** The step's title, or titles that follow the scene's windows. */
   title: string | { text: string; show: string }[];
-  /** Window while the step runs; it is done after it. Omit for a step done when the scene opens. */
-  live?: string;
+  /** Window while the step runs, or `true` in a still; it is done after it. Omit for a step done when the scene opens. */
+  live?: string | true;
   /** Window from which the step is done. */
   done?: string;
   /** What the folded step touched ("4 files"), and when it shows. */
   meta?: { text: string; show?: string };
-  /** Window while the step is open; its body is the slot. */
-  open?: string;
+  /** Window while the step is open, or `true` in a still; its body is the slot. */
+  open?: string | true;
 }
 const { journey, title, live, done, meta, open, grow, ...rest } = Astro.props;
-const at = (windows: string) => (journey ? timed(journey, windows) : {});
+const at = (windows: string | true) => (journey && windows !== true ? timed(journey, windows) : {});
 ---
 
 <li class="hs-step" data-grow={grow ? "" : undefined} {...rest}>

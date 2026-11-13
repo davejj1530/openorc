@@ -3,7 +3,7 @@ import { access, constants } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { harnessBinaryVariable, harnessIds, type HarnessId } from "@openorc/protocol";
+import { harnessBinaryVariable, harnessCatalog, harnessIds, type HarnessId } from "@openorc/protocol";
 
 /**
  * The environment agents launch with, owned by the process that launches them.
@@ -60,7 +60,7 @@ const MARK = "@@openorc@@";
 const PROBE_TIMEOUT_MS = 8000;
 
 /** Printed by the shell after its profile ran. Each value sits behind a marker, so banners and greetings cannot shift it. */
-export const probeScript = `printf '\\n${MARK}path=%s\\n${harnessIds.map((id) => `${MARK}${id}=%s\\n`).join("")}' "$PATH" ${harnessIds.map((id) => `"$(command -v ${id} 2>/dev/null)"`).join(" ")}`;
+export const probeScript = `printf '\\n${MARK}path=%s\\n${harnessIds.map((id) => `${MARK}${id}=%s\\n`).join("")}' "$PATH" ${harnessIds.map((id) => `"$(command -v ${harnessCatalog[id].cli.bin} 2>/dev/null)"`).join(" ")}`;
 
 export function parseShellProbe(stdout: string): ShellProbeResult | null {
   const values = new Map<string, string>();
@@ -128,7 +128,7 @@ export function pathProbe(env: NodeJS.ProcessEnv = process.env): ShellProbe {
   const named = harnessBinaries((id) => env[harnessBinaryVariable(id)] || null);
   return async () => {
     const envPath = env["PATH"] ?? "";
-    const found = new Map(await Promise.all(harnessIds.map(async (id) => [id, named[id] ?? (await resolveBinary(id, envPath))] as const)));
+    const found = new Map(await Promise.all(harnessIds.map(async (id) => [id, named[id] ?? (await resolveBinary(harnessCatalog[id].cli.bin, envPath))] as const)));
     return { path: envPath, binaries: harnessBinaries((id) => found.get(id) ?? null) };
   };
 }

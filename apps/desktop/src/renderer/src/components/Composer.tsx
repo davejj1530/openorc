@@ -10,6 +10,7 @@ import {
   type FileScope,
   type PermissionPreset,
   type RunMode,
+  type UsableConnector,
 } from "@openorc/protocol";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRpcMutation } from "../lib/client";
@@ -20,11 +21,12 @@ import { useComposerSubmission } from "../lib/composer-submission";
 import { formatBytes } from "../lib/file-imports";
 import { ComposerChoice } from "./ComposerChoice";
 import { ComposerDropZone, useComposerDrop } from "./ComposerDropZone";
-import { ComposerFooter } from "./ComposerFooter";
+import { ComposerChangesBar } from "./ComposerCommitChip";
 import { ComposerInput } from "./ComposerInput";
 import { ComposerSendButton } from "./ComposerSendButton";
 import { ContextUsage } from "./ContextUsage";
 import { Cloud, FileText, Laptop, Lightbulb, Pencil, Plus, ShieldCheck, Square, Wand, X } from "./icons";
+import { type PickerAccounts } from "./ModelPickerAccounts";
 import { ComposerModelPicker, type ModelChoice } from "./ModelPicker";
 import { Button, Tooltip } from "./ui";
 
@@ -54,7 +56,7 @@ function composerDestination(props: ComposerProps): ReactNode {
  * an entry carrying neither, or both, fails to typecheck rather than picking
  * silently doing nothing.
  */
-export type SlashCommand = { name: string; hint: string; run: () => void; insert?: never; prefix?: never; aliases?: never } | (SkillCommand & { run?: never });
+export type SlashCommand = { name: string; hint: string; run: () => void; insert?: never; prefix?: never; aliases?: never; displayName?: never; icon?: never } | (SkillCommand & { run?: never });
 
 export interface ComposerChanges {
   projectName: string;
@@ -64,6 +66,8 @@ export interface ComposerChanges {
   onReview: () => void;
   onCommit: () => void;
   commitDisabledReason?: string | null;
+  /** The panel beside the composer shows these changes with its own Commit, so the chip steps aside. */
+  inPanel?: boolean;
   error?: string | null;
   onRetry: () => void;
 }
@@ -79,6 +83,8 @@ export interface ComposerProps {
   onModel: (choice: ModelChoice) => void;
   /** A saved identity can supply its model controls in the toolbar. */
   modelControl?: ReactNode;
+  /** The Claude accounts the conversation can run on, offered in the model picker with their usage. */
+  accounts?: PickerAccounts | undefined;
   mode: RunMode;
   onMode: (mode: RunMode) => void;
   permission: PermissionPreset;
@@ -93,14 +99,15 @@ export interface ComposerProps {
   permissionDisabledReason?: string;
   permissionDescriptionId?: string;
   attachmentsDisabledReason?: string | null;
-  /** Where the agent runs: the working folder and Git context share the footer below the input. */
-  /** A caller supplying its own destination control may omit the static label. */
-  /** `cloud` when the agent works in a sandbox and `directory` is the worktree its changes arrive in. */
+  /** Where the agent runs. A caller supplying its own destination control may omit the static label.
+   * `cloud` when the agent works in a sandbox and `directory` is the worktree its changes arrive in. */
   location: { label: string | null; branch: string | null; directory?: string; cloud?: boolean };
   /** Initial execution location is chosen before the conversation starts. */
   hasStarted?: boolean;
-  /** Uncommitted changes and actions beside the working folder. */
+  /** Uncommitted changes, shown as the Commit chip over the composer's left edge. */
   changes?: ComposerChanges | null;
+  /** Status and recovery controls below the Commit chip and above the writing surface; an empty slot takes no room. */
+  notices?: ReactNode;
   busy?: boolean;
   disabledReason?: string | null;
   /** A saved task can start from its spec without an additional message. */
@@ -131,9 +138,14 @@ export interface ComposerProps {
   /** Called as a `/` or `$` word starts, so a list read a while ago can be read again before it is used. */
   onCommandsWanted?: () => void;
   commandsNotice?: SkillListNotice | null;
+  /** Connectors `@` can name, and the call that reads them as an `@` word starts. */
+  connectors?: UsableConnector[];
+  connectorsAside?: { connectors: UsableConnector[]; reason: string } | undefined;
+  connectorsLoading?: boolean | undefined;
+  onConnectorsWanted?: () => void;
   autoFocus?: boolean;
   size?: "md" | "lg";
-  /** The landing screen draws the roomier composer and shows where the thread works below it, not in a footer. */
+  /** The landing screen draws the roomier composer and places the Commit chip itself. */
   presentation?: "conversation" | "new-thread";
   error?: string | null;
   children?: ReactNode;
@@ -152,8 +164,8 @@ function useSentGhost(text: string | null) {
  * The one composer, for the landing screen and every conversation. Files
  * paste or drop in and ride along with the prompt, images as thumbnails and
  * everything else as a named card; attach, the model and the mode sit in the
- * bar under the text with the context ring and send at its end; the working
- * folder and Git context share the footer. @ mentions a file, / runs a command.
+ * bar under the text with the context ring and send at its end; uncommitted
+ * changes sit in the Commit chip over its left edge. @ mentions a file, / runs a command.
  */
 /** The system's file chooser, as the attach button opens it. */
 function chooseFiles(add: (files: File[]) => void): void {
@@ -230,6 +242,8 @@ export function Composer(props: ComposerProps) {
 
   return (
     <div className={cn("composer min-w-0", props.size === "lg" && "composer-large", isNewThread && "composer-new-thread")}>
+      {isNewThread ? null : <ComposerChangesBar changes={props.changes} />}
+      <div className="mb-2 grid grid-cols-1 gap-2 empty:hidden">{props.notices}</div>
       {interrupt.error || files.error || submission?.error || props.error ? (
         <div role="alert" className="composer-alert">
           {interrupt.error ? `Couldn’t stop the agent. ${interrupt.error.message}` : files.error || submission?.error || props.error}
@@ -251,7 +265,7 @@ export function Composer(props: ComposerProps) {
                 {attachment.url ? (
                   <img src={attachment.url} alt={attachment.name} className="composer-thumbnail" />
                 ) : (
-                  <span className="composer-file" title={attachment.name}>
+                  <span className="composer-file" data-tip={attachment.name}>
                     <FileText size={18} className="text-ink-3" />
                     <span className="composer-file-name">{attachment.name}</span>
                     {attachment.bytes ? <span className="composer-file-size tabular">{formatBytes(attachment.bytes)}</span> : null}
@@ -284,6 +298,10 @@ export function Composer(props: ComposerProps) {
             commands={props.commands}
             onCommandsWanted={props.onCommandsWanted}
             commandsNotice={props.commandsNotice}
+            connectors={props.connectors}
+            connectorsAside={props.connectorsAside}
+            connectorsLoading={props.connectorsLoading}
+            onConnectorsWanted={props.onConnectorsWanted}
             suggestionAnchor={shell}
             suggestionSide={isNewThread ? "bottom" : "top"}
           />
@@ -350,7 +368,6 @@ export function Composer(props: ComposerProps) {
         </div>
         {drop.dragging ? <ComposerDropZone count={drop.count} /> : null}
       </div>
-      {isNewThread ? null : <ComposerFooter location={props.location} changes={props.changes} />}
     </div>
   );
 }
@@ -369,7 +386,7 @@ function composerModelControl(props: ComposerProps): ReactNode {
   const unavailable = props.model ? executionModeUnavailable(props.model.agent, executionMode(props.mode, props.permission)) : null;
   return (
     <>
-      {props.modelControl ?? <ComposerModelPicker value={props.model} onChange={props.onModel} />}
+      {props.modelControl ?? <ComposerModelPicker value={props.model} onChange={props.onModel} accounts={props.accounts} />}
       {unavailable ? (
         <Tooltip label={unavailable}>
           <span className="composer-activity" role="status">

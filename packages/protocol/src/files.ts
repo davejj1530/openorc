@@ -44,11 +44,17 @@ export interface FileDirectory {
 /** Git's own files, under a `.git` segment in any case. They open read-only and are never written. */
 export const inGitFolder = (path: string): boolean => /(^|\/)\.git(\/|$)/i.test(path);
 
-export interface FileSnapshot {
-  /** The folder's real path. With `path` it names one file across conversations, as the editor keys drafts. */
+/** Where a read file is. With `path`, `root` names one file across conversations, as the editor keys drafts. */
+export interface FilePlace {
+  /** The folder's real path, or for a file `outside` it, the file's own folder. */
   root: string;
-  /** The real file's place in the folder: a link to a symlink answers with the file it points at. */
+  /** The real file's place in `root`: a link to a symlink answers with the file it points at. */
   path: FolderPath;
+  /** Outside the conversation's folder, opened by its own path. It is read-only, and never saved into the folder. */
+  outside: boolean;
+}
+
+export interface FileSnapshot extends FilePlace {
   absolutePath: string;
   version: FileVersion;
   /** UTF-8 without a byte order mark. Line endings are as on disk. */
@@ -104,23 +110,20 @@ export function fileMedia(path: string): FileMediaEntry | null {
   return mediaByExtension[fileExtension(path)] ?? null;
 }
 
-/** A viewer URL the core signed after its containment check. Only files.read makes one; the renderer never builds its own. */
+/** A viewer URL the core signed for a file it read. Only files.read makes one; the renderer never builds its own. */
 export type SignedFileUrl = string & { readonly __brand: "SignedFileUrl" };
 
 /**
  * A file the panel shows instead of editing: known media by extension, or anything with a NUL byte. `url` is the only
  * way the renderer gets the bytes; nothing turns a renderer-supplied path into a file.
  */
-export interface BinaryFile extends FileMediaEntry {
-  root: string;
-  path: FolderPath;
+export interface BinaryFile extends FileMediaEntry, FilePlace {
   absolutePath: string;
   size: number;
   url: SignedFileUrl;
 }
 
-export type FileRead =
-  ({ kind: "file" } & FileSnapshot) | ({ kind: "binary" } & BinaryFile) | { kind: "missing"; root: string; path: FolderPath } | { kind: "unreadable"; root: string; path: FolderPath; reason: string };
+export type FileRead = ({ kind: "file" } & FileSnapshot) | ({ kind: "binary" } & BinaryFile) | ({ kind: "missing" } & FilePlace) | ({ kind: "unreadable"; reason: string } & FilePlace);
 
 /** What a save expects on disk: the version the edit started from, or no file at all, which makes the write create-only. */
 export const FileExpectation = z.discriminatedUnion("kind", [z.object({ kind: z.literal("version"), version: FileVersion }).strict(), z.object({ kind: z.literal("absent") }).strict()]);
@@ -168,7 +171,7 @@ export const fileRpcParams = {
   "files.list": z.object({ scope: FileScope, path: z.union([z.literal(""), FolderPath]) }).strict(),
   /** File names in a conversation's folder or a project's checkout, best first, for @ mentions. */
   "files.search": z.object({ scope: FileScope, query: z.string().max(500), limit: z.number().int().positive().max(50).optional() }).strict(),
-  /** A text file in the conversation's folder, with its version. `path` may be relative to the folder or absolute inside it. */
+  /** A text file in the conversation's folder, with its version. `path` is relative to the folder or absolute; an absolute path outside it reads read-only. */
   "files.read": z.object({ scope: FileScope, path: z.string().min(1).max(4096) }).strict(),
   /**
    * Saves editor text if the file is still as `expected`, formatted first by the project's formatter, or by the bundled

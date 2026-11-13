@@ -2,105 +2,45 @@
 import DocsLayout from "../../layouts/DocsLayout.astro";
 import Callout from "../../components/docs/Callout.astro";
 import LinkCards from "../../components/docs/LinkCards.astro";
+import AgentSetup from "../../components/docs/AgentSetup.astro";
+import { agents } from "../../data/agents";
 import { docHref } from "../../data/docs";
 ---
 
 <DocsLayout slug="agents">
   <section aria-labelledby="supported">
     <h2 id="supported">Supported agents</h2>
-    <p>OpenOrc works with three coding agents. Each is a command-line tool that you install and sign in to yourself. OpenOrc starts it for your threads with that sign-in, and the agent sends your requests to its own provider.</p>
-    <div class="docs-table">
-      <table>
-        <thead>
-          <tr>
-            <th scope="col">Agent</th>
-            <th scope="col">Install</th>
-            <th scope="col">Sign in</th>
-            <th scope="col">Account it uses</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Codex</td>
-            <td><a href="https://developers.openai.com/codex/cli">Codex CLI guide</a></td>
-            <td><code>codex login</code></td>
-            <td>Your ChatGPT account</td>
-          </tr>
-          <tr>
-            <td>Claude Code</td>
-            <td><a href="https://code.claude.com/docs/en/setup">Claude Code setup</a></td>
-            <td><code>claude auth login</code></td>
-            <td>Your Claude account</td>
-          </tr>
-          <tr>
-            <td>OpenCode</td>
-            <td><a href="https://opencode.ai/docs/">OpenCode docs</a></td>
-            <td><code>opencode auth login</code></td>
-            <td>The provider accounts you signed in to OpenCode</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <p>OpenOrc supports Codex, Claude Code, OpenCode, Oh My Pi, Cursor, Pi, Antigravity, and Vercel Labs fx. Install the command-line agent you want, connect its account or API key, then enable it in Settings → <strong>Connections</strong>. OpenOrc uses that agent's own models, configuration, and session storage.</p>
+    <p>Each name below links to the agent's installation guide. Model charges and account allowances belong to the provider you connect.</p>
+    <AgentSetup />
+    <Callout title="Pi and Oh My Pi">
+      <p>These are separate agents with separate settings and sign-ins. In Pi, run <code>/login</code> after opening <code>pi</code>. OpenOrc loads Pi's permission and MCP extensions; custom Pi extensions, including custom provider extensions, are disabled in OpenOrc sessions. Configured models, skills, and prompt templates remain available.</p>
+    </Callout>
   </section>
 
   <section aria-labelledby="differences">
     <h2 id="differences">How they differ</h2>
+    <p>Every agent supports conversations, streaming responses, tools, attachments, cancellation, saved sessions, and OpenOrc's project tools. The picker and action menus offer the capabilities that the installed agent can use.</p>
     <div class="docs-table">
       <table>
-        <thead>
-          <tr>
-            <th scope="col"></th>
-            <th scope="col">Codex</th>
-            <th scope="col">Claude Code</th>
-            <th scope="col">OpenCode</th>
-          </tr>
-        </thead>
+        <thead><tr><th scope="col">Agent</th><th scope="col">Modes</th><th scope="col">Live steering</th><th scope="col">Forks</th><th scope="col">Cloud</th></tr></thead>
         <tbody>
-          <tr>
-            <td>Messages sent mid-turn</td>
-            <td>Read during the turn</td>
-            <td>Read during the turn</td>
-            <td>Queued until the turn ends</td>
-          </tr>
-          <tr>
-            <td>Modes</td>
-            <td>All four</td>
-            <td>All four, except Plan and Accept edits on Windows</td>
-            <td>Plan and Autonomous only</td>
-          </tr>
-          <tr>
-            <td>Fast mode</td>
-            <td>Models that offer it</td>
-            <td>Models and accounts that allow it</td>
-            <td>Not available</td>
-          </tr>
-          <tr>
-            <td>Usage in Settings</td>
-            <td>Allowances and resets</td>
-            <td>Allowances</td>
-            <td>On each provider's dashboard</td>
-          </tr>
-          <tr>
-            <td>Import terminal sessions</td>
-            <td>Yes</td>
-            <td>Yes</td>
-            <td>No</td>
-          </tr>
-          <tr>
-            <td>Can summarize runs for memory</td>
-            <td>Yes</td>
-            <td>Yes</td>
-            <td>No</td>
-          </tr>
+          {agents.map((agent) => (
+            <tr><th scope="row">{agent.name}</th><td>{agent.modes}</td><td>{agent.steering}</td><td>{agent.forks ? "Yes" : "Unavailable"}</td><td>{agent.cloud ? "Yes" : "Local computer"}</td></tr>
+          ))}
         </tbody>
       </table>
     </div>
-    <p>For Codex, the mode menu calls the last three modes <strong>Review changes</strong>, <strong>Ask for approval</strong>, and <strong>Full access</strong>, after how its sandbox behaves. <a href={docHref("permissions")}>Modes and permissions</a> compares the modes.</p>
+    <p>All agents can be controlled from a paired phone while the connected computer is available. Cloud support means the agent can also run in an OpenOrc cloud workspace. Oh My Pi uses provider API keys in the cloud.</p>
+    <p>Cursor queues messages until its current turn ends. fx accepts text steering; images wait for a new turn. Other messages may wait while an agent is asking a question, awaiting approval, or compacting.</p>
+    <p>Codex, Claude Code, OpenCode, Oh My Pi, and Pi support native manual compaction. With Cursor, Antigravity, and fx, <strong>Compact context</strong> starts a fresh session with a short handover brief. It preserves less context than native compaction.</p>
+    <p>Terminal session import is available for Codex and Claude Code. Those two also support background memory summaries; other agents can use shared memory directly, or you can choose a supported summary provider in Settings.</p>
+    <p><a href={docHref("permissions")}>Modes and permissions</a> explains each agent's policy. Claude Code cannot use Plan or Accept edits on Windows; fx does not expose a read-only Plan mode.</p>
   </section>
 
   <section aria-labelledby="finding">
     <h2 id="finding">How OpenOrc finds them</h2>
-    <p>On macOS and Linux, OpenOrc asks your login shell where each agent is, the way a terminal would, so it finds the same <code>codex</code>, <code>claude</code>, and <code>opencode</code> you use there. Then it runs each agent's own status command to see whether you're signed in. It checks when it starts and again whenever you ask.</p>
+    <p>On macOS and Linux, OpenOrc asks your login shell where each agent is, the way a terminal would, so it finds the same <code>codex</code>, <code>claude</code>, <code>opencode</code>, <code>omp</code>, <code>cursor-agent</code>, <code>pi</code>, <code>agy</code>, and <code>fx</code> you use there. Then it checks the installed version and the agent's sign-in or available models, without asking a model to work. It checks when it starts and again whenever you ask.</p>
     <ol class="docs-steps">
       <li>Install the agent or sign in from a terminal.</li>
       <li>Open Settings → <strong>Connections</strong> and click <strong>Refresh connections</strong>. During setup, click <strong>Rescan</strong> instead.</li>
@@ -108,7 +48,7 @@ import { docHref } from "../../data/docs";
     </ol>
     <p>If Codex or Claude Code signs out while you work, the thread shows <strong>Sign in</strong>, which runs the agent's sign-in command in the thread's terminal.</p>
     <Callout>
-      <p>On Windows, OpenOrc doesn't ask a login shell. It looks for each agent on your <code>PATH</code>, including the <code>.cmd</code> launchers npm installs. To use a different copy, set <code>OPENORC_CODEX_BIN</code>, <code>OPENORC_CLAUDE_BIN</code>, or <code>OPENORC_OPENCODE_BIN</code> to its full path before you start OpenOrc.</p>
+      <p>On Windows, OpenOrc doesn't ask a login shell. It looks for each agent on your <code>PATH</code>, including the <code>.cmd</code> launchers npm installs. To use a different copy, set <code>OPENORC_&lt;AGENT&gt;_BIN</code> to its full path, such as <code>OPENORC_PI_BIN</code>, <code>OPENORC_CURSOR_BIN</code>, or <code>OPENORC_ANTIGRAVITY_BIN</code> before you start OpenOrc.</p>
     </Callout>
   </section>
 
@@ -116,19 +56,19 @@ import { docHref } from "../../data/docs";
     <h2 id="choose">Choose the agent and model</h2>
     <p>Every thread has its own agent and model. To change them, click the model name in the composer's bottom row.</p>
     <ul>
-      <li>The rail on the left switches between Codex, Claude Code, and OpenCode. An agent that isn't installed or signed in is marked, and its models stay unavailable until you fix that.</li>
+      <li>The rail on the left switches between your enabled agents. On iPhone, use the icon tabs; the selected agent's name appears above them. An agent that isn't installed or signed in is marked, and its models stay unavailable until you fix that.</li>
       <li><strong>Search models</strong> filters the list. Older models wait under <strong>Legacy models</strong>.</li>
       <li>A model the installed CLI can't run stays in the list with the reason, such as a model that needs a newer Claude Code.</li>
       <li>OpenOrc asks each agent for its models and keeps the list for 5 minutes. <strong>Refresh models</strong> asks again.</li>
     </ul>
-    <p>New threads start with the agent you picked during setup, or the first agent that's signed in. The New thread page then remembers your last choice for each project.</p>
+    <p>Only agents enabled in Connections appear in the model picker and can start work. Turn one off to hide it, or open <strong>Add agents</strong> to enable it again. New threads start with the agent you picked during setup, or the first agent that's signed in. The New thread page then remembers your last choice for each project.</p>
   </section>
 
   <section aria-labelledby="effort">
     <h2 id="effort">Effort and Fast mode</h2>
     <p>Under the model list, <strong>Reasoning effort</strong> sets how much the model reasons before it acts. Each model offers its own levels, such as <strong>Low</strong>, <strong>Medium</strong>, <strong>High</strong>, and <strong>Extra high</strong>. Higher effort usually takes longer and uses more of your allowance. Choosing another model resets effort to that model's default, and <strong>Reset to model default</strong> does the same for the current one.</p>
     <p>With Claude Code 2.1.278 or newer, models that offer <strong>Extra high</strong> also offer <strong>Ultracode</strong>. It runs at Extra high and tells the model to orchestrate dynamic workflows by default.</p>
-    <p>The lightning button in the picker's rail requests Fast mode, which trades a higher cost for faster output. A lightning mark beside the model name shows it's on. If Fast mode can't run, the picker says why, such as <strong>This Claude plan does not include Fast mode.</strong></p>
+    <p>The lightning button in the picker's rail requests Fast mode, which trades a higher cost for faster output. It appears only for models and accounts that can run Fast. A lightning mark beside the model name shows it's on. If Fast mode is on but can no longer run, the picker says why, such as <strong>This Claude plan does not include Fast mode.</strong></p>
     <div class="docs-table">
       <table>
         <thead>
@@ -147,8 +87,8 @@ import { docHref } from "../../data/docs";
             <td>On models and accounts that allow it. Costs more and bills to paid usage credits. Off when <code>CLAUDE_CODE_DISABLE_FAST_MODE=1</code> is set, or when Claude Code runs through Amazon Bedrock, Google Vertex AI, or Microsoft Foundry.</td>
           </tr>
           <tr>
-            <td>OpenCode</td>
-            <td>Not available.</td>
+            <td>OpenCode, Oh My Pi, Cursor, Pi, Antigravity, fx</td>
+            <td>No separate OpenOrc Fast toggle. Cursor exposes variants as model choices. fx owns its native Fast setting; OpenOrc disables Ultra.</td>
           </tr>
         </tbody>
       </table>
@@ -177,7 +117,7 @@ import { docHref } from "../../data/docs";
       <li>Type a name, such as <strong>Work</strong>, and click <strong>Add account and sign in</strong>.</li>
       <li>Sign in to that Claude account in the browser window that opens. On macOS and Linux, when Chrome is installed, the sign-in opens in a Chrome Incognito window, so your browser's own Claude login stays as it is.</li>
     </ol>
-    <p>Each account's card has <strong>Make default</strong>, <strong>Sign in again</strong>, and <strong>Disable</strong>. The default account is the one new threads start with. Changing it doesn't move existing threads.</p>
+    <p>Each account's row has <strong>Make default</strong>, <strong>Sign in again</strong>, and <strong>Disable</strong>. The default account is the one new threads start with. Changing it doesn't move existing threads.</p>
     <ul>
       <li>To start a thread on another account, pick it at the end of the line under the New thread composer. The choice appears for Claude models.</li>
       <li>To move a thread to another account, click the account's name in the thread's header and choose one. The switch waits until the current turn ends. Your next message continues the same conversation on the new account.</li>
@@ -188,13 +128,15 @@ import { docHref } from "../../data/docs";
 
   <section aria-labelledby="usage">
     <h2 id="usage">Usage and allowances</h2>
-    <p>The sidebar's footer shows how much of this week's allowance is left on the account your next message would use: the open thread's account, or the one the New thread page has chosen. Click it for a table of every account's 5-hour and weekly limits. Settings → <strong>Usage</strong> shows each account's limits in full, as the agents report them through their own CLIs.</p>
+    <p>The usage ring at the foot of the sidebar's rail shows how much of this week's allowance is left on the account your next message would use: the open thread's account, or the one the New thread page has chosen. Click it for a table of every account's 5-hour and weekly limits. Settings → <strong>Usage</strong> shows each account's limits in full, as the agents report them through their own CLIs.</p>
     <ul>
       <li>For Codex and Claude Code, each allowance window, such as <strong>5-hour window</strong> or <strong>7-day window</strong>, shows how much is used or remaining and when it resets. <strong>Open usage</strong> opens the account's own page.</li>
       <li>Codex also shows any usage resets you have. When Codex allows it, <strong>Use reset</strong> spends one after you confirm.</li>
-      <li>OpenCode bills each model through the provider account you signed in to it, so its allowances are on that provider's dashboard.</li>
+      <li>Antigravity shows the model quota pools and reset times reported by its Google sign-in. API-key usage belongs to the Google AI Studio account instead.</li>
+      <li>fx shows AI Gateway balances and budgets, plus Codex or Grok plan allowances and reported resets. The sidebar follows the thread's selected connection; Settings uses fx's saved connection. Custom connections use their provider's dashboard.</li>
+      <li>Cursor allowances are on the Cursor dashboard. OpenCode, Oh My Pi, and Pi bill their configured providers; use those dashboards or the agent's native usage commands.</li>
     </ul>
-    <p>The limits include activity outside OpenOrc. When a thread hits one, its error links to <strong>Manage usage</strong>.</p>
+    <p>Settings also has <strong>Cost</strong> and <strong>Tokens</strong> views for OpenOrc's recorded history, where the agent reports those numbers. Missing usage or unknown prices stay unavailable. The limits include activity outside OpenOrc. When a thread hits one, its error links to <strong>Manage usage</strong>.</p>
   </section>
 
   <section aria-labelledby="updates">
@@ -204,8 +146,8 @@ import { docHref } from "../../data/docs";
       <li>Click <strong>Check for updates</strong>.</li>
       <li>Click <strong>Update all</strong>, or the update button on one agent's row.</li>
     </ol>
-    <p>OpenOrc can update an agent installed with npm, with a Homebrew cask, or with the agent's own installer. For any other installation, and on Windows, it links to instructions instead. An agent that's installed but fails to start offers <strong>Reinstall</strong>. Updates start only when agent work has finished, and idle sessions reconnect on your next message.</p>
-    <p><strong>Check for agent updates automatically</strong> looks every six hours while OpenOrc is open, using public version information from npm or Homebrew. When it finds one, a notice offers <strong>Review updates</strong>.</p>
+    <p>OpenOrc can update an agent installed with npm, with a Homebrew cask, or with the agent's own installer. For any other installation, and on Windows, it links to instructions instead. An agent that's installed but fails to start offers <strong>Reinstall</strong>. Agents keep working during an update, and each conversation moves to the new version on its next message.</p>
+    <p><strong>Check for agent updates automatically</strong> looks every six hours while OpenOrc is open, using public version information from npm, Homebrew, or the agent's official release service. When it finds one, a notice offers <strong>Review updates</strong>.</p>
   </section>
 
   <section aria-labelledby="next-steps">

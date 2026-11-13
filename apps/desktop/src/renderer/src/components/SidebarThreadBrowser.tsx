@@ -3,7 +3,7 @@ import { Menu } from "@base-ui/react/menu";
 import { useQueryClient } from "@tanstack/react-query";
 import { isSubagentThread, WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 import { CoversPreview } from "../lib/browser-preview";
-import { useLayout } from "../lib/layout";
+import { ALL_WORKSPACES, focusedProject, useLayout } from "../lib/layout";
 import {
   type SidebarDayList,
   type SidebarFilter,
@@ -26,7 +26,7 @@ import {
   useChildThreadPages,
   useSidebarNow,
 } from "@openorc/client";
-import { useOrclings } from "../lib/orclings";
+import { useOrclingChatIds } from "../lib/orclings";
 import { useRpc, useRpcs } from "../lib/client";
 import { useRouter } from "../lib/router";
 import { useUi } from "../lib/ui";
@@ -43,21 +43,26 @@ function emptyMessage(pinned: boolean): string {
   return pinned ? "No pinned threads." : "No threads yet.";
 }
 
-function useSidebarProjects() {
+/** Every project's id, the Workspace's too, and the ones the list shows: all of them, or the rail's choice. */
+export function useSidebarProjects() {
   const projects = useRpc("projects.list", {});
+  const workspace = useLayout((s) => s.workspace);
   useEffect(() => {
     if (!projects.data) return;
-    const { projectId, setProject } = useLayout.getState();
-    if (projectId && projectId !== WORKSPACE_ID && !projects.data.some((p) => p.id === projectId)) setProject(WORKSPACE_ID);
+    const { workspace: chosen, setWorkspace } = useLayout.getState();
+    // A removed project's threads are gone from the list; the filter goes back to All projects.
+    if (chosen !== ALL_WORKSPACES && !projects.data.some((p) => p.id === chosen)) setWorkspace(ALL_WORKSPACES);
   }, [projects.data]);
-  return { query: projects, ids: [WORKSPACE_ID, ...(projects.data ?? []).map((project) => project.id)].sort() };
+  const all = [WORKSPACE_ID, ...(projects.data ?? []).map((project) => project.id)].sort();
+  return { query: projects, all, ids: workspace === ALL_WORKSPACES ? all : [workspace] };
 }
 
 /** Loading an off-page selection must not replace the list's stable page query. */
 type ChildPages = ReturnType<typeof useChildThreadPages>;
 
 function useSelectedFamily(selected: ThreadSummary | null | undefined, filter: SidebarFilter, pages: readonly (readonly ThreadSummary[] | undefined)[], children: ChildPages) {
-  return useRpc(
+  const offPage = Boolean(selected && !pages.some((page) => page?.some((thread) => thread.id === selected.id)));
+  const family = useRpc(
     "threads.list",
     {
       projectId: selected?.projectId,
@@ -67,10 +72,10 @@ function useSelectedFamily(selected: ThreadSummary | null | undefined, filter: S
       selectedId: selected?.id,
       ...children.params(selected?.projectId),
     },
-    {
-      enabled: Boolean(selected && !pages.some((page) => page?.some((thread) => thread.id === selected.id))),
-    },
+    { enabled: offPage },
   ).data;
+  // Once the pages hold the selection this read stops refreshing but keeps its last answer, which would cover their newer rows.
+  return offPage ? family : undefined;
 }
 
 function withFamily(page: ThreadSummary[] | undefined, family: ThreadSummary[] | undefined, projectIds: readonly string[]): ThreadSummary[] | undefined {
@@ -95,7 +100,7 @@ export function SidebarThreadBrowser() {
 }
 
 /**
- * One list across every project, newest work first, read a page at a time. Pinned threads come from their own
+ * One list across every project, or the one the rail chose, newest work first, read a page at a time. Pinned threads come from their own
  * read so an old pin still leads the list, and so do the threads that need you, so a folded day can still show them.
  */
 function useThreadList(children: ChildPages) {
@@ -105,7 +110,7 @@ function useThreadList(children: ChildPages) {
   const [limit, setLimit] = useState(THREAD_PAGE);
   const [resolvedLimit, setResolvedLimit] = useState(THREAD_PAGE);
   const { query: projects, ids: projectIds } = useSidebarProjects();
-  const homes = new Set(useOrclings().map((orcling) => orcling.threadId));
+  const homes = useOrclingChatIds();
   const activeId = useRouter((s) => (s.route.view === "thread" ? s.route.threadId : null));
   const active = useRpc("threads.get", { id: activeId ?? "" }, { enabled: Boolean(activeId) });
   const listed = { projectIds, filter: "active" as const, orderBy: "activity" as const, includeChildren: true, ...children.params() };
@@ -305,7 +310,7 @@ function Section({ label, count, open, onToggle, children }: { label: string; co
 export function ThreadFilter() {
   const pinned = useLayout((s) => s.pinnedOnly);
   const setPinnedOnly = useLayout((s) => s.setPinnedOnly);
-  const projectId = useLayout((s) => s.projectId);
+  const projectId = useLayout(focusedProject);
   return (
     <Menu.Root>
       <Menu.Trigger render={<IconButton aria-label={`Filter threads${pinned ? ": Pinned threads" : ""}`} size="lg" className={cn("no-drag", pinned && "text-accent-ink")} />}>

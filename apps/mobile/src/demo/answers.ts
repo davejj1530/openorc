@@ -89,6 +89,36 @@ const answers: Answers = {
   "inbox.list": (core) => ({ items: inbox(core) }),
   "agents.models": (_core, { agent }) => demoModels.filter((model) => !agent || model.agent === agent),
   "agents.availability": () => demoAvailability,
+  // The demo Mac has no Orclings: its Orclings tab says where to make one.
+  // The demo Mac has no saved tasks.
+  "tasks.get": () => null,
+  "tasks.create": () => {
+    throw new Error("The demo Mac saves no tasks.");
+  },
+  "tasks.update": () => {
+    throw new Error("The demo Mac has no saved tasks.");
+  },
+  "orclings.chats": () => [],
+  "orclings.profile": () => {
+    throw new Error("The demo Mac has no Orclings.");
+  },
+  "orclings.wakes.save": () => {
+    throw new Error("The demo Mac has no Orclings.");
+  },
+  "orclings.create": () => {
+    throw new Error("The demo Mac makes no Orclings.");
+  },
+  "orclings.update": () => {
+    throw new Error("The demo Mac has no Orclings.");
+  },
+  "orclings.delete": () => {
+    throw new Error("The demo Mac has no Orclings.");
+  },
+  "orclings.instructions.save": () => {
+    throw new Error("The demo Mac has no Orclings.");
+  },
+  "orclings.reactions": () => [],
+  "orclings.react": () => null,
   // What the picker offers on the demo Mac: the project's own skill first, then one built into the agent.
   "skills.list": () => [
     { name: "release-notes", description: "Write release notes from the commits since the last tag.", source: "project", path: "" },

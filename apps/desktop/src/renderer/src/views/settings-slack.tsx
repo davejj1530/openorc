@@ -1,21 +1,13 @@
-import {
-  ExecutionMode,
-  executionMode,
-  executionModeAvailable,
-  executionModeNote,
-  executionModePresentation,
-  executionModeSettings,
-  harnessCatalog,
-  harnessIds,
-  type SlackClientConfig,
-} from "@openorc/protocol";
+import { ExecutionMode, executionMode, executionModeAvailable, executionModeNote, executionModePresentation, executionModeSettings, type SlackClientConfig } from "@openorc/protocol";
 import { useState } from "react";
 import { Button, Input, Select } from "../components/ui";
 import { useRpc } from "../lib/client";
+import { EnabledAgentOptions } from "../components/EnabledAgentOptions";
 import { relayClientStatus, relayHostStatus } from "./settings-presentation";
 import { Field, LoadError, Section, Status } from "./settings-shared";
 import { DirectSlackSettings } from "./settings-slack-direct";
 import { useSlackRelaySettings } from "./settings-slack-relay";
+import { computer } from "../lib/this-computer";
 
 export function SlackSettings({ active }: { active: boolean }) {
   const status = useRpc("slack.status", {}, { enabled: active, refetchInterval: active ? 2000 : false });
@@ -73,7 +65,7 @@ function RelaySlackSettings({ active }: { active: boolean }) {
         </Field>
         <Field label="Workspace entrypoint" hint="Slack conversations live in Workspace. Requests can select imported projects or folders beneath this entrypoint; follow-ups remember their folder.">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-sm text-ink-2 truncate flex-1" title={home.data?.rootPath}>
+            <span className="text-sm text-ink-2 truncate flex-1" data-tip={home.data?.rootPath}>
               {home.data?.rootPath ?? "Loading folder…"}
             </span>
             <Button size="sm" disabled={disabled || configure.isPending || client?.busy} onClick={() => void actions.chooseEntrypoint()}>
@@ -88,11 +80,7 @@ function RelaySlackSettings({ active }: { active: boolean }) {
         </Field>
         <Field label="Default coding agent">
           <Select value={config.agent} disabled={disabled || client?.enabled || client?.busy} onChange={(e) => updateConfig({ agent: e.target.value as SlackClientConfig["agent"] })}>
-            {harnessIds.map((id) => (
-              <option key={id} value={id}>
-                {harnessCatalog[id].name}
-              </option>
-            ))}
+            <EnabledAgentOptions />
           </Select>
         </Field>
         <Field label="Default model" hint="Say “using Astra” or another available model in Slack to change it for that thread. Leave blank for the agent's default.">
@@ -181,7 +169,7 @@ function RelaySlackSettings({ active }: { active: boolean }) {
             <Input value={userId} placeholder="U0123456789" onChange={(e) => setUserId(e.target.value)} disabled={disabled} />
           </Field>
           <Field label="Device label">
-            <Input value={deviceLabel} placeholder="Alice's Mac" onChange={(e) => setDeviceLabel(e.target.value)} disabled={disabled} />
+            <Input value={deviceLabel} placeholder={`Alice's ${computer}`} onChange={(e) => setDeviceLabel(e.target.value)} disabled={disabled} />
           </Field>
           <div className="flex justify-end mt-3">
             <Button disabled={disabled || !host?.connected || !userId.trim() || !deviceLabel.trim()} onClick={() => void actions.registerDevice()}>

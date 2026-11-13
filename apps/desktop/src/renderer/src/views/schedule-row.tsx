@@ -1,10 +1,11 @@
 import { relativeTime, untilTime } from "@openorc/client";
-import { harnessName, type Schedule } from "@openorc/protocol";
+import { harnessName, type ModelOption, type Schedule } from "@openorc/protocol";
 import { useEffect, useRef, useState } from "react";
 import { ArrowUpRight, CalendarClock, RefreshCw, Trash2, Zap } from "../components/icons";
 import { IconButton, Switch, Tooltip } from "../components/ui";
-import { useRpcMutation } from "../lib/client";
+import { useRpc, useRpcMutation } from "../lib/client";
 import { cn } from "../lib/cn";
+import { modelLabel } from "../lib/model-effort-label";
 import { openThread, useRouter } from "../lib/router";
 import { beginScheduleTrigger, finishScheduleTrigger, readScheduleTrigger } from "../lib/schedule-draft";
 import "./schedules.css";
@@ -18,10 +19,12 @@ export const intervals: { label: string; minutes: number }[] = [
 ];
 export const intervalLabel = (m: number) => intervals.find((i) => i.minutes === m)?.label ?? `Every ${m} minutes`;
 
-function scheduleTargetLabel(schedule: Schedule): string {
+/** The model a schedule runs, by the name the model picker gives it. */
+function scheduleTargetLabel(schedule: Schedule, models: readonly ModelOption[] | undefined): string {
   const target = schedule.executionTarget;
-  if (target?.kind === "model") return target.settings.model;
-  return schedule.model ?? `${harnessName(schedule.agent)} default model`;
+  if (target?.kind === "model") return modelLabel(target.settings, models);
+  if (!schedule.model) return `${harnessName(schedule.agent)} default model`;
+  return models?.find((model) => model.agent === schedule.agent && model.id === schedule.model)?.label ?? schedule.model;
 }
 
 function scheduleFireLabel(fire: Schedule["lastFire"]): string | null {
@@ -90,7 +93,8 @@ function useRunNow(id: string) {
  * one line for the other.
  */
 function ScheduleWhen({ schedule: s, projectName }: { schedule: Schedule; projectName?: string | undefined }) {
-  const details = [scheduleTargetLabel(s), projectName, s.lastRunAt ? `last ${relativeTime(s.lastRunAt)}` : "never run"];
+  const models = useRpc("agents.models", {}, { staleTime: 5 * 60_000 }).data;
+  const details = [scheduleTargetLabel(s, models), projectName, s.lastRunAt ? `last ${relativeTime(s.lastRunAt)}` : "never run"];
   return (
     <span className="schedule-when">
       <span className="motion-swap shrink-0">

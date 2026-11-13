@@ -49,7 +49,7 @@ function session(
   const link = new FakeLink();
   const remote = new RemoteSession("device", link as unknown as MacSession, {
     answer,
-    guard: { attachmentsDir: "/data/attachments", thread: (id) => (id === "gone" ? null : { team: false }) },
+    guard: { attachmentsDir: "/data/attachments", thread: (id) => (id === "gone" ? null : { team: false }), task: () => null, orcling: () => null },
     roots: () => ({ home: "/Users/me", dataDir: "/Users/me/.openorc", projects: [] }),
     readAsset,
     device,

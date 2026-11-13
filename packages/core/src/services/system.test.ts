@@ -11,7 +11,7 @@ function snapshot(revision = 3): EnvSnapshot {
     revision,
     shell: "/bin/zsh",
     path: env.PATH,
-    binaries: { codex: null, claude: env.OPENORC_CLAUDE_BIN, opencode: null },
+    binaries: { codex: null, claude: env.OPENORC_CLAUDE_BIN, opencode: null, omp: null, cursor: null, pi: null, antigravity: null, fx: null },
     env: Object.freeze(env),
   };
 }

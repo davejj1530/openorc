@@ -1,7 +1,7 @@
 import type { PanelContext } from "../components/Panel";
 import { MemoryCard } from "../components/MemoryCard";
 import { MemoryStatusBar } from "../components/MemoryStatusBar";
-import { Empty } from "../components/ui";
+import { Button, Empty } from "../components/ui";
 import { useRpc } from "../lib/client";
 import { relativeTime } from "@openorc/client";
 
@@ -19,6 +19,13 @@ function TaskMemory({ taskId }: { taskId: string }) {
   const data = useRpc("memory.forTask", { taskId });
   const memories = data.data?.memories ?? [];
   const summaries = data.data?.summaries ?? [];
+  if (data.isError) return <MemoryError retry={() => void data.refetch()} />;
+  if (data.isLoading)
+    return (
+      <div role="status" className="py-4 text-sm text-ink-3">
+        Loading saved history…
+      </div>
+    );
   if (!data.isLoading && memories.length === 0 && summaries.length === 0) {
     return <Empty title="No saved history yet">Run summaries and memories associated with this task appear here.</Empty>;
   }
@@ -56,6 +63,13 @@ function TaskMemory({ taskId }: { taskId: string }) {
 function ProjectMemory({ projectId }: { projectId: string }) {
   const list = useRpc("memory.list", { projectId, limit: 40 });
   const items = list.data ?? [];
+  if (list.isError) return <MemoryError retry={() => void list.refetch()} />;
+  if (list.isLoading)
+    return (
+      <div role="status" className="py-4 text-sm text-ink-3">
+        Loading memories…
+      </div>
+    );
   if (!list.isLoading && items.length === 0) {
     return <Empty title="No saved memories yet">Useful knowledge saved for this project appears here.</Empty>;
   }
@@ -65,5 +79,13 @@ function ProjectMemory({ projectId }: { projectId: string }) {
         <MemoryCard key={m.id} memory={m} />
       ))}
     </div>
+  );
+}
+
+function MemoryError({ retry }: { retry: () => void }) {
+  return (
+    <Empty title="Could not load memories">
+      <Button onClick={retry}>Try again</Button>
+    </Empty>
   );
 }

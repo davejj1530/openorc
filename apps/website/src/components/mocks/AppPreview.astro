@@ -1,60 +1,228 @@
 ---
 /**
- * The app at rest, still: the sidebar, a finished Codex thread, and the Changes panel open beside it on its own
- * plane, from the window's top line to its foot. Laid out at a 1248 × 780 window and scaled as one picture.
+ * The app, live: three threads open in tabs on the window's top line, each with its own panel pages. Codex has
+ * finished the welcome flow in studio, Claude is still working on the command menu, and the website's story has a
+ * result nobody has read yet. Picking a thread's tab or a panel's tab swaps it in place (scripts/app-preview.ts).
+ * Laid out at a 1456 × 910 window and scaled as one picture.
  */
 import "../../styles/hero-scene.css";
+import BrowserPage from "../hero/BrowserPage.astro";
+import ChangeLine from "../hero/ChangeLine.astro";
 import ChangesDiff from "../hero/ChangesDiff.astro";
+import FileChips from "../hero/FileChips.astro";
+import FilesPage, { type Entry } from "../hero/FilesPage.astro";
 import PanelHeader from "../hero/PanelHeader.astro";
 import ProductIcon from "../hero/ProductIcon.astro";
 import Prose from "../hero/Prose.astro";
+import Receipt from "../hero/Receipt.astro";
 import SceneSidebar from "../hero/SceneSidebar.astro";
-import ThreadPane from "../hero/ThreadPane.astro";
+import Step from "../hero/Step.astro";
+import TerminalPage from "../hero/TerminalPage.astro";
+import ThreadBody from "../hero/ThreadBody.astro";
+import ThreadHeader from "../hero/ThreadHeader.astro";
 import TurnHead from "../hero/TurnHead.astro";
+import type { Tab } from "../hero/WorkTab.astro";
+import { commandMenuDiff, storyDiff, welcomeDiff } from "../../data/hero/diffs";
 import { branches, models, type SidebarRow } from "../../data/hero/workspace";
 
-const title = "Make the first five minutes count";
+type Thread = "search" | "story" | "welcome";
+const open: Thread = "welcome";
+const codex = { harness: "codex", label: models.codex.label, effort: models.codex.effort };
+const claude = { harness: "claude", label: models.claude.label, effort: models.claude.effort };
+
 const rows: SidebarRow[] = [
-  { title: "A faster command menu", busy: true, headline: "Run the desktop tests" },
-  { title, current: true },
-  { title: "Tell the product story", project: "website" },
-  { title: "Simplify the design tokens", branch: branches.tokens, day: "today", done: "1 file changed · tests passed" },
+  { id: "search", title: "A faster command menu", busy: true, headline: "Running the command menu tests" },
+  { id: "welcome", title: "Make the first five minutes count", current: true },
+  { id: "story", title: "Tell the product story", project: "website", done: "1 file changed" },
+  { title: "Simplify the design tokens", branch: branches.tokens, day: "today" },
+];
+const threadTab = (thread: Thread, label: string, extra: Partial<Tab> = {}): Tab => ({
+  label,
+  id: `hero-tab-${thread}`,
+  controls: `hero-thread-${thread} hero-panel-${thread}`,
+  value: thread,
+  current: thread === open,
+  ...extra,
+});
+const tabs = [
+  threadTab("search", "A faster command menu", { harness: "claude", busy: true, description: "A faster command menu, working" }),
+  threadTab("story", "Tell the product story", { harness: "claude", unread: true, description: "Tell the product story, unread" }),
+  threadTab("welcome", "Make the first five minutes count", { harness: "codex" }),
+];
+/** A panel page's tab and the page it shows, by thread. */
+const pageTab = (thread: Thread, page: string, tab: Omit<Tab, "id" | "controls" | "value"> & { icon: NonNullable<Tab["icon"]> }) => ({
+  ...tab,
+  id: `hero-page-${thread}-${page}`,
+  controls: `hero-panel-${thread}-${page}`,
+  value: page,
+});
+const page = (thread: Thread, name: string, label: string, current = false) => ({
+  id: `hero-panel-${thread}-${name}`,
+  role: "tabpanel" as const,
+  "aria-label": label,
+  hidden: !current,
+});
+
+const welcomeFiles: Entry[] = [
+  {
+    name: "src",
+    open: true,
+    entries: [{ name: "command-menu", entries: [] }, { name: "ui", entries: [] }, { name: "main.tsx" }, { name: "ProjectPicker.tsx" }, { name: "Welcome.tsx", selected: true }],
+  },
+  { name: "package.json" },
+  { name: "README.md" },
 ];
 const points = [
   ["A real welcome.", "A short introduction gives people a place to start."],
   ["One clear next step.", "Connect a project, then open a conversation."],
   ["Keyboard support throughout.", "Move between choices without leaving the keyboard."],
 ];
+const searchChange = { added: 14, removed: 3 };
 ---
 
-<div class="hs-mock hs-mock-app">
+<div class="hs-mock hs-mock-app" data-app-preview>
   <span class="hs-lights" aria-hidden="true"><i></i><i></i><i></i></span>
-  <SceneSidebar rows={rows} />
-  <ThreadPane
-    id="welcome"
-    title={title}
-    model={{ harness: "codex", label: models.codex.label, effort: models.codex.effort }}
-    permission={models.codex.permission}
-    placeholder="Message Codex…"
-    changes
-    panel
-  >
-    <div class="hs-turn">
-      <div class="hs-user"><div class="hs-bubble">Let’s make onboarding feel more thoughtful. Help people connect their first project, then give them a clear next step.</div></div>
-      <TurnHead harness="codex" agent="Codex" model={models.codex.label} />
-      <div class="hs-reply">
-        <Prose text="The welcome flow is ready to review. It uses the existing components and keeps the first run focused on one decision at a time." />
-        <p class="hs-prose-heading">A calmer first five minutes</p>
-        <ul class="hs-prose-list">
-          {points.map(([lead, text]) => <li><Prose text={`**${lead}** ${text}`} /></li>)}
-        </ul>
-        <Prose text="The changes are in `src/Welcome.tsx`. You can review them alongside this conversation." />
+  <SceneSidebar
+    rows={rows}
+    usage={[
+      { left: 64, for: "welcome" },
+      { left: 28, for: "search story", hidden: true },
+    ]}
+  />
+  <section class="hs-pane hs-app-thread">
+    <ThreadHeader tabs={tabs} tablist="Open threads" panel />
+    <div class="hs-pages">
+      <div class="hs-page" id="hero-thread-search" role="tabpanel" aria-labelledby="hero-tab-search" data-for="search" data-busy hidden>
+        <ThreadBody model={claude} permission={models.claude.permission} placeholder="Message Claude…" changes changeStat={searchChange} context={41}>
+          <div class="hs-turn">
+            <div class="hs-user"><div class="hs-bubble">The command menu lags on big projects. Make results show up as you type.</div></div>
+            <TurnHead harness="claude" agent="Claude" model={claude.label} working={72} />
+            <Receipt thought="Thought 6s" steps="3 steps" />
+            <ol class="hs-steps">
+              <Step title="Reading the command menu" meta={{ text: "6 files" }} />
+              <Step title="Ranking matches as you type" meta={{ text: "2 files" }} />
+              <Step title="Running the command menu tests" live open>
+                <div class="hs-group">
+                  <span class="hs-group-label">Running</span>
+                  <div class="hs-chips"><span class="hs-chip" data-live><ProductIcon name="terminal" class="hs-file-glyph" /><span class="hs-chip-label">pnpm test command-menu</span></span></div>
+                </div>
+              </Step>
+            </ol>
+          </div>
+        </ThreadBody>
       </div>
-      <div class="hs-turn-actions"><ProductIcon name="copy" /></div>
+      <div class="hs-page" id="hero-thread-story" role="tabpanel" aria-labelledby="hero-tab-story" data-for="story" hidden>
+        <ThreadBody model={claude} permission={models.claude.permission} placeholder="Message Claude…" changes changeStat={{ added: storyDiff.added, removed: storyDiff.removed }} context={12}>
+          <div class="hs-turn">
+            <div class="hs-user"><div class="hs-bubble">Rewrite the homepage hero so it says what studio does in one line.</div></div>
+            <TurnHead harness="claude" agent="Claude" model={claude.label} took="52s" />
+            <Receipt thought="Thought 4s" changes={`+${storyDiff.added} −${storyDiff.removed} in 1 file`} />
+            <div class="hs-reply"><Prose text="The hero now says what studio does in one sentence: **Studio turns a folder into a working app.** The line under it gives the next step, and the download link stays where it was." /></div>
+            <ChangeLine files={1} added={storyDiff.added} removed={storyDiff.removed} undo />
+            <div class="hs-turn-actions"><ProductIcon name="copy" /></div>
+          </div>
+        </ThreadBody>
+      </div>
+      <div class="hs-page" id="hero-thread-welcome" role="tabpanel" aria-labelledby="hero-tab-welcome" data-for="welcome">
+        <ThreadBody model={codex} permission={models.codex.permission} placeholder="Message Codex…" changes>
+          <div class="hs-turn">
+            <div class="hs-user"><div class="hs-bubble">Let’s make onboarding feel more thoughtful. Help people connect their first project, then give them a clear next step.</div></div>
+            <TurnHead harness="codex" agent="Codex" model={codex.label} took="1m 36s" />
+            <Receipt thought="Thought 7s" changes={`+${welcomeDiff.added} −${welcomeDiff.removed} in 1 file`} check="tests passed" />
+            <ol class="hs-steps">
+              <Step title="Reading the onboarding flow" meta={{ text: "4 files" }} />
+              <Step title="Writing the welcome screen" open>
+                <FileChips label="Edited" files={[welcomeDiff]} />
+              </Step>
+              <Step title="Running the onboarding tests" meta={{ text: "12 passed" }} />
+            </ol>
+            <div class="hs-reply">
+              <Prose text="The welcome flow is ready to review. It uses the existing components and keeps the first run focused on one decision at a time." />
+              <p class="hs-prose-heading">A calmer first five minutes</p>
+              <ul class="hs-prose-list">
+                {points.map(([lead, text]) => <li><Prose text={`**${lead}** ${text}`} /></li>)}
+              </ul>
+              <Prose text="The changes are in `src/Welcome.tsx`. You can review them alongside this conversation." />
+            </div>
+            <div class="hs-turn-actions"><ProductIcon name="copy" /></div>
+          </div>
+        </ThreadBody>
+      </div>
     </div>
-  </ThreadPane>
+  </section>
   <aside class="hs-app-panel">
-    <PanelHeader tabs={[{ label: "Changes", selected: true }]} />
-    <ChangesDiff />
+    <div class="hs-panel-session" id="hero-panel-search" data-for="search" hidden>
+      <PanelHeader
+        tablist="Panel pages"
+        tabs={[pageTab("search", "terminal", { label: "Terminal", icon: "terminal", current: true }), pageTab("search", "changes", { label: "Changes", icon: "fileDiff" })]}
+      />
+      <div class="hs-pages">
+        <div class="hs-page" {...page("search", "terminal", "The studio dev server in the terminal, reloading the command menu as Claude edits it.", true)}>
+          <div class="hs-page-body" aria-hidden="true">
+            <TerminalPage
+              folder="/Projects/studio"
+              lines={[
+                "studio % pnpm dev",
+                "",
+                ["  VITE v7.1.4  ", "ready in 412 ms"],
+                "",
+                ["  ➜  Local:   ", "http://localhost:5173/"],
+                "",
+                ["10:42:18 ", "[vite] hmr update /src/command-menu/rank.ts"],
+                ["10:42:31 ", "[vite] hmr update /src/command-menu/CommandMenu.tsx"],
+              ]}
+            />
+          </div>
+        </div>
+        <div class="hs-page" {...page("search", "changes", `Uncommitted changes in studio: rank.ts and CommandMenu.tsx, ${searchChange.added} lines added and ${searchChange.removed} removed.`)}>
+          <div class="hs-page-body" aria-hidden="true"><ChangesDiff files={commandMenuDiff} /></div>
+        </div>
+      </div>
+    </div>
+    <div class="hs-panel-session" id="hero-panel-story" data-for="story" hidden>
+      <PanelHeader tablist="Panel pages" tabs={[pageTab("story", "changes", { label: "Changes", icon: "fileDiff", current: true })]} />
+      <div class="hs-pages">
+        <div class="hs-page" {...page("story", "changes", `Uncommitted changes in website: index.astro, ${storyDiff.added} lines added and ${storyDiff.removed} removed.`, true)}>
+          <div class="hs-page-body" aria-hidden="true"><ChangesDiff files={[storyDiff]} /></div>
+        </div>
+      </div>
+    </div>
+    <div class="hs-panel-session" id="hero-panel-welcome" data-for="welcome">
+      <PanelHeader
+        tablist="Panel pages"
+        tabs={[
+          pageTab("welcome", "changes", { label: "Changes", icon: "fileDiff", current: true }),
+          pageTab("welcome", "files", { label: "Files", icon: "folder" }),
+          pageTab("welcome", "browser", { label: "localhost:5173", icon: "globe" }),
+        ]}
+      />
+      <div class="hs-pages">
+        <div class="hs-page" {...page("welcome", "changes", `Uncommitted changes in studio: Welcome.tsx, ${welcomeDiff.added} lines added and ${welcomeDiff.removed} removed.`, true)}>
+          <div class="hs-page-body" aria-hidden="true"><ChangesDiff /></div>
+        </div>
+        <div class="hs-page" {...page("welcome", "files", "The studio project's files, with src open and Welcome.tsx selected.")}>
+          <div class="hs-page-body" aria-hidden="true"><FilesPage root="studio" entries={welcomeFiles} /></div>
+        </div>
+        <div class="hs-page" {...page("welcome", "browser", "The new welcome screen at localhost:5173: Make yourself at home, a project picker, and Start a conversation.")}>
+          <div class="hs-page-body" aria-hidden="true">
+            <BrowserPage url="http://localhost:5173/">
+              <div class="hs-site">
+                <span class="hs-site-title">Make yourself at home.</span>
+                <span class="hs-site-text">Connect a project to start building.</span>
+                <span class="hs-site-picker"><ProductIcon name="folder" /><span>Choose a project</span><ProductIcon name="chevronDown" /></span>
+                <span class="hs-site-button">Start a conversation</span>
+                <span class="hs-site-hint">Press ↵ to start</span>
+              </div>
+            </BrowserPage>
+          </div>
+        </div>
+      </div>
+    </div>
   </aside>
 </div>
+
+<script>
+  import { initAppPreview } from "../../scripts/app-preview";
+
+  for (const root of document.querySelectorAll<HTMLElement>("[data-app-preview]")) initAppPreview(root);
+</script>

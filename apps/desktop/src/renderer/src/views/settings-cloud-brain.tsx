@@ -12,6 +12,7 @@ import { RegionSelect, SERVICE_NAMES, placeWords } from "./settings-cloud-place"
 import { Failure, StillWorks } from "./settings-secret-field";
 import { Section, SettingRow, Status } from "./settings-shared";
 import "./settings-cloud-check.css";
+import { computer, machine, ThisComputer, thisComputer } from "../lib/this-computer";
 
 /** Its service is asked on each look; the brain falls asleep on its own about five minutes after its last use. */
 const REFRESH_MS = 30_000;
@@ -140,7 +141,8 @@ function SettingUp({ place, step }: { place: CloudBrainPlace; step: CloudBrainSt
 function removalWords(threads: number, service: CloudService): string {
   const { account, machines } = SERVICES[service];
   if (!threads) return `This deletes it from ${account}, with its disk and the ${machines} it made. Phones paired with it can no longer reach it.`;
-  const conversations = threads === 1 ? "the conversation on it. Bring it to your Mac first to keep it." : `the ${threads} conversations on it. Bring to Mac any you want to keep first.`;
+  const conversations =
+    threads === 1 ? `the conversation on it. Bring it to your ${computer} first to keep it.` : `the ${threads} conversations on it. Bring to ${machine} any you want to keep first.`;
   return `This deletes it from ${account}, with its disk, the ${machines} it made and ${conversations} Phones paired with it can no longer reach it.`;
 }
 
@@ -201,7 +203,7 @@ function useAwakeBecause(active: boolean, awake: boolean): string | null {
   const busy = useRpc("cloud.brain.busy", {}, { enabled: active && awake, refetchInterval: active && awake ? 30_000 : false });
   if (!awake || busy.data === undefined) return null;
   if (busy.data === null) return "Idle, sleeps after 5 minutes";
-  return AWAKE_BECAUSE[busy.data] ?? "Busy with a request from this Mac";
+  return AWAKE_BECAUSE[busy.data] ?? `Busy with a request from ${thisComputer}`;
 }
 
 /**
@@ -267,7 +269,7 @@ type Ready = Extract<CloudBrainStatus, { state: "ready" }>;
 function FromThisMac({ brain, active, busy }: { brain: Ready; active: boolean; busy: boolean }) {
   const handover = useRpcMutation("cloud.brain.handover");
   return (
-    <Section title="From this Mac">
+    <Section title={`From ${thisComputer}`}>
       <SettingRow label="Claude accounts" hint={brain.claude.length ? brain.claude.join(", ") : "None"}>
         {brain.working === "sending" || handover.isPending ? <Status>Sending</Status> : null}
         {brain.behind && !busy && !handover.isPending ? (
@@ -317,7 +319,7 @@ function BrainState({ brain, place }: { brain: Exclude<CloudBrainStatus, Ready>;
     case "elsewhere":
       return (
         <>
-          <SettingRow label={brain.service === "vercel" ? "Already in this team" : "Already on this account"} hint="This Mac doesn't have its key.">
+          <SettingRow label={brain.service === "vercel" ? "Already in this team" : "Already on this account"} hint={`${ThisComputer} doesn't have its key.`}>
             <RemoveBrain disabled={false} service={brain.service} />
           </SettingRow>
           <Alert error={brain.error} />

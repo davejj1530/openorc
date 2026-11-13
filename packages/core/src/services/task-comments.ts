@@ -1,6 +1,8 @@
 import { orclings, projects, retiredTeams, runs, taskComments, tasks, threads, type Db } from "@openorc/db";
 import {
   commentRecipientKey,
+  executionModeUnavailable,
+  harnessIds,
   modelEfforts,
   resolveCommentMentions,
   type AgentEvent,
@@ -78,7 +80,7 @@ export class TaskCommentService {
     };
   }
   private async catalog(): Promise<ModelOption[]> {
-    const results = await Promise.allSettled(["codex", "claude", "opencode"].map((agent) => this.runService.models(agent as CommentRecipient["agent"])));
+    const results = await Promise.allSettled(harnessIds.map((agent) => this.runService.models(agent)));
     return results.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
   }
   private writableTask(taskId: string): Task {
@@ -102,12 +104,7 @@ export class TaskCommentService {
     const recipients = [...new Map([...input.recipients.map((r) => asOrcling(r, everyOrcling)), ...mentioned].map((r) => [commentRecipientKey(r), r])).values()];
     if (recipients.length > 8) throw new Error("Mention up to eight agents at a time.");
     if (input.source === "description" && !recipients.length) throw new Error("Tag an available model in the description first.");
-    for (const r of recipients) {
-      const model = catalog.find((m) => m.agent === r.agent && m.id === r.model);
-      if (!model || model.unavailable) throw new Error(model?.unavailable ?? `Model ${r.model} is unavailable. Choose another recipient.`);
-      const efforts = modelEfforts(r.agent, r.model, model.efforts);
-      if (r.effort !== null && !efforts.includes(r.effort)) throw new Error(`Unsupported effort for ${model.label}.`);
-    }
+    for (const recipient of recipients) validateRecipient(recipient, catalog);
     const history = taskComments.list(this.db, task.id);
     const parentComment = input.replyTo ? history.comments.find((c) => c.id === input.replyTo) : null;
     const parentAttempt = input.replyTo ? history.attempts.find((a) => a.id === input.replyTo) : null;
@@ -391,6 +388,15 @@ export class TaskCommentService {
     for (const item of taskComments.unfinished(this.db)) if (item.state === "queued" || item.state === "running") await this.cancel(item.taskId, item.id);
     await Promise.allSettled([...this.jobs]);
   }
+}
+
+function validateRecipient(recipient: CommentRecipient, catalog: ModelOption[]): void {
+  const unavailable = executionModeUnavailable(recipient.agent, "plan");
+  if (unavailable) throw new Error(unavailable);
+  const model = catalog.find((m) => m.agent === recipient.agent && m.id === recipient.model);
+  if (!model || model.unavailable) throw new Error(model?.unavailable ?? `Model ${recipient.model} is unavailable. Choose another recipient.`);
+  const efforts = modelEfforts(recipient.agent, recipient.model, model.efforts);
+  if (recipient.effort !== null && !efforts.includes(recipient.effort)) throw new Error(`Unsupported effort for ${model.label}.`);
 }
 
 /** An Orcling replies with its current model, whatever an older reply recorded. */

@@ -36,6 +36,22 @@ export function CommitsPanel({ source }: { source: CommitSource }) {
   const empty = !log.isLoading && commits.length === 0;
   // A branch can carry commits origin lacks from before the work began, such as a worktree started from local commits.
   const pushable = !empty || Boolean(push.data?.unpushedCount);
+  if (log.isError) {
+    return (
+      <Empty title="Could not load commits">
+        <p>{log.error.message}</p>
+        <Button className="mt-3" onClick={() => void log.refetch()}>
+          Try again
+        </Button>
+      </Empty>
+    );
+  }
+  if (log.isLoading)
+    return (
+      <div role="status" className="py-4 text-sm text-ink-3">
+        Loading commits…
+      </div>
+    );
   return (
     <div className="h-full flex flex-col min-h-0">
       {pushable ? <SourcePushBar source={source} state={push.data} error={push.error} /> : null}
@@ -64,8 +80,8 @@ function CommitList({ commits, unpushed }: { commits: Commit[]; unpushed: Readon
         const sent = !unpushed.has(c.sha);
         return (
           <li key={c.sha} className="commit-row">
-            <span className="commit-dot" data-sent={sent || undefined} role="img" aria-label={sent ? "On origin" : "Not pushed"} title={sent ? "On origin" : "Not pushed"} />
-            <span className="commit-subject" title={c.subject}>
+            <span className="commit-dot" data-sent={sent || undefined} role="img" aria-label={sent ? "On origin" : "Not pushed"} data-tip={sent ? "On origin" : "Not pushed"} />
+            <span className="commit-subject" data-tip={c.subject}>
               {c.subject}
             </span>
             <span className="commit-meta">
@@ -157,7 +173,7 @@ function PushBar({
     <>
       <PanelBar title="Commits">
         {step ? (
-          <Button variant="primary" disabled={Boolean(step.reason) || busy} title={step.reason ?? (state?.branch ? `Push ${state.branch} to origin` : undefined)} onClick={pushNow}>
+          <Button variant="primary" disabled={Boolean(step.reason) || busy} data-tip={step.reason ?? (state?.branch ? `Push ${state.branch} to origin` : undefined)} onClick={pushNow}>
             <Upload size={14} /> {step.label}
           </Button>
         ) : null}

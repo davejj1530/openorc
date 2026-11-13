@@ -1,5 +1,5 @@
 import { Menu } from "@base-ui/react/menu";
-import { distillationHarnessIds, harnessCatalog, type AppSettings, type ExtractionProviderChoice, type RpcResults } from "@openorc/protocol";
+import { distillationHarnessIds, harnessCatalog, isHarnessId, type AppSettings, type ExtractionProviderChoice, type RpcResults } from "@openorc/protocol";
 import type { UseQueryResult } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, RefreshCw } from "../components/icons";
@@ -15,23 +15,28 @@ import { useRouter, type Route, type SettingsSection } from "../lib/router";
 import { settingsSection, settingsSections } from "../lib/settings-sections";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { AgentConnections } from "./settings-agent-updates";
+import { useEnabledHarnesses } from "../lib/enabled-harnesses";
 import { AppearanceSettings } from "./settings-appearance";
 import { ClaudeAccountSettings } from "./settings-claude-accounts";
+import { ConnectorSettings } from "./settings-connectors";
 import { CloudSettings } from "./settings-cloud";
 import { DeviceSettings } from "./settings-devices";
 import { GitHubSettings } from "./settings-github";
-import { PairPhone, PhoneSettings } from "./settings-phone";
+import { PhoneSettings } from "./settings-phone";
 import { idleTimeoutLabel, learningStatus, memoryModelAgent } from "./settings-presentation";
+import { SectionActionsSlot } from "./settings-actions-context";
 import { Field, LoadError, SaveStatus, Section, Toggle, usePreference } from "./settings-shared";
 import { SkillsSettings } from "./settings-skills";
 import { SlackSettings } from "./settings-slack";
 import { TextGenerationSettings } from "./settings-text-generation";
+import { HostSettingsSection } from "./settings-host";
 import { UpdateSettingsSection } from "./settings-updates";
-import { ProviderUsageOverview } from "./settings-usage";
+import { WorktreesRow } from "./settings-worktrees";
+import { UsageDashboard } from "./settings-usage-dashboard";
 
 type SettingsRoute = Extract<Route, { view: "settings" }>;
 
-/** The sidebar lists the sections, and the route says which one is open. */
+/** The sidebar lists the sections, the route says which one is open, and the top bar names it. */
 export function Settings({ route }: { route: SettingsRoute }) {
   const current = settingsSection(route);
   const content = useRef<HTMLDivElement>(null);
@@ -42,33 +47,24 @@ export function Settings({ route }: { route: SettingsRoute }) {
     return () => cancelAnimationFrame(frame);
   }, [route]);
   const info = useRpc("system.info", { refresh: true });
+  const [actionsSlot, setActionsSlot] = useState<HTMLElement | null>(null);
   return (
-    <div className="settings-sheet" data-plane>
-      <TopBar showProject={false} className="settings-sheet-bar">
-        {null}
+    <div className="settings-sheet" data-section={current.id}>
+      <TopBar actions={<span ref={setActionsSlot} className="flex items-center gap-1" />}>
+        <SettingsTitle current={current} />
       </TopBar>
-      <div className="settings-shell">
-        <div ref={content} className="settings-content">
-          <header className="settings-page-head">
-            <div className="min-w-0">
-              <SettingsTitle current={current} />
-              <p>{current.description}</p>
-            </div>
-            {current.id === "connections" && (
-              <Button size="lg" disabled={info.isFetching} onClick={() => void info.refetch()}>
-                <RefreshCw size={13} />
-                {info.isFetching ? "Checking…" : "Refresh connections"}
-              </Button>
-            )}
-            {current.id === "phone" && <PairPhone />}
-          </header>
-          {settingsSections.map(({ id, label }) => (
-            <section key={id} id={`settings-${id}`} aria-label={label} hidden={id !== current.id}>
-              <SectionSettings id={id} active={id === current.id} info={info} />
-            </section>
-          ))}
+      <SectionActionsSlot.Provider value={actionsSlot}>
+        <div className="settings-shell">
+          <div ref={content} className="settings-content">
+            {current.description && current.id !== "connectors" ? <p className="settings-page-lead">{current.description}</p> : null}
+            {settingsSections.map(({ id, label, description }) => (
+              <section key={id} id={`settings-${id}`} aria-label={label} hidden={id !== current.id}>
+                <SectionSettings id={id} active={id === current.id} info={info} description={description} />
+              </section>
+            ))}
+          </div>
         </div>
-      </div>
+      </SectionActionsSlot.Provider>
     </div>
   );
 }
@@ -81,7 +77,7 @@ function revealSetting(route: SettingsRoute) {
   target?.focus({ preventScroll: true });
 }
 
-/** The open section's name. While the sidebar is hidden, it also switches sections. */
+/** The open section's name, in the top bar. While the sidebar is hidden, it also switches sections. */
 export function SettingsTitle({ current }: { current: { id: SettingsSection; label: string } }) {
   const sidebarOpen = useLayout((s) => s.sidebarOpen);
   const navigate = useRouter((s) => s.navigate);
@@ -91,7 +87,7 @@ export function SettingsTitle({ current }: { current: { id: SettingsSection; lab
       <Menu.Root>
         <Menu.Trigger className="settings-section-menu no-drag">
           <span className="truncate">{current.label}</span>
-          <ChevronDown size={16} className="shrink-0" />
+          <ChevronDown size={14} className="shrink-0" />
         </Menu.Trigger>
         <Menu.Portal>
           <CoversPreview />
@@ -112,19 +108,12 @@ export function SettingsTitle({ current }: { current: { id: SettingsSection; lab
 }
 
 /** One section's settings. Every section stays mounted, so a change in progress survives a look at another. */
-function SectionSettings({ id, active, info }: { id: SettingsSection; active: boolean; info: UseQueryResult<RpcResults["system.info"]> }) {
+function SectionSettings({ id, active, info, description }: { id: SettingsSection; active: boolean; info: UseQueryResult<RpcResults["system.info"]>; description?: string }) {
   switch (id) {
     case "usage":
-      return <ProviderUsageOverview active={active} />;
+      return <UsageDashboard active={active} />;
     case "connections":
-      return (
-        <>
-          {info.isError && <LoadError retry={() => void info.refetch()} />}
-          <AgentConnections info={info.data} />
-          <ClaudeAccountSettings active={active} />
-          <GitHubSettings info={info.data} />
-        </>
-      );
+      return <ConnectionsSettings active={active} info={info} />;
     case "cloud":
       return <CloudSettings active={active} />;
     case "slack":
@@ -133,6 +122,8 @@ function SectionSettings({ id, active, info }: { id: SettingsSection; active: bo
       return <PhoneSettings active={active} />;
     case "skills":
       return <SkillsSettings active={active} />;
+    case "connectors":
+      return <ConnectorSettings active={active} description={description} />;
     case "devices":
       return <DeviceSettings active={active} />;
     case "appearance":
@@ -151,6 +142,26 @@ function SectionSettings({ id, active, info }: { id: SettingsSection; active: bo
   }
 }
 
+function ConnectionsSettings({ active, info }: { active: boolean; info: UseQueryResult<RpcResults["system.info"]> }) {
+  const enabled = useEnabledHarnesses();
+  return (
+    <>
+      {info.isError && <LoadError retry={() => void info.refetch()} />}
+      <AgentConnections
+        info={info.data}
+        actions={
+          <Button size="sm" disabled={info.isFetching} onClick={() => void info.refetch()}>
+            <RefreshCw size={13} />
+            {info.isFetching ? "Checking…" : "Refresh connections"}
+          </Button>
+        }
+      />
+      {enabled.includes("claude") ? <ClaudeAccountSettings active={active} /> : null}
+      <GitHubSettings info={info.data} />
+    </>
+  );
+}
+
 const days = (v: number | null | undefined) => (v == null ? "" : String(v));
 const idleOptions = [null, 5, 10, 30, 60];
 
@@ -160,6 +171,7 @@ function GeneralSettings() {
   return (
     <>
       {s.query.isError && <LoadError retry={() => void s.query.refetch()} />}
+      <HostSettingsSection />
       <Section title="Notifications">
         <Toggle
           label="Desktop notifications"
@@ -195,13 +207,6 @@ function GeneralSettings() {
             ))}
           </Select>
         </Field>
-        <Toggle
-          label="Your Claude Code MCP servers"
-          hint="Connect the MCP servers from your own Claude Code configuration in Act threads set to Autonomous. Other modes give Claude only OpenOrc's own tools. Servers finish connecting after Claude starts, so a slow one can miss the first message."
-          checked={v.claudeUserMcpServers ?? true}
-          disabled={s.disabled}
-          onChange={(claudeUserMcpServers) => void s.commit({ claudeUserMcpServers })}
-        />
       </Section>
       <SaveStatus status={s.status} retry={() => void s.retry()} />
     </>
@@ -216,6 +221,21 @@ const providerLabel = (choice: ExtractionProviderChoice): string => {
   if (choice === "off") return "Off · no background learning";
   return `${harnessCatalog[choice].name} subscription`;
 };
+function MemoryProviderOptions() {
+  const enabled = useEnabledHarnesses();
+  return (
+    <>
+      {providerChoices
+        .filter((provider) => !isHarnessId(provider) || enabled.includes(provider))
+        .map((provider) => (
+          <option key={provider} value={provider}>
+            {providerLabel(provider)}
+          </option>
+        ))}
+    </>
+  );
+}
+
 export function MemorySettings() {
   const s = usePreference("memory.settings.set");
   const v = s.value;
@@ -246,11 +266,7 @@ export function MemorySettings() {
               void s.commit({ provider: e.target.value as ExtractionProviderChoice });
             }}
           >
-            {providerChoices.map((p) => (
-              <option key={p} value={p}>
-                {providerLabel(p)}
-              </option>
-            ))}
+            <MemoryProviderOptions />
           </Select>
         </Field>
         {provider === "apikey" && (
@@ -321,6 +337,7 @@ function DataSettings({ dataDir, error, retry }: { dataDir?: string; error: bool
       <Section title="Local storage" description="Your ledger, memories, and worktrees live in the OpenOrc data folder.">
         <span className="settings-storage-label">Data folder</span>
         {error ? <LoadError retry={retry} /> : <code className="settings-path">{dataDir ?? "Loading data location…"}</code>}
+        <WorktreesRow />
       </Section>
       <Section title="How your data is used">
         <div className="settings-data-note">

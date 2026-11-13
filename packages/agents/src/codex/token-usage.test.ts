@@ -24,10 +24,16 @@ it("uses the last turn's total tokens for Codex context usage without double-cou
       inputTokens: 500_000,
       outputTokens: 20_000,
       cacheReadTokens: 300_000,
+      requestInputTokens: 190_000,
       contextTokens: 192_000,
       contextWindow: 258_400,
     },
   });
+});
+
+it("retains cache writes separately from cache reads for API estimates", () => {
+  const events = mapNotification("run", "thread/tokenUsage/updated", { tokenUsage: { total: { inputTokens: 1000, cachedInputTokens: 600, cacheWriteTokens: 200, outputTokens: 50 } } }, state());
+  expect(events[0]).toMatchObject({ type: "usage.updated", usage: { inputTokens: 1000, cacheReadTokens: 600, cacheWriteTokens: 200 } });
 });
 
 it("falls back to last input tokens when Codex omits last total tokens", () => {

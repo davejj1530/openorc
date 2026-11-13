@@ -315,6 +315,8 @@ export class WorkspaceService {
           this.assertOpen();
           return threads.update(this.db, thread.id, { baseSha: info.start, branch: info.branch });
         }
+        // Another thread sharing this folder may have made it again while this one waited for the lease.
+        if (thread.worktreePath && (await exists(thread.worktreePath))) return thread;
 
         const branch = this.threadBranch(thread, project);
         const worktreePath = this.threadPath(thread, project);
@@ -394,9 +396,10 @@ export class WorkspaceService {
 
   /**
    * Removes a thread's worktree; its branch always stays. Uncommitted work is committed to that branch first, unless
-   * `save` is false because the caller already took the changes elsewhere.
+   * `save` is false because the caller already took the changes elsewhere. `keepPath` leaves the thread pointing at the
+   * folder, so threads sharing it make it again there, on the same branch, rather than each in a folder of its own.
    */
-  async cleanupThread(thread: Thread, project: Project, options: { save?: boolean } = {}, inherited?: WorkspaceLease): Promise<Thread> {
+  async cleanupThread(thread: Thread, project: Project, options: { save?: boolean; keepPath?: boolean } = {}, inherited?: WorkspaceLease): Promise<Thread> {
     this.assertOpen();
     if (project.id === WORKSPACE_ID) return thread;
     // A legacy task promoted to a conversation retains this workspace for its saved review history.
@@ -420,7 +423,7 @@ export class WorkspaceService {
           await worktree.prune(project.rootPath).catch(() => undefined);
           this.assertOpen();
           audit.record(this.db, { actor: "user", action: "workspace.cleanup", resourceType: "thread", resourceId: thread.id, metadata: { deleteBranch: false, saved } });
-          return threads.update(this.db, thread.id, { worktreePath: null });
+          return options.keepPath ? (threads.get(this.db, thread.id) ?? thread) : threads.update(this.db, thread.id, { worktreePath: null });
         },
         inherited,
       ),

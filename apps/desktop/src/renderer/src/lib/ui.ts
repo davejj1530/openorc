@@ -16,6 +16,8 @@ interface UiState {
   moveThreadId: string | null;
   /** The open move goes to the cloud rather than between the checkout and a worktree. */
   moveThreadToCloud: boolean;
+  /** The conversation whose worktree removal is being confirmed. */
+  removeWorktreeThreadId: string | null;
   /** The folder New file is asking a path for. */
   newFile: FileScope | null;
   openNewTask: (projectId?: string, threadId?: string) => void;
@@ -25,6 +27,7 @@ interface UiState {
   setThreadOrder: (ids: string[]) => void;
   setDeleteThread: (id: string | null) => void;
   setMoveThread: (id: string | null, to?: "cloud") => void;
+  setRemoveWorktree: (id: string | null) => void;
   setNewFile: (scope: FileScope | null) => void;
 }
 
@@ -38,9 +41,11 @@ export const useUi = create<UiState>((set, get) => ({
   deleteThreadId: null,
   moveThreadId: null,
   moveThreadToCloud: false,
+  removeWorktreeThreadId: null,
   newFile: null,
   setDeleteThread: (deleteThreadId) => set({ deleteThreadId }),
   setMoveThread: (moveThreadId, to) => set({ moveThreadId, moveThreadToCloud: to === "cloud" }),
+  setRemoveWorktree: (removeWorktreeThreadId) => set({ removeWorktreeThreadId }),
   setNewFile: (newFile) => set({ newFile }),
   openNewTask: (projectId, threadId) => useRouter.getState().navigate({ view: "newtask", ...(projectId ? { projectId } : {}), ...(threadId ? { threadId } : {}) }),
   setImportProject: (importProject) => set({ importProject }),

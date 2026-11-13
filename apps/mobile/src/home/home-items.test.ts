@@ -128,6 +128,12 @@ describe("homeItems", () => {
     expect(website).toHaveLength(3);
     expect(website.every((index) => index > items.indexOf("§ Resolved"))).toBe(true);
   });
+
+  it("leaves Resolved out once the host says it holds nothing, and keeps it while the host has not said", () => {
+    const current = fixtureThreads.map((thread) => ({ ...thread, archivedAt: null, lastActivityAt: now }));
+    expect(outline(homeItems({ ...list(current), resolvedCount: 0 }, options())).filter((line) => line.startsWith("§ Resolved"))).toEqual([]);
+    expect(outline(homeItems(list(current), options())).at(-1)).toBe("§ Resolved");
+  });
 });
 
 it("pages each parent's newest children with separate Show more rows, keeps older work and the selection, and ends visible trunks", () => {

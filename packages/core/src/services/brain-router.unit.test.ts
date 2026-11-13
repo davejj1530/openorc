@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, expect, it, vi } from "vitest";
-import { Db, projects, relocations, tasks } from "@openorc/db";
+import { claudeAccounts, Db, projects, relocations, tasks } from "@openorc/db";
 import { NOT_ON_BRAIN, threadListCompare, type CorePush, type InboxList, type OwnerReach, type RpcMethod, type RpcRequest, type Task, type ThreadSummary } from "@openorc/protocol";
 import type { RpcReply } from "../transport.js";
 import { until } from "../test-fixtures/fake-claude.js";
@@ -413,5 +413,32 @@ it("answers a call about a thread, run or task on neither host here, never wakin
   // A thread the brain lists wakes it as a person opens it.
   await ask(router, "threads.messages", { id: "cloud-thread" });
   expect(woke).toEqual(["threads.messages"]);
+  router.close();
+});
+
+it("settles a cloud start's Claude account on this Mac when its project uses only some, and sends any other start as it came", async () => {
+  const { router, db, sent } = harness({ cloud: [] });
+  const [work, personal] = ["Work", "Personal"].map((name) => claudeAccounts.add(db, name).id) as [string, string];
+  db.stmt("INSERT INTO projects (id, name, root_path, git_remote, default_branch, settings, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 1, 1)").run(
+    "mac-project",
+    "Mac project",
+    "/tmp/mac-project",
+    null,
+    "main",
+    JSON.stringify({ setupScript: null, worktreeInclude: [], branchPrefix: "openorc", detectedConfigs: [], claudeAccounts: null }),
+  );
+  const startCloud = async (claudeAccountId?: string) => {
+    const { thread } = (await ask(router, "threads.start", { ...start, projectId: "mac-project", cloud: true, ...(claudeAccountId ? { claudeAccountId } : {}) })) as { thread: ThreadSummary };
+    await until(() => sent.some((each) => each.method === "threads.start" && each.params["id"] === thread.id));
+    return { thread, sent: sent.find((each) => each.method === "threads.start" && each.params["id"] === thread.id)!.params };
+  };
+
+  // Following the app's accounts, the brain picks as it always has.
+  expect((await startCloud()).sent).not.toHaveProperty("claudeAccountId");
+  projects.updateSettings(db, "mac-project", { claudeAccounts: { only: true, accountIds: [work, personal], defaultId: personal, autoSwitch: true } });
+  const onDefault = await startCloud();
+  expect([onDefault.thread.claudeAccountId, onDefault.sent["claudeAccountId"]]).toEqual([personal, personal]);
+  expect((await startCloud(work)).sent["claudeAccountId"]).toBe(work);
+  await expect(ask(router, "threads.start", { ...start, projectId: "mac-project", cloud: true, claudeAccountId: "claude-cli" })).rejects.toThrow(/This project only uses these Claude accounts/);
   router.close();
 });

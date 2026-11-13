@@ -55,13 +55,14 @@ const imageReplyInstructions =
 
 /** Acquires the writer, records startup, launches the provider, then transfers the lease to the live entry. */
 interface RunLaunchDependencies {
+  assertHarnessEnabled: (agent: string) => void;
   db: Db;
   ledger: LedgerWriter;
   mcp: () => Promise<OpenOrcMcpServer>;
   writers: WorkspaceWriters;
   turnStarts: Pick<TurnStartCapture, "capture">;
   adapters: RunAdapterRegistry;
-  hooks: Pick<RunHooks, "taskImages" | "browserAvailable" | "claudeUserMcpServers" | "processRegistry" | "untrustedCheckout" | "orclings" | "cloudHost" | "syncCloud">;
+  hooks: Pick<RunHooks, "taskImages" | "browserAvailable" | "claudeUserMcpServers" | "claudeConnectorsOff" | "processRegistry" | "untrustedCheckout" | "orclings" | "cloudHost" | "syncCloud">;
   log: Logger;
   isClosing: () => boolean;
   live: ReadonlyMap<string, LiveRun>;
@@ -79,6 +80,8 @@ interface RunLaunchDependencies {
   validateFastMode: (agent: AgentKind, model: string | undefined, fastMode: boolean | undefined, environment: EnvSnapshot, launch: AgentLaunchEnvironment) => Promise<void>;
   liveRunForTask: (taskId: string) => Run | null;
   liveRunForThread: (threadId: string) => Run | null;
+  /** Which installation of an agent a process started now would run. */
+  installation: (agent: AgentKind) => number;
 }
 
 export class RunLaunch {
@@ -124,6 +127,7 @@ export class RunLaunch {
     // The admission closure must see the normalized input returned by prepareSession.
     let admitted = input;
     const assertAdmission = () => {
+      this.deps.assertHarnessEnabled(admitted.agent);
       if (this.deps.isClosing()) throw new Error("OpenOrc is closing.");
       if (admitted.scope.thread) assertNotMoving(this.deps.db, admitted.scope.thread.id);
       admitted.assertCanStart?.();
@@ -184,7 +188,7 @@ export class RunLaunch {
     const { input, runId } = prepared;
     input.onCreated?.(run);
     if (input.scope.task) tasks.update(this.deps.db, input.scope.task.id, { status: "in_progress" });
-    if (input.scope.thread) threads.touch(this.deps.db, input.scope.thread.id);
+    if (input.scope.thread && !input.unprompted) threads.touch(this.deps.db, input.scope.thread.id);
     this.recordPromptAndAudit(attempt);
     const mcp = await this.deps.mcp();
     phase("mcp");
@@ -216,6 +220,7 @@ export class RunLaunch {
       internalMcp,
       providerPermissionMode: spec.permissionMode,
       ...(orclingCeiling ? { orclingCeiling } : {}),
+      installation: this.deps.installation(input.agent),
     });
     // The picker can change while catalog discovery or MCP startup is awaiting.
     const thread = input.scope.thread;
@@ -233,7 +238,7 @@ export class RunLaunch {
         type: "message.completed",
         runId,
         ts: Date.now(),
-        messageId: `${input.promptRole ?? "user"}-${Date.now()}`,
+        messageId: input.promptMessageId ?? `${input.promptRole ?? "user"}-${Date.now()}`,
         role: input.promptRole ?? "user",
         text: input.prompt,
         ...(input.attachments?.length ? { attachments: input.attachments } : {}),
@@ -295,7 +300,7 @@ export class RunLaunch {
       agent: input.agent,
       fastMode: input.fastMode ?? false,
       cwd: cwd ?? lease.paths[0]!,
-      prompt: withOutsideNote(input.prompt, outside),
+      prompt: withOutsideNote(this.withTurnNote(input), outside),
       permissionMode: input.mode === "plan" ? "review" : input.permissionMode,
       systemPromptAppendix: this.systemPrompt(input, taskImages),
       internalMcp,
@@ -306,6 +311,7 @@ export class RunLaunch {
       resumedSubagents: this.resumedSubagents(prepared),
       ...(forkSession ? { forkSession: true } : {}),
       ...(input.agent === "claude" && this.deps.hooks.claudeUserMcpServers?.() === false ? { strictMcp: true } : {}),
+      ...(input.agent === "claude" && this.deps.hooks.claudeConnectorsOff?.().length ? { connectorsOff: this.deps.hooks.claudeConnectorsOff() } : {}),
       // Decided by the conversation, not its mode, so switching a review to Act keeps it.
       ...(input.scope.thread && this.deps.hooks.untrustedCheckout?.(input.scope.thread) ? { untrustedCheckout: true } : {}),
     };
@@ -319,6 +325,11 @@ export class RunLaunch {
       const parent = thread.parentThreadId ? subagents.byThread(this.deps.db, thread.parentThreadId) : null;
       return [{ nativeId: row.nativeId, taskId: row.taskId, title: thread.title, parentSubagentId: parent?.nativeId, endedAt: row.endedAt ?? row.startedAt }];
     });
+  }
+
+  private withTurnNote(input: StartRunInput): string {
+    const note = [input.turnNote, input.scope.thread ? this.deps.hooks.orclings?.turnNote(input.scope.thread.id) : ""].filter(Boolean).join("\n\n");
+    return note ? `${note}\n\n${input.prompt}` : input.prompt;
   }
 
   private systemPrompt(input: StartRunInput, taskImages: string[]): string {

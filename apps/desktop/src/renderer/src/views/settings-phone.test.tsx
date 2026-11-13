@@ -4,7 +4,7 @@ import type { PairingOfferView, RemoteDevice, RemotePushStatus, RemoteStatus, Rp
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { invalidateTags, queryClient } from "../lib/client";
 import { core } from "../lib/rpc";
-import { PairPhone, PairingCode, PhoneSettings } from "./settings-phone";
+import { PairingCode, PhoneSettings } from "./settings-phone";
 
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
 
@@ -69,7 +69,6 @@ const calls = (method: RpcMethod) => vi.mocked(core.call).mock.calls.filter(([ca
 const show = () =>
   render(
     <QueryClientProvider client={queryClient}>
-      <PairPhone />
       <PhoneSettings active />
     </QueryClientProvider>,
   );

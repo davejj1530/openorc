@@ -247,37 +247,47 @@
   stroke-linecap: round;
 }
 
-/* Sidebar (Sidebar.tsx, sidebar.css): 272 wide on the tile, parted from the work column by a hairline seam the
-   window's full height. Like the app's, the seam stays one device pixel at any scale. */
+/* Sidebar (Sidebar.tsx, sidebar.css): the window's corner on the top line, over a 50-unit rail of screens beside the
+   272-unit thread list. A hairline seam parts it from the work column: a short stroke beside the corner, then the
+   column's full height under the top line. Like the app's, hairlines stay one device pixel at any scale. */
 .hs-sidebar {
   position: relative;
   display: flex;
   flex: none;
   flex-direction: column;
-  width: calc(272 * var(--u));
+  width: calc(322 * var(--u));
   overflow: hidden;
 }
-.hs-sidebar::after {
+.hs-sidebar::after,
+.hs-sidebar-head::after {
   content: "";
   position: absolute;
-  top: 0;
   right: 0;
-  bottom: 0;
   width: var(--hairline);
   background: var(--hs-line);
   pointer-events: none;
 }
-.hs-sidebar .hs-round {
-  width: calc(32 * var(--u));
-  height: calc(32 * var(--u));
+.hs-sidebar::after {
+  top: calc(44 * var(--u) - var(--hairline));
+  bottom: 0;
 }
-/* The window's corner: the wordmark after the traffic lights, then Inbox and the sidebar toggle. */
+/* The window's corner: the wordmark after the traffic lights, then Back, Forward (off, with nothing to go forward to)
+   and the sidebar toggle. */
 .hs-sidebar-head {
+  position: relative;
   display: flex;
   flex: none;
   align-items: center;
   height: calc(44 * var(--u));
   padding: 0 calc(10 * var(--u)) 0 calc(86 * var(--u));
+}
+.hs-sidebar-head::after {
+  top: calc(8.8 * var(--u));
+  bottom: calc(8.8 * var(--u));
+}
+.hs-sidebar .hs-round {
+  width: calc(32 * var(--u));
+  height: calc(32 * var(--u));
 }
 .hs-wordmark {
   display: flex;
@@ -295,13 +305,17 @@
   width: calc(16 * var(--u));
   height: calc(16 * var(--u));
 }
+.hs-sidebar-head .hs-round[data-off] {
+  color: var(--hs-faint);
+}
+/* Inbox on the rail, its count on the glyph's top-right corner. */
 .hs-inbox {
   position: relative;
 }
 .hs-inbox-count {
   position: absolute;
-  top: calc(2 * var(--u));
-  left: calc(16 * var(--u));
+  top: calc(3 * var(--u));
+  right: calc(1 * var(--u));
   display: grid;
   place-items: center;
   min-width: calc(16 * var(--u));
@@ -314,7 +328,97 @@
   line-height: calc(16 * var(--u));
   font-variant-numeric: tabular-nums;
 }
-/* The list head: Search where the titles start, then the filter and New thread at the row's end. */
+.hs-sidebar-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+/* The rail (SidebarRail.tsx): New thread, the screens and Orclings, a short hairline, Projects, another, Inbox, and at
+   its foot the week's usage as a ring, updates and Settings. The open screen sits on the plane. */
+.hs-sidebar-rail {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(4 * var(--u));
+  width: calc(50 * var(--u));
+  padding: calc(6 * var(--u)) 0 calc(8 * var(--u));
+}
+.hs-rail-button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: calc(36 * var(--u));
+  height: calc(36 * var(--u));
+  border-radius: 999px;
+  color: var(--hs-muted);
+}
+.hs-rail-button .hs-icon {
+  width: calc(18 * var(--u));
+  height: calc(18 * var(--u));
+}
+.hs-rail-divider {
+  flex: none;
+  width: calc(20 * var(--u));
+  height: var(--hairline);
+  margin: calc(6 * var(--u)) 0;
+  background: var(--hs-line);
+}
+.hs-rail-gap {
+  margin-top: auto;
+}
+.hs-rail-button[hidden] {
+  display: none;
+}
+.hs-rail-usage .hs-ring {
+  width: calc(18 * var(--u));
+  height: calc(18 * var(--u));
+}
+.hero-scene[data-view="task"] .hs-sidebar-rail [data-screen="tasks"] {
+  background: var(--hs-plane);
+  color: var(--hs-ink);
+}
+/* The thread list beside the rail, its edge rounding into the top line. */
+.hs-workspace {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  padding-top: calc(6 * var(--u));
+}
+.hs-workspace::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--hairline)) 0 0;
+  border-top: var(--hairline) solid var(--hs-line);
+  border-left: var(--hairline) solid var(--hs-line);
+  border-top-left-radius: calc(12 * var(--u));
+  pointer-events: none;
+}
+/* Whose threads the list shows, as the list's own heading. */
+.hs-workspace-name {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: calc(8 * var(--u));
+  height: calc(36 * var(--u));
+  margin: 0 calc(10 * var(--u));
+  padding: 0 calc(10 * var(--u));
+  font-size: calc(14 * var(--u));
+  line-height: calc(22 * var(--u));
+}
+.hs-workspace-name > span {
+  flex: 1;
+}
+.hs-workspace-name .hs-icon {
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
+}
+.hs-workspace-name .hs-icon:last-child {
+  color: var(--hs-muted);
+}
+/* The list head: Search where the titles start, then the filter and New thread, in ink, at the row's end. */
 .hs-list-head {
   display: flex;
   flex: none;
@@ -322,6 +426,9 @@
   gap: calc(2 * var(--u));
   height: calc(34 * var(--u));
   margin: calc(6 * var(--u)) calc(10 * var(--u)) 0;
+}
+.hs-list-new {
+  color: var(--hs-ink);
 }
 .hs-search {
   display: flex;
@@ -332,9 +439,6 @@
   padding: 0 calc(14 * var(--u)) 0 calc(10 * var(--u));
   color: var(--hs-muted);
   line-height: calc(16 * var(--u));
-}
-.hs-compose {
-  color: var(--hs-ink);
 }
 /* One list by day: a quiet 28-unit heading, its chevron showing while the section is folded. */
 .hs-threads {
@@ -412,6 +516,7 @@
   color: var(--hs-attention);
 }
 .hs-row-dot {
+  display: none;
   flex: none;
   width: calc(7 * var(--u));
   height: calc(7 * var(--u));
@@ -448,7 +553,7 @@
 }
 .hs-row[data-busy]:not([data-waiting]) :is(.hs-row-headline, .hs-row-spinner),
 .hs-row[data-waiting] :is(.hs-row-ask, .hs-row-question),
-.hs-row[data-done]:not([data-busy], [data-waiting]) .hs-row-done {
+.hs-row[data-done]:not([data-busy], [data-waiting]) :is(.hs-row-done, .hs-row-dot) {
   display: block;
 }
 /* A working title lights up left to right: a band of full ink sweeps across its muted words. */
@@ -530,37 +635,8 @@
   width: calc(14 * var(--u));
   height: calc(14 * var(--u));
 }
-/* The footer: the week's usage, then the screens, Orclings and Settings as round buttons; the open screen sits on
-   the current-row fill. */
-.hs-sidebar-foot {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: calc(4 * var(--u));
-  padding: calc(6 * var(--u)) calc(10 * var(--u)) calc(10 * var(--u));
-}
-.hs-usage {
-  display: flex;
-  align-items: center;
-  gap: calc(6 * var(--u));
-  height: calc(32 * var(--u));
-  margin-right: auto;
-  padding: 0 calc(12 * var(--u)) 0 calc(8 * var(--u));
-  border-radius: 999px;
-  background: var(--hs-control);
-  line-height: calc(16 * var(--u));
-  font-variant-numeric: tabular-nums;
-}
-.hs-dock {
-  display: flex;
-  gap: calc(2 * var(--u));
-}
-.hero-scene[data-view="task"] .hs-dock [data-screen="tasks"] {
-  background: var(--hs-plane);
-  color: var(--hs-ink);
-}
 
-/* Panes: the conversation on the tile, under a 44-unit header of title, faint facts and round buttons. */
+/* Panes: the conversation on the tile under its header on the window's top line, closed off by a hairline. */
 .hs-panes {
   display: flex;
   flex: 1;
@@ -583,17 +659,28 @@
 .hero-scene[data-view="task"] .hs-panes[data-views] > [data-pane="task"] {
   display: flex;
 }
+/* A thread header (TopBar.tsx): tabs start 8 in, a pane split beside the first names its thread 20 in, and the round
+   tools end 8 from the window's edge or 12 from the pane or panel beside them. Page headers keep 12 on both sides. */
 .hs-header {
   display: flex;
   flex: none;
   align-items: center;
   gap: calc(8 * var(--u));
   height: calc(44 * var(--u));
-  padding: 0 calc(12 * var(--u));
+  padding: 0 calc(8 * var(--u));
+  border-bottom: var(--hairline) solid var(--hs-line);
   line-height: calc(16 * var(--u));
+}
+.hs-header[data-kind="title"] {
+  padding-left: calc(20 * var(--u));
+}
+.hs-panes[data-split] > .hs-pane:first-child .hs-header,
+.hs-app-thread .hs-header {
+  padding-right: calc(12 * var(--u));
 }
 .hs-title {
   min-width: 0;
+  margin-left: calc(-8 * var(--u));
   padding: 0 calc(8 * var(--u));
   overflow: hidden;
   text-overflow: ellipsis;
@@ -620,7 +707,7 @@
   border-radius: 999px;
   background: var(--hs-ink);
 }
-.hs-pane[data-busy] .hs-fact-working {
+:is(.hs-pane, .hs-header)[data-busy] .hs-fact-working {
   display: inline-flex;
 }
 .hs-header-actions {
@@ -630,6 +717,13 @@
   gap: calc(4 * var(--u));
   margin-left: auto;
 }
+.hs-header-actions .hs-facts {
+  flex: none;
+}
+/* The thread's actions sit on a narrow pill: the vertical dots need no more width than themselves. */
+.hs-more {
+  width: calc(20 * var(--u));
+}
 .hs-tools {
   display: flex;
 }
@@ -638,6 +732,136 @@
 }
 .hs-panes[data-split] .hs-close-pane {
   display: grid;
+}
+
+/* Tabs on the top line (work-tabs.css), the work column's and the panel's alike: 30-unit tabs up to 220 wide that share
+   their row down to 136, the panel's as wide as their names. The current tab is raised on the fill with its close;
+   the rest are bare until the pointer fills them. */
+.hs-tabs-row {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: calc(2 * var(--u));
+  min-width: 0;
+}
+.hs-tabs,
+.hs-panel-tabs {
+  display: flex;
+  align-items: center;
+  gap: calc(2 * var(--u));
+  min-width: 0;
+}
+.hs-tabs {
+  overflow: hidden;
+}
+.hs-tab {
+  position: relative;
+  display: flex;
+  flex: 0 1 calc(220 * var(--u));
+  align-items: center;
+  min-width: calc(136 * var(--u));
+  height: calc(30 * var(--u));
+  border-radius: calc(6 * var(--u));
+  color: var(--hs-muted);
+  line-height: calc(20 * var(--u));
+  transition:
+    background-color 120ms ease-out,
+    color 120ms ease-out;
+}
+.hs-panel-tabs .hs-tab {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: calc(220 * var(--u));
+}
+.hs-tab[data-current] {
+  background: var(--hs-fill-strong);
+  color: var(--hs-ink);
+}
+.hs-tab:not([data-current]):has(> button:hover) {
+  background: var(--hs-fill);
+  color: var(--hs-ink);
+}
+.hs-tab-face {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: calc(8 * var(--u));
+  min-width: 0;
+  height: 100%;
+  padding: 0 calc(10 * var(--u));
+  border: 0;
+  border-radius: inherit;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+}
+.hs-tab[data-current] .hs-tab-face {
+  padding-right: calc(28 * var(--u));
+}
+.hs-tab-face:focus-visible {
+  outline: 2px solid var(--hs-ink);
+  outline-offset: -2px;
+}
+/* A thread's state stands in for its agent's mark: waiting outranks working, which outranks an unread result. */
+.hs-tab-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
+}
+.hs-tab-icon > * {
+  display: none;
+  grid-area: 1 / 1;
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
+}
+.hs-tab:not([data-busy], [data-waiting], [data-unread]) .hs-tab-icon > :first-child,
+.hs-tab[data-waiting] .hs-tab-waiting,
+.hs-tab[data-busy]:not([data-waiting]) .hs-tab-busy,
+.hs-tab[data-unread]:not([data-busy], [data-waiting]) .hs-tab-unread {
+  display: block;
+}
+.hs-tab-busy {
+  color: var(--hs-faint);
+  animation: hs-spin 1s linear infinite;
+}
+.hs-tab-waiting {
+  color: var(--hs-attention);
+}
+.hs-tab-icon > :is(.hs-tab-unread, .hs-tab-dot) {
+  width: calc(7 * var(--u));
+  height: calc(7 * var(--u));
+  border-radius: 999px;
+  background: currentColor;
+}
+.hs-tab-icon > .hs-tab-unread {
+  background: var(--hs-attention);
+}
+.hs-tab-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hs-tab-close {
+  position: absolute;
+  right: calc(6 * var(--u));
+  display: none;
+  place-items: center;
+  width: calc(18 * var(--u));
+  height: calc(18 * var(--u));
+  color: var(--hs-muted);
+  pointer-events: none;
+}
+.hs-tab[data-current] .hs-tab-close {
+  display: grid;
+}
+.hs-tab-close .hs-icon {
+  width: calc(12 * var(--u));
+  height: calc(12 * var(--u));
 }
 
 /* Transcript: pinned to its newest line, like a conversation scrolled to the end (Transcript.tsx). */
@@ -990,11 +1214,7 @@
 }
 .hs-presence {
   display: flex;
-  align-items: center;
-  gap: calc(8 * var(--u));
   margin-left: calc(-10 * var(--u));
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
 }
 .hs-orb {
   display: grid;
@@ -1008,19 +1228,19 @@
   width: calc(22 * var(--u));
   height: calc(22 * var(--u));
 }
-.hs-pane[data-busy] .hs-orb {
+:is(.hs-pane, .hs-page)[data-busy] .hs-orb {
   color: var(--hs-ink);
 }
 .hs-mark-face:not([data-face="top"]) {
   opacity: 0;
 }
-.hs-pane[data-busy] .hs-mark-face {
+:is(.hs-pane, .hs-page)[data-busy] .hs-mark-face {
   animation: hs-mark-face 2400ms ease-in-out infinite;
 }
-.hs-pane[data-busy] .hs-mark-face[data-face="right"] {
+:is(.hs-pane, .hs-page)[data-busy] .hs-mark-face[data-face="right"] {
   animation-delay: -1600ms;
 }
-.hs-pane[data-busy] .hs-mark-face[data-face="left"] {
+:is(.hs-pane, .hs-page)[data-busy] .hs-mark-face[data-face="left"] {
   animation-delay: -800ms;
 }
 
@@ -1056,11 +1276,11 @@
   color: var(--hs-faint);
 }
 .hs-placeholder-busy,
-.hs-pane[data-busy] .hs-placeholder-idle,
+:is(.hs-pane, .hs-page)[data-busy] .hs-placeholder-idle,
 .hs-composer[data-typed] .hs-placeholder {
   display: none;
 }
-.hs-pane[data-busy] .hs-composer:not([data-typed]) .hs-placeholder-busy {
+:is(.hs-pane, .hs-page)[data-busy] .hs-composer:not([data-typed]) .hs-placeholder-busy {
   display: block;
 }
 .hs-typed {
@@ -1218,62 +1438,22 @@
   border-radius: calc(2 * var(--u));
   background: currentColor;
 }
-.hs-pane[data-busy] .hs-composer:not([data-typed]) .hs-send-arrow {
+:is(.hs-pane, .hs-page)[data-busy] .hs-composer:not([data-typed]) .hs-send-arrow {
   display: none;
 }
-.hs-pane[data-busy] .hs-composer:not([data-typed]) .hs-send-stop {
+:is(.hs-pane, .hs-page)[data-busy] .hs-composer:not([data-typed]) .hs-send-stop {
   display: block;
 }
 .hs-composer[data-typed] .hs-send,
-.hs-pane[data-busy] .hs-send {
+:is(.hs-pane, .hs-page)[data-busy] .hs-send {
   background: var(--hs-accent);
   color: var(--hs-on-accent);
 }
-.hs-rail {
+/* Uncommitted changes sit right over the composer, on its left edge (composer.css). */
+.hs-changes-bar {
   display: flex;
-  align-items: center;
-  gap: calc(8 * var(--u));
-  height: calc(28 * var(--u));
-  margin-top: calc(10 * var(--u));
-  padding: 0 calc(4 * var(--u)) 0 calc(8 * var(--u));
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
-  line-height: calc(16 * var(--u));
-  white-space: nowrap;
-}
-.hs-directory {
-  display: inline-flex;
-  flex: 1;
-  align-items: center;
-  gap: calc(8 * var(--u));
   min-width: 0;
-}
-.hs-directory > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.hs-rail .hs-icon {
-  width: calc(14 * var(--u));
-  height: calc(14 * var(--u));
-}
-.hs-branch {
-  display: inline-flex;
-  align-items: center;
-  gap: calc(6 * var(--u));
-  min-width: 0;
-  max-width: calc(200 * var(--u));
-  padding: 0 calc(8 * var(--u)) 0 calc(10 * var(--u));
-  color: var(--hs-muted);
-}
-.hs-branch .hs-icon {
-  width: calc(13 * var(--u));
-  height: calc(13 * var(--u));
-  color: var(--hs-faint);
-}
-.hs-branch > span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  margin-bottom: calc(10 * var(--u));
 }
 .hs-commit {
   display: inline-flex;
@@ -1292,22 +1472,82 @@
   padding: 0 calc(12 * var(--u)) 0 calc(6 * var(--u));
 }
 
-/* The new-thread page (NewThread.tsx): the question, the large composer, where it works, starters and recent work. */
+/* The new-thread page (NewThread.tsx, new-thread.css): the question, the large composer and where it works, centred
+   as if the project's year of activity along the bottom were not there. The activity is 134 units tall and sits 36
+   over the pane's bottom; the column's top takes the same room back. */
 .hs-new-body {
   display: flex;
   flex: 1;
-  justify-content: center;
+  flex-direction: column;
   min-height: 0;
-  padding: 0 calc(48 * var(--u));
+  padding: 0 calc(48 * var(--u)) calc(72 * var(--u));
   overflow: hidden;
 }
 .hs-new-column {
   display: grid;
-  align-content: start;
   gap: calc(18 * var(--u));
   width: 100%;
   max-width: calc(640 * var(--u));
+  margin: auto;
+  padding-top: calc((24 + 134 + 36 - 72) * var(--u));
+}
+.hs-new-activity {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  justify-content: flex-end;
+  gap: calc(10 * var(--u));
+  box-sizing: border-box;
+  width: 100%;
+  max-width: calc(640 * var(--u));
+  height: calc(134 * var(--u));
+  margin: 0 auto calc((36 - 72) * var(--u));
   padding-top: calc(24 * var(--u));
+}
+.hs-new-activity-line {
+  margin: 0;
+  color: var(--hs-faint);
+  font-size: calc(12 * var(--u));
+  line-height: calc(16 * var(--u));
+  white-space: nowrap;
+}
+/* One dot a day, a week to a column; a dot grows and darkens with the day's rank. */
+.hs-new-activity-days {
+  display: grid;
+  grid-template-columns: repeat(var(--weeks), minmax(0, 1fr));
+  grid-template-rows: repeat(7, calc(12 * var(--u)));
+  grid-auto-flow: column;
+}
+.hs-new-activity-days > i {
+  display: grid;
+  place-items: center;
+}
+.hs-new-activity-days > i::before {
+  content: "";
+  width: calc(var(--dot) * var(--u));
+  height: calc(var(--dot) * var(--u));
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--hs-ink) var(--shade), transparent);
+}
+.hs-new-activity-days > [data-level="0"] {
+  --dot: 3;
+  --shade: 10%;
+}
+.hs-new-activity-days > [data-level="1"] {
+  --dot: 5;
+  --shade: 22%;
+}
+.hs-new-activity-days > [data-level="2"] {
+  --dot: 6.5;
+  --shade: 32%;
+}
+.hs-new-activity-days > [data-level="3"] {
+  --dot: 8;
+  --shade: 42%;
+}
+.hs-new-activity-days > [data-level="4"] {
+  --dot: 9;
+  --shade: 54%;
 }
 .hs-new-question {
   font-size: calc(28 * var(--u));
@@ -1366,48 +1606,6 @@
   width: calc(12 * var(--u));
   height: calc(12 * var(--u));
 }
-.hs-starters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: calc(6 * var(--u));
-  padding: 0 calc(2 * var(--u));
-}
-.hs-starters .hs-button {
-  background: var(--hs-fill);
-  color: var(--hs-muted);
-}
-.hs-recent {
-  margin-top: calc(26 * var(--u));
-}
-.hs-recent-label {
-  padding: 0 calc(12 * var(--u)) calc(8 * var(--u));
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
-  line-height: calc(16 * var(--u));
-}
-.hs-recent-row {
-  display: flex;
-  align-items: center;
-  gap: calc(10 * var(--u));
-  height: calc(42 * var(--u));
-  padding: 0 calc(12 * var(--u));
-  line-height: calc(16 * var(--u));
-}
-.hs-recent-row + .hs-recent-row {
-  margin-top: calc(2 * var(--u));
-}
-.hs-recent-title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.hs-recent-meta {
-  color: var(--hs-faint);
-  font-size: calc(12 * var(--u));
-}
-
 /* A Markdown table in a reply, as Streamdown renders it with the app's overrides. */
 .hs-table-wrap {
   margin: calc(16 * var(--u)) 0;
@@ -1594,6 +1792,7 @@
 }
 .hs-task-header .hs-title {
   flex: 0 1 auto;
+  margin-left: 0;
   padding: 0;
 }
 .hs-crumb {
@@ -1601,20 +1800,6 @@
 }
 .hs-crumb-sep {
   color: var(--hs-faint);
-}
-.hs-header-chip {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  gap: calc(4 * var(--u));
-  height: calc(22 * var(--u));
-  padding: 0 calc(8 * var(--u));
-  color: var(--hs-muted);
-  font-size: calc(12 * var(--u));
-}
-.hs-header-chip .hs-icon {
-  width: calc(12 * var(--u));
-  height: calc(12 * var(--u));
 }
 .hs-status-mark {
   flex: none;
@@ -2042,53 +2227,56 @@
   text-align: right;
 }
 
-/* The work panel's Changes page, still (Panel.tsx, DiffView.tsx): an r20 plane card. */
-.hs-mock-changes {
-  --hs-canvas: 632;
-  padding-bottom: calc(10 * var(--u));
-  border-radius: calc(20 * var(--u));
-  background: var(--hs-plane);
+/* The work panel (Panel.tsx, panel-browser.css) stands on the same ground as the conversation beside it, parted by a
+   hairline seam that starts as a short stroke on the top line. Its header holds its pages as tabs, the add button
+   after them, and expand at the far end. */
+.hs-app-panel {
+  position: relative;
+  flex: none;
+  width: calc(504 * var(--u));
+  overflow: hidden;
 }
-/* The panel's header (PanelHeader.tsx, panel-browser.css): its pages as text tabs, the open one in ink and the rest
-   faint, then the add button, and the panel's tools at the far end. */
+.hs-app-panel::before,
+.hs-app-panel .hs-panel-header::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  width: var(--hairline);
+  background: var(--hs-line);
+  pointer-events: none;
+}
+.hs-app-panel::before {
+  top: calc(44 * var(--u) - var(--hairline));
+  bottom: 0;
+}
+.hs-app-panel .hs-panel-header::before {
+  top: calc(8.6 * var(--u));
+  bottom: calc(8.6 * var(--u));
+}
 .hs-panel-header {
+  position: relative;
   display: flex;
   flex: none;
   align-items: center;
   gap: calc(2 * var(--u));
   height: calc(44 * var(--u));
   padding: 0 calc(10 * var(--u));
+  border-bottom: var(--hairline) solid var(--hs-line);
 }
-.hs-panel-tabs {
-  display: flex;
-  gap: calc(2 * var(--u));
+.hs-panel-expand {
+  margin-left: auto;
 }
-.hs-panel-tab {
-  display: flex;
-  align-items: center;
-  gap: calc(6 * var(--u));
-  height: calc(28 * var(--u));
-  padding: 0 calc(10 * var(--u)) 0 calc(8 * var(--u));
-  border-radius: calc(10 * var(--u));
+/* The Changes page alone, still: the panel's header over its page. */
+.hs-mock-changes {
+  --hs-canvas: 632;
+  padding-bottom: calc(10 * var(--u));
+}
+.hs-panel-bar .hs-round {
   color: var(--hs-faint);
-  line-height: calc(16 * var(--u));
-  white-space: nowrap;
 }
-.hs-panel-tab[data-selected] {
-  color: var(--hs-ink);
-}
-.hs-panel-tab :is(.hs-icon, .hs-file-glyph) {
-  width: calc(14 * var(--u));
-  height: calc(14 * var(--u));
-}
-.hs-panel-refresh .hs-icon {
+.hs-panel-bar .hs-icon {
   width: calc(15 * var(--u));
   height: calc(15 * var(--u));
-}
-.hs-panel-tools {
-  display: flex;
-  gap: calc(2 * var(--u));
-  margin-left: auto;
 }
 .hs-panel-bar {
   display: flex;
@@ -2107,7 +2295,6 @@
 }
 .hs-panel-refresh {
   margin-left: auto;
-  color: var(--hs-faint);
 }
 .hs-diff-file {
   padding: 0 calc(10 * var(--u));
@@ -2209,6 +2396,220 @@
   margin-top: calc(2 * var(--u));
 }
 
+.hs-diff-file + .hs-diff-file {
+  margin-top: calc(8 * var(--u));
+}
+.hs-page-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* The panel's Files page (FileExplorer.tsx, file-explorer.css): Explorer, the filter field, then 28-unit rows that step
+   in 14 per level, a folder's rows hanging from a faint guide under its chevron. */
+.hs-explorer-bar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: calc(2 * var(--u));
+  height: calc(44 * var(--u));
+  padding: calc(4 * var(--u)) calc(8 * var(--u)) calc(4 * var(--u)) calc(16 * var(--u));
+  color: var(--hs-muted);
+  font-size: calc(12 * var(--u));
+  line-height: calc(16 * var(--u));
+}
+.hs-explorer-bar > span:first-child {
+  flex: 1;
+}
+.hs-explorer-bar .hs-round {
+  width: calc(24 * var(--u));
+  height: calc(24 * var(--u));
+}
+.hs-explorer-bar .hs-icon {
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
+}
+/* The filter reads like the list head's Search: no field, the glyph and its words in the muted ink. */
+.hs-explorer-filter {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: calc(8 * var(--u));
+  height: calc(32 * var(--u));
+  margin: calc(8 * var(--u));
+  padding: 0 calc(12 * var(--u)) 0 calc(8 * var(--u));
+  border-radius: 999px;
+  color: var(--hs-muted);
+  line-height: calc(16 * var(--u));
+}
+.hs-explorer-filter .hs-icon {
+  width: calc(16 * var(--u));
+  height: calc(16 * var(--u));
+}
+.hs-tree {
+  padding: 0 calc(5 * var(--u)) calc(12 * var(--u));
+}
+.hs-tree-group {
+  position: relative;
+}
+.hs-tree-row {
+  display: flex;
+  align-items: center;
+  gap: calc(6 * var(--u));
+  height: calc(28 * var(--u));
+  padding: 0 calc(8 * var(--u)) 0 calc((8 + var(--level) * 14) * var(--u));
+  border-radius: calc(10 * var(--u));
+  color: var(--hs-muted);
+  font-size: calc(12 * var(--u));
+  line-height: calc(20 * var(--u));
+  white-space: nowrap;
+}
+.hs-tree-row[data-selected] {
+  background: var(--hs-plane);
+  color: var(--hs-ink);
+}
+.hs-tree-row :is(.hs-icon, .hs-file-glyph) {
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
+}
+.hs-tree-row .hs-tree-chevron {
+  flex: none;
+  width: calc(12 * var(--u));
+  height: calc(12 * var(--u));
+}
+.hs-tree-folder {
+  opacity: 0.65;
+}
+.hs-tree-guide {
+  position: absolute;
+  top: calc(var(--from) * 28 * var(--u));
+  left: calc((14 + var(--level) * 14) * var(--u));
+  height: calc(var(--count) * 28 * var(--u));
+  border-left: var(--hairline) solid color-mix(in srgb, var(--hs-line) 55%, transparent);
+}
+
+/* The panel's Terminal page: the shell's folder in the bar, and the shell's lines in the code font. */
+.hs-panel-path {
+  font-family: var(--hs-mono);
+  letter-spacing: 0;
+}
+.hs-terminal {
+  padding: 0 calc(10 * var(--u)) calc(10 * var(--u)) calc(20 * var(--u));
+  color: var(--hs-ink);
+  font-family: var(--hs-mono);
+  font-size: calc(12 * var(--u));
+  line-height: calc(21 * var(--u));
+  letter-spacing: 0;
+  white-space: pre;
+}
+.hs-terminal > div {
+  min-height: calc(21 * var(--u));
+}
+.hs-terminal-dim {
+  color: var(--hs-faint);
+}
+
+/* The panel's browser (panel-browser.css): Back and Forward, the address pill with Reload, Home, then the page on a
+   rounded viewport inset in the panel. */
+.hs-browser-bar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: calc(4 * var(--u));
+  height: calc(44 * var(--u));
+  padding: 0 calc(10 * var(--u));
+}
+.hs-browser-forward {
+  color: var(--hs-faint);
+}
+.hs-address {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  height: calc(32 * var(--u));
+  margin: 0 calc(4 * var(--u));
+  padding: 0 calc(4 * var(--u)) 0 calc(14 * var(--u));
+  border-radius: 999px;
+  background: var(--hs-control);
+  color: var(--hs-muted);
+  font-size: calc(12 * var(--u));
+  white-space: nowrap;
+}
+.hs-address .hs-round {
+  width: calc(24 * var(--u));
+  height: calc(24 * var(--u));
+  margin-left: auto;
+}
+.hs-address .hs-icon {
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
+}
+.hs-viewport {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  margin: 0 calc(10 * var(--u)) calc(10 * var(--u));
+  overflow: hidden;
+  border-radius: calc(14 * var(--u));
+  background: var(--hs-plane);
+}
+/* The page the welcome thread built, as studio draws it: a heading, one line, the project picker and the next step. */
+.hs-site {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(12 * var(--u));
+  padding-bottom: calc(40 * var(--u));
+  text-align: center;
+}
+.hs-site-title {
+  font-size: calc(26 * var(--u));
+  line-height: calc(32 * var(--u));
+  letter-spacing: -0.02em;
+}
+.hs-site-text {
+  color: var(--hs-muted);
+  font-size: calc(14 * var(--u));
+  line-height: calc(22 * var(--u));
+}
+.hs-site-picker {
+  display: flex;
+  align-items: center;
+  gap: calc(8 * var(--u));
+  width: calc(240 * var(--u));
+  height: calc(36 * var(--u));
+  margin-top: calc(14 * var(--u));
+  padding: 0 calc(12 * var(--u));
+  border-radius: calc(10 * var(--u));
+  background: var(--hs-fill);
+  color: var(--hs-muted);
+  text-align: left;
+}
+.hs-site-picker > span {
+  flex: 1;
+}
+.hs-site-picker .hs-icon {
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
+}
+.hs-site-button {
+  display: grid;
+  place-items: center;
+  width: calc(240 * var(--u));
+  height: calc(36 * var(--u));
+  border-radius: calc(10 * var(--u));
+  background: var(--hs-accent);
+  color: var(--hs-on-accent);
+}
+.hs-site-hint {
+  color: var(--hs-faint);
+  font-size: calc(12 * var(--u));
+}
+
 /* Worktrees, still: a whole window on the tile. */
 .hs-mock-worktree {
   --hs-canvas: 1360;
@@ -2216,29 +2617,99 @@
   height: clamp(440px, 44vw, 620px);
 }
 
-/* The app at rest, still: one 1248 × 780 window with the Changes panel dragged narrower than its 536 default, to 480,
-   so the conversation beside it keeps its composer row whole, at the app's narrow reading gutters. */
+/* The app, live: one 1456 × 910 window with three threads open in tabs and the panel dragged to 504, so every tab keeps
+   the 136 it needs. Each thread has its own panel pages. Picking a tab swaps the thread, or the panel's page, in
+   place: the old one blurs out as the new one blurs in. */
 .hs-mock-app {
-  --hs-canvas: 1248;
+  --hs-canvas: 1456;
   display: flex;
-  height: calc(780 * var(--u));
+  height: calc(910 * var(--u));
 }
-.hs-mock-app .hs-column {
-  padding-inline: calc(12 * var(--u));
+.hs-app-panel,
+.hs-pages {
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
 }
-/* The open panel is its own plane from the window's top line to its foot, beside the conversation on the tile. */
-.hs-app-panel {
+.hs-pages {
+  flex: 1;
+  min-height: 0;
+}
+:is(.hs-app-panel, .hs-pages) > * {
+  grid-area: 1 / 1;
+}
+.hs-page,
+.hs-panel-session {
   display: flex;
-  flex: none;
   flex-direction: column;
-  width: calc(480 * var(--u));
-  overflow: hidden;
-  background: var(--hs-plane);
-  --hs-control: var(--hs-fill);
+  min-width: 0;
+  min-height: 0;
+}
+[data-swap="in"] {
+  animation: hs-swap-in 200ms ease-out both;
+}
+[data-swap="out"] {
+  animation: hs-swap-out 140ms ease-in both;
+  pointer-events: none;
 }
 .hs-round[data-on] {
   background: var(--hs-fill);
   color: var(--hs-ink);
+}
+/* A thread's menu (floating.css): 8 under the header's line, its right edge 8 in from the thread's, r16 on the
+   floating fill with 36 rows of r10, muted glyphs and hairlines between groups. */
+.hs-menu {
+  position: absolute;
+  z-index: 3;
+  top: calc(52 * var(--u));
+  right: calc(8 * var(--u));
+  display: flex;
+  flex-direction: column;
+  gap: calc(2 * var(--u));
+  min-width: calc(192 * var(--u));
+  padding: calc(6 * var(--u));
+  border-radius: calc(16 * var(--u));
+  background: var(--hs-plane);
+  font-size: calc(13 * var(--u));
+  line-height: calc(16 * var(--u));
+  white-space: nowrap;
+}
+.hs-menu-item {
+  display: flex;
+  align-items: center;
+  gap: calc(10 * var(--u));
+  min-height: calc(36 * var(--u));
+  padding: 0 calc(10 * var(--u));
+  border-radius: calc(10 * var(--u));
+  color: var(--hs-ink);
+}
+.hs-menu-item > .hs-icon {
+  flex: none;
+  width: calc(15 * var(--u));
+  height: calc(15 * var(--u));
+  color: var(--hs-muted);
+}
+.hs-menu-item > .hs-menu-more {
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
+  margin-left: auto;
+}
+.hs-menu-tag {
+  margin-left: auto;
+  padding-left: calc(16 * var(--u));
+  color: var(--hs-faint);
+  font-size: calc(12 * var(--u));
+}
+.hs-menu-tag + .hs-menu-more {
+  margin-left: 0;
+}
+.hs-menu-item[data-danger],
+.hs-menu-item[data-danger] > .hs-icon {
+  color: var(--hs-bad);
+}
+.hs-menu-separator {
+  height: 0;
+  margin: calc(4 * var(--u)) calc(10 * var(--u));
+  border-top: var(--hairline) solid var(--hs-line);
 }
 /* Threads that talk, still: one thread whose transcript reads from the top, so the message that reached it leads. */
 .hs-mock-message {
@@ -2447,6 +2918,12 @@
 }
 @keyframes hs-swap-in {
   from {
+    opacity: 0;
+    filter: blur(calc(3 * var(--u)));
+  }
+}
+@keyframes hs-swap-out {
+  to {
     opacity: 0;
     filter: blur(calc(3 * var(--u)));
   }

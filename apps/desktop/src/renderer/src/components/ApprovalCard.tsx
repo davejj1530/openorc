@@ -26,41 +26,58 @@ function DeniedLine({ block, label }: { block: ApprovalBlock; label: string }) {
   );
 }
 
-/** The agent asks before it acts: what it wants to do, then Deny, Allow for this run and Allow. */
+/** The foot's switch between the request as summed up, or nothing when a reason says it, and the raw request. */
+function toggleLabel(raw: boolean, summed: boolean): string {
+  if (raw) return summed ? "Summary" : "Hide request";
+  return summed ? "Raw request" : "Show request";
+}
+
+/** What the card asks, in words: the agent's own reason when it gives one, else what the request does. */
+function askFor(block: ApprovalBlock, label: string): string {
+  if (block.reason) return block.reason;
+  return typeof approvalDetail(block) === "string" ? "Run this command?" : `Allow ${label}?`;
+}
+
+/**
+ * The agent asks before it acts, laid out as a question card is: what it asks, the request itself in a well the width
+ * of the card, then a foot with the raw request on demand and Deny, Allow for this run and Allow.
+ */
 export function ApprovalCard({ block, runId }: { block: ApprovalBlock; runId: string }) {
   const decide = (decision: "allow" | "allow_for_run" | "deny") => void core.call("approvals.resolve", { runId, approvalId: block.approvalId, decision });
   const [raw, setRaw] = useState(false);
   const label = block.toolName ?? block.approvalKind;
   if (block.decision && block.decision !== "deny") return null;
   if (block.decision) return <DeniedLine block={block} label={label} />;
-  const detail = approvalDetail(block);
-  const Icon = typeof detail === "string" ? Terminal : Hammer;
+  const command = typeof approvalDetail(block) === "string";
+  const Icon = command ? Terminal : Hammer;
+  // A reason already says what a request does; its fields are there on demand. A command is always shown, to be read.
+  const shown = raw || command || !block.reason;
   return (
     <div data-blocking="true" data-plane className="approval-card">
-      <div className="approval-card-request">
-        <span className="approval-card-well" aria-hidden="true">
-          <Icon size={16} />
-        </span>
-        <div className="approval-card-words">
-          <span className="approval-card-title">{block.reason ?? `Allow ${label}?`}</span>
-          <pre className="approval-card-detail" data-raw={raw || undefined}>
-            {raw ? pretty(block.input, 800) : approvalSummary(block)}
-          </pre>
+      <p className="approval-card-ask">
+        <Icon size={14} className="approval-card-icon" aria-hidden="true" />
+        <span>{askFor(block, label)}</span>
+      </p>
+      {shown ? (
+        <pre className="approval-card-detail" data-raw={raw || undefined}>
+          {raw ? pretty(block.input, 800) : approvalSummary(block)}
+        </pre>
+      ) : null}
+      <div className="approval-card-foot">
+        <span className="min-w-0 flex-1">
           <TextButton tone="faint" onClick={() => setRaw((v) => !v)} className="approval-card-raw">
-            {raw ? "Summary" : "Raw request"}
+            {toggleLabel(raw, command || !block.reason)}
           </TextButton>
-        </div>
-      </div>
-      <div className="approval-card-actions">
-        <Button size="lg" variant="secondary" onClick={() => decide("deny")}>
+        </span>
+        <Button size="md" variant="ghost" onClick={() => decide("deny")}>
           Deny
         </Button>
         {block.onceOnly ? null : (
-          <Button size="lg" variant="secondary" onClick={() => decide("allow_for_run")}>
+          <Button size="md" variant="secondary" onClick={() => decide("allow_for_run")}>
             Allow for this run
           </Button>
         )}
-        <Button size="lg" variant="primary" onClick={() => decide("allow")}>
+        <Button size="md" variant="primary" onClick={() => decide("allow")}>
           Allow
         </Button>
       </div>

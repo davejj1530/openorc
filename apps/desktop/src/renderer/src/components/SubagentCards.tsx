@@ -92,7 +92,7 @@ function LaneHead({ card, model, now }: { card: SubagentCard; model: string; now
         <SubagentMark status={card.status} />
       </span>
       <span className="subagent-card-name">{card.title}</span>
-      <span className="subagent-card-meta subagent-card-kind" title={card.agentType}>
+      <span className="subagent-card-meta subagent-card-kind" data-tip={card.agentType}>
         {[kindName(card.agentType), model].filter(Boolean).join(" · ")}
       </span>
       {quiet ? null : <span className="subagent-card-meta">{subagentStatusLabel[card.status]}</span>}

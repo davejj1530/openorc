@@ -40,6 +40,8 @@ vi.mock("../client", async () => ({
   useSavedMacs: () => phone.macs,
   useHostGroup: () => ({ primary: "studio", partner: null }),
   usePartnerLinkState: () => phone.state,
+  // A Mac that has not listed Orclings: this iPhone's Orclings row stays out.
+  useRpc: () => ({ data: undefined }),
   storage: new (await import("../scratch-store")).ScratchStore({
     getString: (key) => phone.saved.get(key),
     set: (key, value) => void phone.saved.set(key, value),
@@ -180,6 +182,26 @@ it("shows the usage at full strength, with no read time, while connected", () =>
   expect(dimmed(screen.getByRole("header", { name: "Codex, Pro" }))).toBe(false);
 });
 
+it("shows Antigravity's model pools and reset times in the same usage cards", () => {
+  const antigravity: PlanLimits = {
+    id: "antigravity",
+    provider: "antigravity",
+    name: "Antigravity",
+    plan: null,
+    status: "available",
+    refreshedAt: now,
+    windows: [
+      { ...codex.windows[0]!, id: "gemini-weekly", label: "Weekly Limit · Gemini Models", group: "Gemini Models", usedPercent: 3, remainingPercent: 97 },
+      { ...codex.windows[0]!, id: "3p-weekly", label: "Weekly Limit · Claude and GPT models", group: "Claude and GPT models", usedPercent: 0, remainingPercent: 100 },
+    ],
+  };
+  usage.current = { accounts: [antigravity], state: "ready", live: true, readAt: now, now, hostName: "Studio", retry: () => undefined };
+  render(<SettingsScreen />);
+  expect(screen.getByRole("header", { name: "Antigravity" })).toBeTruthy();
+  expect(screen.getByLabelText(/Weekly Limit · Gemini Models, 97% left, Resets/)).toBeTruthy();
+  expect(screen.getByLabelText(/Weekly Limit · Claude and GPT models, 100% left, Resets/)).toBeTruthy();
+});
+
 it("waits for the host by name, and offers another try after a read that failed, instead of a dead end", () => {
   usage.current = { accounts: [], state: "loading", live: false, readAt: null, now, hostName: "Eliass-MacBook-Pro", retry: () => undefined };
   const waiting = render(<SettingsScreen />);
@@ -198,3 +220,22 @@ function dimmed(node: Element): boolean {
   for (let at: Element | null = node; at; at = at.parentElement) if (/\bopacity-/.test(String(nativeProps.get(at)?.className ?? ""))) return true;
   return false;
 }
+
+it("shows an fx monetary balance without an empty allowance or guessed percentage", () => {
+  const fx: PlanLimits = {
+    id: "fx",
+    provider: "fx",
+    name: "fx",
+    plan: null,
+    status: "available",
+    refreshedAt: now,
+    windows: [],
+    credits: [{ label: "AI Gateway balance", balance: "12.50", unlimited: false, currency: "USD" }],
+  };
+  usage.current = { accounts: [fx], state: "ready", live: true, readAt: now, now, hostName: "Studio", retry: () => undefined };
+  render(<SettingsScreen />);
+  expect(screen.getByRole("header", { name: "fx" })).toBeTruthy();
+  expect(screen.getByText("AI Gateway balance")).toBeTruthy();
+  expect(screen.getByText("$12.50")).toBeTruthy();
+  expect(screen.queryByText("No limits reported")).toBeNull();
+});

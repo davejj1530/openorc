@@ -10,7 +10,7 @@ const segmentSizes: Record<SegmentedSize, string> = {
   lg: "h-8 px-5 text-base",
 };
 
-export type SegmentedOption<T extends string> = { value: T; label: ReactNode; disabled?: boolean; reason?: string };
+export type SegmentedOption<T extends string> = { value: T; label: ReactNode; title?: string; disabled?: boolean; reason?: string };
 
 /**
  * One choice from a short set: a fill track at its natural width, with a surface knob that
@@ -45,7 +45,7 @@ export function Segmented<T extends string>({
           role="radio"
           aria-checked={value === option.value}
           disabled={option.disabled}
-          title={option.disabled ? option.reason : undefined}
+          data-tip={option.disabled ? option.reason : option.title}
           onClick={() => onChange(option.value)}
           className={cn("segmented-option", segmentSizes[size])}
         >

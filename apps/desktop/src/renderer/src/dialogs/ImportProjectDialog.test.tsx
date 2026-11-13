@@ -56,12 +56,13 @@ it("asks before creating a folder that does not exist, and an edited path import
 });
 
 it("creates and imports the missing folder on the second press, then starts a thread in it", async () => {
+  useLayout.setState({ workspace: "elsewhere" });
   await importMissingFolder();
   fireEvent.click(screen.getByRole("button", { name: "Create and import" }));
   await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
   expect(importCalls()).toEqual([["projects.import", { rootPath: missingFolder, create: true }]]);
   expect(useRouter.getState().route).toEqual({ view: "newthread", projectId: `project:${missingFolder}` });
-  expect(useLayout.getState().projectId).toBe(`project:${missingFolder}`);
+  expect(useLayout.getState().workspace).toBe(`project:${missingFolder}`);
 });
 
 it("imports anyway when the folder check fails, so the import's error explains the problem", async () => {

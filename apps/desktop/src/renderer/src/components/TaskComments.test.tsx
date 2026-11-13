@@ -1,21 +1,23 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { TaskDiscussion } from "@openorc/protocol";
+import { harnessName, type ModelOption, type TaskDiscussion } from "@openorc/protocol";
 import { core } from "../lib/rpc";
 import { TaskComments } from "./TaskComments";
 vi.mock("./ThreadImages", () => ({ ThreadRichText: ({ children }: { children: string }) => <div>{children}</div> }));
 let discussion: TaskDiscussion;
+let models: ModelOption[];
 let failSend = false;
 const beforeSend = vi.fn(async () => true);
 const api = vi.spyOn(core, "call");
 beforeEach(() => {
   localStorage.clear();
   discussion = { comments: [], attempts: [] };
+  models = [{ id: "test-model", label: "Test", agent: "codex", efforts: ["high", "low"], defaultEffort: "high", isDefault: true }];
   failSend = false;
   beforeSend.mockReset().mockResolvedValue(true);
   api.mockImplementation(async (method, params) => {
-    if (method === "agents.models") return [{ id: "test-model", label: "Test", agent: "codex", efforts: ["high", "low"], defaultEffort: "high", isDefault: true }] as never;
+    if (method === "agents.models") return models as never;
     if (method === "tasks.comments.list") return discussion as never;
     if (method === "tasks.comments.post") {
       if (failSend) throw new Error("Disconnected. Retry your comment.");
@@ -41,6 +43,27 @@ it("inserts the model's display name and effort with the keyboard without submit
   await screen.findByRole("option", { name: "@Test - High Codex" });
   fireEvent.keyDown(input(), { key: "Enter" });
   expect(input().value).toBe("@Test - High ");
+  expect(posted()).toHaveLength(0);
+});
+it.each(["omp", "cursor", "pi", "antigravity"] as const)("offers %s for task discussions", async (agent) => {
+  models = models.map((model) => ({ ...model, agent }));
+  mount();
+  fireEvent.change(input(), { target: { value: "@test", selectionStart: 5 } });
+  const option = await screen.findByRole("option", { name: `@Test - High ${harnessName(agent)}` });
+  expect(option.getAttribute("aria-disabled")).toBe("false");
+  fireEvent.click(option);
+  expect(input().value).toBe("@Test - High ");
+});
+it("explains why fx cannot join a read-only discussion with both mouse and keyboard", async () => {
+  models = models.map((model) => ({ ...model, agent: "fx" }));
+  mount();
+  fireEvent.change(input(), { target: { value: "@test", selectionStart: 5 } });
+  const option = await screen.findByRole("option", { name: "@Test - High fx · No read-only Plan mode" });
+  expect(option.getAttribute("aria-disabled")).toBe("true");
+  fireEvent.click(option);
+  expect((await screen.findByRole("alert")).textContent).toContain("fx cannot join task discussions");
+  fireEvent.keyDown(input(), { key: "Enter" });
+  expect(input().value).toBe("@test");
   expect(posted()).toHaveLength(0);
 });
 it("flushes the task before posting a plain note with no recipients", async () => {

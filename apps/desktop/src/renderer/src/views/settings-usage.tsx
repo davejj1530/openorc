@@ -1,16 +1,18 @@
-import { creditBalanceLabel, usageCardState, type UsageCardState } from "./settings-presentation";
+import { usageCardState, type UsageCardState } from "./settings-presentation";
 import { ResetControls } from "./settings-resets";
-import { harnessCatalog, harnessIds, percentLeft, type AllowanceWindow, type ProviderUsage } from "@openorc/protocol";
+import { harnessCatalog, percentLeft, type AllowanceWindow, type ProviderUsage } from "@openorc/protocol";
 import { Button, IconButton, TextButton, Tooltip } from "../components/ui";
 import { HarnessLogo } from "../components/HarnessLogo";
 import { ChevronDown, ExternalLink, RefreshCw } from "../components/icons";
-import { allowanceState, formatUsageTime, usageResetLabel } from "@openorc/client";
+import { creditBalanceLabel, allowanceState, formatUsageTime, usageResetLabel } from "@openorc/client";
 import { useEffect, useId, useRef, useState } from "react";
 import { useRpc } from "../lib/client";
+import { useEnabledHarnesses } from "../lib/enabled-harnesses";
 import { cn } from "../lib/cn";
 
 export function ProviderUsageOverview({ active }: { active: boolean }) {
-  const accounts = useRpc("claude.accounts.list", {}, { enabled: active });
+  const enabled = useEnabledHarnesses();
+  const accounts = useRpc("claude.accounts.list", {}, { enabled: active && enabled.includes("claude") });
   const memory = useRpc("memory.settings.get", {});
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
@@ -22,12 +24,12 @@ export function ProviderUsageOverview({ active }: { active: boolean }) {
   return (
     <div className="usage-overview">
       <div className="usage-grid">
-        {harnessIds
+        {enabled
           .filter((id) => id !== "claude")
           .map((id) => (
             <ProviderReport key={id} provider={id} name={harnessCatalog[id].name} active={active} now={now} />
           ))}
-        {(accounts.data?.accounts ?? [{ id: "claude-cli", name: "Existing CLI login", enabled: true }])
+        {(enabled.includes("claude") ? (accounts.data?.accounts ?? [{ id: "claude-cli", name: "Existing CLI login", enabled: true }]) : [])
           .filter((account) => account.enabled)
           .map((account) => (
             <ProviderReport key={account.id} provider="claude" claudeAccountId={account.id} name={`Claude · ${account.name}`} active={active} now={now} />
@@ -124,7 +126,7 @@ function UsageCardHeading({
         <HarnessLogo id={provider === "anthropic-api" ? "claude" : provider} size={16} />
         <div>
           <h2>{name}</h2>
-          <p title={context}>{context ?? "Checking account…"}</p>
+          <p data-tip={context}>{context ?? "Checking account…"}</p>
         </div>
       </div>
       <div className="usage-account-status">
@@ -163,7 +165,9 @@ function ProviderAllowances({ report: d, now, outdated }: { report: ProviderUsag
   const resets = d.resets;
   return (
     <>
-      {d.windows.length === 0 && <p className="usage-empty">{d.status === "disconnected" ? "Connect this provider to see its account allowances." : "No limits reported."}</p>}
+      {d.windows.length === 0 && d.credits.length === 0 && (
+        <p className="usage-empty">{d.status === "disconnected" ? "Connect this provider to see its account allowances." : "No limits reported."}</p>
+      )}
       {d.windows.length > 0 && (
         <div className="usage-windows">
           {d.windows.map((w) => (
@@ -264,7 +268,7 @@ function UsageWindow({ value: w, now, outdated }: { value: AllowanceWindow; now:
           {percent === null ? "Not reported" : `${percent}% left`}
         </span>
         <h3>{w.label}</h3>
-        <p title={w.resetsAt === null ? undefined : formatUsageTime(w.resetsAt)}>{stale ? `Out of date · reported ${formatUsageTime(w.observedAt)}` : usageResetLabel(w.resetsAt, now)}</p>
+        <p data-tip={w.resetsAt === null ? undefined : formatUsageTime(w.resetsAt)}>{stale ? `Out of date · reported ${formatUsageTime(w.observedAt)}` : usageResetLabel(w.resetsAt, now)}</p>
       </div>
     </div>
   );

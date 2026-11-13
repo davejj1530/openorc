@@ -2,7 +2,7 @@ import "fake-indexeddb/auto";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { WORKSPACE_ID, type FindResult, type Project, type RpcMethod, type RpcParams, type RpcResults, type ThreadSummary } from "@openorc/protocol";
+import { FileVersion, FolderPath, WORKSPACE_ID, type FileRead, type FindResult, type Project, type RpcMethod, type RpcParams, type RpcResults, type ThreadSummary } from "@openorc/protocol";
 import { NewFileDialog } from "../dialogs/NewFileDialog";
 import { fakeFileDisk } from "../fixtures/file-disk";
 import { useAppShortcuts } from "../lib/app-shortcuts";
@@ -54,6 +54,7 @@ function findOnDisk({ query }: RpcParams<"files.find">): FindResult {
   return { kind: "matches", groups, truncated: false };
 }
 let answerFind: (params: RpcParams<"files.find">) => FindResult | Promise<FindResult> = findOnDisk;
+let answerSearch: ((params: RpcParams<"files.search">) => string[]) | null = null;
 
 beforeEach(() => {
   disk = fakeFileDisk();
@@ -68,7 +69,7 @@ beforeEach(() => {
     if (method === "files.search") {
       const search = params as RpcParams<"files.search">;
       searches.push(search);
-      return [...disk.files.keys()].filter((path) => path.includes(search.query)) as RpcResults[M];
+      return (answerSearch?.(search) ?? [...disk.files.keys()].filter((path) => path.includes(search.query))) as RpcResults[M];
     }
     if (method === "files.read") return disk.read((params as RpcParams<"files.read">).path) as RpcResults[M];
     if (method === "files.write") return disk.write(params as RpcParams<"files.write">) as RpcResults[M];
@@ -95,6 +96,7 @@ afterEach(() => {
   finds.length = 0;
   explains.length = 0;
   answerFind = findOnDisk;
+  answerSearch = null;
   queryClient.clear();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -117,8 +119,8 @@ function Window() {
 
 const press = (key: string) => fireEvent.keyDown(document.body, { key, metaKey: true });
 const pressShift = (key: string) => fireEvent.keyDown(document.body, { key, metaKey: true, shiftKey: true });
-const findBox = () => screen.findByRole<HTMLInputElement>("textbox", { name: "Find in files" });
-const search = () => screen.findByRole<HTMLInputElement>("textbox", { name: "Find a file" });
+const search = () => screen.findByRole<HTMLInputElement>("textbox", { name: "Search files" });
+const inFiles = () => screen.findByRole("region", { name: "In files" });
 const tabs = () => screen.getAllByRole("tab").map((tab) => tab.getAttribute("aria-label"));
 const activeTab = () =>
   screen
@@ -160,9 +162,9 @@ it("brings a second ⌘P back to the same Files tab, with what was typed selecte
   fireEvent.click(await screen.findByRole("button", { name: "src/cart.ts" }));
   await editor();
   press("p");
+  await waitFor(() => expect(activeTab()).toBe("Files"));
   const box = await search();
   expect(tabs()).toEqual(["Files", "cart.ts"]);
-  expect(activeTab()).toBe("Files");
   expect(box.value).toBe("cart");
   await waitFor(() => expect(document.activeElement).toBe(box));
   expect([box.selectionStart, box.selectionEnd]).toEqual([0, 4]);
@@ -221,37 +223,39 @@ it("creates a file from the Files tool's New file and opens it empty in a tab", 
   expect(screen.queryByRole("dialog")).toBeNull();
 });
 
-it("finds what files contain on ⌘⇧F, grouped by file, and opens a line's file there in a tab of its own", async () => {
+it("finds what files contain from the same search box on ⌘⇧F, grouped by file, and opens a line's file there in a tab of its own", async () => {
   disk.set("src/cart.ts", "export const total = 1;\nexport const totalWithTax = 2;\n");
   render(<Window />);
   expect(pressShift("F"), "the window claims ⌘⇧F").toBe(false);
-  const box = await findBox();
+  const box = await search();
   await waitFor(() => expect(document.activeElement).toBe(box));
-  expect(screen.getByRole("radio", { name: "Contents" }).getAttribute("aria-checked")).toBe("true");
   fireEvent.change(box, { target: { value: "total" } });
-  expect(await screen.findByText("2 matching lines in 1 file.")).toBeTruthy();
+  const lines = await inFiles();
+  expect(await within(lines).findByText("2 lines")).toBeTruthy();
   expect(finds).toEqual([{ scope, query: { text: "total", regex: false, caseSensitive: false } }]);
-  const file = screen.getByRole("link", { name: /cart\.ts$/ }).closest("section")!;
+  const file = within(lines)
+    .getByRole("link", { name: /cart\.ts$/ })
+    .closest("section")!;
   expect([...within(file).getAllByRole("listitem")].map((line) => line.textContent)).toEqual(["1export const total = 1;", "2export const totalWithTax = 2;"]);
   expect([...file.querySelectorAll("mark")].map((mark) => mark.textContent)).toEqual(["total", "total"]);
   fireEvent.click(within(file).getByRole("link", { name: "2" }));
   expect(await screen.findByText("cart.ts:2")).toBeTruthy();
   expect(tabs()).toEqual(["Files", "cart.ts"]);
   fireEvent.click(screen.getByRole("tab", { name: "Files" }));
-  expect(await screen.findByText("2 matching lines in 1 file.")).toBeTruthy();
-  expect((await findBox()).value).toBe("total");
+  expect(await within(await inFiles()).findByText("2 lines")).toBeTruthy();
+  expect((await search()).value).toBe("total");
 });
 
 it("sends Match case and Regex with the text, and shows why a pattern can't be read", async () => {
   answerFind = () => ({ kind: "invalid", message: "Invalid regular expression: parentheses not balanced" });
   render(<Window />);
   pressShift("F");
-  const box = await findBox();
-  fireEvent.click(screen.getByRole("button", { name: "Match case" }));
-  fireEvent.click(screen.getByRole("button", { name: "Regex" }));
-  fireEvent.change(box, { target: { value: "total(" } });
+  fireEvent.change(await search(), { target: { value: "total(" } });
+  const lines = await inFiles();
+  fireEvent.click(within(lines).getByRole("button", { name: "Match case" }));
+  fireEvent.click(within(lines).getByRole("button", { name: "Regex" }));
+  await waitFor(() => expect(finds.at(-1)?.query).toEqual({ text: "total(", regex: true, caseSensitive: true }));
   expect((await screen.findByRole("alert")).textContent).toBe("Invalid regular expression: parentheses not balanced");
-  expect(finds.at(-1)?.query).toEqual({ text: "total(", regex: true, caseSensitive: true });
   expect(screen.getByRole("button", { name: "Regex" }).getAttribute("aria-pressed")).toBe("true");
 });
 
@@ -259,33 +263,87 @@ it("opens a found file whose name a link would read as an address", async () => 
   disk.set("a:b.ts", "const total = 3;\n");
   render(<Window />);
   pressShift("F");
-  fireEvent.change(await findBox(), { target: { value: "total = 3" } });
+  fireEvent.change(await search(), { target: { value: "total = 3" } });
   const file = (await screen.findByRole("link", { name: /a:b\.ts$/ })).closest("section")!;
   fireEvent.click(within(file).getByRole("link", { name: "1" }));
   expect(await screen.findByText("a:b.ts:1")).toBeTruthy();
 });
 
-it("switches between finding by name and by contents, each keeping what was typed", async () => {
+it("narrows the tree in place: matches in open folders stay in them, the rest of the project's below, the letters matched marked", async () => {
+  disk.set("docs/cart-notes.md", "# Cart\n");
+  useLayout.setState({ panelOpen: true });
+  render(<Window />);
+  fireEvent.click(screen.getByRole("button", { name: "Files" }));
+  fireEvent.click(await screen.findByRole("treeitem", { name: "src" }));
+  await screen.findByRole("treeitem", { name: "cart.ts" });
+  fireEvent.change(await search(), { target: { value: "cart" } });
+  const tree = await screen.findByRole("group", { name: "In open folders" });
+  const match = await within(tree).findByRole("button", { name: "src/cart.ts" });
+  expect(match.querySelector(".file-search-hit")?.textContent).toBe("cart");
+  expect(within(tree).queryByRole("button", { name: "src/checkout.ts" })).toBeNull();
+  const elsewhere = screen.getByRole("region", { name: "More in the project" });
+  expect(
+    within(elsewhere)
+      .getAllByRole("button")
+      .map((row) => row.getAttribute("aria-label")),
+  ).toEqual(["docs/cart-notes.md"]);
+  fireEvent.keyDown(screen.getByRole("textbox", { name: "Search files" }), { key: "Escape" });
+  expect(await screen.findByRole("treeitem", { name: "checkout.ts" })).toBeTruthy();
+});
+
+it("keeps one search for the conversation, on ⌘P and ⌘⇧F alike", async () => {
   render(<Window />);
   press("p");
   fireEvent.change(await search(), { target: { value: "cart" } });
-  fireEvent.click(screen.getByRole("radio", { name: "Contents" }));
-  const box = await findBox();
-  await waitFor(() => expect(document.activeElement).toBe(box));
-  fireEvent.change(box, { target: { value: "total" } });
-  fireEvent.click(screen.getByRole("radio", { name: "File names" }));
-  expect((await search()).value).toBe("cart");
   pressShift("F");
-  expect((await findBox()).value).toBe("total");
+  expect((await search()).value).toBe("cart");
   expect(tabs()).toEqual(["Files"]);
+});
+
+it("shows the lines of the first few files, then the rest on asking", async () => {
+  for (const name of ["a", "b", "c", "d", "e", "f"]) disk.set(`lib/${name}.ts`, "export const total = 0;\n");
+  render(<Window />);
+  press("p");
+  fireEvent.change(await search(), { target: { value: "total" } });
+  const lines = await inFiles();
+  await within(lines).findByText("7 lines");
+  expect(lines.querySelectorAll(".tool-view-matches > section")).toHaveLength(6);
+  fireEvent.click(within(lines).getByRole("button", { name: "Show all 7 matches" }));
+  expect(lines.querySelectorAll(".tool-view-matches > section")).toHaveLength(7);
+});
+
+it("searches inside files once three letters are typed, or fewer with Regex or Match case on", async () => {
+  render(<Window />);
+  press("p");
+  fireEvent.change(await search(), { target: { value: "to" } });
+  await new Promise((resolve) => setTimeout(resolve, 600));
+  expect(finds).toEqual([]);
+  fireEvent.click(within(await inFiles()).getByRole("button", { name: "Match case" }));
+  await waitFor(() => expect(finds.map((find) => find.query)).toEqual([{ text: "to", regex: false, caseSensitive: true }]));
+});
+
+it("opens the name the core ranked best on Enter, wherever it is drawn", async () => {
+  disk.set("src/total.ts", "export {};\n");
+  disk.set("total.md", "# Total\n");
+  useLayout.setState({ panelOpen: true });
+  render(<Window />);
+  fireEvent.click(screen.getByRole("button", { name: "Files" }));
+  fireEvent.click(await screen.findByRole("treeitem", { name: "src" }));
+  await screen.findByRole("treeitem", { name: "total.ts" });
+  answerSearch = () => ["total.md", "src/total.ts"];
+  const box = await search();
+  fireEvent.change(box, { target: { value: "total" } });
+  await screen.findByRole("button", { name: "total.md" });
+  fireEvent.keyDown(box, { key: "Enter" });
+  expect(await screen.findByRole("tab", { name: "total.md" })).toBeTruthy();
 });
 
 it("starts one find once typing pauses, not one per keystroke", async () => {
   render(<Window />);
   pressShift("F");
-  const box = await findBox();
+  const box = await search();
   for (const typed of ["t", "to", "tot", "tota", "total"]) fireEvent.change(box, { target: { value: typed } });
-  expect(await screen.findByText("1 matching line in 1 file.")).toBeTruthy();
+  expect(await within(await inFiles()).findByText("1 line")).toBeTruthy();
   expect(finds.map((find) => find.query.text)).toEqual(["total"]);
 });
 
@@ -293,10 +351,12 @@ it("shows nothing for a find that a newer one stopped", async () => {
   answerFind = () => ({ kind: "superseded" });
   render(<Window />);
   pressShift("F");
-  fireEvent.change(await findBox(), { target: { value: "total" } });
+  fireEvent.change(await search(), { target: { value: "total" } });
   await waitFor(() => expect(finds).toHaveLength(1));
-  await waitFor(() => expect(screen.queryByText("Searching…")).toBeNull());
-  expect(screen.queryByText(/match/)).toBeNull();
+  const lines = await inFiles();
+  await waitFor(() => expect(within(lines).queryByText("Searching…")).toBeNull());
+  expect(within(lines).queryAllByRole("listitem")).toHaveLength(0);
+  expect(within(lines).queryByText("No lines match.")).toBeNull();
   expect(screen.queryByRole("alert")).toBeNull();
 });
 
@@ -316,32 +376,34 @@ it("marks a file's tab with the kind of file it holds, and the Files tool's tab 
 it("keeps the last lines unmarked under Searching… while the next find runs", async () => {
   render(<Window />);
   pressShift("F");
-  const box = await findBox();
-  fireEvent.change(box, { target: { value: "total" } });
-  expect(await screen.findByText("1 matching line in 1 file.")).toBeTruthy();
+  fireEvent.change(await search(), { target: { value: "total" } });
+  const lines = await inFiles();
+  expect(await within(lines).findByText("1 line")).toBeTruthy();
   let finish: (result: FindResult) => void = () => {};
   answerFind = () => new Promise((resolve) => (finish = resolve));
-  fireEvent.click(screen.getByRole("button", { name: "Regex" }));
-  expect(await screen.findByText("Searching…")).toBeTruthy();
-  expect(screen.getByText("export const total = 1;")).toBeTruthy();
-  expect(document.querySelectorAll("mark")).toHaveLength(0);
+  fireEvent.click(within(lines).getByRole("button", { name: "Regex" }));
+  expect(await within(lines).findByText("Searching…")).toBeTruthy();
+  expect(within(lines).getByText("export const total = 1;")).toBeTruthy();
+  expect(lines.querySelectorAll("mark")).toHaveLength(0);
   act(() => finish({ kind: "matches", truncated: false, groups: [] }));
-  expect(await screen.findByText("No matches.")).toBeTruthy();
+  expect(await within(lines).findByText("No lines match.")).toBeTruthy();
 });
 
 it("doesn't search for spaces alone", async () => {
   render(<Window />);
   pressShift("F");
-  fireEvent.change(await findBox(), { target: { value: "   " } });
+  fireEvent.change(await search(), { target: { value: "   " } });
   await new Promise((resolve) => setTimeout(resolve, 400));
   expect(finds).toEqual([]);
+  expect(searches).toEqual([]);
+  expect(screen.getByRole("tree", { name: "Project files" })).toBeTruthy();
 });
 
 it("leaves focus where it was when the panel shows the Files tool without being asked", async () => {
   usePanelSessions.getState().open(`thread:${thread.id}`, { kind: "file", selection: null });
   useLayout.setState({ panelOpen: true });
   render(<Window />);
-  const box = await screen.findByRole("textbox", { name: "Filter files" });
+  const box = await screen.findByRole("textbox", { name: "Search files" });
   await new Promise((resolve) => setTimeout(resolve, 50));
   expect(document.activeElement).not.toBe(box);
 });
@@ -350,7 +412,7 @@ it("focuses the search box when the Files tool is opened from the new tab's tool
   useLayout.setState({ panelOpen: true });
   render(<Window />);
   fireEvent.click(await screen.findByRole("button", { name: "Files" }));
-  const box = await screen.findByRole("textbox", { name: "Filter files" });
+  const box = await screen.findByRole("textbox", { name: "Search files" });
   await waitFor(() => expect(document.activeElement).toBe(box));
 });
 
@@ -375,7 +437,7 @@ it("searches a git project's checkout from a new thread's panel, and a Workspace
     </QueryClientProvider>,
   );
   press("p");
-  await search();
+  fireEvent.change(await search(), { target: { value: "cart" } });
   await waitFor(() => expect(searches.at(-1)?.scope).toEqual({ kind: "project", id: project.id }));
   view.unmount();
   const workspace = { ...project, id: WORKSPACE_ID, name: "Workspace", rootPath: "/home" };
@@ -386,6 +448,7 @@ it("searches a git project's checkout from a new thread's panel, and a Workspace
     </QueryClientProvider>,
   );
   press("p");
+  fireEvent.change(await search(), { target: { value: "cart" } });
   await waitFor(() => expect(searches.at(-1)?.scope).toEqual({ kind: "project", id: WORKSPACE_ID, workingDirectory: "/notes" }));
 });
 
@@ -410,6 +473,33 @@ it("starts with a folder tree and keeps it beside file tabs without browser cont
   fireEvent.click(screen.getByRole("button", { name: "File actions" }));
   expect(await screen.findByRole("menuitem", { name: "Refresh" })).toBeTruthy();
   expect(screen.getByRole("menuitem", { name: "Copy path" })).toBeTruthy();
+});
+
+it("shows a file a reply links outside the folder read-only, under its own folder, without touching the tree", async () => {
+  const linked = "/tmp/vault/signin.log";
+  const outside: FileRead = {
+    kind: "file",
+    root: "/private/tmp/vault",
+    path: FolderPath.parse("signin.log"),
+    outside: true,
+    absolutePath: "/private/tmp/vault/signin.log",
+    version: FileVersion.parse("a".repeat(64)),
+    text: "signed in\n",
+    readOnly: "This file is outside this conversation's folder.",
+  };
+  const answer = vi.mocked(core.call).getMockImplementation();
+  vi.mocked(core.call).mockImplementation(async (method, params) => (method === "files.read" && (params as RpcParams<"files.read">).path === linked ? outside : answer?.(method, params)) as never);
+  useLayout.setState({ panelOpen: true });
+  render(<Window />);
+  act(() => useLayout.getState().openFile({ path: linked, scope }));
+  const shown = await editor();
+  expect([shown.value, shown.readOnly]).toEqual(["signed in\n", true]);
+  const crumbs = screen.getByRole("navigation", { name: "File path" });
+  expect(crumbs.textContent).toBe("vaultsignin.log");
+  expect(within(crumbs).queryByRole("button")).toBeNull();
+  expect(screen.getByText("Read-only")).toBeTruthy();
+  await screen.findByRole("treeitem", { name: "src" });
+  expect(Object.values(useFileExplorer.getState().folders).flat()).not.toContainEqual(expect.stringContaining("tmp"));
 });
 
 it("offers a code file's views in its menu, not on screen, and explains it once one is chosen", async () => {
@@ -502,9 +592,9 @@ it("remembers the tree width and visibility, refreshes directory entries, and fi
   disk.set("notes.md", "# Notes\n");
   fireEvent.click(screen.getByRole("button", { name: "Refresh files" }));
   expect(await screen.findByRole("treeitem", { name: "notes.md" })).toBeTruthy();
-  const filter = screen.getByRole("textbox", { name: "Filter files" });
+  const filter = screen.getByRole("textbox", { name: "Search files" });
   fireEvent.change(filter, { target: { value: "checkout" } });
-  expect(await screen.findByRole("button", { name: "checkout.ts src/checkout.ts" })).toBeTruthy();
+  expect(await within(await screen.findByRole("group", { name: "In open folders" })).findByRole("button", { name: "src/checkout.ts" })).toBeTruthy();
   fireEvent.keyDown(filter, { key: "Escape" });
   expect(await screen.findByRole("treeitem", { name: "cart.ts" })).toBeTruthy();
 });

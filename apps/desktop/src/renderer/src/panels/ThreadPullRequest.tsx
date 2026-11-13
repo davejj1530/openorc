@@ -11,7 +11,7 @@ export function PullRequestLink({ thread }: { thread: ThreadSummary }) {
   const url = thread.prUrl;
   if (!url) return null;
   return (
-    <Button onClick={() => window.openorc.openExternal(url)} title={url}>
+    <Button onClick={() => window.openorc.openExternal(url)} data-tip={url}>
       <GitPullRequest size={14} /> {thread.prState ?? "PR"}
     </Button>
   );
@@ -45,14 +45,14 @@ export function ThreadPullRequest({
   const disabled = Boolean(reason) || busy;
   if (step.kind === "compare") {
     return (
-      <Button disabled={disabled} onClick={() => window.openorc.openExternal(step.url)} title={reason ?? "Compare on GitHub"}>
+      <Button disabled={disabled} onClick={() => window.openorc.openExternal(step.url)} data-tip={reason ?? "Compare on GitHub"}>
         <GitPullRequest size={14} /> PR
       </Button>
     );
   }
   return (
     <>
-      <Button disabled={disabled} onClick={() => setOpen(true)} title={reason ?? "Open a pull request"}>
+      <Button disabled={disabled} onClick={() => setOpen(true)} data-tip={reason ?? "Open a pull request"}>
         <GitPullRequest size={14} /> PR
       </Button>
       <PullRequestDialog open={open} onOpenChange={setOpen} thread={thread} project={project} head={step.head} pr={pr} action={{ allowed: !reason, reason }} busy={busy} onOpened={onOpened} />

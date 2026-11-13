@@ -36,7 +36,7 @@ export function ReviewPublication({
       <Button
         variant="ghost"
         disabled={Boolean(blockedReason) || !hasChanges || exportPatch.isPending}
-        title={blockedReason ?? "Write a lossless patch of these changes to a file"}
+        data-tip={blockedReason ?? "Write a lossless patch of these changes to a file"}
         onClick={() =>
           exportPatch.mutate(
             { taskId: task.id },
@@ -54,18 +54,18 @@ export function ReviewPublication({
       </Button>
       <Button
         disabled={Boolean(blockedReason) || !task.branch || push.isPending}
-        title={blockedReason ?? undefined}
+        data-tip={blockedReason ?? undefined}
         onClick={() => push.mutate({ taskId: task.id }, { onSuccess: (r) => setNotice(`Pushed ${r.branch} to ${r.remote}`), onError: (e) => setNotice(e.message) })}
       >
         <Upload size={14} /> {push.isPending ? "Pushing…" : "Push"}
       </Button>
       {info.data?.gh.installed ? (
-        <Button disabled={Boolean(blockedReason) || !task.branch} onClick={() => setPrOpen(true)} title={blockedReason ?? "Open a pull request"}>
+        <Button disabled={Boolean(blockedReason) || !task.branch} onClick={() => setPrOpen(true)} data-tip={blockedReason ?? "Open a pull request"}>
           <GitPullRequest size={14} /> PR
         </Button>
       ) : null}
       {!info.data?.gh.installed && ghUrl ? (
-        <Button disabled={Boolean(blockedReason)} onClick={() => window.openorc.openExternal(ghUrl)} title={blockedReason ?? "Compare on GitHub"}>
+        <Button disabled={Boolean(blockedReason)} onClick={() => window.openorc.openExternal(ghUrl)} data-tip={blockedReason ?? "Compare on GitHub"}>
           <GitPullRequest size={14} /> PR
         </Button>
       ) : null}
@@ -73,7 +73,7 @@ export function ReviewPublication({
         open={commitOpen}
         onOpenChange={setCommitOpen}
         trigger={
-          <Button variant="primary" disabled={Boolean(blockedReason) || !hasChanges || commit.isPending} title={blockedReason ?? undefined}>
+          <Button variant="primary" disabled={Boolean(blockedReason) || !hasChanges || commit.isPending} data-tip={blockedReason ?? undefined}>
             Commit
           </Button>
         }

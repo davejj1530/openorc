@@ -13,6 +13,7 @@ function forestSql(where: string): string {
   return `eligible AS (
       SELECT threads.* FROM threads WHERE COALESCE(parent_relation, '') != 'subagent' AND ${where}
         AND NOT EXISTS (SELECT 1 FROM orclings WHERE orclings.thread_id = threads.id)
+        AND NOT EXISTS (SELECT 1 FROM orcling_groups WHERE orcling_groups.thread_id = threads.id)
     ),
     parents(child, id) AS (
       SELECT id, parent_thread_id FROM eligible WHERE parent_thread_id IS NOT NULL

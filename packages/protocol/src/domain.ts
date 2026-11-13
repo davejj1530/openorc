@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ClaudeAccountId } from "./claude-accounts.js";
 import { CloudThreadState } from "./cloud.js";
 import { ActivityRecovery, AgentKind, BackgroundCommand, SubagentStatus, Usage } from "./events.js";
 import { ExecutionTarget } from "./execution-target.js";
@@ -19,6 +20,21 @@ export type PermissionPreset = z.infer<typeof PermissionPreset>;
 export const RunMode = z.enum(["plan", "act"]);
 export type RunMode = z.infer<typeof RunMode>;
 
+/**
+ * The Claude accounts a project's threads may use. While `only` is off the project follows the app's accounts, and
+ * the selection is kept so turning it back on restores it.
+ */
+export const ProjectClaudeAccounts = z.object({
+  /** Use only the selected accounts. */
+  only: z.boolean(),
+  accountIds: z.array(ClaudeAccountId).max(50),
+  /** New threads' account, one of accountIds. */
+  defaultId: ClaudeAccountId.nullable(),
+  /** Switch accounts at usage limits, in place of AppSettings.claudeAccountAutoSwitch while `only` is on. */
+  autoSwitch: z.boolean(),
+});
+export type ProjectClaudeAccounts = z.infer<typeof ProjectClaudeAccounts>;
+
 export const ProjectSettings = z.object({
   /** Shell script run in a new worktree before the agent starts. */
   setupScript: z.string().nullable(),
@@ -27,6 +43,8 @@ export const ProjectSettings = z.object({
   branchPrefix: z.string(),
   /** Config files from other tools found in the repo, for the user's information. */
   detectedConfigs: z.array(z.string()),
+  /** The project's own Claude accounts. Missing or null, as on rows saved before it existed, follows the app's. */
+  claudeAccounts: ProjectClaudeAccounts.nullable().optional(),
 });
 export type ProjectSettings = z.infer<typeof ProjectSettings>;
 
@@ -402,12 +420,16 @@ export const AppSettings = z.object({
   defaultPermissionMode: PermissionPreset,
   /** The harness new threads start with on every client, chosen at onboarding; null until one is. */
   defaultHarness: HarnessId.nullable(),
+  /** Agents enabled in OpenOrc; null keeps older profiles unrestricted until onboarding hands over their selection. */
+  enabledHarnesses: z.array(HarnessId).nullable().optional(),
   /** The desktop's look, which phones follow; null until the desktop hands it over. One this version cannot read is none, so it never resets the other settings. */
   look: AppLook.nullable().catch(null),
   /** Minutes a provider process may sit idle between turns before it is closed; the session resumes on the next message. Null keeps processes running. */
   idleProcessMinutes: z.number().int().positive().nullable(),
-  /** Whether Claude Code connects the MCP servers from the user's own Claude configuration in threads. Off, only OpenOrc's tools load and the CLI starts about two seconds sooner. */
+  /** False from before Connectors had a switch per server: only OpenOrc's tools load until Connectors next reads Claude's servers and turns each off. */
   claudeUserMcpServers: z.boolean(),
+  /** Claude's MCP servers turned off in Connectors. Claude has no setting of its own for this, so each run is told. */
+  claudeConnectorsOff: z.array(z.string()),
   /** Whether a conversation stopped by its Claude account's usage limit goes on with the enabled account that has the most 5-hour usage left. */
   claudeAccountAutoSwitch: z.boolean(),
 });
@@ -600,6 +622,16 @@ export const AgentSkill = z.object({
   path: z.string(),
   /** Other names it answers to, as a plugin command's short name. */
   aliases: z.array(z.string()).optional(),
+  /** The name people see, from the skill's interface metadata; without one, `name`. */
+  displayName: z.string().optional(),
+  /** One line for lists, from the same metadata; without one, `description`. */
+  shortDescription: z.string().optional(),
+  /** Its image as a data URL, from the same metadata. */
+  icon: z.string().optional(),
+  /** Whether the agent uses it; absent where the agent has no switch for it. */
+  enabled: z.boolean().optional(),
+  /** Whether its folder is the user's to change: their own or the project's, on disk. */
+  editable: z.boolean().optional(),
 });
 export type AgentSkill = z.infer<typeof AgentSkill>;
 

@@ -57,7 +57,7 @@ async function checkUI() {
     );
   const drag = (id, invalid = false) =>
     read(`(() => {
-    const source = document.querySelector('button[title="Thread ${id.toUpperCase()}"]');
+    const source = document.querySelector('button[data-tip="Thread ${id.toUpperCase()}"]');
     const target = document.querySelector('.thread-pane-viewport');
     const dataTransfer = new DataTransfer();
     ${invalid ? `dataTransfer.setData('application/x-openorc-thread', '${id}');` : `source.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer }));`}
@@ -72,8 +72,8 @@ async function checkUI() {
     const regions = await read(`Array.from(document.querySelectorAll('[data-thread-pane] header')).map(header => ({
       header: getComputedStyle(header).webkitAppRegion,
       surface: header.querySelector('.thread-header-drag-surface')?.getAttribute('aria-hidden'),
-      title: header.querySelector('[title^="Thread "]')?.tagName,
-      staticRegions: Array.from(header.querySelectorAll('span[title]')).map(el => ({ region: getComputedStyle(el).webkitAppRegion, selection: getComputedStyle(el).userSelect })),
+      title: header.querySelector('[data-tip^="Thread "]')?.tagName,
+      staticRegions: Array.from(header.querySelectorAll('span[data-tip]')).map(el => ({ region: getComputedStyle(el).webkitAppRegion, selection: getComputedStyle(el).userSelect })),
       controls: Array.from(header.querySelectorAll('button, input, a')).map(el => getComputedStyle(el).webkitAppRegion),
       controlsReachable: Array.from(header.querySelectorAll('button, input, a')).every(el => {
         const r = el.getBoundingClientRect();
@@ -96,7 +96,7 @@ async function checkUI() {
       `${pane(id)} header`,
       `${pane(id)} .thread-header-drag-surface`,
       `${pane(id)} .header-chip`,
-      `${pane(id)} header [title="Thread ${id.toUpperCase()}"]`,
+      `${pane(id)} header [data-tip="Thread ${id.toUpperCase()}"]`,
       `${pane(id)} [aria-label="Show panel"]`,
     ]) {
       await read(`(() => {
@@ -153,13 +153,13 @@ async function checkUI() {
     // Hold a native HTML drag over the viewport long enough to verify its preview.
     await read(`(() => {
       window.splitTransfer = new DataTransfer();
-      document.querySelector('button[title="Thread B"]').dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: splitTransfer }));
+      document.querySelector('button[data-tip="Thread B"]').dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: splitTransfer }));
       document.querySelector('.thread-pane-viewport').dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: splitTransfer }));
     })()`);
     await until(`document.querySelector('.thread-drop-preview')`);
     assert(await read(`document.querySelector('.thread-drop-preview').getBoundingClientRect().top >= document.querySelector('[data-thread-pane] header').getBoundingClientRect().bottom`));
     await shot("drop-preview");
-    await read(`document.querySelector('button[title="Thread B"]').dispatchEvent(new DragEvent('dragend', { bubbles: true, dataTransfer: splitTransfer }))`);
+    await read(`document.querySelector('button[data-tip="Thread B"]').dispatchEvent(new DragEvent('dragend', { bubbles: true, dataTransfer: splitTransfer }))`);
     await until(`!document.querySelector('.thread-drop-preview')`);
     await drag("b");
     await until(`document.querySelector('${pane("b")} textarea')`);
@@ -230,7 +230,7 @@ async function checkUI() {
     assert.equal(await focused(), "c");
     // The sidebar label now reflects the rename; duplicate drop still uses the same id.
     await read(`(() => {
-      const source = document.querySelector('button[title="Renamed bravo"]');
+      const source = document.querySelector('button[data-tip="Renamed bravo"]');
       const dataTransfer = new DataTransfer();
       source.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer }));
       document.querySelector('.thread-pane-viewport').dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer }));
@@ -299,11 +299,11 @@ async function checkUI() {
     // Navigation replaces focused B and keeps A's exact DOM (and scroll state).
     await draft("b", "Draft bravo");
     await read(`window.alphaPane = document.querySelector('${pane("a")} textarea')`);
-    await click('button[title="Thread D"]');
+    await click('button[data-tip="Thread D"]');
     await until(`document.querySelector('${pane("d")} textarea')`);
     assert.deepEqual(await ids(), ["a", "d", "c"]);
     assert(await read(`window.alphaPane === document.querySelector('${pane("a")} textarea')`));
-    await click('button[title="Renamed bravo"]');
+    await click('button[data-tip="Renamed bravo"]');
     await until(`document.querySelector('${pane("b")} textarea')?.value === 'Draft bravo'`);
     // Closing/removing an owner clears the panel without touching sessions.
     await click(`${pane("b")} [aria-label="Show panel"]`);

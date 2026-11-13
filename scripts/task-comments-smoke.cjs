@@ -60,12 +60,12 @@ async function run() {
     `new Promise(resolve=>{window.addEventListener('message',function ready(event){if(event.data!=='openorc:port'||!event.ports[0])return;window.removeEventListener('message',ready);const port=event.ports[0],pending=new Map();let id=800000;port.onmessage=({data})=>{const p=pending.get(data.id);if(!p)return;pending.delete(data.id);data.type==='rpc.result'?p.resolve(data.result):p.reject(Error(data.message));};port.start();window.commentsQa=(method,params)=>new Promise((resolve,reject)=>{const next=id++;pending.set(next,{resolve,reject});port.postMessage({type:'rpc',id:next,method,params});});resolve();});window.openorc.connectBridge();})`,
   );
   const rpc = (method, params) => read(`window.commentsQa(${JSON.stringify(method)},${JSON.stringify(params)})`);
-  await until(() => read(`Boolean(document.querySelector('button[title="Make the daily workflow feel effortless"]'))`), "Project threads loaded");
-  await read(`document.querySelector('button[title="Make the daily workflow feel effortless"]').click()`);
+  await until(() => read(`Boolean(document.querySelector('button[data-tip="Make the daily workflow feel effortless"]'))`), "Project threads loaded");
+  await read(`document.querySelector('button[data-tip="Make the daily workflow feel effortless"]').click()`);
   await click("Tasks");
   const task = await rpc("tasks.create", { projectId: fixture.projectId, title: "Discuss task comments", spec: "Task-owned discussion and linked execution.", workspaceMode: "current" });
-  await until(() => read(`Boolean(document.querySelector('span[title="Discuss task comments"]'))`), "New task row");
-  await read(`document.querySelector('span[title="Discuss task comments"]').closest('button').click()`);
+  await until(() => read(`Boolean(document.querySelector('span[data-tip="Discuss task comments"]'))`), "New task row");
+  await read(`document.querySelector('span[data-tip="Discuss task comments"]').closest('button').click()`);
   await until(() => read(`Boolean(document.querySelector('[aria-label="Task comment"]'))`), "Comment composer");
   await type("A plain note for later.");
   await click("Comment");

@@ -42,15 +42,23 @@ import { iphoneAppUrl } from "../../data/downloads";
     <h2 id="use">What you can do from the phone</h2>
     <ul>
       <li>See your threads as they change, with what each agent is doing and what needs you.</li>
+      <li>Switch between <strong>Threads</strong>, <strong>Orclings</strong>, and <strong>Tasks</strong> on the bar at the bottom of Home. The button beside it starts a thread, an Orcling, or a task, to match the list in front.</li>
       <li>Open a thread and read the agent's work and reply as they stream in, including its steps, images, and visualizations.</li>
       <li>Send a message, say something during the turn, queue a message, or stop the turn. Answer questions and approvals on their cards.</li>
       <li>Start a thread in any project, with the agent and model you choose and, for Claude, the account. It works where new threads on your computer do, as set by <strong>New thread workspace</strong> in Settings → <a href={docHref("settings") + "#general"}>General</a>, or choose <strong>Cloud</strong> for a sandbox of its own. Attach photos from the camera or your library.</li>
       <li>Choose <strong>Move to Cloud</strong> in a thread's menu to send it to the cloud, and <strong>Bring to Mac</strong> to bring a thread back from the cloud brain. See <a href={docHref("cloud") + "#move"}>Cloud threads</a>.</li>
+      <li>Choose <strong>New Subthread</strong> in a thread's menu to start a thread under it, in the same folder. <strong>Subthreads</strong> lists the ones it has.</li>
       <li>Pin, snooze, rename, mark as read or unread, and resolve threads, from a thread's menu or by swiping its row.</li>
       <li>Under <strong>Changes</strong> in a thread's menu, read the diff, commit, push, and open a pull request on GitHub.</li>
       <li>Under <strong>Preview</strong>, watch the page the thread's <a href={docHref("browser")}>Preview</a> shows on your computer, and scroll, tap, and type into it.</li>
+      <li>
+        Text your <a href={docHref("orclings")}>Orclings</a>. Each chat shows the Orcling typing and takes reactions both ways, and with notifications on, the phone rings when one texts you. Tap an Orcling's name to change its look, name, model, permission,
+        instructions, and check-ins, to read what it remembers, or to delete it.
+      </li>
+      <li>Open a <a href={docHref("tasks")}>task</a> to read it and change its title, status, priority, labels, and description, or add a new task to a project.</li>
     </ul>
-    <p>To delete or fork a thread, or move it between the checkout and a worktree, use your computer. The phone's Settings shows your usage, without account details, and lets you pair another computer.</p>
+    <p>The model sheet has an icon tab for each enabled agent. The selected agent's name appears above the tabs. Tabs and search stay visible while you scroll models. Agents with large catalogs start with suggested models and provider groups; search covers the whole selected agent's catalog.</p>
+    <p>To delete or fork a thread, move it between the checkout and a worktree, start or discuss a task, or open an Orcling group chat, use your computer. The phone's Settings shows your usage, without account details, and lets you pair another computer.</p>
   </section>
 
   <section aria-labelledby="cloud-brain">

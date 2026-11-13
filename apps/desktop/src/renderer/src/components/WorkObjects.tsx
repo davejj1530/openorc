@@ -208,7 +208,7 @@ function FetchView({ fetch }: { fetch: FetchObject }) {
   const path = fetch.url.replace(/^https?:\/\/[^/]+/, "");
   return (
     <div className="work-fetch">
-      <span className="work-chip" data-kind="web" title={fetch.url}>
+      <span className="work-chip" data-kind="web" data-tip={fetch.url}>
         <ThreadLink href={fetch.url}>
           <Globe size={14} className="work-chip-icon" />
           <span className="work-chip-label">{fetch.chip.label}</span>

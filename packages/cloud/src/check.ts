@@ -204,6 +204,8 @@ export async function checkSandbox(
     const started = Date.now();
     options.report({ step: id, state: "running" });
     try {
+      // The sandbox stays up for as long as the step may take, as a thread's sandbox does while its agent works.
+      if (sandbox && id !== "remove") await (sandbox as Sandbox).keepAwake(timeout);
       const found = await within(timeout, work(), "This step");
       if (found instanceof Skipped) options.report({ step: id, state: "skipped", detail: found.why });
       else options.report({ step: id, state: "done", ms: Date.now() - started, ...(found ? { detail: found } : {}) });

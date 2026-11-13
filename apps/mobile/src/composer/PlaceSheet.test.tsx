@@ -60,7 +60,7 @@ function open() {
   );
 }
 
-it("starts a thread in the cloud chosen from the composer's place chip", async () => {
+it("starts a thread in the cloud chosen beside the project picker", async () => {
   macState({ offered: true, provider: "vercel" });
   open();
   fireEvent.click(await screen.findByRole("button", { name: "Runs on, This Mac" }));

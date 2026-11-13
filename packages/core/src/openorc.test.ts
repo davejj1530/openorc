@@ -85,7 +85,12 @@ describe("core", () => {
     await expect(call("files.read", { scope: { kind: "project", id: p.id, workingDirectory: workspace }, path: "README.md" })).rejects.toThrow("Only Workspace");
     expect(await call("files.read", { scope: { kind: "project", id: WORKSPACE_ID, workingDirectory: workspace }, path: "README.md" })).toMatchObject({ kind: "file", text: "# worktree source\n" });
     expect(await call("files.search", { scope: { kind: "project", id: WORKSPACE_ID, workingDirectory: workspace }, query: "worktree-only" })).toEqual(["worktree-only.ts"]);
-    await expect(call("files.read", { scope: { kind: "thread", id: thread.id }, path: path.join(root, "README.md") })).rejects.toThrow("outside");
+    expect(await call("files.read", { scope: { kind: "thread", id: thread.id }, path: path.join(root, "README.md") })).toMatchObject({
+      kind: "file",
+      outside: true,
+      text: "# demo\n",
+      readOnly: expect.any(String),
+    });
     const task = await call("tasks.create", { projectId: p.id, title: "Preview source", useWorktree: false });
     expect(await call("files.read", { scope: { kind: "task", id: task.id }, path: "README.md" })).toMatchObject({ kind: "file", text: "# demo\n" });
     await expect(call("files.read", { scope: { kind: "thread", id: "missing-thread" }, path: "README.md" })).rejects.toThrow("not found");
@@ -333,7 +338,11 @@ describe("core", () => {
     expect(await call("app.settings.get", {})).toMatchObject({ ...optedOut, defaultHarness: "claude", defaultPermissionMode: "trusted", sound: true });
     await call("app.settings.set", { defaultHarness: null });
     expect((await call("app.settings.get", {})).defaultHarness).toBeNull();
-    await expect(call("app.settings.set", { defaultHarness: "pi" as never })).rejects.toThrow();
+    for (const id of harnessIds) {
+      await call("app.settings.set", { defaultHarness: id });
+      expect((await call("app.settings.get", {})).defaultHarness).toBe(id);
+    }
+    await expect(call("app.settings.set", { defaultHarness: "unknown-agent" as never })).rejects.toThrow();
   });
 
   it("answers which harnesses can start a thread as the desktop's New thread reads them, without their paths", async () => {

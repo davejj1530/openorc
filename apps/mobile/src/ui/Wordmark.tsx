@@ -11,6 +11,8 @@ import { Text } from "./Text";
  */
 const MARK = 28;
 const GAP = 12;
+/** Where the cube's drawing starts inside its box at rest size: 3.36 of the mark's 32 units. Rows that lead with a picture line up on it. */
+export const MARK_INSET = MARK * (3.36 / 32);
 /** As far as the wordmark grows with the reader's text size: past it rows outgrow it, so it keeps its rank only to here. */
 export const WORDMARK_MAX_SCALE = 1.2;
 

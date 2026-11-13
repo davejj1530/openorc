@@ -44,3 +44,15 @@ it("offers nothing when another account would not help or the thread is not Clau
     expect(accountsToContinueWith(stopped, accounts)).toEqual([]);
   }
 });
+
+it("offers only the accounts the thread's project uses, when it uses only some", () => {
+  const accounts = [account("main"), account("rainy"), account("spare"), account("other")];
+  const project = { id: "p", settings: { claudeAccounts: { only: true, accountIds: ["main", "spare"], defaultId: "main", autoSwitch: false } } };
+  expect(accountsToContinueWith(thread(), accounts, project).map(({ id }) => id)).toEqual(["spare"]);
+  expect(accountsToContinueWith(thread(), accounts, { ...project, settings: { claudeAccounts: { ...project.settings.claudeAccounts, only: false } } }).map(({ id }) => id)).toEqual([
+    "rainy",
+    "spare",
+    "other",
+  ]);
+  expect(accountsToContinueWith(thread(), accounts, null).map(({ id }) => id)).toEqual(["rainy", "spare", "other"]);
+});

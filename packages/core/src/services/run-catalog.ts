@@ -1,8 +1,8 @@
 import { claudeAccountFastBlock, claudeModelsFrom, withClaudeAccountFastMode, withClaudeLegacyModels } from "./claude-model-catalog.js";
 import { ModelCatalogCache, type DiscoveredModels, type CatalogEntry } from "./model-catalog.js";
-import { captureLaunchEnvironment, listClaudeModels, type AcpAdapter, type AgentLaunchEnvironment, type CodexAdapter } from "@openorc/agents";
+import { captureLaunchEnvironment, listClaudeModels, listPiModels, type AcpAdapter, type AgentLaunchEnvironment, type CodexAdapter } from "@openorc/agents";
 import { ULTRACODE_EFFORT } from "@openorc/protocol";
-import { harnessCatalog, harnessIds, type HarnessId, type ModelCatalog, type ModelOption } from "@openorc/protocol";
+import { harnessCatalog, harnessIds, harnessName, isHarnessId, type HarnessId, type ModelCatalog, type ModelOption } from "@openorc/protocol";
 import type { RunHooks } from "./run-types.js";
 import type { EnvSnapshot } from "./shell-environment.js";
 
@@ -90,9 +90,8 @@ function claudeModelList(list: StaticClaudeModel[], installed: string | null, en
   });
 }
 
-/** Provider catalog discovery and update fencing have one owner. */
+/** Provider catalog discovery has one owner. */
 export class RunCatalog {
-  private pendingCatalogs = 0;
   private readonly modelCache = new ModelCatalogCache();
   /**
    * Fast blocks a Claude turn reported, by account. Claude Code's initialize answer says Fast is on until a request
@@ -102,14 +101,20 @@ export class RunCatalog {
   private readonly claudeFastBlocks = new Map<string, string>();
 
   constructor(
-    private readonly hooks: Pick<RunHooks, "environment" | "claudeVersion" | "claudeEnvironment">,
+    private readonly hooks: Pick<RunHooks, "environment" | "claudeVersion" | "claudeEnvironment" | "enabledHarnesses">,
     private readonly codex: Pick<CodexAdapter, "listModels">,
     private readonly opencode: Pick<AcpAdapter, "listModels">,
-    private readonly assertAvailable: () => void,
+    private readonly omp: Pick<AcpAdapter, "listModels">,
+    private readonly cursor: Pick<AcpAdapter, "listModels">,
+    private readonly updating: (agent: HarnessId) => boolean,
+    private readonly pi = { listModels: listPiModels },
+    private readonly antigravity: Pick<AcpAdapter, "listModels">,
+    private readonly fx: Pick<AcpAdapter, "listModels">,
   ) {}
 
-  get pending(): number {
-    return this.pendingCatalogs;
+  assertEnabled(agent: string): void {
+    const enabled = this.hooks.enabledHarnesses?.();
+    if (enabled && (!isHarnessId(agent) || !enabled.includes(agent))) throw new Error(`${harnessName(agent)} is disabled. Enable it in Settings → Connections before starting work.`);
   }
 
   /** A Claude turn that asked for Fast ended. True when what people are shown changed. */
@@ -132,12 +137,13 @@ export class RunCatalog {
     claudeAccountId?: string,
     shown = false,
   ): Promise<ModelCatalog> {
-    this.assertAvailable();
-    this.pendingCatalogs++;
-    try {
-      const entries = await Promise.all(
-        (agent ? [agent] : harnessIds).map((id): Promise<CatalogEntry> => {
+    const entries = await Promise.all(
+      (this.hooks.enabledHarnesses?.() ?? harnessIds)
+        .filter((id) => !agent || id === agent)
+        .map((id): Promise<CatalogEntry> => {
           try {
+            // Listing models starts the agent, which is being replaced. The list returns when its update ends.
+            if (this.updating(id)) throw new Error(`${harnessCatalog[id].name} is updating.`);
             const snapshot = id === "claude" && !admitted ? (this.hooks.claudeEnvironment?.(environment, claudeAccountId) ?? environment) : environment;
             const account = id === "claude" ? snapshot.claudeAccountId : undefined;
             if (refresh && account) this.claudeFastBlocks.delete(account);
@@ -148,17 +154,19 @@ export class RunCatalog {
             return Promise.resolve({ models: [], provider: { agent: id, status: "error", refreshedAt: null, message: error instanceof Error ? error.message : "This account is unavailable." } });
           }
         }),
-      );
-      return { models: entries.flatMap((entry) => entry.models), providers: entries.map((entry) => entry.provider) };
-    } finally {
-      this.pendingCatalogs--;
-    }
+    );
+    return { models: entries.flatMap((entry) => entry.models), providers: entries.map((entry) => entry.provider) };
   }
 
   private readonly modelLists: Record<HarnessId, (environment: EnvSnapshot, admitted?: AgentLaunchEnvironment) => Promise<DiscoveredModels>> = {
+    fx: async (environment, admitted) => ({ models: await this.acpModelList("fx", this.fx, admitted ?? captureLaunchEnvironment("fx", environment)) }),
+    antigravity: async (environment, admitted) => ({ models: await this.acpModelList("antigravity", this.antigravity, admitted ?? captureLaunchEnvironment("antigravity", environment)) }),
+    pi: async (environment, admitted) => ({ models: await this.pi.listModels(admitted ?? captureLaunchEnvironment("pi", environment)) }),
     codex: async (environment, admitted) => ({ models: await this.codexModelList(admitted ?? captureLaunchEnvironment("codex", environment)) }),
     claude: async (environment, admitted) => this.discoverClaudeModels(environment, admitted ?? captureLaunchEnvironment("claude", environment)),
-    opencode: async (environment, admitted) => ({ models: await this.opencodeModelList(admitted ?? captureLaunchEnvironment("opencode", environment)) }),
+    opencode: async (environment, admitted) => ({ models: await this.acpModelList("opencode", this.opencode, admitted ?? captureLaunchEnvironment("opencode", environment)) }),
+    cursor: async (environment, admitted) => ({ models: await this.acpModelList("cursor", this.cursor, admitted ?? captureLaunchEnvironment("cursor", environment)) }),
+    omp: async (environment, admitted) => ({ models: await this.acpModelList("omp", this.omp, admitted ?? captureLaunchEnvironment("omp", environment)) }),
   };
 
   private async discoverClaudeModels(environment: EnvSnapshot, launch: AgentLaunchEnvironment): Promise<DiscoveredModels> {
@@ -194,16 +202,19 @@ export class RunCatalog {
     }));
   }
 
-  private async opencodeModelList(launch: AgentLaunchEnvironment): Promise<ModelOption[]> {
-    return (await this.opencode.listModels(launch)).map((m) => ({
+  /** An agent that runs models through provider accounts of its own, each model listed with the provider it bills. */
+  private async acpModelList(agent: "opencode" | "omp" | "cursor" | "antigravity" | "fx", adapter: Pick<AcpAdapter, "listModels">, launch: AgentLaunchEnvironment): Promise<ModelOption[]> {
+    let account = agent === "cursor" || agent === "antigravity" ? harnessCatalog[agent].account : null;
+    if (agent === "antigravity" && launch.env["GEMINI_API_KEY"]?.trim()) account = { id: "gemini-api", label: "Gemini API account" };
+    return (await adapter.listModels(launch)).map((m) => ({
       id: m.id,
       label: m.label,
-      agent: "opencode",
-      provider: m.provider,
+      agent,
+      provider: account ?? m.provider,
       isDefault: m.isDefault,
       efforts: m.efforts,
       defaultEffort: m.defaultEffort,
-      fastMode: { supported: false, reason: harnessCatalog.opencode.fastModeHint },
+      fastMode: { supported: false, reason: harnessCatalog[agent].fastModeHint },
     }));
   }
 }

@@ -3,7 +3,9 @@ const path = require("node:path");
 const desktop = path.resolve(__dirname, "../apps/desktop");
 const root = path.resolve(__dirname, "..");
 const port = Number(process.env.OPENORC_PREVIEW_PORT ?? 5177);
-const fixture = process.env.OPENORC_PREVIEW_VIEW === "files" ? "file-explorer-ui.tsx" : "website-product-ui.tsx";
+let fixture = "website-product-ui.tsx";
+if (process.env.OPENORC_PREVIEW_VIEW === "onboarding") fixture = "onboarding-ui.tsx";
+else if (process.env.OPENORC_PREVIEW_VIEW === "files") fixture = "file-explorer-ui.tsx";
 
 async function main() {
   const { createServer } = await import(require.resolve("vite", { paths: [desktop] }));
@@ -25,15 +27,17 @@ async function main() {
         configureServer(server) {
           server.middlewares.use(async (request, response, next) => {
             const url = request.url ?? "/";
-            if (url.split("?")[0] !== "/") return next();
+            const appearancePreview = url.split("?")[0] === "/appearance-preview.html";
+            if (url.split("?")[0] !== "/" && !appearancePreview) return next();
+            const entry = appearancePreview ? path.join(desktop, "src/renderer/src/appearance-preview.tsx") : path.join(__dirname, "fixtures", fixture);
             try {
               const html = await server.transformIndexHtml(
                 url,
                 `<!doctype html>
                 <html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
                 <title>OpenOrc · Design study</title><link rel="stylesheet" href="/src/renderer/src/app.css"></head>
-                <body><div id="root" style="height:100vh"></div>
-                <script type="module" src="/@fs/${path.join(__dirname, "fixtures", fixture)}"></script></body></html>`,
+                <body${appearancePreview ? " inert" : ""}><div id="root" style="height:100vh"></div>
+                <script type="module" src="/@fs/${entry}"></script></body></html>`,
               );
               response.setHeader("Content-Type", "text/html");
               response.end(html);

@@ -238,16 +238,16 @@ it("checks where new cloud threads run in a throwaway sandbox, and shows each st
   await core.cloudChecks.start();
   await until(() => core.cloudChecks.status()?.passed !== null, 30_000);
   const check = core.cloudChecks.status()!;
-  expect(check).toMatchObject({ provider: "local", passed: true });
-  expect(check.steps.map((step) => [step.step, step.state])).toEqual([
-    ["sandbox", "done"],
-    ["tools", "done"],
-    ["runner", "done"],
-    ["relay", "done"],
-    ["signins", "skipped"],
-    ["sync", "done"],
-    ["remove", "done"],
+  expect(check.steps.map((step) => [step.step, step.state, step.error])).toEqual([
+    ["sandbox", "done", null],
+    ["tools", "done", null],
+    ["runner", "done", null],
+    ["relay", "done", null],
+    ["signins", "skipped", null],
+    ["sync", "done", null],
+    ["remove", "done", null],
   ]);
+  expect(check).toMatchObject({ provider: "local", passed: true });
   expect(check.steps[1]?.detail).toContain("Claude Code 2.1.316");
   expect(processesUnder(path.join(root, "sandboxes"))).toEqual([]);
 }, 40_000);

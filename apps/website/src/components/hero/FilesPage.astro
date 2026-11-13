@@ -1,0 +1,57 @@
+---
+/**
+ * The panel's Files page (FileExplorer.tsx): Explorer with refresh and new file, the filter field, then the project's
+ * tree. A folder's rows hang from a faint guide under its chevron, and the file last opened sits on the current-row
+ * fill.
+ */
+import FileGlyph from "./FileGlyph.astro";
+import ProductIcon from "./ProductIcon.astro";
+
+export interface Entry {
+  name: string;
+  /** A folder's entries; an open folder lists them. */
+  entries?: Entry[];
+  open?: boolean;
+  selected?: boolean;
+}
+interface Props {
+  root: string;
+  entries: Entry[];
+}
+const { root, entries } = Astro.props;
+type Row = { entry: Entry; level: number };
+/** The tree as rows, with a guide for each open folder over the rows it holds. */
+const flatten = (list: Entry[], level: number): Row[] =>
+  list.flatMap((entry) => [{ entry, level }, ...(entry.entries && entry.open ? flatten(entry.entries, level + 1) : [])]);
+const rows = flatten(entries, 2);
+const guides = rows.flatMap(({ entry, level }, index) => {
+  if (!entry.entries || !entry.open) return [];
+  const inside = rows.slice(index + 1).findIndex((row) => row.level <= level);
+  const count = inside === -1 ? rows.length - index - 1 : inside;
+  return [{ level, from: index + 1, count }];
+});
+---
+
+<div class="hs-explorer-bar">
+  <span>Explorer</span>
+  <span class="hs-round"><ProductIcon name="refresh" /></span>
+  <span class="hs-round"><ProductIcon name="plus" /></span>
+</div>
+<div class="hs-explorer-filter"><ProductIcon name="search" />Search files…</div>
+<div class="hs-tree">
+  <div class="hs-tree-row" style="--level: 0">
+    <ProductIcon name="chevronDown" class="hs-tree-chevron" />
+    <ProductIcon name="folder" class="hs-tree-folder" />
+    <span>{root}</span>
+  </div>
+  <div class="hs-tree-group">
+    {guides.map((guide) => <span class="hs-tree-guide" style={`--level: ${guide.level - 1}; --from: ${guide.from}; --count: ${guide.count}`} />)}
+    {rows.map(({ entry, level }) => (
+      <div class="hs-tree-row" data-selected={entry.selected ? "" : undefined} style={`--level: ${level - 1}`}>
+        {entry.entries ? <ProductIcon name={entry.open ? "chevronDown" : "chevronRight"} class="hs-tree-chevron" /> : <span class="hs-tree-chevron" />}
+        {entry.entries ? <ProductIcon name="folder" class="hs-tree-folder" /> : <FileGlyph path={entry.name} />}
+        <span>{entry.name}</span>
+      </div>
+    ))}
+  </div>
+</div>

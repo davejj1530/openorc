@@ -1,6 +1,6 @@
 # Fast mode
 
-Fast asks a provider for its faster service tier, at a higher usage cost. It is separate from reasoning effort and never changes the selected model. Toggle the lightning icon in the composer's model and effort popover; the lightning beside the model shows the current setting. When the model list says the model or account cannot serve Fast, the lightning and toggle turn amber and the popover shows the reason. The setting stays on so you can turn it off, and new turns are refused until you do or access returns.
+Fast asks a provider for its faster service tier, at a higher usage cost. It is separate from reasoning effort and never changes the selected model. Toggle the lightning icon in the composer's model and effort popover; the lightning beside the model shows the current setting. The toggle appears only for models and accounts that can run Fast. If Fast is on and the model or account loses access, the lightning and toggle turn amber and the popover shows the reason. The setting stays on so you can turn it off, and new turns are refused until you do or access returns.
 
 ## Behavior
 
@@ -8,7 +8,7 @@ Fast asks a provider for its faster service tier, at a higher usage cost. It is 
 - The conversation stores the setting for its next turn, and each run records what it actually requested. Changing model, effort or Fast between turns does not restart the agent: the next message applies the change to the open session and posts a notice in the conversation. Fast is checked against the account and model first. If the provider refuses the change, or effort is reset to the default, OpenOrc resumes the session with the new settings instead.
 - Forks and tasks started from a conversation keep its Fast setting. A helper thread from `thread_start` keeps it only on the caller's own model, unless the agent sets `fast`. Switching to another provider, or to a model without Fast, turns Fast off; choosing that model again does not turn it back on.
 - Moving a Claude conversation to another account checks Fast against that account first.
-- The phone's model picker has the same Fast switch.
+- The phone's model picker has the same Fast switch, shown under the same rule.
 - Changing or resetting effort leaves Fast unchanged, and changing Fast does not lower effort.
 - OpenOrc checks eligibility again before replacing a session or starting a turn. A refused queued message stays available to retry.
 
@@ -20,11 +20,13 @@ When a model has no Fast information yet, the popover shows "Fast mode availabil
 
 **Claude Code:** OpenOrc passes `--settings '{"fastMode":true}'`, or `false` for Standard, including when resuming. Live model discovery offers Fast on the models Claude Code marks as supporting it. If live discovery fails, or for older models the CLI no longer lists, OpenOrc uses its own list, which requires Claude Code 2.1.219 or newer for every Fast model. Fast is off when `CLAUDE_CODE_DISABLE_FAST_MODE=1` is set or when Claude Code uses Bedrock, Vertex or Foundry (`CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX`, `CLAUDE_CODE_USE_FOUNDRY`). On a Claude subscription, Fast bills to usage credits.
 
-Model discovery asks Claude Code for Fast without running anything, so its answer includes the account's reason when Fast is off. A definite reason, such as usage credits being off, the plan, the organization, the environment, or a failed network check, marks Fast unavailable on every Claude model with that reason. A pending check does not, and neither does `model_not_allowed`, because Claude Code checks that against its default model rather than each model. During a run that asked for Fast, OpenOrc posts a notice when Claude answers at standard speed (Fast turned off, or a rate-limit cooldown) and when Fast comes back. Claude Code's own out-of-credits message is shown as is.
+Model discovery asks Claude Code for Fast without running anything, so its answer includes the account's reason when Fast is off. Claude Code answers before its account check lands and reports Fast on until then, so discovery asks again, for up to two seconds, before trusting an "on". A definite reason, such as usage credits being off, the plan, the organization, the environment, or a failed network check, marks Fast unavailable on every Claude model with that reason. A pending check does not, and neither does `model_not_allowed`, because Claude Code checks that against its default model rather than each model. During a run that asked for Fast, OpenOrc posts a notice when Claude answers at standard speed (Fast turned off, or a rate-limit cooldown) and when Fast comes back. Claude Code's own out-of-credits message is shown as is.
 
 References: [Codex speed](https://learn.chatgpt.com/docs/agent-configuration/speed), [Codex app-server](https://learn.chatgpt.com/docs/app-server), [Claude Fast mode](https://code.claude.com/docs/en/fast-mode).
 
 ## For contributors
+
+OpenOrc does not expose fx's native Fast control; fx owns that setting. Ultra is explicitly disabled for OpenOrc runs.
 
 Recheck the provider documentation before changing model eligibility or minimum versions.
 

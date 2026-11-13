@@ -18,7 +18,9 @@ function useElapsed(active: boolean, since: number | undefined): string | null {
  */
 export function AgentPresence({ working, since }: { working: boolean; since?: number | undefined }) {
   const elapsed = useElapsed(working, since);
-  const { face } = useContext(ConversationVoice);
+  const { face, chat } = useContext(ConversationVoice);
+  // A chat with an Orcling shows it typing instead.
+  if (chat) return null;
   return (
     <div className="transcript-block agent-presence" data-state={working ? "running" : "idle"} role="status">
       {face ? face(working) : <AgentOrb state={working ? "thinking" : "idle"} />}

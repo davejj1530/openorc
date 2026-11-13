@@ -1,11 +1,12 @@
-import "./team-window-stub";
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { QueryClientProvider } from "@tanstack/react-query";
+import { harnessCatalog, harnessIds } from "../../packages/protocol/src/harness";
 
 // The App graph reads window.openorc at module evaluation time. Load it only
 // after the fixture's window stub has run, even when Vite splits shared chunks.
 Object.assign(globalThis, { __OPENORC_QA__: false });
+Object.assign(window, { openorc: { platform: "darwin", onTheme: () => () => {}, setTheme() {} } });
 const [{ App }, { useWindow }, { useRouter }, { Onboarding }, { AppearanceSettings }, { core }, { queryClient }, { useTheme }] = await Promise.all([
   import("../../apps/desktop/src/renderer/src/App"),
   import("../../apps/desktop/src/renderer/src/lib/window"),
@@ -17,25 +18,27 @@ const [{ App }, { useWindow }, { useRouter }, { Onboarding }, { AppearanceSettin
   import("../../apps/desktop/src/renderer/src/lib/theme"),
 ]);
 
-const startup = new URLSearchParams(location.search).has("startup");
-const appearance = new URLSearchParams(location.search).has("appearance");
+const params = new URLSearchParams(location.search);
+const startup = params.has("startup");
+const appearance = params.has("appearance");
+if (params.get("theme") === "dark" || params.get("theme") === "light") useTheme.getState().set(params.get("theme"));
 if (startup) {
   useRouter.setState({ route: { view: "newthread" } });
   window.onboardingStartupSmoke = { fullscreen: (fullscreen) => useWindow.setState({ fullscreen }) };
 }
 
 // Only synthetic data reaches the production renderer. No core or provider is connected.
-const harnesses = ["claude", "codex", "opencode"].map((id) => ({
+const harnesses = harnessIds.map((id) => ({
   id,
-  state: id === "opencode" ? "not_found" : "ready",
-  path: id === "opencode" ? null : `/usr/local/bin/${id}`,
-  version: "1.0.0",
+  state: id === "codex" || id === "claude" ? "ready" : "not_found",
+  path: id === "codex" || id === "claude" ? `/usr/local/bin/${harnessCatalog[id].cli.bin}` : null,
+  version: id === "codex" || id === "claude" ? "1.0.0" : null,
   revision: 1,
 }));
 const project = {
   id: "demo",
   name: "My first project",
-  rootPath: "/Users/developer/Projects/my-first-project",
+  rootPath: "/tmp/example-project",
   defaultBranch: "main",
   gitRemote: null,
   settings: { setupScript: null, worktreeInclude: [], branchPrefix: "openorc/", detectedConfigs: [] },
@@ -59,20 +62,21 @@ window.openorc.pickDirectory = async () => project.rootPath;
 window.openorc.openExternal = async () => {};
 queryClient.setDefaultOptions({ queries: { retry: false, staleTime: Infinity } });
 function Fixture() {
-  const [state, setState] = useState({ key: 0, step: "scan", mode: "first_run" });
+  const initialStep = ["scan", "theme", "project", "done"].includes(params.get("step")) ? params.get("step") : "scan";
+  const [state, setState] = useState({ key: 0, step: initialStep, mode: "first_run" });
   window.onboardingSmoke = {
     theme: (mode) => useTheme.getState().set(mode),
     color: (token, color) => useTheme.getState().setColor(token, color),
     show: (step, mode = "first_run") => setState((old) => ({ key: old.key + 1, step, mode })),
     agents: (states) => {
-      harnesses.forEach((row, i) => (row.state = states[i]));
+      harnesses.forEach((row, i) => (row.state = states[i] ?? "not_found"));
       queryClient.setQueryData(["system.info", { refresh: false }], { harnesses: [...harnesses] });
     },
     importFails: (value) => {
       importFails = value;
     },
     manyProjects: () => {
-      projects = Array.from({ length: 14 }, (_, i) => ({ ...project, id: `project-${i}`, name: `Project ${i + 1}`, rootPath: `/Users/developer/Projects/${"a-long-folder-name/".repeat(10)}${i}` }));
+      projects = Array.from({ length: 14 }, (_, i) => ({ ...project, id: `project-${i}`, name: `Project ${i + 1}`, rootPath: `/tmp/projects/${"a-long-folder-name/".repeat(10)}${i}` }));
       queryClient.setQueryData(["projects.list", {}], projects);
     },
   };

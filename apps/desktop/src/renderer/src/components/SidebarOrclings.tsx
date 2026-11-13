@@ -1,19 +1,20 @@
 import type { Orcling } from "@openorc/protocol";
 import { cn } from "../lib/cn";
-import { useLayout } from "../lib/layout";
 import { messagePreview } from "../lib/message-preview";
-import { useOrclings } from "../lib/orclings";
+import { useOrclingGroups, useOrclings } from "../lib/orclings";
 import { useRpc } from "../lib/client";
 import { useRouter, type Route } from "../lib/router";
 import { Plus } from "./icons";
 import { OrclingAvatar } from "./OrclingAvatar";
+import { NewOrclingGroupButton, OrclingGroupRow } from "./OrclingGroups";
 import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
 import { IconButton, Tooltip } from "./ui";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
 
-/** The Orclings destination replaces the project thread list in the same sidebar. */
+/** The Orclings destination replaces the project thread list in the same sidebar: each Orcling, then the group chats. */
 export function SidebarOrclings({ route }: { route: Route }) {
   const orclings = useOrclings();
+  const groups = useOrclingGroups();
   const activeId = route.view === "thread" ? route.threadId : null;
   return (
     <section className="conversation-browser orcling-browser" aria-label="Orclings">
@@ -21,21 +22,26 @@ export function SidebarOrclings({ route }: { route: Route }) {
         {orclings.map((orcling) => (
           <OrclingRow key={orcling.id} orcling={orcling} active={activeId === orcling.threadId} />
         ))}
+        {groups.map((group) => (
+          <OrclingGroupRow key={group.threadId} group={group} orclings={orclings} active={activeId === group.threadId} />
+        ))}
         {!orclings.length ? <p className="browser-empty">Create an Orcling to start a conversation.</p> : null}
       </div>
-      <p className="browser-hint">Each Orcling keeps its own instructions and memory.</p>
     </section>
   );
 }
 
-/** Starts a new Orcling; it sits where the thread list keeps its tools. */
+/** Starts a new group chat or a new Orcling; they sit where the thread list keeps its tools. */
 export function NewOrclingButton() {
   return (
-    <Tooltip label="New Orcling">
-      <IconButton onClick={() => useRouter.getState().navigate({ view: "orcling" })} aria-label="New Orcling" size="lg" className="no-drag">
-        <Plus size={16} />
-      </IconButton>
-    </Tooltip>
+    <>
+      <NewOrclingGroupButton orclings={useOrclings()} />
+      <Tooltip label="New Orcling">
+        <IconButton onClick={() => useRouter.getState().navigate({ view: "orcling" })} aria-label="New Orcling" size="lg" className="no-drag">
+          <Plus size={16} />
+        </IconButton>
+      </Tooltip>
+    </>
   );
 }
 
@@ -49,12 +55,11 @@ function OrclingRow({ orcling, active }: { orcling: Orcling; active: boolean }) 
     <button
       type="button"
       onClick={() => {
-        useLayout.getState().setProject(thread.data?.projectId ?? null);
         useRouter.getState().navigate({ view: "thread", threadId: orcling.threadId });
         dismissCompactNavigation();
       }}
       aria-current={active ? "page" : undefined}
-      title={orcling.name}
+      data-tip={orcling.name}
       className={cn("orcling-contact no-drag min-w-0 text-ink-2", (active || attention) && "text-ink")}
     >
       <OrclingAvatar orcling={orcling} size={24} className="shrink-0" />

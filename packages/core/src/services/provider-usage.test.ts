@@ -46,7 +46,7 @@ function setup(
 ) {
   if (!databases.includes(db)) databases.push(db);
   const system = { info: vi.fn(async () => connected), infoFor: vi.fn(async () => connected) };
-  const claude = vi.fn(async (_options?: ClaudeUsageOptions): Promise<ClaudeUsageResult> => ({ status: "ok", usage: account, subscriptionType: "max" }));
+  const claude = vi.fn(async (_options?: ClaudeUsageOptions): Promise<ClaudeUsageResult> => ({ status: "ok", usage: account, plan: "Ultra" }));
   const apiKey = vi.fn(async (): Promise<Pick<MemorySettings, "hasApiKey" | "apiKeyError">> => ({ hasApiKey: false }));
   return { db, system, read, claude, apiKey, service: new ProviderUsageService(db, system, { codex: read, claude, apiKey, consumeReset }, snapshot ? () => snapshot : undefined, () => at) };
 }
@@ -159,6 +159,15 @@ describe("usage refresh", () => {
     const failedRefresh = await service.redeemCodex({ attemptId: "00000000-0000-4000-8000-000000000002", confirmationToken: report.resets!.confirmationToken! });
     expect(failedRefresh).toMatchObject({ outcome: "reset", usage: { status: "error", windows: [] } });
   });
+  it("answers a reader that takes a recent report from the last read of that account, and asks the CLI for another account", async () => {
+    const { service, claude } = setup();
+    const first = await service.read("claude", "work");
+    expect(await service.recent("claude", "work", 60_000)).toBe(first);
+    expect(claude).toHaveBeenCalledTimes(1);
+    await service.recent("claude", "personal", 60_000);
+    expect(claude).toHaveBeenCalledTimes(2);
+  });
+
   it("deduplicates concurrent refreshes and performs another read afterward", async () => {
     const { service, read } = setup();
     await Promise.all([service.read("codex"), service.read("codex")]);
@@ -172,7 +181,7 @@ describe("usage refresh", () => {
       revision: 7,
       shell: "/bin/zsh",
       path: env.PATH,
-      binaries: Object.freeze({ claude: env.OPENORC_CLAUDE_BIN, codex: env.OPENORC_CODEX_BIN, opencode: null }),
+      binaries: Object.freeze({ claude: env.OPENORC_CLAUDE_BIN, codex: env.OPENORC_CODEX_BIN, opencode: null, omp: null, cursor: null, pi: null, antigravity: null, fx: null }),
       env,
     });
     const { service, system, read, claude } = setup(undefined, undefined, snapshot);

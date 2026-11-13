@@ -159,7 +159,7 @@ function PullRow({ git, range }: { git: GitObject; range: CommitRange | null }) 
 
 function CommitRow({ row }: { row: Row }) {
   return (
-    <div className="work-git-row work-git-commit" data-fresh={row.fresh || undefined} title={`${row.sha}\n${row.subject}`}>
+    <div className="work-git-row work-git-commit" data-fresh={row.fresh || undefined} data-tip={`${row.sha}\n${row.subject}`}>
       <span className="work-git-subject">{row.subject}</span>
       <span className="work-git-spacer" />
       <span className="work-git-sha">{shortSha(row.sha)}</span>

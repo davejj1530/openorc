@@ -26,7 +26,7 @@ beforeEach(async () => {
   vi.stubEnv("CLAUDE_CONFIG_DIR", path.join(root, "claude"));
   await skill(path.join(root, "claude", "skills"), "humanizer");
   // No Claude CLI here, so the list is read from the folders these tests set up, whatever this machine has installed.
-  const shellProbe = async () => ({ path: process.env["PATH"] ?? "", binaries: { claude: null, codex: null, opencode: null } });
+  const shellProbe = async () => ({ path: process.env["PATH"] ?? "", binaries: { claude: null, codex: null, opencode: null, omp: null, cursor: null, pi: null, antigravity: null, fx: null } });
   core = await OpenOrc.create({ dataDir: path.join(root, "data"), ephemeral: true, transport: { push: () => {} }, shellProbe });
 });
 

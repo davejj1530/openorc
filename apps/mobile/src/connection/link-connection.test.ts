@@ -1,7 +1,8 @@
 import type { ClientPush } from "@openorc/client";
 import { LinkCloseCode, type PhoneMessage } from "@openorc/link";
+import { defaultOrclingLook } from "@openorc/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DROPPED, OLDER_MAC_IMAGE, OLDER_MAC_SKILLS } from "./link-connection";
+import { DROPPED, OLDER_MAC_IMAGE, OLDER_MAC_ORCLING_EDITS, OLDER_MAC_ORCLINGS, OLDER_MAC_SKILLS, OLDER_MAC_SUBTHREADS } from "./link-connection";
 import { ConnectionManager } from "./manager";
 import { effectsFor, FakeMac, lan, pairedWith } from "./test-fixtures/fake-mac";
 
@@ -37,7 +38,11 @@ describe("calls over the link", () => {
     const { connection } = connect(mac);
     await advance(10);
     const declaration = mac.heard.find((message) => message.t !== "ping");
-    expect(declaration).toMatchObject({ t: "rpc", method: "session.negotiate", params: { capabilities: ["subagent-threads", "reply-images", "skill-lists"] } });
+    expect(declaration).toMatchObject({
+      t: "rpc",
+      method: "session.negotiate",
+      params: { capabilities: ["subagent-threads", "reply-images", "skill-lists", "orclings", "task-details", "subthread-starts", "orcling-edits"] },
+    });
     if (declaration?.t !== "rpc") throw new Error("no capability declaration");
     mac.send({ t: "rpc.error", id: declaration.id, message: "This is not available from a phone." });
     mac.answer = (method) => (method === "projects.list" ? [] : undefined);
@@ -92,10 +97,85 @@ describe("calls over the link", () => {
     current.answer = (method) => (method === "skills.list" ? [{ name: "deploy", description: "Ship it.", source: "project", path: "" }] : undefined);
     const second = connect(current);
     await advance(10);
-    current.send({ t: "rpc.result", id: negotiate(current), result: { capabilities: ["subagent-threads", "reply-images", "skill-lists"] } });
+    current.send({ t: "rpc.result", id: negotiate(current), result: { capabilities: ["subagent-threads", "reply-images", "skill-lists", "orclings"] } });
     const listed = second.connection.call("skills.list", params);
     await advance(10);
     expect((await listed).map((skill) => skill.name)).toEqual(["deploy"]);
+  });
+
+  it("asks for Orclings and tapbacks only from a Mac that said it lists them, so an older Mac's session is never refused", async () => {
+    const negotiate = (mac: FakeMac) => {
+      const declaration = mac.heard.find((message) => message.t === "rpc" && message.method === "session.negotiate");
+      if (declaration?.t !== "rpc") throw new Error("no capability declaration");
+      return declaration.id;
+    };
+    const older = new FakeMac();
+    older.behave(lan, { kind: "answer" });
+    const first = connect(older);
+    await advance(10);
+    older.send({ t: "rpc.error", id: negotiate(older), message: "Unknown method." });
+    await expect(first.connection.call("orclings.chats", {})).rejects.toThrow(OLDER_MAC_ORCLINGS);
+    await expect(first.connection.call("orclings.react", { threadId: "t", runId: "r", messageId: "m", part: 0, reaction: "heart" })).rejects.toThrow(OLDER_MAC_ORCLINGS);
+    expect(wire(older).filter((line) => line.includes("orclings"))).toEqual([]);
+
+    const current = new FakeMac();
+    current.behave(lan, { kind: "answer" });
+    current.answer = (method) => (method === "orclings.chats" ? [] : undefined);
+    const second = connect(current);
+    await advance(10);
+    current.send({ t: "rpc.result", id: negotiate(current), result: { capabilities: ["subagent-threads", "orclings"] } });
+    const listed = second.connection.call("orclings.chats", {});
+    await advance(10);
+    await expect(listed).resolves.toEqual([]);
+  });
+
+  it("changes an Orcling only on a Mac that said it saves a phone's changes, even where it lists Orclings", async () => {
+    const mac = new FakeMac();
+    mac.behave(lan, { kind: "answer" });
+    const { connection } = connect(mac);
+    await advance(10);
+    const declaration = mac.heard.find((message) => message.t === "rpc" && message.method === "session.negotiate");
+    if (declaration?.t !== "rpc") throw new Error("no capability declaration");
+    mac.send({ t: "rpc.result", id: declaration.id, result: { capabilities: ["subagent-threads", "orclings"] } });
+    const draft = { name: "Pip", look: defaultOrclingLook, settings: { agent: "codex" as const, model: "gpt", effort: null, fastMode: false }, permission: "allow" as const };
+    await expect(connection.call("orclings.create", { draft })).rejects.toThrow(OLDER_MAC_ORCLING_EDITS);
+    await expect(connection.call("orclings.update", { id: "o", draft })).rejects.toThrow(OLDER_MAC_ORCLING_EDITS);
+    await expect(connection.call("orclings.delete", { id: "o" })).rejects.toThrow(OLDER_MAC_ORCLING_EDITS);
+    await expect(connection.call("orclings.instructions.save", { id: "o", body: "Be brief." })).rejects.toThrow(OLDER_MAC_ORCLING_EDITS);
+    expect(wire(mac).filter((line) => line.includes("orclings."))).toEqual([]);
+  });
+
+  it("starts a thread under another only on a Mac that said it can, and says whether a Mac shares a capability", async () => {
+    const negotiate = (mac: FakeMac) => {
+      const declaration = mac.heard.find((message) => message.t === "rpc" && message.method === "session.negotiate");
+      if (declaration?.t !== "rpc") throw new Error("no capability declaration");
+      return declaration.id;
+    };
+    const start = { projectId: "p", agent: "codex", mode: "act", permissionMode: "review", prompt: "Look into it" } as const;
+    const older = new FakeMac();
+    older.behave(lan, { kind: "answer" });
+    older.answer = (method) => (method === "threads.start" ? { thread: { id: "top" }, run: null } : undefined);
+    const first = connect(older);
+    await advance(10);
+    older.send({ t: "rpc.result", id: negotiate(older), result: { capabilities: ["subagent-threads", "orclings"] } });
+    await expect(first.connection.shares("subthread-starts")).resolves.toBe(false);
+    await expect(first.connection.call("threads.start", { ...start, parentThreadId: "parent" })).rejects.toThrow(OLDER_MAC_SUBTHREADS);
+    expect(wire(older)).not.toContain("rpc threads.start");
+    // A thread of its own still starts there.
+    const own = first.connection.call("threads.start", start);
+    await advance(10);
+    await expect(own).resolves.toMatchObject({ thread: { id: "top" } });
+
+    const current = new FakeMac();
+    current.behave(lan, { kind: "answer" });
+    current.answer = (method) => (method === "threads.start" ? { thread: { id: "child" }, run: null } : undefined);
+    const second = connect(current);
+    await advance(10);
+    current.send({ t: "rpc.result", id: negotiate(current), result: { capabilities: ["subagent-threads", "subthread-starts"] } });
+    await expect(second.connection.shares("subthread-starts")).resolves.toBe(true);
+    const under = second.connection.call("threads.start", { ...start, parentThreadId: "parent" });
+    await advance(10);
+    await expect(under).resolves.toMatchObject({ thread: { id: "child" } });
   });
 
   it("drops and logs a failed frame application at the link boundary, then handles the next frame", async () => {

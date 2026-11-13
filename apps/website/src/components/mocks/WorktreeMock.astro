@@ -1,7 +1,8 @@
 ---
 /**
- * Worktrees, still: threads on their own branches beside threads on the checkout, and one of them open. As in the
- * app, the composer names the thread's branch with its uncommitted changes; the sidebar is the scenes' own.
+ * Worktrees, still: threads on their own branches beside threads on the checkout, and one of them open with its
+ * uncommitted changes in the Commit chip over the composer. With `menu`, the thread's menu is open, its branch marked
+ * Worktree on top. The sidebar is the scenes' own.
  */
 import "../../styles/hero-scene.css";
 import ChangeLine from "../hero/ChangeLine.astro";
@@ -19,6 +20,10 @@ const rows: SidebarRow[] = [
   { title: "Make the first five minutes count" },
   { title: "A faster command menu", branch: "openorc/command-menu-5a1d7e", day: "today", done: "2 files changed · tests passed" },
 ];
+interface Props {
+  menu?: boolean;
+}
+const { menu = false } = Astro.props;
 const change = { added: 12, removed: 4 };
 ---
 
@@ -31,7 +36,7 @@ const change = { added: 12, removed: 4 };
     model={{ harness: "codex", label: models.codex.label, effort: models.codex.effort }}
     permission={models.codex.permission}
     placeholder="Message Codex…"
-    branch={branches.tokens}
+    menu={menu ? branches.tokens : undefined}
     changes
     changeStat={change}
   >

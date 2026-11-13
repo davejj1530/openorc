@@ -20,6 +20,9 @@ CREATE TABLE cloud_workspaces (
 );
 `;
 
+/** The commit a cloud conversation's worktree was on after its last sync, so commits made on the Mac reach the sandbox. */
+export const cloudWorkspaceMirrorHeadMigration = `ALTER TABLE cloud_workspaces ADD COLUMN mirror_head TEXT;`;
+
 /**
  * A conversation's sandbox can be deleted from Settings: `removed` until its next turn sets up a new one. SQLite cannot
  * change a CHECK, so the table is made again with the same rows.

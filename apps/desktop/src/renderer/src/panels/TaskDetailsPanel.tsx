@@ -60,7 +60,7 @@ function TaskDetails({ task: t, project: p }: { task: Task; project: Project }) 
               size="lg"
               variant="primary"
               disabled={Boolean(blockedReason) || startTask.isPending}
-              title={blockedReason ?? undefined}
+              data-tip={blockedReason ?? undefined}
               onClick={() =>
                 startTask.mutate(
                   { taskId: t.id },
@@ -207,12 +207,12 @@ function TaskDetails({ task: t, project: p }: { task: Task; project: Project }) 
           <Button
             disabled={Boolean(blockedReason) || cleanup.isPending}
             onClick={() => cleanup.mutate({ taskId: t.id })}
-            title={blockedReason ?? "Remove the worktree from disk. Uncommitted changes are committed to its branch first; the branch and the history stay."}
+            data-tip={blockedReason ?? "Remove the worktree from disk. Uncommitted changes are committed to its branch first; the branch and the history stay."}
           >
             Remove worktree
           </Button>
         ) : null}
-        <Button variant="danger" disabled={Boolean(blockedReason)} title={blockedReason ?? undefined} onClick={() => setDeleting(true)}>
+        <Button variant="danger" disabled={Boolean(blockedReason)} data-tip={blockedReason ?? undefined} onClick={() => setDeleting(true)}>
           <Trash2 size={13} /> Delete task
         </Button>
         {cleanup.error ? <div className="basis-full text-sm text-bad">{cleanup.error.message}</div> : null}
@@ -296,7 +296,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 function Mono({ text }: { text: string }) {
   return (
     <div className="flex items-center gap-1 min-w-0">
-      <span className="font-mono text-xs text-ink-2 truncate" title={text}>
+      <span className="font-mono text-xs text-ink-2 truncate" data-tip={text}>
         {text}
       </span>
       <IconButton size="xs" aria-label={`Copy ${text}`} onClick={() => void navigator.clipboard.writeText(text)}>

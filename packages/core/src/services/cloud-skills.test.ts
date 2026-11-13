@@ -46,11 +46,11 @@ function lister(byAgent: Partial<Record<HarnessId, AgentSkill[]>>) {
 const user = (name: string, folder: string): AgentSkill => ({ name, description: `${name} things`, source: "user", path: path.join(folder, "SKILL.md") });
 
 describe("choosing the user's skills for cloud sessions", () => {
-  it("lists each agent's own skills, not a project's, and remembers which go", async () => {
+  it("lists each agent's own skills it uses, not a project's, and remembers which go", async () => {
     const review = await skill("review");
     const { list } = lister({
       claude: [user("review", review), { name: "local", description: "", source: "project", path: "/p/.claude/skills/local/SKILL.md" }],
-      codex: [user("review", review)],
+      codex: [user("review", review), { ...user("drafts", review), enabled: false }],
     });
     const skills = new CloudSkills({ db, root: dir, list });
     expect(await skills.catalog()).toEqual({
@@ -58,6 +58,7 @@ describe("choosing the user's skills for cloud sessions", () => {
         { agent: "codex", skills: [{ name: "review", description: "review things", chosen: false }], error: null },
         { agent: "claude", skills: [{ name: "review", description: "review things", chosen: false }], error: null },
         { agent: "opencode", skills: [], error: null },
+        { agent: "omp", skills: [], error: null },
       ],
     });
     const of = (view: Awaited<ReturnType<CloudSkills["catalog"]>>, agent: HarnessId) => view.agents.find((each) => each.agent === agent)!.skills[0]!.chosen;
@@ -79,6 +80,7 @@ describe("choosing the user's skills for cloud sessions", () => {
       ["codex", "Codex is not installed."],
       ["claude", null],
       ["opencode", null],
+      ["omp", null],
     ]);
   });
 
@@ -142,7 +144,10 @@ describe("the skills a Mac sends its cloud brain", () => {
 
   it("are refused whole when a name or a path would leave the brain's folder, or the file is not skills", async () => {
     const kept = path.join(dir, "kept");
-    const payload = (name: string, file: string) => ({ v: 1 as const, agents: { claude: [{ name, files: [{ path: file, data: "", executable: false }] }], codex: [], opencode: [] } });
+    const payload = (name: string, file: string) => ({
+      v: 1 as const,
+      agents: { claude: [{ name, files: [{ path: file, data: "", executable: false }] }], codex: [], opencode: [], omp: [], cursor: [], pi: [], antigravity: [], fx: [] },
+    });
     await expect(storeSkills(kept, payload("../up", "SKILL.md"))).rejects.toThrow(/cannot be kept/);
     await expect(storeSkills(kept, payload("ok", "../../etc/passwd"))).rejects.toThrow(/outside its folder/);
     await expect(storeSkills(kept, payload("ok", "/etc/passwd"))).rejects.toThrow(/outside its folder/);

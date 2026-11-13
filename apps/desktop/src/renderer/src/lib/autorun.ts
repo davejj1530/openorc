@@ -21,7 +21,16 @@ import { useUi } from "./ui";
  *   OPENORC_AUTOQUIT=1                      quit after the final report (handled by main)
  */
 /** Smokes run on the cheapest capable model unless told otherwise; frontier models cost real money per proof. */
-const smokeModels: Record<HarnessId, string> = { codex: "gpt-5.6-sol", claude: "claude-haiku-4-5-20251001", opencode: "opencode/big-pickle" };
+const smokeModels: Record<HarnessId, string> = {
+  codex: "gpt-5.6-sol",
+  claude: "claude-haiku-4-5-20251001",
+  opencode: "opencode/big-pickle",
+  omp: "anthropic/claude-haiku-4-5",
+  cursor: "default[]",
+  pi: "anthropic/claude-haiku-4-5",
+  antigravity: "gemini-3.8-flash",
+  fx: "gateway/spacexai/grok-4.7",
+};
 function smokeModel(agent: HarnessId): string {
   return window.openorc.autorun.model ?? smokeModels[agent];
 }

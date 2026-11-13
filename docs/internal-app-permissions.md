@@ -8,7 +8,8 @@ Each provider is set up so it does not ask you about OpenOrc's tools itself. Ope
 
 - **Claude Code** gets exact `--allowedTools` entries for that connection.
 - **Codex** gets a per-tool `approval_mode="approve"` override for that connection.
-- **OpenCode** asks OpenOrc about each tool call. OpenOrc approves tools named `<server>_<tool>` from that connection. In Plan, OpenOrc's OpenCode configuration also allows these tools explicitly.
+- **OpenCode** asks OpenOrc about each tool call. OpenOrc approves tools named `<server>_<tool>` from that connection. OpenOrc gives OpenCode this server in the run's configuration with Code Mode off, so the model calls each tool by that name rather than through `execute`, and OpenOrc can show what it did, such as a visualization. In Plan, OpenOrc's OpenCode configuration also allows these tools explicitly.
+- **Oh My Pi** asks, unless Autonomous, through a form naming the tool. OpenOrc approves tools named `mcp__<server>_<tool>` from that connection.
 
 These settings apply only to that agent process. Your own MCP configuration and the provider's shell and file permissions are unchanged. See the [Claude CLI permission flags](https://code.claude.com/docs/en/cli-reference) and [Codex MCP configuration](https://developers.openai.com/codex/config-reference).
 
@@ -52,7 +53,7 @@ The `device` tool exists only on a computer with simulators or emulators. It ref
 `thread_send` has three more rules:
 
 - A message to a conversation in the same or a stricter mode is allowed. That conversation acts under its own permissions, so it can do nothing the sender could not.
-- A chain of agent messages stops after 20 messages in a row with no one writing in between. The count is per conversation and kept in memory. A message from a person, in the app, Slack or a schedule, resets it.
+- A chain of agent messages stops after 50 messages in a row with no one writing in between. The count is per conversation and kept in memory. A message from a person, in the app, Slack or a schedule, resets it.
 - A retried call with the same `request_key` is delivered once. Without a key, the same text to the same conversation from the same run counts as a retry.
 
 ## Memory and passwords
@@ -67,7 +68,7 @@ The Preview shares your signed-in sessions (see [agent access to the Preview](ag
 
 ## Default mode for new work
 
-Choosing a mode in a permission picker saves it as your default (`app.settings.defaultPermissionMode`). New conversations and new schedules start with it. A task conversation takes its mode from the task's previous run, then from the conversation that created the task, and only then from the default. Existing conversations and schedules keep their own mode; changing the default never raises them. New work waits for settings to load before it can start. Until you choose, the default is **Accept edits**. A choice made on the phone stays with its thread and leaves the default as it was.
+Choosing a mode in a permission picker saves it as your default (`app.settings.defaultPermissionMode`). New conversations and new schedules start with it. A task conversation takes its mode from the task's previous run, then from the conversation that created the task, and only then from the default. Existing conversations and schedules keep their own mode; changing the default never raises them. New work waits for settings to load before it can start. Until you choose, the default is **Autonomous** for every coding agent, labelled **Full access** for Codex. A choice made on the phone stays with its thread and leaves the default as it was.
 
 ## For contributors
 

@@ -1,4 +1,5 @@
 import { isSubagentThread, THREAD_CHILD_PAGE, type ThreadSummary } from "@openorc/protocol";
+import type { ThreadStatus } from "./thread-row.js";
 
 /** Started threads own their archive, pin and snooze settings; native children inherit them. */
 export function visibleThreadForest(all: readonly ThreadSummary[], archived: boolean, now: number, hidden?: ReadonlySet<string>): ThreadSummary[] {
@@ -94,6 +95,33 @@ export function threadAncestors(all: readonly ThreadSummary[], reveal: readonly 
     }
   }
   return forced;
+}
+
+/**
+ * What each parent's sub threads, at any depth, are doing live: how many need you, else how many work. A sub thread's
+ * unread result or failure stays on its own row. Each active thread walks up its ancestors once.
+ */
+export function subthreadStatuses(all: readonly ThreadSummary[]): Map<string, ThreadStatus> {
+  const byId = new Map(all.map((thread) => [thread.id, thread]));
+  const counts = new Map<string, { waiting: number; running: number }>();
+  for (const thread of all) {
+    if (thread.activity === "idle") continue;
+    const seen = new Set([thread.id]);
+    for (let parent = byId.get(thread.parentThreadId ?? ""); parent && !seen.has(parent.id); parent = byId.get(parent.parentThreadId ?? "")) {
+      seen.add(parent.id);
+      const count = counts.get(parent.id) ?? { waiting: 0, running: 0 };
+      count[thread.activity] += 1;
+      counts.set(parent.id, count);
+    }
+  }
+  return new Map(
+    [...counts].map(([id, { waiting, running }]): [string, ThreadStatus] => [
+      id,
+      waiting
+        ? { kind: "waiting", label: waiting === 1 ? "A subthread needs you" : `${waiting} subthreads need you` }
+        : { kind: "running", label: running === 1 ? "A subthread is working" : `${running} subthreads are working` },
+    ]),
+  );
 }
 
 export function threadTreeRows(

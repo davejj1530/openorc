@@ -54,6 +54,22 @@ export function Button({ role, label, onPress, modifiers }: Modified & { role?: 
   return createElement("button", { "aria-label": spoken(modifiers) ?? label ?? (role === "close" ? "Close" : undefined), disabled, onClick: onPress }, label);
 }
 
+/** A clock picker as a time field: it shows the selection's hours and minutes and reports a typed time as a date. */
+export function DatePicker({ selection, onDateChange }: Modified & { selection?: Date; onDateChange?: (date: Date) => void }) {
+  const shown = selection ? `${String(selection.getHours()).padStart(2, "0")}:${String(selection.getMinutes()).padStart(2, "0")}` : "";
+  return createElement("input", {
+    type: "time",
+    "aria-label": "Time",
+    value: shown,
+    onChange: (event: { target: { value: string } }) => {
+      const [hours, minutes] = event.target.value.split(":").map(Number);
+      const date = new Date(selection ?? Date.now());
+      date.setHours(hours ?? 0, minutes ?? 0, 0, 0);
+      onDateChange?.(date);
+    },
+  });
+}
+
 export function Toggle({ label, isOn, onIsOnChange, modifiers }: Modified & { label?: string; isOn?: boolean; onIsOnChange?: (isOn: boolean) => void }) {
   const disabled = read(modifiers, "disabled") === true;
   return createElement("button", { role: "switch", "aria-label": label, "aria-checked": Boolean(isOn), "aria-disabled": disabled, disabled, onClick: () => onIsOnChange?.(!isOn) }, label);
@@ -63,6 +79,8 @@ export const accessibilityLabel = modifier("accessibilityLabel");
 export const accessibilityValue = modifier("accessibilityValue");
 export const buttonBorderShape = modifier("buttonBorderShape");
 export const buttonStyle = modifier("buttonStyle");
+export const datePickerStyle = modifier("datePickerStyle");
+export const labelsHidden = modifier("labelsHidden");
 export const controlSize = modifier("controlSize");
 export const disabled = modifier("disabled");
 export const dynamicTypeSize = modifier("dynamicTypeSize");

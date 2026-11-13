@@ -97,6 +97,7 @@ export const Check = icon("Check", <path d="m5 12 4.5 4.5L19 7" />);
 export const ChevronDown = icon("ChevronDown", <path d="m6 9 6 6 6-6" />);
 export const ChevronRight = icon("ChevronRight", <path d="m9 6 6 6-6 6" />);
 export const ChevronLeft = icon("ChevronLeft", <path d="m15 6-6 6 6 6" />);
+export const CornerUpLeft = icon("CornerUpLeft", <path d="m10 15-5-5 5-5 M5 10h9a5 5 0 0 1 5 5v4" />);
 export const ChevronsUpDown = icon("ChevronsUpDown", <path d="m7 8 5-5 5 5 M7 16l5 5 5-5" />);
 export const ArrowRight = icon("ArrowRight", <path d="M4 12h16m-6-6 6 6-6 6" />);
 export const ArrowLeft = icon("ArrowLeft", <path d="M20 12H4m6-6-6 6 6 6" />);
@@ -131,6 +132,14 @@ export const MoreHorizontal = icon(
     <circle cx="5" cy="12" r=".8" />
     <circle cx="12" cy="12" r=".8" />
     <circle cx="19" cy="12" r=".8" />
+  </>,
+);
+export const MoreVertical = icon(
+  "MoreVertical",
+  <>
+    <circle cx="12" cy="5" r=".8" />
+    <circle cx="12" cy="12" r=".8" />
+    <circle cx="12" cy="19" r=".8" />
   </>,
 );
 export const Play = icon("Play", <path d="M7 4.5 20 12 7 19.5Z" />);
@@ -199,7 +208,11 @@ export const Inbox = icon("Inbox", <path d="m3 12 4-8h10l4 8v7a1.5 1.5 0 0 1-1.5
 export const MessageSquare = icon("MessageSquare", <path d="M5.5 4h13A2.5 2.5 0 0 1 21 6.5v10a2.5 2.5 0 0 1-2.5 2.5H9l-6 3V6.5A2.5 2.5 0 0 1 5.5 4Z" />);
 export const MailOpen = icon("MailOpen", <path d="m3 10 9-7 9 7v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 19Z M3 10l9 6 9-6 M3.5 20l5.5-6 M20.5 20 15 14" />);
 export const Brain = icon("Brain", layers);
-export const SquareStack = icon("SquareStack", layers);
+/** Projects: a folder with another behind it. */
+export const Folders = icon(
+  "Folders",
+  <path d="M2.5 11v-1a2 2 0 0 1 2-2h3l2.5 2.5h5a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4.5a2 2 0 0 1-2-2Z M7 5.5a2 2 0 0 1 2-2h3L14.5 6h5a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2" />,
+);
 /** An Orcling: the mascot's soft body and two upright eyes. */
 export const Orcling = icon("Orcling", <path d="M12 4.5c5.6 0 7.5 1.9 7.5 7.5s-1.9 7.5-7.5 7.5-7.5-1.9-7.5-7.5 1.9-7.5 7.5-7.5Z M9.75 10.25v2.5 M14.25 10.25v2.5" />);
 export const Workflow = icon(
@@ -321,6 +334,24 @@ export const Tablet = icon(
   </>,
 );
 export const Power = icon("Power", <path d="M12 3v8 M7.4 6.2a7.5 7.5 0 1 0 9.2 0" />);
+export const People = icon(
+  "People",
+  <>
+    <circle cx="9" cy="8.5" r="3.25" />
+    <path d="M3.5 19c.6-3 2.8-4.75 5.5-4.75s4.9 1.75 5.5 4.75" />
+    <path d="M15.25 5.6a3.25 3.25 0 0 1 0 5.8" />
+    <path d="M17 14.6c1.9.6 3.15 2.1 3.5 4.4" />
+  </>,
+);
+export const SmilePlus = icon(
+  "SmilePlus",
+  <>
+    <path d="M20.5 12A8.5 8.5 0 1 1 12 3.5" />
+    <path d="M8.75 14.25c.85 1.1 1.95 1.75 3.25 1.75s2.4-.65 3.25-1.75" />
+    <path d="M9.25 10h.01 M14.75 10h.01" />
+    <path d="M19 2.75v5 M16.5 5.25h5" />
+  </>,
+);
 export const Clock = icon(
   "Clock",
   <>
@@ -472,6 +503,7 @@ export const Bold = icon("Bold", <path strokeWidth="2.25" d="M6 4h7a4 4 0 0 1 0 
 export const Heading2 = icon("Heading2", <path d="M4 5v14 M13 5v14 M4 12h9 M17 15a2 2 0 0 1 4 0c0 2-4 2.5-4 5h4" />);
 export const Italic = icon("Italic", <path d="M10 4h9 M5 20h9 M15 4 9 20" />);
 export const Strikethrough = icon("Strikethrough", <path d="M18 6c-1-2-3-3-6-3-4 0-6 2-6 4 0 3 4 4 6 5 M6 18c1 2 3 3 6 3 4 0 6-2 6-4 0-2-2-3-4-4 M3 12h18" />);
+export const Plug = icon("Plug", <path d="M9 3v4.5 M15 3v4.5 M6.5 7.5h11v3.5a5.5 5.5 0 0 1-11 0z M12 16.5V21" />);
 export const Link2 = icon("Link2", <path d="m9 15 6-6 M8 16l-1 1a4 4 0 0 1-6-6l4-4a4 4 0 0 1 6 0 M16 8l1-1a4 4 0 0 1 6 6l-4 4a4 4 0 0 1-6 0" transform="translate(2 0) scale(.84 1)" />);
 export const Text = icon("Text", <path d="M4 5h16 M12 5v15 M8 20h8 M4 5v3 M20 5v3" />);
 export const Quote = icon("Quote", <path d="M4 7h6v7H5c0 3 1 4 3 5 M14 7h6v7h-5c0 3 1 4 3 5" />);

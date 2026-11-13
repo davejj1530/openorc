@@ -14,10 +14,10 @@ import { projectChoices, type ProjectChoice } from "../projects";
 import { Text } from "../ui/Text";
 import { rememberedProject, rememberProject } from "./drafts";
 import { copyAge, openingProject } from "./new-thread-state";
-import { ProjectPicker } from "./ProjectPicker";
+import { NewThreadPickers } from "./NewThreadPickers";
 import { useNewThread } from "./use-new-thread";
 
-/** The model and mode sheets find this composer's settings under this id. */
+/** The new thread's picker sheets find its choices under this id. */
 const COMPOSER_ID = "new-thread";
 
 interface FormProps {
@@ -33,7 +33,10 @@ function NewThreadForm({ projectId, choices, onProject, copy }: FormProps) {
   const navigation = useNavigation();
   const form = useNewThread(projectId);
   const host = useContext(HostContext);
-  useShareSettings(COMPOSER_ID, form.settings);
+  useShareSettings(COMPOSER_ID, {
+    ...form.settings,
+    project: { chosen: projectId, choices, disabled: form.starting || form.uploading > 0, select: onProject },
+  });
   // Undefined until the Mac's projects load; Workspace is always listed.
   const name = projectId === WORKSPACE_ID ? null : choices.find((choice) => choice.id === projectId)?.name;
   const activity = composerActivity({ stopping: false, submitting: form.starting, generatingImage: false });
@@ -50,8 +53,13 @@ function NewThreadForm({ projectId, choices, onProject, copy }: FormProps) {
           <Text accessibilityRole="header" className="px-5 text-xl">
             {name ? `What should we work on in ${name}?` : "What should we work on?"}
           </Text>
-          {/* An image on its way belongs to this project's draft, so the project holds until it lands. */}
-          <ProjectPicker choices={choices} selected={projectId} disabled={form.starting || form.uploading > 0} onSelect={onProject} />
+          <NewThreadPickers
+            composerId={COMPOSER_ID}
+            project={choices.find((choice) => choice.id === projectId)}
+            place={form.settings.place?.chosen}
+            starting={form.starting}
+            uploading={form.uploading > 0}
+          />
           {copy ? <Text className="-mt-2 px-5 text-sm text-ink-4">{copy}</Text> : null}
           <View className="gap-2 px-3">
             {form.error ? (
@@ -99,7 +107,7 @@ export function NewThreadScreen() {
   // A project removed on the Mac while the screen is open leaves it for Workspace.
   const projectId = projects.data && !choices.some((choice) => choice.id === chosen) ? WORKSPACE_ID : chosen;
   useEffect(() => rememberProject(projectId), [projectId]);
-  // One form for every project, so the prompt keeps the keyboard while the person switches projects.
+  // One form for every project; each project's draft survives a switch through the picker.
   const copy = copyAge(
     projects.data?.find((project) => project.id === projectId),
     Date.now(),

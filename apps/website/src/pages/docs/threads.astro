@@ -16,7 +16,7 @@ import { docHref } from "../../data/docs";
       <li>In the composer's bottom row, choose the agent and model, and the mode. For a Claude model, the Claude account to use is at the end of the line under the composer.</li>
       <li>Type your request and press <kbd>Enter</kbd>.</li>
     </ol>
-    <p>For a project, the New thread page shows three suggestions while the composer is empty: <strong>Explore this project</strong>, <strong>Plan a change</strong>, and <strong>Review my changes</strong>. Each writes a prompt for you and switches the mode to <strong>Plan</strong>, and nothing is sent until you press <kbd>Enter</kbd>. Under them, <strong>Pick up where you left off</strong> lists recent threads and task activity, with the threads that need you first.</p>
+    <p>Along the bottom of the page, a dot for each day of the past year shows how many turns the project's agents finished that day: the more turns, the larger and darker the dot. The line above counts the project's turns and steps, each step being one tool call such as a file read or a command. Point at a day to see its turns, steps, threads, and how they split between agents.</p>
     <p>After the first reply, a small model gives the thread a short title. To rename it, click the title in the thread's header.</p>
   </section>
 
@@ -54,17 +54,16 @@ import { docHref } from "../../data/docs";
         </tbody>
       </table>
     </div>
-    <p>The ring beside the model shows how full the agent's context is. Click it for the numbers or to <strong>Compact context</strong>, which summarizes earlier messages and may lose some detail.</p>
+    <p>The ring beside the model shows context usage when the agent reports it. <strong>Compact context</strong> uses native compaction for Codex, Claude Code, OpenCode, Oh My Pi, and Pi. For Cursor, Antigravity, and fx, it starts a fresh session with a short handover brief. Either can lose earlier detail; the brief preserves less than native compaction.</p>
   </section>
 
   <section aria-labelledby="while-working">
     <h2 id="while-working">Send while the agent works</h2>
-    <p>You don't have to wait for a turn to end. Type while the agent works and press <kbd>Enter</kbd>:</p>
-    <ul>
-      <li>Codex and Claude Code read the message during the current turn, so you can correct course without stopping them. The placeholder reads <strong>Say it during this turn…</strong></li>
-      <li>OpenCode reads new messages only after its turn, so the message waits in the queue. The placeholder reads <strong>Queue a message for when it finishes…</strong></li>
-    </ul>
-    <p>A message also waits after you switch the agent or change the mode, and while the conversation compacts. To hold a message for the next turn on purpose, click <strong>Queue</strong> instead of sending.</p>
+    <p>
+      You don't have to wait for a turn to end. Type while the agent works and press <kbd>Enter</kbd>: Codex, Claude Code, OpenCode, Oh My Pi, Pi, Antigravity, and fx read text messages during the current turn, so you can
+      correct course without stopping them. The placeholder reads <strong>Say it during this turn…</strong>
+    </p>
+    <p>Cursor queues messages for the next turn. fx also queues images. A message waits after you switch the agent or change the mode, and while the conversation compacts. To hold a message for the next turn on purpose, click <strong>Queue</strong> instead of sending.</p>
     <p>Queued messages wait above the composer under <strong>Queued</strong> and go out one at a time, each as a new turn. Each has <strong>Send now</strong>, which hands it to the running turn when the agent can take it, and <strong>×</strong> to remove it. The queue survives a restart: OpenOrc sends what's left when it opens again.</p>
   </section>
 
@@ -79,6 +78,7 @@ import { docHref } from "../../data/docs";
   <section aria-labelledby="fork">
     <h2 id="fork">Fork a thread</h2>
     <p>A fork is a new thread that continues the conversation while the original stays as it is. Use it to try another approach without losing the first.</p>
+    <p>Forking is available for Codex, Claude Code, OpenCode, Oh My Pi, and Pi. Cursor, Antigravity, and fx do not expose native conversation forks; start a new thread instead.</p>
     <p>To fork, choose <strong>Fork</strong> in the <strong>Thread actions</strong> menu (⋯) in the thread's header, type <code>/fork</code>, or hover your latest message and click <strong>Fork thread</strong>.</p>
     <p>The fork opens with the original title followed by "(fork)", and the same agent, model, and mode. It shares its parent's folder and branch, so both threads edit the same files.</p>
     <Callout>
@@ -100,7 +100,7 @@ import { docHref } from "../../data/docs";
 
   <section aria-labelledby="sidebar">
     <h2 id="sidebar">The sidebar</h2>
-    <p>The sidebar lists the threads of every project in one list, newest work first. The OpenOrc wordmark sits at the top, beside the <strong>Inbox</strong> and the button that hides the sidebar. Under it, <strong>Search</strong> opens the command palette, and the filter and <strong>New thread</strong> buttons sit at the end of the same row. The footer starts with how much of this week's allowance is left on the account your next message would use. Click it for every account's limits. After it come buttons for <strong>Tasks</strong>, <strong>Pull requests</strong>, <strong>Schedules</strong>, <strong>Orclings</strong>, and <strong>Settings</strong>.</p>
+    <p>The sidebar lists the threads of every project in one list, newest work first. The OpenOrc wordmark sits at the top, beside <strong>Back</strong> and <strong>Forward</strong>, which step through the screens you've visited (<kbd>⌘[</kbd> and <kbd>⌘]</kbd>), and the button that hides the sidebar. Under it, <strong>Search</strong> opens the command palette, and the filter and <strong>New thread</strong> buttons sit at the end of the same row. A rail of buttons runs beside the list: <strong>New thread</strong>, <strong>Tasks</strong>, <strong>Pull requests</strong>, <strong>Schedules</strong>, and <strong>Orclings</strong>, then your projects, then the <strong>Inbox</strong>. At its foot are how much of this week's allowance is left on the account your next message would use (click it for every account's limits), the update button, and <strong>Settings</strong>.</p>
     <p>Each row shows a thread's title, its project, and where in the project it works: the branch, <strong>worktree</strong>, <strong>cloud</strong>, or the number and state of its pull request. While the agent works, the title lights up. A mark on the row tells you the thread needs you, has failed, or has a result you haven't read. Hover a row for its branch, agent, and when it last changed. While there's something to report, an extra line appears under the title:</p>
     <ul>
       <li>While the agent works, the step it's on, such as <strong>Running pnpm test</strong> or <strong>Thinking</strong>.</li>
@@ -180,7 +180,7 @@ import { docHref } from "../../data/docs";
     <h3>Projects</h3>
     <p>You switch projects from the New thread page. Click the project's name in <strong>What should we work on in</strong> to see every project. There you can pick a project, change its icon, or choose <strong>Add project</strong>. To take a project off the list, right-click it and choose <strong>Remove project…</strong>. Its files, worktrees, and history are kept.</p>
     <h3>Thread actions</h3>
-    <p>Right-click a thread, or open <strong>Thread actions</strong> (⋯) in its header:</p>
+    <p>Right-click a thread, or open <strong>Thread actions</strong> (⋯) in its header. A right-click starts with <strong>New subthread</strong> and the ways to open the thread. Then comes where the thread works: its branch, marked <strong>Worktree</strong> or <strong>Checkout</strong>, then <strong>This Mac</strong> or <strong>Cloud</strong> when cloud threads are set up. Point at either one for the moves from there. The header's menu starts with where the thread works and leaves out the choices that only apply to a thread you aren't looking at.</p>
     <div class="docs-table">
       <table>
         <thead>
@@ -191,8 +191,16 @@ import { docHref } from "../../data/docs";
         </thead>
         <tbody>
           <tr>
+            <td>The branch</td>
+            <td><strong>Show in Finder</strong> opens the thread's folder, <strong>Copy branch name</strong> copies the branch, and <strong>Move to a worktree</strong> or <strong>Move to the checkout</strong> moves a project thread and its uncommitted changes, and <strong>Remove worktree</strong> frees a worktree's folder and keeps its branch. A thread in the checkout shows the branch the checkout is on now. See <a href={docHref("git")}>Git and worktrees</a>.</td>
+          </tr>
+          <tr>
+            <td><strong>This Mac</strong> or <strong>Cloud</strong></td>
+            <td><strong>Move to cloud</strong> moves the thread, between turns, to a sandbox of its own, or to your cloud brain if you set one up. A thread on the cloud brain has <strong>Bring to Mac</strong> and <strong>Open on Mac</strong> instead. See <a href={docHref("cloud") + "#move"}>Cloud threads</a>.</td>
+          </tr>
+          <tr>
             <td><strong>Open beside</strong></td>
-            <td>Opens the thread in another pane. See <a href="#side-by-side">Open threads side by side</a>.</td>
+            <td>Sidebar only. Opens the thread in another pane. See <a href="#side-by-side">Open threads side by side</a>.</td>
           </tr>
           <tr>
             <td><strong>Open in new window</strong></td>
@@ -200,7 +208,7 @@ import { docHref } from "../../data/docs";
           </tr>
           <tr>
             <td><strong>Open parent</strong></td>
-            <td>For a thread that sits under another, opens the parent.</td>
+            <td>Sidebar only. For a thread that sits under another, opens the parent. In the header, click the parent's name.</td>
           </tr>
           <tr>
             <td><strong>Pin</strong></td>
@@ -212,7 +220,7 @@ import { docHref } from "../../data/docs";
           </tr>
           <tr>
             <td><strong>Mark as unread</strong></td>
-            <td>Flags the thread for later. Opening it marks it read again. <kbd>⌘⇧U</kbd></td>
+            <td>Sidebar only. Flags the thread for later. Opening it marks it read again. <kbd>⌘⇧U</kbd></td>
           </tr>
           <tr>
             <td><strong>New subthread</strong></td>
@@ -223,19 +231,11 @@ import { docHref } from "../../data/docs";
             <td>Continues the conversation in a new thread. See <a href="#fork">Fork a thread</a>.</td>
           </tr>
           <tr>
-            <td><strong>Move to a worktree</strong></td>
-            <td>Moves a project thread and its uncommitted changes into a worktree, or back with <strong>Move to the checkout</strong>. See <a href={docHref("git")}>Git and worktrees</a>.</td>
-          </tr>
-          <tr>
-            <td><strong>Move to cloud</strong></td>
-            <td>Between turns, moves the thread to a sandbox of its own, or to your cloud brain if you set one up. A thread on the cloud brain has <strong>Bring to Mac</strong> and <strong>Open on Mac</strong> instead. See <a href={docHref("cloud") + "#move"}>Cloud threads</a>.</td>
-          </tr>
-          <tr>
             <td><strong>Resolve</strong></td>
             <td>Moves the thread to <strong>Resolved</strong>, or back with <strong>Reopen</strong>. <kbd>⌘⇧A</kbd></td>
           </tr>
           <tr>
-            <td><strong>Delete thread</strong></td>
+            <td><strong>Delete</strong></td>
             <td>Removes the conversation, and its worktree if it has one. Uncommitted work in the worktree is first committed to the thread's branch, which stays. Tasks the thread created stay too. A cloud thread's sandbox is deleted.</td>
           </tr>
         </tbody>

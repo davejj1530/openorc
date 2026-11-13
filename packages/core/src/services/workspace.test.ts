@@ -327,6 +327,30 @@ describe("removing a task worktree", () => {
     await service.cleanupThread(moved, project, { save: false });
     expect((await git(root, ["ls-tree", "--name-only", moved.branch!])).stdout).not.toContain("draft.ts");
   });
+
+  it("brings a removed thread worktree back on its own branch at the saved tip, not the project's default branch", async () => {
+    const created = threads.insert(db, { projectId: project.id, title: "Round trip", agent: "codex", model: "fixture", mode: "act", permissionMode: "trusted", workspaceMode: "worktree" });
+    const prepared = await service.prepareThread(created, project, "main");
+    await writeFile(path.join(prepared.worktreePath!, "committed.ts"), "export const committed = 1;\n");
+    await git(prepared.worktreePath!, ["add", "committed.ts"]);
+    await git(prepared.worktreePath!, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.com", "commit", "-qm", "Committed work"]);
+    await writeFile(path.join(prepared.worktreePath!, "draft.ts"), "export const draft = true;\n");
+    await service.cleanupThread(prepared, project);
+    const savedTip = (await git(root, ["rev-parse", prepared.branch!])).stdout.trim();
+    await writeFile(path.join(root, "later.md"), "later\n");
+    await git(root, ["add", "later.md"]);
+    await git(root, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.com", "commit", "-qm", "Main moves on"]);
+
+    const removed = threads.get(db, created.id)!;
+    expect(removed.worktreePath).toBeNull();
+    const back = await service.prepareThread(removed, project, removed.baseBranch ?? undefined);
+    expect(back.branch).toBe(prepared.branch);
+    expect(back.baseSha).toBe(prepared.baseSha);
+    expect((await git(back.worktreePath!, ["rev-parse", "HEAD"])).stdout.trim()).toBe(savedTip);
+    expect(await readFile(path.join(back.worktreePath!, "committed.ts"), "utf8")).toContain("committed = 1");
+    expect(await readFile(path.join(back.worktreePath!, "draft.ts"), "utf8")).toContain("draft = true");
+    await expect(access(path.join(back.worktreePath!, "later.md"))).rejects.toThrow();
+  });
 });
 
 describe("thread workspace preparation", () => {

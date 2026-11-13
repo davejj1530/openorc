@@ -88,7 +88,7 @@ it("folds a page whose renderer ended after it was up into its quiet line, and R
   lifeline.port1.close();
   expect(await screen.findByText("Visualization unavailable: This visualization stopped. Try Reset.")).toBeTruthy();
   expect(screen.queryByTitle(visualization.title)).toBeNull();
-  expect(release).toHaveBeenCalledWith("view");
+  await waitFor(() => expect(release).toHaveBeenCalledWith("view"));
   fireEvent.click(screen.getByRole("button", { name: "Reset" }));
   await waitFor(() => expect(register).toHaveBeenCalledTimes(2));
   expect(screen.getByTitle(visualization.title)).toBeTruthy();

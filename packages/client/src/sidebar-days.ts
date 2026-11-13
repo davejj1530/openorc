@@ -48,7 +48,7 @@ function rootPlace(root: ThreadSummary, all: readonly ThreadSummary[], now: numb
  * Whether a thread is in Resolved: put there, or quiet since before yesterday and neither pinned nor snoozed, which keep
  * their own parts. A started thread goes with its parent unless put there itself.
  */
-export function threadResolved(thread: ThreadSummary, now: number): boolean {
+export function threadResolved(thread: Pick<ThreadSummary, "archivedAt" | "parentThreadId" | "pinnedAt" | "snoozedUntil" | "lastActivityAt" | "treeActivityAt">, now: number): boolean {
   if (thread.archivedAt) return true;
   if (thread.parentThreadId || thread.pinnedAt || (thread.snoozedUntil && thread.snoozedUntil > now)) return false;
   return sidebarPlace(thread.treeActivityAt ?? thread.lastActivityAt, now) === "resolved";

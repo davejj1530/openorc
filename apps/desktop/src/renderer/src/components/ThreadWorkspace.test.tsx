@@ -12,7 +12,7 @@ const { mutate, planThreads, documents, teamThreads, subagentThreads } = vi.hois
 }));
 vi.mock("../lib/client", async (original) => {
   const rpcData = (method: string, params: { id?: string }) => {
-    if (method === "projects.list") return [];
+    if (method === "projects.list" || method === "orclings.list" || method === "orclings.groups.list") return [];
     if (method === "threads.get")
       return {
         id: params.id,
@@ -35,7 +35,6 @@ vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onPush: () => () => {} } }
 vi.mock("../lib/window", () => ({ useTrafficLights: () => true, useWindowsControls: () => false }));
 vi.mock("./Sidebar", () => ({ WindowNav: () => null }));
 vi.mock("./Panel", () => ({ Panel: () => <div data-testid="shared-panel" /> }));
-vi.mock("./ThreadClaudeAccount", () => ({ ThreadClaudeAccount: () => <button>Claude account</button> }));
 vi.mock("./SubagentConversation", () => ({ SubagentConversation: () => null, ThreadParent: () => null }));
 // Keep real headers and controls; tooltip positioning is exercised in the Electron smoke.
 vi.mock("./ui", async (importOriginal) => ({
@@ -69,7 +68,7 @@ beforeEach(() => {
   window.openorc = { ...window.openorc, openExternal: vi.fn() };
   vi.stubGlobal("CSS", { escape: (value: string) => value });
   useRouter.setState({ route: { view: "thread", threadId: "a" }, threadIds: ["a"], history: [], future: [] });
-  useLayout.setState({ sidebarOpen: true, panelOpen: false, panelSide: "right", panelThreadId: "a", panelTab: "changes", projectId: null });
+  useLayout.setState({ sidebarOpen: true, panelOpen: false, panelSide: "right", panelThreadId: "a", panelTab: "changes" });
 });
 
 const active = () => useRouter.getState().route;
@@ -122,8 +121,8 @@ it("waits for an emitted plan and preserves manual sidebar choices", () => {
   expect(useLayout.getState()).toMatchObject({ panelThreadId: "b", panelOpen: true, panelTab: "plan" });
 });
 
-it("swaps the open panel's side from the thread header, handing the window navigation to whichever column comes first", () => {
-  useLayout.setState({ sidebarOpen: false });
+it("moves the open panel left from the thread header, handing the window navigation and the side switch to the panel", () => {
+  useLayout.setState({ sidebarOpen: false, panelSide: "right" });
   const { container } = render(<ThreadWorkspace />);
   const header = () => container.querySelector<HTMLElement>('[data-thread-pane="a"] header')!;
   expect(within(header()).queryByRole("button", { name: "Move panel left" })).toBeNull();
@@ -132,9 +131,10 @@ it("swaps the open panel's side from the thread header, handing the window navig
   fireEvent.click(within(header()).getByRole("button", { name: "Move panel left" }));
   expect(useLayout.getState().panelSide).toBe("left");
   expect(header().hasAttribute("data-window-navigation")).toBe(false);
+  // The panel is now the middle column, so its own header moves it back.
+  expect(within(header()).queryByRole("button", { name: /^Move panel/ })).toBeNull();
 
-  fireEvent.click(within(header()).getByRole("button", { name: "Move panel right" }));
-  expect(useLayout.getState().panelSide).toBe("right");
+  act(() => useLayout.getState().togglePanelSide());
   expect(header().hasAttribute("data-window-navigation")).toBe(true);
 });
 

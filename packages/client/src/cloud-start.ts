@@ -1,6 +1,7 @@
 import {
   DEFAULT_CLAUDE_ACCOUNT,
   harnessShortName,
+  harnessCatalog,
   isHarnessId,
   NO_CLOUD_SERVICE,
   NOT_ON_BRAIN,
@@ -19,9 +20,9 @@ import {
   type ThreadSummary,
 } from "@openorc/protocol";
 
-/** Every agent runs in a cloud sandbox; the reserved ACP kind has no adapter anywhere. */
+/** Cloud execution requires support for installing, authenticating and resuming the harness there. */
 export function runsInCloud(agent: AgentKind | null | undefined): boolean {
-  return isHarnessId(agent);
+  return isHarnessId(agent) && harnessCatalog[agent].cloud;
 }
 
 /** A conversation on this Mac that can move to a sandbox of its own: a project's, not a team's, with an agent that runs there. */
@@ -31,7 +32,14 @@ export function canMoveToCloud(thread: ThreadSummary): boolean {
 
 /** Move to cloud with a cloud brain set up: offered for a project's conversation this host holds. The brain checks again when asked. */
 export function offersBrainMove(thread: ThreadSummary): boolean {
-  return !thread.owner && !thread.moving && !thread.teamInstanceId && thread.projectId !== WORKSPACE_ID && thread.parentRelation !== "subagent";
+  return (
+    !thread.owner &&
+    !thread.moving &&
+    !thread.teamInstanceId &&
+    thread.projectId !== WORKSPACE_ID &&
+    thread.parentRelation !== "subagent" &&
+    (!isHarnessId(thread.agent) || harnessCatalog[thread.agent].cloud)
+  );
 }
 
 /**
@@ -186,8 +194,9 @@ export interface CloudTurnWho {
 function neededSignIn(rows: CloudSignIn[], who: CloudTurnWho): CloudSignIn | null {
   if (who.agent === "claude") return rows.find((row) => row.kind === "claude" && row.accountId === who.claudeAccountId) ?? null;
   if (who.agent === "codex") return rows.find((row) => row.kind === (who.brain ? "brain-codex" : "codex")) ?? null;
-  const provider = who.agent === "opencode" ? openCodeProvider(who.model) : null;
-  if (!provider || provider === OPENCODE_FREE_PROVIDER) return null;
+  // Oh My Pi takes the same provider keys in the cloud as OpenCode.
+  const provider = who.agent === "opencode" || who.agent === "omp" ? openCodeProvider(who.model) : null;
+  if (!provider || (who.agent === "opencode" && provider === OPENCODE_FREE_PROVIDER)) return null;
   // A provider nobody has a key for yet is not among the rows; it takes a key typed in.
   return rows.find((row) => row.kind === "opencode" && row.provider === provider) ?? { kind: "opencode", provider, label: openCodeProviderName(provider), state: "missing", way: "key", error: null };
 }

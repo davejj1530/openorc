@@ -1,9 +1,12 @@
 import { Link } from "expo-router";
 import { Pressable, View } from "react-native";
-import { endDemo } from "../../client";
-import { Funnel, ListChecks, Pin, Settings } from "../../generated/icons";
-import { useTaskBoard } from "../../tasks/use-task-board";
+import { endDemo, useSavedMacs } from "../../client";
+import { showsDemo, type LinkState } from "../../connection/manager";
+import { Cloud, Funnel, Laptop, Pin, Settings } from "../../generated/icons";
+import { LinkDot } from "../../ui/LinkDot";
 import { Text } from "../../ui/Text";
+import { useMacLine } from "./MacLine";
+import type { HomeTab } from "../BottomBar";
 import { FILTER_CHOICES, filterChoice, useHomeFilter } from "../filter";
 
 /**
@@ -28,13 +31,25 @@ export function FilterButton() {
   );
 }
 
-/** The open tasks of this Mac and its cloud brain; shown once a host answers with its list, so never for one from before. */
-function TasksButton() {
-  if (!useTaskBoard().available) return null;
+type Paired = Exclude<LinkState, { kind: "unpaired" }>;
+
+/**
+ * The host Home shows, as a circle like the others: a laptop for a Mac or a cloud for a cloud brain, and the link's ring
+ * in its corner while the phone is not connected. It opens the connection sheet, to switch hosts, try again or pair.
+ */
+export function ConnectionButton({ state }: { state: Paired }) {
+  const line = useMacLine(state);
+  const brain = useSavedMacs().find((host) => host.id === state.mac.id)?.kind === "brain";
+  const Mark = brain ? Cloud : Laptop;
   return (
-    <Link href="/tasks" asChild>
-      <Pressable accessibilityRole="button" accessibilityLabel="Tasks" hitSlop={reach} className={circle}>
-        <ListChecks size={20} className="text-ink-3" />
+    <Link href="/connection" asChild>
+      <Pressable accessibilityRole="button" accessibilityLabel={line.label} hitSlop={reach} className={circle}>
+        <Mark size={20} className="text-ink-3" />
+        {line.trouble ? (
+          <View className="absolute right-1.5 top-1.5">
+            <LinkDot tone={line.tone} />
+          </View>
+        ) : null}
       </Pressable>
     </Link>
   );
@@ -63,16 +78,22 @@ function SkipButton() {
 export type BarFor = "unpaired" | "paired" | "demo";
 
 /**
- * Tasks once a host lists them, the filter, then Settings outermost, as circles 8 pt apart, Settings' over the plus
- * buttons on the list's project headings. With no Mac there is nothing to filter. In the demo Skip takes Settings'
- * place, which the Mac line still opens.
+ * The connection, the filter, then Settings outermost, as circles 8 pt apart, Settings' over the plus buttons on the
+ * list's project headings. With no Mac there is nothing to connect to or filter, and over the Orclings and Tasks tabs
+ * the filter goes: it is the threads'. In the demo Skip takes Settings' place.
  */
-export function HeaderButtons({ shows }: { shows: BarFor }) {
+export function HeaderButtons({ state, tab = "threads" }: { state: LinkState; tab?: HomeTab }) {
+  const shows = barFor(state);
   return (
     <View className="flex-row gap-2">
-      {shows === "paired" ? <TasksButton /> : null}
-      {shows === "unpaired" ? null : <FilterButton />}
+      {state.kind === "unpaired" ? null : <ConnectionButton state={state} />}
+      {shows === "unpaired" || tab !== "threads" ? null : <FilterButton />}
       {shows === "demo" ? <SkipButton /> : <SettingsButton />}
     </View>
   );
+}
+
+function barFor(state: LinkState): BarFor {
+  if (state.kind === "unpaired") return "unpaired";
+  return showsDemo(state) ? "demo" : "paired";
 }

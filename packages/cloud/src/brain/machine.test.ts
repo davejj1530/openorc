@@ -414,6 +414,7 @@ describe("provisioning a brain", () => {
     await brain.provision(bundle("brain-v1"), { region: "fra1" });
     const survey = vercel.machine.runs.find((run) => run.args[2] === "brain-survey")!.args[1];
     for (const bin of ["claude", "codex", "opencode"]) expect(survey).toContain(`"$npm/bin/${bin}" --version`);
+    for (const bin of ["pi", "cursor-agent", "agy", "fx"]) expect(survey).not.toContain(`"$npm/bin/${bin}" --version`);
   });
 
   it("gives a brain made before the snapshot policy that policy, once", async () => {

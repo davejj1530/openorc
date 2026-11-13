@@ -8,21 +8,30 @@
  * Each question is one step through it: who owns an id is a lookup in the rows (a run id carries its thread); the
  * sidebar's rows are the rows filtered in memory; one thread is one row. The `threads` topic reads the list again.
  */
-import { hostedThreadOf, type AccountReach, type Project, type RoutedMethod, type RpcParams, type RpcResults, type ThreadSummary } from "@openorc/protocol";
+import { harnessShortName, hostedThreadOf, isHostedAgent, type AccountReach, type Project, type RoutedMethod, type RpcParams, type RpcResults, type ThreadSummary } from "@openorc/protocol";
 import { z } from "zod";
 import type { HostedDeps, HostedThreads, MergedMethod, PlacePage } from "./index.js";
 import { READ_LIMIT, type Follower } from "./follow.js";
-import type { Session, SessionChange } from "./session.js";
+import type { Account } from "./account.js";
+import * as sends from "./sends.js";
+import { Refused, type Session, type SessionChange } from "./session.js";
 import { CLOUD_PROJECT, listRows, projectPairs, resolvedCount, toAppEvent, toRuns, toSummary } from "./translate.js";
 import { ROUTES, SOCKET, wireProject, wireThread, wireTopics, type WireEvent, type WireProject, type WireThread } from "./wire.js";
 
 const NOT_YET = "This isn't on OpenOrc Cloud yet.";
 const GONE = "That conversation isn't on OpenOrc Cloud.";
 
-const keptThreads = z.object({ email: z.string(), heardAt: z.number(), rows: z.array(wireThread), projects: z.array(wireProject) });
+/**
+ * What this device keeps of a thread for itself: the half-written message, and the settings the person chose for the
+ * next one, which go with it as the message's own (`sends.ts`). Never sent to the server as the thread's.
+ */
+const kept = z.object({ draft: z.string().nullable().optional(), settings: wireThread.shape.settings.partial().optional() });
+export type KeptHere = z.infer<typeof kept>;
+
+const keptThreads = z.object({ email: z.string(), heardAt: z.number(), rows: z.array(wireThread), projects: z.array(wireProject), here: z.record(z.string(), kept).default({}) });
 type Heard = z.infer<typeof keptThreads>;
 
-type ThreadsDeps = { session: Session; follower: Follower } & Pick<HostedDeps, "kept" | "projects" | "push" | "now" | "log">;
+type ThreadsDeps = { session: Session; follower: Follower; account: Pick<Account, "status" | "refused"> } & Pick<HostedDeps, "kept" | "projects" | "push" | "now" | "log">;
 
 /** What a hosted thread answers for one of the app's calls, from its row; methods not here are refused in words. */
 type Answers = { [M in RoutedMethod]?: (threads: Threads, params: RpcParams<M>) => Promise<RpcResults[M]> | RpcResults[M] };
@@ -33,6 +42,19 @@ const ANSWERS: Answers = {
   "events.page": (threads, params) => threads.page(params),
   "events.listForRun": (threads, { runId, afterSeq }) => threads.eventsAfter(runId, afterSeq ?? 0),
   "threads.stopCommand": (threads, { id, commandId }) => threads.stopCommand(id, commandId),
+  "threads.update": (threads, { id, patch }) => threads.update(id, patch),
+  // The composer's sends, the queue, Stop and the answers to asks: sends.ts.
+  "runs.start": async (threads, params) => {
+    await sends.start(threads.calls, params);
+    return toRuns(threads.row(params.threadId!), threads.reach)[0]!;
+  },
+  "runs.send": (threads, params) => sends.send(threads.calls, params).then(() => null),
+  "threads.queue": (threads, params) => sends.queue(threads.calls, params),
+  "threads.unqueue": (threads, params) => sends.unqueue(threads.calls, params),
+  "threads.sendQueued": (threads, params) => sends.sendQueued(threads.calls, params),
+  "runs.interrupt": (threads, params) => sends.stop(threads.calls, params).then(() => null),
+  "approvals.resolve": (threads, params) => sends.answer(threads.calls, params).then(() => null),
+  "threads.ready": (threads, params) => sends.ready(threads.calls, threads.readied, params).then(() => null),
   // Reads the thread view makes as it opens, for parts the server does not serve yet: their empty answers.
   "threads.messages": () => [],
   "threads.lastMessage": () => null,
@@ -49,10 +71,23 @@ export class Threads implements HostedThreads {
   readonly brain = "hosted";
   #heard: Heard | null = null;
   #reading: Promise<void> | null = null;
-  #again = false;
+  #again: Promise<void> | null = null;
   #closed = false;
+  /** When the person last asked each thread to be ready, so a thread is asked at most once a minute. */
+  readonly readied = new Map<string, number>();
+  /** What the writes in sends.ts work with. */
+  readonly calls: sends.Calls;
 
   constructor(private readonly deps: ThreadsDeps) {
+    this.calls = {
+      session: deps.session,
+      row: (threadId) => this.row(threadId),
+      refresh: () => this.refresh(),
+      account: () => deps.account.status(),
+      chosen: (threadId) => this.#heard?.here[threadId]?.settings,
+      refused: (refusal, settings) => deps.account.refused(refusal, settings),
+      now: deps.now,
+    };
     deps.session.onChange((change) => this.#changed(change));
     deps.session.onSocket(SOCKET.changed, (body) => {
       const topics = wireTopics.safeParse(body);
@@ -115,6 +150,27 @@ export class Threads implements HostedThreads {
     const summaries = this.#summaries();
     const rows = method === "threads.list" ? listRows(summaries, params as RpcParams<"threads.list">) : resolvedCount(summaries, params as RpcParams<"threads.resolvedCount">);
     return { reach: this.reach, heardAt: this.#heard!.heardAt, rows } as PlacePage<M>;
+  }
+
+  /**
+   * threads.update. What the composer saves as the person writes stays on this device: the draft, and the settings
+   * chosen for the next message. Marking it read moves the person's own seen position on the server. Anything else
+   * waits for the server (unit 5) and is refused in words.
+   */
+  async update(threadId: string, patch: RpcParams<"threads.update">["patch"]): Promise<ThreadSummary> {
+    const row = this.row(threadId);
+    const { draft, model, effort, mode, permissionMode, agent, fastMode, seen, ...rest } = patch;
+    if (Object.values(rest).some((value) => value !== undefined) || fastMode || seen === false) throw new Refused(NOT_YET);
+    if (agent && !isHostedAgent(agent)) throw new Refused(`${harnessShortName(agent)} doesn't run on OpenOrc Cloud.`);
+    if (seen) await this.deps.session.request(ROUTES.seen(threadId), { seq: row.head });
+    const heard = this.#heard!;
+    const before = heard.here[threadId] ?? {};
+    const settings = { ...before.settings, ...defined({ agent, model, effort, mode, permissionMode }) };
+    heard.here[threadId] = { ...before, ...(draft !== undefined && { draft }), ...(Object.keys(settings).length && { settings }) };
+    this.deps.kept.save("threads", JSON.stringify(heard));
+    if (seen) await this.refresh();
+    this.#tell();
+    return this.summary(threadId);
   }
 
   /** One row, or a rejection in words when the account no longer has it. */
@@ -188,18 +244,16 @@ export class Threads implements HostedThreads {
    * windows hear `threads` when anything differs. A failed read keeps what was heard.
    */
   refresh(): Promise<void> {
-    if (this.#reading) {
-      this.#again = true;
+    if (!this.#reading) {
+      this.#reading = this.#read().finally(() => (this.#reading = null));
       return this.#reading;
     }
-    this.#reading = this.#read().finally(() => {
-      this.#reading = null;
-      if (this.#again) {
-        this.#again = false;
-        void this.refresh();
-      }
+    // A read already under way may have started before what the asker wants to see: one more follows it, for everyone.
+    this.#again ??= this.#reading.then(() => {
+      this.#again = null;
+      return this.refresh();
     });
-    return this.#reading;
+    return this.#again;
   }
 
   async #read(): Promise<void> {
@@ -215,7 +269,7 @@ export class Threads implements HostedThreads {
     const now = this.deps.session.state;
     if (this.#closed || !now.signedIn || now.email !== state.email) return;
     const before = JSON.stringify([this.#heard?.rows, this.#heard?.projects]);
-    this.#heard = { email: state.email, heardAt: this.deps.now(), rows: answers[0].threads, projects: answers[1] };
+    this.#heard = { email: state.email, heardAt: this.deps.now(), rows: answers[0].threads, projects: answers[1], here: this.#heard?.email === state.email ? this.#heard.here : {} };
     this.deps.kept.save("threads", JSON.stringify(this.#heard));
     if (JSON.stringify([this.#heard.rows, this.#heard.projects]) !== before) this.#tell();
   }
@@ -261,7 +315,14 @@ export class Threads implements HostedThreads {
     return heard.rows.map((row) => {
       const pair = row.projectId ? pairs.get(row.projectId) : undefined;
       const projectId = pair?.macId ?? CLOUD_PROJECT + (row.projectId ?? "none");
-      return toSummary(row, { projectId, orphanOf: pair?.macId ? null : (pair?.name ?? "OpenOrc Cloud"), reach: state.reach, heardAt: heard.heardAt });
+      const here = heard.here[row.id];
+      const summary = toSummary(here?.settings ? { ...row, settings: { ...row.settings, ...here.settings } } : row, {
+        projectId,
+        orphanOf: pair?.macId ? null : (pair?.name ?? "OpenOrc Cloud"),
+        reach: state.reach,
+        heardAt: heard.heardAt,
+      });
+      return here?.draft ? { ...summary, draft: here.draft } : summary;
     });
   }
 }
@@ -274,4 +335,9 @@ function parseKept(json: string | null): Heard | null {
   } catch {
     return null;
   }
+}
+
+/** The fields a patch set, without the ones it left out. */
+function defined<T extends Record<string, unknown>>(fields: T): Partial<T> {
+  return Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined)) as Partial<T>;
 }

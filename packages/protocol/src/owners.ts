@@ -82,6 +82,7 @@ export const OWNER_ROUTES: { [M in RoutedMethod]: OwnerRoute<M> } & { [M in Excl
   "threads.unqueue": byId,
   "threads.sendQueued": byId,
   "threads.stopCommand": byId,
+  "threads.ready": byId,
   "threads.send": byId,
   "threads.checkpoints": byId,
   "threads.turnChanges": byId,

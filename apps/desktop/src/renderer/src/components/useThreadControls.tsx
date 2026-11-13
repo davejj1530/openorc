@@ -9,7 +9,7 @@ import { MessageQueue } from "./MessageQueue";
  * to go now or leave the queue, and the commands its agent left running. `error` is the last failed action of either,
  * for the composer's alert. A task's conversation has neither.
  */
-export function useThreadControls(thread: ThreadSummary | null, runCount: number, steer: { canSteer: boolean; reason: string | null; onSent: () => void }) {
+export function useThreadControls(thread: ThreadSummary | null, runCount: number, steer: { canSteer: boolean; reason: string | null; blocked?: string | null; onSent: () => void }) {
   const unqueue = useRpcMutation("threads.unqueue");
   const sendQueued = useRpcMutation("threads.sendQueued");
   const stopCommand = useRpcMutation("threads.stopCommand");
@@ -19,6 +19,7 @@ export function useThreadControls(thread: ThreadSummary | null, runCount: number
       canSend={steer.canSteer}
       pending={sendQueued.isPending || unqueue.isPending}
       sendReason={steer.reason}
+      retryBlocked={steer.blocked}
       agentName={harnessShortName(thread.agent ?? defaultHarnessId)}
       onSend={(messageId) => {
         steer.onSent();

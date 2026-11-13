@@ -2,19 +2,20 @@
  * The account behind `HostedAccount`: who is signed in and what they pay for.
  *
  * State, written only here:
- *   heard       what the server last answered about the person, their billing and where their cloud threads run, with
- *               the address it was for. Kept in `deps.kept`. Each part is replaced only by an answer for it.
+ *   heard       what the server last answered about the person, their billing, where their cloud threads run and their
+ *               agents' sign-ins, with the address it was for, and the sign-ins it refused a turn on as signed out.
+ *               Kept in `deps.kept`. Each part is replaced only by an answer for it.
  *   codeSent    the address a code was last sent to, and when.
  *   error       words for the last read that failed for a reason other than reach.
  *
  * `status()` is computed from these and the session each time it is asked. Nothing stores an AccountStatus.
  */
-import type { AccountStatus } from "@openorc/protocol";
+import { openCodeProvider, type AccountStatus, type HostedRefusal } from "@openorc/protocol";
 import { z } from "zod";
 import type { HostedAccount, HostedDeps } from "./index.js";
 import { OutOfReach, type Session, type SessionChange } from "./session.js";
-import { toImage, toPlan, toSandbox } from "./translate.js";
-import { ROUTES, wireBilling, wireHostedSettings } from "./wire.js";
+import { signInKey, toImage, toPlan, toSandbox, toSignIns } from "./translate.js";
+import { ROUTES, wireBilling, wireHostedSettings, wireSignIn } from "./wire.js";
 
 /** How long Settings keeps asking for the code it sent; the server's code lasts five minutes. */
 const CODE_REMEMBERED_MS = 10 * 60_000;
@@ -24,6 +25,9 @@ const keptAnswers = z.object({
   billing: wireBilling.nullable(),
   person: z.object({ name: z.string(), image: z.string().nullable() }).nullable().default(null),
   sandbox: wireHostedSettings.nullable().default(null),
+  signIns: z.array(wireSignIn).nullable().default(null),
+  /** Sign-ins the server refused a turn on as signed out, by agent and provider, with the `checkedAt` it had then. */
+  ended: z.array(z.object({ key: z.string(), checkedAt: z.string().nullable() })).default([]),
 });
 type Heard = z.infer<typeof keptAnswers>;
 
@@ -69,6 +73,7 @@ export class Account implements HostedAccount {
       plan,
       hours,
       sandbox: heard?.sandbox ? toSandbox(heard.sandbox) : null,
+      signIns: heard?.signIns ? toSignIns(heard.signIns, heard.ended) : null,
       error: this.#error,
     };
   }
@@ -105,6 +110,20 @@ export class Account implements HostedAccount {
     if (email && this.#signedInAs() === email) this.#hear(email, { sandbox: settings });
   }
 
+  /**
+   * The server refused a turn: read the account again, so the card above the composer says why. A sign-in it found
+   * signed out is marked ended until it is set again, which the list alone cannot tell.
+   */
+  refused(refusal: HostedRefusal, settings: { agent: string; model: string | null }): void {
+    const email = this.#signedInAs();
+    if (email && refusal === "signed_out" && this.#heard) {
+      const key = signInKey(settings.agent, settings.agent === "opencode" ? openCodeProvider(settings.model) : null);
+      const row = this.#heard.signIns?.find((each) => signInKey(each.agent, each.agent === "opencode" ? each.provider : null) === key);
+      this.#hear(email, { ended: [...this.#heard.ended.filter((each) => each.key !== key), { key, checkedAt: row?.checkedAt ?? null }] });
+    }
+    void this.#refresh();
+  }
+
   #changed(change: SessionChange): void {
     if (!this.deps.session.state.signedIn) {
       // Before the session's own storage is cleared and before the server hears of it.
@@ -123,10 +142,11 @@ export class Account implements HostedAccount {
   async #refresh(): Promise<void> {
     const email = this.#signedInAs();
     if (!email) return;
-    const [person, billing, sandbox] = await Promise.allSettled([
+    const [person, billing, sandbox, signIns] = await Promise.allSettled([
       this.deps.session.request(ROUTES.person),
       this.deps.session.request(ROUTES.billing),
       this.deps.session.request(ROUTES.hostedSettings),
+      this.deps.session.request(ROUTES.signIns),
     ]);
     if (this.#signedInAs() !== email) return;
     if (person.status === "fulfilled" && person.value === null) return void this.deps.session.end("server");
@@ -135,12 +155,13 @@ export class Account implements HostedAccount {
       ...(person.status === "fulfilled" && person.value && { person: { name: person.value.user.name, image: toImage(person.value.user.image) } }),
       ...(billing.status === "fulfilled" && { billing: billing.value }),
       ...(sandbox.status === "fulfilled" && { sandbox: sandbox.value }),
+      ...(signIns.status === "fulfilled" && { signIns: signIns.value }),
     });
   }
 
   /** Puts what the server just answered for `email` beside what it said before, keeps it, and tells the windows. */
   #hear(email: string, parts: Partial<Omit<Heard, "email">>): void {
-    const before = this.#heard?.email === email ? this.#heard : { email, billing: null, person: null, sandbox: null };
+    const before = this.#heard?.email === email ? this.#heard : { email, billing: null, person: null, sandbox: null, signIns: null, ended: [] };
     this.#heard = { ...before, ...parts };
     if (Object.keys(parts).length) this.deps.kept.save("account", JSON.stringify(this.#heard));
     this.#announce();

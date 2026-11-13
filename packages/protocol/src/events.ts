@@ -230,6 +230,11 @@ export const AgentEvent = z.discriminatedUnion("type", [
     reason: z.string().optional(),
     /** The request can only be allowed this once: nothing would remember an allowance for the rest of the run. */
     onceOnly: z.boolean().optional(),
+    /**
+     * Only an answer closes it: it stays open when its turn or its process ends, as an OpenOrc Cloud thread's asks do.
+     * No agent on this Mac sets it, and phones never receive an OpenOrc Cloud thread's events.
+     */
+    durable: z.boolean().optional(),
   }),
   z.object({
     type: z.literal("approval.resolved"),

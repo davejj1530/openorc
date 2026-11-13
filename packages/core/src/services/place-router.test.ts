@@ -115,6 +115,23 @@ describe("OpenOrc Cloud threads in the window's calls", () => {
     });
   });
 
+  it("sends to a cloud thread through the composer's own call, and refuses in words what the server refuses", async () => {
+    const opened = await open();
+    const project = macProject(opened);
+    const cloudProject = stand.addProject(EMAIL, { name: "openorc", fullName: "altalogy/openorc" });
+    const hosted = stand.addThread(EMAIL, { projectId: cloudProject, title: "Send to me" });
+    stand.setBilling(EMAIL, { pro: true, standing: "live", at: new Date(Date.now() + 86_400_000).toISOString(), monthlyLeftSeconds: 3600, packsLeftSeconds: 0 });
+    stand.setSignIns(EMAIL, [{ agent: "claude" }]);
+    await signIn();
+    await vi.waitFor(async () => expect((await list([project.id])).some((row) => row.id === hosted)).toBe(true), { timeout: 5_000 });
+    const start = { threadId: hosted, agent: "claude", mode: "act", permissionMode: "trusted", prompt: "Go" } as const;
+    await expect(call("runs.start", { ...start, messageId: `user-${crypto.randomUUID()}` })).resolves.toMatchObject({ id: `hosted:${hosted}`, state: "running" });
+    await call("runs.interrupt", { runId: `hosted:${hosted}` });
+    stand.setBilling(EMAIL, { pro: false });
+    await expect(call("runs.start", { ...start, messageId: `user-${crypto.randomUUID()}` })).rejects.toThrow("OpenOrc Cloud needs Pro.");
+    await vi.waitFor(async () => expect(await call("account.status", {})).toMatchObject({ plan: { pro: false } }), { timeout: 5_000 });
+  });
+
   it("answers every call as before, and asks no server, with nobody signed in", async () => {
     const opened = await open();
     const project = macProject(opened);

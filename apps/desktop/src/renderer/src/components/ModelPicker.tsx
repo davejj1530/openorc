@@ -469,16 +469,7 @@ function ComposerTriggerIcon({ orcling, value }: { orcling: Orcling | null; valu
 }
 
 /** A compact trigger with one model browser. */
-export function ComposerModelPicker({
-  value,
-  onChange,
-  onSelectModel,
-  orclings,
-  accounts,
-  modelSelector,
-  disabled,
-  settingsDisabled = false,
-}: {
+interface ComposerModelPickerProps {
   value: ModelChoice | null;
   onChange: (choice: ModelChoice) => void;
   onSelectModel?: (choice: ModelChoice) => void;
@@ -488,10 +479,14 @@ export function ComposerModelPicker({
   modelSelector?: ReactNode;
   disabled?: boolean;
   settingsDisabled?: boolean;
-}) {
+  /** Where the conversation runs takes only these agents, and Fast only when `fast`. */
+  limits?: { harnesses: readonly HarnessId[]; fast: boolean } | undefined;
+}
+
+export function ComposerModelPicker({ value, onChange, onSelectModel, orclings, accounts, modelSelector, disabled, settingsDisabled = false, limits }: ComposerModelPickerProps) {
   const models = useModelCatalog();
   const popup = usePickerPopup();
-  value = useEnabledChoice(value);
+  value = useEnabledChoice(value, limits?.harnesses);
   const current = catalogModel(models.data, value);
   const {
     efforts,
@@ -564,7 +559,8 @@ export function ComposerModelPicker({
                 orclings={orclings}
                 accounts={accounts}
                 showEffort
-                showFast
+                showFast={limits?.fast ?? true}
+                harnesses={limits?.harnesses}
                 disabled={settingsDisabled}
                 closeOnSelect={false}
                 close={() => popup.setOpen(false)}

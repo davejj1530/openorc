@@ -7,7 +7,7 @@ import { z } from "zod";
 
 /** A route with the shape of its answer, so a reply is always parsed where it enters. Null: the body is not read. */
 export interface Route<T> {
-  method: "GET" | "POST" | "PATCH";
+  method: "GET" | "POST" | "PATCH" | "DELETE";
   path: string;
   reply: z.ZodType<T> | null;
 }
@@ -44,15 +44,23 @@ export const wireHostedSettings = z.object({
 });
 export type WireHostedSettings = z.infer<typeof wireHostedSettings>;
 
+/** One of the person's agent sign-ins, never its secret. `checkedAt` changes whenever the sign-in is set again. */
+export const wireSignIn = z.object({ agent: z.string(), provider: z.string(), label: z.string(), checkedAt: iso.nullable() });
+export type WireSignIn = z.infer<typeof wireSignIn>;
+
 const seq = z.number().int().nonnegative();
 
-/** A message to a thread, as its `waiting` lists it. */
+/**
+ * A message to a thread, as its `waiting` lists it: not taken yet, or refused since. `after`: sent to wait for the
+ * running turn to end (assumed of the server: today it answers no such field, and every message is one sent "now").
+ */
 export const wireMessage = z.object({
   id: z.string(),
   authorId: z.string().nullable(),
   text: z.string(),
   state: z.string(),
   refusal: z.string().nullable(),
+  after: z.boolean().default(false),
   createdAt: iso,
 });
 export type WireMessage = z.infer<typeof wireMessage>;
@@ -100,6 +108,12 @@ export type WireEvents = z.infer<typeof wireEvents>;
 export const wireProject = z.object({ id: z.string(), name: z.string(), fullName: z.string() });
 export type WireProject = z.infer<typeof wireProject>;
 
+/** What a send answers: the message as it now stands, or a refusal to start a turn, with nothing stored. */
+export const wireSent = z.discriminatedUnion("sent", [z.object({ sent: z.literal(true), message: wireMessage }), z.object({ sent: z.literal(false), refusal: z.string() })]);
+
+/** What an answer to an ask answers: taken, or refused because it would start a turn the person cannot start. */
+export const wireAnswered = z.discriminatedUnion("answered", [z.object({ answered: z.literal(true) }), z.object({ answered: z.literal(false), refusal: z.string() })]);
+
 /** Socket messages, server to app: a topic of the person's changed, a stored batch of a thread's log, a row's facts moved. */
 export const wireTopics = z.object({ topics: z.array(z.string()) });
 export const wireFrame = z.object({ threadId: z.string(), events: z.array(wireEvent).min(1) });
@@ -126,12 +140,23 @@ export const ROUTES = {
   person: route("GET", "/api/auth/get-session", wirePerson),
   hostedSettings: route("GET", "/settings/hosted", wireHostedSettings),
   setHostedSettings: route("PATCH", "/settings/hosted", wireHostedSettings),
+  signIns: route("GET", "/agent-sign-ins", z.array(wireSignIn)),
   projects: route("GET", "/projects", z.array(wireProject)),
   threads: route("GET", "/hosted/threads", wireThreadList),
   thread: (id: string) => route("GET", `/hosted/threads/${encodeURIComponent(id)}`, wireThreadDetail),
   /** After a seq, or from a turn, at most `limit` events. */
   events: (id: string, from: { after: number } | { fromTurn: number }, limit: number) =>
     route("GET", `/hosted/threads/${encodeURIComponent(id)}/events?${new URLSearchParams({ ...stringsOf(from), limit: String(limit) })}`, wireEvents),
+  /** One message to the thread. Sending the same id again is the same message. */
+  send: (id: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/messages`, wireSent),
+  /** Cancels a message not taken yet, or dismisses a refused one (assumed of the server: not served today). */
+  unsend: (id: string, messageId: string) => route("DELETE", `/hosted/threads/${encodeURIComponent(id)}/messages/${encodeURIComponent(messageId)}`, null),
+  /** The person has read the thread up to `seq`; their position only moves forward. */
+  seen: (id: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/seen`, z.object({ seenSeq: seq })),
+  stop: (id: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/stop`, null),
+  /** The person is about to write: the thread's machine wakes and its agent starts waiting. Answered with nothing. */
+  ready: (id: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/ready`, null),
+  answer: (askId: string) => route("POST", `/hosted/asks/${encodeURIComponent(askId)}/answer`, wireAnswered),
   stopCommand: (id: string, commandId: string) => route("POST", `/hosted/threads/${encodeURIComponent(id)}/commands/${encodeURIComponent(commandId)}/stop`, null),
 } as const;
 

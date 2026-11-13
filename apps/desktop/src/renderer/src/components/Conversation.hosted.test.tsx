@@ -1,7 +1,8 @@
-import { act, cleanup, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { Project, Run, ThreadSummary } from "@openorc/protocol";
+import type { AccountStatus, Project, Run, ThreadSummary } from "@openorc/protocol";
+import { useRouter } from "../lib/router";
 import { runs as runStore } from "../lib/client";
 import { core } from "../lib/rpc";
 import type { ComposerProps } from "./Composer";
@@ -57,7 +58,21 @@ const thread = (overrides: Partial<ThreadSummary> = {}) =>
     ...overrides,
   }) as unknown as ThreadSummary;
 
-async function open(overrides: Partial<ThreadSummary> = {}) {
+const pro: AccountStatus = {
+  state: "signed-in",
+  email: "ada@example.com",
+  name: "Ada Lovelace",
+  image: null,
+  reach: "live",
+  plan: { pro: true, standing: "live", at: 0 },
+  hours: { leftSeconds: 3600, monthly: { grantedSeconds: 3600, leftSeconds: 3600, resetsAt: 0 }, packsLeftSeconds: 0 },
+  sandbox: null,
+  signIns: [{ agent: "claude", provider: "anthropic", label: "Claude Max", ended: false }],
+  error: null,
+};
+
+async function open(overrides: Partial<ThreadSummary> = {}, account: AccountStatus = pro) {
+  queries.set("account.status", account);
   queries.set("runs.listForThread", [
     { id: RUN, threadId: "cloud", taskId: null, agent: "claude", model: "opus", mode: "act", permissionMode: "trusted", state: "success", startedAt: 1, endedAt: 2 } as unknown as Run,
   ]);
@@ -87,4 +102,59 @@ it("offers no Fork on an OpenOrc Cloud thread, which would be refused there", as
 it("still offers Fork on a thread of this Mac", async () => {
   await open({ owner: undefined });
   expect(composer.props!.commands?.map((command) => command.name)).toContain("fork");
+});
+
+it("leaves out of a cloud thread's composer what OpenOrc Cloud does not take yet", async () => {
+  await open();
+  const props = composer.props!;
+  expect(props.commands?.map((command) => command.name)).not.toContain("compact");
+  expect(props.onCompact).toBeUndefined();
+  expect(props.accounts).toBeUndefined();
+  expect(props.attachmentsDisabledReason).toBe("Files can't be sent to OpenOrc Cloud yet.");
+  expect(props.modelLimits).toEqual({ harnesses: ["claude", "codex", "opencode"], fast: false });
+  expect(props.disabledReason).toBeNull();
+  expect(screen.queryByRole("status", { name: "OpenOrc Cloud" })).toBeNull();
+});
+
+it.each([
+  { name: "not Pro", account: { ...pro, plan: { pro: false as const }, hours: null }, words: "OpenOrc Cloud needs Pro.", action: "Upgrade", section: "account" },
+  {
+    name: "out of hours",
+    account: { ...pro, hours: { leftSeconds: 0, monthly: { grantedSeconds: 3600, leftSeconds: 0, resetsAt: 0 }, packsLeftSeconds: 0 } },
+    words: "You're out of cloud hours.",
+    action: "Buy more hours",
+    section: "account",
+  },
+  {
+    name: "a payment not through",
+    account: { ...pro, hours: { leftSeconds: 0, monthly: null, packsLeftSeconds: 0 } },
+    words: "Your payment hasn't gone through.",
+    action: "Billing",
+    section: "account",
+  },
+  { name: "Claude not signed in", account: { ...pro, signIns: [] }, words: "Claude isn't signed in on OpenOrc Cloud.", action: "Sign in", section: "cloud" },
+])("says above the composer when $name, disables Send with the same words, and leads on", async ({ account, words, action, section }) => {
+  await open({}, account as AccountStatus);
+  const card = screen.getByRole("status", { name: "OpenOrc Cloud" });
+  expect(card.textContent).toContain(words);
+  expect(composer.props!.disabledReason).toBe(words);
+  fireEvent.click(screen.getByRole("button", { name: action }));
+  expect(useRouter.getState().route).toMatchObject({ view: "settings", section });
+});
+
+it("lets a message into a running turn go whatever the hours, since the turn's starter pays", async () => {
+  await open({ activity: "running" }, { ...pro, plan: { pro: false }, hours: null });
+  expect(composer.props!.disabledReason).toBeNull();
+});
+
+it("makes the thread ready as the person starts writing, and not for a thread that cannot start a turn", async () => {
+  await open();
+  act(() => composer.props!.onChange("Check the sleeping case"));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("threads.ready", { id: "cloud", settings: expect.objectContaining({ agent: "claude", mode: "act", permissionMode: "trusted" }) }));
+  cleanup();
+  vi.mocked(core.call).mockClear();
+  await open({}, { ...pro, plan: { pro: false }, hours: null });
+  act(() => composer.props!.onChange("Check the sleeping case"));
+  await act(async () => void (await new Promise((resolve) => setTimeout(resolve, 0))));
+  expect(vi.mocked(core.call).mock.calls.map(([method]) => method)).not.toContain("threads.ready");
 });

@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { openCodeProvider } from "./cloud-sign-ins.js";
+import { harnessShortName } from "./harness.js";
 
 /**
  * Every request to the OpenOrc server names the version of these shapes the app reads, so a newer server can tell an
@@ -30,6 +32,22 @@ export interface AccountSandbox {
   services: { id: string; name: string }[];
 }
 
+/** The agents OpenOrc Cloud runs. A turn there runs on the person's own sign-in for its agent. */
+export const HOSTED_AGENTS = ["claude", "codex", "opencode"] as const;
+export type HostedAgent = (typeof HOSTED_AGENTS)[number];
+export const isHostedAgent = (agent: string): agent is HostedAgent => (HOSTED_AGENTS as readonly string[]).includes(agent);
+
+/**
+ * One of the person's agent sign-ins on OpenOrc Cloud, never its secret. `provider` names an OpenCode key's provider
+ * (and Anthropic or OpenAI for the others). `ended`: the server refused a turn on it as signed out since it was last set.
+ */
+export interface AccountSignIn {
+  agent: HostedAgent;
+  provider: string;
+  label: string;
+  ended: boolean;
+}
+
 /** Everything the app knows about the OpenOrc account, in one answer. Signed out is the whole state of an app with no account. */
 export type AccountStatus =
   | {
@@ -53,6 +71,8 @@ export type AccountStatus =
       hours: CloudHours | null;
       /** Null until the server first answers. */
       sandbox: AccountSandbox | null;
+      /** The person's agent sign-ins on OpenOrc Cloud; null until the server first answers. */
+      signIns: AccountSignIn[] | null;
       error: string | null;
     };
 
@@ -80,3 +100,44 @@ export const accountRpcParams = {
 
 /** Every call answers the whole status, so a window never reads a stale half. */
 export type AccountRpcResults = { [M in keyof typeof accountRpcParams]: AccountStatus };
+
+/**
+ * Why a message cannot start a turn on OpenOrc Cloud now: out of reach, or one of the server's refusals, which name
+ * the same reasons (`HOSTED_REFUSALS`).
+ */
+export const HOSTED_REFUSALS = ["not_pro", "no_hours", "awaiting_payment", "no_sign_in", "signed_out"] as const;
+export type HostedRefusal = (typeof HOSTED_REFUSALS)[number];
+export const isHostedRefusal = (refusal: string): refusal is HostedRefusal => (HOSTED_REFUSALS as readonly string[]).includes(refusal);
+export type SendBlockWhy = "offline" | HostedRefusal;
+
+/** The one table of words for a block, shown on the card above the composer, on Send, and on a refused send alike. */
+const SEND_BLOCK_WORDS: Record<SendBlockWhy, (agent: string) => string> = {
+  offline: () => "OpenOrc Cloud can't be reached.",
+  not_pro: () => "OpenOrc Cloud needs Pro.",
+  no_hours: () => "You're out of cloud hours.",
+  awaiting_payment: () => "Your payment hasn't gone through.",
+  no_sign_in: (agent) => `${harnessShortName(agent)} isn't signed in on OpenOrc Cloud.`,
+  signed_out: (agent) => `${harnessShortName(agent)}'s sign-in on OpenOrc Cloud ended.`,
+};
+
+export const sendBlockWords = (why: SendBlockWhy, agent: string): string => SEND_BLOCK_WORDS[why](agent);
+
+/**
+ * The block on starting a turn on OpenOrc Cloud with these settings, from the account as the app last heard it, in the
+ * order the server checks: hours first, then the agent's sign-in. Null when a send can go, or when the app cannot tell
+ * (signed out, or the sign-ins not heard yet), and for a message into a running turn, which runs on that turn's starter.
+ * The server stays the judge: a send this lets through can still be refused, and the account is then read again.
+ */
+export function hostedSendBlock(account: AccountStatus | undefined, settings: { agent: string; model: string | null }, steering: boolean): SendBlockWhy | null {
+  if (account?.state !== "signed-in") return null;
+  if (account.reach !== "live") return "offline";
+  if (steering) return null;
+  if (!account.plan.pro) return "not_pro";
+  if ((account.hours?.leftSeconds ?? 0) <= 0) return account.hours?.monthly ? "no_hours" : "awaiting_payment";
+  if (!account.signIns || !isHostedAgent(settings.agent)) return null;
+  const provider = settings.agent === "opencode" ? openCodeProvider(settings.model) : null;
+  if (settings.agent === "opencode" && !provider) return null;
+  const signIn = account.signIns.find((row) => row.agent === settings.agent && (provider === null || row.provider === provider));
+  if (!signIn) return "no_sign_in";
+  return signIn.ended ? "signed_out" : null;
+}

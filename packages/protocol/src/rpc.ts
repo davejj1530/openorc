@@ -201,6 +201,16 @@ export const rpcParams = {
   "threads.sendQueued": z.object({ id: z.string(), messageId: z.string().min(1) }),
   /** Stop a command the agent left running in the background, such as a dev server. */
   "threads.stopCommand": z.object({ id: z.string(), commandId: z.string().min(1) }),
+  /**
+   * The person is about to write to the thread, with these settings where they differ from the thread's: where the agent
+   * runs on a machine that sleeps, it wakes and starts waiting, so the message finds it running.
+   */
+  "threads.ready": z
+    .object({
+      id: z.string(),
+      settings: z.object({ agent: AgentKind, model: z.string().nullable(), effort: z.string().nullable(), mode: RunMode, permissionMode: PermissionPreset }).partial().optional(),
+    })
+    .strict(),
   "subagents.stop": z.object({ threadId: z.string() }),
   "threads.checkpoints": z.object({ id: z.string() }),
   /** What the turn that saved a checkpoint changed, against the checkpoint before it. */
@@ -619,6 +629,7 @@ export interface RpcResults
   "threads.unqueue": QueuedMessage[];
   "threads.sendQueued": QueuedMessage[];
   "threads.stopCommand": null;
+  "threads.ready": null;
   "subagents.stop": null;
   "threads.checkpoints": ThreadCheckpoint[];
   "threads.turnChanges": TurnFileChanges;

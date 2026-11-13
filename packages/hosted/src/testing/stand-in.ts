@@ -15,7 +15,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import type { AddressInfo, Socket } from "node:net";
 import type { LiveSocket } from "../index.js";
 import { engineSession } from "./stand-in-socket.js";
-import { StandInThreads, type StandInPeer, type StandInThreadSeed } from "./stand-in-threads.js";
+import { StandInThreads, type Admit, type StandInPeer, type StandInThreadSeed } from "./stand-in-threads.js";
 
 export interface StandIn {
   /** Its origin, for `HostedDeps.server` or `OpenOrcOptions.accountServer`. */
@@ -47,7 +47,24 @@ export interface StandIn {
   set(threadId: string, facts: { status?: "idle" | "working" | "needs_answer"; seenSeq?: number; backgroundCommands?: { id: string; description: string }[] }): void;
   /** The background commands a person asked to stop in a thread, in order. */
   stoppedCommands(threadId: string): string[];
+  /** The person's agent sign-ins, as GET /agent-sign-ins lists them; `ended` ones refuse a turn as signed out. */
+  setSignIns(email: string, signIns: StandInSignIn[]): void;
+  /** The agent asks before it acts, or asks a question, in a thread. Answers the ask's id, its `approvalId`. */
+  ask(threadId: string, request: { kind: string; toolName?: string; input: unknown; detail: string }): string;
+  /** The thread's running turn ends: an open ask parks, and the first waiting message is taken or refused. */
+  endTurn(threadId: string, status?: "success" | "cancelled"): void;
+  /** Every ready ask stored, in order. */
+  readies: { threadId: string; settings: unknown }[];
+  /** Every message body posted, in order. */
+  sent: { threadId: string; body: Record<string, unknown> }[];
   close(): Promise<void>;
+}
+
+export interface StandInSignIn {
+  agent: "claude" | "codex" | "opencode";
+  provider?: string;
+  label?: string;
+  ended?: boolean;
 }
 
 export type StandInBilling = { pro: false } | { pro: true; standing: "live" | "ending" | "grace"; at: string; monthlyLeftSeconds: number | null; packsLeftSeconds: number };
@@ -95,7 +112,9 @@ function accounts(options: StandInOptions) {
   const billing = new Map<string, StandInBilling>();
   const people = new Map<string, { name: string; image: string | null }>();
   const sandboxes = new Map<string, string | null>();
+  const signIns = new Map<string, StandInSignIn[]>();
   const services = options.services ?? ["local"];
+  const admit = turnRule(billing, signIns);
   const hostedSettings = (email: string) => ({
     service: sandboxes.get(email) ?? null,
     served: services.map((service) => ({ service, name: SERVICE_NAMES[service] ?? service })),
@@ -153,6 +172,10 @@ function accounts(options: StandInOptions) {
       const person = people.get(who) ?? { name: nameFromEmail(who), image: null };
       return { status: 200, body: { session: { activeOrganizationId: `personal-${who}` }, user: { id: `user-${who}`, email: who, emailVerified: true, ...person } } };
     },
+    "GET /agent-sign-ins": (_body, token) => {
+      const who = holder(token);
+      return who ? { status: 200, body: signInRows(signIns.get(who) ?? []) } : unauthorized();
+    },
     "GET /settings/hosted": (_body, token) => {
       const who = holder(token);
       return who ? { status: 200, body: hostedSettings(who) } : unauthorized();
@@ -166,16 +189,16 @@ function accounts(options: StandInOptions) {
       return { status: 200, body: hostedSettings(who) };
     },
   };
-  return { codes, sessions, billing, people, sandboxes, holder, routes };
+  return { codes, sessions, billing, people, sandboxes, signIns, admit, holder, routes };
 }
 
 export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
-  const { codes, sessions, billing, people, sandboxes, holder, routes } = accounts(options);
+  const { codes, sessions, billing, people, sandboxes, signIns, admit: admitTurn, holder, routes } = accounts(options);
   const requests: StandIn["requests"] = [];
   const connections = new Set<Socket>();
   const peers = new Set<Peer>();
   const sockets = new Set<StandInPeer>();
-  const hosted = new StandInThreads(() => [...[...peers].filter((peer) => !peer.waiting), ...sockets]);
+  const hosted = new StandInThreads(() => [...[...peers].filter((peer) => !peer.waiting), ...sockets], admitTurn);
   const socketAnswers: Record<string, (peer: StandInPeer, body: unknown) => unknown> = {
     "hosted:watch": (peer, body) => hosted.watch(peer, body),
     "hosted:unwatch": (peer, body) => hosted.unwatch(peer, body),
@@ -205,16 +228,17 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
     const text = Buffer.concat(chunks).toString("utf8");
     const route = routes[`${request.method} ${path}`];
     const who = holder(token);
+    const body = text ? (JSON.parse(text) as Record<string, unknown>) : {};
     const signedInRoute = (): Reply | null => {
-      if (who) return hosted.route(request.method ?? "GET", path, url.searchParams, who);
+      if (who) return hosted.route(request.method ?? "GET", path, url.searchParams, who, body);
       return /^\/(projects|hosted)\b/.test(path) ? unauthorized() : null;
     };
-    const reply: Reply = (route ? route(text ? (JSON.parse(text) as Record<string, unknown>) : {}, token) : signedInRoute()) ?? {
+    const reply: Reply = (route ? route(body, token) : signedInRoute()) ?? {
       status: 404,
       body: { message: `Cannot ${request.method} ${path}`, error: "Not Found", statusCode: 404 },
     };
     response.writeHead(reply.status, { "content-type": "application/json", ...(reply.token && { "set-auth-token": reply.token, "access-control-expose-headers": "set-auth-token" }) });
-    response.end(reply.status === 204 ? undefined : JSON.stringify(reply.body));
+    response.end(reply.body === null && reply.status !== 200 ? undefined : JSON.stringify(reply.body));
   }
 
   const admit = (peer: Peer) => {
@@ -233,11 +257,8 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
     setBilling: (email, state) => void billing.set(email.toLowerCase(), state),
     setPerson: (email, person) => void people.set(email.toLowerCase(), person),
     sandboxes,
-    addProject: (email, project) => hosted.addProject(email.toLowerCase(), project),
-    addThread: (email, seed) => hosted.addThread(email.toLowerCase(), seed),
-    append: (threadId, events, appendOptions) => hosted.append(threadId, events, appendOptions),
-    set: (threadId, facts) => hosted.set(threadId, facts),
-    stoppedCommands: (threadId) => hosted.stoppedCommands(threadId),
+    ...threadsFace(hosted),
+    setSignIns: (email, rows) => void signIns.set(email.toLowerCase(), rows),
     revoke: () => sessions.clear(),
     requests,
     async down() {
@@ -291,6 +312,47 @@ function inProcessSocket(
       return structuredClone(server.answer(peer, event, body));
     },
     close: () => void server.peers.delete(peer),
+  };
+}
+
+/** The server's admission to start a turn: hours first, then a sign-in for the agent, and for OpenCode the provider its model names. */
+function turnRule(billing: Map<string, StandInBilling>, signIns: Map<string, StandInSignIn[]>): Admit {
+  return (who, settings) => {
+    const state = billing.get(who) ?? { pro: false };
+    if (!state.pro) return "not_pro";
+    if ((state.monthlyLeftSeconds ?? 0) + state.packsLeftSeconds <= 0) return state.monthlyLeftSeconds === null ? "awaiting_payment" : "no_hours";
+    const provider = settings.agent === "opencode" ? (settings.model?.split("/")[0] ?? null) : null;
+    if (settings.agent === "opencode" && !settings.model?.includes("/")) return null;
+    const row = (signIns.get(who) ?? []).find((each) => each.agent === settings.agent && (provider === null || each.provider === provider));
+    if (!row) return "no_sign_in";
+    return row.ended ? "signed_out" : null;
+  };
+}
+
+/** GET /agent-sign-ins: the person's sign-ins as the real server lists them, never a secret. */
+function signInRows(rows: readonly StandInSignIn[]) {
+  return rows.map((row) => ({
+    agent: row.agent,
+    kind: "subscription",
+    provider: row.provider ?? (row.agent === "codex" ? "openai" : "anthropic"),
+    label: row.label ?? "Subscription",
+    checkedAt: new Date(0).toISOString(),
+    expiresAt: null,
+  }));
+}
+
+/** What a test does to the stand-in's threads, as an agent's host or another person would. */
+function threadsFace(hosted: StandInThreads): Pick<StandIn, "addProject" | "addThread" | "append" | "set" | "stoppedCommands" | "ask" | "endTurn" | "readies" | "sent"> {
+  return {
+    addProject: (email, project) => hosted.addProject(email.toLowerCase(), project),
+    addThread: (email, seed) => hosted.addThread(email.toLowerCase(), seed),
+    append: (threadId, events, options) => hosted.append(threadId, events, options),
+    set: (threadId, facts) => hosted.set(threadId, facts),
+    stoppedCommands: (threadId) => hosted.stoppedCommands(threadId),
+    ask: (threadId, request) => hosted.ask(threadId, request),
+    endTurn: (threadId, status) => hosted.endTurn(threadId, status),
+    readies: hosted.readies,
+    sent: hosted.sent,
   };
 }
 

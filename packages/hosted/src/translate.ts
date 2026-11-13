@@ -2,6 +2,11 @@
 import {
   AgentEvent,
   hostedRunId,
+  isHostedAgent,
+  isHostedRefusal,
+  sendBlockWords,
+  type AccountSignIn,
+  type QueuedMessage,
   type AccountPlan,
   type AccountReach,
   type AccountSandbox,
@@ -12,7 +17,7 @@ import {
   type ThreadActivity,
   type ThreadSummary,
 } from "@openorc/protocol";
-import type { WireBilling, WireEvent, WireHostedSettings, WireProject, WireThread } from "./wire.js";
+import type { WireBilling, WireEvent, WireHostedSettings, WireProject, WireSignIn, WireThread } from "./wire.js";
 
 /** The plan and the hours left. Free carries no hours; a Pro month not paid for yet carries packs alone. */
 export function toPlan(billing: WireBilling): { plan: AccountPlan; hours: CloudHours | null } {
@@ -32,6 +37,21 @@ export function toSandbox(settings: WireHostedSettings): AccountSandbox {
   return { chosen: settings.service, fallback: settings.defaultService, services: settings.served.map(({ service, name }) => ({ id: service, name })) };
 }
 
+/** Which sign-in a turn runs on: the agent's, and for OpenCode the provider its model names. */
+export const signInKey = (agent: string, provider: string | null): string => (provider ? `${agent}:${provider}` : agent);
+
+/**
+ * The person's sign-ins on OpenOrc Cloud, each ended when the server refused a turn on it as signed out and it has not
+ * been set again since. Agents this build does not run on OpenOrc Cloud are left out.
+ */
+export function toSignIns(rows: readonly WireSignIn[], ended: readonly { key: string; checkedAt: string | null }[]): AccountSignIn[] {
+  return rows.flatMap((row) => {
+    if (!isHostedAgent(row.agent)) return [];
+    const key = signInKey(row.agent, row.agent === "opencode" ? row.provider : null);
+    return [{ agent: row.agent, provider: row.provider, label: row.label, ended: ended.some((each) => each.key === key && each.checkedAt === row.checkedAt) }];
+  });
+}
+
 /** A picture a window can draw: only an image held in a data URL, since a window loads nothing from the network. */
 export function toImage(image: string | null | undefined): string | null {
   return image && /^data:image\/(png|jpeg|webp);base64,/.test(image) ? image : null;
@@ -49,6 +69,9 @@ export function toImage(image: string | null | undefined): string | null {
  *   ISO strings                               epoch ms                             parsed here
  *   a project: a GitHub repository            a Mac project                        matched by repository each time
  *   an event this build cannot read           AgentEvent is a closed union         one plain line in its place (UNREADABLE)
+ *   a person's message id: a UUID             the window's echo: user-<UUID>        prefixed here, stripped on the way out
+ *   an ask waits through turns and restarts   an approval expires with its turn    marked `durable`
+ *   messages waiting, or refused later        ThreadSummary.queued                 toQueued
  */
 
 /** What stands in the transcript for an event this build cannot read, so nothing in the log is hidden without a word. */
@@ -76,9 +99,45 @@ const ACTIVITY: Record<string, ThreadActivity> = { idle: "idle", working: "runni
 export function toAppEvent(threadId: string, wire: WireEvent): AgentEvent {
   const ids = { runId: hostedRunId(threadId), eventId: `${threadId}.${wire.seq}` };
   const parsed = AgentEvent.safeParse({ ...wire.event, ...ids });
-  if (parsed.success) return parsed.data;
+  if (parsed.success) return appSide(parsed.data);
   const ts = typeof wire.event["ts"] === "number" ? wire.event["ts"] : 0;
   return { type: "message.completed", ...ids, ts, messageId: ids.eventId, role: "system", text: UNREADABLE };
+}
+
+/** The app's own ids for a person's message: the window shows it as sent under `user-<id>` before the server logs it. */
+export const appMessageId = (id: string): string => (UUID.test(id) ? `user-${id}` : id);
+
+/** The server's id for a message the window names: the id under `user-`, a bare UUID, or none. */
+export function wireMessageId(id: string | undefined): string | null {
+  const bare = id?.startsWith("user-") ? id.slice("user-".length) : id;
+  return bare && UUID.test(bare) ? bare : null;
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** An event the app reads as the server wrote it, but for a person's message id and an ask, which outlives its turn. */
+function appSide(event: AgentEvent): AgentEvent {
+  if (event.type === "message.completed" && event.role === "user") return { ...event, messageId: appMessageId(event.messageId) };
+  if (event.type === "approval.requested") return { ...event, durable: true };
+  return event;
+}
+
+/**
+ * The thread's waiting messages as the composer's queue shows them: those sent to wait for the running turn, and any
+ * the server refused after taking it, with the words for why. A message sent now is in the log already.
+ */
+export function toQueued(row: WireThread): QueuedMessage[] {
+  return row.waiting.flatMap((message) => {
+    const refused = message.state === "refused";
+    if (!refused && !(message.after && message.state === "pending")) return [];
+    const words = refused ? refusalWords(message.refusal, row.settings.agent) : null;
+    return [{ id: message.id, text: message.text, attachments: [], queuedAt: Date.parse(message.createdAt), error: words }];
+  });
+}
+
+/** The words for a refusal the server named; one this build does not know still reads as a refusal. */
+export function refusalWords(refusal: string | null, agent: string): string {
+  return refusal && isHostedRefusal(refusal) ? sendBlockWords(refusal, agent) : "OpenOrc Cloud didn't take this message.";
 }
 
 /** A stretch of the log as one frame for the app's run store. */
@@ -129,7 +188,7 @@ export function toSummary(row: WireThread, context: RowContext): ThreadSummary {
     unread: activity === "idle" && row.lastAgentSeq > row.seenSeq,
     session: { status: activity === "running" ? "live" : "idle", message: null },
     context: null,
-    queued: [],
+    queued: toQueued(row),
     lastAgentEventAt: activity === "running" ? lastActivityAt : null,
     liveRunId: activity === "idle" ? null : hostedRunId(row.id),
     taskCount: 0,

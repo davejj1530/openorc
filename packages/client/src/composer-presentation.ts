@@ -37,7 +37,7 @@ export function composerSendHint(input: {
  * What the pile of queued messages does next: they send when the agent finishes, unless every one of them failed to
  * send and waits to be retried or removed.
  */
-export function queueHint(messages: readonly { interrupted?: boolean }[], agentName: string | undefined): string {
-  if (messages.length && messages.every((message) => message.interrupted)) return "Didn't send";
+export function queueHint(messages: readonly { interrupted?: boolean | undefined; error?: string | null | undefined }[], agentName: string | undefined): string {
+  if (messages.length && messages.every((message) => message.interrupted || message.error)) return "Didn't send";
   return agentName ? `Sends when ${agentName} finishes` : "Runs after this turn";
 }

@@ -134,5 +134,6 @@ it("says what went wrong in a failure's first line, and keeps a daemon's log aft
 it("says queued messages send when the agent finishes, unless none of them will without a retry", () => {
   expect(queueHint([{}, { interrupted: true }], "Claude")).toBe("Sends when Claude finishes");
   expect(queueHint([{ interrupted: true }], "Claude")).toBe("Didn't send");
+  expect(queueHint([{ error: "You're out of cloud hours." }], "Claude")).toBe("Didn't send");
   expect(queueHint([{}], undefined)).toBe("Runs after this turn");
 });

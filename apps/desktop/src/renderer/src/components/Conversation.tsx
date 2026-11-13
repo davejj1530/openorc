@@ -46,6 +46,7 @@ import { useSkillCommands } from "../lib/skill-commands";
 import { ConversationVoice, useRunVoices } from "../lib/turn-authors";
 import { useTurnFooters } from "../lib/turn-footers";
 import { useCloudSignInGate } from "./CloudSignInOffer";
+import { useHostedComposer } from "./HostedSendNotice";
 import { CloudPreparing, CloudStart } from "./CloudStart";
 import { Composer, type SlashCommand } from "./Composer";
 import { ComposerChoice } from "./ComposerChoice";
@@ -110,12 +111,12 @@ function threadCommands({
 }: {
   thread: ThreadSummary | null;
   working: boolean;
-  compact: (input: { id: string }) => void;
+  compact: ((input: { id: string }) => void) | undefined;
   fork: (() => void) | undefined;
 }): SlashCommand[] {
   if (!thread) return [];
   return [
-    ...(!working ? [{ name: "compact", hint: "Fold the conversation so far into a summary", run: () => compact({ id: thread.id }) }] : []),
+    ...(!working && compact ? [{ name: "compact", hint: "Fold the conversation so far into a summary", run: () => compact({ id: thread.id }) }] : []),
     ...(fork ? [{ name: "fork", hint: "Continue in a new thread from here", run: fork }] : []),
   ];
 }
@@ -181,7 +182,8 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const { live, working, generatingImage } = conversationActivity({ thread, activeRun, liveTranscript, compacting: compact.isPending });
   const { sameAgent, settingsPending, canSteer } = processFit({ live, activeRun, choice, mode, permission, compacting: compact.isPending });
   const steerReason = conversationSteerReason({ canSteer, compacting: compact.isPending, settingsPending, sameAgent, agent: activeRun?.agent });
-  const controls = useThreadControls(thread, runs.length, { canSteer, reason: steerReason, onSent: () => setSends((count) => count + 1) });
+  const cloud = useHostedComposer(thread, { choice, mode, permission }, prompt);
+  const controls = useThreadControls(thread, runs.length, { canSteer, reason: steerReason, blocked: cloud.blocked, onSent: () => setSends((count) => count + 1) });
   const sendDisabledReason = conversationSendDisabledReason({ permissionReady, historyLoading: runsQuery.isLoading, historyFailed: Boolean(runsQuery.error), hasModel: Boolean(choice), thread });
   const turnFooter = useTurnFooter({ footers, threadId, working });
   const switching = Boolean(thread && choice && runs.length > 0 && !runs.some((r) => r.agent === choice.agent));
@@ -215,7 +217,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const skills = useSkillCommands(conversation, choice?.agent);
   const connectorMentions = useConnectorMentions(conversation, choice?.agent, executionMode(mode, permission));
   const onFork = thread && !forkUnavailable(thread.agent) && !placeOf(thread).elsewhere ? forkConversation : undefined;
-  const commands: SlashCommand[] = [...threadCommands({ thread, working, compact: compact.mutate, fork: onFork }), ...skills.commands];
+  const commands: SlashCommand[] = [...threadCommands({ thread, working, compact: cloud.hosted ? undefined : compact.mutate, fork: onFork }), ...skills.commands];
   const marks = useMessageMarks(skills.commands, connectorMentions);
 
   const location = conversationLocation({ scope, project, mode: workspaceMode, basePath: links ?? project.rootPath, checkoutBranch: checkout.data?.branch, plainFolder: git.state === "none" });
@@ -250,7 +252,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   return (
     <div className="conversation-pane h-full min-w-0 flex flex-col min-h-0">
       <div className="flex-1 min-h-0 relative">{renderTranscript()}</div>
-      <div className="composer-padding shrink-0 px-6 pb-6 pt-2">
+      <div className="composer-padding shrink-0 px-6 pb-6 pt-2" onFocus={cloud.onFocus}>
         <div className="max-w-chat w-full min-w-0 mx-auto grid grid-cols-1 gap-2">
           <Composer
             draftKey={`${draftKey}.attachments`}
@@ -286,6 +288,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
                   />
                 ) : null}
                 {signIn.offer}
+                {cloud.notice}
                 <SwitchingNote agent={switching && choice ? choice.agent : null} />
                 {settingsPending && activeRun && thread && activeRun.mode === "act" && permission === "autonomous" && activeRun.permissionMode !== permission ? (
                   <div role="status" className="text-xs text-ink-3 px-1">
@@ -296,7 +299,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
             }
             busy={optimistic.busy}
             allowEmpty={firstTaskRun}
-            disabledReason={sendDisabledReason}
+            disabledReason={sendDisabledReason ?? cloud.blocked}
             live={live && activeRun ? { runId: activeRun.id, working } : null}
             queueing={Boolean(thread && working)}
             liveByDefault
@@ -312,6 +315,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
             onCommandsWanted={skills.onCommandsWanted}
             commandsNotice={skills.commandsNotice}
             {...connectorMentions}
+            {...cloud.limits}
             error={(submitter.error ?? controls.error ?? compact.error ?? fork.error ?? settings.error ?? draftError)?.message ?? permissionError}
           >
             {firstTaskRun && scope.kind === "task" ? (

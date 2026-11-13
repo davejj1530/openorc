@@ -35,6 +35,7 @@ it("shows the signed-in person with their plan and cloud hours, and opens Settin
     plan: { pro: true, standing: "live", at: Date.now() + 86_400_000 },
     hours: { leftSeconds: 41 * 3600 + 120, monthly: null, packsLeftSeconds: 41 * 3600 + 120 },
     sandbox: null,
+    signIns: null,
     error: null,
   });
   const button = await screen.findByRole("button", { name: "Theo Laurent Pro · 41 h left" });

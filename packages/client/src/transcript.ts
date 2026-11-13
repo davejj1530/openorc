@@ -65,6 +65,8 @@ export type Block = { at?: number; turnKey?: string; runId?: string } & (
       onceOnly?: boolean;
       decision?: string;
       answers?: Record<string, string[]>;
+      /** Only an answer closes it: it outlives its turn and its process, as an OpenOrc Cloud thread's asks do. */
+      durable?: boolean;
     }
   | {
       id: string;
@@ -135,16 +137,20 @@ function closeThinking(run: RunTranscript, ts: number): void {
   if (last && last.kind === "thinking" && last.endedAt === null && !last.explicit) upsert(run, { ...last, endedAt: ts });
 }
 
-/** Terminal boundaries also cover items whose provider never sent completion. */
+/** Terminal boundaries also cover items whose provider never sent completion. A durable ask is not one of them. */
 function closeActive(run: RunTranscript, ts: number, status: ActivityStatus): void {
+  let waiting = 0;
   for (const block of run.blocks) {
     if (block.kind === "thinking" && block.endedAt === null) upsert(run, { ...block, endedAt: ts, status });
     if (block.kind === "tool" && !block.done && !block.subagent) upsert(run, { ...block, done: true, status, isError: status === "error" });
     if (block.kind === "activity" && block.status === "running") upsert(run, { ...block, status });
     if (block.kind === "message" && block.streaming) upsert(run, { ...block, streaming: false });
-    if (block.kind === "approval" && !block.decision) upsert(run, { ...block, decision: "expired" });
+    if (block.kind === "approval" && !block.decision) {
+      if (block.durable) waiting += 1;
+      else upsert(run, { ...block, decision: "expired" });
+    }
   }
-  run.pendingApprovals = 0;
+  run.pendingApprovals = waiting;
 }
 
 /** The process is gone, and any turn with it. */
@@ -175,6 +181,7 @@ function approvalBlock(ev: Extract<AgentEvent, { type: "approval.requested" }>):
     ...(ev.toolName ? { toolName: ev.toolName } : {}),
     ...(ev.reason ? { reason: ev.reason } : {}),
     ...(ev.onceOnly ? { onceOnly: true } : {}),
+    ...(ev.durable ? { durable: true } : {}),
   };
 }
 
@@ -296,7 +303,6 @@ const handlers: { [T in AgentEventType]: Handler<T> } = {
   "session.completed": (run, ev) => {
     closeActive(run, ev.ts, sessionCloseStatus(ev.status));
     endSession(run);
-    run.pendingApprovals = 0;
     upsert(run, {
       id: "status-end",
       boundary: "session",

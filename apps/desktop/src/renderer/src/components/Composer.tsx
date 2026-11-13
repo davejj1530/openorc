@@ -8,6 +8,7 @@ import {
   executionModeUnavailable,
   type AgentKind,
   type FileScope,
+  type HarnessId,
   type PermissionPreset,
   type RunMode,
   type UsableConnector,
@@ -86,6 +87,8 @@ export interface ComposerProps {
   modelControl?: ReactNode;
   /** The Claude accounts the conversation can run on, offered in the model picker with their usage. */
   accounts?: PickerAccounts | undefined;
+  /** Where the conversation runs takes only these agents, and Fast only when `fast`. */
+  modelLimits?: { harnesses: readonly HarnessId[]; fast: boolean } | undefined;
   mode: RunMode;
   onMode: (mode: RunMode) => void;
   permission: PermissionPreset;
@@ -397,7 +400,7 @@ function composerModelControl(props: ComposerProps): ReactNode {
   const unavailable = props.model ? executionModeUnavailable(props.model.agent, executionMode(props.mode, props.permission)) : null;
   return (
     <>
-      {props.modelControl ?? <ComposerModelPicker value={props.model} onChange={props.onModel} accounts={props.accounts} />}
+      {props.modelControl ?? <ComposerModelPicker value={props.model} onChange={props.onModel} accounts={props.accounts} limits={props.modelLimits} />}
       {unavailable ? (
         <Tooltip label={unavailable}>
           <span className="composer-activity" role="status">

@@ -32,6 +32,7 @@ const pro: AccountStatus = {
       { id: "agent37", name: "Agent37" },
     ],
   },
+  signIns: [{ agent: "claude", provider: "anthropic", label: "Claude Max", ended: false }],
   error: null,
 };
 

@@ -250,3 +250,4 @@ export {
   orclingGlasses,
 } from "./orcling-art.js";
 export { CHAT_STRETCH_MS, chatRows, stretchTime, typingBeat, type ChatRow } from "./orcling-chat.js";
+export { threadSendBlock, type SendBlock, type SendBlockAction } from "./hosted-send.js";

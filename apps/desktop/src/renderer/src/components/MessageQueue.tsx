@@ -14,6 +14,7 @@ export function MessageQueue({
   canSend,
   pending,
   sendReason,
+  retryBlocked,
   agentName,
   onSend,
   onRemove,
@@ -22,6 +23,8 @@ export function MessageQueue({
   canSend: boolean;
   pending: boolean;
   sendReason?: string | null;
+  /** Why a message that failed cannot be tried again now, in the words the composer's card says it with. */
+  retryBlocked?: string | null;
   /** The agent working the turn, named in the pile's hint ("Sends when Codex finishes"). */
   agentName?: string;
   onSend: (messageId: string) => void;
@@ -53,15 +56,7 @@ export function MessageQueue({
                 </summary>
               </details>
               <div className="message-queue-actions">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={(!canSend && !message.interrupted) || pending}
-                  data-tip={message.interrupted ? "Retry delivery after checking the conversation." : (sendReason ?? "Reaches the agent in its current turn.")}
-                  onClick={() => onSend(message.id)}
-                >
-                  {message.interrupted ? "Retry" : "Send now"}
-                </Button>
+                <QueuedSend message={message} canSend={canSend} pending={pending} sendReason={sendReason} retryBlocked={retryBlocked} onSend={onSend} />
                 <IconButton size="xs" disabled={pending} onClick={() => onRemove(message.id)} aria-label={`Remove queued message ${index + 1}`} data-tip="Remove from queue">
                   <X size={13} />
                 </IconButton>
@@ -81,5 +76,39 @@ export function MessageQueue({
         </button>
       </div>
     </section>
+  );
+}
+
+/**
+ * A queued message's way on: Send now into the running turn, Retry after an interrupted delivery, or Try again once a
+ * message the agent's host refused can start a turn. Each is disabled with its reason while it cannot work.
+ */
+function QueuedSend({
+  message,
+  canSend,
+  pending,
+  sendReason,
+  retryBlocked,
+  onSend,
+}: {
+  message: QueuedMessage;
+  canSend: boolean;
+  pending: boolean;
+  sendReason?: string | null | undefined;
+  retryBlocked?: string | null | undefined;
+  onSend: (messageId: string) => void;
+}) {
+  const failed = Boolean(message.error) && !message.interrupted;
+  let reason: string | null = sendReason ?? "Reaches the agent in its current turn.";
+  if (message.interrupted) reason = "Retry delivery after checking the conversation.";
+  if (failed) reason = retryBlocked ?? null;
+  const ready = message.interrupted || (failed ? !retryBlocked : canSend);
+  let label = "Send now";
+  if (message.interrupted) label = "Retry";
+  if (failed) label = "Try again";
+  return (
+    <Button size="sm" variant="ghost" disabled={!ready || pending} data-tip={reason ?? undefined} onClick={() => onSend(message.id)}>
+      {label}
+    </Button>
   );
 }

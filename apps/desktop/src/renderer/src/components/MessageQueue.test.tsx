@@ -26,3 +26,15 @@ it("opens the pile on its own when a message failed to send", () => {
   expect(screen.getByRole("status").textContent).toBe("Could not deliver");
   expect(screen.getByRole("button", { name: /1 queued/ }).getAttribute("aria-expanded")).toBe("true");
 });
+
+it("offers to try a refused message again, disabled with the words while it still cannot start a turn", () => {
+  const onSend = vi.fn();
+  const refused = { id: "refused", text: "Then open a pull request", attachments: [], queuedAt: 1, error: "You're out of cloud hours." };
+  const mounted = render(<MessageQueue canSend={false} pending={false} retryBlocked="You're out of cloud hours." onSend={onSend} onRemove={vi.fn()} messages={[refused]} />);
+  const again = screen.getByRole("button", { name: "Try again" });
+  expect(again.hasAttribute("disabled")).toBe(true);
+  expect(again.getAttribute("data-tip")).toBe("You're out of cloud hours.");
+  mounted.rerender(<MessageQueue canSend={false} pending={false} retryBlocked={null} onSend={onSend} onRemove={vi.fn()} messages={[refused]} />);
+  fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+  expect(onSend).toHaveBeenCalledWith("refused");
+});

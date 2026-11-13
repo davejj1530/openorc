@@ -1,4 +1,4 @@
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { defaultOrclingLook, type Orcling, type OrclingGroup, type ThreadSummary } from "@openorc/protocol";
 import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
@@ -92,4 +92,47 @@ it("marks an Orcling's chat with its face and a group chat with its members' fac
   expect(markOf(container, "b")?.getAttribute("aria-label")).toBe("pip, bo");
   expect(markOf(container, "b")?.querySelectorAll("svg.orcling-avatar")).toHaveLength(2);
   expect(container.querySelector("[data-provider]")).toBeNull();
+});
+
+const order = (container: HTMLElement) => [...container.querySelectorAll("[data-tab]")].map((tab) => tab.getAttribute("data-tab"));
+
+it("leads with the open thread as the column's heading, the other open threads after it in their own order", () => {
+  for (const id of ["t1", "t2", "t3"]) threads.set(id, thread(id, "codex"));
+  useThreadTabs.setState({
+    tabs: [
+      { id: "a", route: { view: "thread", threadId: "t1" } },
+      { id: "b", route: { view: "thread", threadId: "t2" } },
+      { id: "c", route: { view: "thread", threadId: "t3" } },
+    ],
+    active: "b",
+    leaving: [],
+  });
+  const { container } = render(<ThreadTabs />);
+  expect(order(container)).toEqual(["b", "a", "c"]);
+  expect(container.querySelector(".thread-tab-heading")?.getAttribute("data-tab")).toBe("b");
+  expect(screen.getByRole("tab", { selected: true }).textContent).toBe("t2");
+  expect(container.querySelector(".work-tabs [data-tab='b']")).toBeNull();
+
+  fireEvent.click(screen.getByRole("tab", { name: "t3" }));
+  expect(useThreadTabs.getState().active).toBe("c");
+  expect(order(container)).toEqual(["c", "a", "b"]);
+
+  fireEvent.click(within(container.querySelector(".thread-tab-heading") as HTMLElement).getByRole("button", { name: "Close tab" }));
+  expect(useThreadTabs.getState().active).toBe("b");
+  expect(container.querySelector(".thread-tab-heading")?.getAttribute("data-tab")).toBe("b");
+});
+
+it("moves from the heading through the other threads with the arrow keys", () => {
+  for (const id of ["t1", "t2"]) threads.set(id, thread(id, "codex"));
+  useThreadTabs.setState({
+    tabs: [
+      { id: "a", route: { view: "thread", threadId: "t1" } },
+      { id: "b", route: { view: "thread", threadId: "t2" } },
+    ],
+    active: "b",
+    leaving: [],
+  });
+  render(<ThreadTabs />);
+  fireEvent.keyDown(screen.getByRole("tab", { selected: true }), { key: "ArrowRight" });
+  expect(useThreadTabs.getState().active).toBe("a");
 });

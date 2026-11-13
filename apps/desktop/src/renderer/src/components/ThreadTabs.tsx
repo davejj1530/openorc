@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject } from "react";
+import { useCallback, useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { threadStatus } from "@openorc/client";
 import { isHarnessId, type ThreadSummary } from "@openorc/protocol";
 import { useRpc } from "../lib/client";
-import { cn } from "../lib/cn";
 import { focusedProject, useLayout } from "../lib/layout";
 import { useThreadTabs, type ThreadTab } from "../lib/thread-tabs";
 import { useScrollEdges } from "../lib/use-scroll-edges";
@@ -69,38 +68,14 @@ function TabGlyph({ thread }: { thread: ThreadSummary | null | undefined }) {
  */
 const shown = new Set(useThreadTabs.getState().tabs.map((tab) => tab.id));
 let scrolled = 0;
-let revealed = false;
-/**
- * The strip opens where it was scrolled and keeps the current tab in view whenever `current` changes or the bar narrows
- * as the panel opens beside it. It glides there; only the first reveal, as the app opens, is instant.
- */
-function useStripScroll(strip: RefObject<HTMLDivElement | null>, current: string): void {
-  useLayoutEffect(() => {
-    if (strip.current) strip.current.scrollLeft = scrolled;
-  }, [strip]);
-  useEffect(() => {
-    const element = strip.current;
-    if (!element) return;
-    const reveal = () => {
-      element
-        .querySelector('[aria-selected="true"]')
-        ?.closest(".work-tab")
-        ?.scrollIntoView?.({ block: "nearest", inline: "nearest", behavior: revealed ? "smooth" : "instant" });
-      revealed = true;
-    };
-    reveal();
-    const resized = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(reveal);
-    resized?.observe(element);
-    return () => resized?.disconnect();
-  }, [strip, current]);
-}
 
 /**
- * The work column's tabs in its title bar: each open thread or new thread, the current one raised on the surface, a
- * close on the current one and on any under the pointer, and + for a new thread in a tab of its own. The tabs scroll
- * sideways once they outgrow the bar, keeping the current one in view; arrow keys, Home and End move between them,
- * and dragging a tab along the strip reorders them.
- * `title` stands in for the current tab's name while it is renamed, and `onRename` starts that from a double-click.
+ * The work column's heading and its other open threads. The open thread's name leads the header in title ink, as the
+ * column's heading rather than a tab among tabs, with its close on hover. The others follow as tabs on the soft fill,
+ * in the order they were opened or dragged to, scrolling sideways once they outgrow the bar; + opens a new thread in a
+ * tab of its own. Choosing another tab makes it the heading and puts the one it replaces back in its place among them.
+ * Arrow keys, Home and End move from the heading through the others, and dragging a tab along the strip reorders them.
+ * `title` stands in for the heading's name while it is renamed, and `onRename` starts that from a double-click.
  */
 export function ThreadTabs({ title, onRename }: { title?: ReactNode; onRename?: () => void }) {
   const tabs = useThreadTabs((s) => s.tabs);
@@ -109,12 +84,16 @@ export function ThreadTabs({ title, onRename }: { title?: ReactNode; onRename?: 
   const { select, open, close, reorder } = useThreadTabs.getState();
   const projectId = useLayout(focusedProject);
   const arriving = new Set(tabs.filter((tab) => !shown.has(tab.id)).map((tab) => tab.id));
-  const reachable = tabs.filter((tab) => !leaving.includes(tab.id));
+  const current = tabs.find((tab) => tab.id === active && !leaving.includes(tab.id));
+  const others = tabs.filter((tab) => tab !== current);
+  const reachable = [...(current ? [current] : []), ...others.filter((tab) => !leaving.includes(tab.id))];
+  const list = useRef<HTMLDivElement | null>(null);
   const strip = useRef<HTMLDivElement | null>(null);
   const { ref: measureEdges, ...edges } = useScrollEdges("x");
   const attach = useCallback(
     (element: HTMLDivElement | null) => {
       strip.current = element;
+      if (element) element.scrollLeft = scrolled;
       return measureEdges(element);
     },
     [measureEdges],
@@ -123,7 +102,6 @@ export function ThreadTabs({ title, onRename }: { title?: ReactNode; onRename?: 
   useEffect(() => {
     for (const id of arriving) shown.add(id);
   });
-  useStripScroll(strip, `${active}:${tabs.length}`);
   const onPointerDown = useTabReorder(strip, reorder);
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, id: string) => {
     const index = reachable.findIndex((tab) => tab.id === id);
@@ -132,51 +110,64 @@ export function ThreadTabs({ title, onRename }: { title?: ReactNode; onRename?: 
     if (!next) return;
     event.preventDefault();
     select(next.id);
-    strip.current?.querySelector<HTMLElement>(`[data-tab="${next.id}"] [role="tab"]`)?.focus();
+    requestAnimationFrame(() => list.current?.querySelector<HTMLElement>(`[data-tab="${next.id}"] [role="tab"]`)?.focus());
   };
-  return (
-    <div className="work-tabs-row no-drag">
-      <div
-        {...edges}
-        ref={attach}
-        className="work-tabs scroll-edges-x"
-        role="tablist"
-        aria-label="Open threads"
-        onPointerDown={onPointerDown}
-        onScroll={(event) => {
-          scrolled = event.currentTarget.scrollLeft;
-          edges.onScroll();
-        }}
+  const face = (tab: ThreadTab, selected: boolean) =>
+    selected && title ? (
+      <div role="tab" aria-selected className="work-tab-face">
+        <TabFace tab={tab} title={title} />
+      </div>
+    ) : (
+      <button
+        type="button"
+        role="tab"
+        aria-selected={selected}
+        tabIndex={selected ? 0 : -1}
+        className="work-tab-face"
+        onClick={() => select(tab.id)}
+        onDoubleClick={selected ? onRename : undefined}
+        onKeyDown={(event) => onKeyDown(event, tab.id)}
       >
-        {tabs.map((tab) => {
-          const current = tab.id === active;
-          const folding = leaving.includes(tab.id);
-          return (
-            <div key={tab.id} data-tab={tab.id} className={cn("work-tab", current && "work-tab-current")} data-leaving={folding || undefined} inert={folding}>
-              {current && title ? (
-                <div role="tab" aria-selected className="work-tab-face">
-                  <TabFace tab={tab} title={title} />
+        <TabFace tab={tab} />
+      </button>
+    );
+  const closeButton = (tab: ThreadTab) => (
+    <button type="button" className="work-tab-close" aria-label="Close tab" onClick={() => close(tab.id)}>
+      <X size={12} />
+    </button>
+  );
+  return (
+    <div className="work-tabs-row thread-tabs-row no-drag">
+      <div ref={list} className="thread-tabs" role="tablist" aria-label="Open threads">
+        {current ? (
+          <div key={current.id} data-tab={current.id} className="thread-tab-heading">
+            {face(current, true)}
+            {closeButton(current)}
+          </div>
+        ) : null}
+        {others.length ? (
+          <div
+            {...edges}
+            ref={attach}
+            className="work-tabs scroll-edges-x"
+            role="presentation"
+            onPointerDown={onPointerDown}
+            onScroll={(event) => {
+              scrolled = event.currentTarget.scrollLeft;
+              edges.onScroll();
+            }}
+          >
+            {others.map((tab) => {
+              const folding = leaving.includes(tab.id);
+              return (
+                <div key={tab.id} data-tab={tab.id} className="work-tab" data-leaving={folding || undefined} inert={folding}>
+                  {face(tab, false)}
+                  {closeButton(tab)}
                 </div>
-              ) : (
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={current}
-                  tabIndex={current ? 0 : -1}
-                  className="work-tab-face"
-                  onClick={() => select(tab.id)}
-                  onDoubleClick={current ? onRename : undefined}
-                  onKeyDown={(event) => onKeyDown(event, tab.id)}
-                >
-                  <TabFace tab={tab} />
-                </button>
-              )}
-              <button type="button" className="work-tab-close" aria-label="Close tab" onClick={() => close(tab.id)}>
-                <X size={12} />
-              </button>
-            </div>
-          );
-        })}
+              );
+            })}
+          </div>
+        ) : null}
       </div>
       <Tooltip label="New tab">
         <IconButton aria-label="New tab" className="work-tabs-new" onClick={() => open(projectId ?? undefined)}>

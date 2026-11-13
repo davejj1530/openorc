@@ -1,7 +1,7 @@
 /* Tabs on the window's chrome line: 28px pills up to 220px wide that share their row, down to 136px
    (room for a name to read) before the strip scrolls sideways. The rest sit on the soft fill and the
-   current one is a raised plane. A tab's close shows on the current one and under the pointer. The
-   thread header draws its own tabs over these (ThreadTabs). */
+   current one is a raised plane. A tab's close shows on the current one and under the pointer. In the
+   thread header the open thread is the column's heading instead (ThreadTabs, below). */
 .work-tabs-row {
   display: flex;
   align-items: center;
@@ -89,7 +89,7 @@
   height: 100%;
   padding: 0 28px 0 10px;
   border-radius: inherit;
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   /* The current tab's room for its close comes and goes with the tab, so a tab sized to its name eases too. */
   transition: padding var(--duration-resize) var(--ease-out);
   text-align: left;
@@ -146,8 +146,49 @@
 }
 /* The thread header lifts its controls above the window's drag plane with position: relative; a tab's close keeps
    its place over the tab's end rather than taking room from the name. */
-.thread-header .work-tab .work-tab-close {
+.thread-header :is(.work-tab, .thread-tab-heading) .work-tab-close {
   position: absolute;
+}
+
+/* The work column's header: the open thread's name as the column's heading, 15px in title ink with no pill, taking the
+   room its name needs; the other open threads follow as tabs. Their strip gives way first, down to 96px so the next
+   tab always shows; past that the heading truncates too. */
+.thread-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.thread-tab-heading {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  min-width: 96px;
+  max-width: min(420px, 100%);
+  height: var(--control-md);
+  color: var(--ink);
+}
+.thread-tab-heading .work-tab-face {
+  gap: 8px;
+  padding: 0 26px 0 2px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-header);
+  line-height: var(--text-header--line-height);
+  letter-spacing: var(--text-header--letter-spacing);
+}
+.thread-tab-heading .work-tab-close {
+  right: 2px;
+}
+.thread-tab-heading:is(:hover, :focus-within) .work-tab-close {
+  opacity: 1;
+}
+.thread-tab-heading:not(:only-child) {
+  max-width: min(420px, calc(100% - 102px));
+}
+.thread-tabs .work-tabs {
+  flex: 0 1 auto;
+  min-width: 96px;
 }
 .work-tab:is(:hover, .work-tab-current) .work-tab-close,
 .work-tab-close:focus-visible {

@@ -17,30 +17,22 @@ beforeEach(() => useRouter.setState({ route: { view: "newthread" }, history: [],
 
 const labels = () => screen.getAllByRole("button").map((button) => button.getAttribute("aria-label"));
 const back = () => screen.getByRole("button", { name: "Back" }) as HTMLButtonElement;
-const forward = () => screen.getByRole("button", { name: "Forward" }) as HTMLButtonElement;
 
-it("reads Back, Forward, then the sidebar toggle, with the sidebar open or hidden", () => {
+it("reads the sidebar toggle, then Back, with the sidebar open or hidden, and leaves Forward to the keyboard", () => {
   const { rerender } = render(<WindowCorner sidebarOpen={false} />);
-  expect(labels()).toEqual(["Back", "Forward", "Toggle sidebar"]);
+  expect(labels()).toEqual(["Toggle sidebar", "Back"]);
   rerender(<WindowCorner sidebarOpen />);
-  expect(labels()).toEqual(["Back", "Forward", "Toggle sidebar"]);
+  expect(labels()).toEqual(["Toggle sidebar", "Back"]);
 });
 
-it("steps back and forward through the window's history, each off while there is nowhere to go", () => {
+it("steps back through the window's history, off while there is nowhere to go", () => {
   render(<WindowCorner sidebarOpen={false} />);
   expect(back().disabled).toBe(true);
-  expect(forward().disabled).toBe(true);
 
   act(() => useRouter.getState().navigate({ view: "tasks" }));
   expect(back().disabled).toBe(false);
-  expect(forward().disabled).toBe(true);
 
   fireEvent.click(back());
   expect(useRouter.getState().route).toEqual({ view: "newthread" });
   expect(back().disabled).toBe(true);
-  expect(forward().disabled).toBe(false);
-
-  fireEvent.click(forward());
-  expect(useRouter.getState().route).toEqual({ view: "tasks" });
-  expect(forward().disabled).toBe(true);
 });

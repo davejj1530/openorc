@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ArrowLeft, ArrowRight, PanelLeft } from "./icons";
+import { ArrowLeft, PanelLeft } from "./icons";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
 import { useLayout } from "../lib/layout";
 import { cn } from "../lib/cn";
@@ -7,26 +7,22 @@ import { useRouter } from "../lib/router";
 import { IconButton, Tooltip } from "./ui";
 
 /**
- * The window's corner: Back, Forward and the sidebar toggle. It leads the first header beside the sidebar, open or
- * hidden: the main column's, or a panel's docked on the left.
+ * The window's corner: the sidebar toggle, then Back. It leads the first header beside the sidebar, open or hidden: the
+ * main column's, or a panel's docked on the left. Forward stays on ⌘].
  */
 export function WindowCorner({ sidebarOpen }: { sidebarOpen: boolean }) {
   const canBack = useRouter((s) => s.history.length > 0);
-  const canForward = useRouter((s) => s.future.length > 0);
   return (
     <div className="window-corner" role="group" aria-label="Window">
+      <SidebarToggle open={sidebarOpen} />
       <HistoryButton label="Back" disabled={!canBack} onClick={() => useRouter.getState().back()}>
         <ArrowLeft size={16} />
       </HistoryButton>
-      <HistoryButton label="Forward" disabled={!canForward} onClick={() => useRouter.getState().forward()}>
-        <ArrowRight size={16} />
-      </HistoryButton>
-      <SidebarToggle open={sidebarOpen} />
     </div>
   );
 }
 
-/** One step through the window's history, the same as ⌘[ and ⌘]. */
+/** One step back through the window's history, the same as ⌘[. */
 function HistoryButton({ label, disabled, onClick, children }: { label: string; disabled: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <Tooltip label={label}>

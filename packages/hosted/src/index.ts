@@ -10,6 +10,7 @@
  */
 import type { AccountStatus, Frame, OwnerReach, Project, RoutedMethod, RpcParams, RpcResults, ThreadSummary } from "@openorc/protocol";
 import { Account } from "./account.js";
+import { Follower } from "./follow.js";
 import { Session } from "./session.js";
 import { Threads } from "./threads.js";
 
@@ -107,7 +108,8 @@ export interface Hosted {
 export function createHosted(deps: HostedDeps): Hosted {
   const session = new Session(deps);
   const account = new Account({ session, kept: deps.kept, push: deps.push, now: deps.now });
-  const threads = new Threads({ session, kept: deps.kept, projects: deps.projects, push: deps.push, now: deps.now, log: deps.log });
+  const follower = new Follower({ session, push: deps.push, log: deps.log });
+  const threads = new Threads({ session, follower, kept: deps.kept, projects: deps.projects, push: deps.push, now: deps.now, log: deps.log });
   return {
     account,
     threads,

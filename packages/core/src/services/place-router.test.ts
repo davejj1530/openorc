@@ -15,6 +15,7 @@ let stand: StandIn;
 let folder: string;
 let stored: string | null;
 let core: OpenOrc | null = null;
+let pushes: unknown[] = [];
 const call = rpcClient(() => core!);
 const accountSecrets: ProtectedSecretStore = { load: async () => stored, save: async (value) => void (stored = value) };
 
@@ -22,6 +23,7 @@ beforeEach(async () => {
   stand = await standIn({ signup: "open" });
   folder = await mkdtemp(path.join(tmpdir(), "openorc-places-"));
   stored = null;
+  pushes = [];
 });
 
 afterEach(async () => {
@@ -32,7 +34,7 @@ afterEach(async () => {
 });
 
 async function open(options: { accountServer?: string } = { accountServer: stand.url }) {
-  core = await OpenOrc.create({ dataDir: path.join(folder, "data"), transport: { push() {} }, accountSecrets, ...options });
+  core = await OpenOrc.create({ dataDir: path.join(folder, "data"), transport: { push: (push) => void pushes.push(push) }, accountSecrets, ...options });
   return core;
 }
 
@@ -83,6 +85,23 @@ describe("OpenOrc Cloud threads in the window's calls", () => {
     await vi.waitFor(async () => expect((await list([project.id])).find((row) => row.id === hosted)?.owner).toMatchObject({ brain: "hosted", reach: "offline" }));
     await call("account.signOut", {});
     expect((await list([project.id])).map((row: ThreadSummary) => row.title)).toEqual(["On this Mac"]);
+  });
+
+  it("opens a thread's newest turn and streams what follows over the server's socket", async () => {
+    const opened = await open();
+    const project = macProject(opened);
+    const cloudProject = stand.addProject(EMAIL, { name: "openorc", fullName: "altalogy/openorc" });
+    const hosted = stand.addThread(EMAIL, { projectId: cloudProject, title: "Streams", status: "working" });
+    const say = (text: string) => ({ type: "message.completed", ts: Date.now(), messageId: text, role: "assistant", text });
+    stand.append(hosted, [say("first turn"), { type: "turn.completed", ts: Date.now(), turnId: "t1", status: "success", durationMs: 1 }, say("second turn")]);
+    await signIn();
+    await vi.waitFor(async () => expect((await list([project.id])).some((row) => row.id === hosted)).toBe(true), { timeout: 5_000 });
+    const page = await call("events.page", { runId: `hosted:${hosted}`, fromTurn: 1 });
+    expect(page).toMatchObject({ fromTurn: 1, live: true, events: [{ type: "message.completed", text: "second turn", runId: `hosted:${hosted}` }] });
+    stand.append(hosted, [say("streamed")]);
+    await vi.waitFor(() => expect(pushes).toContainEqual({ type: "frame", frame: expect.objectContaining({ runId: `hosted:${hosted}`, events: [expect.objectContaining({ text: "streamed" })] }) }), {
+      timeout: 5_000,
+    });
   });
 
   it("answers every call as before, and asks no server, with nobody signed in", async () => {

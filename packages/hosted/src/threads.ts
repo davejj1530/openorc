@@ -11,9 +11,10 @@
 import { hostedThreadOf, type Project, type RoutedMethod, type RpcParams, type RpcResults, type ThreadSummary } from "@openorc/protocol";
 import { z } from "zod";
 import type { HostedDeps, HostedThreads, MergedMethod, PlacePage } from "./index.js";
+import { READ_LIMIT, type Follower } from "./follow.js";
 import type { Session, SessionChange } from "./session.js";
-import { CLOUD_PROJECT, listRows, projectPairs, toRuns, toSummary } from "./translate.js";
-import { ROUTES, SOCKET, wireProject, wireThread, wireTopics, type WireProject, type WireThread } from "./wire.js";
+import { CLOUD_PROJECT, listRows, projectPairs, toAppEvent, toRuns, toSummary } from "./translate.js";
+import { ROUTES, SOCKET, wireProject, wireThread, wireTopics, type WireEvent, type WireProject, type WireThread } from "./wire.js";
 
 const NOT_YET = "This isn't on OpenOrc Cloud yet.";
 const GONE = "That conversation isn't on OpenOrc Cloud.";
@@ -21,7 +22,7 @@ const GONE = "That conversation isn't on OpenOrc Cloud.";
 const keptThreads = z.object({ email: z.string(), heardAt: z.number(), rows: z.array(wireThread), projects: z.array(wireProject) });
 type Heard = z.infer<typeof keptThreads>;
 
-type ThreadsDeps = { session: Session } & Pick<HostedDeps, "kept" | "projects" | "push" | "now" | "log">;
+type ThreadsDeps = { session: Session; follower: Follower } & Pick<HostedDeps, "kept" | "projects" | "push" | "now" | "log">;
 
 /** What a hosted thread answers for one of the app's calls, from its row; methods not here are refused in words. */
 type Answers = { [M in RoutedMethod]?: (threads: Threads, params: RpcParams<M>) => Promise<RpcResults[M]> | RpcResults[M] };
@@ -29,6 +30,9 @@ type Answers = { [M in RoutedMethod]?: (threads: Threads, params: RpcParams<M>) 
 const ANSWERS: Answers = {
   "threads.get": (threads, { id }) => threads.summary(id),
   "runs.listForThread": (threads, { threadId }) => toRuns(threads.row(threadId)),
+  "events.page": (threads, params) => threads.page(params),
+  "events.listForRun": (threads, { runId, afterSeq }) => threads.eventsAfter(runId, afterSeq ?? 0),
+  "threads.stopCommand": (threads, { id, commandId }) => threads.stopCommand(id, commandId),
   // Reads the thread view makes as it opens, for parts the server does not serve yet: their empty answers.
   "threads.messages": () => [],
   "threads.lastMessage": () => null,
@@ -37,6 +41,8 @@ const ANSWERS: Answers = {
   "orclings.reactions": () => [],
   "review.comments.list": () => [],
   "tasks.list": () => [],
+  // The server keeps a thread's changes (GET /hosted/threads/:id/changes); they are drawn here once translated.
+  "review.threadDiff": () => ({ baseSha: null, patch: "", files: [], since: null }),
 };
 
 export class Threads implements HostedThreads {
@@ -119,6 +125,59 @@ export class Threads implements HostedThreads {
   }
 
   /**
+   * The run's events from a turn on, or its newest `turns`, counted as the app counts them. Follows the thread first, so
+   * frames are coming before the page is read and nothing falls between them.
+   */
+  async page(params: RpcParams<"events.page">): Promise<RpcResults["events.page"]> {
+    const threadId = this.#threadOf(params.runId);
+    const row = this.row(threadId);
+    await this.deps.follower.follow(threadId);
+    let fromTurn = params.fromTurn ?? 0;
+    if (params.fromTurn === undefined && params.turns !== undefined) {
+      const detail = await this.deps.session.request(ROUTES.thread(threadId));
+      fromTurn = Math.max(0, detail.turnEnds.length - params.turns);
+    }
+    const first = await this.deps.session.request(ROUTES.events(threadId, { fromTurn }, READ_LIMIT));
+    const events = await this.#readOn(threadId, first.events, first.head);
+    return { events: events.flatMap((event) => toAppEvent(threadId, event) ?? []), fromTurn: first.fromTurn ?? fromTurn, live: row.status !== "idle" };
+  }
+
+  /** Every event of the run after a seq of its log. */
+  async eventsAfter(runId: string, after: number): Promise<RpcResults["events.listForRun"]> {
+    const threadId = this.#threadOf(runId);
+    this.row(threadId);
+    await this.deps.follower.follow(threadId);
+    const first = await this.deps.session.request(ROUTES.events(threadId, { after }, READ_LIMIT));
+    const events = await this.#readOn(threadId, first.events, first.head);
+    return events.flatMap((event) => toAppEvent(threadId, event) ?? []);
+  }
+
+  /** Stops one command the agent left running in the background, as the Stop beside it on this Mac does. */
+  async stopCommand(threadId: string, commandId: string): Promise<null> {
+    this.row(threadId);
+    await this.deps.session.request(ROUTES.stopCommand(threadId, commandId));
+    void this.refresh();
+    return null;
+  }
+
+  /** A page that came back full is read on until the head. */
+  async #readOn(threadId: string, events: WireEvent[], head: number): Promise<WireEvent[]> {
+    let read = events;
+    let all = events;
+    while (read.length === READ_LIMIT && (all.at(-1)?.seq ?? head) < head) {
+      read = (await this.deps.session.request(ROUTES.events(threadId, { after: all.at(-1)!.seq }, READ_LIMIT))).events;
+      all = [...all, ...read];
+    }
+    return all;
+  }
+
+  #threadOf(runId: string): string {
+    const threadId = hostedThreadOf(runId);
+    if (threadId === null) throw new Error(GONE);
+    return threadId;
+  }
+
+  /**
    * Reads the list and the projects again. One read at a time; asks while one runs fold into one more after it. The
    * windows hear `threads` when anything differs. A failed read keeps what was heard.
    */
@@ -158,6 +217,7 @@ export class Threads implements HostedThreads {
   /** The host is closing: an answer still on its way is dropped. */
   close(): void {
     this.#closed = true;
+    this.deps.follower.forget();
   }
 
   /** Signed out: the rows and their kept copy go, and the windows read their lists again. */

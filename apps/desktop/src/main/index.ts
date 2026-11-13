@@ -18,7 +18,7 @@ import { qaDirectory } from "./qa-directory";
 import { removeInjectedVariables } from "./launch-environment";
 import { FILE_SCHEME } from "@openorc/core/file-url";
 import { imageAssetResponse } from "./image-assets";
-import { installFileViewer, type OpenedFile } from "./file-viewer";
+import { installFileViewer } from "./file-viewer";
 import { installImageContextMenu } from "./image-context-menu";
 import { installLinkNavigation } from "./link-navigation";
 import { installWindowAppearance } from "./window-appearance";
@@ -104,10 +104,10 @@ protocol.registerSchemesAsPrivileged([
 // Signs the file panel's viewer URLs. The core gets it once, at fork; main verifies every URL with it.
 const fileKey = randomBytes(32).toString("hex");
 // On this computer every path the core names is the path main opens. A core inside a WSL distribution names Linux
-// paths, which main opens through the share Windows mounts for the distribution; these three are where they cross.
+// paths, which main opens through the share Windows mounts for the distribution; these two and the file panel's
+// viewer are where they cross.
 /** Images of the profile and of the conversation's folder, read where the core that named them keeps them. */
 const assetResponse = (request: Request) => imageAssetResponse(request, hostPaths().dataDir(), hostPaths().toMain);
-const openedFile: OpenedFile = (path) => ({ file: hostPaths().toMain(path), shared: hostPaths().distro !== null });
 const projectFolder: ProjectFolder = (rootPath) => {
   const paths = hostPaths();
   return paths.distro ? { folder: paths.toMain(rootPath), shown: rootPath } : { folder: normalize(rootPath), shown: normalize(rootPath) };
@@ -403,7 +403,7 @@ app.whenReady().then(async () => {
   // Development runs inside Electron.app, whose bundle still has Electron's icon.
   app.dock?.setIcon(appIcon);
   protocol.handle("openorc-asset", assetResponse);
-  installFileViewer(fileKey, isAppOrigin, openedFile);
+  installFileViewer(fileKey, isAppOrigin, hostPaths);
   core = startCore();
   installProjectIcons(isAppOrigin, app.getPath("userData"), projectFolder);
   const disabledUpdates = updateUnavailableReason() ?? configureReleaseFeed(electronUpdater.autoUpdater, join(process.resourcesPath, "app-update.yml"));

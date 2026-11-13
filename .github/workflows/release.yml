@@ -105,8 +105,8 @@ jobs:
 
   brain:
     needs: validate
-    name: Build the cloud brain
-    # Once, on Linux, which it runs on: every platform's app carries this same brain.
+    name: Build the cloud brain and the core for WSL
+    # Once, on Linux, which both run on: every platform's app carries this same brain, and the Windows app this core.
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -121,6 +121,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @openorc/brain bundle
+      - run: pnpm --filter @openorc/desktop bundle:wsl
       - uses: actions/upload-artifact@v4
         with:
           name: cloud-brain
@@ -129,6 +130,12 @@ jobs:
           path: |
             apps/brain/dist/brain-*.tgz
             apps/brain/dist/door-*.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wsl-core
+          if-no-files-found: error
+          retention-days: 1
+          path: apps/desktop/dist/wsl/wsl-core-*.tgz
 
   build:
     needs: [validate, brain]
@@ -168,6 +175,11 @@ jobs:
         with:
           name: cloud-brain
           path: apps/brain/dist
+      - uses: actions/download-artifact@v4
+        if: matrix.platform == 'win'
+        with:
+          name: wsl-core
+          path: apps/desktop/dist/wsl
       # The download tries again, and falls back to a mirror whose file must match Electron's own checksums, when
       # GitHub's release downloads fail. Packaging still fetches the Electron it ships through electron-builder.
       - name: Prepare Electron runtime and notice files

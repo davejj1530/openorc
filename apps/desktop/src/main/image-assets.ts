@@ -19,8 +19,11 @@ const failures: Record<Exclude<ImageFileRead, { ok: true }>["reason"], () => Res
   "too-large": () => new Response("Image exceeds 32 MB", { status: 413 }),
 };
 
-/** Image-only file access; never expose a general-purpose file fetch endpoint. */
-export async function imageAssetResponse(request: Request, dataDir: string): Promise<Response> {
+/**
+ * Image-only file access; never expose a general-purpose file fetch endpoint. `toMain` gives the path main opens for
+ * one the core named, which differs only when the core runs inside a WSL distribution.
+ */
+export async function imageAssetResponse(request: Request, dataDir: string, toMain: (path: string) => string = (path) => path): Promise<Response> {
   try {
     if (request.method !== "GET") return new Response(null, { status: 405 });
     const url = new URL(request.url);
@@ -29,6 +32,7 @@ export async function imageAssetResponse(request: Request, dataDir: string): Pro
     if (url.hostname === "local-image") {
       path = url.searchParams.get("path") ?? "";
       if (!isAbsolute(path) || path.includes("\0")) return new Response(null, { status: 400 });
+      path = toMain(path);
     } else path = profileAssetPath(url.href, dataDir);
     if (!path) return new Response(null, { status: 404 });
     const read = await readImageFile(path, mimeTypes);

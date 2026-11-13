@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { open, readFile, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { safeStorage, type UtilityProcess } from "electron";
+import { safeStorage } from "electron";
 import { PROTECTED_SECRET_FILES } from "../shared/protected-secrets";
 
 const files = new Map<string, string>(Object.entries(PROTECTED_SECRET_FILES));
@@ -39,7 +39,7 @@ async function save(file: string, value: string, dataDir: string): Promise<void>
 }
 
 /** Only the local core can access these allowlisted stores. No renderer read-secret API. */
-export function installProtectedSecrets(child: UtilityProcess, dataDir: string): void {
+export function installProtectedSecrets(child: { on(event: "message", listener: (message: unknown) => void): unknown; postMessage(message: unknown): void }, dataDir: string): void {
   const pending = new Map<string, Promise<unknown>>();
   child.on("message", (message: unknown) => {
     if (!message || typeof message !== "object") return;

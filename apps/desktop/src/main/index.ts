@@ -1,17 +1,16 @@
 import { randomBytes } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { isAbsolute, join } from "node:path";
-import { protocol, app, BrowserWindow, dialog, ipcMain, MessageChannelMain, session, shell, utilityProcess, type OpenDialogOptions, type UtilityProcess } from "electron";
+import { isAbsolute, join, normalize } from "node:path";
+import { protocol, app, BrowserWindow, dialog, ipcMain, MessageChannelMain, session, shell, utilityProcess, type UtilityProcess, type WebContents } from "electron";
 import { appOrigin, isExternalWebUrl, permitted } from "./app-origin";
 import electronUpdater from "electron-updater";
 import { AppUpdates } from "./app-updates";
 import { configureReleaseFeed } from "./release-feed";
 import { installUpdateControls } from "./update-ipc";
 import { installUpdateMenu } from "./update-menu";
-import { closeCoreForUpdate } from "./update-handoff";
 import { hostSandboxFrames, isolateSandboxFrames, McpAppSandbox } from "./mcp-app-sandbox";
-import { listenForShellEnv } from "./shell-env";
+import { forgetShellEnv, listenForShellEnv } from "./shell-env";
 import { installProtectedSecrets } from "./protected-secrets";
 import { configureAppIdentity } from "./app-identity";
 import { qaDirectory } from "./qa-directory";
@@ -22,7 +21,7 @@ import { installFileViewer } from "./file-viewer";
 import { installImageContextMenu } from "./image-context-menu";
 import { installLinkNavigation } from "./link-navigation";
 import { installWindowAppearance } from "./window-appearance";
-import { installProjectIcons } from "./project-icon-ipc";
+import { installProjectIcons, type ProjectFolder } from "./project-icon-ipc";
 import { closeAllPanes, executeBrowserCommand, installBrowserPane } from "./browser-pane";
 import { installBrowserBridge } from "./browser-bridge";
 import { installPreviewBridge } from "./preview-bridge";
@@ -31,6 +30,11 @@ import { installPresence } from "./presence-ipc";
 import { installTrash } from "./trash-ipc";
 import { installPowerEvents } from "./power-ipc";
 import { cancelPtyUpdate, detachAllPtys, installPtyHost, killAllPtys, preparePtysForUpdate } from "./pty-host";
+import { HostPreferences, hostPaths, localPaths, useHostPaths } from "./host";
+import { connectWindow, hostCores, type CoreProcess } from "./host-core";
+import { importProject, installHostControls } from "./host-controls";
+import { CoreLifecycle, type DistroAnswer } from "./core-lifecycle";
+import { thisComputer, type HostChoice } from "../shared/host";
 
 const here = import.meta.dirname;
 const appIcon = join(here, "../../resources/icon.png");
@@ -49,8 +53,8 @@ if (process.env["OPENORC_GPU_RASTER"] !== "1") {
 }
 isolateSandboxFrames(app.commandLine);
 let coldStartMs: number | null = null;
-let core: UtilityProcess | null = null;
-let preparingUpdate = false;
+/** How long Node's archive may take to arrive before setup gives up on the download. */
+const NODE_DOWNLOAD_MS = 10 * 60_000;
 // Visual QA and CI switches. A release build compiles them out and ignores these variables.
 const screenshot = __OPENORC_QA__ ? process.env["OPENORC_SCREENSHOT"] : undefined;
 const autoquit = __OPENORC_QA__ && process.env["OPENORC_AUTOQUIT"] === "1";
@@ -87,10 +91,62 @@ protocol.registerSchemesAsPrivileged([
 ]);
 // Signs the file panel's viewer URLs. The core gets it once, at fork; main verifies every URL with it.
 const fileKey = randomBytes(32).toString("hex");
+// On this computer every path the core names is the path main opens. A core inside a WSL distribution names Linux
+// paths, which main opens through the share Windows mounts for the distribution; these two and the file panel's
+// viewer are where they cross.
+/** Images of the profile and of the conversation's folder, read where the core that named them keeps them. */
+const assetResponse = (request: Request) => imageAssetResponse(request, hostPaths().dataDir(), hostPaths().toMain);
+const projectFolder: ProjectFolder = (rootPath) => {
+  const paths = hostPaths();
+  return paths.distro ? { folder: paths.toMain(rootPath), shown: rootPath } : { folder: normalize(rootPath), shown: normalize(rootPath) };
+};
 const previewHost = createPreviewHost();
 // QA builds let a kit reach the host through main's inspector, to time captures against the real panes.
 if (__OPENORC_QA__) Object.assign(globalThis, { __openorcPreview: previewHost });
 const mcpAppSandbox = new McpAppSandbox();
+
+/** The core on this computer, in Electron's utility process. */
+function forkCore(): UtilityProcess {
+  const child = utilityProcess.fork(join(here, "core.mjs"), [], {
+    serviceName: "openorc-core",
+    stdio: "pipe",
+    env: { ...process.env, OPENORC_DATA_DIR: app.getPath("userData"), OPENORC_FILE_KEY: fileKey, ...(app.isPackaged ? { OPENORC_BRAIN_DIR: join(process.resourcesPath, "brain") } : {}) },
+  });
+  child.stdout?.on("data", (d: Buffer) => process.stdout.write(`[core] ${d}`));
+  child.stderr?.on("data", (d: Buffer) => process.stderr.write(`[core!] ${d}`));
+  useHostPaths(localPaths(app.getPath("userData")));
+  return child;
+}
+
+/**
+ * Where the core runs is this computer unless someone chose a WSL distribution in Settings, on Windows. The file is
+ * read at each start, and the app carries the core for a distribution beside the cloud brain.
+ */
+const hostPreferences = new HostPreferences(join(app.getPath("userData"), "host.json"));
+const cores = hostCores({
+  userData: app.getPath("userData"),
+  coreDir: app.isPackaged ? join(process.resourcesPath, "wsl") : join(here, "../../dist/wsl"),
+  brainDir: app.isPackaged ? join(process.resourcesPath, "brain") : join(here, "../../../brain/dist"),
+  fileKey,
+  qa: __OPENORC_QA__,
+  // Through Chromium's network stack, so a proxy this PC uses is honoured, in a session of its own: the windows'
+  // session reaches only the hosts the MCP App sandbox lets through.
+  fetchNode: async (url, signal) => {
+    const waited = AbortSignal.timeout(NODE_DOWNLOAD_MS);
+    const response = await session.fromPartition("openorc-wsl-runtime").fetch(url, { signal: signal ? AbortSignal.any([signal, waited]) : waited });
+    if (!response.ok) throw new Error(`nodejs.org answered ${response.status}`);
+    return Buffer.from(await response.arrayBuffer());
+  },
+});
+const currentHost = () => cores.choice(hostPreferences.choice());
+
+/** Asks what to do about a distribution that could not run the core, or stopped running it. Closing the question quits. */
+async function askAboutDistro(distro: string, reason: string): Promise<DistroAnswer> {
+  console.error(`[main] the core in WSL: ${distro} stopped: ${reason}`);
+  const buttons = ["Try again", `Run on ${thisComputer(process.platform)}`, "Quit OpenOrc"];
+  const { response } = await dialog.showMessageBox({ type: "error", message: `OpenOrc could not run in WSL: ${distro}`, detail: reason, buttons, defaultId: 0, cancelId: 2 });
+  return (["retry", "local", "quit"] as const)[response] ?? "quit";
+}
 
 /**
  * An app opened from the Dock inherits a bare PATH, and one opened from a
@@ -99,33 +155,72 @@ const mcpAppSandbox = new McpAppSandbox();
  * Ready has to mean launchable there. Main hears every snapshot the core
  * adopts and keeps the PATH for the Terminal panels it hosts outside macOS.
  */
-function startCore(): UtilityProcess {
-  const child = utilityProcess.fork(join(here, "core.mjs"), [], {
-    serviceName: "openorc-core",
-    stdio: "pipe",
-    env: { ...process.env, OPENORC_DATA_DIR: app.getPath("userData"), OPENORC_FILE_KEY: fileKey, ...(app.isPackaged ? { OPENORC_BRAIN_DIR: join(process.resourcesPath, "brain") } : {}) },
-  });
+function startCore(host: HostChoice): CoreProcess {
+  const child: CoreProcess = host.kind === "wsl" ? cores.start(host.distro) : forkCore();
   // A UtilityProcess hands the listener the raw payload; only MessagePorts wrap it in an event.
   listenForShellEnv(child);
-  installProtectedSecrets(child, app.getPath("userData"));
+  installProtectedSecrets(child, cores.secretsDir(host));
   installBrowserBridge(child, executeBrowserCommand);
   installPreviewBridge(child, previewHost);
   installPresence(child);
   installTrash(child);
   installPowerEvents(child);
-  child.stdout?.on("data", (d: Buffer) => process.stdout.write(`[core] ${d}`));
-  child.stderr?.on("data", (d: Buffer) => process.stderr.write(`[core!] ${d}`));
-  child.on("exit", (code) => {
-    console.log(`[main] core exited with ${code}`);
-    core = null;
-  });
+  child.on("exit", (code) => console.log(`[main] core exited with ${code}`));
   return child;
 }
+
+/** Says a folder could not be added as a project where OpenOrc now runs. The windows have reloaded and have no request of their own to show it under. */
+function folderNotAdded(folder: string, reason: string): void {
+  console.error(`[main] ${folder} was not added as a project: ${reason}`);
+  void dialog.showMessageBox({ type: "error", message: "OpenOrc could not add this folder as a project", detail: `${folder}\n\n${reason}`, buttons: ["OK"] });
+}
+
+const lifecycle = new CoreLifecycle<WebContents>({
+  host: currentHost,
+  start: startCore,
+  // The renderer asks for a direct channel to the core. Main hands each side a port and steps out of the way: no
+  // per-message relay through this process. The second channel carries device video, so a stream never queues behind
+  // RPC replies.
+  connect(core, window) {
+    const rpc = new MessageChannelMain();
+    const media = new MessageChannelMain();
+    connectWindow(core, rpc.port1, media.port1);
+    window.postMessage("bridge:port", null, [rpc.port2, media.port2]);
+  },
+  everyWindow: () => BrowserWindow.getAllWindows().map((win) => win.webContents),
+  reload(windows) {
+    for (const contents of windows) {
+      if (!contents.isDestroyed()) contents.reload();
+    }
+  },
+  leave() {
+    killAllPtys();
+    cancelPtyUpdate();
+    closeAllPanes();
+    forgetShellEnv();
+  },
+  shells: { hold: preparePtysForUpdate, release: cancelPtyUpdate },
+  ask: askAboutDistro,
+  chooseLocal: () => hostPreferences.set({ kind: "local" }),
+  quit: () => app.quit(),
+  importProject,
+  folderNotAdded,
+});
 
 /** A development build loads its UI from the dev server; a packaged app never does, whatever its environment says. */
 const devServer = app.isPackaged ? undefined : process.env["ELECTRON_RENDERER_URL"];
 const isAppOrigin = appOrigin({ packaged: app.isPackaged, devUrl: devServer, rendererDir: join(here, "../renderer") });
 installWindowAppearance(isAppOrigin);
+const hostControls = installHostControls({
+  preferences: hostPreferences,
+  current: currentHost,
+  distros: cores.distros,
+  isAppOrigin,
+  closeCore: () => lifecycle.closeToSwitch(),
+  restart: (folder) => lifecycle.restart(folder),
+  thisComputer: thisComputer(process.platform),
+  home: cores.home,
+});
 
 /** The main window, or a second one opened on a route such as a thread. The route reaches the preload as an argument. */
 function createWindow(route?: string): BrowserWindow {
@@ -157,7 +252,7 @@ function createWindow(route?: string): BrowserWindow {
     },
   });
   installLinkNavigation(win, isAppOrigin);
-  installImageContextMenu(win, app.getPath("userData"));
+  installImageContextMenu(win, app.getPath("userData"), assetResponse);
   hostSandboxFrames(win.webContents);
   // A reload replaces the page without running React cleanup, so no panel gets
   // to say it stopped watching its shell. Main drops every viewer here and
@@ -227,22 +322,12 @@ app.whenReady().then(async () => {
   });
   // Development runs inside Electron.app, whose bundle still has Electron's icon.
   app.dock?.setIcon(appIcon);
-  protocol.handle("openorc-asset", (request) => imageAssetResponse(request, app.getPath("userData")));
-  installFileViewer(fileKey, isAppOrigin);
-  core = startCore();
-  installProjectIcons(isAppOrigin, app.getPath("userData"));
+  protocol.handle("openorc-asset", assetResponse);
+  installFileViewer(fileKey, isAppOrigin, hostPaths);
+  lifecycle.begin();
+  installProjectIcons(isAppOrigin, app.getPath("userData"), projectFolder);
   const disabledUpdates = updateUnavailableReason() ?? configureReleaseFeed(electronUpdater.autoUpdater, join(process.resourcesPath, "app-update.yml"));
-  const updates = new AppUpdates(electronUpdater.autoUpdater, disabledUpdates, async () => {
-    if (!preparePtysForUpdate()) return "A terminal still has a shell running. Use End shell in each terminal, then restart to update.";
-    preparingUpdate = true;
-    if (!core) throw new Error("The core is unavailable. Quit and reopen OpenOrc before installing an update.");
-    const blocked = await closeCoreForUpdate(core);
-    if (blocked) {
-      preparingUpdate = false;
-      cancelPtyUpdate();
-    }
-    return blocked;
-  });
+  const updates = new AppUpdates(electronUpdater.autoUpdater, disabledUpdates, () => lifecycle.closeForUpdate());
   const removeUpdateMenuListener = installUpdateMenu(updates);
   const removeUpdateControls = installUpdateControls(updates, join(app.getPath("userData"), "updates.json"), isAppOrigin, createWindow);
   app.once("will-quit", () => {
@@ -251,17 +336,9 @@ app.whenReady().then(async () => {
     updates.dispose();
   });
 
-  // The renderer asks for a direct channel to the core. Main hands each side a
-  // port and steps out of the way: no per-message relay through this process.
   ipcMain.on("bridge:connect", (event) => {
     if (event.senderFrame !== event.sender.mainFrame || !isAppOrigin(event.senderFrame.url)) return;
-    if (preparingUpdate) return;
-    if (!core) core = startCore();
-    // The second channel carries device video, so a stream never queues behind RPC replies.
-    const rpc = new MessageChannelMain();
-    const media = new MessageChannelMain();
-    core.postMessage({ type: "port" }, [rpc.port1, media.port1]);
-    event.sender.postMessage("bridge:port", null, [rpc.port2, media.port2]);
+    lifecycle.connect(event.sender);
   });
 
   ipcMain.handle("metrics", () => ({
@@ -276,14 +353,11 @@ app.whenReady().then(async () => {
     })),
   }));
 
-  ipcMain.handle("dialog:directory", async (event) => {
+  ipcMain.handle("dialog:directory", async (event, purpose: unknown) => {
     // A QA build can name the repository up front; the native chooser cannot be driven by automation.
     const forced = qaDirectory();
     if (forced) return forced;
-    const win = BrowserWindow.fromWebContents(event.sender);
-    const options: OpenDialogOptions = { properties: ["openDirectory", "createDirectory"], title: "Choose a repository" };
-    const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options);
-    return result.canceled ? null : (result.filePaths[0] ?? null);
+    return hostControls.pickFolder(BrowserWindow.fromWebContents(event.sender), purpose === "project");
   });
 
   ipcMain.on("shell:openExternal", (event, url: unknown) => {
@@ -292,7 +366,7 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.on("shell:revealFile", (_event, path: unknown) => {
-    if (typeof path === "string" && isAbsolute(path) && !path.includes("\0")) shell.showItemInFolder(path);
+    if (typeof path === "string" && isAbsolute(path) && !path.includes("\0")) shell.showItemInFolder(hostPaths().toMain(path));
   });
 
   ipcMain.handle("window:isFullscreen", (event) => BrowserWindow.fromWebContents(event.sender)?.isFullScreen() ?? false);
@@ -338,24 +412,13 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin" || autoquit) app.quit();
 });
 
-let quitting = false;
 app.on("before-quit", (event) => {
   // Unconditional and ahead of the core's shutdown: shells and panes are
   // children of this process, and a window with no core still has both. Left
   // alone the shells outlive the app as orphans holding whatever was running.
   killAllPtys();
   closeAllPanes();
-  if (!core) return;
-  event.preventDefault();
-  if (quitting) return;
-  quitting = true;
-  const child = core;
-  const timeout = setTimeout(() => child.kill(), 12_000);
-  child.once("exit", () => {
-    clearTimeout(timeout);
-    app.quit();
-  });
-  child.postMessage({ type: "shutdown" });
+  if (lifecycle.beforeQuit()) event.preventDefault();
 });
 
 function updateUnavailableReason(): string | null {

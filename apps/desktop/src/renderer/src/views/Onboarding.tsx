@@ -12,6 +12,7 @@ import { toHex } from "../lib/color";
 import { PaletteSelector } from "../components/PaletteSelector";
 import { Wordmark } from "../components/SidebarListHead";
 import { useTrafficLights, useWindowsControls } from "../lib/window";
+import { useHostChoice } from "../lib/host-choice";
 import { useOnboardingFlow } from "./onboarding-flow";
 import "../styles/onboarding.css";
 
@@ -334,6 +335,41 @@ function DefaultHarness({ rows, value, onChange }: { rows: readonly HarnessRow[]
   );
 }
 
+/**
+ * Where setup looks for agents, on a PC with WSL: on Windows, or inside a distribution, where OpenOrc then runs.
+ * Someone whose agents live in Ubuntu would otherwise find none here and have no way on. Shows nothing anywhere else.
+ */
+function AgentsPlace() {
+  const host = useHostChoice();
+  if (!host.options) return null;
+  return (
+    <div className="onboarding-agent-default">
+      <div className="onboarding-default">
+        <div>
+          <label className="onboarding-section-title" htmlFor="onboarding-host">
+            Look for agents on
+          </label>
+          <p className="sr-only" id="onboarding-host-hint">
+            OpenOrc runs where you choose, with the agents, Git and shell installed there.
+          </p>
+        </div>
+        <Select id="onboarding-host" aria-describedby="onboarding-host-hint" value={host.value} disabled={host.pending} onChange={(event) => host.choose(event.target.value)}>
+          {host.options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </Select>
+      </div>
+      {host.refused || host.failed ? (
+        <p className="onboarding-feedback" role="alert">
+          {host.refused ?? "Could not switch. OpenOrc is still running where it was."}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 type Flow = ReturnType<typeof useOnboardingFlow>;
 
 /** Setup's progress could not be saved: said under the actions, while it stays true. */
@@ -387,6 +423,7 @@ function ScanStep({ agents, preview }: { agents: Flow["agents"]; preview: boolea
           Couldn’t refresh agent status. The last results are shown. Try Rescan again.
         </p>
       ) : null}
+      {preview ? null : <AgentsPlace />}
     </>
   );
 }

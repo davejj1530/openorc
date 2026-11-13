@@ -69,6 +69,8 @@ OpenOrc was initially built in private and is now open source. It is in active b
 
 The iPhone app in `apps/mobile` is on the App Store. Cloud threads, which run in a sandbox on your own Vercel or Agent37 account, ship in release builds, and each release carries the cloud brain it installs there.
 
+On Windows, OpenOrc can also run inside a WSL distribution, with the agents, Git and shell installed there: choose it under **Settings → General → Runs on**, or pick a folder under `\\wsl.localhost\`. This is new and only partly checked on Windows; see [running inside WSL](docs/wsl.md).
+
 See the [release guide](docs/desktop-updates.md), the [roadmap](ROADMAP.md), and each platform's [known issues](https://openorc.app/docs/known-issues/).
 
 On Linux, install the rpm on Fedora or openSUSE (`sudo dnf install ./OpenOrc-….rpm`) and the deb on Debian or Ubuntu (`sudo apt install ./OpenOrc-….deb`). Both add OpenOrc to your applications and an `openorc` command. The AppImage runs anywhere else; like other AppImages, it needs FUSE 2 (`fuse-libs` on Fedora, `libfuse2t64` on Ubuntu). Linux packages are not code-signed, so check your download against the release's `SHA256SUMS.txt`.

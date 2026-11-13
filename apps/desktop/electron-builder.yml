@@ -75,6 +75,12 @@ electronFuses:
   resetAdHocDarwinSignature: true
 win:
   icon: resources/icon.png
+  # The core the app runs inside a WSL distribution, which only Windows has. Built on Linux, as the cloud brain is.
+  extraResources:
+    - from: dist/wsl
+      to: wsl
+      filter:
+        - "wsl-core-*.tgz"
 linux:
   # No icon here: electron-builder derives the installed icon sizes from mac.icon's ICNS. From the 1024px PNG alone it
   # installs only a 1024x1024 icon, a size icon themes do not list, so desktops would show a generic one.

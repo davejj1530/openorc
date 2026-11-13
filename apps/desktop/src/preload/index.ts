@@ -55,6 +55,11 @@ const api: OpenOrcApi = {
   syncWindowAppearance(appearance) {
     return ipcRenderer.invoke("window:appearance", appearance);
   },
+  onEditHistory(cb) {
+    const listener = (_event: unknown, action: unknown) => (action === "undo" || action === "redo") && cb(action);
+    ipcRenderer.on("edit:history", listener);
+    return () => ipcRenderer.off("edit:history", listener);
+  },
   onFullscreen(cb) {
     const listener = (_event: unknown, fullscreen: unknown) => cb(fullscreen === true);
     ipcRenderer.on("window:fullscreen", listener);

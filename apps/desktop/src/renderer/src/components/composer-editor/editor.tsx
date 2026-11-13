@@ -36,6 +36,15 @@ export function useRestartHistory(): () => void {
   }, [editor, history]);
 }
 
+/** Every composer's editor on the page, for an Edit menu command to find the one being written in. */
+const mounted = new Set<LexicalEditor>();
+
+/** The composer editor that holds the page's focus, if any. */
+export function focusedComposerEditor(): LexicalEditor | null {
+  for (const editor of mounted) if (editor.getRootElement()?.contains(document.activeElement)) return editor;
+  return null;
+}
+
 /** Typing within this long stays one step to undo. */
 const UNDO_MERGE_MS = 1000;
 
@@ -50,7 +59,10 @@ export function EditorProvider({ namespace, nodes, children }: { namespace: stri
       },
     }),
   );
-  useEffect(() => mergeRegister(registerPlainText(editor), registerHistory(editor, history, UNDO_MERGE_MS)), [editor, history]);
+  useEffect(() => {
+    mounted.add(editor);
+    return mergeRegister(registerPlainText(editor), registerHistory(editor, history, UNDO_MERGE_MS), () => mounted.delete(editor));
+  }, [editor, history]);
   const context = useMemo(() => ({ editor, history }), [editor, history]);
   return <EditorContext.Provider value={context}>{children}</EditorContext.Provider>;
 }

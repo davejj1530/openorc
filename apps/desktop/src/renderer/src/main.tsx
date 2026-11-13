@@ -8,6 +8,7 @@ import { core } from "./lib/rpc";
 import { queryClient } from "./lib/client";
 import { installAutorun } from "./lib/autorun";
 import { installDiffRefresh } from "./lib/diff-refresh";
+import { installEditHistory } from "./lib/edit-history";
 import { installNotifications } from "./lib/notifications";
 import { installWindowState } from "./lib/window";
 import "./lib/theme";
@@ -18,6 +19,7 @@ import "./app.css";
 
 installAutorun();
 installDiffRefresh();
+installEditHistory();
 installNotifications();
 installWindowState();
 core.connect();

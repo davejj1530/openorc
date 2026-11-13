@@ -175,6 +175,8 @@ export interface OpenOrcApi {
   /** Align native window chrome with the current Chromium zoom; returns its factor. */
   syncWindowChrome(): Promise<number>;
   syncWindowAppearance(appearance: WindowAppearance): Promise<WindowAppearanceResult>;
+  /** Edit > Undo and Edit > Redo from the menu bar, for the window to apply where it is being edited; returns the unsubscribe. */
+  onEditHistory(cb: (action: "undo" | "redo") => void): () => void;
   /** Fires on every enter and leave of fullscreen; returns the unsubscribe. */
   onFullscreen(cb: (fullscreen: boolean) => void): () => void;
   platform: string;

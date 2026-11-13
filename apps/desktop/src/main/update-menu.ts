@@ -1,5 +1,6 @@
 import { app, dialog, Menu, type MenuItemConstructorOptions } from "electron";
 import type { AppUpdates, UpdateState } from "./app-updates";
+import { appEditMenu } from "./edit-menu";
 import { appViewMenu } from "./view-menu";
 
 function label(state: UpdateState): string {
@@ -92,7 +93,7 @@ export function installUpdateMenu(updates: AppUpdates): () => void {
         ]
       : []),
     { role: "fileMenu" },
-    { role: "editMenu" },
+    appEditMenu(),
     appViewMenu(),
     { role: "windowMenu" },
     { role: "help", submenu: mac ? [] : [updateItem, { type: "separator" }, { role: "about" }] },

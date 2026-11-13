@@ -4,7 +4,8 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { distroPaths, HostPreferences, localPaths, wslProfile } from "./host";
 import { hostCores } from "./host-core";
-import { closeWhenIdle, placeFolder } from "./host-controls";
+import { placeFolder } from "./host-controls";
+import { closeWhenIdle } from "./update-handoff";
 import { wslDistro } from "./wsl/distro";
 
 const temporary: string[] = [];

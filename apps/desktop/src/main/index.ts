@@ -9,7 +9,6 @@ import { AppUpdates } from "./app-updates";
 import { configureReleaseFeed } from "./release-feed";
 import { installUpdateControls } from "./update-ipc";
 import { installUpdateMenu } from "./update-menu";
-import { closeCore, closeCoreForUpdate } from "./update-handoff";
 import { hostSandboxFrames, isolateSandboxFrames, McpAppSandbox } from "./mcp-app-sandbox";
 import { forgetShellEnv, listenForShellEnv } from "./shell-env";
 import { installProtectedSecrets } from "./protected-secrets";
@@ -33,10 +32,9 @@ import { installPowerEvents } from "./power-ipc";
 import { cancelPtyUpdate, detachAllPtys, installPtyHost, killAllPtys, preparePtysForUpdate } from "./pty-host";
 import { HostPreferences, hostPaths, localPaths, useHostPaths } from "./host";
 import { connectWindow, hostCores, type CoreProcess } from "./host-core";
-import { closeWhenIdle, importProject, installHostControls } from "./host-controls";
-import { WslCore } from "./wsl/core";
-import { ALREADY_RUNNING } from "./wsl/runtime";
-import { thisComputer } from "../shared/host";
+import { importProject, installHostControls } from "./host-controls";
+import { CoreLifecycle, type DistroAnswer } from "./core-lifecycle";
+import { thisComputer, type HostChoice } from "../shared/host";
 
 const here = import.meta.dirname;
 const appIcon = join(here, "../../resources/icon.png");
@@ -55,16 +53,6 @@ if (process.env["OPENORC_GPU_RASTER"] !== "1") {
 }
 isolateSandboxFrames(app.commandLine);
 let coldStartMs: number | null = null;
-let core: CoreProcess | null = null;
-let preparingUpdate = false;
-/** True while the core closes to start again somewhere else; no window is handed a core that is leaving. */
-let switchingHost = false;
-/** True while the user is asked what to do about a distribution that could not run the core; nothing starts one meanwhile. */
-let askingAboutHost = false;
-/** Windows that asked for a core while it was closing to switch. A switch that goes through reloads every window; one that is refused reloads these, which were left without a core. */
-const waitingForSwitch = new Set<WebContents>();
-/** A folder chosen where OpenOrc was not running, to add as a project once a core is up where it lives. Kept until that core answers, so a start that fails and is tried again still adds it. */
-let folderToAdd: string | null = null;
 /** How long Node's archive may take to arrive before setup gives up on the download. */
 const NODE_DOWNLOAD_MS = 10 * 60_000;
 // Visual QA and CI switches. A release build compiles them out and ignores these variables.
@@ -152,48 +140,12 @@ const cores = hostCores({
 });
 const currentHost = () => cores.choice(hostPreferences.choice());
 
-/** Why a core inside a distribution stopped by itself, from how it exited and the last things it printed. */
-function stopReason(distro: string, code: number, lastWords: string): string {
-  if (code === ALREADY_RUNNING) return `OpenOrc is already running in ${distro}, or is still closing there. Close any other OpenOrc that runs in ${distro}, then try again.`;
-  const said = lastWords ? `\n\nThe last it said:\n${lastWords}` : "";
-  return `Its core there stopped (exit ${code}). The distribution may have been shut down.${said}`;
-}
-
-/**
- * A distribution that could not run the core, or stopped running it: the user tries again or goes back to this
- * computer. Asked once, and no core starts until they answer, so a window reconnecting meanwhile cannot start a second.
- * Only a click changes where OpenOrc runs: closing the question quits, and the next start tries the distribution again.
- */
-function stoppedInDistro(distro: string, reason: string): void {
-  if (quitting || preparingUpdate || switchingHost || askingAboutHost) return;
+/** Asks what to do about a distribution that could not run the core, or stopped running it. Closing the question quits. */
+async function askAboutDistro(distro: string, reason: string): Promise<DistroAnswer> {
   console.error(`[main] the core in WSL: ${distro} stopped: ${reason}`);
-  askingAboutHost = true;
   const buttons = ["Try again", `Run on ${thisComputer(process.platform)}`, "Quit OpenOrc"];
-  void dialog.showMessageBox({ type: "error", message: `OpenOrc could not run in WSL: ${distro}`, detail: reason, buttons, defaultId: 0, cancelId: 2 }).then(({ response }) => {
-    askingAboutHost = false;
-    if (quitting) return;
-    if (response === 2) {
-      app.quit();
-      return;
-    }
-    if (response === 1) {
-      hostPreferences.set({ kind: "local" });
-      // The folder that was waiting lives in the distribution; this computer has no such path.
-      folderToAdd = null;
-    }
-    restartCore();
-  });
-}
-
-function startInDistro(distro: string): WslCore {
-  const child = cores.start(distro);
-  let failure: string | null = null;
-  child.on("failed", (error: Error) => (failure = error.message));
-  // Only the core main holds now: one that was replaced has nothing left to report.
-  child.on("exit", (code: number) => {
-    if (core === child) stoppedInDistro(distro, failure ?? stopReason(distro, code, child.lastWords));
-  });
-  return child;
+  const { response } = await dialog.showMessageBox({ type: "error", message: `OpenOrc could not run in WSL: ${distro}`, detail: reason, buttons, defaultId: 0, cancelId: 2 });
+  return (["retry", "local", "quit"] as const)[response] ?? "quit";
 }
 
 /**
@@ -203,9 +155,8 @@ function startInDistro(distro: string): WslCore {
  * Ready has to mean launchable there. Main hears every snapshot the core
  * adopts and keeps the PATH for the Terminal panels it hosts outside macOS.
  */
-function startCore(): CoreProcess {
-  const host = currentHost();
-  const child: CoreProcess = host.kind === "wsl" ? startInDistro(host.distro) : forkCore();
+function startCore(host: HostChoice): CoreProcess {
+  const child: CoreProcess = host.kind === "wsl" ? cores.start(host.distro) : forkCore();
   // A UtilityProcess hands the listener the raw payload; only MessagePorts wrap it in an event.
   listenForShellEnv(child);
   installProtectedSecrets(child, cores.secretsDir(host));
@@ -214,19 +165,8 @@ function startCore(): CoreProcess {
   installPresence(child);
   installTrash(child);
   installPowerEvents(child);
-  child.on("exit", (code) => {
-    console.log(`[main] core exited with ${code}`);
-    if (core === child) core = null;
-  });
+  child.on("exit", (code) => console.log(`[main] core exited with ${code}`));
   return child;
-}
-
-const everyWindow = (): WebContents[] => BrowserWindow.getAllWindows().map((win) => win.webContents);
-
-function reload(windows: Iterable<WebContents>): void {
-  for (const contents of windows) {
-    if (!contents.isDestroyed()) contents.reload();
-  }
 }
 
 /** Says a folder could not be added as a project where OpenOrc now runs. The windows have reloaded and have no request of their own to show it under. */
@@ -235,57 +175,37 @@ function folderNotAdded(folder: string, reason: string): void {
   void dialog.showMessageBox({ type: "error", message: "OpenOrc could not add this folder as a project", detail: `${folder}\n\n${reason}`, buttons: ["OK"] });
 }
 
-/** Starts the core again, where the preference now says, and reloads every window onto it; then adds `folder` as a project there. */
-function restartCore(folder?: string): void {
-  // Shells and pages belong to the place that is being left.
-  killAllPtys();
-  cancelPtyUpdate();
-  closeAllPanes();
-  forgetShellEnv();
-  switchingHost = false;
-  waitingForSwitch.clear();
-  if (folder) folderToAdd = folder;
-  // Never a second core beside one that is still running: both would write the same ledger.
-  if (!core) core = startCore();
-  const adding = folderToAdd;
-  if (adding)
-    importProject(core, adding, (error) => {
-      if (folderToAdd === adding) folderToAdd = null;
-      if (error) folderNotAdded(adding, error);
-    });
-  reload(everyWindow());
-}
-
-/** Ends the core for a switch, or gives its reason for staying, in a switch's own words. */
-async function endCoreToSwitch(closing: CoreProcess | null): Promise<string | null> {
-  try {
-    // A core still being installed in a distribution has started nothing that ending it could cut short.
-    if (closing instanceof WslCore && closing.starting) closing.kill();
-    else if (closing) return await closeWhenIdle(() => closeCore(closing, "switch"));
-    return null;
-  } catch (error) {
-    return error instanceof Error ? error.message : String(error);
-  }
-}
-
-/**
- * Closes the core so it can start somewhere else, cutting nothing short: it refuses while agents work, and so does a
- * running shell. The core waits for more than an update does, since this place stays closed until someone switches
- * back.
- */
-async function closeCoreToSwitch(): Promise<string | null> {
-  if (!preparePtysForUpdate()) return "A terminal still has a shell running. Use End shell in each terminal, then switch.";
-  switchingHost = true;
-  const closing = core;
-  const blocked = await endCoreToSwitch(closing);
-  if (!blocked) return null;
-  switchingHost = false;
-  cancelPtyUpdate();
-  // Windows turned away meanwhile have no core, and neither has any window if this one ended without closing cleanly.
-  reload(core === closing ? waitingForSwitch : everyWindow());
-  waitingForSwitch.clear();
-  return blocked;
-}
+const lifecycle = new CoreLifecycle<WebContents>({
+  host: currentHost,
+  start: startCore,
+  // The renderer asks for a direct channel to the core. Main hands each side a port and steps out of the way: no
+  // per-message relay through this process. The second channel carries device video, so a stream never queues behind
+  // RPC replies.
+  connect(core, window) {
+    const rpc = new MessageChannelMain();
+    const media = new MessageChannelMain();
+    connectWindow(core, rpc.port1, media.port1);
+    window.postMessage("bridge:port", null, [rpc.port2, media.port2]);
+  },
+  everyWindow: () => BrowserWindow.getAllWindows().map((win) => win.webContents),
+  reload(windows) {
+    for (const contents of windows) {
+      if (!contents.isDestroyed()) contents.reload();
+    }
+  },
+  leave() {
+    killAllPtys();
+    cancelPtyUpdate();
+    closeAllPanes();
+    forgetShellEnv();
+  },
+  shells: { hold: preparePtysForUpdate, release: cancelPtyUpdate },
+  ask: askAboutDistro,
+  chooseLocal: () => hostPreferences.set({ kind: "local" }),
+  quit: () => app.quit(),
+  importProject,
+  folderNotAdded,
+});
 
 /** A development build loads its UI from the dev server; a packaged app never does, whatever its environment says. */
 const devServer = app.isPackaged ? undefined : process.env["ELECTRON_RENDERER_URL"];
@@ -296,8 +216,8 @@ const hostControls = installHostControls({
   current: currentHost,
   distros: cores.distros,
   isAppOrigin,
-  closeCore: closeCoreToSwitch,
-  restart: restartCore,
+  closeCore: () => lifecycle.closeToSwitch(),
+  restart: (folder) => lifecycle.restart(folder),
   thisComputer: thisComputer(process.platform),
   home: cores.home,
 });
@@ -404,20 +324,10 @@ app.whenReady().then(async () => {
   app.dock?.setIcon(appIcon);
   protocol.handle("openorc-asset", assetResponse);
   installFileViewer(fileKey, isAppOrigin, hostPaths);
-  core = startCore();
+  lifecycle.begin();
   installProjectIcons(isAppOrigin, app.getPath("userData"), projectFolder);
   const disabledUpdates = updateUnavailableReason() ?? configureReleaseFeed(electronUpdater.autoUpdater, join(process.resourcesPath, "app-update.yml"));
-  const updates = new AppUpdates(electronUpdater.autoUpdater, disabledUpdates, async () => {
-    if (!preparePtysForUpdate()) return "A terminal still has a shell running. Use End shell in each terminal, then restart to update.";
-    preparingUpdate = true;
-    if (!core) throw new Error("The core is unavailable. Quit and reopen OpenOrc before installing an update.");
-    const blocked = await closeCoreForUpdate(core);
-    if (blocked) {
-      preparingUpdate = false;
-      cancelPtyUpdate();
-    }
-    return blocked;
-  });
+  const updates = new AppUpdates(electronUpdater.autoUpdater, disabledUpdates, () => lifecycle.closeForUpdate());
   const removeUpdateMenuListener = installUpdateMenu(updates);
   const removeUpdateControls = installUpdateControls(updates, join(app.getPath("userData"), "updates.json"), isAppOrigin, createWindow);
   app.once("will-quit", () => {
@@ -426,18 +336,9 @@ app.whenReady().then(async () => {
     updates.dispose();
   });
 
-  // The renderer asks for a direct channel to the core. Main hands each side a
-  // port and steps out of the way: no per-message relay through this process.
   ipcMain.on("bridge:connect", (event) => {
     if (event.senderFrame !== event.sender.mainFrame || !isAppOrigin(event.senderFrame.url)) return;
-    if (switchingHost) waitingForSwitch.add(event.sender);
-    if (preparingUpdate || switchingHost || askingAboutHost) return;
-    if (!core) core = startCore();
-    // The second channel carries device video, so a stream never queues behind RPC replies.
-    const rpc = new MessageChannelMain();
-    const media = new MessageChannelMain();
-    connectWindow(core, rpc.port1, media.port1);
-    event.sender.postMessage("bridge:port", null, [rpc.port2, media.port2]);
+    lifecycle.connect(event.sender);
   });
 
   ipcMain.handle("metrics", () => ({
@@ -511,26 +412,13 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin" || autoquit) app.quit();
 });
 
-let quitting = false;
 app.on("before-quit", (event) => {
   // Unconditional and ahead of the core's shutdown: shells and panes are
   // children of this process, and a window with no core still has both. Left
   // alone the shells outlive the app as orphans holding whatever was running.
   killAllPtys();
   closeAllPanes();
-  if (!core) return;
-  event.preventDefault();
-  if (quitting) return;
-  quitting = true;
-  const child = core;
-  const timeout = setTimeout(() => child.kill(), 12_000);
-  child.once("exit", () => {
-    clearTimeout(timeout);
-    app.quit();
-  });
-  // A core still being installed in a distribution is not there to hear a shutdown, and has nothing to close.
-  if (child instanceof WslCore && child.starting) child.kill();
-  else child.postMessage({ type: "shutdown" });
+  if (lifecycle.beforeQuit()) event.preventDefault();
 });
 
 function updateUnavailableReason(): string | null {

@@ -54,6 +54,19 @@ export function closeCore(child: Pick<CoreProcess, "postMessage" | "on" | "remov
   });
 }
 
+/**
+ * Closes the core for a switch. A request caught mid-flight refuses the close for a moment, which an update leaves to
+ * the person to try again; a switch waits it out, and gives up with the core's words only if requests never pause.
+ */
+export async function closeWhenIdle(close: () => Promise<CloseRefusal | null>, { attempts = 40, waitMs = 500 } = {}): Promise<string | null> {
+  for (let attempt = 1; ; attempt++) {
+    const refusal = await close();
+    if (!refusal) return null;
+    if (!refusal.retry || attempt >= attempts) return refusal.reason;
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
+  }
+}
+
 /** Closes the core to install an update, or gives the reason it would not close. */
 export async function closeCoreForUpdate(child: Pick<CoreProcess, "postMessage" | "on" | "removeListener">, timeoutMs = 30_000): Promise<string | null> {
   return (await closeCore(child, "update", timeoutMs))?.reason ?? null;

@@ -2,7 +2,6 @@ import { dialog, ipcMain, MessageChannelMain, type BrowserWindow, type IpcMainIn
 import { hostName, sameHost, type HostChoice, type HostState, type HostSwitch } from "../shared/host";
 import { hostPaths, type HostPreferences } from "./host";
 import { connectWindow, type CoreProcess } from "./host-core";
-import type { CloseRefusal } from "./update-handoff";
 import type { WslDistroInfo } from "./wsl/distros";
 import { parseWslPath } from "./wsl/paths";
 
@@ -27,19 +26,6 @@ export function placeFolder(picked: string, current: HostChoice, toCore: (path: 
   const inside = toCore(picked);
   if (inside) return { kind: "open", path: inside };
   return share ? { kind: "elsewhere", host: { kind: "wsl", distro: share.distro }, path: share.path, direct: null } : { kind: "elsewhere", host: { kind: "local" }, path: picked, direct: null };
-}
-
-/**
- * Closes the core for a switch. A request caught mid-flight refuses the close for a moment, which an update leaves to
- * the person to try again; a switch waits it out, and gives up with the core's words only if requests never pause.
- */
-export async function closeWhenIdle(close: () => Promise<CloseRefusal | null>, { attempts = 40, waitMs = 500 } = {}): Promise<string | null> {
-  for (let attempt = 1; ; attempt++) {
-    const refusal = await close();
-    if (!refusal) return null;
-    if (!refusal.retry || attempt >= attempts) return refusal.reason;
-    await new Promise((resolve) => setTimeout(resolve, waitMs));
-  }
 }
 
 /**

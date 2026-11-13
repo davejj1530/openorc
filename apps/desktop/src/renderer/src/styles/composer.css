@@ -580,9 +580,14 @@
   flex-wrap: wrap;
   gap: 8px;
 }
+/* An attachment: an image as its thumbnail, any other file as one row of glyph, name and size on a key. Its remove
+   control shows only under the pointer or with the keyboard on it. */
+.composer-attachment {
+  position: relative;
+}
 .composer-thumbnail {
-  width: 72px;
-  height: 72px;
+  width: 56px;
+  height: 56px;
   border-radius: var(--radius-lg);
   object-fit: cover;
   background: var(--surface-2);
@@ -597,40 +602,57 @@
 }
 .composer-file {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 4px;
-  width: 160px;
-  height: 72px;
-  padding: 0 12px;
+  align-items: center;
+  gap: 10px;
+  max-width: 240px;
+  height: 56px;
+  padding: 0 14px 0 12px;
   border-radius: var(--radius-lg);
-  background: var(--surface-2);
+  background: var(--control-fill);
+  color: var(--ink);
+}
+.composer-file > svg {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+.composer-file-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  font-size: var(--text-md);
+  line-height: 20px;
 }
 .composer-file-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--ink-2);
-  font-size: var(--text-sm);
 }
 .composer-file-size {
-  color: var(--ink-4);
+  color: var(--ink-3);
   font-size: var(--text-sm);
+  line-height: 16px;
 }
 .composer-remove-image {
   position: absolute;
-  top: 4px;
-  right: 4px;
+  top: -6px;
+  right: -6px;
   display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   border-radius: var(--radius-pill);
-  background: var(--accent);
-  color: var(--accent-fg);
+  background: var(--control-fill);
+  box-shadow: 0 0 0 1px var(--line-strong);
+  color: var(--ink-2);
+  opacity: 0;
+  transition: opacity var(--duration-quick) var(--ease-out);
+}
+.composer-attachment:hover > .composer-remove-image,
+.composer-remove-image:focus-visible {
+  opacity: 1;
 }
 .composer-remove-image:hover {
-  background-image: linear-gradient(color-mix(in srgb, var(--accent-fg) 12%, transparent), color-mix(in srgb, var(--accent-fg) 12%, transparent));
+  color: var(--ink);
 }
 
 /* Files over the composer: the surface darkens a step, the arrow inverts, and the words say

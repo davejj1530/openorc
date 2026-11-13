@@ -299,18 +299,22 @@ export function Composer(props: ComposerProps) {
         {attachments.length > 0 || uploading > 0 ? (
           <div className="composer-attachments">
             {attachments.map((attachment) => (
-              <div key={attachment.path} className="relative group">
+              <div key={attachment.path} className="composer-attachment">
                 {attachment.url ? (
                   <img src={attachment.url} alt={attachment.name} className="composer-thumbnail" />
                 ) : (
-                  <span className="composer-file" data-tip={attachment.name}>
-                    <FileText size={18} className="text-ink-3" />
-                    <span className="composer-file-name">{attachment.name}</span>
-                    {attachment.bytes ? <span className="composer-file-size tabular">{formatBytes(attachment.bytes)}</span> : null}
+                  <span className="composer-file">
+                    <FileText size={18} />
+                    <span className="composer-file-text">
+                      <span className="composer-file-name" data-tip={attachment.name}>
+                        {attachment.name}
+                      </span>
+                      {attachment.bytes ? <span className="composer-file-size tabular">{formatBytes(attachment.bytes)}</span> : null}
+                    </span>
                   </span>
                 )}
                 <button onClick={() => removeAttachments([attachment.path])} aria-label={attachment.url ? "Remove image" : `Remove ${attachment.name}`} className="composer-remove-image">
-                  <X size={12} />
+                  <X size={11} />
                 </button>
               </div>
             ))}

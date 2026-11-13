@@ -1,33 +1,74 @@
-/* Pull request rows: rounded two-line rows on the tile with no rules between them. A dot and a
-   word carry the state; hover is the fill step. */
+/* Pull request rows: two lines on the ground with no rules between them, the glyph in the lead slot, then status as a
+   dot and a word, the diff, the age and the move in fixed columns, so each lines up down the page. */
 .pull-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
 }
 
 .pull-row {
   display: flex;
-  width: 100%;
   min-width: 0;
-  min-height: 56px;
+  min-height: 60px;
   align-items: center;
   gap: 12px;
-  padding: 8px 12px;
+  padding-right: 12px;
   border-radius: var(--radius-lg);
-  text-align: left;
   transition: background-color var(--duration-leave) var(--ease-out);
 }
 .pull-row:hover {
   background: var(--surface-2);
 }
-
-/* As tall as the title's line, so the dot sits on it. */
-.pull-row-mark {
-  width: 16px;
+.pull-row-open {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-self: stretch;
+  align-items: center;
+  gap: var(--list-lead-gap);
+  padding: 8px 0 8px 12px;
+  text-align: left;
+}
+.pull-row-lead {
+  display: grid;
+  width: var(--list-lead);
   height: 20px;
   flex-shrink: 0;
   align-self: flex-start;
-  display: grid;
   place-items: center;
+}
+.pull-row-status {
+  display: inline-flex;
+  width: 184px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-left: 12px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+.pull-row-diff {
+  width: 88px;
+  flex-shrink: 0;
+  margin-left: 12px;
+  font-size: var(--text-sm);
+  text-align: right;
+  white-space: nowrap;
+}
+.pull-row-age {
+  width: 64px;
+  margin-left: 12px;
+}
+/* Wide enough for "Finish review", or Review and the reviewer's key; empty on a row whose move is not the person's. */
+.pull-row-move {
+  display: flex;
+  width: 188px;
+  flex-shrink: 0;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.pull-row-reviewer {
+  max-width: 88px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

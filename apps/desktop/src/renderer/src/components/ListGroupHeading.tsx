@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { ChevronDown } from "./icons";
+import { cn } from "../lib/cn";
 
-/** A list group's sticky heading: its name in ink and a faint count. It folds the group's rows; the chevron shows on hover and while folded. */
+/** A list group's sticky heading: its name in ink and a faint count, or an amber one of what waits on the person. It folds the group's rows; the chevron shows on hover and while folded. */
 export function ListGroupHeading({
   id,
   controls,
@@ -17,8 +18,8 @@ export function ListGroupHeading({
   onToggle: () => void;
   icon?: ReactNode;
   label: string;
-  /** Null while the group's rows are still loading. */
-  count: { value: number; label: string } | null;
+  /** Null while the group's rows are still loading. A count of what waits on the person is amber. */
+  count: { value: number; label: string; waiting?: boolean } | null;
 }) {
   return (
     <h2 className="list-group-heading well-fill sticky top-0 z-10">
@@ -26,7 +27,7 @@ export function ListGroupHeading({
         {icon}
         <span className="truncate text-ink">{label}</span>
         {count ? (
-          <span className="text-sm text-ink-4 tabular" aria-label={count.label}>
+          <span className={cn("text-sm tabular", count.waiting ? "text-attention" : "text-ink-4")} aria-label={count.label}>
             {count.value}
           </span>
         ) : null}

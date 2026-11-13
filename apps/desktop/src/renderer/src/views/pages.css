@@ -1,0 +1,17 @@
+/* Tasks, Pull requests and Schedules share one column: 1056 at most, centred in the work column. A row's lead (a glyph,
+   a task's mark, a project's mark on a label) sits in one 18px slot, so words start in one column on every page, and
+   the last column of a row is its move. */
+.list-page {
+  --list-lead: 18px;
+  --list-lead-gap: 10px;
+  max-width: calc(1056px + 56px);
+}
+.list-page .list-group-header {
+  gap: var(--list-lead-gap);
+}
+.list-page .list-group-header > :first-child:not(span.truncate) {
+  display: grid;
+  width: var(--list-lead);
+  flex-shrink: 0;
+  place-items: center;
+}

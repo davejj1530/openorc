@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { harnessInfo, harnessLoggedIn, isHarnessId, type ModelExecutionSettings, type ModelOption, type PullRequestDetail, type PullRequestReview, type ThreadSummary } from "@openorc/protocol";
+import { harnessInfo, harnessLoggedIn, type ModelOption, type PullRequestDetail, type PullRequestReview, type ThreadSummary } from "@openorc/protocol";
 import { LoaderCircle, Wand } from "./icons";
-import { defaultChoice, ModelPicker, type ModelChoice } from "./ModelPicker";
+import { defaultChoice, ModelPicker } from "./ModelPicker";
 import { Button, Segmented, TextButton } from "./ui";
-import { draftAuthor, readPullReviewer, writePullReviewer, type PullReviewer } from "../lib/pull-requests";
+import { draftAuthor, readPullReviewer, reviewSettings, writePullReviewer, type PullReviewer } from "../lib/pull-requests";
 import { orclingById, useOrclings } from "../lib/orclings";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { openThread } from "../lib/router";
@@ -28,12 +28,6 @@ function useReviewer() {
     writePullReviewer(next);
   };
   return { reviewer, choice: reviewer.choice ?? fallback, choose, models: models.data };
-}
-
-/** What a review run needs from a picker choice; null for a model no harness can run. */
-function reviewSettings(choice: ModelChoice | null): ModelExecutionSettings | null {
-  if (!choice || !isHarnessId(choice.agent)) return null;
-  return { agent: choice.agent, model: choice.model, effort: choice.effort, fastMode: Boolean(choice.fastMode) };
 }
 
 function startLabel(starting: boolean, again: boolean): string {

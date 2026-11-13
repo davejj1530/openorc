@@ -1,6 +1,7 @@
 import {
   harnessName,
   isHarnessId,
+  type ModelExecutionSettings,
   type ModelOption,
   type Orcling,
   type PullRequestDraftComment,
@@ -42,14 +43,51 @@ export const reviewDecisionLabel: Record<PullRequestReviewDecision, { label: str
   review_required: { label: "Review required", tone: "muted" },
 };
 
-/** Every word must match the title, number, author or either branch. */
-export function matchesPullRequest(pull: PullRequestSummary, query: string): boolean {
-  const haystack = `${pull.title} #${pull.number} ${pull.author} ${pull.headRefName} ${pull.baseRefName}`.toLowerCase();
-  return query
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean)
-    .every((word) => haystack.includes(word));
+/** What a pull request's row says of it, as a dot and a word. Amber only when the next move is the person's. */
+export type PullStatus =
+  | { kind: "word"; word: string; tone: "attention" | "ok" | "bad" | "live" | "muted" }
+  /** A model or an Orcling is drafting a review of it now, by the name its reviewer goes by. */
+  | { kind: "reviewing"; who: string };
+
+/** The next move on a pull request, when it is the person's and the app can make it. */
+export type PullMove = { kind: "review" } | { kind: "finish" } | { kind: "open-thread"; threadId: string };
+
+/** What the page knows about a pull request beyond GitHub's summary. */
+export interface PullContext {
+  /** GitHub asks the person to review it. */
+  askedOfYou: boolean;
+  /** The person opened it. */
+  yours: boolean;
+  /** Draft comments waiting on this Mac to be posted. */
+  draftComments: number;
+  /** Who is drafting its review now, while a model or an Orcling does. */
+  reviewing: string | null;
+  /** The thread that opened it, when it is at rest; a thread still working is not a place to act yet. */
+  restingThread: string | null;
+}
+
+export interface PullRow {
+  status: PullStatus;
+  move: PullMove | null;
+  /** The next move is the person's: such rows lead their group and are counted on its label. */
+  yourMove: boolean;
+}
+
+/** One pull request's status and move, from what GitHub and this Mac say. A move the app cannot make is never offered. */
+export function pullRow(pull: Pick<PullRequestSummary, "state" | "isDraft" | "reviewDecision">, context: PullContext): PullRow {
+  const at = (word: string, tone: Extract<PullStatus, { kind: "word" }>["tone"], move: PullMove | null = null, yourMove = false): PullRow => ({ status: { kind: "word", word, tone }, move, yourMove });
+  if (pull.state === "merged") return at("Merged", "live");
+  if (pull.state === "closed") return at("Closed", "bad");
+  if (context.reviewing) return { status: { kind: "reviewing", who: context.reviewing }, move: null, yourMove: false };
+  if (!context.yours && context.draftComments > 0) return at(`${context.draftComments} draft ${context.draftComments === 1 ? "comment" : "comments"}`, "attention", { kind: "finish" }, true);
+  if (context.askedOfYou) return at("Review required", "attention", { kind: "review" }, true);
+  if (context.yours && pull.reviewDecision === "changes_requested")
+    return at("Changes requested", "attention", context.restingThread ? { kind: "open-thread", threadId: context.restingThread } : null, true);
+  if (pull.isDraft) return at("Draft", "muted");
+  if (pull.reviewDecision === "approved") return at("Approved", "ok");
+  if (pull.reviewDecision === "changes_requested") return at("Changes requested", "muted");
+  if (pull.reviewDecision === "review_required") return at("Review required", "muted");
+  return at("Open", "muted");
 }
 
 /** A draft comment in the shape the diff viewer draws. It belongs to no conversation, so nothing marks it sent. */
@@ -72,6 +110,12 @@ export interface PullReviewer {
   choice: ModelChoice | null;
   /** An Orcling that reviews with its own model; the choice then shows that model. */
   orclingId?: string | null;
+}
+
+/** What a review run needs from a picker choice; null for a model no harness can run. */
+export function reviewSettings(choice: ModelChoice | null): ModelExecutionSettings | null {
+  if (!choice || !isHarnessId(choice.agent)) return null;
+  return { agent: choice.agent, model: choice.model, effort: choice.effort, fastMode: Boolean(choice.fastMode) };
 }
 
 const REVIEWER_KEY = "openorc.pull-reviewer";

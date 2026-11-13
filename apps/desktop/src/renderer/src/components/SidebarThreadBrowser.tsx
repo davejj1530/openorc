@@ -263,7 +263,7 @@ function ThreadGroups({ children }: { children: ChildPages }) {
   const waiting = waitingRoots(list.pinned, list.all) + groups.reduce((sum, group) => sum + group.waiting, 0);
   return (
     <section className="sidebar-workspaces" data-open={open || undefined} aria-label="Workspaces">
-      <SidebarListHead label="Workspaces" fold={{ open, waiting, onToggle: toggle(WORKSPACES_FOLD) }} tools={<ListTools />} />
+      <SidebarListHead label="Workspaces" fold={{ open, waiting, onToggle: toggle(WORKSPACES_FOLD) }} tools={<ListTools empty={projects.data?.length === 0} />} />
       <div className="conversation-browser" hidden={!open}>
         <div {...edges} className="browser-threads scroll-edges" data-drop={reopen.over || undefined} {...reopen.props}>
           <ProjectsFailed projects={projects} />
@@ -313,20 +313,27 @@ function ProjectsFailed({ projects }: { projects: ThreadList["projects"] }) {
   );
 }
 
-/** The list head's tools: Search, the app's one search, which opens the palette over the window, then Add project and the filter. */
-function ListTools() {
+/**
+ * The list head's tools: Search, the app's one search, which opens the palette over the window, then Add project and the
+ * filter. With no project yet, Add project alone.
+ */
+function ListTools({ empty }: { empty: boolean }) {
+  const add = (
+    <Tooltip label="Add project">
+      <IconButton size="xs" aria-label="Add project" className="no-drag" onClick={() => useUi.getState().setImportProject(true)}>
+        <FolderPlus size={16} />
+      </IconButton>
+    </Tooltip>
+  );
+  if (empty) return add;
   return (
     <>
       <Tooltip label="Search">
-        <IconButton size="lg" aria-label="Search" className="no-drag" onClick={() => useUi.getState().setPalette(true)}>
+        <IconButton size="xs" aria-label="Search" className="no-drag" onClick={() => useUi.getState().setPalette(true)}>
           <Search size={16} />
         </IconButton>
       </Tooltip>
-      <Tooltip label="Add project">
-        <IconButton size="lg" aria-label="Add project" className="no-drag" onClick={() => useUi.getState().setImportProject(true)}>
-          <FolderPlus size={16} />
-        </IconButton>
-      </Tooltip>
+      {add}
       <ThreadFilter />
     </>
   );
@@ -385,7 +392,7 @@ function ThreadFilter() {
   const projectId = useLayout(focusedProject);
   return (
     <Menu.Root>
-      <Menu.Trigger render={<IconButton aria-label={`Filter threads${pinned ? ": Pinned threads" : ""}`} size="lg" className={cn("no-drag", pinned && "text-accent-ink")} />}>
+      <Menu.Trigger render={<IconButton aria-label={`Filter threads${pinned ? ": Pinned threads" : ""}`} size="xs" className={cn("no-drag", pinned && "text-accent-ink")} />}>
         {/* Pins show their own mark, so the pinned list never looks like the whole one. */}
         {pinned ? <Pin size={16} /> : <Funnel size={16} />}
       </Menu.Trigger>

@@ -348,10 +348,6 @@ button.sidebar-nav-row:hover {
   gap: 4px;
   margin-right: 6px;
 }
-.sidebar-list-tools button {
-  width: 24px;
-  height: 24px;
-}
 
 /* Lists */
 .conversation-browser {

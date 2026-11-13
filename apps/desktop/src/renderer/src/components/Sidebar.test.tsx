@@ -269,7 +269,18 @@ it("heads the sidebar with OpenOrc's mark and name alone, and leads the screens 
   expect(screen.getAllByRole("img", { name: "OpenOrc" })).toHaveLength(1);
 });
 
+it("heads Workspaces with Add project alone until there is a project", () => {
+  mountSidebar();
+  const head = screen.getByRole("button", { name: "Add project" }).parentElement!;
+  expect(
+    within(head)
+      .getAllByRole("button")
+      .map((button) => button.getAttribute("aria-label")),
+  ).toEqual(["Add project"]);
+});
+
 it("heads Workspaces with the app's one search, Add project and the filter", () => {
+  fixture.projects = [{ id: "notes", name: "notes", rootPath: "/projects/notes" }];
   mountSidebar();
   const head = screen.getByRole("button", { name: "Search" }).parentElement!;
   expect(

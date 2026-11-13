@@ -37,7 +37,7 @@ it("shows the signed-in person with their plan and cloud hours, and opens Settin
     sandbox: null,
     error: null,
   });
-  const button = await screen.findByRole("button", { name: "Theo Laurent Pro · 41 h cloud left" });
+  const button = await screen.findByRole("button", { name: "Theo Laurent Pro · 41 h left" });
   expect(screen.getByText("TL")).toBeTruthy();
   fireEvent.click(button);
   expect(useRouter.getState().route).toEqual({ view: "settings", section: "account" });

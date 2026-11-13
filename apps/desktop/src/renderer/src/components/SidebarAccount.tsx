@@ -4,7 +4,10 @@ import { useRpc } from "../lib/client";
 import { useRouter } from "../lib/router";
 import { AccountFace } from "./AccountFace";
 
-/** The signed-in person at the foot's start: their face, name and plan, opening Settings > Account. Nothing while signed out. */
+/**
+ * The signed-in person at the foot's start: their face, name and plan, opening Settings > Account. Nothing while signed
+ * out. In a narrow sidebar the name gives way a whole word at a time from its end, and the plan line always fits.
+ */
 export function SidebarAccount() {
   const account = useRpc("account.status", {}).data;
   const open = useRouter((s) => s.route.view === "settings" && s.route.section === "account");
@@ -22,7 +25,11 @@ export function SidebarAccount() {
     >
       <AccountFace name={name} image={account.image} className="sidebar-account-face" />
       <span className="sidebar-account-words">
-        <span className="sidebar-account-name">{name}</span>
+        <span className="sidebar-account-name">
+          {name.split(/\s+/).map((word, index) => (
+            <span key={index}>{index ? ` ${word}` : word}</span>
+          ))}
+        </span>
         <span className="sidebar-account-plan">{planLine(account)}</span>
       </span>
     </button>

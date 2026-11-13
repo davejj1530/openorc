@@ -12,10 +12,10 @@ export function cloudTime(seconds: number): string {
   return left >= HOUR ? `${Math.floor(left / HOUR)} h` : `${Math.floor(left / 60)} min`;
 }
 
-/** The plan in one short line, as the sidebar's foot shows it: "Free", or "Pro · 41 h cloud left". */
+/** The plan in one short line, as the sidebar's foot shows it: "Free", or "Pro · 41 h left", which fits its narrowest width. */
 export function planLine(account: Pick<SignedIn, "plan" | "hours">): string {
   if (!account.plan.pro) return "Free";
-  return account.hours ? `Pro · ${cloudTime(account.hours.leftSeconds)} cloud left` : "Pro";
+  return account.hours ? `Pro · ${cloudTime(account.hours.leftSeconds)} left` : "Pro";
 }
 
 /** When Pro renews, ends, or stops after a failed payment; null for Free. */

@@ -8,12 +8,12 @@
  * Each question is one step through it: who owns an id is a lookup in the rows (a run id carries its thread); the
  * sidebar's rows are the rows filtered in memory; one thread is one row. The `threads` topic reads the list again.
  */
-import { hostedThreadOf, type Project, type RoutedMethod, type RpcParams, type RpcResults, type ThreadSummary } from "@openorc/protocol";
+import { hostedThreadOf, type AccountReach, type Project, type RoutedMethod, type RpcParams, type RpcResults, type ThreadSummary } from "@openorc/protocol";
 import { z } from "zod";
 import type { HostedDeps, HostedThreads, MergedMethod, PlacePage } from "./index.js";
 import { READ_LIMIT, type Follower } from "./follow.js";
 import type { Session, SessionChange } from "./session.js";
-import { CLOUD_PROJECT, listRows, projectPairs, toAppEvent, toRuns, toSummary } from "./translate.js";
+import { CLOUD_PROJECT, listRows, projectPairs, resolvedCount, toAppEvent, toRuns, toSummary } from "./translate.js";
 import { ROUTES, SOCKET, wireProject, wireThread, wireTopics, type WireEvent, type WireProject, type WireThread } from "./wire.js";
 
 const NOT_YET = "This isn't on OpenOrc Cloud yet.";
@@ -29,7 +29,7 @@ type Answers = { [M in RoutedMethod]?: (threads: Threads, params: RpcParams<M>) 
 
 const ANSWERS: Answers = {
   "threads.get": (threads, { id }) => threads.summary(id),
-  "runs.listForThread": (threads, { threadId }) => toRuns(threads.row(threadId)),
+  "runs.listForThread": (threads, { threadId }) => toRuns(threads.row(threadId), threads.reach),
   "events.page": (threads, params) => threads.page(params),
   "events.listForRun": (threads, { runId, afterSeq }) => threads.eventsAfter(runId, afterSeq ?? 0),
   "threads.stopCommand": (threads, { id, commandId }) => threads.stopCommand(id, commandId),
@@ -74,6 +74,12 @@ export class Threads implements HostedThreads {
     return this.deps.session.state.signedIn && this.#heard !== null;
   }
 
+  /** How far the server can be reached now; rows read while it cannot claim nothing live. */
+  get reach(): AccountReach {
+    const state = this.deps.session.state;
+    return state.signedIn ? state.reach : "offline";
+  }
+
   holds(ref: { thread: string } | { run: string } | { project: string }): boolean {
     if (!this.active) return false;
     if ("project" in ref) return this.#cloudProject(ref.project) !== null;
@@ -105,10 +111,10 @@ export class Threads implements HostedThreads {
   }
 
   listed<M extends MergedMethod>(method: M, params: RpcParams<M>): PlacePage<M> | null {
-    if (!this.active || method !== "threads.list") return null;
-    const rows = listRows(this.#summaries(), params as RpcParams<"threads.list">);
-    const reach = this.deps.session.state.signedIn ? this.deps.session.state.reach : "offline";
-    return { reach, heardAt: this.#heard!.heardAt, rows } as PlacePage<M>;
+    if (!this.active || method === "inbox.list") return null;
+    const summaries = this.#summaries();
+    const rows = method === "threads.list" ? listRows(summaries, params as RpcParams<"threads.list">) : resolvedCount(summaries, params as RpcParams<"threads.resolvedCount">);
+    return { reach: this.reach, heardAt: this.#heard!.heardAt, rows } as PlacePage<M>;
   }
 
   /** One row, or a rejection in words when the account no longer has it. */
@@ -139,7 +145,7 @@ export class Threads implements HostedThreads {
     }
     const first = await this.deps.session.request(ROUTES.events(threadId, { fromTurn }, READ_LIMIT));
     const events = await this.#readOn(threadId, first.events, first.head);
-    return { events: events.flatMap((event) => toAppEvent(threadId, event) ?? []), fromTurn: first.fromTurn ?? fromTurn, live: row.status !== "idle" };
+    return { events: events.map((event) => toAppEvent(threadId, event)), fromTurn: first.fromTurn ?? fromTurn, live: row.status !== "idle" };
   }
 
   /** Every event of the run after a seq of its log. */
@@ -149,7 +155,7 @@ export class Threads implements HostedThreads {
     await this.deps.follower.follow(threadId);
     const first = await this.deps.session.request(ROUTES.events(threadId, { after }, READ_LIMIT));
     const events = await this.#readOn(threadId, first.events, first.head);
-    return events.flatMap((event) => toAppEvent(threadId, event) ?? []);
+    return events.map((event) => toAppEvent(threadId, event));
   }
 
   /** Stops one command the agent left running in the background, as the Stop beside it on this Mac does. */

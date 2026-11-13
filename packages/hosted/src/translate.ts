@@ -44,11 +44,15 @@ export function toImage(image: string | null | undefined): string | null {
  *   one log per thread, ordered by seq        events read per run, paged by turn   the thread's log is one run: hostedRunId
  *   event runId: a process, message or turn   event runId: the run it is read in   rewritten to the thread's run
  *   eventId `${threadId}.${seq}`              eventId dedupes a page and frames    kept as it is
- *   status idle | working | needs_answer      activity idle | running | waiting    one to one; an unknown word reads idle
+ *   status idle | working | needs_answer      activity idle | running | waiting    one to one; an unknown word reads idle;
+ *                                                                                   out of reach, nothing reads as running
  *   ISO strings                               epoch ms                             parsed here
  *   a project: a GitHub repository            a Mac project                        matched by repository each time
- *   an event type this build does not know    AgentEvent is a closed union         dropped here
+ *   an event this build cannot read           AgentEvent is a closed union         one plain line in its place (UNREADABLE)
  */
+
+/** What stands in the transcript for an event this build cannot read, so nothing in the log is hidden without a word. */
+export const UNREADABLE = "Update OpenOrc to see this step.";
 
 /** Where a thread lives here when no project on this Mac has its repository: a group of its own, named by the server. */
 export const CLOUD_PROJECT = "openorc-cloud:";
@@ -65,16 +69,21 @@ export interface RowContext {
 
 const ACTIVITY: Record<string, ThreadActivity> = { idle: "idle", working: "running", needs_answer: "waiting" };
 
-/** One server event as the app's, in the thread's run; null for a type or shape this build does not know. */
-export function toAppEvent(threadId: string, wire: WireEvent): AgentEvent | null {
-  const parsed = AgentEvent.safeParse({ ...wire.event, runId: hostedRunId(threadId), eventId: `${threadId}.${wire.seq}` });
-  return parsed.success ? parsed.data : null;
+/**
+ * One server event as the app's, in the thread's run. An event of a type or shape this build cannot read becomes a line
+ * from OpenOrc in the thread, of a type every build and every phone draws, so it is never silently left out.
+ */
+export function toAppEvent(threadId: string, wire: WireEvent): AgentEvent {
+  const ids = { runId: hostedRunId(threadId), eventId: `${threadId}.${wire.seq}` };
+  const parsed = AgentEvent.safeParse({ ...wire.event, ...ids });
+  if (parsed.success) return parsed.data;
+  const ts = typeof wire.event["ts"] === "number" ? wire.event["ts"] : 0;
+  return { type: "message.completed", ...ids, ts, messageId: ids.eventId, role: "system", text: UNREADABLE };
 }
 
-/** A stretch of the log as one frame for the app's run store; null when nothing in it is known to this build. */
+/** A stretch of the log as one frame for the app's run store. */
 export function toFrame(threadId: string, events: readonly WireEvent[]): Frame | null {
-  const known = events.flatMap((event) => toAppEvent(threadId, event) ?? []);
-  return known.length ? { runId: hostedRunId(threadId), seq: events[0]!.seq, events: known } : null;
+  return events.length ? { runId: hostedRunId(threadId), seq: events[0]!.seq, events: events.map((event) => toAppEvent(threadId, event)) } : null;
 }
 
 /**
@@ -82,7 +91,7 @@ export function toFrame(threadId: string, events: readonly WireEvent[]): Frame |
  * here once, so no window special-cases a hosted row. Unread when the agent wrote past what the person has seen.
  */
 export function toSummary(row: WireThread, context: RowContext): ThreadSummary {
-  const activity = ACTIVITY[row.status] ?? "idle";
+  const activity = activityOf(row, context.reach);
   const lastActivityAt = Date.parse(row.lastActivityAt);
   return {
     id: row.id,
@@ -116,7 +125,7 @@ export function toSummary(row: WireThread, context: RowContext): ThreadSummary {
     archivedAt: null,
     hasStarted: row.head > 0,
     activity,
-    backgroundCommands: row.backgroundCommands,
+    backgroundCommands: context.reach === "live" ? row.backgroundCommands : [],
     unread: activity === "idle" && row.lastAgentSeq > row.seenSeq,
     session: { status: activity === "running" ? "live" : "idle", message: null },
     context: null,
@@ -129,10 +138,19 @@ export function toSummary(row: WireThread, context: RowContext): ThreadSummary {
   };
 }
 
+/**
+ * What a row says the thread is doing. Out of reach, the app cannot vouch that a turn still runs, so nothing reads as
+ * running; an ask stays waiting, since only an answer closes it.
+ */
+function activityOf(row: WireThread, reach: AccountReach): ThreadActivity {
+  const activity = ACTIVITY[row.status] ?? "idle";
+  return reach === "live" || activity !== "running" ? activity : "idle";
+}
+
 /** The thread's one run: running while the thread is not idle. None for a thread whose log is empty. */
-export function toRuns(row: WireThread): Run[] {
+export function toRuns(row: WireThread, reach: AccountReach): Run[] {
   if (row.head === 0) return [];
-  const idle = (ACTIVITY[row.status] ?? "idle") === "idle";
+  const idle = activityOf(row, reach) === "idle";
   return [
     {
       id: hostedRunId(row.id),
@@ -167,13 +185,21 @@ export function projectPairs(projects: readonly WireProject[], local: readonly {
   return new Map(projects.map((project) => [project.id, { macId: byRepo.get(project.fullName.toLowerCase()) ?? null, name: project.name }]));
 }
 
+/** Whether a row belongs to a list across these Mac projects: its own project, or the cloud's own, which none here stands for. */
+const inProjects = (row: ThreadSummary, projectIds: readonly string[]) => projectIds.includes(row.projectId) || row.projectId.startsWith(CLOUD_PROJECT);
+
+/**
+ * How many of the rows Resolved holds, counted as the sidebar files them: roots quiet since before `quietBefore` that
+ * wait on nobody. The account never puts a cloud thread there by hand yet, and pins and snoozes are not kept for it.
+ */
+export function resolvedCount(rows: readonly ThreadSummary[], params: RpcParams<"threads.resolvedCount">): number {
+  return rows.filter((row) => !row.parentThreadId && inProjects(row, params.projectIds) && row.activity !== "waiting" && row.lastActivityAt < params.quietBefore).length;
+}
+
 /** The rows a list asked for, from every row the account has: the same filters the Mac's list applies, in memory. */
 export function listRows(rows: readonly ThreadSummary[], params: RpcParams<"threads.list">): ThreadSummary[] {
-  const projects = params.projectIds ?? (params.projectId ? [params.projectId] : null);
   return rows.filter((row) => {
-    // A list across the Mac's projects also takes the cloud's own, which no project here stands for.
-    const cloudOwn = Boolean(params.projectIds) && row.projectId.startsWith(CLOUD_PROJECT);
-    if (projects && !projects.includes(row.projectId) && !cloudOwn) return false;
+    if (params.projectIds ? !inProjects(row, params.projectIds) : params.projectId && row.projectId !== params.projectId) return false;
     if (params.filter === "archived" || params.filter === "done") return false;
     if (params.pinnedOnly) return false;
     if (!params.includeChildren && row.parentThreadId) return false;

@@ -12,7 +12,7 @@ describe("account words", () => {
 
   it("puts the plan and the hours left in one line", () => {
     expect(planLine({ plan: { pro: false }, hours: null })).toBe("Free");
-    expect(planLine({ plan: { pro: true, standing: "live", at: DEC_3 }, hours: { leftSeconds: 41 * 3600, monthly: null, packsLeftSeconds: 41 * 3600 } })).toBe("Pro · 41 h cloud left");
+    expect(planLine({ plan: { pro: true, standing: "live", at: DEC_3 }, hours: { leftSeconds: 41 * 3600, monthly: null, packsLeftSeconds: 41 * 3600 } })).toBe("Pro · 41 h left");
   });
 
   it("dates Pro by its standing", () => {

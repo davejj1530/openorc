@@ -72,6 +72,17 @@ describe("OpenOrc Cloud threads in the window's calls", () => {
     await expect(call("threads.fork", { id: hosted })).rejects.toThrow("This isn't on OpenOrc Cloud yet.");
   });
 
+  it("counts the quiet ones in Resolved beside this Mac's, so the count and the drawer agree", async () => {
+    const opened = await open();
+    const project = macProject(opened);
+    const cloudProject = stand.addProject(EMAIL, { name: "openorc", fullName: "Altalogy/openorc" });
+    stand.addThread(EMAIL, { projectId: cloudProject, title: "Gone quiet" });
+    const quietBefore = Date.now() + 60_000;
+    const before = await call("threads.resolvedCount", { projectIds: [project.id], quietBefore });
+    await signIn();
+    await vi.waitFor(async () => expect(await call("threads.resolvedCount", { projectIds: [project.id], quietBefore })).toBe(before + 1), { timeout: 5_000 });
+  });
+
   it("keeps them through a restart while the server is down, and lets them go on sign-out", async () => {
     let opened = await open();
     const project = macProject(opened);

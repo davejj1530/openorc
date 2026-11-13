@@ -1,4 +1,5 @@
 import { Select } from "../components/ui";
+import type { AccountSandbox, AccountStatus } from "@openorc/protocol";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { Failure } from "./settings-secret-field";
 import { Field, Section } from "./settings-shared";
@@ -8,10 +9,9 @@ import { Field, Section } from "./settings-shared";
  * it names them. Shown only when there is a choice to make; the server's answer is the state.
  */
 export function OpenOrcCloudSection({ active }: { active: boolean }) {
-  const account = useRpc("account.status", {}, { enabled: active }).data;
   const choose = useRpcMutation("account.setSandbox");
-  if (account?.state !== "signed-in" || !account.plan.pro || !account.sandbox || account.sandbox.services.length < 2) return null;
-  const { sandbox } = account;
+  const sandbox = sandboxChoice(useRpc("account.status", {}, { enabled: active }).data);
+  if (!sandbox) return null;
   return (
     <Section title="OpenOrc Cloud">
       <Field label="Threads run on">
@@ -26,4 +26,15 @@ export function OpenOrcCloudSection({ active }: { active: boolean }) {
       <Failure error={choose.error} />
     </Section>
   );
+}
+
+/** The sandbox choice a Pro person has, or null when there is none to make. */
+function sandboxChoice(account: AccountStatus | undefined): AccountSandbox | null {
+  if (account?.state !== "signed-in" || !account.plan.pro || !account.sandbox || account.sandbox.services.length < 2) return null;
+  return account.sandbox;
+}
+
+/** Whether OpenOrc Cloud has a section in Settings > Cloud, so the person's own cloud service is named apart from it only when both show. */
+export function useOpenOrcCloudShown(active: boolean): boolean {
+  return sandboxChoice(useRpc("account.status", {}, { enabled: active }).data) !== null;
 }

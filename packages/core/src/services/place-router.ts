@@ -53,7 +53,9 @@ export class PlaceRouter {
       case "merge": {
         const id = route.thread?.(params as never);
         if (id) return place.holds({ thread: id }) ? ask() : this.deps.next(request);
-        return method === "threads.list" ? this.list(place, request, params as RpcParams<"threads.list">) : this.deps.next(request);
+        if (method === "threads.list") return this.list(place, request, params as RpcParams<"threads.list">);
+        if (method === "threads.resolvedCount") return this.resolvedCount(place, request, params as RpcParams<"threads.resolvedCount">);
+        return this.deps.next(request);
       }
       default:
         return this.deps.next(request);
@@ -89,6 +91,14 @@ export class PlaceRouter {
       "mac",
     );
     return result(request, rows.slice(offset));
+  }
+
+  /** Resolved's count: this Mac's, with its brain's, and the place's quiet rows, so the count and the drawer agree. */
+  private async resolvedCount(place: HostedThreads, request: RpcRequest, params: RpcParams<"threads.resolvedCount">): Promise<RpcReply> {
+    const base = await this.deps.next(request);
+    const page = place.listed("threads.resolvedCount", params);
+    if (base.type === "rpc.error" || !page) return base;
+    return result(request, (base.result as number) + page.rows);
   }
 }
 

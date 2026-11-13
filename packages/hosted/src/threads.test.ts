@@ -103,4 +103,56 @@ describe("hosted threads", () => {
     expect(device.threads).toBeNull();
     expect(seen.pushes).toContainEqual({ type: "invalidate", keys: ["threads", "runs"] });
   });
+
+  it("draws an event it cannot read as one plain line in its place, never leaving it out", async () => {
+    const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
+    const thread = stand.addThread(ADA, { projectId: project, title: "Newer server" });
+    stand.append(thread, [
+      { type: "message.completed", ts: 1, messageId: "m1", role: "assistant", text: "Before" },
+      { type: "review.requested", ts: 2, reviewer: "sam" },
+      { type: "tool.started", ts: 3, toolCallId: "c1" },
+      { type: "message.completed", ts: 4, messageId: "m2", role: "assistant", text: "After" },
+    ]);
+    const { hosted } = await host();
+    await signIn(hosted);
+    await vi.waitFor(() => expect(hosted.threads.holds({ thread })).toBe(true));
+    const page = await hosted.threads.call("events.page", { runId: `hosted:${thread}`, turns: 4 });
+    expect(page.events.map((event) => (event.type === "message.completed" ? `${event.role}: ${event.text}` : event.type))).toEqual([
+      "assistant: Before",
+      "system: Update OpenOrc to see this step.",
+      "system: Update OpenOrc to see this step.",
+      "assistant: After",
+    ]);
+  });
+
+  it("shows nothing as running while the server can't be reached, and keeps an ask waiting", async () => {
+    const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
+    const working = stand.addThread(ADA, { projectId: project, title: "Working", status: "working", backgroundCommands: [{ id: "dev", description: "pnpm dev" }] });
+    const asking = stand.addThread(ADA, { projectId: project, title: "Asking", status: "needs_answer" });
+    stand.append(working, [{ type: "turn.started", ts: 1, turnId: "t1" }]);
+    const first = await host();
+    await signIn(first.hosted);
+    await vi.waitFor(() => expect(listed(first.hosted)).toHaveLength(2));
+    expect(listed(first.hosted).find((row) => row.id === working)).toMatchObject({ activity: "running", liveRunId: `hosted:${working}` });
+    first.hosted.close();
+    await stand.down();
+    const { hosted } = await host();
+    const rows = new Map(listed(hosted).map((row) => [row.id, row]));
+    expect(rows.get(working)).toMatchObject({ activity: "idle", liveRunId: null, session: { status: "idle" }, backgroundCommands: [], owner: { reach: "offline" } });
+    expect(rows.get(asking)).toMatchObject({ activity: "waiting" });
+    expect(await hosted.threads.call("runs.listForThread", { threadId: working })).toMatchObject([{ state: "success" }]);
+  });
+
+  it("counts the quiet roots Resolved files by age, but never one waiting on the person", async () => {
+    const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
+    stand.addThread(ADA, { projectId: project, title: "Quiet" });
+    stand.addThread(ADA, { projectId: project, title: "Asking", status: "needs_answer" });
+    const { hosted } = await host();
+    await signIn(hosted);
+    await vi.waitFor(() => expect(listed(hosted)).toHaveLength(2));
+    const count = (quietBefore: number) => hosted.threads.listed("threads.resolvedCount", { projectIds: ["mac-openorc"], quietBefore })?.rows;
+    expect(count(Date.now() + 60_000)).toBe(1);
+    expect(count(Date.now() - 60_000)).toBe(0);
+    expect(hosted.threads.listed("threads.resolvedCount", { projectIds: ["another-mac-project"], quietBefore: Date.now() + 60_000 })?.rows).toBe(0);
+  });
 });

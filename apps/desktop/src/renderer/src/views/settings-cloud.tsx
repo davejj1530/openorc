@@ -27,7 +27,7 @@ import { OpenCodeCloudSection } from "./settings-cloud-opencode";
 import { Failure, StillWorks, TokenField } from "./settings-secret-field";
 import { useRouter } from "../lib/router";
 import { thisComputer } from "../lib/this-computer";
-import { OpenOrcCloudSection } from "./settings-cloud-openorc";
+import { OpenOrcCloudSection, useOpenOrcCloudShown } from "./settings-cloud-openorc";
 
 const TOKENS_URL = "https://vercel.com/account/tokens";
 /** Why a token scoped to one team, said on hover. */
@@ -313,6 +313,7 @@ export function CloudSettings({ active }: { active: boolean }) {
   const steps = status.data ? cloudSteps({ status: status.data, place: offer.data?.provider ?? null, signIns: signIns.data, brain: brain.data }) : null;
   const next = steps ? nextStep(steps) : null;
   const { open, toggle, work } = useOpenSteps(next);
+  const openorcShown = useOpenOrcCloudShown(active);
   if (status.isError) return <LoadError retry={() => void status.refetch()} />;
   if (!status.data || !steps) return null;
   const step = (id: CloudStepId, body: ReactNode) => (
@@ -320,9 +321,8 @@ export function CloudSettings({ active }: { active: boolean }) {
       {body}
     </CloudStep>
   );
-  return (
+  const ownService = (
     <>
-      <OpenOrcCloudSection active={active} />
       {status.data.error ? (
         <p role="alert" className="text-bad my-3">
           {status.data.error}
@@ -334,6 +334,18 @@ export function CloudSettings({ active }: { active: boolean }) {
         {step("check", <CloudCheckCard check={status.data.check} place={offer.data?.provider ?? null} />)}
         {step("brain", service ? <CloudBrain active={active} service={service} services={connected(status.data)} /> : null)}
       </div>
+    </>
+  );
+  return (
+    <>
+      <OpenOrcCloudSection active={active} />
+      {openorcShown ? (
+        <Section title="Your own cloud service" flush>
+          {ownService}
+        </Section>
+      ) : (
+        ownService
+      )}
       <Failure error={signIns.error ?? offer.error} />
       {service ? (
         <>

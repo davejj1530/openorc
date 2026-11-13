@@ -13,7 +13,19 @@ import {
   RESTART_PROMPT,
   type SubmitRequest,
 } from "@openorc/client";
-import { WORKSPACE_ID, executionMode, forkUnavailable, harnessShortName, isSubagentThread, type Project, type Run, type Task, type ThreadSummary, type WorkspaceMode } from "@openorc/protocol";
+import {
+  WORKSPACE_ID,
+  executionMode,
+  forkUnavailable,
+  harnessShortName,
+  isSubagentThread,
+  placeOf,
+  type Project,
+  type Run,
+  type Task,
+  type ThreadSummary,
+  type WorkspaceMode,
+} from "@openorc/protocol";
 import { useCallback, useState, type ComponentProps, type ReactNode } from "react";
 import { useConversationSettings, useConversationTranscript, useRpc, useRpcMutation, useSubmit } from "../lib/client";
 import { useThreadAccounts } from "../lib/use-thread-accounts";
@@ -202,7 +214,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
 
   const skills = useSkillCommands(conversation, choice?.agent);
   const connectorMentions = useConnectorMentions(conversation, choice?.agent, executionMode(mode, permission));
-  const onFork = thread && !forkUnavailable(thread.agent) ? forkConversation : undefined;
+  const onFork = thread && !forkUnavailable(thread.agent) && !placeOf(thread).elsewhere ? forkConversation : undefined;
   const commands: SlashCommand[] = [...threadCommands({ thread, working, compact: compact.mutate, fork: onFork }), ...skills.commands];
   const marks = useMessageMarks(skills.commands, connectorMentions);
 

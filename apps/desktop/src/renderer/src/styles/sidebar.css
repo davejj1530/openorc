@@ -400,7 +400,7 @@ button.sidebar-nav-row:hover {
 .sidebar-project-head > * {
   grid-area: 1 / 1;
 }
-.sidebar-project-head > :last-child {
+.sidebar-project-head > .sidebar-project-tools {
   align-self: center;
   justify-self: end;
   margin-right: 2px;
@@ -732,16 +732,25 @@ button.browser-empty:hover,
   flex-direction: column;
   min-width: 0;
 }
-.sidebar-account-name,
 .sidebar-account-plan {
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Words that don't fit wrap onto a second line that never shows, so the name loses whole words, never letters. */
 .sidebar-account-name {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 0.25em;
+  height: 18px;
+  overflow: hidden;
   font-size: 14px;
   line-height: 18px;
   color: var(--ink);
+}
+.sidebar-account-name > :first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .sidebar-account-plan {
   font-size: 12px;

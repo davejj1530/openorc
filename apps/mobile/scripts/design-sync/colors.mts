@@ -6,7 +6,7 @@ export type { Declarations, Hex };
 export type Cascade = { root: Declarations; dark: Declarations };
 
 // Not colors: widths, images and shadows stay with the desktop's CSS.
-const notColors = new Set(["--hairline", "--surface-gradient", "--shadow-overlay"]);
+const notColors = new Set(["--hairline", "--surface-gradient", "--shadow-overlay", "--raised-shadow"]);
 // These change with the ground a control sits on (DESIGN.md, the Contextual Fill Rule), so the phone names its fills directly.
 const contextualFills = new Set(["--current-row-fill", "--control-fill", "--float-fill"]);
 

@@ -72,17 +72,18 @@
   padding-bottom: 6px;
 }
 
-/* Task rows: 44px, r12, the status mark, the title in ink and faint metadata. */
+/* Task rows: 44px, r12, the status mark centred in the pages' lead slot, the title in ink, then fixed columns for the
+   label as a dot and a word, the project with its mark, the age, and last the move. */
 .task-list {
-  padding: 10px 14px 24px;
+  padding: 0 0 24px;
 }
 .task-list-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   min-width: 0;
   height: 44px;
-  padding: 0 8px 0 6px;
+  padding: 0 12px 0 9px;
   border-radius: var(--radius-lg);
   transition: background-color var(--duration-leave) var(--ease-out);
 }
@@ -121,9 +122,34 @@
 }
 .task-row-meta {
   flex-shrink: 0;
-  color: var(--ink-4);
+  color: var(--ink-3);
   font-size: var(--text-sm);
   white-space: nowrap;
+}
+.task-row-label,
+.task-row-project {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+.task-row-label {
+  width: 120px;
+  justify-content: flex-end;
+}
+.task-row-project {
+  width: 148px;
+  gap: 8px;
+}
+.task-row-time {
+  width: 48px;
+}
+/* Wide enough for Review; the way to a task's thread before work starts sits at its end too. */
+.task-row-move {
+  display: flex;
+  width: 84px;
+  flex-shrink: 0;
+  justify-content: flex-end;
 }
 .task-row-status {
   display: flex;

@@ -93,7 +93,7 @@ it("moves rows and updates group counts without opening or starting a task", asy
   expect((await screen.findAllByRole("menuitem")).map((item) => item.textContent?.trim())).toEqual(["Proposed", "Backlog", "In progress", "Review", "Done", "Archived"]);
   fireEvent.click(screen.getByRole("menuitem", { name: "Review" }));
   await waitFor(() => expect(document.querySelector('[data-status-group="backlog"]')).toBeNull());
-  expect(within(screen.getByRole("region", { name: /Ready for review/ })).getByLabelText("2 tasks")).toBeTruthy();
+  expect(within(screen.getByRole("region", { name: /Ready for review/ })).getByLabelText("2 waiting on you")).toBeTruthy();
   expect(core.call).toHaveBeenCalledWith("tasks.update", { id: "task", patch: { status: "review" } });
   expect(useRouter.getState().route).toEqual({ view: "tasks" });
   expect(document.activeElement).toBe(document.querySelector(".task-list"));
@@ -147,17 +147,22 @@ it("filters by stage and clears that filter when changing shelves", async () => 
   expect(screen.getByRole("button", { name: "Filter tasks" })).toBeTruthy();
 });
 
-it("lists each open stage with its count and searches from the header", async () => {
+it("lists each open stage with its count, in the page's order", async () => {
   await show();
   fireEvent.click(screen.getByRole("button", { name: "Filter tasks" }));
   const stages = within(await screen.findByRole("group", { name: "Task status" })).getAllByRole("menuitemradio");
-  expect(stages.map((item) => item.textContent)).toEqual(["All statuses", "In progress0", "Review1", "Proposed0", "Backlog1"]);
-  fireEvent.click(stages[0]!);
-  await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
-  fireEvent.click(screen.getByRole("button", { name: "Search tasks" }));
-  fireEvent.change(screen.getByRole("textbox", { name: "Search tasks" }), { target: { value: "copy" } });
-  expect(screen.queryByRole("button", { name: "Export rows, Backlog" })).toBeNull();
-  expect(screen.getByRole("button", { name: "Review copy, Review" })).toBeTruthy();
+  expect(stages.map((item) => item.textContent)).toEqual(["All statuses", "Review1", "Proposed0", "In progress0", "Backlog1"]);
+});
+
+it("leads with what waits on the person, counts it in amber, and ends a task ready for review in Review", async () => {
+  await show();
+  const groups = [...document.querySelectorAll("[data-status-group]")].map((group) => group.getAttribute("data-status-group"));
+  expect(groups).toEqual(["review", "backlog"]);
+  const review = screen.getByRole("region", { name: /Ready for review/ });
+  expect(within(review).getByLabelText("1 waiting on you")).toBeTruthy();
+  expect(within(screen.getByRole("region", { name: /Backlog/ })).queryByLabelText(/waiting on you/)).toBeNull();
+  fireEvent.click(within(review).getByRole("button", { name: "Review" }));
+  expect(useRouter.getState().route).toEqual({ view: "task", taskId: "other", tab: "files" });
 });
 it("marks a task the cloud brain holds as the cloud's, dimmed while the brain is out of reach", async () => {
   saved = [

@@ -1,15 +1,15 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Menu } from "@base-ui/react/menu";
-import type { Task, TaskStatus } from "@openorc/protocol";
+import type { Project, Task, TaskStatus } from "@openorc/protocol";
 import { Check, Cloud, Funnel, Plus } from "../components/icons";
 import { ListGroupHeading } from "../components/ListGroupHeading";
-import { HeaderSearch } from "../components/PageFilters";
-import { PriorityIcon, StatusIcon, groupLabel, groupOrder, statusLabel, statusOrder } from "../components/status";
+import { ProjectLogo } from "../components/ProjectIconPicker";
+import { StatusIcon, groupLabel, groupOrder, statusLabel, statusOrder } from "../components/status";
 import { ScopedTitle } from "../components/ScopedTitle";
 import { TopBar } from "../components/TopBar";
 import { TaskStart } from "../components/TaskStart";
 import { menuItem, menuPopup, menuSeparator } from "../components/menu";
-import { Badge, Button, Empty, IconButton, metaSlot } from "../components/ui";
+import { Button, Empty, IconButton, metaSlot, StatusDot } from "../components/ui";
 import { CoversPreview } from "../lib/browser-preview";
 import { cn } from "../lib/cn";
 import { focusedProject, useLayout } from "../lib/layout";
@@ -18,6 +18,7 @@ import { openTask } from "../lib/router";
 import { ownerMark, relativeTime } from "@openorc/client";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { stageCount } from "../lib/task-stage-counts";
+import "./pages.css";
 
 function TaskRowStatus({ task, onMoved }: { task: Task; onMoved: () => void }) {
   const update = useRpcMutation("tasks.update");
@@ -69,8 +70,11 @@ function TaskRowStatus({ task, onMoved }: { task: Task; onMoved: () => void }) {
   );
 }
 
-/** The list's groups: tasks whose run waits on your approval first, then each status in the list's order. */
+/** The list's groups: what waits on the person first (an approval, a review, a proposal), then the rest. */
 type TaskGroupKey = TaskStatus | "approval";
+
+const WAITING: readonly TaskGroupKey[] = ["approval", "review", "proposed"];
+const GROUPS: readonly TaskStatus[] = ["review", "proposed", ...groupOrder.filter((status) => status !== "review" && status !== "proposed")];
 
 /** A task opens on its conversation while its run asks for an approval, where the approval waits; otherwise on its page. */
 const openRow = (task: Task) => openTask(task.id, task.approval ? "chat" : "spec");
@@ -78,7 +82,7 @@ const openRow = (task: Task) => openTask(task.id, task.approval ? "chat" : "spec
 function taskGroups(tasks: readonly Task[]): { key: TaskGroupKey; label: string; tasks: Task[] }[] {
   return [
     { key: "approval" as const, label: "Needs you", tasks: tasks.filter((task) => task.approval) },
-    ...groupOrder.map((status) => ({ key: status, label: groupLabel[status], tasks: tasks.filter((task) => task.status === status && !task.approval) })),
+    ...GROUPS.map((status) => ({ key: status, label: groupLabel[status], tasks: tasks.filter((task) => task.status === status && !task.approval) })),
   ].filter((group) => group.tasks.length > 0);
 }
 
@@ -88,7 +92,7 @@ function taskGroups(tasks: readonly Task[]): { key: TaskGroupKey; label: string;
  */
 function TaskRows({ tasks, showProject }: { tasks: Task[]; showProject: boolean }) {
   const projects = useRpc("projects.list", {}, { enabled: showProject });
-  const nameOf = (id: string) => projects.data?.find((p) => p.id === id)?.name ?? "";
+  const projectOf = (id: string) => projects.data?.find((p) => p.id === id);
   const groupId = useId();
   const [collapsed, setCollapsed] = useState<Partial<Record<TaskGroupKey, boolean>>>({});
   const groups = useMemo(() => taskGroups(tasks), [tasks]);
@@ -135,7 +139,7 @@ function TaskRows({ tasks, showProject }: { tasks: Task[]; showProject: boolean 
               collapsed={Boolean(collapsed[key])}
               onToggle={() => setCollapsed((current) => ({ ...current, [key]: !current[key] }))}
               label={label}
-              count={{ value: group.length, label: `${group.length} ${group.length === 1 ? "task" : "tasks"}` }}
+              count={WAITING.includes(key) ? { value: group.length, label: `${group.length} waiting on you`, waiting: true } : null}
             />
             <div id={`${groupId}-${key}-tasks`} hidden={Boolean(collapsed[key])}>
               {group.map((t) => {
@@ -155,13 +159,17 @@ function TaskRows({ tasks, showProject }: { tasks: Task[]; showProject: boolean 
                         <span className="task-row-title" data-tip={t.title}>
                           {t.title}
                         </span>
-                        {t.labels[0] ? <Badge className="task-row-label max-w-24 truncate">{t.labels[0]}</Badge> : null}
+                        {t.labels[0] ? (
+                          <span className="task-row-meta task-row-label">
+                            <StatusDot tone="muted" />
+                            <span className="truncate">{t.labels[0]}</span>
+                          </span>
+                        ) : null}
                         <TaskOwnerMark task={t} />
-                        {showProject ? <span className="task-row-meta task-row-project max-w-28 truncate text-right">{nameOf(t.projectId)}</span> : null}
-                        <span className={cn(metaSlot, "task-row-meta task-row-time w-16")}>{relativeTime(t.updatedAt)}</span>
-                        <PriorityIcon priority={t.priority} />
+                        {showProject ? <TaskProject project={projectOf(t.projectId)} /> : null}
+                        <span className={cn(metaSlot, "task-row-meta task-row-time")}>{relativeTime(t.updatedAt)}</span>
                       </button>
-                      {t.status === "backlog" || t.status === "proposed" ? <TaskStart task={t} /> : <span className="size-6 shrink-0" aria-hidden="true" />}
+                      <TaskMove task={t} />
                     </div>
                   </div>
                 );
@@ -171,6 +179,34 @@ function TaskRows({ tasks, showProject }: { tasks: Task[]; showProject: boolean 
         ))}
       </div>
     </div>
+  );
+}
+
+/** A task's project in its fixed column: the project's mark, then its name. */
+function TaskProject({ project }: { project: Project | undefined }) {
+  return (
+    <span className="task-row-meta task-row-project">
+      {project ? (
+        <>
+          <ProjectLogo project={project} />
+          <span className="truncate">{project.name}</span>
+        </>
+      ) : null}
+    </span>
+  );
+}
+
+/** The row's last column: Review on a task ready for review, the way to its thread before work starts, else nothing. */
+function TaskMove({ task }: { task: Task }) {
+  return (
+    <span className="task-row-move">
+      {task.status === "review" ? (
+        <Button size="sm" onClick={() => openTask(task.id, "files")}>
+          Review
+        </Button>
+      ) : null}
+      {task.status === "backlog" || task.status === "proposed" ? <TaskStart task={task} /> : null}
+    </span>
   );
 }
 
@@ -194,17 +230,7 @@ const shelfOptions = [
 
 type TaskShelf = "active" | "done" | "archived";
 
-function taskListBody(input: {
-  error: Error | null;
-  loading: boolean;
-  list: Task[];
-  query: string;
-  shelf: TaskShelf;
-  stage: TaskStatus | null;
-  showProject: boolean;
-  retry: () => void;
-  onNewTask: () => void;
-}): ReactNode {
+function taskListBody(input: { error: Error | null; loading: boolean; list: Task[]; shelf: TaskShelf; stage: TaskStatus | null; showProject: boolean; retry: () => void }): ReactNode {
   if (input.error)
     return (
       <Empty title="Tasks couldn’t load">
@@ -213,51 +239,22 @@ function taskListBody(input: {
     );
   if (input.loading) return <div className="document-skeleton" aria-label="Loading tasks" />;
   if (input.list.length > 0) return <TaskRows tasks={input.list} showProject={input.showProject} />;
-  let title = `No ${input.shelf} tasks`;
-  let description = "Tasks appear here when you move them out of your active work.";
-  if (input.query) {
-    title = "No matching tasks";
-    description = "Try a different title or label.";
-  } else if (input.stage) {
-    title = `No ${statusLabel[input.stage].toLowerCase()} tasks`;
-    description = "Choose another status to see the rest of your tasks.";
-  } else if (input.shelf === "active") {
-    title = "Make room for your next idea";
-    description = "Capture the work, shape the details, then bring in an agent.";
-  }
-  return (
-    <Empty title={title}>
-      {description}
-      {!input.query && !input.stage && input.shelf === "active" ? (
-        <div className="mt-4">
-          <Button onClick={input.onNewTask}>
-            <Plus size={13} /> New task
-          </Button>
-        </div>
-      ) : null}
-    </Empty>
-  );
+  if (input.stage) return <Empty title={`No ${statusLabel[input.stage].toLowerCase()} tasks`} />;
+  return <Empty title={input.shelf === "active" ? "No tasks yet" : `No ${input.shelf} tasks`} />;
 }
 
 export function TaskListView({ onNewTask }: { onNewTask: () => void }) {
   const projectId = useLayout(focusedProject);
   const tasks = useRpc("tasks.list", projectId ? { projectId } : {});
-  const [query, setQuery] = useState("");
   const [shelf, setShelf] = useState<TaskShelf>("active");
   const all = tasks.data ?? [];
   const [stage, setStage] = useState<TaskStatus | null>(null);
-  const list = all.filter(
-    (task) =>
-      (shelf === "active" ? task.status !== "done" && task.status !== "archived" : task.status === shelf) &&
-      (!stage || task.status === stage) &&
-      `${task.title} ${task.labels.join(" ")}`.toLowerCase().includes(query.toLowerCase()),
-  );
+  const list = all.filter((task) => (shelf === "active" ? task.status !== "done" && task.status !== "archived" : task.status === shelf) && (!stage || task.status === stage));
   return (
     <>
       <TopBar
         actions={
           <>
-            <HeaderSearch label="Search tasks" placeholder="Search tasks…" value={query} onChange={setQuery} />
             <TaskFilterMenu
               tasks={all}
               shelf={shelf}
@@ -277,15 +274,13 @@ export function TaskListView({ onNewTask }: { onNewTask: () => void }) {
       >
         <ScopedTitle>Tasks</ScopedTitle>
       </TopBar>
-      <div className="task-page flex-1 min-h-0 flex flex-col">
-        {taskListBody({ error: tasks.error, loading: tasks.isLoading, list, query, shelf, stage, showProject: !projectId, retry: () => void tasks.refetch(), onNewTask })}
-      </div>
+      <div className="page-column list-page">{taskListBody({ error: tasks.error, loading: tasks.isLoading, list, shelf, stage, showProject: !projectId, retry: () => void tasks.refetch() })}</div>
     </>
   );
 }
 
 /** Open stages in the list's own group order, so the menu reads like the page. */
-const openStages = groupOrder.filter((status) => status !== "done" && status !== "archived");
+const openStages = GROUPS.filter((status) => status !== "done" && status !== "archived");
 
 /** One menu for what the list shows: a shelf, then (on Active) one stage with its count. */
 function TaskFilterMenu({

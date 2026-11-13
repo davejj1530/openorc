@@ -100,13 +100,16 @@ describe("accent colors", () => {
       expect(contrastRatio(colors["--accent"]!, colors["--accent-fg"]!)).toBeGreaterThanOrEqual(4.5);
       const tile = colors["--bg"]!;
       const plane = colors["--surface"]!;
-      const grounds = [tile, plane, over(colors["--surface-2"]!, tile), over(colors["--surface-2"]!, plane)];
+      const rows = [colors["--sidebar"]!, colors["--navigation-soft"]!, colors["--navigation-hover"]!];
+      const grounds = [tile, plane, over(colors["--surface-2"]!, tile), over(colors["--surface-2"]!, plane), ...rows];
       for (const ground of grounds) {
-        for (const ink of ["--ink", "--ink-2", "--ink-3", "--prose-ink", "--accent-ink", "--content-ink"]) {
+        for (const ink of ["--ink", "--ink-2", "--ink-3", "--ink-4", "--prose-ink", "--accent-ink", "--content-ink", "--ok", "--bad"]) {
           expect(contrastRatio(colors[ink]!, ground), `${ink} on ${ground}`).toBeGreaterThanOrEqual(4.5);
         }
-        // Light mode's quiet grey is the approved mock's measured one, about 3:1 on the ground; dark holds 4.5.
-        expect(contrastRatio(colors["--ink-4"]!, ground), `--ink-4 on ${ground}`).toBeGreaterThanOrEqual(mode === "light" ? 2.7 : 4.5);
+      }
+      // Line numbers are a diff's wayfinding, not its reading text: 3:1 on the panel, the planes and both washes.
+      for (const ground of [tile, plane, over(colors["--ok-soft"]!, plane), over(colors["--bad-soft"]!, plane)]) {
+        expect(contrastRatio(colors["--line-number"]!, ground), `--line-number on ${ground}`).toBeGreaterThanOrEqual(3);
       }
       // Strong fill carries muted text at most, never faint.
       for (const ground of [over(colors["--surface-3"]!, tile), over(colors["--surface-3"]!, plane)]) {

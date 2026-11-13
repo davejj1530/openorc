@@ -24,15 +24,15 @@ colors:
   reading-dark: "#a3a3a3"
   muted-light: "#636465"
   muted-dark: "#a4a5a7"
-  faint-light: "#8f9091"
+  faint-light: "#6d6d6e"
   faint-dark: "#8e8f91"
-  line-number-light: "#b2b2b2"
-  line-number-dark: "#5c5c5c"
+  line-number-light: "#8a8a8a"
+  line-number-dark: "#6e6e6e"
   action-light: "#252525"
   action-dark: "#ececec"
   on-action-light: "#ffffff"
   on-action-dark: "#171717"
-  ok-light: "#3c884d"
+  ok-light: "#367b46"
   ok-dark: "#63c27a"
   ok-soft-light: "#e0fae3"
   ok-soft-dark: "#15291b"
@@ -209,7 +209,7 @@ The frontmatter records the OpenOrc palette in both modes; component entries sho
 
 ### Ink and accents
 
-`--ink` is titles and primary text. `--prose-ink` is the agent's reading text, softer than titles in OpenOrc; headings and bold lead-ins stay in `--ink`. `--ink-2` and `--ink-3` are muted, the workhorse. `--ink-4` is faint, for meta, counts, and placeholders; it never sits on `--surface-3`. `--line-number` numbers a diff's lines. Every text role holds 4.5:1 on ground, plane, and fill, except OpenOrc light's faint grey and line numbers, measured from the approved mock at about 3:1 and 2.1:1. `--accent` and `--accent-fg` make the one ink pill. Selected and open rows keep `--navigation-ink`, links and inline code use `--content-ink`, so palette accents survive. `--ok` and `--bad` (with soft companions) mark diffs and results, `--attention` colors dots only, and `--warn` is the readable warning text.
+`--ink` is titles and primary text. `--prose-ink` is the agent's reading text, softer than titles in OpenOrc; headings and bold lead-ins stay in `--ink`. `--ink-2` and `--ink-3` are muted, the workhorse. `--ink-4` is faint, for meta, counts, and placeholders; it never sits on `--surface-3`. `--line-number` numbers a diff's lines. Every text role, `--ok` and `--bad` included, holds 4.5:1 on the ground, the sidebar, the plane, the fill and the selected and hovered rows; line numbers hold 3:1 on the ground, the plane and the diff's washes. `--accent` and `--accent-fg` make the one ink pill. Selected and open rows keep `--navigation-ink`, links and inline code use `--content-ink`, so palette accents survive. `--ok` and `--bad` (with soft companions) mark diffs and results, `--attention` colors dots only, and `--warn` is the readable warning text.
 
 Appearance mode and palette selection stay independent. OpenOrc has the values above, Cursor keeps its own grays, and flat light palettes have a hand-tuned ground step so planes still separate. Accent choices and custom colors persist per palette and mode; fill and line roles accept `#rrggbbaa`. Original Kamakura, Cyberpunk, and Eliron themes keep their authored treatment. [Theme references](../../docs/theme-references.md) separate source values from adaptations.
 

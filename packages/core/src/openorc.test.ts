@@ -240,7 +240,7 @@ describe("core", () => {
     const worktrees = await git(root, ["worktree", "list", "--porcelain"]);
     expect(await call("review.diff", { taskId: unstarted.id })).toEqual({ baseSha: null, patch: "", files: [], since: null });
     expect(await call("git.log", { taskId: unstarted.id })).toEqual([]);
-    expect(await call("tasks.get", { id: unstarted.id })).toEqual(unstarted);
+    expect(await call("tasks.get", { id: unstarted.id })).toEqual({ ...unstarted, approval: null });
     expect(await git(root, ["worktree", "list", "--porcelain"])).toEqual(worktrees);
   });
 

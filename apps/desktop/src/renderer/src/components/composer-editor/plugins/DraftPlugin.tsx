@@ -1,8 +1,8 @@
-import { $getRoot, CLEAR_HISTORY_COMMAND, mergeRegister, SKIP_DOM_SELECTION_TAG, SKIP_SCROLL_INTO_VIEW_TAG } from "lexical";
+import { $getRoot, mergeRegister, SKIP_DOM_SELECTION_TAG, SKIP_SCROLL_INTO_VIEW_TAG } from "lexical";
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { $readDraft, $writeDraft } from "../draft";
 import { EXTERNAL, hasFocus, useLatest } from "../shared";
-import { useEditor } from "../editor";
+import { useEditor, useRestartHistory } from "../editor";
 
 /**
  * The message and the caret after an update: null while the person is not in the draft, since a caret they never
@@ -22,6 +22,7 @@ export interface DraftChange {
 export function DraftPlugin({ value, onChange }: { value: string; onChange: (change: DraftChange) => void }) {
   const editor = useEditor();
   const report = useLatest(onChange);
+  const restartHistory = useRestartHistory();
   // The message as the draft last said it. Only a value other than that comes from outside: one that merely trails the
   // draft, as fast typing outruns the owner's render, must not be written back over newer words.
   const said = useRef<string | null>(null);
@@ -37,8 +38,8 @@ export function DraftPlugin({ value, onChange }: { value: string; onChange: (cha
       },
       { discrete: true, tag: hasFocus(editor) ? EXTERNAL : [EXTERNAL, SKIP_DOM_SELECTION_TAG, SKIP_SCROLL_INTO_VIEW_TAG] },
     );
-    if (wrote) editor.dispatchCommand(CLEAR_HISTORY_COMMAND, undefined);
-  }, [editor, value]);
+    if (wrote) restartHistory();
+  }, [editor, value, restartHistory]);
   useEffect(
     () =>
       mergeRegister(

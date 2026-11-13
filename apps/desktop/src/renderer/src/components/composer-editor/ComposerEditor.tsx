@@ -15,8 +15,13 @@ import { PICKED } from "./shared";
 
 export type { DraftChange } from "./plugins/DraftPlugin";
 
-/** What the composer does to its draft: a pick writes the message with the caret where it belongs, as one step to undo. */
+/**
+ * What the composer does to its draft, each as one step to undo with the caret where it belongs: a pick from a list
+ * writes the message, and its pills land with a pop; `write` puts words back, as a queued message returning, and
+ * nothing moves.
+ */
 export interface ComposerEditorHandle {
+  pick: (text: string, caret: number) => void;
   write: (text: string, caret: number) => void;
 }
 
@@ -48,16 +53,13 @@ export interface ComposerEditorProps {
 function EditorControls({ handle, disabled }: Pick<ComposerEditorProps, "handle" | "disabled">) {
   const editor = useEditor();
   useEffect(() => editor.setEditable(!disabled), [editor, disabled]);
-  useImperativeHandle(
-    handle,
-    () => ({
-      write: (text, caret) => {
-        editor.update(() => $writeDraft(text, caret), { discrete: true, tag: [HISTORY_PUSH_TAG, PICKED] });
-        editor.getRootElement()?.focus({ preventScroll: true });
-      },
-    }),
-    [editor],
-  );
+  useImperativeHandle(handle, () => {
+    const writeAs = (tags: string[]) => (text: string, caret: number) => {
+      editor.update(() => $writeDraft(text, caret), { discrete: true, tag: tags });
+      editor.getRootElement()?.focus({ preventScroll: true });
+    };
+    return { pick: writeAs([HISTORY_PUSH_TAG, PICKED]), write: writeAs([HISTORY_PUSH_TAG]) };
+  }, [editor]);
   return null;
 }
 

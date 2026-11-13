@@ -104,32 +104,28 @@
   border-radius: var(--radius-lg);
   background: var(--surface);
 }
+/* A message's words: pressed, they go back to the composer, so the row lifts a step under the pointer. */
 .message-queue-message {
-  flex: 1;
-  min-width: 0;
-  color: var(--ink);
-}
-.message-queue-message summary {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 4px;
   min-width: 0;
-  list-style: none;
-  border-radius: var(--radius-sm);
-  cursor: default;
+  margin: -6px 0 -6px -8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  text-align: left;
+  transition: background-color var(--duration-quick) var(--ease-out);
 }
-.message-queue-message summary::-webkit-details-marker {
-  display: none;
+button.message-queue-message:hover:not(:disabled) {
+  background-color: var(--surface-2);
 }
 .message-queue-preview {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.message-queue-message[open] .message-queue-preview {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
 }
 .message-queue-error {
   color: var(--bad);

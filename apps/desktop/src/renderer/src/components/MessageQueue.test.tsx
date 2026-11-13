@@ -38,3 +38,14 @@ it("offers to try a refused message again, disabled with the words while it stil
   fireEvent.click(screen.getByRole("button", { name: "Try again" }));
   expect(onSend).toHaveBeenCalledWith("refused");
 });
+
+it("takes a message back to the composer when its words are pressed, and keeps Send now and the cross beside them", () => {
+  const onEdit = vi.fn();
+  const queued = { id: "queued", text: "Then open a pull request", attachments: [], queuedAt: 1 };
+  render(<MessageQueue canSend pending={false} onSend={vi.fn()} onRemove={vi.fn()} onEdit={onEdit} messages={[queued]} />);
+  fireEvent.click(screen.getByRole("button", { name: /1 queued/ }));
+  expect(screen.getByRole("button", { name: "Send now" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Remove queued message 1" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Then open a pull request" }));
+  expect(onEdit).toHaveBeenCalledWith("queued");
+});

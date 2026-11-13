@@ -1,4 +1,4 @@
-import { createEmptyHistoryState, registerHistory } from "@lexical/history";
+import { createEmptyHistoryState, registerHistory, type HistoryState } from "@lexical/history";
 import { registerPlainText } from "@lexical/plain-text";
 import { $getRoot, createEditor, mergeRegister, type Klass, type LexicalEditor, type LexicalNode } from "lexical";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, useSyncExternalStore, type HTMLAttributes, type ReactNode, type Ref } from "react";
@@ -10,19 +10,37 @@ import { createPortal } from "react-dom";
  * every plugin starts from a box that already types, pastes and undoes like a text field.
  */
 
-const EditorContext = createContext<LexicalEditor | null>(null);
+const EditorContext = createContext<{ editor: LexicalEditor; history: HistoryState } | null>(null);
 
 /** The editor of the message box this plugin sits in. */
 export function useEditor(): LexicalEditor {
-  const editor = useContext(EditorContext);
-  if (!editor) throw new Error("A composer plugin sits outside its editor.");
-  return editor;
+  return useEditorContext().editor;
+}
+
+function useEditorContext() {
+  const context = useContext(EditorContext);
+  if (!context) throw new Error("A composer plugin sits outside its editor.");
+  return context;
+}
+
+/**
+ * Starts the undo history over from the draft as it stands, as a text field's does when its value is set: nothing to
+ * undo, and the next edit one step back to here. Clearing alone would leave no state for that next step to return to.
+ */
+export function useRestartHistory(): () => void {
+  const { editor, history } = useEditorContext();
+  return useCallback(() => {
+    history.undoStack.length = 0;
+    history.redoStack.length = 0;
+    history.current = { editor, editorState: editor.getEditorState() };
+  }, [editor, history]);
 }
 
 /** Typing within this long stays one step to undo. */
 const UNDO_MERGE_MS = 1000;
 
 export function EditorProvider({ namespace, nodes, children }: { namespace: string; nodes: readonly Klass<LexicalNode>[]; children: ReactNode }) {
+  const [history] = useState(createEmptyHistoryState);
   const [editor] = useState(() =>
     createEditor({
       namespace,
@@ -32,8 +50,9 @@ export function EditorProvider({ namespace, nodes, children }: { namespace: stri
       },
     }),
   );
-  useEffect(() => mergeRegister(registerPlainText(editor), registerHistory(editor, createEmptyHistoryState(), UNDO_MERGE_MS)), [editor]);
-  return <EditorContext.Provider value={editor}>{children}</EditorContext.Provider>;
+  useEffect(() => mergeRegister(registerPlainText(editor), registerHistory(editor, history, UNDO_MERGE_MS)), [editor, history]);
+  const context = useMemo(() => ({ editor, history }), [editor, history]);
+  return <EditorContext.Provider value={context}>{children}</EditorContext.Provider>;
 }
 
 /** Whether the editor takes typing now, following its editable listener. */

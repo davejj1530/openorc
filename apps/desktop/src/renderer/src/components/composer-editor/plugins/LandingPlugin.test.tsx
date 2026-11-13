@@ -13,15 +13,17 @@ const landing = (field: HTMLElement) => [...field.querySelectorAll("[data-landin
 it("pops a pill picked from a list, and only that one", () => {
   const handle = createRef<ComposerEditorHandle>();
   const { field } = mountEditor({ sources, handle });
-  act(() => handle.current!.write("ask @paper ", 11));
+  act(() => handle.current!.pick("ask @paper ", 11));
   expect(landing(field)).toEqual(["Paper"]);
 });
 
-it("keeps still a pill that arrives by typing, an undo or a draft coming back", () => {
+it("keeps still a pill that arrives by typing, a write, an undo or a draft coming back", () => {
   const handle = createRef<ComposerEditorHandle>();
   const typed = mountEditor({ sources, handle });
   type(typed.field, "ask @paper now");
   expect(typed.field.querySelector("[data-connector]")).not.toBeNull();
+  expect(landing(typed.field)).toEqual([]);
+  act(() => handle.current!.write("ask @paper now, and @paper too", 30));
   expect(landing(typed.field)).toEqual([]);
   act(() => handle.current!.write("ask  now", 4));
   press(typed.field, { key: "z", ctrlKey: true });

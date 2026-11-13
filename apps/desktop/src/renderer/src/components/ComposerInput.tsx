@@ -34,6 +34,8 @@ interface ComposerInputProps {
   onConnectorsWanted?: () => void;
   suggestionAnchor: RefObject<HTMLDivElement | null>;
   suggestionSide: "top" | "bottom";
+  /** The editor's handle, which the composer holds too, to write a queued message back. */
+  editor: RefObject<ComposerEditorHandle | null>;
 }
 
 /** What `@` says while the connector list is read for the first time, which starts the agents' servers. */
@@ -71,7 +73,7 @@ export function ComposerInput(props: ComposerInputProps) {
   const [caret, setCaret] = useState(0);
   const [cursor, setCursor] = useState(0);
   const [suggestionsActive, setSuggestionsActive] = useState(true);
-  const editor = useRef<ComposerEditorHandle>(null);
+  const { editor } = props;
   const root = useRef<HTMLDivElement>(null);
   const listId = useId();
   const picked = usePickedFiles(props.draftKey, value);
@@ -90,7 +92,7 @@ export function ComposerInput(props: ComposerInputProps) {
   const files = useRpc("files.search", { scope: fileSearch ?? NO_SEARCH, query: mentionQuery ?? "", limit: 8 }, { enabled: mentionQuery !== null, staleTime: 10_000 });
   // Skills insert into the prompt; actions clear it, so only offer actions at the start.
   const commandMatches = useMemo(() => matchingCommands(commands, commandQuery, commandPrefix, token?.start), [commandPrefix, commandQuery, commands, token?.start]);
-  const write = useCallback((text: string, at: number) => editor.current?.write(text, at), []);
+  const write = useCallback((text: string, at: number) => editor.current?.pick(text, at), [editor]);
   const suggestions: SuggestionRow[] = useMemo(() => {
     if (memberQuery && memberMatches.length) {
       return memberMatches.map((entry) => ({

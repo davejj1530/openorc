@@ -262,6 +262,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
       <div className="composer-padding shrink-0 px-6 pb-6 pt-2">
         <div className="max-w-chat w-full min-w-0 mx-auto grid grid-cols-1 gap-2">
           <Composer
+            handle={controls.composer}
             draftKey={`${draftKey}.attachments`}
             value={prompt}
             onChange={setPrompt}
@@ -345,12 +346,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
             ) : null}
           </Composer>
           {firstTaskRun ? (
-            <p
-              className="px-1 text-xs text-ink-3 truncate"
-              data-tip={workspaceDestination({ mode: workspaceMode, rootPath: project.rootPath, taskPath: scope.kind === "task" ? scope.task.worktreePath : null })}
-            >
-              {workspaceDestination({ mode: workspaceMode, rootPath: project.rootPath, taskPath: scope.kind === "task" ? scope.task.worktreePath : null })}
-            </p>
+            <TaskDestination destination={workspaceDestination({ mode: workspaceMode, rootPath: project.rootPath, taskPath: scope.kind === "task" ? scope.task.worktreePath : null })} />
           ) : null}
           {runsQuery.error ? (
             <Button size="sm" variant="ghost" onClick={() => void runsQuery.refetch()}>
@@ -360,5 +356,14 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
         </div>
       </div>
     </div>
+  );
+}
+
+/** Where a task's first run will work, under its composer; whole on demand when the line cuts it off. */
+function TaskDestination({ destination }: { destination: string }) {
+  return (
+    <p className="px-1 text-xs text-ink-3 truncate" data-tip={destination}>
+      {destination}
+    </p>
   );
 }

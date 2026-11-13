@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { useState } from "react";
+import { createRef, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Composer, type ComposerProps } from "./Composer";
+import { Composer, type ComposerHandle, type ComposerProps } from "./Composer";
 import { readDraft, writeDraft } from "../lib/drafts";
 import { core } from "../lib/rpc";
 import { isPreviewCovered } from "../lib/browser-preview";
@@ -413,6 +413,27 @@ describe("the send cluster", () => {
     mount({ queueing: true, liveByDefault: true, steerable: true });
     expect(ink().getAttribute("data-tip")).toBeNull();
     expect(screen.getByRole("button", { name: "Queue" }).getAttribute("data-tip")).toBeNull();
+  });
+});
+
+describe("a queued message coming back", () => {
+  it("is added after the words already written, with its files, as one step to undo and no pop", () => {
+    const handle = createRef<ComposerHandle>();
+    mount({ handle, value: "Then open a pull request", draftKey: "returned" });
+    act(() => handle.current!.append("Also run the phone tests", ["/assets/0b0c4b3e-1111-4a4a-8a8a-123456789abc-shot.png"]));
+    const field = screen.getByRole("textbox", { name: "Message" });
+    expect(messageOf(field)).toBe("Then open a pull request\nAlso run the phone tests");
+    expect(field.querySelector("[data-landing]")).toBeNull();
+    expect(screen.getByRole("img", { name: "shot.png" })).toBeTruthy();
+    press(field, { key: "z", ctrlKey: true });
+    expect(messageOf(field)).toBe("Then open a pull request");
+  });
+
+  it("takes the field as it is when nothing is written", () => {
+    const handle = createRef<ComposerHandle>();
+    mount({ handle, value: "" });
+    act(() => handle.current!.append("Also run the phone tests", []));
+    expect(messageOf(screen.getByRole("textbox", { name: "Message" }))).toBe("Also run the phone tests");
   });
 });
 

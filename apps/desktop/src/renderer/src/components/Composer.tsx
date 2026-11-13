@@ -13,18 +13,20 @@ import {
   type RunMode,
   type UsableConnector,
 } from "@openorc/protocol";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from "react";
 import { useRpcMutation } from "../lib/client";
 import { cn } from "../lib/cn";
-import { removeAcceptedAttachments, useComposerAttachments } from "../lib/composer-attachments";
+import { removeAcceptedAttachments, restoreDraftAttachments, useComposerAttachments, type Attachment } from "../lib/composer-attachments";
 import { type MentionEntry } from "../lib/composer-mentions";
 import { useComposerFit } from "../lib/composer-fit";
 import { useComposerSubmission } from "../lib/composer-submission";
 import { formatBytes } from "../lib/file-imports";
+import { isImagePath } from "../../../shared/image-paths";
 import { ComposerChoice } from "./ComposerChoice";
 import { ComposerDropZone, useComposerDrop } from "./ComposerDropZone";
 import { ComposerChangesBar } from "./ComposerCommitChip";
 import { ComposerInput } from "./ComposerInput";
+import type { ComposerEditorHandle } from "./composer-editor/ComposerEditor";
 import { ComposerSendCluster } from "./ComposerSendButton";
 import { ContextUsage } from "./ContextUsage";
 import { Cloud, Eye, FileText, Laptop, Lightbulb, Plus, ShieldCheck, ShieldOff, X } from "./icons";
@@ -74,7 +76,14 @@ export interface ComposerChanges {
   onRetry: () => void;
 }
 
+/** What a caller can do to the composer from outside it. */
+export interface ComposerHandle {
+  /** Puts a message's words back after what is written, as one step to undo, and its files back beside it. */
+  append: (text: string, attachments: readonly string[]) => void;
+}
+
 export interface ComposerProps {
+  handle?: Ref<ComposerHandle>;
   value: string;
   onChange: (text: string) => void;
   /** `now` requests live input; false explicitly queues during an active turn. */
@@ -173,6 +182,13 @@ function useSentGhost(text: string | null) {
  * bar under the text with the context ring and send at its end; uncommitted
  * changes sit in the Commit chip over its left edge. @ mentions a file, / runs a command.
  */
+/** A file a message carried, as the composer shows it again: an image by its served picture, anything else by its name. */
+function returnedAttachment(path: string): Attachment {
+  const stored = path.split(/[\\/]/).pop() ?? path;
+  const name = /^[a-f0-9-]{36}-/.test(stored) ? stored.slice(37) : stored;
+  return { path, url: isImagePath(path) ? `openorc-asset://attachments/${stored}` : null, name };
+}
+
 /** The system's file chooser, as the attach button opens it. */
 function chooseFiles(add: (files: File[]) => void): void {
   const input = document.createElement("input");
@@ -210,6 +226,19 @@ export function Composer(props: ComposerProps) {
   const files = useComposerAttachments({ draftKey: props.draftKey, disabledReason: props.attachmentsDisabledReason });
   const { attachments, uploading, addFiles, remove: removeAttachments } = files;
   const { value, onChange } = props;
+  const editor = useRef<ComposerEditorHandle>(null);
+  useImperativeHandle(
+    props.handle,
+    () => ({
+      append: (text, paths) => {
+        const kept = value.trimEnd();
+        const next = kept ? `${kept}\n${text}` : text;
+        editor.current?.write(next, next.length);
+        restoreDraftAttachments(props.draftKey, paths.map(returnedAttachment));
+      },
+    }),
+    [value, props.draftKey],
+  );
   const interrupt = useRpcMutation("runs.interrupt");
   const { submission, submit: submitDraft, acknowledge } = useComposerSubmission(props.draftKey);
   const submitting = submission?.status === "pending";
@@ -310,6 +339,7 @@ export function Composer(props: ComposerProps) {
             onConnectorsWanted={props.onConnectorsWanted}
             suggestionAnchor={shell}
             suggestionSide={isNewThread ? "bottom" : "top"}
+            editor={editor}
           />
           {sent.ghost ? (
             <div key={sent.ghost.key} className="composer-sent-ghost" aria-hidden="true" onAnimationEnd={sent.clear}>

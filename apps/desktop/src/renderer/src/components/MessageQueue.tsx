@@ -7,7 +7,8 @@ import { Button, IconButton } from "./ui";
 /**
  * Messages waiting for the turn to finish, as a pile above the composer: a front card with the
  * count and up to two cards behind it. Clicking the front fans the pile out into the messages,
- * each with Send now and Remove. A message that failed to send opens it on its own.
+ * each with Send now and Remove; pressing a message's words takes it out of the queue and back
+ * into the message being written. A message that failed to send opens it on its own.
  */
 export function MessageQueue({
   messages,
@@ -18,6 +19,7 @@ export function MessageQueue({
   agentName,
   onSend,
   onRemove,
+  onEdit,
 }: {
   messages: QueuedMessage[];
   canSend: boolean;
@@ -29,6 +31,8 @@ export function MessageQueue({
   agentName?: string;
   onSend: (messageId: string) => void;
   onRemove: (messageId: string) => void;
+  /** Takes the message out of the queue and puts its words and files back in the composer, after what is there. */
+  onEdit?: ((messageId: string) => void) | undefined;
 }) {
   const [expanded, setExpanded] = useState(false);
   if (!messages.length) return null;
@@ -40,21 +44,7 @@ export function MessageQueue({
         <ol className="message-queue-list motion-stagger">
           {messages.map((message, index) => (
             <li className="message-queue-card motion-arrive" key={message.id}>
-              <details className="message-queue-message">
-                <summary aria-label={`Read queued message ${index + 1}`}>
-                  <span className="message-queue-preview">{message.text.trim() || "Attached images"}</span>
-                  {message.error ? (
-                    <span role="status" className="message-queue-error">
-                      {failureParts(message.error).headline}
-                    </span>
-                  ) : null}
-                  {message.attachments.length > 0 ? (
-                    <span className="message-queue-attachments">
-                      {message.attachments.length} {message.attachments.length === 1 ? "image" : "images"} attached
-                    </span>
-                  ) : null}
-                </summary>
-              </details>
+              <QueuedWords message={message} pending={pending} onEdit={onEdit ? () => onEdit(message.id) : undefined} />
               <div className="message-queue-actions">
                 <QueuedSend message={message} canSend={canSend} pending={pending} sendReason={sendReason} retryBlocked={retryBlocked} onSend={onSend} />
                 <IconButton size="xs" disabled={pending} onClick={() => onRemove(message.id)} aria-label={`Remove queued message ${index + 1}`} data-tip="Remove from queue">
@@ -76,6 +66,32 @@ export function MessageQueue({
         </button>
       </div>
     </section>
+  );
+}
+
+/** A queued message's words, what went wrong with it and what it carries; pressed, they go back to the composer. */
+function QueuedWords({ message, pending, onEdit }: { message: QueuedMessage; pending: boolean; onEdit: (() => void) | undefined }) {
+  const words = message.text.trim() || "Attached images";
+  const body = (
+    <>
+      <span className="message-queue-preview">{words}</span>
+      {message.error ? (
+        <span role="status" className="message-queue-error">
+          {failureParts(message.error).headline}
+        </span>
+      ) : null}
+      {message.attachments.length > 0 ? (
+        <span className="message-queue-attachments">
+          {message.attachments.length} {message.attachments.length === 1 ? "image" : "images"} attached
+        </span>
+      ) : null}
+    </>
+  );
+  if (!onEdit) return <div className="message-queue-message">{body}</div>;
+  return (
+    <button type="button" className="message-queue-message" disabled={pending} data-tip={words} onClick={onEdit}>
+      {body}
+    </button>
   );
 }
 

@@ -17,7 +17,7 @@ let props: CodeEditorProps;
 beforeEach(() => {
   key += 1;
   props = { sessionKey: `buffer-${key}`, path: "notes.txt", text: "one\ntwo\nthree\n", readOnly: false, lineWrapping: true, reveal: null, onChange: vi.fn(), onSave: vi.fn() };
-  useRouter.setState({ route: { view: "thread", threadId: "t1" }, threadIds: ["t1"], history: [{ view: "inbox" }], future: [{ view: "memory" }] });
+  useRouter.setState({ route: { view: "thread", threadId: "t1" }, threadIds: ["t1"], history: [{ view: "tasks" }], future: [{ view: "memory" }] });
   useUi.setState({ palette: false });
 });
 afterEach(cleanup);

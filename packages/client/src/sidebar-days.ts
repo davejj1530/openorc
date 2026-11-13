@@ -46,13 +46,20 @@ function rootPlace(root: ThreadSummary, all: readonly ThreadSummary[], now: numb
 
 /**
  * Whether a thread is in Resolved: put there, or quiet since before yesterday and neither pinned nor snoozed, which keep
- * their own parts. A started thread goes with its parent unless put there itself.
+ * their own parts, nor waiting on the person, which its project's count shows however old its work is. A started thread
+ * goes with its parent unless put there itself.
  */
-export function threadResolved(thread: Pick<ThreadSummary, "archivedAt" | "parentThreadId" | "pinnedAt" | "snoozedUntil" | "lastActivityAt" | "treeActivityAt">, now: number): boolean {
+export function threadResolved(
+  thread: Pick<ThreadSummary, "archivedAt" | "parentThreadId" | "pinnedAt" | "snoozedUntil" | "lastActivityAt" | "treeActivityAt"> & Partial<Pick<ThreadSummary, "activity">>,
+  now: number,
+): boolean {
   if (thread.archivedAt) return true;
-  if (thread.parentThreadId || thread.pinnedAt || (thread.snoozedUntil && thread.snoozedUntil > now)) return false;
+  if (thread.parentThreadId || thread.pinnedAt || (thread.snoozedUntil && thread.snoozedUntil > now) || thread.activity === "waiting") return false;
   return sidebarPlace(thread.treeActivityAt ?? thread.lastActivityAt, now) === "resolved";
 }
+
+/** A tree waiting on the person for an answer or an approval never goes to Resolved by its age. */
+const waitsAnywhere = (root: ThreadSummary, all: readonly ThreadSummary[]) => threadTreeMatches(root, all, (row) => row.activity === "waiting");
 
 /** The saved key of a day's fold. Days that start open save their folding; days that start folded save their opening. */
 export function sidebarDayKey(day: SidebarDay): string {
@@ -201,7 +208,7 @@ export function sidebarDayList({
   const unpinned = (thread: ThreadSummary) => !pinned.some((pin) => pin.id === thread.id);
   const paged = pinnedOnly ? [] : pages.flatMap((page) => page.rest.filter(unpinned)).sort(latestFirst);
   const unfiled = [...paged, ...beyond.roots].sort(latestFirst);
-  const quiet = unfiled.filter((root) => rootPlace(root, all, now) === "resolved");
+  const quiet = unfiled.filter((root) => rootPlace(root, all, now) === "resolved" && !waitsAnywhere(root, all));
   const rest = unfiled.filter((root) => !quiet.includes(root));
   const snoozed = pinnedOnly ? [] : pages.flatMap((page) => page.snoozed).sort(latestFirst);
   const holdsActive = (root: ThreadSummary) => Boolean(activeId) && threadTreeMatches(root, all, (row) => row.id === activeId);

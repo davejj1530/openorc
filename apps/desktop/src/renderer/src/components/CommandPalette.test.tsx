@@ -34,7 +34,7 @@ beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn();
   vi.spyOn(core, "call").mockImplementation(async <M extends RpcMethod>(): Promise<RpcResults[M]> => [] as unknown as RpcResults[M]);
   useUi.setState({ palette: false, paletteMode: "all", newFile: null });
-  useRouter.setState({ route: { view: "inbox" } });
+  useRouter.setState({ route: { view: "tasks" } });
   useFilesTool.setState({ host: null });
 });
 

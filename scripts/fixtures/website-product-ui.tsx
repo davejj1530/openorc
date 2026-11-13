@@ -176,7 +176,7 @@ async function main() {
       eventCount: blocks.length,
       ...state,
     });
-  const shell = mode === "shell" || mode === "inbox" ? addShellStates({ base, projects, threads, tasks, seed: seedTranscript }) : null;
+  const shell = mode === "shell" ? addShellStates({ base, projects, threads, tasks, seed: seedTranscript }) : null;
   const working = mode === "working" || mode === "review" ? addWorkingStates({ base, threads, now, response: messages[1]!.text, seed: seedTranscript, running: mode === "working" }) : null;
   const models = [
     { agent: "codex", id: "gpt-6-astra", label: "GPT-6-Astra", efforts: ["high"], defaultEffort: "high", isDefault: true },
@@ -241,7 +241,6 @@ async function main() {
         { id: "dependency-review", title: "Check dependency updates", everyMinutes: 10080, agent: "claude", model: "claude-opus-5-5[1m]", enabled: true },
         { id: "docs-review", title: "Check docs against the code", everyMinutes: 10080, agent: "codex", model: "gpt-6-astra", enabled: false },
       ].map((schedule) => ({ ...schedule, projectId: "studio", version: 1, lastRunAt: now - 3600000, nextRunAt: now + 3600000, lastThreadId: "onboarding" }));
-    if (method === "inbox.list") return { items: shell?.inbox ?? [] };
     if (method === "orclings.list") return orclings;
     if (method === "threads.lastMessage") return messages[1];
     if (method === "orclings.instructions") return [{ version: 1, body: "Help me make clear decisions. Keep project work and personal memory separate.", author: "user", note: null, createdAt: now }];
@@ -333,7 +332,6 @@ async function main() {
     useRouter.getState().navigate({ view: "scheduled" });
   } else if (pageViews.has(mode)) useRouter.getState().navigate(pageRoute(mode));
   else if (mode === "tasks") useRouter.getState().navigate({ view: "tasks" });
-  else if (mode === "inbox") useRouter.getState().navigate({ view: "inbox" });
   else if (["usage", "connections", "slack", "phone", "skills", "appearance", "general", "memory", "data"].includes(mode)) {
     useRouter.getState().navigate({ view: "settings", section: mode as "usage" });
   } else if (mode === "new") useRouter.getState().navigate({ view: "newthread", projectId: "studio" });
@@ -400,7 +398,6 @@ function DesignPreviewBar() {
           <option value="workspace">Conversation</option>
           <option value="shell">Sidebar states</option>
           <option value="working">Agent working</option>
-          <option value="inbox">Inbox</option>
           <option value="orclings">Orclings</option>
           <option value="new">New thread</option>
           <option value="tasks">Tasks</option>
@@ -433,12 +430,13 @@ type Row = Record<string, unknown>;
 type Seed = (runId: string, blocks: Block[], state?: Partial<RunTranscript>) => void;
 
 /**
- * ?view=shell and ?view=inbox: workspace data with varied sidebar and inbox states. In the open
- * project, threads run, wait on an approval, failed, finished unread, or carry a merged pull request, and a title runs
- * long. Folded, website waits on a question and atlas-api runs. The last project, with a long name, has no threads.
+ * ?view=shell: workspace data with varied sidebar and task states. In the open project, threads run, wait on an
+ * approval, failed, finished unread, or carry a merged pull request, and a title runs long; a task's run waits on an
+ * approval, one task is proposed and two wait for review. Folded, website waits on a question and atlas-api runs. The
+ * last project, with a long name, has no threads.
  * Two threads went quiet last week, so Resolved holds them.
- * A thread with a second line gets a seeded live run, as the app holds one while the thread is live. The inbox lists
- * approvals first, as the core does. Every state fits the sidebar of a 1440x900 window.
+ * A thread with a second line gets a seeded live run, as the app holds one while the thread is live. Every state fits
+ * the sidebar of a 1440x900 window.
  */
 function addShellStates({ base, projects, threads, tasks, seed }: { base: Record<string, unknown>; projects: Row[]; threads: Row[]; tasks: Row[]; seed: Seed }) {
   projects.push({ ...projects[0]!, id: "billing", name: "customer-billing-and-payments-reconciliation", rootPath: "/Projects/customer-billing-and-payments-reconciliation" });
@@ -491,15 +489,11 @@ function addShellStates({ base, projects, threads, tasks, seed }: { base: Record
     live: true,
     pendingApprovals: 1,
   });
-  const review = (id: string) => ({ kind: "task", task: tasks.find((task) => task.id === id)!, runId: null, reason: "review", detail: "Finished run waiting for your review" });
-  const inbox = [
-    { kind: "thread", thread: thread("release"), runId: "release-run", reason: "approval", detail: push },
-    { kind: "thread", thread: thread("welcome"), runId: "welcome-run", reason: "approval", detail: question },
-    { kind: "task", task: proposed, runId: null, reason: "proposed", detail: "Proposed by the agent, waiting for your go-ahead" },
-    review("welcome"),
-    review("picker"),
-  ];
-  return { inbox, collapsed: ["project:website"] };
+  Object.assign(
+    tasks.find((task) => task.id === "keys")!,
+    { approval: "pnpm --filter desktop test" },
+  );
+  return { collapsed: ["project:website"] };
 }
 
 /**

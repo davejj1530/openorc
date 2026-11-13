@@ -319,7 +319,7 @@ export class RunApprovals {
         info: { runId, taskId: run?.taskId ?? null, threadId: run?.threadId ?? null, approvalId, detail, ...(subagentId ? { subagentId } : {}) },
       });
       announce();
-      this.deps.invalidate(["inbox", "threads"]);
+      this.deps.invalidate(["inbox", "threads", "tasks"]);
     });
   }
 
@@ -349,7 +349,7 @@ export class RunApprovals {
       resourceId: runId,
       metadata: { approvalId, ...(actor === "openorc" && decision === "allow" ? { policy: "autonomous" } : {}) },
     });
-    this.deps.invalidate(["inbox", "threads"]);
+    this.deps.invalidate(["inbox", "threads", "tasks"]);
   }
 
   private permissionEntries(thread: Thread): LiveRun[] {

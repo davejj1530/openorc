@@ -69,6 +69,19 @@ function TaskRowStatus({ task, onMoved }: { task: Task; onMoved: () => void }) {
   );
 }
 
+/** The list's groups: tasks whose run waits on your approval first, then each status in the list's order. */
+type TaskGroupKey = TaskStatus | "approval";
+
+/** A task opens on its conversation while its run asks for an approval, where the approval waits; otherwise on its page. */
+const openRow = (task: Task) => openTask(task.id, task.approval ? "chat" : "spec");
+
+function taskGroups(tasks: readonly Task[]): { key: TaskGroupKey; label: string; tasks: Task[] }[] {
+  return [
+    { key: "approval" as const, label: "Needs you", tasks: tasks.filter((task) => task.approval) },
+    ...groupOrder.map((status) => ({ key: status, label: groupLabel[status], tasks: tasks.filter((task) => task.status === status && !task.approval) })),
+  ].filter((group) => group.tasks.length > 0);
+}
+
 /**
  * Grouped rows with keyboard navigation: j/k or arrows move, Enter opens.
  * The list owns focus so the shortcuts work without clicking first.
@@ -77,9 +90,9 @@ function TaskRows({ tasks, showProject }: { tasks: Task[]; showProject: boolean 
   const projects = useRpc("projects.list", {}, { enabled: showProject });
   const nameOf = (id: string) => projects.data?.find((p) => p.id === id)?.name ?? "";
   const groupId = useId();
-  const [collapsed, setCollapsed] = useState<Partial<Record<TaskStatus, boolean>>>({});
-  const groups = useMemo(() => groupOrder.map((status) => ({ status, tasks: tasks.filter((t) => t.status === status) })).filter((g) => g.tasks.length > 0), [tasks]);
-  const flat = useMemo(() => groups.flatMap((g) => (collapsed[g.status] ? [] : g.tasks)), [groups, collapsed]);
+  const [collapsed, setCollapsed] = useState<Partial<Record<TaskGroupKey, boolean>>>({});
+  const groups = useMemo(() => taskGroups(tasks), [tasks]);
+  const flat = useMemo(() => groups.flatMap((g) => (collapsed[g.key] ? [] : g.tasks)), [groups, collapsed]);
   const [cursor, setCursor] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -106,7 +119,7 @@ function TaskRows({ tasks, showProject }: { tasks: Task[]; showProject: boolean 
     } else if (e.key === "Enter") {
       e.preventDefault();
       const t = flat[cursor];
-      if (t) openTask(t.id);
+      if (t) openRow(t);
     }
   };
 
@@ -114,25 +127,31 @@ function TaskRows({ tasks, showProject }: { tasks: Task[]; showProject: boolean 
   return (
     <div className="flex-1 min-h-0 flex flex-col">
       <div ref={listRef} tabIndex={0} onKeyDown={onKeyDown} className="task-list flex-1 min-h-0 overflow-y-auto outline-none" autoFocus>
-        {groups.map(({ status, tasks: group }) => (
-          <section key={status} className="list-group" data-status-group={status} aria-labelledby={`${groupId}-${status}-header`}>
+        {groups.map(({ key, label, tasks: group }) => (
+          <section key={key} className="list-group" data-status-group={key} aria-labelledby={`${groupId}-${key}-header`}>
             <ListGroupHeading
-              id={`${groupId}-${status}-header`}
-              controls={`${groupId}-${status}-tasks`}
-              collapsed={Boolean(collapsed[status])}
-              onToggle={() => setCollapsed((current) => ({ ...current, [status]: !current[status] }))}
-              label={groupLabel[status]}
+              id={`${groupId}-${key}-header`}
+              controls={`${groupId}-${key}-tasks`}
+              collapsed={Boolean(collapsed[key])}
+              onToggle={() => setCollapsed((current) => ({ ...current, [key]: !current[key] }))}
+              label={label}
               count={{ value: group.length, label: `${group.length} ${group.length === 1 ? "task" : "tasks"}` }}
             />
-            <div id={`${groupId}-${status}-tasks`} hidden={Boolean(collapsed[status])}>
+            <div id={`${groupId}-${key}-tasks`} hidden={Boolean(collapsed[key])}>
               {group.map((t) => {
-                if (!collapsed[status]) index += 1;
+                if (!collapsed[key]) index += 1;
                 const i = index;
                 return (
-                  <div key={t.id} data-row={collapsed[status] ? undefined : i}>
+                  <div key={t.id} data-row={collapsed[key] ? undefined : i}>
                     <div data-current={i === cursor || undefined} data-status={t.status} className="task-list-row">
                       <TaskRowStatus task={t} onMoved={() => listRef.current?.focus({ preventScroll: true })} />
-                      <button data-task-open onClick={() => openTask(t.id)} tabIndex={i === cursor ? 0 : -1} onFocus={() => setCursor(i)} aria-label={`${t.title}, ${statusLabel[t.status]}`}>
+                      <button
+                        data-task-open
+                        onClick={() => openRow(t)}
+                        tabIndex={i === cursor ? 0 : -1}
+                        onFocus={() => setCursor(i)}
+                        aria-label={`${t.title}, ${t.approval ? "needs your approval" : statusLabel[t.status]}`}
+                      >
                         <span className="task-row-title" data-tip={t.title}>
                           {t.title}
                         </span>

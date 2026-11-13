@@ -20,7 +20,6 @@ import { readOnboardingState, resolveOnboarding, writeOnboardingState, type Pers
 import { useRouter, type Route } from "./lib/router";
 import { useUi } from "./lib/ui";
 import { useTrafficLights } from "./lib/window";
-import { Inbox } from "./views/Inbox";
 import { Memory } from "./views/Memory";
 import { NewSubthread } from "./views/NewSubthread";
 import { NewThread } from "./views/NewThread";
@@ -194,9 +193,6 @@ function MainScreen({ route, currentProject }: { route: Route; currentProject: s
   const openNewTask = useUi((s) => s.openNewTask);
   let screen: ReactNode;
   switch (route.view) {
-    case "inbox":
-      screen = <Inbox />;
-      break;
     case "tasks":
       screen = <TaskListView onNewTask={() => openNewTask(currentProject)} />;
       break;

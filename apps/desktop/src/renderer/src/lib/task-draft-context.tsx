@@ -12,7 +12,7 @@ export function TaskDraftProvider({ taskId, children }: { taskId: string; childr
   if (!actions.current)
     actions.current = createTaskDraftBarrier(taskId, async (draft) => {
       await core.call("tasks.update", { id: taskId, patch: taskDraftPatch(draft) });
-      invalidateTags(["tasks", "inbox", "threads", `task:${taskId}`]);
+      invalidateTags(["tasks", "threads", `task:${taskId}`]);
     });
   return <TaskDraftContext.Provider value={actions.current}>{children}</TaskDraftContext.Provider>;
 }

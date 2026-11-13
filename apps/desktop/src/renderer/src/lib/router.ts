@@ -20,7 +20,6 @@ export type Route =
   | { view: "newtask"; projectId?: string; threadId?: string }
   /** A conversation, optionally with a message to bring into view there, such as a search result. */
   | { view: "thread"; threadId: string; message?: MessageTarget }
-  | { view: "inbox" }
   | { view: "tasks" }
   | { view: "pulls" }
   | { view: "pull"; projectId: string; number: number }
@@ -146,8 +145,8 @@ export function openThread(threadId: string, message?: MessageTarget): void {
 }
 
 /** Screens a spec names without an id. */
-type PlainView = "inbox" | "tasks" | "pulls" | "memory" | "scheduled" | "diagnostics" | "newthread";
-const plainViews: ReadonlySet<string> = new Set<PlainView>(["inbox", "tasks", "pulls", "memory", "scheduled", "diagnostics", "newthread"]);
+type PlainView = "tasks" | "pulls" | "memory" | "scheduled" | "diagnostics" | "newthread";
+const plainViews: ReadonlySet<string> = new Set<PlainView>(["tasks", "pulls", "memory", "scheduled", "diagnostics", "newthread"]);
 
 function isPlainView(view: string | undefined): view is PlainView {
   return view !== undefined && plainViews.has(view);

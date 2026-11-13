@@ -308,7 +308,7 @@ function scheduleEviction(s: Store, runId: string): void {
       s.evictions.delete(runId);
       const run = s.current.get(runId);
       if (!run || s.holds.has(runId)) return;
-      // A live run keeps streaming and a waiting approval counts toward the inbox; both stay until they settle.
+      // A live run keeps streaming and a run waits on an approval; both stay loaded until they settle.
       if (run.live || run.pendingApprovals > 0 || s.hydrating.has(runId)) return scheduleEviction(s, runId);
       drop(s, runId);
     }, EVICT_AFTER_MS),
@@ -345,15 +345,6 @@ function useFailedLoadsOf(s: Store): ReadonlySet<string> {
   return s.published((state) => state.failed);
 }
 
-/** Approvals waiting across every loaded run, for the inbox count. */
-function usePendingApprovalsOf(s: Store): number {
-  return s.published((state) => {
-    let pending = 0;
-    for (const run of state.runs.values()) pending += run.pendingApprovals;
-    return pending;
-  });
-}
-
 export function createRunStore(connection: CoreConnection, scheduleFrame: (callback: () => void) => void, reportFrameError: Store["reportFrameError"]) {
   const s: Store = {
     connection,
@@ -387,7 +378,6 @@ export function createRunStore(connection: CoreConnection, scheduleFrame: (callb
     useRuns: (runIds: readonly string[]) => useRunsOf(s, runIds),
     useRunMap: (runIds: readonly string[]) => useRunMapOf(s, runIds),
     useFailedLoads: () => useFailedLoadsOf(s),
-    usePendingApprovals: () => usePendingApprovalsOf(s),
   };
 }
 

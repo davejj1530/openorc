@@ -109,6 +109,20 @@ describe("sidebar days", () => {
     expect(sidebarDayList({ pages: [loaded], needsYou, pinnedOnly: true, activeId: null, now }).rest).toEqual([]);
   });
 
+  it("never resolves a thread by its age while it or a sub thread waits on the person, so its project still counts it", () => {
+    const page = (fetched: ThreadSummary[]) => sidebarThreadPage({ projectId: "project", fetched, selected: null, filter: "active", limit: 10, now });
+    const waiting = thread("waiting", at(-3), { activity: "waiting" });
+    const parent = thread("parent", at(-3));
+    const child = thread("child", at(-3), { parentThreadId: "parent", activity: "waiting" });
+    const quiet = thread("quiet", at(-3));
+    const list = sidebarDayList({ pages: [page([waiting, parent, child, quiet])], pinnedOnly: false, activeId: null, now });
+    expect(list.rest.map((root) => root.id).sort()).toEqual(["parent", "waiting"]);
+    expect(list.resolved.roots.map((root) => root.id)).toEqual(["quiet"]);
+    expect(threadResolved(waiting, now)).toBe(false);
+    expect(threadResolved({ ...waiting, activity: "idle" }, now)).toBe(true);
+    expect(threadResolved({ ...waiting, archivedAt: now }, now)).toBe(true);
+  });
+
   it("merges the threads put in Resolved with the quiet ones, newest work first, as far as both reads are whole", () => {
     const page = (fetched: ThreadSummary[], limit: number, filter: "active" | "archived" = "active") => sidebarThreadPage({ projectId: "project", fetched, selected: null, filter, limit, now });
     const active = [thread("today", at(6)), thread("quiet", at(-2)), thread("quieter", at(-10)), thread("unread", at(-30))];

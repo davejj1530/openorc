@@ -31,7 +31,7 @@ export interface Autorun {
   /** Render the synthetic 10k-line diff, measure first paint and scroll, report. */
   diff: boolean;
   diffMode: DiffMode;
-  /** Open a screen on launch, for screenshots and second windows: "inbox", "tasks", "settings", "task:<id>:<tab>", "project:<id>", "thread:<id>". */
+  /** Open a screen on launch, for screenshots and second windows: "tasks", "settings", "task:<id>:<tab>", "project:<id>", "thread:<id>". */
   route: string | null;
   /** Force a theme on launch, for screenshots. */
   theme: "light" | "dark" | null;

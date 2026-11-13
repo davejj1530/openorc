@@ -14,9 +14,7 @@ const fixture: {
   resolvedCount?: number;
   /** What Resolved holds in each project, when the count depends on the projects asked about. */
   resolvedByProject?: Record<string, number>;
-  tasks?: { status: string }[];
-  /** Approvals waiting in the runs loaded here. */
-  approvals?: number;
+  tasks?: { status: string; approval?: string }[];
 } = vi.hoisted(() => ({ projects: [], threads: [] }));
 
 /** The core's answer to a thread list, as the fixture's threads read. */
@@ -62,7 +60,6 @@ vi.mock("../lib/client", async (original) => {
   return {
     ...(await original<object>()),
     useRpc: (method: string, params: { id?: string }, options?: { enabled?: boolean }) => ({ data: options?.enabled === false ? undefined : rpcData(method, params) }),
-    usePendingApprovals: () => fixture.approvals ?? 0,
     useRun: () => undefined,
   };
 });
@@ -110,7 +107,6 @@ beforeEach(() => {
   fixture.resolvedCount = undefined;
   fixture.resolvedByProject = undefined;
   fixture.tasks = undefined;
-  fixture.approvals = undefined;
   localStorage.clear();
   useWindow.setState({ fullscreen: false });
   useLayout.setState({ collapsed: [], workspace: ALL_WORKSPACES, sidebarOpen: true, pinnedOnly: false });
@@ -315,7 +311,7 @@ it("names the app's screens as rows, each with its icon, marking the open one as
     within(screens())
       .getAllByRole("button")
       .map((button) => button.textContent),
-  ).toEqual(["Tasks", "Pull requests", "Schedules", "Orclings", "Inbox"]);
+  ).toEqual(["Tasks", "Pull requests", "Schedules", "Orclings"]);
   expect(
     within(screens())
       .getAllByRole("button")
@@ -327,23 +323,22 @@ it("names the app's screens as rows, each with its icon, marking the open one as
   expect(within(screens()).getByRole("button", { name: "Tasks" }).getAttribute("aria-current")).toBeNull();
 });
 
-it("counts only what waits on the person: tasks to accept or review, and the Inbox with approvals too", () => {
-  fixture.tasks = [{ status: "review" }, { status: "proposed" }, { status: "backlog" }, { status: "in_progress" }];
-  fixture.approvals = 2;
+it("counts on Tasks only what waits on the person: a run's approval, a proposal or a review, and keeps no Inbox", () => {
+  fixture.tasks = [{ status: "review" }, { status: "proposed" }, { status: "backlog" }, { status: "in_progress", approval: "Run pnpm install" }, { status: "in_progress" }];
   mountSidebar();
-  expect(within(screens()).getByRole("button", { name: "Tasks, 2 waiting" }).textContent).toBe("Tasks2");
-  const inbox = within(screens()).getByRole("button", { name: "Inbox, 4 waiting" });
-  expect(inbox.textContent).toBe("Inbox4");
+  const tasks = within(screens()).getByRole("button", { name: "Tasks, 3 waiting" });
+  expect(tasks.textContent).toBe("Tasks3");
   expect(within(screens()).getByRole("button", { name: "Schedules" }).querySelector(".sidebar-count")).toBeNull();
-  fireEvent.click(inbox);
-  expect(useRouter.getState().route).toEqual({ view: "inbox" });
-  expect(within(screens()).getByRole("button", { name: "Inbox, 4 waiting" }).getAttribute("aria-current")).toBe("page");
+  expect(screen.queryByRole("button", { name: /^Inbox/ })).toBeNull();
+  fireEvent.click(tasks);
+  expect(useRouter.getState().route).toEqual({ view: "tasks" });
+  expect(within(screens()).getByRole("button", { name: "Tasks, 3 waiting" }).getAttribute("aria-current")).toBe("page");
 });
 
 it("caps a screen's count at 99+", () => {
   fixture.tasks = Array.from({ length: 120 }, () => ({ status: "review" }));
   mountSidebar();
-  expect(within(screens()).getByRole("button", { name: "Inbox, 120 waiting" }).querySelector(".sidebar-count")?.textContent).toBe("99+");
+  expect(within(screens()).getByRole("button", { name: "Tasks, 120 waiting" }).querySelector(".sidebar-count")?.textContent).toBe("99+");
 });
 
 const group = (name: string) => screen.getByRole("region", { name });
@@ -524,7 +519,7 @@ it("keeps Settings in the footer, under the list, and no update while none waits
 });
 
 it.each([
-  ["Inbox", "inbox"],
+  ["Schedules", "scheduled"],
   ["Settings", "settings"],
 ])("dismisses compact navigation after choosing %s", (name, destination) => {
   const matchMedia = window.matchMedia;

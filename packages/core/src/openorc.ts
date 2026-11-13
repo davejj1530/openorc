@@ -744,7 +744,7 @@ export class OpenOrc {
         upkeep: this.upkeep,
       }),
       createThreadMessagesHandlers({ db: this.db, threadService: this.threads }),
-      createTaskQueriesHandlers({ db: this.db, comments: this.comments, threadService: this.threads }),
+      createTaskQueriesHandlers({ db: this.db, comments: this.comments, threadService: this.threads, runService: this.runs }),
       createTaskCreateHandlers({ db: this.db, settings: this.settings, threadService: this.threads, invalidate, dataDir: this.options.dataDir }),
       createTaskUpdateHandlers({ threadService: this.threads, db: this.db, runService: this.runs, workspaceWriters: this.workspaceWriters, workspaces: this.workspaces, invalidate }),
       createTaskDeleteHandlers({ workspaces: this.workspaces, comments: this.comments, runService: this.runs, db: this.db, log: this.log, upkeep: this.upkeep, invalidate }),

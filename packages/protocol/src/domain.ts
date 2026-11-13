@@ -105,6 +105,8 @@ export const Task = z.object({
   completedAt: z.number().nullable(),
   /** Set by the Mac's router on a task its cloud brain holds, as on threads. Never stored. */
   owner: ThreadOwner.optional(),
+  /** What the task's own run waits for the person to approve, while it waits; set when tasks are read, never stored. */
+  approval: z.string().nullable().optional(),
 });
 export type Task = z.infer<typeof Task>;
 

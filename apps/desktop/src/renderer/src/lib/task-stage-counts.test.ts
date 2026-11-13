@@ -12,3 +12,12 @@ it("counts proposed and review as waiting on the person, leaving work in progres
   expect(waitingTaskCount(tasks)).toBe(2);
   expect(waitingTaskCount([])).toBe(0);
 });
+
+it("counts a task whose run waits on an approval, once even when it is also in review", () => {
+  const waiting = [
+    { status: "in_progress", approval: "Run pnpm install" },
+    { status: "in_progress", approval: null },
+    { status: "review", approval: "Push to origin" },
+  ] as const;
+  expect(waitingTaskCount(waiting)).toBe(2);
+});

@@ -7,6 +7,10 @@ type Dependencies = {
   db: Db;
 };
 
+/**
+ * Everything on this host that waits on the person, in one list. The phone's Home and thread screens read it, as do
+ * phone builds already installed; the desktop shows each item where it lives instead.
+ */
 export function createInboxHandlers({ runService, db }: Dependencies): Pick<Handlers, "inbox.list"> {
   return {
     "inbox.list": () => {

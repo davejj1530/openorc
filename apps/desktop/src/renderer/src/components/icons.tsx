@@ -204,7 +204,6 @@ export const Folder = icon("Folder", folder);
 export const FolderPlus = icon("FolderPlus", <path d="M3 8V5.5a2 2 0 0 1 2-2h4.5L13 7h6a2 2 0 0 1 2 2v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z M12 10.5v6 M9 13.5h6" />);
 export const Zap = icon("Zap", <path d="m14 2-11 12h8l-1 8 11-12h-8Z" />);
 export const FolderOpen = icon("FolderOpen", <path d="M3 18V5.5a2 2 0 0 1 2-2h4l3.5 3.5H18a2 2 0 0 1 2 2v1 M3 19l3-8h15l-3 9H5a2 2 0 0 1-2-1Z" />);
-export const Inbox = icon("Inbox", <path d="m3 12 4-8h10l4 8v7a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 19Z M3 12h5l2 3h4l2-3h5" />);
 export const MessageSquare = icon("MessageSquare", <path d="M5.5 4h13A2.5 2.5 0 0 1 21 6.5v10a2.5 2.5 0 0 1-2.5 2.5H9l-6 3V6.5A2.5 2.5 0 0 1 5.5 4Z" />);
 export const MailOpen = icon("MailOpen", <path d="m3 10 9-7 9 7v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 19Z M3 10l9 6 9-6 M3.5 20l5.5-6 M20.5 20 15 14" />);
 export const Brain = icon("Brain", layers);

@@ -24,7 +24,6 @@ export const {
   useRun,
   useRuns,
   useRunMap,
-  usePendingApprovals,
   useSubmit,
   useConversationTranscript,
   useConversationSettings,

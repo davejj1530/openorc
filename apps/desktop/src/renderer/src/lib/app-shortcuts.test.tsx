@@ -12,7 +12,7 @@ import { queryClient } from "./client";
 const updates: RpcParams<"threads.update">[] = [];
 const route = () => useRouter.getState().route;
 const press = (chord: string, target: Window | Element = window) => fireEvent.keyDown(target, { key: chord.replace("⇧", ""), shiftKey: chord.startsWith("⇧"), metaKey: true });
-const inbox = () => useRouter.setState({ route: { view: "inbox" } });
+const taskList = () => useRouter.setState({ route: { view: "tasks" } });
 
 beforeEach(() => {
   queryClient.clear();
@@ -20,7 +20,7 @@ beforeEach(() => {
     if (method === "threads.update") updates.push(params as RpcParams<"threads.update">);
     return { id: "t10", pinnedAt: null, archivedAt: null, unread: false, activity: "idle", lastActivityAt: Date.now() } as unknown as RpcResults[M];
   });
-  useRouter.setState({ route: { view: "thread", threadId: "t10" }, threadIds: ["t10", "t11"], history: [{ view: "inbox" }], future: [{ view: "memory" }] });
+  useRouter.setState({ route: { view: "thread", threadId: "t10" }, threadIds: ["t10", "t11"], history: [{ view: "tasks" }], future: [{ view: "memory" }] });
   useUi.getState().setThreadOrder(Array.from({ length: 11 }, (_, i) => `t${i + 1}`));
   useUi.setState({ palette: false, paletteMode: "all" });
   useLayout.setState({ sidebarOpen: true, panelOpen: false, panelThreadId: null, panelRequest: null });
@@ -37,8 +37,8 @@ const cases: { chord: string; does: string; given?: () => void; then: () => unkn
   { chord: "n", does: "starts a thread in the current project", then: () => expect(route()).toEqual({ view: "newthread", projectId: "project" }) },
   { chord: "b", does: "hides the sidebar", then: () => expect(useLayout.getState().sidebarOpen).toBe(false) },
   { chord: "j", does: "opens the focused thread's panel", then: () => vi.waitFor(() => expect(useLayout.getState()).toMatchObject({ panelThreadId: "t10", panelOpen: true })) },
-  { chord: "j", does: "opens the panel without a focused thread", given: inbox, then: () => expect(useLayout.getState()).toMatchObject({ panelThreadId: null, panelOpen: true }) },
-  { chord: "[", does: "goes back", then: () => expect(route()).toEqual({ view: "inbox" }) },
+  { chord: "j", does: "opens the panel without a focused thread", given: taskList, then: () => expect(useLayout.getState()).toMatchObject({ panelThreadId: null, panelOpen: true }) },
+  { chord: "[", does: "goes back", then: () => expect(route()).toEqual({ view: "tasks" }) },
   { chord: "]", does: "goes forward", then: () => expect(route()).toEqual({ view: "memory" }) },
   { chord: "\\", does: "closes the other thread panes", then: () => expect(useRouter.getState().threadIds).toEqual(["t10"]) },
   {
@@ -112,17 +112,17 @@ it("takes Ctrl as ⌘, and leaves keys without either to typing", () => {
 });
 
 it("leaves a number past the sidebar's threads, and thread actions with no focused thread, to the page", () => {
-  inbox();
+  taskList();
   useUi.getState().setThreadOrder(["t1", "t2", "t3"]);
   renderHook(() => useAppShortcuts("project"));
   expect(press("4")).toBe(true);
   expect(press("⇧p")).toBe(true);
-  expect(route()).toEqual({ view: "inbox" });
+  expect(route()).toEqual({ view: "tasks" });
   expect(core.call).not.toHaveBeenCalled();
 });
 
 it("leaves ⌘P to the page when no conversation's panel is on screen", () => {
-  inbox();
+  taskList();
   renderHook(() => useAppShortcuts("project"));
   expect(press("p")).toBe(true);
   expect(useLayout.getState()).toMatchObject({ panelOpen: false, panelRequest: null });
@@ -134,7 +134,7 @@ it("leaves a ⌘[ that something below the window already handled, so an editor'
   const editor = document.body.appendChild(document.createElement("div"));
   editor.addEventListener("keydown", (event) => event.preventDefault());
   press("[", editor);
-  expect(useRouter.getState()).toMatchObject({ route: { view: "thread", threadId: "t10" }, history: [{ view: "inbox" }] });
+  expect(useRouter.getState()).toMatchObject({ route: { view: "thread", threadId: "t10" }, history: [{ view: "tasks" }] });
   editor.remove();
 });
 

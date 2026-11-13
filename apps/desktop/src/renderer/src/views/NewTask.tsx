@@ -1,5 +1,5 @@
 import { useRef, useState, type ReactNode } from "react";
-import { Check, FolderGit2, GitBranch, Plus } from "../components/icons";
+import { Check, FolderGit2, FolderPlus, GitBranch, Plus } from "../components/icons";
 import { PageCrumbs } from "../components/PageTitle";
 import type { TaskPriority, WorkspaceMode } from "@openorc/protocol";
 import { DocumentEditor, type DocumentEditorHandle } from "../components/DocumentEditor";
@@ -27,7 +27,7 @@ function newTaskProjectGate(input: { error: Error | null; loading: boolean; empt
       <Empty title="Give your work a home">
         <p>Import a project to create your first task.</p>
         <Button className="mt-4" onClick={input.importProject}>
-          <FolderGit2 size={14} /> Import project
+          <FolderPlus size={14} /> Import project
         </Button>
       </Empty>
     );

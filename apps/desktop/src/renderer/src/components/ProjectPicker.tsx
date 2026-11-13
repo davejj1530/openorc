@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { Popover } from "@base-ui/react/popover";
 import { WORKSPACE_ID } from "@openorc/protocol";
-import { Check, Globe, Plus, Search } from "./icons";
+import { Check, FolderPlus, Globe, Search } from "./icons";
 import { ProjectIconPicker } from "./ProjectIconPicker";
 import { ProjectMenu } from "./ProjectMenu";
 import { CoversPreview } from "../lib/browser-preview";
@@ -137,7 +137,7 @@ export function ProjectPicker({
                 useUi.getState().setImportProject(true);
               }}
             >
-              <Plus size={15} />
+              <FolderPlus size={15} />
               Add project
             </button>
           </Popover.Popup>

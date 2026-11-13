@@ -12,7 +12,7 @@ import { floatingGround } from "../lib/use-anchor-ground";
 import { useScrollEdges } from "../lib/use-scroll-edges";
 import { cn } from "../lib/cn";
 import { markThread, projectMarks, projectMarkSummary, type ProjectMark } from "../lib/project-marks";
-import { Check, Folders, Plus, Settings, X } from "./icons";
+import { Check, FolderPlus, Folders, Plus, Settings, X } from "./icons";
 import { menuItem, menuItemDanger, menuPopup, menuSeparator } from "./menu";
 import { ProjectIcon } from "./ProjectIconPicker";
 import { RemoveProjectDialog } from "./ProjectMenu";
@@ -96,7 +96,7 @@ export function ProjectScope() {
               <Menu.Separator className={menuSeparator} />
               {project ? <ProjectActions project={project} onRemove={() => setRemoving(true)} /> : null}
               <Menu.Item className={cn(menuItem, "sidebar-scope-action")} onClick={() => useUi.getState().setImportProject(true)}>
-                <Plus size={13} /> Add project
+                <FolderPlus size={13} /> Add project
               </Menu.Item>
             </Menu.Popup>
           </Menu.Positioner>

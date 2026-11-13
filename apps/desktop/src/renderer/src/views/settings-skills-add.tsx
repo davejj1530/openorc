@@ -1,7 +1,7 @@
 import { Menu } from "@base-ui/react/menu";
 import { useState, type ReactNode } from "react";
 import { SkillName, type SkillPlace } from "@openorc/protocol";
-import { PenSquare, Plus, Upload, Wand } from "../components/icons";
+import { Pencil, Plus, Upload, Wand } from "../components/icons";
 import { menuItem, menuPopup } from "../components/menu";
 import { Button, Dialog, IconButton, Input, Segmented, Textarea } from "../components/ui";
 import { CoversPreview } from "../lib/browser-preview";
@@ -139,7 +139,7 @@ export function AddSkillMenu({ place, onAdded }: { place: SkillsPlace; onAdded: 
           <Menu.Positioner sideOffset={6} align="end" className="z-40" collisionPadding={8}>
             <Menu.Popup ref={floatingGround} className={menuPopup}>
               <Menu.Item className={menuItem} onClick={() => show({ kind: "write" })}>
-                <PenSquare size={14} />
+                <Pencil size={14} />
                 Write a skill
               </Menu.Item>
               <Menu.Item className={menuItem} onClick={() => void openNewThreadWith({ projectId: place.projectId, agent: place.agent, prompt: createPrompt(place.agent) })}>

@@ -12,7 +12,7 @@ import { useStripHandoff } from "../lib/strip-handoff";
 import { useTabReorder } from "../lib/use-tab-reorder";
 import { orclingById, useOrclingGroups, useOrclings } from "../lib/orclings";
 import { HarnessLogo } from "./HarnessLogo";
-import { MessageSquare, PenSquare, Plus, X } from "./icons";
+import { MessageSquare, PenSquare, X } from "./icons";
 import { OrclingAvatar } from "./OrclingAvatar";
 import { OrclingFaces } from "./OrclingFaces";
 import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
@@ -222,9 +222,9 @@ export function ThreadTabs({ title, onRename }: { title?: ReactNode; onRename?: 
         ) : null}
         {folded.length ? <MoreTabs tabs={folded} onSelect={select} /> : null}
       </div>
-      <Tooltip label="New tab">
-        <IconButton aria-label="New tab" className="work-tabs-new" onClick={() => open(projectId ?? undefined)}>
-          <Plus size={16} />
+      <Tooltip label="New thread">
+        <IconButton aria-label="New thread" className="work-tabs-new" onClick={() => open(projectId ?? undefined)}>
+          <PenSquare size={16} />
         </IconButton>
       </Tooltip>
     </div>

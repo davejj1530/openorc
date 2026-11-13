@@ -378,7 +378,8 @@ button.sidebar-nav-row:hover {
   grid-template-columns: minmax(0, 1fr);
   gap: 2px;
 }
-/* A project's label keeps New thread there at its end, shown on hover and focus in place of its count. */
+/* A project's label keeps More and New thread at its end, shown on hover and focus in place of its count,
+   the pen centred on the line the counts and row marks share. */
 /* The label and New thread share one cell, New thread over the label's end. */
 .sidebar-project-head {
   display: grid;
@@ -390,7 +391,7 @@ button.sidebar-nav-row:hover {
 .sidebar-project-head > .sidebar-project-tools {
   align-self: center;
   justify-self: end;
-  margin-right: 2px;
+  margin-right: 6px;
 }
 .sidebar-project-name {
   min-width: 0;

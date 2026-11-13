@@ -76,7 +76,7 @@ export function SidebarProjectGroup({
             {project.id !== WORKSPACE_ID ? <ProjectMoreMenu project={project} actions={actions} /> : null}
             <Tooltip label="New thread">
               <button type="button" aria-label={`New thread in ${project.name}`} className="sidebar-project-tool no-drag" onClick={() => startThread(project.id)}>
-                <Plus size={14} />
+                <PenSquare size={14} />
               </button>
             </Tooltip>
           </div>

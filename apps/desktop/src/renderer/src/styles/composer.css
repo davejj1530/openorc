@@ -853,6 +853,22 @@
 .composer-choice-item[data-current] {
   background: var(--current-row-fill);
 }
+/* A choice with its glyph: the glyph in a column of its own, beside the label and its hint. */
+.composer-choice-item:has(> svg) {
+  grid-template-columns: 15px minmax(0, 1fr);
+  column-gap: 10px;
+}
+.composer-choice-item > svg {
+  align-self: center;
+  color: var(--ink-3);
+}
+.composer-choice-item > :not(svg) {
+  grid-column: 2;
+}
+/* With a hint under its label, the glyph centres on both lines. */
+.composer-choice-item > svg:nth-last-child(3) {
+  grid-row: 1 / span 2;
+}
 
 /* The model picker: a rail of providers as pills, a search pill, 40px rows and the effort bar. */
 .model-picker-popup {

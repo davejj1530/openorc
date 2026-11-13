@@ -73,11 +73,12 @@ export function ComposerChoice<T extends string>({
       <Menu.Portal>
         <CoversPreview />
         <Menu.Positioner side={side} align={align} sideOffset={6} collisionPadding={8}>
-          <Menu.Popup ref={floatingGround} className={cn(menuPopup, "w-64")}>
+          <Menu.Popup ref={floatingGround} className={cn(menuPopup, "w-72")}>
             {options
               .filter((o) => !o.hidden)
               .map((o) => (
                 <Menu.Item key={o.value} className={cn(menuItemDetail, "composer-choice-item")} data-current={value === o.value || undefined} onClick={() => onChange(o.value)}>
+                  {o.icon ? <o.icon size={15} /> : null}
                   <span className={cn(value === o.value ? "text-ink" : "text-ink-2")}>{o.label}</span>
                   {o.hint ? <span className="text-sm text-ink-4">{o.hint}</span> : null}
                 </Menu.Item>

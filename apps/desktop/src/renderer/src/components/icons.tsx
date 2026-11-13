@@ -421,6 +421,13 @@ export const ShieldQuestion = icon(
     {question}
   </>,
 );
+export const ShieldOff = icon(
+  "ShieldOff",
+  <>
+    {shield}
+    <path d="M5 20 19 4" />
+  </>,
+);
 export const Eye = icon(
   "Eye",
   <>

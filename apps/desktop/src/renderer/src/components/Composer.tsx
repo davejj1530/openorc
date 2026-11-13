@@ -27,7 +27,7 @@ import { ComposerChangesBar } from "./ComposerCommitChip";
 import { ComposerInput } from "./ComposerInput";
 import { ComposerSendCluster } from "./ComposerSendButton";
 import { ContextUsage } from "./ContextUsage";
-import { Cloud, FileText, Laptop, Lightbulb, Pencil, Plus, ShieldCheck, Wand, X } from "./icons";
+import { Cloud, Eye, FileText, Laptop, Lightbulb, Plus, ShieldCheck, ShieldOff, X } from "./icons";
 import { type PickerAccounts } from "./ModelPickerAccounts";
 import { ComposerModelPicker, type ModelChoice } from "./ModelPicker";
 import { Tooltip } from "./ui";
@@ -402,7 +402,8 @@ function composerModeControl(props: ComposerProps): ReactNode {
   );
 }
 
-const modeIcons: Record<ExecutionMode, typeof ShieldCheck> = { plan: Lightbulb, review: ShieldCheck, trusted: Pencil, autonomous: Wand };
+/** How freely the agent works, one glyph each: it plans, it shows you each change, it asks outside the sandbox, nothing stops it. */
+const modeIcons: Record<ExecutionMode, typeof ShieldCheck> = { plan: Lightbulb, review: Eye, trusted: ShieldCheck, autonomous: ShieldOff };
 
 /** Every mode keeps its label for the trigger; the menu offers only the ones the agent can run. */
 function modeOptions(agent: AgentKind | undefined) {

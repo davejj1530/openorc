@@ -607,7 +607,7 @@ describe("file mentions", () => {
 });
 
 describe("mode picker", () => {
-  const offered = async () => (await screen.findAllByRole("menuitem")).map((item) => item.firstElementChild?.textContent);
+  const offered = async () => (await screen.findAllByRole("menuitem")).map((item) => item.querySelector("span")?.textContent);
   it("offers Claude every mode", async () => {
     mount({ model: { agent: "claude", model: "claude-opus-5-5", effort: null }, modelControl: <span /> });
     fireEvent.click(screen.getByRole("button", { name: "Mode: Accept edits" }));

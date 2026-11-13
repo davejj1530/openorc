@@ -367,11 +367,11 @@ button.sidebar-nav-row:hover {
   overflow-y: auto;
   padding: 0 10px 12px;
 }
-/* Groups: a project's name, or Pinned and Snoozed, as a quiet 28px label in the titles' column, its
+/* Groups: a project's name, or Pinned and Snoozed, as a 28px label 8px under the group before it, its
    chevron after the word. The chevron shows while the group is folded and on hover; it turns down as
-   the group opens. Its rows sit flush under it. */
+   the group opens. Its rows sit flush under it, at the lead slot's start. */
 .sidebar-section + .sidebar-section {
-  margin-top: 6px;
+  margin-top: 8px;
 }
 .sidebar-thread-list {
   display: grid;

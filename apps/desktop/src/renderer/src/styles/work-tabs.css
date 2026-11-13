@@ -1,17 +1,19 @@
-/* Tabs on the window's chrome line, the work column's and the panel's alike: 30px tabs up to
-   220px wide that share their row, down to 136px (room for a name to read) before the strip
-   scrolls sideways. The current tab is raised on the surface; the rest are bare until the pointer
-   fills them. A tab's close shows on the current one and under the pointer. */
+/* Tabs on the window's chrome line: 28px pills up to 220px wide that share their row, down to 136px
+   (room for a name to read) before the strip scrolls sideways. The rest sit on the soft fill and the
+   current one is a raised plane. A tab's close shows on the current one and under the pointer. The
+   thread header draws its own tabs over these (ThreadTabs). */
 .work-tabs-row {
   display: flex;
   align-items: center;
   gap: 2px;
   min-width: 0;
 }
+/* The strip scrolls, so it clips; 2px around the tabs keeps the raised tab's edge and shadow inside it. */
 .work-tabs {
   display: flex;
   align-items: center;
   min-width: 0;
+  padding: 2px;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -25,10 +27,11 @@
   flex: 0 1 220px;
   min-width: 136px;
   max-width: 220px;
-  height: 30px;
-  margin-inline-end: 2px;
+  height: var(--control-sm);
+  margin-inline-end: 4px;
   overflow: hidden;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-2);
   color: var(--ink-3);
   transition:
     background-color var(--duration-quick) var(--ease-out),
@@ -68,12 +71,13 @@
   color: var(--ink);
 }
 .work-tab:hover {
-  background-color: var(--surface-2);
+  background-color: var(--surface-3);
   color: var(--ink-2);
 }
 .work-tab-current,
 .work-tab-current:hover {
-  background-color: var(--surface-3);
+  background-color: var(--surface);
+  box-shadow: var(--raised-shadow);
   color: var(--ink);
 }
 .work-tab-face {

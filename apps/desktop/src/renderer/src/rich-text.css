@@ -1,8 +1,10 @@
-/* Reading rhythm is shared by streamed replies and static document previews. */
+/* Reading rhythm is shared by streamed replies and static document previews. The words read in the softer
+   --prose-ink; headings and the author's bold keep title ink, so a reply's structure leads. */
 .prose-chat {
   min-width: 0;
   overflow-wrap: anywhere;
-  line-height: 1.75;
+  line-height: 1.5;
+  color: var(--prose-ink);
 }
 .prose-chat :where(p) {
   margin: 0 0 14px;
@@ -105,8 +107,8 @@
   border-top: var(--hairline) solid var(--line);
 }
 .prose-chat pre {
-  font-size: var(--text-sm);
-  line-height: 1.7;
+  font-size: var(--text-xs);
+  line-height: 20px;
   tab-size: 2;
   margin: 0;
 }

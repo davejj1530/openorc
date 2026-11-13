@@ -43,6 +43,7 @@
   padding: 14px 12px 12px 16px;
   border-radius: var(--radius-3xl);
   background: var(--composer-input);
+  box-shadow: var(--raised-shadow);
 }
 
 /* The prompt. The textarea and its highlight mirror agree on geometry to the character, or the
@@ -535,6 +536,7 @@
   height: var(--control-sm);
   border-radius: var(--radius-pill);
   background-color: var(--composer-input);
+  box-shadow: var(--raised-shadow);
 }
 .composer-changes-commit-wrap {
   display: inline-flex;

@@ -151,9 +151,9 @@
   border-radius: 1px;
 }
 .app-shell .prose-chat {
-  color: var(--ink-2);
-  font-size: 14px;
-  line-height: 1.6;
+  color: var(--prose-ink);
+  font-size: var(--text-prose);
+  line-height: var(--text-prose--line-height);
 }
 .app-shell .prose-chat :where(h1, h2, h3, h4, h5, h6) {
   margin-block: 20px 8px;

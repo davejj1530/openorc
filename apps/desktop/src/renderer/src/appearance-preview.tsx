@@ -62,7 +62,7 @@ async function main() {
   createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={queryClient}>
       <App />
-      <div aria-hidden="true" style={{ position: "fixed", left: 14, top: 13, display: "flex", gap: 9, pointerEvents: "none" }}>
+      <div aria-hidden="true" style={{ position: "fixed", left: 16, top: 19, display: "flex", gap: 9, pointerEvents: "none" }}>
         {["#ff5f57", "#febc2e", "#28c840"].map((background) => (
           <span key={background} style={{ width: 14, height: 14, borderRadius: "50%", background }} />
         ))}

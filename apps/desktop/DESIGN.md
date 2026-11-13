@@ -1,53 +1,65 @@
 ---
 name: OpenOrc desktop
-description: A quiet multi-project workspace on one tile ground, with white planes, fill steps for depth, and one ink action per screen.
+description: A quiet multi-project workspace on a near-white ground, with soft grey fills, white planes lifted by a faint edge, and one ink action per screen.
 colors:
-  tile-light: "#f4f4f4"
-  tile-dark: "#171717"
+  ground-light: "#fafafa"
+  ground-dark: "#171717"
+  sidebar-light: "#f9fbfd"
+  sidebar-dark: "#141619"
   plane-light: "#ffffff"
-  plane-dark: "#0a0a0a"
-  fill-light: "#1717170d"
-  fill-dark: "#ffffff12"
-  fill-strong-light: "#17171717"
-  fill-strong-dark: "#ffffff1f"
-  line-light: "#17171717"
-  line-dark: "#ffffff1c"
-  line-strong-light: "#1717172e"
-  line-strong-dark: "#ffffff2e"
-  ink-light: "#171717"
-  ink-dark: "#ffffff"
-  muted-light: "#555555"
-  muted-dark: "#b8b8b8"
-  faint-light: "#666666"
-  faint-dark: "#8e8e8e"
-  action-light: "#171717"
-  action-dark: "#ffffff"
+  plane-dark: "#202020"
+  fill-light: "#f0f0f0"
+  fill-dark: "#262626"
+  fill-strong-light: "#e8e8e8"
+  fill-strong-dark: "#2e2e2e"
+  selected-row-light: "#eef0f3"
+  selected-row-dark: "#23262b"
+  line-light: "#ebebeb"
+  line-dark: "#2a2a2a"
+  line-strong-light: "#dcdcdc"
+  line-strong-dark: "#383838"
+  ink-light: "#252525"
+  ink-dark: "#ececec"
+  reading-light: "#646464"
+  reading-dark: "#a3a3a3"
+  muted-light: "#636465"
+  muted-dark: "#a4a5a7"
+  faint-light: "#8f9091"
+  faint-dark: "#8e8f91"
+  line-number-light: "#b2b2b2"
+  line-number-dark: "#5c5c5c"
+  action-light: "#252525"
+  action-dark: "#ececec"
   on-action-light: "#ffffff"
-  on-action-dark: "#000000"
-  ok-light: "#1e7359"
-  ok-dark: "#7cc4a2"
-  bad-light: "#9b5050"
-  bad-dark: "#e2a3a3"
+  on-action-dark: "#171717"
+  ok-light: "#3c884d"
+  ok-dark: "#63c27a"
+  ok-soft-light: "#e0fae3"
+  ok-soft-dark: "#15291b"
+  bad-light: "#c03737"
+  bad-dark: "#f07878"
+  bad-soft-light: "#fcecea"
+  bad-soft-dark: "#301c1b"
   attention-light: "#b26a00"
   attention-dark: "#f0b35a"
 typography:
   interface:
     fontFamily: '"Immaculate Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
-    fontSize: "13px"
+    fontSize: "14px"
     fontWeight: 400
     lineHeight: "20px"
     letterSpacing: "-0.005em"
   label:
     fontFamily: '"Immaculate Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
-    fontSize: "12px"
+    fontSize: "13px"
     fontWeight: 400
     lineHeight: "16px"
   body:
     fontFamily: '"Immaculate Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
     fontSize: "14px"
     fontWeight: 400
-    lineHeight: "22px"
-    letterSpacing: "-0.01em"
+    lineHeight: "21px"
+    letterSpacing: "-0.005em"
   heading:
     fontFamily: '"Immaculate Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
     fontSize: "16px"
@@ -85,7 +97,7 @@ rounded:
   5xl: "24px"
   pill: "999px"
 spacing:
-  chrome: "44px"
+  chrome: "52px"
   reading-gutter: "32px"
   composer-gutter: "24px"
   narrow-gutter: "12px"
@@ -140,10 +152,10 @@ components:
     rounded: "{rounded.2xl}"
     padding: "6px"
   user-prompt:
-    backgroundColor: "{colors.plane-light}"
+    backgroundColor: "{colors.fill-light}"
     typography: "{typography.body}"
     rounded: "{rounded.2xl}"
-    padding: "12px 16px"
+    padding: "10px 14px"
   composer:
     backgroundColor: "var(--composer-input)"
     rounded: "{rounded.3xl}"
@@ -160,7 +172,7 @@ components:
   work-panel:
     backgroundColor: "{colors.plane-light}"
   settings-card:
-    backgroundColor: "{colors.tile-light}"
+    backgroundColor: "{colors.ground-light}"
     rounded: "{rounded.2xl}"
     padding: "20px"
 ---
@@ -173,14 +185,14 @@ First-run setup pairs a column of controls with a flat illustrated collage. Abov
 
 **Creative North Star: "A calm place to think with coding agents"**
 
-OpenOrc is a compact desktop workspace for several projects at once. The sidebar, the conversation, and the page toolbars share one tile ground. Work that needs its own room (the work panel, the settings sheet, cards in the transcript, the composer) sits on white planes, carved darker than the tile in dark mode. Depth comes from fill steps alone: no borders on persistent surfaces and no shadows on floating ones. Each screen has one ink pill; everything else is quiet. The interface is set in Immaculate Gothic at one regular weight.
+OpenOrc is a compact desktop workspace for several projects at once. The conversation, the panel and the page toolbars share one near-white ground, and the sidebar sits beside them on a faintly cool one. Soft grey fills sit on top: the person's message, idle pills, the composer's chips. Things that are raised (the composer, cards in the transcript, the open tab, New thread, menus) are white planes lifted by a faint edge and a 1px shadow; in dark mode the same planes step lighter than the ground. Each screen has one ink pill; everything else is quiet. The interface is set in Immaculate Gothic at one regular weight.
 
 This record describes the built desktop interface. It preserves the workflows in [PRODUCT.md](../../PRODUCT.md), including drafts, task authorization, Orcling privacy, and project context. Original artwork and provider marks are documented in [artwork provenance](../../docs/artwork-provenance.md).
 
 **Key Characteristics:**
 
-- One tile ground for the sidebar and conversation, white planes for the panel, sheets, cards, and composer.
-- Hierarchy from ink, muted, and faint text, never from weight.
+- One near-white ground for the conversation and the panel, a cool sidebar, grey fills, raised white planes.
+- Hierarchy from title ink, the softer reading ink, muted and faint text, and size, never from weight.
 - Round controls: pills for buttons, chips, tracks, and send; 34px rows with r10 corners.
 - Color only where it means something: diffs, results, attention dots, links, and selection.
 - No keyboard shortcut hints and no capability advertising in the UI. The shortcuts themselves still work.
@@ -191,13 +203,13 @@ The frontmatter records the OpenOrc palette in both modes; component entries sho
 
 ### Grounds and fills
 
-`--bg` is the tile, one flat color in every palette, kept opaque because the native window background follows it. `--surface` is the plane. `--surface-2` is the fill: hover for bare rows, ghost buttons, and menu items, and the resting fill of chips, tracks, fields, and file heads. `--surface-3` is the strong fill, kept for press, hover on controls that already rest on a fill, switch-off tracks, empty rings, disabled send, and meter tracks. `--line` appears only between rows, at `--hairline` width (half a pixel on high-density screens). In OpenOrc the fills and lines are translucent ink, so they read on tile and plane alike.
+`--bg` is the ground, one flat color in every palette, kept opaque because the native window background follows it. `--sidebar` is the sidebar's ground: `--bg` in every palette but OpenOrc's, whose sidebar is faintly cool. `--surface` is the plane, and `--raised-shadow` lifts it where the step from the ground is too faint to see (OpenOrc's faint edge and 1px shadow; an empty shadow elsewhere). `--surface-2` is the fill: hover for bare rows, ghost buttons, and menu items, and the resting fill of chips, tracks, fields, and file heads. `--surface-3` is the strong fill, kept for press, hover on controls that already rest on a fill, switch-off tracks, empty rings, disabled send, and meter tracks. `--line` appears only between rows, at `--hairline` width (half a pixel on high-density screens). Sidebar rows hover on `--navigation-hover`.
 
 **The Contextual Fill Rule.** Selected rows paint `--current-row-fill` and secondary controls paint `--control-fill`. On the tile they are `--navigation-soft` and `--surface`. Every plane (`data-plane`, panel content, menus, dialogs, the composer) restates both as `--surface-2`, and a tile card inside a plane (settings cards, usage accounts, the memory control) restates them back to `--surface`. Mark new planes with `data-plane` instead of growing selector lists.
 
 ### Ink and accents
 
-`--ink` is primary text. `--ink-2` and `--ink-3` are muted, the workhorse. `--ink-4` is faint, for meta, counts, and placeholders; it never sits on `--surface-3`. Every text role holds 4.5:1 on tile, plane, and fill. `--accent` and `--accent-fg` make the one ink pill. Selected and open rows keep `--navigation-ink`, links and inline code use `--content-ink`, so palette accents survive. `--ok` and `--bad` (with soft companions) mark diffs and results, `--attention` colors dots only, and `--warn` is the readable warning text.
+`--ink` is titles and primary text. `--prose-ink` is the agent's reading text, softer than titles in OpenOrc; headings and bold lead-ins stay in `--ink`. `--ink-2` and `--ink-3` are muted, the workhorse. `--ink-4` is faint, for meta, counts, and placeholders; it never sits on `--surface-3`. `--line-number` numbers a diff's lines. Every text role holds 4.5:1 on ground, plane, and fill, except OpenOrc light's faint grey and line numbers, measured from the approved mock at about 3:1 and 2.1:1. `--accent` and `--accent-fg` make the one ink pill. Selected and open rows keep `--navigation-ink`, links and inline code use `--content-ink`, so palette accents survive. `--ok` and `--bad` (with soft companions) mark diffs and results, `--attention` colors dots only, and `--warn` is the readable warning text.
 
 Appearance mode and palette selection stay independent. OpenOrc has the values above, Cursor keeps its own grays, and flat light palettes have a hand-tuned ground step so planes still separate. Accent choices and custom colors persist per palette and mode; fill and line roles accept `#rrggbbaa`. Original Kamakura, Cyberpunk, and Eliron themes keep their authored treatment. [Theme references](../../docs/theme-references.md) separate source values from adaptations.
 
@@ -205,33 +217,33 @@ Appearance mode and palette selection stay independent. OpenOrc has the values a
 
 Immaculate Gothic sets the whole interface by default, in its Text 450 face. Settings > Appearance can switch to Inter, Geist, or the system font; `fonts.css` maps the choice. Code has its own picker: JetBrains Mono Variable by default, Geist Mono Variable, or the system monospace, applied through the runtime `--font-mono` token to code blocks, editors, diffs, and open terminals.
 
-The interface uses one weight: `--font-weight-medium` and `--font-weight-semibold` are both 400. Bold survives only for author emphasis inside content (replies, task documents, comments). UI text is 12, 13, or 14px; there is no 11px or 10px text. The scale, with its tracking, lives in `@theme static`:
+The interface uses one weight: `--font-weight-medium` and `--font-weight-semibold` are both 400. Bold survives only for author emphasis inside content (replies, task documents, comments). UI text is 12.5, 13, 14 or 15px; there is no 11px or 10px text. The scale, with its tracking, lives in `@theme static`:
 
-- `xs` and `sm` 12/16, `base` 13/20, `md` 14/22, `lg` 16/22.
+- `xs` 12.5/16 for quiet lines (times, second lines, meta) and code, `sm` 13/16 for section labels, counts and small controls, `base` 14/20 for rows and labels, `md` 14/22 for writing, `header` 15/20 for a column's title in its header, `prose` 14/21 for reading, `lg` 16/22.
 - `title-sm` 22/28 for document and page titles, `title` 28/34 for the New thread question and settings page titles.
 - `stat` 18/22 and `stat-sm` 16/20 for numerals, always tabular.
 
-Toolbar and thread titles are 13/16. Replies and prompts are 14/22. Single-line rows use 16px leading. Long prose wraps; code and tables scroll in their own blocks.
+Replies and prompts are 14/21; code is 12.5/20. Single-line rows use 16px leading. Long prose wraps; code and tables scroll in their own blocks.
 
 ## Layout
 
-The window has one navigation column, a conversation or destination, and an optional work panel. Toolbars are `max(44px, 32px / zoom)` and line up with the traffic lights at x16. 52px headers appear only inside cards and sheets; a card header that reaches native window controls drops to the 44px chrome line. The sidebar defaults to 272px, resizes from 224 to 380, and respects saved widths. The panel defaults to 640px within 340 to 900.
+The window has one navigation column, a conversation or destination, and an optional work panel. Toolbars are `max(52px, 32px / zoom)` and line up with the traffic lights at x16. The sidebar defaults to 272px, resizes from 224 to 380, and respects saved widths. The panel defaults to 640px within 340 to 900.
 
 The conversation column is at most 800px with 32px reading gutters; the composer uses 24px. Both shrink to 12px at 520px and below and in narrow panes. Each column owns its scrolling. Split conversations keep their own header and panel ownership.
 
-The sidebar is one column, 247px by default (224 to 380), and paints nothing; a hairline in `--line` runs the window's full height at its right edge, through its header, and goes while the sidebar floats at 900px and narrower. Hidden, nothing of it stays, and the first header clears the traffic lights. Its 44px header has no line under it: the traffic lights where the OS draws them, the OpenOrc wordmark (where an organization's logo, name and switcher will go), then New thread as a 30px raised square on the surface fill with a hairline ring. Back, Forward and the sidebar toggle lead the first header beside it, open or hidden. Under the header the app's screens are named rows, 33px apart, a 16px glyph 20px in and the name at 45: Tasks, Pull requests, Schedules, Orclings and Inbox. A count sits at a row's end only where something waits on the person: tasks proposed or in review, Orcling chats with a question or something unread, and in the Inbox approvals and those same tasks. Orclings is a toggle that swaps the threads for the Orclings list and back. Memory is reached from the right panel and the palette. While Settings is open, its sections take the screens' and threads' place under Back to app. The footer, under a hairline, holds the weekly usage, the update while one waits, and Settings at the row's end, its start kept for the signed-in person.
+The sidebar is one column, 247px by default (224 to 380), on its `--sidebar` ground; a hairline in `--line` runs the window's full height at its right edge, through its header, and goes while the sidebar floats at 900px and narrower. Hidden, nothing of it stays, and the first header clears the traffic lights. Its 52px header has no line under it: the traffic lights where the OS draws them, the OpenOrc wordmark (where an organization's logo, name and switcher will go), then New thread as a 30px raised square on the plane with a hairline ring and `--raised-shadow`. Back, Forward and the sidebar toggle lead the first header beside it, open or hidden. Under the header the app's screens are named rows, 33px apart, a 16px glyph 20px in and the name at 45: Tasks, Pull requests, Schedules, Orclings and Inbox. A count sits at a row's end only where something waits on the person: tasks proposed or in review, Orcling chats with a question or something unread, and in the Inbox approvals and those same tasks. Orclings is a toggle that swaps the threads for the Orclings list and back. Memory is reached from the right panel and the palette. While Settings is open, its sections take the screens' and threads' place under Back to app. The footer, under a hairline, holds the weekly usage, the update while one waits, and Settings at the row's end, its start kept for the signed-in person.
 
 Responsive rules:
 
-- At 900px and narrower, the sidebar floats over the page as an opaque tile with `--shadow-overlay`, the only shadow left. Opening a destination dismisses it; switching between Threads and Orclings keeps it open.
+- At 900px and narrower, the sidebar floats over the page on its opaque ground with `--shadow-overlay`. Opening a destination dismisses it; switching between Threads and Orclings keeps it open.
 - At work-row widths of 788px or less, an open panel overlays the work area.
 - New thread centers a 640px column; its composer bar wraps when the column narrows.
 
 ## Elevation & Depth
 
-Depth is the fill step. Persistent surfaces have no borders and no shadows. Planes are one step from the tile, fills one step from their ground.
+Depth is the fill step, lifted by `--raised-shadow` where the step alone is too faint. Persistent surfaces have no borders. Planes are one step from the ground, fills one step from theirs.
 
-**The Floating Fill Rule.** Menus, popovers, tooltips, toasts, and dialogs have no border and no shadow. They paint `--float-fill`: the plane when the layer lands on the tile, the tile when it lands on a plane (`use-anchor-ground` sets `data-ground` on the portal). Dialogs also dim their backdrop. A layer that lies across both, such as a composer picker over the conversation or an update toast over the transcript, has no fill step away from both, so a hairline ring in `--line-strong` draws its edge.
+**The Floating Fill Rule.** Menus, popovers, tooltips, toasts, and dialogs have no border and wear `--raised-shadow`. They paint `--float-fill`: the plane when the layer lands on the tile, the tile when it lands on a plane (`use-anchor-ground` sets `data-ground` on the portal). Dialogs also dim their backdrop. A layer that lies across both, such as a composer picker over the conversation or an update toast over the transcript, has no fill step away from both, so a hairline ring in `--line-strong` draws its edge.
 
 **The Opaque Work Plane Rule.** Keep reading, writing, and tool content opaque when Transparent surroundings is on. The setting paints the shell tint once through `--shell-opacity`, from 0% (solid tint) to 100% (native blur), defaulting to 35%. System Reduce Transparency wins.
 
@@ -284,7 +296,7 @@ New thread keeps the tile ground. Its toolbar holds only the panel toggle, which
 
 ### Work panel
 
-The panel is one opaque plane from the window's top edge to its bottom, beside the conversation's tile, with no margin, card, or seam between its header and the open tab's page. The header shares the 44px chrome line. Tabs are plain labels at natural width, faint at rest and full ink when open, with no track or knob; a tab's glyph becomes its close button on hover. The plus, expand, and hide are bare round buttons. Changes opens as the first tab. The panel's tabs and the work column's reorder by dragging: the held tab follows the pointer on an opaque fill, the tabs it passes step aside, and it glides into place on the drop; a strip that has outgrown its bar scrolls while a tab is held at either end. The round plus opens the New tab page with tool and recent page rows. Each tool page starts with a 48px bar (title, faint meta, actions); Commit is that page's ink pill and grows into the r22 commit sheet. Diffs have 40px r12 fill file heads, 22px rows of 12px mono, `--ok` and `--bad` runs on soft fills with r6 ends, and no syntax colors. Web pages get a 44px bar with their own Back/Forward, an address pill, and an r14 inset viewport.
+The panel shares the conversation's ground from the window's top edge to its bottom, with no margin, card, or seam between its header and the open tab's page. The header shares the 52px chrome line. Tabs are 28px pills on the soft fill, the open one a raised white plane; a tab's close shows on the open one and under the pointer. The plus, expand, and hide are bare round buttons. Changes opens as the first tab. The panel's tabs and the work column's reorder by dragging: the held tab follows the pointer on an opaque fill, the tabs it passes step aside, and it glides into place on the drop; a strip that has outgrown its bar scrolls while a tab is held at either end. The round plus opens the New tab page with tool and recent page rows. Each tool page starts with a 48px bar (title, faint meta, actions); Commit is that page's ink pill and grows into the r22 commit sheet. Diffs have 40px r12 fill file heads, 20px rows of 12.5px mono on the plane, title-ink code on `--ok-soft` and `--bad-soft` runs with r6 ends, `--line-number` numbers, and no syntax colors. Web pages get a 44px bar with their own Back/Forward, an address pill, and an r14 inset viewport.
 
 ### Pages, tasks, and settings
 
@@ -314,7 +326,7 @@ Agent and app update notices are r16 toasts in the upper-right stack with sm pil
 - Do keep one ink pill per screen and let everything else rest on fills.
 - Do keep every existing control and saved state; restyle, don't remove.
 - Do preserve saved widths, palettes, custom colors, keyboard access, native window clearance, drafts, and Orcling privacy.
-- Don't add borders to persistent surfaces or shadows to floating layers.
+- Don't add borders to persistent surfaces, or any shadow but `--raised-shadow` and the floating sidebar's overlay.
 - Don't use bold, 11px text, or faint text on the strong fill.
 - Don't show shortcut hints or advertise what a control can do; reasons belong on disabled controls, on demand.
 - Don't ship a control that does nothing.

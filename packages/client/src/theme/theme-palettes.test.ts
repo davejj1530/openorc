@@ -4,26 +4,34 @@ import { themePresets } from "./theme-palettes.js";
 const colors = (id: string) => themePresets.find((theme) => theme.id === id)!.colors;
 
 describe("themePresets", () => {
-  it("gives OpenOrc the approved tile, plane, fills and ink", () => {
+  it("gives OpenOrc the approved near-white ground, cool sidebar, grey fills, raised planes and two inks", () => {
     expect(colors("openorc").light).toMatchObject({
-      "--bg": "#f4f4f4",
+      "--bg": "#fafafa",
+      "--sidebar": "#f9fbfd",
       "--surface": "#ffffff",
-      "--surface-2": "#1717170d",
-      "--surface-3": "#17171717",
-      "--line": "#17171717",
-      "--ink": "#171717",
-      "--accent": "#171717",
+      "--surface-2": "#f0f0f0",
+      "--bubble": "#f0f0f0",
+      "--navigation-soft": "#eef0f3",
+      "--line": "#ebebeb",
+      "--ink": "#252525",
+      "--prose-ink": "#646464",
+      "--ink-4": "#8f9091",
+      "--line-number": "#b2b2b2",
+      "--ok-soft": "#e0fae3",
+      "--bad-soft": "#fcecea",
+      "--accent": "#252525",
       "--accent-fg": "#ffffff",
     });
+    expect(colors("openorc").light["--raised-shadow"]).toContain("#e4e4e4");
     expect(colors("openorc").dark).toMatchObject({
       "--bg": "#171717",
-      "--surface": "#0a0a0a",
-      "--surface-2": "#ffffff12",
-      "--surface-3": "#ffffff1f",
-      "--line": "#ffffff1c",
-      "--ink": "#ffffff",
-      "--accent": "#ffffff",
-      "--accent-fg": "#000000",
+      "--sidebar": "#141619",
+      "--surface": "#202020",
+      "--surface-2": "#262626",
+      "--ink": "#ececec",
+      "--prose-ink": "#a3a3a3",
+      "--accent": "#ececec",
+      "--accent-fg": "#171717",
     });
   });
 
@@ -43,11 +51,12 @@ describe("themePresets", () => {
     }
   });
 
-  it("paints the window's ground in one color, so the sidebar, the work column and the panel match in every palette", () => {
+  it("paints every ground flat, and keeps the sidebar on the window's ground where a palette does not tint it", () => {
     for (const theme of themePresets) {
       for (const mode of ["light", "dark"] as const) {
         const painted = Object.entries(theme.colors[mode]).filter(([, value]) => String(value).includes("gradient("));
         expect(painted, `${theme.id} ${mode}`).toEqual([]);
+        if (theme.id !== "openorc") expect(theme.colors[mode]["--sidebar"], `${theme.id} ${mode} sidebar`).toBe("var(--bg)");
       }
     }
   });

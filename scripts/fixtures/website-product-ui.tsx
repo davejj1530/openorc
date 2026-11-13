@@ -350,9 +350,9 @@ async function main() {
       {designPreview ? <DesignPreviewBar /> : null}
       {/* Browser captures omit Electron's native chrome. Reproduce only the
           buttons in the space already reserved by the production header:
-          main/index.ts trafficLightPosition (14, 13), 14px buttons, 9px gaps. */}
+          main/index.ts trafficLightPosition (16, 19) in a 52px header, 14px buttons, 9px gaps. */}
       {!fullscreen ? (
-        <div aria-hidden="true" style={{ position: "fixed", left: 14, top: 13, display: "flex", gap: 9, pointerEvents: "none", zIndex: 100 }}>
+        <div aria-hidden="true" style={{ position: "fixed", left: 16, top: 19, display: "flex", gap: 9, pointerEvents: "none", zIndex: 100 }}>
           {["#ff5f57", "#febc2e", "#28c840"].map((background) => (
             <span key={background} style={{ width: 14, height: 14, borderRadius: "50%", background }} />
           ))}

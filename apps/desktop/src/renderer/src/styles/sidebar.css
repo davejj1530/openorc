@@ -1,6 +1,6 @@
 /* The sidebar: one column under its own header, the app's screens by name, the threads grouped by
-   project under Workspaces, and a footer. It sits on the window's ground with no fill of its own, a
-   hairline seam at its edge from the window's top to its foot. Rows have a 10px corner; the current
+   project under Workspaces, and a footer. It sits on its own --sidebar ground (the window's in most
+   palettes), a hairline seam at its edge from the window's top to its foot. Rows have a 10px corner; the current
    row takes --current-row-fill and keeps --navigation-ink. Text starts 20px in: rows sit 10px in and
    keep 10px of padding. */
 
@@ -10,6 +10,10 @@
   flex-direction: column;
   width: var(--width-sidebar);
   overflow: hidden;
+  background: var(--sidebar);
+}
+/* Over the window's blur the sidebar lets the tinted shell show through. */
+html[data-transparent-shell="true"] .app-shell .workspace-navigation {
   background: none;
 }
 /* Hidden, nothing of it stays; the first header beside it clears the traffic lights instead. */
@@ -47,7 +51,9 @@
   height: 30px;
   border-radius: var(--radius-md);
   background: var(--surface);
-  box-shadow: 0 0 0 var(--hairline) var(--line);
+  box-shadow:
+    0 0 0 var(--hairline) var(--line),
+    var(--raised-shadow);
   color: var(--ink-2);
   transition:
     background-color var(--duration-quick) var(--ease-out),
@@ -220,13 +226,13 @@
     color var(--duration-leave) var(--ease-out);
 }
 button.sidebar-nav-row:hover {
-  background-color: var(--surface-2);
+  background-color: var(--navigation-hover);
   color: var(--ink);
 }
 .sidebar-nav-icon {
   display: flex;
   flex-shrink: 0;
-  color: var(--ink-3);
+  color: var(--ink-4);
 }
 .sidebar-nav-label {
   flex: 1;
@@ -441,7 +447,7 @@ button.sidebar-nav-row:hover {
   min-height: 44px;
   padding: 4px 10px;
   border-radius: var(--radius-md);
-  color: var(--ink-3);
+  color: var(--ink);
   text-align: left;
   transition:
     background-color var(--duration-leave) var(--ease-out),
@@ -452,7 +458,7 @@ button.sidebar-nav-row:hover {
   min-height: var(--control-row);
 }
 .app-shell .thread-preview:hover {
-  background-color: var(--surface-2);
+  background-color: var(--navigation-hover);
   color: var(--ink);
 }
 .app-shell .sidebar-shell .thread-preview[data-open]:not(:focus-visible) {
@@ -641,7 +647,7 @@ button.browser-empty:hover,
   transition: background-color var(--duration-leave) var(--ease-out);
 }
 .orcling-contact:hover {
-  background-color: var(--surface-2);
+  background-color: var(--navigation-hover);
 }
 .app-shell .sidebar-shell .orcling-contact[aria-current="page"]:not(:focus-visible) {
   background-color: var(--current-row-fill);
@@ -675,7 +681,7 @@ button.browser-empty:hover,
     color var(--duration-quick) var(--ease-out);
 }
 .sidebar-tool:hover {
-  background-color: var(--surface-2);
+  background-color: var(--navigation-hover);
   color: var(--ink);
 }
 .sidebar-tool:active {
@@ -934,7 +940,7 @@ button.browser-empty:hover,
     z-index: 30;
     max-width: calc(100vw - 40px);
     height: 100%;
-    background: var(--bg);
+    background: var(--sidebar);
     box-shadow: var(--shadow-overlay);
   }
   .app-shell .workspace-navigation[data-open="false"] {

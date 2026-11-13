@@ -8,8 +8,9 @@ export interface ThemeTemplate {
   colors: Record<Mode, Record<string, string>>;
 }
 // Source colors map to shell roles, not a house tint or contrast ladder.
-// Every palette has the same structure: the window ground (--bg, the sidebar and conversation),
-// planes one step off it (--surface: the panel, sheets, cards, the composer), then the fills.
+// Every palette has the same structure: the window ground (--bg, the conversation and the panel; the sidebar's
+// --sidebar follows it unless a palette tints it), planes one step off it (--surface: sheets, cards, the composer),
+// then the fills.
 // Product presets keep flat paint (no gradient); palettes whose source is one flat light color
 // get a hand-tuned ground step. See docs/theme-references.md for sources and adaptations.
 // Readable supporting text may use the next stronger source role.
@@ -32,6 +33,17 @@ function palette(neutrals: Neutrals, accent: string, accentInk: string, accentFo
     ...Object.fromEntries(Object.entries(neutralTokens).map(([role, token]) => [`--${token}`, neutrals[role as keyof Neutrals]])),
     "--paper": "var(--surface)",
     "--composer-input": "var(--surface)",
+    // The sidebar's own ground, the window's unless a palette tints it.
+    "--sidebar": "var(--bg)",
+    // A sidebar row under the pointer.
+    "--navigation-hover": "var(--surface-2)",
+    // What lifts a raised plane (the composer, cards, the open tab, menus) off a ground it barely steps from. Palettes
+    // whose planes step clearly off their ground keep an empty shadow; it stays a shadow so a rule can add its own.
+    "--raised-shadow": "0 0 #0000",
+    // The agent's reading text. Headings and bold lead-ins stay in --ink.
+    "--prose-ink": "var(--ink)",
+    // A diff's line numbers.
+    "--line-number": "var(--ink-4)",
     "--accent": accent,
     "--accent-ink": accentInk,
     "--accent-fg": accentForeground,
@@ -62,61 +74,71 @@ const statusTokens: Record<Mode, Record<string, string>> = {
   light: { "--ok": "#157447", "--warn": "#8b5c0a", "--bad": "#aa4538", ...statusSoft },
   dark: { "--ok": "#3fae74", "--warn": "#c0973a", "--bad": "#e27d6f", ...statusSoft },
 };
-// The approved OpenOrc faint gray measures 4.20 (light) and 4.21 (dark) on a fill over the tile.
-// The nudged one is the nearest gray that holds 4.5:1 there. Switch to compare the two.
-const openorcFaint = { approved: { light: "#6e6e6e", dark: "#888888" }, nudged: { light: "#666666", dark: "#8e8e8e" } }.nudged;
-// OpenOrc: a tile ground under the sidebar and conversation, white planes (carved darker than the
-// tile in dark), translucent ink fills, and one ink action.
+// OpenOrc: a near-white ground with a cool sidebar beside it, soft grey fills on top, white planes lifted by a faint
+// edge and a 1px shadow, title ink over a softer reading ink, and one ink action. Measured from the approved team
+// workspace mock (Tembo's light theme); dark keeps the same relationships inverted.
 const openorcColors: ThemeTemplate["colors"] = {
   light: palette(
     {
-      sidebar: "#f4f4f4",
+      sidebar: "#fafafa",
       body: "#ffffff",
-      raised: "#1717170d",
-      hover: "#17171717",
-      border: "#17171717",
-      borderStrong: "#1717172e",
-      text: "#171717",
-      secondaryText: "#555555",
-      mutedText: "#555555",
-      faintText: openorcFaint.light,
-      bubble: "#ffffff",
+      raised: "#f0f0f0",
+      hover: "#e8e8e8",
+      border: "#ebebeb",
+      borderStrong: "#dcdcdc",
+      text: "#252525",
+      secondaryText: "#646464",
+      mutedText: "#636465",
+      faintText: "#8f9091",
+      bubble: "#f0f0f0",
     },
-    "#171717",
-    "#171717",
+    "#252525",
+    "#252525",
     "#ffffff",
     {
-      "--navigation-soft": "#ffffff",
-      "--ok": "#1e7359",
-      "--ok-soft": "#e6f0eb",
-      "--bad": "#9b5050",
-      "--bad-soft": "#f7ebe9",
+      "--sidebar": "#f9fbfd",
+      "--navigation-soft": "#eef0f3",
+      "--navigation-hover": "#f2f4f7",
+      "--raised-shadow": "0 0 0 1px #e4e4e4, 0 1px 2px rgb(0 0 0 / 0.05)",
+      "--prose-ink": "#646464",
+      "--bubble-ink": "#646464",
+      "--line-number": "#b2b2b2",
+      "--ok": "#3c884d",
+      "--ok-soft": "#e0fae3",
+      "--bad": "#c03737",
+      "--bad-soft": "#fcecea",
       "--attention": "#b26a00",
     },
   ),
   dark: palette(
     {
       sidebar: "#171717",
-      body: "#0a0a0a",
-      raised: "#ffffff12",
-      hover: "#ffffff1f",
-      border: "#ffffff1c",
-      borderStrong: "#ffffff2e",
-      text: "#ffffff",
-      secondaryText: "#b8b8b8",
-      mutedText: "#b8b8b8",
-      faintText: openorcFaint.dark,
-      bubble: "#0a0a0a",
+      body: "#202020",
+      raised: "#262626",
+      hover: "#2e2e2e",
+      border: "#2a2a2a",
+      borderStrong: "#383838",
+      text: "#ececec",
+      secondaryText: "#a3a3a3",
+      mutedText: "#a4a5a7",
+      faintText: "#8e8f91",
+      bubble: "#262626",
     },
-    "#ffffff",
-    "#ffffff",
-    "#000000",
+    "#ececec",
+    "#ececec",
+    "#171717",
     {
-      "--navigation-soft": "#0a0a0a",
-      "--ok": "#7cc4a2",
-      "--ok-soft": "#1e735942",
-      "--bad": "#e2a3a3",
-      "--bad-soft": "#9b505047",
+      "--sidebar": "#141619",
+      "--navigation-soft": "#23262b",
+      "--navigation-hover": "#1d2024",
+      "--raised-shadow": "0 0 0 1px #2e2e2e, 0 1px 2px rgb(0 0 0 / 0.4)",
+      "--prose-ink": "#a3a3a3",
+      "--bubble-ink": "#a6a6a6",
+      "--line-number": "#5c5c5c",
+      "--ok": "#63c27a",
+      "--ok-soft": "#15291b",
+      "--bad": "#f07878",
+      "--bad-soft": "#301c1b",
       "--attention": "#f0b35a",
     },
   ),
@@ -182,7 +204,7 @@ const presets: ThemeTemplate[] = [
   {
     id: "openorc",
     name: "OpenOrc",
-    description: "Tile and white · ink accents",
+    description: "Near white and soft grey · ink accents",
     colors: openorcColors,
   },
   // Solid blue controls keep white labels in both modes; the fill meets 4.5:1 contrast.

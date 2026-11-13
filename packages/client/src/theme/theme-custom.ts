@@ -19,6 +19,7 @@ export const colorGroups = [
     name: "Grounds and fills",
     tokens: [
       { token: "--bg", label: "Window" },
+      { token: "--sidebar", label: "Sidebar" },
       { token: "--surface", label: "Surfaces" },
       { token: "--paper", label: "Work panels" },
       { token: "--composer-input", label: "Writing area" },
@@ -32,6 +33,7 @@ export const colorGroups = [
     name: "Text and lines",
     tokens: [
       { token: "--ink", label: "Text" },
+      { token: "--prose-ink", label: "Reply text" },
       { token: "--ink-2", label: "Secondary text" },
       { token: "--ink-3", label: "Muted text" },
       { token: "--ink-4", label: "Faint text" },

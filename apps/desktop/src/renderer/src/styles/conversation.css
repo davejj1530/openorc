@@ -157,10 +157,10 @@
   justify-self: end;
   overflow-wrap: anywhere;
   border-radius: var(--radius-2xl);
-  padding: 12px 16px;
-  font-size: var(--text-md);
-  line-height: var(--text-md--line-height);
-  letter-spacing: var(--text-md--letter-spacing);
+  padding: 10px 14px;
+  font-size: var(--text-prose);
+  line-height: var(--text-prose--line-height);
+  letter-spacing: var(--text-prose--letter-spacing);
 }
 .journal-message-actions {
   position: absolute;
@@ -178,13 +178,13 @@
   margin: 6px 0 0 -7px;
 }
 
-/* A reply reads at 14/22 in ink; lists step back to muted with ink leads and a faint dot. Scoped to the
-   transcript so documents keep their own reading size. */
+/* A reply reads at 14/21 in the palette's reading ink, its headings and bold leads in title ink, list items
+   after a faint dot. Scoped to the transcript so documents keep their own rhythm. */
 .app-shell .journal-response .prose-chat {
-  font-size: var(--text-md);
-  line-height: var(--text-md--line-height);
-  letter-spacing: var(--text-md--letter-spacing);
-  color: var(--ink);
+  font-size: var(--text-prose);
+  line-height: var(--text-prose--line-height);
+  letter-spacing: var(--text-prose--letter-spacing);
+  color: var(--prose-ink);
 }
 .journal-response .prose-chat :where(p) {
   margin-bottom: 14px;
@@ -198,7 +198,6 @@
 }
 .journal-response .prose-chat :where(ul, ol) {
   margin: 0 0 14px;
-  color: var(--ink-2);
 }
 .journal-response .prose-chat :where(ul:not(:has(> li > input[type="checkbox"]))) {
   display: flex;
@@ -216,7 +215,7 @@
   content: "";
   position: absolute;
   left: 0;
-  top: 9px;
+  top: 8.5px;
   width: 4px;
   height: 4px;
   border-radius: var(--radius-pill);

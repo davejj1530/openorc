@@ -43,16 +43,15 @@ function roundedRuns(type: "change-addition" | "change-deletion"): string {
 }
 
 /**
- * Lines read in the diff's own tones rather than the highlighter's: context muted, added lines
- * and their marks in --ok on --ok-soft, removed ones in --bad on --bad-soft, each run rounded,
- * with 2px between a removed run and the added run that replaces it. Rows are 22px; app.css
- * sets the type.
+ * Lines read in the diff's own tones rather than the highlighter's: every line in title ink,
+ * added lines on --ok-soft and removed ones on --bad-soft, each run rounded, with 2px between a
+ * removed run and the added run that replaces it. app.css sets the type and the line numbers.
  */
 const PLAIN_LINES = `
   [data-line] span { color: inherit; }
-  [data-line] { color: var(--ink-3); }
-  :is([data-line], [data-column-number], [data-gutter-buffer])[data-line-type="change-addition"] { color: var(--ok); background-color: var(--ok-soft); }
-  :is([data-line], [data-column-number], [data-gutter-buffer])[data-line-type="change-deletion"] { color: var(--bad); background-color: var(--bad-soft); }
+  [data-line] { color: var(--ink); }
+  :is([data-line], [data-column-number], [data-gutter-buffer])[data-line-type="change-addition"] { background-color: var(--ok-soft); }
+  :is([data-line], [data-column-number], [data-gutter-buffer])[data-line-type="change-deletion"] { background-color: var(--bad-soft); }
   ${roundedRuns("change-addition")}
   ${roundedRuns("change-deletion")}
   :is([data-line], [data-column-number])[data-line-type="change-deletion"] + [data-line-type="change-addition"] { margin-top: 2px; }

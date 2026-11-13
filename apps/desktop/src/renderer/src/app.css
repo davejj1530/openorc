@@ -99,6 +99,14 @@
   /* The user's own message is a plane in the palette's --bubble tone. */
   --bubble-fill: var(--bubble);
   --bubble-ink: var(--ink);
+  /* Palette roles with a default of their own (lib/theme-palettes.ts): the sidebar's ground, a sidebar row under the
+     pointer, what lifts a raised plane off a ground it barely steps from, the agent's reading text and a diff's
+     line numbers. */
+  --sidebar: var(--bg);
+  --navigation-hover: var(--surface-2);
+  --raised-shadow: 0 0 #0000;
+  --prose-ink: var(--ink);
+  --line-number: var(--ink-4);
   color-scheme: light;
 }
 @media (min-resolution: 2dppx) {
@@ -215,25 +223,29 @@
 @theme static {
   /* Keep font-mono utilities linked to the runtime code-font preference. */
   --font-mono: "JetBrains Mono Variable", "SF Mono", Menlo, Consolas, monospace;
-  /* Type. Interface text is 12, 13 or 14px; headings are 16, 22 and 28px. Nothing smaller
-     than 12px ships, so xs is an alias of sm. Hierarchy comes from size and gray, never weight.
-     Single-line rows set their own 16px leading. */
-  --text-xs: 12px;
+  /* Type. Quiet lines (times, second lines, meta) and code are 12.5px; section labels, counts and
+     small controls 13; rows, labels, writing and reading text 14; a column's title in its header 15.
+     Headings are 16, 22 and 28px. Hierarchy comes from size and gray, never weight. Single-line rows
+     set their own 16px leading. */
+  --text-xs: 12.5px;
   --text-xs--line-height: 16px;
   --text-xs--letter-spacing: 0em;
-  --text-sm: 12px;
+  --text-sm: 13px;
   --text-sm--line-height: 16px;
   --text-sm--letter-spacing: 0em;
-  --text-base: 13px;
+  --text-base: 14px;
   --text-base--line-height: 20px;
   --text-base--letter-spacing: -0.005em;
   --text-md: 14px;
   --text-md--line-height: 22px;
   --text-md--letter-spacing: -0.01em;
+  --text-header: 15px;
+  --text-header--line-height: 20px;
+  --text-header--letter-spacing: -0.01em;
   /* Reading size for replies and documents. */
-  --text-prose: 16px;
-  --text-prose--line-height: 27px;
-  --text-prose--letter-spacing: -0.01em;
+  --text-prose: 14px;
+  --text-prose--line-height: 21px;
+  --text-prose--letter-spacing: -0.005em;
   --text-lg: 16px;
   --text-lg--line-height: 22px;
   --text-lg--letter-spacing: -0.01em;
@@ -374,7 +386,7 @@
   --width-main-min: 440px;
   --width-panel-min: 340px;
   --width-details: 72px;
-  --height-topbar: max(44px, calc(32px / var(--window-zoom, 1)));
+  --height-topbar: max(52px, calc(32px / var(--window-zoom, 1)));
   /* border, border-t, divide-y and the rest draw hairlines. */
   --default-border-width: var(--hairline);
   --container-chat: 760px;
@@ -596,6 +608,7 @@ html[data-transparent-shell="true"] .app-shell {
    under the pointer each hovered row's fading fill trails behind it. The sidebar's fills are
    ink tints here instead, so they blend with whatever shows through. */
 html[data-transparent-shell="true"] .sidebar-shell {
+  --navigation-hover: color-mix(in srgb, var(--ink) 7%, transparent);
   --surface-2: color-mix(in srgb, var(--ink) 7%, transparent);
   --surface-3: color-mix(in srgb, var(--ink) 11%, transparent);
   --current-row-fill: color-mix(in srgb, var(--ink) 9%, transparent);
@@ -809,8 +822,9 @@ body[data-resizing] .sidebar-shell {
   flex-shrink: 0;
 }
 
-/* CONTENT. Depth is a fill step, never a shadow. The surfaces a thread grows for a task, a turn's
-   file changes, a question or an MCP app are planes, in the transcript and the panel alike.
+/* CONTENT. Depth is a fill step, lifted by the palette's --raised-shadow where the step alone is too faint to
+   see. The surfaces a thread grows for a task, a turn's file changes, a question or an MCP app are planes, in the
+   transcript and the panel alike.
    Unlayered on purpose, so the fill beats the components' own bg utilities. The loading
    skeleton carries .surface-card too, so a card cannot change depth as it loads. */
 .surface-card,
@@ -818,6 +832,7 @@ body[data-resizing] .sidebar-shell {
 .question-card,
 .mcp-app-card {
   background: var(--plane-fill);
+  box-shadow: var(--raised-shadow);
 }
 /* The user's own plane, in the palette's --bubble tone. */
 .message-bubble {
@@ -863,22 +878,22 @@ body[data-resizing] iframe {
 }
 /* The highlighter paints its theme's own ground, and github-dark's #24292e is a grey slab on a
    near-black column. A declaration on the host outranks the renderer's :host theme rule, so
-   code sits on the column's ground in both modes. Rows are 22px of 12px mono; added and removed
-   lines sit on the soft status fills with faint numbers elsewhere. */
+   code sits on the plane in both modes. Rows are 20px of 12.5px mono in title ink; added and
+   removed lines sit on the soft status fills, every line number in the palette's --line-number. */
 diffs-container {
-  --diffs-light-bg: var(--bg);
-  --diffs-dark-bg: var(--bg);
+  --diffs-light-bg: var(--surface);
+  --diffs-dark-bg: var(--surface);
   --diffs-font-family: var(--font-mono);
-  --diffs-font-size: var(--text-sm);
-  --diffs-line-height: 22px;
+  --diffs-font-size: var(--text-xs);
+  --diffs-line-height: 20px;
   --diffs-gap-style: none;
-  --diffs-bg-context-override: var(--bg);
-  --diffs-bg-context-gutter-override: var(--bg);
-  --diffs-fg-number-override: var(--ink-4);
-  --diffs-fg-number-addition-override: var(--ok);
-  --diffs-fg-number-deletion-override: var(--bad);
-  --diffs-addition-color-override: var(--ok);
-  --diffs-deletion-color-override: var(--bad);
+  --diffs-bg-context-override: var(--surface);
+  --diffs-bg-context-gutter-override: var(--surface);
+  --diffs-fg-number-override: var(--line-number);
+  --diffs-fg-number-addition-override: var(--line-number);
+  --diffs-fg-number-deletion-override: var(--line-number);
+  --diffs-addition-color-override: var(--ink);
+  --diffs-deletion-color-override: var(--ink);
   --diffs-bg-addition-override: var(--ok-soft);
   --diffs-bg-addition-number-override: var(--ok-soft);
   --diffs-bg-addition-emphasis-override: color-mix(in srgb, var(--ok-soft) 80%, var(--ok));

@@ -1,8 +1,9 @@
 /* Floating layers: menus, popovers, tooltips and dialogs.
 
-   No floating layer has a border or a shadow (D2). Each takes the fill step away from the ground
-   it opened from: --float-fill is --surface over the tile and --bg over a plane. The layer says
-   which with data-ground (lib/use-anchor-ground.ts). Dialogs are planes over their backdrop. */
+   No floating layer has a border. Each takes the fill step away from the ground it opened from:
+   --float-fill is --surface over the tile and --bg over a plane. The layer says which with
+   data-ground (lib/use-anchor-ground.ts). Where that step is too faint to see, the palette's
+   --raised-shadow lifts it. Dialogs are planes over their backdrop. */
 [data-ground="plane"] {
   --float-fill: var(--bg);
 }
@@ -13,7 +14,7 @@
   border: 0;
   background: var(--float-fill);
   color: var(--ink);
-  box-shadow: none;
+  box-shadow: var(--raised-shadow);
   outline: none;
 }
 /* A layer that lands across the tile and a plane (a composer picker over the conversation) has

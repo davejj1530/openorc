@@ -108,7 +108,11 @@ export function Memory() {
       <TopBar>
         {selectedProject ? (
           <ScopedTitle
-            open={<span className="truncate">Memory in {focused ? selectedProject.name : <ProjectPicker projectId={selectedProject.id} projects={projects.data} onProject={setChosen} />}</span>}
+            unscoped={
+              <span className="truncate">
+                Memory in <ProjectPicker projectId={selectedProject.id} projects={projects.data} onProject={setChosen} />
+              </span>
+            }
           >
             Memory
           </ScopedTitle>

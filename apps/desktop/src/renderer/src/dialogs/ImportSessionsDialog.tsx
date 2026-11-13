@@ -19,7 +19,7 @@ function importEmptyState(projectId: string | undefined, loading: boolean, sessi
 export function ImportSessionsDialog({ open, projectId: given, onOpenChange }: { open: boolean; projectId?: string; onOpenChange: (open: boolean) => void }) {
   const projects = useRpc("projects.list", {}, { enabled: open });
   const [chosen, setChosen] = useState<string | null>(null);
-  // The rail's project when there is one; otherwise the user picks here.
+  // The app's scope when it is a project; otherwise the user picks here.
   const projectId = chosen ?? given ?? projects.data?.[0]?.id;
   const list = useRpc("threads.importable", { projectId: projectId ?? "" }, { enabled: open && Boolean(projectId), staleTime: 0 });
   const doImport = useRpcMutation("threads.import");

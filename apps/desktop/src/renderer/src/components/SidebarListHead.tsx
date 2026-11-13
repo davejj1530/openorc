@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
-import { useUi } from "../lib/ui";
-import { Search } from "./icons";
+import { ChevronRight } from "./icons";
 import { OpenOrcMark } from "./OpenOrcMark";
 
 /** OpenOrc's wordmark: the cube and the name, always in Immaculate Gothic. Short of room, the name gives way whole. */
@@ -14,16 +13,28 @@ export function Wordmark() {
 }
 
 /**
- * The head of the sidebar's list: Search, the app's one search, which opens the palette over the window, then at the
- * row's end the list's own tools (the filter and New thread, or New Orcling).
+ * The head of one of the sidebar's lists: its quiet name, then its tools at the row's end. A list that folds names
+ * itself with a button, its chevron showing on hover and while folded; folded, it counts what inside waits on the
+ * person, when anything does.
  */
-export function SidebarListHead({ tools }: { tools: ReactNode }) {
+export function SidebarListHead({ label, fold, tools }: { label: string; fold?: { open: boolean; waiting: number; onToggle: () => void }; tools: ReactNode }) {
   return (
-    <div className="sidebar-list-head">
-      <button type="button" className="sidebar-search no-drag" onClick={() => useUi.getState().setPalette(true)}>
-        <Search size={16} />
-        Search
-      </button>
+    <div className="sidebar-list-head" data-open={!fold || fold.open || undefined}>
+      {fold ? (
+        <button
+          type="button"
+          aria-expanded={fold.open}
+          aria-label={!fold.open && fold.waiting ? `${label}, ${fold.waiting} waiting` : undefined}
+          className="sidebar-list-fold no-drag"
+          onClick={fold.onToggle}
+        >
+          <span>{label}</span>
+          <ChevronRight size={12} className="sidebar-section-chevron" />
+          {!fold.open && fold.waiting ? <span className="sidebar-count tabular">{fold.waiting}</span> : null}
+        </button>
+      ) : (
+        <h2 className="sidebar-list-name">{label}</h2>
+      )}
       <div className="sidebar-list-tools">{tools}</div>
     </div>
   );

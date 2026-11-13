@@ -1,20 +1,19 @@
 import type { ReactNode } from "react";
 import { focusedProject, useLayout } from "../lib/layout";
 import { PageTitle } from "./PageTitle";
-import { ProjectFilter } from "./SidebarWorkspaces";
+import { ProjectScope } from "./ProjectScope";
 
 /**
- * A screen's title. With the sidebar hidden and a project focused, the project leads it, as in "studio / Tasks", and
- * opens the sidebar's project filter, so the screen still says whose it is and can change that. `open` stands in while
- * the sidebar shows.
+ * A screen's title led by the app's scope, as in "studio / Tasks" or "All projects / Tasks": the scope opens the choice
+ * of project, so the screen says whose it is and can change that. A screen that stands for one project at a time puts
+ * its own title in `unscoped` while no project is chosen.
  */
-export function ScopedTitle({ children, open = children }: { children: ReactNode; open?: ReactNode }) {
-  const hidden = useLayout((state) => !state.sidebarOpen);
+export function ScopedTitle({ children, unscoped }: { children: ReactNode; unscoped?: ReactNode }) {
   const focused = useLayout(focusedProject);
-  if (!hidden || !focused) return <PageTitle>{open}</PageTitle>;
+  if (!focused && unscoped) return <PageTitle>{unscoped}</PageTitle>;
   return (
     <span className="title-crumbs">
-      <ProjectFilter crumb onSelect={(workspace) => useLayout.getState().setWorkspace(workspace)} />
+      <ProjectScope />
       <span aria-hidden="true" className="title-crumb-divider">
         /
       </span>

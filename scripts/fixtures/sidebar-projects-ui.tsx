@@ -107,6 +107,7 @@ async function main() {
       return { ok: true };
     }
     if (method === "tasks.list") return [{ id: "review", projectId: "site", status: "review" }];
+    if (method === "claude.accounts.list") return { accounts: [] };
     if (method === "providers.usage")
       return {
         provider: "codex",
@@ -139,16 +140,15 @@ async function main() {
     return [];
   }) as typeof core.call;
   queryClient.setDefaultOptions({ queries: { retry: false } });
-  useLayout.setState({ sidebarOpen: true, projectId: "openorc", collapsed: iconPreview ? ["project:openorc", "project:site"] : [], sidebarFilter: "active" });
-  useLayout.getState().setSidebarWidth(Number(params.get("width")) || 288);
+  useLayout.setState({ sidebarOpen: true, collapsed: iconPreview ? ["project:openorc", "project:site"] : [] });
+  useLayout.getState().setSidebarWidth(Number(params.get("width")) || 247);
   useRouter.getState().navigate(iconPreview ? { view: "tasks" } : { view: "thread", threadId: "openorc-0" });
   Object.assign(window, {
     sidebarSmoke: {
       route: () => useRouter.getState().route,
-      scope: () => useLayout.getState().projectId,
       order: () => useUi.getState().threadOrder,
+      collapsed: () => useLayout.getState().collapsed,
       ui: () => ({ importProject: useUi.getState().importProject }),
-      filter: (filter: "active" | "archived") => useLayout.getState().setSidebarFilter(filter),
       width: (width: number) => useLayout.getState().setSidebarWidth(width),
       navigate: (id: string) => useRouter.getState().navigate({ view: "thread", threadId: id }),
       touch: async (id: string) => {

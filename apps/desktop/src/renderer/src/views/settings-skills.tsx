@@ -81,11 +81,11 @@ function useSkillLists(projectId: string, enabled: boolean, agents: readonly Har
 export function SkillsSettings({ active }: { active: boolean }) {
   const enabled = useEnabledHarnesses();
   const projects = useRpc("projects.list", {});
-  // Settings is a global surface and the rail can be on every project at once,
-  // so the rail seeds this choice rather than being it. Only the project tier
+  // Settings is a global surface and the app's scope can be every project at once,
+  // so the scope seeds this choice rather than being it. Only the project tier
   // depends on which project it is, and picking it here says which one that was.
-  const railProject = useLayout(focusedProject);
-  const [projectId, setProjectId] = useState(railProject ?? "");
+  const scopedProject = useLayout(focusedProject);
+  const [projectId, setProjectId] = useState(scopedProject ?? "");
   const [chosenAgent, setAgent] = useState<HarnessId>("codex");
   const agent = enabled.includes(chosenAgent) ? chosenAgent : enabled[0];
   useEffect(() => {

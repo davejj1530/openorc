@@ -6,10 +6,20 @@ afterEach(() => {
 });
 
 it("lists every project's threads for a layout saved before the project filter", async () => {
-  localStorage.setItem("openorc.layout", JSON.stringify({ projectId: "one", sidebarWidth: 300 }));
+  localStorage.setItem("openorc.layout", JSON.stringify({ projectId: "one" }));
   const { ALL_WORKSPACES, focusedProject, useLayout } = await import("./layout");
-  expect(useLayout.getState()).toMatchObject({ workspace: ALL_WORKSPACES, sidebarWidth: 300 });
+  expect(useLayout.getState()).toMatchObject({ workspace: ALL_WORKSPACES });
   expect(focusedProject(useLayout.getState())).toBeNull();
+});
+
+it("opens the sidebar at its default width over a width the rail's layout saved for the list beside it, then keeps its own", async () => {
+  localStorage.setItem("openorc.layout", JSON.stringify({ sidebarWidth: 300 }));
+  const first = await import("./layout");
+  expect(first.useLayout.getState().sidebarWidth).toBe(first.limits.sidebar.default);
+  first.useLayout.getState().setSidebarWidth(320);
+  vi.resetModules();
+  const second = await import("./layout");
+  expect(second.useLayout.getState().sidebarWidth).toBe(320);
 });
 
 it("remembers the filter's project across launches", async () => {

@@ -23,11 +23,9 @@ import { endThreadDrag, startThreadDrag } from "../lib/thread-drag";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { HarnessLogo } from "./HarnessLogo";
 import { OrclingAvatar } from "./OrclingAvatar";
-import { ProjectIcon } from "./ProjectIconPicker";
 import { ThreadMenuItems, type MenuParts } from "./ThreadActions";
-import { ThreadRowHeadline, useRowHeadline } from "./ThreadHeadline";
 import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
-import { CircleCheck, CircleDashed, Cloud, Folder, GitBranch, GitMerge, GitPullRequest, GitPullRequestClosed, Globe, X } from "./icons";
+import { CircleCheck, CircleDashed, Cloud, Folder, GitBranch, GitMerge, GitPullRequest, GitPullRequestClosed, X } from "./icons";
 import { menuPopup } from "./menu";
 import { Tooltip } from "./ui";
 
@@ -72,16 +70,15 @@ function PullRequestStatus({ thread }: { thread: ThreadSummary }) {
   );
 }
 
-/** The project a sidebar row belongs to. Workspace has no folder of its own. */
-export type RowProject = { name: string; rootPath?: string };
+/** The project a sidebar row names, in a group that holds many projects. */
+export type RowProject = { name: string };
 
 type ThreadRowProps = { thread: ThreadSummary; subthreads?: ThreadStatus | null; active: boolean; project?: RowProject; compact?: boolean };
 
 /**
- * A thread row: its title with what it needs from you at the end, what its agent is doing while it works, then its
- * project and pull request. A sub thread keeps its mark ahead of its title, where the tree's lines reach it. A parent's
- * mark also tells of its sub threads (`subthreads`) while they need you or work. ⌘-click opens it in the split;
- * right-click gives every action.
+ * A thread row: its title with what it needs from you at the end, then where it works and its pull request. A sub
+ * thread keeps its mark ahead of its title, where the tree's lines reach it. A parent's mark also tells of its sub
+ * threads (`subthreads`) while they need you or work. ⌘-click opens it in the split; right-click gives every action.
  */
 export function ThreadRow({ thread, subthreads = null, active, project, compact = false }: ThreadRowProps) {
   const navigate = useRouter((s) => s.navigate);
@@ -197,45 +194,36 @@ function RowTitle({ title, working }: { title: string; working: boolean }) {
 }
 
 /**
- * A thread's visible lines: its title, swept while it works; what its agent is doing; then its project and pull
- * request. Its mark (the spinner, what it or a sub thread needs from you, a failure or an unread dot) sits at the end of
- * the line under the title, in one column under a parent's chevron. A row with no line under its title keeps the mark at its end.
+ * A thread's two lines: its title, swept while it works, with its mark at the end (the spinner, what it or a sub thread
+ * needs from you, a failure or an unread dot); then one quiet line of where it works and its pull request. A row in a
+ * group of many projects (Pinned, Snoozed, Resolved) names its project there first.
  */
 function ThreadLines({ thread, subthreads, project }: { thread: ThreadSummary; subthreads: ThreadStatus | null; project?: RowProject }) {
   const working = threadStatus(thread)?.kind === "running";
-  const headline = useRowHeadline(thread);
-  const mark = <SidebarThreadMark thread={thread} subthreads={subthreads} pull={!project} />;
-  const below = Boolean(headline || project);
-  const trailing = below ? <span className="thread-preview-mark">{mark}</span> : null;
+  // The pull request shows beside it, so where the work is stays named even when there is one.
+  const workspace = workspaceLabel({ ...thread, prUrl: null });
   return (
     <>
       <span className="thread-preview-heading">
         <RowTitle title={thread.title} working={working} />
-        <span className="thread-preview-status">{below ? null : mark}</span>
-      </span>
-      {headline ? <ThreadRowHeadline headline={headline} trailing={trailing} /> : null}
-      {project ? <ProjectLine thread={thread} project={project} trailing={headline ? null : trailing} /> : null}
-    </>
-  );
-}
-
-/** A root row's last line: its project, where in it the thread works, then its pull request. */
-function ProjectLine({ thread, project, trailing }: { thread: ThreadSummary; project: RowProject; trailing: ReactNode }) {
-  const workspace = workspaceLabel(thread);
-  return (
-    <span className="thread-preview-project">
-      <span className="thread-preview-project-icon">{project.rootPath ? <ProjectIcon rootPath={project.rootPath} /> : <Globe size={14} />}</span>
-      <span className="thread-preview-project-name" data-tip={project.name}>
-        {project.name}
-      </span>
-      {workspace ? (
-        <span className="thread-preview-workspace" data-tip={thread.branch ?? undefined}>
-          {workspace}
+        <span className="thread-preview-mark">
+          <SidebarThreadMark thread={thread} subthreads={subthreads} pull={false} />
         </span>
-      ) : null}
-      <PullRequestStatus thread={thread} />
-      {trailing}
-    </span>
+      </span>
+      <span className="thread-preview-line">
+        {project ? (
+          <span className="thread-preview-project" data-tip={project.name}>
+            {project.name}
+          </span>
+        ) : null}
+        {workspace ? (
+          <span className="thread-preview-workspace" data-tip={thread.branch ?? undefined}>
+            {workspace}
+          </span>
+        ) : null}
+        <PullRequestStatus thread={thread} />
+      </span>
+    </>
   );
 }
 

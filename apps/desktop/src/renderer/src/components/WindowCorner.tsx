@@ -2,13 +2,13 @@ import type { ReactNode } from "react";
 import { ArrowLeft, ArrowRight, PanelLeft } from "./icons";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
 import { useLayout } from "../lib/layout";
+import { cn } from "../lib/cn";
 import { useRouter } from "../lib/router";
 import { IconButton, Tooltip } from "./ui";
 
 /**
- * The window's corner: Back, Forward and the sidebar toggle. It sits in the sidebar's header while the
- * sidebar is open and in the main column's header while it is hidden. Search lives in the sidebar's
- * list head and Inbox on the rail.
+ * The window's corner: Back, Forward and the sidebar toggle. It leads the first header beside the sidebar, open or
+ * hidden: the main column's, or a panel's docked on the left.
  */
 export function WindowCorner({ sidebarOpen }: { sidebarOpen: boolean }) {
   const canBack = useRouter((s) => s.history.length > 0);
@@ -47,11 +47,11 @@ function HistoryButton({ label, disabled, onClick, children }: { label: string; 
 }
 
 /** Shows or hides the sidebar. */
-function SidebarToggle({ open }: { open: boolean }) {
+export function SidebarToggle({ open, className }: { open: boolean; className?: string }) {
   const toggle = useLayout((s) => s.toggleSidebar);
   return (
     <Tooltip label={open ? "Hide sidebar" : "Show sidebar"}>
-      <IconButton size="lg" onClick={toggle} aria-label="Toggle sidebar" className="no-drag">
+      <IconButton size="lg" onClick={toggle} aria-label="Toggle sidebar" className={cn("no-drag", className)}>
         <PanelLeft size={16} />
       </IconButton>
     </Tooltip>

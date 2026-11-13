@@ -5,7 +5,6 @@ import { useLayout } from "../lib/layout";
 import { ThreadTreeList } from "./ThreadTreeList";
 
 vi.mock("../lib/orclings", async (original) => ({ ...(await original<typeof import("../lib/orclings")>()), useOrclings: () => [] }));
-vi.mock("./ThreadHeadline", async (original) => ({ ...(await original<typeof import("./ThreadHeadline")>()), useRowHeadline: () => null }));
 vi.mock("../lib/browser-preview", () => ({ CoversPreview: () => null }));
 beforeEach(() => {
   vi.stubGlobal(

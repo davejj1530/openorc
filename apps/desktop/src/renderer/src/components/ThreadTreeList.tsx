@@ -16,6 +16,7 @@ export function ThreadTreeList({
   roots: ThreadSummary[];
   all: ThreadSummary[];
   activeId: string | null;
+  /** Each project's name, for a list that mixes projects, so its rows say whose they are. */
   projects?: ReadonlyMap<string, RowProject>;
   childLimits?: Readonly<Record<string, number>>;
   onShowMore?: (projectId: string, parentId: string) => void;
@@ -38,7 +39,7 @@ export function ThreadTreeList({
     const project = depth ? undefined : projects?.get(thread.projectId);
     return (
       <div key={thread.id} className="sidebar-tree-node" data-child={depth > 0 || undefined}>
-        <BranchRow row={row} project={Boolean(project)} onToggle={hasChildren ? () => toggle(thread.id, expanded) : undefined}>
+        <BranchRow row={row} onToggle={hasChildren ? () => toggle(thread.id, expanded) : undefined}>
           <ThreadRow thread={thread} subthreads={subthreads.get(thread.id) ?? null} active={activeId === thread.id} compact={depth > 0} project={project} />
         </BranchRow>
         {expanded && hasChildren ? (
@@ -59,7 +60,7 @@ export function ThreadTreeList({
   return roots.map(render);
 }
 
-/** The tree's grid: a parent's line leaves its project icon, and a sub thread steps in so its mark sits under the project's name. */
+/** The tree's grid: a parent's line leaves under its title's start, and a sub thread steps in so its mark sits there. */
 const MARK_X = 18;
 const STEP = 24;
 
@@ -68,9 +69,10 @@ const STEP = 24;
  * of its title line, where the phone keeps it: the chevron points down while its sub threads are folded and turns up
  * as they open.
  */
-function BranchRow({ row, project = false, children, paging = false, onToggle }: { row: ThreadTreeRow; project?: boolean; children: ReactNode; paging?: boolean; onToggle?: () => void }) {
+function BranchRow({ row, children, paging = false, onToggle }: { row: ThreadTreeRow; children: ReactNode; paging?: boolean; onToggle?: () => void }) {
   const element = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ height: project ? 52 : 34, mid: project ? 35 : 17, title: 17 });
+  const root = row.depth === 0 && !paging;
+  const [size, setSize] = useState({ height: root ? 52 : 34, mid: root ? 35 : 17, title: 17 });
   useLayoutEffect(() => {
     const node = element.current;
     if (!node) return;
@@ -84,7 +86,7 @@ function BranchRow({ row, project = false, children, paging = false, onToggle }:
       if (scale)
         setSize({
           height: node.offsetHeight,
-          mid: center(node.querySelector(".thread-preview-project-icon") ?? node.querySelector(".thread-preview-status:not(:empty)") ?? node.querySelector(".thread-preview-heading")),
+          mid: center(node.querySelector(".thread-preview-status:not(:empty)") ?? node.querySelector(".thread-preview-line") ?? node.querySelector(".thread-preview-heading")),
           title: center(node.querySelector(".thread-preview-heading")),
         });
     };

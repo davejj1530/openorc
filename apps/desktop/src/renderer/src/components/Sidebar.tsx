@@ -7,107 +7,84 @@ import { useProjectIconChanges } from "../lib/project-icons";
 import { OrclingsRailContext, useOrclingsRail } from "../lib/orclings-rail";
 import { useOrclings } from "../lib/orclings";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
-import { PenSquare } from "./icons";
+import { Plus } from "./icons";
 import { ResizeHandle } from "./ResizeHandle";
+import { SidebarFooter } from "./SidebarFooter";
 import { SidebarListHead, Wordmark } from "./SidebarListHead";
+import { SidebarNav } from "./SidebarNav";
 import { NewOrclingButton, SidebarOrclings } from "./SidebarOrclings";
 import { SidebarSettings } from "./SidebarSettings";
-import { SidebarThreadBrowser, ThreadFilter } from "./SidebarThreadBrowser";
-import { SidebarRail } from "./SidebarRail";
-import { OrclingsHeading, ProjectFilter } from "./SidebarWorkspaces";
-import { IconButton, Tooltip } from "./ui";
-import { WindowCorner } from "./WindowCorner";
+import { SidebarThreadBrowser } from "./SidebarThreadBrowser";
+import { Tooltip } from "./ui";
+import { SidebarToggle } from "./WindowCorner";
 
 /**
- * One navigation column shared by every destination and every project: the window corner spans it, and under it the
- * rail of the app's screens, the week's usage at its foot, sits beside the thread list, which names whose threads it lists.
- * Settings lists its sections in the list's place. Hiding the sidebar folds the list and the corner away and keeps the
- * rail.
+ * The sidebar, one column with a hairline at its edge from the window's top to its foot: its header, the app's screens
+ * by name, then the threads grouped by project under Workspaces, or the Orclings in their place, and the footer.
+ * Settings lists its sections where the screens and threads go. Hidden, nothing of it stays.
  */
 export function Sidebar() {
   useProjectIconChanges();
   const route = useRouter((s) => s.route);
   const open = useLayout((s) => s.sidebarOpen);
   const gone = useNavigationGone();
-  // A new thread starts in the project the list shows; on All projects, in the one last chosen for a new thread.
-  const projectId = useLayout(focusedProject);
   const trafficLights = useTrafficLights();
   const nativeOrclings = useOrclingsRail(route, useOrclings());
   const orclings = useContext(OrclingsRailContext) ?? nativeOrclings;
-  const openThreads = (project = projectId) => nativeOrclings.openThreads(() => newThread(project ?? undefined));
-  const toggleOrclings = () => (orclings.active ? openThreads() : orclings.open());
+  const projectId = useLayout(focusedProject);
+  const toggleOrclings = () => (orclings.active ? nativeOrclings.openThreads(() => newThread(projectId ?? undefined)) : orclings.open());
   const settings = route.view === "settings";
-  const chooseWorkspace = (id: string) => {
-    useLayout.getState().setWorkspace(id);
-    // Choosing a project shows its threads, in place of the Orclings: a new thread there, not in the one it left.
-    if (orclings.active) openThreads(focusedProject({ workspace: id }));
-  };
   return (
     <>
-      <aside className="sidebar-shell workspace-navigation h-full shrink-0" data-open={open} data-settings={settings || undefined} data-traffic-lights={trafficLights} aria-hidden={gone} inert={gone}>
-        <SidebarHeader />
-        <div className="sidebar-columns">
-          <SidebarRail route={route} orclings={{ active: orclings.active, toggle: toggleOrclings }} onProject={chooseWorkspace} projectId={projectId} />
-          <div className="sidebar-workspace">
-            {settings ? <SidebarSettings route={route} /> : null}
-            {/* Settings takes the list's place; the list keeps its pages, filters and scroll for the way back. */}
-            <div className="sidebar-list-pane" hidden={settings}>
-              {orclings.active ? <OrclingsHeading /> : <ProjectFilter onSelect={chooseWorkspace} />}
-              <SidebarListHead
-                tools={
-                  orclings.active ? (
-                    <NewOrclingButton />
-                  ) : (
-                    <>
-                      <ThreadFilter />
-                      <NewThreadButton projectId={projectId} />
-                    </>
-                  )
-                }
-              />
-              {/* Keep loaded pages and filters when switching to a companion. */}
-              <div className="sidebar-browser-slot" hidden={orclings.active}>
-                <SidebarThreadBrowser />
-              </div>
-              {orclings.active ? <SidebarOrclings route={route} /> : null}
-            </div>
+      <aside className="sidebar-shell workspace-navigation h-full shrink-0" data-open={open} data-traffic-lights={trafficLights} aria-hidden={gone} inert={gone}>
+        <SidebarHeader projectId={projectId} />
+        {settings ? <SidebarSettings route={route} /> : null}
+        {/* Settings takes the screens' and threads' place; the list keeps its pages, filters and scroll for the way back. */}
+        <div className="sidebar-body" hidden={settings}>
+          <SidebarNav route={route} orclings={{ active: orclings.active, toggle: toggleOrclings }} />
+          {/* Keep loaded pages and filters while the Orclings take the threads' place. */}
+          <div className="sidebar-browser-slot" hidden={orclings.active}>
+            <SidebarThreadBrowser />
           </div>
+          {orclings.active ? (
+            <div className="sidebar-workspaces" data-open>
+              <SidebarListHead label="Orclings" tools={<NewOrclingButton />} />
+              <SidebarOrclings route={route} />
+            </div>
+          ) : null}
         </div>
+        <SidebarFooter />
       </aside>
       {open ? <ResizeHandle edge="sidebar" /> : null}
     </>
   );
 }
 
-function NewThreadButton({ projectId }: { projectId: string | null }) {
-  return (
-    <Tooltip label="New thread">
-      <IconButton
-        size="lg"
-        aria-label="New thread"
-        className="sidebar-new-thread no-drag"
-        onClick={() => {
-          newThread(projectId ?? undefined);
-          dismissCompactNavigation();
-        }}
-      >
-        <PenSquare size={16} />
-      </IconButton>
-    </Tooltip>
-  );
-}
-
-/** The window's corner: the wordmark, after the traffic lights where the OS draws them, then Inbox and the sidebar toggle. */
-function SidebarHeader() {
+/**
+ * The sidebar's header, where the window is dragged from: the traffic lights where the OS draws them, then whose
+ * workspace this is, then New thread. Until there are organizations, the workspace is OpenOrc's own mark and name. A
+ * narrow window floats the sidebar over the toggle that shows it, so the header carries its own way to hide it there.
+ */
+function SidebarHeader({ projectId }: { projectId: string | null }) {
   return (
     <header className="sidebar-header drag-region h-topbar">
-      <Wordmark />
-      <WindowCorner sidebarOpen />
+      <SidebarToggle open className="sidebar-header-toggle" />
+      <div className="sidebar-identity">
+        <Wordmark />
+      </div>
+      <Tooltip label="New thread">
+        <button
+          type="button"
+          aria-label="New thread"
+          className="sidebar-new-thread no-drag"
+          onClick={() => {
+            newThread(projectId ?? undefined);
+            dismissCompactNavigation();
+          }}
+        >
+          <Plus size={16} />
+        </button>
+      </Tooltip>
     </header>
   );
-}
-
-/** When navigation is hidden, the window corner moves to the main toolbar. */
-export function WindowNav({ open }: { open: boolean }) {
-  return <WindowCorner sidebarOpen={open} />;
 }

@@ -113,7 +113,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it("opens every account's 5-hour and weekly limits from the rail's usage bars, the thread's account first", async () => {
+it("opens every account's 5-hour and weekly limits from the footer's usage bars, the thread's account first", async () => {
   useRouter.setState({ route: { view: "thread", threadId: "notes" } });
   render(<AccountUsage />);
   const button = screen.getByRole("button", { name: "Claude · Work: 59% left this week" });
@@ -141,7 +141,7 @@ it("on an OpenCode thread, which has no weekly limit, shows the usage bars plain
   useRouter.setState({ route: { view: "thread", threadId: "notes" } });
   render(<AccountUsage />);
   const button = screen.getByRole("button", { name: "OpenCode: no weekly limit" });
-  // The rail shows no figure and measures nothing until the popup opens.
+  // The footer shows no figure and measures nothing until the popup opens.
   expect(button.textContent).toBe("");
   expect(button.querySelector(".account-usage-bars")).toBeNull();
   expect(button.querySelector("svg")?.getAttribute("data-icon")).toBe("Signal");

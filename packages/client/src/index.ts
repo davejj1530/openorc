@@ -128,6 +128,7 @@ export {
   sidebarDayOpen,
   sidebarDaySections,
   sidebarListGrows,
+  sidebarGroupsGrow,
   resolvedBefore,
   resolvedRows,
   sidebarPlace,
@@ -139,6 +140,7 @@ export {
   type SidebarPlace,
 } from "./sidebar-days.js";
 export { useSidebarNow } from "./sidebar-clock.js";
+export { GROUP_PAGE, GROUP_STEP, groupPage, liveGroupedFold, projectGroups, waitingRoots, waitsOnYou, WORKSPACES_FOLD, type GroupProject, type ProjectGroup } from "./sidebar-groups.js";
 export { snoozePresets, snoozePresetsChangeAt, snoozeWakeLabel } from "./snooze.js";
 export { startedWorkFromTool, taskActivity, taskCardStatusLabel, taskIdFromTool, taskStepLabel, uniqueTaskCards } from "./task-progress.js";
 export { pruneThreadFolds, threadFoldIds } from "./thread-folds.js";

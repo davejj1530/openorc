@@ -300,14 +300,6 @@
   outline-offset: 2px;
 }
 
-/* The rail's Orclings button carries the mark of whichever Orcling most needs you while their faces are tucked away. */
-.sidebar-rail-orclings {
-  position: relative;
-}
-.sidebar-rail-orclings .sidebar-rail-mark {
-  background: var(--bg);
-}
-
 /* A group's faces, each standing a third over the one before; the drawing behind is cut away around it (OrclingFaces). */
 .orcling-faces {
   display: inline-flex;

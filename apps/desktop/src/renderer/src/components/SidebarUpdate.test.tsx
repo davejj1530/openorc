@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import type { UpdateSnapshot } from "../../../shared/app-updates";
-import { RailUpdate } from "./SidebarRailUpdate";
+import { SidebarUpdate } from "./SidebarUpdate";
 
 vi.mock("./ui", async (original) => ({ ...(await original<object>()), Tooltip: ({ children }: { children: React.ReactNode }) => children }));
 
@@ -15,7 +15,7 @@ function show(snapshot: UpdateSnapshot) {
     return () => {};
   });
   Object.assign(window, { openorc: { updates } });
-  return render(<RailUpdate />);
+  return render(<SidebarUpdate />);
 }
 
 afterEach(() => {
@@ -23,28 +23,19 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-it("checks for updates while nothing newer is known, says how the check went, and holds still while it runs", async () => {
+it("shows nothing while no update waits: before a check, during one, after one and when it failed", async () => {
   show({ state: { phase: "idle" }, dismissed: false });
-  fireEvent.click(await screen.findByRole("button", { name: "Check for updates" }));
   await act(async () => {});
-  expect(updates.check).toHaveBeenCalledTimes(1);
-  act(() => push({ state: { phase: "checking" }, dismissed: false }));
-  const checking = screen.getByRole("button", { name: "Checking for updates…" });
-  fireEvent.click(checking);
-  expect(updates.check).toHaveBeenCalledTimes(1);
-  expect(checking.dataset["offer"]).toBeUndefined();
-  act(() => push({ state: { phase: "current" }, dismissed: false }));
-  fireEvent.click(screen.getByRole("button", { name: "OpenOrc is up to date. Check again" }));
-  await act(async () => {});
-  act(() => push({ state: { phase: "error", message: "The network is offline." }, dismissed: false }));
-  fireEvent.click(screen.getByRole("button", { name: "Couldn’t check for updates: The network is offline. Check again" }));
-  await act(async () => {});
-  expect(updates.check).toHaveBeenCalledTimes(3);
+  expect(screen.queryByRole("button")).toBeNull();
+  for (const state of [{ phase: "checking" }, { phase: "current" }, { phase: "error", message: "The network is offline." }] as const) {
+    act(() => push({ state, dismissed: false }));
+    expect(screen.queryByRole("button")).toBeNull();
+  }
 });
 
-it("offers a new version's download once there is one, dismissed notice or not, marked apart from a check", async () => {
+it("offers a new version's download once there is one, dismissed notice or not, with its dot", async () => {
   show({ state: { phase: "current" }, dismissed: false });
-  await screen.findByRole("button", { name: "OpenOrc is up to date. Check again" });
+  await act(async () => {});
   act(() => push({ state: { phase: "available", version: "0.2.0" }, dismissed: true }));
   const download = screen.getByRole("button", { name: "Download OpenOrc 0.2.0" });
   expect(download.dataset["offer"]).toBe("true");

@@ -29,8 +29,8 @@ const mount = () =>
     </QueryClientProvider>,
   );
 
-it("leads the title with the focused project while the sidebar is hidden, and the project changes the filter", async () => {
-  useLayout.setState({ sidebarOpen: false, workspace: "studio" });
+it("leads the title with the app's scope, open sidebar or hidden, and the scope changes it", async () => {
+  useLayout.setState({ sidebarOpen: true, workspace: "studio" });
   const { container } = mount();
   const crumb = await screen.findByRole("button", { name: "Project: studio" });
   expect(container.textContent).toBe("studio/Tasks");
@@ -39,11 +39,20 @@ it("leads the title with the focused project while the sidebar is hidden, and th
   expect(useLayout.getState().workspace).toBe("site");
 });
 
-it("keeps the plain title while the sidebar shows or no project is focused", () => {
-  useLayout.setState({ sidebarOpen: true, workspace: "studio" });
-  const shown = mount();
-  expect(shown.container.textContent).toBe("Tasks");
-  shown.unmount();
+it("reads All projects with no project chosen, and offers Add project there", async () => {
   useLayout.setState({ sidebarOpen: false, workspace: ALL_WORKSPACES });
-  expect(mount().container.textContent).toBe("Tasks");
+  const { container } = mount();
+  fireEvent.click(await screen.findByRole("button", { name: "Project: All projects" }));
+  expect(container.textContent).toContain("All projects/Tasks");
+  expect(await screen.findByRole("menuitem", { name: "Add project" })).toBeTruthy();
+});
+
+it("gives a screen that stands for one project at a time its own title while no project is chosen", () => {
+  useLayout.setState({ workspace: ALL_WORKSPACES });
+  const { container } = render(
+    <QueryClientProvider client={queryClient}>
+      <ScopedTitle unscoped="Memory in studio">Memory</ScopedTitle>
+    </QueryClientProvider>,
+  );
+  expect(container.textContent).toBe("Memory in studio");
 });

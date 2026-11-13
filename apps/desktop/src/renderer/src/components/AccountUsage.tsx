@@ -11,8 +11,10 @@ import { useRouter } from "../lib/router";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { HarnessLogo } from "./HarnessLogo";
 import { Signal, SignalHigh, SignalLow, SignalMedium } from "./icons";
-import { RAIL_ICON } from "./sidebar-screens";
 import { Tooltip } from "./ui";
+
+/** The footer's glyph size, the same as the sidebar's other tools. */
+const USAGE_ICON = 16;
 
 /** An agent and Claude account as the chip names them, or null for an agent OpenOrc does not run. */
 function usageAccount(agent: string, claudeAccountId: string | undefined, accountName: (id: string) => string | undefined, model?: string | null): UsageAccount | null {
@@ -76,8 +78,8 @@ function LeftBars({ left }: { left: number }) {
   const Lit = lit ? LIT_BARS[lit - 1]! : null;
   return (
     <span className="account-usage-bars" aria-hidden="true">
-      <Signal size={RAIL_ICON} className="account-usage-bars-track" />
-      {Lit ? <Lit size={RAIL_ICON} className="account-usage-bars-fill" /> : null}
+      <Signal size={USAGE_ICON} className="account-usage-bars-track" />
+      {Lit ? <Lit size={USAGE_ICON} className="account-usage-bars-fill" /> : null}
     </span>
   );
 }
@@ -271,8 +273,8 @@ function ConversationCost({ account, cost }: { account: UsageAccount; cost: numb
   );
 }
 
-/** What the rail's button shows and says. */
-interface RailMark {
+/** What the footer's usage button shows and says. */
+interface UsageMark {
   tooltip: string;
   label: string;
   low: boolean;
@@ -280,17 +282,17 @@ interface RailMark {
 }
 
 /** The week's share left, as usage bars. */
-function weekMark(account: UsageAccount, left: number): RailMark {
+function weekMark(account: UsageAccount, left: number): UsageMark {
   const shown = Math.round(left);
   return { tooltip: `${shown}% left this week`, label: `${account.name}: ${shown}% left this week`, low: shown <= 10, mark: <LeftBars left={left} /> };
 }
 
-/** An account with no weekly limit has nothing to measure: the bars plain, like the rail's other buttons, opening on what the conversation has cost. */
-function noLimitMark(account: UsageAccount): RailMark {
-  return { tooltip: "No weekly limit", label: `${account.name}: no weekly limit`, low: false, mark: <Signal size={RAIL_ICON} /> };
+/** An account with no weekly limit has nothing to measure: the bars plain, like the footer's other buttons, opening on what the conversation has cost. */
+function noLimitMark(account: UsageAccount): UsageMark {
+  return { tooltip: "No weekly limit", label: `${account.name}: no weekly limit`, low: false, mark: <Signal size={USAGE_ICON} /> };
 }
 
-function fxMark(account: UsageAccount, windows: AllowanceWindow[], credits: UsageAccountReport["credits"]): RailMark | null {
+function fxMark(account: UsageAccount, windows: AllowanceWindow[], credits: UsageAccountReport["credits"]): UsageMark | null {
   const primary = windows.filter((window) => window.group === windows[0]?.group);
   const window = weeklyWindow(primary) ?? sessionWindow(primary) ?? primary.find((window) => percentLeft(window) !== null);
   if (window) {
@@ -301,11 +303,11 @@ function fxMark(account: UsageAccount, windows: AllowanceWindow[], credits: Usag
   const credit = credits.find((credit) => credit.unlimited || credit.balance !== null);
   if (!credit) return null;
   const tooltip = `${credit.label}: ${creditBalanceLabel(credit)}`;
-  return { tooltip, label: `fx: ${tooltip}`, low: !credit.unlimited && Number(credit.balance) <= 0, mark: <Signal size={RAIL_ICON} /> };
+  return { tooltip, label: `fx: ${tooltip}`, low: !credit.unlimited && Number(credit.balance) <= 0, mark: <Signal size={USAGE_ICON} /> };
 }
 
-/** Where the table opens: beside the rail's button. */
-const PLACE = { side: "right", align: "end", sideOffset: 10 } as const;
+/** Where the table opens: over the sidebar's footer. */
+const PLACE = { side: "top", align: "start", sideOffset: 8 } as const;
 
 /** Allowances and balances for the selected account, alongside reported conversation costs. */
 export function AccountUsage() {
@@ -313,13 +315,13 @@ export function AccountUsage() {
   const usage = useRpc("providers.usage", usageParams(account ?? { provider: "claude" }), { enabled: Boolean(account), staleTime: USAGE_MAX_AGE_MS });
   const cost = useConversationCost(account);
   if (!account) return null;
-  const rail = accountMark(account, usage.data, cost);
-  if (!rail) return null;
+  const mark = accountMark(account, usage.data, cost);
+  if (!mark) return null;
   return (
     <Popover.Root>
-      <Tooltip label={rail.tooltip} side="right">
-        <Popover.Trigger className="sidebar-dock-button account-usage-rail no-drag" data-low={rail.low || undefined} aria-label={rail.label}>
-          {rail.mark}
+      <Tooltip label={mark.tooltip} side="top">
+        <Popover.Trigger className="sidebar-tool account-usage-button no-drag" data-low={mark.low || undefined} aria-label={mark.label}>
+          {mark.mark}
         </Popover.Trigger>
       </Tooltip>
       <Popover.Portal>
@@ -335,14 +337,14 @@ export function AccountUsage() {
   );
 }
 
-function accountMark(account: UsageAccount, report: ProviderUsage | undefined, cost: number | null): RailMark | null {
+function accountMark(account: UsageAccount, report: ProviderUsage | undefined, cost: number | null): UsageMark | null {
   // Antigravity exposes Gemini to OpenOrc; its native CLI also reports a separate Claude/GPT pool.
   const windows = account.provider === "antigravity" ? report?.windows.filter((window) => window.id.startsWith("gemini-")) : report?.windows;
   const week = windows ? weeklyWindow(windows) : null;
   const left = week ? percentLeft(week) : null;
-  let rail: RailMark | null = null;
-  if (account.provider === "fx") rail = fxMark(account, windows ?? [], report?.credits ?? []);
-  else if (left !== null) rail = weekMark(account, left);
-  if (!rail && cost !== null) rail = noLimitMark(account);
-  return rail;
+  let mark: UsageMark | null = null;
+  if (account.provider === "fx") mark = fxMark(account, windows ?? [], report?.credits ?? []);
+  else if (left !== null) mark = weekMark(account, left);
+  if (!mark && cost !== null) mark = noLimitMark(account);
+  return mark;
 }

@@ -12,7 +12,7 @@ import { floatingGround } from "../lib/use-anchor-ground";
 import { useScrollEdges } from "../lib/use-scroll-edges";
 import { cn } from "../lib/cn";
 import { markThread, workspaceMarks, workspaceSummary, type WorkspaceMark } from "../lib/workspace-rail";
-import { Check, ChevronDown, Folders, Orclings, Plus, Settings, X } from "./icons";
+import { Check, Folders, Plus, Settings, X } from "./icons";
 import { menuItem, menuItemDanger, menuPopup, menuSeparator } from "./menu";
 import { ProjectIcon } from "./ProjectIconPicker";
 import { RemoveProjectDialog } from "./ProjectMenu";
@@ -36,24 +36,6 @@ export function useWorkspaceMarks(projectIds: readonly string[], enabled: boolea
 
 const ALL_PROJECTS = "All projects";
 
-function ScopeName({ icon, name }: { icon: ReactNode; name: string }) {
-  return (
-    <>
-      <span className="sidebar-workspace-name-icon">{icon}</span>
-      <span className="sidebar-workspace-name-label">{name}</span>
-    </>
-  );
-}
-
-/** The Orcling list's first row, where the thread list names its project, so Search keeps its place under both. */
-export function OrclingsHeading() {
-  return (
-    <div className="sidebar-workspace-name">
-      <ScopeName icon={<Orclings size={14} />} name="Orclings" />
-    </div>
-  );
-}
-
 /** The chosen row, scrolled to the middle of the projects as the menu opens when they run past it. */
 const inView = (row: HTMLElement | null) => row?.scrollIntoView?.({ block: "center" });
 
@@ -75,11 +57,12 @@ function ScopeItem({ icon, name, chosen, mark, onSelect }: { icon: ReactNode; na
 }
 
 /**
- * The thread list's first row: whose threads it lists. It opens on All projects, then each project with its most
- * pressing thread's mark; the chosen project's settings, a new task there and its removal; and Add project. As a
- * `crumb` it is the project's name at the head of a screen's title, opening the same menu.
+ * The project at the head of a screen's title, the app's scope: All projects, or one project. It opens on All projects,
+ * then each project with its most pressing thread's mark; the chosen project's settings, a new task there and its
+ * removal; and Add project.
  */
-export function ProjectFilter({ onSelect, crumb = false }: { onSelect: (workspace: string) => void; crumb?: boolean }) {
+export function ProjectScope() {
+  const onSelect = (workspace: string) => useLayout.getState().setWorkspace(workspace);
   const { query: projects, all } = useSidebarProjects();
   const workspace = useLayout((s) => s.workspace);
   const marks = useWorkspaceMarks(all, Boolean(projects.data));
@@ -89,12 +72,9 @@ export function ProjectFilter({ onSelect, crumb = false }: { onSelect: (workspac
   return (
     <>
       <Menu.Root>
-        <Menu.Trigger
-          className={cn("no-drag", crumb ? "title-crumb-link" : "sidebar-workspace-name")}
-          aria-label={crumb ? `Project: ${project?.name ?? ALL_PROJECTS}` : `Threads in ${project?.name ?? "all projects"}`}
-        >
-          <ScopeName icon={project ? <ProjectIcon rootPath={project.rootPath} /> : <Folders size={14} />} name={project?.name ?? ALL_PROJECTS} />
-          {crumb ? null : <ChevronDown size={14} className="sidebar-workspace-name-chevron" />}
+        <Menu.Trigger className="title-crumb-link no-drag" aria-label={`Project: ${project?.name ?? ALL_PROJECTS}`}>
+          <span className="project-scope-icon">{project ? <ProjectIcon rootPath={project.rootPath} /> : <Folders size={14} />}</span>
+          <span className="project-scope-name">{project?.name ?? ALL_PROJECTS}</span>
         </Menu.Trigger>
         <Menu.Portal>
           <CoversPreview />

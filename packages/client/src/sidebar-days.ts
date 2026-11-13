@@ -107,6 +107,14 @@ export function sidebarListGrows({ end, hasMore, collapsed, limit = 0 }: { end: 
 }
 
 /**
+ * Whether the list grouped by project reads its next page by itself: until the loaded threads reach Resolved, so every
+ * group is whole. Inside Resolved the reader asks for more.
+ */
+export function sidebarGroupsGrow({ end, hasMore, limit }: { end: SidebarPlace | null; hasMore: boolean; limit: number }): boolean {
+  return hasMore && limit < GROWTH_LIMIT && end !== "resolved";
+}
+
+/**
  * A thread that needs you: unread, waiting on you, or with an agent on it. A folded day still shows these. A subagent
  * counts only while it works: its parent reads its result, so a finished one stays unread forever.
  */

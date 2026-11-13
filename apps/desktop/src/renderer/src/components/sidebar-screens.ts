@@ -11,9 +11,6 @@ export interface Screen {
   views: Route["view"][];
 }
 
-/** The rail's glyphs, a step larger than the 16px the list beside it uses. */
-export const RAIL_ICON = 18;
-
 /** The screens in the order the sidebar lists them. */
 export const SCREENS: Screen[] = [
   { id: "tasks", label: "Tasks", Icon: ListTodo, route: { view: "tasks" }, views: ["tasks", "task", "newtask"] },

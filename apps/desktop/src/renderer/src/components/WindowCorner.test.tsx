@@ -10,7 +10,7 @@ vi.mock("./ui", async (importOriginal) => ({
   Tooltip: ({ children }: { children: ReactNode }) => children,
 }));
 
-import { WindowNav } from "./Sidebar";
+import { WindowCorner } from "./WindowCorner";
 
 afterEach(cleanup);
 beforeEach(() => useRouter.setState({ route: { view: "newthread" }, history: [], future: [], threadIds: [] }));
@@ -20,14 +20,14 @@ const back = () => screen.getByRole("button", { name: "Back" }) as HTMLButtonEle
 const forward = () => screen.getByRole("button", { name: "Forward" }) as HTMLButtonElement;
 
 it("reads Back, Forward, then the sidebar toggle, with the sidebar open or hidden", () => {
-  const { rerender } = render(<WindowNav open={false} />);
+  const { rerender } = render(<WindowCorner sidebarOpen={false} />);
   expect(labels()).toEqual(["Back", "Forward", "Toggle sidebar"]);
-  rerender(<WindowNav open />);
+  rerender(<WindowCorner sidebarOpen />);
   expect(labels()).toEqual(["Back", "Forward", "Toggle sidebar"]);
 });
 
 it("steps back and forward through the window's history, each off while there is nowhere to go", () => {
-  render(<WindowNav open={false} />);
+  render(<WindowCorner sidebarOpen={false} />);
   expect(back().disabled).toBe(true);
   expect(forward().disabled).toBe(true);
 

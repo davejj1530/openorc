@@ -5,7 +5,7 @@ import { cn } from "../lib/cn";
 import { useLayout, type PanelSide } from "../lib/layout";
 import { PageTitle } from "./PageTitle";
 import { PanelSideSwitch } from "./PanelSideSwitch";
-import { WindowNav } from "./Sidebar";
+import { WindowCorner } from "./WindowCorner";
 import { cornerInset, useWindowCorner, type HeaderCorner } from "../lib/navigation-column";
 import { IconButton, Tooltip } from "./ui";
 import { useTrafficLights, useWindowsControls } from "../lib/window";
@@ -32,8 +32,8 @@ function headerEnds({ inSplit, panelShown, panelSide, rightmost }: { inSplit?: b
 /**
  * The main column's header: the screen's title. A plain-text title is the page's heading. The project in view is the
  * sidebar filter's, so headers carry no project of their own.
- * Window navigation stays here. With the sidebar hidden this is the window's
- * leftmost header, so it also clears the native window controls.
+ * Window navigation leads it, the sidebar open or hidden. With the sidebar hidden
+ * this is the window's leftmost header, so it also clears the native window controls.
  * When a panel is available its toggle lives here, showing it or hiding it, so
  * the third column is one click away either way (the panel's own Hide shows only
  * while it covers this header). While it is open on the right, this column is the
@@ -86,8 +86,8 @@ export function TopBar({
       {windowDragSurface ? <span className="thread-header-drag-surface" aria-hidden="true" /> : null}
       <div className="flex items-center gap-2 min-w-0 flex-1 text-base truncate">
         {first ? (
-          <span className="workspace-window-nav flex items-center mr-1" data-sidebar-open={sidebarOpen}>
-            <WindowNav open={sidebarOpen} />
+          <span className="workspace-window-nav flex items-center mr-1">
+            <WindowCorner sidebarOpen={sidebarOpen} />
           </span>
         ) : null}
         {typeof children === "string" ? <PageTitle>{children}</PageTitle> : children}

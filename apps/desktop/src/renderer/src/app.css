@@ -367,10 +367,7 @@
   --height-control-send: var(--control-send);
   --height-control-send-hero: var(--control-send-hero);
   /* Layout measures, so no screen hardcodes a pixel width. The resizable ones are set on :root by the layout store. */
-  --width-sidebar: var(--layout-sidebar, 272px);
-  /* The workspace rail sits beside the thread list; the sidebar is both, and only the list resizes. */
-  --width-rail: 50px;
-  --width-navigation: calc(var(--width-rail) + var(--width-sidebar));
+  --width-sidebar: var(--layout-sidebar, 247px);
   --width-panel: var(--layout-panel, 640px);
   /* The floors the work row keeps: the conversation's, then the panel's. The panel floor is
      limits.panel.min in lib/layout.ts. */
@@ -395,10 +392,6 @@
   --spacing-well: 8px;
   --spacing-traffic: var(--window-controls-left, calc(86px / var(--window-zoom, 1)));
   --spacing-controls: var(--window-controls-right, calc(140px / var(--window-zoom, 1)));
-  /* What traffic lights reaching past the folded rail take of the first header beside it. */
-  --spacing-rail-lights: max(0px, calc(var(--spacing-traffic) - var(--width-rail) - var(--radius-lg)));
-  /* What the folded rail's wordmark takes of the first header in a corner no traffic lights hold (sidebar.css). */
-  --spacing-wordmark: 48px;
 }
 
 @layer base {
@@ -713,19 +706,17 @@ body[data-resizing] .panel-shell {
   width: 100%;
 }
 
-/* The sidebar slides in and out; its content keeps its width so nothing reflows while it moves.
-   While open it also owns the well gutter beside it, so its edge — and the list's overlay
-   scrollbar — seats against the first plane instead of floating short of it. */
+/* The sidebar slides in and out; its content keeps its width so nothing reflows while it moves. */
 .sidebar-shell {
   position: relative;
   /* 1 exists only to stay below the resize handle's 5, so the grip still takes the pointer. */
   z-index: 1;
-  width: calc(var(--width-navigation) + var(--spacing-well));
+  width: var(--width-sidebar);
   overflow: hidden;
   transition: width var(--duration-arrive) var(--ease-out);
 }
 .sidebar-shell[data-open="false"] {
-  width: calc(var(--width-rail) + var(--radius-lg));
+  width: 0;
 }
 body[data-resizing] .sidebar-shell {
   transition: none;

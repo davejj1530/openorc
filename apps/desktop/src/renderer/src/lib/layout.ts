@@ -1,4 +1,4 @@
-import { liveSidebarFold, pruneThreadFolds, toggleSidebarFold, toggleThreadTree, type PanelTool } from "@openorc/client";
+import { liveGroupedFold, pruneThreadFolds, toggleSidebarFold, toggleThreadTree, type PanelTool } from "@openorc/client";
 import type { RpcParams } from "@openorc/protocol";
 import { WORKSPACE_ID } from "@openorc/protocol";
 import { create } from "zustand";
@@ -16,7 +16,7 @@ export type WorkspaceChangesRequest = WorkspaceChangesTarget & { comparison: "ba
 /** Which side of the conversation the shared panel docks on. */
 export type PanelSide = "left" | "right";
 
-/** A screen the sidebar's footer reaches. Inbox sits in the window's header instead. */
+/** A screen the sidebar lists by name, above the threads. */
 export type SidebarScreen = "tasks" | "pulls" | "scheduled";
 
 /** All projects: the sidebar lists every project's threads. A project's id lists only its own. */
@@ -44,14 +44,11 @@ interface LayoutState {
   /** The Files tool rather than a file a link chose: on this thread's panel when given, else on the panel on screen. */
   openFiles: (threadId?: string) => void;
   /**
-   * The app's scope, chosen in the sidebar's project filter: one project, or every project under ALL_WORKSPACES. The
-   * thread list, tasks, schedules, pull requests, memory and new work all follow it; read it with focusedProject.
+   * The app's scope, chosen at the head of a screen's title: one project, or every project under ALL_WORKSPACES.
+   * Tasks, schedules, pull requests, memory and new work follow it; read it with focusedProject. The sidebar lists every
+   * project's threads, each project in its own group.
    */
   workspace: string;
-  /** The rail lists the projects under its Projects button. */
-  railProjects: boolean;
-  /** The rail shows each Orcling's face under its Orclings button. */
-  railOrclings: boolean;
   /** The visible thread whose controls last opened the shared panel. */
   panelThreadId: string | null;
   toggleThreadPanel: (id: string) => void;
@@ -79,8 +76,6 @@ interface LayoutState {
   /** Work opened in another project brings a focused filter along to it; on All projects the filter stays. */
   followProject: (id: string) => void;
   setPinnedOnly: (pinnedOnly: boolean) => void;
-  setRailProjects: (open: boolean) => void;
-  setRailOrclings: (open: boolean) => void;
   toggleCollapsed: (key: string) => void;
   toggleThreadChildren: (id: string, expanded: boolean) => void;
   rememberPreviewUrl: (key: string, url: string) => void;
@@ -88,15 +83,20 @@ interface LayoutState {
 }
 
 export const limits = {
-  sidebar: { min: 224, max: 380, default: 272 },
+  sidebar: { min: 224, max: 380, default: 247 },
   panel: { min: 340, max: 900, default: 640 },
 };
 
 const KEY = "openorc.layout";
 
-function read(): Partial<Pick<LayoutState, "sidebarOpen" | "sidebarWidth" | "panelOpen" | "panelWidth" | "panelSide" | "workspace" | "railProjects" | "railOrclings" | "collapsed" | "previewUrls">> {
+type Saved = Partial<Pick<LayoutState, "sidebarOpen" | "panelOpen" | "panelWidth" | "panelSide" | "workspace" | "collapsed" | "previewUrls">> & {
+  /** The whole sidebar's width. The rail's layouts saved `sidebarWidth`, the thread list's width beside it, which no longer applies. */
+  navigationWidth?: number;
+};
+
+function read(): Saved {
   try {
-    return JSON.parse(localStorage.getItem(KEY) ?? "{}") as Partial<LayoutState>;
+    return JSON.parse(localStorage.getItem(KEY) ?? "{}") as Saved;
   } catch {
     return {};
   }
@@ -108,13 +108,11 @@ function persist(s: LayoutState): void {
       KEY,
       JSON.stringify({
         sidebarOpen: s.sidebarOpen,
-        sidebarWidth: s.sidebarWidth,
+        navigationWidth: s.sidebarWidth,
         panelOpen: s.panelOpen,
         panelWidth: s.panelWidth,
         panelSide: s.panelSide,
         workspace: s.workspace,
-        railProjects: s.railProjects,
-        railOrclings: s.railOrclings,
         collapsed: s.collapsed,
         previewUrls: s.previewUrls,
       }),
@@ -151,7 +149,7 @@ export const useLayout = create<LayoutState>((set, get) => {
   const saved = read();
   const initial = {
     sidebarOpen: saved.sidebarOpen ?? true,
-    sidebarWidth: clamp(saved.sidebarWidth ?? limits.sidebar.default, limits.sidebar),
+    sidebarWidth: clamp(saved.navigationWidth ?? limits.sidebar.default, limits.sidebar),
     panelOpen: saved.panelOpen ?? false,
     panelWidth: clamp(saved.panelWidth ?? limits.panel.default, limits.panel),
     panelSide: saved.panelSide === "left" ? ("left" as const) : ("right" as const),
@@ -162,11 +160,9 @@ export const useLayout = create<LayoutState>((set, get) => {
     workspaceChanges: null,
     // Layouts saved before the project filter list every project, as the sidebar did then.
     workspace: typeof saved.workspace === "string" && saved.workspace ? saved.workspace : ALL_WORKSPACES,
-    railProjects: saved.railProjects === true,
-    railOrclings: saved.railOrclings === true,
     panelThreadId: null,
     pinnedOnly: false,
-    collapsed: (saved.collapsed ?? []).filter(liveSidebarFold),
+    collapsed: (saved.collapsed ?? []).filter(liveGroupedFold),
     previewUrls: saved.previewUrls ?? {},
     panelExpanded: false,
   };
@@ -225,8 +221,6 @@ export const useLayout = create<LayoutState>((set, get) => {
       commit({ panelThreadId: id, panelOpen: open, ...(open ? {} : { panelExpanded: false }) });
     },
     setPinnedOnly: (pinnedOnly) => commit({ pinnedOnly }),
-    setRailProjects: (railProjects) => commit({ railProjects }),
-    setRailOrclings: (railOrclings) => commit({ railOrclings }),
     toggleCollapsed: (key) => commit({ collapsed: toggleSidebarFold(get().collapsed, key) }),
     toggleThreadChildren: (id, expanded) => commit({ collapsed: toggleThreadTree(get().collapsed, id, expanded) }),
     ...threadFoldActions(get, commit),

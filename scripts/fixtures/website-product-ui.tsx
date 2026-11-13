@@ -436,6 +436,7 @@ type Seed = (runId: string, blocks: Block[], state?: Partial<RunTranscript>) => 
  * ?view=shell and ?view=inbox: workspace data with varied sidebar and inbox states. In the open
  * project, threads run, wait on an approval, failed, finished unread, or carry a merged pull request, and a title runs
  * long. Folded, website waits on a question and atlas-api runs. The last project, with a long name, has no threads.
+ * Two threads went quiet last week, so Resolved holds them.
  * A thread with a second line gets a seeded live run, as the app holds one while the thread is live. The inbox lists
  * approvals first, as the core does. Every state fits the sidebar of a 1440x900 window.
  */
@@ -455,6 +456,8 @@ function addShellStates({ base, projects, threads, tasks, seed }: { base: Record
       session: { status: "error", message: "Codex exited before the turn finished" },
     },
     { ...base, id: "release", title: "Publish the release notes", activity: "waiting", liveRunId: "release-run" },
+    { ...base, id: "audit", title: "Paginate the audit log in Settings", workspaceMode: "worktree", branch: "openorc/audit-log-5e2a1b", lastActivityAt: base.lastActivityAt - 5 * 86400000 },
+    { ...base, id: "contrast", projectId: "website", title: "Chart colors fail contrast in dark mode", lastActivityAt: base.lastActivityAt - 9 * 86400000 },
   );
   const proposed = {
     ...tasks[0]!,

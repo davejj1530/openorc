@@ -1,4 +1,4 @@
-import { harnessCatalog, HOSTED_AGENTS, hostedSendBlock, isHostedAgent, placeOf, sendBlockWords, type AccountStatus, type SendBlockWhy, type ThreadSummary } from "@openorc/protocol";
+import { harnessCatalog, harnessShortName, HOSTED_AGENTS, hostedSendBlock, isHostedAgent, placeOf, sendBlockWords, type AccountStatus, type SendBlockWhy, type ThreadSummary } from "@openorc/protocol";
 
 /**
  * Where the card above a cloud thread's composer leads: the Settings section that holds what is missing. Paying opens
@@ -20,7 +20,7 @@ const ACTIONS: Record<SendBlockWhy, SendBlockAction | null> = {
   offline: null,
   not_pro: { label: "Upgrade", section: "account" },
   no_hours: { label: "Buy more hours", section: "account" },
-  awaiting_payment: { label: "Billing", section: "account" },
+  awaiting_payment: { label: "Update payment", section: "account" },
   no_sign_in: { label: "Sign in", section: "cloud" },
   signed_out: { label: "Sign in", section: "cloud" },
 };
@@ -41,16 +41,28 @@ export function placeUnreachable(thread: Pick<ThreadSummary, "owner"> | null): s
   return thread?.owner?.reach === "offline" ? `${placeOf(thread).mark ?? "This thread"} can't be reached.` : null;
 }
 
-/** Why a new thread cannot start on OpenOrc Cloud, with the way to the Settings section, or project row, that fixes it. */
-export interface StartBlock {
-  words: string;
-  action: (SendBlockAction & { project?: string }) | null;
-}
+/** Where a blocked place in a new thread's menu leads: the Settings section, or the project's row there, that fixes it. */
+export type StartFix = SendBlockAction & { project?: string };
+
+/**
+ * Why a place cannot be chosen for a new thread now. `words` says why, on demand. The row ends in the way to the fix, or,
+ * where nothing the person can do here fixes it, in `reason`: a few words that stand for the sentence.
+ */
+export type StartBlock = { words: string; fix: StartFix; reason?: never } | { words: string; fix: null; reason: string };
 
 /** The blocks a send has too: they come first, as the server checks them first. */
 const BEFORE_PROJECT: readonly SendBlockWhy[] = ["offline", "not_pro", "no_hours", "awaiting_payment"];
 
 const RUNS = `OpenOrc Cloud runs ${new Intl.ListFormat("en", { type: "conjunction" }).format(HOSTED_AGENTS.map((agent) => harnessCatalog[agent].name))}.`;
+
+/** A send's block as a new thread's. An agent's own sign-in is fixed by signing that agent in. */
+function sendStartBlock(why: SendBlockWhy, agent: string): StartBlock {
+  const words = sendBlockWords(why, agent);
+  const action = ACTIONS[why];
+  if (!action) return { words, fix: null, reason: "Can't be reached" };
+  const signIn = why === "no_sign_in" || why === "signed_out";
+  return { words, fix: { ...action, label: signIn ? `Sign ${harnessShortName(agent)} in` : action.label } };
+}
 
 /**
  * Whether a new thread's place menu offers OpenOrc Cloud, and why it cannot be chosen now. Offered to a person signed
@@ -60,22 +72,23 @@ const RUNS = `OpenOrc Cloud runs ${new Intl.ListFormat("en", { type: "conjunctio
  */
 export function hostedStart(account: AccountStatus | undefined, input: { projectId: string; agent: string; model: string | null }): { shown: boolean; blocked: StartBlock | null } {
   if (account?.state === "signed-out")
-    return account.ended ? { shown: true, blocked: { words: "Your OpenOrc session ended. Sign in again.", action: { label: "Sign in", section: "account" } } } : { shown: false, blocked: null };
+    return account.ended ? { shown: true, blocked: { words: "Your OpenOrc session ended.", fix: { label: "Sign in", section: "account" } } } : { shown: false, blocked: null };
   if (!account) return { shown: false, blocked: null };
   const why = hostedSendBlock(account, input, false);
-  if (why && BEFORE_PROJECT.includes(why)) return { shown: true, blocked: { words: sendBlockWords(why, input.agent), action: ACTIONS[why] } };
+  if (why && BEFORE_PROJECT.includes(why)) return { shown: true, blocked: sendStartBlock(why, input.agent) };
   const project = projectBlock(account, input.projectId);
   if (project) return { shown: true, blocked: project };
-  if (!isHostedAgent(input.agent)) return { shown: true, blocked: { words: RUNS, action: null } };
-  return { shown: true, blocked: why ? { words: sendBlockWords(why, input.agent), action: ACTIONS[why] } : null };
+  if (!isHostedAgent(input.agent)) return { shown: true, blocked: { words: RUNS, fix: null, reason: `Not with ${harnessShortName(input.agent)}` } };
+  return { shown: true, blocked: why ? sendStartBlock(why, input.agent) : null };
 }
 
 /** Why this Mac project has no cloud project to start in yet, and its row in Settings > Cloud, where that is fixed. */
 function projectBlock(account: Extract<AccountStatus, { state: "signed-in" }>, projectId: string): StartBlock | null {
   const project = account.projects.find((each) => each.projectId === projectId);
-  if (!project) return { words: "This project has no GitHub repository.", action: null };
+  if (!project) return { words: "This project has no GitHub repository.", fix: null, reason: "No GitHub repository" };
   if (project.cloud === "added") return null;
   const row = { section: "cloud" as const, project: projectId };
-  if (project.cloud === "addable") return { words: `Add ${project.repo} to OpenOrc Cloud first.`, action: { label: "Add this project", ...row } };
-  return { words: `GitHub doesn't let OpenOrc read ${project.repo} yet.`, action: account.github?.configured === false ? null : { label: "Connect GitHub", ...row } };
+  if (project.cloud === "addable") return { words: `${project.repo} is not on OpenOrc Cloud yet.`, fix: { label: "Add this project", ...row } };
+  const words = `GitHub doesn't let OpenOrc read ${project.repo} yet.`;
+  return account.github?.configured === false ? { words, fix: null, reason: "No GitHub access" } : { words, fix: { label: "Connect GitHub", ...row } };
 }

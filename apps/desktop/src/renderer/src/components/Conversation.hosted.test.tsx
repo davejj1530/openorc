@@ -133,7 +133,7 @@ it.each([
     name: "a payment not through",
     account: { ...pro, hours: { leftSeconds: 0, monthly: null, packsLeftSeconds: 0 } },
     words: "Your payment hasn't gone through.",
-    action: "Billing",
+    action: "Update payment",
     section: "account",
   },
   { name: "Claude not signed in", account: { ...pro, signIns: [] }, words: "Claude isn't signed in on OpenOrc Cloud.", action: "Sign in", section: "cloud" },

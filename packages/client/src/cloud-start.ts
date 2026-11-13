@@ -2,9 +2,9 @@ import {
   DEFAULT_CLAUDE_ACCOUNT,
   harnessShortName,
   harnessCatalog,
+  harnessIds,
   isHarnessId,
   NO_CLOUD_SERVICE,
-  NOT_ON_BRAIN,
   OPENCODE_FREE_PROVIDER,
   openCodeProvider,
   openCodeProviderName,
@@ -15,14 +15,14 @@ import {
   type CloudSignIns,
   type CloudStep,
   type CloudThreadState,
-  type AgentKind,
   type MoveStep,
   type QueuedMessage,
   type ThreadSummary,
 } from "@openorc/protocol";
+import type { StartBlock } from "./hosted-send.js";
 
 /** Cloud execution requires support for installing, authenticating and resuming the harness there. */
-export function runsInCloud(agent: AgentKind | null | undefined): boolean {
+export function runsInCloud(agent: string | null | undefined): boolean {
   return isHarnessId(agent) && harnessCatalog[agent].cloud;
 }
 
@@ -43,14 +43,19 @@ export function offersBrainMove(thread: ThreadSummary): boolean {
   );
 }
 
+const CLOUD_AGENTS = new Intl.ListFormat("en", { type: "conjunction" }).format(harnessIds.filter((id) => harnessCatalog[id].cloud).map((id) => harnessCatalog[id].name));
+
 /**
- * Why a new thread on this project can't start in the cloud, or null. With a cloud brain set up, a cloud thread starts on
- * the brain, so only on a project it has a copy of; without one, in a sandbox of its own.
+ * Why a new thread with this agent can't start in the person's own cloud, or null. With a cloud brain set up, a cloud
+ * thread starts on the brain, so only on a project it has a copy of; without one, in a sandbox of its own, once a service
+ * is connected to run it on.
  */
-export function cloudStartBlocked(offer: Pick<CloudOffer, "brain" | "provider"> | Pick<CloudOffer, "brain"> | undefined, projectId: string): string | null {
+export function cloudStartBlocked(offer: Pick<CloudOffer, "brain" | "provider"> | Pick<CloudOffer, "brain"> | undefined, projectId: string, agent: string | null | undefined): StartBlock | null {
+  if (!runsInCloud(agent)) return { words: `Your own cloud runs ${CLOUD_AGENTS}.`, fix: null, reason: `Not with ${harnessShortName(agent ?? "")}` };
   const brain = offer?.brain;
-  if (brain) return brain.projects.some((project) => project.mac === projectId) ? null : NOT_ON_BRAIN;
-  return cloudServiceMissing(offer);
+  if (brain)
+    return brain.projects.some((project) => project.mac === projectId) ? null : { words: "Not on your cloud brain yet.", fix: { label: "Add this project", section: "cloud", project: projectId } };
+  return cloudServiceMissing(offer) ? { words: "Connect Vercel or Agent37 first.", fix: { label: "Set up", section: "cloud" } } : null;
 }
 
 /** Why nothing can go to the cloud yet: no brain to take it, and no service connected for a sandbox of its own. */

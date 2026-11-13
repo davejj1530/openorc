@@ -1,5 +1,5 @@
 import type { CloudSignIn, ThreadSummary } from "@openorc/protocol";
-import { NO_CLOUD_SERVICE, NOT_ON_BRAIN, WORKSPACE_ID } from "@openorc/protocol";
+import { WORKSPACE_ID } from "@openorc/protocol";
 import { expect, it } from "vitest";
 import {
   canMoveToCloud,
@@ -40,17 +40,27 @@ it("names where a cloud thread runs, or that its sandbox is gone", () => {
   expect(cloudPlaceLabel({ ...cloud, state: "removed" })).toBe("Sandbox removed");
 });
 
-it("starts a new cloud thread on the cloud brain only for a project it has a copy of; without a brain, anywhere", () => {
+it("starts a new cloud thread on the cloud brain only for a project it has a copy of; without a brain, once a service is connected", () => {
   const brain = { host: "brain-key", projects: [{ mac: "openorc", cloud: "brain-openorc" }] };
-  expect(cloudStartBlocked({ brain }, "openorc")).toBeNull();
-  expect(cloudStartBlocked({ brain }, "website")).toBe(NOT_ON_BRAIN);
-  expect(cloudStartBlocked({ brain: null }, "website")).toBeNull();
-  expect(cloudStartBlocked({}, "website")).toBeNull();
-  expect(cloudStartBlocked(undefined, "website")).toBeNull();
-  // No brain, and no service connected: nowhere to start it yet.
-  expect(cloudStartBlocked({ brain: null, provider: null }, "website")).toBe(NO_CLOUD_SERVICE);
-  expect(cloudStartBlocked({ brain: null, provider: "vercel" }, "website")).toBeNull();
-  expect(cloudStartBlocked({ brain, provider: null }, "openorc")).toBeNull();
+  const notOnBrain = { words: "Not on your cloud brain yet.", fix: { label: "Add this project", section: "cloud", project: "website" } };
+  for (const agent of ["claude", "codex", "opencode", "omp"]) {
+    expect(cloudStartBlocked({ brain }, "openorc", agent)).toBeNull();
+    expect(cloudStartBlocked({ brain }, "website", agent)).toEqual(notOnBrain);
+    expect(cloudStartBlocked({ brain: null }, "website", agent)).toBeNull();
+    expect(cloudStartBlocked(undefined, "website", agent)).toBeNull();
+    expect(cloudStartBlocked({ brain: null, provider: null }, "website", agent)).toEqual({ words: "Connect Vercel or Agent37 first.", fix: { label: "Set up", section: "cloud" } });
+    expect(cloudStartBlocked({ brain: null, provider: "vercel" }, "website", agent)).toBeNull();
+    expect(cloudStartBlocked({ brain, provider: null }, "openorc", agent)).toBeNull();
+  }
+});
+
+it("ends the own cloud's row in why for an agent that does not run there, which nothing here fixes", () => {
+  expect(cloudStartBlocked({ brain: null, provider: "vercel" }, "website", "cursor")).toEqual({
+    words: "Your own cloud runs Codex, Claude Code, OpenCode, and Oh My Pi.",
+    fix: null,
+    reason: "Not with Cursor",
+  });
+  expect(cloudStartBlocked({ brain: null, provider: "vercel" }, "website", "pi")?.reason).toBe("Not with Pi");
 });
 
 it("starts a thread on the cloud brain by waking it, updated first when this Mac carries a newer one, then the brain's own steps", () => {

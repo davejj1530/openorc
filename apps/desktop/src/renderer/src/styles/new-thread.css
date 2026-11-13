@@ -175,6 +175,46 @@
 .new-thread-sentence .composer-branch {
   color: inherit;
 }
+/* The place menu: one-line rows, a hairline before the clouds. A blocked row is dimmed and ends in the way to its fix in
+   ink, or in why in quiet ink where nothing here fixes it. */
+.new-thread-places {
+  width: 320px;
+}
+.new-thread-place[data-current] {
+  background: var(--current-row-fill);
+}
+.new-thread-place[data-blocked] {
+  color: var(--ink-3);
+}
+.new-thread-place[data-disabled] {
+  background: none;
+}
+.new-thread-place-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.new-thread-place-end {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  padding-left: 16px;
+}
+.new-thread-place-fact {
+  color: var(--ink-3);
+}
+.new-thread-place-hours {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.new-thread-place-hours > svg {
+  width: 14px;
+  height: 14px;
+}
 .new-thread-folder {
   display: inline-flex;
   align-items: center;

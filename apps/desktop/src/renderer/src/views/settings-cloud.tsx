@@ -340,7 +340,7 @@ export function CloudSettings({ active }: { active: boolean }) {
     <>
       <OpenOrcCloudSection active={active} />
       {openorcShown ? (
-        <Section title="Your own cloud service" flush>
+        <Section title="Your own cloud" flush>
           {ownService}
         </Section>
       ) : (

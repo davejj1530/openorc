@@ -23,6 +23,7 @@ vi.mock("./lib/client", async (original) => {
     "agents.updates.get": undefined,
     "orchestration.availability": { enabled: false },
     "review.projectDiff": { files: [], patch: "" },
+    "account.status": undefined,
   };
   const empty: unknown[] = [];
   return {

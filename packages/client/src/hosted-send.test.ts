@@ -31,7 +31,7 @@ const claude = { agent: "claude", model: "opus" };
 it.each([
   { name: "not Pro", account: { ...pro, plan: { pro: false as const }, hours: null }, words: "OpenOrc Cloud needs Pro.", action: "Upgrade" },
   { name: "out of hours", account: { ...pro, hours: { ...pro.hours!, leftSeconds: 0 } }, words: "You're out of cloud hours.", action: "Buy more hours" },
-  { name: "a payment not through", account: { ...pro, hours: { leftSeconds: 0, monthly: null, packsLeftSeconds: 0 } }, words: "Your payment hasn't gone through.", action: "Billing" },
+  { name: "a payment not through", account: { ...pro, hours: { leftSeconds: 0, monthly: null, packsLeftSeconds: 0 } }, words: "Your payment hasn't gone through.", action: "Update payment" },
   { name: "no sign-in", account: { ...pro, signIns: [] }, words: "Claude isn't signed in on OpenOrc Cloud.", action: "Sign in" },
   { name: "a sign-in that ended", account: { ...pro, signIns: [{ ...pro.signIns![0]!, ended: true }] }, words: "Claude's sign-in on OpenOrc Cloud ended.", action: "Sign in" },
   { name: "out of reach", account: { ...pro, reach: "offline" as const }, words: "OpenOrc Cloud can't be reached.", action: undefined },
@@ -60,39 +60,63 @@ it.each([
     account: { ...pro, plan: { pro: false as const }, hours: null },
     projectId: "mac-notes",
     words: "OpenOrc Cloud needs Pro.",
-    action: { label: "Upgrade", section: "account" },
+    end: { fix: { label: "Upgrade", section: "account" } },
   },
-  { name: "a project with no GitHub repository", account: pro, projectId: "mac-local", words: "This project has no GitHub repository.", action: null },
+  {
+    name: "OpenOrc Cloud out of reach",
+    account: { ...pro, reach: "offline" as const },
+    projectId: "mac-notes",
+    words: "OpenOrc Cloud can't be reached.",
+    end: { fix: null, reason: "Can't be reached" },
+  },
+  {
+    name: "an agent's sign-in there that ended",
+    account: { ...pro, signIns: [{ ...pro.signIns![0]!, ended: true }] },
+    projectId: "mac-notes",
+    words: "Claude's sign-in on OpenOrc Cloud ended.",
+    end: { fix: { label: "Sign Claude in", section: "cloud" } },
+  },
+  { name: "a project with no GitHub repository", account: pro, projectId: "mac-local", words: "This project has no GitHub repository.", end: { fix: null, reason: "No GitHub repository" } },
   {
     name: "a repository GitHub doesn't let OpenOrc read",
     account: pro,
     projectId: "mac-api",
     words: "GitHub doesn't let OpenOrc read acme/api yet.",
-    action: { label: "Connect GitHub", section: "cloud", project: "mac-api" },
+    end: { fix: { label: "Connect GitHub", section: "cloud", project: "mac-api" } },
   },
   {
     name: "a repository not added yet",
     account: pro,
     projectId: "mac-site",
-    words: "Add ada/site to OpenOrc Cloud first.",
-    action: { label: "Add this project", section: "cloud", project: "mac-site" },
+    words: "ada/site is not on OpenOrc Cloud yet.",
+    end: { fix: { label: "Add this project", section: "cloud", project: "mac-site" } },
   },
-  { name: "an agent not signed in there", account: { ...pro, signIns: [] }, projectId: "mac-notes", words: "Claude isn't signed in on OpenOrc Cloud.", action: { label: "Sign in", section: "cloud" } },
+  {
+    name: "an agent not signed in there",
+    account: { ...pro, signIns: [] },
+    projectId: "mac-notes",
+    words: "Claude isn't signed in on OpenOrc Cloud.",
+    end: { fix: { label: "Sign Claude in", section: "cloud" } },
+  },
   {
     name: "a session the server ended",
     account: { state: "signed-out" as const, codeSentTo: null, ended: true, error: null },
     projectId: "mac-notes",
-    words: "Your OpenOrc session ended. Sign in again.",
-    action: { label: "Sign in", section: "account" },
+    words: "Your OpenOrc session ended.",
+    end: { fix: { label: "Sign in", section: "account" } },
   },
-])("offers OpenOrc Cloud to a new thread blocked by $name, with its words and the way to its fix", ({ account, projectId, words, action }) => {
-  expect(hostedStart(account, { projectId, ...claude })).toEqual({ shown: true, blocked: { words, action } });
+])("offers OpenOrc Cloud to a new thread blocked by $name, with its words and the way to its fix or the reason its row ends in", ({ account, projectId, words, end }) => {
+  expect(hostedStart(account, { projectId, ...claude })).toEqual({ shown: true, blocked: { words, ...end } });
 });
 
 it("offers OpenOrc Cloud to a new thread once every part is there, for each agent it runs, and never to someone with no account", () => {
   const signedIn = { ...pro, signIns: [...pro.signIns!, { agent: "codex" as const, provider: "openai", label: "ChatGPT Plus", ended: false }] };
   for (const settings of [claude, { agent: "codex", model: null }, { agent: "opencode", model: "openrouter/qwen" }])
     expect(hostedStart(signedIn, { projectId: "mac-notes", ...settings })).toEqual({ shown: true, blocked: null });
-  expect(hostedStart(pro, { projectId: "mac-notes", agent: "pi", model: null }).blocked?.words).toBe("OpenOrc Cloud runs Claude Code, Codex, and OpenCode.");
+  expect(hostedStart(pro, { projectId: "mac-notes", agent: "cursor", model: null }).blocked).toEqual({
+    words: "OpenOrc Cloud runs Claude Code, Codex, and OpenCode.",
+    fix: null,
+    reason: "Not with Cursor",
+  });
   expect(hostedStart({ state: "signed-out", codeSentTo: null, ended: false, error: null }, { projectId: "mac-notes", ...claude })).toEqual({ shown: false, blocked: null });
 });

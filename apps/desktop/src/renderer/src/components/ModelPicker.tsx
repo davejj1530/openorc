@@ -449,18 +449,8 @@ export function ModelPicker({
  * trigger's size, so a label that grew and shrank with each step slid the popup sideways
  * while the effort slider was dragged.
  */
-function TriggerEffort({ label, efforts }: { label: string; efforts: string[] }) {
-  const others = [...new Set(efforts.map(effortLabel))].filter((other) => other !== label);
-  return (
-    <span className="composer-model-effort">
-      <span>{label}</span>
-      {others.map((other) => (
-        <span key={other} aria-hidden="true">
-          {other}
-        </span>
-      ))}
-    </span>
-  );
+function TriggerEffort({ label }: { label: string }) {
+  return <span className="composer-model-effort">{label}</span>;
 }
 
 function ComposerTriggerIcon({ orcling, value }: { orcling: Orcling | null; value: ModelChoice | null }) {
@@ -520,7 +510,7 @@ export function ComposerModelPicker({ value, onChange, onSelectModel, orclings, 
         <ComposerTriggerIcon orcling={chosenOrcling(orclings)} value={value} />
         {fast ? <Zap size={13} aria-label={fastBlocked ? "Fast mode can't run" : "Fast mode requested"} className="composer-fast-indicator shrink-0" data-blocked={fastBlocked || undefined} /> : null}
         <span className="composer-model-name">{chosenOrcling(orclings)?.name ?? current?.label ?? value?.model ?? "Choose model"}</span>
-        {value ? <TriggerEffort label={label} efforts={efforts} /> : null}
+        {value ? <TriggerEffort label={label} /> : null}
       </Popover.Trigger>
       <Popover.Portal>
         <CoversPreview />

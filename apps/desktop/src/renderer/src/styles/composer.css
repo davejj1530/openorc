@@ -192,7 +192,7 @@
   padding: 0 10px 0 8px;
   border-radius: var(--radius-pill);
   background-color: var(--control-fill);
-  color: var(--ink-2);
+  color: var(--ink);
   font-size: var(--text-sm);
   line-height: var(--text-sm--line-height);
   white-space: nowrap;
@@ -213,7 +213,7 @@
   flex-shrink: 0;
   width: 13px;
   height: 13px;
-  color: var(--ink-4);
+  color: var(--ink-2);
 }
 .composer-chip-label,
 .composer-model-name {
@@ -232,17 +232,9 @@
   color: var(--ink);
 }
 .composer-model-effort {
-  display: inline-grid;
   flex-shrink: 0;
-  color: var(--ink-4);
+  color: var(--ink-3);
   white-space: nowrap;
-}
-/* Every label shares one cell, so the cell is as wide as the longest; only the current one shows. */
-.composer-model-effort > span {
-  grid-area: 1 / 1;
-}
-.composer-model-effort > [aria-hidden] {
-  visibility: hidden;
 }
 
 /* A choice read as part of a sentence (where the thread works). */

@@ -1,6 +1,6 @@
 import type { AccountStatus, ThreadSummary } from "@openorc/protocol";
 import { expect, it } from "vitest";
-import { hostedStart, threadSendBlock } from "./hosted-send.js";
+import { billingMoves, hostedStart, threadSendBlock } from "./hosted-send.js";
 
 const pro: Extract<AccountStatus, { state: "signed-in" }> = {
   state: "signed-in",
@@ -18,6 +18,7 @@ const pro: Extract<AccountStatus, { state: "signed-in" }> = {
   ],
   github: { configured: true, login: "ada", installedOn: ["ada"], repositories: ["ada/notes", "ada/site"] },
   connectingGithub: null,
+  paying: null,
   projects: [
     { projectId: "mac-notes", repo: "ada/notes", cloud: "added" },
     { projectId: "mac-site", repo: "ada/site", cloud: "addable" },
@@ -119,4 +120,30 @@ it("offers OpenOrc Cloud to a new thread once every part is there, for each agen
     reason: "Not with Cursor",
   });
   expect(hostedStart({ state: "signed-out", codeSentTo: null, ended: false, error: null }, { projectId: "mac-notes", ...claude })).toEqual({ shown: false, blocked: null });
+});
+
+const moveOf = (move: { label: string; primary: boolean; blocked: string | null } | null) => move && `${move.label}${move.primary ? " (ink)" : ""}${move.blocked ? ` [${move.blocked}]` : ""}`;
+it.each([
+  { name: "a free person", account: { ...pro, plan: { pro: false as const }, hours: null }, plan: "Upgrade (ink)", hours: null },
+  { name: "Pro with hours", account: pro, plan: "Manage billing", hours: "Buy more hours" },
+  { name: "Pro out of hours", account: { ...pro, hours: { ...pro.hours!, leftSeconds: 0 } }, plan: "Manage billing", hours: "Buy more hours (ink)" },
+  { name: "a month not paid for", account: { ...pro, hours: { leftSeconds: 0, monthly: null, packsLeftSeconds: 0 } }, plan: "Update payment (ink)", hours: "Buy more hours" },
+  {
+    name: "a failed payment with bought hours left",
+    account: { ...pro, plan: { pro: true as const, standing: "grace" as const, at: 0 }, hours: { leftSeconds: 3600, monthly: null, packsLeftSeconds: 3600 } },
+    plan: "Update payment (ink)",
+    hours: "Buy more hours",
+  },
+  { name: "a free person offline", account: { ...pro, plan: { pro: false as const }, hours: null, reach: "offline" as const }, plan: "Upgrade (ink) [OpenOrc Cloud can't be reached.]", hours: null },
+])("offers $name the ways to pay, the one it lacks in ink", ({ account, plan, hours }) => {
+  const moves = billingMoves(account);
+  expect([moveOf(moves.plan), moveOf(moves.hours)]).toEqual([plan, hours]);
+});
+
+it("names each paying block's move in the account as the card names its way there", () => {
+  const card = (account: typeof pro) => threadSendBlock(hosted(), account, claude)?.action?.label;
+  for (const account of [{ ...pro, plan: { pro: false as const }, hours: null }, { ...pro, hours: { ...pro.hours!, leftSeconds: 0 } }, { ...pro, hours: { leftSeconds: 0, monthly: null, packsLeftSeconds: 0 } }]) {
+    const moves = billingMoves(account);
+    expect([moves.plan, moves.hours].find((move) => move?.primary)?.label).toBe(card(account));
+  }
 });

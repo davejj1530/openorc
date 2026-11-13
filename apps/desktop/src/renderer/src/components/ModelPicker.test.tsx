@@ -144,7 +144,7 @@ describe("ModelPicker", () => {
     expect(screen.getByText("Extra high + workflows")).toBeTruthy();
     expect(slider.closest(".composer-effort-slider")?.getAttribute("data-ultracode")).toBe("true");
   });
-  it("keeps every effort label in the trigger so its width, and the popup anchored to it, hold still", async () => {
+  it("shows only the current effort word beside the model, one gap from it, and follows a change", async () => {
     const opus: ModelOption = { id: "claude-opus-5", agent: "claude", label: "Opus", efforts: ["low", "medium", "high", "xhigh", "max", "ultracode"], defaultEffort: "medium", isDefault: true };
     mocks.call.mockImplementation(async (method) => (method === "agents.modelCatalog" ? { models: [opus], providers: [] } : info));
     function Fixture() {
@@ -157,21 +157,12 @@ describe("ModelPicker", () => {
       </QueryClientProvider>,
     );
     const trigger = await screen.findByRole("button", { name: "Model and effort" });
-    const labels = () => [...trigger.querySelectorAll(".composer-model-effort > span")];
-    const shown = () =>
-      labels()
-        .filter((label) => !label.hasAttribute("aria-hidden"))
-        .map((label) => label.textContent);
-    await waitFor(() => expect(labels()).toHaveLength(6));
-    expect(shown()).toEqual(["Low"]);
+    const effort = () => trigger.querySelector(".composer-model-effort")?.textContent;
+    await waitFor(() => expect(effort()).toBe("Low"));
     fireEvent.click(trigger);
     fireEvent.change(await screen.findByRole("slider", { name: "Reasoning effort" }), { target: { value: "3" } });
-    expect(shown()).toEqual(["Extra high"]);
-    expect(
-      labels()
-        .map((label) => label.textContent)
-        .sort(),
-    ).toEqual(["Extra high", "High", "Low", "Max", "Medium", "Ultracode"]);
+    expect(effort()).toBe("Extra high");
+    expect(trigger.querySelectorAll(".composer-model-effort *")).toHaveLength(0);
   });
   it("keeps model selection and effort in one composer panel", async () => {
     const gpt: ModelOption = { ...models[0]!, fastMode: { supported: true } };

@@ -1,10 +1,12 @@
 import { useCallback } from "react";
 
 /**
- * How much the composer's chips give up to fit their row, a step at a time: the model's effort, then the mode's and the
- * destination's names, then the model's name. Each keeps its mark, and its name stays in its label and hover title.
+ * How much the composer's bar gives up to fit its row, a step at a time: the model's effort, then the mode's and the
+ * destination's names, then the context's number, then the model's name. Each keeps its mark, and its name stays in its
+ * label and hover title. Narrower than that (a pane under 400 points), the send cluster takes a row of its own. Stop,
+ * the quiet word and the pill's word never go.
  */
-export const COMPOSER_FIT = ["whole", "no-effort", "marks", "logos"] as const;
+export const COMPOSER_FIT = ["whole", "no-effort", "marks", "no-context", "logos", "least"] as const;
 export type ComposerFit = (typeof COMPOSER_FIT)[number];
 
 /**

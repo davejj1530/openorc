@@ -13,7 +13,7 @@ function bar(room: number, needs: Record<ComposerFit, number>) {
   return element;
 }
 
-const needs = { whole: 320, "no-effort": 280, marks: 200, logos: 150 };
+const needs = { whole: 320, "no-effort": 280, marks: 200, "no-context": 170, logos: 150, least: 120 };
 
 it("keeps every word while the chips fit, and gives them up a step at a time as the row narrows", () => {
   const fit = renderHook(() => useComposerFit()).result.current;
@@ -21,7 +21,10 @@ it("keeps every word while the chips fit, and gives them up a step at a time as 
     [400, "whole"],
     [300, "no-effort"],
     [240, "marks"],
+    [180, "no-context"],
     [160, "logos"],
+    [130, "least"],
+    [100, "least"],
   ] as const) {
     const element = bar(room, needs);
     fit(element);

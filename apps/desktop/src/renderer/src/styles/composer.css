@@ -1353,18 +1353,31 @@
 
 /* Narrow: the chips give up words a step at a time (lib/composer-fit.ts picks the step); their names stay in their
    labels and hover titles. */
-.composer-bar:is([data-fit="no-effort"], [data-fit="marks"], [data-fit="logos"]) .composer-model-effort {
+/* What a narrow bar gives up, in order (lib/composer-fit.ts): the effort's word, the mode's words, the context's number,
+   the model's name; then, under the least width, the row itself. */
+.composer-bar:is([data-fit="no-effort"], [data-fit="marks"], [data-fit="no-context"], [data-fit="logos"], [data-fit="least"]) .composer-model-effort {
   display: none;
 }
-.composer-bar:is([data-fit="marks"], [data-fit="logos"]) .composer-chip {
+.composer-bar:is([data-fit="marks"], [data-fit="no-context"], [data-fit="logos"], [data-fit="least"]) .composer-chip {
   padding-inline: 8px;
 }
-.composer-bar:is([data-fit="marks"], [data-fit="logos"]) :is(.composer-chip-label, .composer-location > span) {
+.composer-bar:is([data-fit="marks"], [data-fit="no-context"], [data-fit="logos"], [data-fit="least"]) :is(.composer-chip-label, .composer-location > span) {
   display: none;
 }
-.composer-bar[data-fit="logos"] .composer-model-trigger {
+.composer-bar:is([data-fit="no-context"], [data-fit="logos"], [data-fit="least"]) .composer-context-number {
+  display: none;
+}
+.composer-bar:is([data-fit="logos"], [data-fit="least"]) .composer-model-trigger {
   padding-inline: 8px;
 }
-.composer-bar[data-fit="logos"] .composer-model-name {
+.composer-bar:is([data-fit="logos"], [data-fit="least"]) .composer-model-name {
   display: none;
+}
+/* Under the least width the send cluster takes a row of its own at the end, so no chip is cut and nothing in it goes. */
+.composer-bar[data-fit="least"] {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+.composer-bar[data-fit="least"] .composer-end {
+  margin-left: auto;
 }

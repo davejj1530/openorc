@@ -73,8 +73,21 @@ async function check() {
     assert.equal(await read('document.querySelector(".sidebar-list-fold").getAttribute("aria-label")'), "Workspaces, 2 waiting");
     assert.equal(await read('Array.from(document.querySelectorAll("button[draggable]")).filter(e => e.offsetParent).length'), 0);
     await click(".sidebar-list-fold");
+    assert.deepEqual(await text(".sidebar-workspaces .sidebar-list-tools button"), ["Search", "Add project", "Filter threads"]);
     await press("Add project");
     assert.equal((await read("sidebarSmoke.ui()")).importProject, true);
+    // Each label leads with its project's mark, centred on the name's line, and the rows stay flush with the mark.
+    const marks = await read(`Array.from(document.querySelectorAll(".sidebar-project")).map(group => {
+      const mark = group.querySelector(".sidebar-section-toggle > .sidebar-project-mark")?.getBoundingClientRect();
+      const name = group.querySelector(".sidebar-project-name").getBoundingClientRect();
+      const title = group.querySelector(".thread-preview-title")?.getBoundingClientRect();
+      return mark && Math.abs(mark.top + mark.height / 2 - (name.top + name.height / 2)) <= 1 && (!title || Math.abs(title.left - mark.left) <= 1);
+    })`);
+    assert.deepEqual(
+      marks,
+      marks.map(() => true),
+      "marks sit on the label's line, rows flush with them",
+    );
     // The header drags the window; nothing pressable in it, and nothing under it, does.
     const region = (selector) =>
       read(`Array.from(document.querySelectorAll(${JSON.stringify(selector)})).map(e => getComputedStyle(e).webkitAppRegion ?? getComputedStyle(e).getPropertyValue("-webkit-app-region"))`);
@@ -112,7 +125,9 @@ async function check() {
     await until('document.querySelector(".browser-threads").textContent.includes("Retry")');
     await read("sidebarSmoke.fail(null)");
     await until('!document.querySelector(".browser-threads").textContent.includes("Retry")');
-    console.log(`PASS: project groups, screens, paging, folds, scoped creation, Workspaces fold, add project, drag regions, settings, retry, and six layouts. Captures: ${dir}`);
+    console.log(
+      `PASS: project groups, screens, paging, folds, scoped creation, Workspaces fold, add project from the head, project marks, drag regions, settings, retry, and six layouts. Captures: ${dir}`,
+    );
     app.exit(0);
   } catch (error) {
     console.error(error);

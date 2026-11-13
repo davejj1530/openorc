@@ -100,6 +100,11 @@ async function main() {
   }));
   let failProject: string | null = null;
   const removed = new Set<string>();
+  // ?projects=none: a first run, with no projects and no threads.
+  if (params.get("projects") === "none") {
+    for (const project of projects) removed.add(project.id);
+    threads.length = 0;
+  }
   core.call = (async (method: string, params: Record<string, unknown>) => {
     if (method === "projects.list") return projects.filter((project) => !removed.has(project.id));
     if (method === "projects.remove") {

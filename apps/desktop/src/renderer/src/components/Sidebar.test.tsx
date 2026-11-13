@@ -267,14 +267,14 @@ it("heads the sidebar with OpenOrc's mark and name, then New thread for the focu
   expect(screen.getAllByRole("img", { name: "OpenOrc" })).toHaveLength(1);
 });
 
-it("heads Workspaces with the app's one search and the filter", () => {
+it("heads Workspaces with the app's one search, Add project and the filter", () => {
   mountSidebar();
   const head = screen.getByRole("button", { name: "Search" }).parentElement!;
   expect(
     within(head)
       .getAllByRole("button")
       .map((button) => button.getAttribute("aria-label")),
-  ).toEqual(["Search", "Filter threads"]);
+  ).toEqual(["Search", "Add project", "Filter threads"]);
   expect(screen.queryByRole("textbox")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Search" }));
   expect(useUi.getState()).toMatchObject({ palette: true, paletteMode: "all" });
@@ -363,14 +363,37 @@ it("groups the threads under each project in the order projects come, an empty p
   expect(screen.queryByRole("region", { name: "Workspace" })).toBeNull();
 });
 
-it("starts a new thread in a project from its label, and adds a project at the list's end", async () => {
+it("starts a new thread in a project from its label, and adds a project from the Workspaces head, its one way in", async () => {
   projectThreads();
   mountSidebar();
   fireEvent.click(await screen.findByRole("button", { name: "New thread in Second project" }));
   expect(useRouter.getState().route).toEqual({ view: "newthread", projectId: "two" });
+  expect(screen.getAllByRole("button", { name: "Add project" })).toHaveLength(1);
   fireEvent.click(screen.getByRole("button", { name: "Add project" }));
   expect(useUi.getState().importProject).toBe(true);
   act(() => useUi.getState().setImportProject(false));
+});
+
+it("reads No projects yet with no projects, keeping Add project in the head", async () => {
+  mountSidebar();
+  expect(await screen.findByText("No projects yet.")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Add project" }));
+  expect(useUi.getState().importProject).toBe(true);
+  act(() => useUi.getState().setImportProject(false));
+});
+
+it("leads each project's label with its mark, and the Workspace's with the globe", async () => {
+  projectThreads();
+  fixture.threads.push({ ...fixture.threads[0]!, id: "loose", title: "Loose notes", projectId: WORKSPACE_ID, pinnedAt: null });
+  mountSidebar();
+  await screen.findByRole("button", { name: /Loose notes/ });
+  for (const name of ["First project", "Second project", "Workspace"]) {
+    const mark = label(name).firstElementChild!;
+    expect(mark.classList.contains("sidebar-project-mark")).toBe(true);
+    expect(mark.querySelector("svg, img")).not.toBeNull();
+  }
+  expect(label("Workspace").querySelector('.sidebar-project-mark [data-icon="Globe"]')).not.toBeNull();
+  expect(label("First project").querySelector('.sidebar-project-mark [data-icon="Folder"]')).not.toBeNull();
 });
 
 it("opens a project's own actions from a right click on its label", async () => {

@@ -407,9 +407,24 @@ button.sidebar-nav-row:hover {
   background-color: var(--surface-2);
   color: var(--ink);
 }
-.sidebar-add-project {
-  gap: 8px;
-  margin-top: 6px;
+/* The project's mark leads its label at the label's size, quiet like the scope's; rows stay flush with the mark. */
+.sidebar-project-mark {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  margin-right: 2px;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.6;
+  transition: opacity var(--duration-quick) var(--ease-out);
+}
+.sidebar-project-mark > * {
+  width: 14px;
+  height: 14px;
+}
+.sidebar-section-toggle:is(:hover, :focus-visible) .sidebar-project-mark {
+  opacity: 1;
 }
 
 /* Thread rows, 46px apart: the title, with the row's mark at its end, then one quiet line of where the

@@ -8,9 +8,9 @@ import { cn } from "../lib/cn";
 import { newThread, openProject } from "../lib/router";
 import { useUi } from "../lib/ui";
 import { floatingGround } from "../lib/use-anchor-ground";
-import { ChevronRight, Image as ImageIcon, PenSquare, Plus, Settings, X } from "./icons";
+import { ChevronRight, Globe, Image as ImageIcon, PenSquare, Plus, Settings, X } from "./icons";
 import { menuItem, menuItemDanger, menuPopup, menuSeparator } from "./menu";
-import { ProjectIconChooser } from "./ProjectIconPicker";
+import { ProjectIcon, ProjectIconChooser } from "./ProjectIconPicker";
 import { RemoveProjectDialog } from "./ProjectMenu";
 import { Tooltip } from "./ui";
 
@@ -20,7 +20,7 @@ const startThread = (projectId: string) => {
 };
 
 /**
- * One project's part of the thread list: its name as a quiet label that folds the group, with how many of its threads
+ * One project's part of the thread list: its mark and name as a quiet label that folds the group, with how many of its threads
  * wait on the person and, on hover, New thread there; then its rows, and "Show N more" while some are past the page. A
  * right click on the label gives the project's own actions.
  */
@@ -58,6 +58,9 @@ export function SidebarProjectGroup({
               onToggle();
             }}
           >
+            <span className="sidebar-project-mark" aria-hidden="true">
+              {project.rootPath ? <ProjectIcon rootPath={project.rootPath} size={14} /> : <Globe size={14} />}
+            </span>
             <span className="sidebar-project-name" data-tip={project.name}>
               {project.name}
             </span>

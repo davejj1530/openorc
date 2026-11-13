@@ -35,7 +35,7 @@ import { useOrclingChatIds } from "../lib/orclings";
 import { useRpc, useRpcs } from "../lib/client";
 import { useRouter } from "../lib/router";
 import { useUi } from "../lib/ui";
-import { Check, ChevronRight, Funnel, Pin, Plus, Search } from "./icons";
+import { Check, ChevronRight, FolderPlus, Funnel, Pin, Search } from "./icons";
 import { ResolvedDrawer, useResolveThread, useThreadDrop } from "./SidebarResolved";
 import { SidebarListHead } from "./SidebarListHead";
 import { SidebarProjectGroup } from "./SidebarProjectGroup";
@@ -170,9 +170,10 @@ function ListFeedback({ state, shown, snoozed }: { state: ThreadList; shown: num
       </button>
     );
   if (pending && !shown) return <p className="browser-empty">Loading threads…</p>;
-  // Every project keeps its label, empty or not, so only the pinned filter can come up empty.
-  if (shown || snoozed || hasMore || !pinnedOnly) return null;
-  return <p className="browser-empty">No pinned threads.</p>;
+  // Every project keeps its label, empty or not, so the list comes up empty only with no projects or under the pinned filter.
+  if (shown || snoozed || hasMore) return null;
+  if (pinnedOnly) return <p className="browser-empty">No pinned threads.</p>;
+  return projects.data?.length === 0 ? <p className="browser-empty">No projects yet.</p> : null;
 }
 
 /** The list's parts from its pages: pins, the rest, snoozed threads apart, and Resolved. */
@@ -284,12 +285,6 @@ function ThreadGroups({ children }: { children: ChildPages }) {
               {rows(snoozed, true)}
             </Section>
           ) : null}
-          {pinnedOnly ? null : (
-            <button type="button" className="browser-load-more sidebar-add-project" onClick={() => useUi.getState().setImportProject(true)}>
-              <Plus size={14} />
-              Add project
-            </button>
-          )}
         </div>
         {pinnedOnly ? null : (
           <ResolvedDrawer open={resolvedOpen} holding={resolvedShown.length > 0} count={state.resolvedCount} onToggle={toggle(sidebarFoldKey.resolved(SIDEBAR_LIST))} accepts={resolvable(list, now)}>
@@ -311,13 +306,18 @@ function ProjectsFailed({ projects }: { projects: ThreadList["projects"] }) {
   );
 }
 
-/** The list head's tools: Search, the app's one search, which opens the palette over the window, then the filter. */
+/** The list head's tools: Search, the app's one search, which opens the palette over the window, then Add project and the filter. */
 function ListTools() {
   return (
     <>
       <Tooltip label="Search">
         <IconButton size="lg" aria-label="Search" className="no-drag" onClick={() => useUi.getState().setPalette(true)}>
           <Search size={16} />
+        </IconButton>
+      </Tooltip>
+      <Tooltip label="Add project">
+        <IconButton size="lg" aria-label="Add project" className="no-drag" onClick={() => useUi.getState().setImportProject(true)}>
+          <FolderPlus size={16} />
         </IconButton>
       </Tooltip>
       <ThreadFilter />

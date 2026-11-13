@@ -69,7 +69,7 @@ it("draws each kind as its own mark: skill, connector with its image's letter, m
     sources: { ...skills, connectors: [{ name: "linear", title: "Linear", logo: null }], members: [{ key: "rini", name: "Rini" }], files: ["src/app.ts"] },
   });
   type(field, "@Rini, ask @linear to /code-review src/app.ts now");
-  expect(marks(field)).toEqual(["@Rini", "@linear", "/code-review", "src/app.ts"]);
-  expect(field.querySelector(".connector-token-at")?.getAttribute("data-letter")).toBe("L");
+  expect(marks(field)).toEqual(["Rini", "LLinear", "/code-review", "app.ts"]);
+  expect(field.querySelector("[data-connector] .connector-logo-letter")?.textContent).toBe("L");
   expect(field.querySelector("mark.skill-token")?.getAttribute("data-skill")).toBe("code-review");
 });

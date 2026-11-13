@@ -796,38 +796,45 @@
   color: inherit;
   -webkit-text-stroke: 0;
 }
-/* A connector named in the message: its image takes the place of the @, within the @'s own width so
-   the letters keep their places, and never past its start, where a line's edge would clip it. The
-   end of that width is the gap before the name. */
-.connector-token {
-  background: none;
-  color: var(--mention-ink);
-  -webkit-text-stroke: 0.04em currentColor;
+/* A file, an Orcling or a connector named in the message: a pill of its mark and its name on the key, as tall as a
+   line's words, so a line holding one keeps its height. */
+.mark-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  height: 20px;
+  padding: 0 6px 0 4px;
+  border-radius: 6px;
+  background: var(--control-fill);
+  color: var(--ink);
+  vertical-align: top;
+  white-space: nowrap;
 }
-.connector-token-at {
-  position: relative;
-  color: transparent;
-  -webkit-text-stroke: 0;
+.mark-pill > :is(svg, img, .connector-logo, .orcling-avatar) {
+  flex-shrink: 0;
 }
-.connector-token-at::before {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 0;
-  width: 1em;
-  height: 1em;
-  border-radius: 0.25em;
-  background: var(--token-logo) center / cover no-repeat;
-  font-size: 0.76em;
-  transform: translateY(-50%);
+.mark-pill > svg:not(.orcling-avatar) {
+  color: var(--ink-3);
 }
-.connector-token-at[data-letter]::before {
-  content: attr(data-letter);
-  display: grid;
-  place-items: center;
-  background: var(--surface-3);
-  color: var(--ink-2);
-  line-height: 1;
+.mark-pill > .connector-logo {
+  border-radius: 3px;
+}
+.mark-pill-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* A pill picked from a list lands with one small pop; one that arrives any other way does not move. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-landing] > .mark-pill {
+    animation: mark-pill-land 320ms var(--ease-overshoot);
+  }
+}
+@keyframes mark-pill-land {
+  from {
+    transform: scale(0.82);
+  }
 }
 
 /* Composer popups open out of the control that was touched, clear of the composer surface: they

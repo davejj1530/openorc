@@ -1,6 +1,6 @@
 import { cleanup } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { markPieces, type MarkSources, type Piece } from "../../lib/message-marks";
+import { markPieces, type Mark, type MarkSources, type Piece } from "../../lib/message-marks";
 import { holdAtCaret, unitsOf } from "./draft";
 import { caretOf, messageOf, mountEditor, placeCaret, type } from "./testing";
 
@@ -12,13 +12,21 @@ const sources: MarkSources = {
   members: [{ key: "rini", name: "Rini" }],
   files: ["src/app.ts"],
 };
-/** The marks the box draws, by kind and words, in order. */
+const KINDS = ["skill", "connector", "member", "file"] as const;
+/** The marks the box draws, by kind and what each stands for, in order. */
 const drawn = (field: HTMLElement) =>
-  [...field.querySelectorAll<HTMLElement>("[data-skill], [data-connector], [data-member], [data-file]")].map((mark) => [
-    (["skill", "connector", "member", "file"] as const).find((kind) => mark.dataset[kind] !== undefined),
-    mark.textContent,
-  ]);
-const expected = (text: string) => markPieces(text, sources).flatMap((piece) => (piece.mark ? [[piece.mark.kind, piece.text]] : []));
+  [...field.querySelectorAll<HTMLElement>("[data-skill], [data-connector], [data-member], [data-file]")].map((mark) => {
+    const kind = KINDS.find((each) => mark.dataset[each] !== undefined)!;
+    return [kind, mark.dataset[kind]];
+  });
+const named = (mark: Mark) =>
+  ({
+    skill: () => (mark as { name: string }).name,
+    connector: () => (mark as { connector: { name: string } }).connector.name,
+    member: () => (mark as { key: string }).key,
+    file: () => (mark as { path: string }).path,
+  })[mark.kind]();
+const expected = (text: string) => markPieces(text, sources).flatMap((piece) => (piece.mark ? [[piece.mark.kind, named(piece.mark)]] : []));
 
 describe("the message and the draft", () => {
   const samples = [
@@ -56,9 +64,9 @@ describe("the message and the draft", () => {
     type(field, "please /code-review");
     expect(drawn(field)).toEqual([]);
     type(field, "please /code-review ");
-    expect(drawn(field)).toEqual([["skill", "/code-review"]]);
+    expect(drawn(field)).toEqual([["skill", "code-review"]]);
     placeCaret(field, "please /code-review".length);
-    expect(drawn(field)).toEqual([["skill", "/code-review"]]);
+    expect(drawn(field)).toEqual([["skill", "code-review"]]);
   });
 
   it("takes a mark whole when an edit cuts into it, and reads the words left as they now read", () => {

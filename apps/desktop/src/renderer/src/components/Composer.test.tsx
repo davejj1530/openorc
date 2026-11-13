@@ -668,14 +668,14 @@ describe("connector mentions", () => {
     press(message(), { key: "Enter" });
     expect(onSubmit).not.toHaveBeenCalled();
     expect(messageOf(message())).toBe("do you see @paper ");
-    const mark = message().querySelector("mark.connector-token");
-    expect(mark?.textContent).toBe("@paper");
-    expect(mark?.querySelector(".connector-token-at")?.getAttribute("data-letter")).toBe("P");
+    const mark = message().querySelector("mark[data-connector='paper']");
+    expect(mark?.querySelector(".mark-pill-name")?.textContent).toBe("Paper");
+    expect(mark?.querySelector(".connector-logo-letter")?.textContent).toBe("P");
   });
 
   it("leaves an @ word that names no connector unmarked", () => {
     mount({ value: "mail me@paper.com or @papers", connectors });
-    expect(message().querySelector("mark.connector-token")).toBeNull();
+    expect(message().querySelector("mark[data-connector]")).toBeNull();
   });
 
   it("lists the connectors the agent goes without in this mode, dimmed under why, and picking one leaves the message", () => {

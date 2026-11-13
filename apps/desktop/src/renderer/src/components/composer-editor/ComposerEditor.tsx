@@ -8,8 +8,10 @@ import { ClipboardPlugin } from "./plugins/ClipboardPlugin";
 import { DraftPlugin, type DraftChange } from "./plugins/DraftPlugin";
 import { FocusPlugin } from "./plugins/FocusPlugin";
 import { KeyboardPlugin } from "./plugins/KeyboardPlugin";
+import { LandingPlugin } from "./plugins/LandingPlugin";
 import { MarksPlugin } from "./plugins/MarksPlugin";
 import { ReadyPlugin } from "./plugins/ReadyPlugin";
+import { PICKED } from "./shared";
 
 export type { DraftChange } from "./plugins/DraftPlugin";
 
@@ -50,7 +52,7 @@ function EditorControls({ handle, disabled }: Pick<ComposerEditorProps, "handle"
     handle,
     () => ({
       write: (text, caret) => {
-        editor.update(() => $writeDraft(text, caret), { discrete: true, tag: HISTORY_PUSH_TAG });
+        editor.update(() => $writeDraft(text, caret), { discrete: true, tag: [HISTORY_PUSH_TAG, PICKED] });
         editor.getRootElement()?.focus({ preventScroll: true });
       },
     }),
@@ -62,7 +64,7 @@ function EditorControls({ handle, disabled }: Pick<ComposerEditorProps, "handle"
 /**
  * The message box every composer writes in: plain words with each skill, connector, member and picked file as a mark
  * of its own. Each concern is one plugin: the message in and out (Draft), marks (Marks), keys (Keyboard), the clipboard
- * and drops (Clipboard), the ready signal (Ready) and focus on mount (Focus); plain text editing and undo come with the
+ * and drops (Clipboard), the ready signal (Ready), focus on mount (Focus) and a picked pill landing (Landing); plain text editing and undo come with the
  * editor itself.
  */
 export function ComposerEditor(props: ComposerEditorProps) {
@@ -90,6 +92,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
       </div>
       {/* Marks registers how it reads the words before Draft writes the first message in. */}
       <MarksPlugin sources={props.sources} />
+      <LandingPlugin />
       <DraftPlugin value={props.value} onChange={props.onChange} />
       <KeyboardPlugin onKeyDown={props.onKeyDown} />
       <ClipboardPlugin onFiles={props.onFiles} />

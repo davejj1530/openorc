@@ -14,7 +14,7 @@ const marks = {
   connectors: [{ name: "figma", title: "Figma", logo: "data:image/png;base64,AAAA" }],
 };
 
-it("draws a sent message as the composer did: the skill in blue, the connector's @ as its image, and says what the skill is for", async () => {
+it("draws a sent message as the composer did: the skill in blue, the connector as a pill of its image and name, and says what the skill is for", async () => {
   vi.useFakeTimers();
   vi.spyOn(HTMLElement.prototype, "getClientRects").mockImplementation(function (this: HTMLElement) {
     return (this.dataset["skill"] ? [new DOMRect(10, 10, 80, 16)] : []) as unknown as DOMRectList;
@@ -26,9 +26,9 @@ it("draws a sent message as the composer did: the skill in blue, the connector's
     </MessageMarks.Provider>,
   );
   const bubble = container.querySelector<HTMLElement>(".message-bubble")!;
-  expect(bubble.textContent).toBe("run /code-review on the @figma file");
+  expect(bubble.textContent).toBe("run /code-review on the Figma file");
   expect(bubble.querySelector("mark.skill-token")?.textContent).toBe("/code-review");
-  expect(bubble.querySelector<HTMLElement>("mark.connector-token .connector-token-at")?.style.getPropertyValue("--token-logo")).toContain("data:image/png");
+  expect(bubble.querySelector<HTMLImageElement>("mark[data-connector='figma'] img")?.src).toContain("data:image/png");
   fireEvent.pointerMove(bubble, { clientX: 30, clientY: 15 });
   await act(async () => void vi.advanceTimersByTime(400));
   expect(screen.getByText("Review the branch for bugs")).toBeTruthy();

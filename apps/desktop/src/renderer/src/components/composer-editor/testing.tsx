@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, within } from "@testing-library/react";
 import { createRef, useState, type RefObject } from "react";
 import { getNearestEditorFromDOMNode, type LexicalEditor } from "lexical";
@@ -75,7 +76,12 @@ export function mountEditor(overrides: Partial<ComposerEditorProps> = {}): Mount
       />
     );
   }
-  const view = render(<Owner />);
+  // A mark draws an Orcling by its face, which it reads as the app does.
+  const view = render(
+    <QueryClientProvider client={new QueryClient()}>
+      <Owner />
+    </QueryClientProvider>,
+  );
   const setMessage = (text: string) => act(() => outside.set(text));
   return { container: view.container, field: within(view.container).getByRole("textbox", { name: "Message" }), changes, handle, setMessage };
 }

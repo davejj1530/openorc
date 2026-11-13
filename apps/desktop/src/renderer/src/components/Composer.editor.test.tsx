@@ -93,7 +93,7 @@ describe("mentions as marks", () => {
     type(field, "@Ri");
     press(field, { key: "Enter" });
     expect(messageOf(field)).toBe("@Rini ");
-    expect(field.querySelector("[data-member]")?.textContent).toBe("@Rini");
+    expect(field.querySelector("[data-member] .mark-pill-name")?.textContent).toBe("Rini");
     type(field, "@Rini check the copy");
     press(field, { key: "Enter" });
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith("@Rini check the copy", [], false));
@@ -106,11 +106,11 @@ describe("mentions as marks", () => {
     type(field, "look at @app");
     fireEvent.mouseDown(await screen.findByRole("option", { name: "src/app.ts" }));
     expect(messageOf(field)).toBe("look at src/app.ts ");
-    await waitFor(() => expect(field.querySelector("[data-file]")?.textContent).toBe("src/app.ts"));
+    await waitFor(() => expect(field.querySelector("[data-file] .mark-pill-name")?.textContent).toBe("app.ts"));
     expect(readDraft(draftKey, { files: [] as string[] }).files).toEqual(["src/app.ts"]);
     cleanup();
     const back = mount({ draftKey, value: "look at src/app.ts and src/other.ts" });
-    expect([...back.field.querySelectorAll("[data-file]")].map((mark) => mark.textContent)).toEqual(["src/app.ts"]);
+    expect([...back.field.querySelectorAll<HTMLElement>("[data-file]")].map((mark) => mark.dataset["file"])).toEqual(["src/app.ts"]);
   });
 
   it("lands a skill typed in full once the caret moves on, so Backspace right after typing it takes one letter", () => {

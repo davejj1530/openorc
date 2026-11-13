@@ -4,6 +4,9 @@ import { useLayoutEffect, useRef } from "react";
 /** An update that writes the message from outside, as a send clearing it or a draft coming back: not the person's edit. */
 export const EXTERNAL = "composer-external";
 
+/** An update that writes a pick from a list into the draft; the pills it makes land with a pop. */
+export const PICKED = "composer-picked";
+
 /** Whether the person is in the draft now. An update made while they are not must not take focus or move the page's selection. */
 export const hasFocus = (editor: LexicalEditor): boolean => {
   const root = editor.getRootElement();

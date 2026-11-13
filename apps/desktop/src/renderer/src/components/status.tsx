@@ -1,6 +1,7 @@
 import type { TaskPriority, TaskStatus } from "@openorc/protocol";
 import { Archive, CircleCheck, Minus } from "./icons";
 import { cn } from "../lib/cn";
+import { WaitMark } from "./StateMarks";
 
 export const statusLabel: Record<TaskStatus, string> = {
   proposed: "Proposed",
@@ -20,7 +21,7 @@ export const groupOrder: TaskStatus[] = ["in_progress", "review", "proposed", "b
 export const groupLabel: Record<TaskStatus, string> = { ...statusLabel, review: "Ready for review" };
 
 /**
- * A task's status as a 16px mark: an arc for work under way, the attention dot for review, an
+ * A task's status as a 16px mark: an arc for work under way, the amber disc for review (it waits on the person), an
  * attention ring for a proposal, an empty ring for the backlog, a check for done.
  */
 export function StatusIcon({ status, className }: { status: TaskStatus; className?: string }) {
@@ -38,11 +39,7 @@ export function StatusIcon({ status, className }: { status: TaskStatus; classNam
         </svg>
       );
     case "review":
-      return (
-        <svg width={16} height={16} viewBox="0 0 16 16" aria-hidden="true" className={cn(c, "text-attention")}>
-          <circle cx="8" cy="8" r="4" fill="currentColor" />
-        </svg>
-      );
+      return <WaitMark className={cn(c, "text-attention")} />;
     case "done":
       return <CircleCheck size={16} className={cn(c, "text-ok")} />;
     case "archived":

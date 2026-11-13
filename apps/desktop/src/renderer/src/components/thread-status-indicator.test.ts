@@ -15,13 +15,13 @@ const render = (changes: Partial<StatusFields> = {}) => renderToStaticMarkup(cre
 
 describe("sidebar thread status", () => {
   it.each([
-    ["waiting", "Needs you", "CircleHelp"],
-    ["running", "Working", "LoaderCircle"],
-  ] as const)("shows %s ahead of failure, unread and completion", (activity, label, icon) => {
+    ["waiting", "Needs you", 'data-mark="ask"'],
+    ["running", "Working", 'data-icon="LoaderCircle"'],
+  ] as const)("shows %s ahead of failure, unread and completion", (activity, label, mark) => {
     const html = render({ activity, session: { status: "error", message: "Previous failure" }, unread: true, doneAt: 1 });
     expect(html).toContain(`aria-label="${label}"`);
     expect(html).toContain(`data-tip="${label}"`);
-    expect(html).toContain(`data-icon="${icon}"`);
+    expect(html).toContain(mark);
     expect(html.match(/role="img"/g)).toHaveLength(1);
     expect(html).not.toContain("Previous failure");
   });
@@ -30,7 +30,7 @@ describe("sidebar thread status", () => {
     const html = render({ session: { status, message: "Provider unavailable" }, unread: true, doneAt: 1 });
     expect(html).toContain(`aria-label="${label}: Provider unavailable"`);
     expect(html).toContain(`data-tip="${label}: Provider unavailable"`);
-    expect(html).toContain('data-icon="AlertCircle"');
+    expect(html).toContain('data-mark="failed"');
   });
 
   it.each([["error", "Failed"]] as const)("provides a fallback for %s without a message", (status, label) => {
@@ -41,6 +41,7 @@ describe("sidebar thread status", () => {
     const html = render({ unread: true, doneAt: 1 });
     expect(html).toContain('aria-label="Unread"');
     expect(html).toContain('data-tip="Unread"');
+    expect(html).toContain('data-mark="unread"');
     expect(html).not.toContain('data-icon="Check"');
   });
 
@@ -53,7 +54,7 @@ describe("sidebar thread status", () => {
     });
     expect(html).toContain('aria-label="2 background commands are running"');
     expect(html).toContain('data-tip="2 background commands are running"');
-    expect(html).toContain('data-icon="Terminal"');
+    expect(html).toContain('data-mark="background"');
     expect(render({ backgroundCommands: [{ id: "b1", description: "pnpm dev" }], unread: true })).toContain('aria-label="Unread"');
   });
 

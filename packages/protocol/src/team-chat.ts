@@ -67,6 +67,11 @@ export const TeamMessage = z.object({
 export type TeamMessage = z.infer<typeof TeamMessage>;
 export const TeamChatTimeline = z.object({ messages: z.array(TeamMessage).max(60), older: z.boolean(), newer: z.boolean(), headSeq: seq, read: TeamChatRead.nullable() });
 export type TeamChatTimeline = z.infer<typeof TeamChatTimeline>;
+export const PendingTeamMessage = z.object({ id: z.uuid(), body: z.string(), createdAt: z.string(), state: z.enum(["sending", "failed"]), error: z.string().nullable() });
+export type PendingTeamMessage = z.infer<typeof PendingTeamMessage>;
+/** Local words and stable send identities, without an authorized history cache. */
+export const TeamChatDraft = z.object({ text: z.string(), pending: z.array(PendingTeamMessage) });
+export type TeamChatDraft = z.infer<typeof TeamChatDraft>;
 export type TeamChatStatus = { state: "unavailable" } | { state: "ready"; accountId: string; spaceId: string; reach: "live" | "offline"; chat: TeamChatState };
 
 const scope = { spaceId: SpaceId };

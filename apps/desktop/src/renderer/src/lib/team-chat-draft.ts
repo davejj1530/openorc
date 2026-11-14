@@ -1,0 +1,106 @@
+import { TeamChatDraft, type PendingTeamMessage } from "@openorc/protocol";
+export type { TeamChatDraft, PendingTeamMessage } from "@openorc/protocol";
+export interface TeamChatTarget {
+  accountId: string;
+  spaceId: string;
+  conversationId: string;
+}
+const PREFIX = "openorc.teamChat.draft:";
+const keyOf = (at: TeamChatTarget) => PREFIX + JSON.stringify([at.accountId, at.spaceId, at.conversationId]);
+
+/** Only local words and unsent identities persist; authorized server history never enters draft storage. */
+export class TeamChatDrafts {
+  readonly #memory = new Map<string, TeamChatDraft>();
+  readonly #listeners = new Set<() => void>();
+  constructor(private readonly storage: Pick<Storage, "getItem" | "setItem" | "removeItem" | "key" | "length">) {}
+
+  subscribe = (listener: () => void): (() => void) => {
+    this.#listeners.add(listener);
+    return () => {
+      this.#listeners.delete(listener);
+    };
+  };
+  read(at: TeamChatTarget): TeamChatDraft {
+    const key = keyOf(at);
+    const cached = this.#memory.get(key);
+    if (cached) return cached;
+    let saved: TeamChatDraft = { text: "", pending: [] };
+    try {
+      const parsed = TeamChatDraft.safeParse(JSON.parse(this.storage.getItem(key) ?? "null"));
+      if (parsed.success) saved = { ...parsed.data, pending: parsed.data.pending.map((message) => ({ ...message, state: "failed", error: "Delivery couldn't be confirmed." })) };
+    } catch {
+      /* A damaged local draft cannot supply a send. */
+    }
+    this.#memory.set(key, saved);
+    return saved;
+  }
+  write(at: TeamChatTarget, text: string): void {
+    this.#save(at, { ...this.read(at), text });
+  }
+  begin(at: TeamChatTarget): PendingTeamMessage | null {
+    const current = this.read(at);
+    if (!current.text.trim()) return null;
+    const message: PendingTeamMessage = { id: crypto.randomUUID(), body: current.text, createdAt: new Date().toISOString(), state: "sending", error: null };
+    this.#save(at, { text: "", pending: [...current.pending, message] });
+    return message;
+  }
+  attempt(at: TeamChatTarget, id: string): void {
+    this.#change(at, id, { state: "sending", error: null });
+  }
+  failed(at: TeamChatTarget, id: string, error: string): void {
+    this.#change(at, id, { state: "failed", error });
+  }
+  reconcile(at: TeamChatTarget, committed: readonly string[]): void {
+    const current = this.read(at);
+    const pending = current.pending.filter((message) => !committed.includes(message.id));
+    if (pending.length !== current.pending.length) this.#save(at, { ...current, pending });
+  }
+  forget(at: TeamChatTarget): void {
+    this.#forgetKey(keyOf(at));
+    this.#emit();
+  }
+  forgetSpace(accountId: string, spaceId: string): void {
+    const prefix = PREFIX + JSON.stringify([accountId, spaceId]).slice(0, -1) + ",";
+    const keys = new Set(this.#memory.keys());
+    try {
+      for (let i = 0; i < this.storage.length; i++) {
+        const key = this.storage.key(i);
+        if (key) keys.add(key);
+      }
+    } catch {
+      /* Remove the in-memory copies even without storage. */
+    }
+    for (const key of keys) if (key.startsWith(prefix)) this.#forgetKey(key);
+    this.#emit();
+  }
+  #forgetKey(key: string): void {
+    const empty = { text: "", pending: [] };
+    this.#memory.set(key, empty);
+    try {
+      this.storage.removeItem(key);
+    } catch {
+      try {
+        this.storage.setItem(key, JSON.stringify(empty));
+      } catch {
+        /* An empty memory entry prevents rereading inaccessible words in this window. */
+      }
+    }
+  }
+  #change(at: TeamChatTarget, id: string, change: Pick<PendingTeamMessage, "state" | "error">): void {
+    const current = this.read(at);
+    this.#save(at, { ...current, pending: current.pending.map((message) => (message.id === id ? { ...message, ...change } : message)) });
+  }
+  #save(at: TeamChatTarget, value: TeamChatDraft): void {
+    const key = keyOf(at);
+    this.#memory.set(key, value);
+    try {
+      this.storage.setItem(key, JSON.stringify(value));
+    } catch {
+      /* The current window keeps the draft when storage is full. */
+    }
+    this.#emit();
+  }
+  #emit(): void {
+    for (const listener of this.#listeners) listener();
+  }
+}

@@ -1,5 +1,6 @@
 import { defaultHarnessId, harnessShortName, type AgentKind, type ThreadSummary } from "@openorc/protocol";
 import { rowStarter } from "./thread-row.js";
+import { threadTogether, threadWriteBlock } from "./thread-collaboration.js";
 
 const COMPOSER_MESSAGES = {
   stopping: "Stopping…",
@@ -10,7 +11,8 @@ const COMPOSER_MESSAGES = {
 /** A thread's composer says who reads the message, in every state; what Enter does is the send's own word. */
 export function composerPlaceholder(agent: AgentKind | undefined, thread?: Pick<ThreadSummary, "owner"> | null): string {
   const starter = thread ? rowStarter(thread) : null;
-  if (starter) return `${starter.first}'s thread`;
+  // A teammate's thread reads as theirs while this person cannot run its agent; once the server lets them, as any other.
+  if (starter && (!threadTogether(thread) || threadWriteBlock(thread))) return `${starter.first}'s thread`;
   return `Message ${harnessShortName(agent ?? defaultHarnessId)}…`;
 }
 

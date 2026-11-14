@@ -45,14 +45,14 @@ export function writesAsCreator(thread: Row | null | undefined): boolean {
 
 /**
  * The header's and row's words for whose turn or ask it is, when the thread has someone else in it; null when the plain
- * words say it ("Working", "Needs you"). A teammate's turn is theirs; a live ask is its sender's to answer, and calls
+ * words say it ("Working", "Needs you"). A turn is its sender's: theirs, or the reader's own; a live ask is its sender's to answer, and calls
  * only them; a parked ask, or one whose sender's account is gone, waits for whoever answers first.
  */
 export function togetherActivity(thread: Pick<ThreadSummary, "activity" | "owner">): { text: string; tone: "live" | "attention" | "muted" } | null {
   const state = threadTogether(thread);
   if (!state || !withOthers(thread)) return null;
   const sender = state.live?.sender;
-  if (thread.activity === "running" && sender && other(state, sender)) return { text: `${personFirst(sender)}'s turn`, tone: "live" };
+  if (thread.activity === "running" && sender) return { text: other(state, sender) ? `${personFirst(sender)}'s turn` : "Your turn", tone: "live" };
   if (thread.activity !== "waiting" || !state.ask) return null;
   const asker = state.ask.sender;
   if (state.ask.state === "parked" || !asker) return { text: "Waiting for an answer", tone: "muted" };

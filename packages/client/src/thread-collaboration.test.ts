@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { askAnswerBlock, personFirst, personName, queuedBy, threadWriteBlock, togetherActivity, withOthers, writesAsCreator } from "./thread-collaboration.js";
 import { asksBlocked, sendsBlocked } from "./hosted-send.js";
 import { rowFacts, threadActivity, threadWaitsOnYou } from "./thread-row.js";
+import { composerPlaceholder } from "./composer-presentation.js";
 
 const MARA: ThreadPerson = { id: "u-mara", name: "Mara Okafor", image: null };
 const THEO: ThreadPerson = { id: "u-theo", name: "Theo Laurent", image: null };
@@ -87,10 +88,16 @@ describe("a teammate's cloud thread on today's server", () => {
   it("lights up without another change once the server opens shared writing", () => {
     const open = row(together(THEO, { canWrite: true, send: "now", canStop: true, live: live(MARA) }), "running", mara);
     expect(sendsBlocked(open)).toBeNull();
+    expect(composerPlaceholder("codex", open)).toBe("Message Codex…");
+    expect(composerPlaceholder("codex", row(together(THEO), "idle", mara))).toBe("Mara's thread");
     expect(threadActivity(open)).toEqual({ text: "Mara's turn", tone: "live" });
     const parked = row(together(THEO, { canWrite: true, send: "now", ask: ask(MARA, "parked", "start") }), "waiting", mara);
     expect(asksBlocked(parked)).toBeNull();
     expect(askAnswerBlock(parked)).toBeNull();
+  });
+
+  it("names the reader's own turn as theirs inside someone else's thread", () => {
+    expect(threadActivity(row(together(THEO, { canWrite: true, send: "now", live: live(THEO) }), "running", mara))).toEqual({ text: "Your turn", tone: "live" });
   });
 
   it("names the reader's own live ask as theirs inside someone else's thread", () => {

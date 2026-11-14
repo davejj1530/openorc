@@ -1,4 +1,4 @@
-import type { AccountStatus, CloudHours } from "@openorc/protocol";
+import type { AccountStatus, CloudHours, Price, ProPeriod } from "@openorc/protocol";
 
 type SignedIn = Extract<AccountStatus, { state: "signed-in" }>;
 
@@ -6,10 +6,24 @@ const HOUR = 3600;
 
 const day = (at: number) => new Date(at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 
-/** Cloud time as a person reads it: whole hours from an hour up, else minutes. */
+/** Cloud time as a person reads it: whole hours from an hour up, else minutes, and none as hours, the unit it is counted in. */
 export function cloudTime(seconds: number): string {
   const left = Math.max(0, seconds);
-  return left >= HOUR ? `${Math.floor(left / HOUR)} h` : `${Math.floor(left / 60)} min`;
+  if (left >= HOUR || left < 60) return `${Math.floor(left / HOUR)} h`;
+  return `${Math.floor(left / 60)} min`;
+}
+
+/** A price as the person's locale writes it, from an amount in the currency's smallest unit; whole amounts without cents. */
+export function priceText(price: Price, locale?: string): string {
+  const format = new Intl.NumberFormat(locale, { style: "currency", currency: price.currency.toUpperCase(), trailingZeroDisplay: "stripIfInteger" });
+  return format.format(price.amount / 10 ** (format.resolvedOptions().maximumFractionDigits ?? 2));
+}
+
+const PER: Record<ProPeriod, { name: string; per: string }> = { monthly: { name: "Monthly", per: "a month" }, yearly: { name: "Yearly", per: "a year" } };
+
+/** A way of paying for Pro: its price and period, or the period's name alone while the price is not known. */
+export function periodLabel(period: ProPeriod, price: Price | null, locale?: string): string {
+  return price ? `${priceText(price, locale)} ${PER[period].per}` : PER[period].name;
 }
 
 /** The plan in one short line, as the sidebar's foot shows it: "Free", or "Pro · 41 h left", which fits its narrowest width. */

@@ -151,3 +151,10 @@ it("names each paying block's move in the account as the card names its way ther
     expect([moves.plan, moves.hours].find((move) => move?.primary)?.label).toBe(card(account));
   }
 });
+
+it("names the pack and its price on Buy, once the server says them, and the pack alone without a price", () => {
+  const offers = { pro: [], hours: { seconds: 50 * 3600, months: 12, price: { amount: 1000, currency: "usd" } } };
+  expect(billingMoves(pro, offers).hours?.label).toMatch(/^Buy 50 h for .*10/);
+  expect(billingMoves(pro, { ...offers, hours: { ...offers.hours, price: null } }).hours?.label).toBe("Buy 50 h");
+  expect(billingMoves(pro, null).hours?.label).toBe("Buy more hours");
+});

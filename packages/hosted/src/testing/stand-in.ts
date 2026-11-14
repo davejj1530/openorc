@@ -20,7 +20,7 @@ import { engineSession } from "./stand-in-socket.js";
 import { StandInSignIns } from "./stand-in-sign-ins.js";
 import { StandInGithub } from "./stand-in-github.js";
 import { StandInSpaces } from "./stand-in-spaces.js";
-import { billingState, leftSeconds, StandInPayments, type StandInBilling } from "./stand-in-billing.js";
+import { billingState, leftSeconds, StandInPayments, type StandInBilling, type StandInOffers } from "./stand-in-billing.js";
 import { StandInThreads, type Admit, type StandInPeer, type StandInThreadSeed } from "./stand-in-threads.js";
 
 export interface StandIn {
@@ -34,6 +34,8 @@ export interface StandIn {
   checkouts: StandInPayments["checkouts"];
   /** The person pays on the last checkout opened for them; their apps hear of it on the `billing` topic unless `quiet`. */
   pay(email: string, options?: { quiet?: boolean }): void;
+  /** What GET /billing/offers answers next; null answers that billing is not set up. */
+  setOffers(offers: StandInOffers | null): void;
   /** The person's name and picture, as the server keeps them; a new person's name is made from their address. */
   setPerson(email: string, person: { name: string; image: string | null }): void;
   /** The sandbox service each person chose in Settings, by address. */
@@ -89,7 +91,7 @@ export interface StandInSignIn {
   checkedAt?: string;
 }
 
-export type { StandInBilling };
+export type { StandInBilling, StandInOffers };
 
 const NOT_INVITED = "This email doesn't belong to any organization yet.";
 /** The real server's words for a refused code, by the code its auth library names. */
@@ -396,11 +398,12 @@ function tellOf(peers: Set<Peer>, sockets: Set<StandInPeer>): (who: string, topi
 }
 
 /** What a test does to people's billing, as Polar and the person's payments would. */
-function paymentsFace(billing: Map<string, StandInBilling>, payments: StandInPayments): Pick<StandIn, "setBilling" | "checkouts" | "pay"> {
+function paymentsFace(billing: Map<string, StandInBilling>, payments: StandInPayments): Pick<StandIn, "setBilling" | "checkouts" | "pay" | "setOffers"> {
   return {
     setBilling: (email, state) => void billing.set(email.toLowerCase(), state),
     checkouts: payments.checkouts,
     pay: (email, options) => payments.pay(email.toLowerCase(), options),
+    setOffers: (offers) => void (payments.offers = offers),
   };
 }
 

@@ -8,7 +8,7 @@
  * No Node, Electron or React Native import outside testing/. Each host hands in what only it has (`HostedDeps`), so a
  * phone can mount the same package with its own storage.
  */
-import type { AccountStatus, BillingPage, Frame, HostedAgent, OwnerReach, Project, RoutedMethod, RpcParams, RpcResults, ThreadSummary } from "@openorc/protocol";
+import type { AccountStatus, BillingOffers, BillingPage, Frame, HostedAgent, OwnerReach, Project, RoutedMethod, RpcParams, RpcResults, ThreadSummary } from "@openorc/protocol";
 import { Account } from "./account.js";
 import { Follower } from "./follow.js";
 import type { HostedNotice } from "./notices.js";
@@ -92,6 +92,8 @@ export interface HostedAccount {
   openBilling(page: BillingPage): Promise<void>;
   /** Stops watching for a purchase more often than the server's word; `status().paying` ends. */
   leaveBilling(): void;
+  /** What Pro and an hours pack cost, read from the server; null signed out, or when it can't say. */
+  offers(): Promise<BillingOffers | null>;
 }
 
 export type KeptPart = "account" | "threads";

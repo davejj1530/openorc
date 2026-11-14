@@ -11,11 +11,11 @@
  *
  * `status()` is computed from these and the session each time it is asked. Nothing stores an AccountStatus.
  */
-import { openCodeProvider, type AccountProject, type BillingPage, type AccountStatus, type HostedAgent, type HostedRefusal, type RpcParams } from "@openorc/protocol";
+import { openCodeProvider, type AccountProject, type BillingOffers, type BillingPage, type AccountStatus, type HostedAgent, type HostedRefusal, type RpcParams } from "@openorc/protocol";
 import { z } from "zod";
 import type { HostedAccount, HostedDeps } from "./index.js";
 import { OutOfReach, Refused, type Session, type SessionChange } from "./session.js";
-import { githubRepoOf, signInKey, toImage, toPlan, toSandbox, toSignIns } from "./translate.js";
+import { githubRepoOf, signInKey, toImage, toOffers, toPlan, toSandbox, toSignIns } from "./translate.js";
 import { GithubConnect } from "./github.js";
 import { Paying } from "./paying.js";
 import { SignIns } from "./signins.js";
@@ -195,6 +195,13 @@ export class Account implements HostedAccount {
 
   leaveBilling(): void {
     this.#paying.leave();
+  }
+
+  /** Asked of the server each time, never kept: a price is shown only as the server says it now. */
+  async offers(): Promise<BillingOffers | null> {
+    if (!this.#signedInAs()) return null;
+    const offers = await this.deps.session.request(ROUTES.offers).catch(() => null);
+    return offers && toOffers(offers);
   }
 
   /** The host is closing: nothing is watched any more. */

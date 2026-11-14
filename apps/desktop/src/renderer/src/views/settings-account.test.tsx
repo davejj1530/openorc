@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
-import type { AccountStatus } from "@openorc/protocol";
+import type { AccountStatus, BillingOffers } from "@openorc/protocol";
 import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { AccountSettings } from "./settings-account";
@@ -47,11 +47,12 @@ const pro: Extract<AccountStatus, { state: "signed-in" }> = {
 };
 
 /** A core that keeps one account status and answers every account call with it, as the real one does. */
-function fakeCore(start: AccountStatus, signedIn: AccountStatus = pro) {
+function fakeCore(start: AccountStatus, signedIn: AccountStatus = pro, offers: BillingOffers | null = null) {
   let status = start;
   vi.mocked(core.call).mockImplementation(async (method: string, params: unknown) => {
     const p = params as { email?: string; code?: string; service?: string };
     if (method === "projects.list") return [];
+    if (method === "account.offers") return offers;
     if (method === "account.sendCode") status = { ...signedOut, codeSentTo: p.email! };
     if (method === "account.signIn") {
       if (p.code !== "123456") throw new Error("Invalid OTP");
@@ -207,4 +208,33 @@ it("stops watching for the purchase once the person leaves the screen, and not b
     </QueryClientProvider>,
   );
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("account.billing.leave", {}));
+});
+
+const OFFERS: BillingOffers = {
+  pro: [
+    { period: "monthly", price: { amount: 2000, currency: "usd" } },
+    { period: "yearly", price: { amount: 20000, currency: "usd" } },
+  ],
+  hours: { seconds: 50 * 3600, months: 12, price: { amount: 1000, currency: "usd" } },
+};
+
+it("prices each way of paying for Pro, and the pack on its Buy, as the server says them", async () => {
+  fakeCore(free, pro, OFFERS);
+  show(<AccountSettings active />);
+  fireEvent.click(await screen.findByRole("radio", { name: /200.* a year$/ }));
+  expect(screen.getByRole("radio", { name: /20.* a month$/ })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Upgrade" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("account.billing.open", { page: "pro", period: "yearly" }));
+  cleanup();
+  queryClient.clear();
+  fakeCore({ ...pro, hours: { ...pro.hours!, leftSeconds: 0 } }, pro, OFFERS);
+  show(<AccountSettings active />);
+  expect(ink((await screen.findByRole("button", { name: /^Buy 50 h for .*10$/ })).textContent!)).toBe(true);
+});
+
+it("shows no price and blocks nothing when the server can't say them", async () => {
+  fakeCore(free, pro, { ...OFFERS, pro: OFFERS.pro.map((offer) => ({ ...offer, price: null })) });
+  show(<AccountSettings active />);
+  expect(await screen.findByRole("radio", { name: "Yearly" })).toBeTruthy();
+  expect(screen.getByRole<HTMLButtonElement>("button", { name: "Upgrade" }).disabled).toBe(false);
 });

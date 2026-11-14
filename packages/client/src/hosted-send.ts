@@ -8,10 +8,12 @@ import {
   placeOf,
   sendBlockWords,
   type AccountStatus,
+  type BillingOffers,
   type BillingPage,
   type SendBlockWhy,
   type ThreadSummary,
 } from "@openorc/protocol";
+import { cloudTime, priceText } from "./account-words.js";
 
 /**
  * Where the card above a cloud thread's composer leads: the Settings section that holds what is missing. Paying's three
@@ -120,14 +122,15 @@ const FIXED_BY: Record<NonNullable<ReturnType<typeof payBlock>>, BillingPage["pa
 
 /**
  * The ways to pay, by the row they end: the plan's (Upgrade for a free person; billing, to change, cancel or fix a
- * payment, for Pro) and the hours' (Pro only). The one that fixes what the account lacks stands out, and a payment that
- * failed stands out while Pro lasts out its grace.
+ * payment, for Pro) and the hours' (Pro only), which names the pack and its price once the offers are known. The one
+ * that fixes what the account lacks stands out, and a payment that failed stands out while Pro lasts out its grace.
  */
-export function billingMoves(account: Extract<AccountStatus, { state: "signed-in" }>): { plan: BillingMove; hours: BillingMove | null } {
+export function billingMoves(account: Extract<AccountStatus, { state: "signed-in" }>, offers?: BillingOffers | null): { plan: BillingMove; hours: BillingMove | null } {
   const blocked = account.reach === "live" ? null : sendBlockWords("offline", "");
   const lacks = payBlock(account);
   const fix = account.plan.pro && account.plan.standing === "grace" ? "billing" : lacks && FIXED_BY[lacks];
   const move = (page: BillingPage["page"], label: string): BillingMove => ({ page, label, primary: fix === page, blocked });
   if (!account.plan.pro) return { plan: move("pro", ACTIONS.not_pro!.label), hours: null };
-  return { plan: move("billing", fix === "billing" ? ACTIONS.awaiting_payment!.label : "Manage billing"), hours: move("hours", ACTIONS.no_hours!.label) };
+  const pack = offers && `Buy ${cloudTime(offers.hours.seconds)}${offers.hours.price ? ` for ${priceText(offers.hours.price)}` : ""}`;
+  return { plan: move("billing", fix === "billing" ? ACTIONS.awaiting_payment!.label : "Manage billing"), hours: move("hours", pack || ACTIONS.no_hours!.label) };
 }

@@ -25,6 +25,7 @@ export function createAccountHandlers(
   | "account.projects.add"
   | "account.billing.open"
   | "account.billing.leave"
+  | "account.offers"
 > {
   const after = async (work: (account: HostedAccount) => Promise<void>): Promise<AccountStatus> => {
     if (!account) throw new Error(UNAVAILABLE);
@@ -46,5 +47,6 @@ export function createAccountHandlers(
     "account.projects.add": ({ projectId }) => after((a) => a.addProject(projectId)),
     "account.billing.open": (page) => after((a) => a.openBilling(page)),
     "account.billing.leave": () => after(async (a) => a.leaveBilling()),
+    "account.offers": () => account?.offers() ?? null,
   };
 }

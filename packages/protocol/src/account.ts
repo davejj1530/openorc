@@ -83,6 +83,21 @@ const BillingPageInput = z.discriminatedUnion("page", [
 ]);
 export type BillingPage = z.infer<typeof BillingPageInput>;
 
+/** An amount of money in its currency's smallest unit, with the currency's ISO code, as the server prices a purchase. */
+export interface Price {
+  amount: number;
+  currency: string;
+}
+
+/**
+ * What can be bought and what each costs: Pro by each way of paying, and an hours pack with the hours it gives and the
+ * months they keep. A price is null where the server has no single amount for it.
+ */
+export interface BillingOffers {
+  pro: { period: ProPeriod; price: Price | null }[];
+  hours: { seconds: number; months: number; price: Price | null };
+}
+
 /**
  * A page the app opened to pay, until what it is for lands, the person leaves Settings > Account, or it has been open
  * too long. Meanwhile the account is read every few seconds as well as on the server's word.
@@ -189,10 +204,12 @@ export const accountRpcParams = {
   "account.billing.open": BillingPageInput,
   /** The person left the screen they paid from: the app stops watching for the purchase and waits for the server's word. */
   "account.billing.leave": z.object({}).strict(),
+  /** What Pro and an hours pack cost, read from the server each time it is asked; null when it can't say. */
+  "account.offers": z.object({}).strict(),
 };
 
-/** Every call answers the whole status, so a window never reads a stale half. */
-export type AccountRpcResults = { [M in keyof typeof accountRpcParams]: AccountStatus };
+/** Every call but the offers answers the whole status, so a window never reads a stale half. */
+export type AccountRpcResults = { [M in Exclude<keyof typeof accountRpcParams, "account.offers">]: AccountStatus } & { "account.offers": BillingOffers | null };
 
 /**
  * Why a message cannot start a turn on OpenOrc Cloud now: out of reach, or one of the server's refusals, which name

@@ -4,12 +4,14 @@ import {
   hostedRunId,
   isHostedAgent,
   isHostedRefusal,
+  PRO_PERIODS,
   sendBlockWords,
   type AccountSignIn,
   type QueuedMessage,
   type AccountPlan,
   type AccountReach,
   type AccountSandbox,
+  type BillingOffers,
   type CloudHours,
   type Frame,
   type Run,
@@ -17,7 +19,7 @@ import {
   type ThreadActivity,
   type ThreadSummary,
 } from "@openorc/protocol";
-import type { WireBilling, WireEvent, WireHostedSettings, WireProject, WireSignIn, WireThread } from "./wire.js";
+import type { WireBilling, WireOffers, WireEvent, WireHostedSettings, WireProject, WireSignIn, WireThread } from "./wire.js";
 
 /** The plan and the hours left. Free carries no hours; a Pro month not paid for yet carries packs alone. */
 export function toPlan(billing: WireBilling): { plan: AccountPlan; hours: CloudHours | null } {
@@ -29,6 +31,14 @@ export function toPlan(billing: WireBilling): { plan: AccountPlan; hours: CloudH
   return {
     plan: { pro: true, standing: pro.standing, at },
     hours: { leftSeconds: (month?.leftSeconds ?? 0) + packsLeftSeconds, monthly: month, packsLeftSeconds },
+  };
+}
+
+/** What can be bought, by the periods this app pays by; a period a newer server adds is left out. */
+export function toOffers(offers: WireOffers): BillingOffers {
+  return {
+    pro: PRO_PERIODS.flatMap((period) => offers.pro.filter((offer) => offer.plan === period).map((offer) => ({ period, price: offer.price }))),
+    hours: offers.hours,
   };
 }
 

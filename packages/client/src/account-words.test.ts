@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cloudTime, hoursDetail, initials, planDate, planLine } from "./account-words.js";
+import { cloudTime, hoursDetail, initials, periodLabel, planDate, planLine, priceText } from "./account-words.js";
 
 const DEC_3 = Date.parse("2026-12-03T12:00:00Z");
 
@@ -7,7 +7,16 @@ describe("account words", () => {
   it("says cloud time in whole hours, and minutes under an hour", () => {
     expect(cloudTime(41 * 3600 + 3000)).toBe("41 h");
     expect(cloudTime(43 * 60 + 20)).toBe("43 min");
-    expect(cloudTime(-5)).toBe("0 min");
+    expect(cloudTime(-5)).toBe("0 h");
+    expect(cloudTime(30)).toBe("0 h");
+  });
+
+  it("writes a price from its smallest unit in the person's locale, and a period by its price or its name", () => {
+    expect(priceText({ amount: 2000, currency: "usd" }, "en-US")).toBe("$20");
+    expect(priceText({ amount: 1999, currency: "eur" }, "de-DE")).toBe("19,99\u00a0€");
+    expect(priceText({ amount: 3000, currency: "jpy" }, "ja-JP")).toBe("￥3,000");
+    expect(periodLabel("yearly", { amount: 20000, currency: "usd" }, "en-US")).toBe("$200 a year");
+    expect(periodLabel("monthly", null)).toBe("Monthly");
   });
 
   it("puts the plan and the hours left in one line", () => {

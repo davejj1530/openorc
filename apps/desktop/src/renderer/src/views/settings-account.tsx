@@ -1,4 +1,4 @@
-import { billingMoves, cloudTime, hoursDetail, planDate, type BillingMove } from "@openorc/client";
+import { billingMoves, cloudTime, hoursDetail, periodLabel, planDate, type BillingMove } from "@openorc/client";
 import { payBlock, PRO_PERIODS, sendBlockWords, type AccountStatus, type BillingPage, type ProPeriod } from "@openorc/protocol";
 import { useEffect, useState, type KeyboardEvent } from "react";
 import { Button, Input, Segmented, TextButton, Tooltip } from "../components/ui";
@@ -110,14 +110,17 @@ function SignedInAccount({ account, active }: { account: SignedIn; active: boole
 function PlanRows({ account, active, opening, onOpen }: { account: SignedIn; active: boolean; opening: boolean; onOpen: (page: BillingPage) => void }) {
   const [period, setPeriod] = useState<ProPeriod>("monthly");
   useLeaveBilling(active && account.paying !== null);
-  const moves = billingMoves(account);
+  // Asked again on each visit to this screen; a price missing or not read shows none and blocks nothing.
+  const offers = useRpc("account.offers", {}, { enabled: active, staleTime: 0 }).data ?? null;
+  const moves = billingMoves(account, offers);
+  const periods = PRO_PERIODS.map((value) => ({ value, label: periodLabel(value, offers?.pro.find((offer) => offer.period === value)?.price ?? null) }));
   const waiting = (page: BillingPage["page"]) => (account.paying?.page === page && page !== "billing" ? "Waiting for your payment" : null);
   const move = (each: BillingMove, page: BillingPage) => <BillingButton move={each} pending={opening} onClick={() => onOpen(page)} />;
   return (
     <>
       <SettingRow label="Plan" hint={waiting("pro") ?? planHint(account)}>
         <Status ok={account.plan.pro && account.plan.standing !== "grace"}>{account.plan.pro ? "Pro" : "Free"}</Status>
-        {moves.plan.page === "pro" ? <Segmented size="sm" label="Pay" value={period} options={PERIODS} onChange={setPeriod} /> : null}
+        {moves.plan.page === "pro" ? <Segmented size="sm" label="Pay" value={period} options={periods} onChange={setPeriod} /> : null}
         {move(moves.plan, moves.plan.page === "pro" ? { page: "pro", period } : { page: "billing" })}
       </SettingRow>
       {account.hours ? (
@@ -135,9 +138,6 @@ function planHint(account: SignedIn): string | undefined {
   const unpaid = account.plan.pro && account.plan.standing === "live" && payBlock(account) === "awaiting_payment";
   return (unpaid ? sendBlockWords("awaiting_payment", "") : planDate(account.plan)) ?? undefined;
 }
-
-const PERIOD_NAMES: Record<ProPeriod, string> = { monthly: "Monthly", yearly: "Yearly" };
-const PERIODS = PRO_PERIODS.map((value) => ({ value, label: PERIOD_NAMES[value] }));
 
 /** A way to pay; one that cannot be made now is disabled and says why on demand. */
 function BillingButton({ move, pending, onClick }: { move: BillingMove; pending: boolean; onClick: () => void }) {

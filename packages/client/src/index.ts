@@ -1,4 +1,4 @@
-export { cloudTime, hoursDetail, initials, planDate, planLine } from "./account-words.js";
+export { cloudTime, hoursDetail, initials, periodLabel, planDate, planLine, priceText } from "./account-words.js";
 export { approvalDetail, approvalSummary, readQuestions, type Question } from "./approval-request.js";
 export { pageHost, pageLabel, publicAddress } from "./browser-page.js";
 export { isUnifiedDiff, toolDiff } from "./chat-diff.js";

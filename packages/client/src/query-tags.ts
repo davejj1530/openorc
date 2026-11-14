@@ -60,6 +60,8 @@ function scopedTask(p: Params): string[] {
 /** Reads whose tags never depend on their parameters. */
 const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "account.status": ["account"],
+  // Not "account": prices are read once per visit to the screen, not again on every change to the account.
+  "account.offers": ["account-offers"],
   "claude.accounts.list": ["claude-accounts"],
   "connectors.list": ["connectors"],
   "connectors.spec": ["connectors"],

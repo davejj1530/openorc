@@ -29,6 +29,15 @@ export const wireBilling = z.object({
 });
 export type WireBilling = z.infer<typeof wireBilling>;
 
+const wirePrice = z.object({ amount: z.number().int().nonnegative(), currency: z.string().min(1) }).nullable();
+
+/** What Pro and an hours pack cost, as the server reads them from Polar's products. */
+export const wireOffers = z.object({
+  pro: z.array(z.object({ plan: z.string(), price: wirePrice })),
+  hours: z.object({ seconds: z.number().int().positive(), months: z.number().int().positive(), price: wirePrice }),
+});
+export type WireOffers = z.infer<typeof wireOffers>;
+
 /** A page of Polar's the server made for the person: a checkout, or their billing portal. Only the browser is given it. */
 export const wireBillingLink = z.object({ url: z.url() });
 
@@ -176,6 +185,7 @@ export const ROUTES = {
   signIn: route("POST", "/api/auth/sign-in/email-otp", null),
   signOut: route("POST", "/api/auth/sign-out", null),
   billing: route("GET", "/billing", wireBilling),
+  offers: route("GET", "/billing/offers", wireOffers),
   /** A checkout for the person's own Pro, by the period they pay for; 409 in words when they already pay for it. */
   checkoutPro: route("POST", "/billing/checkout/pro", wireBillingLink),
   /** A checkout for an hours pack; 409 in words for a person who is not Pro. */

@@ -133,4 +133,29 @@ describe("paying", () => {
     await hosted.account.signIn(ADA, stand.codeFor(ADA)!);
     expect(status(hosted).paying).toBeNull();
   });
+
+  it("reads what Pro and a pack cost from the server, in the periods this app pays by, and nothing when it can't say", async () => {
+    const { hosted, seen } = await signedIn();
+    stand.setOffers({
+      pro: [
+        { plan: "monthly", price: { amount: 2000, currency: "usd" } },
+        { plan: "weekly", price: { amount: 600, currency: "usd" } },
+        { plan: "yearly", price: null },
+      ],
+      hours: { seconds: 50 * 3600, months: 12, price: { amount: 1000, currency: "eur" } },
+    });
+    expect(await hosted.account.offers()).toEqual({
+      pro: [
+        { period: "monthly", price: { amount: 2000, currency: "usd" } },
+        { period: "yearly", price: null },
+      ],
+      hours: { seconds: 50 * 3600, months: 12, price: { amount: 1000, currency: "eur" } },
+    });
+    stand.setOffers(null);
+    expect(await hosted.account.offers()).toBeNull();
+    await hosted.account.signOut();
+    const asked = seen.timeline.filter((line) => line === "request /billing/offers").length;
+    expect(await hosted.account.offers()).toBeNull();
+    expect(seen.timeline.filter((line) => line === "request /billing/offers").length).toBe(asked);
+  });
 });

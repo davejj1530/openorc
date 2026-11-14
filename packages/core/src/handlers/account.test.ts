@@ -117,4 +117,14 @@ describe("paying through the core", () => {
     expect(await call("account.billing.open", { page: "billing" })).toMatchObject({ paying: { page: "billing" } });
     expect(await call("account.billing.leave", {})).toMatchObject({ paying: null });
   });
+
+  it("answers what Pro and a pack cost while signed in, and nothing signed out or with no account server", async () => {
+    await open();
+    expect(await call("account.offers", {})).toBeNull();
+    await signIn();
+    expect(await call("account.offers", {})).toMatchObject({ pro: [{ period: "monthly", price: { amount: 2000, currency: "usd" } }, { period: "yearly" }], hours: { months: 12 } });
+    await core!.close();
+    await open({});
+    expect(await call("account.offers", {})).toBeNull();
+  });
 });

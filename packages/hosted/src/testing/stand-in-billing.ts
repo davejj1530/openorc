@@ -8,6 +8,8 @@
  *                                 (every Pro person here pays for their own)
  *   POST /billing/checkout/hours  409 for a person who is not Pro
  *   POST /billing/portal          404 for a person who never bought anything
+ *   GET /billing/offers           what Pro and a pack cost, a price null where Polar has no single amount; 503 in words
+ *                                 where billing is not set up
  */
 import { randomUUID } from "node:crypto";
 
@@ -18,6 +20,20 @@ const MONTH_SECONDS = 40 * 3600;
 const PACK_SECONDS = 20 * 3600;
 const DAY_MS = 86_400_000;
 const PLANS = ["monthly", "yearly"];
+const NOT_SET_UP = "Billing isn't set up on this server, so Pro and hours can't be bought here yet.";
+
+/** What GET /billing/offers answers: amounts in the currency's smallest unit. */
+export type StandInOffers = {
+  pro: { plan: string; price: { amount: number; currency: string } | null }[];
+  hours: { seconds: number; months: number; price: { amount: number; currency: string } | null };
+};
+const OFFERS: StandInOffers = {
+  pro: [
+    { plan: "monthly", price: { amount: 2000, currency: "usd" } },
+    { plan: "yearly", price: { amount: 20000, currency: "usd" } },
+  ],
+  hours: { seconds: PACK_SECONDS, months: 12, price: { amount: 1000, currency: "usd" } },
+};
 
 type Reply = { status: number; body: unknown };
 const refused = (status: number, message: string): Reply => ({ status, body: { statusCode: status, message } });
@@ -31,6 +47,8 @@ export class StandInPayments {
   /** Every checkout made, in order, by person, with the address the app was given. */
   readonly checkouts: { who: string; page: "pro" | "hours"; plan: string | null; url: string }[] = [];
   readonly #customers = new Set<string>();
+  /** Null: billing is not set up. */
+  offers: StandInOffers | null = OFFERS;
 
   constructor(
     private readonly billing: Map<string, StandInBilling>,
@@ -40,6 +58,7 @@ export class StandInPayments {
   ) {}
 
   route(method: string, path: string, who: string, body: Record<string, unknown>): Reply | null {
+    if (method === "GET" && path === "/billing/offers") return this.offers ? { status: 200, body: this.offers } : refused(503, NOT_SET_UP);
     if (method !== "POST") return null;
     const state = this.billing.get(who) ?? { pro: false };
     if (path === "/billing/checkout/pro") {

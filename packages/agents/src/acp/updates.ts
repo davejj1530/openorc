@@ -43,6 +43,16 @@ const toolNameFor: Record<ToolKind, string> = {
   other: "tool",
 };
 
+/**
+ * Takes an update's input for the call when it differs from what the call has, and says whether it did. A call's input
+ * can come after the call: OpenCode names a command only once it runs.
+ */
+function takesInput(tool: ToolState, input: unknown): boolean {
+  if (input === undefined || input === null || JSON.stringify(input) === JSON.stringify(tool.input)) return false;
+  tool.input = input;
+  return true;
+}
+
 const planMarks = { pending: "[ ]", in_progress: "[~]", completed: "[x]" } as const;
 
 /**
@@ -203,9 +213,7 @@ export class AcpUpdateMapper {
     const events: AgentEvent[] = [];
     if (this.finished.has(update.toolCallId)) return events;
     const tool = this.toolFor(update, ts, events);
-    // A call's input can come after the call: OpenCode names a command only once it runs.
-    const named = update.rawInput !== undefined && update.rawInput !== null && JSON.stringify(update.rawInput) !== JSON.stringify(tool.input);
-    if (named) tool.input = update.rawInput;
+    const named = takesInput(tool, update.rawInput);
     events.push(...this.fileChanges(update.content, ts));
     const text = progressText(update);
     switch (update.status) {
@@ -228,20 +236,26 @@ export class AcpUpdateMapper {
         });
         return events;
       }
-      default: {
-        const news: { input?: unknown; progress?: string } = named ? { input: tool.input } : {};
-        if (text !== null && text !== tool.text) {
-          const delta = text.startsWith(tool.text) ? text.slice(tool.text.length) : text;
-          tool.text = text;
-          if (delta) events.push({ type: "tool.output.delta", runId: this.runId, ts, toolCallId: update.toolCallId, text: delta });
-        } else if (update.title && update.title !== tool.title) {
-          tool.title = update.title;
-          news.progress = update.title;
-        }
-        if (named || news.progress !== undefined) events.push({ type: "tool.updated", runId: this.runId, ts, toolCallId: update.toolCallId, ...news });
+      default:
+        events.push(...this.stillRunning(update, tool, named, text, ts));
         return events;
-      }
     }
+  }
+
+  /** What a call still running has new: output it printed, or else a new title, and its input when this update named it. */
+  private stillRunning(update: Extract<SessionUpdate, { sessionUpdate: "tool_call_update" }>, tool: ToolState, named: boolean, text: string | null, ts: number): AgentEvent[] {
+    const events: AgentEvent[] = [];
+    const news: { input?: unknown; progress?: string } = named ? { input: tool.input } : {};
+    if (text !== null && text !== tool.text) {
+      const delta = text.startsWith(tool.text) ? text.slice(tool.text.length) : text;
+      tool.text = text;
+      if (delta) events.push({ type: "tool.output.delta", runId: this.runId, ts, toolCallId: update.toolCallId, text: delta });
+    } else if (update.title && update.title !== tool.title) {
+      tool.title = update.title;
+      news.progress = update.title;
+    }
+    if (named || news.progress !== undefined) events.push({ type: "tool.updated", runId: this.runId, ts, toolCallId: update.toolCallId, ...news });
+    return events;
   }
 
   private fileChanges(content: ToolCallContent[] | null | undefined, ts: number): AgentEvent[] {

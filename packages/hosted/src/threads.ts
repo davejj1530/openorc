@@ -375,16 +375,16 @@ export class Threads implements HostedThreads {
     const state = this.deps.session.state;
     const generation = this.deps.session.generation;
     const revision = this.#revision;
-    if (!state.signedIn) return;
+    if (!state.signedIn || this.#closed) return;
     let read: Pick<Heard, "me" | "personal" | "rows" | "projects">;
     try {
       read = await this.#readSpaces();
     } catch (error) {
+      if (!this.#currentRead(generation, revision)) return;
       this.deps.log.warn(`OpenOrc Cloud threads: ${error instanceof Error ? error.message : String(error)}`);
       return;
     }
-    const now = this.deps.session.state;
-    if (this.#closed || !now.signedIn || this.deps.session.generation !== generation || now.email !== state.email || revision !== this.#revision) return;
+    if (!this.#currentRead(generation, revision)) return;
     const before = JSON.stringify([this.#heard?.rows, this.#heard?.projects]);
     const projectsBefore = JSON.stringify(this.#heard?.projects);
     if (this.#heard?.email === state.email) this.#tellPerson(this.#heard.rows, read.rows);
@@ -396,6 +396,10 @@ export class Threads implements HostedThreads {
     if (JSON.stringify([this.#heard.rows, this.#heard.projects]) !== before) this.#tell();
     // Settings shows which of this Mac's projects are on OpenOrc Cloud, read off these.
     if (JSON.stringify(this.#heard.projects) !== projectsBefore) this.deps.push({ type: "invalidate", keys: ["account"] });
+  }
+
+  #currentRead(generation: number, revision: number): boolean {
+    return !this.#closed && this.deps.session.state.signedIn && this.deps.session.generation === generation && this.#revision === revision;
   }
 
   #forgetRemoved(rows: HeardRow[]): void {
@@ -411,6 +415,7 @@ export class Threads implements HostedThreads {
   async #readSpaces(): Promise<Pick<Heard, "me" | "personal" | "rows" | "projects">> {
     const generation = this.deps.session.generation;
     await this.deps.spaces.refresh();
+    if (generation !== this.deps.session.generation) throw new Refused("Your OpenOrc session changed. Try again.");
     const catalog = await this.deps.spaces.catalog();
     if (generation !== this.deps.session.generation) throw new Refused("Your OpenOrc session changed. Try again.");
     this.#restrict(catalog);

@@ -19,7 +19,6 @@ import { useAppShortcuts } from "./lib/app-shortcuts";
 import { focusedProject, useLayout } from "./lib/layout";
 import { useLookHandover } from "./lib/mac-look";
 import { useRouter, type Route } from "./lib/router";
-import { cn } from "./lib/cn";
 import { useUi } from "./lib/ui";
 import { useSpaceNavigation } from "./lib/space-navigation";
 import { Memory } from "./views/Memory";
@@ -78,11 +77,9 @@ function DesktopApp() {
   return (
     <div className="app-shell h-full flex text-ink">
       <Sidebar key={`sidebar:${home}`} />
-      <div key={home} className="work-row flex-1 min-w-0 h-full flex">
-        <div className={cn(route.view === "team-chat" ? "hidden" : "contents")} inert={route.view === "team-chat"}>
-          {workRoute ? <StartScreen route={workRoute} /> : null}
-          {workRoute?.view === "thread" ? <ThreadWorkspace /> : null}
-        </div>
+      <div key={home} className="work-row flex-1 min-w-0 h-full flex" data-chat={route.view === "team-chat" || undefined}>
+        {workRoute ? <StartScreen route={workRoute} /> : null}
+        {workRoute?.view === "thread" ? <ThreadWorkspace /> : null}
         {route.view === "team-chat" ? <TeamChatView target={route} /> : null}
         {route.view === "task" ? (
           <Suspense

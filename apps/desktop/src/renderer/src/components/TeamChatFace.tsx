@@ -3,10 +3,10 @@ import { AccountFace } from "./AccountFace";
 import { Hash, Lock } from "./icons";
 import { cn } from "../lib/cn";
 
-export function TeamChatFace({ people, className }: { people: readonly TeamChatPerson[]; className?: string }) {
+export function TeamChatFace({ people, max = 2, className }: { people: readonly TeamChatPerson[]; max?: number; className?: string }) {
   return (
     <span className={cn("team-chat-faces", className)}>
-      {people.slice(0, 2).map((person) => (
+      {people.slice(0, max).map((person) => (
         <AccountFace key={person.id} name={person.name} image={person.image} />
       ))}
     </span>

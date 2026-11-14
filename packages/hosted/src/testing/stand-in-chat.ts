@@ -44,9 +44,8 @@ export class StandInChat {
     return conversation;
   }
 
-  changeAccess(spaceId: string): void {
-    for (const peer of this.deps.peers())
-      if (peer.who() && this.deps.spaces.readers(spaceId).includes(peer.who() ?? "")) peer.send("changed", { organizationId: spaceId, topics: ["members", "chat"] });
+  changeAccess(spaceId: string, topics = ["members", "chat"]): void {
+    for (const peer of this.deps.peers()) if (peer.who() && this.deps.spaces.readers(spaceId).includes(peer.who() ?? "")) peer.send("changed", { organizationId: spaceId, topics });
   }
 
   route(request: Request, who: string, body: unknown): Reply | null {

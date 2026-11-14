@@ -9,11 +9,17 @@ import { useThreadTabs } from "../lib/thread-tabs";
 import { TopBar } from "../components/TopBar";
 import { ThreadTabs } from "../components/ThreadTabs";
 import { TeamChat } from "../components/TeamChat";
+import { CoversPreview } from "../lib/browser-preview";
 
 export function TeamChatView({ target }: { target: TeamChatRoute }) {
   const scope = useTeamChatContext();
-  if (!scope || target.accountId !== scope.accountId || target.spaceId !== scope.spaceId || !scope.current()) return <ChatUnavailable />;
-  return <AuthorizedChat key={JSON.stringify([target, scope.generation])} scope={scope} target={target} />;
+  const allowed = scope && target.accountId === scope.accountId && target.spaceId === scope.spaceId && scope.current();
+  return (
+    <>
+      <CoversPreview />
+      {allowed ? <AuthorizedChat key={JSON.stringify([target, scope.generation])} scope={scope} target={target} /> : <ChatUnavailable />}
+    </>
+  );
 }
 
 function AuthorizedChat({ scope, target }: { scope: TeamChatContextValue; target: TeamChatRoute }) {

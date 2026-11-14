@@ -33,7 +33,7 @@ export function TeamChat(props: TeamChatProps) {
         </div>
         {props.conversation.kind === "channel" ? (
           <div className="team-chat-heading-people">
-            <TeamChatFace people={props.conversation.members} />
+            <TeamChatFace people={props.conversation.members} max={3} />
             <span>{props.conversation.members.length}</span>
           </div>
         ) : null}

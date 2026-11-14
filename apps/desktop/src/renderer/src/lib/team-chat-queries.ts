@@ -6,6 +6,7 @@ import { core } from "./rpc";
 import { queryClient } from "./client";
 import { useTeamChatContext, type TeamChatContextValue } from "./team-chat-context";
 import { TeamChatDrafts, type TeamChatTarget } from "./team-chat-draft";
+import { refreshTeamHistory } from "./team-chat-history";
 
 export const teamChatDrafts = new TeamChatDrafts(localStorage);
 export const chatStateKey = (scope: TeamChatContextValue) => ["team-chat", scope.accountId, scope.spaceId, scope.generation, "state"];
@@ -43,20 +44,20 @@ export function useTeamChatTimeline(scope: TeamChatContextValue, conversationId:
     gcTime: 0,
     meta: { tags: [...tags(scope), `team-chat:${scope.spaceId}:${conversationId}`] },
     queryFn: async ({ signal }) => {
-      current(scope, signal);
-      const page = await core.call("teamChat.timeline", { spaceId: scope.spaceId, conversationId });
-      current(scope, signal);
       const prior = queryClient.getQueryData<TeamChatTimeline>(key);
-      return prior ? { ...page, older: prior.older, messages: mergeTeamMessages(prior.messages, page.messages) } : page;
+      return refreshTeamHistory(prior, async (afterSeq) => {
+        current(scope, signal);
+        const page = await core.call("teamChat.timeline", { spaceId: scope.spaceId, conversationId, ...(afterSeq === undefined ? {} : { afterSeq }) });
+        current(scope, signal);
+        return page;
+      });
     },
   });
 }
 
 export function receiveTeamMessage(scope: TeamChatContextValue, message: TeamMessage): void {
   if (!scope.current()) return;
-  queryClient.setQueryData<TeamChatTimeline>(chatTimelineKey(scope, message.channelId), (old) =>
-    old ? { ...old, messages: mergeTeamMessages(old.messages, [message]), headSeq: Math.max(old.headSeq, message.seq) } : undefined,
-  );
+  queryClient.setQueryData<TeamChatTimeline>(chatTimelineKey(scope, message.channelId), (old) => (old ? { ...old, messages: mergeTeamMessages(old.messages, [message]) } : undefined));
   teamChatDrafts.reconcile({ ...scope, conversationId: message.channelId }, [message.id]);
 }
 

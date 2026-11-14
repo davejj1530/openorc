@@ -1,3 +1,12 @@
+.work-row[data-chat="true"] > :not(.team-chat) {
+  display: none;
+}
+.work-row[data-chat="true"] > .team-chat {
+  margin-right: var(--spacing-well);
+}
+body:has(.sidebar-shell[data-open="true"]) .work-row[data-chat="true"] > .team-chat {
+  margin-left: 0;
+}
 .sidebar-chat {
   flex: 0 0 auto;
   min-height: 0;

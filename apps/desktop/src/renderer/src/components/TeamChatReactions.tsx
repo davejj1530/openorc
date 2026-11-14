@@ -29,6 +29,7 @@ export function TeamChatReactions({
               type="button"
               disabled={Boolean(reason) || !reaction.success}
               aria-pressed={userIds.includes(self)}
+              data-current={userIds.includes(self) || undefined}
               aria-label={`${emoji}, ${userIds.length} reactions`}
               onClick={() => {
                 if (reaction.success) onReact(reaction.data);
@@ -82,6 +83,7 @@ export function TeamChatReactionPicker({
           className="orcling-react-choice"
           aria-label={emoji}
           aria-pressed={reactions.some((reaction) => reaction.emoji === emoji && reaction.userIds.includes(self))}
+          data-current={reactions.some((reaction) => reaction.emoji === emoji && reaction.userIds.includes(self)) || undefined}
           onClick={() => {
             onReact(emoji);
             onClose();

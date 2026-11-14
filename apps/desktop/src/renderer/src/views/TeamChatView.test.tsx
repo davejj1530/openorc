@@ -126,3 +126,34 @@ it("shows one bubble when an unconfirmed send is found by a live refresh", async
   expect(teamChatDrafts.read(target).pending).toEqual([]);
   expect(call.mock.calls.filter(([method]) => method === "teamChat.send")).toHaveLength(1);
 });
+
+it("fills every missed page when reconnecting after more than sixty messages", async () => {
+  const messages: TeamMessage[] = Array.from({ length: 126 }, (_, index) => ({
+    id: `message-${index + 1}`,
+    channelId: "general",
+    seq: index + 1,
+    actor: { kind: "person", person },
+    body: `Message ${index + 1}`,
+    files: [],
+    reactions: [],
+    call: null,
+    createdAt: new Date(0).toISOString(),
+  }));
+  let connected = false;
+  vi.spyOn(core, "call").mockImplementation(async (method, params) => {
+    if (method === "teamChat.state") return state;
+    if (method !== "teamChat.timeline") return { ok: true };
+    if (!connected) return { ...page, messages: messages.slice(0, 1), headSeq: 1 };
+    const after = "afterSeq" in params ? Number(params.afterSeq) : undefined;
+    const selected = after === undefined ? messages.slice(-60) : messages.slice(after, after + 60);
+    return { ...page, messages: selected, headSeq: 126, older: selected[0]?.seq !== 1, newer: selected.at(-1)?.seq !== 126 };
+  });
+  const scope = context();
+  render(tree(scope));
+  await screen.findByText("Message 1");
+  connected = true;
+  await act(async () => {
+    await queryClient.invalidateQueries({ queryKey: chatTimelineKey(scope, "general") });
+  });
+  expect(queryClient.getQueryData<TeamChatTimeline>(chatTimelineKey(scope, "general"))?.messages.map((message) => message.seq)).toEqual(messages.map((message) => message.seq));
+});

@@ -129,3 +129,54 @@ it("does not reveal a private chat to an organization outsider", async () => {
   expect(state.state === "ready" && state.chat.conversations.some((conversation) => conversation.id === privateChat.id)).toBe(false);
   await expect(hosted.chat.timeline({ spaceId, conversationId: privateChat.id })).rejects.toMatchObject({ status: 404 });
 });
+
+it("discards a delayed private page after a conversation-only removal", async () => {
+  let release = () => {};
+  let delay = true;
+  const privateChat = stand.chat.seed(spaceId, { name: "planning", private: true, userIds: [userOf(FIRST)] });
+  const { hosted } = await host(FIRST, {
+    fetch: async (input, init) => {
+      const response = await fetch(input, init);
+      if (delay && new URL(String(input)).pathname.endsWith("/timeline")) {
+        delay = false;
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+      }
+      return response;
+    },
+  });
+  const read = hosted.chat.timeline({ spaceId, conversationId: privateChat.id });
+  const rejected = expect(read).rejects.toMatchObject({ status: 404 });
+  await vi.waitFor(() => expect(stand.requests.some((request) => request.path.endsWith("/timeline"))).toBe(true));
+  privateChat.members = [];
+  stand.chat.changeAccess(spaceId, ["chat"]);
+  await new Promise<void>((resolve) => queueMicrotask(resolve));
+  release();
+  await rejected;
+});
+
+it("rereads a page when live delivery overtakes the response", async () => {
+  let release = () => {};
+  let delayed = false;
+  const first = await host(FIRST, {
+    fetch: async (input, init) => {
+      const response = await fetch(input, init);
+      if (!delayed && new URL(String(input)).pathname.endsWith("/timeline")) {
+        delayed = true;
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+      }
+      return response;
+    },
+  });
+  const second = await host(SECOND);
+  const conversation = await first.hosted.chat.openDm({ spaceId, userIds: [userOf(SECOND)] });
+  const target = { spaceId, conversationId: conversation.id };
+  const read = first.hosted.chat.timeline(target);
+  await vi.waitFor(() => expect(delayed).toBe(true));
+  const sent = await second.hosted.chat.send({ ...target, id: randomUUID(), body: "Arrived while the page was on its way." });
+  release();
+  expect((await read).messages).toEqual([sent]);
+});

@@ -21,6 +21,7 @@ export class TeamChat {
   readonly #watches = new Map<string, ChatWatch>();
   readonly #opening = new Map<string, Promise<TeamConversation>>();
   readonly #access = new Map<string, number>();
+  readonly #reads = new Map<string, number>();
   #session: number;
   #closed = false;
 
@@ -32,6 +33,7 @@ export class TeamChat {
         this.#watches.clear();
         this.#opening.clear();
         this.#access.clear();
+        this.#reads.clear();
       }
       this.#invalidate();
       if (change === "connected") for (const watch of this.#watches.values()) void this.#admit(watch).catch(() => this.#invalidate(watch.spaceId));
@@ -46,6 +48,9 @@ export class TeamChat {
       const event = wireTopics.safeParse(body);
       if (!event.success || this.#closed) return;
       const { organizationId, topics } = event.data;
+      if (topics.includes("chat")) {
+        for (const id of organizationId ? [organizationId] : this.#access.keys()) this.#reads.set(id, (this.#reads.get(id) ?? 0) + 1);
+      }
       if (topics.some((topic) => ["spaces", "members", "billing", "organization_access"].includes(topic))) {
         if (organizationId) this.#access.set(organizationId, (this.#access.get(organizationId) ?? 0) + 1);
         else for (const space of this.#access.keys()) this.#access.set(space, (this.#access.get(space) ?? 0) + 1);
@@ -155,9 +160,13 @@ export class TeamChat {
 
   async #request<T>(spaceId: string, route: Route<T>, body?: unknown): Promise<T> {
     const identity = this.#identity(spaceId);
-    const result = await this.deps.session.in(spaceId).request(route, body);
-    this.#assert(spaceId, identity);
-    return result;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const readRevision = this.#reads.get(spaceId) ?? 0;
+      const result = await this.deps.session.in(spaceId).request(route, body);
+      this.#assert(spaceId, identity);
+      if (route.method !== "GET" || (this.#reads.get(spaceId) ?? 0) === readRevision) return result;
+    }
+    throw changedSession();
   }
 
   #invalidate(spaceId?: string, conversationId?: string): void {

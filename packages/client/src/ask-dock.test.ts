@@ -59,7 +59,7 @@ describe("the asks a conversation waits on", () => {
     ]);
   });
 
-  it("docks a single-choice question and leaves the other asks where they were asked", () => {
+  it("docks every question and leaves the other asks where they were asked", () => {
     const run = {
       runId: "r",
       blocks: [
@@ -69,6 +69,6 @@ describe("the asks a conversation waits on", () => {
         { id: "cmd", kind: "approval", approvalId: "cmd", approvalKind: "command", input: { command: "ls" } } as Block,
       ],
     };
-    expect(waitingAsks(run).map((ask) => ask.block.approvalId)).toEqual(["one"]);
+    expect(waitingAsks(run).map((ask) => ask.block.approvalId)).toEqual(["one", "several", "words"]);
   });
 });

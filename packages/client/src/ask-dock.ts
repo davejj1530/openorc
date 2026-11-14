@@ -130,9 +130,7 @@ export interface WaitingAsk {
 
 /** Which asks dock onto the composer; the rest stay where they were asked in the conversation. */
 export function docks(block: ApprovalBlock): boolean {
-  if (block.approvalKind !== "user_input") return false;
-  const questions = readQuestions(block.input);
-  return questions.length === 1 && questions.every((q) => q.options !== null && !q.multi);
+  return block.approvalKind === "user_input" && readQuestions(block.input).length > 0;
 }
 
 /** The asks a conversation waits on that dock onto its composer, the oldest first: it shows, the rest wait behind it. */

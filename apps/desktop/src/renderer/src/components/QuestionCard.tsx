@@ -1,13 +1,13 @@
 import { useState, type CSSProperties, type ReactNode } from "react";
-import { type Question, type WaitingAsk, readQuestions } from "@openorc/client";
+import { answerFor, emptyDraft, keptAnswers, LINE, lineWaiting, readQuestions, stepAnswers, type AnswerAction, type AnswerDraft, type Question, type WaitingAsk } from "@openorc/client";
 import { harnessShortName, isHarnessId } from "@openorc/protocol";
 import { useAskAnswer } from "./ask-answer";
 import { useRunVoice } from "../lib/turn-authors";
-import { Button, Input } from "./ui";
+import { Button } from "./ui";
 import { cn } from "../lib/cn";
 import { Check } from "./icons";
 import { HarnessLogo } from "./HarnessLogo";
-import { AskError, AskLine, AskTop, AskWay } from "./AskParts";
+import { askKeyDown, AskError, AskLine, AskTop, AskWay } from "./AskParts";
 
 /** What was answered outside the options: a custom answer, or a question that had none. Secret answers stay hidden. */
 function answeredText(q: Question, answer: string[]): ReactNode {
@@ -29,62 +29,26 @@ function answeredText(q: Question, answer: string[]): ReactNode {
 }
 
 /**
- * One option as a 44px fill row. Picking it marks it with a check; once the answer is sent the chosen rows take the
- * ink pill and the rest step back, one after another. A conversation loaded already answered shows that at once.
+ * One option as the answer left it: the chosen ones take the ink pill and the rest step back, one after another, as
+ * the answer lands. A conversation loaded already answered shows that at once.
  */
-function OptionRow({ q, option, index, name, picked, decided, onToggle }: OptionProps) {
-  let state: string | undefined;
-  if (decided) state = picked ? "chosen" : "dropped";
+function OptionRow({ option, index, chosen }: { option: { label: string; description: string }; index: number; chosen: boolean }) {
   return (
-    <label className="question-option" data-picked={picked || undefined} data-state={state} style={{ "--option-index": index } as CSSProperties}>
-      <input type={q.multi ? "checkbox" : "radio"} name={name} className="sr-only" checked={picked} disabled={Boolean(decided)} onChange={onToggle} />
+    <div className="question-option" data-state={chosen ? "chosen" : "dropped"} style={{ "--option-index": index } as CSSProperties}>
       <span className="question-option-label">
         {option.label}
         {option.description ? <span className="question-option-description">{option.description}</span> : null}
       </span>
       <Check size={16} className="question-option-check" />
-    </label>
+    </div>
   );
 }
 
-type OptionProps = { q: Question; option: { label: string; description: string }; index: number; name: string; picked: boolean; decided: string | undefined; onToggle: () => void };
-
-/** A free answer in the card: beside the options as "something else", or the whole answer when there are none. */
-function OtherAnswer({
-  q,
-  name,
-  picked,
-  value,
-  onPick,
-  onChange,
-  onSubmit,
-}: {
-  q: Question;
-  name: string;
-  picked: boolean;
-  value: string;
-  onPick: () => void;
-  onChange: (value: string) => void;
-  onSubmit: () => void;
-}) {
-  return (
-    <label className="question-other">
-      {q.options ? <input type={q.multi ? "checkbox" : "radio"} name={name} className="sr-only" checked={picked} onChange={onPick} /> : null}
-      <Input
-        variant="sheet"
-        type={q.secret ? "password" : "text"}
-        aria-label={q.options ? `Custom answer: ${q.question}` : q.question}
-        placeholder={q.options ? "Something else" : "Your answer"}
-        value={value}
-        onFocus={() => q.options && !picked && onPick()}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && onSubmit()}
-      />
-    </label>
-  );
-}
-
-/** An agent asked something. Each question gets its options or a text field; one submit answers them all. */
+/**
+ * An agent's question where it was asked. Answered or declined, it is the record of what was asked and answered;
+ * while it waits where no composer takes it (a task's comment, a task's activity), it is the ask itself, as the
+ * composer docks it.
+ */
 export function QuestionCard({
   runId,
   approvalId,
@@ -98,41 +62,18 @@ export function QuestionCard({
   decided: string | undefined;
   answers?: Record<string, string[]> | undefined;
 }) {
-  const questions = readQuestions(input);
   const voice = useRunVoice(runId);
-  const [picked, setPicked] = useState<Record<string, string[]>>({});
-  const [other, setOther] = useState<Record<string, string>>({});
-  const reply = useAskAnswer(runId, approvalId);
-
-  const answerFor = (q: Question): string[] => {
-    const chosen = (picked[q.key] ?? []).filter((v) => v !== "__other");
-    const free = (other[q.key] ?? "").trim();
-    if ((picked[q.key] ?? []).includes("__other") && free) chosen.push(free);
-    if (!q.options && free) return [free];
-    return chosen;
-  };
-  const complete = questions.length > 0 && questions.every((q) => answerFor(q).length > 0);
-
-  const toggle = (q: Question, value: string) =>
-    setPicked((s) => {
-      const current = s[q.key] ?? [];
-      if (q.multi) return { ...s, [q.key]: current.includes(value) ? current.filter((v) => v !== value) : [...current, value] };
-      return { ...s, [q.key]: [value] };
-    });
-
-  const submit = () => {
-    if (!complete || reply.pending || reply.blocked) return;
-    const answers: Record<string, string[]> = {};
-    for (const q of questions) answers[q.key] = answerFor(q);
-    reply.answer("allow", answers);
-  };
-  const chosen = (q: Question): string[] => {
-    if (!decided) return picked[q.key] ?? [];
-    return decided === "deny" ? [] : (answers?.[q.key] ?? []);
-  };
-
+  const [asked] = useState(!decided);
+  if (!decided)
+    return (
+      <div data-blocking="true" data-plane className="question-card" onKeyDown={askKeyDown(() => {})}>
+        <QuestionAsk ask={{ runId, block: { id: approvalId, kind: "approval", approvalId, approvalKind: "user_input", input } }} more={0} fieldHasWords={false} />
+      </div>
+    );
+  const questions = readQuestions(input);
+  const chosen = (q: Question): string[] => (decided === "deny" ? [] : (answers?.[q.key] ?? []));
   return (
-    <div data-blocking={decided ? undefined : "true"} data-plane className="question-card">
+    <div data-plane className="question-card">
       {questions.map((q, i) => (
         <fieldset key={q.key} className="question-set">
           <legend className="question-ask">
@@ -141,132 +82,133 @@ export function QuestionCard({
           </legend>
           <div className="question-options">
             {q.options?.map((o, index) => (
-              <OptionRow key={o.label} q={q} option={o} index={index} name={`${approvalId}-${q.key}`} picked={chosen(q).includes(o.label)} decided={decided} onToggle={() => toggle(q, o.label)} />
+              <OptionRow key={o.label} option={o} index={index} chosen={chosen(q).includes(o.label)} />
             ))}
-            {!decided && q.allowOther ? (
-              <OtherAnswer
-                q={q}
-                name={`${approvalId}-${q.key}`}
-                picked={(picked[q.key] ?? []).includes("__other")}
-                value={other[q.key] ?? ""}
-                onPick={() => toggle(q, "__other")}
-                onChange={(value) => setOther((s) => ({ ...s, [q.key]: value }))}
-                onSubmit={submit}
-              />
-            ) : null}
-            {decided && decided !== "deny" ? answeredText(q, answers?.[q.key] ?? []) : null}
+            {decided !== "deny" ? answeredText(q, answers?.[q.key] ?? []) : null}
           </div>
         </fieldset>
       ))}
-      <QuestionFoot
-        decided={decided}
-        hint={askHint(questions)}
-        agent={voice ? harnessShortName(voice.agent) : null}
-        complete={complete}
-        reply={reply}
-        onSubmit={submit}
-        onDecline={() => reply.answer("deny")}
-      />
-    </div>
-  );
-}
-
-/** What the card asks of the reader, in a few words. */
-function askHint(questions: Question[]): string {
-  if (!questions.some((q) => q.options)) return "Type your answer";
-  const pick = questions.some((q) => q.multi) ? "Pick any" : "Pick one";
-  return questions.some((q) => q.options && q.allowOther) ? `${pick}, or type your own` : pick;
-}
-
-/** The foot swaps in place: a hint and the answers' controls while it waits, then where the answer went. */
-function QuestionFoot({
-  decided,
-  hint,
-  agent,
-  complete,
-  reply,
-  onSubmit,
-  onDecline,
-}: {
-  decided: string | undefined;
-  hint: string;
-  agent: string | null;
-  complete: boolean;
-  reply: Pick<ReturnType<typeof useAskAnswer>, "pending" | "blocked" | "error">;
-  onSubmit: () => void;
-  onDecline: () => void;
-}) {
-  const [asked] = useState(!decided);
-  if (decided)
-    return (
       <p className={cn("question-foot", asked && "motion-arrive")} role="status">
-        {decided === "deny" ? "Declined" : `Sent to ${agent ?? "the agent"}`}
+        {decided === "deny" ? "Declined" : `Sent to ${voice ? harnessShortName(voice.agent) : "the agent"}`}
       </p>
-    );
-  return (
-    <div className="question-foot">
-      {reply.error ? (
-        <span role="alert" className="min-w-0 flex-1 text-bad">
-          {reply.error}
-        </span>
-      ) : (
-        <span className="min-w-0 flex-1">{hint}</span>
-      )}
-      <Button size="md" variant="ghost" disabled={reply.pending || Boolean(reply.blocked)} data-tip={reply.blocked ?? undefined} onClick={onDecline}>
-        Decline
-      </Button>
-      <Button size="md" variant="primary" disabled={!complete || reply.pending || Boolean(reply.blocked)} data-tip={reply.blocked ?? undefined} onClick={onSubmit}>
-        Answer
-      </Button>
     </div>
   );
 }
+
+/** What a control of the ask needs while it waits: whether it takes a press, and why not, on demand. */
+type Hold = { off: boolean; tip: string | undefined };
 
 /**
- * A question docked onto the composer while it waits: its top line, its choices as keys, and its own line for words
- * when its agent takes them. A single choice answers when pressed.
+ * A question docked onto the composer while it waits: its top line, its choices as keys, its own line for words when
+ * its agent takes them, and a row for Answer when the answer is more than one press. Several questions in one ask come
+ * one at a time under one count, each answer kept above as a line that reopens it; the last Answer sends them all.
  */
-export function QuestionAsk({ ask, more, fieldHasWords }: { ask: WaitingAsk; more: number; fieldHasWords: boolean }) {
-  const [q] = readQuestions(ask.block.input);
+export function QuestionAsk({ ask, more, fieldHasWords, onStep }: { ask: WaitingAsk; more: number; fieldHasWords: boolean; onStep?: () => void }) {
+  const questions = readQuestions(ask.block.input);
   const voice = useRunVoice(ask.runId);
   const reply = useAskAnswer(ask.runId, ask.block.approvalId);
-  const [words, setWords] = useState("");
-  if (!q) return null;
-  const off = reply.pending || Boolean(reply.blocked);
-  const tip = reply.blocked ?? undefined;
-  const answer = (value: string) => reply.answer("allow", { [q.key]: [value] });
+  const [draft, setDraft] = useState<AnswerDraft>(emptyDraft);
+  const hold: Hold = { off: reply.pending || Boolean(reply.blocked), tip: reply.blocked ?? undefined };
+  const act = (action: AnswerAction) => {
+    const next = stepAnswers(questions, draft, action);
+    if (next.send) return reply.answer("allow", next.send);
+    if (next.draft.step !== draft.step || next.draft.review !== draft.review) onStep?.();
+    setDraft(next.draft);
+  };
+  const q = draft.review ? undefined : questions[draft.step];
+  const many = questions.length > 1;
   return (
     <>
       <AskTop
-        mark={voice && isHarnessId(voice.agent) ? <HarnessLogo id={voice.agent} size={14} /> : null}
+        mark={<AgentMark voice={voice} />}
         more={more}
+        count={many && q ? `${draft.step + 1} of ${questions.length}` : undefined}
         way={
-          <AskWay disabled={off} tip={tip} onClick={() => reply.answer("deny")}>
+          <AskWay disabled={hold.off} tip={hold.tip} onClick={() => reply.answer("deny")}>
             Decline
           </AskWay>
         }
       >
-        {q.question || q.header}
+        {q ? q.question || q.header : "Your answers"}
       </AskTop>
+      <div className="composer-ask-body">
+        <KeptAnswers questions={questions} draft={draft} hold={hold} act={act} />
+        {q ? <QuestionStep q={q} draft={draft} keepWords={many || q.multi ? "Keep" : "Answer"} ink={!fieldHasWords} hold={hold} act={act} /> : null}
+      </div>
+      <AskError error={reply.error} />
+      <QuestionRow q={q} many={many} draft={draft} ink={!fieldHasWords && !lineWaiting(q, draft)} hold={hold} act={act} />
+    </>
+  );
+}
+
+/** The asking agent's mark, when its run says who it is. */
+function AgentMark({ voice }: { voice: ReturnType<typeof useRunVoice> }) {
+  return voice && isHarnessId(voice.agent) ? <HarnessLogo id={voice.agent} size={14} /> : null;
+}
+
+/** The answers already given above the question that shows, each a line that reopens it. */
+function KeptAnswers({ questions, draft, hold, act }: { questions: readonly Question[]; draft: AnswerDraft; hold: Hold; act: (action: AnswerAction) => void }) {
+  return keptAnswers(questions, draft).map((kept) => (
+    <button key={kept.question.key} type="button" tabIndex={-1} className="composer-ask-kept" data-ask-control="action" disabled={hold.off} onClick={() => act({ kind: "reopen", step: kept.step })}>
+      <span className="composer-ask-kept-question">{kept.question.question || kept.question.header}</span>
+      <span className="composer-ask-kept-answer">{kept.question.secret ? "Answer hidden" : kept.answer.join(", ")}</span>
+    </button>
+  ));
+}
+
+/**
+ * The ask's row, once its answer is more than one press: Next while questions remain, Answer for the last, the ask's
+ * one ink unless words wait elsewhere. With every answer in view it always shows.
+ */
+function QuestionRow({ q, many, draft, ink, hold, act }: { q: Question | undefined; many: boolean; draft: AnswerDraft; ink: boolean; hold: Hold; act: (action: AnswerAction) => void }) {
+  if (q && !((q.multi || many) && answerFor(q, draft).length > 0)) return null;
+  return (
+    <div className="composer-ask-row">
+      <Button size="md" variant={ink ? "primary" : "secondary"} tabIndex={-1} data-ask-control="action" disabled={hold.off} data-tip={hold.tip} onClick={() => act({ kind: "answer" })}>
+        {many && q ? "Next" : "Answer"}
+      </Button>
+    </div>
+  );
+}
+
+/** The question that shows: its choices, then its own line for words when its agent takes them. */
+function QuestionStep({ q, draft, keepWords, ink, hold, act }: { q: Question; draft: AnswerDraft; keepWords: string; ink: boolean; hold: Hold; act: (action: AnswerAction) => void }) {
+  const picked = draft.picked[q.key] ?? [];
+  const words = draft.lines[q.key] ?? "";
+  return (
+    <>
       {q.options?.map((option) => (
-        <button key={option.label} type="button" tabIndex={-1} className="composer-ask-choice" data-ask-control="choice" disabled={off} data-tip={tip} onClick={() => answer(option.label)}>
+        <button
+          key={option.label}
+          type="button"
+          tabIndex={-1}
+          className="composer-ask-choice"
+          aria-pressed={q.multi ? picked.includes(option.label) : undefined}
+          data-picked={picked.includes(option.label) || undefined}
+          data-ask-control="choice"
+          disabled={hold.off}
+          data-tip={hold.tip}
+          onClick={() => act({ kind: "choose", label: option.label })}
+        >
           <span>{option.label}</span>
           {option.description ? <span className="composer-ask-choice-description">{option.description}</span> : null}
+          {q.multi ? <Check size={16} className="composer-ask-check" /> : null}
         </button>
       ))}
       {q.allowOther ? (
         <AskLine
+          key={q.key}
           label={q.options ? `Something else: ${q.question}` : q.question}
           placeholder={q.options ? "Something else" : "Your answer"}
           secret={q.secret}
+          picked={picked.includes(LINE)}
           value={words}
-          onChange={setWords}
-          send={{ words: "Answer", ink: !fieldHasWords, onSend: () => words.trim() && answer(words.trim()) }}
-          disabled={off}
-          tip={tip}
+          onChange={(text) => act({ kind: "write", text })}
+          send={lineWaiting(q, draft) ? { words: keepWords, ink, onSend: () => act({ kind: "keep" }) } : null}
+          disabled={hold.off}
+          tip={hold.tip}
         />
       ) : null}
-      <AskError error={reply.error} />
     </>
   );
 }

@@ -690,8 +690,9 @@
   overflow-wrap: anywhere;
 }
 
-/* A question: an r20 card, 44px fill options, an in-card answer of your own, and a foot that swaps in place.
-   Sent, the chosen options take the ink pill with an overshoot check and the rest step back one after another. */
+/* A question as the record of what was asked and answered: an r20 card, 44px fill options, the chosen ones in the ink
+   pill with an overshoot check and the rest stepped back one after another, then where the answer went. While a
+   question waits where no composer takes it, the card holds the docked ask's own parts (styles/composer.css). */
 .question-card {
   display: flex;
   flex-direction: column;
@@ -739,19 +740,10 @@
   font-size: var(--text-base);
   line-height: 16px;
   color: var(--ink);
-  cursor: pointer;
   transition:
     background-color var(--duration-arrive) var(--ease-out),
     color var(--duration-arrive) var(--ease-out),
     opacity var(--duration-arrive) var(--ease-out) calc(var(--option-index, 0) * var(--stagger));
-}
-.question-option:hover,
-.question-option[data-picked] {
-  background: var(--surface-3);
-}
-.question-option:has(input:focus-visible) {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
 }
 .question-option-label {
   display: grid;
@@ -772,12 +764,9 @@
     opacity var(--duration-leave) var(--ease-out),
     scale var(--duration-confirm) var(--ease-overshoot);
 }
-.question-option[data-picked] .question-option-check {
+.question-option[data-state="chosen"] .question-option-check {
   opacity: 1;
   scale: 1;
-}
-.question-option[data-state] {
-  cursor: default;
 }
 .question-option[data-state="chosen"] {
   background: var(--accent);
@@ -799,9 +788,6 @@
   font-size: var(--text-base);
   line-height: 16px;
   color: var(--accent-fg);
-}
-.question-other {
-  display: block;
 }
 .question-foot {
   display: flex;

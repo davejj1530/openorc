@@ -40,6 +40,23 @@ const ASKS = {
       },
     ],
   },
+  checks: {
+    questions: [
+      {
+        id: "checks",
+        question: "Which checks should run before a merge?",
+        options: [{ label: "Type check" }, { label: "Unit tests" }, { label: "The packaged smoke test" }],
+        multiSelect: true,
+      },
+    ],
+  },
+  three: {
+    questions: [
+      { id: "land", question: "Where should the export land?", options: [{ label: "Downloads folder" }, { label: "Ask each time" }], isOther: true },
+      { id: "format", question: "Which format comes first?", options: [{ label: "CSV" }, { label: "JSON" }] },
+      { id: "checks", question: "Which checks should run before a merge?", options: [{ label: "Type check" }, { label: "Unit tests" }, { label: "The packaged smoke test" }], multiSelect: true },
+    ],
+  },
 };
 type AskName = keyof typeof ASKS;
 
@@ -102,7 +119,7 @@ function mount({ draft = "" }: { draft?: string } = {}) {
   };
 }
 
-const QUESTIONS: AskName[] = ["export", "runner"];
+const QUESTIONS: AskName[] = ["export", "runner", "checks", "three"];
 
 describe.each(QUESTIONS)("a docked %s question, played by keys nobody meant for it", (name) => {
   it("answers nothing when Enter is pressed five times in the empty field, the first two as it arrives", () => {
@@ -262,6 +279,71 @@ describe("a docked question, answered on purpose", () => {
     c.key("Enter");
     c.answer("runner");
     expect([c.dock(), c.where()]).toEqual([null, "field"]);
+  });
+});
+
+describe("several choices, several questions, several asks", () => {
+  const press = (name: RegExp | string) => fireEvent.click(screen.getByRole("button", { name }));
+
+  it("toggles several choices, marks the picked ones, and sends them at Answer", () => {
+    const c = mount();
+    c.arrive("checks");
+    press(/Type check/);
+    press(/Unit tests/);
+    expect(screen.getByRole("button", { name: /Type check/ }).getAttribute("aria-pressed")).toBe("true");
+    expect(c.answered()).toEqual([]);
+    press("Answer");
+    expect(c.answered()).toEqual([{ runId: "run", approvalId: "checks", decision: "allow", answers: { checks: ["Type check", "Unit tests"] } }]);
+  });
+
+  it("asks three questions one at a time under one count, and sends all three at the last Answer", () => {
+    const c = mount();
+    c.arrive("three");
+    expect(within(c.dock()!).getByText("1 of 3")).toBeTruthy();
+    press(/Downloads folder/);
+    expect([within(c.dock()!).getByText("2 of 3").textContent, c.where()]).toEqual(["2 of 3", "field"]);
+    press(/JSON/);
+    press(/Type check/);
+    press(/The packaged smoke test/);
+    press("Next");
+    expect(within(c.dock()!).getByText("Your answers")).toBeTruthy();
+    expect(c.answered()).toEqual([]);
+    press("Answer");
+    expect(c.answered()).toEqual([
+      { runId: "run", approvalId: "three", decision: "allow", answers: { land: ["Downloads folder"], format: ["JSON"], checks: ["Type check", "The packaged smoke test"] } },
+    ]);
+  });
+
+  it("reopens a kept answer from its line", () => {
+    const c = mount();
+    c.arrive("three");
+    press(/Downloads folder/);
+    press(/Where should the export land\?/);
+    expect(within(c.dock()!).getByText("1 of 3")).toBeTruthy();
+  });
+
+  it("shows one ask of two, says one more waits, and lets nothing pressed for the first reach the second", () => {
+    vi.useFakeTimers();
+    try {
+      const c = mount();
+      c.arrive("runner", "first");
+      c.arrive("runner", "second");
+      expect(within(c.dock()!).getByText("1 more waits")).toBeTruthy();
+      c.field.focus();
+      c.key("ArrowUp");
+      c.key("ArrowDown");
+      c.key("Enter");
+      c.answer("first");
+      for (let i = 0; i < 6; i++) c.key("Enter");
+      fireEvent.click(screen.getByRole("button", { name: /Vitest/ }));
+      expect(c.answered().map((params) => (params as { approvalId: string }).approvalId)).toEqual(["first"]);
+      expect(within(c.dock()!).queryByText("1 more waits")).toBeNull();
+      act(() => void vi.advanceTimersByTime(300));
+      fireEvent.click(screen.getByRole("button", { name: /Vitest/ }));
+      expect(c.answered().map((params) => (params as { approvalId: string }).approvalId)).toEqual(["first", "second"]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

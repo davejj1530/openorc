@@ -1,4 +1,5 @@
-import { type ReactNode } from "react";
+import { askKeyAct, askKeyName, type AskPlace } from "@openorc/client";
+import { type KeyboardEvent, type ReactNode } from "react";
 import { Button } from "./ui";
 
 /**
@@ -8,7 +9,7 @@ import { Button } from "./ui";
 export function AskTop({ mark, more, count, children, way }: { mark: ReactNode; more: number; count?: string | undefined; children: ReactNode; way: ReactNode }) {
   return (
     <div className="composer-ask-top">
-      <span className="composer-ask-head" tabIndex={-1} data-ask-control="head">
+      <span className="composer-ask-head" tabIndex={0} data-ask-control="head">
         {mark}
         <span className="min-w-0">{children}</span>
       </span>
@@ -31,13 +32,15 @@ export function AskWay({ children, disabled, tip, onClick }: { children: ReactNo
 }
 
 /**
- * The ask's own line for words: an answer of the person's own, or what to do instead. The words go only when its pill
- * is pressed or Enter is pressed in it; the pill is the column's ink unless the field below holds words.
+ * The ask's own line for words: an answer of the person's own, or what to do instead. The words go only by its pill or
+ * Enter in it, and the pill shows only while it has words to take; it is the column's ink unless the field below holds
+ * words. A line kept among several choices wears a picked choice's edge.
  */
 export function AskLine({
   label,
   placeholder,
   secret,
+  picked = false,
   value,
   onChange,
   send,
@@ -47,15 +50,15 @@ export function AskLine({
   label: string;
   placeholder: string;
   secret: boolean;
+  picked?: boolean;
   value: string;
   onChange: (value: string) => void;
-  send: { words: string; ink: boolean; onSend: () => void };
+  send: { words: string; ink: boolean; onSend: () => void } | null;
   disabled: boolean;
   tip: string | undefined;
 }) {
-  const typed = value.trim().length > 0;
   return (
-    <label className="composer-ask-line" data-ask-line="">
+    <label className="composer-ask-line" data-ask-line="" data-picked={picked || undefined}>
       <input
         type={secret ? "password" : "text"}
         aria-label={label}
@@ -69,7 +72,7 @@ export function AskLine({
         data-ask-control="line"
         onChange={(event) => onChange(event.target.value)}
       />
-      {typed ? (
+      {send ? (
         <Button size="sm" variant={send.ink ? "primary" : "secondary"} tabIndex={-1} data-ask-send="" disabled={disabled} onClick={send.onSend}>
           {send.words}
         </Button>
@@ -85,4 +88,51 @@ export function AskError({ error }: { error: string | null }) {
       {error}
     </p>
   ) : null;
+}
+
+/** Where the keyboard is in the ask, read from the control that has it. */
+function placeOf(node: Element | null): AskPlace | null {
+  switch (node?.getAttribute("data-ask-control")) {
+    case "head":
+      return "head";
+    case "choice":
+      return "choice";
+    case "action":
+      return "action";
+    case "line":
+      return (node as HTMLInputElement).value ? "lineText" : "lineEmpty";
+    default:
+      return null;
+  }
+}
+
+/** The ask's controls in the order the keyboard walks them: down the ask from its question, the quiet ways out last. */
+function walk(root: HTMLElement): HTMLElement[] {
+  const all = [...root.querySelectorAll<HTMLElement>("[data-ask-control]")].filter((node) => !(node as HTMLButtonElement).disabled);
+  return [...all.filter((node) => !node.hasAttribute("data-ask-last")), ...all.filter((node) => node.hasAttribute("data-ask-last"))];
+}
+
+/**
+ * The keys of a waiting ask, by `askKeyAct`: arrows and Tab walk its controls, Enter and Space press the one the
+ * keyboard is on, Escape and a letter go back to the field. `focusField` is where the keyboard goes back to.
+ */
+export function askKeyDown(focusField: () => void) {
+  return (event: KeyboardEvent<HTMLElement>) => {
+    const place = placeOf(event.target as Element);
+    const key = askKeyName(event);
+    if (!place || !key) return;
+    const act = askKeyAct(place, key, true);
+    if (act === "pass") return;
+    // The key is the field's: it lands there, as typed.
+    if (act === "typeThrough") return focusField();
+    event.preventDefault();
+    const target = event.target as HTMLElement;
+    const controls = walk(event.currentTarget);
+    const at = controls.indexOf(target);
+    if (act === "next" && controls[at + 1]) controls[at + 1]!.focus();
+    else if (act === "next" || act === "leave") focusField();
+    else if (act === "prev") controls[at - 1]?.focus();
+    else if (act === "press") target.click();
+    else if (act === "lineSend") target.closest("[data-ask-line]")?.querySelector<HTMLElement>("[data-ask-send]")?.click();
+  };
 }

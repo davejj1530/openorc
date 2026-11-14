@@ -30,7 +30,6 @@ it("says on the question card that its answer was refused", async () => {
   vi.mocked(core.call).mockRejectedValue(new Error("Claude's sign-in on OpenOrc Cloud ended."));
   render(wrap(<QuestionCard runId="hosted:cloud" approvalId="ask-2" input={question} decided={undefined} />));
   fireEvent.click(screen.getByText("Ask each time"));
-  fireEvent.click(screen.getByRole("button", { name: "Answer" }));
   await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("Claude's sign-in on OpenOrc Cloud ended."));
 });
 

@@ -1,9 +1,11 @@
-import { useLayoutEffect, useRef, type MutableRefObject, type RefObject } from "react";
+import { useCallback, useLayoutEffect, useRef, useState, type MutableRefObject, type RefObject } from "react";
 import type { DocumentEditorHandle } from "../components/DocumentEditor";
 import { acknowledgeTaskDraft, sameTaskDraft, taskDraftPatch, type createTaskDraftBarrier, type TaskDocumentDraft } from "./task-draft";
 
 export type TaskDraftTransport = {
   mutateAsync(input: { id: string; patch: ReturnType<typeof taskDraftPatch> }): Promise<unknown>;
+  edited?(): void;
+  clean?(): void;
   isPending: boolean;
   error: Error | null;
 };
@@ -56,4 +58,14 @@ export function useTaskDocumentSource(source: Source): void {
       source.mounted.current = false;
     };
   }, [actions, taskId, storageId]);
+}
+
+export function useTaskDraftImages() {
+  const [imagesReady, setImagesReady] = useState(true);
+  const imagesReadyRef = useRef(true);
+  const reportImagesReady = useCallback((ready: boolean) => {
+    imagesReadyRef.current = ready;
+    setImagesReady(ready);
+  }, []);
+  return { imagesReady, imagesReadyRef, reportImagesReady };
 }

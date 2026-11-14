@@ -1,4 +1,4 @@
-import type { OnlineTaskEnvelope } from "@openorc/protocol";
+import type { OnlineTaskEnvelope, OnlineTaskCreation } from "@openorc/protocol";
 import { z } from "zod";
 import { Refused } from "./session.js";
 import { wireTaskEnvelope } from "./wire-tasks.js";
@@ -20,4 +20,14 @@ export function taskRequest<T>(route: Route<T>): Route<T> {
       return parsed.success ? new TaskChanged(parsed.data.current) : undefined;
     },
   };
+}
+
+/** A definitive refusal lets the author correct a new task; an unknown reply keeps its receipt. */
+export async function taskCreation(write: Promise<OnlineTaskEnvelope>): Promise<OnlineTaskCreation> {
+  try {
+    return { state: "saved", ...(await write) };
+  } catch (error) {
+    if (error instanceof Refused && error.status !== undefined && error.status >= 400 && error.status < 500) return { state: "refused", code: error.code ?? "TASK_REFUSED", message: error.message };
+    throw error;
+  }
 }

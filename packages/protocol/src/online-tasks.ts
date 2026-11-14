@@ -68,7 +68,10 @@ export const OnlineTaskHistoryEntry = z.object({
   actor: OnlineTaskPerson.nullable(),
   at: timestamp,
   revision,
-  changes: z.partialRecord(z.enum(["title", "spec", "status", "priority", "labels", "assigneeMemberId", "executionThreadId"]), z.object({ before: z.unknown(), after: z.unknown() })),
+  changes: z.partialRecord(
+    z.enum(["title", "spec", "status", "priority", "labels", "assignee", "thread"]),
+    z.object({ before: z.union([z.string(), z.array(z.string()), z.null()]), after: z.union([z.string(), z.array(z.string()), z.null()]) }),
+  ),
 });
 export type OnlineTaskHistoryEntry = z.infer<typeof OnlineTaskHistoryEntry>;
 export const OnlineTaskHistory = z.object({ accessRevision: revision, entries: z.array(OnlineTaskHistoryEntry), cursor: z.string().nullable() });
@@ -100,6 +103,7 @@ export const OnlineTaskSeen = z.object({ requestId: z.uuid(), assignmentRevision
 export const OnlineTaskList = z
   .object({ projectId: id.optional(), status: TaskStatus.optional(), assignee: z.literal("me").optional(), cursor: z.string().optional(), limit: z.number().int().min(1).max(200).optional() })
   .strict();
+export type OnlineTaskCreation = ({ state: "saved" } & OnlineTaskEnvelope) | { state: "refused"; code: string; message: string };
 export type OnlineTaskMutation = ({ state: "saved" } | { state: "conflict" }) & OnlineTaskEnvelope;
 export type OnlineTaskAvailability = { state: "unavailable" } | { state: "ready"; accountId: string; spaceId: string; execution: boolean; personal: boolean };
 const scope = { spaceId: SpaceId };
@@ -122,7 +126,7 @@ export interface OnlineTaskRpcResults {
   "tasks.online.state": OnlineTaskAvailability;
   "tasks.online.list": OnlineTaskPage;
   "tasks.online.get": OnlineTaskEnvelope;
-  "tasks.online.create": OnlineTaskEnvelope;
+  "tasks.online.create": OnlineTaskCreation;
   "tasks.online.update": OnlineTaskMutation;
   "tasks.online.delete": { state: "deleted" } | ({ state: "conflict" } & OnlineTaskEnvelope);
   "tasks.online.seen": OnlineTaskEnvelope;

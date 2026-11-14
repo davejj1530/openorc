@@ -9,14 +9,30 @@ type SaveState = { task: OnlineTask; conflict: OnlineTask | null; saving: boolea
 export class TaskSaveController {
   #state: SaveState;
   #pending: Input | null = null;
+  #pendingProperty: Input | null = null;
+  #documentRevision: number | null = null;
   #listeners = new Set<() => void>();
   constructor(
     readonly reference: OnlineTaskRef,
     task: OnlineTask,
     readonly send: (input: Input) => Promise<OnlineTaskMutation>,
+    recoveredRevision?: number | null,
   ) {
     this.#state = { task, conflict: null, saving: false, error: null, propertyError: null };
     this.#check(task);
+    if (recoveredRevision !== undefined) {
+      this.#documentRevision = recoveredRevision;
+      if (recoveredRevision !== task.revision) this.#state = { ...this.#state, conflict: task, error: new Error("This task changed. Your words are kept here.") };
+    }
+  }
+  markEdited(): void {
+    this.#documentRevision ??= this.#state.task.revision;
+  }
+  markClean(): void {
+    this.#documentRevision = null;
+  }
+  get draftRevision(): number | null {
+    return this.#documentRevision;
   }
   getSnapshot = (): SaveState => this.#state;
   subscribe = (listener: () => void): (() => void) => {
@@ -32,16 +48,17 @@ export class TaskSaveController {
   }
   observe(task: OnlineTask): void {
     this.#check(task);
-    if (task.revision > this.#state.task.revision) this.#set({ task });
+    if (task !== this.#state.task && task.revision >= this.#state.task.revision) this.#set({ task, ...(this.#state.conflict && { conflict: task }) });
   }
-  #input(patch: OnlineTaskPatch): Input {
-    return { spaceId: this.reference.spaceId, id: this.reference.id, ifRevision: this.#state.task.revision, requestId: crypto.randomUUID(), patch };
+  #input(patch: OnlineTaskPatch, revision = this.#state.task.revision): Input {
+    return { spaceId: this.reference.spaceId, id: this.reference.id, ifRevision: revision, requestId: crypto.randomUUID(), patch };
   }
   async #write(input: Input): Promise<void> {
     const result = await this.send(input);
     this.#check(result.task);
     this.observe(result.task);
     this.#pending = null;
+    if (result.state === "saved") this.#documentRevision = result.task.revision;
     if (result.state === "conflict") {
       this.#set({ conflict: result.task });
       throw new Error("This task changed. Your words are kept here.");
@@ -54,7 +71,7 @@ export class TaskSaveController {
       const pending = this.#pending;
       if (pending) await this.#write(pending);
       if (!pending || JSON.stringify(pending.patch) !== JSON.stringify(words)) {
-        this.#pending = this.#input(words);
+        this.#pending = this.#input(words, this.#documentRevision ?? this.#state.task.revision);
         await this.#write(this.#pending);
       }
     } catch (error) {
@@ -67,22 +84,38 @@ export class TaskSaveController {
   }
   async overwrite(words: Words): Promise<void> {
     if (!this.#state.conflict) return this.save(words);
-    this.#set({ conflict: null, error: null });
+    this.allowOverwrite();
     await this.save(words);
+  }
+  allowOverwrite(): void {
+    this.#documentRevision = this.#state.task.revision;
+    this.#set({ conflict: null, error: null });
   }
   useSavedVersion(): TaskDocumentDraft {
     const task = this.#state.task;
     this.#pending = null;
+    this.#documentRevision = null;
     this.#set({ conflict: null, error: null });
     return { title: task.title, spec: task.spec ?? "", labels: task.labels.join(", ") };
+  }
+  async #writeProperty(input: Input): Promise<boolean> {
+    const result = await this.send(input);
+    this.#check(result.task);
+    if (result.state === "saved" && this.#documentRevision === input.ifRevision) this.#documentRevision = result.task.revision;
+    this.observe(result.task);
+    this.#pendingProperty = null;
+    if (result.state === "conflict") this.#set({ propertyError: "This property changed. Choose again to update it." });
+    return result.state === "saved";
   }
   async property(patch: OnlineTaskPatch): Promise<void> {
     this.#set({ propertyError: null });
     try {
-      const result = await this.send(this.#input(patch));
-      this.#check(result.task);
-      this.observe(result.task);
-      if (result.state === "conflict") this.#set({ propertyError: "This property changed. Choose again to update it." });
+      const pending = this.#pendingProperty;
+      if (pending && !(await this.#writeProperty(pending))) return;
+      if (!pending || JSON.stringify(pending.patch) !== JSON.stringify(patch)) {
+        this.#pendingProperty = this.#input(patch);
+        await this.#writeProperty(this.#pendingProperty);
+      }
     } catch (error) {
       this.#set({ propertyError: error instanceof Error ? error.message : String(error) });
     }

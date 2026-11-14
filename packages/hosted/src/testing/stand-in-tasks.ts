@@ -168,7 +168,7 @@ export class StandInTasks {
       task.updatedBy = fixturePerson(this.deps, who);
       task.completedAt = task.status === "done" ? task.updatedAt : null;
       let kind: OnlineTaskHistoryEntry["kind"] = fields.status ? "status_changed" : "edited";
-      if (changes.assigneeMemberId) kind = task.assignee ? "assigned" : "unassigned";
+      if (changes.assignee) kind = task.assignee ? "assigned" : "unassigned";
       this.#history(record, who, kind, changes);
     }
     return ok(this.#envelope(record, who));
@@ -178,7 +178,7 @@ export class StandInTasks {
     if (memberId === undefined || memberId === (task.assignee?.memberId ?? null)) return null;
     const assignee = memberId ? this.roster(task.spaceId, task.projectId).find((person) => person.memberId === memberId && person.available) : null;
     if (memberId && !assignee) return refused(400, "Choose someone who can use this project.");
-    changes.assigneeMemberId = { before: task.assignee?.memberId ?? null, after: memberId };
+    changes.assignee = { before: task.assignee?.memberId ?? null, after: memberId };
     task.assignee = assignee ?? null;
     task.assignmentRevision++;
     record.seen = assignee?.userId === userOf(who) ? task.assignmentRevision : 0;

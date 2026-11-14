@@ -1,0 +1,13 @@
+.account-face.task-assignee-face {
+  width: 16px;
+  height: 16px;
+  font-size: 8px;
+}
+.task-unseen {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--ink-3);
+}

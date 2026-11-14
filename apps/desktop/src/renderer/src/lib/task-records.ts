@@ -1,5 +1,4 @@
 import type { OnlineTask, OnlineTaskRef, Project, SpaceProject, Task } from "@openorc/protocol";
-import { openTask, useRouter, type TaskTab } from "./router";
 
 export type TaskRecord = { kind: "local"; task: Task } | { kind: "online"; task: OnlineTask; reference: OnlineTaskRef; project: Project | undefined };
 export const localTaskRecord = (task: Task): TaskRecord => ({ kind: "local", task });
@@ -17,11 +16,3 @@ export const taskRecordKey = (record: TaskRecord): string =>
 export const taskNeedsYou = (record: TaskRecord): boolean => (record.kind === "local" ? Boolean(record.task.approval) : record.task.viewer.attention.includes("ask"));
 export const taskNeedsAttention = (record: TaskRecord): boolean =>
   record.kind === "online" ? record.task.viewer.attention.length > 0 : taskNeedsYou(record) || record.task.status === "review" || record.task.status === "proposed";
-export function openOnlineTask(reference: OnlineTaskRef, tab: TaskTab = "spec"): void {
-  const route = { view: "task", taskId: reference.id, tab, taskRef: reference } as const;
-  useRouter.getState().navigate(route);
-}
-export function openTaskRecord(record: TaskRecord, tab?: TaskTab): void {
-  if (record.kind === "online") openOnlineTask(record.reference, tab);
-  else openTask(record.task.id, tab ?? (record.task.approval ? "chat" : "spec"));
-}

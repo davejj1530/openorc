@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useImperativeHandle, useRef, useState, type Ref, type RefObject } from "react";
-import { createPortal } from "react-dom";
 import { EditorContent, useEditor, type Editor, type UseEditorOptions } from "@tiptap/react";
 import { BubbleMenu, type BubbleMenuProps } from "@tiptap/react/menus";
 import type { EditorView } from "@tiptap/pm/view";
 import Placeholder from "@tiptap/extension-placeholder";
 import { Bold, Code2, Image, Italic, Link2, Plus, Strikethrough } from "./icons";
 import { ThreadMedia } from "./ThreadImages";
-import { IMAGE_ACCEPT } from "../lib/image-imports";
-import { CoversPreview } from "../lib/browser-preview";
 import { documentExtensions } from "./editor/document-schema";
 import { LinkEditor } from "./editor/LinkEditor";
 import { TaskImage } from "./editor/TaskImage";
-import { matchingCommands } from "./editor/commands";
+import { SharedTaskImage } from "./editor/SharedTaskImage";
+import { validateOnlineTaskSpec } from "../lib/task-online-spec";
+import { DocumentInsertMenu } from "./editor/DocumentInsertMenu";
+import { documentImageInput } from "./editor/document-image-input";
 import { useDocumentCommands } from "./editor/use-document-commands";
 import { useDocumentImages } from "./editor/use-document-images";
 import { useDocumentMode } from "./editor/use-document-mode";
@@ -19,7 +19,15 @@ import { IconButton, Tooltip } from "./ui";
 import "./editor/document-editor.css";
 
 export type DocumentEditorHandle = { focus: () => void; flush: () => Promise<boolean> };
-type Props = { value: string; onChange: (value: string) => void; basePath?: string; disabled?: boolean; onReadyChange?: (ready: boolean) => void; ref?: Ref<DocumentEditorHandle> };
+type Props = {
+  value: string;
+  onChange: (value: string) => void;
+  basePath?: string;
+  disabled?: boolean;
+  imageUnavailableReason?: string;
+  onReadyChange?: (ready: boolean) => void;
+  ref?: Ref<DocumentEditorHandle>;
+};
 type EditorHandlers = {
   update: (editor: Editor) => void;
   selectionChange: (editor: Editor) => void;
@@ -33,9 +41,12 @@ type EditorHandlers = {
 const MARKDOWN_TEXT = /(^#{1,6} |^[-*+>] |^\d+[.)] |^```|\*\*|!\[|\]\()/m;
 
 /** Created once per mount; handlers reach the current render through `handlers`. */
-function editorOptions(content: string, handlers: RefObject<EditorHandlers | null>): UseEditorOptions {
+function editorOptions(content: string, handlers: RefObject<EditorHandlers | null>, imageUnavailableReason?: string): UseEditorOptions {
   return {
-    extensions: [...documentExtensions(TaskImage), Placeholder.configure({ placeholder: "Describe the work… Type / for commands, or paste an image.", showOnlyCurrent: true })],
+    extensions: [
+      ...documentExtensions(imageUnavailableReason ? SharedTaskImage : TaskImage),
+      Placeholder.configure({ placeholder: imageUnavailableReason ? "Describe the work… Type / for commands." : "Describe the work… Type / for commands, or paste an image.", showOnlyCurrent: true }),
+    ],
     content,
     contentType: "markdown",
     shouldRerenderOnTransaction: false,
@@ -57,14 +68,14 @@ function editorOptions(content: string, handlers: RefObject<EditorHandlers | nul
 }
 
 /** Rich editing transactions stay local; Markdown remains the task/MCP persistence boundary. */
-export function DocumentEditor({ value, onChange, basePath, disabled = false, onReadyChange, ref }: Props) {
+export function DocumentEditor({ value, onChange, basePath, disabled = false, onReadyChange, imageUnavailableReason, ref }: Props) {
   const [error, setError] = useState("");
   const [link, setLink] = useState<string | null>(null);
   // Link editing ends with the menu it sits in, when the selection moves on.
   const [menuOptions] = useState<BubbleMenuProps["options"]>(() => ({ placement: "top", offset: 8, onHide: () => setLink(null) }));
   const handlers = useRef<EditorHandlers | null>(null);
   const plainPaste = useRef(false);
-  const [options] = useState(() => editorOptions(value, handlers));
+  const [options] = useState(() => editorOptions(value, handlers, imageUnavailableReason));
   const editor = useEditor(options);
   const images = useDocumentImages(onReadyChange, setError);
   const mode = useDocumentMode(editor, value, onChange);
@@ -74,21 +85,8 @@ export function DocumentEditor({ value, onChange, basePath, disabled = false, on
     editor?.setEditable(!disabled, false);
   }, [editor, disabled]);
 
-  const addImages = (files: File[], position?: number) => {
-    if (!editor || disabled) return;
-    setError("");
-    commands.setMenu(null);
-    images.stage(editor, files, position);
-  };
-  const pickImage = () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = IMAGE_ACCEPT;
-    input.multiple = true;
-    input.onchange = () => addImages(Array.from(input.files ?? []));
-    input.click();
-  };
-  const commands = useDocumentCommands(editor, source, pickImage);
+  const { add: addImages, pick: pickImage } = documentImageInput(editor, disabled, imageUnavailableReason, images.stage, () => commands.setMenu(null), setError);
+  const commands = useDocumentCommands(editor, source, pickImage, imageUnavailableReason);
   handlers.current = {
     update: (current) => {
       mode.emitRich(current);
@@ -140,7 +138,16 @@ export function DocumentEditor({ value, onChange, basePath, disabled = false, on
   };
   useImperativeHandle(ref, () => ({
     focus: mode.focus,
-    flush: () => images.flush(editor, source, value),
+    flush: () => {
+      if (!imageUnavailableReason) return images.flush(editor, source, value);
+      try {
+        validateOnlineTaskSpec(value);
+        return Promise.resolve(true);
+      } catch (failure) {
+        setError(failure instanceof Error ? failure.message : String(failure));
+        return Promise.resolve(false);
+      }
+    },
   }));
 
   const shouldShowMenu = useCallback<NonNullable<BubbleMenuProps["shouldShow"]>>(
@@ -177,8 +184,8 @@ export function DocumentEditor({ value, onChange, basePath, disabled = false, on
                   <Plus size={15} />
                 </IconButton>
               </Tooltip>
-              <Tooltip label="Insert image">
-                <IconButton type="button" disabled={disabled} aria-label="Insert image" onMouseDown={(event) => event.preventDefault()} onClick={pickImage}>
+              <Tooltip label={imageUnavailableReason ?? "Insert image"}>
+                <IconButton type="button" disabled={disabled || Boolean(imageUnavailableReason)} aria-label="Insert image" onMouseDown={(event) => event.preventDefault()} onClick={pickImage}>
                   <Image size={15} />
                 </IconButton>
               </Tooltip>
@@ -226,33 +233,7 @@ export function DocumentEditor({ value, onChange, basePath, disabled = false, on
             </button>
           </p>
         ) : null}
-        {commands.menu && !source
-          ? createPortal(
-              <div className="task-insert-menu" style={{ left: commands.menu.left, top: commands.menu.top, transform: commands.menu.above ? "translateY(-100%)" : undefined }}>
-                <CoversPreview />
-                <div className="task-insert-heading">Insert {commands.menu.query ? <span>“{commands.menu.query}”</span> : null}</div>
-                <div id="task-insert-options" role="listbox" aria-label="Insert content">
-                  {matchingCommands(commands.menu.query).map((command, index) => (
-                    <button
-                      type="button"
-                      role="option"
-                      id={`task-insert-${index}`}
-                      aria-selected={commands.highlight === index}
-                      key={command.id}
-                      onMouseDown={(event) => event.preventDefault()}
-                      onMouseEnter={() => commands.setHighlight(index)}
-                      onClick={() => commands.choose(index)}
-                    >
-                      <command.icon size={17} />
-                      <span>{command.label}</span>
-                    </button>
-                  ))}
-                  {matchingCommands(commands.menu.query).length === 0 ? <p className="task-insert-empty">No matching commands</p> : null}
-                </div>
-              </div>,
-              document.body,
-            )
-          : null}
+        <DocumentInsertMenu commands={commands} source={source} imageUnavailableReason={imageUnavailableReason} />
       </div>
     </ThreadMedia>
   );

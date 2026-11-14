@@ -5,7 +5,7 @@ import { writeDraft } from "./drafts";
 import { acknowledgeTaskDraft, readTaskDraft, sameSavedTaskDraft, sameTaskDraft, type TaskDocumentDraft } from "./task-draft";
 import { useTaskDraftActions } from "./task-draft-context";
 import { useRpcMutation } from "./client";
-import { useTaskDocumentSource, type TaskDraftTransport } from "./task-document-source";
+import { useTaskDocumentSource, useTaskDraftImages, type TaskDraftTransport } from "./task-document-source";
 
 /** The locally kept draft when there is one. An unreadable draft is reported, never replaced. */
 function initialDraft(taskId: string, incoming: TaskDocumentDraft): { draft: TaskDocumentDraft; error: string | null } {
@@ -22,8 +22,7 @@ export function useTaskDocumentDraft(task: Pick<Task, "id" | "title" | "spec" | 
   const actions = useTaskDraftActions();
   const body = useRef<DocumentEditorHandle>(null);
   const mounted = useRef(false);
-  const [imagesReady, setImagesReady] = useState(true);
-  const imagesReadyRef = useRef(true);
+  const { imagesReady, imagesReadyRef, reportImagesReady } = useTaskDraftImages();
   const [draftStored, setDraftStored] = useState(true);
   const labels = task.labels.join(", ");
   const incoming = useMemo(() => ({ title: task.title, spec: task.spec ?? "", labels }), [task.title, task.spec, labels]);
@@ -38,13 +37,14 @@ export function useTaskDocumentDraft(task: Pick<Task, "id" | "title" | "spec" | 
   const savedRef = useRef(saved);
   const current = useRef(draft);
   const localSave = useRpcMutation("tasks.update");
-  const save = online?.save ?? localSave;
+  const save: TaskDraftTransport = online?.save ?? localSave;
   const saveRef = useRef(save.mutateAsync);
   saveRef.current = save.mutateAsync;
   const dirty = !sameTaskDraft(draft, saved);
 
   const patch = (value: Partial<TaskDocumentDraft>) => {
     const next = { ...current.current, ...value };
+    if (!sameTaskDraft(next, savedRef.current)) save.edited?.();
     current.current = next;
     setDraft(next);
     const stored = writeDraft(`task.${storageId}`, next);
@@ -80,6 +80,11 @@ export function useTaskDocumentDraft(task: Pick<Task, "id" | "title" | "spec" | 
     }
   }, [actions, storageId]);
 
+  const clean = save.clean;
+  useEffect(() => {
+    if (!dirty) clean?.();
+  }, [dirty, clean]);
+
   useEffect(() => {
     if (!dirty || !imagesReady || save.isPending || save.error) return;
     const timer = setTimeout(() => void flush(), 800);
@@ -100,11 +105,6 @@ export function useTaskDocumentDraft(task: Pick<Task, "id" | "title" | "spec" | 
     setDraft(incoming);
     setSaved(incoming);
   }, [incoming, dirty, save.isPending, storageId]);
-
-  const reportImagesReady = useCallback((ready: boolean) => {
-    imagesReadyRef.current = ready;
-    setImagesReady(ready);
-  }, []);
 
   const replaceSaved = (next: TaskDocumentDraft) => {
     acknowledgeTaskDraft(storageId, current.current);

@@ -1,11 +1,9 @@
 import { useEffect, useRef, type ReactNode, type RefObject } from "react";
-import type { Project, Task, ThreadSummary } from "@openorc/protocol";
+import { OnlineTaskRef, type Project, type Task, type ThreadSummary } from "@openorc/protocol";
 import { Panel, type PanelContext } from "../components/Panel";
-import { PageCrumbs } from "../components/PageTitle";
-import { StatusIcon } from "../components/status";
-import { TabTrack } from "../components/TabTrack";
 import { TaskActivity } from "../components/TaskActivity";
-import { TopBar } from "../components/TopBar";
+import { TaskWorkspace } from "../components/task-list/TaskWorkspace";
+import { OnlineTaskView } from "../components/task-online/TaskView";
 import { Button, Empty } from "../components/ui";
 import { useRpc } from "../lib/client";
 import { useLayout } from "../lib/layout";
@@ -15,14 +13,6 @@ import { ChangesPanel } from "../panels/ChangesPanel";
 import { CommitsPanel } from "../panels/CommitsPanel";
 import { MemoryPanel } from "../panels/MemoryPanel";
 import { TaskDocument, type TaskDocumentHandle } from "./TaskDocument";
-
-const tabs: { id: TaskTab; label: string }[] = [
-  { id: "spec", label: "Overview" },
-  { id: "chat", label: "Activity" },
-  { id: "files", label: "Changes" },
-  { id: "commits", label: "Commits" },
-  { id: "memory", label: "Memory" },
-];
 
 function executionUnavailableTitle(error: Error | null, pending: boolean): string {
   if (error) return "Execution conversation unavailable";
@@ -72,7 +62,16 @@ function TaskTabBody({
   return <CommitsPanel source={{ kind: "thread", thread, project }} />;
 }
 
-export function TaskView({ taskId, tab }: { taskId: string; tab: TaskTab }) {
+export function TaskView({ taskId, tab, taskRef }: { taskId: string; tab: TaskTab; taskRef?: OnlineTaskRef }) {
+  if (taskRef) {
+    const parsed = OnlineTaskRef.safeParse(taskRef);
+    if (!parsed.success || parsed.data.id !== taskId) return <Empty title="This task isn’t available here." />;
+    return <OnlineTaskView reference={parsed.data} tab={tab} />;
+  }
+  return <LocalTaskView taskId={taskId} tab={tab} />;
+}
+
+function LocalTaskView({ taskId, tab }: { taskId: string; tab: TaskTab }) {
   const task = useRpc("tasks.get", { id: taskId });
   const owner = useRpc("tasks.executionThread", { taskId }, { enabled: Boolean(task.data) });
   const project = useRpc("projects.get", { id: task.data?.projectId ?? "" }, { enabled: Boolean(task.data) });
@@ -103,44 +102,23 @@ export function TaskView({ taskId, tab }: { taskId: string; tab: TaskTab }) {
   }, [tab, taskId, setPanel]);
   const thread = owner.data && !owner.data.teamInstanceId ? owner.data : null;
   const activityContext: PanelContext | null = t && p ? { kind: "task", task: t, project: p } : null;
-  const body = t && p ? <TaskTabBody key={t.id} tab={tab} task={t} project={p} thread={thread} owner={owner} editor={editor} /> : null;
+  const body = activityContext ? (
+    <TaskTabBody key={activityContext.task.id} tab={tab} task={activityContext.task} project={activityContext.project} thread={thread} owner={owner} editor={editor} />
+  ) : null;
   return (
     <TaskDraftProvider key={taskId} taskId={taskId}>
-      <main className="task-workspace workspace-main well flex-1 min-w-0 flex flex-col">
-        <TopBar panel={tab === "chat" && Boolean(activityContext)}>
-          <PageCrumbs parent="Tasks" onParent={() => useRouter.getState().navigate({ view: "tasks" })}>
-            {t ? (
-              <>
-                <StatusIcon status={t.status} />
-                <span className="truncate" data-tip={t.title}>
-                  {t.title}
-                </span>
-              </>
-            ) : (
-              <span>Loading task…</span>
-            )}
-          </PageCrumbs>
-        </TopBar>
-        {t && p ? (
-          <>
-            <div className="task-tabs">
-              <TabTrack label="Task workspace" items={tabs} value={tab} panelId="task-tab-content" onSelect={(next) => void selectTab(next)} />
-            </div>
-            <div id="task-tab-content" role="tabpanel" aria-label={tabs.find((item) => item.id === tab)?.label} className="task-tab-content flex-1 min-h-0 flex flex-col" data-tab={tab}>
-              {document || tab === "files" ? body : <div className="task-tab-body">{body}</div>}
-            </div>
-          </>
-        ) : (
-          taskUnavailableContent({
-            loading: task.isLoading || project.isLoading,
-            error: task.error || project.error,
-            retry: () => {
-              void task.refetch();
-              void project.refetch();
-            },
-          })
-        )}
-      </main>
+      <TaskWorkspace task={activityContext?.task} tab={tab} panel={tab === "chat" && Boolean(activityContext)} selectTab={(next) => void selectTab(next)}>
+        {activityContext
+          ? body
+          : taskUnavailableContent({
+              loading: task.isLoading || project.isLoading,
+              error: task.error || project.error,
+              retry: () => {
+                void task.refetch();
+                void project.refetch();
+              },
+            })}
+      </TaskWorkspace>
       {tab === "chat" && activityContext ? <Panel context={activityContext} /> : null}
     </TaskDraftProvider>
   );

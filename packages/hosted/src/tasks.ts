@@ -1,7 +1,7 @@
 import type { OnlineTaskAvailability, OnlineTaskEnvelope, OnlineTaskMutation, OnlineTaskParams, OnlineTaskRpcResults } from "@openorc/protocol";
 import type { HostedDeps, HostedSpaces } from "./index.js";
 import { Refused, type Session } from "./session.js";
-import { TaskChanged, taskRequest } from "./task-requests.js";
+import { TaskChanged, taskCreation, taskRequest } from "./task-requests.js";
 import { TASK_ROUTES } from "./wire-tasks.js";
 import { SOCKET, wireTopics, type Route } from "./wire.js";
 
@@ -82,6 +82,9 @@ export class OnlineTasks {
     return this.#request(spaceId, TASK_ROUTES.context(id));
   }
 
+  creation(input: OnlineTaskParams<"tasks.online.create">) {
+    return taskCreation(this.create(input));
+  }
   async create({ spaceId, ...input }: OnlineTaskParams<"tasks.online.create">): Promise<OnlineTaskEnvelope> {
     const result = await this.#request(spaceId, TASK_ROUTES.create, input);
     this.#invalidate(spaceId);

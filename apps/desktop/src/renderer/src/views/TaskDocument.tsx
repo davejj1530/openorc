@@ -1,13 +1,13 @@
 import { relativeTime } from "@openorc/client";
-import { harnessName, type Project, type Run, type Task, type TaskPriority, type TaskStatus } from "@openorc/protocol";
+import { harnessName, type Project, type Run, type Task } from "@openorc/protocol";
 import { useImperativeHandle, type ReactNode, type Ref } from "react";
-import { DocumentEditor } from "../components/DocumentEditor";
+import { TaskDocumentFields } from "../components/task-list/TaskDocumentFields";
 import { ArrowUpRight, Check, GitBranch, MessageSquare } from "../components/icons";
-import { PriorityIcon, StatusIcon, priorityLabel, priorityOrder, statusLabel, statusOrder } from "../components/status";
+import { StatusIcon } from "../components/status";
 import { TaskComments } from "../components/TaskComments";
 import { TaskDelete } from "../components/TaskDelete";
 import { TaskExecutionSettings, useTaskExecutionLocation } from "../components/TaskExecutionSettings";
-import { Button, Select, TextButton } from "../components/ui";
+import { Button, TextButton } from "../components/ui";
 import { useRpcMutation } from "../lib/client";
 import { openTask, openThread } from "../lib/router";
 import { useTaskDocumentDraft } from "../lib/task-document-draft";
@@ -19,7 +19,7 @@ function taskActivityPrompt(historyCount: number): ReactNode {
   return null;
 }
 
-function taskDraftStatus(input: {
+export function taskDraftStatus(input: {
   draftStored: boolean;
   saveError: Error | null;
   flushError: string | null;
@@ -93,7 +93,7 @@ function TaskHistory({ task, history, openActivity, openConversation }: { task: 
 
 export function TaskDocument({ task, project, ref }: { task: Task; project: Project; ref?: Ref<TaskDocumentHandle> }) {
   const document = useTaskDocumentDraft(task);
-  const { draft, patch, body, imagesReady, reportImagesReady, draftStored, dirty, saving, saveError, error: flushError, reportError: setFlushError, flush } = document;
+  const { draft, imagesReady, draftStored, dirty, saving, saveError, error: flushError, reportError: setFlushError, flush } = document;
   const conversation = useRpcMutation("tasks.openThread");
   const properties = useRpcMutation("tasks.update");
   const execution = useTaskExecutionLocation(task, flush);
@@ -127,72 +127,17 @@ export function TaskDocument({ task, project, ref }: { task: Task; project: Proj
     >
       <div className="task-scroll">
         <article className="task-document">
-          <textarea
-            rows={1}
-            aria-label="Task title"
-            className="document-title native-field"
-            value={draft.title}
-
-            onChange={(e) => patch({ title: e.target.value.replace(/\n/g, " ") })}
-            onBlur={flush}
+          <TaskDocumentFields
+            document={document}
+            status={task.status}
+            priority={task.priority}
+            projectName={project.name}
+            pending={properties.isPending}
+            error={properties.error?.message ?? null}
+            basePath={task.worktreePath ?? project.rootPath}
+            onStatus={(status) => properties.mutate({ id: task.id, patch: { status } })}
+            onPriority={(priority) => properties.mutate({ id: task.id, patch: { priority } })}
           />
-          <div className="task-properties" aria-label="Task properties">
-            <label className="property-chip">
-              <StatusIcon status={task.status} />
-              <Select
-                aria-label="Status"
-                className="property-select"
-                value={task.status}
-                disabled={properties.isPending}
-                onChange={(e) => properties.mutate({ id: task.id, patch: { status: e.target.value as TaskStatus } })}
-              >
-                {statusOrder.map((s) => (
-                  <option key={s} value={s}>
-                    {statusLabel[s]}
-                  </option>
-                ))}
-              </Select>
-            </label>
-            <label className="property-chip">
-              <PriorityIcon priority={task.priority} />
-              <Select
-                aria-label="Priority"
-                className="property-select"
-                value={task.priority}
-                disabled={properties.isPending}
-                onChange={(e) => properties.mutate({ id: task.id, patch: { priority: e.target.value as TaskPriority } })}
-              >
-                {priorityOrder.map((p) => (
-                  <option key={p} value={p}>
-                    {priorityLabel[p]}
-                  </option>
-                ))}
-              </Select>
-            </label>
-            <span className="property-chip truncate" data-tip={project.name}>
-              {project.name}
-            </span>
-          </div>
-          {properties.error ? (
-            <p role="alert" className="text-sm text-bad mb-3">
-              {properties.error.message}
-            </p>
-          ) : null}
-          <DocumentEditor ref={body} value={draft.spec} onChange={(spec) => patch({ spec })} onReadyChange={reportImagesReady} basePath={task.worktreePath ?? project.rootPath} />
-          <div className="flex flex-wrap items-center gap-3 mt-6 text-sm text-ink-3">
-            <label className="flex min-w-0 items-center gap-2">
-              <span>Labels</span>
-              <input
-                aria-label="Labels"
-                className="bg-transparent py-1 text-ink-2 placeholder:text-ink-4"
-                placeholder="Add labels, comma separated"
-                value={draft.labels}
-
-                onChange={(e) => patch({ labels: e.target.value })}
-                onBlur={flush}
-              />
-            </label>
-          </div>
           <TaskComments key={task.id} taskId={task.id} description={draft.spec} beforeSend={flushAll} />
           <TaskExecutionSettings execution={execution} />
           <TaskHistory task={task} history={history} openActivity={openActivity} openConversation={() => void openConversation()} />

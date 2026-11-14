@@ -1,18 +1,18 @@
 import { useSpaceProjects } from "../lib/space-queries";
 import { useRef, useState, type ReactNode } from "react";
-import { Check, FolderGit2, FolderPlus, GitBranch, Plus } from "../components/icons";
-import { PageCrumbs } from "../components/PageTitle";
+import { FolderPlus, GitBranch } from "../components/icons";
 import type { TaskPriority, WorkspaceMode } from "@openorc/protocol";
-import { DocumentEditor, type DocumentEditorHandle } from "../components/DocumentEditor";
-import { PriorityIcon, StatusIcon, priorityLabel, priorityOrder } from "../components/status";
-import { cn } from "../lib/cn";
-import { TopBar } from "../components/TopBar";
-import { Button, Empty, Input, Select, TextButton } from "../components/ui";
+import type { DocumentEditorHandle } from "../components/DocumentEditor";
+import { Button, Empty, Input, TextButton } from "../components/ui";
 import { readDraft, removeDraft, writeDraft } from "../lib/drafts";
 import { useProjectGit } from "../lib/project-git";
 import { useRpc, useRpcMutation } from "../lib/client";
-import { openTask, openThread, useRouter } from "../lib/router";
+import { openTask, openThread } from "../lib/router";
 import { useUi } from "../lib/ui";
+import { TaskNewPage } from "../components/task-list/TaskNewPage";
+import { TaskNewFields } from "../components/task-list/TaskNewFields";
+import { OnlineNewTask } from "../components/task-online/NewTask";
+import { useTaskOnlineScope } from "../lib/task-online-query";
 import { ExecutionLocationSelect } from "../components/TaskExecutionSettings";
 
 function newTaskProjectGate(input: { error: Error | null; loading: boolean; empty: boolean; retry: () => void; importProject: () => void }): ReactNode {
@@ -94,6 +94,19 @@ function NewTaskLocation(props: {
 }
 
 export function NewTask({ projectId, threadId }: { projectId?: string; threadId?: string }) {
+  const { scope, status } = useTaskOnlineScope();
+  if (scope) return <OnlineNewTask key={JSON.stringify([scope.accountId, scope.spaceId, projectId, threadId])} scope={scope} projectId={projectId} threadId={threadId} />;
+  if (status.isLoading) return <div className="document-skeleton" aria-label="Loading projects" />;
+  if (status.error)
+    return (
+      <Empty title="Projects couldn’t load">
+        <Button onClick={() => void status.refetch()}>Try again</Button>
+      </Empty>
+    );
+  return <LocalNewTask projectId={projectId} threadId={threadId} />;
+}
+
+function LocalNewTask({ projectId, threadId }: { projectId?: string; threadId?: string }) {
   const projects = useSpaceProjects(true);
   const thread = useRpc("threads.get", { id: threadId ?? "" }, { enabled: Boolean(threadId) });
   const settings = useRpc("app.settings.get", {});
@@ -149,119 +162,60 @@ export function NewTask({ projectId, threadId }: { projectId?: string; threadId?
     }
   };
   return (
-    <div className="task-workspace h-full flex flex-col min-h-0">
-      <TopBar
-        actions={
-          <span className={cn("text-sm inline-flex items-center gap-1.5", draftStored ? "text-ink-4" : "text-bad")} role="status">
-            {draftStored ? (
-              <>
-                <Check size={12} /> Draft saved locally
-              </>
-            ) : (
-              "Local draft couldn’t be saved. Keep this page open."
-            )}
-          </span>
+    <TaskNewPage
+      draftStored={draftStored}
+      gate={projectGate}
+      submit={() => void submit()}
+      pending={create.isPending}
+      disabled={!settings.data || Boolean(threadId && !thread.data) || !draft.title.trim() || !project || create.isPending || !imagesReady}
+      footer={<LocalTaskFooter settingsError={settings.error} createError={create.error} retry={() => void settings.refetch()} />}
+    >
+      <TaskNewFields
+        draft={draft}
+        patch={patch}
+        body={body}
+        selectedId={selectedId}
+        projects={projects.data}
+        projectLocked={Boolean(threadId)}
+        onProject={(id) => patch({ projectId: id, baseRef: "" })}
+        pending={create.isPending}
+        onReady={setImagesReady}
+        basePath={project?.rootPath}
+        source={
+          threadId ? (
+            <TextButton type="button" tone="muted" className="text-sm mb-5 truncate max-w-full" onClick={() => openThread(threadId)}>
+              From {thread.data?.title ?? "thread"}
+            </TextButton>
+          ) : null
         }
-      >
-        <PageCrumbs parent="Tasks" onParent={() => useRouter.getState().navigate({ view: "tasks" })}>
-          <span className="truncate">New task</span>
-        </PageCrumbs>
-      </TopBar>
-      {projectGate ?? (
-        <form
-          className="flex-1 min-h-0 flex flex-col"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void submit();
-          }}
-          onKeyDown={(e) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-              e.preventDefault();
-              void submit();
-            }
-          }}
-        >
-          <div className="task-scroll">
-            <div className="task-document">
-              <textarea
-                autoFocus
-                rows={1}
-                aria-label="Task title"
-                className="document-title native-field"
-                placeholder="Task title"
-                value={draft.title}
-                onChange={(e) => patch({ title: e.target.value.replace(/\n/g, " ") })}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.metaKey && !e.ctrlKey) {
-                    e.preventDefault();
-                    body.current?.focus();
-                  }
-                }}
-              />
-              <div className="task-properties" aria-label="Task properties">
-                <span className="property-chip">
-                  <StatusIcon status="backlog" /> Backlog
-                </span>
-                <label className="property-chip">
-                  <PriorityIcon priority={draft.priority} />
-                  <Select aria-label="Priority" className="property-select" value={draft.priority} onChange={(e) => patch({ priority: e.target.value as TaskPriority })}>
-                    {priorityOrder.map((p) => (
-                      <option key={p} value={p}>
-                        {priorityLabel[p]}
-                      </option>
-                    ))}
-                  </Select>
-                </label>
-                <label className="property-chip min-w-0">
-                  <FolderGit2 size={14} className="shrink-0" />
-                  <Select aria-label="Project" className="property-select" value={selectedId} disabled={Boolean(threadId)} onChange={(e) => patch({ projectId: e.target.value, baseRef: "" })}>
-                    {projects.data?.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </Select>
-                </label>
-              </div>
-              {threadId ? (
-                <TextButton type="button" tone="muted" className="text-sm mb-5 truncate max-w-full" onClick={() => openThread(threadId)}>
-                  From {thread.data?.title ?? "thread"}
-                </TextButton>
-              ) : null}
-              <DocumentEditor ref={body} value={draft.spec} onChange={(spec) => patch({ spec })} onReadyChange={setImagesReady} disabled={create.isPending} basePath={project?.rootPath} />
-              <NewTaskLocation
-                linked={Boolean(threadId)}
-                worktree={useWorktree}
-                worktreeBlocked={git.cannotBranch}
-                settingsReady={Boolean(settings.data)}
-                baseRef={draft.baseRef}
-                defaultBranch={project?.defaultBranch}
-                onWorktree={(worktree) => patch({ useWorktree: worktree })}
-                onBaseRef={(baseRef) => patch({ baseRef })}
-              />
-            </div>
-          </div>
-          <footer className="document-footer">
-            <div className="min-w-0">
-              <p className="text-sm text-ink-3">Saves to backlog. Continue in a thread when you’re ready.</p>
-              {settings.error ? (
-                <p role="alert" className="text-sm text-bad">
-                  Could not load workspace preferences. <TextButton onClick={() => void settings.refetch()}>Retry</TextButton>
-                </p>
-              ) : null}
-              {create.error ? (
-                <p role="alert" className="text-sm text-bad mt-1 break-words">
-                  {create.error.message}
-                </p>
-              ) : null}
-            </div>
-            <Button type="submit" variant="primary" size="lg" disabled={!settings.data || Boolean(threadId && !thread.data) || !draft.title.trim() || !project || create.isPending || !imagesReady}>
-              <Plus size={14} />
-              {create.isPending ? "Creating…" : "Create task"}
-            </Button>
-          </footer>
-        </form>
-      )}
-    </div>
+      />
+      <NewTaskLocation
+        linked={Boolean(threadId)}
+        worktree={useWorktree}
+        worktreeBlocked={git.cannotBranch}
+        settingsReady={Boolean(settings.data)}
+        baseRef={draft.baseRef}
+        defaultBranch={project?.defaultBranch}
+        onWorktree={(worktree) => patch({ useWorktree: worktree })}
+        onBaseRef={(baseRef) => patch({ baseRef })}
+      />
+    </TaskNewPage>
+  );
+}
+
+function LocalTaskFooter({ settingsError, createError, retry }: { settingsError: Error | null; createError: Error | null; retry(): void }) {
+  return (
+    <>
+      {settingsError ? (
+        <p role="alert" className="text-sm text-bad">
+          Could not load workspace preferences. <TextButton onClick={retry}>Retry</TextButton>
+        </p>
+      ) : null}
+      {createError ? (
+        <p role="alert" className="text-sm text-bad mt-1 break-words">
+          {createError.message}
+        </p>
+      ) : null}
+    </>
   );
 }

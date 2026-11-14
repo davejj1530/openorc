@@ -13,7 +13,7 @@ export function createOnlineTaskHandlers(tasks: OnlineTasks | null): OnlineTaskH
     "tasks.online.state": (input) => tasks?.state(input) ?? { state: "unavailable" },
     "tasks.online.list": (input) => service().list(input),
     "tasks.online.get": (input) => service().get(input),
-    "tasks.online.create": (input) => service().create(input),
+    "tasks.online.create": (input) => service().creation(input),
     "tasks.online.update": (input) => service().update(input),
     "tasks.online.delete": (input) => service().delete(input),
     "tasks.online.seen": (input) => service().seen(input),

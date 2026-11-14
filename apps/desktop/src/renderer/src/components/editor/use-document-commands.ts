@@ -6,7 +6,7 @@ import { slashQuery, type SlashMatch } from "./document-schema";
 export type MenuState = SlashMatch & { left: number; top: number; above: boolean };
 
 /** Owns slash-command selection and the listeners installed while its menu is open. */
-export function useDocumentCommands(editor: Editor | null, source: boolean, pickImage: () => void) {
+export function useDocumentCommands(editor: Editor | null, source: boolean, pickImage: () => void, imageUnavailableReason?: string) {
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [highlight, setHighlight] = useState(0);
   const menuRef = useRef(menu);
@@ -43,7 +43,7 @@ export function useDocumentCommands(editor: Editor | null, source: boolean, pick
   const choose = (index: number): void => {
     if (!editor || !menu) return;
     const command = matchingCommands(menu.query)[index];
-    if (!command) return;
+    if (!command || (command.id === "image" && imageUnavailableReason)) return;
     editor.chain().focus().deleteRange({ from: menu.from, to: menu.to }).run();
     setMenu(null);
     if (command.id === "image") pickImageRef.current();

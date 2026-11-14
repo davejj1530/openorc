@@ -63,3 +63,21 @@ describe("online task document saves", () => {
     expect(controller.getSnapshot().task.projectId).toBe("project-a");
   });
 });
+
+it("does not adopt a background revision as permission to overwrite typed words", async () => {
+  const send = vi.fn().mockResolvedValue(conflict(2));
+  const controller = new TaskSaveController(onlineReference, onlineTask(), send);
+  controller.markEdited();
+  controller.observe(onlineTask({ revision: 2, spec: "Another person's words" }));
+  await expect(controller.save(words)).rejects.toThrow("changed");
+  expect(send.mock.calls[0]?.[0].ifRevision).toBe(1);
+});
+
+it("settles a lost property reply with the same receipt before changing the choice", async () => {
+  const send = vi.fn().mockRejectedValueOnce(new Error("Connection lost")).mockResolvedValueOnce(saved(2)).mockResolvedValueOnce(saved(3));
+  const controller = new TaskSaveController(onlineReference, onlineTask(), send);
+  await controller.property({ priority: "high" });
+  await controller.property({ priority: "low" });
+  expect(send.mock.calls[1]?.[0]).toEqual(send.mock.calls[0]?.[0]);
+  expect(send.mock.calls[2]?.[0]).toMatchObject({ ifRevision: 2, patch: { priority: "low" } });
+});

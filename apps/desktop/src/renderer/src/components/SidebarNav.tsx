@@ -1,13 +1,12 @@
 import type { ReactNode } from "react";
 import { NEEDS_YOU_PAGE, threadStatus, waitsOnYou } from "@openorc/client";
 import { WORKSPACE_ID } from "@openorc/protocol";
-import { useSpaceRpc as useRpc } from "../lib/space-queries";
 import { useRpc as useGlobalRpc } from "../lib/client";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
 import type { SidebarScreen } from "../lib/layout";
 import { useOrclingChatIds } from "../lib/orclings";
 import { newThread, useRouter, type Route } from "../lib/router";
-import { waitingTaskCount } from "../lib/task-stage-counts";
+import { useTaskAttentionCount } from "../lib/task-list-source";
 import { Orclings, PenSquare } from "./icons";
 import { SCREENS } from "./sidebar-screens";
 
@@ -53,7 +52,7 @@ function useWaitingOrclings(): number {
  * what a thread waits for shows on its own row and its project's label.
  */
 export function SidebarNav({ route, projectId, orclings }: { route: Route; projectId: string | null; orclings: { active: boolean; toggle: () => void; tools: ReactNode } }) {
-  const tasks = waitingTaskCount(useRpc("tasks.list", {}).data ?? []);
+  const tasks = useTaskAttentionCount();
   const counts: Partial<Record<SidebarScreen, number>> = { tasks };
   const waitingOrclings = useWaitingOrclings();
   return (

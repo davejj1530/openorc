@@ -31,6 +31,6 @@ export function useTaskOnlineScope() {
   const enabled = Boolean(space?.accountId && !space.personal);
   const candidate = enabled && space?.accountId ? { accountId: space.accountId, spaceId: space.id } : null;
   const status = useTaskOnlineQuery(candidate, "tasks.online.state", { spaceId: space?.id ?? "" });
-  const ready = enabled && status.data?.state === "ready" && status.data.accountId === space?.accountId ? status.data : null;
+  const ready = enabled && !status.error && status.data?.state === "ready" && status.data.accountId === space?.accountId ? status.data : null;
   return { scope: ready ? { accountId: ready.accountId, spaceId: ready.spaceId } : null, availability: ready, status };
 }

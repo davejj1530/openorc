@@ -2,6 +2,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useImperativeHandle, type ReactNode, type Ref } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+vi.mock("../components/task-online/TaskView", () => ({
+  OnlineTaskView: () => {
+    throw new Error("A Mac task must use its local document.");
+  },
+}));
 import { useRouter, type TaskTab } from "../lib/router";
 import { TaskView } from "./TaskView";
 

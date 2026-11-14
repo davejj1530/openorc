@@ -219,8 +219,7 @@ export class Account implements HostedAccount {
   }
 
   #changed(change: SessionChange): void {
-    if (this.deps.session.state.signedIn) this.#signingIn.forget();
-    else {
+    if (!this.deps.session.state.signedIn) {
       // Before the session's own storage is cleared and before the server hears of it.
       this.#signIns.forget();
       this.#github.forget();

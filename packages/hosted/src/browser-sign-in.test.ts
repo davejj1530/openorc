@@ -74,10 +74,44 @@ describe("signing in through the browser", () => {
     const page = browser.opened[0]!;
     hosted.account.cancelSigningIn();
     expect(hosted.account.status()).toEqual({ state: "signed-out", signingIn: null, ended: false, error: null });
-    browser.back(stand.signInPage(page, ADA));
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await vi.waitFor(() => expect(stand.requests.some((request) => request.path === "/app-sign-in/cancel")).toBe(true));
+    expect(() => stand.signInPage(page, ADA)).toThrow("This sign-in can't be finished.");
     expect(stand.requests.some((request) => request.path === "/app-sign-in/finish")).toBe(false);
     expect(device.stored).toBeNull();
+  });
+
+  it("cancels a request whose start answer arrives after the person canceled", async () => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    let started = false;
+    const { hosted, browser } = await host({
+      fetch: async (input, init) => {
+        const response = await fetch(input, init);
+        if (new URL(String(input)).pathname === "/app-sign-in/start") {
+          started = true;
+          await held;
+        }
+        return response;
+      },
+    });
+    const opening = hosted.account.signIn();
+    await vi.waitFor(() => expect(started).toBe(true));
+    hosted.account.cancelSigningIn();
+    release();
+    await opening;
+    await vi.waitFor(() => expect(stand.requests.some((request) => request.path === "/app-sign-in/cancel")).toBe(true));
+    expect(browser.opened).toEqual([]);
+    expect(signingIn(hosted)).toBeNull();
+  });
+
+  it("does not wait for the server when cancellation cannot reach it", async () => {
+    const { hosted, browser } = await host();
+    await hosted.account.signIn();
+    await stand.down();
+    hosted.account.cancelSigningIn();
+    expect(signingIn(hosted)).toBeNull();
+    expect(browser.opened).toHaveLength(1);
+    await stand.up();
   });
 
   it("says so in words when the request ran out before the browser came back", async () => {
@@ -97,6 +131,7 @@ describe("signing in through the browser", () => {
     const { hosted } = await host({ browser: { awaitReturn: async () => ({ port: 40_001, query, close: () => undefined }), open: () => undefined } });
     await hosted.account.signIn();
     await vi.waitFor(() => expect(signingIn(hosted)).toEqual({ state: "failed", error: TIMED_OUT }));
+    await vi.waitFor(() => expect(stand.requests.some((request) => request.path === "/app-sign-in/cancel")).toBe(true));
   });
 
   it("says the server can't be reached, and asking again tries again", async () => {

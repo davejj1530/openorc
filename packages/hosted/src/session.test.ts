@@ -95,6 +95,34 @@ describe("the session", () => {
     await expect(made.request(ROUTES.billing)).rejects.toThrow("Sign in to OpenOrc first.");
   });
 
+  it("discards the session when sign-in is canceled while protected storage is saving", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    let wanted = true;
+    let saving = false;
+    const { session: made, seen } = session({
+      session: {
+        load: async () => null,
+        save: async (value) => {
+          saving = true;
+          await gate;
+          device.stored = value;
+        },
+      },
+    });
+    const token = await tokenFor(EMAIL);
+    const adopting = made.adopt(token, () => wanted);
+    await vi.waitFor(() => expect(saving).toBe(true));
+    wanted = false;
+    release();
+    await adopting;
+    expect(device.stored).toBeNull();
+    expect(made.state.signedIn).toBe(false);
+    expect(seen.sockets).toEqual([]);
+    await vi.waitFor(() => expect(stand.requests.some((request) => request.path === "/api/auth/sign-out")).toBe(true));
+    expect(await (await fetch(new URL("/api/auth/get-session", stand.url), { headers: { authorization: `Bearer ${token}` } })).json()).toBeNull();
+  });
+
   it("forgets the token on a 401, says the session ended, and closes the socket", async () => {
     const { session: made, seen } = session();
     await signedIn(made);

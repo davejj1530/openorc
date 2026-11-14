@@ -50,6 +50,7 @@ export class StandInAppSignIns {
       "POST /app-sign-in/start": () => this.#start(body),
       "POST /app-sign-in/approve": () => this.#approve(String(body["request"] ?? ""), String(body["email"] ?? "").toLowerCase(), String(body["otp"] ?? "")),
       "POST /app-sign-in/finish": () => this.#finish(String(body["request"] ?? ""), String(body["code"] ?? ""), String(body["verifier"] ?? "")),
+      "POST /app-sign-in/cancel": () => this.#cancel(String(body["request"] ?? ""), String(body["verifier"] ?? "")),
     };
     return routes[`${method} ${path}`]?.() ?? null;
   }
@@ -94,6 +95,14 @@ export class StandInAppSignIns {
     this.#requests.delete(id);
     if (createHash("sha256").update(verifier).digest("base64url") !== request.challenge) return refused(410, CANT_FINISH);
     return { status: 200, body: { token: this.server.session(request.approved.who) } };
+  }
+
+  #cancel(id: string, verifier: string): Reply {
+    const request = this.#live(id);
+    if (!request) return { status: 200, body: {} };
+    if (createHash("sha256").update(verifier).digest("base64url") !== request.challenge) return refused(410, CANT_FINISH);
+    this.#requests.delete(id);
+    return { status: 200, body: {} };
   }
 
   #live(id: string): Request | null {

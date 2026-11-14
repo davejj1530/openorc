@@ -82,12 +82,20 @@ export class BrowserSignInTrip {
         waiting.close();
         throw error;
       });
-      if (!live) return;
+      if (!live) return this.#cancel(start.request, verifier);
+      this.#stop = () => {
+        live = false;
+        waiting.close();
+        this.#cancel(start.request, verifier);
+      };
       this.#set({ state: "waiting", page: start.url });
       browser.open(start.url);
       void this.#finish(start.request, verifier, waiting.query, () => live);
     } catch (error) {
-      if (live) this.#settle(wordsOf(error));
+      if (live) {
+        this.#stop?.();
+        this.#settle(wordsOf(error));
+      }
     }
   }
 
@@ -98,12 +106,18 @@ export class BrowserSignInTrip {
       const code = back.get("code");
       if (back.get("request") !== request || !code) throw new Error(NOT_THIS);
       const { token } = await this.deps.session.anonymous(ROUTES.appSignInFinish, { request, code, verifier });
-      if (!live()) return;
-      await this.deps.session.adopt(token);
+      await this.deps.session.adopt(token, live);
       if (live()) this.#settle(null);
     } catch (error) {
-      if (live()) this.#settle(wordsOf(error));
+      if (live()) {
+        this.#stop?.();
+        this.#settle(wordsOf(error));
+      }
     }
+  }
+
+  #cancel(request: string, verifier: string): void {
+    void this.deps.session.anonymous(ROUTES.appSignInCancel, { request, verifier }).catch(() => undefined);
   }
 
   /** The trip is over: signed in (no words), or the words for why not. */

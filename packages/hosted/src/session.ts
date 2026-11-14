@@ -93,10 +93,15 @@ export class Session {
    * A sign-in the server just took: the session is saved to protected storage, then held, then the socket connects. If
    * saving fails nothing is held and this rejects, so the app is never signed in for one launch only.
    */
-  async begin(token: string, email: string): Promise<void> {
+  async begin(token: string, email: string, wanted: () => boolean = () => true): Promise<boolean> {
     await this.deps.session.save(JSON.stringify({ token, email }));
+    if (!wanted()) {
+      await this.deps.session.save(null);
+      return false;
+    }
     this.#ended = false;
     this.#hold({ token, email });
+    return true;
   }
 
   /** Signed out, by the person or by the server. Forgets the token in memory and storage and closes the socket. Idempotent. */
@@ -157,10 +162,17 @@ export class Session {
    * A token the server just gave this app: the server is asked with it who it is for, then it is begun. The token goes
    * to that request and to `begin`, and to nobody else.
    */
-  async adopt(token: string): Promise<void> {
-    const person = await this.#parse(ROUTES.person, await this.#send(ROUTES.person, undefined, token));
-    if (!person) throw new Refused(NOT_SIGNED_IN);
-    await this.begin(token, person.user.email);
+  async adopt(token: string, wanted: () => boolean = () => true): Promise<void> {
+    let kept = false;
+    try {
+      if (!wanted()) return;
+      const person = await this.#parse(ROUTES.person, await this.#send(ROUTES.person, undefined, token));
+      if (!person) throw new Refused(NOT_SIGNED_IN);
+      if (wanted()) kept = await this.begin(token, person.user.email, wanted);
+    } finally {
+      // A canceled trip or failed save must not leave its unused session on the server.
+      if (!kept) void this.#send(ROUTES.signOut, {}, token).catch(() => undefined);
+    }
   }
 
   /** Heard on sign-in, sign-out, every change of reach, and every new socket session. */

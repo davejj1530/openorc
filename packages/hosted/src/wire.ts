@@ -187,6 +187,8 @@ export const ROUTES = {
   appSignInStart: route("POST", "/app-sign-in/start", wireAppSignInStart),
   /** Trades the code the browser brought back, and the verifier, for the session's token; 410 in words once it is spent or ran out. */
   appSignInFinish: route("POST", "/app-sign-in/finish", wireAppSignInFinish),
+  /** Gives up a sign-in, proving ownership with the verifier; a missing request is already canceled. */
+  appSignInCancel: route("POST", "/app-sign-in/cancel", null),
   signOut: route("POST", "/api/auth/sign-out", null),
   billing: route("GET", "/billing", wireBilling),
   offers: route("GET", "/billing/offers", wireOffers),

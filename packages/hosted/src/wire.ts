@@ -7,6 +7,7 @@ import { z } from "zod";
 import { wireGithubChoose, wireGithubStatus } from "./wire-github.js";
 import { SPACE_ROUTES } from "./wire-spaces.js";
 import { wireOrganizationAccess } from "./organization-access-wire.js";
+import { wireCollaboration } from "./wire-collaboration.js";
 
 /** A route with the shape of its answer, so a reply is always parsed where it enters. Null: the body is not read. */
 export interface Route<T> {
@@ -117,6 +118,8 @@ export const wireThread = z.object({
   createdBy: z.string().nullable(),
   /** Who started the thread, as a teammate's list names them; null once their account is gone. */
   startedBy: z.object({ id: z.string(), name: z.string(), image: z.string().nullish() }).nullable().default(null),
+  /** Working together in the thread, as this reader sees it; absent from a server that predates it, or unreadable. */
+  collaboration: wireCollaboration.optional().catch(undefined),
   createdAt: iso,
   lastActivityAt: iso,
 });
@@ -128,8 +131,11 @@ export const wireThreadList = z.object({ threads: z.array(wireThread) });
 export const wireThreadDetail = wireThread.extend({ turnEnds: z.array(z.number().int().positive()) });
 export type WireThreadDetail = z.infer<typeof wireThreadDetail>;
 
-/** One line of a thread's log. `event` is checked against the app's own events where it is translated. */
-export const wireEvent = z.object({ seq: z.number().int().positive(), by: z.string().nullable().optional(), event: z.record(z.string(), z.unknown()) });
+/**
+ * One line of a thread's log. `event` is checked against the app's own events where it is translated. `turnId`: the turn
+ * it belongs to; `by`: the person who caused it, null for the agent's own.
+ */
+export const wireEvent = z.object({ seq: z.number().int().positive(), turnId: z.string().nullable().optional(), by: z.string().nullable().optional(), event: z.record(z.string(), z.unknown()) });
 export type WireEvent = z.infer<typeof wireEvent>;
 
 export const wireEvents = z.object({ events: z.array(wireEvent), head: seq, fromTurn: seq.optional() });

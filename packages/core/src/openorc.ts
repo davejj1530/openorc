@@ -13,6 +13,7 @@ import { FrameCoalescer } from "./frames.js";
 import { createHostedHandlers } from "./handlers/hosted.js";
 import { hostedFilesFor, type HostedFiles } from "./services/hosted-files.js";
 import { hostedParityHandlers } from "./handlers/hosted-parity.js";
+import { threadCollaborationHandlers } from "./handlers/thread-collaboration.js";
 import { createAttachmentsHandlers } from "./handlers/attachments.js";
 import { createBenchHandlers } from "./handlers/bench.js";
 import { createCatalogHandlers } from "./handlers/catalog.js";
@@ -735,6 +736,7 @@ export class OpenOrc {
       createClaudeAccountHandlers(this.claudeAccounts),
       createHostedHandlers(this.account, this.hostedFiles),
       hostedParityHandlers,
+      threadCollaborationHandlers,
       createUsageHandlers({ db: this.db, ledger: this.ledger }),
       createConnectorHandlers({ db: this.db, connectors: this.connectors }),
       createBrainSyncHandlers({ db: this.db, memory: this.memory, textGeneration: this.textGeneration, cloudOnly: this.options.cloudOnly ?? false, invalidate }),

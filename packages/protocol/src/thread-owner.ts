@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ThreadCollaboration } from "./thread-collaboration.js";
 
 /**
  * Where a thread lives: this Mac, the person's own cloud brain, or OpenOrc Cloud. Every thread has exactly one. Only the
@@ -30,6 +31,8 @@ export const ThreadOwner = z.object({
   project: z.object({ name: z.string() }).optional(),
   /** Desktop only: who started a thread someone else shares with the person, by name. */
   startedBy: z.object({ name: z.string(), image: z.string().nullable() }).optional(),
+  /** Desktop only: an OpenOrc Cloud thread's collaboration as its reader's list last heard it; absent from an older server. */
+  collaboration: ThreadCollaboration.optional(),
 });
 export type ThreadOwner = z.infer<typeof ThreadOwner>;
 

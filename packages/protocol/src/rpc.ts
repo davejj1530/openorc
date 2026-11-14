@@ -1,10 +1,12 @@
 import { z } from "zod";
 import { organizationBillingRpcParams, type OrganizationBillingRpcResults } from "./organization-billing.js";
+import { organizationStorageRpcParams, type OrganizationStorageRpcResults } from "./organization-storage.js";
 import { hostedFilesRpcParams, type HostedFilesRpcResults } from "./hosted-files.js";
 import { teamChatRpcParams, type TeamChatRpcResults } from "./team-chat.js";
 import { onlineTaskRpcParams, type OnlineTaskRpcResults } from "./online-tasks.js";
 import { onlineTaskExecutionRpcParams, type OnlineTaskExecutionRpcResults } from "./online-task-execution.js";
 import { hostedParityRpcParams, type HostedParityRpcResults } from "./hosted-parity.js";
+import { threadCollaborationRpcParams, type ThreadCollaborationRpcResults } from "./thread-collaboration.js";
 import { UsageHistoryParams } from "./usage-history.js";
 import { ProjectActivityParams } from "./project-activity.js";
 import type { AgentUpdates } from "./agent-updates.js";
@@ -85,10 +87,12 @@ export const rpcParams = {
   ...threadSendRpcParams,
   ...hostedFilesRpcParams,
   ...organizationBillingRpcParams,
+  ...organizationStorageRpcParams,
   ...teamChatRpcParams,
   ...onlineTaskRpcParams,
   ...onlineTaskExecutionRpcParams,
   ...hostedParityRpcParams,
+  ...threadCollaborationRpcParams,
   ...accountRpcParams,
   ...spacesRpcParams,
   ...organizationInvitationParams,
@@ -565,10 +569,12 @@ export interface RpcResults
   extends
     HostedFilesRpcResults,
     OrganizationBillingRpcResults,
+    OrganizationStorageRpcResults,
     TeamChatRpcResults,
     OnlineTaskRpcResults,
     OnlineTaskExecutionRpcResults,
     HostedParityRpcResults,
+    ThreadCollaborationRpcResults,
     PullRequestRpcResults,
     OrclingRpcResults,
     ProjectRpcResults,

@@ -44,6 +44,8 @@ import { nativeRowFields } from "./wire-subthreads.js";
 import { readNativeRows } from "./subthreads.js";
 import { nativeRowsFromEvents, withNativeSummary } from "./translate-subthreads.js";
 import { assertNativeCall } from "./subthread-calls.js";
+import { ThreadVoices } from "./thread-voices.js";
+import { toCollaboration } from "./wire-collaboration.js";
 
 const GONE = "That conversation isn't on OpenOrc Cloud.";
 
@@ -93,6 +95,8 @@ export class Threads implements HostedThreads {
   readonly readied = new Map<string, number>();
   /** What the writes in sends.ts work with. */
   readonly calls: sends.Calls;
+  /** Who sent each turn and wrote each message of the threads read: collaboration.ts. */
+  readonly voices = new ThreadVoices();
 
   constructor(private readonly deps: ThreadsDeps) {
     this.#cache = new AccountCache({ kept: deps.kept, part: "threads", server: deps.server, schema: keptThreads });
@@ -111,6 +115,7 @@ export class Threads implements HostedThreads {
       const topics = wireTopics.safeParse(body);
       if (topics.success && topics.data.topics.some((topic) => topic === "threads" || topic === "projects" || topic === "members" || topic === "spaces")) {
         if (topics.data.topics.some((topic) => topic === "projects" || topic === "members" || topic === "spaces")) this.#revision++;
+        if (topics.data.topics.includes("members")) this.voices.renamed();
         void this.refresh();
       }
     });
@@ -208,6 +213,7 @@ export class Threads implements HostedThreads {
       heard.rows = heard.rows.filter((row) => row.id !== threadId);
       this.#tickets.delete(threadId);
       this.deps.follower.forget([threadId]);
+      this.voices.forget([threadId]);
       delete heard.here[threadId];
       this.#save();
       this.#tell();
@@ -345,6 +351,7 @@ export class Threads implements HostedThreads {
 
   /** Register cloud ownership before a child card can be opened from a stored or live page. */
   observed(threadId: string, events: readonly WireEvent[]): void {
+    if (this.voices.observe(threadId, events)) this.deps.push({ type: "invalidate", keys: [`authors:${threadId}`] });
     const heard = this.#heard;
     const parent = heard?.rows.find((row) => row.id === threadId);
     if (!heard || !parent) return;
@@ -447,6 +454,7 @@ export class Threads implements HostedThreads {
       if (this.#heard) delete this.#heard.here[id];
     }
     this.deps.follower.forget(removed);
+    this.voices.forget(removed);
   }
 
   /** Every space's threads and projects, each tagged with its space, and the person's own id from their personal space. */
@@ -521,6 +529,7 @@ export class Threads implements HostedThreads {
   #changed(change: SessionChange): void {
     if (this.#generation !== this.deps.session.generation) {
       this.#names.clear();
+      this.voices.forget();
       this.#generation = this.deps.session.generation;
       this.#reading = null;
       this.#again = null;
@@ -593,6 +602,7 @@ export class Threads implements HostedThreads {
           reach: state.reach,
           heardAt: heard.heardAt,
           startedBy: starterOf(row, heard.me),
+          collaboration: row.collaboration ? toCollaboration(row.collaboration) : null,
           now: this.deps.now(),
         });
         const native = withNativeSummary(summary, row);

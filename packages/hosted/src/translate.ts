@@ -18,6 +18,7 @@ import {
   type Run,
   type RpcParams,
   type ThreadActivity,
+  type ThreadCollaboration,
   type ThreadSummary,
 } from "@openorc/protocol";
 import type { WireBilling, WireOffers, WireEvent, WireHostedSettings, WireProject, WireSignIn, WireThread } from "./wire.js";
@@ -87,6 +88,8 @@ export function toImage(image: string | null | undefined): string | null {
  *   a thread lives in one of several spaces   no spaces                            threads.ts keeps each row's space and
  *                                                                                   asks about a thread in it
  *   startedBy: whoever started the thread     owner.startedBy: a teammate only     starterOf
+ *   collaboration: the reader's view of who   owner.collaboration                  wire-collaboration.ts
+ *   writes, sends, asks and waits
  */
 
 /** What stands in the transcript for an event this build cannot read, so nothing in the log is hidden without a word. */
@@ -105,6 +108,8 @@ export interface RowContext {
   heardAt: number;
   /** Who started a thread a teammate shares with the person; null for the person's own. */
   startedBy: { name: string; image: string | null } | null;
+  /** Working together in the thread, as the server tells this reader; null from a server that predates it. */
+  collaboration: ThreadCollaboration | null;
   /** Now, so a snooze that ran out reads as none, as this Mac's own snoozes wake. */
   now: number;
 }
@@ -218,6 +223,7 @@ export function toSummary(row: WireThread, context: RowContext): ThreadSummary {
       heardAt: context.heardAt,
       ...(context.orphanOf !== null && { project: { name: context.orphanOf } }),
       ...(context.startedBy && { startedBy: context.startedBy }),
+      ...(context.collaboration && { collaboration: context.collaboration }),
     },
   };
 }

@@ -119,14 +119,14 @@ function PlanRow({ account, offers, move, ...controls }: { account: SignedIn; of
 function PaymentAction({ move, page, waiting, opening, onOpen }: { move: BillingMove; page: BillingPage; waiting: boolean } & PaymentControls) {
   const leave = useRpcMutation("account.billing.leave");
   return (
-    <>
+    <span className="inline-flex shrink-0 items-center gap-2">
       {waiting ? (
         <TextButton tone="muted" disabled={leave.isPending} onClick={() => leave.mutate({})}>
           Stop waiting
         </TextButton>
       ) : null}
       <BillingButton move={waiting ? { ...move, label: "Open again", blocked: null } : move} pending={opening} onClick={() => onOpen(page)} />
-    </>
+    </span>
   );
 }
 

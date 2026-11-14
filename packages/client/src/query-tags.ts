@@ -168,6 +168,9 @@ const idReadTags: MethodRules = {
   // Only the conversation's own sends and turns change what was said last, so other threads' activity leaves it be.
   "threads.lastMessage": (p) => [`thread:${String(p["id"])}`],
   "threads.checkpoints": (p) => [`checkpoints:${String(p["id"])}`],
+  "teamChat.state": (p) => ["team-chat", `team-chat:${String(p["spaceId"])}`],
+  "teamChat.timeline": (p) => ["team-chat", `team-chat:${String(p["spaceId"])}`, `team-chat:${String(p["spaceId"])}:${String(p["conversationId"])}`],
+  ...each(["hosted.review.changes", "hosted.review.turn", "hosted.review.file", "hosted.review.state"], (p) => ["threads", `thread:${String(p["threadId"])}`, `threaddiff:${String(p["threadId"])}`]),
   "threads.importable": (p) => ["threads", `importable:${String(p["projectId"])}`],
   "runs.listForThread": (p) => [`runs:thread:${String(p["threadId"])}`],
   // The phone's list and single-file reads of the same changes refresh with the full diff.

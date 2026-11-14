@@ -1,15 +1,16 @@
 import { useState } from "react";
 import type { OrganizationIdentity } from "@openorc/protocol";
-import { OrganizationMark } from "../components/OrganizationMark";
 import { TopBar } from "../components/TopBar";
 import { Button } from "../components/ui";
 import { OrganizationIdentityDialog } from "../dialogs/OrganizationIdentityDialog";
 import { OrganizationMembershipDialog, type MembershipAction } from "../dialogs/OrganizationMembershipDialog";
-import { useRpc } from "../lib/client";
+import { cn } from "../lib/cn";
 import { useOrganizationPeople } from "../lib/organization-people";
+import { ORGANIZATION_SEATS_ENABLED, useOrganizationSection } from "../lib/organization-section";
 import { OrganizationMoreMenu } from "./OrganizationMenus";
-import { OrganizationPeopleRow } from "./OrganizationPeopleRow";
-import { OrganizationInvitations } from "./OrganizationInvitations";
+import { OrganizationPeopleContent, OrganizationPeopleHeading } from "./OrganizationPeopleContent";
+import { OrganizationSections } from "./OrganizationSections";
+import { OrganizationSeatsPage } from "./OrganizationSeatsPage";
 import "./pages.css";
 import "./organization-people.css";
 
@@ -23,11 +24,11 @@ interface Props {
 /** People occupies the work column without adding or discarding conversation tabs. */
 export function OrganizationPeople({ spaceId, onInvite, onLeft }: Props) {
   const people = useOrganizationPeople(spaceId);
-  const projects = useRpc("spaces.projects", { spaceId });
   const [dialog, setDialog] = useState<{ action: Action; trigger: HTMLButtonElement | null } | null>(null);
   const data = people.data;
   const admin = data?.viewer.role === "admin";
-  const projectCount = projects.data && !projects.error ? new Set(projects.data.map((project) => project.hostedProjectId ?? project.key)).size : undefined;
+  const sections = Boolean(admin && ORGANIZATION_SEATS_ENABLED);
+  const section = useOrganizationSection(spaceId, sections);
   const open = (action: Action, trigger: HTMLButtonElement | null) => setDialog({ action, trigger });
   const close = () => {
     const trigger = dialog?.trigger;
@@ -36,50 +37,30 @@ export function OrganizationPeople({ spaceId, onInvite, onLeft }: Props) {
       if (trigger?.isConnected) trigger.focus();
     });
   };
+  const roster = data ? (
+    <OrganizationPeopleContent
+      people={data}
+      spaceId={spaceId}
+      editable={Boolean(admin && !people.error)}
+      refresh={people.refetch}
+      remove={(person, trigger) => open({ kind: "remove", organization: data.organization, person }, trigger)}
+    />
+  ) : null;
   return (
     <>
-      <TopBar>People</TopBar>
-      <div className="page-column list-page people-column">
+      <TopBar>{section.section === "seats" ? "Seats" : "People"}</TopBar>
+      <div className={cn("page-column list-page people-column", sections && "seats-column")}>
         {data ? (
           <>
-            <div className="people-heading">
-              <OrganizationMark name={data.organization.name} logo={data.organization.logo} size={44} />
-              <div className="people-identity">
-                <h1>{data.organization.name}</h1>
-                <p>
-                  {data.total} {data.total === 1 ? "person" : "people"}
-                  {projectCount !== undefined ? ` · ${projectCount} project${projectCount === 1 ? "" : "s"}` : ""}
-                </p>
-              </div>
-              {admin ? (
+            <OrganizationPeopleHeading people={data}>
+              {admin && section.section === "people" ? (
                 <Button variant="primary" size="lg" disabled={Boolean(people.error)} onClick={onInvite}>
                   Invite people
                 </Button>
               ) : null}
               <OrganizationMoreMenu people={data} disabled={Boolean(people.error)} onAction={(kind, trigger) => open({ kind, organization: data.organization }, trigger)} />
-            </div>
-            <div role="table" aria-label="People" className="people-roster">
-              <div role="row" className="people-grid people-head">
-                <span role="columnheader">Name</span>
-                <span role="columnheader">Plan</span>
-                <span role="columnheader">Role</span>
-                <span role="columnheader" aria-label="Actions" />
-              </div>
-              <div role="rowgroup">
-                {data.members.map((person) => (
-                  <OrganizationPeopleRow
-                    key={person.memberId}
-                    person={person}
-                    spaceId={spaceId}
-                    self={person.memberId === data.viewer.memberId}
-                    editable={Boolean(admin && !people.error && (person.memberId !== data.viewer.memberId || data.adminCount > 1))}
-                    onChanged={people.refetch}
-                    onRemove={(person, trigger) => open({ kind: "remove", organization: data.organization, person }, trigger)}
-                  />
-                ))}
-              </div>
-            </div>
-            {admin ? <OrganizationInvitations spaceId={spaceId} /> : null}
+            </OrganizationPeopleHeading>
+            {sections ? <OrganizationSections {...section}>{section.section === "seats" ? <OrganizationSeatsPage spaceId={spaceId} /> : roster}</OrganizationSections> : roster}
           </>
         ) : null}
         {people.loading ? <p className="people-read-state text-sm text-ink-3">Loading people…</p> : null}

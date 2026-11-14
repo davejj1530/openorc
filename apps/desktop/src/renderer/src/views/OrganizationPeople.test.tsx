@@ -80,7 +80,7 @@ it("shows the same Plan column to members without admin controls or an empty inv
   expect(screen.queryByRole("button", { name: "Invite people" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Role for Mira Chen" })).toBeNull();
   expect(screen.queryByText("Invitations")).toBeNull();
-  expect(screen.getByText("3 people · 1 project")).toBeTruthy();
+  expect(await screen.findByText("3 people · 1 project")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "More for Birch Studio" }));
   await screen.findByRole("menuitem", { name: "Leave organization…" });
   expect(screen.queryByRole("menuitem", { name: "Edit organization…" })).toBeNull();

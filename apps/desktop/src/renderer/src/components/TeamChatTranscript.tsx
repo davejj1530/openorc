@@ -3,6 +3,7 @@ import { stretchTime } from "@openorc/client";
 import type { PendingTeamMessage, TeamChatPerson, TeamChatReaction, TeamMessage } from "@openorc/protocol";
 import { cn } from "../lib/cn";
 import { teamChatGroups } from "../lib/team-chat-groups";
+import { useTeamChatVisible } from "../lib/team-chat-visibility";
 import { AccountFace } from "./AccountFace";
 import { TeamChatMessage } from "./TeamChatMessage";
 import { Tooltip } from "./ui";
@@ -21,16 +22,17 @@ export interface TeamChatTranscriptProps {
   onRetry(message: PendingTeamMessage): void;
 }
 export function TeamChatTranscript(props: TeamChatTranscriptProps) {
+  const visible = useTeamChatVisible();
   const viewport = useRef<HTMLDivElement>(null);
   const pinned = useRef(true);
   const previous = useRef({ height: 0, first: "" });
   useLayoutEffect(() => {
     const element = viewport.current;
-    if (!element) return;
+    if (!element || !visible) return;
     if (pinned.current) element.scrollTop = element.scrollHeight;
     else if (previous.current.first !== props.messages[0]?.id) element.scrollTop += element.scrollHeight - previous.current.height;
     previous.current = { height: element.scrollHeight, first: props.messages[0]?.id ?? "" };
-  }, [props.messages, props.pending]);
+  }, [visible, props.messages, props.pending]);
   const groups = teamChatGroups(props.messages);
   const sent = new Set(props.messages.map((message) => message.id));
   return (
@@ -38,6 +40,7 @@ export function TeamChatTranscript(props: TeamChatTranscriptProps) {
       ref={viewport}
       className="team-chat-scroll"
       onScroll={(event) => {
+        if (!visible) return;
         const el = event.currentTarget;
         pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
       }}

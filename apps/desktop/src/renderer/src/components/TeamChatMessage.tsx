@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ContextMenu } from "@base-ui/react/context-menu";
 import type { TeamChatPerson, TeamChatReaction, TeamMessage } from "@openorc/protocol";
 import { cn } from "../lib/cn";
+import { useTeamChatVisible } from "../lib/team-chat-visibility";
 import { CoversPreview } from "../lib/browser-preview";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { Copy, SmilePlus } from "./icons";
@@ -24,8 +25,16 @@ export function TeamChatMessage({
   onReact(emoji: TeamChatReaction): void;
 }) {
   const [open, setOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const visible = useTeamChatVisible();
   const [copyError, setCopyError] = useState(false);
   const row = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!visible) {
+      setOpen(false);
+      setMenuOpen(false);
+    }
+  }, [visible]);
   useEffect(() => {
     if (!open) return;
     const outside = (event: PointerEvent) => {
@@ -43,7 +52,7 @@ export function TeamChatMessage({
   };
   return (
     <div ref={row} className={cn("orcling-bubble-row team-chat-message", mine && "team-chat-message-mine")} data-open={(open && !reason) || undefined} data-message-id={message.id}>
-      <ContextMenu.Root>
+      <ContextMenu.Root open={menuOpen && visible} onOpenChange={setMenuOpen}>
         <ContextMenu.Trigger className={cn("orcling-bubble", mine && "message-bubble")} tabIndex={0} aria-label={`${message.actor.person?.name ?? "Former member"}: ${message.body}`}>
           <div className="text-prose text-ink prose-chat">
             <ThreadRichText mode="static">{message.body}</ThreadRichText>

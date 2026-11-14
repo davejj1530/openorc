@@ -10,13 +10,15 @@ import { TopBar } from "../components/TopBar";
 import { ThreadTabs } from "../components/ThreadTabs";
 import { TeamChat } from "../components/TeamChat";
 import { CoversPreview } from "../lib/browser-preview";
+import { useTeamChatVisible } from "../lib/team-chat-visibility";
 
 export function TeamChatView({ target }: { target: TeamChatRoute }) {
   const scope = useTeamChatContext();
+  const visible = useTeamChatVisible();
   const allowed = scope && target.accountId === scope.accountId && target.spaceId === scope.spaceId && scope.current();
   return (
     <>
-      <CoversPreview />
+      {visible ? <CoversPreview /> : null}
       {allowed ? <AuthorizedChat key={JSON.stringify([target, scope.generation])} scope={scope} target={target} /> : <ChatUnavailable />}
     </>
   );

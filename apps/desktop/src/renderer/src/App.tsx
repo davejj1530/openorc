@@ -32,7 +32,7 @@ import { Scheduled } from "./views/Scheduled";
 import { Settings } from "./views/Settings";
 import { AgentUpdateNotice } from "./views/settings-agent-updates";
 import { TaskListView } from "./views/TaskList";
-import { TeamChatView } from "./views/TeamChatView";
+import { RetainedTeamChat } from "./components/RetainedTeamChat";
 
 // The diagnostics screen and its benchmark controls ship only in development and QA builds.
 const Diagnostics = __OPENORC_QA__ ? lazy(() => import("./views/Diagnostics").then((m) => ({ default: m.Diagnostics }))) : null;
@@ -80,7 +80,7 @@ function DesktopApp() {
       <div key={home} className="work-row flex-1 min-w-0 h-full flex" data-chat={route.view === "team-chat" || undefined}>
         {workRoute ? <StartScreen route={workRoute} /> : null}
         {workRoute?.view === "thread" ? <ThreadWorkspace /> : null}
-        {route.view === "team-chat" ? <TeamChatView target={route} /> : null}
+        <RetainedTeamChat route={route} />
         {route.view === "task" ? (
           <Suspense
             fallback={

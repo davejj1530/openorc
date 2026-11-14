@@ -1,3 +1,6 @@
+.work-row:not([data-chat="true"]) > .team-chat {
+  display: none;
+}
 .work-row[data-chat="true"] > :not(.team-chat) {
   display: none;
 }
@@ -174,6 +177,7 @@ body:has(.sidebar-shell[data-open="true"]) .work-row[data-chat="true"] > .team-c
 }
 .team-chat-compose {
   flex-shrink: 0;
+  padding-bottom: 24px;
 }
 .team-chat-send-error {
   display: flex;

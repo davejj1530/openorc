@@ -4,6 +4,7 @@ import { WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 import { ThreadRow } from "./ThreadLibraryRow";
 import { TipLayer } from "./TipLayer";
 import { TooltipProvider } from "./ui";
+import { useRouter } from "../lib/router";
 
 vi.mock("../lib/browser-preview", () => ({ CoversPreview: () => null }));
 vi.mock("../lib/client", () => ({ useRpc: () => ({ data: { defaultWorkspaceMode: "current" } }) }));
@@ -30,6 +31,18 @@ const subagent = {
   parentRelation: "subagent",
   subagent: { status: "running", agentType: "reviewer", toolCallId: null, startedAt: Date.now() - 72_000, endedAt: null, stoppable: true },
 } as unknown as ThreadSummary;
+
+it("does not mark a retained work pane as selected while chat is open", () => {
+  const before = useRouter.getState();
+  try {
+    useRouter.setState({ route: { view: "team-chat", accountId: "account", spaceId: "space", conversationId: "chat" }, threadIds: [subagent.id] });
+    render(<ThreadRow thread={subagent} active={false} />);
+    const row = screen.getByText(subagent.title).closest("button");
+    expect(row?.getAttribute("data-open")).toBeNull();
+  } finally {
+    useRouter.setState(before);
+  }
+});
 
 it("moves a running subagent's elapsed time to its hover and spoken facts while retaining its type", () => {
   render(

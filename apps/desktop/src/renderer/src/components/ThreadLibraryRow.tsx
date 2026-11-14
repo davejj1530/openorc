@@ -25,8 +25,8 @@ type ThreadRowProps = { thread: ThreadSummary; subthreads?: ThreadStatus | null;
 export function ThreadRow({ thread, subthreads = null, active, project, compact = false }: ThreadRowProps) {
   const navigate = useRouter((s) => s.navigate);
   const addPane = useRouter((s) => s.addThreadPane);
-  // Every thread open in a pane is marked alike; aria-current names only the focused one.
-  const open = useRouter((s) => s.threadIds.includes(thread.id)) || active;
+  // Every visible work pane is marked alike; aria-current names only the focused one.
+  const open = useRouter((s) => s.route.view !== "team-chat" && s.threadIds.includes(thread.id)) || active;
   const status = threadTreeStatus(threadStatus(thread), subthreads);
   const facts = rowFacts(thread, { now: useSidebarNow(), project: project?.name });
   const child = thread.subagent;

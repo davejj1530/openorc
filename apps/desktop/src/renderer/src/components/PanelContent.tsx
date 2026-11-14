@@ -11,6 +11,7 @@ import { TaskDetailsPanel } from "../panels/TaskDetailsPanel";
 import { ThreadTasksPanel } from "../panels/ThreadTasksPanel";
 import { FileExplorer } from "../panels/FileExplorer";
 import { panelDirectory, panelFileScope, panelScope, terminalId, type PanelContext } from "./panel-tools";
+import { hostedUnavailablePanel } from "./HostedUnavailablePanel";
 
 const ConversationPlan = lazy(() => import("./ConversationPlan").then((m) => ({ default: m.ConversationPlan })));
 const SavedChangesPanel = lazy(() => import("../panels/SavedChangesPanel").then((m) => ({ default: m.SavedChangesPanel })));
@@ -64,6 +65,8 @@ function ThreadContent({ context, tool }: { context: Extract<PanelContext, { kin
 type ContentProps = { context: PanelContext; page: PanelPage; onNavigate: (page: PanelPage) => void };
 
 export function PanelContent({ context, page, onNavigate }: ContentProps) {
+  const unavailable = hostedUnavailablePanel(context, page);
+  if (unavailable) return unavailable;
   if (page.kind === "file") return <FileContent context={context} page={page} onNavigate={onNavigate} />;
   if (page.kind === "changes") return <ChangesContent context={context} page={page} onNavigate={onNavigate} />;
   if (page.kind !== "tool") return null;

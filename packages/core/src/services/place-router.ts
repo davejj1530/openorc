@@ -17,6 +17,7 @@ import type { HostedSpaces, HostedThreads } from "@openorc/hosted";
 import { mergeThreadPages, ownerRoute, rpcParams, type RoutedMethod, type RpcMethod, type RpcParams, type RpcRequest, type ThreadSummary } from "@openorc/protocol";
 import type { RpcReply } from "../transport.js";
 import { SpaceRequests } from "./space-requests.js";
+import { heldHereCall } from "./hosted-call-guard.js";
 
 export interface PlaceRouterDeps {
   /** The place, or null while there is none (no account server). */
@@ -56,6 +57,7 @@ export class PlaceRouter {
     const route = ownerRoute(method);
     if (!route) return this.deps.next(request);
     const ask = () => this.asked(place, request, method as RoutedMethod, params);
+    if (route.by === "here" && heldHereCall(place, method, params)) return ask();
     switch (route.by) {
       case "owner":
       case "owner-only": {

@@ -108,7 +108,7 @@ it("leaves out the place for this Mac when the cloud has no move for the thread"
 it("pins, snoozes, resolves and deletes an OpenOrc Cloud row like any row, and takes none of it while it can't be reached", () => {
   open({ owner: { brain: "hosted", reach: "live", heardAt: 1 } });
   // OpenOrc Cloud starts no thread under another.
-  expect(screen.queryByText("New subthread")).toBeNull();
+  expect(screen.getByText("New subthread").closest("[role=menuitem]")?.getAttribute("aria-disabled")).toBe("true");
   fireEvent.click(screen.getByText("Pin"));
   expect(mutations.get("threads.update")).toHaveBeenLastCalledWith({ id: "t1", patch: { pinned: true } });
   cleanup();

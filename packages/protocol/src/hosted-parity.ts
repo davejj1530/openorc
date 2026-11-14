@@ -1,6 +1,53 @@
 import { z } from "zod";
 import { FileChange } from "./domain.js";
 
+/** Hosted controls use these reasons only when their operation is unavailable. */
+export const HOSTED_REASONS = {
+  toolOutput: "The full tool output isn't available for this cloud thread.",
+  plans: "Saved plans aren't available in this cloud thread yet.",
+  compact: "Manual compaction isn't available for this cloud thread yet.",
+  fork: "Forking a cloud thread isn't available yet.",
+  checkpoints: "Restoring a cloud checkpoint isn't available yet.",
+  commitHistory: "Commit history isn't available in this cloud thread yet.",
+  comments: "Review comments aren't available in this cloud thread yet.",
+  fileBrowser: "Browsing this cloud workspace's files isn't available yet.",
+  instructions: "Editing this cloud workspace's instructions isn't available yet.",
+  previewServer: "Previewing a server in this cloud workspace isn't available yet.",
+  memory: "Memory isn't available in this cloud thread yet.",
+  usage: "This cloud thread doesn't report this information yet.",
+  search: "Searching this cloud thread's full history isn't available yet.",
+  reactions: "Reactions aren't available in this cloud thread yet.",
+  speed: "This speed setting isn't available for this cloud agent.",
+  claudeAccount: "This cloud turn uses your Claude sign-in in Account.",
+  personSubthreads: "Creating a subthread isn't available in this cloud thread yet.",
+  tasks: "Tasks aren't available in this cloud thread yet.",
+  terminal: "A terminal isn't available in this cloud thread yet.",
+  moveToMac: "Moving this conversation to your Mac isn't available yet.",
+} as const;
+export type HostedUnavailableControl = keyof typeof HOSTED_REASONS;
+
+export const HostedAvailability = z.discriminatedUnion("available", [z.object({ available: z.literal(true) }), z.object({ available: z.literal(false), reason: z.string().min(1) })]);
+export type HostedAvailability = z.infer<typeof HostedAvailability>;
+const availability = HostedAvailability.optional();
+export const HostedCapabilities = z.object({
+  version: z.literal(1),
+  features: z.object({
+    changes: availability,
+    publishing: availability,
+    files: availability,
+    nativeSubthreads: availability,
+    personSubthreads: availability,
+    tasks: availability,
+    skills: availability,
+    macCode: availability,
+    terminal: availability,
+    workKeeping: availability,
+    httpsConnectors: availability,
+  }),
+});
+export type HostedCapabilities = z.infer<typeof HostedCapabilities>;
+export type HostedFeature = keyof HostedCapabilities["features"];
+
 const count = z.number().int().nonnegative();
 const body = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("text"), insertions: count, deletions: count }),
@@ -89,6 +136,7 @@ export type HostedActionRequest = z.infer<typeof HostedActionRequest>;
 
 /** Requested by desktop windows only. These facts never enter hellos or the agent event stream. */
 export const hostedParityRpcParams = {
+  "hosted.capabilities": z.object({ threadId: z.string() }).strict(),
   "hosted.review.changes": z.object({ threadId: z.string() }).strict(),
   "hosted.review.turn": z.object({ threadId: z.string(), turnId: z.string() }).strict(),
   "hosted.review.file": z.object({ threadId: z.string(), turnId: z.string().optional(), path: z.string().min(1).max(4096) }).strict(),
@@ -96,6 +144,7 @@ export const hostedParityRpcParams = {
   "hosted.review.action": z.object({ threadId: z.string(), action: HostedActionRequest }).strict(),
 };
 export interface HostedParityRpcResults {
+  "hosted.capabilities": HostedCapabilities;
   "hosted.review.changes": HostedThreadChanges;
   "hosted.review.turn": HostedTurnChanges;
   "hosted.review.file": HostedFileDiff;

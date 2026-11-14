@@ -36,7 +36,8 @@ export function tabsFor(context: PanelToolContext): PanelTool[] {
       ? ["terminal", "file", "tasks", "plan", "memory", "instructions"]
       : ["changes", "terminal", "file", "plan", "tasks", "checkpoints", "commits", "memory", "instructions"];
   // A thread held elsewhere has no folder on this Mac: its terminal and files would be this Mac's checkout.
-  if (placeOf(context.thread).elsewhere && !context.thread.owner?.mirror) return tools.filter((tool) => tool !== "terminal" && tool !== "file" && tool !== "instructions");
+  if (placeOf(context.thread).elsewhere && context.thread.owner?.brain !== "hosted" && !context.thread.owner?.mirror)
+    return tools.filter((tool) => tool !== "terminal" && tool !== "file" && tool !== "instructions");
   if (isDetachedCopy(context.thread)) tools.splice(tools.indexOf("commits"), tools.includes("commits") ? 1 : 0);
   if (context.thread.orclingId) tools.push("orcling");
   return tools;

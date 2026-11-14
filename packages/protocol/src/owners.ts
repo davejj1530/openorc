@@ -77,6 +77,7 @@ export const OWNER_ROUTES: { [M in RoutedMethod]: OwnerRoute<M> } & { [M in Excl
   "tasks.online.activity": here,
   "tasks.online.context": here,
   "hosted.review.changes": byThreadId,
+  "hosted.capabilities": byThreadId,
   "hosted.review.turn": byThreadId,
   "hosted.review.file": byThreadId,
   "hosted.review.state": byThreadId,

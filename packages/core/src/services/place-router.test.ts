@@ -71,7 +71,7 @@ describe("OpenOrc Cloud threads in the window's calls", () => {
     expect(rows.find((row) => row.title === "On this Mac")?.owner).toBeUndefined();
     expect(await call("threads.get", { id: hosted })).toMatchObject({ id: hosted, title: "Retry the cloud start" });
     expect(await call("runs.listForThread", { threadId: hosted })).toMatchObject([{ id: `hosted:${hosted}`, state: "running" }]);
-    await expect(call("threads.fork", { id: hosted })).rejects.toThrow("This isn't on OpenOrc Cloud yet.");
+    await expect(call("threads.fork", { id: hosted })).rejects.toThrow("Forking a cloud thread isn't available yet.");
   });
 
   it("counts the quiet ones in Resolved beside this Mac's, so the count and the drawer agree", async () => {

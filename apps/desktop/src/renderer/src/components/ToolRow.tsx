@@ -6,6 +6,7 @@ import { ChevronRight, CircleCheck, Loader2, Terminal, X } from "./icons";
 import { toolIcons } from "./tool-icons";
 import { ToolDetail } from "./ToolDetail";
 import { SubagentCards } from "./SubagentCards";
+import { HostedToolOutput, hostedOutputUnavailable } from "./HostedToolOutput";
 
 const McpAppResult = lazy(() => import("./McpAppResult"));
 const VisualizationResult = lazy(() => import("./VisualizationResult"));
@@ -17,8 +18,9 @@ function useToolOutput(block: ToolBlock, open: boolean): unknown {
   const [loaded, setLoaded] = useState<{ id: string; output: unknown } | null>(null);
   const { outputOmitted, runId, id } = block;
   const have = loaded?.id === id;
+  const unavailable = hostedOutputUnavailable(block);
   useEffect(() => {
-    if (!open || !outputOmitted || !runId || have) return;
+    if (!open || !outputOmitted || !runId || have || unavailable) return;
     let current = true;
     core.call("events.toolOutput", { runId, toolCallId: id }).then(
       (result) => current && setLoaded({ id, output: result.output ?? undefined }),
@@ -27,7 +29,7 @@ function useToolOutput(block: ToolBlock, open: boolean): unknown {
     return () => {
       current = false;
     };
-  }, [open, outputOmitted, runId, id, have]);
+  }, [open, outputOmitted, runId, id, have, unavailable]);
   if (!outputOmitted) return block.output;
   return have ? loaded.output : undefined;
 }
@@ -91,6 +93,7 @@ function ToolCallDetails({ block, visualization }: { block: ToolBlock; visualiza
       {visualization ? <Visualization visualization={visualization} /> : null}
       {block.progress ? <div className="tool-call-progress">{block.progress}</div> : null}
       <ToolDetail block={block} output={output} />
+      {hostedOutputUnavailable(block) ? <HostedToolOutput /> : null}
       {!visualization ? <McpApp block={block} /> : null}
     </div>
   );
@@ -118,6 +121,7 @@ function PlainToolRow({ block, label, object }: { block: ToolBlock; label: strin
       {open ? (
         <div className="tool-row-detail">
           <ToolDetail block={block} output={output} />
+          {hostedOutputUnavailable(block) ? <HostedToolOutput /> : null}
         </div>
       ) : null}
     </>
@@ -167,6 +171,7 @@ function CommandCard({ block, command }: { block: ToolBlock; command: string }) 
       {line && !open ? <div className="command-card-output">{line}</div> : null}
       {block.progress ? <div className="command-card-output whitespace-pre-wrap">{block.progress}</div> : null}
       {open ? <ToolDetail block={block} output={output} /> : null}
+      {open && hostedOutputUnavailable(block) ? <HostedToolOutput /> : null}
     </div>
   );
 }

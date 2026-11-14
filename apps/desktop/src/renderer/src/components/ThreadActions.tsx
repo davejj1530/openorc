@@ -1,7 +1,7 @@
 import { Menu } from "@base-ui/react/menu";
 import { placeUnreachable, snoozePresets, threadResolved } from "@openorc/client";
 import type { ThreadSummary } from "@openorc/protocol";
-import { isSubagentThread, forkUnavailable, placeOf, PLACES } from "@openorc/protocol";
+import { HOSTED_REASONS, isSubagentThread, forkUnavailable, placeOf, PLACES } from "@openorc/protocol";
 import { useRef, useState } from "react";
 import { CoversPreview } from "../lib/browser-preview";
 import { useRpc, useRpcMutation } from "../lib/client";
@@ -14,6 +14,7 @@ import { floatingGround } from "../lib/use-anchor-ground";
 import { AlarmClock, AppWindow, ChevronRight, CircleCheck, Columns2, GitFork, MailOpen, PenSquare, Pencil, Pin, PinOff, RotateCcw, SquarePlus, Trash2 } from "./icons";
 import { menuItem, menuItemDanger, menuPopup, menuSeparator } from "./menu";
 import { ThreadPlaceItems } from "./ThreadPlaceItems";
+import { HostedMenuReason } from "./HostedMenuReason";
 import { Button, Dialog } from "./ui";
 import { thisComputer } from "../lib/this-computer";
 
@@ -193,8 +194,12 @@ function awayWords(thread: ThreadSummary): string | null {
 /** A sidebar row's menu leads with it; the header's keeps it beside Fork. OpenOrc Cloud starts no thread under another, so it has none. */
 function NewSubthreadItem({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
   const away = awayWords(thread);
-  const place = placeOf(thread);
-  if (place.elsewhere && !place.brain) return null;
+  if (placeOf(thread) === PLACES.hosted)
+    return (
+      <HostedMenuReason parts={M} reason={HOSTED_REASONS.personSubthreads}>
+        <PenSquare size={13} /> New subthread
+      </HostedMenuReason>
+    );
   return (
     <M.Item className={menuItem} disabled={Boolean(thread.teamInstanceId) || away !== null} data-tip={away ?? undefined} onClick={() => newSubthread(thread.id)}>
       <PenSquare size={13} /> New subthread
@@ -206,6 +211,15 @@ function ThreadForkActions({ thread, parts: M, header }: { thread: ThreadSummary
   const fork = useRpcMutation("threads.fork");
   const mutating = useThreadMutationPending(thread.id);
   const away = awayWords(thread);
+  if (placeOf(thread) === PLACES.hosted)
+    return (
+      <>
+        {header ? <NewSubthreadItem thread={thread} parts={M} /> : null}
+        <HostedMenuReason parts={M} reason={HOSTED_REASONS.fork}>
+          <GitFork size={13} /> Fork
+        </HostedMenuReason>
+      </>
+    );
   return (
     <>
       {fork.error ? (

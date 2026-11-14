@@ -342,6 +342,13 @@ export const People = icon(
     <path d="M17 14.6c1.9.6 3.15 2.1 3.5 4.4" />
   </>,
 );
+export const PersonPlus = icon(
+  "PersonPlus",
+  <>
+    <circle cx="8.5" cy="8" r="3.25" />
+    <path d="M3 19c.6-3.25 2.8-5 5.5-5s4.9 1.75 5.5 5 M18.5 7v6 M15.5 10h6" />
+  </>,
+);
 export const SmilePlus = icon(
   "SmilePlus",
   <>

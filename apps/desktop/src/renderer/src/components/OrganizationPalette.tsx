@@ -1,6 +1,6 @@
 import { Command } from "cmdk";
 import { useOrganization } from "../lib/organization-context";
-import { People, Plus, FolderPlus } from "./icons";
+import { People, PersonPlus, Plus, FolderPlus } from "./icons";
 import { OpenOrcMark } from "./OpenOrcMark";
 import { OrganizationMark } from "./OrganizationMark";
 
@@ -18,7 +18,7 @@ export function OrganizationPalette({ go }: { go(action: () => void): void }) {
       ) : null}
       {actions.organization?.role === "admin" ? (
         <Command.Item className="command-palette-item" onSelect={() => go(actions.invite)}>
-          <Plus size={15} />
+          <PersonPlus size={15} />
           <span>Invite people</span>
         </Command.Item>
       ) : null}

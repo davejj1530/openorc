@@ -8,7 +8,7 @@ import { floatingGround } from "../lib/use-anchor-ground";
 import { cn } from "../lib/cn";
 import { OpenOrcMark } from "./OpenOrcMark";
 import { OrganizationMark } from "./OrganizationMark";
-import { Check, People, Plus } from "./icons";
+import { Check, People, PersonPlus, Plus } from "./icons";
 import { menuItem, menuSeparator } from "./menu";
 import { ReceivedInvitationRow } from "./ReceivedInvitationRow";
 import { TextButton } from "./ui";
@@ -40,7 +40,7 @@ export function SpaceMenu({ actions }: { actions: OrganizationActions }) {
           {actions.organization.role === "admin" ? (
             <Menu.Item className={menuItem} onClick={actions.invite}>
               <span className="space-menu-mark">
-                <Plus size={15} />
+                <PersonPlus size={15} />
               </span>
               Invite people…
             </Menu.Item>

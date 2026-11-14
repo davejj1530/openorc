@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { OnlineTaskCreate, OnlineTaskDelete, OnlineTaskSeen, OnlineTaskUpdate, type OnlineTask, type OnlineTaskAssignee, type OnlineTaskHistoryEntry } from "@openorc/protocol";
 import { taskFixture, taskFixtureView, taskFixtureWire, fixturePerson, type TaskFixtureDeps, type TaskFixtureRecord } from "./stand-in-task-data.js";
 import { userOf } from "./stand-in-spaces.js";
+import { StandInTaskThreads } from "./stand-in-task-threads.js";
 
 type Reply = { status: number; body: unknown };
 type Request = { method: string; path: string; query: URLSearchParams; space: string | null };
@@ -16,7 +17,10 @@ export class StandInTasks {
   readonly frozen = new Set<string>();
   readonly records = new Map<string, TaskFixtureRecord>();
   readonly #receipts = new Map<string, { digest: string; reply: Reply }>();
-  constructor(private readonly deps: TaskFixtureDeps) {}
+  readonly #threads: StandInTaskThreads;
+  constructor(private readonly deps: TaskFixtureDeps) {
+    this.#threads = new StandInTaskThreads(deps);
+  }
   seed(spaceId: string, who: string, projectId: string, values: Partial<OnlineTask> = {}) {
     const record = taskFixture(this.deps, spaceId, who, projectId, values);
     this.records.set(record.task.id, record);
@@ -49,9 +53,10 @@ export class StandInTasks {
   }
   #target(request: Request, spaceId: string, who: string, body: unknown): Reply {
     if (request.path === "/tasks" && request.method === "POST") return this.#receipt(request, spaceId, who, body, () => this.#create(spaceId, who, body));
-    const match = /^\/tasks\/([^/]+)(?:\/(seen|activity|context))?$/.exec(request.path);
+    const match = /^\/tasks\/([^/]+)(?:\/(seen|activity|context|open-thread))?$/.exec(request.path);
     const record = match?.[1] ? this.records.get(decodeURIComponent(match[1])) : undefined;
     if (!record || record.task.spaceId !== spaceId || !this.#readable(record, who)) return absent();
+    if (match?.[2] === "open-thread" && request.method === "POST") return this.#threads.open(record, who, body, this.accessRevision);
     if (request.method === "GET") return this.#read(record, who, match?.[2]);
     return this.#receipt(request, spaceId, who, body, () => this.#write(request, record, who, body));
   }

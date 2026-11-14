@@ -2,11 +2,13 @@ import { randomUUID } from "node:crypto";
 import type { OnlineTask, OnlineTaskHistoryEntry } from "@openorc/protocol";
 import type { StandInSpaces } from "./stand-in-spaces.js";
 import { userOf } from "./stand-in-spaces.js";
+import type { StandInThreads } from "./stand-in-threads.js";
 
 export interface TaskFixtureDeps {
   spaces: StandInSpaces;
   person(email: string): { name: string; image: string | null };
   tell(who: string, topics: string[], space?: string): void;
+  threads?: Pick<StandInThreads, "addThread" | "route">;
 }
 export interface TaskFixtureRecord {
   task: OnlineTask;

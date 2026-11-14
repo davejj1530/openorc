@@ -7,6 +7,7 @@ import { useSpaceNavigation } from "./space-navigation";
 import { organizationContentGate } from "./organization-content-gate";
 import { useTaskContentGate } from "./task-content-gate";
 import { readTaskContent } from "./task-access-cache";
+import { taskRefreshInterval } from "./task-refresh";
 
 type Method = keyof OnlineTaskRpcResults;
 export type TaskOnlineScope = Pick<OnlineTaskRef, "accountId" | "spaceId">;
@@ -19,7 +20,7 @@ export function useTaskOnlineQuery<M extends Method>(scope: TaskOnlineScope | nu
     enabled: Boolean(scope) && enabled,
     retry: false,
     refetchOnWindowFocus: true,
-    refetchInterval: 30_000,
+    refetchInterval: (query) => taskRefreshInterval(query.state.data),
   });
 }
 export function useTaskOnlineMutation<M extends Method>(scope: TaskOnlineScope, method: M) {

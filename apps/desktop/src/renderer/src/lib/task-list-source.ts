@@ -8,6 +8,7 @@ import { useTaskOnlineScope, useTaskOnlineQuery, type TaskOnlineScope } from "./
 import { composedTaskAttention } from "./task-attention";
 import type { TaskShelf } from "./task-list-state";
 import { readTaskContent } from "./task-access-cache";
+import { taskRefreshInterval } from "./task-refresh";
 import { organizationContentGate } from "./organization-content-gate";
 
 export function useTaskProjects(scope: TaskOnlineScope | null) {
@@ -39,7 +40,7 @@ function useOnlineTaskList(projectId: string | null, assignedToMe: boolean, shel
     enabled,
     retry: false,
     refetchOnWindowFocus: true,
-    refetchInterval: 30_000,
+    refetchInterval: (query) => taskRefreshInterval(query.state.data),
   });
   return { scope, availability, projects, online, enabled };
 }

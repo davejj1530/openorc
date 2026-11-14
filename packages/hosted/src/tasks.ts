@@ -1,7 +1,9 @@
-import type { OnlineTaskAvailability, OnlineTaskEnvelope, OnlineTaskMutation, OnlineTaskParams, OnlineTaskRpcResults } from "@openorc/protocol";
+import type { OnlineTaskAvailability, OnlineTaskEnvelope, OnlineTaskExecutionParams, OnlineTaskMutation, OnlineTaskParams, OnlineTaskRpcResults } from "@openorc/protocol";
 import type { HostedDeps, HostedSpaces } from "./index.js";
 import { Refused, type Session } from "./session.js";
 import { TaskChanged, taskCreation, taskRequest } from "./task-requests.js";
+import { taskThreadRoute } from "./task-thread-wire.js";
+import { prepareTaskThread } from "./task-threads.js";
 import { TASK_ROUTES } from "./wire-tasks.js";
 import { SOCKET, wireTopics, type Route } from "./wire.js";
 
@@ -47,7 +49,7 @@ export class OnlineTasks {
       const parsed = wireTopics.safeParse(body);
       if (!parsed.success || this.#closed) return;
       const { topics, organizationId } = parsed.data;
-      if (!topics.some((topic) => ["projects", "spaces", "members", "organization_access", "billing"].includes(topic))) return;
+      if (!topics.some((topic) => ["projects", "threads", "spaces", "members", "organization_access", "billing"].includes(topic))) return;
       if (topics.some((topic) => ["spaces", "members", "organization_access", "billing"].includes(topic))) {
         if (organizationId) this.#epochs.set(organizationId, (this.#epochs.get(organizationId) ?? 0) + 1);
         else for (const [spaceId, epoch] of this.#epochs) this.#epochs.set(spaceId, epoch + 1);
@@ -80,6 +82,12 @@ export class OnlineTasks {
   }
   context({ spaceId, id }: OnlineTaskParams<"tasks.online.context">) {
     return this.#request(spaceId, TASK_ROUTES.context(id));
+  }
+  async openThread({ spaceId, id, ...input }: OnlineTaskExecutionParams) {
+    if (!this.#delivery.execution) throw new Refused("Opening this task's thread isn't available yet.");
+    const result = await prepareTaskThread(this.#request(spaceId, taskThreadRoute(id), input));
+    this.#invalidate(spaceId);
+    return result;
   }
 
   creation(input: OnlineTaskParams<"tasks.online.create">) {

@@ -49,8 +49,36 @@ it("shows the signed-in person with their plan and cloud hours, and opens Settin
   expect(useRouter.getState().route).toEqual({ view: "settings", section: "account" });
 });
 
-it("shows nothing while signed out", async () => {
-  show({ state: "signed-out", signingIn: null, ended: false, error: null });
+it("signs in through the browser while signed out, says it waits, and calls it off", async () => {
+  const page = "http://localhost:3600/sign-in?request=r1";
+  let status: AccountStatus = { state: "signed-out", signingIn: null, ended: false, error: null };
+  vi.mocked(core.call).mockImplementation(async (method: string) => {
+    if (method === "account.signIn") status = { state: "signed-out", signingIn: { state: "waiting", page }, ended: false, error: null };
+    if (method === "account.signIn.cancel") status = { state: "signed-out", signingIn: null, ended: false, error: null };
+    return status;
+  });
+  render(
+    <QueryClientProvider client={queryClient}>
+      <footer>
+        <SidebarAccount />
+      </footer>
+    </QueryClientProvider>,
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "Sign in" }));
+  expect(await screen.findByRole("button", { name: "Signing in…" })).toBeTruthy();
+  expect(core.call).toHaveBeenCalledWith("account.signIn", {});
+  fireEvent.click(screen.getByRole("button", { name: "Cancel signing in" }));
+  expect(await screen.findByRole("button", { name: "Sign in" })).toBeTruthy();
+  expect(core.call).toHaveBeenCalledWith("account.signIn.cancel", {});
+});
+
+it("says why a sign-in failed under Sign in", async () => {
+  show({ state: "signed-out", signingIn: { state: "failed", error: "OpenOrc Cloud can't be reached." }, ended: false, error: null });
+  expect(await screen.findByRole("button", { name: "Sign in OpenOrc Cloud can't be reached." })).toBeTruthy();
+});
+
+it("shows nothing in a build with no account server", async () => {
+  show({ state: "unavailable" });
   await new Promise((resolve) => setTimeout(resolve, 20));
   expect(screen.queryByRole("button")).toBeNull();
 });

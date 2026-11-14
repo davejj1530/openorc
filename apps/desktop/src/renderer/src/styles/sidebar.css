@@ -814,6 +814,90 @@ button.browser-empty:hover,
   line-height: 16px;
   color: var(--ink-3);
 }
+/* Signed out, the person's place holds Sign in, drawn as a navigation row: the glyph 16px in, the label in quiet ink.
+   While the page waits the glyph turns, and a cross takes its place under the pointer to call the sign-in off. A
+   sign-in that failed says why on a second, cut line. */
+.sidebar-sign-in-row {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  margin-right: auto;
+}
+.sidebar-account.sidebar-sign-in {
+  gap: 8px;
+  font-size: var(--text-base);
+  line-height: 16px;
+  color: var(--ink-3);
+}
+.sidebar-account.sidebar-sign-in:hover {
+  color: var(--ink);
+}
+.sidebar-sign-in-glyph {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+.sidebar-sign-in .sidebar-account-words {
+  overflow: hidden;
+}
+.sidebar-sign-in-label,
+.sidebar-sign-in-failed {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar-sign-in-failed {
+  font-size: 12px;
+  color: var(--bad);
+}
+/* Over the glyph's place: 24px round, centred on the glyph 24px in. */
+.sidebar-sign-in-cancel {
+  position: absolute;
+  top: 50%;
+  left: 4px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  color: var(--ink-3);
+  transform: translateY(-50%);
+  transition:
+    background-color var(--duration-quick) var(--ease-out),
+    color var(--duration-quick) var(--ease-out);
+}
+.sidebar-sign-in-cancel > * {
+  grid-area: 1 / 1;
+}
+.sidebar-sign-in-cancel:hover,
+.sidebar-sign-in-cancel:focus-visible {
+  background-color: var(--navigation-hover);
+  color: var(--ink);
+}
+.sidebar-sign-in-turning {
+  animation: sidebar-sign-in-turn 900ms linear infinite;
+}
+.sidebar-sign-in-cross,
+.sidebar-sign-in-cancel:hover .sidebar-sign-in-turning,
+.sidebar-sign-in-cancel:focus-visible .sidebar-sign-in-turning {
+  visibility: hidden;
+}
+.sidebar-sign-in-cancel:hover .sidebar-sign-in-cross,
+.sidebar-sign-in-cancel:focus-visible .sidebar-sign-in-cross {
+  visibility: visible;
+}
+@keyframes sidebar-sign-in-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-sign-in-turning {
+    animation: none;
+  }
+}
 /* A face with no picture: the initials on the control fill. */
 .account-face {
   display: inline-grid;

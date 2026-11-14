@@ -230,4 +230,15 @@ describe("shared organization content authority", () => {
     await f.store.refresh();
     expect(f.store.status("team-a")).toMatchObject({ allowed: false, error: "Offline" });
   });
+
+  it("rejects a callback bound to another account before it starts a request", async () => {
+    const f = fixture();
+    await f.store.refresh();
+    expect(f.store.capture("team-a", "person-b").current()).toBe(false);
+    expect(f.store.capture("team-a", "person-a").current()).toBe(true);
+    f.answer({ ...spaces(), userId: "person-b" });
+    await f.store.refresh();
+    expect(f.store.capture("team-a", "person-a").current()).toBe(false);
+    expect(f.store.capture("team-a", "person-b").current()).toBe(true);
+  });
 });

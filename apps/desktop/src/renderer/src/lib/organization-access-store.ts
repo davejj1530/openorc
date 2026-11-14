@@ -37,6 +37,7 @@ export class OrganizationAccessStore {
   #fence = 0;
   #heardAt = 0;
   #closedAt = 0;
+  #accountId: string | null = null;
   #timer: ReturnType<typeof setTimeout> | null = null;
   #disposed = false;
   constructor(private readonly deps: OrganizationAccessStoreDeps) {}
@@ -60,13 +61,14 @@ export class OrganizationAccessStore {
   }
 
   /** A captured content response remains invalid after a freeze and later recovery. */
-  capture(spaceId: string | null) {
+  capture(spaceId: string | null, expectedAccountId?: string) {
     const captured = this.status(spaceId);
+    const matches = expectedAccountId === undefined || this.#accountId === expectedAccountId;
     return {
       generation: captured.generation,
       current: () => {
         const current = this.status(spaceId);
-        return captured.allowed && current.allowed && current.identity === captured.identity && current.generation === captured.generation;
+        return matches && captured.allowed && current.allowed && current.identity === captured.identity && current.generation === captured.generation;
       },
     };
   }
@@ -105,6 +107,7 @@ export class OrganizationAccessStore {
     if (same && status.heardAt < this.#heardAt) return;
     if (!same) this.#closedAt = 0;
     this.#heardAt = status.heardAt;
+    this.#accountId = status.userId;
     let access = organizationAccessAt(status.organizationAccess, this.deps.now());
     if (same && this.#closedAt > status.heardAt && admits(access)) access = this.#snapshot.access;
     this.#publish({ identity, ready: true, spaces: status.spaces, access, error: status.error, generation: this.#snapshot.generation });
@@ -168,6 +171,7 @@ export class OrganizationAccessStore {
     ++this.#fence;
     this.#heardAt = 0;
     this.#closedAt = 0;
+    this.#accountId = null;
     this.#publish({ identity: null, ready: false, spaces: [], access: undefined, generation: this.#snapshot.generation, error: null });
   }
 

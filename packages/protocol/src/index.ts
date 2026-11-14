@@ -60,3 +60,4 @@ export * from "./spaces.js";
 export * from "./organization-setup.js";
 export * from "./organization-invitations.js";
 export * from "./hosted-parity.js";
+export * from "./team-chat.js";

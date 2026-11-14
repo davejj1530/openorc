@@ -14,6 +14,7 @@ import {
   type ThreadSummary,
 } from "@openorc/protocol";
 import { cloudTime, priceText } from "./account-words.js";
+import { rowStarter } from "./thread-row.js";
 
 /**
  * Where the card above a cloud thread's composer leads: the Settings section that holds what is missing. Paying's three
@@ -54,6 +55,15 @@ export function threadSendBlock(thread: Pick<ThreadSummary, "owner" | "activity"
 /** Why nothing can be done to a thread now: its place can't be reached. Null when it can, and for this Mac's own threads. */
 export function placeUnreachable(thread: Pick<ThreadSummary, "owner"> | null): string | null {
   return thread?.owner?.reach === "offline" ? `${placeOf(thread).mark ?? "This thread"} can't be reached.` : null;
+}
+
+/**
+ * Why the asks a thread waits on can't be answered from here: its place can't be reached, or a teammate started it and
+ * the person only reads it. Null when they can.
+ */
+export function asksBlocked(thread: Pick<ThreadSummary, "owner"> | null): string | null {
+  const starter = thread ? rowStarter(thread) : null;
+  return placeUnreachable(thread) ?? (starter ? `Only ${starter.first} can answer in ${starter.first}'s thread.` : null);
 }
 
 /** Where a blocked place in a new thread's menu leads: the Settings section, or the project's row there, that fixes it. */

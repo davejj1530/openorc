@@ -74,7 +74,7 @@ const waiting = (name: AskName, id: string = name): WaitingAsk => ({
 });
 
 /** A conversation's composer mid-turn, its asks arriving as the agent sends them, with what reached the agent. */
-function mount({ draft = "" }: { draft?: string } = {}) {
+function mount({ draft = "", blocked = null, parked = false }: { draft?: string; blocked?: string | null; parked?: boolean } = {}) {
   const onSubmit = vi.fn(async (_text: string, _files: string[], _now: boolean) => {});
   const outside: { setAsks: (update: (asks: WaitingAsk[]) => WaitingAsk[]) => void } = { setAsks: () => {} };
   function Host() {
@@ -96,12 +96,13 @@ function mount({ draft = "" }: { draft?: string } = {}) {
           permission="review"
           onPermission={() => {}}
           location={{ label: null, branch: null }}
-          live={{ runId: "run", working: true }}
-          queueing
+          live={parked ? null : { runId: "run", working: true }}
+          queueing={!parked}
           liveByDefault
-          steerable
+          steerable={!parked}
           mentions={[{ key: "rini", name: "Rini", hint: "Opus 5.5" }]}
           asks={asks}
+          asksBlocked={blocked}
         />
       </>
     );
@@ -410,6 +411,36 @@ describe("a docked approval, answered on purpose", () => {
     expect(within(c.dock()!).queryByRole("button", { name: "Allow for this run" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Show request" }));
     expect(within(c.dock()!).getByText(/"channel": "#releases"/)).toBeTruthy();
+  });
+});
+
+describe("an ask that can't be answered from here, and one whose turn has ended", () => {
+  it.each(["export", "build"] as const)("shows a %s ask with every control dimmed, says why on demand, and takes no press or key", (name) => {
+    const c = mount({ blocked: "Only Ana can answer in Ana's thread." });
+    c.arrive(name);
+    const controls = [...c.dock()!.querySelectorAll<HTMLElement>("button, input")];
+    expect(controls.every((control) => control.hasAttribute("disabled") || control.textContent === "Show request")).toBe(true);
+    expect(
+      within(c.dock()!)
+        .getAllByRole("button")
+        .find((button) => button.hasAttribute("disabled"))
+        ?.getAttribute("data-tip"),
+    ).toBe("Only Ana can answer in Ana's thread.");
+    for (const control of controls) fireEvent.click(control);
+    c.field.focus();
+    c.key("ArrowUp");
+    for (let i = 0; i < 4; i++) (c.key("ArrowDown"), c.key("Enter"));
+    expect(c.answered()).toEqual([]);
+  });
+
+  it("docks an ask whose turn has ended, and sends a message typed meanwhile, which starts the next turn", async () => {
+    const c = mount({ parked: true });
+    c.arrive("export");
+    expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
+    type(c.field, "Downloads, and add the date range");
+    c.key("Enter");
+    await waitFor(() => expect(c.sent()).toEqual(["queue: Downloads, and add the date range"]));
+    expect(c.answered()).toEqual([]);
   });
 });
 

@@ -1,6 +1,6 @@
 import type { AccountStatus, ThreadSummary } from "@openorc/protocol";
 import { expect, it } from "vitest";
-import { billingMoves, hostedStart, threadSendBlock } from "./hosted-send.js";
+import { asksBlocked, billingMoves, hostedStart, threadSendBlock } from "./hosted-send.js";
 
 const pro: Extract<AccountStatus, { state: "signed-in" }> = {
   state: "signed-in",
@@ -158,4 +158,11 @@ it("names the pack and its price on Buy, once the server says them, and the pack
   expect(billingMoves(pro, offers).hours?.label).toMatch(/^Buy 50 h for .*10/);
   expect(billingMoves(pro, { ...offers, hours: { ...offers.hours, price: null } }).hours?.label).toBe("Buy 50 h");
   expect(billingMoves(pro, null).hours?.label).toBe("Buy more hours");
+});
+
+it("blocks a thread's asks while its place can't be reached, and in a teammate's thread the person only reads", () => {
+  const own = hosted();
+  const teammate = { owner: { ...own.owner, startedBy: { name: "Ana Lee", image: null } } };
+  const offline = { owner: { ...own.owner, reach: "offline" as const } };
+  expect([asksBlocked(own), asksBlocked(null), asksBlocked(teammate), asksBlocked(offline)]).toEqual([null, null, "Only Ana can answer in Ana's thread.", "OpenOrc Cloud can't be reached."]);
 });

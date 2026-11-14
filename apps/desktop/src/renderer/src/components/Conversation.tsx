@@ -6,7 +6,7 @@ import {
   conversationActivity,
   composerPlaceholder,
   heardTranscript,
-  placeUnreachable,
+  asksBlocked,
   waitingAsks,
   conversationSendDisabledReason,
   conversationSteerReason,
@@ -231,7 +231,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
 
   const location = conversationLocation({ scope, project, mode: workspaceMode, basePath: links ?? project.rootPath, checkoutBranch: checkout.data?.branch, plainFolder: git.state === "none" });
   const emptyHint = conversationEmptyHint({ task: scope.kind === "task", workspace: project.id === WORKSPACE_ID });
-  const answersBlocked = placeUnreachable(thread);
+  const answersBlocked = asksBlocked(thread);
   const placeholder = composerPlaceholder(choice?.agent);
   const heard = optimistic.run ? heardTranscript(optimistic.run, thread) : null;
 

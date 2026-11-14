@@ -57,8 +57,8 @@ async function checkUI() {
     await read(`composerSmoke.theme('light')`);
     await pause(200);
 
-    // The attach control no longer says "image", and the picker is not filtered to images.
-    assert.equal(await read(`document.querySelector('[aria-label="Attach file"]') !== null`), true);
+    // The plus adds to the message: files, photos, and what @ and / can name.
+    assert.equal(await read(`document.querySelector('[aria-label="Add to this message"]') !== null`), true);
 
     // A spreadsheet and a log drop in beside an image.
     await read(

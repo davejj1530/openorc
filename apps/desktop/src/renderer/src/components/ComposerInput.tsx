@@ -1,11 +1,25 @@
 import { commandWordAt, useCommandWord, type SkillListNotice } from "@openorc/client";
 import type { FileScope, UsableConnector } from "@openorc/protocol";
-import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
+import { Fragment, useCallback, useEffect, useId, useImperativeHandle, useMemo, useRef, useState, type Ref, type RefObject } from "react";
 import { useRpc } from "../lib/client";
 import { cn } from "../lib/cn";
 import { filterMentions, insertMention, mentionQueryAt, usePickedFiles, type MentionEntry } from "../lib/composer-mentions";
 import type { SlashCommand } from "./Composer";
-import { asideMatching, commandRows, firstPickable, matchingCommands, matchingConnectors, mentionRows, nextPickable, suggestionKey, useConnectorWord, type SuggestionRow } from "./composer-commands";
+import {
+  asideMatching,
+  commandRows,
+  firstPickable,
+  LIST_STARTS,
+  matchingCommands,
+  matchingConnectors,
+  mentionRows,
+  nextPickable,
+  ofKind,
+  suggestionKey,
+  useConnectorWord,
+  type ListKind,
+  type SuggestionRow,
+} from "./composer-commands";
 import { ComposerSuggestions } from "./ComposerSuggestions";
 import { ConnectorLogo } from "./ConnectorLogo";
 import { ComposerEditor, type ComposerEditorHandle, type DraftChange } from "./composer-editor/ComposerEditor";
@@ -36,6 +50,13 @@ interface ComposerInputProps {
   suggestionSide: "top" | "bottom";
   /** The editor's handle, which the composer holds too, to write a queued message back. */
   editor: RefObject<ComposerEditorHandle | null>;
+  /** What the plus menu opens: one kind's list, at the caret. */
+  lists?: Ref<ComposerLists> | undefined;
+}
+
+/** Opens the list of one kind at the caret, as typing `@` or `/` there would, showing only that kind. */
+export interface ComposerLists {
+  open: (kind: ListKind) => void;
 }
 
 /** What `@` says while the connector list is read for the first time, which starts the agents' servers. */
@@ -67,6 +88,29 @@ function suggestionLabel(members: boolean, mention: boolean): string {
   return "Commands";
 }
 
+/**
+ * The kind the plus menu opened a list of, for as long as the word it began is the one at the caret, and the opener the
+ * plus calls.
+ */
+function useListKind(
+  lists: Ref<ComposerLists> | undefined,
+  { token, caret, value, editor, onOpen }: { token: { start: number } | null; caret: number; value: string; editor: RefObject<ComposerEditorHandle | null>; onOpen: () => void },
+): ListKind | null {
+  const [kind, setKind] = useState<{ kind: ListKind; start: number } | null>(null);
+  useImperativeHandle(
+    lists,
+    () => ({
+      open: (opened) => {
+        setKind({ kind: opened, start: caret + (caret > 0 && !/\s$/.test(value.slice(0, caret)) ? 1 : 0) });
+        onOpen();
+        editor.current?.begin(LIST_STARTS[opened], caret);
+      },
+    }),
+    [value, caret, editor, onOpen],
+  );
+  return kind && token?.start === kind.start ? kind.kind : null;
+}
+
 /** Owns text interaction: suggestions, the caret and focus, around the editor that holds the words. */
 export function ComposerInput(props: ComposerInputProps) {
   const { value, onChange, onSubmit, onFiles, disabled, placeholder, autoFocus, fileSearch, mentions, commands, onCommandsWanted, connectors, onConnectorsWanted } = props;
@@ -79,7 +123,8 @@ export function ComposerInput(props: ComposerInputProps) {
   const picked = usePickedFiles(props.draftKey, value);
   const sources = useMemo(() => ({ commands, connectors, members: mentions, files: picked.files }), [commands, connectors, mentions, picked.files]);
   const token = useMemo(() => tokenAtCaret(value, caret), [value, caret]);
-  const memberQuery = useMemo(() => (mentions?.length ? mentionQueryAt(value, caret) : null), [mentions, value, caret]);
+  const scope = useListKind(props.lists, { token, caret, value, editor, onOpen: () => setSuggestionsActive(true) });
+  const memberQuery = useMemo(() => (mentions?.length && (scope === null || scope === "orcling") ? mentionQueryAt(value, caret) : null), [mentions, value, caret, scope]);
   const memberMatches = useMemo(() => (memberQuery ? filterMentions(mentions ?? [], memberQuery.query) : []), [memberQuery, mentions]);
   const atQuery = token?.token.startsWith("@") && !memberMatches.length ? token.token.slice(1) : null;
   const mentionQuery = fileSearch ? atQuery : null;
@@ -93,7 +138,7 @@ export function ComposerInput(props: ComposerInputProps) {
   // Skills insert into the prompt; actions clear it, so only offer actions at the start.
   const commandMatches = useMemo(() => matchingCommands(commands, commandQuery, commandPrefix, token?.start), [commandPrefix, commandQuery, commands, token?.start]);
   const write = useCallback((text: string, at: number) => editor.current?.pick(text, at), [editor]);
-  const suggestions: SuggestionRow[] = useMemo(() => {
+  const all: SuggestionRow[] = useMemo(() => {
     if (memberQuery && memberMatches.length) {
       return memberMatches.map((entry) => ({
         key: `mention:${entry.key}`,
@@ -112,6 +157,7 @@ export function ComposerInput(props: ComposerInputProps) {
     }
     return commandRows(commandMatches, { query: commandQuery, token, caret, value, write });
   }, [memberQuery, memberMatches, atQuery, connectorMatches, asideMatches, mentionQuery, files.data, commandMatches, commandQuery, token, caret, value, write, picked.pick]);
+  const suggestions = useMemo(() => (scope ? all.filter((row) => ofKind(row, scope)) : all), [all, scope]);
   // The skill under the pointer says what it is for.
   const skillHover = useSkillHover(root);
   // Whether the arrow keys chose the row, which is what lets Enter pick one in the middle of a message.

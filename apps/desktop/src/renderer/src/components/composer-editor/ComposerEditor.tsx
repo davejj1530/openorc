@@ -1,7 +1,7 @@
 import { HISTORY_PUSH_TAG } from "lexical";
 import { useEffect, useImperativeHandle, type AriaAttributes, type FocusEventHandler, type PointerEventHandler, type Ref } from "react";
 import type { MarkSources } from "../../lib/message-marks";
-import { $writeDraft } from "./draft";
+import { $readDraft, $writeDraft } from "./draft";
 import { EditorBox, EditorPlaceholder, EditorProvider, useEditor } from "./editor";
 import { MARK_NODES } from "./nodes";
 import { ClipboardPlugin } from "./plugins/ClipboardPlugin";
@@ -18,11 +18,13 @@ export type { DraftChange } from "./plugins/DraftPlugin";
 /**
  * What the composer does to its draft, each as one step to undo with the caret where it belongs: a pick from a list
  * writes the message, and its pills land with a pop; `write` puts words back, as a queued message returning, and
- * nothing moves.
+ * nothing moves; `begin` starts an `@` or `/` word where the person was, as the plus menu does.
  */
 export interface ComposerEditorHandle {
   pick: (text: string, caret: number) => void;
   write: (text: string, caret: number) => void;
+  /** Starts a word at `at`, apart from the word before it. */
+  begin: (start: string, at: number) => void;
 }
 
 export interface ComposerEditorProps {
@@ -58,7 +60,20 @@ function EditorControls({ handle, disabled }: Pick<ComposerEditorProps, "handle"
       editor.update(() => $writeDraft(text, caret), { discrete: true, tag: tags });
       editor.getRootElement()?.focus({ preventScroll: true });
     };
-    return { pick: writeAs([HISTORY_PUSH_TAG, PICKED]), write: writeAs([HISTORY_PUSH_TAG]) };
+    const begin = (start: string, from: number) => {
+      // In first, so the caret the update leaves is the person's and the list at it opens.
+      editor.getRootElement()?.focus({ preventScroll: true });
+      editor.update(
+        () => {
+          const { text } = $readDraft();
+          const at = Math.min(from, text.length);
+          const word = at > 0 && !/\s/.test(text[at - 1]!) ? ` ${start}` : start;
+          $writeDraft(text.slice(0, at) + word + text.slice(at), at + word.length);
+        },
+        { discrete: true, tag: HISTORY_PUSH_TAG },
+      );
+    };
+    return { pick: writeAs([HISTORY_PUSH_TAG, PICKED]), write: writeAs([HISTORY_PUSH_TAG]), begin };
   }, [editor]);
   return null;
 }

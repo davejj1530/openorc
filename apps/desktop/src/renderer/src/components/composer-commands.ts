@@ -22,6 +22,26 @@ export interface SuggestionRow {
   pick: () => void;
 }
 
+/** The kinds the plus menu opens a list of, and the character each list starts its word with. */
+export type ListKind = "orcling" | "file" | "connector" | "skill" | "command";
+export const LIST_STARTS: Record<ListKind, "@" | "/"> = { orcling: "@", file: "@", connector: "@", skill: "/", command: "/" };
+
+/** Whether a row of the `@` or `/` list is of the kind the plus menu opened it for. */
+export function ofKind(row: SuggestionRow, kind: ListKind): boolean {
+  switch (kind) {
+    case "orcling":
+      return Boolean(row.mention);
+    case "file":
+      return row.group === "Files";
+    case "connector":
+      return Boolean(row.logo);
+    case "skill":
+      return Boolean(row.insert);
+    case "command":
+      return !row.insert && !row.mention && !row.logo && row.group === undefined;
+  }
+}
+
 export function matchingCommands(commands: SlashCommand[] | undefined, query: string | null, prefix: string | undefined, start: number | undefined): SlashCommand[] {
   if (query === null) return [];
   // Slash opens the skill picker for either harness; selection still inserts its native prefix.

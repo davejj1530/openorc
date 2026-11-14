@@ -416,6 +416,54 @@ describe("the send cluster", () => {
   });
 });
 
+describe("the plus", () => {
+  const offers = {
+    commands: [
+      { name: "code-review", hint: "Review the branch", insert: true as const, prefix: "/" as const },
+      { name: "compact", hint: "Summarize", run: () => {} },
+    ],
+    connectors: [{ name: "paper", title: "Paper", logo: null }],
+    mentions: [{ key: "orcling:rini", name: "Rini", hint: "Orcling" }],
+  };
+  const choose = async (row: string) => {
+    fireEvent.click(screen.getByRole("button", { name: "Add to this message" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: row }));
+  };
+  const listed = () => screen.queryAllByRole("option").map((option) => option.textContent);
+
+  it("opens one kind's list at the caret, apart from the word before it, as one step to undo", async () => {
+    mount({ ...offers, value: "ask" });
+    const field = screen.getByRole("textbox", { name: "Message" });
+    act$(field, () => (placeCaret(field, 3), true));
+    await choose("Connector");
+    expect(messageOf(field)).toBe("ask @");
+    await waitFor(() => expect(listed()).toEqual(["P@paperPaper"]));
+    press(field, { key: "Enter" });
+    expect(messageOf(field)).toBe("ask @paper ");
+    press(field, { key: "z", ctrlKey: true });
+    press(field, { key: "z", ctrlKey: true });
+    expect(messageOf(field)).toBe("ask");
+  });
+
+  it("opens Orclings alone, and skills alone, where `@` and `/` would mix them", async () => {
+    mount({ ...offers, value: "" });
+    await choose("Orcling");
+    await waitFor(() => expect(listed()).toEqual(["@RiniOrcling"]));
+    cleanup();
+    mount({ ...offers, value: "" });
+    await choose("Skill");
+    await waitFor(() => expect(listed()).toEqual(["/code-reviewReview the branch"]));
+  });
+
+  it("keeps Command dimmed with its reason once words are written", async () => {
+    mount({ ...offers, value: "ask" });
+    fireEvent.click(screen.getByRole("button", { name: "Add to this message" }));
+    const command = await screen.findByRole("menuitem", { name: "Command" });
+    expect(command.getAttribute("aria-disabled")).toBe("true");
+    expect(command.getAttribute("data-tip")).toBe("Commands start a message.");
+  });
+});
+
 describe("a queued message coming back", () => {
   it("is added after the words already written, with its files, as one step to undo and no pop", () => {
     const handle = createRef<ComposerHandle>();

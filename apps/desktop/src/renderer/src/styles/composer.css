@@ -1427,3 +1427,12 @@
 .composer-bar[data-fit="least"] .composer-end {
   margin-left: auto;
 }
+
+/* The plus: add to this message. Files and photos, then what `@` and `/` can name, each ending in the way into its list. */
+.composer-add-menu {
+  width: 232px;
+}
+.composer-add-menu-end {
+  margin-left: auto;
+  color: var(--ink-4);
+}

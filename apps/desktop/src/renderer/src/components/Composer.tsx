@@ -25,11 +25,12 @@ import { isImagePath } from "../../../shared/image-paths";
 import { ComposerChoice } from "./ComposerChoice";
 import { ComposerDropZone, useComposerDrop } from "./ComposerDropZone";
 import { ComposerChangesBar } from "./ComposerCommitChip";
-import { ComposerInput } from "./ComposerInput";
+import { ComposerAddMenu, type AddOffers } from "./ComposerAddMenu";
+import { ComposerInput, type ComposerLists } from "./ComposerInput";
 import type { ComposerEditorHandle } from "./composer-editor/ComposerEditor";
 import { ComposerSendCluster } from "./ComposerSendButton";
 import { ContextUsage } from "./ContextUsage";
-import { Cloud, Eye, FileText, Laptop, Lightbulb, Plus, ShieldCheck, ShieldOff, X } from "./icons";
+import { Cloud, Eye, FileText, Laptop, Lightbulb, ShieldCheck, ShieldOff, X } from "./icons";
 import { type PickerAccounts } from "./ModelPickerAccounts";
 import { ComposerModelPicker, type ModelChoice } from "./ModelPicker";
 import { Tooltip } from "./ui";
@@ -189,15 +190,6 @@ function returnedAttachment(path: string): Attachment {
   return { path, url: isImagePath(path) ? `openorc-asset://attachments/${stored}` : null, name };
 }
 
-/** The system's file chooser, as the attach button opens it. */
-function chooseFiles(add: (files: File[]) => void): void {
-  const input = document.createElement("input");
-  input.type = "file";
-  input.multiple = true;
-  input.onchange = () => add(Array.from(input.files ?? []));
-  input.click();
-}
-
 /** Why the last send or stop failed, and a failed read of the changes with its retry. */
 function ComposerAlerts({ message, changes }: { message: ReactNode; changes: ComposerProps["changes"] }) {
   return (
@@ -280,7 +272,7 @@ export function Composer(props: ComposerProps) {
     });
   };
 
-  const pickFiles = () => chooseFiles((chosen) => void addFiles(chosen));
+  const lists = useRef<ComposerLists>(null);
 
   const stopping = props.stopAction?.pending ?? interrupt.isPending;
   const activityLabel = composerActivity({ stopping, submitting, generatingImage: Boolean(props.generatingImage) });
@@ -344,6 +336,7 @@ export function Composer(props: ComposerProps) {
             suggestionAnchor={shell}
             suggestionSide={isNewThread ? "bottom" : "top"}
             editor={editor}
+            lists={lists}
           />
           {sent.ghost ? (
             <div key={sent.ghost.key} className="composer-sent-ghost" aria-hidden="true" onAnimationEnd={sent.clear}>
@@ -354,7 +347,7 @@ export function Composer(props: ComposerProps) {
         <div ref={fitBar} className="composer-bar">
           {/* Attach, then where and how the agent works. Chips truncate before the end group moves. */}
           <div className="composer-tools">
-            <ComposerAttach onAttach={pickFiles} disabledReason={props.attachmentsDisabledReason} />
+            <ComposerAddMenu onFiles={(chosen) => void addFiles(chosen)} attachmentsBlocked={props.attachmentsDisabledReason} offers={addOffers(props)} lists={lists} />
             {composerDestination(props)}
             {composerModelControl(props)}
             {composerModeControl(props)}
@@ -389,14 +382,16 @@ export function Composer(props: ComposerProps) {
   );
 }
 
-function ComposerAttach({ onAttach, disabledReason }: { onAttach: () => void; disabledReason?: string | null }) {
-  return (
-    <Tooltip label={disabledReason ?? "Attach files"}>
-      <button onClick={onAttach} disabled={Boolean(disabledReason)} aria-label="Attach file" className="composer-icon-button composer-attach">
-        <Plus size={16} />
-      </button>
-    </Tooltip>
-  );
+/** What the plus offers to name in this composer: only what its `@` and `/` lists can hold. */
+function addOffers(props: ComposerProps): AddOffers {
+  return {
+    orclings: Boolean(props.mentions?.length),
+    files: Boolean(props.fileSearch),
+    connectors: Boolean(props.connectors?.length || props.onConnectorsWanted),
+    skills: Boolean(props.commands?.some((command) => command.insert)),
+    commands: Boolean(props.commands?.some((command) => !command.insert)),
+    written: Boolean(props.value.trim()),
+  };
 }
 
 function composerModelControl(props: ComposerProps): ReactNode {

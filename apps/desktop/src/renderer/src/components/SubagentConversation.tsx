@@ -12,7 +12,7 @@ import { HostedSubagentHistoryError, HostedSubagentStop } from "./HostedSubagent
 export function SubagentConversation({ thread, project }: { thread: ThreadSummary; project: Project }) {
   const history = useRpc("runs.listForThread", { threadId: thread.id });
   const target = useRouter(({ route }) => (route.view === "thread" && route.threadId === thread.id ? route.message : undefined));
-  const { merged, hasOlder, loadOlder } = useConversationTranscript({ runs: history.data ?? [], threadId: thread.id, target });
+  const { merged, hasOlder, loadOlder } = useConversationTranscript({ runs: history.data ?? [], threadId: thread.id, target, hosted: thread.owner?.brain === "hosted" });
   const voice = useRunVoices({ authors: new Map() }, history.data ?? [], thread);
   const parent = useRpc("threads.get", { id: thread.parentThreadId ?? "" }, { enabled: placeOf(thread).elsewhere && Boolean(thread.parentThreadId) });
   const links = subagentLinkFolder(thread, parent.data, project);

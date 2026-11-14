@@ -51,6 +51,7 @@ it("keeps the cloud child read-only and stops only the handle shown by its row",
   fireEvent.click(screen.getByRole("button", { name: "Stop" }));
   await waitFor(() => expect(calls).toContainEqual({ method: "subagents.stop", params: { threadId: child.id, expectedRunId: "host-one" } }));
   expect(calls.some(({ method }) => method === "runs.interrupt")).toBe(false);
+  expect(calls.some(({ method }) => method === "threads.messages")).toBe(false);
 });
 
 it("explains an unsupported selected Stop only on focus", async () => {
@@ -107,6 +108,7 @@ it("keeps local Stop's existing request and hides its unavailable action", async
   const view = mount(local);
   fireEvent.click(screen.getByRole("button", { name: "Stop" }));
   await waitFor(() => expect(calls).toContainEqual({ method: "subagents.stop", params: { threadId: child.id } }));
+  expect(calls).toContainEqual({ method: "threads.messages", params: { id: child.id } });
   view.rerender(
     <QueryClientProvider client={queryClient}>
       <SubagentConversation thread={{ ...local, subagent: { ...native, stoppable: false } }} project={reviewProject} />

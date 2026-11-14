@@ -1,0 +1,198 @@
+.sidebar-chat {
+  flex: 0 0 auto;
+  min-height: 0;
+  padding: 8px 8px 12px;
+}
+.sidebar-chat .sidebar-list-head {
+  height: 28px;
+  margin: 0 0 2px;
+  padding: 0;
+}
+.sidebar-chat-list {
+  display: grid;
+  gap: 2px;
+  max-height: 202px;
+  overflow-y: auto;
+}
+.sidebar-chat-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 32px;
+  padding-inline: 8px;
+  border-radius: var(--radius-lg);
+  color: var(--ink-3);
+  font-size: var(--text-md);
+  text-align: left;
+}
+.sidebar-chat-row > svg {
+  flex-shrink: 0;
+  width: 18px;
+}
+.sidebar-chat-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebar-chat-row:hover {
+  background: var(--surface-1);
+}
+.sidebar-chat-row-current {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.sidebar-chat-error {
+  padding: 6px 8px;
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+}
+.team-chat-faces {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+}
+.team-chat-faces .account-face {
+  width: 20px;
+  height: 20px;
+  font-size: var(--text-2xs);
+}
+.team-chat-faces .account-face + .account-face {
+  margin-left: -8px;
+  box-shadow: 0 0 0 2px var(--bg);
+}
+.team-chat-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 0 24px;
+  color: var(--ink-3);
+}
+.team-chat-heading-name,
+.team-chat-heading-people {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.team-chat-heading-name > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.team-chat-heading-people {
+  flex-shrink: 0;
+  padding-left: 16px;
+  font-size: var(--text-sm);
+}
+.team-chat-scroll {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px var(--composer-gutter) 20px;
+  display: flex;
+  flex-direction: column;
+}
+.team-chat-transcript {
+  width: 100%;
+  max-width: calc(var(--container-chat) - 2 * var(--composer-gutter));
+  margin: auto auto 0;
+  padding: 0 8px;
+}
+.team-chat .team-chat-run {
+  --orcling-fill: var(--surface-2);
+}
+.team-chat-run .account-face {
+  width: 28px;
+  height: 28px;
+}
+.team-chat-run-mine {
+  display: block;
+}
+.team-chat-run-mine .orcling-run-bubbles {
+  justify-items: end;
+}
+.team-chat-message-mine .orcling-bubble {
+  background: var(--bubble-fill);
+  color: var(--bubble-ink);
+  padding: 10px 14px;
+}
+.team-chat-run-mine .orcling-run-bubbles > :not(:first-child) .orcling-bubble {
+  border-top-left-radius: 18px;
+  border-top-right-radius: 6px;
+}
+.team-chat-run-mine .orcling-run-bubbles > :not(:last-child) .orcling-bubble {
+  border-bottom-left-radius: 18px;
+  border-bottom-right-radius: 6px;
+}
+.team-chat .orcling-reaction button {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+.team-chat-message-mine .orcling-react-open {
+  left: auto;
+  right: calc(100% + 4px);
+}
+.team-chat-message-mine .orcling-react-bar {
+  left: auto;
+  right: 0;
+}
+.team-chat-empty,
+.team-chat-older {
+  justify-self: center;
+  color: var(--ink-4);
+  font-size: var(--text-md);
+}
+.team-chat-older {
+  margin-bottom: 12px;
+  font-size: var(--text-sm);
+}
+.team-chat-state {
+  flex: 1;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  color: var(--ink-3);
+}
+.team-chat-compose .composer-input {
+  min-height: 48px;
+}
+.team-chat-compose .composer-bar {
+  justify-content: flex-end;
+}
+.team-chat-compose {
+  flex-shrink: 0;
+}
+.team-chat-send-error {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 20px;
+  padding: 8px 12px 0;
+  color: var(--bad);
+  font-size: var(--text-sm);
+}
+.team-chat-send-error button {
+  color: var(--ink-3);
+}
+.team-chat-message-error {
+  color: var(--bad);
+  font-size: var(--text-xs);
+}
+.team-chat-action-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 4px 16px;
+  color: var(--bad);
+  font-size: var(--text-sm);
+}
+@media (max-height: 650px) {
+  .sidebar-chat-list {
+    max-height: 134px;
+  }
+}

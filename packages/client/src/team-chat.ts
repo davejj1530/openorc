@@ -41,14 +41,13 @@ export function teamConversationTitle(conversation: TeamConversation, self: stri
   if (conversation.kind === "channel") return conversation.name ?? "Channel";
   const others = (conversation.participants ?? []).map(({ person }) => person).filter((person) => person.id !== self);
   if (others.length === 1) return others[0]?.name ?? "Chat";
-  return (
-    others
-      .map((person) => {
-        const first = person.name.split(/\s/)[0] ?? person.name;
-        return others.filter((other) => other.name.split(/\s/)[0] === first).length > 1 ? person.name : first;
-      })
-      .join(", ") || "Chat"
-  );
+  return teamChatShortNames(others).join(", ") || "Chat";
+}
+
+/** First names, with the full name wherever two of these people share a first name. */
+export function teamChatShortNames(people: readonly TeamChatPerson[]): string[] {
+  const first = (person: TeamChatPerson) => person.name.split(/\s/)[0] || person.name;
+  return people.map((person) => (people.filter((other) => first(other) === first(person)).length > 1 ? person.name : first(person)));
 }
 
 export function teamChatRoster(state: TeamChatState, self: string): TeamChatRow[] {

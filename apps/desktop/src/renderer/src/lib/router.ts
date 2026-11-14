@@ -24,7 +24,7 @@ export type Route =
   | { view: "thread"; threadId: string; message?: MessageTarget }
   | { view: "tasks" }
   | { view: "pulls" }
-  | { view: "people"; spaceId: string; section?: "invitations" }
+  | { view: "people"; spaceId: string; section?: "invitations" | "seats" }
   | { view: "pull"; projectId: string; number: number }
   /** A project's settings. */
   | { view: "project"; projectId: string }
@@ -159,7 +159,7 @@ function isPlainView(view: string | undefined): view is PlainView {
 /** Screens a spec names by one id. */
 const idViews: Readonly<Record<string, (id: string, tab: string | undefined) => Route>> = {
   thread: (threadId) => ({ view: "thread", threadId }),
-  people: (spaceId, section) => ({ view: "people", spaceId, ...(section === "invitations" ? { section: "invitations" } : {}) }),
+  people: (spaceId, section) => ({ view: "people", spaceId, ...(section === "invitations" || section === "seats" ? { section } : {}) }),
   project: (projectId) => ({ view: "project", projectId }),
   newsubthread: (parentId) => ({ view: "newsubthread", parentId }),
 };
@@ -224,7 +224,7 @@ export function specFromRoute(route: Route): string {
     case "project":
       return `project:${route.projectId}`;
     case "people":
-      return `people:${route.spaceId}${route.section ? ":invitations" : ""}`;
+      return `people:${route.spaceId}${route.section ? `:${route.section}` : ""}`;
     case "pull":
       return `pull:${route.projectId}:${route.number}`;
     case "newtask":

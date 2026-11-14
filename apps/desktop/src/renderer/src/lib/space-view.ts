@@ -100,7 +100,8 @@ function threadRoute(value: SavedRoute, inventory: SpaceInventory): Route | null
 }
 function peopleRoute(value: SavedRoute, inventory: SpaceInventory): Route | null {
   if (inventory.personal || value["spaceId"] !== inventory.id) return null;
-  return { view: "people", spaceId: inventory.id, ...(value["section"] === "invitations" ? { section: "invitations" } : {}) };
+  const section = value["section"];
+  return { view: "people", spaceId: inventory.id, ...(section === "invitations" || section === "seats" ? { section } : {}) };
 }
 function chatRoute(value: SavedRoute, inventory: SpaceInventory): Route | null {
   const accountId = text(value["accountId"]);

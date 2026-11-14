@@ -1,4 +1,5 @@
 import { useComposerChanges } from "../lib/composer-changes";
+import { useHostedComposerChanges } from "../lib/hosted-composer-changes";
 import { useProjectGit } from "../lib/project-git";
 import {
   cloudTurnOf,
@@ -93,9 +94,14 @@ function SwitchingNote({ agent }: { agent: string | null }) {
  */
 function useCheckout(thread: ThreadSummary | null, project: Project) {
   const git = useProjectGit(project.id);
-  const checkout = useRpc("git.threadPushState", { threadId: thread?.id ?? "" }, { enabled: Boolean(thread) && git.tracks && thread?.workspaceMode === "current", refetchInterval: 8000 });
-  const changes = useComposerChanges(thread && git.tracks ? { kind: "thread", id: thread.id, projectName: project.name, thread } : null);
-  return { checkout, changes, git };
+  const checkout = useRpc(
+    "git.threadPushState",
+    { threadId: thread?.id ?? "" },
+    { enabled: Boolean(thread) && thread?.owner?.brain !== "hosted" && git.tracks && thread?.workspaceMode === "current", refetchInterval: 8000 },
+  );
+  const localChanges = useComposerChanges(thread && thread.owner?.brain !== "hosted" && git.tracks ? { kind: "thread", id: thread.id, projectName: project.name, thread } : null);
+  const hostedChanges = useHostedComposerChanges(thread?.owner?.brain === "hosted" ? thread : null, project.name);
+  return { checkout, changes: hostedChanges ?? localChanges, git };
 }
 
 /** The message the route opened this conversation at, such as a search result; only the focused conversation has one. */
@@ -175,7 +181,13 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const links = linkFolder(scope, project);
   const target = useMessageTarget(scope);
   const { merged, transcripts, liveTranscript, hasOlder, loadOlder } = useConversationTranscript({ runs, threadId: thread?.id ?? null, target });
-  const footers = useTurnFooters({ threadId: thread?.id ?? null, transcripts, blocks: merged?.blocks, basePath: toolPathBase(scope, links ?? project.rootPath) });
+  const footers = useTurnFooters({
+    threadId: thread?.id ?? null,
+    transcripts,
+    blocks: merged?.blocks,
+    basePath: toolPathBase(scope, links ?? project.rootPath),
+    hosted: thread?.owner?.brain === "hosted",
+  });
 
   const settings = useConversationSettings({ thread, activeRun });
   const { choice, mode, permission, permissionReady, permissionError } = settings;
@@ -339,21 +351,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
               error={cloud.shown((submitter.error ?? controls.error ?? compact.error ?? fork.error ?? settings.error ?? draftError)?.message ?? permissionError)}
             >
               {firstTaskRun && scope.kind === "task" ? (
-                <ComposerChoice
-                  ariaLabel="Where the task works"
-                  value={workspaceMode}
-                  options={[
-                    { value: "current" as const, label: "Checkout", hint: project.rootPath, icon: Laptop },
-                    {
-                      value: "worktree" as const,
-                      label: "Worktree",
-                      hint: scope.task.worktreePath ?? `New isolated worktree from ${scope.task.baseRef ?? project.defaultBranch ?? "HEAD"}`,
-                      icon: GitBranch,
-                    },
-                  ]}
-                  onChange={setWorkspace}
-                  disabled={optimistic.busy || Boolean(scope.task.worktreePath) || !runsQuery.data}
-                />
+                <TaskWorkspaceChoice task={scope.task} project={project} value={workspaceMode} onChange={setWorkspace} busy={optimistic.busy || !runsQuery.data} />
               ) : null}
             </Composer>
           </ConversationVoice.Provider>
@@ -368,6 +366,21 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
         </div>
       </div>
     </div>
+  );
+}
+
+function TaskWorkspaceChoice({ task, project, value, onChange, busy }: { task: Task; project: Project; value: WorkspaceMode; onChange(value: WorkspaceMode): void; busy: boolean }) {
+  return (
+    <ComposerChoice
+      ariaLabel="Where the task works"
+      value={value}
+      options={[
+        { value: "current" as const, label: "Checkout", hint: project.rootPath, icon: Laptop },
+        { value: "worktree" as const, label: "Worktree", hint: task.worktreePath ?? `New isolated worktree from ${task.baseRef ?? project.defaultBranch ?? "HEAD"}`, icon: GitBranch },
+      ]}
+      onChange={onChange}
+      disabled={busy || Boolean(task.worktreePath)}
+    />
   );
 }
 

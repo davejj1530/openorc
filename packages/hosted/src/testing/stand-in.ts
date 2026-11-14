@@ -406,10 +406,10 @@ function personRoutes(...routers: { route: PersonRoute }[]): PersonRoute {
   return (method, path, who, body) => routers.reduce<Reply | null>((reply, router) => reply ?? router.route(method, path, who, body), null);
 }
 
-/** Tells a person's sockets that topics of theirs changed, in their personal space's name, as the server's `changed` does. */
-function tellOf(peers: Set<Peer>, sockets: Set<StandInPeer>): (who: string, topics: string[]) => void {
-  return (who, topics) => {
-    for (const peer of [...peers, ...sockets]) if (peer.who() === who) peer.send("changed", { organizationId: `personal-${who}`, topics });
+/** Tells a person's sockets which space changed, defaulting personal topics to their own space. */
+function tellOf(peers: Set<Peer>, sockets: Set<StandInPeer>): (who: string, topics: string[], space?: string) => void {
+  return (who, topics, space = `personal-${who}`) => {
+    for (const peer of [...peers, ...sockets]) if (peer.who() === who) peer.send("changed", { organizationId: space, topics });
   };
 }
 
@@ -513,7 +513,7 @@ function organizationReads(
   spaces: StandInSpaces,
   people: Map<string, { name: string; image: string | null }>,
   billing: Map<string, StandInBilling>,
-  tell: (who: string, topics: string[]) => void,
+  tell: (who: string, topics: string[], space?: string) => void,
 ) {
   return new StandInOrganizations({
     spaces,

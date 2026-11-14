@@ -125,4 +125,9 @@ export class StandInSpaces {
     const team = this.teams.get(space);
     if (team) team.members = team.members.filter((member) => member.email !== who);
   }
+
+  deleteOrganization(space: string): void {
+    this.teams.delete(space);
+    this.#projects.delete(space);
+  }
 }

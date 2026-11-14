@@ -1,0 +1,125 @@
+.people-column {
+  overflow-y: auto;
+  container-type: inline-size;
+}
+.people-heading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 12px 32px;
+}
+.people-identity {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.people-identity h1 {
+  font-size: 24px;
+  line-height: 30px;
+  letter-spacing: -0.02em;
+}
+.people-identity p {
+  font-size: 13px;
+  line-height: 19px;
+  color: var(--ink-4);
+  margin-top: 3px;
+}
+.people-grid {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) 100px 128px 24px;
+  gap: 24px;
+  align-items: center;
+  padding: 0 12px;
+}
+.people-head {
+  height: 32px;
+  color: var(--ink-4);
+  font-size: 12.5px;
+  line-height: 18px;
+}
+.people-head > :first-child {
+  padding-left: 44px;
+}
+.people-row {
+  min-height: 60px;
+  border-radius: var(--radius-lg);
+}
+.people-row:hover {
+  background: var(--surface-2);
+}
+.people-name {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.people-name .account-face {
+  width: 32px;
+  height: 32px;
+  font-size: 13px;
+}
+.people-you {
+  margin-left: 8px;
+  color: var(--ink-4);
+  font-size: 12px;
+}
+.people-plan {
+  font-size: 13px;
+  line-height: 19px;
+  color: var(--ink-3);
+}
+.people-role {
+  font-size: 13px;
+  line-height: 19px;
+  color: var(--ink-2);
+}
+.people-role > button {
+  margin-left: -12px;
+}
+.people-role-menu {
+  width: 170px;
+}
+.people-organization-menu {
+  width: 230px;
+}
+.people-member-menu {
+  width: 205px;
+}
+.people-check-space {
+  width: 13px;
+  flex: none;
+}
+.people-row-error {
+  padding: 0 12px 8px;
+}
+.people-read-state {
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+@media (max-width: 1100px) {
+  .people-grid {
+    grid-template-columns: minmax(220px, 1fr) 66px 96px 24px;
+    gap: 12px;
+  }
+}
+@container (max-width: 700px) {
+  .people-grid {
+    grid-template-columns: minmax(180px, 1fr) 56px 88px 24px;
+    gap: 12px;
+  }
+}
+@container (max-width: 450px) {
+  .people-grid {
+    grid-template-columns: minmax(0, 1fr) 42px 76px 24px;
+    gap: 8px;
+  }
+  .people-heading {
+    flex-wrap: wrap;
+  }
+  .people-identity {
+    min-width: 140px;
+  }
+}

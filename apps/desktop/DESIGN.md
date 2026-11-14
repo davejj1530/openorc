@@ -237,6 +237,8 @@ Scoped views keep project groups, counts, search and task lists within the selec
 
 Create organization and Edit organization share a 420px dialog with the built Close control, an optional 48px raster logo, Name, Cancel and one primary action. Name refusals stay beside the input. A failed logo save after creation retains the created organization and offers Try again on its empty screen. The empty organization names itself above Add projects from GitHub and Invite people. Add projects uses a 460px dialog: GitHub and Connect first, then a searchable repository list with individual results. Only the selected organization's installations and repositories appear; adding a cloud project never invents a local folder.
 
+People uses the shared list-page column with aligned Name, Plan and Role columns. Members see the same Pro facts as admins. The sole admin's own role is plain Admin; with another admin present, it becomes the normal role picker. A successful self-demotion immediately removes admin controls. More holds Edit organization, Leave organization and Delete organization with the appropriate permissions. Pending invitations are absent when there are none. Leaving or deleting restores Personal; removing someone keeps People open.
+
 Responsive rules:
 
 - At 900px and narrower, the sidebar floats over the page on its opaque ground with `--shadow-overlay`. Opening a destination dismisses it; switching between Threads and Orclings keeps it open.

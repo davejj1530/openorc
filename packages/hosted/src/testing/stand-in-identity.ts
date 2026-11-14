@@ -16,7 +16,7 @@ interface IdentityRequest {
   allowed: boolean;
   logoFailure: string | null;
   now(): number;
-  tell(who: string, topics: string[]): void;
+  tell(who: string, topics: string[], space?: string): void;
 }
 export async function identityRoute(input: IdentityRequest): Promise<Reply | null> {
   const { method, path, who, spaces } = input;
@@ -78,6 +78,6 @@ async function patchIdentity(input: IdentityRequest, team: StandInTeam): Promise
   }
   team.name = nextName;
   team.logo = nextLogo;
-  for (const member of team.members) input.tell(member.email, ["spaces", "settings", "members"]);
+  for (const member of team.members) input.tell(member.email, ["spaces", "settings", "members"], input.space ?? undefined);
   return null;
 }

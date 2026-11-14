@@ -78,7 +78,12 @@ const github = z.object({ configured: z.boolean(), installations: z.array(z.obje
 const repositories = z.array(z.object({ installationId: id, repoId: z.number().int().positive(), fullName: z.string(), defaultBranch: z.string(), private: z.boolean() }));
 const route = <T>(method: Route<T>["method"], path: string, reply: z.ZodType<T>): Route<T> => ({ method, path, reply });
 const get = <T>(path: string, reply: z.ZodType<T>): Route<T> => ({ method: "GET", path, reply });
+const empty = (method: Route<null>["method"], path: string): Route<null> => ({ method, path, reply: null });
 export const SPACE_ROUTES = {
+  leaveOrganization: empty("POST", "/organization/leave"),
+  deleteOrganization: empty("DELETE", "/settings/organization"),
+  setMemberRole: (memberId: string) => route("PATCH", `/organization/members/${encodeURIComponent(memberId)}`, wireMembership),
+  removeMember: (memberId: string) => empty("DELETE", `/organization/members/${encodeURIComponent(memberId)}`),
   createOrganization: route("POST", "/api/auth/organization/create", wireOrganization.extend({ members: z.array(wireMembership) })),
   updateOrganization: route("PATCH", "/settings/organization", settings),
   organizationGithub: get("/github", github),

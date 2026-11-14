@@ -119,6 +119,12 @@ export interface HostedAccount {
 }
 
 export interface HostedSpaces {
+  readonly membership: {
+    setRole(input: RpcParams<"organization.member.setRole">): Promise<RpcResults["organization.member.setRole"]>;
+    remove(input: RpcParams<"organization.member.remove">): Promise<RpcResults["organization.member.remove"]>;
+    leave(input: RpcParams<"organization.leave">): Promise<RpcResults["organization.leave"]>;
+    delete(input: RpcParams<"organization.delete">): Promise<RpcResults["organization.delete"]>;
+  };
   readonly setup: {
     create(input: RpcParams<"spaces.create">): Promise<RpcResults["spaces.create"]>;
     update(input: RpcParams<"organization.update">): Promise<RpcResults["organization.update"]>;

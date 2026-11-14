@@ -1,4 +1,5 @@
 import { identityRoute } from "./stand-in-identity.js";
+import { membershipRoute } from "./stand-in-membership.js";
 import { randomUUID } from "node:crypto";
 import { userOf, type StandInSpaces } from "./stand-in-spaces.js";
 
@@ -16,7 +17,7 @@ interface OrganizationDeps {
   creationAllowed: boolean;
   person(email: string): { name: string; image: string | null };
   pro(email: string): boolean;
-  tell(who: string, topics: string[]): void;
+  tell(who: string, topics: string[], space?: string): void;
   now(): number;
 }
 
@@ -35,6 +36,15 @@ export class StandInOrganizations {
   }
 
   async route(request: { method: string; path: string; query: URLSearchParams; space: string | null }, who: string, body: Record<string, unknown> = {}): Promise<Reply | null> {
+    const membership = membershipRoute({
+      ...request,
+      who,
+      body,
+      spaces: this.deps.spaces,
+      tell: this.deps.tell,
+      recipients: this.received.filter((invite) => invite.spaceId === request.space).map((invite) => invite.email),
+    });
+    if (membership) return membership;
     const identity = await identityRoute({
       ...request,
       who,

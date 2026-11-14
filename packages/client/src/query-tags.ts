@@ -30,6 +30,10 @@ const readRules: Rules = {
 };
 
 const mutationRules: Rules = {
+  "organization.member.setRole": ({ spaceId }) => ["spaces", "projects", `people:${spaceId}`, `invitations:${spaceId}`],
+  "organization.member.remove": ({ spaceId }) => ["spaces", "projects", `people:${spaceId}`],
+  "organization.leave": () => ["spaces", "projects"],
+  "organization.delete": () => ["spaces", "projects"],
   "spaces.create": () => ["spaces"],
   "organization.update": ({ spaceId }) => ["spaces", `people:${spaceId}`],
   "organization.github.connect": ({ spaceId }) => [`repositories:${spaceId}`],

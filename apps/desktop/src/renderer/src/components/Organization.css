@@ -70,6 +70,25 @@
   line-height: 18px;
   margin-top: 2px;
 }
+.organization-person-identity {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.organization-person-identity .account-face {
+  width: 36px;
+  height: 36px;
+}
+.organization-person-identity p {
+  color: var(--ink-4);
+  font-size: 13px;
+  line-height: 20px;
+  margin-top: 3px;
+}
+.organization-membership-detail {
+  color: var(--ink-2);
+  line-height: 21px;
+}
 .organization-empty {
   display: flex;
   align-items: center;

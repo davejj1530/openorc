@@ -73,14 +73,30 @@ export interface OrganizationPeople {
   adminCount: number;
 }
 
+export interface OrganizationMembership {
+  memberId: string;
+  spaceId: string;
+  userId: string;
+  role: OrganizationRole;
+  joinedAt: number;
+}
+
 export const spacesRpcParams = {
   "spaces.status": z.object({}).strict(),
   "spaces.projects": z.object({ spaceId: SpaceId }).strict(),
   "organization.people": z.object({ spaceId: SpaceId, offset: z.number().int().nonnegative().optional(), limit: z.number().int().min(1).max(100).optional() }).strict(),
+  "organization.leave": z.object({ spaceId: SpaceId }).strict(),
+  "organization.delete": z.object({ spaceId: SpaceId, name: z.string().max(1000) }).strict(),
+  "organization.member.setRole": z.object({ spaceId: SpaceId, memberId: SpaceId, role: OrganizationRole }).strict(),
+  "organization.member.remove": z.object({ spaceId: SpaceId, memberId: SpaceId }).strict(),
 };
 
 export interface SpacesRpcResults extends OrganizationSetupResults {
   "spaces.status": SpacesStatus;
   "spaces.projects": SpaceProject[];
   "organization.people": OrganizationPeople;
+  "organization.leave": Record<string, never>;
+  "organization.delete": Record<string, never>;
+  "organization.member.setRole": OrganizationMembership;
+  "organization.member.remove": Record<string, never>;
 }

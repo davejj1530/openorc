@@ -8,6 +8,10 @@ export function createSpacesHandlers(spaces: HostedSpaces | null): Pick<Handlers
     return spaces;
   };
   return {
+    "organization.member.setRole": (input) => service().membership.setRole(input),
+    "organization.member.remove": (input) => service().membership.remove(input),
+    "organization.leave": (input) => service().membership.leave(input),
+    "organization.delete": (input) => service().membership.delete(input),
     "spaces.create": (input) => service().setup.create(input),
     "organization.update": (input) => service().setup.update(input),
     "organization.repositories": ({ spaceId }) => service().setup.repositories(spaceId),

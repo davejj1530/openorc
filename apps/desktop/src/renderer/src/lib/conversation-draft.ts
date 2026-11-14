@@ -12,7 +12,7 @@ export function useConversationDraft({ draftKey, threadId, initialText }: { draf
   const setPrompt = useCallback(
     (text: string) => {
       updatePrompt(text);
-      writeDraft(draftKey, { text });
+      writeDraft(draftKey, { ...readDraft(draftKey, { text }), text });
     },
     [draftKey],
   );

@@ -5,6 +5,7 @@ import type { HostedReviewReply, RpcMethod, RpcParams, RpcResults } from "@openo
 import { ChangesPanel } from "../panels/ChangesPanel";
 import { PanelContent } from "./PanelContent";
 import { HostedTurnChangeCard } from "./HostedTurnChangeCard";
+import { TipLayer } from "./TipLayer";
 import { useHostedReviewAction } from "../lib/hosted-review-action";
 import { core } from "../lib/rpc";
 import { queryClient } from "../lib/client";
@@ -109,10 +110,17 @@ it("keeps PR title and body usable without fetching a template or local branches
 });
 
 it("draws a saved turn with the same totals and disables Restore with its own reason", async () => {
-  mount(<HostedTurnChangeCard threadId={cloudReviewThread.id} turnId="turn-1" />);
+  mount(
+    <>
+      <HostedTurnChangeCard threadId={cloudReviewThread.id} turnId="turn-1" />
+      <TipLayer />
+    </>,
+  );
   expect(await screen.findByText("Changed 1 file")).toBeTruthy();
   expect(screen.getByRole("button", { name: "Undo" }).hasAttribute("disabled")).toBe(true);
-  expect(screen.getByLabelText("Undo this turn's changes").getAttribute("data-tip")).toBe("Restoring files isn't available in this cloud thread yet.");
+  expect(screen.queryByText("Restoring files isn't available in this cloud thread yet.")).toBeNull();
+  await act(async () => screen.getByLabelText("Undo this turn's changes").focus());
+  expect(await screen.findByText("Restoring files isn't available in this cloud thread yet.")).toBeTruthy();
 });
 
 it("shows a working turn's reason on a keyboard-reachable review control", async () => {
@@ -120,8 +128,9 @@ it("shows a working turn's reason on a keyboard-reachable review control", async
   mount(<HostedTurnChangeCard threadId={cloudReviewThread.id} turnId="turn-1" />);
   const control = await screen.findByLabelText("Review changes");
   expect(control.getAttribute("tabindex")).toBe("0");
-  expect(control.getAttribute("data-tip")).toBe("This turn's changes aren't recorded yet.");
   expect(screen.getByRole("button", { name: "Review changes" }).hasAttribute("disabled")).toBe(true);
+  await act(async () => control.focus());
+  expect(await screen.findByText("This turn's changes aren't recorded yet.")).toBeTruthy();
 });
 
 it("leaves the local empty workspace and RPC path unchanged", async () => {

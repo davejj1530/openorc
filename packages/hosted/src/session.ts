@@ -28,7 +28,15 @@ export class OutOfReach extends Error {
 }
 
 /** The server answered and said no, in its own words, which it writes for people. Never carries the request. */
-export class Refused extends Error {}
+export class Refused extends Error {
+  constructor(
+    message: string,
+    readonly status?: number,
+    readonly code?: string,
+  ) {
+    super(message);
+  }
+}
 
 /** The server answered in a shape this build does not read. */
 export class Unreadable extends Error {
@@ -69,6 +77,11 @@ interface Held {
 
 export class Session {
   #held: Held | null = null;
+  #generation = 0;
+
+  get generation(): number {
+    return this.#generation;
+  }
   #ended = false;
   #closed = false;
   #blip: ReturnType<typeof setTimeout> | null = null;
@@ -109,6 +122,7 @@ export class Session {
     const held = this.#held;
     if (!held) return;
     this.#held = null;
+    this.#generation++;
     this.#clearBlip();
     held.socket?.close();
     this.#ended = why === "server";
@@ -211,6 +225,7 @@ export class Session {
   }
 
   #hold(session: { token: string; email: string }): void {
+    this.#generation++;
     this.#held = { ...session, socket: null, reach: "offline" };
     this.#connect();
     this.#emit("changed");
@@ -287,7 +302,7 @@ export class Session {
       return parsed.data;
     }
     const refusal = wireRefusal.safeParse(parseJson(text));
-    if (refusal.success) throw new Refused(refusal.data.message.slice(0, WORDS_MAX));
+    if (refusal.success) throw new Refused(refusal.data.message.slice(0, WORDS_MAX), response.status, refusal.data.code);
     // A gateway's page in front of a server that is down carries no words of the server's.
     if (response.status >= 500) {
       this.#reconnectSoon();

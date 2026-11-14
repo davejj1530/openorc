@@ -4,6 +4,7 @@
  */
 import { AgentKind, BackgroundCommand, PermissionPreset, PrState, RunMode } from "@openorc/protocol";
 import { z } from "zod";
+import { SPACE_ROUTES } from "./wire-spaces.js";
 
 /** A route with the shape of its answer, so a reply is always parsed where it enters. Null: the body is not read. */
 export interface Route<T> {
@@ -128,7 +129,7 @@ export const wireEvents = z.object({ events: z.array(wireEvent), head: seq, from
 export type WireEvents = z.infer<typeof wireEvents>;
 
 /** A project of one of the person's spaces: a GitHub repository. */
-export const wireProject = z.object({ id: z.string(), name: z.string(), fullName: z.string() });
+export const wireProject = z.object({ id: z.string(), name: z.string(), fullName: z.string(), connected: z.boolean().default(true) });
 
 /**
  * One of the person's spaces: their personal one, whose `personalOf` is their own user id, or a team they are in. Read
@@ -164,7 +165,7 @@ export const wireGithubOutcome = z.object({ outcome: z.string() });
 export const wireAnswered = z.discriminatedUnion("answered", [z.object({ answered: z.literal(true) }), z.object({ answered: z.literal(false), refusal: z.string() })]);
 
 /** Socket messages, server to app: a topic of the person's changed, a stored batch of a thread's log, a row's facts moved. */
-export const wireTopics = z.object({ topics: z.array(z.string()) });
+export const wireTopics = z.object({ organizationId: z.string().optional(), topics: z.array(z.string()) });
 export const wireFrame = z.object({ threadId: z.string(), events: z.array(wireEvent).min(1) });
 export const wireChange = z.object({ threadId: z.string(), head: seq });
 export const wireWatched = z.object({ ok: z.boolean(), head: seq });
@@ -173,7 +174,7 @@ export const wireWatched = z.object({ ok: z.boolean(), head: seq });
 export const SOCKET = { changed: "changed", watch: "hosted:watch", unwatch: "hosted:unwatch", events: "hosted:events", threadChanged: "hosted:changed" } as const;
 
 /** The words a refusal carries, from either Better Auth (`{ code, message }`) or the server's own routes (`{ message }`). */
-export const wireRefusal = z.object({ message: z.string().min(1) });
+export const wireRefusal = z.object({ message: z.string().min(1), code: z.string().optional() });
 
 /** A sign-in through the browser the server started for an app waiting on a loopback port: the page the browser opens for it. */
 export const wireAppSignInStart = z.object({ request: z.string().min(1), url: z.url(), resultUrl: z.url(), expiresInMs: z.number() });
@@ -184,6 +185,7 @@ const route = <T = null>(method: Route<T>["method"], path: string, reply: z.ZodT
 
 /** Every route the app calls, in one list. The stand-in server in testing/ serves exactly these. */
 export const ROUTES = {
+  ...SPACE_ROUTES,
   /** Starts a sign-in through the browser for an app waiting on a loopback port, with the challenge of a verifier only the app holds. */
   appSignInStart: route("POST", "/app-sign-in/start", wireAppSignInStart),
   /** Trades the code the browser brought back, and the verifier, for the session's token; 410 in words once it is spent or ran out. */

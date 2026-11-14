@@ -13,7 +13,7 @@ import { noticeLine } from "./notice-text.js";
 import { spawnWithPipes, type SpawnTerminal } from "./terminal-process.js";
 
 /** What the server last said, by part, in the settings table. */
-const KEPT = { account: "hosted.kept", threads: "hosted.threads" } as const;
+const KEPT = { account: "hosted.kept", threads: "hosted.threads", spaces: "hosted.spaces" } as const;
 const STORAGE = "Cannot access protected storage for your OpenOrc account. Unlock your OS keychain and retry.";
 /** How long a socket the server answered with an error other than a refusal waits before trying again. */
 const RETRY_MS = 10_000;
@@ -56,7 +56,7 @@ function createAccount(deps: AccountDeps): Hosted {
       load: (part) => settings.get(deps.db, KEPT[part]),
       save: (part, json) => (json === null ? settings.remove(deps.db, KEPT[part]) : settings.set(deps.db, KEPT[part], json)),
     },
-    projects: () => projects.list(deps.db).map((project) => ({ id: project.id, remote: project.gitRemote })),
+    projects: () => projects.list(deps.db).map((project) => ({ id: project.id, name: project.name, remote: project.gitRemote })),
     fetch,
     connect: liveSocket,
     push: (push) => deps.windows.push(push),

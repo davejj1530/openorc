@@ -21,6 +21,7 @@ import { StandInSignIns } from "./stand-in-sign-ins.js";
 import { StandInAppSignIns } from "./stand-in-app-sign-ins.js";
 import { StandInGithub } from "./stand-in-github.js";
 import { StandInSpaces } from "./stand-in-spaces.js";
+import { StandInOrganizations } from "./stand-in-organizations.js";
 import { billingState, leftSeconds, StandInPayments, type StandInBilling, type StandInOffers } from "./stand-in-billing.js";
 import { StandInThreads, type Admit, type StandInPeer, type StandInThreadSeed } from "./stand-in-threads.js";
 
@@ -85,6 +86,8 @@ export interface StandIn {
   started: { space: string; body: Record<string, unknown> }[];
   /** GitHub as the server reaches it: what an install grants, and where its pages send the browser back. */
   github: Pick<StandInGithub, "grant" | "returnFor" | "configured">;
+  organizations: StandInOrganizations;
+  spaces: StandInSpaces;
   close(): Promise<void>;
 }
 
@@ -128,6 +131,7 @@ export interface StandInOptions {
   invited?: string[];
   /** The sandbox services it runs threads on, its default first. The real server's default alone when unset. */
   services?: string[];
+  now?: () => number;
 }
 
 /** "sam.lee@acme.com" becomes "Sam Lee", as the real server names a person who signed up with a code. */
@@ -245,23 +249,21 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
   const hosted = new StandInThreads(() => [...[...peers].filter((peer) => !peer.waiting), ...sockets], admitTurn, spaces);
   const signInWrites = new StandInSignIns(signIns);
   const tell = tellOf(peers, sockets);
+  const organizations = new StandInOrganizations({
+    spaces,
+    creationAllowed: options.signup === "open",
+    person: (email) => people.get(email) ?? { name: nameFromEmail(email), image: null },
+    pro: (email) => billing.get(email)?.pro ?? false,
+    tell,
+    now: options.now ?? Date.now,
+  });
   const github = new StandInGithub(spaces, (who) => tell(who, ["projects", "github"]));
   const payments = new StandInPayments(billing, tell, () => `http://127.0.0.1:${port}`);
   const personal = personRoutes(signInWrites, payments, github);
   const answerSocket = socketAnswers(hosted);
   let serving = true;
 
-  const server = createServer((request, response) => void answer(request, response));
-  server.on("connection", (socket) => {
-    connections.add(socket);
-    socket.once("close", () => connections.delete(socket));
-  });
-  server.on("upgrade", (request, socket) => {
-    requests.push({ method: "GET", path: SOCKET_PATH, authorized: false });
-    if (!request.url?.startsWith(SOCKET_PATH)) return void socket.destroy();
-    if (tooOld(request.headers["x-openorc-protocol"])) return void socket.destroy();
-    engineSession(request, socket as Socket, { holder, joined: (peer) => sockets.add(peer), left: (peer) => sockets.delete(peer), answer: answerSocket });
-  });
+  const server = transportServer({ connections, requests, holder, sockets, answerSocket, answer });
 
   async function answer(request: IncomingMessage, response: ServerResponse): Promise<void> {
     const { method, path, query, body, token, space } = await asked(request);
@@ -269,8 +271,8 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
     requests.push({ method, path, authorized: who !== null });
     const route = routes[`${method} ${path}`];
     const signedInRoute = (): Reply | null => {
-      if (who) return personal(method, path, who, body) ?? hosted.route({ method, path, query, space }, who, body);
-      return /^\/(projects|hosted|github|agent-sign-ins|billing|api\/auth\/organization)\b/.test(path) ? unauthorized() : null;
+      if (who) return organizations.route({ method, path, query, space }, who) ?? personal(method, path, who, body) ?? hosted.route({ method, path, query, space }, who, body);
+      return /^\/(spaces|organization|invitations|projects|hosted|github|agent-sign-ins|billing|api\/auth\/organization)\b/.test(path) ? unauthorized() : null;
     };
     const old = tooOld(request.headers["x-openorc-protocol"]) ? { status: 426, body: { statusCode: 426, message: APP_TOO_OLD } } : null;
     const reply: Reply = old ??
@@ -279,12 +281,7 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
     response.end(reply.body === null && reply.status !== 200 ? undefined : JSON.stringify(reply.body));
   }
 
-  const admit = (peer: Peer) => {
-    requests.push({ method: "GET", path: SOCKET_PATH, authorized: holder(peer.token) !== null });
-    peer.waiting = false;
-    peer.watched.clear();
-    queueMicrotask(() => peer.emit(holder(peer.token) ? "up" : "refused"));
-  };
+  const admit = (peer: Peer) => admitPeer(peer, requests, holder);
 
   await listen(server, 0);
   const { port } = server.address() as AddressInfo;
@@ -298,6 +295,8 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
     sandboxes,
     ...threadsFace(hosted),
     github,
+    spaces,
+    organizations,
     addTeam: (name, members) =>
       spaces.addTeam(
         name,
@@ -477,4 +476,32 @@ function listen(server: ReturnType<typeof createServer>, port: number): Promise<
       resolve();
     });
   });
+}
+
+function admitPeer(peer: Peer, requests: StandIn["requests"], holder: (token: string) => string | null): void {
+  requests.push({ method: "GET", path: SOCKET_PATH, authorized: holder(peer.token) !== null });
+  peer.waiting = false;
+  peer.watched.clear();
+  queueMicrotask(() => peer.emit(holder(peer.token) ? "up" : "refused"));
+}
+
+function transportServer(deps: {
+  connections: Set<Socket>;
+  requests: StandIn["requests"];
+  holder(token: string | null | undefined): string | null;
+  sockets: Set<StandInPeer>;
+  answerSocket(peer: StandInPeer, event: string, body: unknown): unknown;
+  answer(request: IncomingMessage, response: ServerResponse): Promise<void>;
+}) {
+  const server = createServer((request, response) => void deps.answer(request, response));
+  server.on("connection", (socket) => {
+    deps.connections.add(socket);
+    socket.once("close", () => deps.connections.delete(socket));
+  });
+  server.on("upgrade", (request, socket) => {
+    deps.requests.push({ method: "GET", path: SOCKET_PATH, authorized: false });
+    if (!request.url?.startsWith(SOCKET_PATH) || tooOld(request.headers["x-openorc-protocol"])) return void socket.destroy();
+    engineSession(request, socket as Socket, { holder: deps.holder, joined: (peer) => deps.sockets.add(peer), left: (peer) => deps.sockets.delete(peer), answer: deps.answerSocket });
+  });
+  return server;
 }

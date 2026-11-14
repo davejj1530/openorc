@@ -8,12 +8,28 @@
  * No Node, Electron or React Native import outside testing/. Each host hands in what only it has (`HostedDeps`), so a
  * phone can mount the same package with its own storage.
  */
-import type { AccountStatus, BillingOffers, BillingPage, Frame, HostedAgent, OwnerReach, Project, RoutedMethod, RpcParams, RpcResults, ThreadSummary } from "@openorc/protocol";
+import type {
+  AccountStatus,
+  OrganizationPeople,
+  SpaceProject,
+  SpacesStatus,
+  BillingOffers,
+  BillingPage,
+  Frame,
+  HostedAgent,
+  OwnerReach,
+  Project,
+  RoutedMethod,
+  RpcParams,
+  RpcResults,
+  ThreadSummary,
+} from "@openorc/protocol";
 import { Account } from "./account.js";
 import { Follower } from "./follow.js";
 import type { HostedNotice } from "./notices.js";
 import { Session } from "./session.js";
 import { Threads } from "./threads.js";
+import { Spaces } from "./spaces.js";
 
 /** The server's push socket, as little of it as the package uses. The desktop core builds one from `socket.io-client`. */
 export interface LiveSocket {
@@ -41,7 +57,7 @@ export interface HostedDeps {
    */
   kept: { load(part: KeptPart): string | null; save(part: KeptPart, json: string | null): void };
   /** This device's projects with their git remotes. Hosted projects are matched to them by GitHub repository. */
-  projects(): readonly { id: string; remote: string | null }[];
+  projects(): readonly { id: string; name?: string; remote: string | null }[];
   fetch: typeof fetch;
   /** Opens the socket with the token. Called again after each sign-in and each early reconnect; it retries by itself in between. */
   connect(url: string, token: string): LiveSocket;
@@ -102,7 +118,13 @@ export interface HostedAccount {
   offers(): Promise<BillingOffers | null>;
 }
 
-export type KeptPart = "account" | "threads";
+export interface HostedSpaces {
+  status(): SpacesStatus;
+  projects(spaceId: string): Promise<SpaceProject[]>;
+  people(spaceId: string, offset?: number, limit?: number): Promise<OrganizationPeople>;
+}
+
+export type KeptPart = "account" | "threads" | "spaces";
 
 /** The lists every place answers its own rows of, which the asker merges. */
 export type MergedMethod = "threads.list" | "threads.resolvedCount" | "inbox.list";
@@ -137,6 +159,7 @@ export type { HostedNotice, ThreadSummary };
 export interface Hosted {
   readonly account: HostedAccount;
   readonly threads: HostedThreads;
+  readonly spaces: HostedSpaces;
   /** Reads the stored session and the kept answers, and connects when signed in. Never rejects: no session is signed out. */
   start(): Promise<void>;
   /** The device woke or the network came back: connect now instead of at the next retry. */
@@ -146,8 +169,15 @@ export interface Hosted {
 
 export function createHosted(deps: HostedDeps): Hosted {
   const session = new Session(deps);
+  const spaces = new Spaces({ ...deps, session });
   // The account says which of this Mac's projects are on OpenOrc Cloud, from the projects the thread rows were read with.
-  const cloud = { repos: () => threads.cloudRepos(), reread: () => threads.refresh() };
+  const cloud = {
+    repos: () => threads.cloudRepos(),
+    reread: async () => {
+      await spaces.refresh();
+      await threads.refresh();
+    },
+  };
   const account = new Account({
     session,
     kept: deps.kept,
@@ -161,17 +191,23 @@ export function createHosted(deps: HostedDeps): Hosted {
   });
   // The follower reads a thread's log in the thread's space, which the rows know.
   const follower: Follower = new Follower({ session, on: (threadId) => threads.on(threadId), push: deps.push, log: deps.log });
-  const threads: Threads = new Threads({ session, follower, account, kept: deps.kept, projects: deps.projects, push: deps.push, notify: deps.notify, now: deps.now, log: deps.log });
+  const threads: Threads = new Threads({ session, spaces, follower, account, kept: deps.kept, projects: deps.projects, push: deps.push, notify: deps.notify, now: deps.now, log: deps.log });
   return {
     account,
     threads,
+    spaces,
     start: async () => {
       await account.start();
       threads.start();
     },
-    awoke: () => session.awoke(),
+    awoke: () => {
+      session.awoke();
+      void spaces.refresh();
+      void threads.refresh();
+    },
     close: () => {
       account.close();
+      spaces.close();
       threads.close();
       session.close();
     },

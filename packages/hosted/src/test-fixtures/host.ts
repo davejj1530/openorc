@@ -8,6 +8,7 @@ export interface Device {
   kept: string | null;
   /** The kept thread rows. */
   threads: string | null;
+  spaces: string | null;
   /** This device's projects, as the core lists them. */
   projects: { id: string; remote: string | null }[];
 }
@@ -21,7 +22,7 @@ export interface Seen {
   sockets: { closed: boolean }[];
 }
 
-export const newDevice = (): Device => ({ stored: null, kept: null, threads: null, projects: [] });
+export const newDevice = (): Device => ({ stored: null, kept: null, threads: null, spaces: null, projects: [] });
 
 /**
  * The person's browser, with this device's loopback held in memory. On OpenOrc's sign-in page the person signs in as
@@ -83,9 +84,9 @@ export function hostDeps(stand: StandIn, device: Device, overrides: Partial<Host
       },
     },
     kept: {
-      load: (part) => (part === "account" ? device.kept : device.threads),
+      load: (part) => (part === "account" ? device.kept : device[part]),
       save: (part, json) => {
-        if (part === "threads") return void (device.threads = json);
+        if (part !== "account") return void (device[part] = json);
         seen.timeline.push(json === null ? "kept forgotten" : "kept saved");
         device.kept = json;
       },

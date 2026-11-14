@@ -26,6 +26,7 @@ import { z } from "zod";
 import type { HostedDeps, HostedThreads, MergedMethod, PlacePage } from "./index.js";
 import { READ_LIMIT, type Follower } from "./follow.js";
 import type { Account } from "./account.js";
+import type { Spaces } from "./spaces.js";
 import { askNotice, endNotice, noticed } from "./notices.js";
 import * as sends from "./sends.js";
 import { Refused, type Requests, type Session, type SessionChange } from "./session.js";
@@ -57,7 +58,7 @@ const keptThreads = z.object({
 });
 type Heard = z.infer<typeof keptThreads>;
 
-type ThreadsDeps = { session: Session; follower: Follower; account: Pick<Account, "status" | "refused"> } & Pick<HostedDeps, "kept" | "projects" | "push" | "notify" | "now" | "log">;
+type ThreadsDeps = { session: Session; spaces: Spaces; follower: Follower; account: Pick<Account, "status" | "refused"> } & Pick<HostedDeps, "kept" | "projects" | "push" | "notify" | "now" | "log">;
 
 type Answer<M extends RoutedMethod> = (threads: Threads, params: RpcParams<M>) => Promise<RpcResults[M]> | RpcResults[M];
 
@@ -205,7 +206,7 @@ export class Threads implements HostedThreads {
     deps.session.onChange((change) => this.#changed(change));
     deps.session.onSocket(SOCKET.changed, (body) => {
       const topics = wireTopics.safeParse(body);
-      if (topics.success && topics.data.topics.some((topic) => topic === "threads" || topic === "projects" || topic === "members")) void this.refresh();
+      if (topics.success && topics.data.topics.some((topic) => topic === "threads" || topic === "projects" || topic === "members" || topic === "spaces")) void this.refresh();
     });
   }
 
@@ -442,6 +443,7 @@ export class Threads implements HostedThreads {
 
   async #read(): Promise<void> {
     const state = this.deps.session.state;
+    const generation = this.deps.session.generation;
     if (!state.signedIn) return;
     let read: Pick<Heard, "me" | "personal" | "rows" | "projects">;
     try {
@@ -451,7 +453,7 @@ export class Threads implements HostedThreads {
       return;
     }
     const now = this.deps.session.state;
-    if (this.#closed || !now.signedIn || now.email !== state.email) return;
+    if (this.#closed || !now.signedIn || this.deps.session.generation !== generation || now.email !== state.email) return;
     const before = JSON.stringify([this.#heard?.rows, this.#heard?.projects]);
     const projectsBefore = JSON.stringify(this.#heard?.projects);
     if (this.#heard?.email === state.email) this.#tellPerson(this.#heard.rows, read.rows);
@@ -464,16 +466,20 @@ export class Threads implements HostedThreads {
 
   /** Every space's threads and projects, each tagged with its space, and the person's own id from their personal space. */
   async #readSpaces(): Promise<Pick<Heard, "me" | "personal" | "rows" | "projects">> {
-    const spaces = await this.deps.session.request(ROUTES.spaces);
-    const read = await Promise.all(
-      spaces.map(async ({ id }) => {
-        const space = this.deps.session.in(id);
-        const [threads, projects] = await Promise.all([space.request(ROUTES.threads), space.request(ROUTES.projects)]);
-        return { rows: threads.threads.map((row) => ({ ...row, space: id })), projects: projects.map((project) => ({ ...project, space: id })) };
+    await this.deps.spaces.refresh();
+    const catalog = await this.deps.spaces.catalog();
+    const read = await Promise.allSettled(
+      catalog.ids.map(async (id) => {
+        const threads = await this.deps.session.in(id).request(ROUTES.threads);
+        return threads.threads.map((row) => ({ ...row, space: id }));
       }),
     );
-    const personal = spaces.find((space) => space.personalOf);
-    return { me: personal?.personalOf ?? null, personal: personal?.id ?? null, rows: read.flatMap((each) => each.rows), projects: read.flatMap((each) => each.projects) };
+    const rows = read.flatMap((answer, i) => {
+      if (answer.status === "fulfilled") return answer.value;
+      if (answer.reason instanceof Refused && [403, 404].includes(answer.reason.status ?? 0)) return [];
+      return this.#heard?.rows.filter((row) => row.space === catalog.ids[i]) ?? [];
+    });
+    return { me: catalog.me, personal: catalog.personal, rows, projects: catalog.projects };
   }
 
   /**

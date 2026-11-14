@@ -173,7 +173,7 @@ export class StandInThreads {
     if (!/^\/(projects|hosted)\b/.test(path)) return null;
     const space = this.spaces.resolve(who, request.space);
     if (typeof space !== "string") return space;
-    if (method === "GET" && path === "/projects") return { status: 200, body: this.spaces.listed(space) };
+    if (method === "GET" && path === "/projects") return { status: 200, body: this.spaces.listed(space, who) };
     const asked = /^\/hosted\/asks\/([^/]+)\/answer$/.exec(path);
     if (asked && method === "POST") return this.#answer(who, space, decodeURIComponent(asked[1]!), body);
     if (method === "POST" && path === "/hosted/threads") return this.#create(who, space, body);
@@ -489,7 +489,7 @@ export class StandInThreads {
   }
 
   #reads(who: string, thread: Thread): boolean {
-    return this.spaces.readers(thread.space).includes(who);
+    return thread.projectId ? this.spaces.canRead(thread.space, thread.projectId, who) : this.spaces.readers(thread.space).includes(who);
   }
 
   /** A thread of the space the request is in, which the person reads; null for any other. */

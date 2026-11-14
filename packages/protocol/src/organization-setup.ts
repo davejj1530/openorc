@@ -11,7 +11,7 @@ const repository = z.object({ installationId: SpaceId, repoId: z.number().int().
 
 export interface OrganizationRepositories {
   configured: boolean;
-  installations: { id: string; accountLogin: string; accountType: "User" | "Organization"; suspended: boolean }[];
+  installations: { id: string; accountLogin: string; accountType: "User" | "Organization"; suspended: boolean; settingsUrl: string | null }[];
   repositories: { installationId: string; repoId: number; fullName: string; defaultBranch: string; private: boolean; projectId: string | null }[];
   connecting: GithubWork | null;
 }
@@ -24,7 +24,7 @@ export const organizationSetupParams = {
     .strict()
     .refine((input) => input.name !== undefined || input.logo !== undefined, "Say what to change."),
   "organization.repositories": z.object({ spaceId: SpaceId }).strict(),
-  "organization.github.connect": z.object({ spaceId: SpaceId }).strict(),
+  "organization.github.connect": z.object({ spaceId: SpaceId, another: z.boolean().optional() }).strict(),
   "organization.projects.add": z.object({ spaceId: SpaceId, repositories: z.array(repository).min(1).max(50) }).strict(),
 };
 export interface OrganizationSetupResults {

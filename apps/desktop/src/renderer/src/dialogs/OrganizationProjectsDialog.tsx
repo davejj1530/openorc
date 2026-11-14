@@ -1,7 +1,8 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { OrganizationProjectAdded, OrganizationRepositories } from "@openorc/protocol";
-import { Button, Checkbox, Dialog, Input } from "../components/ui";
+import { Button, Checkbox, Dialog, Input, TextButton } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
+import { OrganizationGithubChooser } from "./OrganizationGithubChooser";
 import "../components/Organization.css";
 
 type Repository = OrganizationRepositories["repositories"][number];
@@ -16,7 +17,13 @@ export function OrganizationProjectsDialog({ open, spaceId, onOpenChange, onAdde
 }
 
 function RepositoryPicker({ spaceId, onOpenChange, onAdded }: { spaceId: string; onOpenChange(open: boolean): void; onAdded(): void | Promise<void> }) {
-  const read = useRpc("organization.repositories", { spaceId }, { refetchInterval: 2000 });
+  const read = useRpc("organization.repositories", { spaceId }, { staleTime: 0, refetchInterval: 2000 });
+  const { refetch } = read;
+  useEffect(() => {
+    const refresh = () => void refetch();
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
+  }, [refetch]);
   const connect = useRpcMutation("organization.github.connect");
   const add = useRpcMutation("organization.projects.add");
   const [chosen, setChosen] = useState<string[]>([]);
@@ -50,14 +57,10 @@ function RepositoryPicker({ spaceId, onOpenChange, onAdded }: { spaceId: string;
   return (
     <div className="organization-form">
       {!data ? <p className="text-sm text-ink-3">{read.isError ? "Repositories couldn't load." : "Loading repositories…"}</p> : null}
-      {data && !data.installations.length ? <GithubConnection configured={data.configured} waiting={waiting} connect={() => connect.mutate({ spaceId })} /> : null}
       {data && data.installations.length > 0 ? <RepositoryChoices data={data} chosen={chosen} onChosen={setChosen} outcomes={outcomes} pending={add.isPending} /> : null}
+      {data ? <OrganizationGithubChooser data={data} waiting={waiting} connect={(another) => connect.mutate({ spaceId, ...(another && { another: true }) })} /> : null}
       <RepositoryReadError error={readError} outcomes={outcomes} />
-      {error ? (
-        <p className="organization-error" role="alert">
-          {error}
-        </p>
-      ) : null}
+      <RepositoryError error={error} data={data} connectionFailed={Boolean(connect.error)} waiting={waiting} another={() => connect.mutate({ spaceId, another: true })} />
       {readError ? (
         <div className="organization-actions">
           <Button onClick={() => onOpenChange(false)}>Close</Button>
@@ -109,19 +112,37 @@ function RepositoryReadError({ error, outcomes }: { error: string | null; outcom
   );
 }
 
-function repositoryError(data: OrganizationRepositories | undefined, add: Error | null, connect: Error | null, read: Error | null): string | undefined {
-  return add?.message ?? connect?.message ?? (data?.connecting?.state === "failed" ? data.connecting.error : null) ?? read?.message;
-}
-
-function GithubConnection({ configured, waiting, connect }: { configured: boolean; waiting: boolean; connect(): void }) {
+function RepositoryError({
+  error,
+  data,
+  connectionFailed,
+  waiting,
+  another,
+}: {
+  error: string | undefined;
+  data: OrganizationRepositories | undefined;
+  connectionFailed: boolean;
+  waiting: boolean;
+  another(): void;
+}) {
+  if (!error) return null;
+  const offerAnother = !data?.installations.length && (connectionFailed || data?.connecting?.state === "failed");
   return (
-    <div className="organization-connect-row">
-      <span>GitHub</span>
-      <Button variant="primary" disabled={!configured || waiting} data-tip={!configured ? "GitHub isn't available on this server." : undefined} onClick={connect}>
-        {waiting ? "Connecting…" : "Connect"}
-      </Button>
+    <div>
+      <p className="organization-error" role="alert">
+        {error}
+      </p>
+      {offerAnother ? (
+        <TextButton tone="muted" className="text-sm mt-2" disabled={waiting} onClick={another}>
+          Another account or organization
+        </TextButton>
+      ) : null}
     </div>
   );
+}
+
+function repositoryError(data: OrganizationRepositories | undefined, add: Error | null, connect: Error | null, read: Error | null): string | undefined {
+  return add?.message ?? connect?.message ?? (data?.connecting?.state === "failed" ? data.connecting.error : null) ?? read?.message;
 }
 
 function RepositoryActions({

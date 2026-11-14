@@ -16,15 +16,31 @@ type Reply = { status: number; body: unknown };
 
 interface Person {
   login: string | null;
-  installed: { space: string; id: string; login: string; repositories: { fullName: string; repoId: number }[] } | null;
   /** What GitHub lets the app read once the person installs it. */
-  granted: string[];
+  granted: { repositories: string[] } & Grant;
+}
+interface Grant {
+  id?: number;
+  accountLogin?: string;
+  accountType?: "User" | "Organization";
+  settingsUrl?: string | null;
+}
+interface Installation {
+  owner: string;
+  space: string;
+  installationId: number;
+  id: string;
+  accountLogin: string;
+  accountType: "User" | "Organization";
+  settingsUrl: string | null;
+  repositories: { fullName: string; repoId: number }[];
 }
 
 const PAGE_MS = 15 * 60_000;
 
 export class StandInGithub {
   readonly #people = new Map<string, Person>();
+  readonly #installations = new Map<string, Installation>();
   readonly #states = new Map<string, { who: string; step: "link" | "install"; port: number; space: string }>();
   #repoIds = 0;
   configured = true;
@@ -35,8 +51,13 @@ export class StandInGithub {
   ) {}
 
   /** The repositories GitHub lets OpenOrc read once this person installs its app, as owner/name. */
-  grant(who: string, repositories: string[]): void {
-    this.#person(who).granted = repositories;
+  grant(who: string, repositories: string[], options: Grant = {}): void {
+    this.#person(who).granted = { repositories, ...options };
+    for (const installed of this.#installations.values()) {
+      if (installed.owner !== who || installed.installationId !== (options.id ?? 7001)) continue;
+      installed.repositories = repositories.map((fullName) => installed.repositories.find((repository) => repository.fullName === fullName) ?? { fullName, repoId: ++this.#repoIds });
+      if (options.settingsUrl !== undefined) installed.settingsUrl = options.settingsUrl;
+    }
   }
 
   /**
@@ -48,7 +69,7 @@ export class StandInGithub {
     const page = this.#states.get(state);
     if (!page) throw new Error("No such GitHub page.");
     const linked = options.denied ? "error=access_denied" : "code=granted";
-    const query = `${page.step === "link" ? linked : "installation_id=7001&setup_action=install"}&state=${state}`;
+    const query = `${page.step === "link" ? linked : `installation_id=${this.#person(page.who).granted.id ?? 7001}&setup_action=install`}&state=${state}`;
     return `http://127.0.0.1:${page.port}/github-return?${query}`;
   }
 
@@ -59,31 +80,42 @@ export class StandInGithub {
     if (typeof space !== "string") return space;
     if (["/github", "/github/repositories", "/github/install/start", "/projects"].includes(path) && space !== `personal-${who}` && this.spaces.member(space, who)?.role !== "admin")
       return { status: 403, body: { message: "Only an admin can do that." } };
-    const installed = person.installed?.space === space ? person.installed : null;
+    const installed = [...this.#installations.values()].filter((installation) => installation.space === space);
     const routes: Record<string, () => Reply> = {
       "GET /github": () => ({
         status: 200,
-        body: { configured: this.configured, installations: installed ? [{ id: installed.id, accountLogin: installed.login, accountType: "User", suspended: false }] : [] },
+        body: {
+          configured: this.configured,
+          installations: installed.map(({ id, accountLogin, accountType, settingsUrl }) => ({ id, accountLogin, accountType, suspended: false, settingsUrl: this.configured ? settingsUrl : null })),
+        },
       }),
       "GET /github/account": () => ({ status: 200, body: { configured: this.configured, account: person.login ? { login: person.login, name: null } : null } }),
       "GET /github/repositories": () => ({
         status: 200,
-        body: (installed?.repositories ?? []).map((repository) => ({ installationId: installed!.id, ...repository, defaultBranch: "main", private: true })),
+        body: installed.flatMap((installation) => installation.repositories.map((repository) => ({ installationId: installation.id, ...repository, defaultBranch: "main", private: true }))),
       }),
-      "POST /github/install/start": () => this.#start(who, person, Number(body["port"]), space),
+      "POST /github/install/start": () => this.#start(who, person, Number(body["port"]), space, body["another"] === true),
       "POST /github/link/finish": () => this.#finish(who, "link", String(body["query"] ?? "")),
       "POST /github/install/finish": () => this.#finish(who, "install", String(body["query"] ?? "")),
       "DELETE /github/account": () => {
         person.login = null;
         return { status: 204, body: null };
       },
-      "POST /projects": () => this.#addProjects(who, person, body, space),
+      "POST /projects": () => this.#addProjects(who, body, space),
     };
     return routes[`${method} ${path}`]?.() ?? null;
   }
 
-  #start(who: string, person: Person, port: number, space: string): Reply {
-    if (person.installed && person.installed.space !== space) return { status: 200, body: { kind: "settled", outcome: "taken" } };
+  #start(who: string, person: Person, port: number, space: string, another: boolean): Reply {
+    const owned = [...this.#installations.values()].filter((installation) => installation.owner === who);
+    if (person.login && !another && owned.length) {
+      for (const installation of owned) {
+        const key = `${space}:${installation.installationId}`;
+        if (!this.#installations.has(key)) this.#installations.set(key, { ...installation, space, id: randomBytes(12).toString("hex") });
+      }
+      this.projectsChanged(who);
+      return { status: 200, body: { kind: "settled", outcome: "connected" } };
+    }
     const step = person.login ? "install" : "link";
     const state = randomBytes(12).toString("hex");
     this.#states.set(state, { who, step, port, space });
@@ -103,15 +135,34 @@ export class StandInGithub {
       person.login = who.split("@")[0]!;
       return { status: 200, body: { outcome: "linked" } };
     }
-    person.installed = { space: page.space, id: "installation-7001", login: person.login ?? "github", repositories: person.granted.map((fullName) => ({ fullName, repoId: ++this.#repoIds })) };
+    return this.#install(who, page.space, Number(params.get("installation_id")));
+  }
+
+  #install(who: string, space: string, id: number): Reply {
+    const person = this.#person(who);
+    const key = `${space}:${id}`;
+    const prior = this.#installations.get(key);
+    const managed = [...this.#installations.values()].find((installation) => installation.installationId === id);
+    if (id !== (person.granted.id ?? 7001) || (managed && managed.owner !== who)) return { status: 200, body: { outcome: "unverified" } };
+    this.#installations.set(key, {
+      owner: who,
+      space,
+      id: prior?.id ?? randomBytes(12).toString("hex"),
+      installationId: id,
+      accountLogin: person.granted.accountLogin ?? person.login ?? "github",
+      accountType: person.granted.accountType ?? "User",
+      settingsUrl: person.granted.settingsUrl === undefined ? `https://github.com/settings/installations/${id}` : person.granted.settingsUrl,
+      repositories: person.granted.repositories.map((fullName) => prior?.repositories.find((repository) => repository.fullName === fullName) ?? { fullName, repoId: ++this.#repoIds }),
+    });
     this.projectsChanged(who);
     return { status: 200, body: { outcome: "connected" } };
   }
 
-  #addProjects(who: string, person: Person, body: Record<string, unknown>, space: string): Reply {
+  #addProjects(who: string, body: Record<string, unknown>, space: string): Reply {
     const asked = (body["repositories"] ?? []) as { installationId: string; repoId: number }[];
     const made = asked.map(({ installationId, repoId }) => {
-      const repository = person.installed?.id === installationId && person.installed.space === space ? person.installed.repositories.find((each) => each.repoId === repoId) : undefined;
+      const installation = [...this.#installations.values()].find((each) => each.id === installationId && each.space === space);
+      const repository = installation?.repositories.find((each) => each.repoId === repoId);
       return repository ? this.spaces.ensureProject(space, { ...repository, defaultBranch: "main" }) : null;
     });
     if (made.includes(null)) return { status: 404, body: { message: "OpenOrc can't read that repository. Check the app's access on GitHub.", statusCode: 404 } };
@@ -121,7 +172,7 @@ export class StandInGithub {
 
   #person(who: string): Person {
     let person = this.#people.get(who);
-    if (!person) this.#people.set(who, (person = { login: null, installed: null, granted: [] }));
+    if (!person) this.#people.set(who, (person = { login: null, granted: { repositories: [] } }));
     return person;
   }
 }

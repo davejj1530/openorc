@@ -115,7 +115,7 @@ it("retains chosen repositories after partial failure and never resends successf
   const data: OrganizationRepositories = {
     configured: true,
     connecting: null,
-    installations: [{ id: "installation", accountLogin: "example", accountType: "Organization", suspended: false }],
+    installations: [{ id: "installation", accountLogin: "example", accountType: "Organization", suspended: false, settingsUrl: null }],
     repositories: ["canvas", "tools"].map((name, i) => ({ installationId: "installation", repoId: i + 1, fullName: `example/${name}`, defaultBranch: "main", private: true, projectId: null })),
   };
   const additions: unknown[] = [];
@@ -159,7 +159,7 @@ it.each([true, false])("retries only the read after project results, without cla
   const data: OrganizationRepositories = {
     configured: true,
     connecting: null,
-    installations: [{ id: "installation", accountLogin: "example", accountType: "Organization", suspended: false }],
+    installations: [{ id: "installation", accountLogin: "example", accountType: "Organization", suspended: false, settingsUrl: null }],
     repositories: [{ installationId: "installation", repoId: 1, fullName: "example/canvas", defaultBranch: "main", private: true, projectId: null }],
   };
   vi.mocked(core.call).mockImplementation(async (method) => {

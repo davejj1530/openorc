@@ -110,9 +110,12 @@ it("binds GitHub and per-repository outcomes to the organization across the brow
   expect(await hosted.spaces.projects(organization)).toMatchObject([{ key: expect.stringMatching(/^openorc-cloud:/), localProjectId: null }]);
   expect(await hosted.spaces.projects(other)).toEqual([]);
   await hosted.spaces.setup.connect(other);
-  await vi.waitFor(async () =>
-    expect((await hosted.spaces.setup.repositories(other)).connecting).toMatchObject({ state: "failed", error: "Another OpenOrc space already uses that GitHub installation." }),
-  );
+  const connected = await hosted.spaces.setup.repositories(other);
+  expect(connected.connecting).toBeNull();
+  expect(connected.repositories).toHaveLength(2);
+  expect(connected.installations[0]?.id).not.toBe(read.installations[0]?.id);
+  expect(connected.repositories.every((repository) => repository.projectId === null)).toBe(true);
+  expect((await hosted.spaces.setup.repositories(organization)).repositories[0]?.projectId).toBeTruthy();
 });
 
 it("keeps member setup controls unauthorized at the HTTP boundary", async () => {
@@ -132,4 +135,52 @@ it("accepts a GitHub install that the service settles as connected without openi
       new URL(String(input)).pathname === "/github/install/start" ? Promise.resolve(new Response(JSON.stringify({ kind: "settled", outcome: "connected" }), { status: 200 })) : fetch(input, init),
   });
   expect((await hosted.spaces.setup.connect(spaceId)).connecting).toBeNull();
+});
+
+it("keeps another-account intent through linking and adds a second installation without replacing the first", async () => {
+  const spaceId = stand.addTeam("Birch Studio", [ADMIN]);
+  const other = stand.addTeam("Cedar Studio", [ADMIN]);
+  stand.github.grant(ADMIN, ["birch/canvas"], { accountLogin: "birch", accountType: "Organization" });
+  const starts: { body: unknown; space: string | null }[] = [];
+  const hosted = await host({
+    fetch: (input, init) => {
+      if (new URL(String(input)).pathname === "/github/install/start") starts.push({ body: JSON.parse(String(init?.body)), space: new Headers(init?.headers).get("x-openorc-space") });
+      return fetch(input, init);
+    },
+  });
+  await hosted.spaces.setup.connect(spaceId, true);
+  await vi.waitFor(async () => expect((await hosted.spaces.setup.repositories(spaceId)).installations).toHaveLength(1));
+  expect(starts).toHaveLength(2);
+  expect(starts).toEqual([1, 2].map(() => ({ body: { port: expect.any(Number), another: true }, space: spaceId })));
+  const first = (await hosted.spaces.setup.repositories(spaceId)).repositories[0]!;
+  await hosted.spaces.setup.addProjects({ spaceId, repositories: [first] });
+  stand.github.grant(ADMIN, ["cedar/tools"], { id: 7002, accountLogin: "cedar", accountType: "Organization", settingsUrl: "https://github.com/organizations/cedar/settings/installations/7002" });
+  await hosted.spaces.setup.connect(spaceId, true);
+  await vi.waitFor(async () => expect((await hosted.spaces.setup.repositories(spaceId)).installations).toHaveLength(2));
+  const data = await hosted.spaces.setup.repositories(spaceId);
+  expect(data.installations.map(({ accountLogin, settingsUrl }) => ({ accountLogin, settingsUrl }))).toEqual([
+    { accountLogin: "birch", settingsUrl: "https://github.com/settings/installations/7001" },
+    { accountLogin: "cedar", settingsUrl: "https://github.com/organizations/cedar/settings/installations/7002" },
+  ]);
+  expect(data.repositories[0]?.projectId).toBeTruthy();
+  expect(data.repositories.map((repository) => repository.fullName)).toEqual(["birch/canvas", "cedar/tools"]);
+  expect((await hosted.spaces.setup.repositories(other)).installations).toEqual([]);
+});
+
+it("rereads new grants and unavailable settings without losing a connected account or added project", async () => {
+  const spaceId = stand.addTeam("Birch Studio", [ADMIN]);
+  stand.github.grant(ADMIN, ["birch/canvas"]);
+  const hosted = await host();
+  await hosted.spaces.setup.connect(spaceId);
+  await vi.waitFor(async () => expect((await hosted.spaces.setup.repositories(spaceId)).repositories).toHaveLength(1));
+  const first = (await hosted.spaces.setup.repositories(spaceId)).repositories[0]!;
+  await hosted.spaces.setup.addProjects({ spaceId, repositories: [first] });
+  stand.github.grant(ADMIN, ["birch/canvas", "birch/tools"], { settingsUrl: null });
+  const data = await hosted.spaces.setup.repositories(spaceId);
+  expect(data.installations).toMatchObject([{ id: first.installationId, settingsUrl: null }]);
+  expect(data.repositories).toMatchObject([
+    { ...first, projectId: expect.any(String) },
+    { fullName: "birch/tools", projectId: null },
+  ]);
+  expect(stand.requests.filter((request) => request.path === "/github/install/finish")).toHaveLength(1);
 });

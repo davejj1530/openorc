@@ -25,11 +25,15 @@ import type {
   ThreadSummary,
 } from "@openorc/protocol";
 import { Account } from "./account.js";
+import { TeamChat } from "./chat.js";
 import { Follower } from "./follow.js";
 import type { HostedNotice } from "./notices.js";
 import { Session } from "./session.js";
 import { Threads } from "./threads.js";
 import { Spaces } from "./spaces.js";
+import { OnlineTasks } from "./tasks.js";
+
+export { OnlineTasks } from "./tasks.js";
 
 /** The server's push socket, as little of it as the package uses. The desktop core builds one from `socket.io-client`. */
 export interface LiveSocket {
@@ -148,7 +152,7 @@ export interface HostedSpaces {
     create(input: RpcParams<"spaces.create">): Promise<RpcResults["spaces.create"]>;
     update(input: RpcParams<"organization.update">): Promise<RpcResults["organization.update"]>;
     repositories(spaceId: string): Promise<RpcResults["organization.repositories"]>;
-    connect(spaceId: string): Promise<RpcResults["organization.github.connect"]>;
+    connect(spaceId: string, another?: boolean): Promise<RpcResults["organization.github.connect"]>;
     addProjects(input: RpcParams<"organization.projects.add">): Promise<RpcResults["organization.projects.add"]>;
   };
   status(): SpacesStatus;
@@ -192,6 +196,8 @@ export interface Hosted {
   readonly account: HostedAccount;
   readonly threads: HostedThreads;
   readonly spaces: HostedSpaces;
+  readonly chat: TeamChat;
+  readonly tasks: OnlineTasks;
   /** Reads the stored session and the kept answers, and connects when signed in. Never rejects: no session is signed out. */
   start(): Promise<void>;
   /** The device woke or the network came back: connect now instead of at the next retry. */
@@ -202,6 +208,8 @@ export interface Hosted {
 export function createHosted(deps: HostedDeps): Hosted {
   const session = new Session(deps);
   const spaces = new Spaces({ ...deps, session });
+  const chat = new TeamChat({ session, spaces, push: deps.push });
+  const tasks = new OnlineTasks({ session, spaces, push: deps.push });
   // The account says which of this Mac's projects are on OpenOrc Cloud, from the projects the thread rows were read with.
   const cloud = {
     repos: () => threads.cloudRepos(),
@@ -242,6 +250,8 @@ export function createHosted(deps: HostedDeps): Hosted {
     account,
     threads,
     spaces,
+    chat,
+    tasks,
     start: async () => {
       await account.start();
       threads.start();
@@ -255,6 +265,8 @@ export function createHosted(deps: HostedDeps): Hosted {
       account.close();
       spaces.close();
       threads.close();
+      chat.close();
+      tasks.close();
       session.close();
     },
   };

@@ -27,7 +27,7 @@ export function createSpacesHandlers(spaces: HostedSpaces | null): Pick<Handlers
     "spaces.create": (input) => service().setup.create(input),
     "organization.update": (input) => service().setup.update(input),
     "organization.repositories": ({ spaceId }) => service().setup.repositories(spaceId),
-    "organization.github.connect": ({ spaceId }) => service().setup.connect(spaceId),
+    "organization.github.connect": ({ spaceId, another }) => service().setup.connect(spaceId, another),
     "organization.projects.add": (input) => service().setup.addProjects(input),
     "spaces.status": () => spaces?.status() ?? { state: "unavailable" },
     "spaces.projects": ({ spaceId }) => service().projects(spaceId),

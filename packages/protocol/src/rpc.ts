@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { hostedParityRpcParams, type HostedParityRpcResults } from "./hosted-parity.js";
 import { UsageHistoryParams } from "./usage-history.js";
 import { ProjectActivityParams } from "./project-activity.js";
 import type { AgentUpdates } from "./agent-updates.js";
@@ -75,6 +76,7 @@ const hasReviewScope = (scope: { threadId?: string; taskId?: string }) => Boolea
 const REVIEW_SCOPE_REQUIRED = "Review comments need a conversation or a task.";
 
 export const rpcParams = {
+  ...hostedParityRpcParams,
   ...accountRpcParams,
   ...spacesRpcParams,
   ...organizationInvitationParams,
@@ -571,6 +573,7 @@ export interface ResolvedExtraction {
 
 export interface RpcResults
   extends
+    HostedParityRpcResults,
     PullRequestRpcResults,
     OrclingRpcResults,
     ProjectRpcResults,

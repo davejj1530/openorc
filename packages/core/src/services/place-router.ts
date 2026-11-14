@@ -40,6 +40,11 @@ export class PlaceRouter {
     const params = parsed.data as Record<string, unknown>;
     if (typeof params["spaceId"] === "string" && ["threads.list", "threads.resolvedCount", "threads.search", "threads.start", "tasks.list"].includes(method))
       return this.scoped.handle(request, params["spaceId"]);
+    if (method.startsWith("hosted.")) {
+      const id = params["threadId"];
+      if (place?.active && typeof id === "string" && place.holds({ thread: id })) return this.asked(place, request, method as RoutedMethod, params);
+      return Promise.resolve({ type: "rpc.error", id: request.id, message: "That conversation isn't available on OpenOrc Cloud." });
+    }
     if (!place?.active) return this.deps.next(request);
     if (method === "projects.get" && place.holds({ project: String(params["id"]) })) return Promise.resolve(result(request, place.project(String(params["id"]))));
     if (method === "threads.start" && params["hosted"]) return this.asked(place, request, "threads.start", params);

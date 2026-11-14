@@ -2,6 +2,7 @@ import type { RoutedMethod, RpcParams, RpcResults } from "@openorc/protocol";
 import type { Threads } from "./threads.js";
 import { toRuns } from "./translate.js";
 import * as sends from "./sends.js";
+import * as review from "./thread-review.js";
 
 type Answer<M extends RoutedMethod> = (threads: Threads, params: RpcParams<M>) => Promise<RpcResults[M]> | RpcResults[M];
 
@@ -19,6 +20,11 @@ const STAYS = refused("An OpenOrc Cloud thread stays on OpenOrc Cloud.");
  * words, or is never asked it. Total over `RoutedMethod`, so a new such call does not compile until someone decides.
  */
 export const ANSWERS: { [M in RoutedMethod]: Answer<M> | ReturnType<typeof refused> | typeof NOT_ASKED } = {
+  "hosted.review.changes": review.changes,
+  "hosted.review.turn": review.turn,
+  "hosted.review.file": review.file,
+  "hosted.review.state": review.state,
+  "hosted.review.action": review.action,
   "threads.get": (threads, { id }) => threads.summary(id),
   "runs.listForThread": (threads, { threadId }) => toRuns(threads.row(threadId), threads.reach),
   "events.page": (threads, params) => threads.page(params),
@@ -47,8 +53,7 @@ export const ANSWERS: { [M in RoutedMethod]: Answer<M> | ReturnType<typeof refus
   "orclings.reactions": () => [],
   "review.comments.list": () => [],
   "tasks.list": () => [],
-  // The server keeps a thread's changes (GET /hosted/threads/:id/changes); they are drawn here once translated.
-  "review.threadDiff": () => ({ baseSha: null, patch: "", files: [], since: null }),
+  "review.threadDiff": review.legacyDiff,
 
   "threads.delete": (threads, { id }) => threads.remove(id),
   "threads.implementPlan": NOT_YET,
@@ -56,7 +61,7 @@ export const ANSWERS: { [M in RoutedMethod]: Answer<M> | ReturnType<typeof refus
   "threads.switchClaudeAccount": refused("An OpenOrc Cloud thread runs on your Claude sign-in there."),
   "threads.compact": NOT_YET,
   "threads.send": NOT_YET,
-  "threads.turnChanges": NOT_YET,
+  "threads.turnChanges": review.legacyTurn,
   "threads.fork": NOT_YET,
   "subagents.stop": NOT_YET,
   "runs.close": NOT_YET,
@@ -71,12 +76,12 @@ export const ANSWERS: { [M in RoutedMethod]: Answer<M> | ReturnType<typeof refus
   "review.comments.add": NOT_YET,
   "review.comments.remove": NOT_YET,
   "review.comments.send": NOT_YET,
-  "review.threadChanges": NOT_YET,
-  "review.threadFileDiff": NOT_YET,
-  "review.commitThread": NOT_YET,
-  "review.pushThread": NOT_YET,
-  "review.createThreadPr": NOT_YET,
-  "review.threadPrTemplate": NOT_YET,
+  "review.threadChanges": review.legacyChanges,
+  "review.threadFileDiff": review.file,
+  "review.commitThread": review.commit,
+  "review.pushThread": review.push,
+  "review.createThreadPr": review.pullRequest,
+  "review.threadPrTemplate": refused("Pull request templates aren't available in this cloud thread yet."),
   "git.threadLog": NO_FILES,
   "git.commitRange": NO_FILES,
   "git.threadPushState": NO_FILES,

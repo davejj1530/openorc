@@ -59,3 +59,4 @@ export { THREAD_CHILD_PAGE } from "./thread-list.js";
 export * from "./spaces.js";
 export * from "./organization-setup.js";
 export * from "./organization-invitations.js";
+export * from "./hosted-parity.js";

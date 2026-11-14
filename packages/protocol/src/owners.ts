@@ -63,6 +63,11 @@ const here = { by: "here" } as const;
  * allowlist from it. Methods not listed and not RoutedMethod are host-level: the asked core answers about itself.
  */
 export const OWNER_ROUTES: { [M in RoutedMethod]: OwnerRoute<M> } & { [M in Exclude<RpcMethod, RoutedMethod>]?: OwnerRoute<M> } = {
+  "hosted.review.changes": byThreadId,
+  "hosted.review.turn": byThreadId,
+  "hosted.review.file": byThreadId,
+  "hosted.review.state": byThreadId,
+  "hosted.review.action": byThreadId,
   "threads.start": { by: "start", cloud: (p) => (p.cloud ? p.projectId : undefined) },
   "cloud.warm": { by: "ahead", cloud: (p) => p.projectId },
   "threads.list": { by: "merge" },

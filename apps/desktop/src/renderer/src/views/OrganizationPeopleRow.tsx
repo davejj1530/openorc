@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Menu } from "@base-ui/react/menu";
 import type { OrganizationPerson, OrganizationRole } from "@openorc/protocol";
 import { AccountFace } from "../components/AccountFace";
-import { Check, ChevronDown, MoreHorizontal, X } from "../components/icons";
-import { Button, IconButton } from "../components/ui";
-import { menuItem, menuItemDanger, menuPopup } from "../components/menu";
+import { Check, ChevronDown } from "../components/icons";
+import { Button } from "../components/ui";
+import { menuItem, menuPopup } from "../components/menu";
+import { TeamChatPersonMenu } from "../components/TeamChatPersonMenu";
 import { CoversPreview } from "../lib/browser-preview";
 import { useRpcMutation } from "../lib/client";
 import { floatingGround } from "../lib/use-anchor-ground";
@@ -68,7 +69,7 @@ export function OrganizationPeopleRow({
             roleName[person.role]
           )}
         </div>
-        <div role="cell">{!self && editable ? <PersonMore person={person} onRemove={onRemove} /> : null}</div>
+        <div role="cell">{!self ? <TeamChatPersonMenu person={person} spaceId={spaceId} editable={editable} onRemove={onRemove} /> : null}</div>
       </div>
       {readError ? (
         <p role="alert" className="organization-error people-row-error">
@@ -107,28 +108,6 @@ function RolePicker({ person, pending, onRole }: { person: OrganizationPerson; p
                 {roleName[role]}
               </Menu.Item>
             ))}
-          </Menu.Popup>
-        </Menu.Positioner>
-      </Menu.Portal>
-    </Menu.Root>
-  );
-}
-
-function PersonMore({ person, onRemove }: { person: OrganizationPerson; onRemove(person: OrganizationPerson, trigger: HTMLButtonElement | null): void }) {
-  const trigger = useRef<HTMLButtonElement>(null);
-  return (
-    <Menu.Root>
-      <Menu.Trigger ref={trigger} render={<IconButton aria-label={`More for ${person.name}`} size="xs" />}>
-        <MoreHorizontal size={15} />
-      </Menu.Trigger>
-      <Menu.Portal>
-        <CoversPreview />
-        <Menu.Positioner align="end" sideOffset={4} collisionPadding={8} className="z-40">
-          <Menu.Popup ref={floatingGround} className={`${menuPopup} people-member-menu`}>
-            <Menu.Item className={menuItemDanger} onClick={() => onRemove(person, trigger.current)}>
-              <X size={14} />
-              Remove member…
-            </Menu.Item>
           </Menu.Popup>
         </Menu.Positioner>
       </Menu.Portal>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { TeamChatRow } from "@openorc/client";
 import { cn } from "../lib/cn";
+import { useTeamChatOrder } from "../lib/use-team-chat-order";
 import { SidebarListHead } from "./SidebarListHead";
 import { TeamChatFace, TeamConversationFace } from "./TeamChatFace";
 import { Tooltip } from "./ui";
@@ -17,12 +18,13 @@ export interface SidebarChatProps {
 }
 export function SidebarChat({ rows, self, selected, opening, error, onOpen, onRetry }: SidebarChatProps) {
   const [open, setOpen] = useState(true);
+  const order = useTeamChatOrder(rows);
   return (
-    <section className="sidebar-chat" aria-label="Chat">
+    <section className="sidebar-chat" aria-label="Chat" {...order.props}>
       <SidebarListHead label="Chat" fold={{ open, waiting: 0, onToggle: () => setOpen(!open) }} tools={null} />
       {open ? (
         <div className="sidebar-chat-list">
-          {rows.map((row) => {
+          {order.rows.map((row) => {
             const conversationId = row.kind === "person" ? row.conversation?.id : row.conversation.id;
             const pending = opening === row.id;
             return (

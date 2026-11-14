@@ -165,13 +165,13 @@ export function threadTreeRows(
 }
 
 /** A single stroke keeps translucent lines even when deeper branches share the capped lane. */
-export function threadBranchPath(row: ThreadTreeRow, { markX, mid, height, step = 20 }: { markX: number; mid: number; height: number; step?: number }): string {
+export function threadBranchPath(row: ThreadTreeRow, { markX, mid, height, step = 20, endInset = 0 }: { markX: number; mid: number; height: number; step?: number; endInset?: number }): string {
   const depth = Math.min(row.depth, 3);
   const mark = markX + depth * step;
   const spine = mark - step;
   const paths = row.continuing.map((level) => `M${markX + (Math.min(level, 3) - 1) * step} 0V${height}`);
   if (depth) {
-    paths.push(`M${spine} 0V${mid - 6}q0 6 6 6h${step - 14}`);
+    paths.push(`M${spine} 0V${mid - 6}q0 6 6 6h${step - 14 - endInset}`);
     if (!row.last) paths.push(`M${spine} ${mid - 6}V${height}`);
   }
   if (row.hasChildren && row.expanded && row.visibleChildren !== 0) {

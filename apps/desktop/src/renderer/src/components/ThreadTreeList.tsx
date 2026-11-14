@@ -36,7 +36,7 @@ export function ThreadTreeList({
     if (!row || visited.has(thread.id)) return null;
     visited.add(thread.id);
     const { depth, hasChildren, expanded } = row;
-    const project = depth ? undefined : projects?.get(thread.projectId);
+    const project = projects?.get(thread.projectId);
     return (
       <div key={thread.id} className="sidebar-tree-node" data-child={depth > 0 || undefined}>
         <BranchRow row={row} onToggle={hasChildren ? () => toggle(thread.id, expanded) : undefined}>
@@ -60,7 +60,7 @@ export function ThreadTreeList({
   return roots.map(render);
 }
 
-/** The tree's grid: a parent's line leaves under its title's start, and a sub thread steps in so its mark sits there. */
+/** The branch starts under the parent title and ends before the indented child title. */
 const MARK_X = 16;
 const STEP = 24;
 
@@ -71,8 +71,7 @@ const STEP = 24;
  */
 function BranchRow({ row, children, paging = false, onToggle }: { row: ThreadTreeRow; children: ReactNode; paging?: boolean; onToggle?: () => void }) {
   const element = useRef<HTMLDivElement>(null);
-  const root = row.depth === 0 && !paging;
-  const [size, setSize] = useState({ height: root ? 52 : 34, mid: root ? 35 : 17, title: 17 });
+  const [size, setSize] = useState({ height: 32, mid: 16, title: 16 });
   useLayoutEffect(() => {
     const node = element.current;
     if (!node) return;
@@ -86,7 +85,7 @@ function BranchRow({ row, children, paging = false, onToggle }: { row: ThreadTre
       if (scale)
         setSize({
           height: node.offsetHeight,
-          mid: center(node.querySelector(".thread-preview-status:not(:empty)") ?? node.querySelector(".thread-preview-line") ?? node.querySelector(".thread-preview-heading")),
+          mid: center(node.querySelector(".thread-preview-heading")),
           title: center(node.querySelector(".thread-preview-heading")),
         });
     };
@@ -117,7 +116,7 @@ function BranchRow({ row, children, paging = false, onToggle }: { row: ThreadTre
         </button>
       ) : null}
       <svg aria-hidden className="sidebar-tree-lines" style={{ left: -indent }} width={MARK_X + 16 + indent} height={size.height}>
-        <path d={(paging ? threadPageBranchPath : threadBranchPath)(row, { markX: MARK_X, step: STEP, mid: size.mid, height: size.height })} />
+        <path d={(paging ? threadPageBranchPath : threadBranchPath)(row, { markX: MARK_X, step: STEP, endInset: 4, mid: size.mid, height: size.height + 2 })} />
       </svg>
     </div>
   );

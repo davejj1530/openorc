@@ -363,7 +363,7 @@ it("groups the threads under each project in the order projects come, an empty p
   expect(group("First project").querySelector(".thread-preview-project")).toBeNull();
   // Pinned threads lead in their own group, naming their project; No project shows only once it holds threads.
   expect(rowTitles(screen.getByRole("button", { name: "Pinned" }).closest(".sidebar-section") as HTMLElement)).toEqual(["Pinned notes"]);
-  expect(screen.getByRole("button", { name: /Pinned notes/ }).querySelector(".thread-preview-project")?.textContent).toBe("First project");
+  expect(screen.getByRole("button", { name: /Pinned notes/ }).getAttribute("data-tip-detail")).toContain(" · First project · ");
   expect(screen.queryByRole("region", { name: "No project" })).toBeNull();
 });
 
@@ -623,24 +623,23 @@ it("leads with pinned threads however long ago they last worked", async () => {
   expect(screen.getAllByRole("button", { name: /Old notes/ })).toHaveLength(1);
 });
 
-it("puts how fresh each thread is on its second line, where it works only off the usual place, its pull request at the end, and no word of what its agent is doing", async () => {
+it("keeps freshness and place in the hover facts, the pull request as a mark, and activity words off the row", async () => {
   dayThreads();
   const [recent, yesterday] = fixture.threads;
   fixture.threads = [
     { ...recent!, workspaceMode: "current", branch: "main", activity: "running" },
-    { ...yesterday!, workspaceMode: "worktree", branch: "openorc/notes-a1b2c3", prUrl: "https://github.com/acme/app/pull/8", prState: "merged" },
+    { ...yesterday!, workspaceMode: "worktree", branch: "feature/notes", prUrl: "https://github.com/example/app/pull/8", prState: "merged" },
   ];
   mountSidebar();
-  const line = async (name: RegExp) => (await screen.findByRole("button", { name })).querySelector(".thread-preview-line")!;
-  const checkout = await line(/Recent notes/);
-  expect(checkout.querySelector(".thread-preview-place")).toBeNull();
-  expect(checkout.textContent).toMatch(/^(now|\d+(m|h|d|w|mo|y))$/);
-  const worktree = await line(/Yesterday's notes/);
-  expect(worktree.querySelector(".thread-preview-place")?.textContent).toBe("worktree");
-  const pull = within(worktree as HTMLElement).getByRole("img", { name: "Pull request #8, merged" });
-  expect(pull.textContent).toBe("#8");
+  const checkout = await screen.findByRole("button", { name: /Recent notes/ });
+  expect(checkout.textContent).toBe("Recent notes");
+  expect(checkout.getAttribute("data-tip-detail")).toMatch(/^(now|\d+(m|h|d|w|mo|y)) · This Mac · main$/);
+  const worktree = await screen.findByRole("button", { name: /Yesterday's notes/ });
+  expect(worktree.getAttribute("data-tip-detail")).toContain(" · Worktree · feature/notes · #8 merged");
+  expect(worktree.getAttribute("aria-description")).toContain(worktree.getAttribute("data-tip-detail"));
+  const pull = within(worktree).getByRole("img", { name: "Pull request #8, merged" });
+  expect(pull.textContent).toBe("");
   expect(pull.getAttribute("class")).toContain("text-ok");
-  expect(screen.getByRole("button", { name: /Recent notes/ }).querySelector(".thread-preview-headline")).toBeNull();
 });
 
 it("ends the title line with what the thread needs or is doing", async () => {
@@ -649,9 +648,9 @@ it("ends the title line with what the thread needs or is doing", async () => {
   fixture.threads[1] = { ...fixture.threads[1]!, activity: "waiting" };
   mountSidebar();
   const row = await screen.findByRole("button", { name: /Recent notes/ });
-  expect(row.querySelector(".thread-preview-heading > .thread-preview-mark [aria-label='Working']")).not.toBeNull();
+  expect(row.querySelector(".thread-fact-slot[data-fact=state] [aria-label='Working']")).not.toBeNull();
   const asking = screen.getByRole("button", { name: /Yesterday's notes/ });
-  expect(asking.querySelector(".thread-preview-heading > .thread-preview-mark [aria-label='Needs you']")).not.toBeNull();
+  expect(asking.querySelector(".thread-fact-slot[data-fact=state] [aria-label='Needs you']")).not.toBeNull();
 });
 
 it("reads on by itself until every group is whole, then pages Resolved when asked", async () => {

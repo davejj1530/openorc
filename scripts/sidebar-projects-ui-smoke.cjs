@@ -52,12 +52,12 @@ async function check() {
     await read('window.addEventListener("error", (e) => console.error(e.error?.stack ?? e.message)), true');
     await until('document.querySelectorAll(".sidebar-project").length === 4 && document.querySelectorAll("button[draggable]").length >= 8');
     assert.deepEqual(await text("section.sidebar-project"), ["studio", "Website", "A project with a very long name that needs to truncate", "No project"]);
-    assert.deepEqual(await text('nav[aria-label="Screens"] .sidebar-nav-label'), ["Tasks", "Pull requests", "Schedules", "Orclings"]);
+    assert.deepEqual(await text('nav[aria-label="Screens"] .sidebar-nav-label'), ["New thread", "Tasks", "Pull requests", "Schedules", "Orclings"]);
     assert.deepEqual(await titles(".sidebar-section:not(.sidebar-project)"), ["Redesign the sidebar"]);
     assert.equal((await titles(group("studio"))).length, 4);
-    assert.equal(await read(`document.querySelector(${JSON.stringify(`${group("Website")} .sidebar-section-toggle`)}).getAttribute("aria-label")`), "Website, 2 waiting");
+    assert.equal(await read(`document.querySelector(${JSON.stringify(`${group("Website")} .sidebar-section-toggle`)}).getAttribute("aria-label")`), "Website, 1 waiting");
     assert.equal(await read(`document.querySelectorAll(${JSON.stringify(`${group("studio")} [aria-label=Working]`)}).length`), 1);
-    // Rows carry no project line or activity text; the quiet line names where each works.
+    // Rows carry only their titles and marks; metadata is available on hover and keyboard focus.
     assert.equal(await read('document.querySelectorAll(".sidebar-project .thread-preview-project, .thread-preview-headline").length'), 0);
     await press("Show 4 more");
     assert.equal((await titles(group("studio"))).length, 8);
@@ -70,7 +70,7 @@ async function check() {
     await press("New thread in studio");
     assert.deepEqual(await read("sidebarSmoke.route()"), { view: "newthread", projectId: "openorc" });
     await click(".sidebar-list-fold");
-    assert.equal(await read('document.querySelector(".sidebar-list-fold").getAttribute("aria-label")'), "Workspaces, 2 waiting");
+    assert.equal(await read('document.querySelector(".sidebar-list-fold").getAttribute("aria-label")'), "Workspaces, 1 waiting");
     assert.equal(await read('Array.from(document.querySelectorAll("button[draggable]")).filter(e => e.offsetParent).length'), 0);
     await click(".sidebar-list-fold");
     assert.deepEqual(await text(".sidebar-workspaces .sidebar-list-tools button"), ["Search", "Add project", "Filter threads"]);
@@ -109,10 +109,18 @@ async function check() {
         );
         assert.deepEqual(overflow, [], `${theme} ${width} overflow`);
         const misfits = await read(`Array.from(document.querySelectorAll('.sidebar-project .sidebar-thread-row')).filter(row => {
-          const title = row.querySelector('.thread-preview-heading').getBoundingClientRect();
-          const line = row.querySelector('.thread-preview-line')?.getBoundingClientRect();
+          const title = row.querySelector('.thread-preview-title').getBoundingClientRect();
           const box = row.getBoundingClientRect();
-          return !((!line || !line.height || (line.top >= title.bottom && line.right <= box.right)) && title.right <= box.right && row.scrollWidth <= row.clientWidth);
+          const sidebar = row.closest('.sidebar-shell').getBoundingClientRect();
+          const stateX = sidebar.right - 24 - (row.parentElement.hasAttribute('data-parent') ? 24 : 0);
+          const centerY = box.top + box.height / 2;
+          const slots = [...row.querySelectorAll('.thread-fact-slot')];
+          const misplaced = slots.some((slot, index) => {
+            const rect = slot.getBoundingClientRect();
+            const offset = (slots.length - 1 - index) * 20;
+            return Math.abs(rect.x + rect.width / 2 - (stateX - offset)) > 1 || Math.abs(rect.y + rect.height / 2 - centerY) > 1;
+          });
+          return box.height !== 32 || Math.abs(title.y + title.height / 2 - centerY) > 1 || title.right > box.right || row.scrollWidth > row.clientWidth || misplaced;
         }).map(row => [row.textContent, row.scrollWidth, row.clientWidth])`);
         assert.deepEqual(misfits, [], `${theme} ${width} thread rows`);
         await fs.writeFile(path.join(dir, `${theme}-${width}.png`), (await win.webContents.capturePage()).toPNG());

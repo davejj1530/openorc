@@ -187,6 +187,7 @@ export {
   pullRequestNumber,
   renamedTitle,
   rowAge,
+  rowFacts,
   rowPlace,
   rowStarter,
   STATUS_PRIORITY,

@@ -552,30 +552,21 @@ button.sidebar-nav-row:hover {
   height: 14px;
 }
 
-/* Thread rows, 46px apart: the title, with the row's mark at its end, then one quiet line: the age, a
-   teammate, the place, and the pull request at the right. No lead column: titles start where the group's
-   label does. The title is the second ink at rest and full ink where the person looks or is needed. The
-   open row sits on the current-row fill. */
+/* One title line on the navigation rhythm: 32px high and a 2px list gap. */
 .app-shell .thread-preview {
   position: relative;
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 2px;
+  align-items: center;
   width: 100%;
   min-width: 0;
-  min-height: 44px;
-  padding: 4px 8px;
+  height: 32px;
+  padding: 0 8px;
   border-radius: var(--radius-md);
   color: var(--ink-2);
   text-align: left;
   transition:
     background-color var(--duration-leave) var(--ease-out),
     color var(--duration-leave) var(--ease-out);
-}
-/* A sub thread is one line under its parent. */
-.app-shell .thread-preview.sidebar-thread-child {
-  min-height: var(--control-row);
 }
 .app-shell .thread-preview:is(:hover, [data-attention]) {
   color: var(--ink);
@@ -589,66 +580,14 @@ button.sidebar-nav-row:hover {
 .app-shell .sidebar-shell .thread-preview[data-open]:not(:focus-visible) {
   background-color: var(--current-row-fill);
 }
-.thread-preview-line {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  overflow: hidden;
-  font-size: var(--text-xs);
-  line-height: 16px;
-  color: var(--ink-3);
-  white-space: nowrap;
-}
-.thread-preview-line > * {
-  flex-shrink: 0;
-}
-/* In a group of many projects the project follows the age and is cut before anything else is. */
-.thread-preview-project {
-  flex-shrink: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.thread-preview-who,
-.thread-preview-place {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.thread-preview-face {
-  width: 14px;
-  height: 14px;
-  font-size: 7px;
-}
-/* What gives way, in order (lib/row-fit.ts): the place, whole, though a cloud keeps its glyph; then a
-   teammate's name, whose face stays. */
-.thread-preview-line:is([data-fit="no-place"], [data-fit="face"]) .thread-preview-place:not([data-cloud]),
-.thread-preview-line:is([data-fit="no-place"], [data-fit="face"]) .thread-preview-place .thread-preview-word,
-.thread-preview-line[data-fit="face"] .thread-preview-who .thread-preview-word {
-  display: none;
-}
-.thread-preview-pull {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  margin-left: auto;
-  padding-left: 4px;
-}
 .thread-preview-heading {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
-}
-.thread-preview-status {
-  display: flex;
-  flex-shrink: 0;
-  width: 16px;
-  justify-content: center;
-}
-.thread-preview-status:empty {
-  display: none;
+  width: 100%;
+  height: 32px;
+  container: thread-row / inline-size;
 }
 .thread-preview-title {
   flex: 1;
@@ -659,15 +598,44 @@ button.sidebar-nav-row:hover {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-/* A row's mark (the cube, question, failure, unread dot) at the end of its title line, before a parent's chevron. */
-.thread-preview-mark {
-  display: flex;
+/* Present facts pack against the count line; absent facts leave their space to the title. */
+.thread-facts {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 16px;
+  gap: 4px;
+  align-items: center;
+  height: 16px;
   flex-shrink: 0;
-  width: 16px;
-  justify-content: center;
+  color: var(--ink-3);
 }
-.thread-preview-mark:empty {
-  display: none;
+.thread-fact-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+}
+.thread-preview-face {
+  width: 14px;
+  height: 14px;
+  font-size: 7px;
+}
+/* At deep indents only, remove outer columns until one em remains for the title's ellipsis. */
+@container thread-row (width < calc(84px + 1em)) {
+  .thread-fact-slot:nth-last-child(n + 4) {
+    display: none;
+  }
+}
+@container thread-row (width < calc(64px + 1em)) {
+  .thread-fact-slot:nth-last-child(n + 3) {
+    display: none;
+  }
+}
+@container thread-row (width < calc(44px + 1em)) {
+  .thread-fact-slot:nth-last-child(n + 2) {
+    display: none;
+  }
 }
 .sidebar-section-toggle {
   display: flex;

@@ -44,6 +44,7 @@ it("pages five children per parent, adds twelve at a time, and ends the branch a
   expect(first[0]?.hiddenChildren).toBe(15);
   expect(first.at(-1)?.last).toBe(true);
   expect(threadBranchPath(first.at(-1)!, { markX: 34, mid: 17, height: 34 })).toBe("M34 0V11q0 6 6 6h6");
+  expect(threadBranchPath(first.at(-1)!, { markX: 16, mid: 16, height: 32, step: 24, endInset: 4 })).toBe("M16 0V10q0 6 6 6h6");
   expect(threadPageBranchPath(first[0]!, { markX: 34, height: 34 })).toBe("");
   const second = threadTreeRows([parent], all, ["thread-open:parent"], [], { parent: 17 });
   expect(second).toHaveLength(18);

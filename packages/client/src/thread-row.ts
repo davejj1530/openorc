@@ -136,6 +136,30 @@ export function rowStarter(thread: Pick<ThreadSummary, "owner">): { name: string
   return { ...starter, first: starter.name.trim().split(/\s+/)[0] ?? starter.name };
 }
 
+/** Facts for a one-line row, including cloud-only projects whose group already names the cloud. */
+export function rowFacts(
+  thread: Pick<ThreadSummary, "lastActivityAt" | "treeActivityAt" | "lastAgentEventAt" | "workspaceMode" | "branch" | "cloud" | "owner" | "workingDirectory" | "prUrl" | "prState">,
+  { now, project }: { now: number; project?: string },
+) {
+  const place = placeOf(thread);
+  const ownCloud = thread.cloud || place.brain ? "Your own cloud" : null;
+  const cloud = place.rowIcon ? "OpenOrc Cloud" : ownCloud;
+  const starter = rowStarter(thread);
+  const pull = pullRequestMark(thread);
+  const folder = thread.workingDirectory?.split(/[\\/]/).filter(Boolean).at(-1);
+  const detail = [
+    rowAge(latestActivity(thread), now),
+    project,
+    starter?.name,
+    cloud ?? (thread.workspaceMode === "worktree" ? "Worktree" : "This Mac"),
+    thread.branch || folder,
+    pull ? `#${pullRequestNumber(thread.prUrl)} ${pull.state}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return { starter, pull, cloud, detail };
+}
+
 /** The title a rename saves: what was typed, trimmed, or null when it is empty or unchanged and nothing should save. */
 export function renamedTitle(current: string, typed: string): string | null {
   const next = typed.trim();

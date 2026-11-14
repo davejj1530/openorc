@@ -425,6 +425,14 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 12;
 }
+/* Row facts stay on one line until the viewport boundary, without the ordinary tip's line cap. */
+.tooltip-popup-detail {
+  display: block;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  overflow: visible;
+  -webkit-line-clamp: unset;
+}
 /* A disabled control that says why keeps the pointer, so its reason can open; it still takes no press. */
 :is(button, input)[data-tip]:disabled {
   pointer-events: auto;

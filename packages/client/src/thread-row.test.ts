@@ -5,6 +5,7 @@ import {
   pullRequestNumber,
   renamedTitle,
   rowAge,
+  rowFacts,
   rowPlace,
   rowStarter,
   threadActivity,
@@ -184,5 +185,41 @@ describe("renamedTitle", () => {
     expect(renamedTitle("Pairing", "  Pairing review ")).toBe("Pairing review");
     expect(renamedTitle("Pairing", "   ")).toBeNull();
     expect(renamedTitle("Pairing", " Pairing ")).toBeNull();
+  });
+});
+
+describe("rowFacts", () => {
+  const now = 600_000;
+  const local = { lastActivityAt: now - 180_000, lastAgentEventAt: null, workspaceMode: "current", branch: "main", workingDirectory: null, prUrl: null, prState: null } as const;
+  const owner = { brain: "hosted", reach: "live", heardAt: now, startedBy: { name: "Morgan Reed", image: null } } as const;
+
+  it("orders age, project, full teammate name, place, branch and pull request", () => {
+    const facts = rowFacts({ ...local, owner, prUrl: "https://github.com/example/app/pull/218" }, { now, project: "Example project" });
+    expect(facts.detail).toBe("3m · Example project · Morgan Reed · OpenOrc Cloud · main · #218 open");
+    expect(facts.starter).toEqual({ name: "Morgan Reed", first: "Morgan", image: null });
+    expect(facts.cloud).toBe("OpenOrc Cloud");
+  });
+
+  it("keeps a cloud-only project's cloud and omits absent facts without separators", () => {
+    const facts = rowFacts({ ...local, owner: { brain: "hosted", reach: "offline", heardAt: now, project: { name: "Example project" } }, branch: null }, { now });
+    expect(facts.detail).toBe("3m · OpenOrc Cloud");
+    expect(facts.cloud).toBe("OpenOrc Cloud");
+    expect(facts.starter).toBeNull();
+    expect(facts.pull).toBeNull();
+    expect(rowFacts(local, { now }).detail).toBe("3m · This Mac · main");
+    expect(rowFacts(local, { now }).cloud).toBeNull();
+  });
+
+  it.each(["open", "merged", "closed"] as const)("keeps a %s PR independent of place and state", (prState) => {
+    const facts = rowFacts({ ...local, prState, prUrl: "https://github.com/example/app/pull/8", workspaceMode: "worktree", branch: "feature/review" }, { now });
+    expect(facts.detail).toBe(`3m · Worktree · feature/review · #8 ${prState}`);
+    expect(facts.pull?.label).toBe(`Pull request #8, ${prState}`);
+  });
+
+  it("names an own cloud, uses a detached folder, and reads the latest child activity", () => {
+    expect(rowFacts({ ...local, owner: { brain: "cloud", reach: "asleep", heardAt: now } }, { now }).detail).toBe("3m · Your own cloud · main");
+    expect(rowFacts({ ...local, cloud: { provider: "vercel", state: "ready", step: null, setup: false, error: null } }, { now }).cloud).toBe("Your own cloud");
+    expect(rowFacts({ ...local, branch: null, workingDirectory: "/tmp/example-project/notes", treeActivityAt: now - 60_000 }, { now }).detail).toBe("1m · This Mac · notes");
+    expect(rowFacts({ ...local, branch: null, workingDirectory: "C:\\example-project\\notes\\" }, { now }).detail).toBe("3m · This Mac · notes");
   });
 });

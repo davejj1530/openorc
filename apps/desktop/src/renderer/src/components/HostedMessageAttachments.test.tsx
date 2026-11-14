@@ -15,6 +15,7 @@ vi.mock("../lib/organization-content-gate", () => {
 });
 
 import { HostedMessageAttachments } from "./HostedMessageAttachments";
+import { ThreadMedia } from "./ThreadImages";
 
 const thread = { id: "cloud", projectId: "project" } as ThreadSummary;
 const PNG = "iVBORw0KGgo=";
@@ -76,4 +77,21 @@ it("says a failed download beside its file", async () => {
   render(<HostedMessageAttachments thread={thread} paths={["/hosted/files/f2/release-notes.pdf"]} />);
   fireEvent.click(screen.getByRole("button", { name: "release-notes.pdf" }));
   expect((await screen.findByRole("alert")).textContent).toBe("You're not in this organization.");
+});
+
+it("opens a sent picture's preview with Download, never claiming the preview's size is the original's", async () => {
+  call.mockImplementation(async (method: string) => (method === "hostedFiles.thumbnail" ? { contentType: "image/webp", data: PNG } : { saved: true }));
+  render(
+    <ThreadMedia scopeKey="cloud">
+      <HostedMessageAttachments thread={thread} paths={["/hosted/files/f1/sidebar.png"]} />
+    </ThreadMedia>,
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "View image: sidebar.png" }));
+  const viewer = await screen.findByRole("dialog");
+  fireEvent.load(viewer.querySelector("img")!);
+  expect(viewer.textContent).toContain("Image preview");
+  expect(viewer.textContent).not.toMatch(/\d+ × \d+/);
+  expect(screen.queryByRole("button", { name: "Show image in folder" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Download sidebar.png" }));
+  await waitFor(() => expect(call).toHaveBeenCalledWith("hostedFiles.download", { scope, file: { id: "f1", name: "sidebar.png" } }));
 });

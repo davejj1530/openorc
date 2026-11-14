@@ -99,7 +99,7 @@ function ImageViewer({ image }: { image: ImageSelection }) {
         <Image size={16} className="shrink-0 text-ink-3" />
         <div className="min-w-24 flex-1">
           <BaseDialog.Title className="truncate text-base">{image.label}</BaseDialog.Title>
-          <BaseDialog.Description className="whitespace-nowrap text-xs text-ink-3">{size ? `${size.width} × ${size.height}` : "Image preview"}</BaseDialog.Description>
+          <BaseDialog.Description className="whitespace-nowrap text-xs text-ink-3">{size && !image.download ? `${size.width} × ${size.height}` : "Image preview"}</BaseDialog.Description>
         </div>
         <div className="flex items-center gap-1">
           <Button variant="ghost" aria-label="Zoom out" disabled={failed || zoom === 0.25} onClick={() => zoomBy(-0.25)}>

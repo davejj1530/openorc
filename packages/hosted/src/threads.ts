@@ -186,7 +186,7 @@ export class Threads implements HostedThreads {
   #again: Promise<void> | null = null;
   #closed = false;
   /** The run states last announced to windows. A row can change these before any agent event arrives. */
-  #toldRuns = new Map<string, boolean>();
+  #toldRuns = new Map<string, ReturnType<typeof toRuns>>();
   /** When the person last asked each thread to be ready, so a thread is asked at most once a minute. */
   readonly readied = new Map<string, number>();
   /** What the writes in sends.ts work with. */
@@ -519,13 +519,18 @@ export class Threads implements HostedThreads {
   }
 
   #tell(): void {
-    const next = new Map((this.#heard?.rows ?? []).map((row) => [row.id, runsNow(row, this.reach)]));
+    const next = new Map((this.#heard?.rows ?? []).map((row) => [row.id, toRuns(row, this.reach)]));
     const ids = new Set([...this.#toldRuns.keys(), ...next.keys()]);
-    const changed = [...ids].filter((id) => this.#toldRuns.has(id) && this.#toldRuns.get(id) !== next.get(id));
+    const changed = [...ids].filter((id) => JSON.stringify(this.#toldRuns.get(id)) !== JSON.stringify(next.get(id)));
+    const resync = changed.filter((id) => {
+      const before = this.#toldRuns.get(id);
+      const after = next.get(id);
+      return before !== undefined && after !== undefined && before.some((run) => run.endedAt === null) !== after.some((run) => run.endedAt === null);
+    });
     this.#toldRuns = next;
-    this.deps.push({ type: "invalidate", keys: ["threads", ...[...ids].map((id) => `runs:thread:${id}`)] });
+    this.deps.push({ type: "invalidate", keys: ["threads", ...changed.map((id) => `runs:thread:${id}`)] });
     // A turn can start or park without a session event. Reload its snapshot to read the row's live state.
-    if (changed.length) this.deps.push({ type: "gap", runIds: changed.map(hostedRunId) });
+    if (resync.length) this.deps.push({ type: "gap", runIds: resync.map(hostedRunId) });
   }
 
   #rows(): Map<string, HeardRow> {

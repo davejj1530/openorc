@@ -90,6 +90,42 @@ describe("hosted threads", () => {
     expect(seen.pushes).toContainEqual({ type: "invalidate", keys: ["threads", `runs:thread:${thread}`] });
   });
 
+  it("refreshes only changed runs, without refreshing a working run for each row change", async () => {
+    const first = stand.addThread(ADA, { projectId: null, title: "First report", status: "working" });
+    const second = stand.addThread(ADA, { projectId: null, title: "Second report", status: "working" });
+    for (const id of [first, second]) stand.append(id, [{ type: "turn.started", ts: 1, turnId: id }]);
+    const { hosted, seen } = await host();
+    await signIn(hosted);
+    await vi.waitFor(() => expect(hosted.threads.holds({ thread: first }) && hosted.threads.holds({ thread: second })).toBe(true));
+    seen.pushes.length = 0;
+    await hosted.threads.call("threads.update", { id: first, patch: { title: "Updated report" } });
+    expect(seen.pushes).toEqual([{ type: "invalidate", keys: ["threads"] }]);
+    seen.pushes.length = 0;
+    await hosted.threads.call("threads.update", { id: first, patch: { model: "sonnet" } });
+    expect(seen.pushes).toEqual([{ type: "invalidate", keys: ["threads", `runs:thread:${first}`] }]);
+    seen.pushes.length = 0;
+    stand.endTurn(first);
+    await vi.waitFor(async () => expect(await hosted.threads.call("runs.listForThread", { threadId: first })).toMatchObject([{ endedAt: expect.any(Number) }]));
+    expect(seen.pushes).toEqual([
+      { type: "invalidate", keys: ["threads", `runs:thread:${first}`] },
+      { type: "gap", runIds: [`hosted:${first}`] },
+    ]);
+  });
+
+  it.each(["delete", "sign out"] as const)("invalidates a removed row without trying to reload its transcript on %s", async (way) => {
+    const thread = stand.addThread(ADA, { projectId: null, title: "Temporary report", status: "working" });
+    stand.append(thread, [{ type: "turn.started", ts: 1, turnId: thread }]);
+    const { hosted, seen } = await host();
+    await signIn(hosted);
+    await vi.waitFor(() => expect(hosted.threads.holds({ thread })).toBe(true));
+    seen.pushes.length = 0;
+    if (way === "delete") await hosted.threads.call("threads.delete", { id: thread });
+    else await hosted.account.signOut();
+    await vi.waitFor(() => expect(hosted.threads.holds({ thread })).toBe(false));
+    expect(seen.pushes).toContainEqual({ type: "invalidate", keys: ["threads", `runs:thread:${thread}`] });
+    expect(seen.pushes).not.toContainEqual(expect.objectContaining({ type: "gap" }));
+  });
+
   it("keeps its rows through a restart with the server down, offline, and lets them go on sign-out", async () => {
     const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
     const thread = stand.addThread(ADA, { projectId: project, title: "Kept" });

@@ -43,6 +43,14 @@ it("keeps the previous confirmed inventory after a read failure", async () => {
   await f.view.refresh();
   expect(f.view.getSnapshot()).toMatchObject({ status: empty, error: "Offline", loading: false });
 });
+it("clears the inventory as soon as core returns an authority refusal, before a spaces update", async () => {
+  const f = fixture();
+  await f.view.refresh();
+  const refused = { billing: null, payment: null, error: "Only an admin can do that." };
+  f.deps.get.mockResolvedValueOnce(refused);
+  await f.view.refresh();
+  expect(f.view.getSnapshot()).toMatchObject({ status: refused, error: refused.error, loading: false });
+});
 it("coalesces duplicate presses and never lets a preceding read erase the waiting state", async () => {
   const f = fixture(),
     late = deferred<OrganizationBillingStatus>();

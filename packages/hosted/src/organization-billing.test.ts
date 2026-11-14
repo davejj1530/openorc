@@ -134,3 +134,15 @@ it("does not invalidate its own reads while external reconciliation notifies the
   await f.service.awoke();
   expect(f.push).toHaveBeenCalledExactlyOnceWith({ type: "invalidate", keys: ["organization-billing:team-a"] });
 });
+
+it.each([401, 403, 404])("returns an empty private projection after HTTP %s before the roster catches up", async (status) => {
+  const f = fixture();
+  await f.service.get("team-a");
+  await f.service.open("team-a", { page: "checkout", plan: "monthly", seats: 3 });
+  f.push.mockClear();
+  f.reply.mockRejectedValue(new Refused("Organization billing is no longer available.", status));
+  expect(await f.service.read("team-a")).toEqual({ billing: null, payment: null, error: "Organization billing is no longer available." });
+  expect(f.push).toHaveBeenCalledTimes(1);
+  expect(await f.service.read("team-a")).toEqual({ billing: null, payment: null, error: "Organization billing is no longer available." });
+  expect(f.push).toHaveBeenCalledTimes(1);
+});

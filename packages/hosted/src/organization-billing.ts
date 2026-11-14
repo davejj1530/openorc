@@ -15,6 +15,7 @@ interface Entry {
   scope: OrganizationBillingScope;
   generation: number;
   billing: Billing | null;
+  exposed: boolean;
   error: string | null;
   reading: Promise<void> | null;
   payment: OrganizationBillingPayment;
@@ -48,12 +49,23 @@ export class OrganizationBilling {
     return this.#status(entry);
   }
 
+  /** RPC errors carry only words. Authority refusals must clear the renderer's private snapshot explicitly. */
+  async read(spaceId: string): Promise<OrganizationBillingStatus> {
+    try {
+      return await this.get(spaceId);
+    } catch (error) {
+      if (error instanceof Refused) return { billing: null, payment: null, error: error.message };
+      throw error;
+    }
+  }
+
   async offers(spaceId: string, seats: number): Promise<OrganizationBillingOffers> {
     organizationBillingRpcParams["organization.billing.offers"].parse({ spaceId, seats });
     const entry = this.#entry(spaceId);
     const offers = await this.#request(entry, routes.offers(seats));
     this.#assert(entry);
     if (offers.offers.some((offer) => offer.seats !== seats)) throw new Error("The seat prices changed. Try again.");
+    entry.exposed = true;
     return offers;
   }
 
@@ -106,6 +118,7 @@ export class OrganizationBilling {
       scope,
       generation,
       billing: null,
+      exposed: false,
       error: null,
       reading: null,
       payment: new OrganizationBillingPayment({
@@ -117,7 +130,9 @@ export class OrganizationBilling {
         save: (record) => this.#store.save(scope, record),
         link: (target) => this.#request(entry, target.page === "checkout" ? routes.checkout : routes.portal, target.page === "checkout" ? { plan: target.plan, seats: target.seats } : undefined),
         reread: () => this.#refresh(entry),
-        changed: () => this.#tell(spaceId),
+        changed: () => {
+          if (this.#current(entry)) this.#tell(spaceId);
+        },
       }),
     };
     this.#entries.set(key, entry);
@@ -125,6 +140,7 @@ export class OrganizationBilling {
   }
 
   #status(entry: Entry): OrganizationBillingStatus {
+    entry.exposed = true;
     return { billing: entry.billing, payment: entry.payment.work, error: entry.error };
   }
 
@@ -189,7 +205,7 @@ export class OrganizationBilling {
     this.#entries.delete(organizationBillingKey(entry.scope));
     entry.billing = null;
     entry.payment.close();
-    this.#tell(entry.scope.spaceId);
+    if (entry.exposed) this.#tell(entry.scope.spaceId);
   }
 
   #tell(spaceId: string): void {

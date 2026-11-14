@@ -105,7 +105,7 @@ export class OrganizationBillingPayment {
       await this.deps.reread().catch(() => undefined);
       return;
     }
-    const failed = error instanceof Refused && error.code !== "organization_payment_pending" && error.status !== undefined && error.status >= 400 && error.status < 500 && error.status !== 408;
+    const failed = definiteRefusal(error);
     this.#save(record, { state: failed ? "failed" : "pending", error: words(error) });
     if (failed) this.leave();
   }
@@ -173,6 +173,12 @@ export class OrganizationBillingPayment {
 
 function alreadyPaid(target: OrganizationBillingPage, error: unknown): boolean {
   return target.page === "checkout" && error instanceof Refused && error.status === 409 && error.message === "This organization already pays for seats. Change the number of seats in billing.";
+}
+
+function definiteRefusal(error: unknown): boolean {
+  if (!(error instanceof Refused) || error.status === undefined || error.code === "organization_payment_pending") return false;
+  if (error.status === 502 && error.code === "organization_payment_refused") return true;
+  return error.status >= 400 && error.status < 500 && error.status !== 408;
 }
 
 const words = (error: unknown) => (error instanceof Error ? error.message : "The payment page could not be opened.");

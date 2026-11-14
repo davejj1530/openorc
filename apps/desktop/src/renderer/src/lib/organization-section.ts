@@ -1,7 +1,7 @@
 import { useRouter, type Route } from "./router";
 
 export type OrganizationSection = "people" | "seats";
-export const ORGANIZATION_SEATS_ENABLED = false;
+export const ORGANIZATION_SEATS_ENABLED = true;
 
 export function organizationSection(route: Route, spaceId: string, admin: boolean): OrganizationSection {
   return admin && route.view === "people" && route.spaceId === spaceId && route.section === "seats" ? "seats" : "people";

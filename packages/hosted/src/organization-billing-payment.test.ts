@@ -205,6 +205,41 @@ describe("organization payment", () => {
     expect(f.payment.work).toMatchObject({ state: "pending", error: "The payment service could not be reached." });
   });
 
+  it("ends a coded provider refusal and permits a new purchase only on the next press", async () => {
+    vi.useFakeTimers();
+    const f = fixture();
+    f.link.mockRejectedValueOnce(new Refused("Polar answered 500. Try again in a moment.", 502, "organization_payment_refused"));
+    await f.payment.open(checkout);
+    const failed = f.record();
+    expect(f.payment.work).toMatchObject({ state: "failed", watching: false, error: "Polar answered 500. Try again in a moment." });
+    await vi.advanceTimersByTimeAsync(6 * 60_000);
+    expect(f.link).toHaveBeenCalledTimes(1);
+    expect(f.reread).not.toHaveBeenCalled();
+    const target: OrganizationBillingPage = { page: "checkout", plan: "monthly", seats: 4 };
+    await f.payment.open(target);
+    expect(f.link.mock.calls).toEqual([[checkout], [target]]);
+    expect(f.payment.work).toMatchObject({ state: "waiting", target });
+    expect(f.payment.work?.id).not.toBe(failed?.id);
+  });
+
+  it.each([
+    new Refused("Polar answered 500. Try again in a moment.", 502),
+    new Refused("The payment page could not be opened.", 502, "unknown_code"),
+    new Refused("The payment page could not be opened.", 503, "organization_payment_refused"),
+  ])("keeps an unclassified gateway failure unresolved without inferring a deadline", async (error) => {
+    vi.useFakeTimers();
+    const f = fixture();
+    f.link.mockRejectedValueOnce(error);
+    await f.payment.open(checkout);
+    const pending = f.record();
+    await vi.advanceTimersByTimeAsync(6 * 60_000);
+    expect(f.payment.work).toMatchObject({ state: "pending", id: pending?.id });
+    expect(f.link).toHaveBeenCalledTimes(1);
+    expect(f.browser.open).not.toHaveBeenCalled();
+    await f.payment.open({ page: "checkout", plan: "monthly", seats: 4 });
+    expect(f.link.mock.calls).toEqual([[checkout], [checkout]]);
+  });
+
   it("does not request a payment page without a browser", async () => {
     const f = fixture();
     const bare = new OrganizationBillingPayment({ ...f.deps, browser: undefined });

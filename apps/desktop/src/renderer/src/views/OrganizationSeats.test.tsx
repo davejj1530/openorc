@@ -115,6 +115,20 @@ it("drops the inventory and an open purchase form on authority loss", async () =
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(screen.queryByText("No seats")).toBeNull();
 });
+it("clears a priced purchase form on a core authority refusal before a roster update", async () => {
+  const f = await show();
+  fireEvent.click(screen.getByRole("button", { name: "Buy seats" }));
+  await screen.findByText(/19.37 a month/);
+  f.get.mockResolvedValueOnce({ billing: null, payment: null, error: "Only an admin can do that." });
+  await act(() => f.view.refresh());
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(screen.queryByText("No seats")).toBeNull();
+  expect(screen.queryByText(/19.37 a month/)).toBeNull();
+  expect(screen.getByRole("alert").textContent).toBe("Only an admin can do that.");
+  fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+  await waitFor(() => expect(f.get).toHaveBeenCalledTimes(3));
+  expect(f.open).not.toHaveBeenCalled();
+});
 it("retains an old holder without a membership and never invents unknown hours", async () => {
   const f = await show({
     ...empty,

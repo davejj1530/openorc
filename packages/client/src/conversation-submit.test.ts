@@ -75,6 +75,14 @@ describe("composerActions", () => {
 
 describe("sendCluster", () => {
   const typed = { queueing: false, liveByDefault: true, steerable: false, canStop: false, hasDraft: true };
+  it.each([false, true])("keeps one bare arrow in a read-only thread, with a running turn=%s", (working) => {
+    for (const hasDraft of [false, true]) {
+      for (const asked of [null, "The agent is waiting for an answer."]) {
+        expect(sendCluster({ ...typed, readOnly: true, queueing: working, canStop: working, steerable: working, hasDraft, asked })).toEqual({ kind: "send", stop: false, startsTask: false });
+      }
+    }
+  });
+
   it.each([
     { name: "a bare arrow with nothing running", input: typed, cluster: { kind: "send", stop: false, startsTask: false } },
     { name: "one ink Stop with nothing typed while a turn runs", input: { ...typed, queueing: true, canStop: true, hasDraft: false }, cluster: { kind: "stop" } },

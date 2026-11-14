@@ -264,6 +264,7 @@ export function Composer(props: ComposerProps) {
   const asks = props.asks ?? [];
   const focusField = useCallback(() => editor.current?.focus(), []);
   const cluster = sendCluster({
+    readOnly: Boolean(props.readOnlyReason),
     queueing: Boolean(props.queueing),
     liveByDefault: Boolean(props.liveByDefault),
     steerable: Boolean(props.steerable),

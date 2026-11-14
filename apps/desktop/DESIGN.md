@@ -294,7 +294,7 @@ An ask the agent waits on docks at the top of the composer's own piece, above a 
 
 A live turn shows its head and timer as soon as it starts. An ask waiting in the composer does not count as turn content; once its turn rests, an ask alone leaves no head or empty space in the conversation. Prompts and answered records stay visible. Views without a dock keep asks in the conversation.
 
-A teammate's thread that the person can only read keeps the field editable, with a quiet placeholder naming whose thread it is. One read-only rule disables Send, Queue, attach, the model and the mode, with the same reason on demand; Enter cannot send and Stop is absent. The pickers still show what the thread runs on. An owner's thread out of reach blocks sending but keeps its local choices. Drafts stay on this device. Neither state adds a card above the composer.
+A teammate's thread that the person can only read keeps the field editable, with a quiet placeholder naming whose thread it is. One read-only rule disables Send, Queue, attach, the model and the mode, with the same reason on demand; Enter cannot send and Stop is absent. The pickers still show what the thread runs on. Its send cluster is always one bare disabled arrow, whether the thread works or rests and whether the draft is empty or has words. An owner's thread out of reach blocks sending but keeps its local choices. Drafts stay on this device. Neither state adds a card above the composer.
 
 A teammate's thread waiting on an ask says who it waits on, using the starter's first name. Its question mark stays in quiet ink. It does not enter Needs you counts, parent counts or attention lines at the list's edge. The person's own asks keep their attention mark.
 

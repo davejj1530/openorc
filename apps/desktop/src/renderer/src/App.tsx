@@ -19,6 +19,7 @@ import { useAppShortcuts } from "./lib/app-shortcuts";
 import { focusedProject, useLayout } from "./lib/layout";
 import { useLookHandover } from "./lib/mac-look";
 import { useRouter, type Route } from "./lib/router";
+import { taskRefKey } from "./lib/task-ref";
 import { useUi } from "./lib/ui";
 import { useSpaceNavigation } from "./lib/space-navigation";
 import { Memory } from "./views/Memory";
@@ -89,7 +90,7 @@ function DesktopApp() {
               </Main>
             }
           >
-            <TaskView key={route.taskId} taskId={route.taskId} tab={route.tab} />
+            <TaskView key={taskRefKey(route.taskRef ?? { kind: "local", id: route.taskId })} taskId={route.taskId} {...(route.taskRef && { taskRef: route.taskRef })} tab={route.tab} />
           </Suspense>
         ) : null}
         <MainScreen route={route} currentProject={currentProject} />

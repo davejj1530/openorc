@@ -2,6 +2,8 @@ import { create } from "zustand";
 import type { HarnessId } from "@openorc/protocol";
 import { useLayout } from "./layout";
 import { chatRouteFromSpec, chatRouteSpec, chatRouteTransition, type ChatWorkRoute, type TeamChatRoute } from "./team-chat-route";
+import type { OnlineTaskRef } from "./task-ref";
+import { onlineTaskRouteFromSpec, onlineTaskRouteSpec } from "./online-task-route";
 
 export type TaskTab = "chat" | "spec" | "files" | "commits" | "memory";
 
@@ -28,7 +30,7 @@ export type Route =
   | { view: "pull"; projectId: string; number: number }
   /** A project's settings. */
   | { view: "project"; projectId: string }
-  | { view: "task"; taskId: string; tab: TaskTab; message?: MessageTarget }
+  | { view: "task"; taskId: string; taskRef?: OnlineTaskRef; tab: TaskTab; message?: MessageTarget }
   | { view: "memory" }
   | { view: "scheduled" }
   /** The Orcling designer: a new Orcling, or one being changed. */
@@ -163,10 +165,15 @@ const idViews: Readonly<Record<string, (id: string, tab: string | undefined) => 
   project: (projectId) => ({ view: "project", projectId }),
   newsubthread: (parentId) => ({ view: "newsubthread", parentId }),
 };
+const scopedViews = new Map<string, (spec: string) => Route | null>([
+  ["team-chat", chatRouteFromSpec],
+  ["online-task", onlineTaskRouteFromSpec],
+]);
 
 /** "thread:<id>", "task:<id>:<tab>", "pull:<project>:<number>", or a plain screen name, as windows and autorun pass them. */
 export function routeFromSpec(spec: string): Route | null {
-  if (spec.startsWith("team-chat:")) return chatRouteFromSpec(spec);
+  const scoped = scopedViews.get(spec.slice(0, spec.indexOf(":")));
+  if (scoped) return scoped(spec);
   const [view, id, tab] = spec.split(":");
   if (view === "onboarding")
     return {
@@ -220,7 +227,7 @@ export function specFromRoute(route: Route): string {
     case "thread":
       return `thread:${route.threadId}`;
     case "task":
-      return `task:${route.taskId}:${route.tab}`;
+      return route.taskRef ? onlineTaskRouteSpec(route.taskRef, route.tab) : `task:${route.taskId}:${route.tab}`;
     case "project":
       return `project:${route.projectId}`;
     case "people":

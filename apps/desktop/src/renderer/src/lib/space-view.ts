@@ -2,6 +2,8 @@ import { WORKSPACE_ID, type SpaceProject, type ThreadSummary } from "@openorc/pr
 import { routeFromSpec, type Route } from "./router";
 import type { ThreadTab } from "./thread-tabs";
 import type { ChatWorkRoute } from "./team-chat-route";
+import { OnlineTaskRef } from "./task-ref";
+import { onlineTaskDestination } from "./online-task-route";
 
 export interface SpaceInventory {
   id: string;
@@ -86,12 +88,21 @@ function projectRoute(value: SavedRoute, inventory: SpaceInventory): Route | nul
 function taskRoute(value: SavedRoute, inventory: SpaceInventory): Route | null {
   if (value["view"] === "task") {
     const task = text(value["taskId"]);
+    if (value["taskRef"] !== undefined) return onlineTaskRoute(value, inventory);
     return task && inventory.taskIds.includes(task) && ["chat", "spec", "files", "commits", "memory"].includes(String(value["tab"])) ? routeFromSpec(`task:${task}:${value["tab"]}`) : null;
   }
   const project = text(value["projectId"]);
   const thread = text(value["threadId"]);
   if ((project && !hasProject(project, inventory)) || (thread && !hasThread(thread, inventory))) return null;
   return { view: "newtask", ...(project && { projectId: project }), ...(thread && { threadId: thread }) };
+}
+function onlineTaskRoute(value: SavedRoute, inventory: SpaceInventory): Route | null {
+  const parsed = OnlineTaskRef.safeParse(value["taskRef"]);
+  if (!parsed.success || inventory.personal) return null;
+  const ref = parsed.data;
+  if (ref.id !== value["taskId"] || ref.accountId !== inventory.accountId || ref.spaceId !== inventory.id) return null;
+  if (!inventory.projects.some((project) => project.hostedProjectId === ref.projectId)) return null;
+  return onlineTaskDestination(ref, value["tab"]);
 }
 function threadRoute(value: SavedRoute, inventory: SpaceInventory): Route | null {
   const id = text(value[value["view"] === "thread" ? "threadId" : "parentId"]);

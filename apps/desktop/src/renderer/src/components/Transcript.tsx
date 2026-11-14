@@ -464,8 +464,10 @@ const WorkTurn = memo(function WorkTurn({
   ...props
 }: WorkTurnProps) {
   props = { ...props, runId: blocks.find((b) => b.runId)?.runId ?? props.runId };
+  const docked = useDockedAsks();
+  const visible = useMemo(() => blocks.filter((block) => !docked(block)), [blocks, docked]);
   const size = useTurnSize(blocks);
-  const turn = useTurnModel(blocks, live, props.taskCards, ambient, props.replyAction?.blockId, size);
+  const turn = useTurnModel(visible, live, props.taskCards, ambient, props.replyAction?.blockId, size);
   const { before, work, after } = turn.parts;
   const revealWork = reveal && work.some((block) => block.id === reveal.messageId) ? reveal : undefined;
   const { open, visited, choose } = useWorkOpen(showActivity, turn.live, revealWork);
@@ -473,8 +475,8 @@ const WorkTurn = memo(function WorkTurn({
   const ended = turn.status.kind === "failed" || turn.status.kind === "stopped";
   const footer = trailing?.(blocks);
   const hiddenRecovery = !open || !showActivity ? work.findLast((b): b is Extract<Block, { kind: "activity" }> => b.kind === "activity" && Boolean(b.recovery))?.recovery : undefined;
-  if (!showActivity && !before.length && !after.length && !ended && !footer) return null;
-  const spoke = Boolean(work.length || after.length || turn.live || ended);
+  const spoke = Boolean((showActivity && work.length) || after.length || ended);
+  if (!before.length && !spoke && !footer) return null;
   // The fork rides the turn's actions once it has them; until then it stays on the prompt.
   const actions = head && spoke && !turn.live && (turn.reply || onFork);
   return (

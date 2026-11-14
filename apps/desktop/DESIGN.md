@@ -292,6 +292,8 @@ An ask the agent waits on docks at the top of the composer's own piece, above a 
 
 ### Composer
 
+A turn with nothing to draw in the conversation has no head or empty space there. An ask waiting in the composer does not count as turn content. The person's prompt stays visible, and the agent's head appears with its work, reply or failure. Views without a dock keep asks in the conversation.
+
 A teammate's thread that the person can only read keeps the field editable, with a quiet placeholder naming whose thread it is. Send and Queue are disabled, with the reason on demand; Enter cannot send. A thread whose place is out of reach uses the same disabled controls. Drafts stay on this device. Neither state adds a card above the composer.
 
 The conversation composer is one r20 surface on `--composer-input` with no inner well. One bar holds attach, the project or destination chip, model, and mode on the left, and activity, the context ring, and send on the right. It never wraps, scrolls or clips: short of room the chips give up words a step at a time, the model's effort, then the mode's and destination's names, then the model's name, keeping their marks. Send, Queue, and Stop are layers of one 32px ink pill. The mode pill grows a small menu of the levels the agent offers; it does not step. Clicking the context ring opens its details; only Compact compacts. When there are uncommitted changes, the Commit chip (Commit plus its +N −M totals) is first in the stack above the writing surface, aligned left. Queued messages, background work, cloud status, recovery, and all other notices follow the chip. Queued messages stack as a pile that fans out on click.

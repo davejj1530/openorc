@@ -1,6 +1,6 @@
 import { docks, type Block } from "@openorc/client";
 import type { RpcParams } from "@openorc/protocol";
-import { createContext, useContext, useState } from "react";
+import { createContext, useCallback, useContext, useState } from "react";
 import { core } from "../lib/rpc";
 
 /** Why the asks in a conversation can't be answered now, as when the thread's place can't be reached; null when they can. */
@@ -12,7 +12,7 @@ export const AsksDocked = createContext(false);
 /** Which blocks are asks that wait on the composer rather than where they were asked. */
 export function useDockedAsks(): (block: Block) => boolean {
   const docked = useContext(AsksDocked);
-  return (block) => docked && block.kind === "approval" && !block.decision && docks(block);
+  return useCallback((block: Block) => docked && block.kind === "approval" && !block.decision && docks(block), [docked]);
 }
 
 /** Asks answered from this window, so their record lands in the conversation as it is drawn, and not on a reload. */

@@ -202,5 +202,5 @@ it("discards protected bytes if sign-out happens before their consumer completes
   await host.account.signOut();
   release();
   await result;
-  expect(seen.pushes).toContainEqual({ type: "invalidate", keys: ["hostedFiles"] });
+  expect(seen.pushes).toContainEqual({ type: "invalidate", keys: ["hostedFiles", "hostedAssets"] });
 });

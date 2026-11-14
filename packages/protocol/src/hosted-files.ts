@@ -39,6 +39,18 @@ export type HostedFileDraft = z.infer<typeof draft>;
 export type HostedFileRef = z.infer<typeof ref>;
 const asset = z.object({ scope: HostedFileScope, file: z.object({ id, name: z.string() }).strict() }).strict();
 
+/** The existing event carries a path. Only these two parts may become an authenticated file request. */
+export function hostedFileReference(path: string): { id: string; name: string } | null {
+  const match = /^\/hosted\/files\/([^/]+)\/(.+)$/.exec(path);
+  const id = match?.[1];
+  const name = match?.[2];
+  return id && name ? { id, name } : null;
+}
+
+export function hostedFilePath(file: Pick<TeamChatFile, "id" | "name">): string {
+  return `/hosted/files/${file.id}/${file.name}`;
+}
+
 /** Window-only file transfer. Account credentials and arbitrary authenticated URLs never cross this boundary. */
 export const hostedFilesRpcParams = {
   "hostedFiles.capture": z.object({ scope: HostedFileScope }).strict(),

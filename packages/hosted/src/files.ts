@@ -32,13 +32,13 @@ export class Files {
       if (this.#generation === deps.session.generation) return;
       this.#generation = deps.session.generation;
       this.#abort();
-      deps.push({ type: "invalidate", keys: ["hostedFiles"] });
+      deps.push({ type: "invalidate", keys: ["hostedFiles", "hostedAssets"] });
     });
     deps.session.onSocket(SOCKET.changed, (body) => {
       const notice = wireTopics.safeParse(body);
       if (!notice.success || !notice.data.topics.some((topic) => ["spaces", "projects", "members"].includes(topic))) return;
       this.#abort("read");
-      deps.push({ type: "invalidate", keys: ["hostedFiles"] });
+      deps.push({ type: "invalidate", keys: ["hostedFiles", "hostedAssets"] });
     });
   }
 

@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { HOSTED_FILE_CHUNK_BYTES, hostedFilesRpcParams } from "./hosted-files.js";
+import { HOSTED_FILE_CHUNK_BYTES, hostedFilePath, hostedFileReference, hostedFilesRpcParams } from "./hosted-files.js";
 import { rpcParams } from "./rpc.js";
 import { isRemoteMethod } from "./remote.js";
 
@@ -28,4 +28,12 @@ it("accepts only a captured destination and file reference, never an arbitrary a
   expect(rpcParams["hostedFiles.thumbnail"].safeParse(asset).success).toBe(true);
   expect(rpcParams["hostedFiles.thumbnail"].safeParse({ ...asset, url: "https://other.example.com/file" }).success).toBe(false);
   expect(rpcParams["hostedFiles.download"].safeParse({ ...asset, path: "/tmp/example" }).success).toBe(false);
+});
+
+it("reads the existing hosted file path without changing the submitted filename", () => {
+  const file = { id: "upload", name: "notes %20 #1.txt" };
+  expect(hostedFileReference(hostedFilePath(file))).toEqual(file);
+  expect(hostedFileReference("https://api.example.com/hosted/files/upload/notes.txt")).toBeNull();
+  expect(hostedFileReference("/tmp/notes.txt")).toBeNull();
+  expect(hostedFileReference("/hosted/files/upload/")).toBeNull();
 });

@@ -58,7 +58,6 @@ export function MessageQueue({
   onStart?: ((messageId: string) => void) | undefined;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const remove = useComposerControl(pending, "Remove from queue");
   if (!messages.length) return null;
   const open = expanded || messages.some((message) => message.error || message.interrupted);
   const behind = open ? 0 : Math.min(2, messages.length);
@@ -76,11 +75,7 @@ export function MessageQueue({
                 <div className="message-queue-actions">
                   {by?.paused && by.mine ? <QueuedStart canStart={Boolean(by.canStart)} blocked={by.startBlocked ?? null} pending={pending} onStart={() => onStart?.(message.id)} /> : null}
                   {(!by || by.mine) && !by?.paused ? <QueuedSend message={message} canSend={canSend} pending={pending} sendReason={sendReason} retryBlocked={retryBlocked} onSend={onSend} /> : null}
-                  {!by || by.canRemove ? (
-                    <IconButton size="xs" disabled={remove.disabled} onClick={() => onRemove(message.id)} aria-label={`Remove queued message ${index + 1}`} data-tip={remove.reason}>
-                      <X size={13} />
-                    </IconButton>
-                  ) : null}
+                  {!by || by.canRemove ? <QueuedRemove index={index} pending={pending} granted={Boolean(by?.canRemove)} onRemove={() => onRemove(message.id)} /> : null}
                 </div>
               </li>
             );
@@ -128,6 +123,25 @@ function QueuedWords({ message, pending, onEdit, author }: { message: QueuedMess
     <button type="button" className="message-queue-message" disabled={control.disabled} data-tip={control.reason} onClick={onEdit}>
       {body}
     </button>
+  );
+}
+
+/**
+ * Takes a message out of the queue. It closes with a read-only composer, except on the author's own row in a shared cloud
+ * thread, which the server lets them withdraw while the agent is not theirs to run.
+ */
+function QueuedRemove({ index, pending, granted, onRemove }: { index: number; pending: boolean; granted: boolean; onRemove: () => void }) {
+  const control = useComposerControl(pending, "Remove from queue");
+  return (
+    <IconButton
+      size="xs"
+      disabled={granted ? pending : control.disabled}
+      onClick={onRemove}
+      aria-label={`Remove queued message ${index + 1}`}
+      data-tip={granted ? "Remove from queue" : control.reason}
+    >
+      <X size={13} />
+    </IconButton>
   );
 }
 

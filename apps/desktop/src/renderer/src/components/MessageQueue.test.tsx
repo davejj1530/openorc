@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { MessageQueue } from "./MessageQueue";
+import { ComposerReadOnly } from "./composer-read-only";
 
 afterEach(cleanup);
 
@@ -96,4 +97,33 @@ it("pauses a stopped queue: only the reader's own message offers Start turn, on 
   fireEvent.click(start);
   expect(onStart).toHaveBeenCalledWith("mine");
   expect(screen.getAllByRole("button", { name: "Start turn" })).toHaveLength(1);
+});
+
+it("lets the author remove their own paused message while the composer is closed to them", () => {
+  const onRemove = vi.fn();
+  const mine = { id: "mine", text: "Also rename the file", attachments: [], queuedAt: 1 };
+  const people = {
+    hint: null,
+    pausedHint: null,
+    of: () => ({
+      author: { id: "u-bea", name: "Bea Walk", image: null },
+      mine: true,
+      canEdit: true,
+      canRemove: true,
+      paused: true,
+      canStart: false,
+      startBlocked: "Only Ana can run the agent in this cloud thread for now.",
+    }),
+  };
+  render(
+    <ComposerReadOnly.Provider value="Only Ana can run the agent in this cloud thread for now.">
+      <MessageQueue canSend={false} pending={false} onSend={vi.fn()} onRemove={onRemove} messages={[mine]} people={people} />
+    </ComposerReadOnly.Provider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: /1 paused/ }));
+  const remove = screen.getByRole("button", { name: "Remove queued message 1" });
+  expect(remove.hasAttribute("disabled")).toBe(false);
+  fireEvent.click(remove);
+  expect(onRemove).toHaveBeenCalledWith("mine");
+  expect(screen.getByRole("button", { name: "Start turn" }).hasAttribute("disabled")).toBe(true);
 });

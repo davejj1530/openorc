@@ -113,12 +113,14 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it("opens every account's 5-hour and weekly limits from the footer's usage bars, the thread's account first", async () => {
+it("opens every account's 5-hour and weekly limits from the footer's share left, the thread's account first", async () => {
   useRouter.setState({ route: { view: "thread", threadId: "notes" } });
   render(<AccountUsage />);
   const button = screen.getByRole("button", { name: "Claude · Work: 59% left this week" });
-  // 59% left lights three of the four bars.
-  expect(button.querySelector(".account-usage-bars-fill")?.getAttribute("data-icon")).toBe("SignalHigh");
+  // The share is filled on its disc, never drawn as an arc, and its number stands beside it.
+  expect(button.textContent).toBe("59%");
+  expect(button.querySelector(".amount-share path")).not.toBeNull();
+  expect(button.querySelector("[stroke-dasharray]")).toBeNull();
   fireEvent.click(button);
   const table = await screen.findByRole("table");
   const rows = within(table).getAllByRole("row").slice(1);
@@ -136,14 +138,14 @@ it("opens every account's 5-hour and weekly limits from the footer's usage bars,
   expect(screen.queryByRole("region", { name: "This conversation" })).toBeNull();
 });
 
-it("on an OpenCode thread, which has no weekly limit, shows the usage bars plain and opens with what the conversation has cost", async () => {
+it("on an OpenCode thread, which has no weekly limit, shows the usage glyph plain and opens with what the conversation has cost", async () => {
   thread = { id: "notes", agent: "opencode", claudeAccountId: null, teamInstanceId: null };
   useRouter.setState({ route: { view: "thread", threadId: "notes" } });
   render(<AccountUsage />);
   const button = screen.getByRole("button", { name: "OpenCode: no weekly limit" });
   // The footer shows no figure and measures nothing until the popup opens.
   expect(button.textContent).toBe("");
-  expect(button.querySelector(".account-usage-bars")).toBeNull();
+  expect(button.querySelector(".amount-share")).toBeNull();
   expect(button.querySelector("svg")?.getAttribute("data-icon")).toBe("Signal");
   fireEvent.click(button);
   const cost = await screen.findByRole("region", { name: "This conversation" });
@@ -188,7 +190,7 @@ it("shows an fx balance before a first turn, without a percentage meter or inven
   publishComposerAccount({ agent: "fx", model: "gateway/anthropic/example" });
   render(<AccountUsage />);
   const button = screen.getByRole("button", { name: "fx: AI Gateway balance: $12.50" });
-  expect(button.querySelector(".account-usage-bars")).toBeNull();
+  expect(button.querySelector(".amount-share")).toBeNull();
   fireEvent.click(button);
   const details = await screen.findByRole("region", { name: "fx account usage" });
   expect(within(details).getByText("$12.50")).toBeTruthy();

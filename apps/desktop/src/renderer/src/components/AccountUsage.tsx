@@ -3,14 +3,14 @@ import { DEFAULT_CLAUDE_ACCOUNT, harnessCatalog, isHarnessId, percentLeft, sessi
 import { allowanceState, conversationCost, creditBalanceLabel, formatCost, formatUsageTime, usageResetLabel } from "@openorc/client";
 import { useEffect, useState, type ReactNode } from "react";
 import { CoversPreview } from "../lib/browser-preview";
-import { cn } from "../lib/cn";
 import { useRpc } from "../lib/client";
 import { useUsageAccounts, usageAccountId, usageParams, USAGE_MAX_AGE_MS, type UsageAccount, type UsageAccountReport } from "../lib/account-usage-data";
 import { savedComposerAccount, useComposerAccount, type ComposerAccount } from "../lib/composer-account";
 import { useRouter } from "../lib/router";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { HarnessLogo } from "./HarnessLogo";
-import { Signal, SignalHigh, SignalLow, SignalMedium } from "./icons";
+import { AmountShare } from "./ContextUsage";
+import { Signal } from "./icons";
 import { Tooltip } from "./ui";
 
 /** The footer's glyph size, the same as the sidebar's other tools. */
@@ -53,37 +53,6 @@ function useConversationCost(account: UsageAccount | null): number | null {
   return priced && runs.data ? conversationCost(runs.data) : null;
 }
 
-/** A small ring for the share that is left. */
-function LeftRing({ left, className }: { left: number; className?: string }) {
-  return (
-    <svg viewBox="0 0 16 16" className={cn("account-usage-ring", className)} aria-hidden="true">
-      <circle cx="8" cy="8" r="6" className="account-usage-track" />
-      {left > 0 ? <circle cx="8" cy="8" r="6" className="account-usage-fill" pathLength="100" strokeDasharray={`${Math.min(100, left)} 100`} transform="rotate(-90 8 8)" /> : null}
-    </svg>
-  );
-}
-
-/** Settings' usage bars, from the fewest lit to all four. */
-const LIT_BARS = [SignalLow, SignalMedium, SignalHigh, Signal] as const;
-
-/** How many of the four bars a share left lights: one more for each quarter begun, none once nothing is left. */
-function barsLit(left: number): number {
-  if (left <= 0) return 0;
-  return Math.min(4, Math.ceil(left / 25));
-}
-
-/** The share left as Settings' usage bars: the lit ones over all four on the track. */
-function LeftBars({ left }: { left: number }) {
-  const lit = barsLit(left);
-  const Lit = lit ? LIT_BARS[lit - 1]! : null;
-  return (
-    <span className="account-usage-bars" aria-hidden="true">
-      <Signal size={USAGE_ICON} className="account-usage-bars-track" />
-      {Lit ? <Lit size={USAGE_ICON} className="account-usage-bars-fill" /> : null}
-    </span>
-  );
-}
-
 const emptyWords: Record<UsageAccountReport["status"], string> = {
   loading: "Reading usage",
   available: "No limits reported",
@@ -124,7 +93,7 @@ function LimitCell({ window, now }: { window: AllowanceWindow | null; now: numbe
   return (
     <td className="usage-table-cell" data-tone={tone} data-tip={window.resetsAt === null ? undefined : formatUsageTime(window.resetsAt)}>
       <span className="usage-table-limit">
-        <LeftRing left={left} />
+        <AmountShare fraction={left / 100} size={USAGE_ICON} />
         <span className="usage-table-value tabular">{shown}% left</span>
         {reset ? <span className="usage-table-reset">{reset}</span> : null}
       </span>
@@ -237,7 +206,7 @@ function FxAccountUsage({ account, now }: { account: UsageAccountReport; now: nu
               <span className="usage-table-plan">{resetWords(window, now)}</span>
             </span>
             <span className="usage-table-limit" data-tone={left === null ? undefined : limitTone(window, left, now)}>
-              <LeftRing left={left ?? 0} />
+              <AmountShare fraction={(left ?? 0) / 100} size={USAGE_ICON} />
               <span className="usage-cost-value tabular">{left === null ? "Not reported" : `${Math.round(left)}% left`}</span>
             </span>
           </div>
@@ -281,13 +250,23 @@ interface UsageMark {
   mark: ReactNode;
 }
 
-/** The week's share left, as usage bars. */
-function weekMark(account: UsageAccount, left: number): UsageMark {
-  const shown = Math.round(left);
-  return { tooltip: `${shown}% left this week`, label: `${account.name}: ${shown}% left this week`, low: shown <= 10, mark: <LeftBars left={left} /> };
+/** A share left as the foot shows it: filled on its disc, then the number. */
+function ShareLeft({ left }: { left: number }) {
+  return (
+    <>
+      <AmountShare fraction={left / 100} size={USAGE_ICON} />
+      <span className="tabular">{Math.round(left)}%</span>
+    </>
+  );
 }
 
-/** An account with no weekly limit has nothing to measure: the bars plain, like the footer's other buttons, opening on what the conversation has cost. */
+/** The week's share left. */
+function weekMark(account: UsageAccount, left: number): UsageMark {
+  const shown = Math.round(left);
+  return { tooltip: `${shown}% left this week`, label: `${account.name}: ${shown}% left this week`, low: shown <= 10, mark: <ShareLeft left={left} /> };
+}
+
+/** An account with no weekly limit has nothing to measure: the plain glyph, like the footer's other buttons, opening on what the conversation has cost. */
 function noLimitMark(account: UsageAccount): UsageMark {
   return { tooltip: "No weekly limit", label: `${account.name}: no weekly limit`, low: false, mark: <Signal size={USAGE_ICON} /> };
 }
@@ -298,7 +277,7 @@ function fxMark(account: UsageAccount, windows: AllowanceWindow[], credits: Usag
   if (window) {
     const left = percentLeft(window)!;
     const tooltip = `${Math.round(left)}% left · ${window.label}`;
-    return { tooltip, label: `${account.name}: ${tooltip}`, low: left <= 10, mark: <LeftBars left={left} /> };
+    return { tooltip, label: `${account.name}: ${tooltip}`, low: left <= 10, mark: <ShareLeft left={left} /> };
   }
   const credit = credits.find((credit) => credit.unlimited || credit.balance !== null);
   if (!credit) return null;

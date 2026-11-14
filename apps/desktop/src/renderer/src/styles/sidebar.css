@@ -649,7 +649,8 @@ button.browser-empty:hover,
   justify-content: flex-end;
   gap: 2px;
   height: 52px;
-  padding: 0 10px;
+  /* The gear's centre sits on the list's centre line, 28px in from the edge. */
+  padding: 0 12px 0 10px;
   border-top: var(--hairline) solid var(--line);
 }
 /* The signed-in person at the foot's start: a 26px face, the name in ink, the plan in one quiet line. */
@@ -774,39 +775,22 @@ button.browser-empty:hover,
   stroke-linecap: round;
   transition: stroke-dasharray var(--duration-quick) var(--ease-out);
 }
-/* The week's usage is a footer button: Settings' usage bars, lit in ink by the share left over the rest
-   on the ring's track; a low week turns them. An account with no weekly limit shows the bars plain. */
-.account-usage-bars {
-  display: grid;
+/* The week's usage is a footer button: the share left filled on its disc, then the number, in a 28px pill; a
+   low week turns both amber. An account with no weekly limit shows its glyph plain. */
+.sidebar-tool.account-usage-button {
+  grid-auto-flow: column;
+  gap: 6px;
+  width: auto;
+  height: 28px;
+  padding: 0 8px 0 6px;
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--ink-2);
 }
-.account-usage-bars > * {
-  grid-area: 1 / 1;
+.account-usage-button[data-low] {
+  color: var(--warn);
 }
-.account-usage-bars-track {
-  color: var(--surface-3);
-}
-.account-usage-bars-fill {
-  color: var(--ink);
-}
-.account-usage-button[data-low] .account-usage-bars-fill {
-  color: var(--attention);
-}
-.account-usage-ring {
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke-width: 2;
-}
-.account-usage-track {
-  stroke: var(--surface-3);
-}
-.account-usage-fill {
-  stroke: var(--ink);
-  stroke-linecap: round;
-  transition: stroke-dasharray var(--duration-resize) var(--ease-out);
-}
-/* The ring's popover: every account's 5-hour and weekly limits in one table. Hairlines sit between
+/* The usage button's popover: every account's 5-hour and weekly limits in one table. Hairlines sit between
    rows; the open thread's account sits on the current-row fill instead. */
 .account-usage-popup {
   width: min(440px, calc(100vw - 24px));
@@ -883,8 +867,13 @@ button.browser-empty:hover,
   align-items: center;
   column-gap: 8px;
 }
-.usage-table-limit .account-usage-ring {
+.usage-table-limit .amount-share {
   grid-row: span 2;
+  color: var(--ink-2);
+}
+.usage-table-cell[data-tone] .amount-share,
+.usage-table-limit[data-tone] .amount-share {
+  color: var(--warn);
 }
 .usage-table-value {
   font-size: var(--text-base);

@@ -3,7 +3,7 @@ import type { FileScope, UsableConnector } from "@openorc/protocol";
 import { Fragment, useCallback, useEffect, useId, useImperativeHandle, useMemo, useRef, useState, type Ref, type RefObject } from "react";
 import { useRpc } from "../lib/client";
 import { cn } from "../lib/cn";
-import { filterMentions, insertMention, mentionQueryAt, usePickedFiles, type MentionEntry } from "../lib/composer-mentions";
+import { filterMentions, mentionQueryAt, usePickedFiles, type MentionEntry } from "../lib/composer-mentions";
 import type { SlashCommand } from "./Composer";
 import {
   asideMatching,
@@ -12,6 +12,7 @@ import {
   LIST_STARTS,
   matchingCommands,
   matchingConnectors,
+  memberRows,
   mentionRows,
   nextPickable,
   ofKind,
@@ -126,7 +127,7 @@ export function ComposerInput(props: ComposerInputProps) {
   const scope = useListKind(props.lists, { token, caret, value, editor, onOpen: () => setSuggestionsActive(true) });
   const memberQuery = useMemo(() => (mentions?.length && (scope === null || scope === "orcling") ? mentionQueryAt(value, caret) : null), [mentions, value, caret, scope]);
   const memberMatches = useMemo(() => (memberQuery ? filterMentions(mentions ?? [], memberQuery.query) : []), [memberQuery, mentions]);
-  const atQuery = token?.token.startsWith("@") && !memberMatches.length ? token.token.slice(1) : null;
+  const atQuery = token?.token.startsWith("@") ? token.token.slice(1) : null;
   const mentionQuery = fileSearch ? atQuery : null;
   const connectorMatches = useMemo(() => matchingConnectors(connectors, atQuery), [connectors, atQuery]);
   const asideMatches = useMemo(() => asideMatching(props.connectorsAside, atQuery), [props.connectorsAside, atQuery]);
@@ -139,22 +140,12 @@ export function ComposerInput(props: ComposerInputProps) {
   const commandMatches = useMemo(() => matchingCommands(commands, commandQuery, commandPrefix, token?.start), [commandPrefix, commandQuery, commands, token?.start]);
   const write = useCallback((text: string, at: number) => editor.current?.pick(text, at), [editor]);
   const all: SuggestionRow[] = useMemo(() => {
-    if (memberQuery && memberMatches.length) {
-      return memberMatches.map((entry) => ({
-        key: `mention:${entry.key}`,
-        label: `@${entry.name}`,
-        hint: entry.hint,
-        mention: entry.key,
-        pick: () => {
-          const next = insertMention(value, memberQuery.start, caret, entry.name);
-          write(next.text, next.caret);
-        },
-      }));
-    }
+    const members = memberQuery ? memberRows(memberMatches, { start: memberQuery.start, caret, value, write }) : [];
     if (atQuery !== null) {
       const draft = { token, caret, value, write, onFile: picked.pick };
-      return mentionRows({ usable: connectorMatches, aside: asideMatches, files: mentionQuery !== null ? (files.data ?? []) : [] }, draft);
+      return [...members, ...mentionRows({ usable: connectorMatches, aside: asideMatches, files: mentionQuery !== null ? (files.data ?? []) : [] }, draft)];
     }
+    if (members.length) return members;
     return commandRows(commandMatches, { query: commandQuery, token, caret, value, write });
   }, [memberQuery, memberMatches, atQuery, connectorMatches, asideMatches, mentionQuery, files.data, commandMatches, commandQuery, token, caret, value, write, picked.pick]);
   const suggestions = useMemo(() => (scope ? all.filter((row) => ofKind(row, scope)) : all), [all, scope]);
@@ -213,7 +204,7 @@ export function ComposerInput(props: ComposerInputProps) {
                     skill's description runs to a paragraph and would otherwise squeeze the
                     name it belongs to down to nothing. Half the row is the ceiling, so a
                     long file path still truncates rather than crowding out its own hint. */}
-                  <span className={cn("composer-suggestion-label", (suggestion.insert || suggestion.logo) && "skill-token")} data-mono={memberList ? undefined : true}>
+                  <span className={cn("composer-suggestion-label", (suggestion.insert || suggestion.logo) && "skill-token")} data-mono={suggestion.mention ? undefined : true}>
                     {suggestion.logo ? <ConnectorLogo title={suggestion.logo.title} logo={suggestion.logo.logo} size={16} /> : null}
                     {suggestion.label}
                   </span>

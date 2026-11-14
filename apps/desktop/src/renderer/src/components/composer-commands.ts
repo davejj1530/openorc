@@ -1,7 +1,7 @@
 import { insertSkill, rankCommands } from "@openorc/client";
 import type { UsableConnector } from "@openorc/protocol";
 import { useEffect, useRef } from "react";
-import { insertMention } from "../lib/composer-mentions";
+import { insertMention, type MentionEntry } from "../lib/composer-mentions";
 import type { SlashCommand } from "./Composer";
 
 /** One row of the composer's suggestions: a mention, a file, a skill or an app action. */
@@ -38,7 +38,7 @@ export function ofKind(row: SuggestionRow, kind: ListKind): boolean {
     case "skill":
       return Boolean(row.insert);
     case "command":
-      return !row.insert && !row.mention && !row.logo && row.group === undefined;
+      return !row.insert && !row.logo && row.group === undefined;
   }
 }
 
@@ -108,9 +108,24 @@ export function connectorRows(matches: UsableConnector[], { token, caret, value,
   }));
 }
 
+/** The Orclings whose name matches the `@` word: picking one puts its name in place of the word. */
+export function memberRows(matches: readonly MentionEntry[], { start, caret, value, write }: { start: number } & Pick<Draft, "caret" | "value" | "write">): SuggestionRow[] {
+  return matches.map((entry) => ({
+    key: `mention:${entry.key}`,
+    label: `@${entry.name}`,
+    hint: entry.hint,
+    mention: entry.key,
+    group: "Orclings",
+    pick: () => {
+      const next = insertMention(value, start, caret, entry.name);
+      write(next.text, next.caret);
+    },
+  }));
+}
+
 /**
- * What `@` lists: the connectors the agent has, then the ones it goes without in this mode, dimmed under why, then the
- * files whose path matches, each run under its heading.
+ * What `@` lists after the Orclings: the files whose path matches, then the connectors the agent has, then the ones it
+ * goes without in this mode, dimmed under why, each run under its heading.
  */
 export function mentionRows(
   { usable, aside, files }: { usable: UsableConnector[]; aside: { connectors: UsableConnector[]; reason: string } | null; files: string[] },
@@ -118,9 +133,9 @@ export function mentionRows(
 ): SuggestionRow[] {
   const reason = aside?.reason ?? "";
   return [
+    ...fileRows(files, draft).map((row) => ({ ...row, group: "Files" })),
     ...connectorRows(usable, draft).map((row) => ({ ...row, group: "Connectors" })),
     ...connectorRows(aside?.connectors ?? [], draft).map((row) => ({ ...row, group: reason, unavailable: reason, pick: () => {} })),
-    ...fileRows(files, draft).map((row) => ({ ...row, group: "Files" })),
   ];
 }
 

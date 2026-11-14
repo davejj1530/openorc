@@ -416,6 +416,19 @@ describe("the send cluster", () => {
   });
 });
 
+it("lists @ in one list, in groups: Orclings, then Files, then Connectors", async () => {
+  vi.spyOn(core, "call").mockImplementation(async (method) => (method === "files.search" ? ["src/rini.ts"] : null) as never);
+  mount({
+    value: "",
+    mentions: [{ key: "orcling:rini", name: "Rini", hint: "Orcling" }],
+    connectors: [{ name: "rini-notes", title: "Rini notes", logo: null }],
+    fileSearch: { kind: "project", id: "p" },
+  });
+  type(screen.getByRole("textbox", { name: "Message" }), "@ri");
+  await waitFor(() => expect([...document.querySelectorAll(".composer-suggestion-group")].map((group) => group.textContent)).toEqual(["Orclings", "Files", "Connectors"]));
+  vi.restoreAllMocks();
+});
+
 describe("the plus", () => {
   const offers = {
     commands: [

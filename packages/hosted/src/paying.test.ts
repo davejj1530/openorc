@@ -64,18 +64,19 @@ describe("paying", () => {
   });
 
   it("does not open a checkout whose answer arrives after sign-out", async () => {
-    const release = Promise.withResolvers<void>();
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
     const { hosted } = await signedIn({
       fetch: async (input, init) => {
         const response = await fetch(input, init);
-        if (String(input).endsWith("/billing/checkout/pro")) await release.promise;
+        if (String(input).endsWith("/billing/checkout/pro")) await held;
         return response;
       },
     });
     const opening = hosted.account.openBilling({ page: "pro", period: "monthly" });
     await vi.waitFor(() => expect(stand.checkouts).toHaveLength(1));
     await hosted.account.signOut();
-    release.resolve();
+    release();
     await opening;
     expect(opened).toEqual([]);
     expect(hosted.account.status().state).toBe("signed-out");

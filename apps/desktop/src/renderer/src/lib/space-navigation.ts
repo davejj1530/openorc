@@ -163,6 +163,7 @@ function capture(ownership: SpaceView["filter"]["ownership"]): SpaceView {
   return {
     destination: route.route,
     panes: route.threadIds,
+    ...(route.route.view === "team-chat" && { chatWork: route.chatWork }),
     tabs: tabs.tabs.filter((tab) => !tabs.leaving.includes(tab.id)),
     activeTab: tabs.active,
     history: route.history,
@@ -185,7 +186,7 @@ function restore(view: SpaceView): void {
     panelOpen: false,
   });
   useThreadTabs.setState({ tabs: view.tabs, active: view.activeTab, leaving: [] });
-  useRouter.setState({ route: view.destination, threadIds: view.panes, history: view.history, future: view.future });
+  useRouter.setState({ route: view.destination, threadIds: view.panes, chatWork: view.chatWork ?? null, history: view.history, future: view.future });
   navigationScope.restoring = false;
 }
 

@@ -1,9 +1,11 @@
 import { WORKSPACE_ID, type SpaceProject, type ThreadSummary } from "@openorc/protocol";
 import { routeFromSpec, type Route } from "./router";
 import type { ThreadTab } from "./thread-tabs";
+import type { ChatWorkRoute } from "./team-chat-route";
 
 export interface SpaceInventory {
   id: string;
+  accountId?: string;
   personal: boolean;
   projects: SpaceProject[];
   threads: (Pick<ThreadSummary, "id" | "projectId" | "owner"> & Partial<Pick<ThreadSummary, "title">>)[];
@@ -44,6 +46,7 @@ export interface SpaceView {
   tabs: ThreadTab[];
   activeTab: string | null;
   panes: string[];
+  chatWork?: ChatWorkRoute | null;
   filter: { ownership: "mine" | "everyone"; pinnedOnly: boolean; hiddenProjectKeys: string[]; project: string };
   history: Route[];
   future: Route[];
@@ -99,6 +102,12 @@ function peopleRoute(value: SavedRoute, inventory: SpaceInventory): Route | null
   if (inventory.personal || value["spaceId"] !== inventory.id) return null;
   return { view: "people", spaceId: inventory.id, ...(value["section"] === "invitations" ? { section: "invitations" } : {}) };
 }
+function chatRoute(value: SavedRoute, inventory: SpaceInventory): Route | null {
+  const accountId = text(value["accountId"]);
+  const conversationId = text(value["conversationId"]);
+  if (inventory.personal || !accountId || accountId !== inventory.accountId || value["spaceId"] !== inventory.id || !conversationId) return null;
+  return { view: "team-chat", accountId, spaceId: inventory.id, conversationId };
+}
 
 /** Saved routes are reconstructed from known fields, then checked against the current accessible catalog. */
 function destination(value: unknown, inventory: SpaceInventory): Route | null {
@@ -116,6 +125,8 @@ function destination(value: unknown, inventory: SpaceInventory): Route | null {
       return taskRoute(value, inventory);
     case "people":
       return peopleRoute(value, inventory);
+    case "team-chat":
+      return chatRoute(value, inventory);
     case "tasks":
     case "pulls":
     case "memory":
@@ -126,6 +137,20 @@ function destination(value: unknown, inventory: SpaceInventory): Route | null {
   }
 }
 
+function savedWorkspace(value: SavedRoute, route: Route, inventory: SpaceInventory): Pick<SpaceView, "panes" | "chatWork"> {
+  const suspended = route.view === "team-chat" ? destination(value["chatWork"], inventory) : null;
+  const chatWork = suspended?.view === "thread" || suspended?.view === "newthread" ? suspended : null;
+  const panes =
+    route.view === "thread" || chatWork?.view === "thread"
+      ? strings(value["panes"])
+          .filter((id) => hasOpenThread(id, inventory))
+          .slice(0, 3)
+      : [];
+  const work = route.view === "thread" ? route : chatWork;
+  if (work?.view === "thread" && !panes.includes(work.threadId)) panes.unshift(work.threadId);
+  return { panes: panes.slice(0, 3), ...(route.view === "team-chat" && { chatWork }) };
+}
+
 export function validSpaceView(value: unknown, inventory: SpaceInventory): SpaceView {
   if (!record(value)) return emptySpaceView();
   const route = destination(value["destination"], inventory) ?? { view: "newthread" };
@@ -133,24 +158,17 @@ export function validSpaceView(value: unknown, inventory: SpaceInventory): Space
     ? value["tabs"].flatMap((tab: unknown) => {
         if (!record(tab) || typeof tab["id"] !== "string") return [];
         const route = destination(tab["route"], inventory);
-        return route && (route.view === "thread" || route.view === "newthread") ? [{ id: tab["id"], route }] : [];
+        return route && (route.view === "thread" || route.view === "newthread" || route.view === "team-chat") ? [{ id: tab["id"], route }] : [];
       })
     : [];
   const filter = record(value["filter"]) ? value["filter"] : {};
   const keys = [...inventory.projects.map((project) => project.key), ...(inventory.personal ? [WORKSPACE_ID] : [])];
   const routes = (value: unknown) => (Array.isArray(value) ? value.flatMap((item: unknown) => destination(item, inventory) ?? []).slice(-50) : []);
-  const panes =
-    route.view === "thread"
-      ? strings(value["panes"])
-          .filter((id) => hasOpenThread(id, inventory))
-          .slice(0, 3)
-      : [];
-  if (route.view === "thread" && !panes.includes(route.threadId)) panes.unshift(route.threadId);
   return {
     destination: route,
     tabs,
     activeTab: tabs.find((tab) => tab.id === value["activeTab"])?.id ?? tabs[0]?.id ?? null,
-    panes: panes.slice(0, 3),
+    ...savedWorkspace(value, route, inventory),
     filter: {
       ownership: filter["ownership"] === "mine" ? "mine" : "everyone",
       pinnedOnly: filter["pinnedOnly"] === true,

@@ -116,6 +116,7 @@ async function readSpaceNavigation(status: SpacesStatus, coreIdentity: string, t
   const listed = await Promise.all(
     status.spaces.map(async (space) => ({
       id: space.id,
+      accountId: status.userId,
       personal: space.kind === "personal",
       projects: await core.call("spaces.projects", { spaceId: space.id }),
       threads: await core.call("threads.list", { spaceId: space.id, filter: "all", includeChildren: true }),

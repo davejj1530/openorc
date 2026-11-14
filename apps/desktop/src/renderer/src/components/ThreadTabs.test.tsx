@@ -96,7 +96,7 @@ it("marks an Orcling's chat with its face and a group chat with its members' fac
 
 const order = (container: HTMLElement) => [...container.querySelectorAll("[data-tab]")].map((tab) => tab.getAttribute("data-tab"));
 
-it("leads with the open thread as the column's heading, the other open threads after it in their own order", () => {
+it("keeps every open thread where it was opened when one is chosen, by click or by key, marking only that one", () => {
   for (const id of ["t1", "t2", "t3"]) threads.set(id, thread(id, "codex"));
   useThreadTabs.setState({
     tabs: [
@@ -108,36 +108,26 @@ it("leads with the open thread as the column's heading, the other open threads a
     leaving: [],
   });
   const { container } = render(<ThreadTabs />);
-  expect(order(container)).toEqual(["b", "a", "c"]);
-  expect(container.querySelector(".thread-tab-heading")?.getAttribute("data-tab")).toBe("b");
+  expect(order(container)).toEqual(["a", "b", "c"]);
   expect(screen.getByRole("tab", { selected: true }).textContent).toBe("t2");
-  expect(container.querySelector(".work-tabs [data-tab='b']")).toBeNull();
 
   fireEvent.click(screen.getByRole("tab", { name: "t3" }));
   expect(useThreadTabs.getState().active).toBe("c");
-  expect(order(container)).toEqual(["c", "a", "b"]);
+  expect(order(container)).toEqual(["a", "b", "c"]);
+  expect(container.querySelectorAll(".work-tab-current")).toHaveLength(1);
+  expect(container.querySelector(".work-tab-current")?.getAttribute("data-tab")).toBe("c");
 
-  fireEvent.click(within(container.querySelector(".thread-tab-heading") as HTMLElement).getByRole("button", { name: "Close tab" }));
-  expect(useThreadTabs.getState().active).toBe("b");
-  expect(container.querySelector(".thread-tab-heading")?.getAttribute("data-tab")).toBe("b");
-});
-
-it("moves from the heading through the other threads with the arrow keys", () => {
-  for (const id of ["t1", "t2"]) threads.set(id, thread(id, "codex"));
-  useThreadTabs.setState({
-    tabs: [
-      { id: "a", route: { view: "thread", threadId: "t1" } },
-      { id: "b", route: { view: "thread", threadId: "t2" } },
-    ],
-    active: "b",
-    leaving: [],
-  });
-  render(<ThreadTabs />);
-  fireEvent.keyDown(screen.getByRole("tab", { selected: true }), { key: "ArrowRight" });
+  fireEvent.keyDown(screen.getByRole("tab", { selected: true }), { key: "Home" });
   expect(useThreadTabs.getState().active).toBe("a");
+  expect(document.activeElement?.textContent).toBe("t1");
+  fireEvent.keyDown(screen.getByRole("tab", { selected: true }), { key: "ArrowRight" });
+  expect(useThreadTabs.getState().active).toBe("b");
+  fireEvent.keyDown(screen.getByRole("tab", { selected: true }), { key: "End" });
+  expect(useThreadTabs.getState().active).toBe("c");
+  expect(order(container)).toEqual(["a", "b", "c"]);
 });
 
-it("keeps the heading's whole name in a narrow header, folding the other threads into a menu that opens them", async () => {
+it("closes a tab from its own close, leaving the others in their order", () => {
   for (const id of ["t1", "t2", "t3"]) threads.set(id, thread(id, "codex"));
   useThreadTabs.setState({
     tabs: [
@@ -148,23 +138,13 @@ it("keeps the heading's whole name in a narrow header, folding the other threads
     active: "a",
     leaving: [],
   });
-  // Room for the heading's whole name and one tab at its narrowest, with the menu after it.
-  const widths: Record<string, Partial<Record<"clientWidth" | "offsetWidth" | "scrollWidth", number>>> = {
-    "thread-tabs-row": { clientWidth: 34 + 4 + 200 + 6 + 124 + 76 },
-    "thread-tab-heading": { offsetWidth: 200 },
-    "work-tab-title": { offsetWidth: 150, scrollWidth: 150 },
-    "work-tabs-new": { offsetWidth: 34 },
-  };
-  const measured = (key: "clientWidth" | "offsetWidth" | "scrollWidth") =>
-    vi.spyOn(HTMLElement.prototype, key, "get").mockImplementation(function (this: HTMLElement) {
-      const own = Object.keys(widths).find((name) => this.classList.contains(name) && !(name === "work-tab-title" && !this.closest(".thread-tab-heading")));
-      return own ? (widths[own]![key] ?? 0) : 0;
-    });
-  const spies = [measured("clientWidth"), measured("offsetWidth"), measured("scrollWidth")];
   const { container } = render(<ThreadTabs />);
-  expect(order(container)).toEqual(["a", "b"]);
-  fireEvent.click(screen.getByRole("button", { name: "1 more open thread" }));
-  fireEvent.click(await screen.findByRole("menuitem", { name: "t3" }));
-  expect(useThreadTabs.getState().active).toBe("c");
-  for (const spy of spies) spy.mockRestore();
+  fireEvent.click(within(container.querySelector('[data-tab="b"]') as HTMLElement).getByRole("button", { name: "Close tab" }));
+  expect(useThreadTabs.getState().active).toBe("a");
+  expect(
+    useThreadTabs
+      .getState()
+      .tabs.filter((tab) => !useThreadTabs.getState().leaving.includes(tab.id))
+      .map((tab) => tab.id),
+  ).toEqual(["a", "c"]);
 });

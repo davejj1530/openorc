@@ -88,7 +88,7 @@ export function TopBar({
     >
       {/* Native regions follow declaration order: controls must follow this layer. */}
       {windowDragSurface ? <span className="thread-header-drag-surface" aria-hidden="true" /> : null}
-      <div className="flex items-center gap-2 min-w-0 flex-1 text-base truncate">
+      <div className={cn("flex items-center gap-2 min-w-0 flex-1 text-base truncate", tabs && "self-stretch")}>
         {first ? (
           <span className="workspace-window-nav flex items-center mr-1">
             <WindowCorner sidebarOpen={sidebarOpen} />

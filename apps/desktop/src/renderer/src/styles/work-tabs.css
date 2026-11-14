@@ -1,19 +1,17 @@
-/* Tabs on the window's chrome line: 28px pills up to 220px wide that share their row, down to 136px
-   (room for a name to read) before the strip scrolls sideways. The rest sit on the soft fill and the
-   current one is a raised plane. A tab's close shows on the current one and under the pointer. In the
-   thread header the open thread is the column's heading instead (ThreadTabs, below). */
+/* Tabs on the window's chrome line, shared by the work column's threads and the panel. A tab's close shows on the
+   current one, under the pointer and while focus is in it. The panel's tabs are pills (below); the threads' are
+   plain words, the current one underlined (further below). */
 .work-tabs-row {
   display: flex;
   align-items: center;
   gap: 2px;
   min-width: 0;
 }
-/* The strip scrolls, so it clips; 2px around the tabs keeps the raised tab's edge and shadow inside it. */
+/* The strip scrolls sideways once its tabs outgrow it. */
 .work-tabs {
   display: flex;
   align-items: center;
   min-width: 0;
-  padding: 2px;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -24,14 +22,11 @@
   position: relative;
   display: flex;
   align-items: center;
-  flex: 0 1 220px;
-  min-width: 136px;
   max-width: 220px;
   height: var(--control-sm);
   margin-inline-end: 4px;
   overflow: hidden;
   border-radius: var(--radius-md);
-  background-color: var(--surface-2);
   color: var(--ink-3);
   transition:
     background-color var(--duration-quick) var(--ease-out),
@@ -55,29 +50,25 @@
     margin var(--duration-resize) var(--ease-out);
 }
 /* A dragged tab rides over the row while the tabs it passes step aside (use-tab-reorder moves them); it follows the
-   pointer exactly, so only the others ease. The fills are tints, so it draws its own over the chrome's colour to hide
-   the names passing under it, and it stacks above the thread header's controls, which sit at 2. */
+   pointer exactly, so only the others ease. It draws the chrome's colour under itself to hide the names passing under
+   it, and it stacks above the thread header's controls, which sit at 2. */
 .work-tabs[data-reordering] .work-tab {
   transition: transform var(--duration-arrive) var(--ease-out);
 }
 .work-tabs .work-tab[data-dragged] {
   z-index: 3;
-  background: linear-gradient(var(--surface-2), var(--surface-2)) var(--bg);
+  background-color: var(--bg);
   color: var(--ink-2);
   transition: none;
 }
 .work-tabs .work-tab-current[data-dragged] {
-  background-image: linear-gradient(var(--surface-3), var(--surface-3));
   color: var(--ink);
 }
 .work-tab:hover {
-  background-color: var(--surface-3);
   color: var(--ink-2);
 }
 .work-tab-current,
 .work-tab-current:hover {
-  background-color: var(--surface);
-  box-shadow: var(--raised-shadow);
   color: var(--ink);
 }
 .work-tab-face {
@@ -87,20 +78,9 @@
   flex: 1;
   min-width: 0;
   height: 100%;
-  padding: 0 28px 0 10px;
   border-radius: inherit;
   font-size: var(--text-sm);
-  /* The current tab's room for its close comes and goes with the tab, so a tab sized to its name eases too. */
-  transition: padding var(--duration-resize) var(--ease-out);
   text-align: left;
-}
-/* Only the current tab keeps room for its close; another tab's name runs to its end, and its close
-   fades in over the last letters under the pointer. */
-.work-tab:not(.work-tab-current) .work-tab-face {
-  padding-right: 10px;
-}
-.work-tab:not(.work-tab-current):hover .work-tab-title {
-  mask-image: linear-gradient(to left, transparent 14px, #000 30px);
 }
 .work-tab-face:focus-visible {
   outline: 2px solid var(--ring);
@@ -146,83 +126,10 @@
 }
 /* The thread header lifts its controls above the window's drag plane with position: relative; a tab's close keeps
    its place over the tab's end rather than taking room from the name. */
-.thread-header :is(.work-tab, .thread-tab-heading) .work-tab-close {
+.thread-header .work-tab .work-tab-close {
   position: absolute;
 }
-
-/* The work column's header: the open thread's name as the column's heading, 15px in title ink with no pill, taking the
-   room its name needs up to 420px; the other open threads follow as tabs. The tabs give way first, down to their
-   narrowest, and ThreadTabs moves those that still do not fit into the More menu; the heading truncates only once all
-   of them are there. The row takes the header's room so ThreadTabs can measure it; + still follows the last tab. */
-.thread-tabs-row {
-  flex: 1 1 auto;
-}
-.thread-tabs {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-.thread-tab-heading {
-  position: relative;
-  display: flex;
-  flex: 0 1 auto;
-  align-items: center;
-  min-width: 0;
-  max-width: 420px;
-  height: var(--control-md);
-  color: var(--ink);
-}
-.thread-tab-heading .work-tab-face {
-  gap: 8px;
-  padding: 0 26px 0 2px;
-  border-radius: var(--radius-md);
-  font-size: var(--text-header);
-  line-height: var(--text-header--line-height);
-  letter-spacing: var(--text-header--letter-spacing);
-}
-.thread-tab-heading .work-tab-close {
-  right: 2px;
-}
-.thread-tab-heading:is(:hover, :focus-within) .work-tab-close {
-  opacity: 1;
-}
-/* While tabs show beside it the heading keeps its whole name and the tabs ThreadTabs left in the strip shrink to their
-   narrowest; with every other thread in the menu, the heading gives way. */
-.thread-tabs .work-tabs {
-  flex: 0 1 auto;
-  min-width: 0;
-}
-.thread-tabs:has(> .work-tabs) > .thread-tab-heading {
-  flex-shrink: 0;
-}
-/* The narrowest a tab gets beside the heading: TAB_MIN in lib/tab-fit.ts. */
-.thread-tabs .work-tab {
-  min-width: 120px;
-}
-.thread-tabs-more {
-  flex: none;
-  height: var(--control-sm);
-  padding: 0 10px;
-  border-radius: var(--radius-md);
-  background-color: var(--surface-2);
-  color: var(--ink-3);
-  font-size: var(--text-sm);
-  white-space: nowrap;
-  transition:
-    background-color var(--duration-quick) var(--ease-out),
-    color var(--duration-quick) var(--ease-out);
-}
-.thread-tabs-more:is(:hover, [data-popup-open]) {
-  background-color: var(--surface-3);
-  color: var(--ink-2);
-}
-.thread-tabs-more:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-}
-.work-tab:is(:hover, .work-tab-current) .work-tab-close,
-.work-tab-close:focus-visible {
+.work-tab:is(:hover, :focus-within, .work-tab-current) .work-tab-close {
   opacity: 1;
 }
 .work-tab-close:hover {
@@ -232,4 +139,75 @@
 .work-tabs-new {
   flex-shrink: 0;
   color: var(--ink-3);
+}
+
+/* The panel's tabs: 28px pills on the soft fill, the current one a raised plane; the strip's 2px keeps that plane's
+   edge and shadow inside its clip. The fills are tints, so a dragged pill draws its own over the chrome's colour. */
+.panel-tabs {
+  padding: 2px;
+}
+.panel-tabs .work-tab {
+  background-color: var(--surface-2);
+}
+.panel-tabs .work-tab:hover {
+  background-color: var(--surface-3);
+}
+.panel-tabs .work-tab-current,
+.panel-tabs .work-tab-current:hover {
+  background-color: var(--surface);
+  box-shadow: var(--raised-shadow);
+}
+.panel-tabs .work-tab[data-dragged] {
+  background: linear-gradient(var(--surface-2), var(--surface-2)) var(--bg);
+}
+.panel-tabs .work-tab-current[data-dragged] {
+  background-image: linear-gradient(var(--surface-3), var(--surface-3));
+}
+/* Only the current pill keeps room for its close, easing as it comes and goes; another pill's name runs to its end,
+   and its close fades in over the last letters under the pointer or focus. */
+.panel-tabs .work-tab-face {
+  padding: 0 28px 0 10px;
+  transition: padding var(--duration-resize) var(--ease-out);
+}
+.panel-tabs .work-tab:not(.work-tab-current) .work-tab-face {
+  padding-right: 10px;
+}
+.panel-tabs .work-tab:not(.work-tab-current):is(:hover, :focus-within) .work-tab-title {
+  mask-image: linear-gradient(to left, transparent 14px, #000 30px);
+}
+
+/* The work column's threads: each its mark and name as plain words in the third ink, the second under the pointer and
+   full ink with a 2px line on the header's foot for the current one. The strip runs the header's full height so that
+   line meets the header's hairline. Every tab keeps the room for its close, so choosing one never changes a width.
+   A tab takes its name's width up to 220px and gives way, as the row fills, down to 136px (room for a name to read)
+   or its own width if that is less; past that the strip scrolls sideways. */
+.work-tabs-row:has(> .thread-tabs) {
+  align-self: stretch;
+}
+.thread-tabs {
+  align-self: stretch;
+  align-items: stretch;
+}
+.thread-tabs .work-tab {
+  flex: 0 1 auto;
+  min-width: calc-size(max-content, min(size, 136px));
+  height: auto;
+  margin-inline-end: 0;
+  border-radius: 0;
+}
+.thread-tabs .work-tab-current::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 2px;
+  background-color: currentColor;
+}
+/* The face stays a 28px control in the middle of the tab, so its focus ring and fill hug the words. */
+.thread-tabs .work-tab-face {
+  height: var(--control-sm);
+  padding: 0 26px 0 8px;
+  border-radius: var(--radius-md);
+}
+.thread-tabs .work-tab-close {
+  right: 4px;
 }

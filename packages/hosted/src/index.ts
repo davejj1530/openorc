@@ -27,6 +27,7 @@ import type {
 import { Account } from "./account.js";
 import { TeamChat } from "./chat.js";
 import { Follower } from "./follow.js";
+import { Files } from "./files.js";
 import type { HostedNotice } from "./notices.js";
 import { Session } from "./session.js";
 import { Threads } from "./threads.js";
@@ -34,6 +35,9 @@ import { Spaces } from "./spaces.js";
 import { OnlineTasks } from "./tasks.js";
 
 export { OnlineTasks } from "./tasks.js";
+export type { CloudFileScope, CloudFileReference, FileDestination } from "./files.js";
+export type { FileByteSource } from "./file-transfer.js";
+export type { UploadPlan, UploadedFile } from "./wire-files.js";
 
 /** The server's push socket, as little of it as the package uses. The desktop core builds one from `socket.io-client`. */
 export interface LiveSocket {
@@ -198,6 +202,7 @@ export interface Hosted {
   readonly spaces: HostedSpaces;
   readonly chat: TeamChat;
   readonly tasks: OnlineTasks;
+  readonly files: Files;
   /** Reads the stored session and the kept answers, and connects when signed in. Never rejects: no session is signed out. */
   start(): Promise<void>;
   /** The device woke or the network came back: connect now instead of at the next retry. */
@@ -210,6 +215,7 @@ export function createHosted(deps: HostedDeps): Hosted {
   const spaces = new Spaces({ ...deps, session });
   const chat = new TeamChat({ session, spaces, push: deps.push });
   const tasks = new OnlineTasks({ session, spaces, push: deps.push });
+  const files = new Files({ session, spaces, fetch: deps.fetch, push: deps.push });
   // The account says which of this Mac's projects are on OpenOrc Cloud, from the projects the thread rows were read with.
   const cloud = {
     repos: () => threads.cloudRepos(),
@@ -252,6 +258,7 @@ export function createHosted(deps: HostedDeps): Hosted {
     spaces,
     chat,
     tasks,
+    files,
     start: async () => {
       await account.start();
       threads.start();
@@ -267,6 +274,7 @@ export function createHosted(deps: HostedDeps): Hosted {
       threads.close();
       chat.close();
       tasks.close();
+      files.close();
       session.close();
     },
   };

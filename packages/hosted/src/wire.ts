@@ -178,8 +178,11 @@ export const wireWatched = z.object({ ok: z.boolean(), head: seq });
 /** The socket's event names. */
 export const SOCKET = { changed: "changed", watch: "hosted:watch", unwatch: "hosted:unwatch", events: "hosted:events", threadChanged: "hosted:changed" } as const;
 
-/** The words a refusal carries, from either Better Auth (`{ code, message }`) or the server's own routes (`{ message }`). */
-export const wireRefusal = z.object({ message: z.string().min(1), code: z.string().optional() });
+/** Runtime refusals use one sentence; decorated body validators use an ordered list of sentences. */
+export const wireRefusal = z.object({
+  message: z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]).transform((message) => (typeof message === "string" ? message : message[0]!)),
+  code: z.string().optional(),
+});
 
 /** A sign-in through the browser the server started for an app waiting on a loopback port: the page the browser opens for it. */
 export const wireAppSignInStart = z.object({ request: z.string().min(1), url: z.url(), resultUrl: z.url(), expiresInMs: z.number() });

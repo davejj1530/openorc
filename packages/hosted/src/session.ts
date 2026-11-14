@@ -47,7 +47,7 @@ export class Unreadable extends Error {
 
 /** Requests made in one of the person's spaces. */
 export interface Requests {
-  request<T>(route: Route<T>, body?: unknown): Promise<T>;
+  request<T>(route: Route<T>, body?: unknown, signal?: AbortSignal): Promise<T>;
 }
 
 export type SessionState = { signedIn: false; ended: boolean } | { signedIn: true; email: string; reach: AccountReach };
@@ -153,13 +153,34 @@ export class Session {
 
   /** Requests in one space of the person's, whatever space the session has active. */
   in(space: string): Requests {
-    return { request: (route, body) => this.#request(route, body, space) };
+    return { request: (route, body, signal) => this.#request(route, body, space, signal) };
   }
 
-  async #request<T>(route: Route<T>, body: unknown, space: string | null): Promise<T> {
+  /** An authorized binary read. Its caller consumes the body under its own cancellation and byte bounds. */
+  async stream(space: string, path: string, signal: AbortSignal): Promise<Response> {
     const held = this.#held;
     if (!held) throw new Refused(SIGN_IN_FIRST);
-    const response = await this.#send(route, body, held.token, space);
+    const url = new URL(path, this.deps.server);
+    if (!path.startsWith("/") || path.startsWith("//") || url.origin !== new URL(this.deps.server).origin) throw new Unreadable();
+    const route: Route<null> = { method: "GET", path, reply: null };
+    const response = await this.#send(route, undefined, held.token, space, signal);
+    if (response.status === 401) {
+      if (this.#held === held) await this.end("server");
+      await response.body?.cancel();
+      throw new Refused(ENDED);
+    }
+    if (this.#held !== held || this.#closed) {
+      await response.body?.cancel();
+      throw new Refused("Your OpenOrc session changed. Try again.");
+    }
+    if (!response.ok) await this.#parse(route, response);
+    return response;
+  }
+
+  async #request<T>(route: Route<T>, body: unknown, space: string | null, signal?: AbortSignal): Promise<T> {
+    const held = this.#held;
+    if (!held) throw new Refused(SIGN_IN_FIRST);
+    const response = await this.#send(route, body, held.token, space, signal);
     if (response.status === 401) {
       if (this.#held === held) await this.end("server");
       throw new Refused(ENDED);
@@ -275,21 +296,27 @@ export class Session {
     this.#blip = null;
   }
 
-  async #send(route: Route<unknown>, body: unknown, token: string | null, space: string | null = null): Promise<Response> {
+  async #send(route: Route<unknown>, body: unknown, token: string | null, space: string | null = null, signal?: AbortSignal): Promise<Response> {
     const headers: Record<string, string> = { [ACCOUNT_PROTOCOL_HEADER]: String(ACCOUNT_PROTOCOL_VERSION) };
     if (token) headers["authorization"] = `Bearer ${token}`;
     if (space) headers[SPACE_HEADER] = space;
     if (body !== undefined) headers["content-type"] = "application/json";
+    const headerTimeout = signal ? new AbortController() : null;
+    const timer = headerTimeout ? setTimeout(() => headerTimeout.abort(), REQUEST_TIMEOUT_MS) : null;
     try {
       return await this.deps.fetch(new URL(route.path, this.deps.server), {
         method: route.method,
         headers,
         body: body === undefined ? undefined : JSON.stringify(body),
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal: signal && headerTimeout ? AbortSignal.any([signal, headerTimeout.signal]) : AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        redirect: signal ? "error" : "follow",
       });
     } catch {
+      signal?.throwIfAborted();
       this.#reconnectSoon();
       throw new OutOfReach();
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   }
 

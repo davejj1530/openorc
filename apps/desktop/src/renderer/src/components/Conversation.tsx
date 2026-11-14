@@ -126,6 +126,11 @@ function threadCommands({
   ];
 }
 
+/** What the composer's dock is given: the asks that wait, whose answer they wait on in words, and why they can't be answered from here. */
+function dockedAsks(heard: Parameters<typeof waitingAsks>[0], thread: ThreadSummary | null, blocked: string | null) {
+  return { asks: waitingAsks(heard), asksLabel: threadActivity({ activity: "waiting", owner: thread?.owner })?.text, asksBlocked: blocked };
+}
+
 /** What a conversation's transcript reads from around it: whose voice each turn is, the marks its messages are drawn with, and its turns' change footers. */
 function TranscriptContext({
   voice,
@@ -330,9 +335,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
               commandsNotice={skills.commandsNotice}
               {...connectorMentions}
               {...cloud.limits}
-              asks={waitingAsks(heard)}
-              asksLabel={threadActivity({ activity: "waiting", owner: thread?.owner })?.text}
-              asksBlocked={answersBlocked}
+              {...dockedAsks(heard, thread, answersBlocked)}
               error={cloud.shown((submitter.error ?? controls.error ?? compact.error ?? fork.error ?? settings.error ?? draftError)?.message ?? permissionError)}
             >
               {firstTaskRun && scope.kind === "task" ? (

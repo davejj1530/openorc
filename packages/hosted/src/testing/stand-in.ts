@@ -22,10 +22,12 @@ import { StandInAppSignIns } from "./stand-in-app-sign-ins.js";
 import { StandInGithub } from "./stand-in-github.js";
 import { StandInSpaces } from "./stand-in-spaces.js";
 import { StandInOrganizations } from "./stand-in-organizations.js";
+import { StandInChat, socketAnswers } from "./stand-in-chat.js";
 import { billingState, leftSeconds, StandInPayments, type StandInBilling, type StandInOffers } from "./stand-in-billing.js";
 import { StandInThreads, type Admit, type StandInPeer, type StandInThreadSeed } from "./stand-in-threads.js";
 
 export interface StandIn {
+  chat: StandInChat;
   /** Its origin, for `HostedDeps.server` or `OpenOrcOptions.accountServer`. */
   url: string;
   /**
@@ -253,8 +255,8 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
   const organizations = organizationReads(options, spaces, people, billing, tell, (space) => hosted.accessChanged(space));
   const github = new StandInGithub(spaces, (who) => tell(who, ["projects", "github"]));
   const payments = new StandInPayments(billing, billingTopics(tell, organizations), () => `http://127.0.0.1:${port}`);
-  const personal = personRoutes(signInWrites, payments);
-  const answerSocket = socketAnswers(hosted);
+  const chat = new StandInChat({ spaces, person, peers: () => [...peers, ...sockets] });
+  const answerSocket = socketAnswers(hosted, chat);
   let serving = true;
 
   const server = transportServer({ connections, requests, holder, sockets, answerSocket, answer });
@@ -267,12 +269,13 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
     const signedInRoute = async (): Promise<Reply | null> => {
       if (who)
         return (
+          chat.route({ method, path, query, space }, who, body) ??
           (await organizations.route({ method, path, query, space }, who, body)) ??
           github.route(method, path, who, body, space) ??
-          personal(method, path, who, body) ??
+          personRoutes(signInWrites, payments)(method, path, who, body) ??
           hosted.route({ method, path, query, space }, who, body)
         );
-      return /^\/(account|spaces|organization|invitations|projects|hosted|github|agent-sign-ins|billing|api\/auth\/organization)\b/.test(path) ? unauthorized() : null;
+      return /^\/(account|spaces|organization|invitations|projects|hosted|chat|github|agent-sign-ins|billing|api\/auth\/organization)\b/.test(path) ? unauthorized() : null;
     };
     const old = tooOld(request.headers["x-openorc-protocol"]) ? { status: 426, body: { statusCode: 426, message: APP_TOO_OLD } } : null;
     const reply: Reply = old ??
@@ -291,6 +294,7 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
 
   return {
     url: `http://127.0.0.1:${port}`,
+    chat,
     signInPage: (url, email) => appSignIns.signInPage(url, email.toLowerCase()),
     appSignIns,
     ...paymentsFace(billing, payments),
@@ -389,15 +393,6 @@ function signInRows(rows: readonly StandInSignIn[]) {
     checkedAt: row.checkedAt ?? new Date(0).toISOString(),
     expiresAt: null,
   }));
-}
-
-/** The server's answers to a socket's messages: watching a thread and leaving it, and `{ ok: false }` to anything else. */
-function socketAnswers(hosted: StandInThreads): (peer: StandInPeer, event: string, body: unknown) => unknown {
-  const answers: Record<string, (peer: StandInPeer, body: unknown) => unknown> = {
-    "hosted:watch": (peer, body) => hosted.watch(peer, body),
-    "hosted:unwatch": (peer, body) => hosted.unwatch(peer, body),
-  };
-  return (peer, event, body) => answers[event]?.(peer, body) ?? { ok: false };
 }
 
 type PersonRoute = (method: string, path: string, who: string, body: Record<string, unknown>) => Reply | null;

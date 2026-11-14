@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { queryClient } from "./client";
 import { core } from "./rpc";
 
 const NONE: readonly string[] = [];
@@ -8,13 +9,17 @@ const NONE: readonly string[] = [];
  * nothing until the unread capability is advertised, and focus repairs a missed invalidation.
  */
 export function useUnreadChatSpaces(accountId: string | null): readonly string[] {
-  const read = useQuery({
-    queryKey: ["team-chat-unread", accountId],
-    enabled: Boolean(accountId),
-    retry: false,
-    refetchOnWindowFocus: true,
-    meta: { tags: ["team-chat-unread"] },
-    queryFn: async () => (await core.call("teamChat.unreadSpaces", {})).spaceIds,
-  });
+  const read = useQuery(
+    {
+      queryKey: ["team-chat-unread", accountId],
+      enabled: Boolean(accountId),
+      retry: false,
+      refetchOnWindowFocus: true,
+      meta: { tags: ["team-chat-unread"] },
+      queryFn: async () => (await core.call("teamChat.unreadSpaces", {})).spaceIds,
+    },
+    // The app's own client, so a switcher drawn without a provider (a window corner, a test) still reads it.
+    queryClient,
+  );
   return accountId ? (read.data ?? NONE) : NONE;
 }

@@ -115,7 +115,8 @@ export function createSpaceNavigation(deps: Dependencies) {
         if (!current) return;
         const view = views[current] ?? emptySpaceView();
         const captured = deps.capture(get().ownership);
-        if (current !== get().current || (!isGlobal(deps, captured) && JSON.stringify(captured) !== JSON.stringify(view))) restore(current, view);
+        // Compared regardless of key order: restoring an unchanged view would close the panel.
+        if (current !== get().current || (!isGlobal(deps, captured) && sameShape(captured) !== sameShape(view))) restore(current, view);
       },
       end() {
         const view = validSpaceView(localView, localInventory(get().inventory));
@@ -137,6 +138,12 @@ function departDetachedSpace(state: Navigation, id: string, set: (value: Partial
   set({ inventory: state.inventory.map((space) => (space.id === previous.id ? clean : space)), views: { ...state.views, [previous.id]: view } });
   save(previous.id, view);
 }
+
+/** A view as JSON with every object's keys in order, so two equal views read the same however each was built. */
+const sameShape = (view: SpaceView): string =>
+  JSON.stringify(view, (_key, value: unknown) =>
+    value && typeof value === "object" && !Array.isArray(value) ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => (a < b ? -1 : 1))) : value,
+  );
 
 const isGlobal = (deps: Dependencies, view: SpaceView) => ["settings", "onboarding", "orcling"].includes(view.destination.view) || deps.global?.(view.destination) === true;
 

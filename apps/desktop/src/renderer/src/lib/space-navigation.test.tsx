@@ -5,6 +5,7 @@ import { navigationScope } from "./navigation-scope";
 import { useRouter } from "./router";
 import { useThreadTabs } from "./thread-tabs";
 import { queryClient } from "./client";
+import { useLayout } from "./layout";
 
 const spaces: SpaceInventory[] = [
   {
@@ -280,4 +281,15 @@ it("keeps open Personal local work in place when access acquired elsewhere moves
   w.store.getState().select("birch");
   w.store.getState().select("personal");
   expect(w.get()).toMatchObject({ destination: { view: "newthread" }, tabs: [] });
+});
+
+it("leaves an open panel and the view as they are when the space list is read again with nothing changed", () => {
+  spaceNavigation.getState().initialize("key", "personal", spaces);
+  spaceNavigation.getState().select("birch");
+  useRouter.getState().navigate({ view: "thread", threadId: "cloud" });
+  useLayout.getState().setPanel(true);
+  const before = useRouter.getState().route;
+  spaceNavigation.getState().initialize("key", "personal", spaces);
+  expect(useLayout.getState().panelOpen).toBe(true);
+  expect(useRouter.getState().route).toBe(before);
 });

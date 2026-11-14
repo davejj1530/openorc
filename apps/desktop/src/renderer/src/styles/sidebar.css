@@ -754,7 +754,7 @@ button.browser-empty:hover,
   align-items: center;
   justify-content: flex-end;
   gap: 2px;
-  height: 52px;
+  height: var(--height-chrome);
   /* The gear's centre sits on the list's centre line, 24px in from the edge. */
   padding: 0 8px;
   border-top: var(--hairline) solid var(--line);
@@ -766,7 +766,7 @@ button.browser-empty:hover,
   align-items: center;
   gap: 10px;
   min-width: 0;
-  height: 40px;
+  height: 36px;
   margin-right: auto;
   padding: 0 8px;
   border-radius: var(--radius-md);
@@ -797,10 +797,10 @@ button.browser-empty:hover,
   display: flex;
   flex-wrap: wrap;
   column-gap: 0.25em;
-  height: 18px;
+  height: 16px;
   overflow: hidden;
   font-size: 14px;
-  line-height: 18px;
+  line-height: 16px;
   color: var(--ink);
 }
 .sidebar-account-name > :first-child {
@@ -811,7 +811,7 @@ button.browser-empty:hover,
 }
 .sidebar-account-plan {
   font-size: 12px;
-  line-height: 16px;
+  line-height: 14px;
   color: var(--ink-3);
 }
 /* Signed out, the person's place holds Sign in, drawn as a navigation row: the glyph 16px in, the label in quiet ink.

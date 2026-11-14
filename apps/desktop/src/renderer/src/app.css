@@ -390,7 +390,8 @@
   --width-main-min: 440px;
   --width-panel-min: 340px;
   --width-details: 72px;
-  --height-topbar: max(52px, calc(32px / var(--window-zoom, 1)));
+  --height-chrome: 44px;
+  --height-topbar: max(var(--height-chrome), calc(32px / var(--window-zoom, 1)));
   /* border, border-t, divide-y and the rest draw hairlines. */
   --default-border-width: var(--hairline);
   --container-chat: 760px;

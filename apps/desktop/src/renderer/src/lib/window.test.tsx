@@ -7,7 +7,7 @@ class FakeOverlay extends EventTarget {
   visible = true;
   free = { left: 0, right: 1167 };
   getTitlebarAreaRect(): DOMRect {
-    return { x: this.free.left, left: this.free.left, right: this.free.right, width: this.free.right - this.free.left, y: 0, top: 0, height: 52, bottom: 52 } as DOMRect;
+    return { x: this.free.left, left: this.free.left, right: this.free.right, width: this.free.right - this.free.left, y: 0, top: 0, height: 44, bottom: 44 } as DOMRect;
   }
   move(free: { left: number; right: number }, visible = true): void {
     this.free = free;

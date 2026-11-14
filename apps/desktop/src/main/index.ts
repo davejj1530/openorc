@@ -36,7 +36,7 @@ import { cancelPtyUpdate, detachAllPtys, installPtyHost, killAllPtys, preparePty
 const here = import.meta.dirname;
 const appIcon = join(here, "../../resources/icon.png");
 const launchedAt = Date.now();
-const TOPBAR_HEIGHT = 52;
+const TOPBAR_HEIGHT = 44;
 const TRAFFIC_LIGHT_DIAMETER = 14;
 
 // Before anything starts a child process, so no terminal, agent or Git command inherits them.

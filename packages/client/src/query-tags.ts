@@ -23,12 +23,17 @@ const fileReadRules: { [M in FileReadMethod]: Rule<M> } = {
 
 const readRules: Rules = {
   ...fileReadRules,
+  "organization.repositories": ({ spaceId }) => [`repositories:${spaceId}`, "spaces"],
   "organization.people": ({ spaceId }) => [`people:${spaceId}`, "spaces"],
   "instructions.list": ({ threadId }) => ["instructions", "workspace-diff", `thread:${threadId}`],
   "review.comments.list": reviewCommentTags,
 };
 
 const mutationRules: Rules = {
+  "spaces.create": () => ["spaces"],
+  "organization.update": ({ spaceId }) => ["spaces", `people:${spaceId}`],
+  "organization.github.connect": ({ spaceId }) => [`repositories:${spaceId}`],
+  "organization.projects.add": ({ spaceId }) => ["spaces", "projects", `repositories:${spaceId}`],
   "subagents.stop": ({ threadId }) => ["threads", `thread:${threadId}`, `runs:thread:${threadId}`],
   "review.comments.add": reviewCommentTags,
   "review.comments.remove": reviewCommentTags,

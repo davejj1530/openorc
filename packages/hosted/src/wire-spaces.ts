@@ -73,8 +73,16 @@ export const wireInvitation = z.object({
   inviterId: id,
 });
 
+const settings = z.object({ name: z.string(), logo: z.string().nullable(), activityDays: z.union([z.literal(30), z.literal(90), z.literal(180), z.literal(365)]) });
+const github = z.object({ configured: z.boolean(), installations: z.array(z.object({ id, accountLogin: z.string(), accountType: z.enum(["User", "Organization"]), suspended: z.boolean() })) });
+const repositories = z.array(z.object({ installationId: id, repoId: z.number().int().positive(), fullName: z.string(), defaultBranch: z.string(), private: z.boolean() }));
+const route = <T>(method: Route<T>["method"], path: string, reply: z.ZodType<T>): Route<T> => ({ method, path, reply });
 const get = <T>(path: string, reply: z.ZodType<T>): Route<T> => ({ method: "GET", path, reply });
 export const SPACE_ROUTES = {
+  createOrganization: route("POST", "/api/auth/organization/create", wireOrganization.extend({ members: z.array(wireMembership) })),
+  updateOrganization: route("PATCH", "/settings/organization", settings),
+  organizationGithub: get("/github", github),
+  organizationRepositories: get("/github/repositories", repositories),
   spaceIndex: get("/spaces", wireSpaces),
   receivedInvitations: get("/invitations/received", wireReceivedInvitations),
   people: (offset = 0, limit = 100) => get(`/organization/people?offset=${offset}&limit=${limit}`, wirePeople),

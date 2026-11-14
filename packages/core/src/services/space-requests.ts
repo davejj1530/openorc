@@ -3,7 +3,7 @@ import { mergeThreadPages, rpcParams, WORKSPACE_ID, type RpcMethod, type RpcPara
 import type { RpcReply } from "../transport.js";
 
 interface Dependencies {
-  spaces(): HostedSpaces | null;
+  spaces(): Pick<HostedSpaces, "status" | "projects" | "people"> | null;
   place(): HostedThreads | null;
   next(request: RpcRequest): Promise<RpcReply>;
 }

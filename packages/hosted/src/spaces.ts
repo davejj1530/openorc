@@ -4,6 +4,7 @@ import type { HostedDeps, HostedSpaces } from "./index.js";
 import { Refused, type Session, type SessionChange } from "./session.js";
 import { scopedProject, spaceProjects, type ScopedProject } from "./space-projects.js";
 import { ROUTES, SOCKET, wireTopics } from "./wire.js";
+import { OrganizationSetup } from "./organization-setup.js";
 import { wireSpaces } from "./wire-spaces.js";
 
 const snapshot = z.object({ apiOrigin: z.string(), email: z.string(), index: wireSpaces, projects: z.array(scopedProject), heardAt: z.number() });
@@ -14,10 +15,11 @@ export interface SpaceCatalog {
   ids: string[];
   projects: ScopedProject[];
 }
-type SpacesDeps = { session: Session } & Pick<HostedDeps, "server" | "kept" | "projects" | "push" | "now">;
+type SpacesDeps = { session: Session } & Pick<HostedDeps, "browser" | "server" | "kept" | "projects" | "push" | "now">;
 
 /** The account's membership and project authority, independent of any window's selected space. */
 export class Spaces implements HostedSpaces {
+  readonly setup: OrganizationSetup;
   #snapshot: Snapshot | null = null;
   #legacy: SpaceCatalog | null = null;
   #invitations: ReceivedInvitation[] = [];
@@ -31,6 +33,7 @@ export class Spaces implements HostedSpaces {
   readonly #origin: string;
 
   constructor(private readonly deps: SpacesDeps) {
+    this.setup = new OrganizationSetup({ ...deps, refresh: () => this.refresh(), status: () => this.status() });
     this.#origin = new URL(deps.server).origin;
     deps.session.onChange((change) => this.#changed(change));
     deps.session.onSocket(SOCKET.changed, (body) => {
@@ -227,6 +230,7 @@ export class Spaces implements HostedSpaces {
   }
   close(): void {
     this.#closed = true;
+    this.setup.close();
     if (this.#expiry) clearTimeout(this.#expiry);
   }
 }

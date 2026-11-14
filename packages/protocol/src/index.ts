@@ -55,3 +55,4 @@ export * from "./workspace-transfer.js";
 export { THREAD_CHILD_PAGE } from "./thread-list.js";
 
 export * from "./spaces.js";
+export * from "./organization-setup.js";

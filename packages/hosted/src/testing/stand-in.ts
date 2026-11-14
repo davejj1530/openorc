@@ -249,17 +249,10 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
   const hosted = new StandInThreads(() => [...[...peers].filter((peer) => !peer.waiting), ...sockets], admitTurn, spaces);
   const signInWrites = new StandInSignIns(signIns);
   const tell = tellOf(peers, sockets);
-  const organizations = new StandInOrganizations({
-    spaces,
-    creationAllowed: options.signup === "open",
-    person: (email) => people.get(email) ?? { name: nameFromEmail(email), image: null },
-    pro: (email) => billing.get(email)?.pro ?? false,
-    tell,
-    now: options.now ?? Date.now,
-  });
+  const organizations = organizationReads(options, spaces, people, billing, tell);
   const github = new StandInGithub(spaces, (who) => tell(who, ["projects", "github"]));
   const payments = new StandInPayments(billing, tell, () => `http://127.0.0.1:${port}`);
-  const personal = personRoutes(signInWrites, payments, github);
+  const personal = personRoutes(signInWrites, payments);
   const answerSocket = socketAnswers(hosted);
   let serving = true;
 
@@ -270,13 +263,22 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
     const who = holder(token);
     requests.push({ method, path, authorized: who !== null });
     const route = routes[`${method} ${path}`];
-    const signedInRoute = (): Reply | null => {
-      if (who) return organizations.route({ method, path, query, space }, who) ?? personal(method, path, who, body) ?? hosted.route({ method, path, query, space }, who, body);
+    const signedInRoute = async (): Promise<Reply | null> => {
+      if (who)
+        return (
+          (await organizations.route({ method, path, query, space }, who, body)) ??
+          github.route(method, path, who, body, space) ??
+          personal(method, path, who, body) ??
+          hosted.route({ method, path, query, space }, who, body)
+        );
       return /^\/(spaces|organization|invitations|projects|hosted|github|agent-sign-ins|billing|api\/auth\/organization)\b/.test(path) ? unauthorized() : null;
     };
     const old = tooOld(request.headers["x-openorc-protocol"]) ? { status: 426, body: { statusCode: 426, message: APP_TOO_OLD } } : null;
     const reply: Reply = old ??
-      (route ? route(body, token) : (appSignIns.route(method, path, body) ?? signedInRoute())) ?? { status: 404, body: { message: `Cannot ${method} ${path}`, error: "Not Found", statusCode: 404 } };
+      (route ? route(body, token) : (appSignIns.route(method, path, body) ?? (await signedInRoute()))) ?? {
+        status: 404,
+        body: { message: `Cannot ${method} ${path}`, error: "Not Found", statusCode: 404 },
+      };
     response.writeHead(reply.status, { "content-type": "application/json" });
     response.end(reply.body === null && reply.status !== 200 ? undefined : JSON.stringify(reply.body));
   }
@@ -504,4 +506,21 @@ function transportServer(deps: {
     engineSession(request, socket as Socket, { holder: deps.holder, joined: (peer) => deps.sockets.add(peer), left: (peer) => deps.sockets.delete(peer), answer: deps.answerSocket });
   });
   return server;
+}
+
+function organizationReads(
+  options: StandInOptions,
+  spaces: StandInSpaces,
+  people: Map<string, { name: string; image: string | null }>,
+  billing: Map<string, StandInBilling>,
+  tell: (who: string, topics: string[]) => void,
+) {
+  return new StandInOrganizations({
+    spaces,
+    creationAllowed: options.signup === "open",
+    person: (email) => people.get(email) ?? { name: nameFromEmail(email), image: null },
+    pro: (email) => billing.get(email)?.pro ?? false,
+    tell,
+    now: options.now ?? Date.now,
+  });
 }

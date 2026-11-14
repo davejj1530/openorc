@@ -14,7 +14,7 @@
  */
 import type { GithubWork } from "@openorc/protocol";
 import type { HostedDeps } from "./index.js";
-import type { Session } from "./session.js";
+import type { Requests, Session } from "./session.js";
 import { ROUTES, type WireGithubStart } from "./wire.js";
 
 /** The path the server sends the browser on to, on this device's loopback. */
@@ -41,6 +41,7 @@ const FAILED = "GitHub didn't connect. Try again.";
 
 interface GithubDeps extends Pick<HostedDeps, "browser"> {
   session: Session;
+  requests?: Requests;
   /** The work changed: the windows read the account again. */
   changed(): void;
   /** A trip settled: GitHub and the projects are read again. */
@@ -96,7 +97,7 @@ export class GithubConnect {
     try {
       let trip: Trip | "done" = first;
       for (let count = 1; trip !== "done"; count++) {
-        const words = await this.#step(trip);
+        const words = await this.#step(trip, live);
         if (!live()) return;
         if (words !== "again" || count >= TRIPS) return this.#settle(words === "again" ? FAILED : words, live);
         trip = await this.#trip(browser, live);
@@ -110,6 +111,10 @@ export class GithubConnect {
   /** One trip: listen, start the step, and open GitHub's page; `done` when the server settled it without GitHub. */
   async #trip(browser: NonNullable<HostedDeps["browser"]>, live: () => boolean): Promise<Trip | "done"> {
     const waiting = await browser.awaitReturn(RETURN_PATH, 15 * 60_000);
+    if (!live()) {
+      waiting.close();
+      throw new Error("");
+    }
     const stop = this.#stop;
     this.#stop = () => {
       stop?.();
@@ -117,14 +122,15 @@ export class GithubConnect {
     };
     let start: WireGithubStart;
     try {
-      start = await this.deps.session.request(ROUTES.githubStart, { port: waiting.port });
+      start = await (this.deps.requests ?? this.deps.session).request(ROUTES.githubStart, { port: waiting.port });
     } catch (error) {
       waiting.close();
       throw error;
     }
     if (start.kind === "settled") {
       waiting.close();
-      this.#settle(INSTALL_WORDS[start.outcome] ?? FAILED, live);
+      const words = INSTALL_WORDS[start.outcome];
+      this.#settle(words === undefined ? FAILED : words, live);
       return "done";
     }
     if (live()) browser.open(start.url);
@@ -132,8 +138,9 @@ export class GithubConnect {
   }
 
   /** Posts the caught query to finish a step: `again` for a link that linked, else the words for how it went (null: connected). */
-  async #step(trip: Trip): Promise<string | null | "again"> {
+  async #step(trip: Trip, live: () => boolean): Promise<string | null | "again"> {
     const query = await trip.query;
+    if (!live()) throw new Error("");
     if (trip.step === "link") {
       const { outcome } = await this.deps.session.request(ROUTES.githubLinkFinish, { query });
       return outcome === "linked" ? "again" : (LINK_WORDS[outcome] ?? FAILED);

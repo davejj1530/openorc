@@ -1,3 +1,4 @@
+import { identityRoute } from "./stand-in-identity.js";
 import { randomUUID } from "node:crypto";
 import { userOf, type StandInSpaces } from "./stand-in-spaces.js";
 
@@ -21,6 +22,7 @@ interface OrganizationDeps {
 
 /** Organization reads use membership IDs and explicit targets, matching the HTTP service. */
 export class StandInOrganizations {
+  logoFailure: string | null = null;
   readonly received: Received[] = [];
   readonly created = new Map<string, number>();
   constructor(private readonly deps: OrganizationDeps) {}
@@ -32,7 +34,19 @@ export class StandInOrganizations {
     return id;
   }
 
-  route(request: { method: string; path: string; query: URLSearchParams; space: string | null }, who: string): Reply | null {
+  async route(request: { method: string; path: string; query: URLSearchParams; space: string | null }, who: string, body: Record<string, unknown> = {}): Promise<Reply | null> {
+    const identity = await identityRoute({
+      ...request,
+      who,
+      body,
+      spaces: this.deps.spaces,
+      created: this.created,
+      allowed: this.deps.creationAllowed,
+      logoFailure: this.logoFailure,
+      now: this.deps.now,
+      tell: this.deps.tell,
+    });
+    if (identity) return identity;
     if (request.method !== "GET") return null;
     if (request.path === "/spaces") return { status: 200, body: this.index(who) };
     if (request.path === "/invitations/received") return { status: 200, body: { invitations: this.inbox(who) } };

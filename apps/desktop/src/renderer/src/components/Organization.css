@@ -1,0 +1,111 @@
+.organization-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.organization-label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 18px;
+}
+.organization-mark {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  overflow: hidden;
+  background: var(--surface-2);
+  color: var(--ink-3);
+}
+.organization-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.organization-logo-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.organization-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.organization-error {
+  color: var(--bad);
+  font-size: 13px;
+  line-height: 19px;
+  overflow-wrap: anywhere;
+}
+.organization-connect-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.organization-connect-row > button {
+  margin-left: auto;
+}
+.organization-repositories {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.organization-repository {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 6px;
+}
+.organization-small {
+  display: block;
+  color: var(--ink-4);
+  font-size: 12.5px;
+  line-height: 18px;
+  margin-top: 2px;
+}
+.organization-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: 32px;
+}
+.organization-empty-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  transform: translateY(-30px);
+  max-width: 100%;
+}
+.organization-empty-identity {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 100%;
+}
+.organization-empty-identity h1 {
+  overflow-wrap: anywhere;
+}
+.organization-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+.organization-logo-retry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--bad);
+  margin-top: 14px;
+}

@@ -16,7 +16,7 @@ type Reply = { status: number; body: unknown };
 
 interface Person {
   login: string | null;
-  installed: { id: string; login: string; repositories: { fullName: string; repoId: number }[] } | null;
+  installed: { space: string; id: string; login: string; repositories: { fullName: string; repoId: number }[] } | null;
   /** What GitHub lets the app read once the person installs it. */
   granted: string[];
 }
@@ -25,7 +25,7 @@ const PAGE_MS = 15 * 60_000;
 
 export class StandInGithub {
   readonly #people = new Map<string, Person>();
-  readonly #states = new Map<string, { who: string; step: "link" | "install"; port: number }>();
+  readonly #states = new Map<string, { who: string; step: "link" | "install"; port: number; space: string }>();
   #repoIds = 0;
   configured = true;
 
@@ -52,34 +52,41 @@ export class StandInGithub {
     return `http://127.0.0.1:${page.port}/github-return?${query}`;
   }
 
-  route(method: string, path: string, who: string, body: Record<string, unknown>): Reply | null {
+  route(method: string, path: string, who: string, body: Record<string, unknown>, named: string | null = null): Reply | null {
     const person = this.#person(who);
+    if (!(path.startsWith("/github") || (method === "POST" && path === "/projects"))) return null;
+    const space = this.spaces.resolve(who, named);
+    if (typeof space !== "string") return space;
+    if (["/github", "/github/repositories", "/github/install/start", "/projects"].includes(path) && space !== `personal-${who}` && this.spaces.member(space, who)?.role !== "admin")
+      return { status: 403, body: { message: "Only an admin can do that." } };
+    const installed = person.installed?.space === space ? person.installed : null;
     const routes: Record<string, () => Reply> = {
       "GET /github": () => ({
         status: 200,
-        body: { configured: this.configured, installations: person.installed ? [{ id: person.installed.id, accountLogin: person.installed.login, accountType: "User", suspended: false }] : [] },
+        body: { configured: this.configured, installations: installed ? [{ id: installed.id, accountLogin: installed.login, accountType: "User", suspended: false }] : [] },
       }),
       "GET /github/account": () => ({ status: 200, body: { configured: this.configured, account: person.login ? { login: person.login, name: null } : null } }),
       "GET /github/repositories": () => ({
         status: 200,
-        body: (person.installed?.repositories ?? []).map((repository) => ({ installationId: person.installed!.id, ...repository, defaultBranch: "main", private: true })),
+        body: (installed?.repositories ?? []).map((repository) => ({ installationId: installed!.id, ...repository, defaultBranch: "main", private: true })),
       }),
-      "POST /github/install/start": () => this.#start(who, person, Number(body["port"])),
+      "POST /github/install/start": () => this.#start(who, person, Number(body["port"]), space),
       "POST /github/link/finish": () => this.#finish(who, "link", String(body["query"] ?? "")),
       "POST /github/install/finish": () => this.#finish(who, "install", String(body["query"] ?? "")),
       "DELETE /github/account": () => {
         person.login = null;
         return { status: 204, body: null };
       },
-      "POST /projects": () => this.#addProjects(who, person, body),
+      "POST /projects": () => this.#addProjects(who, person, body, space),
     };
     return routes[`${method} ${path}`]?.() ?? null;
   }
 
-  #start(who: string, person: Person, port: number): Reply {
+  #start(who: string, person: Person, port: number, space: string): Reply {
+    if (person.installed && person.installed.space !== space) return { status: 200, body: { kind: "settled", outcome: "taken" } };
     const step = person.login ? "install" : "link";
     const state = randomBytes(12).toString("hex");
-    this.#states.set(state, { who, step, port });
+    this.#states.set(state, { who, step, port, space });
     const url = step === "link" ? `https://github.com/login/oauth/authorize?client_id=openorc&state=${state}` : `https://github.com/apps/openorc/installations/new?state=${state}`;
     return { status: 200, body: { kind: "github", step, url, expiresInMs: PAGE_MS } };
   }
@@ -96,16 +103,15 @@ export class StandInGithub {
       person.login = who.split("@")[0]!;
       return { status: 200, body: { outcome: "linked" } };
     }
-    person.installed = { id: "installation-7001", login: person.login ?? "github", repositories: person.granted.map((fullName) => ({ fullName, repoId: ++this.#repoIds })) };
+    person.installed = { space: page.space, id: "installation-7001", login: person.login ?? "github", repositories: person.granted.map((fullName) => ({ fullName, repoId: ++this.#repoIds })) };
     this.projectsChanged(who);
     return { status: 200, body: { outcome: "connected" } };
   }
 
-  #addProjects(who: string, person: Person, body: Record<string, unknown>): Reply {
+  #addProjects(who: string, person: Person, body: Record<string, unknown>, space: string): Reply {
     const asked = (body["repositories"] ?? []) as { installationId: string; repoId: number }[];
-    const space = this.spaces.spacesOf(who)[0]!.id;
     const made = asked.map(({ installationId, repoId }) => {
-      const repository = person.installed?.id === installationId ? person.installed.repositories.find((each) => each.repoId === repoId) : undefined;
+      const repository = person.installed?.id === installationId && person.installed.space === space ? person.installed.repositories.find((each) => each.repoId === repoId) : undefined;
       return repository ? this.spaces.ensureProject(space, { ...repository, defaultBranch: "main" }) : null;
     });
     if (made.includes(null)) return { status: 404, body: { message: "OpenOrc can't read that repository. Check the app's access on GitHub.", statusCode: 404 } };

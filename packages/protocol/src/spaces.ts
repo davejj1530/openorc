@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { OrganizationSetupResults } from "./organization-setup.js";
 import type { AccountReach } from "./account.js";
 
 export const SpaceId = z.string().min(1).max(200);
@@ -78,7 +79,7 @@ export const spacesRpcParams = {
   "organization.people": z.object({ spaceId: SpaceId, offset: z.number().int().nonnegative().optional(), limit: z.number().int().min(1).max(100).optional() }).strict(),
 };
 
-export interface SpacesRpcResults {
+export interface SpacesRpcResults extends OrganizationSetupResults {
   "spaces.status": SpacesStatus;
   "spaces.projects": SpaceProject[];
   "organization.people": OrganizationPeople;

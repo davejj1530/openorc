@@ -3,6 +3,7 @@ import { UsageHistoryParams } from "./usage-history.js";
 import { ProjectActivityParams } from "./project-activity.js";
 import type { AgentUpdates } from "./agent-updates.js";
 import { accountRpcParams, type AccountRpcResults } from "./account.js";
+import { organizationSetupParams } from "./organization-setup.js";
 import { SpaceId, spacesRpcParams, type SpacesRpcResults } from "./spaces.js";
 import { ClaudeAccountId, claudeAccountRpcParams, type ClaudeAccountRpcResults } from "./claude-accounts.js";
 import { connectorRpcParams, type ConnectorRpcResults } from "./connectors.js";
@@ -75,6 +76,7 @@ const REVIEW_SCOPE_REQUIRED = "Review comments need a conversation or a task.";
 export const rpcParams = {
   ...accountRpcParams,
   ...spacesRpcParams,
+  ...organizationSetupParams,
   ...claudeAccountRpcParams,
   ...connectorRpcParams,
   ...skillRpcParams,

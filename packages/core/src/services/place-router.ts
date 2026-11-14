@@ -21,7 +21,7 @@ import { SpaceRequests } from "./space-requests.js";
 export interface PlaceRouterDeps {
   /** The place, or null while there is none (no account server). */
   place(): HostedThreads | null;
-  spaces?(): HostedSpaces | null;
+  spaces?(): Pick<HostedSpaces, "status" | "projects" | "people"> | null;
   /** What answered every window call before this router existed: the brain router while a brain is set up, else dispatch. */
   next(request: RpcRequest): Promise<RpcReply>;
 }

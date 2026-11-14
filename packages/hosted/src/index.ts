@@ -119,6 +119,13 @@ export interface HostedAccount {
 }
 
 export interface HostedSpaces {
+  readonly setup: {
+    create(input: RpcParams<"spaces.create">): Promise<RpcResults["spaces.create"]>;
+    update(input: RpcParams<"organization.update">): Promise<RpcResults["organization.update"]>;
+    repositories(spaceId: string): Promise<RpcResults["organization.repositories"]>;
+    connect(spaceId: string): Promise<RpcResults["organization.github.connect"]>;
+    addProjects(input: RpcParams<"organization.projects.add">): Promise<RpcResults["organization.projects.add"]>;
+  };
   status(): SpacesStatus;
   projects(spaceId: string): Promise<SpaceProject[]>;
   people(spaceId: string, offset?: number, limit?: number): Promise<OrganizationPeople>;

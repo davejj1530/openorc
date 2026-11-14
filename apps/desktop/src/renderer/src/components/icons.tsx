@@ -96,6 +96,14 @@ export const X = icon("X", <path d="m6 6 12 12 M18 6 6 18" />);
 export const Check = icon("Check", <path d="m5 12 4.5 4.5L19 7" />);
 export const ChevronDown = icon("ChevronDown", <path d="m6 9 6 6 6-6" />);
 export const ChevronRight = icon("ChevronRight", <path d="m9 6 6 6-6 6" />);
+export const Hash = icon("Hash", <path d="m10 3-3 18m10-18-3 18M4 8h16M3 16h16" />);
+export const Lock = icon(
+  "Lock",
+  <>
+    <rect x="5" y="10" width="14" height="11" rx="3" />
+    <path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2" />
+  </>,
+);
 export const ChevronLeft = icon("ChevronLeft", <path d="m15 6-6 6 6 6" />);
 export const CornerUpLeft = icon("CornerUpLeft", <path d="m10 15-5-5 5-5 M5 10h9a5 5 0 0 1 5 5v4" />);
 export const ChevronsUpDown = icon("ChevronsUpDown", <path d="m7 8 5-5 5 5 M7 16l5 5 5-5" />);

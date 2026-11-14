@@ -3,25 +3,23 @@ import type { ReactNode } from "react";
 import { ArrowLeft, ArrowRight, PanelLeft } from "./icons";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
 import { useLayout } from "../lib/layout";
+import { useSidebarHistory } from "../lib/sidebar-history";
 import { cn } from "../lib/cn";
 import { useRouter } from "../lib/router";
 import { IconButton, Tooltip, type IconSize } from "./ui";
 
 /**
  * The window's corner: the sidebar toggle. It leads the first header beside the sidebar, open or hidden: the main
- * column's, or a panel's docked on the left. Back and Forward end the sidebar's own header; with the sidebar hidden
- * they follow the toggle here.
+ * column's, or a panel's docked on the left. Back and Forward follow the toggle here when
+ * the sidebar is hidden or its whole space name leaves too little room for them.
  */
 export function WindowCorner({ sidebarOpen }: { sidebarOpen: boolean }) {
+  const historyFits = useSidebarHistory((state) => state.fits);
   return (
     <div className="window-corner" role="group" aria-label="Window">
       <SidebarToggle open={sidebarOpen} />
-      {sidebarOpen ? null : (
-        <>
-          <SpaceSwitcher hidden />
-          <HistoryButtons size="lg" />
-        </>
-      )}
+      {sidebarOpen ? null : <SpaceSwitcher hidden />}
+      {!sidebarOpen || !historyFits ? <HistoryButtons size="lg" /> : null}
     </div>
   );
 }

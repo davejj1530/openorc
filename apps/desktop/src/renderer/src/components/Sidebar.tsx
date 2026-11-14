@@ -15,6 +15,7 @@ import { NewOrclingButton, SidebarOrclings } from "./SidebarOrclings";
 import { SidebarSettings } from "./SidebarSettings";
 import { SidebarThreadBrowser } from "./SidebarThreadBrowser";
 import { HistoryButtons, SidebarToggle } from "./WindowCorner";
+import { useSidebarHistory } from "../lib/sidebar-history";
 
 /**
  * The sidebar, one column with a hairline at its edge from the window's top to its foot: its header, the app's screens
@@ -64,13 +65,14 @@ export function Sidebar() {
  * shows it, so the header carries its own way to hide it there.
  */
 function SidebarHeader() {
+  const historyFits = useSidebarHistory((state) => state.fits);
   return (
     <header className="sidebar-header drag-region h-topbar">
       <SidebarToggle open className="sidebar-header-toggle" />
       <div className="sidebar-identity">
         <SpaceSwitcher fallback={<Wordmark />} />
       </div>
-      <HistoryButtons size="xs" className="sidebar-history" />
+      {historyFits ? <HistoryButtons size="xs" className="sidebar-history" /> : null}
     </header>
   );
 }

@@ -4,9 +4,6 @@
 .sidebar-header[data-space-history="true"] .sidebar-history {
   display: flex;
 }
-.sidebar-header[data-space-history="false"] .sidebar-history {
-  display: none;
-}
 .space-switcher {
   display: inline-flex;
   position: relative;

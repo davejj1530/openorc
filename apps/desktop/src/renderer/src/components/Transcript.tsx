@@ -468,7 +468,7 @@ const WorkTurn = memo(function WorkTurn({ id, blocks, live = false, ambient = fa
   return (
     <div className="work-turn" data-turn={id}>
       <TranscriptContents {...props} onFork={actions ? undefined : onFork} blocks={before} />
-      {head && spoke ? <TurnHead runId={props.runId} named={named} status={turn.status} /> : null}
+      {head && spoke ? <TurnHead runId={props.runId} named={named} status={turn.status} blocks={blocks} /> : null}
       {!head && ended ? <TurnOutcome named={named} runId={props.runId} failed={turn.status.kind === "failed"} /> : null}
       {showActivity && work.length ? (
         <section className="work-section" aria-label={named ? `${named}’s work` : "Agent work"}>
@@ -632,7 +632,7 @@ export const BlockView = memo(function BlockView({
 }) {
   switch (block.kind) {
     case "message":
-      if (block.role === "user") return block.text || block.attachments?.length ? <UserMessage text={block.text} at={block.at} attachments={block.attachments} onFork={onFork} /> : null;
+      if (block.role === "user") return block.text || block.attachments?.length ? <UserMessage id={block.id} text={block.text} at={block.at} attachments={block.attachments} onFork={onFork} /> : null;
       if (block.role === "system")
         return (
           <div>

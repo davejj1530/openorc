@@ -1,4 +1,5 @@
-import type { ComponentType, ReactNode } from "react";
+import { useState, type ComponentType, type ReactNode } from "react";
+import { useComposerControl } from "./composer-read-only";
 import { Menu } from "@base-ui/react/menu";
 import { ChevronDown } from "./icons";
 import { cn } from "../lib/cn";
@@ -50,16 +51,18 @@ export function ComposerChoice<T extends string>({
   side?: "top" | "bottom";
   align?: "start" | "end";
 }) {
+  const control = useComposerControl(disabled, disabledReason);
+  const [open, setOpen] = useState(false);
   const current = options.find((o) => o.value === value) ?? options[0];
   const Icon = current?.icon;
   const chip = look === "chip";
   return (
-    <Menu.Root>
+    <Menu.Root open={open && !control.disabled} onOpenChange={setOpen}>
       <Menu.Trigger
-        disabled={disabled}
+        disabled={control.disabled}
         aria-label={`${ariaLabel}: ${current?.label ?? value}`}
         aria-describedby={describedBy}
-        data-tip={disabled ? disabledReason : current?.hint}
+        data-tip={control.disabled ? control.reason : current?.hint}
         className={cn(chip ? "composer-chip" : "composer-text-choice", className)}
       >
         {display ?? (

@@ -1,9 +1,11 @@
 import type { BackgroundCommand } from "@openorc/protocol";
 import { Terminal } from "./icons";
 import { Button } from "./ui";
+import { useComposerControl } from "./composer-read-only";
 
 /** Commands the agent left running, such as a dev server. They outlive its turns, so each has its own stop. */
 export function BackgroundCommands({ commands, pending, onStop }: { commands: BackgroundCommand[]; pending: boolean; onStop: (commandId: string) => void }) {
+  const control = useComposerControl(pending);
   if (!commands.length) return null;
   return (
     <ul aria-label="Running in the background" data-plane className="m-0 list-none divide-y divide-line rounded-xl bg-surface px-3.5 text-base">
@@ -14,7 +16,7 @@ export function BackgroundCommands({ commands, pending, onStop }: { commands: Ba
             {command.description}
           </span>
           <span className="text-xs">Running</span>
-          <Button size="sm" variant="ghost" disabled={pending} aria-label={`Stop ${command.description}`} onClick={() => onStop(command.id)}>
+          <Button size="sm" variant="ghost" disabled={control.disabled} data-tip={control.reason} aria-label={`Stop ${command.description}`} onClick={() => onStop(command.id)}>
             Stop
           </Button>
         </li>

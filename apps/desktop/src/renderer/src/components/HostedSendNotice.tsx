@@ -1,4 +1,4 @@
-import { sendsBlocked, threadSendBlock, type SendBlock } from "@openorc/client";
+import { sendsBlocked, threadReadOnlyReason, threadSendBlock, type SendBlock } from "@openorc/client";
 import { HOSTED_AGENTS, type HarnessId, type PermissionPreset, type RunMode, type ThreadSummary } from "@openorc/protocol";
 import type { ReactNode } from "react";
 import { useRpc, useRpcMutation } from "../lib/client";
@@ -40,11 +40,12 @@ export function useHostedComposer(
   hosted: boolean;
   notice: ReactNode;
   blocked: string | null;
-  limits: CloudComposerLimits | object;
+  limits: Partial<CloudComposerLimits> & { readOnlyReason: string | null };
   onReady?: () => void;
   shown: (error: string | null | undefined) => string | null | undefined;
 } {
   const hosted = thread?.owner?.brain === "hosted";
+  const limits = { ...(hosted ? CLOUD_LIMITS : {}), readOnlyReason: threadReadOnlyReason(thread) };
   const account = useRpc("account.status", {}, { enabled: hosted });
   const ready = useRpcMutation("threads.ready");
   const blocked = sendsBlocked(thread);
@@ -55,12 +56,12 @@ export function useHostedComposer(
     const { choice, mode, permission } = settings;
     ready.mutate({ id: thread.id, settings: { ...(choice && { agent: choice.agent, model: choice.model, effort: choice.effort ?? null }), mode, permissionMode: permission } });
   };
-  if (!hosted) return { hosted, notice: null, blocked: null, limits: {}, shown: (error) => error };
+  if (!hosted) return { hosted, notice: null, blocked: null, limits, shown: (error) => error };
   return {
     hosted,
     notice: block && !blocked ? <SendBlockCard block={block} /> : null,
     blocked: blocked ?? block?.words ?? null,
-    limits: CLOUD_LIMITS,
+    limits,
     shown: (error) => (error === block?.words ? undefined : error),
     onReady: readyNow,
   };

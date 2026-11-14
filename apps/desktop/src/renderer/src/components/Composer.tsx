@@ -14,7 +14,7 @@ import {
   type RunMode,
   type UsableConnector,
 } from "@openorc/protocol";
-import { useCallback, useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from "react";
+import { useCallback, useContext, useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from "react";
 import { useRpcMutation } from "../lib/client";
 import { cn } from "../lib/cn";
 import { removeAcceptedAttachments, restoreDraftAttachments, useComposerAttachments, type Attachment } from "../lib/composer-attachments";
@@ -24,6 +24,7 @@ import { useComposerSubmission } from "../lib/composer-submission";
 import { formatBytes } from "../lib/file-imports";
 import { isImagePath } from "../../../shared/image-paths";
 import { ComposerChoice } from "./ComposerChoice";
+import { ComposerReadOnly } from "./composer-read-only";
 import { ComposerDropZone, useComposerDrop } from "./ComposerDropZone";
 import { ComposerChangesBar } from "./ComposerCommitChip";
 import { ComposerAddMenu, type AddOffers } from "./ComposerAddMenu";
@@ -126,6 +127,8 @@ export interface ComposerProps {
   notices?: ReactNode;
   busy?: boolean;
   disabledReason?: string | null;
+  /** Why this person may only read the thread. The draft stays editable; controls cannot act. */
+  readOnlyReason?: string | null;
   /** A saved task can start from its spec without an additional message. */
   allowEmpty?: boolean;
   /** Live-run controls, when a session is open. */
@@ -221,8 +224,9 @@ export function Composer(props: ComposerProps) {
   const isNewThread = props.presentation === "new-thread";
   const shell = useRef<HTMLDivElement>(null);
   const fitBar = useComposerFit();
-  const files = useComposerAttachments({ draftKey: props.draftKey, disabledReason: props.attachmentsDisabledReason });
-  const { attachments, uploading, addFiles, remove: removeAttachments } = files;
+  const files = useComposerAttachments({ draftKey: props.draftKey, disabledReason: props.readOnlyReason ?? props.attachmentsDisabledReason });
+  const { attachments, uploading, remove: removeAttachments } = files;
+  const addFiles = (chosen: File[]) => (props.readOnlyReason ? Promise.resolve() : files.addFiles(chosen));
   const { value, onChange } = props;
   const editor = useRef<ComposerEditorHandle>(null);
   useImperativeHandle(
@@ -253,9 +257,10 @@ export function Composer(props: ComposerProps) {
   }, [submission, value, onChange, acknowledge, removeAttachments]);
   const drop = useComposerDrop((dropped) => void addFiles(dropped));
   const attachmentBlock = attachments.length > 0 ? props.attachmentsDisabledReason : null;
-  const canSend = Boolean(props.allowEmpty || props.value.trim() || attachments.length > 0) && !props.busy && !submitting && !props.disabledReason && !attachmentBlock && uploading === 0;
+  const canSend =
+    Boolean(props.allowEmpty || props.value.trim() || attachments.length > 0) && !props.busy && !submitting && !props.readOnlyReason && !props.disabledReason && !attachmentBlock && uploading === 0;
 
-  const canStop = Boolean(props.stopAction?.working || (!props.stopAction && props.live?.working));
+  const canStop = !props.readOnlyReason && Boolean(props.stopAction?.working || (!props.stopAction && props.live?.working));
   const asks = props.asks ?? [];
   const focusField = useCallback(() => editor.current?.focus(), []);
   const cluster = sendCluster({
@@ -286,12 +291,12 @@ export function Composer(props: ComposerProps) {
   const stopping = props.stopAction?.pending ?? interrupt.isPending;
   const activityLabel = composerActivity({ stopping, submitting, generatingImage: Boolean(props.generatingImage) });
   const stop = () => {
-    if (stopping) return;
+    if (stopping || props.readOnlyReason) return;
     if (props.stopAction) props.stopAction.onStop();
     else if (props.live) interrupt.mutate({ runId: props.live.runId });
   };
 
-  return (
+  const content = (
     <div className={cn("composer min-w-0", props.size === "lg" && "composer-large", isNewThread && "composer-new-thread")}>
       {isNewThread ? null : <ComposerChangesBar changes={props.changes} />}
       <div className="mb-2 grid grid-cols-1 gap-2 empty:hidden">{props.notices}</div>
@@ -329,14 +334,14 @@ export function Composer(props: ComposerProps) {
             onChange={props.onChange}
             onSubmit={submit}
             onFiles={addFiles}
-            onReady={props.onReady}
+            onReady={props.readOnlyReason ? undefined : props.onReady}
             draftKey={props.draftKey}
             disabled={Boolean(props.busy || submitting)}
             placeholder={props.placeholder}
             autoFocus={props.autoFocus}
             fileSearch={props.fileSearch}
             mentions={props.mentions}
-            commands={props.commands}
+            commands={props.readOnlyReason ? props.commands?.filter((command) => command.insert) : props.commands}
             onCommandsWanted={props.onCommandsWanted}
             commandsNotice={props.commandsNotice}
             connectors={props.connectors}
@@ -373,18 +378,11 @@ export function Composer(props: ComposerProps) {
                 {activityLabel}
               </span>
             ) : null}
-            {props.compacting ? (
-              <span role="status" className="composer-activity">
-                Compacting context…
-              </span>
-            ) : null}
-            {props.context ? (
-              <ContextUsage used={props.context.used} window={props.context.window} onCompact={props.onCompact} compacting={props.compacting} disabledReason={props.compactDisabledReason} />
-            ) : null}
+            <ComposerContext {...props} />
             <ComposerSendCluster
               cluster={cluster}
               canSend={canSend}
-              block={composerSendBlock({ disabledReason: props.disabledReason, attachmentBlock })}
+              block={composerSendBlock({ disabledReason: props.readOnlyReason ?? props.disabledReason, attachmentBlock })}
               stopping={stopping}
               onSend={submit}
               onStop={stop}
@@ -394,6 +392,22 @@ export function Composer(props: ComposerProps) {
         {drop.dragging ? <ComposerDropZone count={drop.count} /> : null}
       </div>
     </div>
+  );
+  return <ComposerReadOnly.Provider value={props.readOnlyReason ?? null}>{content}</ComposerReadOnly.Provider>;
+}
+
+/** Context remains readable when the composer cannot act; compaction shares the controls' reason. */
+function ComposerContext({ compacting, context, onCompact, compactDisabledReason }: Pick<ComposerProps, "compacting" | "context" | "onCompact" | "compactDisabledReason">) {
+  const readOnlyReason = useContext(ComposerReadOnly);
+  return (
+    <>
+      {compacting ? (
+        <span role="status" className="composer-activity">
+          Compacting context…
+        </span>
+      ) : null}
+      {context ? <ContextUsage used={context.used} window={context.window} onCompact={onCompact} compacting={compacting} disabledReason={readOnlyReason ?? compactDisabledReason} /> : null}
+    </>
   );
 }
 

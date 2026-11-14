@@ -1,5 +1,6 @@
 import { Menu } from "@base-ui/react/menu";
-import { Fragment, useRef, type ComponentType, type RefObject } from "react";
+import { Fragment, useRef, useState, type ComponentType, type RefObject } from "react";
+import { useComposerControl } from "./composer-read-only";
 import { CoversPreview } from "../lib/browser-preview";
 import { floatingGround } from "../lib/use-anchor-ground";
 import type { ListKind } from "./composer-commands";
@@ -64,6 +65,8 @@ export function ComposerAddMenu({
   offers: AddOffers;
   lists: RefObject<ComposerLists | null>;
 }) {
+  const control = useComposerControl(false, "Add to this message");
+  const [open, setOpen] = useState(false);
   const groups = listGroups(offers);
   // A list opens once the menu has gone, so the focus it takes into the message is not taken back by the menu closing.
   const pending = useRef<ListKind | null>(null);
@@ -73,8 +76,8 @@ export function ComposerAddMenu({
     if (!open && kind) lists.current?.open(kind);
   };
   return (
-    <Menu.Root onOpenChangeComplete={settle}>
-      <Menu.Trigger aria-label="Add to this message" data-tip="Add to this message" className="composer-icon-button composer-attach">
+    <Menu.Root open={open && !control.disabled} onOpenChange={setOpen} onOpenChangeComplete={settle}>
+      <Menu.Trigger disabled={control.disabled} aria-label="Add to this message" data-tip={control.reason} className="composer-icon-button composer-attach">
         <Plus size={16} />
       </Menu.Trigger>
       <Menu.Portal>

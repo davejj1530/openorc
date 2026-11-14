@@ -36,7 +36,7 @@ Conversations use a 800px column with 32px reading gutters and 24px composer gut
 
 A live turn shows its head and timer as soon as it starts. An ask waiting in the composer does not count as turn content; once its turn rests, an ask alone leaves no head or empty space in the conversation. Prompts and answered records stay visible. Views without a dock keep asks in the conversation.
 
-A teammate's thread that the person can only read keeps the field editable, with a quiet placeholder naming whose thread it is. Send and Queue are disabled, with the reason on demand; Enter cannot send. A thread whose place is out of reach uses the same disabled controls. Drafts stay on this device. Neither state adds a card above the composer.
+A teammate's thread that the person can only read keeps the field editable, with a quiet placeholder naming whose thread it is. One read-only rule disables Send, Queue, attach, the model and the mode, with the same reason on demand; Enter cannot send and Stop is absent. The pickers still show what the thread runs on. An owner's thread out of reach blocks sending but keeps its local choices. Drafts stay on this device. Neither state adds a card above the composer.
 
 On phones, New thread places the environment and project selectors side by side above the composer. The project selector opens a searchable vertical sheet with Workspace and the imported projects; model and mode stay inside the composer.
 

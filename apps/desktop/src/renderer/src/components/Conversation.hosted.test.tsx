@@ -199,7 +199,8 @@ it("sends rather than queues on a thread whose ask outlived its turn, since noth
 
 it("keeps a teammate's composer honest even when the reader lacks cloud hours", async () => {
   await open({ owner: { brain: "hosted", reach: "live", heardAt: 1, startedBy: { name: "Morgan Reed", image: null } } }, { ...pro, plan: { pro: false }, hours: null });
-  expect(composer.props!.disabledReason).toBe("Only Morgan can send in Morgan's thread.");
+  expect(composer.props!.disabledReason).toBe("Only Morgan can make changes in Morgan's thread.");
+  expect(composer.props!.readOnlyReason).toBe("Only Morgan can make changes in Morgan's thread.");
   expect(composer.props!.placeholder).toBe("Morgan's thread");
   expect(screen.queryByRole("status", { name: "OpenOrc Cloud" })).toBeNull();
   act(() => composer.props!.onReady!());
@@ -210,11 +211,13 @@ it("keeps a teammate's composer honest even when the reader lacks cloud hours", 
 it.each(["hosted", "cloud"] as const)("blocks sending to a %s thread out of reach even if the account is online", async (brain) => {
   await open({ owner: { brain, reach: "offline", heardAt: 1 } });
   expect(composer.props!.disabledReason).toMatch(/can't be reached/);
+  expect(composer.props!.readOnlyReason).toBeNull();
   expect(screen.queryByRole("status", { name: "OpenOrc Cloud" })).toBeNull();
 });
 
 it.each([undefined, { brain: "hosted", reach: "live", heardAt: 1 }] satisfies ThreadSummary["owner"][])("keeps sending available on one's own reachable thread (%j)", async (owner) => {
   await open({ owner });
   expect(composer.props!.disabledReason).toBeNull();
+  expect(composer.props!.readOnlyReason).toBeNull();
   expect(composer.props!.placeholder).toBe("Message Claude…");
 });

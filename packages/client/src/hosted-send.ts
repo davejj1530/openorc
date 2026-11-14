@@ -68,8 +68,13 @@ export function asksBlocked(thread: Pick<ThreadSummary, "owner"> | null): string
 
 /** Why a thread takes no messages from this person now. Drafts stay on the device until they can be sent. */
 export function sendsBlocked(thread: Pick<ThreadSummary, "owner"> | null): string | null {
+  return placeUnreachable(thread) ?? threadReadOnlyReason(thread);
+}
+
+/** Why only the starter can change this thread. Reach does not change who may act. */
+export function threadReadOnlyReason(thread: Pick<ThreadSummary, "owner"> | null): string | null {
   const starter = thread ? rowStarter(thread) : null;
-  return placeUnreachable(thread) ?? (starter ? `Only ${starter.first} can send in ${starter.first}'s thread.` : null);
+  return starter ? `Only ${starter.first} can make changes in ${starter.first}'s thread.` : null;
 }
 
 /** Where a blocked place in a new thread's menu leads: the Settings section, or the project's row there, that fixes it. */

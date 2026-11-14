@@ -16,6 +16,7 @@ import {
   type SystemInfo,
 } from "@openorc/protocol";
 import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
+import { useComposerControl } from "./composer-read-only";
 import { CoversPreview } from "../lib/browser-preview";
 import { useClaudeAccountId } from "../lib/claude-account";
 import { PickerAccountRows, warmAccountUsage, type PickerAccounts } from "./ModelPickerAccounts";
@@ -458,6 +459,10 @@ function ComposerTriggerIcon({ orcling, value }: { orcling: Orcling | null; valu
   return <>{pickerTriggerIcon(value, 14)}</>;
 }
 
+function composerModelName(orclings: OrclingPickerChoices | undefined, current: ModelOption | undefined, value: ModelChoice | null): string {
+  return chosenOrcling(orclings)?.name ?? current?.label ?? value?.model ?? "Choose model";
+}
+
 /** A compact trigger with one model browser. */
 interface ComposerModelPickerProps {
   value: ModelChoice | null;
@@ -491,25 +496,19 @@ export function ComposerModelPicker({ value, onChange, onSelectModel, orclings, 
   const label = effort ? effortLabel(effort) : "Default";
   const hint = effortHint(effort);
   const title = `${modelTitle(current, value?.model) ?? "Choose a model"} · ${label}`;
+  const control = useComposerControl(disabled, fast && fastBlocked ? `${title} · ${fastStatus(fast, fastBlocked)}${fastHint}` : title);
   return (
     <Popover.Root
-      open={popup.open}
+      open={popup.open && !control.disabled}
       onOpenChange={(next) => {
         popup.onOpenChange(next);
         if (next) void models.refetch();
       }}
     >
-      <Popover.Trigger
-        ref={popup.trigger}
-        disabled={disabled}
-        className="composer-model-trigger"
-        aria-label="Model and effort"
-        {...warmAccountUsage(accounts)}
-        data-tip={fast && fastBlocked ? `${title} · ${fastStatus(fast, fastBlocked)}${fastHint}` : title}
-      >
+      <Popover.Trigger ref={popup.trigger} disabled={control.disabled} className="composer-model-trigger" aria-label="Model and effort" {...warmAccountUsage(accounts)} data-tip={control.reason}>
         <ComposerTriggerIcon orcling={chosenOrcling(orclings)} value={value} />
         {fast ? <Zap size={13} aria-label={fastBlocked ? "Fast mode can't run" : "Fast mode requested"} className="composer-fast-indicator shrink-0" data-blocked={fastBlocked || undefined} /> : null}
-        <span className="composer-model-name">{chosenOrcling(orclings)?.name ?? current?.label ?? value?.model ?? "Choose model"}</span>
+        <span className="composer-model-name">{composerModelName(orclings, current, value)}</span>
         {value ? <TriggerEffort label={label} /> : null}
       </Popover.Trigger>
       <Popover.Portal>

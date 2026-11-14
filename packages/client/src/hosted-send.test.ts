@@ -1,6 +1,6 @@
 import type { AccountStatus, ThreadSummary } from "@openorc/protocol";
 import { expect, it } from "vitest";
-import { asksBlocked, billingMoves, hostedStart, sendsBlocked, threadSendBlock } from "./hosted-send.js";
+import { asksBlocked, billingMoves, hostedStart, sendsBlocked, threadReadOnlyReason, threadSendBlock } from "./hosted-send.js";
 
 const pro: Extract<AccountStatus, { state: "signed-in" }> = {
   state: "signed-in",
@@ -175,7 +175,15 @@ it("blocks sends to a teammate's thread or a place out of reach, leaving own rea
     null,
     null,
     null,
-    "Only Morgan can send in Morgan's thread.",
+    "Only Morgan can make changes in Morgan's thread.",
     "OpenOrc Cloud can't be reached.",
   ]);
+});
+
+it("makes only a teammate's composer read-only, including while its place is out of reach", () => {
+  const own = hosted();
+  const teammate = { owner: { ...own.owner, startedBy: { name: "Morgan Reed", image: null } } };
+  expect(threadReadOnlyReason(teammate)).toBe("Only Morgan can make changes in Morgan's thread.");
+  expect(threadReadOnlyReason({ owner: { ...teammate.owner, reach: "offline" } })).toBe(threadReadOnlyReason(teammate));
+  expect([threadReadOnlyReason(own), threadReadOnlyReason(null), threadReadOnlyReason({}), threadReadOnlyReason({ owner: { ...own.owner, reach: "offline" } })]).toEqual([null, null, null, null]);
 });

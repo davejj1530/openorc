@@ -3,6 +3,9 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { createRef, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Composer, type ComposerHandle, type ComposerProps } from "./Composer";
+import { ComposerModelPicker } from "./ModelPicker";
+import { BackgroundCommands } from "./BackgroundCommands";
+import { MessageQueue } from "./MessageQueue";
 import { readDraft, writeDraft } from "../lib/drafts";
 import { core } from "../lib/rpc";
 import { isPreviewCovered } from "../lib/browser-preview";
@@ -48,6 +51,70 @@ function mount(overrides: Partial<ComposerProps> = {}) {
 }
 
 // Context popover behavior is covered in composer-steering-ui-smoke.cjs with real layout and focus.
+
+it.each([false, true])("keeps a read-only composer's controls inactive, with working=%s", (working) => {
+  const reason = "Only Morgan can make changes in Morgan's thread.";
+  const onSubmit = vi.fn(async () => {});
+  const onStop = vi.fn();
+  const onModel = vi.fn();
+  const command = vi.fn();
+  const model = { agent: "claude", model: "opus", effort: null } as const;
+  mount({
+    value: "",
+    readOnlyReason: reason,
+    model,
+    onModel,
+    modelControl: working ? <ComposerModelPicker value={model} onChange={onModel} /> : undefined,
+    onSubmit,
+    stopAction: { working, pending: false, onStop },
+    queueing: working,
+    commands: [{ name: "compact", hint: "Summarize", run: command }],
+  });
+  expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
+  for (const name of ["Model and effort", /^Mode:/, "Add to this message"]) {
+    const control = screen.getByRole("button", { name });
+    expect(control.hasAttribute("disabled")).toBe(true);
+    expect(control.getAttribute("data-tip")).toBe(reason);
+    fireEvent.click(control);
+  }
+  expect(screen.queryByRole("menu")).toBeNull();
+  expect(screen.queryByRole("dialog")).toBeNull();
+  const field = screen.getByRole("textbox", { name: "Message" });
+  type(field, "/compact", 8);
+  press(field, { key: "Enter" });
+  expect(messageOf(field)).toBe("/compact");
+  expect(command).not.toHaveBeenCalled();
+  expect(onSubmit).not.toHaveBeenCalled();
+  expect(onStop).not.toHaveBeenCalled();
+  expect(onModel).not.toHaveBeenCalled();
+});
+
+it.each([null, "This thread can't be reached."])("keeps an owner's controls when only sending is blocked (%s)", (disabledReason) => {
+  mount({ value: "", disabledReason, live: { runId: "run", working: true } });
+  for (const name of ["Model and effort", /^Mode:/, "Add to this message", "Stop"]) expect(screen.getByRole("button", { name }).hasAttribute("disabled")).toBe(false);
+});
+
+it("keeps queued messages readable but prevents their actions and background Stop in a read-only composer", () => {
+  const actOnThread = vi.fn();
+  const reason = "Only Morgan can make changes in Morgan's thread.";
+  mount({
+    readOnlyReason: reason,
+    notices: (
+      <>
+        <MessageQueue messages={[{ id: "queued", text: "Check the totals", attachments: [], queuedAt: 1 }]} canSend pending={false} onSend={actOnThread} onRemove={actOnThread} onEdit={actOnThread} />
+        <BackgroundCommands commands={[{ id: "server", description: "Preview server" }]} pending={false} onStop={actOnThread} />
+      </>
+    ),
+  });
+  fireEvent.click(screen.getByRole("button", { name: /1 queued/ }));
+  for (const name of ["Check the totals", "Send now", "Remove queued message 1", "Stop Preview server"]) {
+    const control = screen.getByRole("button", { name });
+    expect(control.hasAttribute("disabled")).toBe(true);
+    expect(control.getAttribute("data-tip")).toBe(reason);
+    fireEvent.click(control);
+  }
+  expect(actOnThread).not.toHaveBeenCalled();
+});
 
 describe("slash suggestions", () => {
   const commands: ComposerProps["commands"] = [

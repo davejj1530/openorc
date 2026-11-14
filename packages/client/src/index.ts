@@ -296,6 +296,7 @@ export {
   hostedStart,
   placeUnreachable,
   sendsBlocked,
+  threadReadOnlyReason,
   threadSendBlock,
   type BillingMove,
   type SendBlock,

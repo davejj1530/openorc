@@ -3,6 +3,7 @@ import { failureParts, queueHint } from "@openorc/client";
 import type { QueuedMessage } from "@openorc/protocol";
 import { ChevronDown, X } from "./icons";
 import { Button, IconButton } from "./ui";
+import { useComposerControl } from "./composer-read-only";
 
 /**
  * Messages waiting for the turn to finish, as a pile above the composer: a front card with the
@@ -35,6 +36,7 @@ export function MessageQueue({
   onEdit?: ((messageId: string) => void) | undefined;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const remove = useComposerControl(pending, "Remove from queue");
   if (!messages.length) return null;
   const open = expanded || messages.some((message) => message.error || message.interrupted);
   const behind = open ? 0 : Math.min(2, messages.length);
@@ -47,7 +49,7 @@ export function MessageQueue({
               <QueuedWords message={message} pending={pending} onEdit={onEdit ? () => onEdit(message.id) : undefined} />
               <div className="message-queue-actions">
                 <QueuedSend message={message} canSend={canSend} pending={pending} sendReason={sendReason} retryBlocked={retryBlocked} onSend={onSend} />
-                <IconButton size="xs" disabled={pending} onClick={() => onRemove(message.id)} aria-label={`Remove queued message ${index + 1}`} data-tip="Remove from queue">
+                <IconButton size="xs" disabled={remove.disabled} onClick={() => onRemove(message.id)} aria-label={`Remove queued message ${index + 1}`} data-tip={remove.reason}>
                   <X size={13} />
                 </IconButton>
               </div>
@@ -72,6 +74,7 @@ export function MessageQueue({
 /** A queued message's words, what went wrong with it and what it carries; pressed, they go back to the composer. */
 function QueuedWords({ message, pending, onEdit }: { message: QueuedMessage; pending: boolean; onEdit: (() => void) | undefined }) {
   const words = message.text.trim() || "Attached images";
+  const control = useComposerControl(pending, words);
   const body = (
     <>
       <span className="message-queue-preview">{words}</span>
@@ -89,7 +92,7 @@ function QueuedWords({ message, pending, onEdit }: { message: QueuedMessage; pen
   );
   if (!onEdit) return <div className="message-queue-message">{body}</div>;
   return (
-    <button type="button" className="message-queue-message" disabled={pending} data-tip={words} onClick={onEdit}>
+    <button type="button" className="message-queue-message" disabled={control.disabled} data-tip={control.reason} onClick={onEdit}>
       {body}
     </button>
   );
@@ -122,8 +125,9 @@ function QueuedSend({
   let label = "Send now";
   if (message.interrupted) label = "Retry";
   if (failed) label = "Try again";
+  const control = useComposerControl(!ready || pending, reason);
   return (
-    <Button size="sm" variant="ghost" disabled={!ready || pending} data-tip={reason ?? undefined} onClick={() => onSend(message.id)}>
+    <Button size="sm" variant="ghost" disabled={control.disabled} data-tip={control.reason} onClick={() => onSend(message.id)}>
       {label}
     </Button>
   );

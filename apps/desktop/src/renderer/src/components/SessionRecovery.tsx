@@ -8,6 +8,7 @@ import { floatingGround } from "../lib/use-anchor-ground";
 import { AlertCircle, ChevronDown } from "./icons";
 import { menuItem, menuPopup } from "./menu";
 import { Button, TextButton } from "./ui";
+import { useComposerControl } from "./composer-read-only";
 
 /**
  * A lost session or a failed last turn, with a fresh start that hands the conversation over. A turn stopped by a
@@ -16,6 +17,7 @@ import { Button, TextButton } from "./ui";
 export function SessionRecovery({ thread, disabled, onRestart, onContinueWith }: { thread: ThreadSummary; disabled: boolean; onRestart: () => void; onContinueWith: (accountId: string) => void }) {
   const { session } = thread;
   const { accounts, exhausted } = useAccountsToContinueWith(thread);
+  const control = useComposerControl(disabled);
   if (session.status !== "lost" && session.status !== "error") return null;
   return (
     <div data-blocking="true" className="rounded-xl bg-bad-soft px-4 py-3 text-base">
@@ -25,8 +27,8 @@ export function SessionRecovery({ thread, disabled, onRestart, onContinueWith }:
           <div className="text-ink">{session.status === "lost" ? `${harnessShortName(thread.agent)} no longer has this session.` : "The last turn failed."}</div>
           {session.message ? <div className="text-ink-2 whitespace-pre-wrap break-words max-h-24 overflow-auto">{session.message}</div> : null}
           <div className="flex flex-wrap items-center gap-2">
-            <ContinueWith accounts={accounts} disabled={disabled} onChoose={onContinueWith} />
-            <Button size="sm" variant={accounts.length ? "secondary" : "primary"} disabled={disabled} onClick={onRestart}>
+            <ContinueWith accounts={accounts} disabled={control.disabled} onChoose={onContinueWith} />
+            <Button size="sm" variant={accounts.length ? "secondary" : "primary"} disabled={control.disabled} data-tip={control.reason} onClick={onRestart}>
               {session.status === "lost" ? "Start a fresh session with a handoff" : "Retry with a fresh session"}
             </Button>
             {session.status === "error" ? <span className="text-xs text-ink-2">Or send a message to resume.</span> : null}
@@ -59,17 +61,18 @@ function useAccountsToContinueWith(thread: ThreadSummary): { accounts: ClaudeAcc
 }
 
 function ContinueWith({ accounts, disabled, onChoose }: { accounts: ClaudeAccountConnection[]; disabled: boolean; onChoose: (accountId: string) => void }) {
+  const control = useComposerControl(disabled);
   const [only] = accounts;
   if (!only) return null;
   if (accounts.length === 1)
     return (
-      <Button size="sm" variant="primary" disabled={disabled} onClick={() => onChoose(only.id)}>
+      <Button size="sm" variant="primary" disabled={control.disabled} data-tip={control.reason} onClick={() => onChoose(only.id)}>
         Continue with {only.name}
       </Button>
     );
   return (
     <Menu.Root>
-      <Menu.Trigger render={<Button size="sm" variant="primary" />} disabled={disabled}>
+      <Menu.Trigger render={<Button size="sm" variant="primary" />} disabled={control.disabled} data-tip={control.reason}>
         Continue with another account
         <ChevronDown size={14} />
       </Menu.Trigger>

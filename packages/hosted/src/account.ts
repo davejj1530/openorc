@@ -20,6 +20,7 @@ import { GithubConnect } from "./github.js";
 import { Paying } from "./paying.js";
 import { SignIns } from "./signins.js";
 import { AccountCache } from "./account-cache.js";
+import { accountSeatFacts } from "./organization-access-wire.js";
 import { ROUTES, SOCKET, wireBilling, wireGithubRepository, wireHostedSettings, wireSignIn, wireTopics } from "./wire.js";
 
 const keptAnswers = z.object({
@@ -102,6 +103,7 @@ export class Account implements HostedAccount {
       reach: state.reach,
       plan,
       hours,
+      ...accountSeatFacts(heard?.billing),
       sandbox: heard?.sandbox ? toSandbox(heard.sandbox) : null,
       signIns: heard?.signIns ? toSignIns(heard.signIns, heard.ended) : null,
       signingIn: this.#signIns.work,
@@ -281,9 +283,10 @@ export class Account implements HostedAccount {
   /** Reads billing alone, as a page opened to pay is watched. A failed read keeps what was heard. */
   async #readBilling(): Promise<void> {
     const email = this.#signedInAs();
+    const generation = this.deps.session.generation;
     if (!email) return;
     const billing = await this.deps.session.request(ROUTES.billing).catch(() => null);
-    if (billing && this.#signedInAs() === email) this.#hear(email, { billing });
+    if (billing && this.#signedInAs() === email && this.deps.session.generation === generation) this.#hear(email, { billing });
   }
 
   /**

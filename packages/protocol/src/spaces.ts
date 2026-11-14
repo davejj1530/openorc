@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { OrganizationSetupResults } from "./organization-setup.js";
 import type { OrganizationInvitationResults } from "./organization-invitations.js";
 import type { AccountReach } from "./account.js";
+import type { OrganizationAccess } from "./organization-access.js";
 
 export const SpaceId = z.string().min(1).max(200);
 export const OrganizationRole = z.enum(["admin", "member"]);
@@ -42,6 +43,7 @@ export type SpacesStatus =
       invitations: ReceivedInvitation[];
       reach: AccountReach;
       heardAt: number;
+      organizationAccess?: OrganizationAccess;
       error: string | null;
     };
 

@@ -2,15 +2,18 @@
  * The server's routes and the shapes it answers, parsed where they enter. Nothing outside the package sees a type from
  * this file: translate.ts turns each into the app's own.
  */
-import { AgentKind, BackgroundCommand, PermissionPreset, PrState, RunMode } from "@openorc/protocol";
+import { AgentKind, AllowanceSource, BackgroundCommand, PermissionPreset, PrState, RunMode } from "@openorc/protocol";
 import { z } from "zod";
 import { SPACE_ROUTES } from "./wire-spaces.js";
+import { wireOrganizationAccess } from "./organization-access-wire.js";
 
 /** A route with the shape of its answer, so a reply is always parsed where it enters. Null: the body is not read. */
 export interface Route<T> {
   method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   path: string;
   reply: z.ZodType<T> | null;
+  /** Optional validated refusal for routes with a structured conflict. */
+  refusal?: (status: number, body: unknown) => Error | undefined;
 }
 
 const iso = z.iso.datetime();
@@ -27,6 +30,8 @@ export const wireBilling = z.object({
   monthly: hours.nullable(),
   packs: z.array(hours.extend({ boughtAt: iso, expiresAt: iso })),
   leftSeconds: z.number().int(),
+  organizationAccess: wireOrganizationAccess.optional(),
+  allowanceSource: AllowanceSource.nullable().optional(),
 });
 export type WireBilling = z.infer<typeof wireBilling>;
 

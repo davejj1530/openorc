@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { openCodeProvider } from "./cloud-sign-ins.js";
 import { harnessShortName } from "./harness.js";
+import type { AllowanceSource, OrganizationAccess } from "./organization-access.js";
 
 /**
  * Every request to the OpenOrc server names the version of these shapes the app reads, so a newer server can tell an
@@ -145,7 +146,11 @@ export type AccountStatus =
       image: string | null;
       reach: AccountReach;
       plan: AccountPlan;
-      /** Null for a person who is not Pro. */
+      organizationAccess?: OrganizationAccess;
+      allowanceSource?: AllowanceSource | null;
+      /** Payer kind of the recorded subscription, when present, without another organization's identity. */
+      paidBy?: "self" | "organization" | null;
+      /** Null when no hours are shown, or when a passed local deadline needs a fresh billing read. */
       hours: CloudHours | null;
       /** Null until the server first answers. */
       sandbox: AccountSandbox | null;

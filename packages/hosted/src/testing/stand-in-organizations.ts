@@ -4,6 +4,7 @@ import { membershipRoute } from "./stand-in-membership.js";
 import { projectAccessRoute } from "./stand-in-access.js";
 import { StandInInvitations } from "./stand-in-invitations.js";
 import { userOf, type StandInSpaces } from "./stand-in-spaces.js";
+import type { StandInBilling } from "./stand-in-billing.js";
 
 type Reply = { status: number; body: unknown };
 interface OrganizationDeps {
@@ -12,6 +13,7 @@ interface OrganizationDeps {
   person(email: string): { name: string; image: string | null };
   savePerson(email: string, person: { name: string; image: string | null }): void;
   pro(email: string): boolean;
+  organizationAccess?(email: string): StandInBilling["organizationAccess"];
   tell(who: string, topics: string[], space?: string): void;
   accessChanged(space: string): void;
   now(): number;
@@ -91,6 +93,7 @@ export class StandInOrganizations {
       personalSpaceId: `personal-${who}`,
       spaces: [spaces[0], ...spaces.slice(1).sort((a, b) => (a.name ?? "").localeCompare(b.name ?? "") || a.id.localeCompare(b.id))],
       create: { allowed: reason === null, reason },
+      ...(this.deps.organizationAccess?.(who) !== undefined && { organizationAccess: this.deps.organizationAccess?.(who) }),
     };
   }
 

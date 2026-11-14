@@ -4,6 +4,8 @@ import { cloneElement } from "react";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { useRouter } from "../lib/router";
+import { useAccountSeatState } from "../lib/account-seat-state";
+import { AccountGraceLine } from "./AccountGraceLine";
 import { AccountFace } from "./AccountFace";
 import { CircleUser, LoaderCircle, X } from "./icons";
 import { Tooltip } from "./ui";
@@ -14,7 +16,7 @@ import { Tooltip } from "./ui";
  * in a build with no account server to sign in to.
  */
 export function SidebarAccount() {
-  const account = useRpc("account.status", {}).data;
+  const { account, now } = useAccountSeatState(useRpc("account.status", {}).data);
   const open = useRouter((s) => s.route.view === "settings" && s.route.section === "account");
   if (account?.state === "signed-out") return <SidebarSignIn account={account} />;
   if (account?.state !== "signed-in") return null;
@@ -23,6 +25,7 @@ export function SidebarAccount() {
     <button
       type="button"
       className="sidebar-account no-drag"
+      data-grace={account.organizationAccess?.state === "grace" || undefined}
       aria-current={open ? "page" : undefined}
       onClick={() => {
         useRouter.getState().navigate({ view: "settings", section: "account" });
@@ -36,7 +39,7 @@ export function SidebarAccount() {
             <span key={index}>{index ? ` ${word}` : word}</span>
           ))}
         </span>
-        <span className="sidebar-account-plan">{planLine(account)}</span>
+        <span className="sidebar-account-plan">{account.organizationAccess?.state === "grace" ? <AccountGraceLine until={account.organizationAccess.until} now={now} /> : planLine(account)}</span>
       </span>
     </button>
   );

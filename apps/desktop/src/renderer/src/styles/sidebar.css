@@ -718,6 +718,7 @@ button.browser-empty:hover,
 
 /* The footer, under a hairline: its tools at the row's end, its start kept for the signed-in person. */
 .sidebar-footer {
+  container: account-footer / inline-size;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -759,6 +760,22 @@ button.browser-empty:hover,
 }
 .sidebar-account-plan {
   white-space: nowrap;
+}
+.sidebar-grace-short {
+  display: none;
+}
+.sidebar-account[data-grace="true"] {
+  padding-left: 4px;
+  padding-right: 0;
+  gap: 7px;
+}
+@container account-footer (max-width: 220px) {
+  .sidebar-grace-long {
+    display: none;
+  }
+  .sidebar-grace-short {
+    display: inline;
+  }
 }
 /* Words that don't fit wrap onto a second line that never shows, so the name loses whole words, never letters. */
 .sidebar-account-name {

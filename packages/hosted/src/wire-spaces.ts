@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Route } from "./wire.js";
+import { wireOrganizationAccess } from "./organization-access-wire.js";
 
 const id = z.string().min(1);
 const iso = z.iso.datetime();
@@ -24,6 +25,7 @@ export const wireSpaces = z
       ]),
     ),
     create: z.object({ allowed: z.boolean(), reason: z.string().nullable() }),
+    organizationAccess: wireOrganizationAccess.optional(),
   })
   .refine(
     (value) => value.spaces.filter((space) => space.kind === "personal").length === 1 && value.spaces.some((space) => space.kind === "personal" && space.id === value.personalSpaceId),

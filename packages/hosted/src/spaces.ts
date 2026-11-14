@@ -11,6 +11,7 @@ import { OrganizationInvitations } from "./organization-invitations.js";
 import { ReceivedInvitations } from "./received-invitations.js";
 import { wireSpaces } from "./wire-spaces.js";
 import { toImage } from "./translate.js";
+import { toOrganizationAccess } from "./organization-access-wire.js";
 
 const snapshot = z.object({ apiOrigin: z.string(), email: z.string(), index: wireSpaces, projects: z.array(scopedProject), heardAt: z.number() });
 type Snapshot = z.infer<typeof snapshot>;
@@ -68,9 +69,11 @@ export class Spaces implements HostedSpaces {
     if (!state.signedIn) return { state: "signed-out" };
     const heard = this.#snapshot;
     if (!heard) return { state: "loading", error: this.#error };
+    const { organizationAccess, ...index } = heard.index;
     return {
       state: "ready",
-      ...heard.index,
+      ...index,
+      ...(organizationAccess !== undefined && { organizationAccess: toOrganizationAccess(organizationAccess) }),
       apiOrigin: this.#origin,
       invitations: this.#invitations.filter((invitation) => invitation.expiresAt > this.deps.now()),
       reach: state.reach,

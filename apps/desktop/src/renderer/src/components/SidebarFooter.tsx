@@ -1,5 +1,7 @@
 import { dismissCompactNavigation } from "../lib/compact-navigation";
 import { useRouter } from "../lib/router";
+import { useRpc } from "../lib/client";
+import { useAccountSeatState } from "../lib/account-seat-state";
 import { AccountUsage } from "./AccountUsage";
 import { Settings } from "./icons";
 import { SidebarAccount } from "./SidebarAccount";
@@ -12,10 +14,12 @@ import { Tooltip } from "./ui";
  */
 export function SidebarFooter() {
   const settings = useRouter((s) => s.route.view === "settings");
+  const { account } = useAccountSeatState(useRpc("account.status", {}).data);
+  const grace = account?.state === "signed-in" && account.organizationAccess?.state === "grace";
   return (
     <footer className="sidebar-footer">
       <SidebarAccount />
-      <AccountUsage />
+      {!grace ? <AccountUsage /> : null}
       <SidebarUpdate />
       <Tooltip label="Settings" side="top">
         <button

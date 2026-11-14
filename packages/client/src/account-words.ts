@@ -4,7 +4,7 @@ type SignedIn = Extract<AccountStatus, { state: "signed-in" }>;
 
 const HOUR = 3600;
 
-const day = (at: number) => new Date(at).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+export const accountDay = (at: number, locale?: string, timeZone?: string) => new Date(at).toLocaleDateString(locale, { month: "short", day: "numeric", timeZone });
 
 /** Cloud time as a person reads it: whole hours from an hour up, else minutes, and none as hours, the unit it is counted in. */
 export function cloudTime(seconds: number): string {
@@ -35,14 +35,14 @@ export function planLine(account: Pick<SignedIn, "plan" | "hours">): string {
 /** When Pro renews, ends, or stops after a failed payment; null for Free. */
 export function planDate(plan: SignedIn["plan"]): string | null {
   if (!plan.pro) return null;
-  if (plan.standing === "live") return `Renews ${day(plan.at)}`;
-  if (plan.standing === "ending") return `Ends ${day(plan.at)}`;
-  return `Payment failed. Pro until ${day(plan.at)}.`;
+  if (plan.standing === "live") return `Renews ${accountDay(plan.at)}`;
+  if (plan.standing === "ending") return `Ends ${accountDay(plan.at)}`;
+  return `Payment failed. Pro until ${accountDay(plan.at)}.`;
 }
 
 /** What the hours left are made of: the month's, when it resets, and what was bought on top. */
 export function hoursDetail(hours: CloudHours): string {
-  const parts = hours.monthly ? [`${cloudTime(hours.monthly.leftSeconds)} of ${cloudTime(hours.monthly.grantedSeconds)} this month, resets ${day(hours.monthly.resetsAt)}`] : [];
+  const parts = hours.monthly ? [`${cloudTime(hours.monthly.leftSeconds)} of ${cloudTime(hours.monthly.grantedSeconds)} this month, resets ${accountDay(hours.monthly.resetsAt)}`] : [];
   if (hours.packsLeftSeconds > 0) parts.push(`${cloudTime(hours.packsLeftSeconds)} bought`);
   return parts.join(", ");
 }

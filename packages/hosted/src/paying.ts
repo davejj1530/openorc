@@ -22,7 +22,7 @@ type Page = BillingPage["page"];
 
 /** Whether billing, as heard now, shows what a page was for, against billing as heard when it opened. */
 const LANDED: Record<Page, (before: WireBilling | null, now: WireBilling) => boolean> = {
-  pro: (_before, now) => now.pro.status === "pro",
+  pro: (_before, now) => now.pro.status === "pro" && now.pro.paidBy.kind === "self" && now.pro.standing !== "grace",
   hours: (before, now) => now.packs.some((pack) => !before?.packs.some((had) => had.boughtAt === pack.boughtAt)),
   billing: (before, now) => JSON.stringify(now.pro) !== JSON.stringify(before?.pro),
 };

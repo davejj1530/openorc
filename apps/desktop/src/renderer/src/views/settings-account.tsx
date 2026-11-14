@@ -1,12 +1,15 @@
-import { billingMoves, cloudTime, hoursDetail, periodLabel, planDate, type BillingMove } from "@openorc/client";
-import { payBlock, PRO_PERIODS, sendBlockWords, type AccountStatus, type BillingOffers, type BillingPage, type ProPeriod } from "@openorc/protocol";
+import { billingMoves, cloudTime, hoursDetail } from "@openorc/client";
+import { type AccountStatus } from "@openorc/protocol";
 import { useEffect, useState } from "react";
-import { Button, Segmented, TextButton, Tooltip } from "../components/ui";
+import { Button, TextButton } from "../components/ui";
 import { AccountFace } from "../components/AccountFace";
 import { ProfileDialog } from "../dialogs/ProfileDialog";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { Failure } from "./settings-secret-field";
 import { LoadError, Section, SettingRow, Status } from "./settings-shared";
+
+import { AccountSeatPlan, PaymentAction, type PaymentControls } from "./AccountSeatPlan";
+import { useAccountSeatState } from "../lib/account-seat-state";
 
 type SignedOut = Extract<AccountStatus, { state: "signed-out" }>;
 type SignedIn = Extract<AccountStatus, { state: "signed-in" }>;
@@ -14,9 +17,10 @@ type SignedIn = Extract<AccountStatus, { state: "signed-in" }>;
 /** Settings > Account. Everything shown is `account.status`, which the core keeps and announces, so every window agrees. */
 export function AccountSettings({ active }: { active: boolean }) {
   const status = useRpc("account.status", {}, { enabled: active });
+  const { account } = useAccountSeatState(status.data);
   if (status.isError) return <LoadError retry={() => void status.refetch()} />;
-  if (!status.data || status.data.state === "unavailable") return null;
-  return status.data.state === "signed-in" ? <SignedInAccount account={status.data} active={active} /> : <SignIn status={status.data} />;
+  if (!account || account.state === "unavailable") return null;
+  return account.state === "signed-in" ? <SignedInAccount key={account.email} account={account} active={active} /> : <SignIn status={account} />;
 }
 
 /**
@@ -90,8 +94,6 @@ function SignedInAccount({ account, active }: { account: SignedIn; active: boole
  * ink pill, so a person sent here to upgrade, buy hours or fix a payment lands on that move. A page opened to pay is
  * watched by the core until its purchase lands or the person leaves this screen.
  */
-type PaymentControls = { opening: boolean; onOpen: (page: BillingPage) => void };
-
 function PlanRows({ account, active, ...controls }: { account: SignedIn; active: boolean } & PaymentControls) {
   useLeaveBilling(active && account.paying !== null);
   // Asked again on each visit to this screen; a price missing or not read shows none and blocks nothing.
@@ -100,68 +102,22 @@ function PlanRows({ account, active, ...controls }: { account: SignedIn; active:
   const waitingForHours = account.paying?.page === "hours";
   return (
     <>
-      <PlanRow account={account} offers={offers} move={moves.plan} {...controls} />
-      {account.hours ? (
-        <SettingRow label="Cloud hours" hint={waitingForHours ? "Waiting for your payment" : hoursDetail(account.hours) || undefined}>
-          <span className="tabular">{cloudTime(account.hours.leftSeconds)} left</span>
-          {moves.hours ? <PaymentAction move={moves.hours} page={{ page: "hours" }} waiting={waitingForHours} {...controls} /> : null}
-        </SettingRow>
-      ) : null}
+      <AccountSeatPlan account={account} offers={offers} move={moves.plan} {...controls} />
+      <AccountHours account={account} moves={moves} waiting={waitingForHours} {...controls} />
     </>
   );
 }
 
-function PlanRow({ account, offers, move, ...controls }: { account: SignedIn; offers: BillingOffers | null; move: BillingMove } & PaymentControls) {
-  const [chosen, setChosen] = useState<ProPeriod>("monthly");
-  const waiting = account.paying?.page === "pro" ? account.paying : null;
-  const period = waiting?.period ?? chosen;
-  const periods = PRO_PERIODS.map((value) => ({
-    value,
-    label: periodLabel(value, offers?.pro.find((offer) => offer.period === value)?.price ?? null),
-    disabled: controls.opening || waiting !== null,
-    reason: "Stop waiting to choose another plan.",
-  }));
-  const purchase = move.page === "pro" ? { ...move, label: "Upgrade to Pro" } : move;
-  const page: BillingPage = move.page === "pro" ? { page: "pro", period } : { page: "billing" };
+function AccountHours({ account, moves, waiting, ...controls }: { account: SignedIn; moves: ReturnType<typeof billingMoves>; waiting: boolean } & PaymentControls) {
+  const frozen = account.organizationAccess?.state === "frozen";
+  if (!account.hours) return frozen && account.organizationAccess?.reason !== "no_pro" ? <SettingRow label="Cloud hours" hint="Not available" children={null} /> : null;
+  const hint = hoursDetail(account.hours) || (frozen && account.hours.leftSeconds === 0 ? "No hours available" : undefined);
   return (
-    <SettingRow label="Plan" hint={waiting ? "Waiting for your payment" : planHint(account, offers)}>
-      <Status ok={account.plan.pro && account.plan.standing !== "grace"}>{account.plan.pro ? "Pro" : "Free"}</Status>
-      {move.page === "pro" ? <Segmented size="sm" label="Pay" value={period} options={periods} onChange={setChosen} /> : null}
-      <PaymentAction move={purchase} page={page} waiting={waiting !== null} {...controls} />
+    <SettingRow label="Cloud hours" hint={waiting ? "Waiting for your payment" : hint}>
+      <span className="tabular">{cloudTime(account.hours.leftSeconds)} left</span>
+      {moves.hours && !frozen ? <PaymentAction move={moves.hours} page={{ page: "hours" }} waiting={waiting} {...controls} /> : null}
     </SettingRow>
   );
-}
-
-/** A waiting checkout opens again at the same address, or can be left without canceling the payment. */
-function PaymentAction({ move, page, waiting, opening, onOpen }: { move: BillingMove; page: BillingPage; waiting: boolean } & PaymentControls) {
-  const leave = useRpcMutation("account.billing.leave");
-  return (
-    <span className="inline-flex shrink-0 items-center gap-2">
-      {waiting ? (
-        <TextButton tone="muted" disabled={leave.isPending} onClick={() => leave.mutate({})}>
-          Stop waiting
-        </TextButton>
-      ) : null}
-      <BillingButton move={waiting ? { ...move, label: "Open again", blocked: null } : move} pending={opening} onClick={() => onOpen(page)} />
-    </span>
-  );
-}
-
-/** The included allowance on Free, otherwise when Pro renews or needs a payment. */
-function planHint(account: SignedIn, offers: BillingOffers | null): string | undefined {
-  if (!account.plan.pro) return offers?.monthlySeconds ? `Pro includes ${offers.monthlySeconds / 3600} cloud hours a month.` : undefined;
-  const unpaid = account.plan.pro && account.plan.standing === "live" && payBlock(account) === "awaiting_payment";
-  return (unpaid ? sendBlockWords("awaiting_payment", "") : planDate(account.plan)) ?? undefined;
-}
-
-/** A way to pay; one that cannot be made now is disabled and says why on demand. */
-function BillingButton({ move, pending, onClick }: { move: BillingMove; pending: boolean; onClick: () => void }) {
-  const button = (
-    <Button size="sm" variant={move.primary ? "primary" : "secondary"} disabled={pending || move.blocked !== null} onClick={onClick}>
-      {move.label}
-    </Button>
-  );
-  return move.blocked ? <Tooltip label={move.blocked}>{button}</Tooltip> : button;
 }
 
 /** While a page opened to pay is watched, leaving this screen (another section, or out of Settings) stops the watch. */

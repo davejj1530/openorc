@@ -169,6 +169,7 @@ const idReadTags: MethodRules = {
   "threads.lastMessage": (p) => [`thread:${String(p["id"])}`],
   "threads.checkpoints": (p) => [`checkpoints:${String(p["id"])}`],
   "teamChat.state": (p) => ["team-chat", `team-chat:${String(p["spaceId"])}`],
+  "teamChat.conversation": (p) => ["team-chat", `team-chat:${String(p["spaceId"])}`, `team-chat:${String(p["spaceId"])}:${String(p["conversationId"])}`],
   "teamChat.timeline": (p) => ["team-chat", `team-chat:${String(p["spaceId"])}`, `team-chat:${String(p["spaceId"])}:${String(p["conversationId"])}`],
   "hosted.capabilities": (p) => ["account", "threads", `thread:${String(p["threadId"])}`],
   ...each(["hosted.review.changes", "hosted.review.turn", "hosted.review.file", "hosted.review.state"], (p) => ["threads", `thread:${String(p["threadId"])}`, `threaddiff:${String(p["threadId"])}`]),

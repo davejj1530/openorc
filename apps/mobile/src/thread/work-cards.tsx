@@ -1,5 +1,4 @@
-import { startedWorkFromTool, taskIdFromTool, type Block } from "@openorc/client";
-import type { ThreadActivity } from "@openorc/protocol";
+import { startedWorkFromTool, taskIdFromTool, threadActivity, type Block } from "@openorc/client";
 import { router } from "expo-router";
 import { useContext, type ReactNode } from "react";
 import { Pressable, View } from "react-native";
@@ -12,8 +11,6 @@ import { Text } from "../ui/Text";
 import { ToolRow } from "./tools";
 
 type ToolBlock = Extract<Block, { kind: "tool" }>;
-
-const activityLabel: Record<ThreadActivity, string> = { running: "Working", waiting: "Needs you", idle: "Idle" };
 
 /** One r24 plane row for work a tool call saved or started: what it is, where it stands, and a tap opens it. */
 function WorkCard({ icon, title, line, waiting, onPress }: { icon: ReactNode; title: string; line: string; waiting: boolean; onPress: () => void }) {
@@ -60,13 +57,14 @@ function StartedThreadCard({ threadId, block, runId }: { threadId: string; block
   const host = useContext(HostContext);
   const thread = useRpc("threads.get", { id: threadId });
   if (!thread.data) return thread.isLoading ? <View className="h-16 rounded-3xl bg-surface" /> : <ToolRow block={block} runId={runId} />;
-  const { title, activity } = thread.data;
+  const { title } = thread.data;
+  const activity = threadActivity(thread.data);
   return (
     <WorkCard
       icon={<MessageSquare size={18} className="text-ink-4" />}
       title={title}
-      line={`Subthread · ${activityLabel[activity]}`}
-      waiting={activity === "waiting"}
+      line={`Subthread · ${activity?.text ?? "Idle"}`}
+      waiting={activity?.tone === "attention"}
       onPress={() => router.push({ pathname: "/thread/[id]", params: host ? { id: threadId, host } : { id: threadId } })}
     />
   );

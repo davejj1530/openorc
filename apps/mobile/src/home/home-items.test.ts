@@ -40,6 +40,21 @@ function list(threads: readonly ThreadSummary[] = fixtureThreads, more: { pinned
 const options = (more: Partial<HomeOptions> = {}): HomeOptions => ({ now, pinnedOnly: false, collapsed: allOpen, waiting: [], projectsFailed: false, opened: null, ...more });
 
 describe("homeItems", () => {
+  it("keeps a teammate's ask in its day and out of Needs you, including an inbox copy", () => {
+    const shared: ThreadSummary = {
+      ...fixtureThreads[0]!,
+      id: "shared",
+      projectId: "project",
+      pinnedAt: null,
+      lastActivityAt: now,
+      activity: "waiting",
+      owner: { brain: "hosted", reach: "live", heardAt: 1, startedBy: { name: "Morgan Reed", image: null } },
+    };
+    const items = homeItems(list([shared]), options({ waiting: [shared] }));
+    expect(items.some((item) => item.kind === "heading" && item.title === "Needs you")).toBe(false);
+    expect(items.filter((item) => item.kind === "thread").map((item) => item.thread.id)).toEqual(["shared"]);
+  });
+
   it("lists what waits on you first across projects, then pins, then the rest newest first, each row naming its project", () => {
     const items = homeItems(list(), options());
     expect(rows(items)).toEqual([

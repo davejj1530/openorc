@@ -1,6 +1,7 @@
 import { isSubagentThread, type ThreadSummary } from "@openorc/protocol";
 import { sidebarFoldKey, sidebarSectionOpen, type ThreadPage } from "./sidebar-thread-groups.js";
 import { threadTreeActivity, threadTreeMatches, threadTreeRoot } from "./thread-tree.js";
+import { threadWaitsOnYou } from "./thread-row.js";
 
 /** When a thread last saw work, as the sidebar groups it: the last few hours, then by calendar day. Recent and Today start open. */
 export type SidebarDay = "recent" | "today" | "yesterday";
@@ -126,6 +127,7 @@ export function sidebarGroupsGrow({ end, hasMore, limit }: { end: SidebarPlace |
  * counts only while it works: its parent reads its result, so a finished one stays unread forever.
  */
 export function threadNeedsYou(thread: ThreadSummary): boolean {
+  if (thread.activity === "waiting") return threadWaitsOnYou(thread);
   return thread.activity !== "idle" || (thread.unread && !isSubagentThread(thread));
 }
 

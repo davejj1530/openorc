@@ -1,6 +1,37 @@
-import { placeOf, STATUS_PRIORITY, threadStatus, WORKSPACE_ID, type PrState, type ThreadStatus, type ThreadSummary, type WorkspaceMode } from "@openorc/protocol";
+import {
+  placeOf,
+  STATUS_PRIORITY as STATUS_ORDER,
+  threadStatus as localThreadStatus,
+  WORKSPACE_ID,
+  type PrState,
+  type ThreadStatus as LocalThreadStatus,
+  type ThreadSummary,
+  type WorkspaceMode,
+} from "@openorc/protocol";
 
-export { STATUS_PRIORITY, threadStatus, type ThreadStatus };
+/** A teammate's ask still has a question mark, but does not call the reader. */
+export type ThreadStatus = LocalThreadStatus | { kind: "waiting-other"; label: string };
+export const STATUS_PRIORITY: readonly ThreadStatus["kind"][] = [...STATUS_ORDER, "waiting-other"];
+
+/** Whether the waiting agent needs this person to answer. Reach does not change whose answer it needs. */
+export function threadWaitsOnYou(thread: Pick<ThreadSummary, "activity" | "owner">): boolean {
+  return thread.activity === "waiting" && !rowStarter(thread);
+}
+
+/** The short activity words and tone shared by a thread's header and row. */
+export function threadActivity(thread: Pick<ThreadSummary, "activity" | "owner">): { text: string; tone: "live" | "attention" | "muted" } | null {
+  if (thread.activity === "waiting") {
+    const starter = rowStarter(thread);
+    return starter ? { text: `Waiting on ${starter.first}`, tone: "muted" } : { text: "Needs you", tone: "attention" };
+  }
+  return thread.activity === "running" ? { text: "Working", tone: "live" } : null;
+}
+
+/** The thread's status as seen by this person, including a teammate's quiet wait. */
+export function threadStatus(thread: Pick<ThreadSummary, "activity" | "session" | "unread" | "backgroundCommands" | "owner">): ThreadStatus | null {
+  const activity = threadActivity(thread);
+  return activity?.tone === "muted" ? { kind: "waiting-other", label: activity.text } : localThreadStatus(thread);
+}
 
 /** A row's lead: its status, else the state of the thread's pull request. */
 export type ThreadMark = ThreadStatus | { kind: "pull"; label: string; state: PrState };
@@ -30,7 +61,7 @@ export function pullRequestMark(thread: Pick<ThreadSummary, "prUrl" | "prState">
   return { kind: "pull", label: `Pull request #${pull}, ${state}`, state };
 }
 
-export function threadMark(thread: Pick<ThreadSummary, "activity" | "session" | "unread" | "backgroundCommands" | "prUrl" | "prState">): ThreadMark | null {
+export function threadMark(thread: Pick<ThreadSummary, "activity" | "session" | "unread" | "backgroundCommands" | "prUrl" | "prState" | "owner">): ThreadMark | null {
   return threadStatus(thread) ?? pullRequestMark(thread);
 }
 

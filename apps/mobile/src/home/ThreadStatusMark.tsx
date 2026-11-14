@@ -24,6 +24,8 @@ function Glyph({ mark }: { mark: ThreadMark }) {
   switch (mark.kind) {
     case "waiting":
       return <CircleHelp size={16} className="text-attention" />;
+    case "waiting-other":
+      return <CircleHelp size={16} className="text-ink-4" />;
     case "running":
       return <Spinner />;
     case "failed":
@@ -44,7 +46,15 @@ function Glyph({ mark }: { mark: ThreadMark }) {
  */
 export const REACH = { ring: 6.25, cross: 4.6, frame: 6.6, dot: 4 } as const;
 
-const reaches: Record<ThreadMark["kind"], number> = { waiting: REACH.ring, running: REACH.ring, failed: REACH.ring, unread: REACH.dot, background: REACH.frame, pull: REACH.cross };
+const reaches: Record<ThreadMark["kind"], number> = {
+  waiting: REACH.ring,
+  "waiting-other": REACH.ring,
+  running: REACH.ring,
+  failed: REACH.ring,
+  unread: REACH.dot,
+  background: REACH.frame,
+  pull: REACH.cross,
+};
 
 /** How far a row's status glyph reaches left of its center, so the tree's lines can stop a set gap short of it. */
 export const markReach = (mark: ThreadMark | null): number | null => (mark ? reaches[mark.kind] : null);

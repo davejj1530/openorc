@@ -1,7 +1,8 @@
 import { sidebarThreadPage, STATUS_PRIORITY, threadResolved, threadStatus, threadTreeRoot, type ThreadStatus } from "@openorc/client";
 import { isSubagentThread, WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 
-type StatusKind = ThreadStatus["kind"];
+type StatusKind = Exclude<ThreadStatus["kind"], "waiting-other">;
+const COUNTED_STATUS = STATUS_PRIORITY.filter((kind) => kind !== "waiting-other");
 
 /** How a project's description counts each kind of thread. */
 const SUMMARY: Record<StatusKind, string> = { waiting: "needs you", failed: "failed", running: "working", unread: "unread", background: "with commands running" };
@@ -22,7 +23,7 @@ export function projectMarks(rows: readonly ThreadSummary[] | undefined, now: nu
     const root = threadTreeRoot(thread, byId);
     if (!root || threadResolved(root, now)) continue;
     const kind = threadStatus(thread)?.kind;
-    if (!kind || (kind === "unread" && isSubagentThread(thread))) continue;
+    if (!kind || kind === "waiting-other" || (kind === "unread" && isSubagentThread(thread))) continue;
     const mark = marks.get(thread.projectId) ?? { kind, counts: {} };
     mark.counts[kind] = (mark.counts[kind] ?? 0) + 1;
     if (STATUS_PRIORITY.indexOf(kind) < STATUS_PRIORITY.indexOf(mark.kind)) mark.kind = kind;
@@ -34,7 +35,7 @@ export function projectMarks(rows: readonly ThreadSummary[] | undefined, now: nu
 /** The tooltip's second line, such as "1 needs you · 2 unread", leaving out what has none. */
 export function projectMarkSummary(mark: ProjectMark | undefined): string {
   if (!mark) return "";
-  return STATUS_PRIORITY.flatMap((kind) => (mark.counts[kind] ? [`${mark.counts[kind]} ${SUMMARY[kind]}`] : [])).join(" · ");
+  return COUNTED_STATUS.flatMap((kind) => (mark.counts[kind] ? [`${mark.counts[kind]} ${SUMMARY[kind]}`] : [])).join(" · ");
 }
 
 /** A stand-in thread in the given state, so a project's mark shows the thread rows' own glyph with its plain label. */

@@ -23,6 +23,13 @@ const thread = (id: string, projectId: string, patch: Partial<ThreadSummary> = {
   }) as ThreadSummary;
 
 describe("projectMarks", () => {
+  it("does not count a teammate's ask in the workspace mark or its description", () => {
+    const shared = thread("shared", "project", { activity: "waiting", owner: { brain: "hosted", reach: "live", heardAt: 1, startedBy: { name: "Morgan Reed", image: null } } });
+    expect(projectMarks([shared], now).size).toBe(0);
+    const mark = projectMarks([shared, thread("own", "project", { activity: "waiting" })], now).get("project");
+    expect(projectMarkSummary(mark)).toBe("1 needs you");
+  });
+
   it("shows a project's most pressing state: needs you, then a failure, then work, then a result waiting", () => {
     const marks = projectMarks(
       [

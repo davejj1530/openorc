@@ -22,6 +22,14 @@ it("says what the agent is doing while it works", () => {
   expect(threadHeadline({ activity: "running", unread: false }, undefined)).toEqual({ text: "Working", tone: "live" });
 });
 
+it.each([undefined, run([{ id: "ask", kind: "approval", approvalId: "ask", approvalKind: "user_input", input: {} }])])(
+  "keeps a teammate's waiting headline quiet, with or without its transcript",
+  (transcript) => {
+    const owner = { brain: "hosted", reach: "live", heardAt: 1, startedBy: { name: "Morgan Reed", image: null } } as const;
+    expect(threadHeadline({ activity: "waiting", unread: true, owner }, transcript)).toEqual({ text: "Waiting on Morgan", tone: "muted" });
+  },
+);
+
 it("says what a finished turn came to until the thread is read", () => {
   expect(threadHeadline({ activity: "idle", unread: true }, run([user, edit, tests]))).toEqual({ text: "Done · 1 file changed · tests passed", tone: "done" });
   expect(threadHeadline({ activity: "idle", unread: false }, run([user, edit, tests]))).toBeNull();

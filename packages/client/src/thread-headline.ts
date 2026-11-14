@@ -5,10 +5,11 @@ import { commandLabel } from "./work-chips.js";
 import { turnReceipt } from "./work-receipt.js";
 import { liveHeadline, workEntries } from "./work-steps.js";
 import { cloudStartFailure, cloudStartSteps, threadMoveCard } from "./cloud-start.js";
+import { threadActivity } from "./thread-row.js";
 
 export interface ThreadHeadline {
   text: string;
-  tone: "live" | "attention" | "done";
+  tone: "live" | "attention" | "done" | "muted";
 }
 
 type Approval = Extract<Block, { kind: "approval" }>;
@@ -57,6 +58,8 @@ export function threadHeadline(thread: Pick<ThreadSummary, "activity" | "unread"
   const cloud = run ? null : cloudHeadline(thread);
   if (cloud) return cloud;
   if (thread.activity === "waiting") {
+    const activity = threadActivity(thread);
+    if (activity?.tone === "muted") return activity;
     const ask = run?.blocks.findLast((block): block is Approval => block.kind === "approval" && !block.decision);
     return { text: ask ? approvalWords(ask) : "Needs you", tone: "attention" };
   }

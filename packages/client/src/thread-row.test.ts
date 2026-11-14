@@ -1,6 +1,19 @@
 import { WORKSPACE_ID } from "@openorc/protocol";
 import { describe, expect, it } from "vitest";
-import { latestActivity, pullRequestNumber, renamedTitle, rowAge, rowPlace, rowStarter, threadMark, threadPlace, threadStatus, threadTreeStatus, workspaceLabel } from "./thread-row.js";
+import {
+  latestActivity,
+  pullRequestNumber,
+  renamedTitle,
+  rowAge,
+  rowPlace,
+  rowStarter,
+  threadActivity,
+  threadMark,
+  threadPlace,
+  threadStatus,
+  threadTreeStatus,
+  workspaceLabel,
+} from "./thread-row.js";
 
 const resting = { activity: "idle", session: { status: "idle", message: null }, unread: false, prUrl: null, prState: null } as const;
 const pr = "https://github.com/me/openorc/pull/482";
@@ -17,6 +30,26 @@ describe("pullRequestNumber", () => {
 });
 
 describe("threadMark", () => {
+  it("names the starter of a shared thread's ask without calling the reader", () => {
+    const owner = { brain: "hosted", reach: "live", heardAt: 1, startedBy: { name: "Morgan Reed", image: null } } as const;
+    const shared = { ...resting, activity: "waiting", unread: true, owner } as const;
+    const mark = threadStatus(shared);
+    expect(mark).toEqual({ kind: "waiting-other", label: "Waiting on Morgan" });
+    expect(threadMark(shared)).toEqual(mark);
+    const own = threadStatus({ ...resting, activity: "waiting" });
+    expect(threadTreeStatus(mark, own)).toBe(own);
+    expect(threadTreeStatus(own, mark)).toBe(own);
+    expect(threadStatus({ ...resting, activity: "waiting", owner: { ...owner, startedBy: undefined } })).toEqual(own);
+  });
+
+  it("keeps the owner's activity words and tones at home and in the cloud", () => {
+    for (const owner of [undefined, { brain: "hosted", reach: "offline", heardAt: 1 }] as const) {
+      expect(threadActivity({ activity: "waiting", owner })).toEqual({ text: "Needs you", tone: "attention" });
+      expect(threadActivity({ activity: "running", owner })).toEqual({ text: "Working", tone: "live" });
+      expect(threadActivity({ activity: "idle", owner })).toBeNull();
+    }
+  });
+
   it("ranks live activity over session health, health over unread, unread over commands left running, and those over a pull request", () => {
     const failed = { status: "error", message: "exit 1" } as const;
     expect(threadMark({ ...resting, activity: "waiting", session: failed, unread: true })).toEqual({ kind: "waiting", label: "Needs you" });

@@ -14,7 +14,7 @@ const pullWords = { open: "PR open", merged: "PR merged", closed: "PR closed" } 
  */
 export function statusLine(thread: ThreadSummary, project: string | undefined, now = Date.now()): string {
   const mark = threadMark(thread);
-  const doing = mark && (mark.kind === "running" || mark.kind === "waiting" || mark.kind === "failed") ? mark.label : null;
+  const doing = mark && (mark.kind === "running" || mark.kind === "waiting" || mark.kind === "waiting-other" || mark.kind === "failed") ? mark.label : null;
   const pull = thread.prUrl ? pullWords[thread.prState ?? "open"] : null;
   const snoozed = thread.snoozedUntil && thread.snoozedUntil > now ? `Snoozed until ${snoozeWakeLabel(thread.snoozedUntil)}` : null;
   const cloud = thread.cloud ? cloudPlaceLabel(thread.cloud) : null;

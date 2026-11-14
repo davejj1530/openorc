@@ -109,6 +109,13 @@ it("names where a cloud thread runs in the header's line", () => {
   expect(statusLine({ ...base, cloud: cloud({ state: "removed" }) }, "Site")).toMatch(/^Site · Sandbox removed/);
 });
 
+it("names the starter when a shared thread waits on an answer", () => {
+  const thread: ThreadSummary = { ...base, activity: "waiting", owner: { brain: "hosted", reach: "live", heardAt: 1, startedBy: { name: "Morgan Reed", image: null } } };
+  expect(statusLine(thread, "Project")).toContain("Waiting on Morgan");
+  expect(statusLine(thread, "Project")).not.toContain("Needs you");
+  expect(statusLine({ ...thread, owner: undefined }, "Project")).toContain("Needs you");
+});
+
 function moveSheet(mode: "current" | "worktree", move: () => Promise<unknown> = async () => base) {
   const files: FileChange[] = Array.from({ length: 8 }, (_, index) => ({ path: `src/file-${index}.tsx`, status: "modified", oldPath: null }));
   const preview = vi.fn(async () => ({ files, blocked: null }));

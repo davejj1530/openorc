@@ -5,10 +5,11 @@ import { cn } from "../lib/cn";
 import { WorkingCube } from "./OpenOrcMark";
 import { AskMark, BackgroundMark, FailedMark, UnreadMark } from "./StateMarks";
 
-type StatusFields = Pick<ThreadSummary, "activity" | "session" | "unread" | "doneAt" | "backgroundCommands">;
+type StatusFields = Pick<ThreadSummary, "activity" | "session" | "unread" | "doneAt" | "backgroundCommands" | "owner">;
 
 const indicators: Record<ThreadStatus["kind"], ReactNode> = {
   waiting: <AskMark className="text-attention" />,
+  "waiting-other": <AskMark className="text-ink-3" />,
   running: <WorkingCube />,
   failed: <FailedMark className="text-bad" />,
   unread: <UnreadMark />,

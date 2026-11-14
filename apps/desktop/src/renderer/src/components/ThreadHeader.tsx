@@ -1,5 +1,5 @@
 import { Menu } from "@base-ui/react/menu";
-import { snoozeWakeLabel } from "@openorc/client";
+import { snoozeWakeLabel, threadActivity } from "@openorc/client";
 import type { CloudThreadState, ThreadSummary as Thread } from "@openorc/protocol";
 import { isSubagentThread } from "@openorc/protocol";
 import { useCallback, useRef } from "react";
@@ -170,13 +170,14 @@ function ThreadCloud({ cloud }: { cloud: CloudThreadState }) {
 /** Where a cloud thread runs, activity, the pull request and snooze, as faint words with small marks. */
 function ThreadFacts({ thread: t }: { thread: Thread }) {
   const snoozed = t.snoozedUntil && t.snoozedUntil > Date.now();
+  const activity = threadActivity(t);
   return (
     <>
       {t.cloud ? <ThreadCloud cloud={t.cloud} /> : null}
-      {!t.teamInstanceId && t.activity !== "idle" ? (
+      {!t.teamInstanceId && activity ? (
         <span className="thread-header-fact">
-          <StatusDot tone={t.activity === "waiting" ? "attention" : "live"} />
-          {t.activity === "waiting" ? "Needs you" : "Working"}
+          <StatusDot tone={activity.tone} />
+          {activity.text}
         </span>
       ) : null}
       {t.prUrl ? (

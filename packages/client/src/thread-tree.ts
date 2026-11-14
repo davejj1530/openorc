@@ -1,5 +1,5 @@
 import { isSubagentThread, THREAD_CHILD_PAGE, type ThreadSummary } from "@openorc/protocol";
-import type { ThreadStatus } from "./thread-row.js";
+import { threadWaitsOnYou, type ThreadStatus } from "./thread-row.js";
 
 /** Started threads own their archive, pin and snooze settings; native children inherit them. */
 export function visibleThreadForest(all: readonly ThreadSummary[], archived: boolean, now: number, hidden?: ReadonlySet<string>): ThreadSummary[] {
@@ -105,7 +105,7 @@ export function subthreadStatuses(all: readonly ThreadSummary[]): Map<string, Th
   const byId = new Map(all.map((thread) => [thread.id, thread]));
   const counts = new Map<string, { waiting: number; running: number }>();
   for (const thread of all) {
-    if (thread.activity === "idle") continue;
+    if (thread.activity === "idle" || (thread.activity === "waiting" && !threadWaitsOnYou(thread))) continue;
     const seen = new Set([thread.id]);
     for (let parent = byId.get(thread.parentThreadId ?? ""); parent && !seen.has(parent.id); parent = byId.get(parent.parentThreadId ?? "")) {
       seen.add(parent.id);

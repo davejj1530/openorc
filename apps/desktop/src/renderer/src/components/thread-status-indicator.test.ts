@@ -4,7 +4,7 @@ import type { ThreadSummary } from "@openorc/protocol";
 import { describe, expect, it } from "vitest";
 import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
 
-type StatusFields = Pick<ThreadSummary, "activity" | "session" | "unread" | "doneAt" | "backgroundCommands">;
+type StatusFields = Pick<ThreadSummary, "activity" | "session" | "unread" | "doneAt" | "backgroundCommands" | "owner">;
 const idle: StatusFields = {
   activity: "idle",
   session: { status: "idle", message: null },
@@ -14,6 +14,14 @@ const idle: StatusFields = {
 const render = (changes: Partial<StatusFields> = {}) => renderToStaticMarkup(createElement(ThreadStatusIndicator, { thread: { ...idle, ...changes } }));
 
 describe("sidebar thread status", () => {
+  it("keeps the question mark in quiet ink when it waits on a teammate", () => {
+    const html = render({ activity: "waiting", owner: { brain: "hosted", reach: "live", heardAt: 1, startedBy: { name: "Morgan Reed", image: null } } });
+    expect(html).toContain('aria-label="Waiting on Morgan"');
+    expect(html).toContain('data-mark="ask"');
+    expect(html).toContain("text-ink-3");
+    expect(html).not.toContain("text-attention");
+  });
+
   it.each([
     ["waiting", "Needs you", 'data-mark="ask"'],
     ["running", "Working", 'class="working-cube"'],

@@ -1,6 +1,8 @@
 import type { ThreadSummary } from "@openorc/protocol";
 import { describe, expect, it } from "vitest";
-import { sidebarGroupsGrow } from "./sidebar-days.js";
+import { sidebarGroupsGrow, threadNeedsYou } from "./sidebar-days.js";
+import { projectMeta } from "./sidebar-thread-groups.js";
+import { callsThePerson, rootStatuses } from "./sidebar-list.js";
 import { cloudProjects, inShownWorkspaces, liveGroupedFold, liveHiddenWorkspaces, projectGroups, threadFilterLabel, toggleWorkspace, waitingRoots, WORKSPACES_FOLD } from "./sidebar-groups.js";
 
 function thread(id: string, projectId: string, values: Partial<ThreadSummary> = {}): ThreadSummary {
@@ -26,6 +28,23 @@ const projects = [
 ];
 
 describe("sidebar project groups", () => {
+  it("leaves teammate asks out of group counts, edge lines and folded-day attention, including asks below a root", () => {
+    const owner = { brain: "hosted", reach: "live", heardAt: 1, startedBy: { name: "Morgan Reed", image: null } } as const;
+    const shared = thread("shared", "project", { activity: "waiting", unread: true, owner });
+    const parent = thread("parent", "project");
+    const child = thread("child", "project", { activity: "waiting", parentThreadId: parent.id, owner });
+    const all = [shared, parent, child];
+    expect(waitingRoots([shared, parent], all)).toBe(0);
+    expect(projectGroups([{ id: "project", name: "Project" }], [shared, parent], all)[0]?.waiting).toBe(0);
+    expect(projectMeta(all, { loaded: true })).toEqual({ text: "3 threads", tone: "faint" });
+    expect([...rootStatuses([shared, parent], all).values()].some(callsThePerson)).toBe(false);
+    expect(threadNeedsYou(shared)).toBe(false);
+    const own = { ...shared, owner: { ...owner, reach: "offline", startedBy: undefined } } satisfies ThreadSummary;
+    expect(waitingRoots([own], [own])).toBe(1);
+    expect(projectMeta([own], { loaded: true })).toEqual({ text: "Needs you", tone: "attention" });
+    expect(threadNeedsYou(own)).toBe(true);
+  });
+
   it("groups roots under their projects in the projects' order, keeps empty projects, and drops unknown ones", () => {
     const roots = [thread("a", "site"), thread("b", "openorc"), thread("c", "gone"), thread("d", "site")];
     const groups = projectGroups(projects, roots, roots);

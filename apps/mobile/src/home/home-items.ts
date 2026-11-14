@@ -1,4 +1,15 @@
-import { SIDEBAR_LIST, sidebarDayKey, sidebarDayOpen, sidebarFoldKey, sidebarSectionOpen, threadTreeRows, visibleThreadForest, type SidebarDayList, type ThreadTreeRow } from "@openorc/client";
+import {
+  SIDEBAR_LIST,
+  sidebarDayKey,
+  sidebarDayOpen,
+  sidebarFoldKey,
+  sidebarSectionOpen,
+  threadTreeRows,
+  threadWaitsOnYou,
+  visibleThreadForest,
+  type SidebarDayList,
+  type ThreadTreeRow,
+} from "@openorc/client";
 import type { ThreadOwner, ThreadSummary } from "@openorc/protocol";
 
 /**
@@ -71,7 +82,6 @@ export interface Waiting {
 }
 
 const newestFirst = (a: ThreadSummary, b: ThreadSummary) => b.lastActivityAt - a.lastActivityAt;
-const isWaiting = (thread: ThreadSummary) => thread.activity === "waiting";
 
 /** The shown host's rows marked as another host's: as out of reach while it cannot be reached. */
 export function owned(items: HomeItem[], owner: ThreadOwner): HomeItem[] {
@@ -85,7 +95,7 @@ export function owned(items: HomeItem[], owner: ThreadOwner): HomeItem[] {
 export function homeWaiting(list: HomeList, options: HomeOptions): Waiting[] {
   const all = visibleThreadForest([...new Map([...options.waiting, ...list.read].map((thread) => [thread.id, thread])).values()], false, options.now);
   return all
-    .filter((thread) => isWaiting(thread) && !thread.archivedAt && !thread.teamInstanceId)
+    .filter((thread) => threadWaitsOnYou(thread) && !thread.archivedAt && !thread.teamInstanceId)
     .sort(newestFirst)
     .map((thread) => ({ thread, project: list.names.get(thread.projectId) ?? null }));
 }

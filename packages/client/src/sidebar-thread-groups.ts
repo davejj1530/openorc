@@ -1,4 +1,5 @@
 import type { ThreadSummary } from "@openorc/protocol";
+import { threadWaitsOnYou } from "./thread-row.js";
 import { threadChildren, threadTreeActivity, threadTreeRoot, threadTreeRows, visibleThreadForest } from "./thread-tree.js";
 
 /** Which threads the sidebar lists: every active thread, or the archive. */
@@ -124,11 +125,11 @@ export type ProjectMeta = { text: string; tone: "attention" | "faint" };
  * running, then how many threads it lists. `more` marks a list with further pages. Nothing while it loads.
  */
 export function projectMeta(
-  threads: readonly (Pick<ThreadSummary, "activity"> & Partial<Pick<ThreadSummary, "parentRelation">>)[],
+  threads: readonly (Pick<ThreadSummary, "activity" | "owner"> & Partial<Pick<ThreadSummary, "parentRelation">>)[],
   { loaded, more = false }: { loaded: boolean; more?: boolean },
 ): ProjectMeta | null {
   threads = threads.filter((thread) => thread.parentRelation !== "subagent");
-  if (threads.some((thread) => thread.activity === "waiting")) return { text: "Needs you", tone: "attention" };
+  if (threads.some(threadWaitsOnYou)) return { text: "Needs you", tone: "attention" };
   const running = threads.filter((thread) => thread.activity === "running").length;
   if (running) return { text: `${running} running`, tone: "faint" };
   if (!loaded) return null;

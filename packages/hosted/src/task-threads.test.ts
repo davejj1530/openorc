@@ -30,6 +30,15 @@ async function client(email = ADMIN, overrides: Partial<HostedDeps> = {}, execut
 const seed = () => stand.tasks.seed(spaceId, ADMIN, projectId, { title: "Keep the task document", spec: "Preserve the writer's words." });
 const input = (task: ReturnType<typeof seed>) => ({ spaceId, id: task.id, ifRevision: task.revision, requestId: randomUUID() });
 
+it("knows a newly prepared thread in the hosted router before returning its destination", async () => {
+  const current = await taskClient(stand, ADMIN, { organization: true, execution: true, personal: false });
+  close.push(current.close);
+  const result = await current.tasks.openThread(input(seed()));
+  if (result.state !== "ready") throw new Error("Preparation conflicted");
+  expect(current.hosted.threads.holds({ thread: result.threadId })).toBe(true);
+  expect(await current.hosted.threads.call("threads.get", { id: result.threadId })).toMatchObject({ id: result.threadId, owner: { brain: "hosted" } });
+});
+
 it("opens one shared thread for two people without preparing or starting a paid turn", async () => {
   const a = await client(),
     b = await client(MEMBER),

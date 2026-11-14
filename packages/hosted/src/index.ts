@@ -222,7 +222,7 @@ export function createHosted(deps: HostedDeps): Hosted {
     storage: { load: () => deps.kept.load("organizationBilling"), save: (value) => deps.kept.save("organizationBilling", value) },
   });
   const chat = new TeamChat({ session, spaces, push: deps.push });
-  const tasks = new OnlineTasks({ session, spaces, push: deps.push });
+  const tasks = new OnlineTasks({ session, spaces, push: deps.push, prepared: () => threads.refresh() });
   const files = new Files({ session, spaces, fetch: deps.fetch, push: deps.push });
   // The account says which of this Mac's projects are on OpenOrc Cloud, from the projects the thread rows were read with.
   const cloud = {

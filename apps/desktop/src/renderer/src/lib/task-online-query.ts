@@ -1,6 +1,6 @@
 import { onlineTaskTags } from "@openorc/client";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import type { OnlineTaskParams, OnlineTaskRef, OnlineTaskRpcResults, RpcParams, RpcResults } from "@openorc/protocol";
+import type { OnlineTaskExecutionRpcResults, OnlineTaskRef, OnlineTaskRpcResults, RpcParams, RpcResults } from "@openorc/protocol";
 import { core } from "./rpc";
 import { invalidateTags } from "./client";
 import { useSpaceNavigation } from "./space-navigation";
@@ -9,10 +9,10 @@ import { useTaskContentGate } from "./task-content-gate";
 import { readTaskContent } from "./task-access-cache";
 import { taskRefreshInterval } from "./task-refresh";
 
-type Method = keyof OnlineTaskRpcResults;
+type Method = keyof OnlineTaskRpcResults | keyof OnlineTaskExecutionRpcResults;
 export type TaskOnlineScope = Pick<OnlineTaskRef, "accountId" | "spaceId">;
 export const taskOnlineTags = onlineTaskTags;
-export function useTaskOnlineQuery<M extends Method>(scope: TaskOnlineScope | null, method: M, params: RpcParams<M>, enabled = true) {
+export function useTaskOnlineQuery<M extends keyof OnlineTaskRpcResults>(scope: TaskOnlineScope | null, method: M, params: RpcParams<M>, enabled = true) {
   return useQuery<RpcResults[M]>({
     queryKey: ["online-tasks", scope?.accountId, scope?.spaceId, method, params],
     queryFn: () => readTaskContent(organizationContentGate, scope, () => core.call(method, params)),
@@ -27,7 +27,7 @@ export function useTaskOnlineMutation<M extends Method>(scope: TaskOnlineScope, 
   return useMutation<RpcResults[M], Error, RpcParams<M>>({
     mutationKey: ["online-tasks", scope.accountId, scope.spaceId, method],
     mutationFn: (input) => readTaskContent(organizationContentGate, scope, () => core.call(method, input)),
-    onSuccess: (_result, input: OnlineTaskParams<M>) => invalidateTags(taskOnlineTags(input.spaceId), { immediate: true }),
+    onSuccess: (_result, input) => invalidateTags(taskOnlineTags(input.spaceId), { immediate: true }),
   });
 }
 /** No online request is added to the unchanged, unscoped Personal screen. */

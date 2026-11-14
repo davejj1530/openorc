@@ -27,14 +27,14 @@ export function protectTaskCache(gate: OrganizationAccessStore, client: QueryCli
   });
 }
 
-const prefixes = ["openorc.draft.task.online:", "openorc.draft.task-revision.online:", "openorc.draft.newtask.online."];
+const prefixes = ["openorc.draft.task.online:", "openorc.draft.task-revision.online:", "openorc.draft.newtask.online.", "openorc.draft.conversation.online:"];
 function removeTaskDrafts(storage: Storage, spaces: readonly string[], all: boolean): void {
   for (let index = storage.length - 1; index >= 0; --index) {
     const key = storage.key(index);
     const prefix = key && prefixes.find((value) => key.startsWith(value));
     if (!key || !prefix) continue;
     try {
-      const scope: unknown = JSON.parse(key.slice(prefix.length));
+      const scope: unknown = JSON.parse(key.slice(prefix.length).replace(/\.attachments$/, ""));
       if (all || (Array.isArray(scope) && typeof scope[1] === "string" && spaces.includes(scope[1]))) storage.removeItem(key);
     } catch {
       /* Unreadable recovery data is never used as a server document. */

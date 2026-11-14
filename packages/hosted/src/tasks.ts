@@ -18,6 +18,7 @@ interface Dependencies extends Pick<HostedDeps, "push"> {
   session: Session;
   spaces: Pick<HostedSpaces, "status">;
   delivery?: Readonly<TaskDelivery>;
+  prepared?(threadId: string): Promise<void>;
 }
 interface Identity {
   userId: string;
@@ -85,7 +86,10 @@ export class OnlineTasks {
   }
   async openThread({ spaceId, id, ...input }: OnlineTaskExecutionParams) {
     if (!this.#delivery.execution) throw new Refused("Opening this task's thread isn't available yet.");
+    const identity = this.#identity(spaceId);
     const result = await prepareTaskThread(this.#request(spaceId, taskThreadRoute(id), input));
+    if (result.state === "ready") await this.deps.prepared?.(result.threadId);
+    this.#assert(spaceId, identity);
     this.#invalidate(spaceId);
     return result;
   }

@@ -8,6 +8,7 @@ const active: OrganizationAccess = { state: "active", reason: null, until: null,
 const frozen: OrganizationAccess = { state: "frozen", reason: "seat_removed", until: null, message: "Your day of grace has ended." };
 const scope = { accountId: "account-a", spaceId: "team-a" };
 const draftKey = (space: string) => `openorc.draft.task.online:${JSON.stringify(["account-a", space, "project-a", "task-a"])}`;
+const conversationKey = (space: string) => `openorc.draft.conversation.online:${JSON.stringify(["account-a", space, "thread-a", "https://example.com"])}`;
 const stops: (() => void)[] = [];
 afterEach(() => {
   stops
@@ -15,6 +16,20 @@ afterEach(() => {
     .reverse()
     .forEach((stop) => stop());
   localStorage.clear();
+});
+it("retains a prepared conversation on freeze and removes its words and file references on departure", async () => {
+  const f = await fixture();
+  const key = conversationKey("team-a");
+  localStorage.setItem(key, "Own draft words");
+  localStorage.setItem(`${key}.attachments`, "Own file references");
+  await f.change(frozen);
+  expect(localStorage.getItem(key)).toBe("Own draft words");
+  await f.change(
+    active,
+    f.gate.getSnapshot().spaces.filter((space) => space.id !== "team-a"),
+  );
+  expect(localStorage.getItem(key)).toBeNull();
+  expect(localStorage.getItem(`${key}.attachments`)).toBeNull();
 });
 async function fixture() {
   let status: Extract<SpacesStatus, { state: "ready" }> = {

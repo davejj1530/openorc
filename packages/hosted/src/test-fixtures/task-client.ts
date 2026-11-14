@@ -11,7 +11,15 @@ export async function taskClient(stand: StandIn, email: string, delivery: TaskDe
   const { deps, browser, seen } = hostDeps(stand, device, overrides);
   const hosted = createHosted(deps);
   const session = new Session(deps);
-  const tasks = new OnlineTasks({ session, spaces: hosted.spaces, push: deps.push, delivery });
+  const tasks = new OnlineTasks({
+    session,
+    spaces: hosted.spaces,
+    push: deps.push,
+    delivery,
+    prepared: async (threadId) => {
+      await vi.waitFor(() => expect(hosted.threads.holds({ thread: threadId })).toBe(true));
+    },
+  });
   const close = () => {
     tasks.close();
     session.close();

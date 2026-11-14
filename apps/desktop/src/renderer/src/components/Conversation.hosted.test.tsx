@@ -208,6 +208,15 @@ it("keeps a teammate's composer honest even when the reader lacks cloud hours", 
   expect(vi.mocked(core.call).mock.calls.map(([method]) => method)).not.toContain("threads.ready");
 });
 
+it.each([
+  { owner: undefined, label: "Needs you" },
+  { owner: { brain: "hosted", reach: "live", heardAt: 1 }, label: "Needs you" },
+  { owner: { brain: "hosted", reach: "live", heardAt: 1, startedBy: { name: "Morgan Reed", image: null } }, label: "Waiting on Morgan" },
+] satisfies { owner: ThreadSummary["owner"]; label: string }[])("gives the ask dock the header's waiting words: $label", async ({ owner, label }) => {
+  await open({ activity: "waiting", owner });
+  expect(composer.props!.asksLabel).toBe(label);
+});
+
 it.each(["hosted", "cloud"] as const)("blocks sending to a %s thread out of reach even if the account is online", async (brain) => {
   await open({ owner: { brain, reach: "offline", heardAt: 1 } });
   expect(composer.props!.disabledReason).toMatch(/can't be reached/);

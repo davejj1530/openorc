@@ -8,6 +8,7 @@ import {
   heardTranscript,
   asksBlocked,
   waitingAsks,
+  threadActivity,
   conversationSendDisabledReason,
   conversationSteerReason,
   messageBody,
@@ -330,6 +331,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
               {...connectorMentions}
               {...cloud.limits}
               asks={waitingAsks(heard)}
+              asksLabel={threadActivity({ activity: "waiting", owner: thread?.owner })?.text}
               asksBlocked={answersBlocked}
               error={cloud.shown((submitter.error ?? controls.error ?? compact.error ?? fork.error ?? settings.error ?? draftError)?.message ?? permissionError)}
             >

@@ -92,7 +92,19 @@ function useDockMotion(ask: WaitingAsk | undefined) {
  * its own, so no Tab can land on a choice, even one pressed as the ask arrives. Once it is answered the keyboard goes
  * back to the field, so the next key cannot land on the ask that takes its place.
  */
-export function ComposerAsk({ asks, blocked, fieldHasWords, focusField }: { asks: WaitingAsk[]; blocked: string | null; fieldHasWords: boolean; focusField: () => void }) {
+export function ComposerAsk({
+  asks,
+  label = "Waiting on you",
+  blocked,
+  fieldHasWords,
+  focusField,
+}: {
+  asks: WaitingAsk[];
+  label?: string | undefined;
+  blocked: string | null;
+  fieldHasWords: boolean;
+  focusField: () => void;
+}) {
   const root = useRef<HTMLDivElement>(null);
   const motion = useDockMotion(asks[0]);
   const ask = motion.shown;
@@ -125,7 +137,7 @@ export function ComposerAsk({ asks, blocked, fieldHasWords, focusField }: { asks
         <div
           ref={root}
           role="group"
-          aria-label="Waiting on you"
+          aria-label={label}
           className="composer-ask"
           data-ask={ask.block.approvalKind === "user_input" ? "question" : "approval"}
           data-landing={landing || undefined}

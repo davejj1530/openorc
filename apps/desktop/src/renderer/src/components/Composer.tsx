@@ -171,6 +171,8 @@ export interface ComposerProps {
   error?: string | null;
   /** What the agent waits on the person for, docked at the top of the composer; the first shows. */
   asks?: WaitingAsk[];
+  /** The dock's name for screen readers. */
+  asksLabel?: string | undefined;
   /** Why the asks can't be answered now, as when the thread's place can't be reached. */
   asksBlocked?: string | null;
   children?: ReactNode;
@@ -303,7 +305,7 @@ export function Composer(props: ComposerProps) {
       <div className="mb-2 grid grid-cols-1 gap-2 empty:hidden">{props.notices}</div>
       <ComposerAlerts message={interrupt.error ? `Couldn’t stop the agent. ${interrupt.error.message}` : files.error || submission?.error || props.error} changes={props.changes} />
       <div ref={shell} className="composer-shell" data-dragging={drop.dragging || undefined} {...drop.handlers}>
-        <ComposerAsk asks={asks} blocked={props.asksBlocked ?? null} fieldHasWords={Boolean(props.value.trim())} focusField={focusField} />
+        <ComposerAsk asks={asks} label={props.asksLabel} blocked={props.asksBlocked ?? null} fieldHasWords={Boolean(props.value.trim())} focusField={focusField} />
         {attachments.length > 0 || uploading > 0 ? (
           <div className="composer-attachments">
             {attachments.map((attachment) => (

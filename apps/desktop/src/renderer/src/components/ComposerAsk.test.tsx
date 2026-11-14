@@ -74,7 +74,7 @@ const waiting = (name: AskName, id: string = name): WaitingAsk => ({
 });
 
 /** A conversation's composer mid-turn, its asks arriving as the agent sends them, with what reached the agent. */
-function mount({ draft = "", blocked = null, parked = false }: { draft?: string; blocked?: string | null; parked?: boolean } = {}) {
+function mount({ draft = "", blocked = null, parked = false, label }: { draft?: string; blocked?: string | null; parked?: boolean; label?: string } = {}) {
   const onSubmit = vi.fn(async (_text: string, _files: string[], _now: boolean) => {});
   const outside: { setAsks: (update: (asks: WaitingAsk[]) => WaitingAsk[]) => void } = { setAsks: () => {} };
   function Host() {
@@ -102,6 +102,7 @@ function mount({ draft = "", blocked = null, parked = false }: { draft?: string;
           steerable={!parked}
           mentions={[{ key: "rini", name: "Rini", hint: "Opus 5.5" }]}
           asks={asks}
+          asksLabel={label}
           asksBlocked={blocked}
         />
       </>
@@ -132,6 +133,13 @@ function mount({ draft = "", blocked = null, parked = false }: { draft?: string;
 }
 
 const EVERY: AskName[] = ["export", "runner", "checks", "three", "build", "deploy", "slack"];
+
+it("names the dock for the person whose answer is needed", () => {
+  const c = mount({ label: "Waiting on Morgan" });
+  c.arrive("export");
+  expect(screen.getByRole("group", { name: "Waiting on Morgan" })).toBe(c.dock());
+  expect(screen.queryByRole("group", { name: "Waiting on you" })).toBeNull();
+});
 
 describe.each(EVERY)("a docked %s ask, played by keys nobody meant for it", (name) => {
   it("answers nothing when Enter is pressed five times in the empty field, the first two as it arrives", () => {

@@ -49,7 +49,7 @@ export function SidebarProjectGroup({
   const actions = useProjectDialogs(project, label);
   return (
     <section className="sidebar-section sidebar-project" data-open={open || undefined} aria-label={project.name}>
-      <div className="sidebar-project-head">
+      <div className="sidebar-project-head" data-project-label={project.id}>
         <ProjectActions project={project} actions={actions}>
           <ContextMenu.Trigger
             render={<button ref={label} type="button" />}

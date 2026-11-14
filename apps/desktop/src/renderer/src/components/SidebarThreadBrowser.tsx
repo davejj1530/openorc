@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Menu } from "@base-ui/react/menu";
 import { useQueryClient } from "@tanstack/react-query";
 import { isSubagentThread, WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
@@ -6,13 +6,19 @@ import { CoversPreview } from "../lib/browser-preview";
 import { ALL_WORKSPACES, focusedProject, useLayout } from "../lib/layout";
 import {
   type GroupProject,
+  type ListMembers,
   type SidebarDayList,
   type SidebarFilter,
   cachedListPage,
-  GROUP_PAGE,
-  GROUP_STEP,
-  groupPage,
+  callsThePerson,
+  inListOrder,
+  listMembers,
+  moreRows,
   NEEDS_YOU_PAGE,
+  pinOrder,
+  projectRows,
+  rootStatuses,
+  subthreadStatuses,
   projectGroups,
   cloudProjects,
   sidebarDayList,
@@ -37,6 +43,7 @@ import { useRouter } from "../lib/router";
 import { useUi } from "../lib/ui";
 import { Check, ChevronRight, FolderPlus, Funnel, Pin, Search } from "./icons";
 import { ResolvedDrawer, useResolveThread, useThreadDrop } from "./SidebarResolved";
+import { ListEdgeLines, useListEdges, type EdgeCall } from "./SidebarListEdge";
 import { SidebarListHead } from "./SidebarListHead";
 import { SidebarProjectGroup } from "./SidebarProjectGroup";
 import type { RowProject } from "./ThreadLibraryRow";
@@ -44,6 +51,7 @@ import { ThreadTreeList } from "./ThreadTreeList";
 import { menuItem, menuPopup, menuSeparator } from "./menu";
 import { IconButton, Tooltip } from "./ui";
 import { floatingGround } from "../lib/use-anchor-ground";
+import { useListHold } from "../lib/use-list-hold";
 import { useScrollEdges } from "../lib/use-scroll-edges";
 import { cn } from "../lib/cn";
 
@@ -189,21 +197,39 @@ function groupProjects(projects: readonly { id: string; name: string; rootPath: 
 }
 
 /**
- * Each project's group as the list shows it: open or folded by the reader, and paged. Every project has one, an empty
- * one too, but the Workspace only while it holds threads.
+ * Each project's group as the list shows it: open or folded by the reader, its rows kept through the day in the order
+ * they started. Every project has one, an empty one too, but the Workspace only while it holds threads. While the list
+ * is `held`, rows that would arrive wait; what the person reaches for lands at once.
  */
-function useGroupPages(list: SidebarDayList, projects: readonly GroupProject[], collapsed: readonly string[]) {
-  const [shown, setShown] = useState<Readonly<Record<string, number>>>({});
+function useGroupPages(list: SidebarDayList, projects: readonly GroupProject[], collapsed: readonly string[], { ready, held, now }: { ready: boolean; held: boolean; now: number }) {
+  const [more, setMore] = useState<readonly string[]>([]);
+  const remembered = useRef<ListMembers | null>(null);
   const holding = new Set(list.shown(list.rest, false).map((root) => root.id));
   const holdsActive = (root: ThreadSummary) => holding.has(root.id);
-  return projectGroups(projects, list.rest, list.all)
-    .filter((group) => group.project.id !== WORKSPACE_ID || group.roots.length)
-    .map((group) => {
-      const id = group.project.id;
-      const open = sidebarSectionOpen(collapsed, "project", id);
-      const limit = shown[id] ?? GROUP_PAGE;
-      return { ...group, open, ...groupPage(group.roots, { open, shown: limit, holdsActive }), showMore: () => setShown((old) => ({ ...old, [id]: limit + GROUP_STEP })) };
-    });
+  const groups = projectGroups(projects, list.rest, list.all).filter((group) => group.project.id !== WORKSPACE_ID || group.roots.length);
+  const statuses = rootStatuses(list.rest, list.all);
+  const members = listMembers(ready ? remembered.current : null, { groups, quiet: (root) => !statuses.get(root.id), now, held, own: [...more, ...holding] });
+  useEffect(() => {
+    if (ready) remembered.current = members;
+  });
+  return inListOrder(groups, members).map((group) => {
+    const id = group.project.id;
+    const open = sidebarSectionOpen(collapsed, "project", id);
+    return { ...group, open, ...projectRows(group.roots, { members: members.ids, open, holdsActive }), showMore: () => setMore((old) => [...old, ...moreRows(group.roots, members.ids)]) };
+  });
+}
+
+type GroupPage = ReturnType<typeof useGroupPages>[number];
+
+/** What calls the person in the groups, each by its row, or by its project's label while the project is folded. */
+function edgeCalls(groups: readonly GroupPage[], all: readonly ThreadSummary[]): EdgeCall[] {
+  const below = subthreadStatuses(all);
+  return groups.flatMap((group) => {
+    const statuses = rootStatuses(group.roots, all);
+    const calls = (group.open ? group.rows : group.roots).filter((root) => callsThePerson(statuses.get(root.id)));
+    const anchor = (root: ThreadSummary) => (group.open ? `[data-row=${JSON.stringify(root.id)}]` : `[data-project-label=${JSON.stringify(group.project.id)}]`);
+    return calls.map((root) => ({ thread: root, subthreads: below.get(root.id) ?? null, anchor: anchor(root) }));
+  });
 }
 
 /**
@@ -223,32 +249,29 @@ function useListUpkeep({ activeId, pinnedOnly, pending, limit, loadMore }: Threa
 }
 
 /**
- * The threads grouped by project, in the order projects come and newest work first inside each. Pinned threads lead in
- * a group of their own, snoozed ones follow the projects, and Resolved sits at the foot. The whole list folds under its
- * head, which keeps Search and the filter; folded, it counts what waits on the person.
+ * The threads grouped by project, in the order projects come and the newest started first inside each, held still while
+ * the pointer or the keyboard is in the list. Pinned threads lead in a group of their own that never scrolls away,
+ * snoozed ones follow the projects, and Resolved sits at the foot. A line at an edge names what calls the person past
+ * it. The whole list folds under its head, which keeps Search and the filter; folded, it counts what waits on the person.
  */
 function ThreadGroups({ children }: { children: ChildPages }) {
   const state = useThreadList(children);
-  const { projects, activeId, pinnedOnly, pending, loadMore } = state;
+  const { projects, activeId, pinnedOnly, pending } = state;
   const collapsed = useLayout((s) => s.collapsed);
   const now = useSidebarNow();
   const list = dayList(state, now);
   const open = !collapsed.includes(WORKSPACES_FOLD);
+  const hold = useListHold();
   const shownProjects = groupProjects(projects.data, list.all);
-  const allGroups = useGroupPages(list, shownProjects, collapsed);
+  const ready = !pending && !sidebarGroupsGrow({ end: list.end, hasMore: list.hasMore, limit: state.limit });
+  const allGroups = useGroupPages(list, shownProjects, collapsed, { ready, held: hold.held, now });
   const groups = pinnedOnly ? [] : allGroups;
   const pinsOpen = sidebarSectionOpen(collapsed, "pinned", SIDEBAR_LIST);
-  const pins = list.shown(list.pinned, pinsOpen);
+  const pins = pinOrder(list.shown(list.pinned, pinsOpen));
   const snoozedOpen = sidebarSectionOpen(collapsed, "snoozed", SIDEBAR_LIST);
   const snoozed = list.shown(list.snoozed, snoozedOpen);
   const resolvedOpen = !pinnedOnly && sidebarSectionOpen(collapsed, "resolved", SIDEBAR_LIST);
-  const resolvedIds = new Set(list.resolved.roots.map((root) => root.id));
   const resolvedShown = list.shown(list.resolved.roots, resolvedOpen);
-  const resolve = useResolveThread();
-  const reopen = useThreadDrop(
-    (id) => resolvedIds.has(id),
-    (id) => resolve(id, false),
-  );
   const named = new Map<string, RowProject>(shownProjects.map((project) => [project.id, { name: project.name }]));
   const shownRoots = [...pins, ...groups.flatMap((group) => group.rows), ...snoozed, ...resolvedShown];
   useListUpkeep(state, list, open ? shownRoots : [], children);
@@ -256,20 +279,21 @@ function ThreadGroups({ children }: { children: ChildPages }) {
     <ThreadTreeList childLimits={children.limits} onShowMore={children.showMore} roots={roots} all={list.all} activeId={activeId} projects={mixed ? named : undefined} />
   );
   const toggle = (fold: string) => () => useLayout.getState().toggleCollapsed(fold);
-  const edges = useScrollEdges();
   const waiting = waitingRoots(list.pinned, list.all) + groups.reduce((sum, group) => sum + group.waiting, 0);
+  const pinned = list.pinned.length ? (
+    <Section label="Pinned" count={list.pinned.length} open={pinsOpen} onToggle={toggle(sidebarFoldKey.pinned(SIDEBAR_LIST))}>
+      {rows(pins, true)}
+      <PinsMore state={state} list={list} open={pinsOpen} />
+    </Section>
+  ) : null;
   return (
-    <section className="sidebar-workspaces" data-open={open || undefined} aria-label="Workspaces">
+    <section className="sidebar-workspaces" data-open={open || undefined} aria-label="Workspaces" {...hold.props}>
       <SidebarListHead label="Workspaces" fold={{ open, waiting, onToggle: toggle(WORKSPACES_FOLD) }} tools={<ListTools empty={projects.data?.length === 0} />} />
       <div className="conversation-browser" hidden={!open}>
-        <div {...edges} className="browser-threads scroll-edges" data-drop={reopen.over || undefined} {...reopen.props}>
+        {pinnedOnly ? null : <div className="sidebar-pinned">{pinned}</div>}
+        <GroupsView calls={edgeCalls(groups, list.all)} list={list}>
           <ProjectsFailed projects={projects} />
-          {list.pinned.length ? (
-            <Section label="Pinned" count={list.pinned.length} open={pinsOpen} onToggle={toggle(sidebarFoldKey.pinned(SIDEBAR_LIST))}>
-              {rows(pins, true)}
-              {pinsOpen && pinnedOnly && list.hasMore ? <LoadMore pending={pending} onClick={loadMore} /> : null}
-            </Section>
-          ) : null}
+          {pinnedOnly ? pinned : null}
           {groups.map((group) => (
             <SidebarProjectGroup
               key={group.project.id}
@@ -289,7 +313,7 @@ function ThreadGroups({ children }: { children: ChildPages }) {
               {rows(snoozed, true)}
             </Section>
           ) : null}
-        </div>
+        </GroupsView>
         {pinnedOnly ? null : (
           <ResolvedDrawer open={resolvedOpen} holding={resolvedShown.length > 0} onToggle={toggle(sidebarFoldKey.resolved(SIDEBAR_LIST))} accepts={resolvable(list, now)}>
             {rows(resolvedShown, true)}
@@ -299,6 +323,53 @@ function ThreadGroups({ children }: { children: ChildPages }) {
       </div>
     </section>
   );
+}
+
+/**
+ * The part of the list that scrolls, under the lines at its edges. A thread dragged here from Resolved goes back to the
+ * list.
+ */
+function GroupsView({ calls, list, children }: { calls: EdgeCall[]; list: SidebarDayList; children: ReactNode }) {
+  const resolve = useResolveThread();
+  const reopen = useThreadDrop(
+    (id) => list.resolved.roots.some((root) => root.id === id),
+    (id) => resolve(id, false),
+  );
+  const fades = useScrollEdges();
+  const edges = useListEdges(calls);
+  const [fadesRef, edgesRef] = [fades.ref, edges.ref];
+  const ref = useCallback(
+    (element: HTMLDivElement | null) => {
+      const unfade = fadesRef(element);
+      const unedge = edgesRef(element);
+      return () => {
+        unfade?.();
+        unedge?.();
+      };
+    },
+    [fadesRef, edgesRef],
+  );
+  return (
+    <div className="sidebar-list-view">
+      <div
+        {...fades}
+        ref={ref}
+        className="browser-threads scroll-edges"
+        data-edge-above={edges.edges.above.length ? true : undefined}
+        data-edge-below={edges.edges.below.length ? true : undefined}
+        data-drop={reopen.over || undefined}
+        {...reopen.props}
+      >
+        {children}
+      </div>
+      <ListEdgeLines edges={edges.edges} calls={calls} onBring={edges.bring} />
+    </div>
+  );
+}
+
+/** Under the pinned filter, Pinned is the whole list and reads on a page at a time. */
+function PinsMore({ state, list, open }: { state: ThreadList; list: SidebarDayList; open: boolean }) {
+  return open && state.pinnedOnly && list.hasMore ? <LoadMore pending={state.pending} onClick={state.loadMore} /> : null;
 }
 
 function ProjectsFailed({ projects }: { projects: ThreadList["projects"] }) {

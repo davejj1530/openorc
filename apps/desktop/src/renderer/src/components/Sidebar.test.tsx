@@ -658,7 +658,14 @@ it("reads on by itself until every group is whole, then pages Resolved when aske
   projectThreads();
   const base = fixture.threads[1]!;
   fixture.threads = [
-    ...Array.from({ length: 15 }, (_, index) => ({ ...base, id: `today-${index}`, title: `Today ${index}`, projectId: index % 2 ? "one" : "two", lastActivityAt: Date.now() - (index + 1) * 1000 })),
+    ...Array.from({ length: 15 }, (_, index) => ({
+      ...base,
+      id: `today-${index}`,
+      title: `Today ${index}`,
+      projectId: index % 2 ? "one" : "two",
+      createdAt: Date.now() - (index + 1) * 1000,
+      lastActivityAt: Date.now() - (index + 1) * 1000,
+    })),
     ...Array.from({ length: 30 }, (_, index) => ({ ...base, id: `old-${index}`, title: `Old ${index}`, lastActivityAt: ago(30) - index * 1000 })),
   ];
   const shown = (project: number) => Array.from({ length: 15 }, (_, index) => `today-${index}`).filter((_, index) => index % 2 === project);

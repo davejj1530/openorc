@@ -1,7 +1,7 @@
 import type { ThreadSummary } from "@openorc/protocol";
 import { describe, expect, it } from "vitest";
 import { sidebarGroupsGrow } from "./sidebar-days.js";
-import { cloudProjects, groupPage, liveGroupedFold, projectGroups, waitingRoots, WORKSPACES_FOLD } from "./sidebar-groups.js";
+import { cloudProjects, liveGroupedFold, projectGroups, waitingRoots, WORKSPACES_FOLD } from "./sidebar-groups.js";
 
 function thread(id: string, projectId: string, values: Partial<ThreadSummary> = {}): ThreadSummary {
   return {
@@ -51,16 +51,6 @@ describe("sidebar project groups", () => {
     expect(waitingRoots([roots[4]!], [roots[4]!, ...onlyUnreadBelow])).toBe(0);
   });
 
-  it("pages a group, keeps the open thread past the page, and folded lists only the open thread's tree", () => {
-    const roots = Array.from({ length: 7 }, (_, index) => thread(`t${index}`, "openorc"));
-    const holdsActive = (root: ThreadSummary) => root.id === "t6";
-    expect(groupPage(roots, { open: true, shown: 4, holdsActive: () => false })).toMatchObject({ hidden: 3 });
-    const kept = groupPage(roots, { open: true, shown: 4, holdsActive });
-    expect(kept.rows.map((row) => row.id)).toEqual(["t0", "t1", "t2", "t3", "t6"]);
-    expect(kept.hidden).toBe(2);
-    expect(groupPage(roots, { open: false, shown: 4, holdsActive }).rows.map((row) => row.id)).toEqual(["t6"]);
-  });
-
   it("reads on until the loaded threads reach Resolved, then waits to be asked", () => {
     expect(sidebarGroupsGrow({ end: "yesterday", hasMore: true, limit: 12 })).toBe(true);
     expect(sidebarGroupsGrow({ end: null, hasMore: true, limit: 12 })).toBe(true);
@@ -80,12 +70,12 @@ describe("sidebar project groups", () => {
 });
 
 describe("cloudProjects", () => {
-  it("names each project only OpenOrc Cloud has once, in the order its rows come", () => {
+  it("names each project only OpenOrc Cloud has once, by name, whatever order its rows come in", () => {
     const row = (id: string, projectId: string, name?: string) =>
       ({ id, projectId, owner: name ? { brain: "hosted", reach: "live", heardAt: 0, project: { name } } : undefined }) as unknown as ThreadSummary;
     expect(cloudProjects([row("a", "openorc-cloud:web", "website"), row("b", "mac"), row("c", "openorc-cloud:web", "website"), row("d", "openorc-cloud:api", "api")])).toEqual([
-      { id: "openorc-cloud:web", name: "website", cloud: true },
       { id: "openorc-cloud:api", name: "api", cloud: true },
+      { id: "openorc-cloud:web", name: "website", cloud: true },
     ]);
   });
 });

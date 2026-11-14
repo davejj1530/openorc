@@ -301,7 +301,10 @@ export class Session {
       if (!parsed.success) throw new Unreadable();
       return parsed.data;
     }
-    const refusal = wireRefusal.safeParse(parseJson(text));
+    const body = parseJson(text);
+    const structured = route.refusal?.(response.status, body);
+    if (structured) throw structured;
+    const refusal = wireRefusal.safeParse(body);
     if (refusal.success) throw new Refused(refusal.data.message.slice(0, WORDS_MAX), response.status, refusal.data.code);
     // A gateway's page in front of a server that is down carries no words of the server's.
     if (response.status >= 500) {

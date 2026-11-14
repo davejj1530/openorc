@@ -177,8 +177,9 @@ function NewThreadProject({
   const choice = targetModel(draft.target);
   const target = draft.target;
   // The landing composer has no thread, so no thread action applies to it. The
-  // skills do: they belong to the project, or the Workspace folder, chosen on this screen.
-  const suggestions = useComposerSuggestions(projectScope(projectId, draft.workingDirectory), choice?.agent, executionMode(draft.mode, permission), claudeAccountId);
+  // skills do: they belong to the project, or the Workspace folder, chosen on this screen. A cloud-only project has
+  // no folder here, so this Mac offers none of its own, as a cloud thread's composer does.
+  const suggestions = useComposerSuggestions(projectScope(cloudOnly ? null : projectId, draft.workingDirectory), choice?.agent, executionMode(draft.mode, permission), claudeAccountId);
   const cloud = useNewThreadCloud(target, projectId);
   const hosted = useNewThreadHosted(target, projectId);
   const workspaceMode = cloudOnly

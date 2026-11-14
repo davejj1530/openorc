@@ -53,7 +53,10 @@ vi.mock("../lib/client", async (original) => ({
   usePermissionSelection: () => ({ permission: "review", ready: true, select: vi.fn(), error: null }),
 }));
 vi.mock("../lib/rpc", () => ({ core: { call: async (method: string) => (method === "cloud.signIns" ? signIns : null), onReady: () => () => {}, onPush: () => () => {} } }));
-vi.mock("../lib/skill-commands", () => ({ projectScope: () => null, useSkillCommands: () => ({ commands: [], onCommandsWanted: () => {} }) }));
+vi.mock("../lib/skill-commands", async (original) => ({
+  projectScope: (await original<typeof import("../lib/skill-commands")>()).projectScope,
+  useSkillCommands: (scope: unknown) => (reads.push(["skills.list", { scope }]), { commands: [], onCommandsWanted: () => {} }),
+}));
 vi.mock("../lib/composer-changes", () => ({ useComposerChanges: () => null }));
 vi.mock("../lib/project-git", async (original) => ({
   ...(await original<object>()),
@@ -164,6 +167,25 @@ function saveModelDraft(projectId: string, prompt: string) {
 const placeSays = () => screen.getByRole("button", { name: /^Where the thread works/ }).getAttribute("data-tip");
 
 describe("NewThread", () => {
+  it("asks this Mac for none of a cloud-only project's skills, which it does not hold", () => {
+    projects = [{ ...makeProject("p1"), rootPath: "" }];
+    spaceNavigation.getState().initialize("scoped", "personal", [
+      { id: "personal", personal: true, projects: [], threads: [], taskIds: [] },
+      {
+        id: "birch",
+        personal: false,
+        projects: [{ key: "p1", name: "Canvas", repo: "example/canvas", localProjectId: null, hostedProjectId: "cloud-project", connected: true }],
+        threads: [],
+        taskIds: [],
+      },
+    ]);
+    spaceNavigation.getState().select("birch");
+    reads.length = 0;
+    render(<NewThread projectId="p1" />);
+    const scoped = reads.filter(([method, params]) => method === "skills.list" && JSON.stringify(params).includes('"kind":"project","id":"p1"'));
+    expect(scoped).toEqual([]);
+  });
+
   it("asks for no project's activity while there is no project to start in", () => {
     projects = [];
     reads.length = 0;

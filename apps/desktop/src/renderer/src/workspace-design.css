@@ -23,13 +23,24 @@
   background: var(--bg);
   border-bottom: var(--hairline) solid var(--line);
 }
+/* The cube at a thread's end: the fourth ink and still while the agent rests, full ink while it works. */
 .agent-presence-mark {
-  color: var(--ink-3);
+  color: var(--ink-4);
 }
 .agent-presence-mark[data-state="thinking"] {
   color: var(--content-ink);
 }
-/* While a turn runs, the light moves around the cube: top, right, then left. Reduced motion keeps the top lit. */
+/* The cube on a row, a tab, a palette row or a task: the third ink, and full ink where the person is. */
+.working-cube {
+  flex-shrink: 0;
+  color: var(--ink-3);
+}
+.thread-preview[data-open] .working-cube,
+.work-tab-face[aria-selected="true"] .working-cube {
+  color: var(--ink);
+}
+/* While a turn runs, the light moves around the cube: top, right, then left, each face held 0.6s and crossed in
+   0.2s. Reduced motion keeps the top lit. */
 .openorc-mark-face {
   animation: openorc-mark-face 2400ms ease-in-out infinite;
 }

@@ -1,4 +1,5 @@
-import { useId } from "react";
+import { useId, useLayoutEffect, useRef } from "react";
+import { cn } from "../lib/cn";
 
 const outline =
   "M17.91 2.5L26.74 7.6Q28.64 8.7 28.64 10.9L28.64 21.1Q28.64 23.3 26.74 24.4L17.91 29.5Q16 30.6 14.09 29.5L5.26 24.4Q3.36 23.3 3.36 21.1L3.36 10.9Q3.36 8.7 5.26 7.6L14.09 2.5Q16 1.4 17.91 2.5Z";
@@ -13,12 +14,18 @@ export const openOrcMarkPath = `${outline}${faces.top}`;
 
 /**
  * OpenOrc's mark; the surrounding UI supplies its color. While an agent works the light moves around the cube, one
- * face at a time. The faces are cut through a mask, so the mark still shows whatever it sits on.
+ * face at a time. The faces are cut through a mask, so the mark still shows whatever it sits on. Every working cube in
+ * the window keeps one clock: its faces count from the document's start, not from when the cube appeared.
  */
 export function OpenOrcMark({ size = 30, working = false, className }: { size?: number; working?: boolean; className?: string }) {
   const mask = `openorc-mark-${useId().replace(/[^a-zA-Z0-9-]/g, "")}`;
+  const svg = useRef<SVGSVGElement>(null);
+  useLayoutEffect(() => {
+    if (!working || typeof svg.current?.getAnimations !== "function") return;
+    for (const animation of svg.current.getAnimations({ subtree: true })) animation.startTime = 0;
+  }, [working]);
   return (
-    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" className={className}>
+    <svg ref={svg} width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" className={className}>
       {working ? (
         <>
           <mask id={mask}>
@@ -34,4 +41,9 @@ export function OpenOrcMark({ size = 30, working = false, className }: { size?: 
       )}
     </svg>
   );
+}
+
+/** An agent at work, at 16px: in the third ink, and in full ink where the person is (the open row, the open tab). */
+export function WorkingCube({ className }: { className?: string }) {
+  return <OpenOrcMark size={16} working className={cn("working-cube", className)} />;
 }

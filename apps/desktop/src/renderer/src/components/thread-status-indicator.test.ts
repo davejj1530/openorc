@@ -16,7 +16,7 @@ const render = (changes: Partial<StatusFields> = {}) => renderToStaticMarkup(cre
 describe("sidebar thread status", () => {
   it.each([
     ["waiting", "Needs you", 'data-mark="ask"'],
-    ["running", "Working", 'data-icon="LoaderCircle"'],
+    ["running", "Working", 'class="working-cube"'],
   ] as const)("shows %s ahead of failure, unread and completion", (activity, label, mark) => {
     const html = render({ activity, session: { status: "error", message: "Previous failure" }, unread: true, doneAt: 1 });
     expect(html).toContain(`aria-label="${label}"`);

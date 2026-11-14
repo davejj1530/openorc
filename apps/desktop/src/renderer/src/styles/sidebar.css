@@ -564,12 +564,6 @@ button.sidebar-nav-row:hover {
 .thread-preview-mark:empty {
   display: none;
 }
-.thread-status-spinner {
-  color: var(--ink-4);
-}
-.thread-preview[data-open] .thread-status-spinner {
-  color: var(--ink-3);
-}
 .sidebar-section-toggle {
   display: flex;
   align-items: center;

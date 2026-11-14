@@ -84,8 +84,8 @@ it("finds an Orcling by name, lists its own conversation only under Orclings, an
   const results: Partial<Record<RpcMethod, unknown>> = {
     "orclings.list": [{ id: "rini", name: "Rini", threadId: "rini-home" }],
     "threads.list": [
-      { id: "rini-home", title: "Rini" },
-      { id: "notes", title: "Notes" },
+      { id: "rini-home", title: "Rini", activity: "idle", session: { status: "idle", message: null }, unread: false },
+      { id: "notes", title: "Notes", activity: "idle", session: { status: "idle", message: null }, unread: false },
     ],
   };
   vi.mocked(core.call).mockImplementation((async (method: RpcMethod) => results[method] ?? []) as typeof core.call);

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { ThreadRichText } from "./ThreadImages";
-import { WorkAgent, WorkDelegate, Loader2, AlertCircle, ArrowUpRight, Check, ChevronRight, GitBranch, LoaderCircle, Play } from "./icons";
+import { WorkAgent, WorkDelegate, AlertCircle, ArrowUpRight, Check, ChevronRight, GitBranch, LoaderCircle, Play } from "./icons";
 import { statusLabel } from "./status";
+import { WorkingCube } from "./OpenOrcMark";
 import { Button, TextButton } from "./ui";
 import { cn } from "../lib/cn";
 import { useRpc, useRpcMutation, runs as runStore, useRun } from "../lib/client";
@@ -10,7 +11,7 @@ import { relativeTime, taskActivity, taskCardStatusLabel, taskStepLabel } from "
 
 function taskActivityIcon({ waiting, failed, working, finished, successful }: { waiting: boolean; failed: boolean; working: boolean; finished: boolean; successful: boolean }) {
   if (waiting || failed) return <AlertCircle size={14} className={cn("shrink-0", failed ? "text-bad" : "text-warn")} />;
-  if (working) return <Loader2 size={16} className="tool-row-live" />;
+  if (working) return <WorkingCube />;
   if (finished && successful) return <WorkAgent size={16} className="shrink-0 text-ink-3" />;
   return <WorkDelegate size={16} className="shrink-0 text-ink-3" />;
 }

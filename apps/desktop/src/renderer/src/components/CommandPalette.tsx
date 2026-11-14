@@ -9,6 +9,7 @@ import { useUi } from "../lib/ui";
 import { MessageSquare, Orclings, Search } from "./icons";
 import { ProjectLogo } from "./ProjectIconPicker";
 import { StatusIcon } from "./status";
+import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
 
 function emptySearchMessage(query: string, messageMode: boolean, fetching: boolean): string {
   if (query.trim().length < 2 && messageMode) return "Type two or more characters.";
@@ -137,7 +138,9 @@ function PlaceGroups({ go }: { go: (fn: () => void) => void }) {
       <PlaceGroup
         heading="Threads"
         go={go}
-        places={threads.filter((t) => !homes.has(t.id)).map((t) => ({ key: t.id, value: `thread ${t.title}`, label: t.title, icon: <MessageSquare size={14} />, open: () => openThread(t.id) }))}
+        places={threads
+          .filter((t) => !homes.has(t.id))
+          .map((t) => ({ key: t.id, value: `thread ${t.title}`, label: t.title, icon: <ThreadStatusIndicator thread={t} idle={<MessageSquare size={14} />} />, open: () => openThread(t.id) }))}
       />
       <PlaceGroup
         heading="Orclings"

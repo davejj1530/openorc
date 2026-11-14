@@ -30,7 +30,8 @@ function inkTip(stops: boolean, words: string | null, reason: string | undefined
  * The send cluster at the composer bar's end. The ink button is one button through every state: the bare arrow with
  * nothing running, the one Stop with nothing typed while something runs, and a pill carrying the word of what Enter
  * does mid-turn, so a turn starting or ending swaps it in place. Mid-turn, Stop steps aside as a white key and the other
- * way waits beside the pill as a quiet word, dimmed with its reason when the turn cannot take it.
+ * way waits beside the pill as a quiet word, dimmed with its reason when the turn cannot take it. While an ask waits with
+ * nothing typed, the ink is the ask's and Stop stands alone as the white key.
  */
 export function ComposerSendCluster({
   cluster,
@@ -52,13 +53,13 @@ export function ComposerSendCluster({
   const reason = canSend ? undefined : (block ?? undefined);
   return (
     <div className="composer-send-cluster">
-      {cluster.kind !== "stop" && cluster.stop ? <StopKey stopping={stopping} onStop={onStop} /> : null}
+      {cluster.kind === "asked" || (cluster.kind !== "stop" && cluster.stop) ? <StopKey stopping={stopping} onStop={onStop} /> : null}
       {cluster.kind === "turn" ? (
         <button type="button" onClick={() => onSend(true)} disabled={!canSend || Boolean(cluster.other.blocked)} data-tip={cluster.other.blocked ?? reason} className="composer-send-other">
           {WAY_WORDS[cluster.other.way]}
         </button>
       ) : null}
-      <InkButton cluster={cluster} canSend={canSend} reason={reason} stopping={stopping} onSend={() => onSend(false)} onStop={onStop} />
+      {cluster.kind === "asked" ? null : <InkButton cluster={cluster} canSend={canSend} reason={reason} stopping={stopping} onSend={() => onSend(false)} onStop={onStop} />}
     </div>
   );
 }

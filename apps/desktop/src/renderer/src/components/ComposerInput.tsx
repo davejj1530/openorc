@@ -1,4 +1,4 @@
-import { commandWordAt, useCommandWord, type SkillListNotice } from "@openorc/client";
+import { askKeyAct, askKeyName, commandWordAt, useCommandWord, type AskPlace, type SkillListNotice } from "@openorc/client";
 import type { FileScope, UsableConnector } from "@openorc/protocol";
 import { Fragment, useCallback, useEffect, useId, useImperativeHandle, useMemo, useRef, useState, type Ref, type RefObject } from "react";
 import { useRpc } from "../lib/client";
@@ -53,6 +53,8 @@ interface ComposerInputProps {
   editor: RefObject<ComposerEditorHandle | null>;
   /** What the plus menu opens: one kind's list, at the caret. */
   lists?: Ref<ComposerLists> | undefined;
+  /** An ask docked onto the composer, which arrow up or Shift and Tab enter at its question. */
+  ask?: { enter: () => void } | null | undefined;
 }
 
 /** Opens the list of one kind at the caret, as typing `@` or `/` there would, showing only that kind. */
@@ -110,6 +112,18 @@ function useListKind(
     [value, caret, editor, onOpen],
   );
   return kind && token?.start === kind.start ? kind.kind : null;
+}
+
+/** A key the docked ask's table takes from the field: into the ask at its question, or nothing at all. */
+function askTook(event: KeyboardEvent, ask: ComposerInputProps["ask"], field: { listOpen: boolean; value: string }): boolean {
+  let place: AskPlace = field.value ? "fieldText" : "fieldEmpty";
+  if (field.listOpen) place = "fieldList";
+  const key = ask ? askKeyName(event) : null;
+  const act = key ? askKeyAct(place, key, true) : "pass";
+  if (act !== "enter" && act !== "none") return false;
+  event.preventDefault();
+  if (act === "enter") ask?.enter();
+  return true;
 }
 
 /** Owns text interaction: suggestions, the caret and focus, around the editor that holds the words. */
@@ -228,6 +242,7 @@ export function ComposerInput(props: ComposerInputProps) {
         }}
         sources={sources}
         onKeyDown={(e) => {
+          if (askTook(e, props.ask, { listOpen: suggestionsOpen, value })) return true;
           const endsMessage = (token?.start ?? 0) > 0 && value.slice(caret).trim() === "";
           const action = suggestionsOpen ? suggestionKey(e, suggestions[cursor], { chosen, endsMessage }) : "pass";
           if (action === "down" || action === "up") {

@@ -1404,3 +1404,123 @@
   margin-left: auto;
   color: var(--ink-4);
 }
+
+/* An ask the agent waits on, docked at the top of the composer's piece above a hairline (components/ComposerAsk.tsx).
+   Its top line holds what it asks, how many more wait and its quiet way out; its choices are keys the width of the
+   piece less 12px a side, and its own line for words is a key the same width. Nothing is ringed at rest. */
+.composer-ask {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  margin-left: -4px;
+  padding-bottom: 12px;
+  border-bottom: var(--hairline) solid var(--line);
+}
+.composer-ask-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding-left: 4px;
+}
+.composer-ask-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  padding: 4px 0;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-md);
+  line-height: 20px;
+  letter-spacing: var(--text-md--letter-spacing);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  outline: none;
+}
+/* 3px centers a 14px mark on the first 20px line of a question that wraps. */
+.composer-ask-head > :is(svg, img) {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.composer-ask-head:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.composer-ask-end {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 2px;
+  min-height: 28px;
+}
+.composer-ask-count {
+  padding: 0 8px;
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.composer-ask-choice {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 6px 8px;
+  border-radius: var(--radius-xl);
+  background-color: var(--control-fill);
+  font-size: var(--text-base);
+  line-height: 20px;
+  color: var(--ink);
+  text-align: left;
+  overflow-wrap: anywhere;
+  transition: background-color var(--duration-quick) var(--ease-out);
+}
+.composer-ask-choice:hover:not(:disabled) {
+  background-image: linear-gradient(var(--surface-2), var(--surface-2));
+}
+.composer-ask-choice:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.composer-ask-choice:disabled {
+  color: var(--ink-3);
+}
+.composer-ask-choice-description {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  color: var(--ink-3);
+}
+.composer-ask-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 4px 0 8px;
+  border-radius: var(--radius-xl);
+  background-color: var(--control-fill);
+  cursor: text;
+}
+.composer-ask-line:focus-within {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.composer-ask-line > input {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 36px;
+  background: transparent;
+  font-size: var(--text-base);
+  color: var(--ink);
+  outline: none;
+}
+.composer-ask-line > input::placeholder {
+  color: var(--ink-3);
+}
+.composer-ask-error {
+  padding: 0 12px;
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+  color: var(--bad);
+}

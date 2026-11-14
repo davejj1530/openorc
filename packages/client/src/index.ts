@@ -1,5 +1,6 @@
 export { cloudTime, hoursDetail, initials, periodLabel, planDate, planLine, priceText } from "./account-words.js";
 export { approvalDetail, approvalSummary, readQuestions, type Question } from "./approval-request.js";
+export { askKeyAct, askKeyName, docks, waitingAsks, type AskAct, type AskKey, type AskPlace, type WaitingAsk } from "./ask-dock.js";
 export { pageHost, pageLabel, publicAddress } from "./browser-page.js";
 export { isUnifiedDiff, toolDiff } from "./chat-diff.js";
 export { createClientState, type ClientState, type ClientStateOptions } from "./client-state.js";

@@ -1,4 +1,4 @@
-import { composerActivity, composerSendBlock, sendCluster, sendsNow, type SkillCommand, type SkillListNotice } from "@openorc/client";
+import { composerActivity, composerSendBlock, sendCluster, sendsNow, type SkillCommand, type SkillListNotice, type WaitingAsk } from "@openorc/client";
 import {
   ExecutionMode,
   executionMode,
@@ -6,6 +6,7 @@ import {
   executionModePresentation,
   executionModeSettings,
   executionModeUnavailable,
+  harnessShortName,
   type AgentKind,
   type FileScope,
   type HarnessId,
@@ -13,7 +14,7 @@ import {
   type RunMode,
   type UsableConnector,
 } from "@openorc/protocol";
-import { useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from "react";
+import { useCallback, useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from "react";
 import { useRpcMutation } from "../lib/client";
 import { cn } from "../lib/cn";
 import { removeAcceptedAttachments, restoreDraftAttachments, useComposerAttachments, type Attachment } from "../lib/composer-attachments";
@@ -26,6 +27,7 @@ import { ComposerChoice } from "./ComposerChoice";
 import { ComposerDropZone, useComposerDrop } from "./ComposerDropZone";
 import { ComposerChangesBar } from "./ComposerCommitChip";
 import { ComposerAddMenu, type AddOffers } from "./ComposerAddMenu";
+import { ComposerAsk } from "./ComposerAsk";
 import { ComposerInput, type ComposerLists } from "./ComposerInput";
 import type { ComposerEditorHandle } from "./composer-editor/ComposerEditor";
 import { ComposerSendCluster } from "./ComposerSendButton";
@@ -164,6 +166,10 @@ export interface ComposerProps {
   /** The landing screen draws the roomier composer and places the Commit chip itself. A small chat keeps only attach and send. */
   presentation?: "conversation" | "new-thread" | "small";
   error?: string | null;
+  /** What the agent waits on the person for, docked at the top of the composer; the first shows. */
+  asks?: WaitingAsk[];
+  /** Why the asks can't be answered now, as when the thread's place can't be reached. */
+  asksBlocked?: string | null;
   children?: ReactNode;
 }
 
@@ -250,6 +256,8 @@ export function Composer(props: ComposerProps) {
   const canSend = Boolean(props.allowEmpty || props.value.trim() || attachments.length > 0) && !props.busy && !submitting && !props.disabledReason && !attachmentBlock && uploading === 0;
 
   const canStop = Boolean(props.stopAction?.working || (!props.stopAction && props.live?.working));
+  const asks = props.asks ?? [];
+  const focusField = useCallback(() => editor.current?.focus(), []);
   const cluster = sendCluster({
     queueing: Boolean(props.queueing),
     liveByDefault: Boolean(props.liveByDefault),
@@ -258,6 +266,7 @@ export function Composer(props: ComposerProps) {
     canStop,
     hasDraft: Boolean(props.value.trim()) || attachments.length > 0 || uploading > 0,
     startsTask: props.allowEmpty,
+    asked: asks.length > 0 ? `${props.model ? harnessShortName(props.model.agent) : "The agent"} is waiting for your answer.` : null,
   });
   const submit = (otherWay: boolean) => {
     if (!canSend) return;
@@ -288,6 +297,7 @@ export function Composer(props: ComposerProps) {
       <div className="mb-2 grid grid-cols-1 gap-2 empty:hidden">{props.notices}</div>
       <ComposerAlerts message={interrupt.error ? `Couldn’t stop the agent. ${interrupt.error.message}` : files.error || submission?.error || props.error} changes={props.changes} />
       <div ref={shell} className="composer-shell" data-dragging={drop.dragging || undefined} {...drop.handlers}>
+        <ComposerAsk asks={asks} blocked={props.asksBlocked ?? null} fieldHasWords={Boolean(props.value.trim())} focusField={focusField} />
         {attachments.length > 0 || uploading > 0 ? (
           <div className="composer-attachments">
             {attachments.map((attachment) => (
@@ -337,6 +347,7 @@ export function Composer(props: ComposerProps) {
             suggestionSide={isNewThread ? "bottom" : "top"}
             editor={editor}
             lists={lists}
+            ask={asks.length > 0 ? { enter: () => shell.current?.querySelector<HTMLElement>("[data-ask-control='head']")?.focus() } : null}
           />
           {sent.ghost ? (
             <div key={sent.ghost.key} className="composer-sent-ghost" aria-hidden="true" onAnimationEnd={sent.clear}>

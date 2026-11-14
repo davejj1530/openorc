@@ -7,6 +7,7 @@ import {
   composerPlaceholder,
   heardTranscript,
   placeUnreachable,
+  waitingAsks,
   conversationSendDisabledReason,
   conversationSteerReason,
   messageBody,
@@ -48,7 +49,7 @@ import { useSkillCommands } from "../lib/skill-commands";
 import { ConversationVoice, useRunVoices } from "../lib/turn-authors";
 import { useTurnFooters } from "../lib/turn-footers";
 import { useCloudSignInGate } from "./CloudSignInOffer";
-import { AnswersBlocked } from "./ask-answer";
+import { AnswersBlocked, AsksDocked } from "./ask-answer";
 import { useHostedComposer } from "./HostedSendNotice";
 import { CloudPreparing, CloudStart } from "./CloudStart";
 import { Composer, type SlashCommand } from "./Composer";
@@ -144,7 +145,9 @@ function TranscriptContext({
     <ConversationVoice.Provider value={voice}>
       <MessageMarks.Provider value={marks}>
         <TurnChangesProvider footers={footers} threadId={threadId}>
-          <AnswersBlocked.Provider value={answersBlocked}>{children}</AnswersBlocked.Provider>
+          <AnswersBlocked.Provider value={answersBlocked}>
+            <AsksDocked.Provider value>{children}</AsksDocked.Provider>
+          </AnswersBlocked.Provider>
         </TurnChangesProvider>
       </MessageMarks.Provider>
     </ConversationVoice.Provider>
@@ -230,15 +233,16 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const emptyHint = conversationEmptyHint({ task: scope.kind === "task", workspace: project.id === WORKSPACE_ID });
   const answersBlocked = placeUnreachable(thread);
   const placeholder = composerPlaceholder(choice?.agent);
+  const heard = optimistic.run ? heardTranscript(optimistic.run, thread) : null;
 
   function renderTranscript() {
-    if (optimistic.run && optimistic.run.blocks.length > 0)
+    if (heard && heard.blocks.length > 0)
       return (
         <TranscriptContext voice={voice} marks={marks} footers={footers} threadId={threadId} answersBlocked={answersBlocked}>
           <Transcript
             working={working}
             media={links ? { basePath: links, fileScope: conversation } : { fileLinks: "cite" }}
-            run={heardTranscript(optimistic.run, thread)}
+            run={heard}
             scrollKey={conversation.id}
             followKey={sends}
             onFork={onFork}
@@ -261,90 +265,93 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
       <div className="flex-1 min-h-0 relative">{renderTranscript()}</div>
       <div className="composer-padding shrink-0 px-6 pb-6 pt-2">
         <div className="max-w-chat w-full min-w-0 mx-auto grid grid-cols-1 gap-2">
-          <Composer
-            handle={controls.composer}
-            draftKey={`${draftKey}.attachments`}
-            value={prompt}
-            onChange={setPrompt}
-            onSubmit={submit}
-            onReady={cloud.onReady}
-            placeholder={orclings.placeholder ?? placeholder}
-            mentions={orclings.mentions}
-            modelControl={orclings.modelControl}
-            accounts={accounts}
-            model={choice}
-            onModel={settings.selectModel}
-            onExecutionMode={settings.selectExecutionMode}
-            mode={mode}
-            onMode={settings.selectMode}
-            permission={permission}
-            onPermission={settings.selectPermission}
-            location={location}
-            hasStarted={thread?.hasStarted ?? (runs.length > 0 || Boolean(thread?.forkedAtRunId))}
-            changes={composerChanges}
-            notices={
-              <>
-                <ThreadMoveCard thread={thread} />
-                <CloudPreparing thread={preparingCloud(thread, runs.length)} />
-                {controls.queue}
-                {controls.commands}
-                {thread?.session && !working ? (
-                  <SessionRecovery
-                    thread={thread}
-                    disabled={!choice || optimistic.busy}
-                    onRestart={() => void restart().catch(() => {})}
-                    onContinueWith={(id) => void continueWith(id).catch(() => {})}
+          <ConversationVoice.Provider value={voice}>
+            <Composer
+              handle={controls.composer}
+              draftKey={`${draftKey}.attachments`}
+              value={prompt}
+              onChange={setPrompt}
+              onSubmit={submit}
+              onReady={cloud.onReady}
+              placeholder={orclings.placeholder ?? placeholder}
+              mentions={orclings.mentions}
+              modelControl={orclings.modelControl}
+              accounts={accounts}
+              model={choice}
+              onModel={settings.selectModel}
+              onExecutionMode={settings.selectExecutionMode}
+              mode={mode}
+              onMode={settings.selectMode}
+              permission={permission}
+              onPermission={settings.selectPermission}
+              location={location}
+              hasStarted={thread?.hasStarted ?? (runs.length > 0 || Boolean(thread?.forkedAtRunId))}
+              changes={composerChanges}
+              notices={
+                <>
+                  <ThreadMoveCard thread={thread} />
+                  <CloudPreparing thread={preparingCloud(thread, runs.length)} />
+                  {controls.queue}
+                  {controls.commands}
+                  {thread?.session && !working ? (
+                    <SessionRecovery
+                      thread={thread}
+                      disabled={!choice || optimistic.busy}
+                      onRestart={() => void restart().catch(() => {})}
+                      onContinueWith={(id) => void continueWith(id).catch(() => {})}
+                    />
+                  ) : null}
+                  {signIn.offer}
+                  {cloud.notice}
+                  <SwitchingNote agent={switching && choice ? choice.agent : null} />
+                  <ApplyingAutonomous
+                    shown={Boolean(settingsPending && activeRun && thread && activeRun.mode === "act" && permission === "autonomous" && activeRun.permissionMode !== permission)}
+                    failed={Boolean(settings.error)}
                   />
-                ) : null}
-                {signIn.offer}
-                {cloud.notice}
-                <SwitchingNote agent={switching && choice ? choice.agent : null} />
-                {settingsPending && activeRun && thread && activeRun.mode === "act" && permission === "autonomous" && activeRun.permissionMode !== permission ? (
-                  <div role="status" className="text-xs text-ink-3 px-1">
-                    {settings.error ? "Could not apply Autonomous. Select it again to retry." : "Applying Autonomous to the current turn…"}
-                  </div>
-                ) : null}
-              </>
-            }
-            busy={optimistic.busy}
-            allowEmpty={firstTaskRun}
-            disabledReason={sendDisabledReason ?? cloud.blocked}
-            live={live && activeRun ? { runId: activeRun.id, working } : null}
-            queueing={Boolean(thread && working)}
-            liveByDefault
-            steerable={canSteer}
-            steerReason={steerReason}
-            context={thread?.context ?? null}
-            compacting={compact.isPending}
-            generatingImage={generatingImage}
-            onCompact={thread && !working ? () => compact.mutate({ id: thread.id }) : undefined}
-            compactDisabledReason={working ? "Available after this turn finishes." : undefined}
-            fileSearch={conversation}
-            commands={commands}
-            onCommandsWanted={skills.onCommandsWanted}
-            commandsNotice={skills.commandsNotice}
-            {...connectorMentions}
-            {...cloud.limits}
-            error={cloud.shown((submitter.error ?? controls.error ?? compact.error ?? fork.error ?? settings.error ?? draftError)?.message ?? permissionError)}
-          >
-            {firstTaskRun && scope.kind === "task" ? (
-              <ComposerChoice
-                ariaLabel="Where the task works"
-                value={workspaceMode}
-                options={[
-                  { value: "current" as const, label: "Checkout", hint: project.rootPath, icon: Laptop },
-                  {
-                    value: "worktree" as const,
-                    label: "Worktree",
-                    hint: scope.task.worktreePath ?? `New isolated worktree from ${scope.task.baseRef ?? project.defaultBranch ?? "HEAD"}`,
-                    icon: GitBranch,
-                  },
-                ]}
-                onChange={setWorkspace}
-                disabled={optimistic.busy || Boolean(scope.task.worktreePath) || !runsQuery.data}
-              />
-            ) : null}
-          </Composer>
+                </>
+              }
+              busy={optimistic.busy}
+              allowEmpty={firstTaskRun}
+              disabledReason={sendDisabledReason ?? cloud.blocked}
+              live={live && activeRun ? { runId: activeRun.id, working } : null}
+              queueing={Boolean(thread && working)}
+              liveByDefault
+              steerable={canSteer}
+              steerReason={steerReason}
+              context={thread?.context ?? null}
+              compacting={compact.isPending}
+              generatingImage={generatingImage}
+              onCompact={thread && !working ? () => compact.mutate({ id: thread.id }) : undefined}
+              compactDisabledReason={working ? "Available after this turn finishes." : undefined}
+              fileSearch={conversation}
+              commands={commands}
+              onCommandsWanted={skills.onCommandsWanted}
+              commandsNotice={skills.commandsNotice}
+              {...connectorMentions}
+              {...cloud.limits}
+              asks={waitingAsks(heard)}
+              asksBlocked={answersBlocked}
+              error={cloud.shown((submitter.error ?? controls.error ?? compact.error ?? fork.error ?? settings.error ?? draftError)?.message ?? permissionError)}
+            >
+              {firstTaskRun && scope.kind === "task" ? (
+                <ComposerChoice
+                  ariaLabel="Where the task works"
+                  value={workspaceMode}
+                  options={[
+                    { value: "current" as const, label: "Checkout", hint: project.rootPath, icon: Laptop },
+                    {
+                      value: "worktree" as const,
+                      label: "Worktree",
+                      hint: scope.task.worktreePath ?? `New isolated worktree from ${scope.task.baseRef ?? project.defaultBranch ?? "HEAD"}`,
+                      icon: GitBranch,
+                    },
+                  ]}
+                  onChange={setWorkspace}
+                  disabled={optimistic.busy || Boolean(scope.task.worktreePath) || !runsQuery.data}
+                />
+              ) : null}
+            </Composer>
+          </ConversationVoice.Provider>
           {firstTaskRun ? (
             <TaskDestination destination={workspaceDestination({ mode: workspaceMode, rootPath: project.rootPath, taskPath: scope.kind === "task" ? scope.task.worktreePath : null })} />
           ) : null}
@@ -355,6 +362,16 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
           ) : null}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Autonomous chosen mid-turn, applied to the running turn, or why it could not be. */
+function ApplyingAutonomous({ shown, failed }: { shown: boolean; failed: boolean }) {
+  if (!shown) return null;
+  return (
+    <div role="status" className="text-xs text-ink-3 px-1">
+      {failed ? "Could not apply Autonomous. Select it again to retry." : "Applying Autonomous to the current turn…"}
     </div>
   );
 }

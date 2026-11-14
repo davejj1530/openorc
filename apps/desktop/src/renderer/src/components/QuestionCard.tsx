@@ -1,5 +1,5 @@
 import { useState, type CSSProperties, type ReactNode } from "react";
-import { type Question, readQuestions } from "@openorc/client";
+import { type Question, type WaitingAsk, readQuestions } from "@openorc/client";
 import { harnessShortName, isHarnessId } from "@openorc/protocol";
 import { useAskAnswer } from "./ask-answer";
 import { useRunVoice } from "../lib/turn-authors";
@@ -7,6 +7,7 @@ import { Button, Input } from "./ui";
 import { cn } from "../lib/cn";
 import { Check } from "./icons";
 import { HarnessLogo } from "./HarnessLogo";
+import { AskError, AskLine, AskTop, AskWay } from "./AskParts";
 
 /** What was answered outside the options: a custom answer, or a question that had none. Secret answers stay hidden. */
 function answeredText(q: Question, answer: string[]): ReactNode {
@@ -218,5 +219,54 @@ function QuestionFoot({
         Answer
       </Button>
     </div>
+  );
+}
+
+/**
+ * A question docked onto the composer while it waits: its top line, its choices as keys, and its own line for words
+ * when its agent takes them. A single choice answers when pressed.
+ */
+export function QuestionAsk({ ask, more, fieldHasWords }: { ask: WaitingAsk; more: number; fieldHasWords: boolean }) {
+  const [q] = readQuestions(ask.block.input);
+  const voice = useRunVoice(ask.runId);
+  const reply = useAskAnswer(ask.runId, ask.block.approvalId);
+  const [words, setWords] = useState("");
+  if (!q) return null;
+  const off = reply.pending || Boolean(reply.blocked);
+  const tip = reply.blocked ?? undefined;
+  const answer = (value: string) => reply.answer("allow", { [q.key]: [value] });
+  return (
+    <>
+      <AskTop
+        mark={voice && isHarnessId(voice.agent) ? <HarnessLogo id={voice.agent} size={14} /> : null}
+        more={more}
+        way={
+          <AskWay disabled={off} tip={tip} onClick={() => reply.answer("deny")}>
+            Decline
+          </AskWay>
+        }
+      >
+        {q.question || q.header}
+      </AskTop>
+      {q.options?.map((option) => (
+        <button key={option.label} type="button" tabIndex={-1} className="composer-ask-choice" data-ask-control="choice" disabled={off} data-tip={tip} onClick={() => answer(option.label)}>
+          <span>{option.label}</span>
+          {option.description ? <span className="composer-ask-choice-description">{option.description}</span> : null}
+        </button>
+      ))}
+      {q.allowOther ? (
+        <AskLine
+          label={q.options ? `Something else: ${q.question}` : q.question}
+          placeholder={q.options ? "Something else" : "Your answer"}
+          secret={q.secret}
+          value={words}
+          onChange={setWords}
+          send={{ words: "Answer", ink: !fieldHasWords, onSend: () => words.trim() && answer(words.trim()) }}
+          disabled={off}
+          tip={tip}
+        />
+      ) : null}
+      <AskError error={reply.error} />
+    </>
   );
 }

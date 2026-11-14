@@ -93,6 +93,16 @@ describe("sendCluster", () => {
       input: { ...typed, queueing: true, canStop: true, steerReason: "This agent reads new messages after its turn. It will be queued." },
       cluster: { kind: "turn", stop: true, enter: "queue", other: { way: "now", blocked: "This agent reads new messages after its turn. It will be queued." } },
     },
+    {
+      name: "Stop alone as a white key while an ask waits and nothing is typed",
+      input: { ...typed, queueing: true, canStop: true, hasDraft: false, asked: "Claude is waiting for your answer." },
+      cluster: { kind: "asked" },
+    },
+    {
+      name: "Queue on the pill and Send now dimmed with the ask's reason when a message is typed while an ask waits",
+      input: { ...typed, queueing: true, canStop: true, steerable: true, asked: "Claude is waiting for your answer." },
+      cluster: { kind: "turn", stop: true, enter: "queue", other: { way: "now", blocked: "Claude is waiting for your answer." } },
+    },
     { name: "a task's empty first send names that it starts the task", input: { ...typed, hasDraft: false, startsTask: true }, cluster: { kind: "send", stop: false, startsTask: true } },
   ])("$name", ({ input, cluster }) => {
     expect(sendCluster(input)).toEqual(cluster);

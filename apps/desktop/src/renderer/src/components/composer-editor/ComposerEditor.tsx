@@ -18,13 +18,15 @@ export type { DraftChange } from "./plugins/DraftPlugin";
 /**
  * What the composer does to its draft, each as one step to undo with the caret where it belongs: a pick from a list
  * writes the message, and its pills land with a pop; `write` puts words back, as a queued message returning, and
- * nothing moves; `begin` starts an `@` or `/` word where the person was, as the plus menu does.
+ * nothing moves; `begin` starts an `@` or `/` word where the person was, as the plus menu does; `focus` puts the keyboard
+ * back in the words where the caret was, as a docked ask hands it back.
  */
 export interface ComposerEditorHandle {
   pick: (text: string, caret: number) => void;
   write: (text: string, caret: number) => void;
   /** Starts a word at `at`, apart from the word before it. */
   begin: (start: string, at: number) => void;
+  focus: () => void;
 }
 
 export interface ComposerEditorProps {
@@ -73,7 +75,7 @@ function EditorControls({ handle, disabled }: Pick<ComposerEditorProps, "handle"
         { discrete: true, tag: HISTORY_PUSH_TAG },
       );
     };
-    return { pick: writeAs([HISTORY_PUSH_TAG, PICKED]), write: writeAs([HISTORY_PUSH_TAG]), begin };
+    return { pick: writeAs([HISTORY_PUSH_TAG, PICKED]), write: writeAs([HISTORY_PUSH_TAG]), begin, focus: () => editor.getRootElement()?.focus({ preventScroll: true }) };
   }, [editor]);
   return null;
 }

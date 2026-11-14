@@ -129,16 +129,26 @@ const TURN_TAKES_NOTHING = "This turn can’t take a message now.";
  * The composer's send cluster, so what it draws and what Enter does never disagree. With nothing typed while something
  * runs, one ink Stop. With nothing running, the bare arrow, which only ever sends (or, for a task's empty first send,
  * names that it starts the task). While a turn runs and something is typed, the ink pill carries the word of what Enter
- * does and a quiet word beside it is the other way; Stop steps aside as a white key.
+ * does and a quiet word beside it is the other way; Stop steps aside as a white key. While an ask waits on the person
+ * the ink is the ask's: with nothing typed Stop stands alone as a white key, and a message typed meanwhile queues, with
+ * Send now dimmed for the ask's reason.
  */
-export type SendCluster = { kind: "stop" } | { kind: "send"; stop: boolean; startsTask: boolean } | { kind: "turn"; stop: boolean; enter: SendWay; other: { way: SendWay; blocked: string | null } };
+export type SendCluster =
+  { kind: "stop" } | { kind: "asked" } | { kind: "send"; stop: boolean; startsTask: boolean } | { kind: "turn"; stop: boolean; enter: SendWay; other: { way: SendWay; blocked: string | null } };
 
-export function sendCluster(input: ComposerActionsInput & { steerReason?: string | null | undefined; startsTask?: boolean }): SendCluster {
+export function sendCluster(input: ComposerActionsInput & { steerReason?: string | null | undefined; startsTask?: boolean; asked?: string | null | undefined }): SendCluster {
+  if (input.asked) return askedCluster({ ...input, asked: input.asked });
   if (input.canStop && !input.hasDraft) return { kind: "stop" };
   if (!input.queueing) return { kind: "send", stop: input.canStop, startsTask: Boolean(input.startsTask && !input.hasDraft) };
   const enter: SendWay = input.liveByDefault && input.steerable ? "now" : "queue";
   if (enter === "now") return { kind: "turn", stop: input.canStop, enter, other: { way: "queue", blocked: null } };
   return { kind: "turn", stop: input.canStop, enter, other: { way: "now", blocked: input.steerable ? null : input.steerReason || TURN_TAKES_NOTHING } };
+}
+
+/** The cluster while an ask waits: the running turn takes no message until it is answered. */
+function askedCluster(input: ComposerActionsInput & { asked: string; startsTask?: boolean }): SendCluster {
+  if (input.canStop && !input.hasDraft) return { kind: "asked" };
+  return sendCluster({ ...input, asked: null, steerable: false, steerReason: input.asked });
 }
 
 /** Whether a send by this way reaches the running turn, for `planSubmit`'s `now`; Command and Enter takes the other way. */

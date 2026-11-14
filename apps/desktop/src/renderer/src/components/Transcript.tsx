@@ -32,6 +32,7 @@ import { ConversationVoice, useTurnAuthor } from "../lib/turn-authors";
 import { ToolRow } from "./ToolRow";
 import { SubagentCards } from "./SubagentCards";
 import { ApprovalCard, pretty } from "./ApprovalCard";
+import { useDockedAsks } from "./ask-answer";
 export { AgentPresence } from "./AgentPresence";
 import { StartedThreadCard } from "./StartedThreadCard";
 import { TaskCard } from "./TaskCard";
@@ -535,7 +536,6 @@ export function TranscriptContents({
   trailing,
   taskCards = true,
   groupTools = true,
-  pendingApproval,
   toolDetails = false,
   replyActions = true,
 }: {
@@ -546,13 +546,14 @@ export function TranscriptContents({
   /** Content that follows a block or a folded group of blocks, such as a turn's change card. */ trailing?: ((blocks: Block[]) => ReactNode) | undefined;
   taskCards?: boolean;
   groupTools?: boolean;
-  pendingApproval?: ((block: Extract<Block, { kind: "approval" }>) => ReactNode) | undefined;
   /** Tool calls as their details alone, for a call opened from its chip in the work list. */
   toolDetails?: boolean;
   /** Replies carry their own copy and time; a turn that ends in its actions row passes false. */
   replyActions?: boolean;
 }) {
-  const items: Item[] = useMemo(() => groupBlocks(blocks, taskCards, replyAction?.blockId, groupTools), [blocks, taskCards, replyAction?.blockId, groupTools]);
+  const docked = useDockedAsks();
+  const grouped: Item[] = useMemo(() => groupBlocks(blocks, taskCards, replyAction?.blockId, groupTools), [blocks, taskCards, replyAction?.blockId, groupTools]);
+  const items = grouped.filter((item) => item.kind !== "block" || !docked(item.block));
   const agents = subagentGroups(blocks);
   const compact = (item: Item | undefined) => Boolean(item && (item.kind === "group" || isCompact(item.block)));
   return (
@@ -576,11 +577,7 @@ export function TranscriptContents({
             data-message={item.block.kind === "message" ? item.block.id : undefined}
             className={cn("transcript-block", isCompact(item.block) && compact(items[i - 1]) ? "mt-0" : "mt-3")}
           >
-            {item.block.kind === "approval" && !item.block.decision && pendingApproval ? (
-              pendingApproval(item.block)
-            ) : (
-              <BlockView block={item.block} runId={runId} onFork={onFork} taskCards={taskCards} toolDetails={toolDetails} actions={replyActions} />
-            )}
+            <BlockView block={item.block} runId={runId} onFork={onFork} taskCards={taskCards} toolDetails={toolDetails} actions={replyActions} />
             {replyAction?.blockId === item.block.id ? replyAction.content : null}
             {trailing?.([item.block])}
           </div>
@@ -660,17 +657,24 @@ export const BlockView = memo(function BlockView({
     case "tool":
       return <ToolBlock block={block} cards={taskCards} details={toolDetails} />;
     case "approval":
-      return block.approvalKind === "user_input" ? (
-        <QuestionCard runId={runId} approvalId={block.approvalId} input={block.input} decided={block.decision} answers={block.answers} />
-      ) : (
-        <ApprovalCard block={block} runId={runId} />
-      );
+      return <AskView block={block} runId={runId} />;
     case "status":
       if (block.notice) return <div className="text-sm text-ink-4">{block.text}</div>;
       // "turn error" and "session error" restate the error card above them.
       return block.tone === "bad" && !/^(turn|session) /.test(block.text) ? <TranscriptErrorCard text={block.text} /> : null;
   }
 });
+
+/** An ask where it was asked: answered, or waiting where no composer takes it. */
+function AskView({ block, runId }: { block: Extract<Block, { kind: "approval" }>; runId: string }) {
+  const docked = useDockedAsks();
+  if (docked(block)) return null;
+  return block.approvalKind === "user_input" ? (
+    <QuestionCard runId={runId} approvalId={block.approvalId} input={block.input} decided={block.decision} answers={block.answers} />
+  ) : (
+    <ApprovalCard block={block} runId={runId} />
+  );
+}
 
 /** A tool call that saved or started work shows that work as a live card; any other call is a row. */
 function ToolBlock({ block, cards, details = false }: { block: Extract<Block, { kind: "tool" }>; cards: boolean; details?: boolean }) {

@@ -48,6 +48,7 @@ function AuthorizedChat({ scope, target }: { scope: TeamChatContextValue; target
       );
   }, [timeline.data, target]);
   if (lost) return <ChatUnavailable />;
+  if (conversation?.joined === false) return <ChatUnavailable message="This chat isn't available here." />;
   if (state.data?.state === "unavailable") return <ChatUnavailable message="Chat isn't available here." />;
   if (!conversation)
     return (

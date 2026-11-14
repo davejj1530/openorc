@@ -6,7 +6,7 @@ import type { TeamChatStatus, TeamChatTimeline, TeamConversation, TeamMessage } 
 import { core } from "../lib/rpc";
 import { queryClient } from "../lib/client";
 import { TeamChatContext, type TeamChatContextValue } from "../lib/team-chat-context";
-import { chatTimelineKey, teamChatDrafts } from "../lib/team-chat-queries";
+import { chatStateKey, chatTimelineKey, teamChatDrafts } from "../lib/team-chat-queries";
 import { TeamChatView } from "./TeamChatView";
 
 vi.mock("../components/TopBar", () => ({ TopBar: ({ children }: { children: ReactNode }) => <header>{children}</header> }));
@@ -56,6 +56,23 @@ it("keeps local words when an older server has no chat capability", async () => 
   render(tree(context()));
   await waitFor(() => expect(screen.queryByText("Loading chat…")).toBeNull());
   expect(teamChatDrafts.read(target).text).toBe("Words from before the server changed");
+});
+it("cannot send into a channel after its subscription is removed before channel joining is available", async () => {
+  vi.spyOn(core, "call").mockImplementation(async (method) => {
+    if (method === "teamChat.state") return state;
+    if (method === "teamChat.timeline") return page;
+    return { ok: true };
+  });
+  const scope = context();
+  teamChatDrafts.write(target, "Keep these words until I join again");
+  render(tree(scope));
+  await screen.findByRole("button", { name: "Send" });
+  act(() => {
+    queryClient.setQueryData(chatStateKey(scope), { ...state, chat: { ...state.chat, conversations: [{ ...conversation, joined: false }] } });
+  });
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Send" })).toBeNull());
+  expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+  expect(teamChatDrafts.read(target).text).toBe("Keep these words until I join again");
 });
 it("keeps a frozen draft while a late private page cannot enter the cache", async () => {
   let finish = (_page: TeamChatTimeline) => {};

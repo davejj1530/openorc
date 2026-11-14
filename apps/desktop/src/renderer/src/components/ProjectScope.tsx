@@ -100,16 +100,17 @@ export function ProjectScope() {
   );
 }
 
-/** The chosen project's actions: its settings, a new task, and removal. */
+/** The chosen project's actions: a new task, its settings, and removal after a hairline. */
 function ProjectActions({ project, onRemove }: { project: Pick<Project, "id" | "name">; onRemove: () => void }) {
   return (
     <>
-      <Menu.Item className={cn(menuItem, "sidebar-scope-action")} onClick={() => openProject(project.id)}>
-        <Settings size={13} /> Project settings
-      </Menu.Item>
       <Menu.Item className={cn(menuItem, "sidebar-scope-action")} onClick={() => useUi.getState().openNewTask(project.id)}>
         <Plus size={13} /> New task
       </Menu.Item>
+      <Menu.Item className={cn(menuItem, "sidebar-scope-action")} onClick={() => openProject(project.id)}>
+        <Settings size={13} /> Project settings
+      </Menu.Item>
+      <Menu.Separator className={menuSeparator} />
       <Menu.Item className={cn(menuItemDanger, "sidebar-scope-action")} onClick={onRemove}>
         <X size={13} /> Remove project…
       </Menu.Item>

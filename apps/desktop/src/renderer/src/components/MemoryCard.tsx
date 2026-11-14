@@ -179,6 +179,7 @@ function Actions({
             <Menu.Item className={menuItem} onClick={onRetract}>
               <X size={15} /> Retract
             </Menu.Item>
+            <Menu.Separator className={menuSeparator} />
             <Menu.Item className={menuItemDanger} onClick={onDelete}>
               <Trash2 size={15} /> Delete
             </Menu.Item>

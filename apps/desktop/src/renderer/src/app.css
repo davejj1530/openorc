@@ -393,7 +393,7 @@
   --container-document: 800px;
   --document-gutter: 48px;
   --composer-max-height: 240px;
-  --container-palette: 560px;
+  --container-palette: 600px;
   --grid-template-columns-rail: 72px minmax(0, 1fr);
   --grid-template-columns-field: 6rem minmax(0, 1fr);
   --spacing-hero: 14vh;

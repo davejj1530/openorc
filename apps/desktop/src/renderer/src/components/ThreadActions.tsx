@@ -175,6 +175,7 @@ function LifecycleItems({ thread, parts: M, disabled, tip, patch }: { thread: Th
       <M.Item className={menuItem} disabled={disabled} data-tip={tip} closeOnClick onClick={() => patch({ archived: !resolved })}>
         {resolved ? <RotateCcw size={13} /> : <CircleCheck size={13} />} {resolved ? "Reopen" : "Resolve"}
       </M.Item>
+      <M.Separator className={menuSeparator} />
       <M.Item className={menuItemDanger} disabled={team || disabled} data-tip={team ? "This item is no longer available." : tip} onClick={() => useUi.getState().setDeleteThread(thread.id)}>
         <Trash2 size={13} /> Delete
       </M.Item>

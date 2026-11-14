@@ -1,26 +1,26 @@
 import { Command } from "cmdk";
 import { useEffect, useState, type ReactNode } from "react";
+import { latestActivity, rowAge, useSidebarNow } from "@openorc/client";
+import { isHarnessId, type ThreadSummary } from "@openorc/protocol";
 import { CoversPreview } from "../lib/browser-preview";
 import { useRpc } from "../lib/client";
 import { useOrclingChatIds, useOrclings } from "../lib/orclings";
 import { paletteActions } from "../lib/palette-actions";
 import { openTask, openThread, useRouter } from "../lib/router";
 import { useUi } from "../lib/ui";
+import { HarnessLogo } from "./HarnessLogo";
 import { MessageSquare, Orclings, Search } from "./icons";
 import { ProjectLogo } from "./ProjectIconPicker";
 import { StatusIcon } from "./status";
 import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
 
+/** Threads listed before a word is typed. */
+const RECENT = 5;
+
 function emptySearchMessage(query: string, messageMode: boolean, fetching: boolean): string {
   if (query.trim().length < 2 && messageMode) return "Type two or more characters.";
   if (fetching) return "Searching…";
   return "Nothing matches.";
-}
-
-function messageSender(role: string, member: { name: string } | null | undefined): string {
-  if (role === "user") return "You";
-  if (member) return member.name;
-  return "Agent";
 }
 
 function usePaletteKeys(open: boolean, onOpenChange: (open: boolean) => void): void {
@@ -54,55 +54,30 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
     fn();
   };
 
+  const typed = query.trim().length > 0;
   return (
     <div className="fixed inset-0 z-50 bg-black/30" onMouseDown={() => onOpenChange(false)}>
       <CoversPreview />
-      <div className="absolute left-1/2 top-1/5 -translate-x-1/2 w-full max-w-palette" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="absolute left-1/2 top-1/6 -translate-x-1/2 w-full max-w-palette" onMouseDown={(e) => e.stopPropagation()}>
         <Command className="command-palette" label="Command palette" shouldFilter={mode === "all"}>
-          <Command.Input
-            autoFocus
-            value={query}
-            onValueChange={setQuery}
-            placeholder={mode === "messages" ? "Search what was said in any thread…" : "Search threads, tasks, projects, messages, actions…"}
-            className="command-palette-input native-field"
-          />
+          <div className="command-palette-field">
+            <Search size={18} className="command-palette-icon" />
+            <Command.Input autoFocus value={query} onValueChange={setQuery} placeholder="Search" className="command-palette-input native-field" />
+          </div>
           <Command.List className="command-palette-list">
             <Command.Empty className="px-3 py-6 text-center text-base text-ink-3">{emptySearchMessage(query, mode === "messages", hits.isFetching)}</Command.Empty>
-            {(hits.data ?? []).length > 0 ? (
-              <Command.Group heading="Messages" className="command-palette-group">
-                {(hits.data ?? []).map((h) => (
-                  <Command.Item
-                    key={`${h.runId}-${h.messageId}`}
-                    value={`message ${h.threadTitle} ${h.snippet} ${h.ts}`}
-                    onSelect={() => {
-                      const message = { runId: h.runId, turn: h.turn, messageId: h.messageId };
-                      go(() => (h.taskId ? openTask(h.taskId, "chat", message) : openThread(h.threadId, message)));
-                    }}
-                    className="command-palette-item command-palette-hit"
-                  >
-                    <span className="flex items-center gap-2.5 min-w-0">
-                      <Search size={14} className="command-palette-icon" />
-                      <span className="truncate">{h.snippet}</span>
-                    </span>
-                    <span className="pl-6 text-sm text-ink-4 truncate">
-                      {messageSender(h.role, h.member)} in {h.taskTitle ?? h.threadTitle}
-                    </span>
-                  </Command.Item>
-                ))}
-              </Command.Group>
-            ) : null}
+            {mode === "all" ? <PlaceGroups typed={typed} go={go} /> : null}
+            <MessageHits hits={hits.data ?? []} go={go} />
+            {mode === "all" && typed ? <ProjectGroup go={go} /> : null}
             {mode === "messages" ? null : (
               <Command.Group heading="Actions" className="command-palette-group">
                 {paletteActions
                   .filter((action) => action.available?.() ?? true)
                   .map(({ label, icon: Icon, run }) => (
-                    <Item key={label} onSelect={() => go(run)} icon={<Icon size={14} />}>
-                      {label}
-                    </Item>
+                    <Item key={label} onSelect={() => go(run)} icon={<Icon size={15} />} label={label} />
                   ))}
               </Command.Group>
             )}
-            {mode === "all" ? <PlaceGroups go={go} /> : null}
           </Command.List>
         </Command>
       </div>
@@ -110,58 +85,124 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
   );
 }
 
-type Place = { key: string; value: string; label: string; icon: ReactNode; open: () => void };
+type Place = { key: string; value: string; label: string; icon: ReactNode; place?: string; age?: string; open: () => void };
 
 function PlaceGroup({ heading, places, go }: { heading: string; places: Place[]; go: (fn: () => void) => void }) {
   if (!places.length) return null;
   return (
     <Command.Group heading={heading} className="command-palette-group">
       {places.map((place) => (
-        <Item key={place.key} value={place.value} onSelect={() => go(place.open)} icon={place.icon}>
-          {place.label}
-        </Item>
+        <Item key={place.key} value={place.value} onSelect={() => go(place.open)} icon={place.icon} label={place.label} place={place.place} age={place.age} />
       ))}
     </Command.Group>
   );
 }
 
-/** Threads, Orclings, tasks and projects by name. An Orcling's own conversation is listed under its name, as the sidebar lists it. */
-function PlaceGroups({ go }: { go: (fn: () => void) => void }) {
+/** A thread's mark: what it needs or the working cube, else its agent's. */
+function threadIcon(thread: ThreadSummary): ReactNode {
+  const agent = isHarnessId(thread.agent) ? <HarnessLogo id={thread.agent} size={15} /> : <MessageSquare size={15} />;
+  return <ThreadStatusIndicator thread={thread} idle={agent} />;
+}
+
+/**
+ * Before a word is typed, the latest threads; then threads, Orclings and tasks by name, each with where it lives and its
+ * age. An Orcling's own conversation is listed under its name, as the sidebar lists it.
+ */
+function PlaceGroups({ typed, go }: { typed: boolean; go: (fn: () => void) => void }) {
   const tasks = useRpc("tasks.list", {}).data ?? [];
   const threads = useRpc("threads.list", { limit: 40, excludeSubagents: true }).data ?? [];
-  const projects = useRpc("projects.list", {}).data ?? [];
+  const projectName = useProjectNames();
   const orclings = useOrclings();
-  const navigate = useRouter((s) => s.navigate);
   const homes = useOrclingChatIds();
+  const now = useSidebarNow();
+  const listed = threads.filter((t) => !homes.has(t.id)).slice(0, typed ? undefined : RECENT);
+  const threadPlaces = listed.map((t) => ({
+    key: t.id,
+    value: `thread ${t.title} ${t.id}`,
+    label: t.title,
+    icon: threadIcon(t),
+    place: projectName(t.projectId),
+    age: rowAge(latestActivity(t), now),
+    open: () => openThread(t.id),
+  }));
+  if (!typed) return <PlaceGroup heading="Recent" go={go} places={threadPlaces} />;
   return (
     <>
-      <PlaceGroup
-        heading="Threads"
-        go={go}
-        places={threads
-          .filter((t) => !homes.has(t.id))
-          .map((t) => ({ key: t.id, value: `thread ${t.title}`, label: t.title, icon: <ThreadStatusIndicator thread={t} idle={<MessageSquare size={14} />} />, open: () => openThread(t.id) }))}
-      />
+      <PlaceGroup heading="Threads" go={go} places={threadPlaces} />
       <PlaceGroup
         heading="Orclings"
         go={go}
-        places={orclings.map((o) => ({ key: o.id, value: `orcling ${o.name}`, label: o.name, icon: <Orclings size={14} />, open: () => openThread(o.threadId) }))}
+        places={orclings.map((o) => ({ key: o.id, value: `orcling ${o.name}`, label: o.name, icon: <Orclings size={15} />, open: () => openThread(o.threadId) }))}
       />
-      <PlaceGroup heading="Tasks" go={go} places={tasks.map((t) => ({ key: t.id, value: `task ${t.title}`, label: t.title, icon: <StatusIcon status={t.status} />, open: () => openTask(t.id) }))} />
       <PlaceGroup
-        heading="Projects"
+        heading="Tasks"
         go={go}
-        places={projects.map((p) => ({ key: p.id, value: `project ${p.name}`, label: p.name, icon: <ProjectLogo project={p} />, open: () => navigate({ view: "project", projectId: p.id }) }))}
+        places={tasks.map((t) => ({
+          key: t.id,
+          value: `task ${t.title} ${t.id}`,
+          label: t.title,
+          icon: <StatusIcon status={t.status} />,
+          place: projectName(t.projectId),
+          age: rowAge(t.updatedAt, now),
+          open: () => openTask(t.id),
+        }))}
       />
     </>
   );
 }
 
-function Item({ children, icon, onSelect, value }: { children: ReactNode; icon: ReactNode; onSelect: () => void; value?: string }) {
+/** Messages that match, each with its speaker's mark, where it was said and its age. */
+function MessageHits({ hits, go }: { hits: RpcHits; go: (fn: () => void) => void }) {
+  const now = useSidebarNow();
+  if (!hits.length) return null;
+  return (
+    <Command.Group heading="Messages" className="command-palette-group">
+      {hits.map((h) => (
+        <Item
+          key={`${h.runId}-${h.messageId}`}
+          value={`message ${h.threadTitle} ${h.snippet} ${h.ts}`}
+          onSelect={() => {
+            const message = { runId: h.runId, turn: h.turn, messageId: h.messageId };
+            go(() => (h.taskId ? openTask(h.taskId, "chat", message) : openThread(h.threadId, message)));
+          }}
+          icon={<MessageSquare size={15} />}
+          label={h.snippet}
+          place={h.member ? `${h.member.name} in ${h.taskTitle ?? h.threadTitle}` : (h.taskTitle ?? h.threadTitle)}
+          age={rowAge(h.ts, now)}
+        />
+      ))}
+    </Command.Group>
+  );
+}
+
+type RpcHits = NonNullable<ReturnType<typeof useRpc<"threads.search">>["data"]>;
+
+function ProjectGroup({ go }: { go: (fn: () => void) => void }) {
+  const projects = useRpc("projects.list", {}).data ?? [];
+  const navigate = useRouter((s) => s.navigate);
+  return (
+    <PlaceGroup
+      heading="Projects"
+      go={go}
+      places={projects.map((p) => ({ key: p.id, value: `project ${p.name}`, label: p.name, icon: <ProjectLogo project={p} />, open: () => navigate({ view: "project", projectId: p.id }) }))}
+    />
+  );
+}
+
+/** A project's name by its id, for the faint place on a row. */
+function useProjectNames(): (id: string) => string | undefined {
+  const projects = useRpc("projects.list", {}).data ?? [];
+  return (id) => projects.find((project) => project.id === id)?.name;
+}
+
+/** A row: its mark, its label, where it lives in faint ink, and its age at the end. */
+function Item({ icon, label, place, age, onSelect, value }: { icon: ReactNode; label: string; place?: string | undefined; age?: string | undefined; onSelect: () => void; value?: string }) {
   return (
     <Command.Item value={value} onSelect={onSelect} className="command-palette-item">
       <span className="command-palette-icon">{icon}</span>
-      <span className="truncate">{children}</span>
+      <span className="command-palette-label">{label}</span>
+      {place ? <span className="command-palette-place">{place}</span> : null}
+      {age ? <span className="command-palette-age tabular">{age}</span> : null}
     </Command.Item>
   );
 }

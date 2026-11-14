@@ -180,13 +180,12 @@
   font-size: var(--text-sm);
 }
 
-/* Menus. A drop menu is r16 with padding 6 and 36px r10 rows that take the fill step when
-   highlighted. It never grows past the space Base UI measures between its anchor and the
+/* Menus, all at one size: r16 with padding 6 and 34px r10 rows that take the fill step when
+   highlighted, 15px glyphs in the third ink, a hairline between kinds of action, the destructive one last. It never grows past the space Base UI measures between its anchor and the
    window edge; it scrolls instead. */
 .menu-popup {
   display: flex;
   flex-direction: column;
-  gap: 2px;
   min-width: 192px;
   max-height: var(--available-height);
   overflow-y: auto;
@@ -196,14 +195,13 @@
 .menu-popup [role="listbox"] {
   display: flex;
   flex-direction: column;
-  gap: 2px;
 }
 .menu-item {
   display: flex;
   flex-shrink: 0;
   align-items: center;
   gap: 10px;
-  min-height: 36px;
+  min-height: 34px;
   padding: 0 10px;
   border-radius: var(--radius-md);
   color: var(--ink);
@@ -255,7 +253,7 @@
 .menu-separator {
   flex-shrink: 0;
   height: 0;
-  margin: 4px 10px;
+  margin: 6px 10px;
   border-top: var(--hairline) solid var(--line);
 }
 
@@ -481,68 +479,92 @@
   padding: 12px 20px 20px;
 }
 
-/* The command palette: an r18 card over its backdrop with the search field on top and 36px r10
-   rows. The highlighted row takes the fill step; its label and glyph step up to full ink. */
+/* The command palette, the app's one search: a floating plane, r20 and 600 wide, over its 30% scrim, on the
+   float's hairline and shadow. A 48px field at lead size over a hairline, then 38px rows: a 15px mark, the
+   label, where it lives in faint ink, and its age at the end. The highlighted row takes the fill step. */
 .command-palette {
   display: flex;
   flex-direction: column;
   overflow: hidden;
   padding: 6px;
-  border-radius: var(--radius-2xl);
+  border-radius: var(--radius-3xl);
   background: var(--float-fill);
+  box-shadow: var(--raised-shadow);
   color: var(--ink);
 }
+.command-palette-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 48px;
+  margin-bottom: 4px;
+  padding: 0 12px;
+  border-bottom: var(--hairline) solid var(--line);
+}
 .command-palette-input {
-  width: 100%;
-  height: 40px;
-  padding: 0 10px;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
   border: 0;
   background: transparent;
   color: var(--ink);
-  font-size: var(--text-md);
-  letter-spacing: var(--text-md--letter-spacing);
+  font-size: var(--text-lg);
+  line-height: 22px;
+  letter-spacing: -0.01em;
   outline: none;
 }
 .command-palette-input::placeholder {
-  color: var(--ink-4);
+  color: var(--ink-3);
 }
 .command-palette-list {
   max-height: 384px;
   overflow-y: auto;
 }
 .command-palette-group [cmdk-group-heading] {
-  padding: 10px 10px 4px;
-  color: var(--ink-4);
+  display: flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  color: var(--ink-3);
   font-size: var(--text-xs);
 }
 .command-palette-item {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 36px;
+  min-height: 38px;
   padding: 0 10px;
   border-radius: var(--radius-md);
-  color: var(--ink-2);
+  color: var(--ink);
   font-size: var(--text-base);
   letter-spacing: var(--text-base--letter-spacing);
-}
-.command-palette-hit {
-  display: grid;
-  align-content: center;
-  gap: 2px;
-  padding-block: 8px;
+  white-space: nowrap;
 }
 .command-palette-icon {
   display: inline-flex;
   flex-shrink: 0;
-  color: var(--ink-4);
+  color: var(--ink-3);
+}
+.command-palette-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.command-palette-place {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink-3);
+  text-overflow: ellipsis;
+}
+.command-palette-age {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding-left: 16px;
+  color: var(--ink-3);
 }
 .command-palette-item[data-selected="true"] {
   background: var(--surface-2);
-  color: var(--ink);
-}
-.command-palette-item[data-selected="true"] .command-palette-icon {
-  color: var(--ink-3);
 }
 
 /* A skill under the pointer in a message: its image beside its name, the call in the mark's blue

@@ -5,10 +5,10 @@
  * menuPopup       drops out of its trigger: r16, padding 6, --float-fill, no border or shadow.
  * menuGrowPopup   grows out of the pill it covers, r18 to r20 over 420ms. Position it over the
  *                 trigger with growOffset. Flipped above the trigger it drops instead.
- * menuItem        a 36px r10 row; the fill step on highlight, faint when disabled.
+ * menuItem        a 34px r10 row; the fill step on highlight, faint when disabled.
  * menuItemDanger  a destructive row, in --bad.
  * menuItemDetail  a row with a second line under its label (label, then a faint hint).
- * menuSeparator   a hairline between groups of rows.
+ * menuSeparator   a hairline between kinds of action; a destructive row comes last, after one.
  *
  * Floating layers take data-ground from useAnchorGround (lib/use-anchor-ground.ts) or a fixed
  * "plane" when their trigger always sits on one.

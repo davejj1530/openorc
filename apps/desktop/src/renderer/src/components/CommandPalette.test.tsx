@@ -80,18 +80,22 @@ it("puts New file in the focused thread's folder", () => {
   expect(useUi.getState().newFile).toEqual({ kind: "thread", id: "focused" });
 });
 
-it("finds an Orcling by name, lists its own conversation only under Orclings, and opens it", async () => {
+it("lists recent threads with their age before a word is typed, finds an Orcling by name, lists its own conversation only under Orclings, and opens it", async () => {
   const results: Partial<Record<RpcMethod, unknown>> = {
     "orclings.list": [{ id: "rini", name: "Rini", threadId: "rini-home" }],
     "threads.list": [
-      { id: "rini-home", title: "Rini", activity: "idle", session: { status: "idle", message: null }, unread: false },
-      { id: "notes", title: "Notes", activity: "idle", session: { status: "idle", message: null }, unread: false },
+      { id: "rini-home", title: "Rini", activity: "idle", session: { status: "idle", message: null }, unread: false, lastActivityAt: Date.now() },
+      { id: "notes", title: "Notes", activity: "idle", session: { status: "idle", message: null }, unread: false, lastActivityAt: Date.now() - 3 * 3_600_000 },
     ],
   };
   vi.mocked(core.call).mockImplementation((async (method: RpcMethod) => results[method] ?? []) as typeof core.call);
   render(<PaletteHost />);
   act(() => useUi.getState().setPalette(true));
-  await screen.findByRole("option", { name: "Notes" });
+  const notes = await screen.findByRole("option", { name: /^Notes/ });
+  expect(notes.textContent).toBe("Notes3h");
+  expect(screen.getByText("Recent")).toBeTruthy();
+  expect(screen.queryByRole("option", { name: /^Rini/ })).toBeNull();
+  fireEvent.change(screen.getByRole("combobox"), { target: { value: "Rini" } });
   await screen.findByText("Orclings");
   expect(screen.getAllByRole("option", { name: "Rini" })).toHaveLength(1);
   fireEvent.click(screen.getByRole("option", { name: "Rini" }));

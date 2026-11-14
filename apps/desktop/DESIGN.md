@@ -256,8 +256,8 @@ Corner radius is set per component:
 - 12: tall rows, sheet fields, and diff file heads.
 - 14: the browser viewport.
 - 16: drop menus, command, schedule, and toast cards, code blocks.
-- 18: popovers, the palette, prompt bubbles, permission, task, and MCP cards, settings cards.
-- 20: sheets, dialogs, grown menus (model, branch, context, slash), steps and question cards, the conversation composer.
+- 18: popovers, prompt bubbles, permission, task, and MCP cards, settings cards.
+- 20: the palette, sheets, dialogs, grown menus (model, branch, context, slash), steps and question cards, the conversation composer.
 - 22: the commit sheet and usage account cards.
 - 24: the New thread composer.
 - Full: buttons, chips, tracks, and send.
@@ -276,7 +276,7 @@ Motion uses tokens only: leaving 160ms; arriving 220ms with opacity, a 4px blur,
 
 Use the shared primitives in `components/ui.tsx`, `Segmented.tsx`, and `menu.ts`. Primary is the ink pill, secondary and danger rest on `--control-fill` (danger with a `--bad` label), ghost is bare with a fill hover. `hover-step` layers the fill step over a control's own fill so hover reads on tile and plane. Segmented controls are a fill track at natural width with a surface knob that slides over 320ms. Switches are an ink track when on and `--surface-3` when off. Fields are fills with no border; focus deepens the fill instead of drawing a ring, while buttons, chips, and segmented choices draw a 2px `--ring` outline on keyboard focus. Badges are neutral fill pills; status reads as a 7px `StatusDot` and a word.
 
-Menus are r16 with 36px r10 rows, muted glyphs, and hairline separators. Grown menus (model, branch, mode) open out of their pill into an r20 layer. Tooltips are fill-step labels, opened once per group without a second delay. A plain line takes `data-tip` on its element, which the window's one tip layer opens (`TipLayer`); `Tooltip` wraps a control whose tip is more than a line. Nothing uses the browser's `title`, which waits longer and draws outside the app's look; a frame keeps `title` as its name. A tip that only repeats its element's words opens when those words are cut off, and a disabled control's tip says why.
+Menus are all one size: r16 with padding 6 and 34px r10 rows, 15px glyphs in the third ink, a hairline between kinds of action, and the destructive one last after a hairline. The palette is the one search, a floating plane 600 wide and r20 over a 30% scrim, its field 48px at lead size with "Search" as its placeholder; before a word is typed it lists recent threads, then actions; searching it lists threads, Orclings, tasks, messages and projects in 38px rows, each with its mark (a thread's state or the working cube, else its agent's), its place in faint ink and its age at the end. Grown menus (model, branch, mode) open out of their pill into an r20 layer. Tooltips are fill-step labels, opened once per group without a second delay. A plain line takes `data-tip` on its element, which the window's one tip layer opens (`TipLayer`); `Tooltip` wraps a control whose tip is more than a line. Nothing uses the browser's `title`, which waits longer and draws outside the app's look; a frame keeps `title` as its name. A tip that only repeats its element's words opens when those words are cut off, and a disabled control's tip says why.
 
 ### Sidebar
 

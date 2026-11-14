@@ -4,7 +4,7 @@ import { harnessCatalog, type AgentConnector, type Connector, type ConnectorList
 import { ConnectorLogo } from "../components/ConnectorLogo";
 import { HarnessLogo } from "../components/HarnessLogo";
 import { MoreHorizontal, Plus, RefreshCw } from "../components/icons";
-import { menuItem, menuItemDanger, menuPopup } from "../components/menu";
+import { menuItem, menuItemDanger, menuPopup, menuSeparator } from "../components/menu";
 import { Button, IconButton, Switch, Tooltip } from "../components/ui";
 import { CoversPreview } from "../lib/browser-preview";
 import { useRpc, useRpcMutation } from "../lib/client";
@@ -82,9 +82,12 @@ function RowMenu({ connector, onEdit, onProblem }: { connector: Connector; onEdi
               </Menu.Item>
             ) : null}
             {isYours(connector) ? (
-              <Menu.Item className={menuItemDanger} onClick={() => remove.mutate({ name: connector.name }, report)}>
-                Remove
-              </Menu.Item>
+              <>
+                <Menu.Separator className={menuSeparator} />
+                <Menu.Item className={menuItemDanger} onClick={() => remove.mutate({ name: connector.name }, report)}>
+                  Remove
+                </Menu.Item>
+              </>
             ) : null}
           </Menu.Popup>
         </Menu.Positioner>

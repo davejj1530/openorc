@@ -16,6 +16,7 @@ import { SidebarSettings } from "./SidebarSettings";
 import { SidebarThreadBrowser } from "./SidebarThreadBrowser";
 import { HistoryButtons, SidebarToggle } from "./WindowCorner";
 import { useSidebarHistory } from "../lib/sidebar-history";
+import { OrganizationChat } from "./OrganizationChat";
 
 /**
  * The sidebar, one column with a hairline at its edge from the window's top to its foot: its header, the app's screens
@@ -50,6 +51,7 @@ export function Sidebar() {
               <SidebarOrclings route={route} />
             </div>
           ) : null}
+          <OrganizationChat />
         </div>
         <SidebarFooter />
       </aside>

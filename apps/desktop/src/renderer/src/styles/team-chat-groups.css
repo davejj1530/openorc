@@ -1,0 +1,41 @@
+.team-group-selected {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.team-group-person-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 4px 8px 4px 4px;
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  font-size: var(--text-sm);
+}
+.team-group-person-chip > span:not(.account-face) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.team-group-person-chip .account-face {
+  width: 20px;
+  height: 20px;
+}
+.team-group-person-chip > svg {
+  flex-shrink: 0;
+}
+.team-group-empty {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  min-height: 120px;
+  gap: 16px;
+  color: var(--ink-3);
+  font-size: var(--text-md);
+}
+.team-group-departed {
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+}

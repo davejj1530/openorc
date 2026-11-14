@@ -3,7 +3,8 @@ import { teamChatRpcParams, type TeamChatPerson } from "@openorc/protocol";
 import { cn } from "../lib/cn";
 import type { TeamChatContextValue } from "../lib/team-chat-context";
 import { core } from "../lib/rpc";
-import { openCreatedChannel, useTeamChannelAction } from "../lib/team-channel-actions";
+import { useTeamChannelAction } from "../lib/team-channel-actions";
+import { openTeamConversation } from "../lib/team-chat-open";
 import { Button, Dialog, Input } from "./ui";
 import { Check, Hash, Lock, Plus } from "./icons";
 import { TeamChannelPeople } from "./TeamChannelPeople";
@@ -28,7 +29,7 @@ export function TeamChannelDialog({ scope, organizationName, people, onClose }: 
     void action.run(
       () => core.call("teamChat.createChannel", input.data),
       (conversation) => {
-        openCreatedChannel(scope, conversation);
+        openTeamConversation(scope, conversation);
         onClose();
       },
     );

@@ -1,6 +1,7 @@
 import type { TeamConversation } from "@openorc/protocol";
 import type { TeamChatContextValue } from "../lib/team-chat-context";
-import { closeTeamChannel, useTeamChannelAction } from "../lib/team-channel-actions";
+import { useTeamChannelAction } from "../lib/team-channel-actions";
+import { closeTeamChatTab } from "../lib/team-chat-group-preferences";
 import { core } from "../lib/rpc";
 import { Button, Dialog } from "./ui";
 
@@ -10,7 +11,7 @@ export function TeamChannelLeave({ scope, conversation, onCancel, onLeft }: { sc
     action.run(async () => {
       await core.call("teamChat.leaveChannel", { spaceId: scope.spaceId, conversationId: conversation.id });
       // A membership notification may already have closed this dialog. Close only the tab that was left.
-      closeTeamChannel(scope, conversation.id);
+      closeTeamChatTab(scope, conversation.id);
     }, onLeft);
   const offline = scope.reach === "offline";
   return (

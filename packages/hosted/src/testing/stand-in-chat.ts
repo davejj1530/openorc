@@ -14,6 +14,7 @@ const absent = (): Reply => ({ status: 404, body: { message: "That conversation 
 export class StandInChat {
   enabled = false;
   channelsEnabled = false;
+  groupsEnabled = false;
   readonly frozen = new Set<string>();
   readonly records = new Map<string, StandInChatRecord>();
   readonly #watches = new WeakMap<StandInPeer, Map<string, { spaceId: string; conversationId: string }>>();
@@ -65,11 +66,11 @@ export class StandInChat {
       return {
         status: 200,
         body: {
-          features: this.channelsEnabled ? ["base", "channels"] : ["base"],
+          features: ["base", ...(this.channelsEnabled ? ["channels"] : []), ...(this.groupsEnabled ? ["groups"] : [])],
           people: this.people(spaceId),
           conversations: this.#in(spaceId)
             .filter((record) => this.#readable(record, who))
-            .map(({ conversation }) => this.#view(conversation, who)),
+            .map(({ conversation }) => this.#view(spaceId, conversation, who)),
         },
       };
     return this.#conversationRoute(request, spaceId, who, body);
@@ -83,7 +84,7 @@ export class StandInChat {
     if (route) {
       const record = this.records.get(decodeURIComponent(route[1] ?? ""));
       if (!record || record.spaceId !== spaceId || !this.#readable(record, who)) return absent();
-      if (request.method === "GET" && !route[2]) return { status: 200, body: this.#view(record.conversation, who) };
+      if (request.method === "GET" && !route[2]) return { status: 200, body: this.#view(spaceId, record.conversation, who) };
       if (request.method === "GET" && route[2] === "timeline") return this.#timeline(record, request.query);
       if (request.method === "POST" && route[2] === "messages") return this.#send(record, who, body);
     }
@@ -126,8 +127,14 @@ export class StandInChat {
       ((record.conversation.kind === "channel" && !record.conversation.private) || record.conversation.members.some((person) => person.id === userOf(who)))
     );
   }
-  #view(conversation: TeamConversation, who: string): TeamConversation {
-    return this.#channels.view(conversation, who);
+  #view(spaceId: string, conversation: TeamConversation, who: string): TeamConversation {
+    if (conversation.kind === "channel") return this.#channels.view(conversation, who);
+    const people = this.people(spaceId);
+    const participants = (conversation.participants ?? []).map(({ person }) => {
+      const current = people.find((candidate) => candidate.id === person.id);
+      return { person: current ?? person, inOrganization: Boolean(current) };
+    });
+    return { ...conversation, participants, members: participants.filter((participant) => participant.inOrganization).map((participant) => participant.person) };
   }
 
   #open(spaceId: string, who: string, body: unknown): Reply {
@@ -139,7 +146,7 @@ export class StandInChat {
     const prior = this.#in(spaceId).find(
       ({ conversation }) => conversation.kind === "dm" && JSON.stringify(conversation.participants?.map(({ person }) => person.id).sort()) === JSON.stringify(userIds),
     );
-    return { status: 200, body: prior?.conversation ?? this.seed(spaceId, { userIds }) };
+    return { status: 200, body: this.#view(spaceId, prior?.conversation ?? this.seed(spaceId, { userIds }), who) };
   }
 
   #timeline(record: StandInChatRecord, query: URLSearchParams): Reply {

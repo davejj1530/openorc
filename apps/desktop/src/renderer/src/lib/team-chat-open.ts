@@ -1,11 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import type { TeamChatRow } from "@openorc/client";
-import type { TeamChatStatus } from "@openorc/protocol";
+import type { TeamChatStatus, TeamConversation } from "@openorc/protocol";
 import { useTeamChatContext, type TeamChatContextValue } from "./team-chat-context";
 import { chatStateKey } from "./team-chat-queries";
 import { core } from "./rpc";
 import { queryClient } from "./client";
 import { useRouter } from "./router";
+import { teamChatClosedGroups } from "./team-chat-group-preferences";
+
+export function openTeamConversation(scope: TeamChatContextValue, conversation: TeamConversation): void {
+  if (!scope.current()) return;
+  teamChatClosedGroups.reopen(scope, conversation.id);
+  queryClient.setQueryData<TeamChatStatus>(chatStateKey(scope), (state) =>
+    state?.state === "ready" ? { ...state, chat: { ...state.chat, conversations: [...state.chat.conversations.filter((item) => item.id !== conversation.id), conversation] } } : state,
+  );
+  useRouter.getState().navigate({ view: "team-chat", accountId: scope.accountId, spaceId: scope.spaceId, conversationId: conversation.id });
+}
 
 /** Every entry opens the same canonical conversation without moving a later destination. */
 export function useOpenTeamChat() {
@@ -29,10 +39,7 @@ export function useOpenTeamChat() {
     try {
       const conversation = row.kind === "person" ? await core.call("teamChat.openDm", { spaceId: scope.spaceId, userIds: [row.person.id] }) : row.conversation;
       if (!current()) return false;
-      queryClient.setQueryData<TeamChatStatus>(chatStateKey(scope), (old) =>
-        old?.state === "ready" ? { ...old, chat: { ...old.chat, conversations: [...old.chat.conversations.filter((item) => item.id !== conversation.id), conversation] } } : old,
-      );
-      useRouter.getState().navigate({ view: "team-chat", accountId: scope.accountId, spaceId: scope.spaceId, conversationId: conversation.id });
+      openTeamConversation(scope, conversation);
       return true;
     } catch (error) {
       if (current()) setFailure({ scope, row, message: error instanceof Error ? error.message : "Chat could not be opened." });

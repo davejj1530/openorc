@@ -26,9 +26,10 @@ export function TeamChatView({ target }: { target: TeamChatRoute }) {
 
 function AuthorizedChat({ scope, target }: { scope: TeamChatContextValue; target: TeamChatRoute }) {
   const state = useTeamChatState();
-  const conversation = state.data?.state === "ready" ? state.data.chat.conversations.find((conversation) => conversation.id === target.conversationId) : undefined;
-  const lost = state.data?.state === "ready" && !conversation;
-  const channels = state.data?.state === "ready" && state.data.chat.features.includes("channels");
+  const chat = state.data?.state === "ready" ? state.data.chat : undefined;
+  const conversation = chat?.conversations.find((conversation) => conversation.id === target.conversationId);
+  const lost = Boolean(chat && !conversation);
+  const channels = chat?.features.includes("channels") ?? false;
   useTeamChatWatch(scope, target.conversationId, Boolean(conversation));
   useEffect(() => {
     if (!lost) return;
@@ -47,7 +48,7 @@ function AuthorizedChat({ scope, target }: { scope: TeamChatContextValue; target
         }}
       />
     );
-  return <TeamChatConversation scope={scope} target={target} conversation={conversation} people={state.data?.state === "ready" ? state.data.chat.people : []} channels={channels} />;
+  return <TeamChatConversation scope={scope} target={target} conversation={conversation} people={chat?.people ?? []} channels={channels} groups={chat?.features.includes("groups") ?? false} />;
 }
 
 function ChatUnavailable({ message = "You no longer have access to this chat." }: { message?: string }) {

@@ -41,6 +41,7 @@ body:has(.sidebar-shell[data-open="true"]) .work-row[data-chat="true"] > .team-c
 .sidebar-chat-row > svg {
   flex-shrink: 0;
   width: 18px;
+  margin-inline: 1px;
 }
 .sidebar-chat-title {
   overflow: hidden;
@@ -72,6 +73,32 @@ body:has(.sidebar-shell[data-open="true"]) .work-row[data-chat="true"] > .team-c
 .team-chat-faces .account-face + .account-face {
   margin-left: -8px;
   box-shadow: 0 0 0 2px var(--bg);
+}
+/* A group takes one face's room: two smaller faces, one above and behind the other. */
+.team-chat-faces.team-chat-pair {
+  position: relative;
+  width: 20px;
+  height: 20px;
+}
+.team-chat-faces.team-chat-pair .account-face {
+  position: absolute;
+  width: 75%;
+  height: 75%;
+  margin: 0;
+  font-size: var(--text-2xs);
+  box-shadow: 0 0 0 1.5px var(--bg);
+}
+.team-chat-faces.team-chat-pair .account-face:first-child {
+  top: -10%;
+  left: -10%;
+}
+.team-chat-faces.team-chat-pair .account-face + .account-face {
+  right: -10%;
+  bottom: -10%;
+}
+.work-tab-icon.team-chat-pair {
+  width: 18px;
+  height: 18px;
 }
 .team-chat-heading {
   display: flex;

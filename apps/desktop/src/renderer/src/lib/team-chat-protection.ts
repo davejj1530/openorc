@@ -3,6 +3,7 @@ import type { SpacesStatus } from "@openorc/protocol";
 import type { QueryClient } from "@tanstack/react-query";
 import type { OrganizationAccessStore } from "./organization-access-store";
 import type { TeamChatDrafts } from "./team-chat-draft";
+import type { TeamChatClosedGroups } from "./team-chat-closed-groups";
 import type { TeamChatContextValue } from "./team-chat-context";
 import type { spaceNavigation } from "./space-navigation";
 
@@ -11,6 +12,7 @@ interface Dependencies {
   navigation: Pick<typeof spaceNavigation, "getState" | "subscribe">;
   queries: QueryClient;
   drafts: TeamChatDrafts;
+  closedGroups: TeamChatClosedGroups;
 }
 
 /** Chat leases combine the shared account authority with this window's selected space. */
@@ -44,7 +46,10 @@ export class TeamChatProtection {
       clear();
       if (!accountId) return;
       const removed = change.reason === "account" ? change.spaceIds : change.removed;
-      for (const spaceId of removed) drafts.forgetSpace(accountId, spaceId);
+      for (const spaceId of removed) {
+        drafts.forgetSpace(accountId, spaceId);
+        this.deps.closedGroups.forgetSpace(accountId, spaceId);
+      }
     });
     const selected = navigation.subscribe((next, before) => {
       if (next.current !== before.current || next.key !== before.key) clear();

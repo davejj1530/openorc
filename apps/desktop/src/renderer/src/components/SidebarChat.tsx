@@ -1,9 +1,9 @@
 import { useState, type ReactNode } from "react";
 import type { TeamChatRow } from "@openorc/client";
-import { cn } from "../lib/cn";
+import type { TeamConversation } from "@openorc/protocol";
 import { useTeamChatOrder } from "../lib/use-team-chat-order";
 import { SidebarListHead } from "./SidebarListHead";
-import { TeamChatFace, TeamConversationFace } from "./TeamChatFace";
+import { SidebarTeamChatRow } from "./SidebarTeamChatRow";
 import { Tooltip } from "./ui";
 import "../styles/team-chat.css";
 
@@ -16,8 +16,9 @@ export interface SidebarChatProps {
   onOpen(row: TeamChatRow): void;
   onRetry(): void;
   tools?: ReactNode;
+  onCloseGroup?: (conversation: TeamConversation) => void;
 }
-export function SidebarChat({ rows, self, selected, opening, error, onOpen, onRetry, tools }: SidebarChatProps) {
+export function SidebarChat({ rows, self, selected, opening, error, onOpen, onRetry, tools, onCloseGroup }: SidebarChatProps) {
   const [open, setOpen] = useState(true);
   const order = useTeamChatOrder(rows);
   return (
@@ -25,25 +26,9 @@ export function SidebarChat({ rows, self, selected, opening, error, onOpen, onRe
       <SidebarListHead label="Chat" fold={{ open, waiting: 0, onToggle: () => setOpen(!open) }} tools={tools} />
       {open ? (
         <div className="sidebar-chat-list">
-          {order.rows.map((row) => {
-            const conversationId = row.kind === "person" ? row.conversation?.id : row.conversation.id;
-            const pending = opening === row.id;
-            return (
-              <button
-                key={`${row.kind}:${row.id}`}
-                type="button"
-                className={cn("sidebar-chat-row", conversationId === selected && "sidebar-chat-row-current")}
-                aria-current={conversationId === selected ? "page" : undefined}
-                aria-busy={pending || undefined}
-                onClick={() => onOpen(row)}
-              >
-                {row.kind === "person" ? <TeamChatFace people={[row.person]} /> : <TeamConversationFace conversation={row.conversation} self={self} />}
-                <span className="sidebar-chat-title" data-tip={row.title}>
-                  {row.title}
-                </span>
-              </button>
-            );
-          })}
+          {order.rows.map((row) => (
+            <SidebarTeamChatRow key={`${row.kind}:${row.id}`} row={row} self={self} selected={selected} pending={opening === row.id} onOpen={onOpen} onCloseGroup={onCloseGroup} />
+          ))}
           {error ? (
             <div className="sidebar-chat-error">
               <Tooltip label={error}>

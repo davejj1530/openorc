@@ -1,6 +1,6 @@
 import type { TeamConversation } from "@openorc/protocol";
 import type { ReactNode } from "react";
-import { teamConversationTitle } from "@openorc/client";
+import { teamChatShortNames, teamConversationTitle } from "@openorc/client";
 import { TopBar } from "./TopBar";
 import { ThreadTabs } from "./ThreadTabs";
 import { TeamChatFace, TeamConversationFace } from "./TeamChatFace";
@@ -24,7 +24,8 @@ export interface TeamChatProps extends TeamChatTranscriptProps {
 }
 export function TeamChat(props: TeamChatProps) {
   const title = teamConversationTitle(props.conversation, props.self);
-  const placeholder = props.conversation.kind === "channel" ? `Message #${title}…` : `Message ${title}…`;
+  const placeholder = props.conversation.kind === "channel" ? `Message #${title}…` : `Message ${spokenList(teamChatShortNames(others(props.conversation, props.self)))}…`;
+  const group = props.conversation.kind === "channel" || others(props.conversation, props.self).length > 1;
   return (
     <main className="well flex-1 min-w-0 flex flex-col team-chat">
       <TopBar tabs>
@@ -32,7 +33,7 @@ export function TeamChat(props: TeamChatProps) {
       </TopBar>
       <header className="team-chat-heading">
         {props.onDetails ? (
-          <button type="button" className="team-chat-heading-name" onClick={props.onDetails} aria-label={`Details for #${title}`}>
+          <button type="button" className="team-chat-heading-name" onClick={props.onDetails} aria-label={`Details for ${props.conversation.kind === "channel" ? "#" : ""}${title}`}>
             <TeamConversationFace conversation={props.conversation} self={props.self} />
             <span>{title}</span>
             <ChevronDown size={12} />
@@ -43,7 +44,7 @@ export function TeamChat(props: TeamChatProps) {
             <span>{title}</span>
           </div>
         )}
-        {props.conversation.kind === "channel" ? (
+        {group ? (
           <div className="team-chat-heading-people">
             <TeamChatFace people={props.conversation.members} max={3} />
             <span>{props.conversation.members.length}</span>
@@ -63,6 +64,9 @@ export function TeamChat(props: TeamChatProps) {
     </main>
   );
 }
+
+const others = (conversation: TeamConversation, self: string) => (conversation.participants ?? []).flatMap(({ person }) => (person.id === self ? [] : [person]));
+const spokenList = (names: readonly string[]) => (names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : (names[0] ?? "this chat"));
 
 function TeamChatBody(props: TeamChatProps) {
   if (props.loading)

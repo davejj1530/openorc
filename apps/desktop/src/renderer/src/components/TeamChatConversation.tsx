@@ -7,6 +7,7 @@ import { useTeamChatVisible } from "../lib/team-chat-visibility";
 import { TeamChat } from "./TeamChat";
 import { TeamChannelJoin } from "./TeamChannelJoin";
 import { TeamChannelDetails } from "./TeamChannelDetails";
+import { TeamChatDetails } from "./TeamChatDetails";
 
 export function TeamChatConversation({
   scope,
@@ -14,18 +15,27 @@ export function TeamChatConversation({
   conversation,
   people,
   channels,
+  groups,
 }: {
   scope: TeamChatContextValue;
   target: TeamChatRoute;
   conversation: TeamConversation;
   people: TeamChatPerson[];
   channels: boolean;
+  groups: boolean;
 }) {
   const content = useTeamChatConversation(scope, target, conversation);
   const [details, setDetails] = useState(false);
   const visible = useTeamChatVisible();
   if (details && !visible) setDetails(false);
   const names = conversation.kind === "channel" || (conversation.participants?.length ?? 0) > 2;
+  const hasDetails = conversation.kind === "channel" ? channels : groups;
+  const detail =
+    conversation.kind === "channel" ? (
+      <TeamChannelDetails scope={scope} conversation={conversation} people={people} onClose={() => setDetails(false)} />
+    ) : (
+      <TeamChatDetails scope={scope} conversation={conversation} onClose={() => setDetails(false)} />
+    );
   return (
     <>
       <TeamChat
@@ -34,9 +44,9 @@ export function TeamChatConversation({
         people={people}
         names={names}
         {...(!conversation.joined && { footer: <TeamChannelJoin scope={scope} conversationId={conversation.id} /> })}
-        {...(channels && conversation.kind === "channel" && { onDetails: () => setDetails(true) })}
+        {...(hasDetails && { onDetails: () => setDetails(true) })}
       />
-      {details && channels ? <TeamChannelDetails scope={scope} conversation={conversation} people={people} onClose={() => setDetails(false)} /> : null}
+      {details && hasDetails ? detail : null}
     </>
   );
 }

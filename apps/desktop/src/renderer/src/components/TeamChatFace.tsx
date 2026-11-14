@@ -17,5 +17,6 @@ export function TeamConversationFace({ conversation, self, className }: { conver
     const Icon = conversation.private ? Lock : Hash;
     return <Icon size={18} className={className} />;
   }
-  return <TeamChatFace people={(conversation.participants ?? []).flatMap(({ person }) => (person.id === self ? [] : [person]))} className={className} />;
+  const others = (conversation.participants ?? []).flatMap(({ person }) => (person.id === self ? [] : [person]));
+  return <TeamChatFace people={others} className={cn(others.length > 1 && "team-chat-pair", className)} />;
 }

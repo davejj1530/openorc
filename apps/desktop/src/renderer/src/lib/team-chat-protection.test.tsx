@@ -3,11 +3,13 @@ import { QueryClient } from "@tanstack/react-query";
 import type { SpacesStatus } from "@openorc/protocol";
 import { OrganizationAccessStore } from "./organization-access-store";
 import { TeamChatDrafts } from "./team-chat-draft";
+import { TeamChatClosedGroups } from "./team-chat-closed-groups";
 import { TeamChatProtection } from "./team-chat-protection";
 import { spaceNavigation } from "./space-navigation";
 
 const target = { accountId: "self", spaceId: "team", conversationId: "general" };
 const other = { ...target, spaceId: "other" };
+const group = { id: "group", kind: "dm" as const, lastMessageSeq: 4, participants: ["self", "one", "two"].map((id) => ({ person: { id, name: id, image: null }, inOrganization: true })) };
 function status(): Extract<SpacesStatus, { state: "ready" }> {
   return {
     state: "ready",
@@ -45,7 +47,8 @@ async function fixture() {
   const gate = new OrganizationAccessStore({ now: Date.now, read: async () => answer });
   const queries = new QueryClient();
   const drafts = new TeamChatDrafts(localStorage);
-  const protection = new TeamChatProtection({ gate, queries, drafts, navigation: spaceNavigation });
+  const closedGroups = new TeamChatClosedGroups(localStorage);
+  const protection = new TeamChatProtection({ gate, queries, drafts, closedGroups, navigation: spaceNavigation });
   stops.push(
     () => gate.dispose(),
     () => queries.clear(),
@@ -56,10 +59,13 @@ async function fixture() {
   queries.setQueryData(["team-chat", "self", "team", scope.generation, "timeline"], "Private history");
   drafts.write(target, "Keep through a frozen seat");
   drafts.write(other, "Other team draft");
+  closedGroups.close(target, group);
+  closedGroups.close(other, group);
   return {
     gate,
     queries,
     drafts,
+    closedGroups,
     scope,
     protection,
     answer: (next: typeof answer) => {
@@ -84,6 +90,7 @@ it("closes cached history before rendering at the offline grace deadline and pre
   expect(cachedAtClosure).toBe(0);
   expect(f.scope.current()).toBe(false);
   expect(f.drafts.read(target).text).toBe("Keep through a frozen seat");
+  expect(f.closedGroups.isClosed(target, group)).toBe(true);
   f.answer(status());
   await f.gate.refresh();
   expect(f.protection.scope(status(), "team")?.current()).toBe(true);
@@ -106,6 +113,8 @@ it("forgets only a removed membership's drafts and clears protected history", as
   f.answer({ ...fresh, spaces: fresh.spaces.filter((space) => space.id !== "team") });
   await f.gate.refresh();
   expect(f.drafts.read(target).text).toBe("");
+  expect(f.closedGroups.isClosed(target, group)).toBe(false);
+  expect(f.closedGroups.isClosed(other, group)).toBe(true);
   expect(f.drafts.read(other).text).toBe("Other team draft");
   expect(f.queries.getQueryCache().getAll()).toEqual([]);
   expect(f.scope.current()).toBe(false);

@@ -1,4 +1,4 @@
-import { teamChatRoster } from "@openorc/client";
+import { closeTeamGroup, useTeamChatRoster } from "../lib/team-chat-group-preferences";
 import { useTeamChatContext } from "../lib/team-chat-context";
 import { useTeamChatState } from "../lib/team-chat-queries";
 import { useOpenTeamChat } from "../lib/team-chat-open";
@@ -12,6 +12,7 @@ export function OrganizationChat() {
   const state = useTeamChatState();
   const route = useRouter((s) => s.route);
   const action = useOpenTeamChat();
+  const rows = useTeamChatRoster(scope, state.data?.state === "ready" ? state.data.chat : undefined);
   if (!scope || state.data?.state === "unavailable") return null;
   if (state.data?.state !== "ready")
     return state.error ? (
@@ -30,7 +31,7 @@ export function OrganizationChat() {
   return (
     <SidebarChat
       tools={state.data.chat.features.includes("channels") ? <TeamChatAddMenu key={JSON.stringify([scope.accountId, scope.spaceId, scope.generation])} scope={scope} chat={state.data.chat} /> : null}
-      rows={teamChatRoster(state.data.chat, scope.accountId)}
+      rows={rows}
       self={scope.accountId}
       selected={route.view === "team-chat" ? route.conversationId : null}
       opening={action.opening}
@@ -38,6 +39,7 @@ export function OrganizationChat() {
       onOpen={(row) => {
         void action.open(row);
       }}
+      onCloseGroup={(conversation) => closeTeamGroup(scope, conversation)}
       onRetry={() => {
         void action.retry();
       }}

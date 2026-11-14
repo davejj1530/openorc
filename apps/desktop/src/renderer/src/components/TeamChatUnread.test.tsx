@@ -159,6 +159,11 @@ it("tags a person picked from the list as their identity and draws their first n
 it("draws a sent tag as the person's full name and copies names, never tokens", async () => {
   const writeText = vi.fn(async () => {});
   vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+  const odd = { id: "user-robin@example.com", name: "Robin Lee", image: null };
+  const linked = render(<TeamChatMessage message={message(5, `@[user:${odd.id}] and *@[user:${robin.id}]*`, casey)} self="self" people={[robin, odd]} reason={null} onReact={() => {}} />);
+  await waitFor(() => expect([...linked.container.querySelectorAll(".person-token")].map((mark) => mark.textContent)).toEqual(["@Robin Lee", "@Robin Patel"]));
+  expect(linked.container.querySelector("a")).toBeNull();
+  cleanup();
   const view = render(
     <TeamChatMessage message={message(4, `@[user:${robin.id}] can you check the **notes**? @[user:gone]`, casey)} self="self" people={[robin, casey]} reason={null} onReact={() => {}} />,
   );

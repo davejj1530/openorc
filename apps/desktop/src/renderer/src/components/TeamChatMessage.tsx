@@ -9,7 +9,7 @@ import { Copy, SmilePlus } from "./icons";
 import { menuItem, menuPopup } from "./menu";
 import { TeamChatReactionPicker, TeamChatReactions } from "./TeamChatReactions";
 import { defaultRehypePlugins } from "streamdown";
-import { personTagText, rehypePersonTags } from "../lib/rehype-person-tags";
+import { holdPersonTags, personTagText, rehypePersonTags } from "../lib/rehype-person-tags";
 import { RichText } from "./RichText";
 import { ThreadRichText, threadMarkdownComponents, threadUrlTransform } from "./ThreadImages";
 import { Tooltip } from "./ui";
@@ -98,19 +98,20 @@ export function TeamChatMessage({
 
 /** A message that tags people: the same Markdown, with each tag drawn as the person's name. */
 function TaggedText({ body, people }: { body: string; people: readonly TeamChatPerson[] }) {
+  const held = useMemo(() => holdPersonTags(body), [body]);
   const plugins = useMemo<NonNullable<Parameters<typeof RichText>[0]["rehypePlugins"]>>(
     () => [
       defaultRehypePlugins.raw!,
       ...Object.entries(defaultRehypePlugins)
         .filter(([name]) => name !== "raw")
         .map(([, plugin]) => plugin),
-      [rehypePersonTags, { names: people.map((person) => [person.id, person.name] as const) }],
+      [rehypePersonTags, { names: people.map((person) => [person.id, person.name] as const), ids: held.ids }],
     ],
-    [people],
+    [people, held.ids],
   );
   return (
     <RichText mode="static" components={threadMarkdownComponents} urlTransform={threadUrlTransform} rehypePlugins={plugins}>
-      {body}
+      {held.text}
     </RichText>
   );
 }

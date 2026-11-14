@@ -2,6 +2,7 @@ import { useId, type RefObject } from "react";
 import type { TeamChatPerson } from "@openorc/protocol";
 import { AccountFace } from "./AccountFace";
 import { ComposerSuggestions } from "./ComposerSuggestions";
+import "../styles/team-chat-unread.css";
 
 /** Teammates the `@` word at the caret may tag, by face and full name; picking writes their structured tag. */
 export function TeamChatTagPicker({

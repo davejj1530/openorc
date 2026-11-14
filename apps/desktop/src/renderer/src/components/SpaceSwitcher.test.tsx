@@ -1,7 +1,9 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { OrganizationSpace, SpacesStatus } from "@openorc/protocol";
 import { OrganizationContext, type OrganizationActions } from "../lib/organization-context";
+import { core } from "../lib/rpc";
 import { SpaceSwitcher } from "./SpaceSwitcher";
 import { TooltipProvider } from "./ui";
 
@@ -41,16 +43,21 @@ function actions(patch: Partial<OrganizationActions> = {}): OrganizationActions 
     ...patch,
   };
 }
+let queries = new QueryClient();
 function view(value: OrganizationActions) {
   return (
-    <TooltipProvider>
-      <OrganizationContext.Provider value={value}>
-        <SpaceSwitcher fallback={<span>Wordmark</span>} />
-      </OrganizationContext.Provider>
-    </TooltipProvider>
+    <QueryClientProvider client={queries}>
+      <TooltipProvider>
+        <OrganizationContext.Provider value={value}>
+          <SpaceSwitcher fallback={<span>Wordmark</span>} />
+        </OrganizationContext.Provider>
+      </TooltipProvider>
+    </QueryClientProvider>
   );
 }
 beforeEach(() => {
+  queries = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  vi.mocked(core.call).mockReset();
   vi.stubGlobal(
     "ResizeObserver",
     class {
@@ -96,4 +103,14 @@ it("keeps Personal checked on a first read failure with an explicit retry and a 
   await waitFor(() => expect(value.refresh).toHaveBeenCalledTimes(1));
   expect(value.create).not.toHaveBeenCalled();
   expect(screen.queryByLabelText(/invitation waiting/)).toBeNull();
+});
+
+it("adds unread chat in another organization to the one neutral dot, with its words on demand and on its menu row", async () => {
+  vi.mocked(core.call).mockImplementation((async (method: string) => (method === "teamChat.unreadSpaces" ? { spaceIds: ["birch"] } : undefined)) as typeof core.call);
+  render(view(actions({ organization: null })));
+  const trigger = await screen.findByRole("button", { name: "Switch space, OpenOrc, unread chat in Birch Studio" });
+  expect(screen.getByLabelText("Unread chat in Birch Studio")).toBeTruthy();
+  fireEvent.click(trigger);
+  const row = await screen.findByRole("menuitemradio", { name: /Birch Studio/ });
+  expect(row.querySelector('[aria-label="Unread chat"]')).toBeTruthy();
 });

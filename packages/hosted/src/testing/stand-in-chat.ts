@@ -4,6 +4,7 @@ import { chatWatch } from "../wire-chat.js";
 import { userOf, type StandInSpaces } from "./stand-in-spaces.js";
 import type { StandInPeer, StandInThreads } from "./stand-in-threads.js";
 import { StandInChatChannels } from "./stand-in-chat-channels.js";
+import { StandInChatReads } from "./stand-in-chat-reads.js";
 
 type Reply = { status: number; body: unknown };
 type Request = { method: string; path: string; query: URLSearchParams; space: string | null };
@@ -15,6 +16,8 @@ export class StandInChat {
   enabled = false;
   channelsEnabled = false;
   groupsEnabled = false;
+  unreadEnabled = false;
+  readonly reads = new StandInChatReads();
   readonly frozen = new Set<string>();
   readonly records = new Map<string, StandInChatRecord>();
   readonly #watches = new WeakMap<StandInPeer, Map<string, { spaceId: string; conversationId: string }>>();
@@ -57,6 +60,7 @@ export class StandInChat {
   route(request: Request, who: string, body: unknown): Reply | null {
     if (!request.path.startsWith("/chat/")) return null;
     if (!this.enabled) return absent();
+    if (request.method === "GET" && request.path === "/chat/unread-spaces") return this.#unreadSpaces(who);
     const spaceId = request.space;
     if (!spaceId) return { status: 400, body: { message: "Name the organization in x-openorc-space." } };
     if (!this.deps.spaces.teams.has(spaceId) || !this.deps.spaces.readers(spaceId).includes(who)) return absent();
@@ -66,7 +70,7 @@ export class StandInChat {
       return {
         status: 200,
         body: {
-          features: ["base", ...(this.channelsEnabled ? ["channels"] : []), ...(this.groupsEnabled ? ["groups"] : [])],
+          features: ["base", ...(this.channelsEnabled ? ["channels"] : []), ...(this.groupsEnabled ? ["groups"] : []), ...(this.unreadEnabled ? ["unread"] : [])],
           people: this.people(spaceId),
           conversations: this.#in(spaceId)
             .filter((record) => this.#readable(record, who))
@@ -78,17 +82,20 @@ export class StandInChat {
 
   #conversationRoute(request: Request, spaceId: string, who: string, body: unknown): Reply {
     if (request.method === "POST" && request.path === "/chat/dms") return this.#open(spaceId, who, body);
-    const channel = this.#channels.route(request, spaceId, who, body);
-    if (channel) return channel;
-    const route = /^\/chat\/conversations\/([^/]+)(?:\/(timeline|messages))?$/.exec(request.path);
-    if (route) {
-      const record = this.records.get(decodeURIComponent(route[1] ?? ""));
-      if (!record || record.spaceId !== spaceId || !this.#readable(record, who)) return absent();
-      if (request.method === "GET" && !route[2]) return { status: 200, body: this.#view(spaceId, record.conversation, who) };
-      if (request.method === "GET" && route[2] === "timeline") return this.#timeline(record, request.query);
-      if (request.method === "POST" && route[2] === "messages") return this.#send(record, who, body);
-    }
-    return this.#reactionRoute(request, spaceId, who, body);
+    return this.#channels.route(request, spaceId, who, body) ?? this.#recordRoute(request, spaceId, who, body) ?? this.#reactionRoute(request, spaceId, who, body);
+  }
+
+  #recordRoute(request: Request, spaceId: string, who: string, body: unknown): Reply | null {
+    const route = /^\/chat\/conversations\/([^/]+)(?:\/(timeline|messages|seen))?$/.exec(request.path);
+    if (!route) return null;
+    const record = this.records.get(decodeURIComponent(route[1] ?? ""));
+    if (!record || record.spaceId !== spaceId || !this.#readable(record, who)) return absent();
+    const action = `${request.method} ${route[2] ?? ""}`;
+    if (action === "GET ") return { status: 200, body: this.#view(spaceId, record.conversation, who) };
+    if (action === "GET timeline") return this.#timeline(record, request.query, who);
+    if (action === "POST messages") return this.#send(record, who, body);
+    if (action === "PUT seen" && this.unreadEnabled) return this.reads.seen(record, who, body);
+    return absent();
   }
 
   #reactionRoute(request: Request, spaceId: string, who: string, body: unknown): Reply {
@@ -128,6 +135,11 @@ export class StandInChat {
     );
   }
   #view(spaceId: string, conversation: TeamConversation, who: string): TeamConversation {
+    const viewed = this.#fixed(spaceId, conversation, who);
+    const record = this.records.get(conversation.id);
+    return this.unreadEnabled && record ? { ...viewed, read: viewed.joined ? this.reads.read(record, who) : null } : viewed;
+  }
+  #fixed(spaceId: string, conversation: TeamConversation, who: string): TeamConversation {
     if (conversation.kind === "channel") return this.#channels.view(conversation, who);
     const people = this.people(spaceId);
     const participants = (conversation.participants ?? []).map(({ person }) => {
@@ -149,7 +161,12 @@ export class StandInChat {
     return { status: 200, body: this.#view(spaceId, prior?.conversation ?? this.seed(spaceId, { userIds }), who) };
   }
 
-  #timeline(record: StandInChatRecord, query: URLSearchParams): Reply {
+  #unreadSpaces(who: string): Reply {
+    if (!this.unreadEnabled) return { status: 200, body: { spaces: [] } };
+    return this.reads.unreadSpaces([...this.records.values()], who, (spaceId) => this.deps.spaces.readers(spaceId).includes(who) && !this.frozen.has(who));
+  }
+
+  #timeline(record: StandInChatRecord, query: URLSearchParams, who: string): Reply {
     const before = query.has("beforeSeq") ? Number(query.get("beforeSeq")) : Infinity;
     const after = query.has("afterSeq") ? Number(query.get("afterSeq")) : 0;
     const matching = record.messages.filter((message) => message.seq < before && message.seq > after);
@@ -161,7 +178,7 @@ export class StandInChat {
         older: record.messages.some((message) => message.seq < (messages[0]?.seq ?? 0)),
         newer: record.messages.some((message) => message.seq > (messages.at(-1)?.seq ?? 0)),
         headSeq: record.conversation.lastMessageSeq,
-        read: null,
+        read: this.unreadEnabled ? this.reads.read(record, who) : null,
       },
     };
   }
@@ -171,6 +188,8 @@ export class StandInChat {
     const { parentId: _parent, fileIds: _files, ...text } = { parentId: null, fileIds: [], ...fields };
     const input = teamChatRpcParams["teamChat.send"].safeParse({ ...text, spaceId: record.spaceId, conversationId: record.conversation.id });
     if (!input.success) return { status: 400, body: { message: "Write a message first." } };
+    const refusal = this.unreadEnabled ? this.reads.refusal(record, input.data.body, this.people(record.spaceId)) : null;
+    if (refusal) return refusal;
     const previous = this.#in(record.spaceId)
       .flatMap((each) => each.messages)
       .find((message) => message.id === input.data.id);

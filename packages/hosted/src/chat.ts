@@ -233,6 +233,10 @@ export class TeamChat {
   }
 
   #invalidate(spaceId?: string, conversationId?: string): void {
-    this.deps.push({ type: "invalidate", keys: spaceId ? [`team-chat:${spaceId}`, ...(conversationId ? [`team-chat:${spaceId}:${conversationId}`] : [])] : ["team-chat"] });
+    // The switcher's unread organizations follow every chat change, here or in another space.
+    this.deps.push({
+      type: "invalidate",
+      keys: spaceId ? [`team-chat:${spaceId}`, ...(conversationId ? [`team-chat:${spaceId}:${conversationId}`] : []), "team-chat-unread"] : ["team-chat", "team-chat-unread"],
+    });
   }
 }

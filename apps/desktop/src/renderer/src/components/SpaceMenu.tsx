@@ -11,16 +11,25 @@ import { OrganizationMark } from "./OrganizationMark";
 import { Check, People, PersonPlus, Plus } from "./icons";
 import { menuItem, menuSeparator } from "./menu";
 import { ReceivedInvitationRow } from "./ReceivedInvitationRow";
-import { TextButton } from "./ui";
+import { TextButton, Tooltip } from "./ui";
+import { useUnreadChatSpaces } from "../lib/team-chat-unread";
 
 export function SpaceMenu({ actions }: { actions: OrganizationActions }) {
   const current = useSpaceNavigation((state) => state.current);
   const data = actions.status?.state === "ready" ? actions.status : null;
   const spaces = data ? [...data.spaces.filter((space) => space.kind === "organization"), ...data.spaces.filter((space) => space.kind === "personal")] : [];
+  const unread = useUnreadChatSpaces(data?.userId ?? null);
   return (
     <>
       {spaces.map((space) => (
-        <SpaceRow key={space.id} space={space} person={actions.person} checked={space.id === (current ?? data?.personalSpaceId)} onClick={() => actions.select(space.id)} />
+        <SpaceRow
+          key={space.id}
+          space={space}
+          person={actions.person}
+          checked={space.id === (current ?? data?.personalSpaceId)}
+          unread={space.id !== current && unread.includes(space.id)}
+          onClick={() => actions.select(space.id)}
+        />
       ))}
       {!data ? <SpaceRow space={{ id: "", kind: "personal" }} person={actions.person} checked onClick={() => {}} /> : null}
       {!data ? <SpaceReadState actions={actions} /> : null}
@@ -53,7 +62,7 @@ export function SpaceMenu({ actions }: { actions: OrganizationActions }) {
   );
 }
 
-function SpaceRow({ space, person, checked, onClick }: { space: Space; person: string; checked: boolean; onClick(): void }) {
+function SpaceRow({ space, person, checked, unread = false, onClick }: { space: Space; person: string; checked: boolean; unread?: boolean; onClick(): void }) {
   const label = space.kind === "personal" ? "Personal" : space.name;
   return (
     <Menu.Item className={cn(menuItem, "space-menu-row")} role="menuitemradio" aria-checked={checked} onClick={onClick}>
@@ -62,6 +71,11 @@ function SpaceRow({ space, person, checked, onClick }: { space: Space; person: s
         <span data-tip={label}>{label}</span>
         <span className="space-menu-detail">{space.kind === "personal" ? person : `${space.memberCount} ${space.memberCount === 1 ? "person" : "people"}`}</span>
       </span>
+      {unread ? (
+        <Tooltip label="Unread chat">
+          <span className="space-menu-unread" role="img" aria-label="Unread chat" />
+        </Tooltip>
+      ) : null}
       {checked ? <Check size={14} /> : null}
     </Menu.Item>
   );

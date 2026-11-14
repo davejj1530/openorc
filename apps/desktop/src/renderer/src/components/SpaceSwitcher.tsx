@@ -4,6 +4,8 @@ import { CoversPreview } from "../lib/browser-preview";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { useOrganization } from "../lib/organization-context";
 import { useSpaceLabel } from "../lib/space-label";
+import { useSpaceNavigation } from "../lib/space-navigation";
+import { useUnreadChatSpaces } from "../lib/team-chat-unread";
 import { ChevronsUpDown } from "./icons";
 import { OpenOrcMark } from "./OpenOrcMark";
 import { OrganizationMark } from "./OrganizationMark";
@@ -19,17 +21,23 @@ export function SpaceSwitcher({ fallback = null, hidden = false }: { fallback?: 
   const organization = actions?.organization;
   const label = organization?.name ?? "OpenOrc";
   const fit = useSpaceLabel(label, actions?.signedIn === true);
+  const status = actions?.status?.state === "ready" ? actions.status : null;
+  const unread = useUnreadChatSpaces(status?.userId ?? null);
+  const current = useSpaceNavigation((state) => state.current);
   if (!actions?.signedIn) return fallback;
-  const count = actions.status?.state === "ready" ? actions.status.invitations.length : 0;
+  const count = status ? status.invitations.length : 0;
+  const chats = (status?.spaces ?? []).flatMap((space) => (space.kind === "organization" && space.id !== current && unread.includes(space.id) ? [space.name] : []));
   return (
     <Menu.Root open={open} onOpenChange={setOpen}>
       <Menu.Trigger
         ref={fit.button}
         className={cn("space-switcher no-drag", hidden && "space-switcher-hidden")}
-        aria-label={`Switch space, ${label}${count ? `, ${count} invitation${count === 1 ? "" : "s"}` : ""}`}
+        aria-label={`Switch space, ${label}${count ? `, ${count} invitation${count === 1 ? "" : "s"}` : ""}${chats.length ? `, unread chat in ${chats.join(", ")}` : ""}`}
         data-tip={fit.clipped ? label : undefined}
       >
-        <InvitationIndicator count={count}>{organization ? <OrganizationMark {...organization} /> : <OpenOrcMark size={16} />}</InvitationIndicator>
+        <InvitationIndicator count={count} chats={chats}>
+          {organization ? <OrganizationMark {...organization} /> : <OpenOrcMark size={16} />}
+        </InvitationIndicator>
         <span className="space-switcher-name">
           {label.split(/\s+/).map((word, index) => (
             <span key={index}>

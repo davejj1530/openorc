@@ -77,7 +77,7 @@ it("repairs lost send responses through live delivery and a stable message UUID"
   second.seen.pushes.length = 0;
   const input = { spaceId, conversationId, id: randomUUID(), body: "Here is the first message." };
   await expect(first.hosted.chat.send(input)).rejects.toThrow("can't be reached");
-  await vi.waitFor(() => expect(second.seen.pushes).toContainEqual({ type: "invalidate", keys: [`team-chat:${spaceId}`, `team-chat:${spaceId}:${conversationId}`] }));
+  await vi.waitFor(() => expect(second.seen.pushes).toContainEqual({ type: "invalidate", keys: [`team-chat:${spaceId}`, `team-chat:${spaceId}:${conversationId}`, "team-chat-unread"] }));
   const retried = await first.hosted.chat.send(input);
   expect((await second.hosted.chat.timeline({ spaceId, conversationId })).messages).toEqual([retried]);
   await expect(first.hosted.chat.send({ ...input, body: "Changed text" })).rejects.toMatchObject({ status: 409, code: "message_id_conflict" });

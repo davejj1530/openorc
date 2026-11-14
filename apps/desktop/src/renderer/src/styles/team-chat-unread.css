@@ -11,10 +11,10 @@
 .team-chat-new::after {
   content: "";
   flex: 1;
-  height: 1px;
-  background: var(--border);
+  height: var(--hairline);
+  background: var(--line);
 }
-.sidebar-chat-row-unread {
+.sidebar-chat-row.sidebar-chat-row-unread {
   color: var(--ink);
 }
 .sidebar-chat-marks {
@@ -33,4 +33,13 @@
 .sidebar-chat-count {
   min-width: 16px;
   text-align: center;
+}
+.team-chat-tag-option {
+  gap: 8px;
+}
+.team-chat-tag-option .account-face {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  font-size: var(--text-2xs);
 }

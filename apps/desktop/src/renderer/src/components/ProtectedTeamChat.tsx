@@ -11,7 +11,7 @@ export function ProtectedTeamChat({ target }: { target: TeamChatRoute }) {
   const visible = useTeamChatVisible();
   if (access.allowed) return <TeamChatView target={target} />;
   return (
-    <main className="workspace-main team-chat-view well flex flex-1 flex-col min-w-0 min-h-0">
+    <main className="workspace-main team-chat well flex flex-1 flex-col min-w-0 min-h-0">
       {visible ? <CoversPreview /> : null}
       <OrganizationAccessGate spaceId={target.spaceId}>{null}</OrganizationAccessGate>
     </main>

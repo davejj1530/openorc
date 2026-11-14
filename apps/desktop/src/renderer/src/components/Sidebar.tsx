@@ -17,6 +17,7 @@ import { SidebarThreadBrowser } from "./SidebarThreadBrowser";
 import { HistoryButtons, SidebarToggle } from "./WindowCorner";
 import { useSidebarHistory } from "../lib/sidebar-history";
 import { OrganizationChat } from "./OrganizationChat";
+import { OrganizationSidebarWork } from "./OrganizationSidebarWork";
 
 /**
  * The sidebar, one column with a hairline at its edge from the window's top to its foot: its header, the app's screens
@@ -44,7 +45,9 @@ export function Sidebar() {
           <SidebarNav route={route} projectId={projectId} orclings={{ active: orclings.active, toggle: toggleOrclings, tools: <NewOrclingButton /> }} />
           {/* Keep loaded pages and filters while the Orclings take the threads' place. */}
           <div className="sidebar-browser-slot" hidden={orclings.active}>
-            <SidebarThreadBrowser />
+            <OrganizationSidebarWork>
+              <SidebarThreadBrowser />
+            </OrganizationSidebarWork>
           </div>
           {orclings.active ? (
             <div className="sidebar-workspaces" data-open>

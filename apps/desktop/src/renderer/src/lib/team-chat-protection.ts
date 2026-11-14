@@ -40,10 +40,11 @@ export class TeamChatProtection {
       for (const listener of this.#listeners) listener();
     };
     const protectedChange = gate.subscribeProtected((change) => {
+      const accountId = this.#accountId;
       clear();
-      if (!this.#accountId) return;
+      if (!accountId) return;
       const removed = change.reason === "account" ? change.spaceIds : change.removed;
-      for (const spaceId of removed) drafts.forgetSpace(this.#accountId, spaceId);
+      for (const spaceId of removed) drafts.forgetSpace(accountId, spaceId);
     });
     const selected = navigation.subscribe((next, before) => {
       if (next.current !== before.current || next.key !== before.key) clear();

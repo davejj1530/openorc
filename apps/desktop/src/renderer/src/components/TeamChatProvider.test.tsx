@@ -9,6 +9,7 @@ import { spaceNavigation } from "../lib/space-navigation";
 import { organizationContentGate } from "../lib/organization-content-gate";
 import { useTeamChatContext } from "../lib/team-chat-context";
 import { TeamChatProvider } from "./TeamChatProvider";
+import { OrganizationSidebarWork } from "./OrganizationSidebarWork";
 
 function Probe() {
   const scope = useTeamChatContext();
@@ -56,4 +57,18 @@ it("uses the shared gate through strict mount, Personal and an organization retu
   expect(screen.getByText("Closed")).toBeTruthy();
   act(() => spaceNavigation.setState({ current: "team" }));
   await screen.findByText("Allowed team");
+});
+
+it("removes organization project names while keeping Personal navigation available", () => {
+  spaceNavigation.setState({ key: "account", current: "team", personal: "personal" });
+  organizationContentGate.reset();
+  const view = render(
+    <OrganizationSidebarWork>
+      <span>Private project</span>
+    </OrganizationSidebarWork>,
+  );
+  expect(screen.queryByText("Private project")).toBeNull();
+  act(() => spaceNavigation.setState({ current: "personal" }));
+  expect(screen.getByText("Private project")).toBeTruthy();
+  view.unmount();
 });

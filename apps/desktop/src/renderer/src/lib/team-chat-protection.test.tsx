@@ -113,10 +113,14 @@ it("forgets only a removed membership's drafts and clears protected history", as
 
 it("closes the previous account without letting a late reply enter the next account", async () => {
   const f = await fixture();
-  f.answer({ ...status(), userId: "second" });
+  const next = { ...status(), userId: "second" };
+  f.drafts.write({ ...target, accountId: "second" }, "The next account's words");
+  f.protection.subscribe(() => f.protection.scope(next, "team"));
+  f.answer(next);
   await f.gate.refresh();
   expect(f.drafts.read(target).text).toBe("");
   expect(f.queries.getQueryCache().getAll()).toEqual([]);
   expect(f.scope.current()).toBe(false);
+  expect(f.drafts.read({ ...target, accountId: "second" }).text).toBe("The next account's words");
   expect(f.protection.scope(status(), "team")).toBeNull();
 });

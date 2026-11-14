@@ -234,7 +234,7 @@ it("fetches another child page and keeps rows while loading", async () => {
   }
 });
 
-it("heads the sidebar with OpenOrc's mark and name alone, and leads the screens with New thread, lit while its screen is open", () => {
+it("heads the sidebar with OpenOrc's mark and name, then Back and Forward, and leads the screens with New thread, lit while its screen is open", () => {
   fixture.projects = [{ id: "notes", name: "notes", rootPath: "/projects/notes" }];
   useLayout.setState({ workspace: "notes" });
   useRouter.setState({ route: { view: "tasks" } });
@@ -246,7 +246,7 @@ it("heads the sidebar with OpenOrc's mark and name alone, and leads the screens 
     within(header)
       .getAllByRole("button")
       .map((button) => button.getAttribute("aria-label")),
-  ).toEqual(["Toggle sidebar"]);
+  ).toEqual(["Toggle sidebar", "Back", "Forward"]);
   const screens = screen.getByRole("navigation", { name: "Screens" });
   const newThread = within(screens).getAllByRole("button")[0]!;
   expect(newThread.textContent).toBe("New thread");

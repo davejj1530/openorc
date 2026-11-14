@@ -1,33 +1,46 @@
 import type { ReactNode } from "react";
-import { ArrowLeft, PanelLeft } from "./icons";
+import { ArrowLeft, ArrowRight, PanelLeft } from "./icons";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
 import { useLayout } from "../lib/layout";
 import { cn } from "../lib/cn";
 import { useRouter } from "../lib/router";
-import { IconButton, Tooltip } from "./ui";
+import { IconButton, Tooltip, type IconSize } from "./ui";
 
 /**
- * The window's corner: the sidebar toggle, then Back. It leads the first header beside the sidebar, open or hidden: the
- * main column's, or a panel's docked on the left. Forward stays on ⌘].
+ * The window's corner: the sidebar toggle. It leads the first header beside the sidebar, open or hidden: the main
+ * column's, or a panel's docked on the left. Back and Forward end the sidebar's own header; with the sidebar hidden
+ * they follow the toggle here.
  */
 export function WindowCorner({ sidebarOpen }: { sidebarOpen: boolean }) {
-  const canBack = useRouter((s) => s.history.length > 0);
   return (
     <div className="window-corner" role="group" aria-label="Window">
       <SidebarToggle open={sidebarOpen} />
-      <HistoryButton label="Back" disabled={!canBack} onClick={() => useRouter.getState().back()}>
+      {sidebarOpen ? null : <HistoryButtons size="lg" />}
+    </div>
+  );
+}
+
+/** Back and Forward through the window's history, the same as ⌘[ and ⌘]. Each is off while there is nowhere to go. */
+export function HistoryButtons({ size, className }: { size: IconSize; className?: string }) {
+  const canBack = useRouter((s) => s.history.length > 0);
+  const canForward = useRouter((s) => s.future.length > 0);
+  return (
+    <div className={cn("history-buttons", className)} role="group" aria-label="History">
+      <HistoryButton size={size} label="Back" disabled={!canBack} onClick={() => useRouter.getState().back()}>
         <ArrowLeft size={16} />
+      </HistoryButton>
+      <HistoryButton size={size} label="Forward" disabled={!canForward} onClick={() => useRouter.getState().forward()}>
+        <ArrowRight size={16} />
       </HistoryButton>
     </div>
   );
 }
 
-/** One step back through the window's history, the same as ⌘[. */
-function HistoryButton({ label, disabled, onClick, children }: { label: string; disabled: boolean; onClick: () => void; children: ReactNode }) {
+function HistoryButton({ size, label, disabled, onClick, children }: { size: IconSize; label: string; disabled: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <Tooltip label={label}>
       <IconButton
-        size="lg"
+        size={size}
         disabled={disabled}
         onClick={() => {
           onClick();

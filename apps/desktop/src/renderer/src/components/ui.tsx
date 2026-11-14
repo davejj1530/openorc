@@ -24,7 +24,7 @@ export { Segmented, type SegmentedOption } from "./Segmented";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md" | "lg" | "xl" | "hero";
-type IconSize = "xs" | "sm" | "md" | "lg";
+export type IconSize = "xs" | "sm" | "md" | "lg";
 
 /**
  * Trailing metadata in a list row: a fixed slot that never wraps and whose

@@ -26,9 +26,10 @@ html[data-transparent-shell="true"] .app-shell .workspace-navigation {
   flex-shrink: 0;
 }
 
-/* The header: the traffic lights where the OS draws them, then whose workspace this is, and nothing
-   else. No line under it. */
+/* The header: the traffic lights where the OS draws them, then whose workspace this is, then Back and
+   Forward. No line under it. The header is a container so the two can go when it is too narrow. */
 .sidebar-header {
+  container-type: inline-size;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -47,10 +48,18 @@ html[data-transparent-shell="true"] .app-shell .workspace-navigation {
 .sidebar-header .sidebar-header-toggle {
   display: none;
 }
-.window-corner {
+.window-corner,
+.history-buttons {
   display: flex;
   align-items: center;
   flex-shrink: 0;
+}
+/* Back and Forward need the name's width, a gap and their own 48px beside it. Short of that they go, and the keys
+   still step through the history. */
+@container (max-width: 141px) {
+  .sidebar-history {
+    display: none;
+  }
 }
 
 /* Under the header: the screens, then the threads or the Orclings, which take the rest and scroll. */

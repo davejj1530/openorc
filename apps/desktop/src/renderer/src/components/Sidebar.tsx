@@ -13,7 +13,7 @@ import { SidebarNav } from "./SidebarNav";
 import { NewOrclingButton, SidebarOrclings } from "./SidebarOrclings";
 import { SidebarSettings } from "./SidebarSettings";
 import { SidebarThreadBrowser } from "./SidebarThreadBrowser";
-import { SidebarToggle } from "./WindowCorner";
+import { HistoryButtons, SidebarToggle } from "./WindowCorner";
 
 /**
  * The sidebar, one column with a hairline at its edge from the window's top to its foot: its header, the app's screens
@@ -58,8 +58,9 @@ export function Sidebar() {
 
 /**
  * The sidebar's header, where the window is dragged from: the traffic lights where the OS draws them, then whose
- * workspace this is, and nothing else. Until there are organizations, the workspace is OpenOrc's own mark and name. A
- * narrow window floats the sidebar over the toggle that shows it, so the header carries its own way to hide it there.
+ * workspace this is, then Back and Forward at its end while the header has room for them. Until there are
+ * organizations, the workspace is OpenOrc's own mark and name. A narrow window floats the sidebar over the toggle that
+ * shows it, so the header carries its own way to hide it there.
  */
 function SidebarHeader() {
   return (
@@ -68,6 +69,7 @@ function SidebarHeader() {
       <div className="sidebar-identity">
         <Wordmark />
       </div>
+      <HistoryButtons size="xs" className="sidebar-history" />
     </header>
   );
 }

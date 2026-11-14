@@ -52,6 +52,7 @@ import { AnswersBlocked } from "./ask-answer";
 import { useHostedComposer } from "./HostedSendNotice";
 import { CloudPreparing, CloudStart } from "./CloudStart";
 import { Composer, type SlashCommand } from "./Composer";
+import { ThreadPlaceLine } from "./ThreadPlaceLine";
 import { ComposerChoice } from "./ComposerChoice";
 import { GitBranch, Laptop } from "./icons";
 import { SessionRecovery } from "./SessionRecovery";
@@ -345,6 +346,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
               />
             ) : null}
           </Composer>
+          {thread?.hasStarted ? <ThreadPlaceLine thread={thread} accounts={accounts} /> : null}
           {firstTaskRun ? (
             <TaskDestination destination={workspaceDestination({ mode: workspaceMode, rootPath: project.rootPath, taskPath: scope.kind === "task" ? scope.task.worktreePath : null })} />
           ) : null}

@@ -1,0 +1,59 @@
+.organization-invite-role {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.organization-invite-role-menu {
+  width: 170px;
+}
+.organization-invite-check {
+  width: 13px;
+  flex: none;
+}
+.organization-invite-errors {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: -8px;
+  font-size: 13px;
+}
+.organization-invite-errors > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-wrap: anywhere;
+}
+.organization-invite-results {
+  max-height: 360px;
+  overflow-y: auto;
+}
+.organization-invite-result {
+  min-height: 45px;
+  padding: 10px 0;
+  border-bottom: var(--hairline) solid var(--line);
+}
+.organization-invite-result:last-child {
+  border: 0;
+}
+.organization-invite-result-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  overflow-wrap: anywhere;
+}
+.organization-invite-outcome {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-3);
+  font-size: 13px;
+}
+.organization-invite-outcome.organization-error {
+  color: var(--bad);
+}
+.organization-invite-refusal .organization-invite-result-row {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}

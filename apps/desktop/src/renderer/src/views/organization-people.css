@@ -99,6 +99,37 @@
   align-items: center;
   gap: 12px;
 }
+.people-invitations {
+  margin-top: 32px;
+}
+.people-invitations h2 {
+  height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  font-size: 14px;
+  line-height: 18px;
+  margin-bottom: 6px;
+}
+.people-invitation-row {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  min-height: 60px;
+  padding: 8px 12px;
+  border-radius: var(--radius-lg);
+}
+.people-invitation-row:hover {
+  background: var(--surface-2);
+}
+.people-invitation-identity {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.people-invitation-identity .organization-error {
+  color: var(--bad);
+}
 @media (max-width: 1100px) {
   .people-grid {
     grid-template-columns: minmax(220px, 1fr) 66px 96px 24px;

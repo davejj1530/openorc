@@ -7,6 +7,7 @@ import { ROUTES, SOCKET, wireTopics } from "./wire.js";
 import { OrganizationSetup } from "./organization-setup.js";
 import { OrganizationMembers } from "./organization-members.js";
 import { OrganizationAccess } from "./organization-access.js";
+import { OrganizationInvitations } from "./organization-invitations.js";
 import { wireSpaces } from "./wire-spaces.js";
 
 const snapshot = z.object({ apiOrigin: z.string(), email: z.string(), index: wireSpaces, projects: z.array(scopedProject), heardAt: z.number() });
@@ -24,6 +25,7 @@ export class Spaces implements HostedSpaces {
   readonly setup: OrganizationSetup;
   readonly membership: OrganizationMembers;
   readonly access: OrganizationAccess;
+  readonly invitations: OrganizationInvitations;
   #snapshot: Snapshot | null = null;
   #legacy: SpaceCatalog | null = null;
   #invitations: ReceivedInvitation[] = [];
@@ -40,6 +42,7 @@ export class Spaces implements HostedSpaces {
     this.setup = new OrganizationSetup({ ...deps, refresh: () => this.refresh(), status: () => this.status() });
     this.membership = new OrganizationMembers({ ...deps, refresh: () => this.refresh() });
     this.access = new OrganizationAccess({ ...deps, refresh: () => this.refresh() });
+    this.invitations = new OrganizationInvitations({ ...deps, refresh: () => this.refresh() });
     this.#origin = new URL(deps.server).origin;
     deps.session.onChange((change) => this.#changed(change));
     deps.session.onSocket(SOCKET.changed, (body) => {

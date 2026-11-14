@@ -119,6 +119,12 @@ export interface HostedAccount {
 }
 
 export interface HostedSpaces {
+  readonly invitations: {
+    list(spaceId: string): Promise<RpcResults["organization.invitations"]>;
+    send(input: RpcParams<"organization.invite">): Promise<RpcResults["organization.invite"]>;
+    resend(input: RpcParams<"organization.invitation.resend">): Promise<RpcResults["organization.invitation.resend"]>;
+    revoke(input: RpcParams<"organization.invitation.revoke">): Promise<RpcResults["organization.invitation.revoke"]>;
+  };
   readonly access: {
     get(input: RpcParams<"organization.project.access">): Promise<RpcResults["organization.project.access"]>;
     set(input: RpcParams<"organization.project.setAccess">): Promise<RpcResults["organization.project.setAccess"]>;

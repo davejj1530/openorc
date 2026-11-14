@@ -1,18 +1,10 @@
 import { identityRoute } from "./stand-in-identity.js";
 import { membershipRoute } from "./stand-in-membership.js";
 import { projectAccessRoute } from "./stand-in-access.js";
-import { randomUUID } from "node:crypto";
+import { StandInInvitations } from "./stand-in-invitations.js";
 import { userOf, type StandInSpaces } from "./stand-in-spaces.js";
 
 type Reply = { status: number; body: unknown };
-interface Received {
-  id: string;
-  spaceId: string;
-  email: string;
-  role: "admin" | "member";
-  inviter: string;
-  expiresAt: number;
-}
 interface OrganizationDeps {
   spaces: StandInSpaces;
   creationAllowed: boolean;
@@ -26,18 +18,23 @@ interface OrganizationDeps {
 /** Organization reads use membership IDs and explicit targets, matching the HTTP service. */
 export class StandInOrganizations {
   logoFailure: string | null = null;
-  readonly received: Received[] = [];
+  readonly invitations: StandInInvitations;
   readonly created = new Map<string, number>();
-  constructor(private readonly deps: OrganizationDeps) {}
+  constructor(private readonly deps: OrganizationDeps) {
+    this.invitations = new StandInInvitations(deps);
+  }
+
+  get received() {
+    return this.invitations.records;
+  }
 
   invite(spaceId: string, email: string, inviter: string, role: "admin" | "member" = "member"): string {
-    const id = randomUUID();
-    this.received.push({ id, spaceId, email, inviter, role, expiresAt: this.deps.now() + 7 * 86_400_000 });
-    this.deps.tell(email, ["invitations"]);
-    return id;
+    return this.invitations.seed(spaceId, email, inviter, role);
   }
 
   async route(request: { method: string; path: string; query: URLSearchParams; space: string | null }, who: string, body: Record<string, unknown> = {}): Promise<Reply | null> {
+    const invitation = this.invitations.route({ ...request, who, body });
+    if (invitation) return invitation;
     const access = projectAccessRoute({ ...request, who, body, spaces: this.deps.spaces, accessChanged: this.deps.accessChanged, tell: this.deps.tell });
     if (access) return access;
     const membership = membershipRoute({
@@ -91,24 +88,7 @@ export class StandInOrganizations {
   }
 
   inbox(who: string) {
-    return this.received
-      .filter((invite) => invite.email === who && invite.expiresAt > this.deps.now() && !this.deps.spaces.member(invite.spaceId, who))
-      .flatMap((invite) => {
-        const team = this.deps.spaces.teams.get(invite.spaceId);
-        return team
-          ? [
-              {
-                id: invite.id,
-                email: invite.email,
-                role: invite.role,
-                expiresAt: new Date(invite.expiresAt).toISOString(),
-                organization: { id: invite.spaceId, name: team.name, logo: team.logo },
-                inviter: { name: this.deps.person(invite.inviter).name, email: invite.inviter },
-              },
-            ]
-          : [];
-      })
-      .reverse();
+    return this.invitations.inbox(who);
   }
 
   people(space: string, who: string, query: URLSearchParams): Reply {

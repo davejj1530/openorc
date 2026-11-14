@@ -36,6 +36,7 @@ afterEach(() => {
 });
 
 async function answer(method: string, params: Record<string, unknown>) {
+  if (method === "organization.invitations") return [];
   if (method === "organization.people") return { ...people, members: people.members.slice(Number(params["offset"] ?? 0), Number(params["offset"] ?? 0) + 100) };
   if (method === "spaces.projects")
     return [

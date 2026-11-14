@@ -19,6 +19,10 @@ it("keeps organization methods off the phone and validates scope and pagination 
     "organization.member.remove",
     "organization.project.access",
     "organization.project.setAccess",
+    "organization.invitations",
+    "organization.invite",
+    "organization.invitation.resend",
+    "organization.invitation.revoke",
   ])
     expect(isRemoteMethod(method)).toBe(false);
   expect(rpcParams["spaces.projects"].safeParse({ spaceId: "" }).success).toBe(false);
@@ -27,4 +31,6 @@ it("keeps organization methods off the phone and validates scope and pagination 
   expect(rpcParams["organization.member.setRole"].safeParse({ spaceId: "org", memberId: "member", role: "owner" }).success).toBe(false);
   expect(rpcParams["organization.member.remove"].safeParse({ spaceId: "org", memberId: "" }).success).toBe(false);
   expect(rpcParams["organization.project.setAccess"].safeParse({ spaceId: "org", projectId: "project", everyone: false, memberIds: ["member", "member"] }).success).toBe(false);
+  expect(rpcParams["organization.invite"].safeParse({ spaceId: "org", emails: Array(31).fill("person@example.com"), role: "member" }).success).toBe(false);
+  expect(rpcParams["organization.invite"].safeParse({ spaceId: "org", emails: ["person@example.com"], role: "owner" }).success).toBe(false);
 });

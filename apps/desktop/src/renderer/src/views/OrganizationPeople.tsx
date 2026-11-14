@@ -9,6 +9,7 @@ import { useRpc } from "../lib/client";
 import { useOrganizationPeople } from "../lib/organization-people";
 import { OrganizationMoreMenu } from "./OrganizationMenus";
 import { OrganizationPeopleRow } from "./OrganizationPeopleRow";
+import { OrganizationInvitations } from "./OrganizationInvitations";
 import "./pages.css";
 import "./organization-people.css";
 
@@ -78,6 +79,7 @@ export function OrganizationPeople({ spaceId, onInvite, onLeft }: Props) {
                 ))}
               </div>
             </div>
+            {admin ? <OrganizationInvitations spaceId={spaceId} /> : null}
           </>
         ) : null}
         {people.loading ? <p className="people-read-state text-sm text-ink-3">Loading people…</p> : null}

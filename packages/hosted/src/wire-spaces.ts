@@ -73,6 +73,21 @@ export const wireInvitation = z.object({
   inviterId: id,
 });
 
+const sentInvitations = z.object({
+  invitations: z.array(
+    z.object({
+      id,
+      email: z.string(),
+      role,
+      expiresAt: iso,
+      state: z.enum(["pending", "expired"]),
+      url: z.url(),
+      delivery: z.object({ status: z.enum(["sent", "logged", "failed"]), reason: z.string().nullable(), at: iso }).nullable(),
+      resendAfterMs: z.number().nonnegative(),
+    }),
+  ),
+});
+
 const settings = z.object({ name: z.string(), logo: z.string().nullable(), activityDays: z.union([z.literal(30), z.literal(90), z.literal(180), z.literal(365)]) });
 const projectAccess = z.object({ projectId: id, everyone: z.boolean(), memberIds: z.array(id) });
 const github = z.object({ configured: z.boolean(), installations: z.array(z.object({ id, accountLogin: z.string(), accountType: z.enum(["User", "Organization"]), suspended: z.boolean() })) });
@@ -81,6 +96,9 @@ const route = <T>(method: Route<T>["method"], path: string, reply: z.ZodType<T>)
 const get = <T>(path: string, reply: z.ZodType<T>): Route<T> => ({ method: "GET", path, reply });
 const empty = (method: Route<null>["method"], path: string): Route<null> => ({ method, path, reply: null });
 export const SPACE_ROUTES = {
+  sentInvitations: get("/invitations", sentInvitations),
+  invite: route("POST", "/api/auth/organization/invite-member", wireInvitation),
+  revokeInvitation: route("POST", "/api/auth/organization/cancel-invitation", wireInvitation),
   projectAccess: (projectId: string) => get(`/projects/${encodeURIComponent(projectId)}/access`, projectAccess),
   setProjectAccess: (projectId: string) => route("PUT", `/projects/${encodeURIComponent(projectId)}/access`, projectAccess),
   leaveOrganization: empty("POST", "/organization/leave"),

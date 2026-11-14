@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { organizationBillingRpcParams, type OrganizationBillingRpcResults } from "./organization-billing.js";
+import { organizationBillingRpcParams, organizationSeatRpcParams, type OrganizationBillingRpcResults, type OrganizationSeatRpcResults } from "./organization-billing.js";
 import { organizationStorageRpcParams, type OrganizationStorageRpcResults } from "./organization-storage.js";
 import { hostedFilesRpcParams, type HostedFilesRpcResults } from "./hosted-files.js";
 import { teamChatRpcParams, type TeamChatRpcResults } from "./team-chat.js";
@@ -87,6 +87,7 @@ export const rpcParams = {
   ...threadSendRpcParams,
   ...hostedFilesRpcParams,
   ...organizationBillingRpcParams,
+  ...organizationSeatRpcParams,
   ...organizationStorageRpcParams,
   ...teamChatRpcParams,
   ...onlineTaskRpcParams,
@@ -473,6 +474,7 @@ export type RpcParams<M extends RpcMethod> = z.infer<(typeof rpcParams)[M]>;
  */
 const SECRET_PARAMS: ReadonlySet<RpcMethod> = new Set<RpcMethod>([
   "account.signIns.connect",
+  "organization.seat.assign",
   "memory.settings.set",
   "remote.push.setKey",
   "cloud.vercel.connect",
@@ -569,6 +571,7 @@ export interface RpcResults
   extends
     HostedFilesRpcResults,
     OrganizationBillingRpcResults,
+    OrganizationSeatRpcResults,
     OrganizationStorageRpcResults,
     TeamChatRpcResults,
     OnlineTaskRpcResults,

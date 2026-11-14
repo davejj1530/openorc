@@ -1,0 +1,56 @@
+.seat-preview-person {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.seat-preview-person .account-face {
+  width: 22px;
+  height: 22px;
+  flex: none;
+}
+.seat-assignment-note {
+  color: var(--ink-3);
+}
+.seat-person-options {
+  display: grid;
+  gap: 2px;
+  max-height: 276px;
+  overflow-y: auto;
+}
+.seat-person-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 8px 10px;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+}
+.seat-person-option:hover,
+.seat-person-option:focus-within,
+.seat-person-selected {
+  background: var(--surface-2);
+}
+.seat-person-option .account-face {
+  width: 26px;
+  height: 26px;
+  flex: none;
+}
+.seat-person-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.seat-person-unavailable {
+  color: var(--ink-3);
+  cursor: default;
+}
+.seat-person-held {
+  flex: none;
+  font-size: 13px;
+  line-height: 19px;
+  color: var(--ink-3);
+}

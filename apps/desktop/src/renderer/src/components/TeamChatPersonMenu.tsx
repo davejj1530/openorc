@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Menu } from "@base-ui/react/menu";
 import type { OrganizationPerson } from "@openorc/protocol";
 import { useTeamChatContext } from "../lib/team-chat-context";
@@ -15,10 +15,11 @@ export interface TeamChatPersonMenuProps {
   person: OrganizationPerson;
   spaceId: string;
   editable: boolean;
+  extra?: ReactNode;
   onRemove(person: OrganizationPerson, trigger: HTMLButtonElement | null): void;
 }
 
-export function TeamChatPersonMenu({ person, spaceId, editable, onRemove }: TeamChatPersonMenuProps) {
+export function TeamChatPersonMenu({ person, spaceId, editable, onRemove, extra }: TeamChatPersonMenuProps) {
   const trigger = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const scope = useTeamChatContext();
@@ -28,7 +29,7 @@ export function TeamChatPersonMenu({ person, spaceId, editable, onRemove }: Team
     scope?.spaceId === spaceId && scope.accountId !== person.userId && state.data?.state === "ready" && state.data.chat.features.includes("base")
       ? state.data.chat.people.find((candidate) => candidate.id === person.userId)
       : undefined;
-  if (!editable && !peer) return null;
+  if (!editable && !peer && !extra) return null;
   const offline = scope?.reach === "offline";
   return (
     <Menu.Root open={open} onOpenChange={setOpen}>
@@ -55,6 +56,7 @@ export function TeamChatPersonMenu({ person, spaceId, editable, onRemove }: Team
                 Message
               </Menu.Item>
             ) : null}
+            {extra}
             {editable ? (
               <Menu.Item className={menuItemDanger} onClick={() => onRemove(person, trigger.current)}>
                 <X size={14} />

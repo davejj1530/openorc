@@ -2,6 +2,7 @@ import { OrganizationBillingPage, type OrganizationBillingOffers, type Organizat
 import { randomUUID } from "node:crypto";
 import type { WireOrganizationBilling } from "../organization-billing-wire.js";
 import type { StandInSpaces } from "./stand-in-spaces.js";
+import { StandInSeatAssignments } from "./stand-in-seat-assignments.js";
 
 type Request = { method: string; path: string; query: URLSearchParams; space: string | null };
 type Reply = { status: number; body: unknown };
@@ -17,13 +18,22 @@ interface Dependencies {
 
 /** Loopback capacity is created only by paid confirmation; a return alone does not settle a checkout. */
 export class StandInSeats {
+  readonly assignments: StandInSeatAssignments;
   enabled = false;
   configured = true;
   readonly checkouts: Checkout[] = [];
   readonly records = new Map<string, WireOrganizationBilling>();
   readonly storage = new Map<string, OrganizationStorage>();
   prices: Record<"monthly" | "yearly", { amount: number; currency: string } | null> = { monthly: { amount: 2000, currency: "usd" }, yearly: { amount: 20000, currency: "usd" } };
-  constructor(private readonly deps: Dependencies) {}
+  constructor(private readonly deps: Dependencies) {
+    this.assignments = new StandInSeatAssignments({
+      ...deps,
+      records: this.records,
+      changed: (spaceId) => {
+        for (const who of deps.spaces.readers(spaceId)) deps.tell(who, ["billing", "members"], spaceId);
+      },
+    });
+  }
 
   seed(spaceId: string, values: Partial<WireOrganizationBilling> = {}): WireOrganizationBilling {
     const team = this.deps.spaces.teams.get(spaceId);
@@ -42,7 +52,7 @@ export class StandInSeats {
   }
 
   route(request: Request, who: string, body: unknown): Reply | null {
-    if (!/^\/organization\/(?:billing(?:\/|$)|storage$)/.test(request.path)) return null;
+    if (!/^\/organization\/(?:billing(?:\/|$)|seats\/|storage$)/.test(request.path)) return null;
     if (!this.enabled) return refused(404, "Not found.");
     const spaceId = request.space;
     if (!spaceId) return refused(400, "Name the space in x-openorc-space.");
@@ -50,6 +60,8 @@ export class StandInSeats {
     if (typeof resolved !== "string") return resolved;
     if (!this.deps.spaces.teams.has(spaceId)) return refused(409, "Your personal space has no organization seats. Manage your own Pro in Account.");
     if (this.deps.spaces.member(spaceId, who)?.role !== "admin") return refused(403, "Only an admin can do that.");
+    const assignment = this.assignments.route(request.method, request.path, spaceId, who, body);
+    if (assignment) return assignment;
     if (request.method === "GET") return this.#get(request, spaceId);
     if (request.method === "POST" && request.path === "/organization/billing/checkout") return this.#checkout(spaceId, body);
     if (request.method === "POST" && request.path === "/organization/billing/portal") return this.#portal(spaceId);

@@ -5,7 +5,8 @@ import { AccountFace } from "../components/AccountFace";
 import { Check, ChevronDown } from "../components/icons";
 import { Button } from "../components/ui";
 import { menuItem, menuPopup } from "../components/menu";
-import { TeamChatPersonMenu } from "../components/TeamChatPersonMenu";
+import { PersonSeatMenu } from "./PersonSeatActions";
+import { OrganizationPersonPlan } from "./OrganizationPersonPlan";
 import { CoversPreview } from "../lib/browser-preview";
 import { useRpcMutation } from "../lib/client";
 import { floatingGround } from "../lib/use-anchor-ground";
@@ -44,7 +45,7 @@ export function OrganizationPeopleRow({
           </div>
         </div>
         <span className="people-plan" role="cell">
-          {person.plan === "pro" ? "Pro" : "Free"}
+          <OrganizationPersonPlan person={person} spaceId={spaceId} />
         </span>
         <div className="people-role" role="cell">
           {editable ? (
@@ -69,7 +70,9 @@ export function OrganizationPeopleRow({
             roleName[person.role]
           )}
         </div>
-        <div role="cell">{!self ? <TeamChatPersonMenu person={person} spaceId={spaceId} editable={editable} onRemove={onRemove} /> : null}</div>
+        <div role="cell">
+          <PersonSeatMenu person={person} spaceId={spaceId} self={self} editable={editable} onRemove={onRemove} />
+        </div>
       </div>
       {readError ? (
         <p role="alert" className="organization-error people-row-error">

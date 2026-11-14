@@ -11,7 +11,7 @@ export interface OrganizationBillingTransport {
   leave(spaceId: string): Promise<OrganizationBillingStatus>;
   subscribe(spaceId: string, refresh: () => void): () => void;
 }
-interface BillingScope {
+export interface BillingScope {
   spaceId: string;
   identity: string;
   view: OrganizationBillingView;
@@ -53,7 +53,7 @@ export function useOrganizationBilling(spaceId: string, transport: OrganizationB
   return snapshot.ready && scope?.spaceId === spaceId && scope.identity === identity ? scope : null;
 }
 
-function billingIdentity(gate: OrganizationAccessStore, spaceId: string): string | null {
+export function billingIdentity(gate: OrganizationAccessStore, spaceId: string): string | null {
   const snapshot = gate.getSnapshot();
   if (!snapshot.ready || !snapshot.identity) return null;
   return snapshot.spaces.some((space) => space.id === spaceId && space.kind === "organization" && space.role === "admin") ? snapshot.identity : null;

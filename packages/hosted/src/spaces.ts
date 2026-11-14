@@ -92,7 +92,16 @@ export class Spaces implements HostedSpaces {
     const generation = this.deps.session.generation;
     const read = await this.deps.session.in(spaceId).request(ROUTES.people(offset, limit));
     this.#assertCurrent(generation);
-    return { ...read, members: read.members.map((member) => ({ ...member, joinedAt: Date.parse(member.joinedAt) })) };
+    const current = this.#snapshot?.index.spaces.find((space) => space.id === spaceId);
+    const admin = read.viewer.role === "admin" && current?.kind === "organization" && current.role === "admin";
+    return {
+      ...read,
+      members: read.members.map((member) => ({
+        ...member,
+        joinedAt: Date.parse(member.joinedAt),
+        ...(member.seat !== undefined && { seat: admin || member.memberId === read.viewer.memberId ? member.seat : null }),
+      })),
+    };
   }
 
   /** Threads consume this same catalog, including a legacy server's read-only list during rollout. */

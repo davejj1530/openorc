@@ -26,7 +26,7 @@
 }
 .people-grid {
   display: grid;
-  grid-template-columns: minmax(240px, 1fr) 100px 128px 24px;
+  grid-template-columns: minmax(240px, 1fr) 116px 100px 28px;
   gap: 24px;
   align-items: center;
   padding: 0 12px;
@@ -130,15 +130,9 @@
 .people-invitation-identity .organization-error {
   color: var(--bad);
 }
-@media (max-width: 1100px) {
-  .people-grid {
-    grid-template-columns: minmax(220px, 1fr) 66px 96px 24px;
-    gap: 12px;
-  }
-}
 @container (max-width: 700px) {
   .people-grid {
-    grid-template-columns: minmax(180px, 1fr) 56px 88px 24px;
+    grid-template-columns: minmax(180px, 1fr) 98px 88px 28px;
     gap: 12px;
   }
 }

@@ -5,6 +5,7 @@ import { Button, Tooltip } from "../components/ui";
 import { BuySeatsDialog, type BuySeatsDialogProps } from "../dialogs/BuySeatsDialog";
 import type { OrganizationBillingView, OrganizationBillingViewState } from "../lib/organization-billing-state";
 import { SeatInventory } from "./SeatInventory";
+import { SeatOperations } from "./SeatOperations";
 import { OrganizationStorage, type OrganizationStorageTransport } from "./OrganizationStorage";
 import "./organization-seats.css";
 
@@ -35,6 +36,7 @@ export function OrganizationSeats({ spaceId, view, offers, storage }: Props) {
       {billing ? <SeatSummary spaceId={spaceId} storage={storage} billing={billing} state={state} buy={buy} manage={() => void view.open({ page: "billing" })} /> : null}
       {!billing && state.loading ? <p className="seats-inline-state text-ink-3">Loading seats…</p> : null}
       {!formOpen ? <SeatPaymentState state={state} view={view} /> : null}
+      <SeatOperations />
       {billing?.subscription?.overallocated ? <p className="seats-inline-state">More people hold seats than are paid for. Take back a seat or add seats.</p> : null}
       {billing && billing.seats.length > 0 ? <SeatInventory seats={billing.seats} /> : null}
       {formOpen ? (

@@ -4,7 +4,7 @@ import type { Route } from "./wire.js";
 import { wireBillingLink } from "./wire.js";
 
 const iso = z.iso.datetime();
-const seat = OrganizationSeat.extend({
+export const wireOrganizationSeat = OrganizationSeat.extend({
   assignment: z.discriminatedUnion("kind", [
     OrganizationSeat.shape.assignment.options[0],
     OrganizationSeat.shape.assignment.options[1],
@@ -24,7 +24,7 @@ export const wireOrganizationBilling = OrganizationBilling.extend({
       pendingQuantity: z.object({ quantity: z.number().int().nonnegative(), at: iso }).nullable(),
     })
     .nullable(),
-  seats: z.array(seat),
+  seats: z.array(wireOrganizationSeat),
 });
 export type WireOrganizationBilling = z.infer<typeof wireOrganizationBilling>;
 
@@ -40,12 +40,16 @@ export function toOrganizationBilling(read: WireOrganizationBilling): Organizati
       graceUntil: time(read.subscription.graceUntil),
       pendingQuantity: read.subscription.pendingQuantity && { ...read.subscription.pendingQuantity, at: Date.parse(read.subscription.pendingQuantity.at) },
     },
-    seats: read.seats.map((row) => ({
-      ...row,
-      assignment: row.assignment.kind === "invitation" ? { ...row.assignment, expiresAt: Date.parse(row.assignment.expiresAt) } : row.assignment,
-      period: row.period && { startsAt: Date.parse(row.period.startsAt), endsAt: Date.parse(row.period.endsAt) },
-      retiresAt: time(row.retiresAt),
-    })),
+    seats: read.seats.map(toOrganizationSeat),
+  };
+}
+
+export function toOrganizationSeat(row: z.infer<typeof wireOrganizationSeat>): OrganizationSeat {
+  return {
+    ...row,
+    assignment: row.assignment.kind === "invitation" ? { ...row.assignment, expiresAt: Date.parse(row.assignment.expiresAt) } : row.assignment,
+    period: row.period && { startsAt: Date.parse(row.period.startsAt), endsAt: Date.parse(row.period.endsAt) },
+    retiresAt: time(row.retiresAt),
   };
 }
 

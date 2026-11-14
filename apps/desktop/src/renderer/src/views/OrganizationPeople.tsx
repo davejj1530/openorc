@@ -11,6 +11,7 @@ import { OrganizationMoreMenu } from "./OrganizationMenus";
 import { OrganizationPeopleContent, OrganizationPeopleHeading } from "./OrganizationPeopleContent";
 import { OrganizationSections } from "./OrganizationSections";
 import { OrganizationSeatsPage } from "./OrganizationSeatsPage";
+import { OrganizationSeatAdministration } from "./OrganizationSeatAdministration";
 import "./pages.css";
 import "./organization-people.css";
 
@@ -22,7 +23,15 @@ interface Props {
 }
 
 /** People occupies the work column without adding or discarding conversation tabs. */
-export function OrganizationPeople({ spaceId, onInvite, onLeft }: Props) {
+export function OrganizationPeople(props: Props) {
+  return (
+    <OrganizationSeatAdministration spaceId={props.spaceId}>
+      <OrganizationPeopleBody {...props} />
+    </OrganizationSeatAdministration>
+  );
+}
+
+function OrganizationPeopleBody({ spaceId, onInvite, onLeft }: Props) {
   const people = useOrganizationPeople(spaceId);
   const [dialog, setDialog] = useState<{ action: Action; trigger: HTMLButtonElement | null } | null>(null);
   const data = people.data;

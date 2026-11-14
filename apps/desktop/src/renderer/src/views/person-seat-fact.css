@@ -1,0 +1,19 @@
+.person-seat-detail {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+.person-seat-label {
+  color: var(--ink-4);
+}
+.person-seat-compact {
+  display: none;
+}
+@container (max-width: 450px) {
+  .person-seat-wide {
+    display: none;
+  }
+  .person-seat-compact {
+    display: inline;
+  }
+}

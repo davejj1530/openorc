@@ -16,7 +16,7 @@ const billing: WireOrganizationBilling = {
 const services: OrganizationBilling[] = [];
 afterEach(() => services.splice(0).forEach((service) => service.close()));
 
-function fixture() {
+function fixture(operations?: { load(): string | null; save(value: string): void }) {
   let status: SpacesStatus = {
     state: "ready",
     userId: "person-a",
@@ -58,6 +58,7 @@ function fixture() {
         saved = value;
       },
     },
+    operations,
     server: "https://example.com",
     now: Date.now,
     browser,
@@ -78,6 +79,57 @@ function fixture() {
     },
   };
 }
+
+function seatJournal() {
+  let value: string | null = null;
+  return {
+    load: () => value,
+    save: (next: string) => {
+      value = next;
+    },
+  };
+}
+const assignment = { seatId: "seat-a", body: { id: "6b556141-a9de-41be-a557-aa938a09b8b8", previewToken: "preview-a" } };
+const moved = { id: assignment.body.id, kind: "assignment", state: "complete", message: null };
+
+it("recovers an unknown assignment by reading first and repeating only its saved exact request", async () => {
+  const journal = seatJournal();
+  const f = fixture(journal);
+  let writes = 0;
+  f.reply.mockImplementation(async (path, body) => {
+    if (path === "/organization/billing") return billing;
+    if (path.includes("/operations/")) throw new Refused("Unknown operation", 404);
+    expect(journal.load()).toContain(JSON.stringify(assignment));
+    expect(body).toEqual(assignment.body);
+    if (++writes === 1) throw new OutOfReach();
+    return moved;
+  });
+  expect(await f.service.seats.assign("team-a", assignment)).toMatchObject({ state: "ready", value: { request: assignment, operation: null } });
+  expect(await f.service.seats.operation("team-a", assignment.body.id)).toMatchObject({ state: "ready", value: { operation: null } });
+  expect(writes).toBe(1);
+  expect(await f.service.seats.assign("team-a", assignment)).toMatchObject({ state: "ready", value: { operation: moved, error: null } });
+  expect(writes).toBe(2);
+  expect((await f.service.get("team-a")).assignments).toBeUndefined();
+});
+
+it("a completed assignment with an unread inventory offers only read recovery", async () => {
+  const f = fixture(seatJournal());
+  f.reply.mockResolvedValueOnce(moved).mockRejectedValueOnce(new OutOfReach());
+  expect(await f.service.seats.assign("team-a", assignment)).toMatchObject({ state: "ready", value: { operation: moved, error: "OpenOrc Cloud can't be reached." } });
+  expect(await f.service.seats.assign("team-a", assignment)).toMatchObject({ state: "ready", value: { operation: moved, error: null } });
+  expect(f.reply.mock.calls.map(([path]) => path)).toEqual(["/organization/seats/seat-a", "/organization/billing", "/organization/billing"]);
+});
+
+it("returns an explicit empty authority result for a refused assignment before the roster updates", async () => {
+  const f = fixture(seatJournal());
+  await f.service.get("team-a");
+  f.reply.mockRejectedValueOnce(new Refused("Only an admin can do that.", 403));
+  const result = await f.service.seats.assign("team-a", assignment);
+  expect(result).toMatchObject({ state: "denied" });
+  expect(result).not.toHaveProperty("value");
+  f.reply.mockRejectedValueOnce(new OutOfReach());
+  expect((await f.service.read("team-a")).billing).toBeNull();
+});
 
 it("uses the explicit organization and never returns private billing to a member or Personal", async () => {
   const f = fixture();

@@ -2,6 +2,7 @@ import type { OrganizationSeat } from "@openorc/protocol";
 import { accountDay, cloudTime, formatUsageTime } from "@openorc/client";
 import { AccountFace } from "../components/AccountFace";
 import { cn } from "../lib/cn";
+import { SeatInventoryActions } from "./SeatInventoryActions";
 
 /** Only an admin view supplies this inventory. Null balances remain unknown. */
 export function SeatInventory({ seats }: { seats: readonly OrganizationSeat[] }) {
@@ -25,7 +26,9 @@ export function SeatInventory({ seats }: { seats: readonly OrganizationSeat[] })
             <span role="cell" data-tip={seat.period ? formatUsageTime(seat.period.endsAt) : undefined}>
               {seat.period ? accountDay(seat.period.endsAt) : "Not available"}
             </span>
-            <div role="cell" />
+            <div role="cell">
+              <SeatInventoryActions seat={seat} />
+            </div>
           </div>
         ))}
       </div>

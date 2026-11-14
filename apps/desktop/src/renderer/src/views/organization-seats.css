@@ -183,3 +183,9 @@
     gap: 16px;
   }
 }
+
+.seats-inline-state .seats-operation-status {
+  height: auto;
+  padding: 0;
+  line-height: inherit;
+}

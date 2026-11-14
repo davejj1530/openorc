@@ -26,6 +26,7 @@ import type {
 } from "@openorc/protocol";
 import { Account } from "./account.js";
 import { OrganizationBilling } from "./organization-billing.js";
+export type { OrganizationSeatAdministration } from "./organization-seat-administration.js";
 import { TeamChat } from "./chat.js";
 import { Follower } from "./follow.js";
 import { Files } from "./files.js";
@@ -165,7 +166,7 @@ export interface HostedSpaces {
   people(spaceId: string, offset?: number, limit?: number): Promise<OrganizationPeople>;
 }
 
-export type KeptPart = "account" | "threads" | "spaces" | "organizationBilling";
+export type KeptPart = "account" | "threads" | "spaces" | "organizationBilling" | "seatOperations";
 
 /** The lists every place answers its own rows of, which the asker merges. */
 export type MergedMethod = "threads.list" | "threads.resolvedCount" | "inbox.list";
@@ -220,6 +221,7 @@ export function createHosted(deps: HostedDeps): Hosted {
     session,
     spaces,
     storage: { load: () => deps.kept.load("organizationBilling"), save: (value) => deps.kept.save("organizationBilling", value) },
+    operations: { load: () => deps.kept.load("seatOperations"), save: (value) => deps.kept.save("seatOperations", value) },
   });
   const chat = new TeamChat({ session, spaces, push: deps.push });
   const tasks = new OnlineTasks({ session, spaces, push: deps.push, prepared: () => threads.refresh() });

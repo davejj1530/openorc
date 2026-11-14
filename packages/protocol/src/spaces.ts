@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { OrganizationPersonSeat } from "./organization-billing.js";
 import type { OrganizationSetupResults } from "./organization-setup.js";
 import type { OrganizationInvitationResults } from "./organization-invitations.js";
 import type { AccountReach } from "./account.js";
@@ -58,6 +59,7 @@ export interface SpaceProject {
 }
 
 export interface OrganizationPerson {
+  seat?: OrganizationPersonSeat | null;
   memberId: string;
   userId: string;
   name: string;

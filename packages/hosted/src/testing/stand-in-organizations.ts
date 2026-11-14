@@ -21,6 +21,7 @@ interface OrganizationDeps {
 
 /** Organization reads use membership IDs and explicit targets, matching the HTTP service. */
 export class StandInOrganizations {
+  seat: ((spaceId: string, email: string) => { id: string | null; paysForPro: boolean } | undefined) | undefined;
   logoFailure: string | null = null;
   readonly invitations: StandInInvitations;
   readonly created = new Map<string, number>();
@@ -130,7 +131,8 @@ export class StandInOrganizations {
         ...this.deps.person(member.email),
         email: member.email,
         role: member.role,
-        plan: this.deps.pro(member.email) ? "pro" : "free",
+        plan: this.deps.pro(member.email) || this.seat?.(space, member.email)?.id ? "pro" : "free",
+        ...(this.seat?.(space, member.email) !== undefined && { seat: viewer.role === "admin" || member.id === viewer.id ? this.seat?.(space, member.email) : null }),
         joinedAt: member.createdAt,
       }))
       .sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()) || a.memberId.localeCompare(b.memberId));

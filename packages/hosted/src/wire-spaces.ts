@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { OrganizationPersonSeat } from "@openorc/protocol";
 import type { Route } from "./wire.js";
 import { wireOrganizationAccess } from "./organization-access-wire.js";
 import { wireGithubStatus } from "./wire-github.js";
@@ -37,7 +38,19 @@ export type WireSpaces = z.infer<typeof wireSpaces>;
 export const wirePeople = z.object({
   organization: identity,
   viewer: z.object({ memberId: id, role }),
-  members: z.array(z.object({ memberId: id, userId: id, name: z.string(), email: z.string(), image: z.string().nullable(), role, plan: z.enum(["free", "pro"]), joinedAt: iso })),
+  members: z.array(
+    z.object({
+      memberId: id,
+      userId: id,
+      name: z.string(),
+      email: z.string(),
+      image: z.string().nullable(),
+      role,
+      plan: z.enum(["free", "pro"]),
+      joinedAt: iso,
+      seat: OrganizationPersonSeat.nullable().optional(),
+    }),
+  ),
   total: z.number().int().nonnegative(),
   adminCount: z.number().int().nonnegative(),
 });

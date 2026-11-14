@@ -2,12 +2,14 @@ import type { OrganizationBillingOffers, OrganizationBillingPage, OrganizationBi
 import type { Hosted } from "@openorc/hosted";
 import { createAccountHandlers } from "./account.js";
 import { createOrganizationStorageHandlers } from "./organization-storage.js";
+import { createOrganizationSeatHandlers } from "./organization-seat-assignment.js";
 
 export function createHostedAccountHandlers(hosted: Hosted | null) {
   return {
     ...createAccountHandlers(hosted?.account ?? null),
     ...createOrganizationBillingHandlers(hosted?.organizationBilling ?? null),
     ...createOrganizationStorageHandlers(hosted?.organizationBilling ?? null),
+    ...createOrganizationSeatHandlers(hosted?.organizationBilling.seats ?? null),
   };
 }
 

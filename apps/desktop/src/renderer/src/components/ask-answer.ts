@@ -15,6 +15,12 @@ export function useDockedAsks(): (block: Block) => boolean {
   return (block) => docked && block.kind === "approval" && !block.decision && docks(block);
 }
 
+/** Asks answered from this window, so their record lands in the conversation as it is drawn, and not on a reload. */
+const answeredHere = new Set<string>();
+
+/** Whether this ask was answered from this window, for its record's arrival. */
+export const answeredInThisWindow = (approvalId: string): boolean => answeredHere.has(approvalId);
+
 /**
  * Answering one ask from its own card: the answer goes once, its card shows it is on its way, and a refusal reads on
  * the card that was acted on. `blocked` is why no answer can go now.
@@ -25,7 +31,10 @@ export function useAskAnswer(runId: string, approvalId: string) {
   const answer = (decision: RpcParams<"approvals.resolve">["decision"], answers?: Record<string, string[]>, note?: string) => {
     setState({ pending: true, error: null });
     Promise.resolve(core.call("approvals.resolve", { runId, approvalId, decision, ...(answers && { answers }), ...(note && { note }) })).then(
-      () => setState({ pending: false, error: null }),
+      () => {
+        answeredHere.add(approvalId);
+        setState({ pending: false, error: null });
+      },
       (error: unknown) => setState({ pending: false, error: error instanceof Error ? error.message : String(error) }),
     );
   };

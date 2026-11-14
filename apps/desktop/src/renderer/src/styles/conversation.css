@@ -633,8 +633,9 @@
   overflow-wrap: anywhere;
 }
 
-/* A question as the record of what was asked and answered: an r20 card, 44px fill options, the chosen ones in the ink
-   pill with an overshoot check and the rest stepped back one after another, then where the answer went. While a
+/* A question as the record of what was asked and answered: an r20 card, 44px fill options, the chosen ones a key with an
+   ink edge and a check, as a picked option is everywhere (never an ink slab: the column's one ink is the composer's),
+   the rest stepped back, then where the answer went. While a
    question waits where no composer takes it, the card holds the docked ask's own parts (styles/composer.css). */
 .question-card {
   display: flex;
@@ -712,11 +713,8 @@
   scale: 1;
 }
 .question-option[data-state="chosen"] {
-  background: var(--accent);
-  color: var(--accent-fg);
-}
-.question-option[data-state="chosen"] .question-option-description {
-  color: inherit;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1.5px var(--ink);
 }
 .question-option[data-state="dropped"] {
   background: var(--surface-2);
@@ -727,10 +725,11 @@
   gap: 4px;
   padding: 14px 12px;
   border-radius: var(--radius-lg);
-  background: var(--accent);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1.5px var(--ink);
   font-size: var(--text-base);
   line-height: 16px;
-  color: var(--accent-fg);
+  color: var(--ink);
 }
 .question-foot {
   display: flex;

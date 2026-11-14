@@ -1,6 +1,6 @@
 # Agent questions (`ask_user`)
 
-Every agent in OpenOrc can ask you questions with `ask_user`, a tool on OpenOrc's private MCP connection for that run. Questions appear as a question card in the conversation, in the inbox, and as a notification, and a paired phone can answer them too. Claude Code and Codex also have their own question tools, which OpenOrc shows as the same card.
+Every agent in OpenOrc can ask you questions with `ask_user`, a tool on OpenOrc's private MCP connection for that run. A question waits at the top of the message box, where you answer it, shows on the thread's row and as a notification, and a paired phone can answer it too. Once answered, the conversation keeps a card of what was asked and what you answered. Claude Code and Codex also have their own question tools, which OpenOrc shows the same way. Words typed in the message box stay a message; to answer in your own words, type in the question's own line.
 
 ## The tool
 
@@ -19,7 +19,7 @@ or `{"status":"cancelled","requestId":"ask-user-…"}`. The same result is retur
 - Questions are accepted only during an active turn. After a turn is stopped, the agent cannot ask again until you send a new message.
 - Autonomous mode never answers for you; the question waits for your reply.
 - Your answers are checked against the questions still waiting before they are used, and an old reply cannot answer a newer question.
-- Declining, interrupting, the agent exiting, the turn or run ending, closing the app, or the MCP connection dropping all end the question, and the card shows how it ended.
+- Declining, interrupting, the agent exiting, the turn or run ending, closing the app, or the MCP connection dropping all end the question, and the conversation shows how it ended.
 - OpenOrc sets no time limit on a question.
 
 ## OpenCode

@@ -13,7 +13,7 @@ Each provider is set up so it does not ask you about OpenOrc's tools itself. Ope
 
 These settings apply only to that agent process. Your own MCP configuration and the provider's shell and file permissions are unchanged. See the [Claude CLI permission flags](https://code.claude.com/docs/en/cli-reference) and [Codex MCP configuration](https://developers.openai.com/codex/config-reference).
 
-If a provider still asks, OpenOrc checks that the request really comes from that connection: for Claude, the full tool name must match one of its tools; for Codex, the server name reported by Codex must match; for OpenCode, the tool name must start with the connection's server name. Codex confirmation forms with no fields are accepted automatically. Questions, and forms that have fields, still show a card. OpenOrc never decides trust from display text or tool arguments.
+If a provider still asks, OpenOrc checks that the request really comes from that connection: for Claude, the full tool name must match one of its tools; for Codex, the server name reported by Codex must match; for OpenCode, the tool name must start with the connection's server name. Codex confirmation forms with no fields are accepted automatically. Questions, and forms that have fields, still ask you. OpenOrc never decides trust from display text or tool arguments.
 
 ## What each mode allows
 
@@ -29,7 +29,7 @@ If a provider still asks, OpenOrc checks that the request really comes from that
 | `device` open and close                         | blocked | allowed           | allowed      | allowed    |
 | `thread_start`                                  | blocked | allowed           | allowed      | allowed    |
 
-When OpenOrc asks, you see the usual approval card. **Allow for this run** covers later actions of the same kind in that run, except password fields, which ask every time.
+When OpenOrc asks, the request waits at the top of the message box, as every approval does. **Allow for this run** covers later actions of the same kind in that run, except password fields, which ask every time. To deny with a reason, write it in **Say what to do instead**: OpenOrc denies the request and sends your words to the agent as your next message, the same way for Claude Code, Codex and OpenCode.
 
 Everything else is allowed in every mode, because it changes nothing outside OpenOrc's own records:
 
@@ -38,7 +38,7 @@ Everything else is allowed in every mode, because it changes nothing outside Ope
 - Documents: `task_create` in the backlog, `orcling_task_create`, `task_update`, `plan_write`, and `visualize`, which adds a view to the conversation.
 - Pull request reviews: `pull_request_diff`, and `pull_request_comment` and `pull_request_summary`, which write the review's drafts for you to post.
 - Task comments: `task_comment_intent`, which records whether a comment asks for work. The work itself starts only after the agent's reply.
-- `approve`: Claude Code's permission prompt. Claude Code calls it, not the model, to hand each tool request to OpenOrc's approval cards and mode rules.
+- `approve`: Claude Code's permission prompt. Claude Code calls it, not the model, to hand each tool request to OpenOrc's approvals and mode rules.
 
 An Orcling's tools exist only in runs where an Orcling speaks. Its permission caps the mode it works in anywhere: Approve runs as Review everything (Plan on OpenCode, which cannot ask first), Allow as Autonomous, and the stricter of the Orcling's and the conversation's rule wins. `orcling_thread_send` follows the `thread_send` rules below and can reach threads in any project. `orcling_thread_start` sets the Orcling working in a new project thread, or on a saved task that has no conversation of someone else's; that thread works as freely as the conversation that started it, within the Orcling's permission. See [Orclings](orclings.md).
 

@@ -1408,25 +1408,36 @@
 /* An ask the agent waits on, docked at the top of the composer's piece above a hairline (components/ComposerAsk.tsx).
    Its top line holds what it asks, how many more wait and its quiet way out; its choices are keys the width of the
    piece less 12px a side, and its own line for words is a key the same width. Nothing is ringed at rest. */
+/* The dock opens and folds by its height (ComposerAsk's motion), so it carries the piece's gap below it itself: a dock
+   folded to nothing leaves no gap. The clip margin keeps a ringed control's outline. */
+.composer-ask-dock {
+  min-width: 0;
+  margin-bottom: -14px;
+  overflow: clip;
+  overflow-clip-margin: 4px;
+}
 .composer-ask {
   display: flex;
   flex-direction: column;
   gap: 8px;
   min-width: 0;
-  margin-left: -4px;
+  margin: 0 0 14px -4px;
   padding-bottom: 12px;
   border-bottom: var(--hairline) solid var(--line);
 }
+/* In a narrow composer the quiet words drop under the question rather than squeeze it. */
 .composer-ask-top {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 0 12px;
   min-width: 0;
   padding-left: 4px;
 }
 .composer-ask-head {
   display: flex;
+  flex: 1 1 12rem;
   align-items: flex-start;
   gap: 8px;
   min-width: 0;
@@ -1452,6 +1463,7 @@
   display: flex;
   align-items: center;
   flex-shrink: 0;
+  margin-left: auto;
   gap: 2px;
   min-height: 28px;
 }
@@ -1509,6 +1521,7 @@
 }
 .composer-ask-row {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 6px;
 }

@@ -15,18 +15,18 @@ Oh My Pi has no per-session approval setting, so each run starts with its own `-
 | Autonomous        | `yolo`                 | nothing                   |
 | Plan              | `always-ask`           | OpenOrc refuses what asks |
 
-Commands and file deletes or moves come as `session/request_permission`. Other tools come as form elicitations, which OpenOrc shows as the same approval card. OpenOrc tells Oh My Pi it supports forms; without them Oh My Pi denies those tools and approves plans without asking.
+Commands and file deletes or moves come as `session/request_permission`. Other tools come as form elicitations, which OpenOrc shows as the same approval. OpenOrc tells Oh My Pi it supports forms; without them Oh My Pi denies those tools and approves plans without asking.
 
 The overlay also sets `tools.xdev: false`, so OpenOrc's tools are called and approved by their own names rather than as `xd://` devices, and `async.enabled: false`, so subagents finish inside the turn that started them.
 
 ## Questions and plans
 
-- Oh My Pi's `ask` tool comes as a form, shown as OpenOrc's question card. Declining it ends the turn, as Oh My Pi does.
+- Oh My Pi's `ask` tool comes as a form, shown as OpenOrc's question. Declining it ends the turn, as Oh My Pi does.
 - In Plan, Oh My Pi drafts its plan in a file of its own and proposes it. OpenOrc reads the whole plan file, shows it as the conversation's plan, answers "Refine plan" and stops the turn. You implement it from OpenOrc or reply with changes.
 
 ## Messages during a turn
 
-Oh My Pi advertises `_session/steering`, so a message sent while it works joins the running turn. While an approval or question is open, the message waits in the queue instead, since steering would dismiss the card.
+Oh My Pi advertises `_session/steering`, so a message sent while it works joins the running turn. While an approval or question is open, the message waits in the queue instead, since steering would dismiss the ask.
 
 ## Connectors
 

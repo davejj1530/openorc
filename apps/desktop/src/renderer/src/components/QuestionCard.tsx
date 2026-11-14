@@ -1,7 +1,7 @@
 import { useState, type CSSProperties, type ReactNode } from "react";
 import { answerFor, emptyDraft, keptAnswers, LINE, lineWaiting, readQuestions, stepAnswers, type AnswerAction, type AnswerDraft, type Question, type WaitingAsk } from "@openorc/client";
 import { harnessShortName, isHarnessId } from "@openorc/protocol";
-import { useAskAnswer } from "./ask-answer";
+import { answeredInThisWindow, useAskAnswer } from "./ask-answer";
 import { useRunVoice } from "../lib/turn-authors";
 import { Button } from "./ui";
 import { cn } from "../lib/cn";
@@ -63,7 +63,8 @@ export function QuestionCard({
   answers?: Record<string, string[]> | undefined;
 }) {
   const voice = useRunVoice(runId);
-  const [asked] = useState(!decided);
+  // A record lands when it was asked on this screen, or answered from this window's composer; history shows still.
+  const [asked] = useState(() => !decided || answeredInThisWindow(approvalId));
   if (!decided)
     return (
       <div data-blocking="true" data-plane className="question-card" onKeyDown={askKeyDown(() => {})}>
@@ -73,7 +74,7 @@ export function QuestionCard({
   const questions = readQuestions(input);
   const chosen = (q: Question): string[] => (decided === "deny" ? [] : (answers?.[q.key] ?? []));
   return (
-    <div data-plane className="question-card">
+    <div data-plane className={cn("question-card", asked && "motion-arrive")}>
       {questions.map((q, i) => (
         <fieldset key={q.key} className="question-set">
           <legend className="question-ask">
@@ -88,7 +89,7 @@ export function QuestionCard({
           </div>
         </fieldset>
       ))}
-      <p className={cn("question-foot", asked && "motion-arrive")} role="status">
+      <p className="question-foot" role="status">
         {decided === "deny" ? "Declined" : `Sent to ${voice ? harnessShortName(voice.agent) : "the agent"}`}
       </p>
     </div>

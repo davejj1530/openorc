@@ -4,6 +4,8 @@ import { useScrollEdges } from "../lib/use-scroll-edges";
 import { HarnessLogo } from "./HarnessLogo";
 import { fastStatus } from "./ModelPickerEffort";
 import { Orcling as OrclingIcon, Zap } from "./icons";
+import { useHostedControlReason } from "./HostedConversationBoundary";
+import { HostedControlReason } from "./HostedControlReason";
 
 export type PickerSection = HarnessId | "orclings";
 
@@ -33,6 +35,7 @@ export function ModelPickerRail({
   const selected = useRef<HTMLButtonElement>(null);
   const edges = useScrollEdges();
   const fastDescriptionId = useId();
+  const fastReason = useHostedControlReason("speed");
   useLayoutEffect(() => {
     selected.current?.scrollIntoView?.({ block: "nearest" });
   }, [section]);
@@ -72,7 +75,13 @@ export function ModelPickerRail({
           );
         })}
       </div>
-      {fast ? (
+      {fast && fastReason ? (
+        <HostedControlReason label="Fast mode" reason={fastReason}>
+          <button type="button" className="model-picker-rail-button model-picker-fast" aria-label="Fast mode" disabled>
+            <Zap size={20} />
+          </button>
+        </HostedControlReason>
+      ) : fast ? (
         <>
           <button
             type="button"

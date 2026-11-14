@@ -23,6 +23,9 @@ export const HOSTED_REASONS = {
   tasks: "Tasks aren't available in this cloud thread yet.",
   terminal: "A terminal isn't available in this cloud thread yet.",
   moveToMac: "Moving this conversation to your Mac isn't available yet.",
+  macCode: "Opening this cloud workspace on your Mac isn't available yet.",
+  nativeStop: "Stopping a cloud subthread isn't available yet.",
+  interactiveApp: "Interactive tool apps aren't available in this cloud thread yet.",
 } as const;
 export type HostedUnavailableControl = keyof typeof HOSTED_REASONS;
 

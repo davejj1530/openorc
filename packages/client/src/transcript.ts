@@ -1,5 +1,6 @@
 import type { ActivityRecovery, ActivityStatus, AgentEvent, AgentEventType, McpToolSource, ToolDigest } from "@openorc/protocol";
 import { replaceSubagentCompletionReply, subagentBlock, subagentCompletionReply, type SubagentCard } from "./transcript-subagents.js";
+import { recordHostedContext } from "./hosted-run-facts.js";
 
 /**
  * Transcript projection. Events fold into blocks. A change replaces only the blocks it touches and the arrays that
@@ -82,6 +83,7 @@ export type Block = { at?: number; turnKey?: string; runId?: string } & (
 
 export interface RunTranscript {
   runId: string;
+  context?: { used: number; window: number | null };
   blocks: Block[];
   blockIndex: Map<string, number>;
   live: boolean;
@@ -323,7 +325,7 @@ const handlers: { [T in AgentEventType]: Handler<T> } = {
     }
   },
   "file.changed": ignore,
-  "usage.updated": ignore,
+  "usage.updated": recordHostedContext,
   "background.updated": ignore,
   "subagent.started": (run, ev) => {
     const block = subagentBlock(run, ev);
@@ -337,7 +339,7 @@ const handlers: { [T in AgentEventType]: Handler<T> } = {
   raw: ignore,
   // Plans load through threads.plans, and how full the context is comes with the thread summary.
   "plan.updated": ignore,
-  "context.updated": ignore,
+  "context.updated": recordHostedContext,
 };
 
 /**

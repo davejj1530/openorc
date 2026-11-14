@@ -1,10 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import { AppBridge, PostMessageTransport, type McpUiHostContext } from "@modelcontextprotocol/ext-apps/app-bridge";
 import { CallToolResultSchema, ReadResourceResultSchema, ToolSchema } from "@modelcontextprotocol/sdk/types.js";
-import type { McpAppOpenResult, McpAppReady } from "@openorc/protocol";
+import { HOSTED_REASONS, hostedThreadOf, type McpAppOpenResult, type McpAppReady } from "@openorc/protocol";
 import { core } from "../lib/rpc";
+import { HostedControlReason } from "./HostedControlReason";
 
 export default function McpAppResult({ runId, toolCallId }: { runId: string; toolCallId: string }) {
+  if (hostedThreadOf(runId))
+    return (
+      <HostedControlReason label="Open interactive app" reason={HOSTED_REASONS.interactiveApp}>
+        <button type="button" className="text-xs text-ink-3" disabled>
+          Open interactive app
+        </button>
+      </HostedControlReason>
+    );
+  return <LocalMcpAppResult runId={runId} toolCallId={toolCallId} />;
+}
+
+function LocalMcpAppResult({ runId, toolCallId }: { runId: string; toolCallId: string }) {
   const [result, setResult] = useState<McpAppOpenResult | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [closed, setClosed] = useState(false);

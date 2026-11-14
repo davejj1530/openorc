@@ -1,0 +1,120 @@
+import { QueryClientProvider } from "@tanstack/react-query";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { createRef, useState, type ReactNode } from "react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { HOSTED_REASONS } from "@openorc/protocol";
+import { queryClient } from "../lib/client";
+import { core } from "../lib/rpc";
+import { Composer, type ComposerProps } from "./Composer";
+import { ComposerAddMenu } from "./ComposerAddMenu";
+import { ContextUsage } from "./ContextUsage";
+import { HostedConversationBoundary } from "./HostedConversationBoundary";
+import { ModelPickerRail } from "./ModelPickerRail";
+import { PickerAccountRows } from "./ModelPickerAccounts";
+import { cloudReviewThread } from "./test-fixtures/hosted-review";
+import { messageOf, press, type } from "./composer-editor/testing";
+
+beforeEach(() => {
+  queryClient.clear();
+  vi.spyOn(core, "call").mockRejectedValue(new Error("Unexpected read"));
+});
+afterEach(() => {
+  cleanup();
+  queryClient.clear();
+  vi.restoreAllMocks();
+});
+const mount = (children: ReactNode) =>
+  render(
+    <QueryClientProvider client={queryClient}>
+      <HostedConversationBoundary thread={cloudReviewThread}>{children}</HostedConversationBoundary>
+    </QueryClientProvider>,
+  );
+
+it("shows real context while disabling manual compaction with a focusable reason", async () => {
+  const compact = vi.fn();
+  mount(<ContextUsage used={1500} window={10000} onCompact={compact} />);
+  fireEvent.click(screen.getByRole("button", { name: "Context usage" }));
+  expect(await screen.findByText("1,500 tokens")).toBeTruthy();
+  const button = screen.getByRole("button", { name: "Compact context" });
+  expect(button.hasAttribute("disabled")).toBe(true);
+  await act(async () => screen.getByLabelText("Compact context").focus());
+  expect(await screen.findByText(HOSTED_REASONS.compact)).toBeTruthy();
+  fireEvent.click(button);
+  expect(compact).not.toHaveBeenCalled();
+});
+
+it("keeps project file mentions disabled without disabling uploads", async () => {
+  mount(<ComposerAddMenu onFiles={vi.fn()} offers={{ files: true, orclings: false, skills: false, connectors: false, commands: false, written: false }} lists={createRef()} />);
+  fireEvent.click(screen.getByRole("button", { name: "Add to this message" }));
+  const item = await screen.findByRole("menuitem", { name: "File from the project" });
+  expect(item.getAttribute("aria-disabled")).toBe("true");
+  await act(async () => item.focus());
+  expect(await screen.findByText(HOSTED_REASONS.fileBrowser)).toBeTruthy();
+  expect(screen.getByRole("menuitem", { name: "Files…" }).getAttribute("aria-disabled")).not.toBe("true");
+});
+
+it("keeps a shown Fast setting disabled with its specific reason", async () => {
+  const toggle = vi.fn();
+  mount(
+    <ModelPickerRail
+      section="codex"
+      onSectionChange={vi.fn()}
+      enabled={["codex"]}
+      orclings={false}
+      system={undefined}
+      fast={{ active: false, blocked: false, hint: "Fast", disabled: false, onToggle: toggle }}
+    />,
+  );
+  const button = screen.getByRole("button", { name: "Fast mode" });
+  expect(button.hasAttribute("disabled")).toBe(true);
+  await act(async () => button.parentElement?.focus());
+  expect(await screen.findByText(HOSTED_REASONS.speed)).toBeTruthy();
+  fireEvent.click(button);
+  expect(toggle).not.toHaveBeenCalled();
+});
+
+it("does not read or offer another local Claude account for a cloud turn", async () => {
+  const choose = vi.fn();
+  mount(<PickerAccountRows section="claude" searching={false} accounts={{ current: "local", accounts: [{ id: "local", name: "Local account", status: "ready" }], choose }} moveRowFocus={() => {}} />);
+  const account = await screen.findByRole("button", { name: "Claude account" });
+  expect(account.hasAttribute("disabled")).toBe(true);
+  await act(async () => account.parentElement?.focus());
+  expect(await screen.findByText(HOSTED_REASONS.claudeAccount)).toBeTruthy();
+  expect(core.call).not.toHaveBeenCalled();
+});
+
+const base: ComposerProps = {
+  value: "",
+  onChange: vi.fn(),
+  onSubmit: async () => {},
+  placeholder: "Message",
+  model: null,
+  onModel: vi.fn(),
+  mode: "act",
+  onMode: vi.fn(),
+  permission: "trusted",
+  onPermission: vi.fn(),
+  location: { label: null, branch: null },
+};
+function Draft(props: Partial<ComposerProps>) {
+  const [value, onChange] = useState("");
+  return <Composer {...base} {...props} value={value} onChange={onChange} />;
+}
+it("does not read this Mac's files when a cloud message types a file mention", async () => {
+  mount(<Draft fileSearch={{ kind: "thread", id: cloudReviewThread.id }} />);
+  type(screen.getByRole("textbox", { name: "Message" }), "@example", 8);
+  await act(async () => {});
+  expect(vi.mocked(core.call).mock.calls.some(([method]) => method === "files.search")).toBe(false);
+});
+
+it("does not execute or send a disabled cloud slash command", async () => {
+  const submit = vi.fn(async () => {});
+  const compact = vi.fn();
+  mount(<Draft onSubmit={submit} commands={[{ name: "compact", hint: "Summarize", run: compact }]} />);
+  const field = screen.getByRole("textbox", { name: "Message" });
+  type(field, "/compact", 8);
+  press(field, { key: "Enter" });
+  expect(messageOf(field)).toBe("/compact");
+  expect(compact).not.toHaveBeenCalled();
+  expect(submit).not.toHaveBeenCalled();
+});

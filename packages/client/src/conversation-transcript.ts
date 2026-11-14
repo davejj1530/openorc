@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { Run } from "@openorc/protocol";
+import { hostedThreadOf, type Run } from "@openorc/protocol";
 import type { ClientQueries } from "./query.js";
 import type { createRunStore } from "./run-store.js";
 import { emptyRun, type Block, type RunTranscript } from "./transcript.js";
@@ -17,9 +17,14 @@ export type ConversationTarget = { runId: string; turn: number };
  * time. Paging and the live run follow the same loaded window, whose runs `shown` names, oldest first. A `target`
  * extends the window back to it.
  */
-export function useConversationTranscriptWith(queries: ClientQueries, store: Runs, { runs, threadId, target }: { runs: Run[]; threadId: string | null; target?: ConversationTarget | undefined }) {
+export function useConversationTranscriptWith(
+  queries: ClientQueries,
+  store: Runs,
+  { runs, threadId, target, hosted }: { runs: Run[]; threadId: string | null; target?: ConversationTarget | undefined; hosted?: boolean },
+) {
   const activeRun = runs.at(-1);
-  const conversationMessages = queries.useRpc("threads.messages", { id: threadId ?? "" }, { enabled: Boolean(threadId) });
+  const remoteMessages = hosted ?? Boolean(activeRun && hostedThreadOf(activeRun.id));
+  const conversationMessages = queries.useRpc("threads.messages", { id: threadId ?? "" }, { enabled: Boolean(threadId) && !remoteMessages });
   const { shown, transcripts, hasOlder, loadOlder } = useRecentRuns(store, runs, target);
   const messages = useMemo(
     () =>

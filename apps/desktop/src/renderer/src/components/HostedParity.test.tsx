@@ -9,6 +9,7 @@ import { PanelContent } from "./PanelContent";
 import { PanelNewTab } from "./PanelNewTab";
 import { ThreadMenuItems } from "./ThreadActions";
 import { ToolRow } from "./ToolRow";
+import McpAppResult from "./McpAppResult";
 import { cloudReviewThread, localReviewThread, reviewProject } from "./test-fixtures/hosted-review";
 
 vi.mock("../lib/orclings", () => ({ useOrclings: () => [], useOrclingGroups: () => [], orclingHome: () => null }));
@@ -91,4 +92,33 @@ it("does not fetch omitted hosted tool output on hover or focus", async () => {
   fireEvent.click(row);
   expect(await screen.findByRole("button", { name: "Full output" })).toBeTruthy();
   expect(vi.mocked(core.call)).not.toHaveBeenCalled();
+});
+
+it("does not open a local interactive tool app for a hosted run", async () => {
+  mount(<McpAppResult runId="hosted:example-thread" toolCallId="call-1" />);
+  const button = screen.getByRole("button", { name: "Open interactive app" });
+  expect(button.hasAttribute("disabled")).toBe(true);
+  await act(async () => button.parentElement?.focus());
+  expect(await screen.findByText(HOSTED_REASONS.interactiveApp)).toBeTruthy();
+  expect(core.call).not.toHaveBeenCalled();
+});
+
+it("keeps cloud relocation and code-copy controls disabled in the place menu", async () => {
+  mount(
+    <Menu.Root open>
+      <Menu.Portal>
+        <Menu.Positioner>
+          <Menu.Popup>
+            <ThreadMenuItems thread={cloudReviewThread} parts={Menu} />
+          </Menu.Popup>
+        </Menu.Positioner>
+      </Menu.Portal>
+    </Menu.Root>,
+  );
+  fireEvent.click(screen.getByText("OpenOrc Cloud"));
+  const bring = await screen.findByRole("menuitem", { name: /Bring to Mac/ });
+  expect(bring.getAttribute("aria-disabled")).toBe("true");
+  await act(async () => bring.focus());
+  expect(await screen.findByText(HOSTED_REASONS.moveToMac)).toBeTruthy();
+  expect(screen.getByRole("menuitem", { name: /Open on Mac/ }).getAttribute("aria-disabled")).toBe("true");
 });

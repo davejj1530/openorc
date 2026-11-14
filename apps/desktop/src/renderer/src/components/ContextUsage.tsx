@@ -3,6 +3,8 @@ import { Button } from "./ui";
 import { formatTokens } from "@openorc/client";
 import { CoversPreview } from "../lib/browser-preview";
 import { floatingGround } from "../lib/use-anchor-ground";
+import { useHostedControlReason } from "./HostedConversationBoundary";
+import { HostedControlReason } from "./HostedControlReason";
 
 /** How full reads as a warning: warn above 60%, bad above 85%. */
 function fullness(fraction: number): "warn" | "bad" | undefined {
@@ -99,6 +101,17 @@ export function ContextUsage({ used, window, onCompact, compacting, disabledReas
 
 /** The one action: dimmed with its reason on demand while it cannot run. */
 function ContextCompact({ onCompact, compacting, disabledReason }: { onCompact?: (() => void) | undefined; compacting?: boolean | undefined; disabledReason?: string | undefined }) {
+  const hostedReason = useHostedControlReason("compact");
+  if (hostedReason)
+    return (
+      <div className="composer-context-compact">
+        <HostedControlReason label="Compact context" reason={hostedReason}>
+          <Button size="sm" variant="secondary" disabled>
+            Compact context
+          </Button>
+        </HostedControlReason>
+      </div>
+    );
   const reason = compacting ? undefined : (disabledReason ?? (onCompact ? undefined : "Compacting isn’t available for this conversation."));
   return (
     <div className="composer-context-compact">

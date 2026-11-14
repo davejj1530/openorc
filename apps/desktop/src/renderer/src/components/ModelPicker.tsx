@@ -1,4 +1,5 @@
 import { Popover } from "@base-ui/react/popover";
+import { useHostedControlReason } from "./HostedConversationBoundary";
 import { browserModels, catalogModel, modelChoiceFor, pickerCatalog, pickerSettings, providerChoice, providerGroups, type ModelChoice } from "@openorc/client";
 import {
   effortHint,
@@ -479,6 +480,7 @@ interface ComposerModelPickerProps {
 }
 
 export function ComposerModelPicker({ value, onChange, onSelectModel, orclings, accounts, modelSelector, disabled, settingsDisabled = false, limits }: ComposerModelPickerProps) {
+  const fastReason = useHostedControlReason("speed");
   const models = useModelCatalog();
   const popup = usePickerPopup();
   value = useEnabledChoice(value, limits?.harnesses);
@@ -548,7 +550,7 @@ export function ComposerModelPicker({ value, onChange, onSelectModel, orclings, 
                 orclings={orclings}
                 accounts={accounts}
                 showEffort
-                showFast={limits?.fast ?? true}
+                showFast={Boolean(fastReason) || (limits?.fast ?? true)}
                 harnesses={limits?.harnesses}
                 disabled={settingsDisabled}
                 closeOnSelect={false}

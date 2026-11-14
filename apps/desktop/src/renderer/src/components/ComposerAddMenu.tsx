@@ -7,6 +7,8 @@ import type { ListKind } from "./composer-commands";
 import type { ComposerLists } from "./ComposerInput";
 import { BookText, ChevronRight, FileCode2, Image, Orcling, Plug, Plus, Slash, Upload } from "./icons";
 import { menuItem, menuPopup, menuSeparator } from "./menu";
+import { useHostedControlReason } from "./HostedConversationBoundary";
+import { HostedMenuReason } from "./HostedMenuReason";
 
 /** The system's file chooser, for any file or only pictures. */
 function chooseFiles(add: (files: File[]) => void, accept?: string): void {
@@ -66,6 +68,7 @@ export function ComposerAddMenu({
   lists: RefObject<ComposerLists | null>;
 }) {
   const control = useComposerControl(false, "Add to this message");
+  const fileReason = useHostedControlReason("fileBrowser");
   const [open, setOpen] = useState(false);
   const groups = listGroups(offers);
   // A list opens once the menu has gone, so the focus it takes into the message is not taken back by the menu closing.
@@ -95,21 +98,29 @@ export function ComposerAddMenu({
             {groups.map((group, index) => (
               <Fragment key={index}>
                 <Menu.Separator className={menuSeparator} />
-                {group.map((row) => (
-                  <Menu.Item
-                    key={row.kind}
-                    className={menuItem}
-                    disabled={Boolean(row.blocked)}
-                    data-tip={row.blocked}
-                    onClick={() => {
-                      pending.current = row.kind;
-                    }}
-                  >
-                    <row.icon size={15} />
-                    {row.label}
-                    <ChevronRight size={14} className="composer-add-menu-end" />
-                  </Menu.Item>
-                ))}
+                {group.map((row) =>
+                  row.kind === "file" && fileReason ? (
+                    <HostedMenuReason key={row.kind} parts={Menu} reason={fileReason}>
+                      <row.icon size={15} />
+                      {row.label}
+                      <ChevronRight size={14} className="composer-add-menu-end" />
+                    </HostedMenuReason>
+                  ) : (
+                    <Menu.Item
+                      key={row.kind}
+                      className={menuItem}
+                      disabled={Boolean(row.blocked)}
+                      data-tip={row.blocked}
+                      onClick={() => {
+                        pending.current = row.kind;
+                      }}
+                    >
+                      <row.icon size={15} />
+                      {row.label}
+                      <ChevronRight size={14} className="composer-add-menu-end" />
+                    </Menu.Item>
+                  ),
+                )}
               </Fragment>
             ))}
           </Menu.Popup>

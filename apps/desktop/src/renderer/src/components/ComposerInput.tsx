@@ -7,7 +7,6 @@ import { filterMentions, mentionQueryAt, usePickedFiles, type MentionEntry } fro
 import type { SlashCommand } from "./Composer";
 import {
   asideMatching,
-  commandRows,
   firstPickable,
   LIST_STARTS,
   matchingCommands,
@@ -22,6 +21,8 @@ import {
   type SuggestionRow,
 } from "./composer-commands";
 import { ComposerSuggestions } from "./ComposerSuggestions";
+import { useHostedControlReason } from "./HostedConversationBoundary";
+import { blockHostedCommandKey, cloudCommandRows, hostedFileSuggestion, HostedSuggestion } from "./HostedComposerControls";
 import { ConnectorLogo } from "./ConnectorLogo";
 import { ComposerEditor, type ComposerEditorHandle, type DraftChange } from "./composer-editor/ComposerEditor";
 import { SkillHoverCard, useSkillHover } from "./MarkedText";
@@ -128,7 +129,9 @@ function askTook(event: KeyboardEvent, ask: ComposerInputProps["ask"], field: { 
 
 /** Owns text interaction: suggestions, the caret and focus, around the editor that holds the words. */
 export function ComposerInput(props: ComposerInputProps) {
-  const { value, onChange, onSubmit, onFiles, disabled, placeholder, autoFocus, fileSearch, mentions, commands, onCommandsWanted, connectors, onConnectorsWanted } = props;
+  const { value, onChange, onSubmit, onFiles, disabled, placeholder, autoFocus, mentions, commands, onCommandsWanted, connectors, onConnectorsWanted } = props;
+  const fileReason = useHostedControlReason("fileBrowser");
+  const fileSearch = fileReason ? undefined : props.fileSearch;
   const [caret, setCaret] = useState(0);
   const [cursor, setCursor] = useState(0);
   const [suggestionsActive, setSuggestionsActive] = useState(true);
@@ -157,11 +160,11 @@ export function ComposerInput(props: ComposerInputProps) {
     const members = memberQuery ? memberRows(memberMatches, { start: memberQuery.start, caret, value, write }) : [];
     if (atQuery !== null) {
       const draft = { token, caret, value, write, onFile: picked.pick };
-      return [...members, ...mentionRows({ usable: connectorMatches, aside: asideMatches, files: mentionQuery !== null ? (files.data ?? []) : [] }, draft)];
+      return [...members, ...mentionRows({ usable: connectorMatches, aside: asideMatches, files: mentionQuery !== null ? (files.data ?? []) : [] }, draft), ...hostedFileSuggestion(fileReason)];
     }
     if (members.length) return members;
-    return commandRows(commandMatches, { query: commandQuery, token, caret, value, write });
-  }, [memberQuery, memberMatches, atQuery, connectorMatches, asideMatches, mentionQuery, files.data, commandMatches, commandQuery, token, caret, value, write, picked.pick]);
+    return cloudCommandRows(fileReason, commandMatches, { query: commandQuery, token, caret, value, write }, token);
+  }, [memberQuery, memberMatches, atQuery, connectorMatches, asideMatches, mentionQuery, files.data, commandMatches, commandQuery, token, caret, value, write, picked.pick, fileReason]);
   const suggestions = useMemo(() => (scope ? all.filter((row) => ofKind(row, scope)) : all), [all, scope]);
   // The skill under the pointer says what it is for.
   const skillHover = useSkillHover(root);
@@ -191,41 +194,45 @@ export function ComposerInput(props: ComposerInputProps) {
             </div>
           ) : null}
           <div id={listId} role="listbox" hidden={suggestions.length === 0} aria-label={suggestionLabel(memberList, atQuery !== null)} data-agent-mention-list={memberList || undefined}>
-            {suggestions.map((suggestion, index) => (
-              <Fragment key={suggestion.key}>
-                {suggestion.group && suggestion.group !== suggestions[index - 1]?.group ? (
-                  <div aria-hidden="true" className="composer-suggestion-group">
-                    {suggestion.group}
-                  </div>
-                ) : null}
-                <button
-                  id={`${listId}-${index}`}
-                  tabIndex={-1}
-                  role="option"
-                  aria-selected={index === cursor}
-                  aria-disabled={suggestion.unavailable ? true : undefined}
-                  data-tip={suggestion.unavailable}
-                  data-agent-mention={suggestion.mention}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    suggestion.pick();
-                  }}
-                  // A move, not an enter: a row scrolling under a still pointer must not take the selection from the arrow keys.
-                  onMouseMove={() => setCursor(index)}
-                  className="composer-suggestion"
-                >
-                  {/* The label is the thing being inserted, so the hint gives way first. A
+            {suggestions.map((suggestion, index) =>
+              fileReason && suggestion.unavailable ? (
+                <HostedSuggestion key={suggestion.key} id={`${listId}-${index}`} row={suggestion} active={chosen && index === cursor} />
+              ) : (
+                <Fragment key={suggestion.key}>
+                  {suggestion.group && suggestion.group !== suggestions[index - 1]?.group ? (
+                    <div aria-hidden="true" className="composer-suggestion-group">
+                      {suggestion.group}
+                    </div>
+                  ) : null}
+                  <button
+                    id={`${listId}-${index}`}
+                    tabIndex={-1}
+                    role="option"
+                    aria-selected={index === cursor}
+                    aria-disabled={suggestion.unavailable ? true : undefined}
+                    data-tip={suggestion.unavailable}
+                    data-agent-mention={suggestion.mention}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      suggestion.pick();
+                    }}
+                    // A move, not an enter: a row scrolling under a still pointer must not take the selection from the arrow keys.
+                    onMouseMove={() => setCursor(index)}
+                    className="composer-suggestion"
+                  >
+                    {/* The label is the thing being inserted, so the hint gives way first. A
                     skill's description runs to a paragraph and would otherwise squeeze the
                     name it belongs to down to nothing. Half the row is the ceiling, so a
                     long file path still truncates rather than crowding out its own hint. */}
-                  <span className={cn("composer-suggestion-label", (suggestion.insert || suggestion.logo) && "skill-token")} data-mono={suggestion.mention ? undefined : true}>
-                    {suggestion.logo ? <ConnectorLogo title={suggestion.logo.title} logo={suggestion.logo.logo} size={16} /> : null}
-                    {suggestion.label}
-                  </span>
-                  {suggestion.hint ? <span className="composer-suggestion-hint">{suggestion.hint}</span> : null}
-                </button>
-              </Fragment>
-            ))}
+                    <span className={cn("composer-suggestion-label", (suggestion.insert || suggestion.logo) && "skill-token")} data-mono={suggestion.mention ? undefined : true}>
+                      {suggestion.logo ? <ConnectorLogo title={suggestion.logo.title} logo={suggestion.logo.logo} size={16} /> : null}
+                      {suggestion.label}
+                    </span>
+                    {suggestion.hint ? <span className="composer-suggestion-hint">{suggestion.hint}</span> : null}
+                  </button>
+                </Fragment>
+              ),
+            )}
           </div>
         </ComposerSuggestions>
       ) : null}
@@ -242,6 +249,10 @@ export function ComposerInput(props: ComposerInputProps) {
         }}
         sources={sources}
         onKeyDown={(e) => {
+          if (blockHostedCommandKey(fileReason, value, e)) {
+            setChosen(true);
+            return true;
+          }
           if (askTook(e, props.ask, { listOpen: suggestionsOpen, value })) return true;
           const endsMessage = (token?.start ?? 0) > 0 && value.slice(caret).trim() === "";
           const action = suggestionsOpen ? suggestionKey(e, suggestions[cursor], { chosen, endsMessage }) : "pass";

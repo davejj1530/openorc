@@ -1,6 +1,7 @@
 import { canMoveToCloud, cloudServiceMissing, offersBrainMove, threadPlace } from "@openorc/client";
 import type { CloudOffer, ThreadSummary, WorktreeBlock } from "@openorc/protocol";
-import { placeOf, WORKSPACE_ID, WORKTREE_BLOCK_WORDS } from "@openorc/protocol";
+import { HOSTED_REASONS, placeOf, WORKSPACE_ID, WORKTREE_BLOCK_WORDS } from "@openorc/protocol";
+import { HostedMenuReason } from "./HostedMenuReason";
 import type { ReactNode } from "react";
 import { CoversPreview } from "../lib/browser-preview";
 import { useRpc, useRpcMutation } from "../lib/client";
@@ -11,10 +12,11 @@ import { menuItem, menuPopup, menuSeparator } from "./menu";
 import type { MenuParts } from "./ThreadActions";
 import { machine, revealLabel, ThisComputer, thisComputer } from "../lib/this-computer";
 
-type Where = "moving" | "cloud" | "mac";
+type Where = "moving" | "cloud" | "mac" | "hosted";
 
 /** Where the next turn runs, when the menu has a move to offer from there: this Mac only when the cloud is an option. */
 function whereKind(thread: ThreadSummary, offer: CloudOffer | undefined): Where | null {
+  if (thread.owner?.brain === "hosted") return "hosted";
   if (thread.moving) return "moving";
   const place = placeOf(thread);
   if (place.brain) return "cloud";
@@ -36,9 +38,23 @@ export function ThreadPlaceItems({ thread, parts: M }: { thread: ThreadSummary; 
       {branch ? <BranchRow thread={thread} parts={M} /> : null}
       {where === "moving" ? <MovingRow thread={thread} parts={M} /> : null}
       {where === "cloud" ? <CloudRow thread={thread} parts={M} /> : null}
+      {where === "hosted" ? <HostedPlaceRow parts={M} /> : null}
       {where === "mac" ? <MacRow thread={thread} parts={M} offer={offer} /> : null}
       <M.Separator className={menuSeparator} />
     </>
+  );
+}
+
+function HostedPlaceRow({ parts: M }: { parts: MenuParts }) {
+  return (
+    <PlaceRow parts={M} icon={<Cloud size={13} />} label="OpenOrc Cloud">
+      <HostedMenuReason parts={M} reason={HOSTED_REASONS.moveToMac}>
+        <Laptop size={13} /> Bring to {machine}
+      </HostedMenuReason>
+      <HostedMenuReason parts={M} reason={HOSTED_REASONS.macCode}>
+        <Folder size={13} /> Open on {machine}
+      </HostedMenuReason>
+    </PlaceRow>
   );
 }
 

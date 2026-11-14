@@ -17,7 +17,7 @@ import type { HostedSpaces, HostedThreads } from "@openorc/hosted";
 import { mergeThreadPages, ownerRoute, rpcParams, type RoutedMethod, type RpcMethod, type RpcParams, type RpcRequest, type ThreadSummary } from "@openorc/protocol";
 import type { RpcReply } from "../transport.js";
 import { SpaceRequests } from "./space-requests.js";
-import { heldHereCall } from "./hosted-call-guard.js";
+import { HostedCallGuard, heldHereCall } from "./hosted-call-guard.js";
 
 export interface PlaceRouterDeps {
   /** The place, or null while there is none (no account server). */
@@ -28,6 +28,7 @@ export interface PlaceRouterDeps {
 }
 
 export class PlaceRouter {
+  private readonly hostedOwnership = new HostedCallGuard();
   private readonly scoped = new SpaceRequests({ spaces: () => this.deps.spaces?.() ?? null, place: () => this.deps.place(), next: (request) => this.deps.next(request) });
   constructor(private readonly deps: PlaceRouterDeps) {}
 
@@ -39,17 +40,21 @@ export class PlaceRouter {
     // The Mac words a refusal of params, as before.
     if (!parsed.success) return this.deps.next(request);
     const params = parsed.data as Record<string, unknown>;
+    const refusal = this.hostedOwnership.refusal(place, method, params);
+    if (refusal) return Promise.resolve({ type: "rpc.error", id: request.id, message: refusal });
     if (typeof params["spaceId"] === "string" && ["threads.list", "threads.resolvedCount", "threads.search", "threads.start", "tasks.list"].includes(method))
       return this.scoped.handle(request, params["spaceId"]);
-    if (method.startsWith("hosted.")) {
-      const id = params["threadId"];
-      if (place?.active && typeof id === "string" && place.holds({ thread: id })) return this.asked(place, request, method as RoutedMethod, params);
-      return Promise.resolve({ type: "rpc.error", id: request.id, message: "That conversation isn't available on OpenOrc Cloud." });
-    }
+    if (method.startsWith("hosted.")) return this.hostedRequest(place, request, method as RoutedMethod, params);
     if (!place?.active) return this.deps.next(request);
     if (method === "projects.get" && place.holds({ project: String(params["id"]) })) return Promise.resolve(result(request, place.project(String(params["id"]))));
     if (method === "threads.start" && params["hosted"]) return this.asked(place, request, "threads.start", params);
     return this.routed(place, request, method, params);
+  }
+
+  private hostedRequest(place: HostedThreads | null, request: RpcRequest, method: RoutedMethod, params: Record<string, unknown>): Promise<RpcReply> {
+    const id = params["threadId"];
+    if (place?.active && typeof id === "string" && place.holds({ thread: id })) return this.asked(place, request, method, params);
+    return Promise.resolve({ type: "rpc.error", id: request.id, message: "That conversation isn't available on OpenOrc Cloud." });
   }
 
   /** A call that names a thread, a run or a list: the place answers what it holds; anything else goes on as before. */

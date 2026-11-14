@@ -3,6 +3,8 @@ import { percentLeft, sessionWindow, weeklyWindow, type ClaudeAccountConnection,
 import { ensureRpc, useRpcs } from "../lib/client";
 import { openProject, useRouter } from "../lib/router";
 import { Check } from "./icons";
+import { useHostedControlReason } from "./HostedConversationBoundary";
+import { HostedControlReason } from "./HostedControlReason";
 
 /** The Claude accounts a picker offers: its choices, the one in use, and how a choice is made. */
 export interface PickerAccounts {
@@ -75,6 +77,15 @@ export function PickerAccountRows({
   disabled?: boolean | undefined;
   moveRowFocus: (event: KeyboardEvent<HTMLButtonElement>) => void;
 }) {
+  const cloudReason = useHostedControlReason("claudeAccount");
+  if (cloudReason && section === "claude" && !searching)
+    return (
+      <HostedControlReason label="Claude account" reason={cloudReason}>
+        <button type="button" aria-label="Claude account" className="model-picker-row" disabled>
+          Account
+        </button>
+      </HostedControlReason>
+    );
   if (section !== "claude" || searching || !accounts) return null;
   return <AccountRows accounts={accounts} disabled={disabled} moveRowFocus={moveRowFocus} />;
 }

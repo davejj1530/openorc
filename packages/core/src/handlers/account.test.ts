@@ -49,7 +49,7 @@ afterEach(async () => {
 function browse(url: string): void {
   opened.push(url);
   if (new URL(url).pathname !== "/sign-in" || !person) return;
-  void fetch(stand.signInPage(url, person)).then(async (response) => void answered.push(await response.text()));
+  void fetch(stand.signInPage(url, person), { redirect: "manual" }).then((response) => void answered.push(response.headers.get("location") ?? ""));
 }
 
 async function open(options: { accountServer?: string } = { accountServer: stand.url }) {
@@ -69,11 +69,11 @@ describe("the OpenOrc account in the core", () => {
     expect(await call("account.status", {})).toEqual({ state: "signed-out", signingIn: null, ended: false, error: null });
   });
 
-  it("signs in through the browser, whose return to this Mac is answered with a line to go back to OpenOrc", async () => {
+  it("signs in through the browser and redirects to the server's result page after keeping the session", async () => {
     await open();
     expect(await call("account.signIn", {})).toMatchObject({ state: "signed-out", signingIn: { state: "waiting", page: opened[0] } });
     await vi.waitFor(async () => expect(await call("account.status", {})).toMatchObject({ state: "signed-in", email: EMAIL }), { timeout: 5_000 });
-    expect(answered).toEqual([expect.stringContaining("Go back to OpenOrc")]);
+    await vi.waitFor(() => expect(answered).toEqual([new URL("/sign-in/complete?outcome=signed-in", opened[0]).href]));
     expect(stored).toContain(EMAIL);
   });
 

@@ -76,7 +76,7 @@ export class StandInAppSignIns {
     const id = randomBytes(24).toString("base64url");
     this.#requests.set(id, { port, challenge, device, at: Date.now(), approved: null });
     this.devices.push(device);
-    return { status: 200, body: { request: id, url: `${this.server.web()}/sign-in?request=${id}`, expiresInMs: REQUEST_MS } };
+    return { status: 200, body: { request: id, url: `${this.server.web()}/sign-in?request=${id}`, resultUrl: `${this.server.web()}/sign-in/complete`, expiresInMs: REQUEST_MS } };
   }
 
   #approve(id: string, who: string, otp: string): Reply {

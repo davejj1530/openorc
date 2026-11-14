@@ -51,8 +51,34 @@ describe("signing in through the browser", () => {
     browser.back(stand.signInPage(page, ADA));
     await vi.waitFor(() => expect(hosted.account.status()).toMatchObject({ state: "signed-in", email: ADA }));
     expect(storedToken(device)).toMatch(/^[^.]+\.[^.]+$/);
+    expect(browser.results).toEqual([new URL("/sign-in/complete?outcome=signed-in", page).href]);
     await hosted.account.signOut();
     expect(hosted.account.status()).toEqual({ state: "signed-out", signingIn: null, ended: false, error: null });
+  });
+
+  it("holds the result page until the session is safely stored", async () => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    let saving = false;
+    const { hosted, browser } = await host({
+      session: {
+        load: async () => null,
+        save: async (value) => {
+          if (value) {
+            saving = true;
+            await held;
+          }
+          device.stored = value;
+        },
+      },
+    });
+    await hosted.account.signIn();
+    browser.back(stand.signInPage(browser.opened[0]!, ADA));
+    await vi.waitFor(() => expect(saving).toBe(true));
+    expect(browser.results).toEqual([]);
+    release();
+    await vi.waitFor(() => expect(browser.results).toHaveLength(1));
+    expect(hosted.account.status().state).toBe("signed-in");
   });
 
   it("opens the same page again when asked while one waits, and does nothing once signed in", async () => {
@@ -122,13 +148,17 @@ describe("signing in through the browser", () => {
     browser.back(returnTo);
     await vi.waitFor(() => expect(signingIn(hosted)).toEqual({ state: "failed", error: "This sign-in can't be finished. Sign in again." }));
     expect(device.stored).toBeNull();
+    const result = new URL(browser.results[0]!);
+    expect(result.pathname).toBe("/sign-in/complete");
+    expect(result.searchParams.get("outcome")).toBe("failed");
+    expect(result.searchParams.get("message")).toBe("This sign-in can't be finished. Sign in again.");
   });
 
   it("says so in words when the browser never comes back", async () => {
     const TIMED_OUT = "The browser didn't come back in time. Try again.";
     const query = Promise.reject(new Error(TIMED_OUT));
     query.catch(() => undefined);
-    const { hosted } = await host({ browser: { awaitReturn: async () => ({ port: 40_001, query, close: () => undefined }), open: () => undefined } });
+    const { hosted } = await host({ browser: { awaitReturn: async () => ({ port: 40_001, query, redirect: () => undefined, close: () => undefined }), open: () => undefined } });
     await hosted.account.signIn();
     await vi.waitFor(() => expect(signingIn(hosted)).toEqual({ state: "failed", error: TIMED_OUT }));
     await vi.waitFor(() => expect(stand.requests.some((request) => request.path === "/app-sign-in/cancel")).toBe(true));
@@ -180,7 +210,7 @@ describe("signing in through the browser", () => {
     const finish = JSON.parse(sent.find((body) => body.includes("verifier"))!) as { code: string; verifier: string };
     const secrets = [finish.code, finish.verifier, storedToken(device)];
     expect(new URL(returnTo).searchParams.get("code")).toBe(finish.code);
-    const everything = JSON.stringify({ said, logs: seen.logs, pushes: seen.pushes, kept: device.kept, opened: browser.opened });
+    const everything = JSON.stringify({ said, logs: seen.logs, pushes: seen.pushes, kept: device.kept, opened: browser.opened, results: browser.results });
     for (const secret of secrets) expect(everything).not.toContain(secret);
   });
 });

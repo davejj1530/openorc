@@ -60,7 +60,7 @@ export interface HostedDeps {
    * device has neither.
    */
   browser?: {
-    awaitReturn(path: string, timeoutMs: number): Promise<{ port: number; query: Promise<string>; close(): void }>;
+    awaitReturn(path: string, timeoutMs: number, waitForResult?: boolean): Promise<{ port: number; query: Promise<string>; redirect(url: string): void; close(): void }>;
     open(url: string): void;
   };
   /** What the sign-in page calls this device, such as "OpenOrc on this Mac". */

@@ -21,6 +21,7 @@ const RETURN_PATH = "/signed-in";
 const REQUEST_MS = 10 * 60_000;
 const NO_BROWSER = "This device can't open OpenOrc's sign-in page.";
 const NOT_THIS = "That sign-in wasn't this app's. Try again.";
+type BrowserReturn = Awaited<ReturnType<NonNullable<HostedDeps["browser"]>["awaitReturn"]>>;
 
 interface SignInDeps extends Pick<HostedDeps, "browser" | "deviceName"> {
   session: Session;
@@ -32,7 +33,7 @@ export class BrowserSignInTrip {
   #work: BrowserSignIn | null = null;
   #starting: Promise<void> | null = null;
   /** Ends the trip under way: closes its listener, so its wait rejects as a cancel. */
-  #stop: (() => void) | null = null;
+  #stop: ((reason?: string) => void) | null = null;
 
   constructor(private readonly deps: SignInDeps) {}
 
@@ -71,7 +72,7 @@ export class BrowserSignInTrip {
     let live = true;
     this.#stop = () => void (live = false);
     try {
-      const waiting = await browser.awaitReturn(RETURN_PATH, REQUEST_MS);
+      const waiting = await browser.awaitReturn(RETURN_PATH, REQUEST_MS, true);
       if (!live) return waiting.close();
       this.#stop = () => {
         live = false;
@@ -83,34 +84,39 @@ export class BrowserSignInTrip {
         throw error;
       });
       if (!live) return this.#cancel(start.request, verifier);
-      this.#stop = () => {
+      this.#stop = (reason = "This sign-in was canceled. Start again from OpenOrc.") => {
         live = false;
+        waiting.redirect(resultPage(start.resultUrl, reason));
         waiting.close();
         this.#cancel(start.request, verifier);
       };
       this.#set({ state: "waiting", page: start.url });
       browser.open(start.url);
-      void this.#finish(start.request, verifier, waiting.query, () => live);
+      void this.#finish(start, verifier, waiting, () => live);
     } catch (error) {
       if (live) {
-        this.#stop?.();
+        this.#stop?.(wordsOf(error));
         this.#settle(wordsOf(error));
       }
     }
   }
 
   /** Waits on the browser's return, then trades its code for the token. */
-  async #finish(request: string, verifier: string, returned: Promise<string>, live: () => boolean): Promise<void> {
+  async #finish(start: { request: string; resultUrl: string }, verifier: string, waiting: BrowserReturn, live: () => boolean): Promise<void> {
     try {
-      const back = new URLSearchParams(await returned);
+      const { request } = start;
+      const back = new URLSearchParams(await waiting.query);
       const code = back.get("code");
       if (back.get("request") !== request || !code) throw new Error(NOT_THIS);
       const { token } = await this.deps.session.anonymous(ROUTES.appSignInFinish, { request, code, verifier });
       await this.deps.session.adopt(token, live);
-      if (live()) this.#settle(null);
+      if (live()) {
+        this.#settle(null);
+        waiting.redirect(resultPage(start.resultUrl));
+      }
     } catch (error) {
       if (live()) {
-        this.#stop?.();
+        this.#stop?.(wordsOf(error));
         this.#settle(wordsOf(error));
       }
     }
@@ -130,6 +136,13 @@ export class BrowserSignInTrip {
     this.#work = work;
     this.deps.changed();
   }
+}
+
+function resultPage(address: string, failure?: string): string {
+  const url = new URL(address);
+  url.searchParams.set("outcome", failure ? "failed" : "signed-in");
+  if (failure) url.searchParams.set("message", failure.slice(0, 300));
+  return url.toString();
 }
 
 function randomBase64url(bytes: number): string {

@@ -30,6 +30,7 @@ export const newDevice = (): Device => ({ stored: null, kept: null, threads: nul
  */
 export interface TestBrowser extends NonNullable<HostedDeps["browser"]> {
   opened: string[];
+  results: string[];
   person: string | null;
   back(url: string): void;
 }
@@ -39,12 +40,13 @@ export function testBrowser(stand: StandIn, other: (url: string, browser: TestBr
   let port = 40_000;
   const browser: TestBrowser = {
     opened: [],
+    results: [],
     person: null,
     awaitReturn: async (path) => {
       const at = ++port;
       const query = new Promise<string>((resolve, reject) => waiting.set(at, { path, resolve, reject }));
       query.catch(() => undefined);
-      return { port: at, query, close: () => waiting.get(at)?.reject(new Error("")) };
+      return { port: at, query, redirect: (url) => void browser.results.push(url), close: () => waiting.get(at)?.reject(new Error("")) };
     },
     open: (url) => {
       browser.opened.push(url);

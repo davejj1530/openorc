@@ -176,7 +176,7 @@ export const SOCKET = { changed: "changed", watch: "hosted:watch", unwatch: "hos
 export const wireRefusal = z.object({ message: z.string().min(1) });
 
 /** A sign-in through the browser the server started for an app waiting on a loopback port: the page the browser opens for it. */
-export const wireAppSignInStart = z.object({ request: z.string().min(1), url: z.url(), expiresInMs: z.number() });
+export const wireAppSignInStart = z.object({ request: z.string().min(1), url: z.url(), resultUrl: z.url(), expiresInMs: z.number() });
 /** The session's bearer token, given once, for the request the browser approved. */
 export const wireAppSignInFinish = z.object({ token: z.string().min(1) });
 

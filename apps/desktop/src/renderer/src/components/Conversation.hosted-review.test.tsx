@@ -46,12 +46,15 @@ afterEach(() => {
 });
 const mount = (children = <PanelContent context={{ kind: "thread", thread: cloudReviewThread, project: reviewProject }} page={{ kind: "changes", selection: null }} onNavigate={() => undefined} />) =>
   render(<QueryClientProvider client={queryClient}>{children}</QueryClientProvider>);
+const commits = () => <PanelContent context={{ kind: "thread", thread: cloudReviewThread, project: reviewProject }} page={{ kind: "tool", tool: "commits" }} onNavigate={() => undefined} />;
 
 it("draws saved changes and publishing controls without a local Git or review-comment call", async () => {
   mount();
   expect((await screen.findByTestId("saved-diff")).textContent).toContain("+new");
   expect(screen.getByText("Branch")).toBeTruthy();
   expect(screen.getByRole("button", { name: "Commit" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Push" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "PR" })).toBeNull();
   expect(screen.queryByText("Clean workspace")).toBeNull();
   expect(vi.mocked(core.call).mock.calls.every(([method]) => method.startsWith("hosted.review.") || method === "account.status")).toBe(true);
 });
@@ -96,7 +99,8 @@ it("shows the binary reason instead of an empty patch", async () => {
 });
 
 it("keeps PR title and body usable without fetching a template or local branches", async () => {
-  mount();
+  reads.set("hosted.review.state", { ...reviewState, work: { uncommitted: null, unpushed: null, published: true } });
+  mount(commits());
   await screen.findByRole("button", { name: "PR" });
   await waitFor(() => expect(screen.getByRole("button", { name: "PR" }).hasAttribute("disabled")).toBe(false));
   fireEvent.click(screen.getByRole("button", { name: "PR" }));
@@ -109,6 +113,27 @@ it("keeps PR title and body usable without fetching a template or local branches
   expect(vi.mocked(core.call).mock.calls.some(([method]) => method === "review.threadPrTemplate" || method.startsWith("git."))).toBe(false);
 });
 
+it.each([
+  { uncommitted: null, unpushed: { since: "2026-01-01" }, published: false, label: "Publish branch" },
+  { uncommitted: null, unpushed: { since: "2026-01-01" }, published: true, label: "Push" },
+  { uncommitted: null, unpushed: null, published: true, label: "PR" },
+])("puts $label in Commits without inventing an empty history", async ({ label, ...work }) => {
+  reads.set("hosted.review.state", { ...reviewState, work });
+  mount(commits());
+  expect(await screen.findByRole("button", { name: label })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Commit" })).toBeNull();
+  expect(screen.getByText("Commit history isn't available in this cloud thread yet.")).toBeTruthy();
+  expect(vi.mocked(core.call).mock.calls.some(([method]) => method.startsWith("git."))).toBe(false);
+});
+
+it("keeps the existing PR beside Refresh and disables Commit when the server reports no dirty work", async () => {
+  reads.set("hosted.review.state", { ...reviewState, work: { uncommitted: null, unpushed: null, published: true }, pullRequest: { url: "https://example.com/pull/1", state: "open" } });
+  mount();
+  expect(await screen.findByRole("button", { name: "open" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Commit" }).hasAttribute("disabled")).toBe(true);
+  expect(screen.queryByRole("button", { name: "Push" })).toBeNull();
+});
+
 it("draws a saved turn with the same totals and disables Restore with its own reason", async () => {
   mount(
     <>
@@ -118,9 +143,9 @@ it("draws a saved turn with the same totals and disables Restore with its own re
   );
   expect(await screen.findByText("Changed 1 file")).toBeTruthy();
   expect(screen.getByRole("button", { name: "Undo" }).hasAttribute("disabled")).toBe(true);
-  expect(screen.queryByText("Restoring files isn't available in this cloud thread yet.")).toBeNull();
+  expect(screen.queryByText("Restoring a cloud checkpoint isn't available yet.")).toBeNull();
   await act(async () => screen.getByLabelText("Undo this turn's changes").focus());
-  expect(await screen.findByText("Restoring files isn't available in this cloud thread yet.")).toBeTruthy();
+  expect(await screen.findByText("Restoring a cloud checkpoint isn't available yet.")).toBeTruthy();
 });
 
 it("shows a working turn's reason on a keyboard-reachable review control", async () => {

@@ -36,6 +36,7 @@ export function HostedCommitControl({ threadId, action, reason }: ControlProps &
           </Button>
         }
         title="Commit changes"
+        summary="Uncommitted changes"
         message={message}
         onMessageChange={setMessage}
         busy={action.pending}
@@ -48,17 +49,21 @@ export function HostedCommitControl({ threadId, action, reason }: ControlProps &
   );
 }
 
-export function HostedPushControl({ action, reason }: ControlProps) {
+export function HostedPushControl({ action, reason, published }: ControlProps & { published: boolean }) {
+  const running = action.pending && action.request?.kind === "push";
+  const pushedLabel = running ? "Pushing…" : "Push";
+  const unpublishedLabel = running ? "Publishing…" : "Publish branch";
   return (
     <HostedControlReason label="Push" reason={reason}>
       <Button
+        variant="primary"
         disabled={Boolean(reason)}
         onClick={() => {
           if (!reason) action.start({ kind: "push", id: crypto.randomUUID() });
         }}
       >
         <Upload size={14} />
-        Push
+        {published ? pushedLabel : unpublishedLabel}
       </Button>
     </HostedControlReason>
   );

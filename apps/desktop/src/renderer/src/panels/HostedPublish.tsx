@@ -7,7 +7,16 @@ import { useHostedReviewAction, type HostedActionController } from "../lib/hoste
 import { useRpc } from "../lib/client";
 import { HostedCommitControl, HostedPullRequestControl, HostedPushControl } from "./HostedPublishControls";
 
-type PublishProps = { thread: ThreadSummary; state?: HostedReviewState; changes?: HostedThreadChanges; heading: ReactNode; meta: ReactNode; refresh: ReactNode; stateError?: Error | null };
+type PublishProps = {
+  thread: ThreadSummary;
+  state?: HostedReviewState;
+  changes?: HostedThreadChanges;
+  heading: ReactNode;
+  meta?: ReactNode;
+  refresh?: ReactNode;
+  stateError?: Error | null;
+  surface?: "changes" | "commits";
+};
 
 export function HostedPublish(props: PublishProps) {
   const account = useRpc("account.status", {}).data;
@@ -17,7 +26,7 @@ export function HostedPublish(props: PublishProps) {
         {props.refresh}
       </PanelBar>
     );
-  return <HostedPublishForm key={`${account.email}:${props.thread.id}`} {...props} account={account.email} />;
+  return <HostedPublishForm key={`${account.email}:${props.thread.id}:${props.surface ?? "changes"}`} {...props} account={account.email} />;
 }
 
 function commitUnavailable(reason: string | null, changes: HostedThreadChanges | undefined, state: HostedReviewState | undefined): string | null {
@@ -26,21 +35,35 @@ function commitUnavailable(reason: string | null, changes: HostedThreadChanges |
   return state?.work.uncommitted ? null : "Nothing to commit.";
 }
 
-function HostedPublishForm({ thread, state, changes, heading, meta, refresh, stateError, account }: PublishProps & { account: string }) {
+function HostedPublishForm({ thread, state, changes, heading, meta, refresh, stateError, account, surface = "changes" }: PublishProps & { account: string }) {
   const action = useHostedReviewAction(thread.id, thread.owner?.reach === "live", account);
   const waiting = action.pending ? "Wait for the current action to finish." : null;
-  const reason = waiting ?? stateError?.message ?? hostedPublishReason(thread, state, changes);
-  const pushReason = reason ?? (state?.work.unpushed ? null : "Nothing to push.");
-  const prReason = reason ?? (state?.work.unpushed || state?.work.published ? null : "Commit changes before opening a pull request.");
+  const reason = waiting ?? stateError?.message ?? hostedPublishReason(thread, state);
   return (
     <>
       <PanelBar title={heading} meta={meta}>
-        {refresh}
-        <HostedCommitControl threadId={thread.id} action={action} reason={commitUnavailable(reason, changes, state)} />
-        <HostedPushControl action={action} reason={pushReason} />
-        <HostedPullRequestControl thread={thread} state={state} action={action} reason={prReason} />
+        {surface === "commits" ? (
+          <HostedCommitActions thread={thread} state={state} action={action} reason={reason} />
+        ) : (
+          <>
+            {state?.pullRequest?.url || thread.prUrl ? <HostedPullRequestControl thread={thread} state={state} action={action} reason={reason} /> : null}
+            {refresh}
+            <HostedCommitControl threadId={thread.id} action={action} reason={commitUnavailable(reason, changes, state)} />
+          </>
+        )}
       </PanelBar>
       <HostedPublishNotice action={action} state={state} />
+    </>
+  );
+}
+
+function HostedCommitActions({ thread, state, action, reason }: Pick<PublishProps, "thread" | "state"> & { action: HostedActionController; reason: string | null }) {
+  const existing = state?.pullRequest?.url ?? thread.prUrl;
+  const published = state?.work.published && !state.work.unpushed && state.branch !== state.baseBranch;
+  return (
+    <>
+      {state?.work.unpushed ? <HostedPushControl action={action} reason={reason} published={state.work.published} /> : null}
+      {existing || published ? <HostedPullRequestControl thread={thread} state={state} action={action} reason={reason} /> : null}
     </>
   );
 }

@@ -2,6 +2,7 @@ import { lazy } from "react";
 import type { PanelPage } from "../lib/panel-tabs";
 import { ChangesPanel } from "../panels/ChangesPanel";
 import { HostedChangesPanel, HostedSavedChangesPanel } from "../panels/HostedChangesPanel";
+import { HostedCommitsPanel } from "../panels/HostedCommitsPanel";
 import { CheckpointsPanel } from "../panels/CheckpointsPanel";
 import { CommitsPanel, type CommitSource } from "../panels/CommitsPanel";
 import { MemoryPanel } from "../panels/MemoryPanel";
@@ -72,6 +73,7 @@ export function PanelContent({ context, page, onNavigate }: ContentProps) {
       return <TerminalPanel key={id} id={id} cwd={panelDirectory(context)} />;
     }
     case "commits": {
+      if (context.kind === "thread" && context.thread.owner?.brain === "hosted") return <HostedCommitsPanel key={context.thread.id} thread={context.thread} />;
       const source = commitSource(context);
       return source ? <CommitsPanel source={source} /> : null;
     }

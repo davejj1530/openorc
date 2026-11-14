@@ -1,4 +1,4 @@
-import type { HostedFileDiff, HostedReviewAction, HostedReviewState, HostedThreadChanges, ThreadSummary } from "@openorc/protocol";
+import type { HostedFileDiff, HostedReviewAction, HostedReviewState, ThreadSummary } from "@openorc/protocol";
 import type { RunTranscript } from "./transcript.js";
 import { threadReadOnlyReason } from "./hosted-send.js";
 
@@ -30,11 +30,11 @@ export function hostedActionLine(action: HostedReviewAction): string {
 }
 
 /** A saved base diff is never a count of what a commit would include. */
-export function hostedPublishReason(thread: Pick<ThreadSummary, "owner">, state: HostedReviewState | undefined, changes: HostedThreadChanges | undefined): string | null {
+export function hostedPublishReason(thread: Pick<ThreadSummary, "owner">, state: HostedReviewState | undefined): string | null {
   if (thread.owner?.reach !== "live") return "OpenOrc Cloud can't be reached.";
   const readOnly = threadReadOnlyReason(thread);
   if (readOnly) return readOnly;
-  if (!state || !changes) return "Refresh changes before continuing.";
+  if (!state) return "Refresh changes before continuing.";
   if (state.actions.some(hostedReviewPending)) return "Wait for the current action to finish.";
   return null;
 }

@@ -45,7 +45,7 @@ export function HostedTurnChangeCard({ threadId, turnId }: { threadId: string; t
       note={changes.unlisted ? `${changes.unlisted} more files are not listed.` : undefined}
       onReview={(paths) => useLayout.getState().openChanges({ kind: "thread", id: threadId, checkpointId: turnId, paths })}
       actions={
-        <HostedControlReason label="Undo this turn's changes" reason="Restoring files isn't available in this cloud thread yet.">
+        <HostedControlReason label="Undo this turn's changes" reason="Restoring a cloud checkpoint isn't available yet.">
           <Button size="sm" variant="ghost" disabled>
             Undo
           </Button>

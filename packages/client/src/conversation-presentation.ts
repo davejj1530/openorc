@@ -1,5 +1,6 @@
 import { defaultHarnessId, harnessCatalog, harnessShortName, isHarnessId, MOVING_WORDS, type AgentKind, type Run, type ThreadSummary } from "@openorc/protocol";
 import { isImageGeneration } from "./image-activity.js";
+import { sendsBlocked } from "./hosted-send.js";
 import type { RunTranscript } from "./transcript.js";
 
 const CONVERSATION_REASONS = {
@@ -33,16 +34,18 @@ export function conversationSteerReason(input: { canSteer: boolean; compacting: 
   return CONVERSATION_REASONS.betweenTurns;
 }
 
-/** Why the composer cannot send now; a thread moving between the Mac and the cloud reads but takes nothing until it lands. */
+/** Why the composer cannot send now, from the thread's access and location through its saved settings. */
 export function conversationSendDisabledReason(input: {
   permissionReady: boolean;
   historyLoading: boolean;
   historyFailed: boolean;
   hasModel: boolean;
-  thread?: Pick<ThreadSummary, "moving"> | null | undefined;
+  thread?: Pick<ThreadSummary, "moving" | "owner"> | null | undefined;
 }): string | null {
   const moving = input.thread?.moving;
   if (moving) return MOVING_WORDS[moving.to];
+  const blocked = sendsBlocked(input.thread ?? null);
+  if (blocked) return blocked;
   if (!input.permissionReady) return CONVERSATION_REASONS.loadingPermissions;
   if (input.historyLoading) return CONVERSATION_REASONS.loadingHistory;
   if (input.historyFailed) return CONVERSATION_REASONS.failedHistory;

@@ -1,6 +1,6 @@
 import type { AccountStatus, ThreadSummary } from "@openorc/protocol";
 import { expect, it } from "vitest";
-import { asksBlocked, billingMoves, hostedStart, threadSendBlock } from "./hosted-send.js";
+import { asksBlocked, billingMoves, hostedStart, sendsBlocked, threadSendBlock } from "./hosted-send.js";
 
 const pro: Extract<AccountStatus, { state: "signed-in" }> = {
   state: "signed-in",
@@ -165,4 +165,17 @@ it("blocks a thread's asks while its place can't be reached, and in a teammate's
   const teammate = { owner: { ...own.owner, startedBy: { name: "Ana Lee", image: null } } };
   const offline = { owner: { ...own.owner, reach: "offline" as const } };
   expect([asksBlocked(own), asksBlocked(null), asksBlocked(teammate), asksBlocked(offline)]).toEqual([null, null, "Only Ana can answer in Ana's thread.", "OpenOrc Cloud can't be reached."]);
+});
+
+it("blocks sends to a teammate's thread or a place out of reach, leaving own reachable threads open", () => {
+  const own = hosted();
+  const teammate = { owner: { ...own.owner, startedBy: { name: "Morgan Reed", image: null } } };
+  const offline = { owner: { ...teammate.owner, reach: "offline" as const } };
+  expect([sendsBlocked(own), sendsBlocked(null), sendsBlocked({}), sendsBlocked(teammate), sendsBlocked(offline)]).toEqual([
+    null,
+    null,
+    null,
+    "Only Morgan can send in Morgan's thread.",
+    "OpenOrc Cloud can't be reached.",
+  ]);
 });

@@ -1,4 +1,4 @@
-import { threadSendBlock, type SendBlock } from "@openorc/client";
+import { sendsBlocked, threadSendBlock, type SendBlock } from "@openorc/client";
 import { HOSTED_AGENTS, type HarnessId, type PermissionPreset, type RunMode, type ThreadSummary } from "@openorc/protocol";
 import type { ReactNode } from "react";
 import { useRpc, useRpcMutation } from "../lib/client";
@@ -47,18 +47,19 @@ export function useHostedComposer(
   const hosted = thread?.owner?.brain === "hosted";
   const account = useRpc("account.status", {}, { enabled: hosted });
   const ready = useRpcMutation("threads.ready");
+  const blocked = sendsBlocked(thread);
   const agent = settings.choice?.agent ?? thread?.agent ?? "";
   const block = threadSendBlock(thread, account.data, { agent, model: settings.choice?.model ?? thread?.model ?? null });
   const readyNow = () => {
-    if (!thread || !hosted || block || thread.activity === "running") return;
+    if (!thread || !hosted || blocked || block || thread.activity === "running") return;
     const { choice, mode, permission } = settings;
     ready.mutate({ id: thread.id, settings: { ...(choice && { agent: choice.agent, model: choice.model, effort: choice.effort ?? null }), mode, permissionMode: permission } });
   };
   if (!hosted) return { hosted, notice: null, blocked: null, limits: {}, shown: (error) => error };
   return {
     hosted,
-    notice: block ? <SendBlockCard block={block} /> : null,
-    blocked: block?.words ?? null,
+    notice: block && !blocked ? <SendBlockCard block={block} /> : null,
+    blocked: blocked ?? block?.words ?? null,
     limits: CLOUD_LIMITS,
     shown: (error) => (error === block?.words ? undefined : error),
     onReady: readyNow,

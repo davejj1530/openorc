@@ -414,6 +414,28 @@ describe("the send cluster", () => {
     expect(ink().getAttribute("data-tip")).toBeNull();
     expect(screen.getByRole("button", { name: "Queue" }).getAttribute("data-tip")).toBeNull();
   });
+
+  it.each([false, true])("keeps a blocked draft editable and takes no send by mouse or keyboard while queueing=%s", async (queueing) => {
+    const onSubmit = vi.fn(async () => {});
+    const reason = "Only Morgan can send in Morgan's thread.";
+    mount({ value: "", placeholder: "Morgan's thread", disabledReason: reason, onSubmit, queueing, liveByDefault: true, steerable: true });
+    const field = screen.getByRole("textbox", { name: "Message" });
+    type(field, "Keep this draft");
+    expect(messageOf(field)).toBe("Keep this draft");
+    expect(ink()).toHaveProperty("disabled", true);
+    expect(ink().getAttribute("data-tip")).toBe(reason);
+    fireEvent.click(ink());
+    fireEvent.keyDown(field, { key: "Enter" });
+    fireEvent.keyDown(field, { key: "Enter", metaKey: true });
+    if (queueing) {
+      const other = screen.getByRole("button", { name: "Queue" });
+      expect(other).toHaveProperty("disabled", true);
+      fireEvent.click(other);
+    }
+    await act(async () => undefined);
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(messageOf(field)).toBe("Keep this draft");
+  });
 });
 
 it("lists @ in one list, in groups: Orclings, then Files, then Connectors", async () => {

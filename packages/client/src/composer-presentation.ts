@@ -1,4 +1,5 @@
-import { defaultHarnessId, harnessShortName, type AgentKind } from "@openorc/protocol";
+import { defaultHarnessId, harnessShortName, type AgentKind, type ThreadSummary } from "@openorc/protocol";
+import { rowStarter } from "./thread-row.js";
 
 const COMPOSER_MESSAGES = {
   stopping: "Stopping…",
@@ -7,7 +8,9 @@ const COMPOSER_MESSAGES = {
 } as const;
 
 /** A thread's composer says who reads the message, in every state; what Enter does is the send's own word. */
-export function composerPlaceholder(agent: AgentKind | undefined): string {
+export function composerPlaceholder(agent: AgentKind | undefined, thread?: Pick<ThreadSummary, "owner"> | null): string {
+  const starter = thread ? rowStarter(thread) : null;
+  if (starter) return `${starter.first}'s thread`;
   return `Message ${harnessShortName(agent ?? defaultHarnessId)}…`;
 }
 

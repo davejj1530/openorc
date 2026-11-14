@@ -11,6 +11,8 @@ import { ThreadTabs } from "../components/ThreadTabs";
 import { TeamChat } from "../components/TeamChat";
 import { CoversPreview } from "../lib/browser-preview";
 import { useTeamChatVisible } from "../lib/team-chat-visibility";
+import { Loader2 } from "../components/icons";
+import { Button } from "../components/ui";
 
 export function TeamChatView({ target }: { target: TeamChatRoute }) {
   const scope = useTeamChatContext();
@@ -122,9 +124,9 @@ function ChatUnavailable({ message = "You no longer have access to this chat." }
       </TopBar>
       <div className="team-chat-state">
         <p>{message}</p>
-        <button type="button" onClick={close}>
+        <Button size="sm" onClick={close}>
           Close chat
-        </button>
+        </Button>
       </div>
     </main>
   );
@@ -139,11 +141,12 @@ function ChatWaiting({ error, onRetry }: { error: string | null; onRetry(): void
         <ThreadTabs />
       </TopBar>
       <div className="team-chat-state" role="status">
+        {!error ? <Loader2 size={16} className="animate-spin" /> : null}
         <p>{error ?? "Loading chat…"}</p>
         {error ? (
-          <button type="button" onClick={onRetry}>
+          <Button size="sm" onClick={onRetry}>
             Try again
-          </button>
+          </Button>
         ) : null}
       </div>
     </main>

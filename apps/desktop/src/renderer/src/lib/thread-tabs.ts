@@ -3,6 +3,7 @@ import { PANE_MS, prefersReducedMotion } from "./motion";
 import { useRouter, type Route } from "./router";
 import { movedBefore } from "./tab-order";
 import { navigationScope } from "./navigation-scope";
+import { pristineNewThread } from "./new-thread-preparation";
 
 /** Work and organization conversations share a strip, with separate identities. */
 export type TabRoute = Extract<Route, { view: "thread" | "newthread" | "team-chat" }>;
@@ -118,11 +119,16 @@ function follow(route: Route): void {
   const holding = staying(state).find((tab) => sameRoute(tab.route, shown));
   if (holding) return void useThreadTabs.setState({ active: holding.id, tabs: tabs.map((tab) => (tab.id === holding.id ? { ...tab, route: shown } : tab)) });
   const current = tabs.find((tab) => tab.id === active);
-  if (!current || shown.view === "team-chat" || current.route.view === "team-chat") {
+  if (!current || needsOwnTab(current.route, shown)) {
     const tab = newTab(shown);
     return void useThreadTabs.setState({ tabs: [...tabs, tab], active: tab.id });
   }
   useThreadTabs.setState({ tabs: tabs.map((tab) => (tab.id === active ? { ...tab, route: shown } : tab)) });
+}
+
+function needsOwnTab(current: TabRoute, next: TabRoute): boolean {
+  if (current.view === "team-chat") return true;
+  return next.view === "team-chat" && !(current.view === "newthread" && pristineNewThread(current.projectId));
 }
 
 // The tabs saved from last time come back with the one that was open; with none, the first tab holds where the app opens.

@@ -33,6 +33,17 @@ export function TeamChatTranscript(props: TeamChatTranscriptProps) {
     else if (previous.current.first !== props.messages[0]?.id) element.scrollTop += element.scrollHeight - previous.current.height;
     previous.current = { height: element.scrollHeight, first: props.messages[0]?.id ?? "" };
   }, [visible, props.messages, props.pending]);
+  useLayoutEffect(() => {
+    const element = viewport.current;
+    if (!element || !visible || typeof ResizeObserver === "undefined") return;
+    const resize = new ResizeObserver(() => {
+      if (pinned.current) element.scrollTop = element.scrollHeight;
+      previous.current.height = element.scrollHeight;
+    });
+    resize.observe(element);
+    if (element.firstElementChild) resize.observe(element.firstElementChild);
+    return () => resize.disconnect();
+  }, [visible]);
   const groups = teamChatGroups(props.messages);
   const sent = new Set(props.messages.map((message) => message.id));
   return (

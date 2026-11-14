@@ -28,6 +28,7 @@ import { swapInPlace } from "../lib/motion";
 import { evaluateNewThreadAvailability, initialThreadChoice } from "../lib/new-thread-availability";
 import { readNewThreadDraft, readNewThreadProject, rememberNewThreadProject, writeNewThreadDraft } from "../lib/new-thread-draft";
 import { useNewThreadLocation } from "../lib/new-thread-location";
+import { useNewThreadPreparation } from "../lib/new-thread-preparation";
 import { orclingById, useOrclings } from "../lib/orclings";
 import { branchingReason, loadProjectGit, useProjectGit } from "../lib/project-git";
 import { openThread, useRouter } from "../lib/router";
@@ -147,6 +148,7 @@ function NewThreadProject({
   const isWorkspace = projectId === WORKSPACE_ID;
   const git = useProjectGit(cloudOnly ? null : projectId);
   const [draft, setDraft] = useState(() => readNewThreadDraft(projectId));
+  useNewThreadPreparation(projectId, draft.prompt);
   const orclings = useOrclings();
   // An Orcling runs on its own account; the account chosen here is for models.
   const orcling = orclingById(orclings, draft.target.kind === "orcling" ? draft.target.orclingId : null);

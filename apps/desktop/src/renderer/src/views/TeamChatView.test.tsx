@@ -71,7 +71,7 @@ it("keeps a frozen draft while a late private page cannot enter the cache", asyn
   const scope = { ...context(), current: () => allowed };
   teamChatDrafts.write(target, "Recover after access returns");
   const view = render(tree(scope));
-  await screen.findByText("Loading messages…");
+  await screen.findByText("Loading chat…");
   allowed = false;
   view.rerender(tree(null));
   const secret: TeamMessage = {

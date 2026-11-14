@@ -5,7 +5,8 @@ import { ThreadTabs } from "./ThreadTabs";
 import { TeamChatFace, TeamConversationFace } from "./TeamChatFace";
 import { TeamChatComposer } from "./TeamChatComposer";
 import { TeamChatTranscript, type TeamChatTranscriptProps } from "./TeamChatTranscript";
-import { X } from "./icons";
+import { Loader2, X } from "./icons";
+import { Button } from "./ui";
 import "../styles/team-chat.css";
 
 export interface TeamChatProps extends TeamChatTranscriptProps {
@@ -56,16 +57,17 @@ function TeamChatBody(props: TeamChatProps) {
   if (props.loading)
     return (
       <div className="team-chat-state" role="status">
-        Loading messages…
+        <Loader2 size={16} className="animate-spin" />
+        <span>Loading chat…</span>
       </div>
     );
   if (props.error)
     return (
       <div className="team-chat-state" role="status">
         <p>{props.error}</p>
-        <button type="button" onClick={props.onReload}>
+        <Button size="sm" onClick={props.onReload}>
           Try again
-        </button>
+        </Button>
       </div>
     );
   return <TeamChatTranscript {...props} />;

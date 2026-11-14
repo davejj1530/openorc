@@ -14,6 +14,7 @@ import { MessageSquare, PenSquare, X } from "./icons";
 import { OrclingAvatar } from "./OrclingAvatar";
 import { OrclingFaces } from "./OrclingFaces";
 import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
+import { TeamChatTab } from "./TeamChatTab";
 import { IconButton, Tooltip } from "./ui";
 
 /**
@@ -28,6 +29,7 @@ function TabFace({ tab, title }: { tab: ThreadTab; title?: ReactNode }) {
   useEffect(() => {
     if (gone) useThreadTabs.getState().close(tab.id);
   }, [gone, tab.id]);
+  if (tab.route.view === "team-chat") return <TeamChatTab route={tab.route} />;
   if (tab.route.view === "newthread") {
     return (
       <>

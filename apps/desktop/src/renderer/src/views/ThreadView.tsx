@@ -65,7 +65,7 @@ function AccessibleThread({ threadId, first, last, focused, onClose }: ThreadVie
 
   return (
     <ClaudeAccountScope id={t.claudeAccountId ?? "claude-cli"}>
-      {!isSubagentThread(t) ? <RevealEmittedPlan key={threadId} threadId={threadId} focused={focused} /> : null}
+      {!isSubagentThread(t) && t.owner?.brain !== "hosted" ? <RevealEmittedPlan key={threadId} threadId={threadId} focused={focused} /> : null}
       <main className="workspace-main well flex-1 min-w-0 flex flex-col">
         <ThreadHeader thread={t} renaming={renaming} onRenamingChange={setRenaming} onRename={(title) => update.mutate({ id: t.id, patch: { title } })} first={first} last={last} onClose={onClose} />
         {/* Header controls own their thread explicitly; only conversation interaction activates a pane. */}

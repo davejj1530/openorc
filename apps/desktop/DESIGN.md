@@ -223,7 +223,7 @@ The interface uses one weight: `--font-weight-medium` and `--font-weight-semibol
 - `title-sm` 22/28 for document and page titles, `title` 28/34 for the New thread question and settings page titles.
 - `stat` 18/22 and `stat-sm` 16/20 for numerals, always tabular.
 
-Replies and prompts are 14/21; code is 12.5/20. Single-line rows use 16px leading. Long prose wraps; code and tables scroll in their own blocks.
+Replies and prompts are 14/21; code is 12.5/20. Single-line rows use 16px leading. Long prose wraps; code and tables scroll in their own blocks. A table is no piece: it sits on the ground as hairlines under quiet heads, with no fill.
 
 ## Layout
 

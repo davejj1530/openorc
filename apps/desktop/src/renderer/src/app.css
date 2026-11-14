@@ -840,8 +840,8 @@ body[data-resizing] .sidebar-shell {
   color: var(--bubble-ink);
 }
 
-/* Deliberately excluded: [data-streamdown="table-wrapper"]. rich-text.css paints --surface
-   back inside the --surface-2 frame, so recessing it reads as three layers for one table. */
+/* Deliberately excluded: [data-streamdown="table-wrapper"]. A reply's table is no piece; rich-text.css draws it
+   on the ground as hairlines under quiet heads. */
 body[data-resizing] {
   cursor: col-resize;
   user-select: none;

@@ -139,3 +139,39 @@ it("takes back a seat without showing a recipient or a subscription quantity cha
   });
   expect(f.deps.send).toHaveBeenCalledTimes(1);
 });
+
+it.each([
+  [
+    "give",
+    { ...preview, seat: { ...preview.seat, assignment: { kind: "available" as const } }, previousHolderAfter: null, graceUntil: null, runningTurnsToStop: 0 },
+    "Give seat",
+    "Giving the seat",
+    "Seat given",
+  ],
+  ["takeBack", { ...preview, to: null }, "Take back seat", "Taking back the seat", "Seat taken back"],
+  ["move", preview, "Move seat", "Moving the seat", "Seat moved"],
+] as const)("words a %s by what happened while it runs and once it is done", async (action, read, confirm, running, done) => {
+  const f = await show(read, action);
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: confirm }));
+  });
+  expect(screen.getByRole("dialog", { name: running })).toBeTruthy();
+  expect(screen.getByText(`${running}.`)).toBeTruthy();
+  const request = f.deps.send.mock.calls[0]![0];
+  act(() => f.view.resume({ request, operation: { id: request.body.id, kind: "assignment", state: "complete", message: null }, error: null }, read));
+  expect(screen.getByRole("dialog", { name: done })).toBeTruthy();
+  expect(screen.getByText(`${done}.`)).toBeTruthy();
+});
+
+it("words a reopened change by the server's preview, not the row it was reopened from", async () => {
+  const given = { ...preview, seat: { ...preview.seat, assignment: { kind: "available" as const } } };
+  const f = await show(given, "give");
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Give seat" }));
+  });
+  cleanup();
+  const request = f.deps.send.mock.calls[0]![0];
+  f.view.resume({ request, operation: { id: request.body.id, kind: "assignment", state: "complete", message: null }, error: null }, given);
+  render(<SeatAssignmentDialog action="move" view={f.view} onClose={f.onClose} />);
+  expect(screen.getByRole("dialog", { name: "Seat given" })).toBeTruthy();
+});

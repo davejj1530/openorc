@@ -129,7 +129,7 @@ it("gives the sole admin a fullest-seat action without exposing role or removal 
   expect(screen.getByText("Sample pays for Pro themselves. Their own included hours stay in use.")).toBeTruthy();
   expect(mock.call).toHaveBeenCalledWith("organization.seat.preview", { spaceId: "team-a", target: { seatId: "fullest", memberId: "member-a" } });
   fireEvent.click(screen.getByRole("button", { name: "Give seat" }));
-  await screen.findByRole("dialog", { name: "Seat moved" });
+  await screen.findByRole("dialog", { name: "Seat given" });
   expect(mock.call.mock.calls.filter(([method]) => method === "organization.seat.assign")).toHaveLength(1);
 });
 

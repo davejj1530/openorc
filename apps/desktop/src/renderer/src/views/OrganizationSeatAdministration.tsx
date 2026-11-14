@@ -6,7 +6,7 @@ import { useOrganizationPeople } from "../lib/organization-people";
 import { organizationContentGate } from "../lib/organization-content-gate";
 import { useSeatAssignment } from "../lib/seat-assignment-scope";
 import { seatAssignmentTransport } from "../lib/seat-assignment-rpc";
-import { SEAT_ASSIGNMENT_ENABLED, SeatAdministrationContext, type SeatDialog } from "../lib/seat-administration";
+import { SEAT_ASSIGNMENT_ENABLED, SeatAdministrationContext, seatChange, type SeatDialog } from "../lib/seat-administration";
 import { SeatAssignmentDialog } from "../dialogs/SeatAssignmentDialog";
 import { SeatPersonDialog } from "../dialogs/SeatPersonDialog";
 import type { SeatAssignmentState } from "../lib/seat-assignment";
@@ -60,7 +60,7 @@ function SeatScope({ scope, children }: { scope: BillingScope; children: ReactNo
     setDialog(null);
   };
   return (
-    <SeatAdministrationContext value={{ scope, state, permitted, open }}>
+    <SeatAdministrationContext value={{ scope, state, permitted, open, change: (work) => seatChange(previews.current.get(work.request.body.id)) }}>
       {children}
       {dialog && permitted ? (
         <SeatFlow key={JSON.stringify(dialog)} spaceId={scope.spaceId} seat={state.status?.billing?.seats.find((seat) => seat.id === dialog.seatId)} dialog={dialog} close={close} denied={refuse} />

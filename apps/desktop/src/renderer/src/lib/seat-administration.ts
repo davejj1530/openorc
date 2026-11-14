@@ -11,7 +11,23 @@ export interface SeatAdministration {
   state: OrganizationBillingViewState;
   permitted: boolean;
   open(dialog: SeatDialog): void;
+  /** What a running or finished change does, once this window has seen its preview. */
+  change(work: SeatAssignmentWork): SeatAction | null;
 }
+/** The server's preview says what a change does: a free seat is given, a change with no one to receive it takes the seat back. */
+export function seatChange(preview: OrganizationSeatPreview | null | undefined, fallback: SeatAction | null = null): SeatAction | null {
+  if (!preview) return fallback;
+  if (!preview.to) return "takeBack";
+  return preview.seat.assignment.kind === "available" ? "give" : "move";
+}
+
+const changeWords = {
+  give: { running: "Giving the seat", done: "Seat given" },
+  move: { running: "Moving the seat", done: "Seat moved" },
+  takeBack: { running: "Taking back the seat", done: "Seat taken back" },
+};
+export const seatChangeWords = (change: SeatAction | null) => (change ? changeWords[change] : { running: "Updating the seat", done: "Seat updated" });
+
 export const SeatAdministrationContext = createContext<SeatAdministration | null>(null);
 export const useSeatAdministration = () => useContext(SeatAdministrationContext);
 

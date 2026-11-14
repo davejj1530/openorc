@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { SeatAssignment, SeatAssignmentState } from "../lib/seat-assignment";
+import { seatChange, seatChangeWords } from "../lib/seat-administration";
 import { Button, Dialog } from "../components/ui";
 import { SeatAssignmentFacts, seatHolderName } from "./SeatAssignmentFacts";
 import "../views/organization-seats.css";
@@ -17,18 +18,19 @@ const actionWords = { give: "Give seat", move: "Move seat", takeBack: "Take back
 export function SeatAssignmentDialog({ action, view, onClose, recipientPaysForPro = false }: SeatAssignmentDialogProps) {
   const state = useSyncExternalStore(view.subscribe, view.getSnapshot);
   const pending = state.state === "pending" || state.state === "submitting";
+  const words = seatChangeWords(seatChange(state.preview, action));
   return (
     <Dialog
       open
-      title={assignmentTitle(action, state)}
+      title={assignmentTitle(action, state, words)}
       width={480}
       onOpenChange={(open) => {
         if (!open) onClose();
       }}
     >
       <div className="seats-dialog">
-        <AssignmentDetails state={state} recipientPaysForPro={recipientPaysForPro} />
-        {pending ? <p role="status">Moving the seat.</p> : null}
+        <AssignmentDetails state={state} done={words.done} recipientPaysForPro={recipientPaysForPro} />
+        {pending ? <p role="status">{words.running}.</p> : null}
         {state.error ? (
           <p className="seats-error" role="alert">
             {state.error}
@@ -43,10 +45,10 @@ export function SeatAssignmentDialog({ action, view, onClose, recipientPaysForPr
   );
 }
 
-function AssignmentDetails({ state, recipientPaysForPro }: { state: SeatAssignmentState; recipientPaysForPro: boolean }) {
+function AssignmentDetails({ state, done, recipientPaysForPro }: { state: SeatAssignmentState; done: string; recipientPaysForPro: boolean }) {
   return (
     <>
-      {state.state === "complete" ? <p role="status">Seat moved.</p> : null}
+      {state.state === "complete" ? <p role="status">{done}.</p> : null}
       {state.reviewing ? <p role="status">Loading…</p> : null}
       {state.preview ? <SeatAssignmentFacts preview={state.preview} completed={state.state === "complete"} /> : null}
       {state.state !== "complete" && state.preview?.to && recipientPaysForPro ? (
@@ -79,9 +81,9 @@ function AssignmentAction({ action, state, view }: Pick<SeatAssignmentDialogProp
   return null;
 }
 
-function assignmentTitle(action: SeatAssignmentDialogProps["action"], state: SeatAssignmentState): string {
-  if (state.state === "pending" || state.state === "submitting") return "Moving the seat";
-  if (state.state === "complete") return "Seat moved";
+function assignmentTitle(action: SeatAssignmentDialogProps["action"], state: SeatAssignmentState, words: { running: string; done: string }): string {
+  if (state.state === "pending" || state.state === "submitting") return words.running;
+  if (state.state === "complete") return words.done;
   if (action === "give" && state.preview?.to) return `Give ${firstName(state.preview.to.person.name)} a seat`;
   const name = state.preview && seatHolderName(state.preview.seat.assignment);
   if (!name || action === "give") return actionWords[action];

@@ -84,7 +84,7 @@ function AuthorizedChat({ scope, target }: { scope: TeamChatContextValue; target
         loading={timeline.isPending}
         error={error}
         {...(actionError && { notice: { message: actionError, dismiss: () => setActionError(null) } })}
-        reason={offline ? "You're offline. Reconnect to send." : null}
+        reason={offline ? "Reconnect to send" : null}
         onDraft={(text) => teamChatDrafts.write(target, text)}
         onSend={() => {
           if (offline || !scope.current()) return;

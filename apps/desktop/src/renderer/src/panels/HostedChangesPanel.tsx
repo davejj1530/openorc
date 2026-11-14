@@ -10,12 +10,14 @@ import { cn } from "../lib/cn";
 import { useLayout, type ChangeSelection } from "../lib/layout";
 import { HostedPublish } from "./HostedPublish";
 import { HostedReviewFiles } from "./HostedReviewFiles";
+import { useHostedChangesReason } from "../hooks/useHostedCapabilities";
 
 export function HostedChangesPanel({ thread }: { thread: ThreadSummary }) {
-  const read = useRpc("hosted.review.changes", { threadId: thread.id });
+  const off = useHostedChangesReason(thread.id);
+  const read = useRpc("hosted.review.changes", { threadId: thread.id }, { enabled: off === null });
   const state = useRpc("hosted.review.state", { threadId: thread.id });
   const refresh = () => {
-    void read.refetch();
+    if (off === null) void read.refetch();
     void state.refetch();
   };
   useEffect(() => {
@@ -49,14 +51,15 @@ export function HostedChangesPanel({ thread }: { thread: ThreadSummary }) {
           </Tooltip>
         }
       />
-      <HostedReviewState changes={changes} error={read.error} retry={refresh} />
+      <HostedReviewState changes={changes} error={read.error} retry={refresh} unavailable={Boolean(off)} />
       {!read.error && recorded && recorded.totals.files > 0 ? <HostedReviewFiles key={recorded.treeSha} threadId={thread.id} changes={recorded} /> : null}
     </div>
   );
 }
 
 export function HostedSavedChangesPanel({ selection }: { selection: ChangeSelection }) {
-  const read = useRpc("hosted.review.turn", { threadId: selection.id, turnId: selection.checkpointId });
+  const off = useHostedChangesReason(selection.id);
+  const read = useRpc("hosted.review.turn", { threadId: selection.id, turnId: selection.checkpointId }, { enabled: off === null });
   const changes = read.data;
   return (
     <section className="h-full flex flex-col min-h-0" aria-label="Selected code changes">
@@ -65,7 +68,7 @@ export function HostedSavedChangesPanel({ selection }: { selection: ChangeSelect
           All changes
         </Button>
       </PanelBar>
-      <HostedReviewState changes={changes} error={read.error} retry={() => void read.refetch()} />
+      <HostedReviewState changes={changes} error={read.error} retry={() => void read.refetch()} unavailable={Boolean(off)} />
       {!read.error && changes?.state === "recorded" && changes.totals.files > 0 ? (
         <HostedReviewFiles threadId={selection.id} changes={changes} turnId={selection.checkpointId} paths={selection.paths} />
       ) : null}

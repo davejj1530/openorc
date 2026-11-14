@@ -5,6 +5,7 @@ import { HOSTED_REASONS, type HostedReviewReply, type RpcMethod, type RpcParams,
 import { ChangesPanel } from "../panels/ChangesPanel";
 import { PanelContent } from "./PanelContent";
 import { HostedTurnChangeCard } from "./HostedTurnChangeCard";
+import { TurnChangesProvider } from "./TurnFooter";
 import { TipLayer } from "./TipLayer";
 import { useHostedReviewAction } from "../lib/hosted-review-action";
 import { core } from "../lib/rpc";
@@ -56,7 +57,7 @@ it("draws saved changes and publishing controls without a local Git or review-co
   expect(screen.queryByRole("button", { name: "Push" })).toBeNull();
   expect(screen.queryByRole("button", { name: "PR" })).toBeNull();
   expect(screen.queryByText("Clean workspace")).toBeNull();
-  expect(vi.mocked(core.call).mock.calls.every(([method]) => method.startsWith("hosted.review.") || method === "account.status")).toBe(true);
+  expect(vi.mocked(core.call).mock.calls.every(([method]) => method.startsWith("hosted.review.") || method === "account.status" || method === "hosted.capabilities")).toBe(true);
 });
 
 it.each([
@@ -249,4 +250,23 @@ it("keeps an older server's open Commits panel unavailable without an error or e
   expect(screen.queryByRole("alert")).toBeNull();
   await act(async () => button.parentElement?.focus());
   expect(await screen.findByText(HOSTED_REASONS.publishing)).toBeTruthy();
+});
+
+it("asks nothing about saved changes once the server says this cloud thread has none, however often the thread refreshes", async () => {
+  reads.set("hosted.capabilities", { version: 1, features: { changes: { available: false, reason: HOSTED_REASONS.changes }, publishing: { available: true } } });
+  const card = { checkpointId: "turn-1", previousCheckpointId: null, paths: [], hosted: true as const };
+  mount(
+    <>
+      <TurnChangesProvider footers={{ cards: new Map([["block-1", card]]), outside: new Map() }} threadId={cloudReviewThread.id}>
+        <HostedTurnChangeCard threadId={cloudReviewThread.id} turnId="turn-1" />
+      </TurnChangesProvider>
+      <PanelContent context={{ kind: "thread", thread: cloudReviewThread, project: reviewProject }} page={{ kind: "changes", selection: null }} onNavigate={() => undefined} />
+    </>,
+  );
+  expect((await screen.findByRole("button", { name: "Review changes" })).hasAttribute("disabled")).toBe(true);
+  expect(await screen.findByText("Changes unavailable")).toBeTruthy();
+  for (let i = 0; i < 3; i++) await act(() => queryClient.invalidateQueries());
+  const asked = vi.mocked(core.call).mock.calls.map(([method]) => method);
+  expect(asked.filter((method) => method === "hosted.review.turn" || method === "hosted.review.changes" || method === "hosted.review.file")).toEqual([]);
+  expect(screen.queryByRole("alert")).toBeNull();
 });

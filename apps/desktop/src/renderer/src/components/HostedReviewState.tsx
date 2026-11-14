@@ -3,8 +3,18 @@ import { HostedUnavailableContent } from "./HostedUnavailablePanel";
 import { Button, Empty } from "./ui";
 
 /** Only an actual empty recorded checkpoint is an empty diff. */
-export function HostedReviewState({ changes, error, retry }: { changes?: HostedThreadChanges | HostedTurnChanges; error: Error | null; retry: () => void }) {
-  if (error?.message === HOSTED_REASONS.changes) return <HostedUnavailableContent title="Changes" control="changes" />;
+export function HostedReviewState({
+  changes,
+  error,
+  retry,
+  unavailable = false,
+}: {
+  changes?: HostedThreadChanges | HostedTurnChanges;
+  error: Error | null;
+  retry: () => void;
+  unavailable?: boolean;
+}) {
+  if (unavailable || error?.message === HOSTED_REASONS.changes) return <HostedUnavailableContent title="Changes" control="changes" />;
   if (error)
     return (
       <Empty title="Could not read changes">

@@ -4,6 +4,7 @@ import { ThreadChangeCard, UndoTurnButton } from "./ThreadChangeCard";
 import { HostedTurnChangeCard } from "./HostedTurnChangeCard";
 import { useRpc, useRpcs } from "../lib/client";
 import { useLayout } from "../lib/layout";
+import { useHostedChangesReason } from "../hooks/useHostedCapabilities";
 import type { Block, TurnSize } from "@openorc/client";
 import type { OutsideLine, TurnFooters } from "../lib/turn-footers";
 
@@ -40,10 +41,11 @@ export function TurnChangesProvider({ footers, threadId, children }: { footers: 
   const allCards = [...footers.cards.values()];
   const cards = allCards.filter((card) => !card.hosted);
   const hostedCards = allCards.filter((card) => card.hosted);
+  const changesOff = useHostedChangesReason(threadId ?? "", hostedCards.length > 0);
   const hosted = useRpcs(
     "hosted.review.turn",
     hostedCards.map((card) => ({ threadId: threadId ?? "", turnId: card.checkpointId })),
-    { enabled: Boolean(threadId) },
+    { enabled: Boolean(threadId) && changesOff === null },
   );
   const summaries = useRpcs(
     "threads.turnChanges",

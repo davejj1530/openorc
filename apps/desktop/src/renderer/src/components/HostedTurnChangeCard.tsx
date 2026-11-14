@@ -4,13 +4,16 @@ import { ChangeCard } from "./ChangeCard";
 import { Button } from "./ui";
 import { HostedControlReason } from "./HostedControlReason";
 import { HOSTED_REASONS } from "@openorc/protocol";
+import { useHostedChangesReason } from "../hooks/useHostedCapabilities";
 
 export function HostedTurnChangeCard({ threadId, turnId }: { threadId: string; turnId: string }) {
-  const read = useRpc("hosted.review.turn", { threadId, turnId });
+  const off = useHostedChangesReason(threadId);
+  const read = useRpc("hosted.review.turn", { threadId, turnId }, { enabled: off === null });
   const changes = read.data;
-  if (read.error?.message === HOSTED_REASONS.changes)
+  const unavailable = off ?? (read.error?.message === HOSTED_REASONS.changes ? read.error.message : null);
+  if (unavailable)
     return (
-      <HostedControlReason label="Review changes" reason={read.error.message}>
+      <HostedControlReason label="Review changes" reason={unavailable}>
         <Button size="sm" variant="ghost" disabled>
           Review changes
         </Button>

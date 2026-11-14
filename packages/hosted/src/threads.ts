@@ -39,6 +39,7 @@ import { Refused, type Requests, type Session, type SessionChange } from "./sess
 import { CLOUD_PROJECT, githubRepoOf, listRows, projectPairs, resolvedCount, runsNow, starterOf, toAppEvent, toRuns, toSummary } from "./translate.js";
 import { ROUTES, SOCKET, wireProject, wireThread, wireTopics, type WireEvent, type WireThread } from "./wire.js";
 
+import { firstMessage } from "./first-message.js";
 import { nativeRowFields } from "./wire-subthreads.js";
 import { readNativeRows } from "./subthreads.js";
 import { nativeRowsFromEvents, withNativeSummary } from "./translate-subthreads.js";
@@ -233,11 +234,10 @@ export class Threads implements HostedThreads {
   async startThread(params: RpcParams<"threads.start">): Promise<RpcResults["threads.start"]> {
     const settings = startSettings(params);
     if (!isHostedAgent(settings.agent)) throw new Refused(`${harnessShortName(settings.agent)} doesn't run on OpenOrc Cloud.`);
-    if (params.attachments?.length) throw new Refused("Files can't be sent to OpenOrc Cloud yet.");
     const project = this.#projectFor(params.projectId, params.spaceId);
     if (!project) throw new Refused(params.spaceId ? "This project isn't available in this space." : "Add this project to OpenOrc Cloud in Settings first.");
     const generation = this.deps.session.generation;
-    const body = { projectId: project.id, ...(params.title && { title: params.title }), settings, first: { id: crypto.randomUUID(), text: params.prompt }, ready: true };
+    const body = { projectId: project.id, ...(params.title && { title: params.title }), settings, ...(await firstMessage(this.deps.session.in(project.space), params)), ready: true };
     const reply = await this.deps.session.in(project.space).request(ROUTES.start, body);
     if (generation !== this.deps.session.generation) throw new Refused("Your OpenOrc session changed. Try again.");
     if (!this.#heard?.projects.some((row) => row.id === project.id && row.space === project.space)) throw new Refused("You no longer have access to this project.");

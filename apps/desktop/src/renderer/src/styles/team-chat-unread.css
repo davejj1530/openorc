@@ -41,7 +41,7 @@
   flex-shrink: 0;
   width: 20px;
   height: 20px;
-  font-size: var(--text-2xs);
+  font-size: 9px;
 }
 .team-chat-files {
   display: flex;

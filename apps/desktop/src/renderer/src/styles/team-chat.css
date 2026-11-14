@@ -65,10 +65,11 @@ body:has(.sidebar-shell[data-open="true"]) .work-row[data-chat="true"] > .team-c
   flex-shrink: 0;
   align-items: center;
 }
+/* Initials sit inside the face at about 0.45 of its width, as the account face's do. */
 .team-chat-faces .account-face {
   width: 20px;
   height: 20px;
-  font-size: var(--text-2xs);
+  font-size: 9px;
 }
 .team-chat-faces .account-face + .account-face {
   margin-left: -8px;
@@ -85,7 +86,7 @@ body:has(.sidebar-shell[data-open="true"]) .work-row[data-chat="true"] > .team-c
   width: 75%;
   height: 75%;
   margin: 0;
-  font-size: var(--text-2xs);
+  font-size: 7px;
   box-shadow: 0 0 0 1.5px var(--bg);
 }
 .team-chat-faces.team-chat-pair .account-face:first-child {

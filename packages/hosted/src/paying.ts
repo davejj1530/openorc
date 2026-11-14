@@ -57,7 +57,6 @@ export class Paying {
       return;
     }
     if (this.#starting) return this.#starting;
-    this.leave();
     const starting = this.#begin(page, this.#generation);
     this.#starting = starting;
     try {
@@ -72,6 +71,8 @@ export class Paying {
       page.page === "pro" ? await this.deps.session.request(ROUTES.checkoutPro, { plan: page.period }) : await this.deps.session.request(page.page === "hours" ? ROUTES.checkoutHours : ROUTES.portal);
     if (generation !== this.#generation) return;
     this.deps.browser!.open(link.url);
+    // Only now is the page before it given up: a page the server refused leaves the one being waited on watched.
+    this.#stop();
     this.#open = { target: page, url: link.url, since: this.deps.now(), before: this.deps.billing(), read: null, ends: setTimeout(() => this.leave(), OPEN_MS) };
     this.#next();
     this.deps.changed();

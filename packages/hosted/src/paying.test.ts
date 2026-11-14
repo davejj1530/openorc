@@ -158,6 +158,13 @@ describe("paying", () => {
     expect(status(hosted).paying).toMatchObject({ page: "billing" });
   });
 
+  it("keeps watching a checkout when another page asked for meanwhile is refused", async () => {
+    const { hosted } = await signedIn();
+    await hosted.account.openBilling({ page: "pro", period: "monthly" });
+    await expect(hosted.account.openBilling({ page: "hours" })).rejects.toThrow("Hours packs are for Pro. Upgrade to Pro first.");
+    expect([opened.length, status(hosted).paying]).toMatchObject([1, { page: "pro", period: "monthly" }]);
+  });
+
   it("asks for no page on a device with no browser, and forgets a page opened once signed out", async () => {
     (await signedIn()).hosted.close();
     const bare = await signedIn({ browser: undefined });

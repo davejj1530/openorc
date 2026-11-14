@@ -441,8 +441,9 @@ export class Threads implements HostedThreads {
     );
     this.#save();
     if (JSON.stringify([this.#heard.rows, this.#heard.projects]) !== before) this.#tell();
-    // Settings shows which of this Mac's projects are on OpenOrc Cloud, read off these.
-    if (JSON.stringify(this.#heard.projects) !== projectsBefore) this.deps.push({ type: "invalidate", keys: ["account"] });
+    // Settings shows which of this Mac's projects are on OpenOrc Cloud, read off these, and a space's cloud-only projects
+    // are read through them: a window that asked about a new one before it was heard reads it again.
+    if (JSON.stringify(this.#heard.projects) !== projectsBefore) this.deps.push({ type: "invalidate", keys: ["account", "projects"] });
   }
 
   #currentRead(generation: number, revision: number): boolean {

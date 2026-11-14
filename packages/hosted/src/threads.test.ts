@@ -250,6 +250,16 @@ describe("a team's threads", () => {
     expect(stand.requests.some((request) => request.path.endsWith("/ready"))).toBe(false);
   });
 
+  it("tells windows to read projects again when a space gains a project, so a cloud-only one asked about early appears", async () => {
+    const team = stand.addTeam("Altalogy", [ADA, BOB]);
+    const { hosted, seen } = await hostAs(ADA);
+    await vi.waitFor(() => expect(hosted.threads.active).toBe(true));
+    const added = stand.addProject(ADA, { name: "api", fullName: "acme/api" }, team);
+    await (hosted.threads as unknown as { refresh(): Promise<void> }).refresh();
+    expect(seen.pushes).toContainEqual({ type: "invalidate", keys: ["account", "projects"] });
+    expect(hosted.threads.project(`openorc-cloud:${added}`)?.name).toBe("api");
+  });
+
   it("tells an app too old for the server to update, in the server's words", async () => {
     const old = newDevice();
     const { deps } = hostDeps(stand, old, { fetch: (input, init) => fetch(input, { ...init, headers: { ...(init?.headers as Record<string, string>), "x-openorc-protocol": "0" } }) });

@@ -474,7 +474,6 @@ const WorkTurn = memo(function WorkTurn({
   const contentId = useId();
   const ended = turn.status.kind === "failed" || turn.status.kind === "stopped";
   const footer = trailing?.(blocks);
-  const hiddenRecovery = !open || !showActivity ? work.findLast((b): b is Extract<Block, { kind: "activity" }> => b.kind === "activity" && Boolean(b.recovery))?.recovery : undefined;
   if (!showActivity && !before.length && !after.length && !ended && !footer) return null;
   const spoke = Boolean(work.length || after.length || turn.live || ended);
   if (!before.length && !spoke && !footer) return null;
@@ -511,13 +510,20 @@ const WorkTurn = memo(function WorkTurn({
           </div>
         </section>
       ) : null}
-      {hiddenRecovery ? <Recovery recovery={hiddenRecovery} folded /> : null}
+      <FoldedRecovery work={work} open={open} showActivity={showActivity} />
       <TranscriptContents {...props} blocks={after} replyActions={!head} />
       {footer}
       {actions ? <TurnActions text={turn.reply?.text} at={turn.reply?.at} onFork={onFork} resting={latest} /> : null}
     </div>
   );
 });
+
+/** Keep a recovery visible when its work is folded or hidden. */
+function FoldedRecovery({ work, open, showActivity }: { work: Block[]; open: boolean; showActivity: boolean }) {
+  if (open && showActivity) return null;
+  const recovery = work.findLast((block): block is Extract<Block, { kind: "activity" }> => block.kind === "activity" && Boolean(block.recovery))?.recovery;
+  return recovery ? <Recovery recovery={recovery} folded /> : null;
+}
 
 /** A failed or stopped turn retains its author and outcome. */
 function TurnOutcome({ named, runId, failed }: { named: string | undefined; runId: string; failed: boolean }) {

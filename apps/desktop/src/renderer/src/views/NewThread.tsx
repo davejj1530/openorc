@@ -331,7 +331,7 @@ function NewThreadProject({
               </>
             )}
           </div>
-          {cloudOnly ? null : <ProjectActivity projectId={projectId} />}
+          {cloudOnly || !projectId ? null : <ProjectActivity projectId={projectId} />}
         </div>
       </main>
       {panelContext ? <Panel context={panelContext} /> : null}

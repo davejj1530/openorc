@@ -21,11 +21,14 @@ let account: AccountStatus | undefined;
 const mutated: [string, unknown][] = [];
 /** A project's git read held open by a test; any other project's is already in. */
 const gitReads: Record<string, Promise<unknown>> = {};
+/** Every read the screen asked for, with its parameters. */
+const reads: [string, unknown][] = [];
 
 vi.mock("../lib/client", async (original) => ({
   ...(await original<object>()),
   useRpcs: () => [],
   useRpc: (method: string, params: { id?: string; spaceId?: string }) => {
+    reads.push([method, params]);
     const data: Record<string, unknown> = {
       "projects.list": projects,
       "spaces.projects": spaceNavigation.getState().inventory.find((space) => space.id === params.spaceId)?.projects,
@@ -161,6 +164,13 @@ function saveModelDraft(projectId: string, prompt: string) {
 const placeSays = () => screen.getByRole("button", { name: /^Where the thread works/ }).getAttribute("data-tip");
 
 describe("NewThread", () => {
+  it("asks for no project's activity while there is no project to start in", () => {
+    projects = [];
+    reads.length = 0;
+    render(<NewThread projectId="" />);
+    expect(reads.filter(([method, params]) => method === "projects.activity" && !(params as { id: string }).id)).toEqual([]);
+  });
+
   it("shows the checked-out prod branch when the project default is dev", () => {
     projects[0]!.defaultBranch = "dev";
     render(<NewThread projectId="p1" />);

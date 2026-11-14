@@ -713,7 +713,7 @@ function toolNameForKind(kind: string | null): string {
   return kind ?? "tool";
 }
 
-/** Images travel inline from this Mac; other files are named by path, so a host gets copies and the text names those. */
+/** Images travel inline from the host's reader when present; other files are named by their placed paths. */
 async function promptBlocks(text: string, attachments: string[] | undefined, host: AgentHost | undefined, appendix: string | undefined): Promise<ContentBlock[]> {
   const { images, files } = partitionAttachments(attachments);
   const named = host && files.length ? await host.upload(files) : files;
@@ -722,7 +722,8 @@ async function promptBlocks(text: string, attachments: string[] | undefined, hos
   if (appendix) blocks.push({ type: "text", text: appendix });
   blocks.push({ type: "text", text: withAttachedFiles(text, named, "open them to read") });
   for (const path of images) {
-    blocks.push({ type: "image", mimeType: imageMimeTypes[extname(path).toLowerCase()] ?? "image/png", data: await readFile(path, { encoding: "base64" }) });
+    const data = host?.readAttachment ? Buffer.from(await host.readAttachment(path)).toString("base64") : await readFile(path, { encoding: "base64" });
+    blocks.push({ type: "image", mimeType: imageMimeTypes[extname(path).toLowerCase()] ?? "image/png", data });
   }
   return blocks;
 }

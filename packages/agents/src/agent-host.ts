@@ -23,6 +23,8 @@ export interface AgentHost {
   spawn(binary: string, args: string[], options: { runId: string; cwd: string; env: Record<string, string>; files: AgentHostFile[]; dirs: string[] }): ChildProcessWithoutNullStreams;
   /** Copies files from this Mac onto the host and returns their paths there, in order. */
   upload(paths: string[]): Promise<string[]>;
+  /** Reads an attachment already placed on the host. The host checks that this run may read the path. */
+  readAttachment?(path: string): Promise<Uint8Array>;
 }
 
 /** Where an adapter puts what the CLI reads before it starts: this Mac's disk, or files a host writes as the CLI starts. */

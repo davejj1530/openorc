@@ -730,6 +730,25 @@ describe("AcpAdapter on a host", () => {
     expect(JSON.stringify(s.promptCalls()[0]!.params["prompt"])).toContain("/home/sandbox/uploads/notes.md");
   });
 
+  it("reads an image placed on the host through the host, and never this machine's disk", async () => {
+    const sandbox = { ...host(), readAttachment: vi.fn(async () => new Uint8Array([137, 80, 78, 71])) };
+    const s = agent("autonomous", { attachments: ["/home/sandbox/attachments/shot.png"] }, undefined, { revision: 0, binary: "opencode", env: { PATH: "/usr/bin" }, host: sandbox as never });
+    await vi.waitFor(() => expect(s.promptCalls()).toHaveLength(1));
+    expect(sandbox.readAttachment).toHaveBeenCalledWith("/home/sandbox/attachments/shot.png");
+    expect(s.promptCalls()[0]!.params["prompt"]).toContainEqual({ type: "image", mimeType: "image/png", data: Buffer.from([137, 80, 78, 71]).toString("base64") });
+  });
+
+  it("sends no image when the host refuses to read it, rather than reading this machine's disk", async () => {
+    const local = path.join(mkdtempSync(path.join(os.tmpdir(), "acp-host-read-")), "shot.png");
+    writeFileSync(local, Buffer.from([137, 80, 78, 71]));
+    const sandbox = { ...host(), readAttachment: vi.fn(async () => Promise.reject(new Error("This run can't read that file."))) };
+    const s = agent("autonomous", { attachments: [local] }, undefined, { revision: 0, binary: "opencode", env: { PATH: "/usr/bin" }, host: sandbox as never });
+    await vi.waitFor(() => expect(sandbox.readAttachment).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(s.events).toContainEqual(expect.objectContaining({ type: "error", message: "This run can't read that file." })));
+    expect(s.promptCalls()).toHaveLength(0);
+    rmSync(path.dirname(local), { recursive: true, force: true });
+  });
+
   it("refuses an unvetted checkout on a host, whose settings it cannot look into", () => {
     expect(() =>
       new AcpAdapter({ onApproval: async () => "allow" }).start(

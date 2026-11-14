@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Menu } from "@base-ui/react/menu";
 import type { OrganizationPerson, OrganizationRole } from "@openorc/protocol";
 import { AccountFace } from "../components/AccountFace";
@@ -26,6 +26,8 @@ export function OrganizationPeopleRow({
   onRemove(person: OrganizationPerson, trigger: HTMLButtonElement | null): void;
   onChanged(): Promise<void>;
 }) {
+  const [readError, setReadError] = useState<string | null>(null);
+  useEffect(() => setReadError(null), [person]);
   const role = useRpcMutation("organization.member.setRole");
   return (
     <div>
@@ -53,7 +55,10 @@ export function OrganizationPeopleRow({
                   { spaceId, memberId: person.memberId, role: next },
                   {
                     onSuccess: () => {
-                      void onChanged();
+                      void onChanged().then(
+                        () => setReadError(null),
+                        (error: unknown) => setReadError(error instanceof Error ? error.message : "OpenOrc Cloud can't be reached."),
+                      );
                     },
                   },
                 )
@@ -65,6 +70,11 @@ export function OrganizationPeopleRow({
         </div>
         <div role="cell">{!self && editable ? <PersonMore person={person} onRemove={onRemove} /> : null}</div>
       </div>
+      {readError ? (
+        <p role="alert" className="organization-error people-row-error">
+          Role changed. {readError}
+        </p>
+      ) : null}
       {role.error ? (
         <p role="alert" className="organization-error people-row-error">
           {role.error.message}

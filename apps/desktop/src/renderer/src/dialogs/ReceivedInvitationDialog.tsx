@@ -53,8 +53,8 @@ export function ReceivedInvitationDialog({ actions }: { actions: ReceivedInvitat
                   {pending === "decline" ? "Declining…" : "Decline"}
                 </Button>
               ) : null}
-              <Button variant="primary" disabled={Boolean(pending)} onClick={() => void actions.respond(invitation, "join", true)}>
-                {joinLabel}
+              <Button variant="primary" className="organization-received-join" disabled={Boolean(pending)} onClick={() => void actions.respond(invitation, "join", true)}>
+                <span data-tip={joinLabel}>{joinLabel}</span>
               </Button>
             </>
           )}

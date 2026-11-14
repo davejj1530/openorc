@@ -1,0 +1,108 @@
+.sidebar-header:has(.space-switcher) {
+  gap: 4px;
+}
+.sidebar-header[data-space-history="true"] .sidebar-history {
+  display: flex;
+}
+.sidebar-header[data-space-history="false"] .sidebar-history {
+  display: none;
+}
+.space-switcher {
+  display: inline-flex;
+  position: relative;
+  align-items: center;
+  gap: 7px;
+  padding: 0;
+  border-radius: var(--radius-md);
+  height: 30px;
+  max-width: 100%;
+  min-width: 0;
+  color: var(--ink);
+  font-family: "Immaculate Gothic", var(--font-sans);
+  font-size: 15px;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.space-switcher:hover,
+.space-switcher[data-popup-open] {
+  background: var(--surface-2);
+}
+.space-switcher-name {
+  display: flex;
+  flex-wrap: wrap;
+  overflow: hidden;
+  height: 20px;
+  line-height: 20px;
+  min-width: 0;
+}
+.space-switcher-name > span {
+  white-space: pre;
+}
+.space-switcher-chevron {
+  margin-left: -2.5px;
+  color: var(--ink-4);
+  flex-shrink: 0;
+}
+.space-switcher-measure {
+  position: absolute;
+  visibility: hidden;
+  width: max-content;
+  white-space: pre;
+  pointer-events: none;
+}
+.space-switcher-hidden {
+  margin: 0 10px 0 6px;
+  max-width: 200px;
+}
+.space-menu {
+  width: 264px;
+  max-height: min(640px, var(--available-height));
+  overflow-y: auto;
+}
+.space-menu .menu-item {
+  width: 100%;
+  gap: 10px;
+}
+.space-menu .space-menu-row {
+  min-height: 52px;
+  height: auto;
+}
+.space-menu-mark {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.space-menu-label {
+  flex: 1;
+  min-width: 0;
+}
+.space-menu-label > span {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.space-menu-detail {
+  color: var(--ink-4);
+  font-size: 12.5px;
+  line-height: 16px;
+  margin-top: 1px;
+}
+.space-menu-read {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px;
+  color: var(--ink-3);
+  font-size: 13px;
+}
+.space-menu-read > span {
+  flex: 1;
+  min-width: 0;
+}
+.space-menu-read > button {
+  flex-shrink: 0;
+}

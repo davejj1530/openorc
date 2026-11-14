@@ -22,6 +22,8 @@ function RepositoryPicker({ spaceId, onOpenChange, onAdded }: { spaceId: string;
   const [chosen, setChosen] = useState<string[]>([]);
   const [outcomes, setOutcomes] = useState<OrganizationProjectAdded[]>([]);
   const submitting = useRef(false);
+  const [readError, setReadError] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState(false);
   const data = read.data;
   const selected = (data?.repositories ?? []).filter((repository) => chosen.includes(keyOf(repository)) && !isAdded(repository, outcomes));
   const submit = async () => {
@@ -30,7 +32,12 @@ function RepositoryPicker({ spaceId, onOpenChange, onAdded }: { spaceId: string;
     try {
       const result = await add.mutateAsync({ spaceId, repositories: selected.map(({ installationId, repoId }) => ({ installationId, repoId })) });
       setOutcomes((before) => [...before.filter((outcome) => !result.some((next) => keyOf(next) === keyOf(outcome))), ...result]);
-      await onAdded();
+      try {
+        await onAdded();
+      } catch (error) {
+        setReadError(error instanceof Error ? error.message : "OpenOrc Cloud can't be reached.");
+        return;
+      }
       if (result.every((outcome) => outcome.state === "added")) onOpenChange(false);
     } catch {
       /* The mutation retains its readable error and the chosen repositories. */
@@ -45,12 +52,37 @@ function RepositoryPicker({ spaceId, onOpenChange, onAdded }: { spaceId: string;
       {!data ? <p className="text-sm text-ink-3">{read.isError ? "Repositories couldn't load." : "Loading repositories…"}</p> : null}
       {data && !data.installations.length ? <GithubConnection configured={data.configured} waiting={waiting} connect={() => connect.mutate({ spaceId })} /> : null}
       {data && data.installations.length > 0 ? <RepositoryChoices data={data} chosen={chosen} onChosen={setChosen} outcomes={outcomes} pending={add.isPending} /> : null}
+      <RepositoryReadError error={readError} outcomes={outcomes} />
       {error ? (
         <p className="organization-error" role="alert">
           {error}
         </p>
       ) : null}
-      {data?.installations.length || read.isError ? (
+      {readError ? (
+        <div className="organization-actions">
+          <Button onClick={() => onOpenChange(false)}>Close</Button>
+          <Button
+            variant="primary"
+            disabled={retrying}
+            onClick={() => {
+              setRetrying(true);
+              void Promise.resolve()
+                .then(onAdded)
+                .then(
+                  () => {
+                    setReadError(null);
+                    if (!selected.length) onOpenChange(false);
+                  },
+                  (error: unknown) => setReadError(error instanceof Error ? error.message : "OpenOrc Cloud can't be reached."),
+                )
+                .finally(() => setRetrying(false));
+            }}
+          >
+            {retrying ? "Trying…" : "Try again"}
+          </Button>
+        </div>
+      ) : null}
+      {!readError && (data?.installations.length || read.isError) ? (
         <RepositoryActions
           failed={read.isError}
           retry={() => void read.refetch()}
@@ -61,6 +93,18 @@ function RepositoryPicker({ spaceId, onOpenChange, onAdded }: { spaceId: string;
           submit={submit}
         />
       ) : null}
+    </div>
+  );
+}
+
+function RepositoryReadError({ error, outcomes }: { error: string | null; outcomes: OrganizationProjectAdded[] }) {
+  if (!error) return null;
+  return (
+    <div>
+      {outcomes.some((outcome) => outcome.state === "added") ? <p>Projects added.</p> : null}
+      <p className="organization-error" role="alert">
+        {error}
+      </p>
     </div>
   );
 }

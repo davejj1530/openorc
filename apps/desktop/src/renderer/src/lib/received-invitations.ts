@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReceivedInvitation } from "@openorc/protocol";
 import { core } from "./rpc";
 import { useRpc } from "./client";
@@ -13,7 +13,7 @@ export interface InvitationDecision {
 }
 
 /** An explicit Join may select a space; a live inbox update never does. */
-export function useReceivedInvitations(onJoined: (spaceId: string, signal: AbortSignal) => Promise<void>) {
+export function useReceivedInvitations(onJoined: (spaceId: string, signal: AbortSignal) => Promise<void>, accountKey?: string) {
   const status = useRpc("spaces.status", {}).data;
   const latest = useRef(status);
   latest.current = status;
@@ -22,12 +22,17 @@ export function useReceivedInvitations(onJoined: (spaceId: string, signal: Abort
   const request = useRef<AbortController | null>(null);
   const busy = useRef(false);
   const joined = useRef<{ invitationId: string; spaceId: string } | null>(null);
-  useEffect(() => () => request.current?.abort(), []);
-  const close = () => {
+  useEffect(() => {
+    joined.current = null;
+    setDecision(null);
+    busy.current = false;
+    return () => request.current?.abort();
+  }, [accountKey]);
+  const close = useCallback(() => {
     request.current?.abort();
     busy.current = false;
     setDecision(null);
-  };
+  }, []);
   const open = (invitation: ReceivedInvitation) => {
     request.current?.abort();
     setDecision({ invitation, pending: null, detail: true, declined: false, joined: joined.current?.invitationId === invitation.id, error: null });

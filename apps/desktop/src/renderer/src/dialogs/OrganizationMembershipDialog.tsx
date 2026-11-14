@@ -14,23 +14,32 @@ export function OrganizationMembershipDialog({ action, onClose, onDone }: { acti
   const destroy = useRpcMutation("organization.delete");
   const [confirmation, setConfirmation] = useState("");
   const submitting = useRef(false);
-  const pending = remove.isPending || leave.isPending || destroy.isPending;
+  const completed = useRef(false);
+  const [readError, setReadError] = useState<string | null>(null);
+  const [reading, setReading] = useState(false);
+  const pending = remove.isPending || leave.isPending || destroy.isPending || reading;
   const error = remove.error ?? leave.error ?? destroy.error;
   const words = actionWords(action);
+  const submitLabel = membershipActionLabel(completed.current, pending, words);
   const submit = async () => {
     if (submitting.current) return;
     submitting.current = true;
     try {
       const spaceId = action.organization.id;
-      if (action.kind === "remove") await remove.mutateAsync({ spaceId, memberId: action.person.memberId });
-      else if (action.kind === "leave") await leave.mutateAsync({ spaceId });
-      else await destroy.mutateAsync({ spaceId, name: confirmation });
+      if (!completed.current) {
+        if (action.kind === "remove") await remove.mutateAsync({ spaceId, memberId: action.person.memberId });
+        else if (action.kind === "leave") await leave.mutateAsync({ spaceId });
+        else await destroy.mutateAsync({ spaceId, name: confirmation });
+        completed.current = true;
+      }
+      setReading(true);
       await onDone();
       onClose();
-    } catch {
-      /* Refusals stay in the dialog with its confirmation text. */
+    } catch (error) {
+      if (completed.current) setReadError(error instanceof Error ? error.message : "OpenOrc Cloud can't be reached.");
     } finally {
       submitting.current = false;
+      setReading(false);
     }
   };
   return (
@@ -58,7 +67,7 @@ export function OrganizationMembershipDialog({ action, onClose, onDone }: { acti
             </div>
           </div>
         ) : null}
-        <p className="organization-membership-detail">{words.detail}</p>
+        {!completed.current ? <p className="organization-membership-detail">{words.detail}</p> : null}
         {action.kind === "delete" ? (
           <label className="organization-label">
             Type {action.organization.name} to confirm
@@ -67,27 +76,28 @@ export function OrganizationMembershipDialog({ action, onClose, onDone }: { acti
               aria-label={`Type ${action.organization.name} to confirm`}
               value={confirmation}
               onChange={(event) => setConfirmation(event.target.value)}
-              disabled={pending}
+              disabled={pending || completed.current}
               autoFocus
             />
           </label>
         ) : null}
-        {error ? (
-          <p role="alert" className="organization-error">
-            {error.message}
-          </p>
-        ) : null}
+        <MembershipErrors action={action} readError={readError} error={error} />
         <div className="organization-actions">
           <Button disabled={pending} onClick={onClose}>
-            Cancel
+            {completed.current ? "Close" : "Cancel"}
           </Button>
           <Button type="submit" variant="primary" disabled={pending || (action.kind === "delete" && confirmation.trim() !== action.organization.name)}>
-            {pending ? words.working : words.action}
+            {submitLabel}
           </Button>
         </div>
       </form>
     </Dialog>
   );
+}
+
+function membershipActionLabel(completed: boolean, pending: boolean, words: ReturnType<typeof actionWords>) {
+  if (pending) return completed ? "Trying…" : words.working;
+  return completed ? "Try again" : words.action;
 }
 
 function actionWords(action: MembershipAction) {
@@ -98,4 +108,30 @@ function actionWords(action: MembershipAction) {
   }
   if (action.kind === "leave") return { title: `Leave ${name}?`, detail: "You'll lose access to its projects and threads.", action: "Leave organization", working: "Leaving…" };
   return { title: `Delete ${name}?`, detail: "Its projects, threads, files and activity will be deleted for everyone. This can't be undone.", action: "Delete organization", working: "Deleting…" };
+}
+
+function completedWords(action: MembershipAction) {
+  if (action.kind === "remove") return `${personFirstName(action.person)} was removed.`;
+  if (action.kind === "leave") return `You left ${action.organization.name}.`;
+  return `${action.organization.name} was deleted.`;
+}
+
+function MembershipErrors({ action, readError, error }: { action: MembershipAction; readError: string | null; error: Error | null }) {
+  return (
+    <>
+      {readError ? (
+        <>
+          <p>{completedWords(action)}</p>
+          <p role="alert" className="organization-error">
+            {readError}
+          </p>
+        </>
+      ) : null}
+      {error ? (
+        <p role="alert" className="organization-error">
+          {error.message}
+        </p>
+      ) : null}
+    </>
+  );
 }

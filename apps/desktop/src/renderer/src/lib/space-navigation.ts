@@ -62,6 +62,7 @@ export function createSpaceNavigation(deps: Dependencies) {
         const old = deps.capture("everyone");
         localView ??= old;
         const saved = readSpaceRecord(deps.durable, key);
+        if (!get().key && !saved.views[personal]) inventory = retainInitialLocal(inventory, personal, old);
         const views = Object.fromEntries(inventory.map((space) => [space.id, validSpaceView(saved.views[space.id] ?? (get().key ? null : old), space)]));
         let wanted = saved.last;
         try {
@@ -74,6 +75,7 @@ export function createSpaceNavigation(deps: Dependencies) {
         // Write every migrated home before legacy persistence is suspended.
         for (const [id, view] of Object.entries(views)) save(id, view);
         restore(id, views[id] ?? emptySpaceView());
+        if (isGlobal(deps, old)) deps.restore(old);
       },
       select(id) {
         const space = get().inventory.find((space) => space.id === id);
@@ -116,15 +118,7 @@ export function createSpaceNavigation(deps: Dependencies) {
         if (current !== get().current || (!isGlobal(deps, captured) && JSON.stringify(captured) !== JSON.stringify(view))) restore(current, view);
       },
       end() {
-        const local = get().inventory.flatMap((space) => space.threads.filter((thread) => thread.owner?.brain !== "hosted"));
-        const personal: SpaceInventory = {
-          id: "",
-          personal: true,
-          projects: get().inventory.flatMap((space) => space.projects.filter((project) => project.localProjectId)),
-          threads: local,
-          taskIds: [],
-        };
-        const view = validSpaceView(localView, personal);
+        const view = validSpaceView(localView, localInventory(get().inventory));
         restoring = true;
         deps.restore(view);
         set({ key: null, current: null, personal: null, inventory: [], views: {}, ownership: "everyone", generation: get().generation + 1 });
@@ -204,3 +198,24 @@ for (const store of [useRouter, useThreadTabs, useLayout])
   store.subscribe(() => {
     if (!navigationScope.restoring) spaceNavigation.getState().remember();
   });
+
+function retainInitialLocal(inventory: SpaceInventory[], personal: string, old: SpaceView): SpaceInventory[] {
+  const prior: SpaceInventory = {
+    id: personal,
+    personal: true,
+    projects: inventory.flatMap((space) => space.projects.filter((project) => project.localProjectId)),
+    threads: inventory.flatMap((space) => space.threads.filter((thread) => thread.owner?.brain !== "hosted")),
+    taskIds: [],
+  };
+  return retainUnavailable([prior], inventory, { [personal]: old }, personal);
+}
+
+function localInventory(inventory: SpaceInventory[]): SpaceInventory {
+  return {
+    id: "",
+    personal: true,
+    projects: inventory.flatMap((space) => space.projects.filter((project) => project.localProjectId)),
+    threads: inventory.flatMap((space) => space.threads.filter((thread) => thread.owner?.brain !== "hosted")),
+    taskIds: [],
+  };
+}

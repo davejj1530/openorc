@@ -1,8 +1,12 @@
-import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
+import { AppOnboarding } from "./AppOnboarding";
+import { lazy, Suspense, type ReactNode } from "react";
 import { AppUpdateNotice } from "./components/AppUpdateNotice";
 import { CommandPalette } from "./components/CommandPalette";
 import { Sidebar } from "./components/Sidebar";
-import { Wordmark } from "./components/SidebarListHead";
+import { OrganizationProvider } from "./components/OrganizationProvider";
+import { OrganizationPeople } from "./views/OrganizationPeople";
+import { OrganizationStart } from "./views/OrganizationStart";
+import { useOrganization } from "./lib/organization-context";
 import { DeleteThreadDialog } from "./components/ThreadActions";
 import { ThreadMoveDialog } from "./components/ThreadMoveDialog";
 import { RemoveWorktreeDialog } from "./components/RemoveWorktreeDialog";
@@ -12,19 +16,14 @@ import { ImportProjectDialog } from "./dialogs/ImportProjectDialog";
 import { ImportSessionsDialog } from "./dialogs/ImportSessionsDialog";
 import { NewFileDialog } from "./dialogs/NewFileDialog";
 import { useAppShortcuts } from "./lib/app-shortcuts";
-import { useRpc } from "./lib/client";
-import { useOnboardingAgents } from "./lib/default-harness";
 import { focusedProject, useLayout } from "./lib/layout";
 import { useLookHandover } from "./lib/mac-look";
-import { readOnboardingState, resolveOnboarding, writeOnboardingState, type PersistedOnboardingState } from "./lib/onboarding";
 import { useRouter, type Route } from "./lib/router";
 import { useUi } from "./lib/ui";
-import { useTrafficLights } from "./lib/window";
 import { useSpaceNavigation } from "./lib/space-navigation";
 import { Memory } from "./views/Memory";
 import { NewSubthread } from "./views/NewSubthread";
 import { NewThread } from "./views/NewThread";
-import { Onboarding } from "./views/Onboarding";
 import { OrclingDesigner } from "./views/OrclingDesigner";
 import { ProjectView } from "./views/ProjectView";
 import { PullRequestList } from "./views/PullRequestList";
@@ -44,142 +43,77 @@ function projectForRoute(route: ReturnType<typeof useRouter.getState>["route"], 
   return savedProjectId ?? undefined;
 }
 
-function requestedOnboarding(onboarding: ReturnType<typeof resolveOnboarding> | null, systemError: boolean, projectsError: boolean): "first_run" | "recovery" | null {
-  if (onboarding) return onboarding.mode === "done" ? null : onboarding.mode;
-  if (systemError || projectsError) return "recovery";
-  return null;
-}
-
 /**
  * Navigation, a workspace of up to three conversations, and one shared panel.
  * Task screens keep their own panel; other screens use the main column alone.
  */
 export function App() {
-  const space = useSpaceNavigation((state) => state.current);
-  const trafficLights = useTrafficLights();
-  const route = useRouter((s) => s.route);
-  const ui = useUi();
+  const route = useRouter((state) => state.route);
   const projectId = useLayout(focusedProject);
-  const system = useRpc("system.info", { refresh: false });
-  const projects = useRpc("projects.list", {});
-  const [savedOnboarding, setOnboardingState] = useState(readOnboardingState);
-  const settings = useRpc("app.settings.get", {});
-  const onboardingState =
-    settings.data?.enabledHarnesses == null ? savedOnboarding : { ...savedOnboarding, selectedHarnesses: settings.data.enabledHarnesses, defaultHarness: settings.data.defaultHarness };
-  const recordAgents = useOnboardingAgents();
   useLookHandover();
-  const [onboardingSession, setOnboardingSession] = useState<"first_run" | "recovery" | "dismissed" | null>(null);
-  const currentProject = projectForRoute(route, projectId);
-  const onboarding =
-    system.data && projects.data
-      ? resolveOnboarding({
-          persisted: onboardingState,
-          harnesses: system.data.harnesses,
-          projectCount: projects.data.length,
-        })
-      : null;
-  const automaticOnboarding = route.view === "newthread" && !route.projectId;
-  const automaticOnboardingEnabled = automaticOnboarding && onboardingSession !== "dismissed";
-  const requestedOnboardingMode = requestedOnboarding(onboarding, system.isError, projects.isError);
-  const onboardingMode = onboardingSession === "first_run" || onboardingSession === "recovery" ? onboardingSession : requestedOnboardingMode;
-
-  // Wait for a resolved check, then keep the current flow mounted until the user exits.
-  useEffect(() => {
-    if (automaticOnboardingEnabled && onboardingSession === null && requestedOnboardingMode) {
-      setOnboardingSession(requestedOnboardingMode);
-    }
-  }, [automaticOnboardingEnabled, onboardingSession, requestedOnboardingMode]);
-
-  const dismissOnboarding = () => {
-    setOnboardingSession("dismissed");
-    if (route.view === "onboarding") {
-      const router = useRouter.getState();
-      if (router.history.length > 0) router.back();
-      else router.navigate({ view: "newthread" });
-    }
-  };
-  const persistOnboarding = (next: PersistedOnboardingState): boolean => {
-    if (!writeOnboardingState(next)) return false;
-    setOnboardingState(next);
-    recordAgents(next);
-    return true;
-  };
-
-  useAppShortcuts(currentProject);
-
-  if (route.view === "onboarding") {
-    return <Onboarding mode={route.mode ?? "first_run"} previewInitially={route.preview ?? false} persisted={onboardingState} onPersist={persistOnboarding} onComplete={dismissOnboarding} />;
-  }
-
-  if (automaticOnboardingEnabled && !onboardingMode && !onboarding && !system.isError && !projects.isError) {
-    return (
-      <div className="onboarding-root">
-        <header className="onboarding-chrome" data-traffic-lights={trafficLights || undefined}>
-          <span className="onboarding-brand">
-            <Wordmark />
-          </span>
-        </header>
-        <main className="onboarding-surface">
-          <div className="document-skeleton" aria-label="Checking setup" />
-        </main>
-      </div>
-    );
-  }
-
-  if (automaticOnboardingEnabled && onboardingMode) {
-    return (
-      <Onboarding
-        key={onboardingMode}
-        mode={onboardingMode}
-        initialStep={onboarding?.step}
-        persisted={onboarding?.state ?? onboardingState}
-        onPersist={persistOnboarding}
-        onComplete={dismissOnboarding}
-      />
-    );
-  }
-
+  useAppShortcuts(projectForRoute(route, projectId));
   return (
     <TooltipProvider>
-      <div className="app-shell h-full flex text-ink">
-        <Sidebar key={`sidebar:${space ?? "local"}`} />
-        <div key={space ?? "local"} className="work-row flex-1 min-w-0 h-full flex">
-          <StartScreen route={route} />
-          {route.view === "thread" ? <ThreadWorkspace /> : null}
-          {route.view === "task" ? (
-            <Suspense
-              fallback={
-                <Main>
-                  <div className="document-skeleton" aria-label="Loading task" />
-                </Main>
-              }
-            >
-              <TaskView key={route.taskId} taskId={route.taskId} tab={route.tab} />
-            </Suspense>
-          ) : null}
-          <MainScreen route={route} currentProject={currentProject} />
-        </div>
-        <CommandPalette open={ui.palette} onOpenChange={ui.setPalette} />
-        <div className="workspace-update-notices">
-          <AppUpdateNotice />
-          <AgentUpdateNotice />
-        </div>
-        <ImportProjectDialog open={ui.importProject} onOpenChange={ui.setImportProject} />
-        <ImportSessionsDialog open={ui.importSessions.open} projectId={ui.importSessions.projectId ?? currentProject} onOpenChange={(open) => ui.setImportSessions(open)} />
-        <DeleteThreadDialog />
-
-        <ThreadMoveDialog />
-        <RemoveWorktreeDialog />
-        <NewFileDialog />
-      </div>
+      <OrganizationProvider>
+        <AppOnboarding>
+          <DesktopApp />
+        </AppOnboarding>
+      </OrganizationProvider>
     </TooltipProvider>
   );
 }
 
-/** The screens that use the main column alone. */
+function DesktopApp() {
+  const space = useSpaceNavigation((state) => state.current);
+  const personal = useSpaceNavigation((state) => state.personal);
+  const home = space === null || space === personal ? "personal" : space;
+  const route = useRouter((s) => s.route);
+  const ui = useUi();
+  const projectId = useLayout(focusedProject);
+  const currentProject = projectForRoute(route, projectId);
+  return (
+    <div className="app-shell h-full flex text-ink">
+      <Sidebar key={`sidebar:${home}`} />
+      <div key={home} className="work-row flex-1 min-w-0 h-full flex">
+        <StartScreen route={route} />
+        {route.view === "thread" ? <ThreadWorkspace /> : null}
+        {route.view === "task" ? (
+          <Suspense
+            fallback={
+              <Main>
+                <div className="document-skeleton" aria-label="Loading task" />
+              </Main>
+            }
+          >
+            <TaskView key={route.taskId} taskId={route.taskId} tab={route.tab} />
+          </Suspense>
+        ) : null}
+        <MainScreen route={route} currentProject={currentProject} />
+      </div>
+      <CommandPalette open={ui.palette} onOpenChange={ui.setPalette} />
+      <div className="workspace-update-notices">
+        <AppUpdateNotice />
+        <AgentUpdateNotice />
+      </div>
+      <ImportProjectDialog open={ui.importProject} onOpenChange={ui.setImportProject} />
+      <ImportSessionsDialog open={ui.importSessions.open} projectId={ui.importSessions.projectId ?? currentProject} onOpenChange={(open) => ui.setImportSessions(open)} />
+      <DeleteThreadDialog />
+
+      <ThreadMoveDialog />
+      <RemoveWorktreeDialog />
+      <NewFileDialog />
+    </div>
+  );
+}
+
 /** The screens that start something: a thread, a thread under another, or a task. */
 function StartScreen({ route }: { route: Route }) {
-  if (route.view === "newthread") return <NewThread key={route.projectId ?? ""} projectId={route.projectId} />;
+  if (route.view === "newthread")
+    return (
+      <OrganizationStart projectId={route.projectId}>
+        <NewThread key={route.projectId ?? ""} projectId={route.projectId} />
+      </OrganizationStart>
+    );
   if (route.view === "newsubthread") return <NewSubthread key={route.parentId} parentId={route.parentId} />;
   if (route.view !== "newtask") return null;
   return (
@@ -193,8 +127,13 @@ function StartScreen({ route }: { route: Route }) {
 
 function MainScreen({ route, currentProject }: { route: Route; currentProject: string | undefined }) {
   const openNewTask = useUi((s) => s.openNewTask);
+  const organization = useOrganization();
   let screen: ReactNode;
   switch (route.view) {
+    case "people":
+      screen =
+        organization?.organization?.id === route.spaceId ? <OrganizationPeople key={route.spaceId} spaceId={route.spaceId} onInvite={organization.invite} onLeft={organization.refresh} /> : null;
+      break;
     case "tasks":
       screen = <TaskListView onNewTask={() => openNewTask(currentProject)} />;
       break;

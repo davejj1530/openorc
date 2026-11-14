@@ -60,3 +60,21 @@
   background: var(--ink-3);
   box-shadow: 0 0 0 2px var(--bg);
 }
+
+.organization-received-identity > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.organization-received-name > span {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.organization-received-join {
+  min-width: 0;
+  max-width: 100%;
+}
+.organization-received-join > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

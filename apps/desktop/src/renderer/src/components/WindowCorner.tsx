@@ -1,3 +1,4 @@
+import { SpaceSwitcher } from "./SpaceSwitcher";
 import type { ReactNode } from "react";
 import { ArrowLeft, ArrowRight, PanelLeft } from "./icons";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
@@ -15,7 +16,12 @@ export function WindowCorner({ sidebarOpen }: { sidebarOpen: boolean }) {
   return (
     <div className="window-corner" role="group" aria-label="Window">
       <SidebarToggle open={sidebarOpen} />
-      {sidebarOpen ? null : <HistoryButtons size="lg" />}
+      {sidebarOpen ? null : (
+        <>
+          <SpaceSwitcher hidden />
+          <HistoryButtons size="lg" />
+        </>
+      )}
     </div>
   );
 }

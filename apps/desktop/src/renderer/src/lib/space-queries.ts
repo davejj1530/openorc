@@ -89,15 +89,30 @@ function projectData(scoped: SpaceProject[] | undefined, local: Project[] | unde
 }
 
 let reading = 0;
+let reconciliation: Promise<void> = Promise.resolve();
 
 /** Called only by the completed space entry point, or by the isolated renderer fixture before it is mounted. */
-export async function reconcileSpaceNavigation(status: SpacesStatus, coreIdentity: string): Promise<void> {
+export function reconcileSpaceNavigation(status: SpacesStatus, coreIdentity: string): Promise<void> {
   const turn = ++reading;
+  const read = readSpaceNavigation(status, coreIdentity, turn);
+  // An explicit opening waits for the background read that superseded it before selecting its destination.
+  reconciliation = read.then(
+    () => (turn === reading ? undefined : reconciliation),
+    (error: unknown) => {
+      if (turn !== reading) return reconciliation;
+      throw error;
+    },
+  );
+  return reconciliation;
+}
+
+async function readSpaceNavigation(status: SpacesStatus, coreIdentity: string, turn: number): Promise<void> {
   if (status.state === "unavailable" || status.state === "signed-out") {
     if (spaceNavigation.getState().key) spaceNavigation.getState().end();
     return;
   }
   if (status.state !== "ready") return;
+  if (!spaceNavigation.getState().key && status.spaces.every((space) => space.kind === "personal")) return;
   const listed = await Promise.all(
     status.spaces.map(async (space) => ({
       id: space.id,

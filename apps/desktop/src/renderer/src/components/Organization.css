@@ -158,3 +158,13 @@
   font-size: 13px;
   margin-top: -8px;
 }
+
+.organization-save-action {
+  min-width: 0;
+  max-width: 100%;
+}
+.organization-save-action > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

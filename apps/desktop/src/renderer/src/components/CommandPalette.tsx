@@ -1,3 +1,5 @@
+import { OrganizationPalette } from "./OrganizationPalette";
+import { useOrganization } from "../lib/organization-context";
 import { useSpaceProjects } from "../lib/space-queries";
 import { Command } from "cmdk";
 import { useEffect, useState, type ReactNode } from "react";
@@ -40,6 +42,7 @@ function usePaletteKeys(open: boolean, onOpenChange: (open: boolean) => void): v
 }
 
 export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const organization = useOrganization();
   const mode = useUi((s) => s.paletteMode);
   const [query, setQuery] = useState("");
   // Messages match by prefix from two characters on, across every thread's conversation.
@@ -73,10 +76,11 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
             {mode === "messages" ? null : (
               <Command.Group heading="Actions" className="command-palette-group">
                 {paletteActions
-                  .filter((action) => action.available?.() ?? true)
+                  .filter((action) => (action.available?.() ?? true) && !(organization?.organization && action.label === "Add project"))
                   .map(({ label, icon: Icon, run }) => (
                     <Item key={label} onSelect={() => go(run)} icon={<Icon size={15} />} label={label} />
                   ))}
+                <OrganizationPalette go={go} />
               </Command.Group>
             )}
           </Command.List>

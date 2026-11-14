@@ -115,7 +115,7 @@ it("migrates local tabs into all valid homes and does not save Settings as an or
     ],
   });
   w.store.getState().initialize("key", "personal", [...spaces, { ...spaces[1]!, id: "cedar" }]);
-  expect(w.get().tabs.map((tab) => tab.id)).toEqual(["note"]);
+  expect(w.get().tabs.map((tab) => tab.id)).toEqual(["a", "note"]);
   w.store.getState().select("birch");
   expect(w.get().tabs.map((tab) => tab.id)).toEqual(["a"]);
   w.edit({ destination: { view: "people", spaceId: "birch" } });
@@ -261,5 +261,23 @@ it("keeps an already open local conversation usable until space switch after its
   expect(w.store.getState().inventory[1]!.threads).toEqual([]);
   w.store.getState().select("personal");
   w.store.getState().select("birch");
+  expect(w.get()).toMatchObject({ destination: { view: "newthread" }, tabs: [] });
+});
+
+it("keeps open Personal local work in place when access acquired elsewhere moves its folder into an organization", () => {
+  const w = windowOf();
+  const local = spaces[1]!.threads.filter((thread) => thread.owner?.brain !== "hosted");
+  const personal = { ...spaces[0]!, projects: [...spaces[0]!.projects, ...spaces[1]!.projects], threads: [...spaces[0]!.threads, ...local] };
+  w.edit({ destination: { view: "thread", threadId: "a" }, tabs: [{ id: "a-tab", route: { view: "thread", threadId: "a" } }], panes: ["a"] });
+  w.store.getState().initialize("key", "personal", spaces);
+  expect(w.get().destination).toEqual({ view: "thread", threadId: "a" });
+  expect(w.store.getState().inventory[0]!.detached?.threads.map((row) => row.id)).toEqual(["a"]);
+  w.store.getState().reconcile([personal, { ...spaces[1]!, projects: [], threads: [] }]);
+  expect(w.store.getState().inventory[0]!.detached).toBeUndefined();
+  w.store.getState().reconcile(spaces);
+  expect(w.get().destination).toEqual({ view: "thread", threadId: "a" });
+  expect(w.store.getState().inventory[0]!.detached?.threads.map((row) => row.id)).toEqual(["a"]);
+  w.store.getState().select("birch");
+  w.store.getState().select("personal");
   expect(w.get()).toMatchObject({ destination: { view: "newthread" }, tabs: [] });
 });

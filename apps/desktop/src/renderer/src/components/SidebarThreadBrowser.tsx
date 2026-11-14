@@ -55,6 +55,7 @@ import { useListHold } from "../lib/use-list-hold";
 import { useScrollEdges } from "../lib/use-scroll-edges";
 import { cn } from "../lib/cn";
 import { useSpaceNavigation } from "../lib/space-navigation";
+import { useOrganization } from "../lib/organization-context";
 
 /** Every project, and every project's id with the Workspace's, which the list reads all of. */
 export function useSidebarProjects() {
@@ -175,6 +176,7 @@ type ThreadList = ReturnType<typeof useThreadList>;
 
 function ListFeedback({ state, shown, snoozed }: { state: ThreadList; shown: number; snoozed: number }) {
   const organization = useSpaceNavigation((state) => Boolean(state.current && state.current !== state.personal));
+  const admin = useOrganization()?.organization?.role === "admin";
   const { projects, queries, pages, pinnedOnly, pending } = state;
   if (projects.isError) return null;
   const hasMore = pages.some((page) => page.hasMore);
@@ -189,7 +191,7 @@ function ListFeedback({ state, shown, snoozed }: { state: ThreadList; shown: num
   // Every project keeps its label, empty or not, so the list comes up empty only with no projects or under the pinned filter.
   if (shown || snoozed || hasMore) return null;
   if (pinnedOnly) return <p className="browser-empty">No pinned threads.</p>;
-  return projects.data?.length === 0 ? <p className="browser-empty">{organization ? "No projects available" : "No projects yet."}</p> : null;
+  return projects.data?.length === 0 ? <p className="browser-empty">{organization && !admin ? "No projects available" : "No projects yet."}</p> : null;
 }
 
 /** The list's parts from its pages: pins, the rest, snoozed threads apart, and Resolved. */

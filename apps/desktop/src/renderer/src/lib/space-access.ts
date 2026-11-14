@@ -8,13 +8,14 @@ export function retainUnavailable(before: SpaceInventory[], after: SpaceInventor
   return after.map((space) => {
     const prior = before.find((each) => each.id === space.id);
     const view = views[space.id];
-    if (!prior || !view || space.personal) return space;
+    if (!prior || !view) return space;
+    const detached = space.id === current ? retainLocal(prior, space, view, after) : undefined;
+    if (space.personal) return { ...space, detached };
     const open = openThreads(view);
     const removed = prior.threads.filter((row) => row.owner?.brain === "hosted" && !space.projects.some((project) => project.key === row.projectId));
     const unavailable = [...(prior.unavailable ?? []), ...removed.map(({ id, title, projectId }) => ({ id, title: title ?? "Thread", projectId }))].filter(
       (row) => open.has(row.id) && !space.threads.some((thread) => thread.id === row.id),
     );
-    const detached = space.id === current ? retainLocal(prior, space, view, after) : undefined;
     return { ...space, unavailable, detached };
   });
 }

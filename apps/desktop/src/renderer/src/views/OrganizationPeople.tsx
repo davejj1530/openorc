@@ -88,7 +88,7 @@ export function OrganizationPeople({ spaceId, onInvite, onLeft }: Props) {
             <p className="organization-error" role="alert">
               {people.error.message}
             </p>
-            <Button onClick={() => void people.refetch()}>Try again</Button>
+            <Button onClick={() => void people.refetch().catch(() => {})}>Try again</Button>
           </div>
         ) : null}
       </div>

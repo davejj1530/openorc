@@ -15,7 +15,7 @@ export function useOrganizationPeople(spaceId: string) {
     loading: pages.some((page) => page.isPending),
     error: pages.find((page) => page.error)?.error ?? null,
     refetch: async () => {
-      await Promise.all(pages.map((page) => page.refetch()));
+      await Promise.all(pages.map((page) => page.refetch({ throwOnError: true })));
     },
   };
 }

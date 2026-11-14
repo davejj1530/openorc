@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import type { OrganizationIdentity } from "@openorc/protocol";
 import { OrganizationMark } from "../components/OrganizationMark";
 import { Button, Dialog, Input } from "../components/ui";
-import { useRpcMutation } from "../lib/client";
+import { useOrganizationSave } from "../lib/organization-save";
 import { organizationLogo } from "../lib/organization-logo";
 
 export interface OrganizationSaved {
@@ -14,7 +14,7 @@ interface Props {
   open: boolean;
   organization?: OrganizationIdentity;
   onOpenChange(open: boolean): void;
-  onSaved(result: OrganizationSaved): void | Promise<void>;
+  onSaved(result: OrganizationSaved, signal: AbortSignal): void | Promise<void>;
 }
 
 export function OrganizationIdentityDialog(props: Props) {
@@ -28,15 +28,10 @@ export function OrganizationIdentityDialog(props: Props) {
 function IdentityForm({ organization, onOpenChange, onSaved }: Props) {
   const [name, setName] = useState(organization?.name ?? "");
   const [logo, setLogo] = useState(organization?.logo ?? null);
-  const [error, setError] = useState<string | null>(null);
   const [reading, setReading] = useState(false);
-  const submitting = useRef(false);
-  const create = useRpcMutation("spaces.create");
-  const update = useRpcMutation("organization.update");
-  const pending = create.isPending || update.isPending;
-  const action = organization ? "Save changes" : "Create organization";
-  const working = organization ? "Saving…" : "Creating…";
-  const changed = name !== organization?.name || logo !== organization?.logo;
+  const save = useOrganizationSave({ organization, name, logo, onSaved, close: () => onOpenChange(false) });
+  const { pending, error, setError } = save;
+  const disabled = pending || Boolean(save.saved);
   const pick = async (picked: File | undefined) => {
     if (!picked) return;
     setReading(true);
@@ -49,31 +44,15 @@ function IdentityForm({ organization, onOpenChange, onSaved }: Props) {
       setReading(false);
     }
   };
-  const submit = async () => {
-    if (submitting.current || reading || !name.trim()) return;
-    submitting.current = true;
-    setError(null);
-    try {
-      const result = organization
-        ? { spaceId: (await update.mutateAsync({ spaceId: organization.id, name, ...(logo !== organization.logo ? { logo } : {}) })).id, logoError: null }
-        : await create.mutateAsync({ name, ...(logo ? { logo } : {}) });
-      await onSaved({ ...result, pendingLogo: result.logoError ? logo : null });
-      onOpenChange(false);
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "OpenOrc Cloud can't be reached.");
-    } finally {
-      submitting.current = false;
-    }
-  };
   return (
     <form
       className="organization-form"
       onSubmit={(event) => {
         event.preventDefault();
-        void submit();
+        if (!reading) void save.submit();
       }}
     >
-      <LogoField logo={logo} pending={pending} reading={reading} pick={pick} remove={() => setLogo(null)} />
+      <LogoField logo={logo} pending={disabled} reading={reading} pick={pick} remove={() => setLogo(null)} />
       <label className="organization-label">
         Name
         <Input
@@ -81,7 +60,7 @@ function IdentityForm({ organization, onOpenChange, onSaved }: Props) {
           aria-label="Organization name"
           placeholder="Organization name"
           value={name}
-          disabled={pending}
+          disabled={disabled}
           autoFocus
           onChange={(event) => {
             setName(event.target.value);
@@ -90,18 +69,46 @@ function IdentityForm({ organization, onOpenChange, onSaved }: Props) {
           aria-invalid={Boolean(error)}
         />
       </label>
+      {save.saved ? <p>{organization ? "Organization updated." : `You created ${name.trim()}.`}</p> : null}
       {error ? (
         <p className="organization-error" role="alert">
           {error}
         </p>
       ) : null}
-      <div className="organization-actions">
-        <Button onClick={() => onOpenChange(false)}>Cancel</Button>
-        <Button type="submit" variant="primary" disabled={!name.trim() || pending || reading || Boolean(organization && !changed)}>
-          {pending ? working : action}
-        </Button>
-      </div>
+      <IdentityActions name={name} logo={logo} organization={organization} saved={Boolean(save.saved)} pending={pending} reading={reading} close={() => onOpenChange(false)} />
     </form>
+  );
+}
+
+function IdentityActions({
+  name,
+  logo,
+  organization,
+  saved,
+  pending,
+  reading,
+  close,
+}: {
+  name: string;
+  logo: string | null;
+  organization?: OrganizationIdentity;
+  saved: boolean;
+  pending: boolean;
+  reading: boolean;
+  close(): void;
+}) {
+  let action = organization ? "Save changes" : "Create organization";
+  if (saved) action = organization ? "Try again" : `Open ${name.trim()}`;
+  let working = organization ? "Saving…" : "Creating…";
+  if (saved) working = "Opening…";
+  const unchanged = organization && name === organization.name && logo === organization.logo && !saved;
+  return (
+    <div className="organization-actions">
+      <Button onClick={close}>{saved ? "Close" : "Cancel"}</Button>
+      <Button type="submit" variant="primary" className="organization-save-action" disabled={!name.trim() || pending || reading || Boolean(unchanged)}>
+        <span data-tip={action}>{pending ? working : action}</span>
+      </Button>
+    </div>
   );
 }
 

@@ -3,6 +3,7 @@ import { Tooltip } from "./ui";
 import "../dialogs/received-invitations.css";
 
 export function InvitationIndicator({ count, children }: { count: number; children: ReactNode }) {
+  if (!count) return <span className="organization-invitation-mark">{children}</span>;
   return (
     <Tooltip label={count ? `${count} invitation${count === 1 ? "" : "s"} waiting` : undefined}>
       <span className="organization-invitation-mark">

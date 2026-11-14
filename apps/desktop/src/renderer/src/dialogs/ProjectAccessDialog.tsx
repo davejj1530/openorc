@@ -39,7 +39,7 @@ export function ProjectAccessDialog({ organization, project, onClose }: { organi
             <Button
               onClick={() => {
                 void read.refetch();
-                void people.refetch();
+                void people.refetch().catch(() => {});
               }}
             >
               Try again

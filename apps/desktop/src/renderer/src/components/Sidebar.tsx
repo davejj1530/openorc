@@ -8,6 +8,7 @@ import { OrclingsModeContext, useOrclingsMode } from "../lib/orclings-mode";
 import { useOrclings } from "../lib/orclings";
 import { ResizeHandle } from "./ResizeHandle";
 import { SidebarFooter } from "./SidebarFooter";
+import { SpaceSwitcher } from "./SpaceSwitcher";
 import { Wordmark } from "./SidebarListHead";
 import { SidebarNav } from "./SidebarNav";
 import { NewOrclingButton, SidebarOrclings } from "./SidebarOrclings";
@@ -58,8 +59,8 @@ export function Sidebar() {
 
 /**
  * The sidebar's header, where the window is dragged from: the traffic lights where the OS draws them, then whose
- * workspace this is, then Back and Forward at its end while the header has room for them. Until there are
- * organizations, the workspace is OpenOrc's own mark and name. A narrow window floats the sidebar over the toggle that
+ * workspace this is, then Back and Forward at its end while the header has room for them. Signed in, the
+ * identity switches spaces. A narrow window floats the sidebar over the toggle that
  * shows it, so the header carries its own way to hide it there.
  */
 function SidebarHeader() {
@@ -67,7 +68,7 @@ function SidebarHeader() {
     <header className="sidebar-header drag-region h-topbar">
       <SidebarToggle open className="sidebar-header-toggle" />
       <div className="sidebar-identity">
-        <Wordmark />
+        <SpaceSwitcher fallback={<Wordmark />} />
       </div>
       <HistoryButtons size="xs" className="sidebar-history" />
     </header>

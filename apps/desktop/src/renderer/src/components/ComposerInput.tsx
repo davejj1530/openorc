@@ -13,7 +13,6 @@ import {
   matchingConnectors,
   memberRows,
   mentionRows,
-  nextPickable,
   ofKind,
   suggestionKey,
   useConnectorWord,
@@ -22,7 +21,7 @@ import {
 } from "./composer-commands";
 import { ComposerSuggestions } from "./ComposerSuggestions";
 import { useHostedControlReason } from "./HostedConversationBoundary";
-import { blockHostedCommandKey, cloudCommandRows, hostedFileSuggestion, HostedSuggestion } from "./HostedComposerControls";
+import { blockHostedCommandKey, cloudCommandRows, hostedFileSuggestion, HostedSuggestion, nextCommandSuggestion } from "./HostedComposerControls";
 import { ConnectorLogo } from "./ConnectorLogo";
 import { ComposerEditor, type ComposerEditorHandle, type DraftChange } from "./composer-editor/ComposerEditor";
 import { SkillHoverCard, useSkillHover } from "./MarkedText";
@@ -259,7 +258,7 @@ export function ComposerInput(props: ComposerInputProps) {
           if (action === "down" || action === "up") {
             e.preventDefault();
             setChosen(true);
-            setCursor((current) => nextPickable(suggestions, current, action === "down" ? 1 : -1));
+            setCursor((current) => nextCommandSuggestion(fileReason, suggestions, current, action === "down" ? 1 : -1));
             return true;
           }
           if (action === "pick" || action === "close") {

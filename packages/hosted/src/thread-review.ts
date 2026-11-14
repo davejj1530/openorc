@@ -4,11 +4,12 @@ import { Refused } from "./session.js";
 import { refuse } from "./sends.js";
 import { REVIEW_ROUTES } from "./wire-review.js";
 import { completePatch, reviewChanges, turnFiles } from "./translate-review.js";
+import { readReview, readPublishing } from "./review-availability.js";
 
-export const changes = (threads: Threads, { threadId }: RpcParams<"hosted.review.changes">) => threads.on(threadId).request(REVIEW_ROUTES.changes(threadId));
-export const turn = (threads: Threads, { threadId, turnId }: RpcParams<"hosted.review.turn">) => threads.on(threadId).request(REVIEW_ROUTES.turn(threadId, turnId));
+export const changes = (threads: Threads, { threadId }: RpcParams<"hosted.review.changes">) => readReview(threads.on(threadId), threadId, REVIEW_ROUTES.changes(threadId));
+export const turn = (threads: Threads, { threadId, turnId }: RpcParams<"hosted.review.turn">) => readReview(threads.on(threadId), threadId, REVIEW_ROUTES.turn(threadId, turnId));
 export const file = (threads: Threads, { threadId, path, turnId }: RpcParams<"hosted.review.file">) => threads.on(threadId).request(REVIEW_ROUTES.file(threadId, path, turnId));
-export const state = (threads: Threads, { threadId }: RpcParams<"hosted.review.state">) => threads.on(threadId).request(REVIEW_ROUTES.state(threadId));
+export const state = (threads: Threads, { threadId }: RpcParams<"hosted.review.state">) => readPublishing(threads.on(threadId), threadId);
 
 export async function action(threads: Threads, { threadId, action: request }: RpcParams<"hosted.review.action">): Promise<HostedReviewReply> {
   const { kind, ...body } = request;

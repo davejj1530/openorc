@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createHosted, type Hosted } from "./index.js";
 import { hostDeps, newDevice, signInAs } from "./test-fixtures/host.js";
 import { standIn, type StandIn } from "./testing/stand-in.js";
+import { wireThreadDetail } from "./wire.js";
 
 const email = "reader@example.com";
 let stand: StandIn;
@@ -9,18 +10,22 @@ let hosted: Hosted;
 let id: string;
 let reads: string[];
 let readFailure: boolean;
+let oldDetail: boolean;
 beforeEach(async () => {
   stand = await standIn({ signup: "open" });
   id = stand.addThread(email, { title: "Example", projectId: null });
   reads = [];
   readFailure = false;
+  oldDetail = false;
   const { deps, browser } = hostDeps(stand, newDevice(), {
     fetch: async (input, init) => {
       const url = new URL(String(input));
       if (url.pathname.endsWith("/events")) {
         reads.push(url.pathname + url.search);
+        if (Number(url.searchParams.get("before")) > 2147483647) return Response.json({ message: "The event cursor is out of range." }, { status: 500 });
         if (readFailure) return Response.json({ message: "The history could not be read." }, { status: 503 });
       }
+      if (oldDetail && url.pathname === `/hosted/threads/${id}`) return Response.json(wireThreadDetail.parse(await (await fetch(input, init)).json()));
       return fetch(input, init);
     },
   });
@@ -79,4 +84,13 @@ it("does not turn a failed last-message read into no message", async () => {
 
 it("keeps a new thread's legitimate empty preview", async () => {
   expect(await hosted.threads.call("threads.lastMessage", { id })).toBeNull();
+});
+
+it("explains an older server's missing turn-change route without exposing an endpoint", async () => {
+  await expect(hosted.threads.call("hosted.review.turn", { threadId: id, turnId: "saved-turn" })).rejects.toThrow("Saved changes aren't available in this cloud thread yet.");
+});
+
+it("explains an older thread detail without publishing facts", async () => {
+  oldDetail = true;
+  await expect(hosted.threads.call("hosted.review.state", { threadId: id })).rejects.toThrow("Publishing isn't available in this cloud thread yet.");
 });

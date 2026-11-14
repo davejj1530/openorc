@@ -22,7 +22,7 @@ export async function lastMessage(threads: Threads, { id }: { id: string }): Pro
   const row = threads.row(id);
   const cached = previews.get(row);
   if (cached?.head === row.head) return cached.message;
-  const page = await threads.on(id).request(ROUTES.events(id, { before: Number.MAX_SAFE_INTEGER }, PAGE_SIZE));
+  const page = await threads.on(id).request(ROUTES.events(id, { before: row.head + 1 }, PAGE_SIZE));
   const message = latestMessage(id, page.events);
   if (!message && page.events.length === PAGE_SIZE) throw new Refused(HOSTED_REASONS.search);
   previews.set(row, { head: row.head, message });

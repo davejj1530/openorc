@@ -1,4 +1,5 @@
 import { Menu } from "@base-ui/react/menu";
+import { CoversPreview } from "../lib/browser-preview";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -38,6 +39,10 @@ it.each([
   ["tasks", "tasks"],
 ] as const)("an already open hosted %s panel shows unavailable without reading local data", async (tool, control) => {
   mount(<PanelContent context={context} page={{ kind: "tool", tool }} onNavigate={() => undefined} />);
+  expect(screen.queryByText(HOSTED_REASONS[control])).toBeNull();
+  const disabled = screen.getByRole("button", { name: /unavailable$/ });
+  expect(disabled.hasAttribute("disabled")).toBe(true);
+  await act(async () => disabled.parentElement?.focus());
   expect(await screen.findByText(HOSTED_REASONS[control])).toBeTruthy();
   expect(vi.mocked(core.call).mock.calls.every(([method]) => method === "hosted.capabilities")).toBe(true);
 });
@@ -66,6 +71,7 @@ it("keeps Fork and New subthread disabled with keyboard-reachable reasons", asyn
   mount(
     <Menu.Root open>
       <Menu.Portal>
+        <CoversPreview />
         <Menu.Positioner>
           <Menu.Popup>
             <ThreadMenuItems thread={cloudReviewThread} parts={Menu} />
@@ -107,6 +113,7 @@ it("keeps cloud relocation and code-copy controls disabled in the place menu", a
   mount(
     <Menu.Root open>
       <Menu.Portal>
+        <CoversPreview />
         <Menu.Positioner>
           <Menu.Popup>
             <ThreadMenuItems thread={cloudReviewThread} parts={Menu} />

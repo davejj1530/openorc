@@ -1,7 +1,8 @@
 import { Tooltip } from "@base-ui/react/tooltip";
+import { CoversPreview } from "../lib/browser-preview";
 import { HOSTED_REASONS } from "@openorc/protocol";
 import { floatingGround } from "../lib/use-anchor-ground";
-import { commandRows, type SuggestionRow } from "./composer-commands";
+import { commandRows, nextPickable, type SuggestionRow } from "./composer-commands";
 import { HostedControlReason } from "./HostedControlReason";
 
 /** Missing context has no numeric value to draw. The existing details control explains its absence. */
@@ -17,7 +18,8 @@ export function HostedUnknownContext() {
 
 export function hostedCommandReason(value: string): string | null {
   const name = /^\/(compact|fork)(?:\s|$)/.exec(value)?.[1];
-  return name === "compact" ? HOSTED_REASONS.compact : name === "fork" ? HOSTED_REASONS.fork : null;
+  if (name === "compact") return HOSTED_REASONS.compact;
+  return name === "fork" ? HOSTED_REASONS.fork : null;
 }
 
 export function blockHostedCommandKey(reason: string | null, value: string, event: KeyboardEvent): boolean {
@@ -49,6 +51,10 @@ export function hostedFileSuggestion(reason: string | null): SuggestionRow[] {
   return reason ? [{ key: "hosted-files", label: "File from the project", group: "Files", unavailable: reason, pick: () => {} }] : [];
 }
 
+export function nextCommandSuggestion(reason: string | null, rows: SuggestionRow[], current: number, direction: 1 | -1): number {
+  return reason && rows.length ? (current + direction + rows.length) % rows.length : nextPickable(rows, current, direction);
+}
+
 /** Arrow-key selection keeps focus in the editor; it still opens the selected disabled row's reason. */
 export function HostedSuggestion({ row, id, active }: { row: SuggestionRow; id: string; active: boolean }) {
   return (
@@ -62,6 +68,7 @@ export function HostedSuggestion({ row, id, active }: { row: SuggestionRow; id: 
           </span>
         </Tooltip.Trigger>
         <Tooltip.Portal>
+          <CoversPreview />
           <Tooltip.Positioner sideOffset={6}>
             <Tooltip.Popup ref={floatingGround} className="tooltip-popup">
               {row.unavailable}

@@ -67,3 +67,21 @@ it("does not show a cached local message result after opening search from a clou
   await screen.findByRole("button", { name: "Search messages" });
   expect(screen.queryByText("A local-only match")).toBeNull();
 });
+
+it("keeps cached message results private while the thread's place is still loading", async () => {
+  useRouter.setState({ route: { view: "thread", threadId: cloudReviewThread.id } });
+  queryClient.setQueryData(
+    ["threads.search", { query: "example", limit: 20 }],
+    [{ threadId: "local", threadTitle: "Local", messageId: "local-message", runId: "local-run", role: "assistant", snippet: "A local-only match", ts: 1, turn: 0 }],
+  );
+  vi.spyOn(core, "call").mockImplementation((async (method: string) => (method === "threads.get" ? new Promise(() => {}) : [])) as typeof core.call);
+  render(
+    <QueryClientProvider client={queryClient}>
+      <CommandPalette open onOpenChange={() => {}} />
+    </QueryClientProvider>,
+  );
+  fireEvent.change(screen.getByRole("combobox"), { target: { value: "example" } });
+  await act(async () => {});
+  expect(screen.queryByText("A local-only match")).toBeNull();
+  expect(vi.mocked(core.call).mock.calls.some(([method]) => method === "threads.search")).toBe(false);
+});

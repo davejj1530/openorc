@@ -20,7 +20,7 @@ export function PanelNewTab({ context, onTool, onNavigate, recentUrls }: { conte
             if (reason)
               return (
                 <HostedControlReason key={tool} label={label} reason={reason}>
-                  <button className="panel-tool-shortcut w-full" disabled>
+                  <button className="panel-tool-shortcut w-full disabled:text-ink-4" disabled>
                     <Icon size={15} />
                     <span>{label}</span>
                   </button>

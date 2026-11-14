@@ -3,6 +3,8 @@ import { FileChange } from "./domain.js";
 
 /** Hosted controls use these reasons only when their operation is unavailable. */
 export const HOSTED_REASONS = {
+  changes: "Saved changes aren't available in this cloud thread yet.",
+  publishing: "Publishing isn't available in this cloud thread yet.",
   toolOutput: "The full tool output isn't available for this cloud thread.",
   plans: "Saved plans aren't available in this cloud thread yet.",
   compact: "Manual compaction isn't available for this cloud thread yet.",

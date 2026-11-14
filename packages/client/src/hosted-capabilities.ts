@@ -17,6 +17,8 @@ export function hostedControlReason(thread: Pick<ThreadSummary, "owner"> | null 
 }
 
 const panelControls: Partial<Record<PanelTool, HostedControl>> = {
+  changes: "changes",
+  commits: "publishing",
   file: "fileBrowser",
   plan: "plans",
   tasks: "tasks",

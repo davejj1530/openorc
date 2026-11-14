@@ -1,7 +1,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { HostedReviewReply, RpcMethod, RpcParams, RpcResults } from "@openorc/protocol";
+import { HOSTED_REASONS, type HostedReviewReply, type RpcMethod, type RpcParams, type RpcResults } from "@openorc/protocol";
 import { ChangesPanel } from "../panels/ChangesPanel";
 import { PanelContent } from "./PanelContent";
 import { HostedTurnChangeCard } from "./HostedTurnChangeCard";
@@ -228,4 +228,25 @@ it.each([
   fireEvent.click(screen.getByRole("button", { name: "Start" }));
   await screen.findByText("Settled");
   expect(screen.queryByText("done")).toBeNull();
+});
+
+it("shows a missing turn route as a disabled control whose reason is on demand", async () => {
+  reads.set("hosted.review.turn", new Error(HOSTED_REASONS.changes));
+  mount(<HostedTurnChangeCard threadId={cloudReviewThread.id} turnId="turn-1" />);
+  const button = await screen.findByRole("button", { name: "Review changes" });
+  expect(button.hasAttribute("disabled")).toBe(true);
+  expect(screen.queryByText(HOSTED_REASONS.changes)).toBeNull();
+  expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+  await act(async () => button.parentElement?.focus());
+  expect(await screen.findByText(HOSTED_REASONS.changes)).toBeTruthy();
+});
+
+it("keeps an older server's open Commits panel unavailable without an error or empty log", async () => {
+  reads.set("hosted.review.state", new Error(HOSTED_REASONS.publishing));
+  mount(commits());
+  const button = await screen.findByRole("button", { name: "Commits unavailable" });
+  expect(button.hasAttribute("disabled")).toBe(true);
+  expect(screen.queryByRole("alert")).toBeNull();
+  await act(async () => button.parentElement?.focus());
+  expect(await screen.findByText(HOSTED_REASONS.publishing)).toBeTruthy();
 });

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createHosted, type Hosted } from "./index.js";
 import { hostDeps, newDevice, signInAs } from "./test-fixtures/host.js";
 import { standIn, type StandIn } from "./testing/stand-in.js";
+import { wireThreadDetail } from "./wire.js";
 
 let stand: StandIn;
 let hosted: Hosted;
@@ -10,11 +11,15 @@ let response: unknown;
 let status: number;
 let changesStatus: number;
 let paths: string[];
+let detailStatus: number;
+let publishing: boolean;
 beforeEach(async () => {
   stand = await standIn({ signup: "open" });
   threadId = stand.addThread("reader@example.com", { title: "Example", projectId: null });
   status = 200;
   changesStatus = 200;
+  detailStatus = 200;
+  publishing = true;
   response = { version: 1, features: { changes: { available: true }, terminal: { available: false, reason: "A terminal isn't available in this cloud thread yet." }, future: { available: true } } };
   paths = [];
   const { deps, browser } = hostDeps(stand, newDevice(), {
@@ -30,7 +35,10 @@ beforeEach(async () => {
         return Response.json(changesStatus === 200 ? { state: "none", line: "No turn has ended yet." } : { message: "That thread is unavailable." }, { status: changesStatus });
       }
       if (url.pathname === `/hosted/threads/${threadId}` && status === 404) {
-        return Response.json({ branch: "example", baseBranch: "main", work: { uncommitted: null, unpushed: null, published: false }, actions: [], pullRequest: null });
+        if (detailStatus !== 200) return Response.json({ message: "This project is unavailable." }, { status: detailStatus });
+        const detail = wireThreadDetail.parse(await (await fetch(input, init)).json());
+        if (!publishing) return Response.json(detail);
+        return Response.json({ ...detail, branch: "example", baseBranch: "main", work: { uncommitted: null, unpushed: null, published: false }, actions: [], pullRequest: null });
       }
       return fetch(input, init);
     },
@@ -68,5 +76,26 @@ it("preserves failure and denied-access responses instead of treating them as ol
   status = 503;
   response = { message: "Capabilities could not be read." };
   await expect(hosted.threads.call("hosted.capabilities", { threadId })).rejects.toThrow("Capabilities could not be read.");
+  expect(paths).toEqual(["/hosted/capabilities"]);
+});
+
+it("keeps unavailable review controls quiet on a readable older server", async () => {
+  status = 404;
+  response = { message: "Not found" };
+  changesStatus = 404;
+  publishing = false;
+  expect(await hosted.threads.call("hosted.capabilities", { threadId })).toEqual({
+    version: 1,
+    features: {
+      publishing: { available: false, reason: "Publishing isn't available in this cloud thread yet." },
+      changes: { available: false, reason: "Saved changes aren't available in this cloud thread yet." },
+    },
+  });
+});
+it("does not mistake a denied thread for an older server's missing route", async () => {
+  status = 404;
+  response = { message: "Not found" };
+  detailStatus = 403;
+  await expect(hosted.threads.call("hosted.capabilities", { threadId })).rejects.toThrow("This project is unavailable.");
   expect(paths).toEqual(["/hosted/capabilities"]);
 });

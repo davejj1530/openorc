@@ -11,7 +11,7 @@ export function useHostedPaletteSearch(open: boolean, query: string) {
   const organization = useOrganization();
   const hosted = thread.data?.owner?.brain === "hosted" || Boolean(organization?.organization);
   const ready = !threadId || thread.isSuccess;
-  return { reason: hosted ? HOSTED_REASONS.search : null, enabled: open && ready && !hosted && query.trim().length >= 2 };
+  return { reason: hosted ? HOSTED_REASONS.search : null, messagesAvailable: ready && !hosted, enabled: open && ready && !hosted && query.trim().length >= 2 };
 }
 
 export function HostedPaletteUnavailable({ label, reason }: { label: string; reason: string }) {

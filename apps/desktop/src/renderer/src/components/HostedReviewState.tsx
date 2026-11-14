@@ -1,8 +1,10 @@
-import type { HostedThreadChanges, HostedTurnChanges } from "@openorc/protocol";
+import { HOSTED_REASONS, type HostedThreadChanges, type HostedTurnChanges } from "@openorc/protocol";
+import { HostedUnavailableContent } from "./HostedUnavailablePanel";
 import { Button, Empty } from "./ui";
 
 /** Only an actual empty recorded checkpoint is an empty diff. */
 export function HostedReviewState({ changes, error, retry }: { changes?: HostedThreadChanges | HostedTurnChanges; error: Error | null; retry: () => void }) {
+  if (error?.message === HOSTED_REASONS.changes) return <HostedUnavailableContent title="Changes" control="changes" />;
   if (error)
     return (
       <Empty title="Could not read changes">

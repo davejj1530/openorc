@@ -3,10 +3,19 @@ import { useLayout } from "../lib/layout";
 import { ChangeCard } from "./ChangeCard";
 import { Button } from "./ui";
 import { HostedControlReason } from "./HostedControlReason";
+import { HOSTED_REASONS } from "@openorc/protocol";
 
 export function HostedTurnChangeCard({ threadId, turnId }: { threadId: string; turnId: string }) {
   const read = useRpc("hosted.review.turn", { threadId, turnId });
   const changes = read.data;
+  if (read.error?.message === HOSTED_REASONS.changes)
+    return (
+      <HostedControlReason label="Review changes" reason={read.error.message}>
+        <Button size="sm" variant="ghost" disabled>
+          Review changes
+        </Button>
+      </HostedControlReason>
+    );
   if (read.error)
     return (
       <p role="alert" className="change-error text-bad">

@@ -1,8 +1,9 @@
 import { useEffect } from "react";
-import type { ThreadSummary } from "@openorc/protocol";
+import { HOSTED_REASONS, type ThreadSummary } from "@openorc/protocol";
 import { Button, Empty } from "../components/ui";
 import { useRpc } from "../lib/client";
 import { HostedPublish } from "./HostedPublish";
+import { HostedUnavailablePanel } from "../components/HostedUnavailablePanel";
 
 export function HostedCommitsPanel({ thread }: { thread: ThreadSummary }) {
   const read = useRpc("hosted.review.state", { threadId: thread.id });
@@ -11,6 +12,7 @@ export function HostedCommitsPanel({ thread }: { thread: ThreadSummary }) {
     window.addEventListener("focus", refresh);
     return () => window.removeEventListener("focus", refresh);
   });
+  if (read.error?.message === HOSTED_REASONS.publishing) return <HostedUnavailablePanel title="Commits" control="publishing" />;
   return (
     <section className="h-full flex flex-col min-h-0">
       <HostedPublish thread={thread} state={read.error ? undefined : read.data} stateError={read.error} surface="commits" heading="Commits" />

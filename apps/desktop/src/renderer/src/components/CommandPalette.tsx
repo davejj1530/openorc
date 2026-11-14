@@ -80,7 +80,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
             )}
             {mode === "all" ? <PlaceGroups typed={typed} go={go} /> : null}
             {mode === "all" && typed ? <TeamChatPalette onOpened={() => onOpenChange(false)} /> : null}
-            <MessageHits hits={search.reason ? [] : (hits.data ?? [])} go={go} />
+            <MessageHits hits={search.messagesAvailable ? (hits.data ?? []) : []} go={go} />
             {mode === "all" && typed ? <ProjectGroup go={go} /> : null}
             {mode === "messages" ? null : (
               <Command.Group heading="Actions" className="command-palette-group">

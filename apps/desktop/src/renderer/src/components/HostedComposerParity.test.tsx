@@ -118,3 +118,22 @@ it("does not execute or send a disabled cloud slash command", async () => {
   expect(compact).not.toHaveBeenCalled();
   expect(submit).not.toHaveBeenCalled();
 });
+
+it("lets the keyboard reach each unavailable cloud command's reason", async () => {
+  mount(<Draft />);
+  const field = screen.getByRole("textbox", { name: "Message" });
+  type(field, "/", 1);
+  press(field, { key: "ArrowDown" });
+  expect(await screen.findByText(HOSTED_REASONS.fork)).toBeTruthy();
+  press(field, { key: "ArrowUp" });
+  expect(await screen.findByText(HOSTED_REASONS.compact)).toBeTruthy();
+  expect(messageOf(field)).toBe("/");
+});
+it("keeps unknown context unnumbered and explains it on focus", async () => {
+  mount(<Draft />);
+  const context = screen.getByRole("button", { name: "Context" });
+  expect(context.hasAttribute("disabled")).toBe(true);
+  expect(screen.queryByText("0%")).toBeNull();
+  await act(async () => context.parentElement?.focus());
+  expect(await screen.findByText(HOSTED_REASONS.usage)).toBeTruthy();
+});

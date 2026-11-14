@@ -29,6 +29,9 @@ export const wireBilling = z.object({
 });
 export type WireBilling = z.infer<typeof wireBilling>;
 
+/** A page of Polar's the server made for the person: a checkout, or their billing portal. Only the browser is given it. */
+export const wireBillingLink = z.object({ url: z.url() });
+
 /**
  * Who the session is for. Better Auth answers null for a session it no longer holds. The server never takes a picture
  * from an app, so `image` is whatever it was given elsewhere.
@@ -173,6 +176,12 @@ export const ROUTES = {
   signIn: route("POST", "/api/auth/sign-in/email-otp", null),
   signOut: route("POST", "/api/auth/sign-out", null),
   billing: route("GET", "/billing", wireBilling),
+  /** A checkout for the person's own Pro, by the period they pay for; 409 in words when they already pay for it. */
+  checkoutPro: route("POST", "/billing/checkout/pro", wireBillingLink),
+  /** A checkout for an hours pack; 409 in words for a person who is not Pro. */
+  checkoutHours: route("POST", "/billing/checkout/hours", wireBillingLink),
+  /** Polar's portal, where the person changes or cancels what they pay for; 404 in words when they never bought anything. */
+  portal: route("POST", "/billing/portal", wireBillingLink),
   person: route("GET", "/api/auth/get-session", wirePerson),
   hostedSettings: route("GET", "/settings/hosted", wireHostedSettings),
   setHostedSettings: route("PATCH", "/settings/hosted", wireHostedSettings),

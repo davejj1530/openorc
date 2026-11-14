@@ -1,7 +1,7 @@
-import { cloudTime, hoursDetail, planDate } from "@openorc/client";
-import type { AccountStatus } from "@openorc/protocol";
-import { useState, type KeyboardEvent } from "react";
-import { Button, Input, TextButton } from "../components/ui";
+import { billingMoves, cloudTime, hoursDetail, planDate, type BillingMove } from "@openorc/client";
+import { payBlock, PRO_PERIODS, sendBlockWords, type AccountStatus, type BillingPage, type ProPeriod } from "@openorc/protocol";
+import { useEffect, useState, type KeyboardEvent } from "react";
+import { Button, Input, Segmented, TextButton, Tooltip } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { Failure } from "./settings-secret-field";
 import { LoadError, Section, SettingRow, Status } from "./settings-shared";
@@ -14,7 +14,7 @@ export function AccountSettings({ active }: { active: boolean }) {
   const status = useRpc("account.status", {}, { enabled: active });
   if (status.isError) return <LoadError retry={() => void status.refetch()} />;
   if (!status.data) return null;
-  return status.data.state === "signed-in" ? <SignedInAccount account={status.data} /> : <SignIn status={status.data} />;
+  return status.data.state === "signed-in" ? <SignedInAccount account={status.data} active={active} /> : <SignIn status={status.data} />;
 }
 
 /**
@@ -78,9 +78,10 @@ function SignIn({ status }: { status: SignedOut }) {
   );
 }
 
-/** Who is signed in, their plan, their cloud hours, and whether OpenOrc Cloud answers now, with Sign out beside the name. */
-function SignedInAccount({ account }: { account: SignedIn }) {
+/** Who is signed in, what they have and the ways to pay, and whether OpenOrc Cloud answers now, with Sign out beside the name. */
+function SignedInAccount({ account, active }: { account: SignedIn; active: boolean }) {
   const signOut = useRpcMutation("account.signOut");
+  const open = useRpcMutation("account.billing.open");
   const live = account.reach === "live";
   return (
     <Section
@@ -92,18 +93,67 @@ function SignedInAccount({ account }: { account: SignedIn }) {
         </Button>
       }
     >
-      <SettingRow label="Plan" hint={planDate(account.plan) ?? undefined}>
-        <Status ok={account.plan.pro}>{account.plan.pro ? "Pro" : "Free"}</Status>
-      </SettingRow>
-      {account.hours ? (
-        <SettingRow label="Cloud hours" hint={hoursDetail(account.hours) || undefined}>
-          <span className="tabular">{cloudTime(account.hours.leftSeconds)} left</span>
-        </SettingRow>
-      ) : null}
+      <PlanRows account={account} active={active} opening={open.isPending} onOpen={(page) => open.mutate(page)} />
       <SettingRow label="OpenOrc Cloud">
         <Status ok={live}>{live ? "Connected" : "Can't be reached"}</Status>
       </SettingRow>
-      <Failure error={signOut.error ?? (account.error ? new Error(account.error) : null)} />
+      <Failure error={open.error ?? signOut.error ?? (account.error ? new Error(account.error) : null)} />
     </Section>
   );
+}
+
+/**
+ * The plan and the hours, each row ending in its way to pay. The one that fixes what the account lacks is the column's
+ * ink pill, so a person sent here to upgrade, buy hours or fix a payment lands on that move. A page opened to pay is
+ * watched by the core until its purchase lands or the person leaves this screen.
+ */
+function PlanRows({ account, active, opening, onOpen }: { account: SignedIn; active: boolean; opening: boolean; onOpen: (page: BillingPage) => void }) {
+  const [period, setPeriod] = useState<ProPeriod>("monthly");
+  useLeaveBilling(active && account.paying !== null);
+  const moves = billingMoves(account);
+  const waiting = (page: BillingPage["page"]) => (account.paying?.page === page && page !== "billing" ? "Waiting for your payment" : null);
+  const move = (each: BillingMove, page: BillingPage) => <BillingButton move={each} pending={opening} onClick={() => onOpen(page)} />;
+  return (
+    <>
+      <SettingRow label="Plan" hint={waiting("pro") ?? planHint(account)}>
+        <Status ok={account.plan.pro && account.plan.standing !== "grace"}>{account.plan.pro ? "Pro" : "Free"}</Status>
+        {moves.plan.page === "pro" ? <Segmented size="sm" label="Pay" value={period} options={PERIODS} onChange={setPeriod} /> : null}
+        {move(moves.plan, moves.plan.page === "pro" ? { page: "pro", period } : { page: "billing" })}
+      </SettingRow>
+      {account.hours ? (
+        <SettingRow label="Cloud hours" hint={waiting("hours") ?? (hoursDetail(account.hours) || undefined)}>
+          <span className="tabular">{cloudTime(account.hours.leftSeconds)} left</span>
+          {moves.hours ? move(moves.hours, { page: "hours" }) : null}
+        </SettingRow>
+      ) : null}
+    </>
+  );
+}
+
+/** When Pro renews or ends, or, for a month not paid for, that the payment has not gone through. */
+function planHint(account: SignedIn): string | undefined {
+  const unpaid = account.plan.pro && account.plan.standing === "live" && payBlock(account) === "awaiting_payment";
+  return (unpaid ? sendBlockWords("awaiting_payment", "") : planDate(account.plan)) ?? undefined;
+}
+
+const PERIOD_NAMES: Record<ProPeriod, string> = { monthly: "Monthly", yearly: "Yearly" };
+const PERIODS = PRO_PERIODS.map((value) => ({ value, label: PERIOD_NAMES[value] }));
+
+/** A way to pay; one that cannot be made now is disabled and says why on demand. */
+function BillingButton({ move, pending, onClick }: { move: BillingMove; pending: boolean; onClick: () => void }) {
+  const button = (
+    <Button size="sm" variant={move.primary ? "primary" : "secondary"} disabled={pending || move.blocked !== null} onClick={onClick}>
+      {move.label}
+    </Button>
+  );
+  return move.blocked ? <Tooltip label={move.blocked}>{button}</Tooltip> : button;
+}
+
+/** While a page opened to pay is watched, leaving this screen (another section, or out of Settings) stops the watch. */
+function useLeaveBilling(watching: boolean) {
+  const { mutate } = useRpcMutation("account.billing.leave");
+  useEffect(() => {
+    if (!watching) return;
+    return () => mutate({});
+  }, [watching, mutate]);
 }

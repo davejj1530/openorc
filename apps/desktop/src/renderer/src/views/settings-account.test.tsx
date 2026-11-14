@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import type { AccountStatus } from "@openorc/protocol";
+import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { AccountSettings } from "./settings-account";
 import { OpenOrcCloudSection } from "./settings-cloud-openorc";
@@ -8,6 +9,10 @@ import { queryClient } from "../lib/client";
 import { core } from "../lib/rpc";
 
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
+vi.mock("../components/ui", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../components/ui")>()),
+  Tooltip: ({ label, children }: { label: string; children: ReactNode }) => <span data-tooltip={label}>{children}</span>,
+}));
 afterEach(() => {
   cleanup();
   queryClient.clear();
@@ -16,7 +21,7 @@ afterEach(() => {
 
 const ADA = "ada@example.com";
 const signedOut: Extract<AccountStatus, { state: "signed-out" }> = { state: "signed-out", codeSentTo: null, ended: false, error: null };
-const pro: AccountStatus = {
+const pro: Extract<AccountStatus, { state: "signed-in" }> = {
   state: "signed-in",
   email: ADA,
   name: "Ada Lovelace",
@@ -36,6 +41,7 @@ const pro: AccountStatus = {
   signingIn: {},
   github: null,
   connectingGithub: null,
+  paying: null,
   projects: [],
   error: null,
 };
@@ -53,6 +59,8 @@ function fakeCore(start: AccountStatus, signedIn: AccountStatus = pro) {
     }
     if (method === "account.signOut") status = signedOut;
     if (method === "account.setSandbox" && status.state === "signed-in") status = { ...status, sandbox: { ...status.sandbox!, chosen: p.service! } };
+    if (method === "account.billing.open" && status.state === "signed-in") status = { ...status, paying: { page: (params as { page: "pro" }).page, since: 0 } };
+    if (method === "account.billing.leave" && status.state === "signed-in") status = { ...status, paying: null };
     return status;
   });
 }
@@ -137,4 +145,66 @@ it("offers no choice to a Free person or where the server runs threads in one pl
   show(<OpenOrcCloudSection active />);
   await waitFor(() => expect(core.call).toHaveBeenCalled());
   expect(screen.queryByRole("combobox")).toBeNull();
+});
+
+const free: AccountStatus = { ...pro, plan: { pro: false }, hours: null };
+const ink = (name: string) => screen.getByRole("button", { name }).className.includes("ink-pill");
+
+it("lets a free person upgrade, monthly or yearly, as the one ink move, and opens the checkout through the core", async () => {
+  fakeCore(free);
+  show(<AccountSettings active />);
+  fireEvent.click(await screen.findByRole("radio", { name: "Yearly" }));
+  expect(ink("Upgrade")).toBe(true);
+  expect(screen.queryByRole("button", { name: "Buy more hours" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Upgrade" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("account.billing.open", { page: "pro", period: "yearly" }));
+  expect(await screen.findByText("Waiting for your payment")).toBeTruthy();
+});
+
+it.each([
+  { name: "out of hours", account: { ...pro, hours: { ...pro.hours!, leftSeconds: 0 } }, move: "Buy more hours", page: { page: "hours" } },
+  {
+    name: "with a payment that failed",
+    account: { ...pro, plan: { pro: true as const, standing: "grace" as const, at: Date.parse("2026-11-15T12:00:00Z") }, hours: { leftSeconds: 0, monthly: null, packsLeftSeconds: 0 } },
+    move: "Update payment",
+    page: { page: "billing" },
+  },
+])("puts the one move a Pro person $name needs in ink", async ({ account, move, page }) => {
+  fakeCore(account);
+  show(<AccountSettings active />);
+  fireEvent.click(await screen.findByRole("button", { name: move }));
+  expect(
+    screen
+      .getAllByRole("button")
+      .filter((button) => button.className.includes("ink-pill"))
+      .map((button) => button.textContent),
+  ).toEqual([move]);
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("account.billing.open", page));
+});
+
+it("disables every move while OpenOrc Cloud can't be reached, saying why only on demand", async () => {
+  fakeCore({ ...pro, reach: "offline" });
+  show(<AccountSettings active />);
+  for (const name of ["Manage billing", "Buy more hours"]) {
+    const button = await screen.findByRole<HTMLButtonElement>("button", { name });
+    expect([button.disabled, button.closest("[data-tooltip]")?.getAttribute("data-tooltip")]).toEqual([true, "OpenOrc Cloud can't be reached."]);
+  }
+  expect(screen.queryByText("OpenOrc Cloud can't be reached.")).toBeNull();
+});
+
+it("stops watching for the purchase once the person leaves the screen, and not before", async () => {
+  fakeCore({ ...free, paying: { page: "pro", since: 0 } });
+  const { rerender } = render(
+    <QueryClientProvider client={queryClient}>
+      <AccountSettings active />
+    </QueryClientProvider>,
+  );
+  expect(await screen.findByText("Waiting for your payment")).toBeTruthy();
+  expect(core.call).not.toHaveBeenCalledWith("account.billing.leave", {});
+  rerender(
+    <QueryClientProvider client={queryClient}>
+      <AccountSettings active={false} />
+    </QueryClientProvider>,
+  );
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("account.billing.leave", {}));
 });

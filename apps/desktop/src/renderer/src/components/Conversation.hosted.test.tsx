@@ -71,6 +71,7 @@ const pro: AccountStatus = {
   signingIn: {},
   github: null,
   connectingGithub: null,
+  paying: null,
   projects: [],
   error: null,
 };

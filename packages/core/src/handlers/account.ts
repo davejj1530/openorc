@@ -23,6 +23,8 @@ export function createAccountHandlers(
   | "account.github.cancel"
   | "account.github.disconnect"
   | "account.projects.add"
+  | "account.billing.open"
+  | "account.billing.leave"
 > {
   const after = async (work: (account: HostedAccount) => Promise<void>): Promise<AccountStatus> => {
     if (!account) throw new Error(UNAVAILABLE);
@@ -42,5 +44,7 @@ export function createAccountHandlers(
     "account.github.cancel": () => after(async (a) => a.cancelGithub()),
     "account.github.disconnect": () => after((a) => a.disconnectGithub()),
     "account.projects.add": ({ projectId }) => after((a) => a.addProject(projectId)),
+    "account.billing.open": (page) => after((a) => a.openBilling(page)),
+    "account.billing.leave": () => after(async (a) => a.leaveBilling()),
   };
 }

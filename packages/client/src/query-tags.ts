@@ -202,6 +202,8 @@ const fixedInvalidations: Partial<Record<RpcMethod, readonly string[]>> = {
   "account.github.cancel": ["account"],
   "account.github.disconnect": ["account"],
   "account.projects.add": ["account", "threads"],
+  "account.billing.open": ["account"],
+  "account.billing.leave": ["account"],
   "devices.setup": ["devices"],
   "worktrees.remove": ["worktrees", "threads", "tasks", "workspace-diff"],
   "devices.settings.set": ["devices"],

@@ -8,7 +8,7 @@
  * No Node, Electron or React Native import outside testing/. Each host hands in what only it has (`HostedDeps`), so a
  * phone can mount the same package with its own storage.
  */
-import type { AccountStatus, Frame, HostedAgent, OwnerReach, Project, RoutedMethod, RpcParams, RpcResults, ThreadSummary } from "@openorc/protocol";
+import type { AccountStatus, BillingPage, Frame, HostedAgent, OwnerReach, Project, RoutedMethod, RpcParams, RpcResults, ThreadSummary } from "@openorc/protocol";
 import { Account } from "./account.js";
 import { Follower } from "./follow.js";
 import type { HostedNotice } from "./notices.js";
@@ -55,7 +55,7 @@ export interface HostedDeps {
    */
   mintClaudeToken?(claudeAccountId: string | undefined): { token: Promise<string>; cancel(): void };
   /**
-   * The person's browser, for GitHub's pages: waits on this device's loopback for one return to `path` (its query, or a
+   * The person's browser, for GitHub's and Polar's pages: waits on this device's loopback for one return to `path` (its query, or a
    * rejection on timeout or `close`), and opens a page. Absent where the device has neither.
    */
   browser?: {
@@ -88,6 +88,10 @@ export interface HostedAccount {
   disconnectGithub(): Promise<void>;
   /** Adds a Mac project's GitHub repository to the person's space as a cloud project. Rejects in words when GitHub doesn't let OpenOrc read it. */
   addProject(projectId: string): Promise<void>;
+  /** Opens a checkout or the billing portal in the browser; what it was for shows in `status()` once the server has it. */
+  openBilling(page: BillingPage): Promise<void>;
+  /** Stops watching for a purchase more often than the server's word; `status().paying` ends. */
+  leaveBilling(): void;
 }
 
 export type KeptPart = "account" | "threads";
@@ -149,6 +153,7 @@ export function createHosted(deps: HostedDeps): Hosted {
     },
     awoke: () => session.awoke(),
     close: () => {
+      account.close();
       threads.close();
       session.close();
     },

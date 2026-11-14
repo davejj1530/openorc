@@ -142,7 +142,11 @@ it.each([
 
 it("names each paying block's move in the account as the card names its way there", () => {
   const card = (account: typeof pro) => threadSendBlock(hosted(), account, claude)?.action?.label;
-  for (const account of [{ ...pro, plan: { pro: false as const }, hours: null }, { ...pro, hours: { ...pro.hours!, leftSeconds: 0 } }, { ...pro, hours: { leftSeconds: 0, monthly: null, packsLeftSeconds: 0 } }]) {
+  for (const account of [
+    { ...pro, plan: { pro: false as const }, hours: null },
+    { ...pro, hours: { ...pro.hours!, leftSeconds: 0 } },
+    { ...pro, hours: { leftSeconds: 0, monthly: null, packsLeftSeconds: 0 } },
+  ]) {
     const moves = billingMoves(account);
     expect([moves.plan, moves.hours].find((move) => move?.primary)?.label).toBe(card(account));
   }

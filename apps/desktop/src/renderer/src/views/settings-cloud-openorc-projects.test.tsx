@@ -21,6 +21,7 @@ const account: SignedIn = {
   signingIn: {},
   github: { configured: true, login: null, installedOn: [], repositories: [] },
   connectingGithub: null,
+  paying: null,
   projects: [],
   error: null,
 };

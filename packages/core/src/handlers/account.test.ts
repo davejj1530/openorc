@@ -13,6 +13,7 @@ const EMAIL = "ada@example.com";
 let stand: StandIn;
 let folder: string;
 let stored: string | null;
+let pushed: unknown[] = [];
 let core: OpenOrc | null = null;
 const call = rpcClient(() => core!);
 
@@ -26,6 +27,7 @@ beforeEach(async () => {
   stand = await standIn({ signup: "open" });
   folder = await mkdtemp(path.join(tmpdir(), "openorc-account-"));
   stored = null;
+  pushed = [];
 });
 
 afterEach(async () => {
@@ -35,8 +37,8 @@ afterEach(async () => {
   await rm(folder, { recursive: true, force: true });
 });
 
-async function open(options: { accountServer?: string } = { accountServer: stand.url }) {
-  core = await OpenOrc.create({ dataDir: path.join(folder, "data"), ephemeral: true, transport: { push() {} }, accountSecrets, ...options });
+async function open(options: { accountServer?: string; openBrowser?: (url: string) => void } = { accountServer: stand.url }) {
+  core = await OpenOrc.create({ dataDir: path.join(folder, "data"), ephemeral: true, transport: { push: (push) => void pushed.push(push) }, accountSecrets, ...options });
   return core;
 }
 
@@ -98,5 +100,21 @@ describe("agent sign-ins on OpenOrc Cloud through the core", () => {
     const status = await call("account.signIns.connect", { way: "key", agent: "opencode", provider: "openrouter", key: "sk-or-good" });
     expect(status).toMatchObject({ state: "signed-in", signIns: [{ agent: "opencode", provider: "openrouter" }], signingIn: {} });
     expect(JSON.stringify(status)).not.toContain("sk-or-good");
+  });
+});
+
+describe("paying through the core", () => {
+  it("opens a checkout in the browser, never in a window, and answers Pro once the server says it was paid", async () => {
+    const browser: string[] = [];
+    await open({ accountServer: stand.url, openBrowser: (url) => void browser.push(url) });
+    await signIn();
+    expect(await call("account.billing.open", { page: "pro", period: "monthly" })).toMatchObject({ state: "signed-in", plan: { pro: false }, paying: { page: "pro" } });
+    expect(browser).toEqual([stand.checkouts[0]!.url]);
+    stand.pay(EMAIL);
+    await vi.waitFor(async () => expect(await call("account.status", {})).toMatchObject({ plan: { pro: true }, paying: null }), { timeout: 5_000 });
+    expect(JSON.stringify(pushed)).not.toContain(stand.checkouts[0]!.url);
+    await expect(call("account.billing.open", { page: "pro", period: "yearly" })).rejects.toThrow("You already pay for Pro. Change your plan in billing.");
+    expect(await call("account.billing.open", { page: "billing" })).toMatchObject({ paying: { page: "billing" } });
+    expect(await call("account.billing.leave", {})).toMatchObject({ paying: null });
   });
 });

@@ -39,6 +39,7 @@ it("shows the signed-in person with their plan and cloud hours, and opens Settin
     signingIn: {},
     github: null,
     connectingGithub: null,
+    paying: null,
     projects: [],
     error: null,
   });

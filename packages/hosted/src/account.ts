@@ -11,12 +11,13 @@
  *
  * `status()` is computed from these and the session each time it is asked. Nothing stores an AccountStatus.
  */
-import { openCodeProvider, type AccountProject, type AccountStatus, type HostedAgent, type HostedRefusal, type RpcParams } from "@openorc/protocol";
+import { openCodeProvider, type AccountProject, type BillingPage, type AccountStatus, type HostedAgent, type HostedRefusal, type RpcParams } from "@openorc/protocol";
 import { z } from "zod";
 import type { HostedAccount, HostedDeps } from "./index.js";
 import { OutOfReach, Refused, type Session, type SessionChange } from "./session.js";
 import { githubRepoOf, signInKey, toImage, toPlan, toSandbox, toSignIns } from "./translate.js";
 import { GithubConnect } from "./github.js";
+import { Paying } from "./paying.js";
 import { SignIns } from "./signins.js";
 import { ROUTES, SOCKET, wireBilling, wireGithubRepository, wireHostedSettings, wireSignIn, wireTopics } from "./wire.js";
 
@@ -48,10 +49,19 @@ export class Account implements HostedAccount {
   #announced = "";
   readonly #signIns: SignIns;
   readonly #github: GithubConnect;
+  readonly #paying: Paying;
 
   constructor(private readonly deps: AccountDeps) {
     this.#signIns = new SignIns({ session: deps.session, mintClaudeToken: deps.mintClaudeToken, now: deps.now, changed: () => this.#announce(), landed: () => this.#refresh() });
     this.#github = new GithubConnect({ session: deps.session, browser: deps.browser, changed: () => this.#announce(), landed: () => this.#landed() });
+    this.#paying = new Paying({
+      session: deps.session,
+      browser: deps.browser,
+      now: deps.now,
+      billing: () => this.#heard?.billing ?? null,
+      reread: () => this.#readBilling(),
+      changed: () => this.#announce(),
+    });
     deps.session.onChange((change) => this.#changed(change));
     // The person's own topics: what they pay for, their sign-ins and their GitHub, changed elsewhere.
     deps.session.onSocket(SOCKET.changed, (body) => {
@@ -95,6 +105,7 @@ export class Account implements HostedAccount {
       github: heard?.github ? { ...heard.github, repositories: heard.github.repositories.map((repository) => repository.fullName) } : null,
       connectingGithub: this.#github.work,
       projects: this.#projects(heard?.github?.repositories ?? []),
+      paying: this.#paying.work,
       error: this.#error,
     };
   }
@@ -178,6 +189,19 @@ export class Account implements HostedAccount {
     this.#announce();
   }
 
+  openBilling(page: BillingPage): Promise<void> {
+    return this.#paying.open(page);
+  }
+
+  leaveBilling(): void {
+    this.#paying.leave();
+  }
+
+  /** The host is closing: nothing is watched any more. */
+  close(): void {
+    this.#paying.forget();
+  }
+
   /** A GitHub trip settled: its part and the projects are read again. */
   async #landed(): Promise<void> {
     await Promise.all([this.#refresh(), this.deps.cloud.reread()]);
@@ -203,6 +227,7 @@ export class Account implements HostedAccount {
       // Before the session's own storage is cleared and before the server hears of it.
       this.#signIns.forget();
       this.#github.forget();
+      this.#paying.forget();
       this.#heard = null;
       this.#error = null;
       this.deps.kept.save("account", null);
@@ -237,6 +262,14 @@ export class Account implements HostedAccount {
     });
   }
 
+  /** Reads billing alone, as a page opened to pay is watched. A failed read keeps what was heard. */
+  async #readBilling(): Promise<void> {
+    const email = this.#signedInAs();
+    if (!email) return;
+    const billing = await this.deps.session.request(ROUTES.billing).catch(() => null);
+    if (billing && this.#signedInAs() === email) this.#hear(email, { billing });
+  }
+
   /**
    * The person's GitHub for their space: the app's installations and the account they linked, and the repositories
    * those let OpenOrc read. What only an admin of the space may read reads as none for anyone else.
@@ -259,6 +292,7 @@ export class Account implements HostedAccount {
   #hear(email: string, parts: Partial<Omit<Heard, "email">>): void {
     const before = this.#heard?.email === email ? this.#heard : { email, billing: null, person: null, sandbox: null, signIns: null, ended: [], github: null };
     this.#heard = { ...before, ...parts };
+    if (parts.billing) this.#paying.heard(parts.billing);
     if (Object.keys(parts).length) this.deps.kept.save("account", JSON.stringify(this.#heard));
     this.#announce();
   }

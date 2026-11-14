@@ -1,8 +1,21 @@
-import { harnessCatalog, harnessShortName, HOSTED_AGENTS, hostedSendBlock, isHostedAgent, placeOf, sendBlockWords, type AccountStatus, type SendBlockWhy, type ThreadSummary } from "@openorc/protocol";
+import {
+  harnessCatalog,
+  harnessShortName,
+  HOSTED_AGENTS,
+  hostedSendBlock,
+  isHostedAgent,
+  payBlock,
+  placeOf,
+  sendBlockWords,
+  type AccountStatus,
+  type BillingPage,
+  type SendBlockWhy,
+  type ThreadSummary,
+} from "@openorc/protocol";
 
 /**
- * Where the card above a cloud thread's composer leads: the Settings section that holds what is missing. Paying opens
- * nothing yet, so its three lead to the account, where the plan, its date and the hours left are.
+ * Where the card above a cloud thread's composer leads: the Settings section that holds what is missing. Paying's three
+ * lead to the account, where the move of the same name is the one that stands out (`billingMoves`).
  */
 export interface SendBlockAction {
   label: string;
@@ -91,4 +104,30 @@ function projectBlock(account: Extract<AccountStatus, { state: "signed-in" }>, p
   if (project.cloud === "addable") return { words: `${project.repo} is not on OpenOrc Cloud yet.`, fix: { label: "Add this project", ...row } };
   const words = `GitHub doesn't let OpenOrc read ${project.repo} yet.`;
   return account.github?.configured === false ? { words, fix: null, reason: "No GitHub access" } : { words, fix: { label: "Connect GitHub", ...row } };
+}
+
+/** One way to pay in Settings > Account. `primary`: what the account lacks now, the move that stands out. */
+export interface BillingMove {
+  page: BillingPage["page"];
+  label: string;
+  primary: boolean;
+  /** Why it cannot be made now, said on demand. */
+  blocked: string | null;
+}
+
+/** The page that fixes each block paying fixes, under the card's own words for it. */
+const FIXED_BY: Record<NonNullable<ReturnType<typeof payBlock>>, BillingPage["page"]> = { not_pro: "pro", no_hours: "hours", awaiting_payment: "billing" };
+
+/**
+ * The ways to pay, by the row they end: the plan's (Upgrade for a free person; billing, to change, cancel or fix a
+ * payment, for Pro) and the hours' (Pro only). The one that fixes what the account lacks stands out, and a payment that
+ * failed stands out while Pro lasts out its grace.
+ */
+export function billingMoves(account: Extract<AccountStatus, { state: "signed-in" }>): { plan: BillingMove; hours: BillingMove | null } {
+  const blocked = account.reach === "live" ? null : sendBlockWords("offline", "");
+  const lacks = payBlock(account);
+  const fix = account.plan.pro && account.plan.standing === "grace" ? "billing" : lacks && FIXED_BY[lacks];
+  const move = (page: BillingPage["page"], label: string): BillingMove => ({ page, label, primary: fix === page, blocked });
+  if (!account.plan.pro) return { plan: move("pro", ACTIONS.not_pro!.label), hours: null };
+  return { plan: move("billing", fix === "billing" ? ACTIONS.awaiting_payment!.label : "Manage billing"), hours: move("hours", ACTIONS.no_hours!.label) };
 }

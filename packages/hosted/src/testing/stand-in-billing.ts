@@ -1,0 +1,95 @@
+/**
+ * The stand-in's billing: what each person has, and the server's checkout and portal routes as apps call them. Polar
+ * is not stood in for: a checkout's page is an address nothing serves, and `pay` is Polar telling the server a page
+ * was paid, after which the server tells the person's apps on the `billing` topic, as its webhooks do.
+ *
+ * The real server's rules kept here:
+ *   POST /billing/checkout/pro    takes `{ plan }` of monthly or yearly; 409 for a person who already pays for Pro
+ *                                 (every Pro person here pays for their own)
+ *   POST /billing/checkout/hours  409 for a person who is not Pro
+ *   POST /billing/portal          404 for a person who never bought anything
+ */
+import { randomUUID } from "node:crypto";
+
+/** `bought`: when each hours pack was bought, every one of them unused, beside `packsLeftSeconds` of one bought earlier. */
+export type StandInBilling = { pro: false } | { pro: true; standing: "live" | "ending" | "grace"; at: string; monthlyLeftSeconds: number | null; packsLeftSeconds: number; bought?: string[] };
+
+const MONTH_SECONDS = 40 * 3600;
+const PACK_SECONDS = 20 * 3600;
+const DAY_MS = 86_400_000;
+const PLANS = ["monthly", "yearly"];
+
+type Reply = { status: number; body: unknown };
+const refused = (status: number, message: string): Reply => ({ status, body: { statusCode: status, message } });
+
+/** Hours a person can use, as the server counts them before a turn. */
+export function leftSeconds(state: StandInBilling): number {
+  return state.pro ? (state.monthlyLeftSeconds ?? 0) + state.packsLeftSeconds + (state.bought?.length ?? 0) * PACK_SECONDS : 0;
+}
+
+export class StandInPayments {
+  /** Every checkout made, in order, by person, with the address the app was given. */
+  readonly checkouts: { who: string; page: "pro" | "hours"; plan: string | null; url: string }[] = [];
+  readonly #customers = new Set<string>();
+
+  constructor(
+    private readonly billing: Map<string, StandInBilling>,
+    /** Tells the person's apps topics of theirs changed. */
+    private readonly tell: (who: string, topics: string[]) => void,
+    private readonly origin: () => string,
+  ) {}
+
+  route(method: string, path: string, who: string, body: Record<string, unknown>): Reply | null {
+    if (method !== "POST") return null;
+    const state = this.billing.get(who) ?? { pro: false };
+    if (path === "/billing/checkout/pro") {
+      if (!PLANS.includes(String(body["plan"]))) return refused(400, "Choose monthly or yearly.");
+      if (state.pro) return refused(409, "You already pay for Pro. Change your plan in billing.");
+      return this.#checkout(who, "pro", String(body["plan"]));
+    }
+    if (path === "/billing/checkout/hours") return state.pro ? this.#checkout(who, "hours", null) : refused(409, "Hours packs are for Pro. Upgrade to Pro first.");
+    if (path === "/billing/portal") {
+      if (!this.#customers.has(who)) return refused(404, "You haven't bought anything yet, so there is no billing to manage.");
+      return { status: 200, body: { url: `${this.origin()}/stand-in/portal/${randomUUID()}` } };
+    }
+    return null;
+  }
+
+  /** The person pays on the last checkout opened for them. Their apps hear of it unless `quiet`, as when the topic is lost. */
+  pay(who: string, options: { quiet?: boolean } = {}): void {
+    const checkout = this.checkouts.findLast((each) => each.who === who);
+    if (!checkout) throw new Error(`No checkout was opened for ${who}.`);
+    const now = Date.now();
+    const state = this.billing.get(who) ?? { pro: false };
+    if (checkout.page === "pro") this.billing.set(who, { pro: true, standing: "live", at: new Date(now + 30 * DAY_MS).toISOString(), monthlyLeftSeconds: MONTH_SECONDS, packsLeftSeconds: 0 });
+    else if (state.pro) this.billing.set(who, { ...state, bought: [...(state.bought ?? []), new Date(now).toISOString()] });
+    this.#customers.add(who);
+    if (!options.quiet) this.tell(who, ["billing"]);
+  }
+
+  #checkout(who: string, page: "pro" | "hours", plan: string | null): Reply {
+    const url = `${this.origin()}/stand-in/checkout/${randomUUID()}`;
+    this.checkouts.push({ who, page, plan, url });
+    return { status: 200, body: { url } };
+  }
+}
+
+/** The billing state the real server answers, built from the few facts a test sets. */
+export function billingState(state: StandInBilling) {
+  if (!state.pro) return { pro: { status: "free" }, period: null, monthly: null, packs: [], leftSeconds: 0 };
+  const end = Date.parse(state.at);
+  const pro =
+    state.standing === "live"
+      ? { status: "pro", standing: "live", renewsAt: state.at, paidBy: { kind: "self" } }
+      : { status: "pro", standing: state.standing, until: state.at, paidBy: { kind: "self" } };
+  const monthly = state.monthlyLeftSeconds === null ? null : { grantedSeconds: MONTH_SECONDS, usedSeconds: MONTH_SECONDS - state.monthlyLeftSeconds, leftSeconds: state.monthlyLeftSeconds };
+  const pack = (left: number, boughtAt: number) => ({
+    grantedSeconds: PACK_SECONDS,
+    usedSeconds: PACK_SECONDS - left,
+    leftSeconds: left,
+    boughtAt: new Date(boughtAt).toISOString(),
+    expiresAt: new Date(boughtAt + 365 * DAY_MS).toISOString(),
+  });
+  const packs = [...(state.packsLeftSeconds > 0 ? [pack(state.packsLeftSeconds, end - DAY_MS)] : []), ...(state.bought ?? []).map((at) => pack(PACK_SECONDS, Date.parse(at)))];
+  return { pro, period: { startsAt: new Date(end - 30 * DAY_MS).toISOString(), endsAt: state.at }, monthly, packs, leftSeconds: leftSeconds(state) };
+}

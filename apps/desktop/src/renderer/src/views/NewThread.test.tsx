@@ -139,6 +139,7 @@ function openOrcCloud(cloud: "added" | "addable"): AccountStatus {
     signingIn: {},
     github: { configured: true, login: "ada", installedOn: ["acme"], repositories: ["acme/p1"] },
     connectingGithub: null,
+    paying: null,
     projects: [{ projectId: "p1", repo: "acme/p1", cloud }],
     error: null,
   };

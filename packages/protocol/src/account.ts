@@ -71,6 +71,24 @@ export interface AccountGithub {
   repositories: string[];
 }
 
+/** How a person pays for their own Pro, as the server offers it. */
+export const PRO_PERIODS = ["monthly", "yearly"] as const;
+export type ProPeriod = (typeof PRO_PERIODS)[number];
+
+/** A page the core opens in the browser to pay: a checkout for Pro or for hours, or the billing portal. Its address never reaches a window. */
+const BillingPageInput = z.discriminatedUnion("page", [
+  z.object({ page: z.literal("pro"), period: z.enum(PRO_PERIODS) }).strict(),
+  z.object({ page: z.literal("hours") }).strict(),
+  z.object({ page: z.literal("billing") }).strict(),
+]);
+export type BillingPage = z.infer<typeof BillingPageInput>;
+
+/**
+ * A page the app opened to pay, until what it is for lands, the person leaves Settings > Account, or it has been open
+ * too long. Meanwhile the account is read every few seconds as well as on the server's word.
+ */
+export type Paying = { page: BillingPage["page"]; since: number };
+
 /** A trip through GitHub's pages in the browser, under way, or the last one's words when it did not connect. */
 export type GithubWork = { state: "waiting" } | { state: "failed"; error: string };
 
@@ -118,6 +136,8 @@ export type AccountStatus =
       connectingGithub: GithubWork | null;
       /** This Mac's projects that have a GitHub repository, each with where it stands on OpenOrc Cloud. */
       projects: AccountProject[];
+      /** A checkout or the billing portal the app opened and has not seen land yet. */
+      paying: Paying | null;
       error: string | null;
     };
 
@@ -165,6 +185,10 @@ export const accountRpcParams = {
   "account.github.disconnect": z.object({}).strict(),
   /** Adds this Mac project's GitHub repository to the person's space as a cloud project. */
   "account.projects.add": z.object({ projectId: z.string().min(1).max(200) }).strict(),
+  /** Opens a checkout or the billing portal in the browser. What was bought arrives by itself in `account.status`. */
+  "account.billing.open": BillingPageInput,
+  /** The person left the screen they paid from: the app stops watching for the purchase and waits for the server's word. */
+  "account.billing.leave": z.object({}).strict(),
 };
 
 /** Every call answers the whole status, so a window never reads a stale half. */
@@ -201,12 +225,19 @@ export function hostedSendBlock(account: AccountStatus | undefined, settings: { 
   if (account?.state !== "signed-in") return null;
   if (account.reach !== "live") return "offline";
   if (steering) return null;
-  if (!account.plan.pro) return "not_pro";
-  if ((account.hours?.leftSeconds ?? 0) <= 0) return account.hours?.monthly ? "no_hours" : "awaiting_payment";
+  const paying = payBlock(account);
+  if (paying) return paying;
   if (!account.signIns || !isHostedAgent(settings.agent)) return null;
   const provider = settings.agent === "opencode" ? openCodeProvider(settings.model) : null;
   if (settings.agent === "opencode" && !provider) return null;
   const signIn = account.signIns.find((row) => row.agent === settings.agent && (provider === null || row.provider === provider));
   if (!signIn) return "no_sign_in";
   return signIn.ended ? "signed_out" : null;
+}
+
+/** What only paying fixes, in the server's order: not Pro, then no hours left, as this month's or as unpaid. */
+export function payBlock(account: Pick<Extract<AccountStatus, { state: "signed-in" }>, "plan" | "hours">): "not_pro" | "no_hours" | "awaiting_payment" | null {
+  if (!account.plan.pro) return "not_pro";
+  if ((account.hours?.leftSeconds ?? 0) <= 0) return account.hours?.monthly ? "no_hours" : "awaiting_payment";
+  return null;
 }

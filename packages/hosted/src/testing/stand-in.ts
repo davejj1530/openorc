@@ -20,6 +20,7 @@ import { engineSession } from "./stand-in-socket.js";
 import { StandInSignIns } from "./stand-in-sign-ins.js";
 import { StandInGithub } from "./stand-in-github.js";
 import { StandInSpaces } from "./stand-in-spaces.js";
+import { billingState, leftSeconds, StandInPayments, type StandInBilling } from "./stand-in-billing.js";
 import { StandInThreads, type Admit, type StandInPeer, type StandInThreadSeed } from "./stand-in-threads.js";
 
 export interface StandIn {
@@ -29,6 +30,10 @@ export interface StandIn {
   codeFor(email: string): string | undefined;
   /** What the next GET /billing answers for a person. */
   setBilling(email: string, billing: StandInBilling): void;
+  /** Every checkout the person's apps were given, in order. */
+  checkouts: StandInPayments["checkouts"];
+  /** The person pays on the last checkout opened for them; their apps hear of it on the `billing` topic unless `quiet`. */
+  pay(email: string, options?: { quiet?: boolean }): void;
   /** The person's name and picture, as the server keeps them; a new person's name is made from their address. */
   setPerson(email: string, person: { name: string; image: string | null }): void;
   /** The sandbox service each person chose in Settings, by address. */
@@ -84,7 +89,7 @@ export interface StandInSignIn {
   checkedAt?: string;
 }
 
-export type StandInBilling = { pro: false } | { pro: true; standing: "live" | "ending" | "grace"; at: string; monthlyLeftSeconds: number | null; packsLeftSeconds: number };
+export type { StandInBilling };
 
 const NOT_INVITED = "This email doesn't belong to any organization yet.";
 /** The real server's words for a refused code, by the code its auth library names. */
@@ -97,8 +102,6 @@ const APP_TOO_OLD = "This version of OpenOrc is too old for OpenOrc Cloud. Updat
 const OLDEST_APP_PROTOCOL = 1;
 const CODE_MS = 5 * 60_000;
 const CODE_TRIES = 3;
-const MONTH_SECONDS = 40 * 3600;
-const PACK_SECONDS = 20 * 3600;
 const SOCKET_PATH = "/socket.io/";
 /** What the real server calls each sandbox service it can run threads on. */
 const SERVICE_NAMES: Record<string, string> = { local: "this machine", vercel: "Vercel", agent37: "Agent37" };
@@ -226,14 +229,11 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
   const spaces = new StandInSpaces();
   const hosted = new StandInThreads(() => [...[...peers].filter((peer) => !peer.waiting), ...sockets], admitTurn, spaces);
   const signInWrites = new StandInSignIns(signIns);
-  const github = new StandInGithub(spaces, (who) => {
-    for (const peer of [...peers, ...sockets]) if (peer.who() === who) peer.send("changed", { organizationId: `personal-${who}`, topics: ["projects", "github"] });
-  });
-  const socketAnswers: Record<string, (peer: StandInPeer, body: unknown) => unknown> = {
-    "hosted:watch": (peer, body) => hosted.watch(peer, body),
-    "hosted:unwatch": (peer, body) => hosted.unwatch(peer, body),
-  };
-  const answerSocket = (peer: StandInPeer, event: string, body: unknown) => socketAnswers[event]?.(peer, body) ?? { ok: false };
+  const tell = tellOf(peers, sockets);
+  const github = new StandInGithub(spaces, (who) => tell(who, ["projects", "github"]));
+  const payments = new StandInPayments(billing, tell, () => `http://127.0.0.1:${port}`);
+  const personal = personRoutes(signInWrites, payments, github);
+  const answerSocket = socketAnswers(hosted);
   let serving = true;
 
   const server = createServer((request, response) => void answer(request, response));
@@ -254,8 +254,8 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
     requests.push({ method, path, authorized: who !== null });
     const route = routes[`${method} ${path}`];
     const signedInRoute = (): Reply | null => {
-      if (who) return signInWrites.route(method, path, who, body) ?? github.route(method, path, who, body) ?? hosted.route({ method, path, query, space }, who, body);
-      return /^\/(projects|hosted|github|agent-sign-ins|api\/auth\/organization)\b/.test(path) ? unauthorized() : null;
+      if (who) return personal(method, path, who, body) ?? hosted.route({ method, path, query, space }, who, body);
+      return /^\/(projects|hosted|github|agent-sign-ins|billing|api\/auth\/organization)\b/.test(path) ? unauthorized() : null;
     };
     const old = tooOld(request.headers["x-openorc-protocol"]) ? { status: 426, body: { statusCode: 426, message: APP_TOO_OLD } } : null;
     const reply: Reply = old ?? (route ? route(body, token) : signedInRoute()) ?? { status: 404, body: { message: `Cannot ${method} ${path}`, error: "Not Found", statusCode: 404 } };
@@ -276,7 +276,7 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
   return {
     url: `http://127.0.0.1:${port}`,
     codeFor: (email) => codes.get(email.toLowerCase())?.code,
-    setBilling: (email, state) => void billing.set(email.toLowerCase(), state),
+    ...paymentsFace(billing, payments),
     setPerson: (email, person) => void people.set(email.toLowerCase(), person),
     sandboxes,
     ...threadsFace(hosted),
@@ -351,7 +351,7 @@ function turnRule(billing: Map<string, StandInBilling>, signIns: Map<string, Sta
   return (who, settings) => {
     const state = billing.get(who) ?? { pro: false };
     if (!state.pro) return "not_pro";
-    if ((state.monthlyLeftSeconds ?? 0) + state.packsLeftSeconds <= 0) return state.monthlyLeftSeconds === null ? "awaiting_payment" : "no_hours";
+    if (leftSeconds(state) <= 0) return state.monthlyLeftSeconds === null ? "awaiting_payment" : "no_hours";
     const provider = settings.agent === "opencode" ? (settings.model?.split("/")[0] ?? null) : null;
     if (settings.agent === "opencode" && !settings.model?.includes("/")) return null;
     const row = (signIns.get(who) ?? []).find((each) => each.agent === settings.agent && (provider === null || each.provider === provider));
@@ -370,6 +370,38 @@ function signInRows(rows: readonly StandInSignIn[]) {
     checkedAt: row.checkedAt ?? new Date(0).toISOString(),
     expiresAt: null,
   }));
+}
+
+/** The server's answers to a socket's messages: watching a thread and leaving it, and `{ ok: false }` to anything else. */
+function socketAnswers(hosted: StandInThreads): (peer: StandInPeer, event: string, body: unknown) => unknown {
+  const answers: Record<string, (peer: StandInPeer, body: unknown) => unknown> = {
+    "hosted:watch": (peer, body) => hosted.watch(peer, body),
+    "hosted:unwatch": (peer, body) => hosted.unwatch(peer, body),
+  };
+  return (peer, event, body) => answers[event]?.(peer, body) ?? { ok: false };
+}
+
+type PersonRoute = (method: string, path: string, who: string, body: Record<string, unknown>) => Reply | null;
+
+/** The routes about the person alone, asked in turn: the first that serves the request answers it. */
+function personRoutes(...routers: { route: PersonRoute }[]): PersonRoute {
+  return (method, path, who, body) => routers.reduce<Reply | null>((reply, router) => reply ?? router.route(method, path, who, body), null);
+}
+
+/** Tells a person's sockets that topics of theirs changed, in their personal space's name, as the server's `changed` does. */
+function tellOf(peers: Set<Peer>, sockets: Set<StandInPeer>): (who: string, topics: string[]) => void {
+  return (who, topics) => {
+    for (const peer of [...peers, ...sockets]) if (peer.who() === who) peer.send("changed", { organizationId: `personal-${who}`, topics });
+  };
+}
+
+/** What a test does to people's billing, as Polar and the person's payments would. */
+function paymentsFace(billing: Map<string, StandInBilling>, payments: StandInPayments): Pick<StandIn, "setBilling" | "checkouts" | "pay"> {
+  return {
+    setBilling: (email, state) => void billing.set(email.toLowerCase(), state),
+    checkouts: payments.checkouts,
+    pay: (email, options) => payments.pay(email.toLowerCase(), options),
+  };
 }
 
 /** What a test does to the stand-in's threads, as an agent's host or another person would. */
@@ -427,34 +459,4 @@ function listen(server: ReturnType<typeof createServer>, port: number): Promise<
       resolve();
     });
   });
-}
-
-/** The billing state the real server answers, built from the few facts a test sets. */
-function billingState(state: StandInBilling) {
-  if (!state.pro) return { pro: { status: "free" }, period: null, monthly: null, packs: [], leftSeconds: 0 };
-  const end = Date.parse(state.at);
-  const pro =
-    state.standing === "live"
-      ? { status: "pro", standing: "live", renewsAt: state.at, paidBy: { kind: "self" } }
-      : { status: "pro", standing: state.standing, until: state.at, paidBy: { kind: "self" } };
-  const monthly = state.monthlyLeftSeconds === null ? null : { grantedSeconds: MONTH_SECONDS, usedSeconds: MONTH_SECONDS - state.monthlyLeftSeconds, leftSeconds: state.monthlyLeftSeconds };
-  const packs =
-    state.packsLeftSeconds > 0
-      ? [
-          {
-            grantedSeconds: PACK_SECONDS,
-            usedSeconds: PACK_SECONDS - state.packsLeftSeconds,
-            leftSeconds: state.packsLeftSeconds,
-            boughtAt: new Date(end - 86_400_000).toISOString(),
-            expiresAt: new Date(end + 300 * 86_400_000).toISOString(),
-          },
-        ]
-      : [];
-  return {
-    pro,
-    period: { startsAt: new Date(end - 30 * 86_400_000).toISOString(), endsAt: state.at },
-    monthly,
-    packs,
-    leftSeconds: (monthly?.leftSeconds ?? 0) + state.packsLeftSeconds,
-  };
 }

@@ -25,9 +25,9 @@ function newTaskProjectGate(input: { error: Error | null; loading: boolean; empt
   if (input.empty) {
     return (
       <Empty title="Give your work a home">
-        <p>Import a project to create your first task.</p>
+        <p>Add a project to create your first task.</p>
         <Button className="mt-4" onClick={input.importProject}>
-          <FolderPlus size={14} /> Import project
+          <FolderPlus size={14} /> Add project
         </Button>
       </Empty>
     );

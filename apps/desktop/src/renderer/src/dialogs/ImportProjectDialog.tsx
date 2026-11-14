@@ -56,7 +56,7 @@ export function ImportProjectDialog({ open, onOpenChange }: { open: boolean; onO
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} title="Import a project">
+    <Dialog open={open} onOpenChange={onOpenChange} title="Add a project">
       <form
         onSubmit={(e) => {
           e.preventDefault();

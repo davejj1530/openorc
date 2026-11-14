@@ -14,7 +14,7 @@ import { useEffect, useRef, useState } from "react";
 import { useCloudSignInGate } from "../components/CloudSignInOffer";
 import { Composer } from "../components/Composer";
 import { ComposerCommitChip } from "../components/ComposerCommitChip";
-import { FolderGit2 } from "../components/icons";
+import { FolderPlus } from "../components/icons";
 import { type PickerAccounts } from "../components/ModelPickerAccounts";
 import { ComposerModelPicker, ModelPicker, type ModelChoice, type OrclingPickerChoices } from "../components/ModelPicker";
 import { NewThreadOptions } from "../components/NewThreadOptions";
@@ -259,10 +259,10 @@ function NewThreadProject({
           <div className="new-thread-column">
             {projects?.length === 0 ? (
               <div className="new-thread-empty">
-                Import a project to start.
+                Add a project to start.
                 <div className="mt-3">
                   <Button variant="primary" size="sm" onClick={() => useUi.getState().setImportProject(true)}>
-                    <FolderGit2 size={13} /> Import project
+                    <FolderPlus size={13} /> Add project
                   </Button>
                 </div>
               </div>

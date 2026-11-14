@@ -173,7 +173,7 @@ function ProjectSection({ entry, named, reviewer }: { entry: ProjectPulls; named
 /** Why the list is empty before any project is asked, or null when it can load. */
 function unavailable(input: { ghInstalled: boolean | undefined; projects: Project[] }): { title: string; body: string } | null {
   if (input.ghInstalled === false) return { title: "GitHub CLI not found", body: "Pull requests load through gh. Install it, then sign in with gh auth login." };
-  if (input.projects.length === 0) return { title: "No GitHub projects", body: "Import a project whose remote is on GitHub." };
+  if (input.projects.length === 0) return { title: "No GitHub projects", body: "Add a project whose remote is on GitHub." };
   return null;
 }
 

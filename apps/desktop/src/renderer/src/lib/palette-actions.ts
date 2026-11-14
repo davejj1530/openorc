@@ -24,7 +24,7 @@ export const paletteActions: readonly PaletteAction[] = [
     available: () => fileTarget(focusedThread()) !== null,
     run: () => useUi.getState().setNewFile(fileTarget(focusedThread())),
   },
-  { label: "Import project", icon: FolderPlus, run: () => useUi.getState().setImportProject(true) },
+  { label: "Add project", icon: FolderPlus, run: () => useUi.getState().setImportProject(true) },
   { label: "All tasks", icon: ListTodo, run: () => go({ view: "tasks" }) },
   { label: "Schedules", icon: CalendarClock, run: () => go({ view: "scheduled" }) },
   { label: "Memory", icon: Brain, run: () => go({ view: "memory" }) },

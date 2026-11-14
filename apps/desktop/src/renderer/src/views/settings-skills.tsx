@@ -105,7 +105,7 @@ export function SkillsSettings({ active }: { active: boolean }) {
         <ProjectChoice projects={projects.data} projectId={projectId} error={projects.isError} onProject={setProjectId} />
       </SectionActions>
       {projects.isError ? <LoadError retry={() => void projects.refetch()} /> : null}
-      {projects.isSuccess && projectId === "" ? <p className="settings-note">Import a project and OpenOrc will list the skills it can resolve there.</p> : null}
+      {projects.isSuccess && projectId === "" ? <p className="settings-note">Add a project and OpenOrc will list the skills it can resolve there.</p> : null}
       {projectId && agent && list ? <SkillsBrowser key={projectId} place={{ agent, scope: { kind: "project", id: projectId }, projectId, active }} list={list} /> : null}
       {!enabled.length ? <p className="settings-note">Enable an agent in Connections to see its skills.</p> : null}
     </div>

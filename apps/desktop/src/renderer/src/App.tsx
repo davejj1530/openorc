@@ -19,6 +19,7 @@ import { useAppShortcuts } from "./lib/app-shortcuts";
 import { focusedProject, useLayout } from "./lib/layout";
 import { useLookHandover } from "./lib/mac-look";
 import { useRouter, type Route } from "./lib/router";
+import { cn } from "./lib/cn";
 import { useUi } from "./lib/ui";
 import { useSpaceNavigation } from "./lib/space-navigation";
 import { Memory } from "./views/Memory";
@@ -32,6 +33,7 @@ import { Scheduled } from "./views/Scheduled";
 import { Settings } from "./views/Settings";
 import { AgentUpdateNotice } from "./views/settings-agent-updates";
 import { TaskListView } from "./views/TaskList";
+import { TeamChatView } from "./views/TeamChatView";
 
 // The diagnostics screen and its benchmark controls ship only in development and QA builds.
 const Diagnostics = __OPENORC_QA__ ? lazy(() => import("./views/Diagnostics").then((m) => ({ default: m.Diagnostics }))) : null;
@@ -68,6 +70,8 @@ function DesktopApp() {
   const personal = useSpaceNavigation((state) => state.personal);
   const home = space === null || space === personal ? "personal" : space;
   const route = useRouter((s) => s.route);
+  const chatWork = useRouter((s) => s.chatWork);
+  const workRoute = route.view === "team-chat" ? chatWork : route;
   const ui = useUi();
   const projectId = useLayout(focusedProject);
   const currentProject = projectForRoute(route, projectId);
@@ -75,8 +79,11 @@ function DesktopApp() {
     <div className="app-shell h-full flex text-ink">
       <Sidebar key={`sidebar:${home}`} />
       <div key={home} className="work-row flex-1 min-w-0 h-full flex">
-        <StartScreen route={route} />
-        {route.view === "thread" ? <ThreadWorkspace /> : null}
+        <div className={cn(route.view === "team-chat" ? "hidden" : "contents")} inert={route.view === "team-chat"}>
+          {workRoute ? <StartScreen route={workRoute} /> : null}
+          {workRoute?.view === "thread" ? <ThreadWorkspace /> : null}
+        </div>
+        {route.view === "team-chat" ? <TeamChatView target={route} /> : null}
         {route.view === "task" ? (
           <Suspense
             fallback={

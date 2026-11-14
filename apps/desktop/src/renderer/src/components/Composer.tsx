@@ -205,6 +205,9 @@ function useSentGhost(text: string | null) {
  * changes sit in the Commit chip over its left edge. @ mentions a file, / runs a command.
  */
 /** A file a message carried, as the composer shows it again: an image by its served picture, anything else by its name. */
+/** A send's error, unless it is the reason the composer can't send now, which the composer already shows. */
+const unshown = (error: string | null | undefined, readOnlyReason: string | null | undefined) => (error && error !== readOnlyReason ? error : null);
+
 /** Why the last send or stop failed, and a failed read of the changes with its retry. */
 function ComposerAlerts({ message, changes }: { message: ReactNode; changes: ComposerProps["changes"] }) {
   return (
@@ -309,7 +312,12 @@ export function Composer(props: ComposerProps) {
     <div className={cn("composer min-w-0", props.size === "lg" && "composer-large", isNewThread && "composer-new-thread")}>
       {isNewThread ? null : <ComposerChangesBar changes={props.changes} />}
       <div className="mb-2 grid grid-cols-1 gap-2 empty:hidden">{props.notices}</div>
-      <ComposerAlerts message={interrupt.error ? `Couldn’t stop the agent. ${interrupt.error.message}` : files.error || submission?.error || props.error} changes={props.changes} />
+      <ComposerAlerts
+        message={
+          interrupt.error ? `Couldn’t stop the agent. ${interrupt.error.message}` : files.error || unshown(submission?.error, props.readOnlyReason) || unshown(props.error, props.readOnlyReason)
+        }
+        changes={props.changes}
+      />
       <div ref={shell} className="composer-shell" data-dragging={drop.dragging || undefined} {...drop.handlers}>
         <ComposerAsk asks={asks} label={props.asksLabel} blocked={props.asksBlocked ?? null} fieldHasWords={Boolean(props.value.trim())} focusField={focusField} />
         {attachments.length > 0 || uploading > 0 ? <div className="composer-attachments">{files.content}</div> : null}

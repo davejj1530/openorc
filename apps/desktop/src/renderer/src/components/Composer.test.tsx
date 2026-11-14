@@ -95,6 +95,28 @@ it.each([false, true])("keeps a read-only composer's controls inactive, with wor
   expect(onModel).not.toHaveBeenCalled();
 });
 
+it("does not repeat a refused send's words once the composer shows them as why it can't send", async () => {
+  const reason = "Only Ana can run the agent in this cloud thread for now.";
+  function Refused() {
+    const [value, setValue] = useState("Also sum the hours column.");
+    const [readOnlyReason, setReadOnly] = useState<string | null>(null);
+    const onSubmit = async () => {
+      setReadOnly(reason);
+      throw new Error(reason);
+    };
+    return <Composer {...BASE} value={value} onChange={setValue} readOnlyReason={readOnlyReason} onSubmit={onSubmit} />;
+  }
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <Refused />
+    </QueryClientProvider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Send" }).getAttribute("data-tip")).toBe(reason));
+  await act(async () => {});
+  expect(screen.queryByRole("alert")).toBeNull();
+});
+
 it.each([null, "This thread can't be reached."])("keeps an owner's controls when only sending is blocked (%s)", (disabledReason) => {
   mount({ value: "", disabledReason, live: { runId: "run", working: true } });
   for (const name of ["Model and effort", /^Mode:/, "Add to this message", "Stop"]) expect(screen.getByRole("button", { name }).hasAttribute("disabled")).toBe(false);

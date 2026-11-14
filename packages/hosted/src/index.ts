@@ -245,7 +245,14 @@ export function createHosted(deps: HostedDeps): Hosted {
     cloud,
   });
   // The follower reads a thread's log in the thread's space, which the rows know.
-  const follower: Follower = new Follower({ session, on: (threadId) => threads.on(threadId), completed: (id, seq) => threads.completed(id, seq), push: deps.push, log: deps.log });
+  const follower: Follower = new Follower({
+    session,
+    on: (threadId) => threads.on(threadId),
+    completed: (id, seq) => threads.completed(id, seq),
+    observed: (id, events) => threads.observed(id, events),
+    push: deps.push,
+    log: deps.log,
+  });
   const threads: Threads = new Threads({
     session,
     spaces,

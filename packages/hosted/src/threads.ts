@@ -39,14 +39,19 @@ import { Refused, type Requests, type Session, type SessionChange } from "./sess
 import { CLOUD_PROJECT, githubRepoOf, listRows, projectPairs, resolvedCount, runsNow, starterOf, toAppEvent, toRuns, toSummary } from "./translate.js";
 import { ROUTES, SOCKET, wireProject, wireThread, wireTopics, type WireEvent, type WireThread } from "./wire.js";
 
+import { nativeRowFields } from "./wire-subthreads.js";
+import { readNativeRows } from "./subthreads.js";
+import { nativeRowsFromEvents, withNativeSummary } from "./translate-subthreads.js";
+import { assertNativeCall } from "./subthread-calls.js";
+
 const GONE = "That conversation isn't on OpenOrc Cloud.";
 
 /** What this device keeps of a thread for itself: the half-written message, which never leaves it. */
-const kept = z.object({ draft: z.string().nullable().optional() });
+const kept = z.object({ draft: z.string().nullable().optional(), nativeStop: z.object({ id: z.uuid(), expectedRunId: z.string() }).optional() });
 export type KeptHere = z.infer<typeof kept>;
 
 /** A row and a project as heard, each with the space it was read in. */
-const heardRow = wireThread.extend({ space: z.string() });
+const heardRow = wireThread.extend({ space: z.string(), ...nativeRowFields });
 const heardProject = wireProject.extend({ space: z.string() });
 export type HeardRow = z.infer<typeof heardRow>;
 type HeardProject = z.infer<typeof heardProject>;
@@ -138,6 +143,7 @@ export class Threads implements HostedThreads {
   }
 
   async call<M extends RoutedMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> {
+    assertNativeCall(this, method, params);
     const entry = ANSWERS[method];
     if (typeof entry === "function") return entry(this, params);
     throw new Refused("refused" in entry ? entry.refused : GONE);
@@ -186,7 +192,7 @@ export class Threads implements HostedThreads {
     if (Object.keys(mine).length) this.#hearRow(await this.on(threadId).request(ROUTES.mine(threadId), mine));
     if (draft !== undefined) {
       const heard = this.#heard!;
-      heard.here[threadId] = { draft };
+      heard.here[threadId] = { ...heard.here[threadId], draft };
       this.#save();
       this.#tell();
     }
@@ -206,6 +212,17 @@ export class Threads implements HostedThreads {
       this.#tell();
     }
     return null;
+  }
+
+  nativeStopRequest(threadId: string, expectedRunId: string): string {
+    this.row(threadId);
+    const heard = this.#heard!;
+    const here = heard.here[threadId] ?? {};
+    if (here.nativeStop?.expectedRunId === expectedRunId) return here.nativeStop.id;
+    const id = crypto.randomUUID();
+    heard.here[threadId] = { ...here, nativeStop: { id, expectedRunId } };
+    this.#save();
+    return id;
   }
 
   /**
@@ -256,7 +273,7 @@ export class Threads implements HostedThreads {
   #hearRow(row: WireThread): void {
     const heard = this.#heard;
     if (!heard) return;
-    heard.rows = heard.rows.map((each) => (each.id === row.id ? { ...row, space: each.space } : each));
+    heard.rows = heard.rows.map((each) => (each.id === row.id ? { ...each, ...row, space: each.space } : each));
     this.#save();
     this.#tell();
   }
@@ -309,7 +326,8 @@ export class Threads implements HostedThreads {
     }
     const first = await space.request(ROUTES.events(threadId, { fromTurn }, READ_LIMIT));
     const events = await this.#readOn(space, threadId, first.events, first.head);
-    this.#names.observed(threadId, events, first.fromTurn ?? fromTurn);
+    this.observed(threadId, events);
+    if (!row.parentId) this.#names.observed(threadId, events, first.fromTurn ?? fromTurn);
     return { events: events.map((event) => toAppEvent(threadId, event)), fromTurn: first.fromTurn ?? fromTurn, live: runsNow(row, this.reach) };
   }
 
@@ -320,13 +338,27 @@ export class Threads implements HostedThreads {
     await this.deps.follower.follow(threadId);
     const first = await space.request(ROUTES.events(threadId, { after }, READ_LIMIT));
     const events = await this.#readOn(space, threadId, first.events, first.head);
-    if (after === 0) this.#names.observed(threadId, events, 0);
+    this.observed(threadId, events);
+    if (after === 0 && !this.row(threadId).parentId) this.#names.observed(threadId, events, 0);
     return events.map((event) => toAppEvent(threadId, event));
+  }
+
+  /** Register cloud ownership before a child card can be opened from a stored or live page. */
+  observed(threadId: string, events: readonly WireEvent[]): void {
+    const heard = this.#heard;
+    const parent = heard?.rows.find((row) => row.id === threadId);
+    if (!heard || !parent) return;
+    const children = nativeRowsFromEvents(parent, events, new Set(heard.rows.map((row) => row.id)));
+    if (!children.length) return;
+    heard.rows.push(...children.map((row) => ({ ...row, space: parent.space })));
+    this.#save();
+    this.#tell();
+    void this.refresh();
   }
 
   /** A completion delivered to an open conversation can name its first turn even beyond discovery's age limit. */
   completed(threadId: string, seq: number): void {
-    this.#names.completed(threadId, seq);
+    if (!this.#rows().get(threadId)?.parentId) this.#names.completed(threadId, seq);
   }
 
   /** Stops one command the agent left running in the background, as the Stop beside it on this Mac does. */
@@ -393,7 +425,11 @@ export class Threads implements HostedThreads {
     this.#forgetRemoved(read.rows);
     const previous = this.#heard?.email === state.email ? this.#heard : null;
     this.#heard = { email: state.email, heardAt: this.deps.now(), ...read, here: previous?.here ?? {}, names: previous?.names ?? {} };
-    this.#names.refresh(read.rows, read.me, this.#heard.names);
+    this.#names.refresh(
+      read.rows.filter((row) => !row.parentId),
+      read.me,
+      this.#heard.names,
+    );
     this.#save();
     if (JSON.stringify([this.#heard.rows, this.#heard.projects]) !== before) this.#tell();
     // Settings shows which of this Mac's projects are on OpenOrc Cloud, read off these.
@@ -423,8 +459,10 @@ export class Threads implements HostedThreads {
     this.#restrict(catalog);
     const read = await Promise.allSettled(
       catalog.ids.map(async (id) => {
-        const threads = await this.deps.session.in(id).request(ROUTES.threads);
-        return threads.threads.map((row) => ({ ...row, space: id }));
+        const on = this.deps.session.in(id);
+        const listed = await on.request(ROUTES.threads);
+        const rows = await readNativeRows(on, listed.threads, this.#heard?.rows.filter((row) => row.space === id) ?? []);
+        return rows.map((row) => ({ ...row, space: id }));
       }),
     );
     const rows = read.flatMap((answer, i) => {
@@ -557,7 +595,8 @@ export class Threads implements HostedThreads {
           startedBy: starterOf(row, heard.me),
           now: this.deps.now(),
         });
-        return here?.draft ? { ...summary, draft: here.draft } : summary;
+        const native = withNativeSummary(summary, row);
+        return here?.draft ? { ...native, draft: here.draft } : native;
       });
   }
 }

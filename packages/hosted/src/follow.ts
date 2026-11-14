@@ -36,7 +36,12 @@ export class Follower {
   readonly #tickets = new Map<string, symbol>();
 
   /** `on`: requests about a thread, in its space. */
-  constructor(private readonly deps: { session: Session; on(threadId: string): Requests; completed(threadId: string, seq: number): void } & Pick<HostedDeps, "push" | "log">) {
+  constructor(
+    private readonly deps: { session: Session; on(threadId: string): Requests; completed(threadId: string, seq: number): void; observed?(threadId: string, events: readonly WireEvent[]): void } & Pick<
+      HostedDeps,
+      "push" | "log"
+    >,
+  ) {
     let generation = deps.session.generation;
     deps.session.onSocket(SOCKET.events, (body) => this.#onFrame(body));
     deps.session.onSocket(SOCKET.threadChanged, (body) => this.#onChanged(body));
@@ -165,6 +170,7 @@ export class Follower {
   #hand(threadId: string, events: WireEvent[]): void {
     if (!events.length) return;
     this.#cursors.set(threadId, events.at(-1)!.seq);
+    this.deps.observed?.(threadId, events);
     const frame = toFrame(threadId, events);
     if (frame) this.deps.push({ type: "frame", frame });
     for (const entry of events) if (entry.event["type"] === "turn.completed") this.deps.completed(threadId, entry.seq);

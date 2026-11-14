@@ -2,6 +2,7 @@ import { threadSendBlock, type SendBlock } from "@openorc/client";
 import { HOSTED_AGENTS, type HarnessId, type PermissionPreset, type RunMode, type ThreadSummary } from "@openorc/protocol";
 import type { ReactNode } from "react";
 import { useRpc, useRpcMutation } from "../lib/client";
+import { cn } from "../lib/cn";
 import { useRouter } from "../lib/router";
 import type { ModelChoice } from "./ModelPicker";
 import { Button } from "./ui";
@@ -64,19 +65,20 @@ export function useHostedComposer(
   };
 }
 
-/** The card above the composer: why a send cannot start a turn on OpenOrc Cloud, and the Settings section with the way on. */
+/**
+ * The card above the composer: why a send cannot start a turn on OpenOrc Cloud, and at the row's end a key to the
+ * Settings section with the way on. A key, since the column's one ink pill is the send.
+ */
 function SendBlockCard({ block }: { block: SendBlock }) {
   const navigate = useRouter((s) => s.navigate);
   const { action } = block;
   return (
-    <section role="status" aria-label="OpenOrc Cloud" data-plane className={card}>
+    <section role="status" aria-label="OpenOrc Cloud" data-plane className={cn(card, "flex flex-wrap items-center justify-between gap-x-3")}>
       <div className="py-1.5 text-ink">{block.words}</div>
       {action ? (
-        <div className="flex flex-wrap items-center gap-2 pb-1.5">
-          <Button variant="primary" onClick={() => navigate({ view: "settings", section: action.section })}>
-            {action.label}
-          </Button>
-        </div>
+        <Button variant="secondary" onClick={() => navigate({ view: "settings", section: action.section })}>
+          {action.label}
+        </Button>
       ) : null}
     </section>
   );

@@ -9,6 +9,8 @@ import { spaceNavigation } from "../lib/space-navigation";
 const start = vi.fn();
 const resetStart = vi.fn();
 let projects: Project[];
+/** The project list's first answer has not arrived. */
+let listLoading = false;
 let models: RpcResults["agents.models"];
 let system: RpcResults["system.info"];
 let branches: Record<string, string | null | undefined>;
@@ -21,16 +23,16 @@ let account: AccountStatus | undefined;
 const mutated: [string, unknown][] = [];
 /** A project's git read held open by a test; any other project's is already in. */
 const gitReads: Record<string, Promise<unknown>> = {};
-/** Every read the screen asked for, with its parameters. */
+/** Every read the screen asked for, with its parameters; a read it holds back with `enabled: false` is not asked. */
 const reads: [string, unknown][] = [];
 
 vi.mock("../lib/client", async (original) => ({
   ...(await original<object>()),
   useRpcs: () => [],
-  useRpc: (method: string, params: { id?: string; spaceId?: string }) => {
-    reads.push([method, params]);
+  useRpc: (method: string, params: { id?: string; spaceId?: string }, options?: { enabled?: boolean }) => {
+    if (options?.enabled !== false) reads.push([method, params]);
     const data: Record<string, unknown> = {
-      "projects.list": projects,
+      "projects.list": listLoading ? undefined : projects,
       "spaces.projects": spaceNavigation.getState().inventory.find((space) => space.id === params.spaceId)?.projects,
       "claude.accounts.list": accounts,
       "projects.git": "ready",
@@ -108,6 +110,7 @@ const makeProject = (id: string): Project => ({
 
 afterEach(() => {
   cleanup();
+  listLoading = false;
   if (spaceNavigation.getState().key) spaceNavigation.getState().end();
 });
 beforeEach(() => {
@@ -184,6 +187,28 @@ describe("NewThread", () => {
     render(<NewThread projectId="p1" />);
     const scoped = reads.filter(([method, params]) => method === "skills.list" && JSON.stringify(params).includes('"kind":"project","id":"p1"'));
     expect(scoped).toEqual([]);
+  });
+
+  it.each([
+    ["while the project list is still loading", true],
+    ["once the list says the project has no folder here", false],
+  ])("asks this Mac nothing about a cloud-only project's checkout %s", (_when, loading) => {
+    projects = [{ ...makeProject("p1"), rootPath: "" }];
+    listLoading = loading;
+    spaceNavigation.getState().initialize("scoped", "personal", [
+      { id: "personal", personal: true, projects: [], threads: [], taskIds: [] },
+      {
+        id: "birch",
+        personal: false,
+        projects: [{ key: "p1", name: "Canvas", repo: "example/canvas", localProjectId: null, hostedProjectId: "cloud-project", connected: true }],
+        threads: [],
+        taskIds: [],
+      },
+    ]);
+    spaceNavigation.getState().select("birch");
+    reads.length = 0;
+    render(<NewThread projectId="p1" />);
+    expect(reads.filter(([method]) => method === "projects.git" || method === "projects.checkoutBranch")).toEqual([]);
   });
 
   it("asks for no project's activity while there is no project to start in", () => {

@@ -131,6 +131,12 @@ function orclingChoices(options: OrclingPickerChoices["options"], target: NewThr
   };
 }
 
+/** A cloud-only project has no folder on this Mac. Until the list arrives neither is known, so this Mac's checkout is asked nothing. */
+function listedPlace(projects: Project[] | undefined, projectId: string, spaceId: string | null) {
+  const listed = projects?.find((project) => project.id === projectId);
+  return { cloudOnly: Boolean(spaceId && listed && !listed.rootPath), macFolder: Boolean(listed?.rootPath) };
+}
+
 function NewThreadProject({
   projectId,
   projects,
@@ -145,9 +151,9 @@ function NewThreadProject({
   onRetryProjects: () => void;
 }) {
   const spaceId = useSpaceNavigation((state) => state.current);
-  const cloudOnly = Boolean(spaceId && projects?.some((project) => project.id === projectId && !project.rootPath));
+  const { cloudOnly, macFolder } = listedPlace(projects, projectId, spaceId);
   const isWorkspace = projectId === WORKSPACE_ID;
-  const git = useProjectGit(cloudOnly ? null : projectId);
+  const git = useProjectGit(macFolder ? projectId : null);
   const [draft, setDraft] = useState(() => readNewThreadDraft(projectId));
   useNewThreadPreparation(projectId, draft.prompt);
   const orclings = useOrclings();

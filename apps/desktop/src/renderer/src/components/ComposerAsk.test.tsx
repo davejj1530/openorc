@@ -57,10 +57,21 @@ const ASKS = {
       { id: "checks", question: "Which checks should run before a merge?", options: [{ label: "Type check" }, { label: "Unit tests" }, { label: "The packaged smoke test" }], multiSelect: true },
     ],
   },
+  build: { command: "pnpm --filter website build" },
+  deploy: { command: "vercel deploy --prebuilt --prod" },
+  slack: { channel: "#releases", text: "OpenOrc beta 21 is out." },
 };
 type AskName = keyof typeof ASKS;
+const APPROVALS: Partial<Record<AskName, { toolName: string; reason?: string; onceOnly?: boolean }>> = {
+  build: { toolName: "Bash" },
+  deploy: { toolName: "Bash" },
+  slack: { toolName: "slack.post", reason: "Allow Slack to post in #releases?", onceOnly: true },
+};
 
-const waiting = (name: AskName, id: string = name): WaitingAsk => ({ runId: "run", block: { id: `approval-${id}`, kind: "approval", approvalId: id, approvalKind: "user_input", input: ASKS[name] } });
+const waiting = (name: AskName, id: string = name): WaitingAsk => ({
+  runId: "run",
+  block: { id: `approval-${id}`, kind: "approval", approvalId: id, approvalKind: APPROVALS[name] ? "command" : "user_input", input: ASKS[name], ...APPROVALS[name] },
+});
 
 /** A conversation's composer mid-turn, its asks arriving as the agent sends them, with what reached the agent. */
 function mount({ draft = "" }: { draft?: string } = {}) {
@@ -119,9 +130,9 @@ function mount({ draft = "" }: { draft?: string } = {}) {
   };
 }
 
-const QUESTIONS: AskName[] = ["export", "runner", "checks", "three"];
+const EVERY: AskName[] = ["export", "runner", "checks", "three", "build", "deploy", "slack"];
 
-describe.each(QUESTIONS)("a docked %s question, played by keys nobody meant for it", (name) => {
+describe.each(EVERY)("a docked %s ask, played by keys nobody meant for it", (name) => {
   it("answers nothing when Enter is pressed five times in the empty field, the first two as it arrives", () => {
     const c = mount();
     c.field.focus();
@@ -344,6 +355,61 @@ describe("several choices, several questions, several asks", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("a docked approval, answered on purpose", () => {
+  it("allows once by arrow up, the arrows down to Allow once, and Enter", () => {
+    const c = mount();
+    c.arrive("build");
+    c.field.focus();
+    c.key("ArrowUp");
+    for (let i = 0; i < 3; i++) c.key("ArrowDown");
+    expect(document.activeElement?.textContent).toBe("Allow once");
+    c.key("Enter");
+    expect(c.answered()).toEqual([{ runId: "run", approvalId: "build", decision: "allow" }]);
+  });
+
+  it("denies with the note written in its own line at Enter there, and the field's draft stays a message", () => {
+    const c = mount({ draft: "also run the lint after" });
+    c.arrive("build");
+    const line = screen.getByRole("textbox", { name: "What to do instead of Bash" });
+    act(() => line.focus());
+    fireEvent.change(line, { target: { value: "Build only the pricing page" } });
+    c.key("Enter");
+    expect(c.answered()).toEqual([{ runId: "run", approvalId: "build", decision: "deny", note: "Build only the pricing page" }]);
+    expect([c.sent(), messageOf(c.field)]).toEqual([[], "also run the lint after"]);
+  });
+
+  it("allows once at a double press on Allow once", () => {
+    const c = mount();
+    c.arrive("build");
+    const allow = screen.getByRole("button", { name: "Allow once" });
+    fireEvent.click(allow);
+    fireEvent.click(allow);
+    expect(c.answered()).toEqual([{ runId: "run", approvalId: "build", decision: "allow" }]);
+  });
+
+  it("allows the first of two by keys, and six more Enters leave the second untouched", () => {
+    const c = mount();
+    c.arrive("build");
+    c.arrive("deploy");
+    c.field.focus();
+    c.key("ArrowUp");
+    for (let i = 0; i < 3; i++) c.key("ArrowDown");
+    c.key("Enter");
+    c.answer("build");
+    for (let i = 0; i < 6; i++) c.key("Enter");
+    expect(c.answered().map((params) => (params as { approvalId: string }).approvalId)).toEqual(["build"]);
+    expect(within(c.dock()!).getByText("vercel deploy --prebuilt --prod")).toBeTruthy();
+  });
+
+  it("offers Allow once alone for a request that can only be allowed once, with the raw request on demand", () => {
+    const c = mount();
+    c.arrive("slack");
+    expect(within(c.dock()!).queryByRole("button", { name: "Allow for this run" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Show request" }));
+    expect(within(c.dock()!).getByText(/"channel": "#releases"/)).toBeTruthy();
   });
 });
 

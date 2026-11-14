@@ -25,7 +25,7 @@ export function AskTop({ mark, more, count, children, way }: { mark: ReactNode; 
 /** The quiet way out of an ask, last in the keyboard's walk though it is drawn in the top line. */
 export function AskWay({ children, disabled, tip, onClick }: { children: ReactNode; disabled: boolean; tip: string | undefined; onClick: () => void }) {
   return (
-    <Button size="sm" variant="ghost" tabIndex={-1} data-ask-control="action" data-ask-last="" disabled={disabled} data-tip={tip} onClick={onClick}>
+    <Button size="sm" variant="ghost" className="focus-ring" tabIndex={-1} data-ask-control="action" data-ask-last="" disabled={disabled} data-tip={tip} onClick={onClick}>
       {children}
     </Button>
   );
@@ -61,6 +61,7 @@ export function AskLine({
     <label className="composer-ask-line" data-ask-line="" data-picked={picked || undefined}>
       <input
         type={secret ? "password" : "text"}
+        className="native-field"
         aria-label={label}
         placeholder={placeholder}
         autoComplete="off"

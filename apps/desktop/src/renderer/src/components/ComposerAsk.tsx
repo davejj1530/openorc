@@ -2,6 +2,7 @@ import type { WaitingAsk } from "@openorc/client";
 import { useEffect, useRef, useState, type SyntheticEvent } from "react";
 import { AnswersBlocked } from "./ask-answer";
 import { askKeyDown } from "./AskParts";
+import { ApprovalAsk } from "./ApprovalCard";
 import { QuestionAsk } from "./QuestionCard";
 
 /** How long an ask that takes another's place takes to land, in which it takes no press or key. */
@@ -53,7 +54,11 @@ export function ComposerAsk({ asks, blocked, fieldHasWords, focusField }: { asks
         onKeyDownCapture={hold}
         onClickCapture={hold}
       >
-        <QuestionAsk key={shown} ask={ask} more={asks.length - 1} fieldHasWords={fieldHasWords} onStep={focusField} />
+        {ask.block.approvalKind === "user_input" ? (
+          <QuestionAsk key={shown} ask={ask} more={asks.length - 1} fieldHasWords={fieldHasWords} onStep={focusField} />
+        ) : (
+          <ApprovalAsk key={shown} ask={ask} more={asks.length - 1} fieldHasWords={fieldHasWords} />
+        )}
       </div>
     </AnswersBlocked.Provider>
   );

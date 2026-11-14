@@ -298,6 +298,8 @@ export const rpcParams = {
     decision: ApprovalDecision,
     /** Answers to an agent's questions, keyed by question id. */
     answers: z.record(z.string(), z.array(z.string())).optional(),
+    /** With a denial: what to do instead, sent to the agent as the person's next message to the same turn. */
+    note: z.string().trim().min(1).optional(),
   }),
   "review.diff": z.object({ taskId: z.string(), sinceReviewed: z.boolean().optional() }),
   /** Uncommitted changes in the project root, where threads work. */

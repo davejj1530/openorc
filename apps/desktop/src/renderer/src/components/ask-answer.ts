@@ -22,9 +22,9 @@ export function useDockedAsks(): (block: Block) => boolean {
 export function useAskAnswer(runId: string, approvalId: string) {
   const [state, setState] = useState<{ pending: boolean; error: string | null }>({ pending: false, error: null });
   const blocked = useContext(AnswersBlocked);
-  const answer = (decision: RpcParams<"approvals.resolve">["decision"], answers?: Record<string, string[]>) => {
+  const answer = (decision: RpcParams<"approvals.resolve">["decision"], answers?: Record<string, string[]>, note?: string) => {
     setState({ pending: true, error: null });
-    Promise.resolve(core.call("approvals.resolve", { runId, approvalId, decision, ...(answers && { answers }) })).then(
+    Promise.resolve(core.call("approvals.resolve", { runId, approvalId, decision, ...(answers && { answers }), ...(note && { note }) })).then(
       () => setState({ pending: false, error: null }),
       (error: unknown) => setState({ pending: false, error: error instanceof Error ? error.message : String(error) }),
     );

@@ -71,6 +71,6 @@ it("offers Allow for this run only where something keeps allowing it", () => {
   expect(screen.getByRole("button", { name: "Allow for this run" })).toBeTruthy();
   unmount();
   render(<TranscriptContents runId="run" blocks={[approval("password", true)]} />);
-  expect(screen.getByRole("button", { name: "Allow" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Allow once" })).toBeTruthy();
   expect(screen.queryByRole("button", { name: "Allow for this run" })).toBeNull();
 });

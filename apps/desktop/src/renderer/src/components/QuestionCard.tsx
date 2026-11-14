@@ -149,7 +149,15 @@ function AgentMark({ voice }: { voice: ReturnType<typeof useRunVoice> }) {
 /** The answers already given above the question that shows, each a line that reopens it. */
 function KeptAnswers({ questions, draft, hold, act }: { questions: readonly Question[]; draft: AnswerDraft; hold: Hold; act: (action: AnswerAction) => void }) {
   return keptAnswers(questions, draft).map((kept) => (
-    <button key={kept.question.key} type="button" tabIndex={-1} className="composer-ask-kept" data-ask-control="action" disabled={hold.off} onClick={() => act({ kind: "reopen", step: kept.step })}>
+    <button
+      key={kept.question.key}
+      type="button"
+      tabIndex={-1}
+      className="composer-ask-kept focus-ring"
+      data-ask-control="action"
+      disabled={hold.off}
+      onClick={() => act({ kind: "reopen", step: kept.step })}
+    >
       <span className="composer-ask-kept-question">{kept.question.question || kept.question.header}</span>
       <span className="composer-ask-kept-answer">{kept.question.secret ? "Answer hidden" : kept.answer.join(", ")}</span>
     </button>
@@ -164,7 +172,16 @@ function QuestionRow({ q, many, draft, ink, hold, act }: { q: Question | undefin
   if (q && !((q.multi || many) && answerFor(q, draft).length > 0)) return null;
   return (
     <div className="composer-ask-row">
-      <Button size="md" variant={ink ? "primary" : "secondary"} tabIndex={-1} data-ask-control="action" disabled={hold.off} data-tip={hold.tip} onClick={() => act({ kind: "answer" })}>
+      <Button
+        size="md"
+        variant={ink ? "primary" : "secondary"}
+        className="focus-ring"
+        tabIndex={-1}
+        data-ask-control="action"
+        disabled={hold.off}
+        data-tip={hold.tip}
+        onClick={() => act({ kind: "answer" })}
+      >
         {many && q ? "Next" : "Answer"}
       </Button>
     </div>
@@ -182,7 +199,7 @@ function QuestionStep({ q, draft, keepWords, ink, hold, act }: { q: Question; dr
           key={option.label}
           type="button"
           tabIndex={-1}
-          className="composer-ask-choice"
+          className="composer-ask-choice focus-ring"
           aria-pressed={q.multi ? picked.includes(option.label) : undefined}
           data-picked={picked.includes(option.label) || undefined}
           data-ask-control="choice"

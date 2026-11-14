@@ -158,6 +158,15 @@ describe("an OpenOrc Cloud thread's asks", () => {
     expect(await row(hosted, thread)).toMatchObject({ activity: "running" });
   });
 
+  it("deny with a note: the denial goes to the ask, then the note to the thread as the person's next message", async () => {
+    const { hosted, thread, run } = await withThread({ status: "working" });
+    const ask = stand.ask(thread, { kind: "command", toolName: "Bash", input: { command: "pnpm build" }, detail: "Bash: pnpm build" });
+    await hosted.threads.call("approvals.resolve", { runId: run, approvalId: ask, decision: "deny", note: "Build only the pricing page" });
+    expect(stand.sent.map((sent) => [sent.threadId, sent.body["text"]])).toEqual([[thread, "Build only the pricing page"]]);
+    const page = await hosted.threads.call("events.page", { runId: run, turns: 4 });
+    expect(page.events.find((event) => event.type === "approval.resolved")).toMatchObject({ approvalId: ask, decision: "deny" });
+  });
+
   it("refuses an answer that would start a turn the person cannot start, and the ask stays open", async () => {
     const { hosted, thread, run } = await withThread({ status: "working" });
     const ask = stand.ask(thread, { kind: "user_input", input: { questions: [] }, detail: "Which branch?" });

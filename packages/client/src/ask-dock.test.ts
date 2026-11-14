@@ -59,16 +59,17 @@ describe("the asks a conversation waits on", () => {
     ]);
   });
 
-  it("docks every question and leaves the other asks where they were asked", () => {
+  it("docks every question and every request, and leaves an ask with nothing to ask where it was asked", () => {
     const run = {
       runId: "r",
       blocks: [
         question("one", choices),
         question("several", { ...choices, multiSelect: true }),
         question("words", {}),
+        { id: "empty", kind: "approval", approvalId: "empty", approvalKind: "user_input", input: { questions: [] } } as Block,
         { id: "cmd", kind: "approval", approvalId: "cmd", approvalKind: "command", input: { command: "ls" } } as Block,
       ],
     };
-    expect(waitingAsks(run).map((ask) => ask.block.approvalId)).toEqual(["one", "several", "words"]);
+    expect(waitingAsks(run).map((ask) => ask.block.approvalId)).toEqual(["one", "several", "words", "cmd"]);
   });
 });

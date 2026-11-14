@@ -1494,10 +1494,6 @@
 .composer-ask-kept:hover:not(:disabled) {
   background-color: var(--surface-2);
 }
-.composer-ask-kept:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-}
 .composer-ask-kept-question {
   flex: 1 1 0;
   min-width: 0;
@@ -1534,12 +1530,27 @@
 .composer-ask-choice:hover:not(:disabled) {
   background-image: linear-gradient(var(--surface-2), var(--surface-2));
 }
-.composer-ask-choice:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-}
 .composer-ask-choice:disabled {
   color: var(--ink-3);
+}
+/* The request an approval asks about, as its agent sums it up: shown whole, so a command's last line is read before it
+   is allowed. The raw request, on demand, can run long and scrolls. */
+.composer-ask-detail {
+  margin: 0;
+  padding: 9px 8px;
+  border-radius: var(--radius-xl);
+  background-color: var(--control-fill);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: 18px;
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.composer-ask-detail[data-raw] {
+  max-height: 12rem;
+  overflow: auto;
+  color: var(--ink-2);
 }
 /* A picked choice of several, or a kept line among them: a key in the piece's own fill with an ink edge and a check. */
 .composer-ask-choice[data-picked],

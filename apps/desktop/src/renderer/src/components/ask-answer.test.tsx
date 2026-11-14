@@ -21,7 +21,7 @@ const wrap = (children: ReactNode, blocked: string | null = null) => <AnswersBlo
 it("says on the approval card that its answer was refused", async () => {
   vi.mocked(core.call).mockRejectedValue(new Error("You're out of cloud hours."));
   render(wrap(<ApprovalCard block={approval} runId="hosted:cloud" />));
-  fireEvent.click(screen.getByRole("button", { name: "Allow" }));
+  fireEvent.click(screen.getByRole("button", { name: "Allow once" }));
   await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("You're out of cloud hours."));
   expect(core.call).toHaveBeenCalledWith("approvals.resolve", { runId: "hosted:cloud", approvalId: "ask-1", decision: "allow" });
 });
@@ -35,7 +35,7 @@ it("says on the question card that its answer was refused", async () => {
 
 it("takes no answer while the thread's place can't be reached, and says why on demand", () => {
   render(wrap(<ApprovalCard block={approval} runId="hosted:cloud" />, "OpenOrc Cloud can't be reached."));
-  const allow = screen.getByRole("button", { name: "Allow" });
+  const allow = screen.getByRole("button", { name: "Allow once" });
   expect(allow.hasAttribute("disabled")).toBe(true);
   expect(allow.getAttribute("data-tip")).toBe("OpenOrc Cloud can't be reached.");
   fireEvent.click(allow);

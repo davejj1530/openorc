@@ -125,6 +125,8 @@ export async function answer(calls: Calls, params: RpcParams<"approvals.resolve"
   const row = calls.row(threadId);
   const reply = await calls.on(threadId).request(ROUTES.answer(params.approvalId), { decision: params.decision, ...(params.answers && { answers: params.answers }) });
   if (!reply.answered) return refuse(calls, reply.refusal, turnSettings(row, undefined));
+  // A denial's note is the person's next message, as on this Mac: the server joins it to the turn or starts one.
+  if (params.note && params.decision === "deny") return post(calls, threadId, { text: params.note });
   await calls.refresh();
 }
 

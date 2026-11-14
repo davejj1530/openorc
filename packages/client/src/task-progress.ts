@@ -1,5 +1,6 @@
 import type { Block } from "./transcript.js";
 import type { RunState } from "@openorc/protocol";
+import { taskToolKey } from "./task-tool-reference.js";
 
 /** An unanswered approval outranks a failed run; otherwise the task keeps its saved status. */
 export function taskCardStatusLabel({ approvalKind, runState, taskLabel }: { approvalKind?: string; runState?: RunState; taskLabel: string }): string {
@@ -49,8 +50,9 @@ export function uniqueTaskCards(blocks: Block[], taskCards: boolean): Block[] {
   return blocks.filter((block) => {
     const taskId = block.kind === "tool" ? taskIdFromTool(block) : null;
     if (!taskId) return true;
-    if (seen.has(taskId)) return false;
-    seen.add(taskId);
+    const key = block.kind === "tool" ? taskToolKey(block, taskId) : taskId;
+    if (seen.has(key)) return false;
+    seen.add(key);
     return true;
   });
 }

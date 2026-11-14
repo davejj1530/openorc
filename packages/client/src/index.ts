@@ -179,6 +179,7 @@ export {
 } from "./sidebar-groups.js";
 export { snoozePresets, snoozePresetsChangeAt, snoozeWakeLabel } from "./snooze.js";
 export { startedWorkFromTool, taskActivity, taskCardStatusLabel, taskIdFromTool, taskStepLabel, uniqueTaskCards } from "./task-progress.js";
+export { taskReferenceFromTool, type TaskToolReference, type TaskToolSource } from "./task-tool-reference.js";
 export { pruneThreadFolds, threadFoldIds } from "./thread-folds.js";
 export { threadHeadline, type ThreadHeadline } from "./thread-headline.js";
 export {

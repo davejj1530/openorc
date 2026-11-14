@@ -10,6 +10,11 @@ export type OnlineTaskOpen = z.infer<typeof OnlineTaskOpen>;
 export type OnlineTaskPreparation = ({ state: "ready" } & OnlineTaskThread) | ({ state: "conflict" } & z.infer<typeof OnlineTaskEnvelope>);
 export const OnlineTaskSendContext = z.object({ id: z.string().min(1).max(128), ifRevision: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER) }).strict();
 export type OnlineTaskSendContext = z.infer<typeof OnlineTaskSendContext>;
+/** Routing inside opaque tool-result JSON; it is never a legacy Task or phone event field. */
+export const OnlineTaskToolReference = OnlineTaskRef.omit({ kind: true, accountId: true })
+  .extend({ place: z.literal("server") })
+  .strict();
+export type OnlineTaskToolReference = z.infer<typeof OnlineTaskToolReference>;
 export const OnlineTaskThreadDraft = z
   .object({
     reference: OnlineTaskRef,

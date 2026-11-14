@@ -1,3 +1,4 @@
+import { useSpaceThread } from "../lib/space-queries";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { isSubagentThread } from "@openorc/protocol";
 import { useLayout } from "../lib/layout";
@@ -18,7 +19,7 @@ function dropPreviewReason(id: string, visibleThreadIds: readonly string[]): str
 /** The shared panel's thread while it is one of these panes, and which side of them it docks on while open. */
 function useSharedPanel(ids: readonly string[]) {
   const requested = useLayout((s) => (s.panelThreadId && ids.includes(s.panelThreadId) ? s.panelThreadId : null));
-  const thread = useRpc("threads.get", { id: requested ?? "" }, { enabled: Boolean(requested) });
+  const thread = useSpaceThread(requested ?? "", { enabled: Boolean(requested) });
   const owner = thread.data && !isSubagentThread(thread.data) ? requested : null;
   const open = useLayout((s) => s.panelOpen) && owner !== null;
   const side = useLayout((s) => s.panelSide);
@@ -135,7 +136,7 @@ export function ThreadWorkspace() {
 }
 
 function SharedThreadPanel({ threadId }: { threadId: string }) {
-  const thread = useRpc("threads.get", { id: threadId });
+  const thread = useSpaceThread(threadId);
   const project = useRpc("projects.get", { id: thread.data?.projectId ?? "" }, { enabled: Boolean(thread.data) });
   return thread.data && !isSubagentThread(thread.data) && project.data ? <Panel context={{ kind: "thread", thread: thread.data, project: project.data }} /> : null;
 }

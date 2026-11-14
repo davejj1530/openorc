@@ -20,6 +20,7 @@ import { readOnboardingState, resolveOnboarding, writeOnboardingState, type Pers
 import { useRouter, type Route } from "./lib/router";
 import { useUi } from "./lib/ui";
 import { useTrafficLights } from "./lib/window";
+import { useSpaceNavigation } from "./lib/space-navigation";
 import { Memory } from "./views/Memory";
 import { NewSubthread } from "./views/NewSubthread";
 import { NewThread } from "./views/NewThread";
@@ -54,6 +55,7 @@ function requestedOnboarding(onboarding: ReturnType<typeof resolveOnboarding> | 
  * Task screens keep their own panel; other screens use the main column alone.
  */
 export function App() {
+  const space = useSpaceNavigation((state) => state.current);
   const trafficLights = useTrafficLights();
   const route = useRouter((s) => s.route);
   const ui = useUi();
@@ -140,8 +142,8 @@ export function App() {
   return (
     <TooltipProvider>
       <div className="app-shell h-full flex text-ink">
-        <Sidebar />
-        <div className="work-row flex-1 min-w-0 h-full flex">
+        <Sidebar key={`sidebar:${space ?? "local"}`} />
+        <div key={space ?? "local"} className="work-row flex-1 min-w-0 h-full flex">
           <StartScreen route={route} />
           {route.view === "thread" ? <ThreadWorkspace /> : null}
           {route.view === "task" ? (

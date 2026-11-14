@@ -1,3 +1,4 @@
+import { useSpaceProjects } from "../lib/space-queries";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Menu } from "@base-ui/react/menu";
 import type { Project, Task, TaskStatus } from "@openorc/protocol";
@@ -13,7 +14,8 @@ import { Button, Empty, IconButton, metaSlot, StatusDot } from "../components/ui
 import { CoversPreview } from "../lib/browser-preview";
 import { cn } from "../lib/cn";
 import { focusedProject, useLayout } from "../lib/layout";
-import { useRpc, useRpcMutation } from "../lib/client";
+import { useRpcMutation } from "../lib/client";
+import { useSpaceRpc as useRpc } from "../lib/space-queries";
 import { openTask } from "../lib/router";
 import { ownerMark, relativeTime } from "@openorc/client";
 import { floatingGround } from "../lib/use-anchor-ground";
@@ -91,7 +93,7 @@ function taskGroups(tasks: readonly Task[]): { key: TaskGroupKey; label: string;
  * The list owns focus so the shortcuts work without clicking first.
  */
 function TaskRows({ tasks, showProject }: { tasks: Task[]; showProject: boolean }) {
-  const projects = useRpc("projects.list", {}, { enabled: showProject });
+  const projects = useSpaceProjects(true);
   const projectOf = (id: string) => projects.data?.find((p) => p.id === id);
   const groupId = useId();
   const [collapsed, setCollapsed] = useState<Partial<Record<TaskGroupKey, boolean>>>({});

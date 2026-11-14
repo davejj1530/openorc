@@ -1,3 +1,4 @@
+import { useSpaceThread, useSpaceProjects } from "../lib/space-queries";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { isSubagentThread, WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
@@ -37,7 +38,7 @@ import {
   WORKSPACES_FOLD,
 } from "@openorc/client";
 import { useOrclingChatIds } from "../lib/orclings";
-import { useRpc, useRpcs } from "../lib/client";
+import { useSpaceRpc as useRpc, useSpaceRpcs as useRpcs } from "../lib/space-queries";
 import { useRouter } from "../lib/router";
 import { useUi } from "../lib/ui";
 import { ChevronRight, FolderPlus, Search } from "./icons";
@@ -52,17 +53,19 @@ import { IconButton, Tooltip } from "./ui";
 import { useListHold } from "../lib/use-list-hold";
 import { useScrollEdges } from "../lib/use-scroll-edges";
 import { cn } from "../lib/cn";
+import { useSpaceNavigation } from "../lib/space-navigation";
 
 /** Every project, and every project's id with the Workspace's, which the list reads all of. */
 export function useSidebarProjects() {
-  const projects = useRpc("projects.list", {});
+  const projects = useSpaceProjects();
+  const personal = useSpaceNavigation((state) => !state.current || state.current === state.personal);
   useEffect(() => {
     if (!projects.data) return;
     const { workspace: chosen, setWorkspace } = useLayout.getState();
     // A removed project can't stay the app's scope; it goes back to All projects.
     if (chosen !== ALL_WORKSPACES && !projects.data.some((p) => p.id === chosen)) setWorkspace(ALL_WORKSPACES);
   }, [projects.data]);
-  const all = [WORKSPACE_ID, ...(projects.data ?? []).map((project) => project.id)].sort();
+  const all = [...(personal ? [WORKSPACE_ID] : []), ...(projects.data ?? []).map((project) => project.id)].sort();
   return { query: projects, all };
 }
 
@@ -113,6 +116,8 @@ export function SidebarThreadBrowser() {
  * an old pin still leads the list, and so do the threads that need you, so a project's count holds them all.
  */
 function useThreadList(children: ChildPages) {
+  const spaceId = useSpaceNavigation((state) => state.current);
+  const ownership = useSpaceNavigation((state) => state.ownership);
   const queryClient = useQueryClient();
   const pinnedOnly = useLayout((s) => s.pinnedOnly);
   const hidden = useLayout((s) => s.hiddenWorkspaces);
@@ -122,8 +127,8 @@ function useThreadList(children: ChildPages) {
   const { query: projects, all: projectIds } = useSidebarProjects();
   const homes = useOrclingChatIds();
   const activeId = useRouter((s) => (s.route.view === "thread" ? s.route.threadId : null));
-  const active = useRpc("threads.get", { id: activeId ?? "" }, { enabled: Boolean(activeId) });
-  const listed = { projectIds, filter: "active" as const, orderBy: "activity" as const, includeChildren: true, ...children.params() };
+  const active = useSpaceThread(activeId ?? "", { enabled: Boolean(activeId) });
+  const listed = { projectIds, filter: "active" as const, orderBy: "activity" as const, includeChildren: true, ...children.params(), ...(spaceId ? { spaceId, ownership } : {}) };
   const params = [{ ...listed, pinnedOnly, limit: limit + 1 }];
   const queries = useRpcs("threads.list", params, { enabled: Boolean(projects.data), refetchInterval: 60_000 });
   const besides = { enabled: Boolean(projects.data) && !pinnedOnly, refetchInterval: 60_000 };
@@ -195,7 +200,12 @@ function dayList({ pages, pinPage, needsYouPage, resolvedPage, pinnedOnly, activ
  * Workspace's threads, which belong to none.
  */
 function groupProjects(projects: readonly { id: string; name: string; rootPath: string }[] | undefined, rows: readonly ThreadSummary[]): GroupProject[] {
-  return [...(projects ?? []).map(({ id, name, rootPath }) => ({ id, name, rootPath })), ...cloudProjects(rows), { id: WORKSPACE_ID, name: "No project" }];
+  const known = new Set(projects?.map((project) => project.id));
+  return [
+    ...(projects ?? []).map(({ id, name, rootPath }): GroupProject => ({ id, name, rootPath, cloud: rootPath ? undefined : true })),
+    ...cloudProjects(rows).filter((project) => !known.has(project.id)),
+    { id: WORKSPACE_ID, name: "No project" },
+  ];
 }
 
 /**

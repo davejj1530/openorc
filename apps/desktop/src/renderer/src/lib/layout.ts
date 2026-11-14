@@ -4,6 +4,7 @@ import { WORKSPACE_ID } from "@openorc/protocol";
 import { create } from "zustand";
 import type { FileReference } from "../../../shared/file-reference";
 import { withFileScope } from "./file-scope";
+import { navigationScope } from "./navigation-scope";
 
 /** The shared panel tools, and the desktop's own Device panel. */
 export type PanelTab = PanelTool | "device";
@@ -117,8 +118,8 @@ function persist(s: LayoutState): void {
         panelOpen: s.panelOpen,
         panelWidth: s.panelWidth,
         panelSide: s.panelSide,
-        workspace: s.workspace,
-        hiddenWorkspaces: s.hiddenWorkspaces,
+        workspace: navigationScope.active ? read().workspace : s.workspace,
+        hiddenWorkspaces: navigationScope.active ? read().hiddenWorkspaces : s.hiddenWorkspaces,
         collapsed: s.collapsed,
         previewUrls: s.previewUrls,
       }),

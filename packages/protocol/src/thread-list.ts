@@ -1,9 +1,12 @@
 import { z } from "zod";
 import { ThreadFilter } from "./domain.js";
+import { SpaceId } from "./spaces.js";
 
 export const THREAD_CHILD_PAGE = 5;
 
 export const ThreadListParams = z.object({
+  spaceId: SpaceId.optional(),
+  ownership: z.enum(["mine", "everyone"]).optional(),
   projectId: z.string().optional(),
   projectIds: z.array(z.string()).optional(),
   projectsOnly: z.boolean().optional(),

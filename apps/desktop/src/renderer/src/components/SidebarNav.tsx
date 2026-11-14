@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { NEEDS_YOU_PAGE, threadStatus, waitsOnYou } from "@openorc/client";
 import { WORKSPACE_ID } from "@openorc/protocol";
-import { useRpc } from "../lib/client";
+import { useSpaceRpc as useRpc } from "../lib/space-queries";
+import { useRpc as useGlobalRpc } from "../lib/client";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
 import type { SidebarScreen } from "../lib/layout";
 import { useOrclingChatIds } from "../lib/orclings";
@@ -38,7 +39,7 @@ function NavRow({ icon, label, count = 0, lead, current, pressed, onClick }: Nav
 /** Orclings' chats, their own and their groups', that wait on the person. */
 function useWaitingOrclings(): number {
   const homes = useOrclingChatIds();
-  const rows = useRpc(
+  const rows = useGlobalRpc(
     "threads.list",
     { projectIds: [WORKSPACE_ID], filter: "active", orderBy: "activity", includeChildren: false, needsYou: true, limit: NEEDS_YOU_PAGE },
     { enabled: homes.size > 0, refetchInterval: 60_000 },

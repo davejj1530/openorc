@@ -1,3 +1,4 @@
+import { useSpaceProjects } from "./space-queries";
 import { offeredAccount, projectAccountChoice } from "@openorc/client";
 import { type ClaudeAccounts, type Project, type RunMode, type Schedule, type WorkspaceMode } from "@openorc/protocol";
 import { useEffect, useState } from "react";
@@ -26,7 +27,7 @@ function useScheduleAccount(initial: string | undefined, project: Project | unde
 
 /** Owns the editable schedule, selected target and the version used for its save. */
 export function useScheduleEditor(schedule: Schedule | null, latest: Schedule | undefined, projectId: string, onClose: () => void) {
-  const projects = useRpc("projects.list", {});
+  const projects = useSpaceProjects(true);
   const [project, setProject] = useState(schedule?.projectId ?? projectId);
   const { accounts, setAccount, claudeAccountId } = useScheduleAccount(
     schedule?.claudeAccountId,

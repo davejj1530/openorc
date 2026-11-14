@@ -27,6 +27,8 @@ import type { HostedDeps, HostedThreads, MergedMethod, PlacePage } from "./index
 import { READ_LIMIT, type Follower } from "./follow.js";
 import type { Account } from "./account.js";
 import type { Spaces } from "./spaces.js";
+import { spaceProjects } from "./space-projects.js";
+import { AccountCache } from "./account-cache.js";
 import { askNotice, endNotice, noticed } from "./notices.js";
 import * as sends from "./sends.js";
 import { Refused, type Requests, type Session, type SessionChange } from "./session.js";
@@ -58,7 +60,10 @@ const keptThreads = z.object({
 });
 type Heard = z.infer<typeof keptThreads>;
 
-type ThreadsDeps = { session: Session; spaces: Spaces; follower: Follower; account: Pick<Account, "status" | "refused"> } & Pick<HostedDeps, "kept" | "projects" | "push" | "notify" | "now" | "log">;
+type ThreadsDeps = { session: Session; spaces: Spaces; follower: Follower; account: Pick<Account, "status" | "refused"> } & Pick<
+  HostedDeps,
+  "server" | "kept" | "projects" | "push" | "notify" | "now" | "log"
+>;
 
 type Answer<M extends RoutedMethod> = (threads: Threads, params: RpcParams<M>) => Promise<RpcResults[M]> | RpcResults[M];
 
@@ -181,6 +186,8 @@ const ANSWERS: { [M in RoutedMethod]: Answer<M> | ReturnType<typeof refused> | t
 };
 
 export class Threads implements HostedThreads {
+  readonly #cache: AccountCache<Heard>;
+  #generation = -1;
   readonly brain = "hosted";
   #heard: Heard | null = null;
   #reading: Promise<void> | null = null;
@@ -194,6 +201,7 @@ export class Threads implements HostedThreads {
   readonly calls: sends.Calls;
 
   constructor(private readonly deps: ThreadsDeps) {
+    this.#cache = new AccountCache({ kept: deps.kept, part: "threads", server: deps.server, schema: keptThreads });
     this.calls = {
       on: (threadId) => this.on(threadId),
       row: (threadId) => this.row(threadId),
@@ -213,8 +221,8 @@ export class Threads implements HostedThreads {
   /** Reads what was kept for the signed-in address. */
   start(): void {
     const state = this.deps.session.state;
-    const kept = parseKept(this.deps.kept.load("threads"));
-    if (!kept || !state.signedIn || kept.email !== state.email) return this.deps.kept.save("threads", null);
+    const kept = state.signedIn ? this.#cache.load(state.email) : null;
+    if (!kept || !state.signedIn || kept.email !== state.email) return;
     this.#heard = kept;
     // Windows that read their lists while the kept rows were loading read them again.
     this.#tell();
@@ -262,7 +270,8 @@ export class Threads implements HostedThreads {
 
   listed<M extends MergedMethod>(method: M, params: RpcParams<M>): PlacePage<M> | null {
     if (!this.active || method === "inbox.list") return null;
-    const summaries = this.#summaries();
+    const scope = params as RpcParams<"threads.list">;
+    const summaries = this.#summaries(scope.spaceId, scope.ownership);
     const rows = method === "threads.list" ? listRows(summaries, params as RpcParams<"threads.list">) : resolvedCount(summaries, params as RpcParams<"threads.resolvedCount">, this.deps.now());
     return { reach: this.reach, heardAt: this.#heard!.heardAt, rows } as PlacePage<M>;
   }
@@ -285,7 +294,7 @@ export class Threads implements HostedThreads {
     if (draft !== undefined) {
       const heard = this.#heard!;
       heard.here[threadId] = { draft };
-      this.deps.kept.save("threads", JSON.stringify(heard));
+      this.#save();
       this.#tell();
     }
     return this.summary(threadId);
@@ -298,7 +307,7 @@ export class Threads implements HostedThreads {
     if (heard) {
       heard.rows = heard.rows.filter((row) => row.id !== threadId);
       delete heard.here[threadId];
-      this.deps.kept.save("threads", JSON.stringify(heard));
+      this.#save();
       this.#tell();
     }
     return null;
@@ -313,29 +322,32 @@ export class Threads implements HostedThreads {
     const settings = startSettings(params);
     if (!isHostedAgent(settings.agent)) throw new Refused(`${harnessShortName(settings.agent)} doesn't run on OpenOrc Cloud.`);
     if (params.attachments?.length) throw new Refused("Files can't be sent to OpenOrc Cloud yet.");
-    const project = this.#projectFor(params.projectId);
-    if (!project) throw new Refused("Add this project to OpenOrc Cloud in Settings first.");
+    const project = this.#projectFor(params.projectId, params.spaceId);
+    if (!project) throw new Refused(params.spaceId ? "This project isn't available in this space." : "Add this project to OpenOrc Cloud in Settings first.");
+    const generation = this.deps.session.generation;
     const body = { projectId: project.id, ...(params.title && { title: params.title }), settings, first: { id: crypto.randomUUID(), text: params.prompt }, ready: true };
     const reply = await this.deps.session.in(project.space).request(ROUTES.start, body);
+    if (generation !== this.deps.session.generation) throw new Refused("Your OpenOrc session changed. Try again.");
     if (!reply.thread) return sends.refuse(this.calls, reply.first?.sent === false ? reply.first.refusal : "", settings);
     const row = { ...reply.thread, space: project.space };
     const heard = this.#heard;
     if (heard && !heard.rows.some((each) => each.id === row.id)) {
       heard.rows = [row, ...heard.rows];
-      this.deps.kept.save("threads", JSON.stringify(heard));
+      this.#save();
       this.#tell();
     }
     void this.refresh();
-    return { thread: this.summary(row.id), run: toRuns(row, this.reach)[0] ?? null };
+    return { thread: this.summary(row.id, params.spaceId), run: toRuns(row, this.reach)[0] ?? null };
   }
 
-  /** The server project with a Mac project's repository: the personal space's first, then any other space's. */
-  #projectFor(macId: string): HeardProject | null {
+  /** Explicit scopes select that space's project. Legacy starts prefer Personal, then another matching space. */
+  #projectFor(macId: string, spaceId?: string): HeardProject | null {
     const heard = this.#heard;
+    if (macId.startsWith(CLOUD_PROJECT)) return heard?.projects.find((project) => CLOUD_PROJECT + project.id === macId && (!spaceId || project.space === spaceId)) ?? null;
     const remote = this.deps.projects().find((project) => project.id === macId)?.remote ?? null;
     const repo = githubRepoOf(remote);
     if (!heard || !repo) return null;
-    const matching = heard.projects.filter((project) => project.fullName.toLowerCase() === repo);
+    const matching = heard.projects.filter((project) => project.fullName.toLowerCase() === repo && (!spaceId || project.space === spaceId));
     return matching.find((project) => project.space === heard.personal) ?? matching[0] ?? null;
   }
 
@@ -349,7 +361,7 @@ export class Threads implements HostedThreads {
     const heard = this.#heard;
     if (!heard) return;
     heard.rows = heard.rows.map((each) => (each.id === row.id ? { ...row, space: each.space } : each));
-    this.deps.kept.save("threads", JSON.stringify(heard));
+    this.#save();
     this.#tell();
   }
 
@@ -365,8 +377,8 @@ export class Threads implements HostedThreads {
     return this.deps.session.in(this.row(threadId).space);
   }
 
-  summary(threadId: string): ThreadSummary {
-    const summary = this.#summaries().find((each) => each.id === threadId);
+  summary(threadId: string, spaceId?: string): ThreadSummary {
+    const summary = this.#summaries(spaceId).find((each) => each.id === threadId);
     if (!summary) throw new Error(GONE);
     return summary;
   }
@@ -430,8 +442,11 @@ export class Threads implements HostedThreads {
    */
   refresh(): Promise<void> {
     if (!this.#reading) {
-      this.#reading = this.#read().finally(() => (this.#reading = null));
-      return this.#reading;
+      const reading = this.#read().finally(() => {
+        if (this.#reading === reading) this.#reading = null;
+      });
+      this.#reading = reading;
+      return reading;
     }
     // A read already under way may have started before what the asker wants to see: one more follows it, for everyone.
     this.#again ??= this.#reading.then(() => {
@@ -458,7 +473,7 @@ export class Threads implements HostedThreads {
     const projectsBefore = JSON.stringify(this.#heard?.projects);
     if (this.#heard?.email === state.email) this.#tellPerson(this.#heard.rows, read.rows);
     this.#heard = { email: state.email, heardAt: this.deps.now(), ...read, here: this.#heard?.email === state.email ? this.#heard.here : {} };
-    this.deps.kept.save("threads", JSON.stringify(this.#heard));
+    this.#save();
     if (JSON.stringify([this.#heard.rows, this.#heard.projects]) !== before) this.#tell();
     // Settings shows which of this Mac's projects are on OpenOrc Cloud, read off these.
     if (JSON.stringify(this.#heard.projects) !== projectsBefore) this.deps.push({ type: "invalidate", keys: ["account"] });
@@ -513,10 +528,17 @@ export class Threads implements HostedThreads {
 
   /** Signed out: the rows and their kept copy go, and the windows read their lists again. */
   #changed(change: SessionChange): void {
+    if (this.#generation !== this.deps.session.generation) {
+      this.#generation = this.deps.session.generation;
+      this.#reading = null;
+      this.#again = null;
+      const state = this.deps.session.state;
+      if (state.signedIn) this.#heard = this.#cache.load(state.email);
+    }
     if (!this.deps.session.state.signedIn) {
       const had = this.#heard !== null;
+      this.#cache.forget(this.#heard?.me ?? null);
       this.#heard = null;
-      this.deps.kept.save("threads", null);
       return had ? this.#tell() : undefined;
     }
     // Reach shows on every row, so the lists are read again when it moves.
@@ -543,41 +565,45 @@ export class Threads implements HostedThreads {
     return new Map((this.#heard?.rows ?? []).map((row) => [row.id, row]));
   }
 
+  #save(): void {
+    if (this.#heard) this.#cache.save(this.#heard.me, this.#heard.email, this.#heard);
+  }
+
   #cloudProject(id: string): HeardProject | null {
     if (!id.startsWith(CLOUD_PROJECT)) return null;
     return this.#heard?.projects.find((project) => CLOUD_PROJECT + project.id === id) ?? null;
   }
 
   /** Every row in the app's shape, each under its Mac project, or under its own when this Mac has none. */
-  #summaries(): ThreadSummary[] {
+  #summaries(spaceId?: string, ownership?: "mine" | "everyone"): ThreadSummary[] {
     const heard = this.#heard;
     const state = this.deps.session.state;
     if (!heard || !state.signedIn) return [];
-    const pairs = projectPairs(heard.projects, this.deps.projects());
-    return heard.rows.map((row) => {
-      const pair = row.projectId ? pairs.get(row.projectId) : undefined;
-      const projectId = pair?.macId ?? CLOUD_PROJECT + (row.projectId ?? "none");
-      const here = heard.here[row.id];
-      const summary = toSummary(row, {
-        projectId,
-        orphanOf: pair?.macId ? null : (pair?.name ?? "OpenOrc Cloud"),
-        reach: state.reach,
-        heardAt: heard.heardAt,
-        startedBy: starterOf(row, heard.me),
-        now: this.deps.now(),
+    const local = this.deps.projects();
+    const visible = spaceId ? spaceProjects(spaceId, heard.personal ?? "", heard.projects, local) : null;
+    const pairs = visible
+      ? new Map(
+          heard.projects
+            .filter((project) => project.space === spaceId)
+            .map((project) => [project.id, { macId: visible.find((row) => row.hostedProjectId === project.id)?.localProjectId ?? null, name: project.name }]),
+        )
+      : projectPairs(heard.projects, local);
+    return heard.rows
+      .filter((row) => (!spaceId || row.space === spaceId) && (!spaceId || ownership !== "mine" || row.startedBy?.id === heard.me))
+      .map((row) => {
+        const pair = row.projectId ? pairs.get(row.projectId) : undefined;
+        const projectId = pair?.macId ?? CLOUD_PROJECT + (row.projectId ?? "none");
+        const here = heard.here[row.id];
+        const summary = toSummary(row, {
+          projectId,
+          orphanOf: pair?.macId ? null : (pair?.name ?? "OpenOrc Cloud"),
+          reach: state.reach,
+          heardAt: heard.heardAt,
+          startedBy: starterOf(row, heard.me),
+          now: this.deps.now(),
+        });
+        return here?.draft ? { ...summary, draft: here.draft } : summary;
       });
-      return here?.draft ? { ...summary, draft: here.draft } : summary;
-    });
-  }
-}
-
-function parseKept(json: string | null): Heard | null {
-  if (!json) return null;
-  try {
-    const parsed = keptThreads.safeParse(JSON.parse(json));
-    return parsed.success ? parsed.data : null;
-  } catch {
-    return null;
   }
 }
 

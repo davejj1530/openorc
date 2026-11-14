@@ -1,11 +1,12 @@
 import { Schedule } from "@openorc/protocol";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { queryClient } from "../lib/client";
 import { useLayout } from "../lib/layout";
 import { core } from "../lib/rpc";
 import { useRouter } from "../lib/router";
+import { spaceNavigation } from "../lib/space-navigation";
 import { Scheduled } from "./Scheduled";
 
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
@@ -60,9 +61,10 @@ beforeEach(() => {
   vi.mocked(core.call).mockImplementation(async (method, _input) => {
     if (method === "projects.list")
       return [
-        { id: "project", name: "Project" },
-        { id: "other", name: "Other project" },
+        { id: "project", name: "Project", rootPath: "/tmp/project" },
+        { id: "other", name: "Other project", rootPath: "/tmp/other" },
       ] as never;
+    if (method === "spaces.projects") return spaceNavigation.getState().inventory.find((space) => space.id === ("spaceId" in _input ? _input.spaceId : undefined))?.projects as never;
     if (method === "schedules.list") return [...(schedule ? [schedule] : []), ...paused] as never;
     if (method === "agents.models") return [];
     if (method === "system.info") return { harnesses: [{ id: "codex", state: "ready", path: "/bin/codex", version: "1", revision: 1 }] } as never;
@@ -77,8 +79,30 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  if (spaceNavigation.getState().key) spaceNavigation.getState().end();
   queryClient.clear();
   vi.resetAllMocks();
+});
+
+it("preserves the existing unscoped list and scopes schedules to the selected space's local projects", async () => {
+  schedule = savedSchedule();
+  paused = [{ ...savedSchedule(), id: "other-schedule", projectId: "other", title: "Other review" }];
+  render(
+    <QueryClientProvider client={queryClient}>
+      <Scheduled />
+    </QueryClientProvider>,
+  );
+  await screen.findByText("Other review");
+  const project = (id: string) => ({ key: id, name: id, repo: null, localProjectId: id, hostedProjectId: null, connected: false });
+  act(() => {
+    spaceNavigation.getState().initialize("schedules", "personal", [
+      { id: "personal", personal: true, projects: [project("other")], threads: [], taskIds: [] },
+      { id: "birch", personal: false, projects: [project("project")], threads: [], taskIds: [] },
+    ]);
+    spaceNavigation.getState().select("birch");
+  });
+  await screen.findByRole("button", { name: /Review/ });
+  await waitFor(() => expect(screen.queryByText("Other review")).toBeNull());
 });
 
 it("keeps active and paused schedules on separate tabs", async () => {

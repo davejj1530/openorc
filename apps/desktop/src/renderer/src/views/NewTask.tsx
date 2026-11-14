@@ -1,3 +1,4 @@
+import { useSpaceProjects } from "../lib/space-queries";
 import { useRef, useState, type ReactNode } from "react";
 import { Check, FolderGit2, FolderPlus, GitBranch, Plus } from "../components/icons";
 import { PageCrumbs } from "../components/PageTitle";
@@ -93,7 +94,7 @@ function NewTaskLocation(props: {
 }
 
 export function NewTask({ projectId, threadId }: { projectId?: string; threadId?: string }) {
-  const projects = useRpc("projects.list", {});
+  const projects = useSpaceProjects(true);
   const thread = useRpc("threads.get", { id: threadId ?? "" }, { enabled: Boolean(threadId) });
   const settings = useRpc("app.settings.get", {});
   const create = useRpcMutation("tasks.create");

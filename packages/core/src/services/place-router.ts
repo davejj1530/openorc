@@ -13,28 +13,34 @@
  *   4. A start that asks for OpenOrc Cloud goes to it, and never to this Mac or the brain, which would start the
  *      thread somewhere the person did not choose.
  */
-import type { HostedThreads } from "@openorc/hosted";
+import type { HostedSpaces, HostedThreads } from "@openorc/hosted";
 import { mergeThreadPages, ownerRoute, rpcParams, type RoutedMethod, type RpcMethod, type RpcParams, type RpcRequest, type ThreadSummary } from "@openorc/protocol";
 import type { RpcReply } from "../transport.js";
+import { SpaceRequests } from "./space-requests.js";
 
 export interface PlaceRouterDeps {
   /** The place, or null while there is none (no account server). */
   place(): HostedThreads | null;
+  spaces?(): HostedSpaces | null;
   /** What answered every window call before this router existed: the brain router while a brain is set up, else dispatch. */
   next(request: RpcRequest): Promise<RpcReply>;
 }
 
 export class PlaceRouter {
+  private readonly scoped = new SpaceRequests({ spaces: () => this.deps.spaces?.() ?? null, place: () => this.deps.place(), next: (request) => this.deps.next(request) });
   constructor(private readonly deps: PlaceRouterDeps) {}
 
   handle(request: RpcRequest): Promise<RpcReply> {
     const place = this.deps.place();
-    if (!place?.active || !Object.hasOwn(rpcParams, request.method)) return this.deps.next(request);
+    if (!Object.hasOwn(rpcParams, request.method)) return this.deps.next(request);
     const method = request.method as RpcMethod;
     const parsed = rpcParams[method].safeParse(request.params ?? {});
     // The Mac words a refusal of params, as before.
     if (!parsed.success) return this.deps.next(request);
     const params = parsed.data as Record<string, unknown>;
+    if (typeof params["spaceId"] === "string" && ["threads.list", "threads.resolvedCount", "threads.search", "threads.start", "tasks.list"].includes(method))
+      return this.scoped.handle(request, params["spaceId"]);
+    if (!place?.active) return this.deps.next(request);
     if (method === "projects.get" && place.holds({ project: String(params["id"]) })) return Promise.resolve(result(request, place.project(String(params["id"]))));
     if (method === "threads.start" && params["hosted"]) return this.asked(place, request, "threads.start", params);
     return this.routed(place, request, method, params);

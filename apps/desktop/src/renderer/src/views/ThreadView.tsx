@@ -1,3 +1,4 @@
+import { useSpaceThread } from "../lib/space-queries";
 import { isSubagentThread } from "@openorc/protocol";
 import { useEffect, useRef, useState } from "react";
 import { Conversation } from "../components/Conversation";
@@ -14,7 +15,7 @@ import { useRouter } from "../lib/router";
  */
 /** `first` and `last` say whether this pane's header starts or ends the work row, past any panel docked beside it. */
 export function ThreadView({ threadId, first, last, focused, onClose }: { threadId: string; first: boolean; last: boolean; focused: boolean; onClose?: () => void }) {
-  const thread = useRpc("threads.get", { id: threadId });
+  const thread = useSpaceThread(threadId);
   const project = useRpc("projects.get", { id: thread.data?.projectId ?? "" }, { enabled: Boolean(thread.data) });
   const update = useRpcMutation("threads.update");
   const followProject = useLayout((s) => s.followProject);

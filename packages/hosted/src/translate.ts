@@ -286,7 +286,7 @@ export function projectPairs(projects: readonly WireProject[], local: readonly {
 }
 
 /** Whether a row belongs to a list across these Mac projects: its own project, or the cloud's own, which none here stands for. */
-const inProjects = (row: ThreadSummary, projectIds: readonly string[]) => projectIds.includes(row.projectId) || row.projectId.startsWith(CLOUD_PROJECT);
+const inProjects = (row: ThreadSummary, projectIds: readonly string[], scoped = false) => projectIds.includes(row.projectId) || (!scoped && row.projectId.startsWith(CLOUD_PROJECT));
 
 const at = (iso: string | null): number | null => (iso === null ? null : Date.parse(iso));
 
@@ -302,7 +302,7 @@ function snoozedUntil(row: WireThread, now: number): number | null {
  */
 export function resolvedCount(rows: readonly ThreadSummary[], params: RpcParams<"threads.resolvedCount">, now: number): number {
   return rows.filter((row) => {
-    if (row.parentThreadId || !inProjects(row, params.projectIds)) return false;
+    if (row.parentThreadId || !inProjects(row, params.projectIds, Boolean(params.spaceId))) return false;
     if (row.archivedAt !== null) return true;
     return !row.pinnedAt && !(row.snoozedUntil && row.snoozedUntil > now) && row.activity !== "waiting" && row.lastActivityAt < params.quietBefore;
   }).length;
@@ -318,7 +318,7 @@ function inFilter(row: ThreadSummary, filter: NonNullable<RpcParams<"threads.lis
 /** The rows a list asked for, from every row the account has: the same filters the Mac's list applies, in memory. */
 export function listRows(rows: readonly ThreadSummary[], params: RpcParams<"threads.list">): ThreadSummary[] {
   return rows.filter((row) => {
-    if (params.projectIds ? !inProjects(row, params.projectIds) : params.projectId && row.projectId !== params.projectId) return false;
+    if (params.projectIds ? !inProjects(row, params.projectIds, Boolean(params.spaceId)) : params.projectId && row.projectId !== params.projectId) return false;
     if (!inFilter(row, params.filter ?? "active")) return false;
     if (params.pinnedOnly && !row.pinnedAt) return false;
     if (!params.includeChildren && row.parentThreadId) return false;

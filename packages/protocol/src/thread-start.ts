@@ -3,6 +3,7 @@ import { ClaudeAccountId } from "./claude-accounts.js";
 import { PermissionPreset, RunMode, WorkspaceMode } from "./domain.js";
 import { AgentKind } from "./events.js";
 import { ExecutionTarget } from "./execution-target.js";
+import { SpaceId } from "./spaces.js";
 
 /** Why a start that names its thread's id is refused: that thread exists. */
 export const THREAD_EXISTS = "That conversation already exists.";
@@ -17,6 +18,7 @@ export const ThreadStartParams = z
     id: z.string().uuid().optional(),
     claudeAccountId: ClaudeAccountId.optional(),
     projectId: z.string(),
+    spaceId: SpaceId.optional(),
     workingDirectory: z.string().min(1).max(4096).optional(),
     agent: AgentKind.optional(),
     executionTarget: ExecutionTarget.optional(),

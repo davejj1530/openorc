@@ -3,7 +3,7 @@ import { Menu } from "@base-ui/react/menu";
 import { NEEDS_YOU_PAGE, useSidebarNow } from "@openorc/client";
 import type { Project } from "@openorc/protocol";
 import { CoversPreview } from "../lib/browser-preview";
-import { useRpc } from "../lib/client";
+import { useSpaceRpc as useRpc } from "../lib/space-queries";
 import { ALL_WORKSPACES, useLayout } from "../lib/layout";
 import { useOrclingChatIds } from "../lib/orclings";
 import { openProject } from "../lib/router";
@@ -87,7 +87,7 @@ export function ProjectScope() {
                 ))}
               </div>
               <Menu.Separator className={menuSeparator} />
-              {project ? <ProjectActions project={project} onRemove={() => setRemoving(true)} /> : null}
+              {project?.rootPath ? <ProjectActions project={project} onRemove={() => setRemoving(true)} /> : null}
               <Menu.Item className={cn(menuItem, "sidebar-scope-action")} onClick={() => useUi.getState().setImportProject(true)}>
                 <FolderPlus size={13} /> Add project
               </Menu.Item>

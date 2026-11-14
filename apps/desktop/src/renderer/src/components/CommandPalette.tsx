@@ -1,9 +1,10 @@
+import { useSpaceProjects } from "../lib/space-queries";
 import { Command } from "cmdk";
 import { useEffect, useState, type ReactNode } from "react";
 import { latestActivity, rowAge, useSidebarNow } from "@openorc/client";
 import { isHarnessId, type ThreadSummary } from "@openorc/protocol";
 import { CoversPreview } from "../lib/browser-preview";
-import { useRpc } from "../lib/client";
+import { useSpaceRpc as useRpc } from "../lib/space-queries";
 import { useOrclingChatIds, useOrclings } from "../lib/orclings";
 import { paletteActions } from "../lib/palette-actions";
 import { openTask, openThread, useRouter } from "../lib/router";
@@ -178,7 +179,7 @@ function MessageHits({ hits, go }: { hits: RpcHits; go: (fn: () => void) => void
 type RpcHits = NonNullable<ReturnType<typeof useRpc<"threads.search">>["data"]>;
 
 function ProjectGroup({ go }: { go: (fn: () => void) => void }) {
-  const projects = useRpc("projects.list", {}).data ?? [];
+  const projects = useSpaceProjects(true).data ?? [];
   const navigate = useRouter((s) => s.navigate);
   return (
     <PlaceGroup
@@ -191,7 +192,7 @@ function ProjectGroup({ go }: { go: (fn: () => void) => void }) {
 
 /** A project's name by its id, for the faint place on a row. */
 function useProjectNames(): (id: string) => string | undefined {
-  const projects = useRpc("projects.list", {}).data ?? [];
+  const projects = useSpaceProjects().data ?? [];
   return (id) => projects.find((project) => project.id === id)?.name;
 }
 

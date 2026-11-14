@@ -19,9 +19,11 @@ import { BrowserSignInTrip } from "./browser-sign-in.js";
 import { GithubConnect } from "./github.js";
 import { Paying } from "./paying.js";
 import { SignIns } from "./signins.js";
+import { AccountCache } from "./account-cache.js";
 import { ROUTES, SOCKET, wireBilling, wireGithubRepository, wireHostedSettings, wireSignIn, wireTopics } from "./wire.js";
 
 const keptAnswers = z.object({
+  userId: z.string().nullable().default(null),
   email: z.string(),
   billing: wireBilling.nullable(),
   person: z.object({ name: z.string(), image: z.string().nullable() }).nullable().default(null),
@@ -39,10 +41,11 @@ type Heard = z.infer<typeof keptAnswers>;
 /** `cloud`: the repositories the person's spaces have as projects, and a read of them again. */
 type AccountDeps = { session: Session; cloud: { repos(): ReadonlySet<string>; reread(): Promise<void> } } & Pick<
   HostedDeps,
-  "kept" | "push" | "now" | "mintClaudeToken" | "browser" | "deviceName" | "projects"
+  "kept" | "server" | "push" | "now" | "mintClaudeToken" | "browser" | "deviceName" | "projects"
 >;
 
 export class Account implements HostedAccount {
+  readonly #cache: AccountCache<Heard>;
   #heard: Heard | null = null;
   #error: string | null = null;
   #announced = "";
@@ -52,6 +55,7 @@ export class Account implements HostedAccount {
   readonly #paying: Paying;
 
   constructor(private readonly deps: AccountDeps) {
+    this.#cache = new AccountCache({ kept: deps.kept, part: "account", server: deps.server, schema: keptAnswers });
     this.#signingIn = new BrowserSignInTrip({ session: deps.session, browser: deps.browser, deviceName: deps.deviceName, changed: () => this.#announce() });
     this.#signIns = new SignIns({ session: deps.session, mintClaudeToken: deps.mintClaudeToken, now: deps.now, changed: () => this.#announce(), landed: () => this.#refresh() });
     this.#github = new GithubConnect({ session: deps.session, browser: deps.browser, changed: () => this.#announce(), landed: () => this.#landed() });
@@ -78,8 +82,8 @@ export class Account implements HostedAccount {
     } catch (error) {
       this.#error = wordsOf(error);
     }
-    const kept = parseKept(this.deps.kept.load("account"));
     const state = this.deps.session.state;
+    const kept = state.signedIn ? this.#cache.load(state.email) : null;
     if (kept && state.signedIn && kept.email === state.email) this.#heard = kept;
     this.#announce();
   }
@@ -219,14 +223,16 @@ export class Account implements HostedAccount {
   }
 
   #changed(change: SessionChange): void {
-    if (!this.deps.session.state.signedIn) {
+    const state = this.deps.session.state;
+    if (state.signedIn && this.#heard?.email !== state.email) this.#heard = this.#cache.load(state.email);
+    if (!state.signedIn) {
       // Before the session's own storage is cleared and before the server hears of it.
       this.#signIns.forget();
       this.#github.forget();
       this.#paying.forget();
+      this.#cache.forget(this.#heard?.userId ?? null);
       this.#heard = null;
       this.#error = null;
-      this.deps.kept.save("account", null);
     }
     if (change === "connected") void this.#refresh();
     this.#announce();
@@ -238,6 +244,7 @@ export class Account implements HostedAccount {
    */
   async #refresh(): Promise<void> {
     const email = this.#signedInAs();
+    const generation = this.deps.session.generation;
     if (!email) return;
     const [person, billing, sandbox, signIns, github] = await Promise.allSettled([
       this.deps.session.request(ROUTES.person),
@@ -246,11 +253,11 @@ export class Account implements HostedAccount {
       this.deps.session.request(ROUTES.signIns),
       this.#readGithub(),
     ]);
-    if (this.#signedInAs() !== email) return;
+    if (this.#signedInAs() !== email || this.deps.session.generation !== generation) return;
     if (person.status === "fulfilled" && person.value === null) return void this.deps.session.end("server");
     this.#error = billing.status === "rejected" && !(billing.reason instanceof OutOfReach) ? wordsOf(billing.reason) : null;
     this.#hear(email, {
-      ...(person.status === "fulfilled" && person.value && { person: { name: person.value.user.name, image: toImage(person.value.user.image) } }),
+      ...(person.status === "fulfilled" && person.value && { userId: person.value.user.id, person: { name: person.value.user.name, image: toImage(person.value.user.image) } }),
       ...(billing.status === "fulfilled" && { billing: billing.value }),
       ...(sandbox.status === "fulfilled" && { sandbox: sandbox.value }),
       ...(signIns.status === "fulfilled" && { signIns: signIns.value }),
@@ -286,10 +293,10 @@ export class Account implements HostedAccount {
 
   /** Puts what the server just answered for `email` beside what it said before, keeps it, and tells the windows. */
   #hear(email: string, parts: Partial<Omit<Heard, "email">>): void {
-    const before = this.#heard?.email === email ? this.#heard : { email, billing: null, person: null, sandbox: null, signIns: null, ended: [], github: null };
+    const before = this.#heard?.email === email ? this.#heard : { email, userId: null, billing: null, person: null, sandbox: null, signIns: null, ended: [], github: null };
     this.#heard = { ...before, ...parts };
     if (parts.billing) this.#paying.heard(parts.billing);
-    if (Object.keys(parts).length) this.deps.kept.save("account", JSON.stringify(this.#heard));
+    if (Object.keys(parts).length) this.#cache.save(this.#heard.userId, email, this.#heard);
     this.#announce();
   }
 
@@ -304,16 +311,6 @@ export class Account implements HostedAccount {
     if (now === this.#announced) return;
     this.#announced = now;
     this.deps.push({ type: "invalidate", keys: ["account"] });
-  }
-}
-
-function parseKept(json: string | null): Heard | null {
-  if (!json) return null;
-  try {
-    const parsed = keptAnswers.safeParse(JSON.parse(json));
-    return parsed.success ? parsed.data : null;
-  } catch {
-    return null;
   }
 }
 

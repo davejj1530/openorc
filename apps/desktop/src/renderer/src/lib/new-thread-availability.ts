@@ -1,5 +1,5 @@
-import type { ModelChoice, NewThreadTarget } from "@openorc/client";
-import { harnessInfo, harnessLoggedIn, harnessName, isHarnessId, type Project, type RpcResults } from "@openorc/protocol";
+import { defaultChoice, newThreadChoice, type ModelChoice, type NewThreadTarget } from "@openorc/client";
+import { harnessInfo, harnessLoggedIn, harnessName, isHarnessId, isHostedAgent, type HarnessId, type ModelOption, type Project, type RpcResults } from "@openorc/protocol";
 interface QueryState<T> {
   data: T | undefined;
   failed: boolean;
@@ -13,6 +13,16 @@ export interface NewThreadAvailabilityInput {
   choice: ModelChoice | null;
   models: QueryState<RpcResults["agents.models"]>;
   system: QueryState<RpcResults["system.info"]>;
+  hosted?: boolean;
+}
+
+export function initialThreadChoice(models: ModelOption[], preferred: HarnessId | null, system: RpcResults["system.info"] | undefined, hosted: boolean) {
+  if (hosted)
+    return defaultChoice(
+      models.filter((model) => isHostedAgent(model.agent)),
+      preferred,
+    );
+  return system ? newThreadChoice(models, { preferred, harnesses: system.harnesses }) : null;
 }
 export function evaluateNewThreadAvailability(input: NewThreadAvailabilityInput) {
   const { target, choice, models, system } = input;
@@ -29,7 +39,7 @@ export function evaluateNewThreadAvailability(input: NewThreadAvailabilityInput)
   };
   let targetIssue: string | null = null;
   if (target.kind === "unavailable") targetIssue = target.reason;
-  else if (choice) targetIssue = providerIssue(choice);
+  else if (choice && !input.hosted) targetIssue = providerIssue(choice);
   let projectIssue: string | null = null;
   if (input.projectsFailed) projectIssue = "Projects could not load. Retry to continue.";
   else if (input.projects && !selectedProject) projectIssue = "This project is unavailable. Choose a project to continue.";

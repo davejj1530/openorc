@@ -623,6 +623,7 @@ export class OpenOrc {
   private get places(): PlaceRouter {
     this.placeRouter ??= new PlaceRouter({
       place: () => this.account?.threads ?? null,
+      spaces: () => this.account?.spaces ?? null,
       next: (request) => (this.brainRouting?.active ? this.brainRouting.router.handle(request) : this.dispatch(request)),
     });
     return this.placeRouter;

@@ -1,14 +1,5 @@
-import {
-  newThreadChoice,
-  newThreadWorkspaceMode,
-  offeredAccount,
-  projectAccountChoice,
-  targetModel,
-  type CloudTurnWho,
-  type ModelChoice as Choice,
-  type NewThreadDraft,
-  type NewThreadPlace,
-} from "@openorc/client";
+import { useSpaceProjects } from "../lib/space-queries";
+import { newThreadWorkspaceMode, offeredAccount, projectAccountChoice, targetModel, type CloudTurnWho, type ModelChoice as Choice, type NewThreadDraft, type NewThreadPlace } from "@openorc/client";
 import { WORKSPACE_ID, executionMode, type ClaudeAccounts, type Project } from "@openorc/protocol";
 import { useEffect, useRef, useState } from "react";
 import { useCloudSignInGate } from "../components/CloudSignInOffer";
@@ -34,7 +25,7 @@ import { useComposerChanges } from "../lib/composer-changes";
 import { useDefaultHarness } from "../lib/default-harness";
 import { focusedProject, useLayout } from "../lib/layout";
 import { swapInPlace } from "../lib/motion";
-import { evaluateNewThreadAvailability } from "../lib/new-thread-availability";
+import { evaluateNewThreadAvailability, initialThreadChoice } from "../lib/new-thread-availability";
 import { readNewThreadDraft, readNewThreadProject, rememberNewThreadProject, writeNewThreadDraft } from "../lib/new-thread-draft";
 import { useNewThreadLocation } from "../lib/new-thread-location";
 import { orclingById, useOrclings } from "../lib/orclings";
@@ -44,13 +35,16 @@ import { useComposerSuggestions } from "../lib/connector-mentions";
 import { projectScope } from "../lib/skill-commands";
 import { useUi } from "../lib/ui";
 import { startNewThread } from "./new-thread-start";
+import { startSpaceThread } from "../lib/space-start";
+import { spaceNavigation, useSpaceNavigation } from "../lib/space-navigation";
 
 /** How long a project switch waits for the reads that size the screen before it swaps without them. */
 const SWITCH_READS_MS = 250;
 
 /** Project changes remount the composer so prompt, target and image drafts move together. */
 export function NewThread({ projectId }: { projectId?: string }) {
-  const projects = useRpc("projects.list", {});
+  const personal = useSpaceNavigation((state) => !state.current || state.current === state.personal);
+  const projects = useSpaceProjects();
   const home = useRpc("workspace.get", {});
   // The project the screen was opened for, else the one the sidebar's filter focuses, else the last one chosen here.
   const focused = useLayout(focusedProject);
@@ -72,8 +66,8 @@ export function NewThread({ projectId }: { projectId?: string }) {
   }, [focused]);
   // A remembered project that has since been removed gives way to Workspace.
   useEffect(() => {
-    if (projects.data && project !== WORKSPACE_ID && !projects.data.some((each) => each.id === project)) chooseProject(WORKSPACE_ID);
-  }, [project, projects.data]);
+    if (projects.data && !(personal && project === WORKSPACE_ID) && !projects.data.some((each) => each.id === project)) chooseProject(personal ? WORKSPACE_ID : (projects.data[0]?.id ?? ""));
+  }, [project, projects.data, personal]);
   // Choosing a project in the question brings a focused sidebar filter along. The screen swaps in place once the
   // project's git state and activity are read, so the Commit chip, location and activity never blink out and back.
   const switching = useRef(0);
@@ -95,7 +89,7 @@ export function NewThread({ projectId }: { projectId?: string }) {
     <NewThreadProject
       key={project}
       projectId={project}
-      projects={home.data ? [home.data, ...(projects.data ?? [])] : projects.data}
+      projects={personal && home.data ? [home.data, ...(projects.data ?? [])] : projects.data}
       projectsError={projects.error?.message}
       onProject={switchProject}
       onRetryProjects={() => void projects.refetch()}
@@ -147,6 +141,8 @@ function NewThreadProject({
   onProject: (id: string) => void;
   onRetryProjects: () => void;
 }) {
+  const spaceId = useSpaceNavigation((state) => state.current);
+  const cloudOnly = Boolean(spaceId && projects?.some((project) => project.id === projectId && !project.rootPath));
   const isWorkspace = projectId === WORKSPACE_ID;
   const git = useProjectGit(projectId);
   const [draft, setDraft] = useState(() => readNewThreadDraft(projectId));
@@ -181,21 +177,23 @@ function NewThreadProject({
   const suggestions = useComposerSuggestions(projectScope(projectId, draft.workingDirectory), choice?.agent, executionMode(draft.mode, permission), claudeAccountId);
   const cloud = useNewThreadCloud(target, projectId);
   const hosted = useNewThreadHosted(target, projectId);
-  const workspaceMode = newThreadWorkspaceMode({
-    canBranch: !isWorkspace && !git.cannotBranch,
-    canCloud: cloud.can,
-    canHosted: hosted.can,
-    chosen: draft.workspace,
-    preferred: settings.data?.defaultWorkspaceMode,
-  });
+  const workspaceMode = cloudOnly
+    ? "hosted"
+    : newThreadWorkspaceMode({
+        canBranch: !isWorkspace && !git.cannotBranch,
+        canCloud: cloud.can,
+        canHosted: hosted.can,
+        chosen: draft.workspace,
+        preferred: settings.data?.defaultWorkspaceMode,
+      });
   const signIn = useCloudSignInGate(newCloudTurn(workspaceMode, choice, claudeAccountId, cloud));
   useCloudWarm(workspaceMode === "cloud" && cloud.can ? projectId : null, choice?.agent, draft.prompt);
 
   useEffect(() => {
-    if (target.kind !== "model" || target.choice || !models.data || !info.data || defaultHarness === undefined) return;
-    const initial = newThreadChoice(models.data, { preferred: defaultHarness, harnesses: info.data.harnesses });
+    if (target.kind !== "model" || target.choice || !models.data || defaultHarness === undefined) return;
+    const initial = initialThreadChoice(models.data, defaultHarness, info.data, cloudOnly);
     if (initial) changeDraft({ target: { kind: "model", choice: initial } });
-  }, [target, models.data, info.data, defaultHarness]);
+  }, [target, models.data, info.data, defaultHarness, cloudOnly]);
   usePublishComposerAccount(choice?.agent, claudeAccountId, choice?.model);
 
   const {
@@ -208,14 +206,16 @@ function NewThreadProject({
     projects,
     projectsFailed: Boolean(projectsError),
     permissionReady,
+    hosted: cloudOnly,
     target,
     choice,
     models: { data: models.data, failed: models.isError },
     system: { data: info.data, failed: info.isError },
   });
   const usesClaude = choice?.agent === "claude";
-  const pickerAccounts = orcling ? undefined : newThreadAccounts(accountChoices, claudeAccountId, start.isPending, (id) => changeDraft({ claudeAccountId: id }));
-  const disabledReason = usesClaude && !accounts.data ? (accounts.error?.message ?? "Loading Claude accounts…") : targetDisabledReason;
+  const pickerAccounts = orcling || cloudOnly ? undefined : newThreadAccounts(accountChoices, claudeAccountId, start.isPending, (id) => changeDraft({ claudeAccountId: id }));
+  const localReason = usesClaude && !accounts.data ? (accounts.error?.message ?? "Loading Claude accounts…") : targetDisabledReason;
+  const disabledReason = cloudOnly ? (hosted.blocked?.words ?? (!hosted.shown ? "Checking OpenOrc Cloud…" : targetDisabledReason)) : localReason;
   const location = useNewThreadLocation(projectId, selected, workspaceMode, draft.workingDirectory);
   const chooseModel = (model: ModelChoice) => changeDraft({ target: { kind: "model", choice: model } });
   const retry = () => {
@@ -224,9 +224,10 @@ function NewThreadProject({
     void info.refetch();
     onRetryProjects();
   };
-  const pickerOrclings = isWorkspace ? undefined : orclingChoices(orclings, target, (next) => changeDraft({ target: next }));
+  const pickerOrclings = isWorkspace || cloudOnly ? undefined : orclingChoices(orclings, target, (next) => changeDraft({ target: next }));
 
   const submit = async (text: string, attachments: string[]) => {
+    const { generation, key } = spaceNavigation.getState();
     if (disabledReason) throw new Error(disabledReason);
     if (!choice || !selected || target.kind === "unavailable") throw new Error("Choose a project and execution target first.");
     const threadId = await startNewThread({
@@ -238,15 +239,16 @@ function NewThreadProject({
       text,
       attachments,
       // A cloud start waits for the sign-in the cloud lacks, offered above the composer.
-      launch: (params) => signIn.ready().then(() => start.mutateAsync(params)),
+      launch: (params) => signIn.ready().then(() => startSpaceThread(params, start.mutateAsync, spaceId, key)),
     });
-    if (mounted.current && useRouter.getState().route.view === "newthread") openThread(threadId);
+    if (mounted.current && spaceNavigation.getState().generation === generation && useRouter.getState().route.view === "newthread") openThread(threadId);
   };
 
   const composerChanges = useComposerChanges(git.tracks && selected && workspaceMode === "current" ? { kind: "project", id: selected.id, projectName: selected.name } : null);
-  const panelContext = selected
-    ? { kind: "newthread" as const, project: selected, workingDirectory: draft.workingDirectory ?? selected.rootPath, changes: git.tracks && workspaceMode === "current" }
-    : null;
+  const panelContext =
+    selected && !cloudOnly
+      ? { kind: "newthread" as const, project: selected, workingDirectory: draft.workingDirectory ?? selected.rootPath, changes: git.tracks && workspaceMode === "current" }
+      : null;
 
   return (
     <ClaudeAccountScope id={claudeAccountId}>
@@ -305,6 +307,7 @@ function NewThreadProject({
                     error={start.error?.message ?? permissionError ?? storageError}
                   >
                     <NewThreadOptions
+                      local={!cloudOnly}
                       projectId={projectId}
                       mode={workspaceMode}
                       cloud={cloud}
@@ -317,21 +320,25 @@ function NewThreadProject({
                     />
                   </Composer>
                 </div>
-                {targetIssue || projectIssue ? (
-                  <p role="status" className="text-xs text-warn mt-2 break-words">
-                    {targetIssue ?? projectIssue}{" "}
-                    <TextButton type="button" underline tone="strong" onClick={retry}>
-                      Retry checks
-                    </TextButton>
-                  </p>
-                ) : null}
+                <NewThreadIssue issue={targetIssue ?? projectIssue} retry={retry} />
               </>
             )}
           </div>
-          <ProjectActivity projectId={projectId} />
+          {cloudOnly ? null : <ProjectActivity projectId={projectId} />}
         </div>
       </main>
       {panelContext ? <Panel context={panelContext} /> : null}
     </ClaudeAccountScope>
   );
+}
+
+function NewThreadIssue({ issue, retry }: { issue: string | null; retry(): void }) {
+  return issue ? (
+    <p role="status" className="text-xs text-warn mt-2 break-words">
+      {issue}{" "}
+      <TextButton type="button" underline tone="strong" onClick={retry}>
+        Retry checks
+      </TextButton>
+    </p>
+  ) : null;
 }

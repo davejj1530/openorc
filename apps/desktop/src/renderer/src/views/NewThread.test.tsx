@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readNewThreadDraft, readNewThreadProject, rememberNewThreadProject, writeNewThreadDraft } from "../lib/new-thread-draft";
 import { useLayout } from "../lib/layout";
 import { useRouter } from "../lib/router";
+import { spaceNavigation } from "../lib/space-navigation";
 
 const start = vi.fn();
 const resetStart = vi.fn();
@@ -23,9 +24,11 @@ const gitReads: Record<string, Promise<unknown>> = {};
 
 vi.mock("../lib/client", async (original) => ({
   ...(await original<object>()),
-  useRpc: (method: string, params: { id?: string }) => {
+  useRpcs: () => [],
+  useRpc: (method: string, params: { id?: string; spaceId?: string }) => {
     const data: Record<string, unknown> = {
       "projects.list": projects,
+      "spaces.projects": spaceNavigation.getState().inventory.find((space) => space.id === params.spaceId)?.projects,
       "claude.accounts.list": accounts,
       "projects.git": "ready",
       "projects.checkoutBranch": branches[params.id ?? ""],
@@ -97,7 +100,10 @@ const makeProject = (id: string): Project => ({
   updatedAt: 1,
 });
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  if (spaceNavigation.getState().key) spaceNavigation.getState().end();
+});
 beforeEach(() => {
   localStorage.clear();
   projects = [makeProject("p1"), makeProject("p2")];
@@ -350,6 +356,40 @@ describe("NewThread", () => {
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ projectId: "p1", hosted: true, prompt: "Add a health check" })));
     expect(start).toHaveBeenCalledWith(expect.not.objectContaining({ workspaceMode: expect.anything() }));
+  });
+
+  it.each([false, true])("offers only OpenOrc Cloud for a scoped cloud-only project without requiring a local sign-in (account loading: %s)", async (loading) => {
+    account = loading ? undefined : openOrcCloud("added");
+    projects = [{ ...makeProject("p1"), rootPath: "" }];
+    system = { ...system, harnesses: system.harnesses.map((row) => ({ ...row, state: "sign_in" as const })) };
+    spaceNavigation.getState().initialize("scoped", "personal", [
+      { id: "personal", personal: true, projects: [], threads: [], taskIds: [] },
+      {
+        id: "birch",
+        personal: false,
+        projects: [{ key: "p1", name: "Canvas", repo: "example/canvas", localProjectId: null, hostedProjectId: "cloud-project", connected: true }],
+        threads: [],
+        taskIds: [],
+      },
+    ]);
+    spaceNavigation.getState().select("birch");
+    saveModelDraft("p1", "Add a health check");
+    const view = render(<NewThread projectId="p1" />);
+    if (loading) {
+      expect(screen.getByRole("button", { name: "Send" }).getAttribute("disabled")).not.toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: /^Where the thread works/ }));
+      expect((await screen.findByRole("menuitem", { name: "OpenOrc Cloud Checking" })).getAttribute("aria-disabled")).toBe("true");
+      fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+      account = openOrcCloud("added");
+      view.rerender(<NewThread projectId="p1" />);
+    }
+    fireEvent.click(screen.getByRole("button", { name: /^Where the thread works/ }));
+    expect(await screen.findByRole("menuitem", { name: "OpenOrc Cloud 1 h" })).toBeTruthy();
+    expect(screen.queryByRole("menuitem", { name: "Local checkout" })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: "Worktree" })).toBeNull();
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ spaceId: "birch", projectId: "p1", hosted: true })));
   });
 
   it("ends OpenOrc Cloud's row in adding a project not there yet, leading to its row in Cloud settings", async () => {

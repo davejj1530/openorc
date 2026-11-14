@@ -1,3 +1,4 @@
+import { useSpaceProjects } from "../lib/space-queries";
 import { useId, useState, type ReactNode } from "react";
 import { useQueries } from "@tanstack/react-query";
 import { type Project, type PullRequestFilter, type PullRequestReview, type PullRequestSummary, type ThreadSummary } from "@openorc/protocol";
@@ -15,7 +16,8 @@ import { focusedProject, useLayout } from "../lib/layout";
 import { draftAuthor, onGitHub, pullRequestFilters, pullRequestTone, pullRow, readPullReviewer, reviewSettings, type PullRow, type PullRequestTone } from "../lib/pull-requests";
 import { orclingById, useOrclings } from "../lib/orclings";
 import { tagsFor, relativeTime } from "@openorc/client";
-import { useRpc, useRpcMutation } from "../lib/client";
+import { useRpcMutation } from "../lib/client";
+import { useSpaceRpc as useRpc } from "../lib/space-queries";
 import { core } from "../lib/rpc";
 import { openPullRequest, openThread } from "../lib/router";
 import { useModelCatalog } from "../lib/use-model-catalog";
@@ -237,7 +239,7 @@ function usePullEntries(scoped: Project[], filter: PullRequestFilter, enabled: b
 export function PullRequestList() {
   const projectId = useLayout(focusedProject);
   const system = useRpc("system.info", {});
-  const projectList = useRpc("projects.list", {});
+  const projectList = useSpaceProjects(true);
   const [filter, setFilter] = useState<PullRequestFilter>("open");
   const scoped = (projectList.data ?? []).filter((project) => (projectId ? project.id === projectId : onGitHub(project.gitRemote)));
   const reason = unavailable({ ghInstalled: system.data?.gh.installed, projects: projectList.data ? scoped : [] });

@@ -8,13 +8,14 @@ import type { RpcReply } from "../transport.js";
 import { until } from "../test-fixtures/fake-claude.js";
 import { BrainOutOfReach, type BrainLink, type BrainPush } from "./brain-link.js";
 import { BrainRouter } from "./brain-router.js";
+import { PlaceRouter } from "./place-router.js";
 
 const row = (id: string, lastActivityAt: number, projectId: string, worktreePath: string | null = null) =>
   ({ id, projectId, worktreePath, pinnedAt: null, archivedAt: null, doneAt: null, lastActivityAt, parentThreadId: null }) as unknown as ThreadSummary;
 
 /** A host's answer to a page of the thread list, as its ledger pages it. */
-function paged(rows: ThreadSummary[], params: { limit?: number; offset?: number }): ThreadSummary[] {
-  const sorted = [...rows].sort(threadListCompare());
+function paged(rows: ThreadSummary[], params: { limit?: number; offset?: number; projectId?: string; projectIds?: string[] }): ThreadSummary[] {
+  const sorted = rows.filter((row) => (!params.projectId || row.projectId === params.projectId) && (!params.projectIds || params.projectIds.includes(row.projectId))).sort(threadListCompare());
   const offset = params.offset ?? 0;
   return sorted.slice(offset, params.limit ? offset + params.limit : undefined);
 }
@@ -441,4 +442,29 @@ it("settles a cloud start's Claude account on this Mac when its project uses onl
   expect((await startCloud(work)).sent["claudeAccountId"]).toBe(work);
   await expect(ask(router, "threads.start", { ...start, projectId: "mac-project", cloud: true, claudeAccountId: "claude-cli" })).rejects.toThrow(/This project only uses these Claude accounts/);
   router.close();
+});
+
+it("keeps the window's space off the installed brain wire while projecting its mirrored projects before pagination", async () => {
+  const { router, db, windows, sent } = harness({ mac: [row("local", 30, "mac-project"), row("private", 40, "notes")], cloud: [row("cloud", 20, "cloud-project"), row("foreign", 50, "other-cloud")] });
+  const places = new PlaceRouter({
+    place: () => null,
+    spaces: () => ({
+      status: () => ({ state: "loading", error: null }),
+      projects: async () => [{ key: "mac-project", name: "Canvas", repo: "example/canvas", localProjectId: "mac-project", hostedProjectId: "project", connected: true }],
+      people: async () => {
+        throw new Error("Not used");
+      },
+    }),
+    next: (request) => router.handle(request),
+  });
+  try {
+    const ask = () => places.handle({ type: "rpc", id: 1, method: "threads.list", params: { spaceId: "birch", ownership: "mine", limit: 1, offset: 1 } });
+    await ask();
+    await until(() => windows.some((push) => push.type === "invalidate"));
+    expect(await ask()).toMatchObject({ type: "rpc.result", result: [{ id: "cloud", projectId: "mac-project", owner: { brain: "cloud" } }] });
+    expect(sent[0]).toEqual({ method: "threads.list", params: { projectIds: ["cloud-project"], limit: 2, offset: 0 } });
+  } finally {
+    router.close();
+    db.close();
+  }
 });

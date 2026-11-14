@@ -180,6 +180,7 @@ export function createHosted(deps: HostedDeps): Hosted {
   };
   const account = new Account({
     session,
+    server: deps.server,
     kept: deps.kept,
     push: deps.push,
     now: deps.now,
@@ -191,7 +192,19 @@ export function createHosted(deps: HostedDeps): Hosted {
   });
   // The follower reads a thread's log in the thread's space, which the rows know.
   const follower: Follower = new Follower({ session, on: (threadId) => threads.on(threadId), push: deps.push, log: deps.log });
-  const threads: Threads = new Threads({ session, spaces, follower, account, kept: deps.kept, projects: deps.projects, push: deps.push, notify: deps.notify, now: deps.now, log: deps.log });
+  const threads: Threads = new Threads({
+    session,
+    spaces,
+    follower,
+    account,
+    server: deps.server,
+    kept: deps.kept,
+    projects: deps.projects,
+    push: deps.push,
+    notify: deps.notify,
+    now: deps.now,
+    log: deps.log,
+  });
   return {
     account,
     threads,

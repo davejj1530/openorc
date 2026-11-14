@@ -1,3 +1,5 @@
+import { spaceNavigation } from "../lib/space-navigation";
+import { useSpaceThread } from "../lib/space-queries";
 import { offeredAccount, projectAccountChoice, type ModelChoice } from "@openorc/client";
 import { executionMode, type Thread } from "@openorc/protocol";
 import { useEffect, useRef, useState } from "react";
@@ -18,7 +20,7 @@ const draftKey = (parentId: string) => `subthread.${parentId}`;
 
 /** Starts a thread under another, in its folder, on the parent's model, account and settings until you change them. */
 export function NewSubthread({ parentId }: { parentId: string }) {
-  const parent = useRpc("threads.get", { id: parentId });
+  const parent = useSpaceThread(parentId);
   if (parent.error) {
     return (
       <main className="workspace-main well flex flex-1 flex-col min-w-0 min-h-0">
@@ -63,7 +65,9 @@ function SubthreadComposer({ parent }: { parent: Thread }) {
   const submit = async (text: string, attachments: string[]) => {
     if (!choice) throw new Error("Choose a model first.");
     if (accountsMissing) throw new Error(accountsMissing);
+    const scope = spaceNavigation.getState();
     const { thread } = await start.mutateAsync({
+      ...(scope.current ? { spaceId: scope.current } : {}),
       projectId: parent.projectId,
       parentThreadId: parent.id,
       agent: choice.agent,
@@ -77,7 +81,8 @@ function SubthreadComposer({ parent }: { parent: Thread }) {
       ...(claudeAccountId ? { claudeAccountId } : {}),
     });
     if (readDraft(draftKey(parent.id), { prompt: "" }).prompt === text) writeDraft(draftKey(parent.id), { prompt: "" });
-    if (mounted.current && useRouter.getState().route.view === "newsubthread") openThread(thread.id);
+    if (scope.current) spaceNavigation.getState().observe(scope.current, [thread], scope.key);
+    if (mounted.current && spaceNavigation.getState().generation === scope.generation && useRouter.getState().route.view === "newsubthread") openThread(thread.id);
   };
   const chooseModel = (next: ModelChoice) => {
     setChoice(next);

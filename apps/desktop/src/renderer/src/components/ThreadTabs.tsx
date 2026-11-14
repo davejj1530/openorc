@@ -1,7 +1,7 @@
+import { useSpaceThread } from "../lib/space-queries";
 import { useCallback, useEffect, useLayoutEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { threadStatus } from "@openorc/client";
 import { isHarnessId, type ThreadSummary } from "@openorc/protocol";
-import { useRpc } from "../lib/client";
 import { cn } from "../lib/cn";
 import { focusedProject, useLayout } from "../lib/layout";
 import { useThreadTabs, type ThreadTab } from "../lib/thread-tabs";
@@ -22,7 +22,7 @@ import { IconButton, Tooltip } from "./ui";
  */
 function TabFace({ tab, title }: { tab: ThreadTab; title?: ReactNode }) {
   const threadId = tab.route.view === "thread" ? tab.route.threadId : "";
-  const read = useRpc("threads.get", { id: threadId }, { enabled: Boolean(threadId) });
+  const read = useSpaceThread(threadId, { enabled: Boolean(threadId) });
   const gone = Boolean(threadId) && read.isSuccess && read.data === null;
   useEffect(() => {
     if (gone) useThreadTabs.getState().close(tab.id);

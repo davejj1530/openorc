@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { PANE_MS, prefersReducedMotion } from "./motion";
 import { useRouter, type Route } from "./router";
 import { movedBefore } from "./tab-order";
+import { navigationScope } from "./navigation-scope";
 
 /** What a tab holds: a thread, or a new thread being written. */
 export type TabRoute = Extract<Route, { view: "thread" } | { view: "newthread" }>;
@@ -104,6 +105,7 @@ function staying({ tabs, leaving }: Pick<ThreadTabsState, "tabs" | "leaving">): 
  * leftmost pane's thread; focusing another pane leaves it be.
  */
 function follow(route: Route): void {
+  if (navigationScope.restoring) return;
   if (!isTabRoute(route)) return;
   const { threadIds } = useRouter.getState();
   const shown: TabRoute = route.view === "thread" && threadIds.length > 1 ? { view: "thread", threadId: threadIds[0]! } : route;
@@ -126,6 +128,7 @@ useRouter.subscribe((state, previous) => {
   if (state.route !== previous.route || state.threadIds !== previous.threadIds) follow(state.route);
 });
 useThreadTabs.subscribe((state) => {
+  if (navigationScope.active) return;
   try {
     localStorage.setItem(KEY, JSON.stringify({ tabs: staying(state), active: state.active }));
   } catch {

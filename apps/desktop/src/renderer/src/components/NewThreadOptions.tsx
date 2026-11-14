@@ -48,14 +48,22 @@ function HoursLeft({ hours }: { hours: CloudHours }) {
 }
 
 /** Every place, from this folder outward: the checkout, a worktree beside it, the person's own cloud, then OpenOrc's. */
-function places(cloud: NewThreadCloud, hosted: NewThreadHosted): Place[] {
+function places(cloud: NewThreadCloud, hosted: NewThreadHosted, local: boolean): Place[] {
   const all: (Place & { shown: boolean })[] = [
     { value: "current", label: "Local checkout", icon: ICONS.current, cloud: false, blocked: null, shown: true },
     { value: "worktree", label: "Worktree", icon: ICONS.worktree, cloud: false, blocked: null, shown: true },
     { value: "cloud", label: "Your own cloud", icon: ICONS.cloud, cloud: true, blocked: cloud.blocked, shown: cloud.shown, fact: cloud.service },
-    { value: "hosted", label: "OpenOrc Cloud", icon: ICONS.hosted, cloud: true, blocked: hosted.blocked, shown: hosted.shown, fact: hosted.hours ? <HoursLeft hours={hosted.hours} /> : null },
+    {
+      value: "hosted",
+      label: "OpenOrc Cloud",
+      icon: ICONS.hosted,
+      cloud: true,
+      blocked: hosted.blocked ?? (!local && !hosted.shown ? { words: "Checking OpenOrc Cloud…", fix: null, reason: "Checking" } : null),
+      shown: hosted.shown || !local,
+      fact: hosted.hours ? <HoursLeft hours={hosted.hours} /> : null,
+    },
   ];
-  return all.filter((place) => place.shown);
+  return all.filter((place) => place.shown && (local || place.value === "hosted"));
 }
 
 function takeFix(fix: StartFix) {
@@ -79,6 +87,7 @@ function placeWords(mode: NewThreadPlace, branch: string | null): string {
  * the pointer or keyboard focus.
  */
 function PlaceMenu(props: {
+  local: boolean;
   mode: NewThreadPlace;
   branch: string | null;
   cloud: NewThreadCloud;
@@ -87,7 +96,7 @@ function PlaceMenu(props: {
   disabledReason: string | null;
   onMode: (mode: NewThreadPlace) => void;
 }) {
-  const rows = places(props.cloud, props.hosted);
+  const rows = places(props.cloud, props.hosted, props.local);
   const current = rows.find((row) => row.value === props.mode) ?? rows[0]!;
   const Icon = ICONS[props.mode];
   const [why, setWhy] = useState<{ anchor: HTMLElement; words: string } | null>(null);
@@ -118,7 +127,7 @@ function PlaceMenu(props: {
           <Menu.Popup ref={floatingGround} className={cn(menuPopup, "new-thread-places")}>
             {rows.map((row, index) => (
               <Fragment key={row.value}>
-                {row.cloud && !rows[index - 1]?.cloud ? <Menu.Separator className={menuSeparator} /> : null}
+                {index > 0 && row.cloud && !rows[index - 1]?.cloud ? <Menu.Separator className={menuSeparator} /> : null}
                 <Menu.Item
                   className={cn(menuItem, "new-thread-place")}
                   data-current={row.value === props.mode || undefined}
@@ -163,6 +172,7 @@ function PlaceMenu(props: {
 
 /** In the New thread composer's bar: where the thread works, as one icon that opens the places, or the Workspace folder's chooser. */
 export function NewThreadOptions(props: {
+  local?: boolean;
   projectId: string;
   mode: NewThreadPlace;
   cloud: NewThreadCloud;
@@ -190,5 +200,16 @@ export function NewThreadOptions(props: {
         <Folder size={16} />
       </button>
     );
-  return <PlaceMenu mode={props.mode} branch={props.location.branch} cloud={props.cloud} hosted={props.hosted} disabled={props.disabled} disabledReason={props.blocked} onMode={props.onMode} />;
+  return (
+    <PlaceMenu
+      local={props.local ?? true}
+      mode={props.mode}
+      branch={props.location.branch}
+      cloud={props.cloud}
+      hosted={props.hosted}
+      disabled={props.disabled}
+      disabledReason={props.local === false ? null : props.blocked}
+      onMode={props.onMode}
+    />
+  );
 }

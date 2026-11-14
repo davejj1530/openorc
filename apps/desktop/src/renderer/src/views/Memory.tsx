@@ -1,3 +1,4 @@
+import { useSpaceProjects } from "../lib/space-queries";
 import { useEffect, useState, type ReactNode } from "react";
 import type { MemorySource, MemoryType } from "@openorc/protocol";
 import { memorySourceLabel } from "../components/MemoryCard";
@@ -83,7 +84,7 @@ function MemoryBrowser({ projectId }: { projectId: string }) {
 
 /** A project's saved memories. Turning memory on or off lives in Settings. */
 export function Memory() {
-  const projects = useRpc("projects.list", {});
+  const projects = useSpaceProjects(true);
   // Memory belongs to one project at a time: the sidebar's, else the one chosen here, else the first.
   const focused = useLayout(focusedProject);
   const [chosen, setChosen] = useState<string | null>(null);

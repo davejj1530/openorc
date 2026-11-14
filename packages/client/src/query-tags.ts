@@ -23,6 +23,7 @@ const fileReadRules: { [M in FileReadMethod]: Rule<M> } = {
 
 const readRules: Rules = {
   ...fileReadRules,
+  "organization.people": ({ spaceId }) => [`people:${spaceId}`, "spaces"],
   "instructions.list": ({ threadId }) => ["instructions", "workspace-diff", `thread:${threadId}`],
   "review.comments.list": reviewCommentTags,
 };
@@ -59,6 +60,8 @@ function scopedTask(p: Params): string[] {
 
 /** Reads whose tags never depend on their parameters. */
 const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
+  "spaces.status": ["spaces"],
+  "spaces.projects": ["spaces", "projects"],
   "account.status": ["account"],
   // Not "account": prices are read once per visit to the screen, not again on every change to the account.
   "account.offers": ["account-offers"],

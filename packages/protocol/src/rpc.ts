@@ -3,7 +3,7 @@ import { UsageHistoryParams } from "./usage-history.js";
 import { ProjectActivityParams } from "./project-activity.js";
 import type { AgentUpdates } from "./agent-updates.js";
 import { accountRpcParams, type AccountRpcResults } from "./account.js";
-import { spacesRpcParams, type SpacesRpcResults } from "./spaces.js";
+import { SpaceId, spacesRpcParams, type SpacesRpcResults } from "./spaces.js";
 import { ClaudeAccountId, claudeAccountRpcParams, type ClaudeAccountRpcResults } from "./claude-accounts.js";
 import { connectorRpcParams, type ConnectorRpcResults } from "./connectors.js";
 import { skillRpcParams, type SkillRpcResults } from "./skills.js";
@@ -143,7 +143,7 @@ export const rpcParams = {
    * How many roots the sidebar's Resolved lists across these projects: those put there, and the unpinned, unsnoozed ones
    * whose tree last worked before `quietBefore`, which the asker's clock sets.
    */
-  "threads.resolvedCount": z.object({ projectIds: z.array(z.string()), quietBefore: z.number() }).strict(),
+  "threads.resolvedCount": z.object({ spaceId: SpaceId.optional(), ownership: z.enum(["mine", "everyone"]).optional(), projectIds: z.array(z.string()), quietBefore: z.number() }).strict(),
   "threads.get": z.object({ id: z.string() }),
   "threads.messages": z.object({ id: z.string() }),
   /** The newest thing the person or an agent said in the conversation, its text clipped for a preview. */
@@ -190,7 +190,7 @@ export const rpcParams = {
   /** A new thread that continues this one's conversation, through the given run (the latest by default). */
   "threads.fork": z.object({ id: z.string(), upToRunId: z.string().optional(), requestKey: z.string().min(1).max(200).optional() }),
   /** Full-text search over what was said in threads. */
-  "threads.search": z.object({ query: z.string().min(1), projectId: z.string().optional(), limit: z.number().int().positive().max(100).optional() }),
+  "threads.search": z.object({ spaceId: SpaceId.optional(), query: z.string().min(1), projectId: z.string().optional(), limit: z.number().int().positive().max(100).optional() }),
   /** Move a thread between the checkout and a worktree of its own, carrying uncommitted changes along. */
   "threads.moveWorkspace": z.object({ id: z.string(), to: WorkspaceMode, requestKey: z.string().min(1).max(200).optional() }),
   /** The files a move would carry, for its confirmation. */
@@ -226,7 +226,7 @@ export const rpcParams = {
   "threads.import": z.object({ projectId: z.string(), sessions: z.array(z.object({ agent: AgentKind, path: z.string() })).min(1) }),
   /** The other threads of the project, for cross-thread messaging in the UI. */
   "threads.send": z.object({ id: z.string(), text: z.string().min(1), fromThreadId: z.string().optional() }),
-  "tasks.list": z.object({ threadId: z.string().optional(), projectId: z.string().optional(), statuses: z.array(TaskStatus).optional() }),
+  "tasks.list": z.object({ spaceId: SpaceId.optional(), threadId: z.string().optional(), projectId: z.string().optional(), statuses: z.array(TaskStatus).optional() }),
   "tasks.get": z.object({ id: z.string() }),
   "tasks.openThread": z.object({ taskId: z.string() }),
   "tasks.executionThread": z.object({ taskId: z.string() }),

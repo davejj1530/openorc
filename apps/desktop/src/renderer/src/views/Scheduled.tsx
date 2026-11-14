@@ -1,3 +1,5 @@
+import { useSpaceProjects } from "../lib/space-queries";
+import { useSpaceNavigation } from "../lib/space-navigation";
 import {
   ExecutionMode,
   executionMode,
@@ -47,12 +49,13 @@ function scheduleListBody(input: { loading: boolean; failed: boolean; total: num
 
 /** Prompts that start a thread on a timer with a saved model. */
 export function Scheduled() {
+  const spaceId = useSpaceNavigation((state) => state.current);
   const projectId = useLayout(focusedProject);
-  const projects = useRpc("projects.list", {});
+  const projects = useSpaceProjects(true);
   const list = useRpc("schedules.list", projectId ? { projectId } : {});
   const [editing, setEditing] = useState<Schedule | "new" | null>(null);
   const [shelf, setShelf] = useState<ScheduleShelf>("active");
-  const items = (list.data ?? []).filter((schedule) => !schedule.retiredTeam);
+  const items = (list.data ?? []).filter((schedule) => !schedule.retiredTeam && (!spaceId || projects.data?.some((project) => project.id === schedule.projectId)));
   const shown = items.filter((schedule) => schedule.enabled === (shelf === "active"));
   const canCreate = (projects.data?.length ?? 0) > 0;
   const projectName = (schedule: Schedule) => (projectId ? undefined : projects.data?.find((project) => project.id === schedule.projectId)?.name);

@@ -1,24 +1,26 @@
 /**
- * The ground a floating layer lands on. Floating layers have no shadow: they take the fill step
- * away from what is under them (D2). Over the tile they paint --surface; over a plane (the panel,
- * a sheet, a dialog, the composer, another menu) they paint the tile, --bg. The layer carries
- * data-ground and styles/floating.css turns it into --float-fill.
+ * The ground a floating layer lands on. Floating layers take the fill step away from what is under them (D2). Over the
+ * tile they paint --surface; over a plane that is itself --surface (a sheet, a dialog, another menu, the panel) they
+ * paint the tile, --bg. A piece set into the ground (the composer, a card, a Settings tile) is a step darker than the
+ * ground, so a layer over one paints --surface as it does over the tile, with a hairline for its edge where the two
+ * fills meet. The layer carries data-ground and styles/floating.css turns it into --float-fill.
  *
  * What counts is where the layer lands, not where its trigger sits: the composer's pickers open
  * from the composer onto the conversation, and a panel's menus drop onto the panel. So the ground
  * is read under the open layer, once it is placed.
  */
-export type Ground = "tile" | "plane";
+export type Ground = "tile" | "plane" | "piece";
 
-/* Planes and the tile cards that sit inside them. Keep in step with the contextual-fill lists in
-   app.css; new planes should carry data-plane rather than join these lists. */
-const PLANE =
-  ':is([data-plane]:not([data-plane="tile"]), .panel-content, .composer-shell, [role="dialog"], .menu-popup, .floating-popover, .model-picker-popup, .composer-context-popup, .composer-effort-popup, .command-palette, .settings-group, .settings-card, .settings-disclosure, .usage-account, .memory-control)';
+/* Planes painted --surface (floating layers, sheets, the panel), then the pieces set into the ground. Keep in step with
+   the contextual-fill lists in app.css; a new piece should carry data-plane rather than join the list. */
+const PLANE = ':is(.panel-content, [role="dialog"], .menu-popup, .floating-popover, .model-picker-popup, .composer-context-popup, .composer-effort-popup, .command-palette, .commit-sheet)';
+const PIECE = ':is([data-plane]:not([data-plane="tile"]), .composer-shell, .settings-group, .settings-card, .settings-disclosure, .usage-account, .memory-control)';
 const TILE_CARD = ':is([data-plane="tile"], .harness-list)';
 
 export function groundOf(element: Element | null): Ground {
-  const nearest = element?.closest(`${PLANE}, ${TILE_CARD}`);
-  return nearest?.matches(PLANE) ? "plane" : "tile";
+  const nearest = element?.closest(`${PLANE}, ${PIECE}, ${TILE_CARD}`);
+  if (nearest?.matches(PLANE)) return "plane";
+  return nearest?.matches(PIECE) ? "piece" : "tile";
 }
 
 /**
@@ -40,8 +42,10 @@ export function groundBeneath(layer: HTMLElement): { ground: Ground; straddles: 
   ];
   // Skip the layer itself and Base UI's invisible click-catching backdrops.
   const beneath = (x: number, y: number) => document.elementsFromPoint(x, y).find((element) => !own.contains(element) && !element.matches("[data-base-ui-inert]")) ?? null;
-  const planes = points.filter(([x, y]) => groundOf(beneath(x, y)) === "plane").length;
-  return { ground: planes > points.length / 2 ? "plane" : "tile", straddles: planes > 0 && planes < points.length };
+  const grounds = points.map(([x, y]) => groundOf(beneath(x, y)));
+  const count = (ground: Ground) => grounds.filter((each) => each === ground).length;
+  const most = (["plane", "piece", "tile"] as const).reduce((best, ground) => (count(ground) > count(best) ? ground : best));
+  return { ground: most, straddles: count("plane") > 0 && count("plane") < points.length };
 }
 
 /**

@@ -243,7 +243,7 @@ Responsive rules:
 
 Depth is the fill step, lifted by `--raised-shadow` where the step alone is too faint. Persistent surfaces have no borders. Planes are one step from the ground, fills one step from theirs.
 
-**The Floating Fill Rule.** Menus, popovers, tooltips, toasts, and dialogs have no border and wear `--raised-shadow`. They paint `--float-fill`: the plane when the layer lands on the tile, the tile when it lands on a plane (`use-anchor-ground` sets `data-ground` on the portal). Dialogs also dim their backdrop. A layer that lies across both, such as a composer picker over the conversation or an update toast over the transcript, has no fill step away from both, so a hairline ring in `--line-strong` draws its edge.
+**The Floating Fill Rule.** Menus, popovers, tooltips, toasts, and dialogs have no border and wear `--raised-shadow`. They paint `--float-fill`: the plane when the layer lands on the tile or on a piece set into it (the composer, a card, a Settings tile), with a hairline ring in `--line-strong` over a piece; the tile when it lands on a plane, such as a sheet, a dialog, the panel or another menu (`use-anchor-ground` sets `data-ground` on the portal). Dialogs also dim their backdrop. A layer that lies across both, such as a composer picker over the conversation or an update toast over the transcript, has no fill step away from both, so a hairline ring in `--line-strong` draws its edge.
 
 **The Opaque Work Plane Rule.** Keep reading, writing, and tool content opaque when Transparent surroundings is on. The setting paints the shell tint once through `--shell-opacity`, from 0% (solid tint) to 100% (native blur), defaulting to 35%. System Reduce Transparency wins.
 

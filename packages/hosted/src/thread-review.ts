@@ -7,8 +7,11 @@ import { completePatch, reviewChanges, turnFiles } from "./translate-review.js";
 import { readReview, readPublishing } from "./review-availability.js";
 
 export const changes = (threads: Threads, { threadId }: RpcParams<"hosted.review.changes">) => readReview(threads.on(threadId), threadId, REVIEW_ROUTES.changes(threadId));
-export const turn = (threads: Threads, { threadId, turnId }: RpcParams<"hosted.review.turn">) => readReview(threads.on(threadId), threadId, REVIEW_ROUTES.turn(threadId, turnId));
-export const file = (threads: Threads, { threadId, path, turnId }: RpcParams<"hosted.review.file">) => threads.on(threadId).request(REVIEW_ROUTES.file(threadId, path, turnId));
+// A turn's card names it by the agent's own id; the server's change routes know it by its own.
+export const turn = (threads: Threads, { threadId, turnId }: RpcParams<"hosted.review.turn">) =>
+  readReview(threads.on(threadId), threadId, REVIEW_ROUTES.turn(threadId, threads.voices.serverTurn(threadId, turnId)));
+export const file = (threads: Threads, { threadId, path, turnId }: RpcParams<"hosted.review.file">) =>
+  threads.on(threadId).request(REVIEW_ROUTES.file(threadId, path, turnId === undefined ? undefined : threads.voices.serverTurn(threadId, turnId)));
 export const state = (threads: Threads, { threadId }: RpcParams<"hosted.review.state">) => readPublishing(threads.on(threadId), threadId);
 
 export async function action(threads: Threads, { threadId, action: request }: RpcParams<"hosted.review.action">): Promise<HostedReviewReply> {
@@ -55,7 +58,7 @@ export async function legacyDiff(threads: Threads, params: RpcParams<"review.thr
 export async function legacyTurn(threads: Threads, params: RpcParams<"threads.turnChanges">): Promise<RpcResults["threads.turnChanges"]> {
   const read = await turn(threads, { threadId: params.id, turnId: params.checkpointId });
   const files = turnFiles(read).filter((file) => !params.paths || params.paths.includes(file.path));
-  const diffs = params.includePatch ? await patches(threads, params.id, files, params.checkpointId) : null;
+  const diffs = params.includePatch ? await patches(threads, params.id, files, threads.voices.serverTurn(params.id, params.checkpointId)) : null;
   return { files, patch: diffs ? completePatch(diffs) : null };
 }
 

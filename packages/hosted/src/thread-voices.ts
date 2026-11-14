@@ -32,6 +32,9 @@ function blockKeys(event: Record<string, unknown>): string[] {
   if (call) keys.push(call);
   const approval = text("approvalId");
   if (approval) keys.push(`approval-${approval}`);
+  // A turn's end, by the agent's own id for the turn: the server names that turn by its row's id instead.
+  const turn = text("turnId");
+  if (turn && event["type"] === "turn.completed") keys.push(`turn-${turn}`);
   return keys;
 }
 
@@ -61,6 +64,11 @@ export class ThreadVoices {
       learned = true;
     }
     return learned;
+  }
+
+  /** The server's id for a turn the app knows by the agent's own id, once its end was read; else the id as given. */
+  serverTurn(threadId: string, turnId: string): string {
+    return this.#heard.get(threadId)?.turnOf.get(`turn-${turnId}`) ?? turnId;
   }
 
   /** People named anywhere a row names them: the reader, the live turn's and the ask's senders, the queue's authors. */

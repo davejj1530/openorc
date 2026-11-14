@@ -129,6 +129,8 @@ const NO_PROJECT: Reply = { status: 404, body: { message: "That project isn't he
 const lastAgentSeq = (thread: Thread) => thread.events.findLast((stored) => stored.by === null)?.seq ?? 0;
 const headOf = (thread: Thread) => thread.events.at(-1)?.seq ?? 0;
 const turnEnds = (thread: Thread) => thread.events.filter((stored) => stored.event["type"] === "turn.completed").map((stored) => stored.seq);
+/** The agent's own id for a turn. Its host's turn events carry it; the server names the turn by its row's id, on each stored event. */
+const agentTurn = (turnId: string) => `${turnId}-agent`;
 const wire = (thread: Thread, stored: Stored) => ({ seq: stored.seq, turnId: stored.turnId, by: stored.by, event: { ...stored.event, eventId: `${thread.id}.${stored.seq}` } });
 const openAsk = (thread: Thread) => thread.asks.find((ask) => !ask.answered) ?? null;
 const viewOf = (thread: Thread, who: string): View => thread.views.get(who) ?? { seenSeq: 0, pinnedAt: null, archivedAt: null, snoozedUntil: null };
@@ -478,7 +480,7 @@ export class StandInThreads {
     // A person's own message is read by them.
     const view = viewOf(thread, message.author);
     thread.views.set(message.author, { ...view, seenSeq: Math.max(view.seenSeq, headOf(thread)) });
-    if (starts) this.append(thread.id, [{ type: "turn.started", ts: Date.now(), turnId: thread.turnId }]);
+    if (starts) this.append(thread.id, [{ type: "turn.started", ts: Date.now(), turnId: agentTurn(thread.turnId!) }]);
   }
 
   #unsend(thread: Thread, messageId: string, who: string): Reply {
@@ -507,7 +509,7 @@ export class StandInThreads {
       for (const message of thread.messages) if (message.state === "pending" && !this.#reads(message.author, thread)) message.state = "cancelled";
       if (thread.turn && !this.#reads(thread.turn, thread)) {
         this.#stop(thread);
-        const turnId = String(thread.events.findLast((stored) => stored.event["type"] === "turn.completed")!.event["turnId"]);
+        const turnId = String(thread.events.findLast((stored) => stored.event["type"] === "turn.completed")!.turnId);
         this.append(thread.id, [{ type: "error", runId: turnId, ts: Date.now(), fatal: true, message: "This turn stopped because its sender no longer has access to this project." }], { turnId });
       } else this.#changed(thread);
     }
@@ -561,7 +563,7 @@ export class StandInThreads {
     thread.turnStartedAt = null;
     for (const ask of thread.asks) if (!ask.answered) ask.parked = true;
     thread.status = openAsk(thread) ? "needs_answer" : "idle";
-    this.append(threadId, [{ type: "turn.completed", ts: Date.now(), turnId: thread.turnId ?? `turn-${threadId}`, status, durationMs: 1000 }]);
+    this.append(threadId, [{ type: "turn.completed", ts: Date.now(), turnId: agentTurn(thread.turnId ?? `turn-${threadId}`), status, durationMs: 1000 }]);
     thread.turnId = null;
     for (const message of thread.messages) if (message.state === "pending" && !this.#reads(message.author, thread)) message.state = "cancelled";
     const next = thread.messages.find((message) => message.state === "pending" && !message.paused);

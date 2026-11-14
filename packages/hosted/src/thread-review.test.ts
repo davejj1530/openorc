@@ -158,3 +158,21 @@ describe("cloud review bridges", () => {
     expect(await hosted.threads.call("review.threadFileDiff", { threadId, path: FolderPath.parse(file.path) })).toMatchObject(expected);
   });
 });
+
+it("asks for a turn's saved changes and files by the server's turn, though the agent's events name it by their own id", async () => {
+  stand.setBilling(email, { pro: true, standing: "live", at: "2099-01-01T00:00:00.000Z", monthlyLeftSeconds: 3600, packsLeftSeconds: 0 });
+  stand.setSignIns(email, [{ agent: "claude" }]);
+  const runId = `hosted:${threadId}`;
+  await hosted.threads.call("runs.send", { runId, text: "Add a CSV export", messageId: "user-00000000-0000-4000-8000-000000000001" });
+  stand.endTurn(threadId);
+  const { events } = await hosted.threads.call("events.page", { runId, fromTurn: 0 });
+  const ended = events.find((event) => event.type === "turn.completed");
+  if (ended?.type !== "turn.completed") throw new Error("The turn must end.");
+  const server = ended.turnId.replace(/-agent$/, "");
+  expect(server).not.toBe(ended.turnId);
+  answer = { ...recorded, comparison: undefined, missing: undefined, turnId: server, since: null };
+  await hosted.threads.call("hosted.review.turn", { threadId, turnId: ended.turnId });
+  answer = { path: file.path, oldPath: null, status: "modified", body: file.body, patch: "@@ -1 +1 @@\n-a\n+b", cut: null, note: null };
+  await hosted.threads.call("hosted.review.file", { threadId, path: file.path, turnId: ended.turnId });
+  expect(requests.map((request) => request.path.split("?")[0])).toEqual([`/hosted/threads/${threadId}/turns/${server}/changes`, `/hosted/threads/${threadId}/turns/${server}/changes/file`]);
+});

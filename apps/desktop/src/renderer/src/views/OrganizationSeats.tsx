@@ -88,11 +88,7 @@ function SeatSummary({
   if (complete && !subscription) return null;
   return (
     <section className="seats-summary">
-      <div>
-        <h2>{seatSummaryTitle(billing)}</h2>
-        {subscription ? <SeatRenewal subscription={subscription} /> : null}
-        {storage ? <OrganizationStorage spaceId={spaceId} revision={billing.revision} transport={storage} /> : null}
-      </div>
+      <SeatFacts spaceId={spaceId} storage={storage} billing={billing} />
       <div className="seats-summary-actions">
         {subscription ? (
           <Button disabled={state.opening || state.uncertain} onClick={manage}>
@@ -102,6 +98,18 @@ function SeatSummary({
         {!hasSubscription && !complete ? <SeatBuyButton disabled={disabled} reason={state.error ?? "The payment is still being checked."} buy={buy} /> : null}
       </div>
     </section>
+  );
+}
+
+/** Storage belongs to seats, so an organization with none shows no storage line. */
+function SeatFacts({ spaceId, storage, billing }: { spaceId: string; storage?: OrganizationStorageTransport; billing: OrganizationBilling }) {
+  const subscription = billing.subscription;
+  return (
+    <div>
+      <h2>{seatSummaryTitle(billing)}</h2>
+      {subscription ? <SeatRenewal subscription={subscription} /> : null}
+      {storage && subscription && subscription.standing !== "ended" ? <OrganizationStorage spaceId={spaceId} revision={billing.revision} transport={storage} /> : null}
+    </div>
   );
 }
 

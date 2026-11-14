@@ -34,7 +34,7 @@ import type { ComposerEditorHandle } from "./composer-editor/ComposerEditor";
 import { ComposerSendCluster } from "./ComposerSendButton";
 import { ContextUsage } from "./ContextUsage";
 import { useHostedControlReason } from "./HostedConversationBoundary";
-import { HostedUnknownContext, hostedCommandReason } from "./HostedComposerControls";
+import { hostedCommandReason } from "./HostedComposerControls";
 import { Cloud, Eye, FileText, Laptop, Lightbulb, ShieldCheck, ShieldOff, X } from "./icons";
 import { type PickerAccounts } from "./ModelPickerAccounts";
 import { ComposerModelPicker, type ModelChoice } from "./ModelPicker";
@@ -410,7 +410,6 @@ function guardHostedCommand(props: ComposerProps, hosted: string | null): Compos
 /** Context remains readable when the composer cannot act; compaction shares the controls' reason. */
 function ComposerContext({ compacting, context, onCompact, compactDisabledReason }: Pick<ComposerProps, "compacting" | "context" | "onCompact" | "compactDisabledReason">) {
   const readOnlyReason = useContext(ComposerReadOnly);
-  const usageReason = useHostedControlReason("usage");
   return (
     <>
       {compacting ? (
@@ -418,11 +417,7 @@ function ComposerContext({ compacting, context, onCompact, compactDisabledReason
           Compacting context…
         </span>
       ) : null}
-      {context ? (
-        <ContextUsage used={context.used} window={context.window} onCompact={onCompact} compacting={compacting} disabledReason={readOnlyReason ?? compactDisabledReason} />
-      ) : (
-        usageReason && <HostedUnknownContext />
-      )}
+      {context ? <ContextUsage used={context.used} window={context.window} onCompact={onCompact} compacting={compacting} disabledReason={readOnlyReason ?? compactDisabledReason} /> : null}
     </>
   );
 }

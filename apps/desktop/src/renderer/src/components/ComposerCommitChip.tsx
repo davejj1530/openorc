@@ -56,9 +56,6 @@ function HostedCommitChip({ changes }: { changes: ComposerChanges }) {
           </button>
         </span>
       </Tooltip>
-      <button type="button" className="composer-changes-summary" onClick={changes.onReview}>
-        Review
-      </button>
     </section>
   );
 }

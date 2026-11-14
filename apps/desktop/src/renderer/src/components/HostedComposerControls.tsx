@@ -3,18 +3,6 @@ import { CoversPreview } from "../lib/browser-preview";
 import { HOSTED_REASONS } from "@openorc/protocol";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { commandRows, nextPickable, type SuggestionRow } from "./composer-commands";
-import { HostedControlReason } from "./HostedControlReason";
-
-/** Missing context has no numeric value to draw. The existing details control explains its absence. */
-export function HostedUnknownContext() {
-  return (
-    <HostedControlReason label="Context usage" reason={HOSTED_REASONS.usage}>
-      <button type="button" className="composer-context" disabled>
-        Context
-      </button>
-    </HostedControlReason>
-  );
-}
 
 export function hostedCommandReason(value: string): string | null {
   const name = /^\/(compact|fork)(?:\s|$)/.exec(value)?.[1];

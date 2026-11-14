@@ -12,3 +12,7 @@ export function HostedConversationBoundary({ thread, children }: { thread: Threa
 export function useHostedControlReason(control: HostedControl): string | null {
   return hostedControlReason(useContext(HostedConversation), control);
 }
+
+export function useHostedConversation(): ThreadSummary | null {
+  return useContext(HostedConversation);
+}

@@ -7,6 +7,7 @@ import { queryClient } from "../lib/client";
 import { core } from "../lib/rpc";
 import { Composer, type ComposerProps } from "./Composer";
 import { ComposerAddMenu } from "./ComposerAddMenu";
+import { ComposerCommitChip } from "./ComposerCommitChip";
 import { ContextUsage } from "./ContextUsage";
 import { HostedConversationBoundary } from "./HostedConversationBoundary";
 import { ModelPickerRail } from "./ModelPickerRail";
@@ -129,11 +130,17 @@ it("lets the keyboard reach each unavailable cloud command's reason", async () =
   expect(await screen.findByText(HOSTED_REASONS.compact)).toBeTruthy();
   expect(messageOf(field)).toBe("/");
 });
-it("keeps unknown context unnumbered and explains it on focus", async () => {
+it("leaves unknown context out of the cloud composer", () => {
   mount(<Draft />);
-  const context = screen.getByRole("button", { name: "Context" });
-  expect(context.hasAttribute("disabled")).toBe(true);
+  expect(screen.queryByRole("button", { name: "Context" })).toBeNull();
+  expect(screen.queryByLabelText("Context usage")).toBeNull();
   expect(screen.queryByText("0%")).toBeNull();
-  await act(async () => context.parentElement?.focus());
-  expect(await screen.findByText(HOSTED_REASONS.usage)).toBeTruthy();
+});
+
+it("offers only Commit when the cloud has no uncommitted totals", () => {
+  const commit = vi.fn();
+  mount(<ComposerCommitChip changes={{ uncounted: true, files: 0, insertions: 0, deletions: 0, inPanel: false, projectName: "Example", onCommit: commit, onReview: vi.fn(), onRetry: vi.fn() }} />);
+  expect(screen.getByRole("region", { name: "Uncommitted changes" }).textContent).toBe("Commit");
+  fireEvent.click(screen.getByRole("button", { name: "Commit changes" }));
+  expect(commit).toHaveBeenCalledOnce();
 });

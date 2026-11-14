@@ -25,3 +25,18 @@ it("allows a corrected assignment after a definitive refusal", async () => {
   await draft.save(corrected);
   expect(write.mock.calls[1]?.[0]).toEqual(corrected);
 });
+
+it("retains an unsettled receipt when access is refused after a lost reply", async () => {
+  const write = vi
+    .fn()
+    .mockRejectedValueOnce(new Error("Lost reply"))
+    .mockResolvedValueOnce({ state: "refused", code: "organization_frozen", message: "Access is frozen." })
+    .mockResolvedValueOnce({ state: "saved", task: onlineTask(), accessRevision: 1 });
+  const draft = new TaskCreateDraft(write);
+  const original = input();
+  await expect(draft.save(original)).rejects.toThrow("Lost reply");
+  await expect(draft.save(input())).rejects.toThrow("Access is frozen");
+  expect(draft.pending).toBe(true);
+  await draft.save(input());
+  expect(write.mock.calls.map(([request]) => request)).toEqual([original, original, original]);
+});

@@ -15,5 +15,5 @@ export function useTaskRoster(scope: TaskOnlineScope, projectId: string, enabled
   });
   const people = [...new Map((roster.data?.pages.flatMap((page) => page.people) ?? []).map((person) => [person.memberId, person])).values()];
   const changed = new Set(roster.data?.pages.map((page) => page.accessRevision)).size > 1;
-  return { ...roster, people: changed ? [] : people, error: changed ? new Error("Project access changed. Try again.") : roster.error };
+  return { ...roster, people: changed || roster.error ? [] : people, error: changed ? new Error("Project access changed. Try again.") : roster.error };
 }

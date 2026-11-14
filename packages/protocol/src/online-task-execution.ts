@@ -8,7 +8,7 @@ export type OnlineTaskThread = z.infer<typeof OnlineTaskThread>;
 export const OnlineTaskOpen = OnlineTaskDelete;
 export type OnlineTaskOpen = z.infer<typeof OnlineTaskOpen>;
 export type OnlineTaskPreparation = ({ state: "ready" } & OnlineTaskThread) | ({ state: "conflict" } & z.infer<typeof OnlineTaskEnvelope>);
-export const OnlineTaskSendContext = z.object({ id: z.string().min(1), ifRevision: z.number().int().nonnegative() }).strict();
+export const OnlineTaskSendContext = z.object({ id: z.string().min(1).max(128), ifRevision: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER) }).strict();
 export type OnlineTaskSendContext = z.infer<typeof OnlineTaskSendContext>;
 export const OnlineTaskThreadDraft = z
   .object({

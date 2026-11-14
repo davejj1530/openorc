@@ -7,7 +7,17 @@
  * the card above the composer says why, and the send fails with the same words, which keeps the message in the
  * composer. After every write the rows are read again before the answer, so the window's next read sees it.
  */
-import { hostedSendBlock, hostedThreadOf, isHostedAgent, isHostedRefusal, type AccountStatus, type HostedRefusal, type QueuedMessage, type RpcParams } from "@openorc/protocol";
+import {
+  hostedSendBlock,
+  hostedThreadOf,
+  isHostedAgent,
+  isHostedRefusal,
+  type AccountStatus,
+  type HostedRefusal,
+  type OnlineTaskSendContext,
+  type QueuedMessage,
+  type RpcParams,
+} from "@openorc/protocol";
 import { Refused, type Requests } from "./session.js";
 import { refusalWords, toQueued, wireMessageId } from "./translate.js";
 import { ROUTES, type WireThread } from "./wire.js";
@@ -52,13 +62,13 @@ const turnSettings = (row: WireThread, asked: TurnSettings | undefined) => ({ ag
 async function post(
   calls: Calls,
   threadId: string,
-  message: { id?: string | undefined; text: string; attachments?: readonly string[] | undefined; settings?: TurnSettings; after?: boolean },
+  message: { id?: string | undefined; text: string; attachments?: readonly string[] | undefined; settings?: TurnSettings; after?: boolean; task?: OnlineTaskSendContext | undefined },
 ): Promise<void> {
   const row = calls.row(threadId);
   if (message.attachments?.length) throw new Refused(FILES);
   if (message.settings?.agent && !isHostedAgent(message.settings.agent)) throw new Refused(`${message.settings.agent} doesn't run on OpenOrc Cloud.`);
   const id = wireMessageId(message.id) ?? crypto.randomUUID();
-  const body = { id, text: message.text, ...(message.settings && { settings: message.settings }), ...(message.after && { delivery: "after" }) };
+  const body = { id, text: message.text, ...(message.settings && { settings: message.settings }), ...(message.after && { delivery: "after" }), ...(message.task && { task: message.task }) };
   const reply = await calls.on(threadId).request(ROUTES.send(threadId), body);
   if (!reply.sent) return refuse(calls, reply.refusal, turnSettings(row, message.settings));
   await calls.refresh();
@@ -80,17 +90,17 @@ export async function start(calls: Calls, params: RpcParams<"runs.start">): Prom
     mode: params.mode,
     permissionMode: params.permissionMode,
   };
-  await post(calls, params.threadId, { id: params.messageId, text: params.prompt, attachments: params.attachments, settings });
+  await post(calls, params.threadId, { id: params.messageId, text: params.prompt, attachments: params.attachments, settings, task: params.task });
 }
 
 /** runs.send: into the running turn, or the next turn of a resting agent. The server tells which. */
 export function send(calls: Calls, params: RpcParams<"runs.send">): Promise<void> {
-  return post(calls, threadOf(params.runId), { id: params.messageId, text: params.text, attachments: params.attachments });
+  return post(calls, threadOf(params.runId), { id: params.messageId, text: params.text, attachments: params.attachments, task: params.task });
 }
 
 /** threads.queue: for after the running turn. Answers the queue as it now stands. */
 export async function queue(calls: Calls, params: RpcParams<"threads.queue">): Promise<QueuedMessage[]> {
-  await post(calls, params.id, { id: params.requestKey, text: params.text, attachments: params.attachments, after: true });
+  await post(calls, params.id, { id: params.requestKey, text: params.text, attachments: params.attachments, after: true, task: params.task });
   return toQueued(calls.row(params.id));
 }
 

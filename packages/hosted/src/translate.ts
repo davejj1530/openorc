@@ -173,7 +173,7 @@ export function toSummary(row: WireThread, context: RowContext): ThreadSummary {
   return {
     id: row.id,
     projectId: context.projectId,
-    title: row.title,
+    title: row.title.trim() ? row.title : "New thread",
     agent: row.settings.agent,
     model: row.settings.model,
     effort: row.settings.effort,

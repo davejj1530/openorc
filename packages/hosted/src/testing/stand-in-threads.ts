@@ -28,6 +28,7 @@
  *   a waiting message the host refuses when its turn comes stays in `waiting` as refused
  */
 import { randomUUID } from "node:crypto";
+import { titleFromPrompt } from "@openorc/protocol";
 import { userOf, type StandInSpaces } from "./stand-in-spaces.js";
 
 export interface StandInPeer {
@@ -259,6 +260,7 @@ export class StandInThreads {
 
   /** The thread's title and what its next turns run with, for everyone in it. Answers the row. */
   #rename(thread: Thread, who: string, body: Record<string, unknown>): Reply {
+    if (body["expectedTitle"] !== undefined && body["expectedTitle"] !== this.#title(thread)) return { status: 200, body: this.#rowOf(thread, who) };
     const settings = (body["settings"] ?? {}) as Partial<Thread["settings"]> & { agent?: string };
     if (typeof body["title"] === "string") thread.title = body["title"].trim();
     const { agent, ...rest } = settings;
@@ -288,6 +290,7 @@ export class StandInThreads {
     }
     const message: Message = { id, author: who, text: String(body["text"] ?? ""), state: "pending", refusal: null, after: Boolean(thread.turn) && after, createdAt: new Date().toISOString() };
     thread.messages.push(message);
+    if (!thread.title.trim() && thread.messages.length === 1) thread.title = titleFromPrompt(message.text);
     if (!message.after) this.#take(thread, message);
     else this.#changed(thread);
     return { status: 200, body: { sent: true, message: messageOf(message) } };
@@ -481,7 +484,7 @@ export class StandInThreads {
       id: thread.id,
       projectId: thread.projectId,
       parentId: null,
-      title: thread.title,
+      title: this.#title(thread),
       baseBranch: "main",
       branch: thread.branch,
       settings: { agent: thread.agent, ...thread.settings },
@@ -502,6 +505,13 @@ export class StandInThreads {
       createdAt: thread.createdAt,
       lastActivityAt: thread.lastActivityAt,
     };
+  }
+
+  #title(thread: Thread): string {
+    if (thread.title.trim()) return thread.title;
+    const first = thread.messages[0]?.text;
+    const event = thread.events.find(({ event }) => event["type"] === "message.completed" && event["role"] === "user")?.event;
+    return titleFromPrompt(first ?? (typeof event?.["text"] === "string" ? event["text"] : ""));
   }
 
   #reads(who: string, thread: Thread): boolean {

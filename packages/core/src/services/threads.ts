@@ -30,6 +30,7 @@ import type { RunService } from "./runs.js";
 import { ThreadAgentTools } from "./thread-agent-tools.js";
 import { startAccount, titleFromPrompt, type ContinueThreadInput, type StartThreadInput, type ThreadPatch, type ThreadTitler } from "./thread-inputs.js";
 import { ThreadMessageQueue } from "./thread-message-queue.js";
+import { nameThread } from "./thread-naming.js";
 import { ThreadMoves, fileChanges } from "./thread-moves.js";
 import { assertMutableThread } from "./thread-mutations.js";
 import { applyRequestedPolicy } from "./thread-policy-requests.js";
@@ -394,11 +395,8 @@ export class ThreadService {
   }
 
   /**
-   * After the first exchange, a thread gets a real name the way Codex and
-   * Claude Desktop do it: a cheap model reads the request and the reply and
-   * names the subject. Only while the title is still the prompt's first line,
-   * so a rename by the user always wins. A finished turn also wakes a snoozed
-   * thread and sends the next queued message.
+   * A finished turn wakes a snoozed thread, sends the next queued message and
+   * proposes a short name through the same rule as hosted conversations.
    */
   async onTurnCompleted(thread: Thread, exchange: { prompt: string | null; reply: string | null }): Promise<void> {
     if (thread.snoozedUntil) {
@@ -406,16 +404,10 @@ export class ThreadService {
       this.invalidate(["threads", `thread:${thread.id}`]);
     }
     void this.messageQueue.drainQueue(thread.id);
-    if (!exchange.prompt || thread.title !== titleFromPrompt(exchange.prompt)) return;
-    let title: string | null = null;
-    try {
-      title = await this.titler({ request: exchange.prompt, reply: exchange.reply }, thread.agent, thread.claudeAccountId ?? "claude-cli");
-    } catch (e) {
-      this.log.warn(`could not name thread ${thread.id}: ${e instanceof Error ? e.message : String(e)}`);
-    }
+    const named = await nameThread(thread, exchange, this.titler, this.log);
     const fresh = threads.get(this.db, thread.id);
-    if (!title || !fresh || fresh.title !== thread.title) return;
-    threads.update(this.db, thread.id, { title });
+    if (!named || !fresh || fresh.title !== named.expectedTitle) return;
+    threads.update(this.db, thread.id, { title: named.title });
     this.invalidate(["threads", `thread:${thread.id}`]);
   }
 

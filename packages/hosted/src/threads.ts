@@ -30,6 +30,7 @@ import type { Account } from "./account.js";
 import type { SpaceCatalog, Spaces } from "./spaces.js";
 import { spaceProjects } from "./space-projects.js";
 import { AccountCache } from "./account-cache.js";
+import { ThreadNames } from "./thread-names.js";
 import { askNotice, endNotice, noticed } from "./notices.js";
 import * as sends from "./sends.js";
 import { Refused, type Requests, type Session, type SessionChange } from "./session.js";
@@ -63,11 +64,12 @@ type Heard = z.infer<typeof keptThreads>;
 
 type ThreadsDeps = { session: Session; spaces: Spaces; follower: Follower; account: Pick<Account, "status" | "refused"> } & Pick<
   HostedDeps,
-  "server" | "kept" | "projects" | "push" | "notify" | "now" | "log"
+  "server" | "kept" | "projects" | "push" | "notify" | "nameThread" | "now" | "log"
 >;
 
 export class Threads implements HostedThreads {
   readonly #cache: AccountCache<Heard>;
+  readonly #names: ThreadNames;
   #generation = -1;
   readonly brain = "hosted";
   #heard: Heard | null = null;
@@ -85,6 +87,7 @@ export class Threads implements HostedThreads {
 
   constructor(private readonly deps: ThreadsDeps) {
     this.#cache = new AccountCache({ kept: deps.kept, part: "threads", server: deps.server, schema: keptThreads });
+    this.#names = new ThreadNames({ nameThread: deps.nameThread, log: deps.log, on: (id) => this.on(id), saved: (row) => this.#hearRow(row) });
     this.calls = {
       on: (threadId) => this.on(threadId),
       row: (threadId) => this.row(threadId),
@@ -378,6 +381,7 @@ export class Threads implements HostedThreads {
     if (this.#heard?.email === state.email) this.#tellPerson(this.#heard.rows, read.rows);
     this.#forgetRemoved(read.rows);
     this.#heard = { email: state.email, heardAt: this.deps.now(), ...read, here: this.#heard?.email === state.email ? this.#heard.here : {} };
+    this.#names.refresh(read.rows, read.me);
     this.#save();
     if (JSON.stringify([this.#heard.rows, this.#heard.projects]) !== before) this.#tell();
     // Settings shows which of this Mac's projects are on OpenOrc Cloud, read off these.
@@ -454,12 +458,14 @@ export class Threads implements HostedThreads {
   /** The host is closing: an answer still on its way is dropped. */
   close(): void {
     this.#closed = true;
+    this.#names.clear();
     this.deps.follower.forget();
   }
 
   /** Signed out: the rows and their kept copy go, and the windows read their lists again. */
   #changed(change: SessionChange): void {
     if (this.#generation !== this.deps.session.generation) {
+      this.#names.clear();
       this.#generation = this.deps.session.generation;
       this.#reading = null;
       this.#again = null;

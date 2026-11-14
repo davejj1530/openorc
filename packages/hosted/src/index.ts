@@ -65,6 +65,8 @@ export interface HostedDeps {
   push(push: { type: "invalidate"; keys: string[] } | { type: "frame"; frame: Frame } | { type: "gap"; runIds: string[] }): void;
   /** A notice for the person about a cloud thread: an ask it waits on, or a turn that ended. The host words and shows it as its own. */
   notify(notice: HostedNotice): void;
+  /** The host's shared small-model naming rule. Its proposal is saved only while the expected title still matches. */
+  nameThread?(thread: Pick<ThreadSummary, "id" | "title" | "agent">, exchange: { prompt: string | null; reply: string | null }): Promise<{ title: string; expectedTitle: string } | null>;
   /**
    * Makes a long-lived Claude token as one of the device's Claude accounts (its default when none is named), as the
    * Mac's `claude setup-token` does. Absent where the device cannot; the token goes to the server and nowhere else.
@@ -232,6 +234,7 @@ export function createHosted(deps: HostedDeps): Hosted {
     projects: deps.projects,
     push: deps.push,
     notify: deps.notify,
+    nameThread: deps.nameThread,
     now: deps.now,
     log: deps.log,
   });

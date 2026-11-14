@@ -11,6 +11,8 @@ import { mintClaudeToken, type ClaudeSignInLaunch } from "./claude-token-mint.js
 import { awaitBrowserReturn } from "./browser-return.js";
 import { noticeLine } from "./notice-text.js";
 import { spawnWithPipes, type SpawnTerminal } from "./terminal-process.js";
+import { nameThread } from "./thread-naming.js";
+import type { TextGenerationService } from "./text-generation.js";
 
 /** What the server last said, by part, in the settings table. */
 const KEPT = { account: "hosted.kept", threads: "hosted.threads", spaces: "hosted.spaces" } as const;
@@ -36,19 +38,22 @@ export interface AccountDeps {
   terminal: SpawnTerminal | undefined;
   openBrowser: ((url: string) => void) | undefined;
   log: Logger;
+  textGeneration?: Pick<TextGenerationService, "title">;
 }
 
 /** The account for this core: none on the cloud brain, or with no account server. */
 export function accountFor(
   options: Pick<OpenOrcOptions, "cloudOnly" | "accountServer" | "accountSecrets" | "terminal" | "openBrowser">,
-  parts: Omit<AccountDeps, "server" | "secrets" | "terminal" | "openBrowser">,
+  parts: Omit<AccountDeps, "server" | "secrets" | "terminal" | "openBrowser" | "textGeneration">,
+  textGeneration?: AccountDeps["textGeneration"],
 ): Hosted | null {
   if (options.cloudOnly || !options.accountServer) return null;
-  return createAccount({ ...parts, server: options.accountServer, secrets: options.accountSecrets, terminal: options.terminal, openBrowser: options.openBrowser });
+  return createAccount({ ...parts, textGeneration, server: options.accountServer, secrets: options.accountSecrets, terminal: options.terminal, openBrowser: options.openBrowser });
 }
 
 /** The account for this Mac. Made only for a core given an account server. */
 function createAccount(deps: AccountDeps): Hosted {
+  const generator = deps.textGeneration;
   return createHosted({
     server: deps.server,
     session: sessionStore(deps.secrets),
@@ -68,6 +73,7 @@ function createAccount(deps: AccountDeps): Hosted {
     deviceName: process.platform === "darwin" ? "OpenOrc on this Mac" : "OpenOrc on this computer",
     now: Date.now,
     log: deps.log,
+    nameThread: generator ? (thread, exchange) => nameThread(thread, exchange, (input, agent, account) => generator.title(input, agent, account), deps.log) : undefined,
   });
 }
 

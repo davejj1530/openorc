@@ -387,7 +387,7 @@ export class OpenOrc {
   /** The OpenOrc account; null on the cloud brain and in a core given no account server. Made at its first use. */
   get account(): Hosted | null {
     if (this.hosted === undefined)
-      this.hosted = accountFor(this.options, { db: this.db, windows: this.windows, notices: () => this.settings.get().notifications, claude: this.claudeAccounts, log: this.log });
+      this.hosted = accountFor(this.options, { db: this.db, windows: this.windows, notices: () => this.settings.get().notifications, claude: this.claudeAccounts, log: this.log }, this.textGeneration);
     return this.hosted;
   }
 

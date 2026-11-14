@@ -5,6 +5,8 @@ export * from "./skills.js";
 export * from "./diff-lines.js";
 export * from "./domain.js";
 export * from "./thread-status.js";
+export * from "./thread-title.js";
+export * from "./redact.js";
 export * from "./events.js";
 export * from "./execution-target.js";
 export * from "./harness.js";

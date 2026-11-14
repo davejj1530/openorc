@@ -122,7 +122,7 @@ export const wireThreadDetail = wireThread.extend({ turnEnds: z.array(z.number()
 export type WireThreadDetail = z.infer<typeof wireThreadDetail>;
 
 /** One line of a thread's log. `event` is checked against the app's own events where it is translated. */
-export const wireEvent = z.object({ seq: z.number().int().positive(), event: z.record(z.string(), z.unknown()) });
+export const wireEvent = z.object({ seq: z.number().int().positive(), by: z.string().nullable().optional(), event: z.record(z.string(), z.unknown()) });
 export type WireEvent = z.infer<typeof wireEvent>;
 
 export const wireEvents = z.object({ events: z.array(wireEvent), head: seq, fromTurn: seq.optional() });

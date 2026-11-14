@@ -6,6 +6,7 @@ import { Sidebar } from "./components/Sidebar";
 import { OrganizationProvider } from "./components/OrganizationProvider";
 import { OrganizationPeople } from "./views/OrganizationPeople";
 import { OrganizationStart } from "./views/OrganizationStart";
+import { OrganizationWorkGate } from "./components/OrganizationWorkGate";
 import { useOrganization } from "./lib/organization-context";
 import { DeleteThreadDialog } from "./components/ThreadActions";
 import { ThreadMoveDialog } from "./components/ThreadMoveDialog";
@@ -82,21 +83,23 @@ function DesktopApp() {
     <div className="app-shell h-full flex text-ink">
       <Sidebar key={`sidebar:${home}`} />
       <div key={home} className="work-row flex-1 min-w-0 h-full flex" data-chat={route.view === "team-chat" || undefined}>
-        {workRoute ? <StartScreen route={workRoute} /> : null}
-        {workRoute?.view === "thread" ? <ThreadWorkspace /> : null}
-        <RetainedTeamChat route={route} />
-        {route.view === "task" ? (
-          <Suspense
-            fallback={
-              <Main>
-                <div className="document-skeleton" aria-label="Loading task" />
-              </Main>
-            }
-          >
-            <TaskView key={taskRefKey(route.taskRef ?? { kind: "local", id: route.taskId })} taskId={route.taskId} {...(route.taskRef && { taskRef: route.taskRef })} tab={route.tab} />
-          </Suspense>
-        ) : null}
-        <MainScreen route={route} currentProject={currentProject} />
+        <OrganizationWorkGate route={route}>
+          {workRoute ? <StartScreen route={workRoute} /> : null}
+          {workRoute?.view === "thread" ? <ThreadWorkspace /> : null}
+          <RetainedTeamChat route={route} />
+          {route.view === "task" ? (
+            <Suspense
+              fallback={
+                <Main>
+                  <div className="document-skeleton" aria-label="Loading task" />
+                </Main>
+              }
+            >
+              <TaskView key={taskRefKey(route.taskRef ?? { kind: "local", id: route.taskId })} taskId={route.taskId} {...(route.taskRef && { taskRef: route.taskRef })} tab={route.tab} />
+            </Suspense>
+          ) : null}
+          <MainScreen route={route} currentProject={currentProject} />
+        </OrganizationWorkGate>
       </div>
       <CommandPalette open={ui.palette} onOpenChange={ui.setPalette} />
       <div className="workspace-update-notices">

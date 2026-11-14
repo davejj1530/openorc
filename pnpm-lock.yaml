@@ -303,6 +303,9 @@ importers:
       '@openorc/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@openorc/hosted':
+        specifier: workspace:*
+        version: link:../../packages/hosted
       '@openorc/link':
         specifier: workspace:*
         version: link:../../packages/link

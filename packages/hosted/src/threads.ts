@@ -10,7 +10,18 @@
  * sidebar's rows are the rows filtered in memory; one thread is one row, and every request about it is made in its
  * space (`on`). The `threads`, `projects` and `members` topics read every space again.
  */
-import { harnessShortName, hostedThreadOf, isHostedAgent, type AccountReach, type Project, type RoutedMethod, type RpcParams, type RpcResults, type ThreadSummary } from "@openorc/protocol";
+import {
+  harnessShortName,
+  hostedRunId,
+  hostedThreadOf,
+  isHostedAgent,
+  type AccountReach,
+  type Project,
+  type RoutedMethod,
+  type RpcParams,
+  type RpcResults,
+  type ThreadSummary,
+} from "@openorc/protocol";
 import { z } from "zod";
 import type { HostedDeps, HostedThreads, MergedMethod, PlacePage } from "./index.js";
 import { READ_LIMIT, type Follower } from "./follow.js";
@@ -174,6 +185,8 @@ export class Threads implements HostedThreads {
   #reading: Promise<void> | null = null;
   #again: Promise<void> | null = null;
   #closed = false;
+  /** The run states last announced to windows. A row can change these before any agent event arrives. */
+  #toldRuns = new Map<string, boolean>();
   /** When the person last asked each thread to be ready, so a thread is asked at most once a minute. */
   readonly readied = new Map<string, number>();
   /** What the writes in sends.ts work with. */
@@ -506,7 +519,13 @@ export class Threads implements HostedThreads {
   }
 
   #tell(): void {
-    this.deps.push({ type: "invalidate", keys: ["threads", "runs"] });
+    const next = new Map((this.#heard?.rows ?? []).map((row) => [row.id, runsNow(row, this.reach)]));
+    const ids = new Set([...this.#toldRuns.keys(), ...next.keys()]);
+    const changed = [...ids].filter((id) => this.#toldRuns.has(id) && this.#toldRuns.get(id) !== next.get(id));
+    this.#toldRuns = next;
+    this.deps.push({ type: "invalidate", keys: ["threads", ...[...ids].map((id) => `runs:thread:${id}`)] });
+    // A turn can start or park without a session event. Reload its snapshot to read the row's live state.
+    if (changed.length) this.deps.push({ type: "gap", runIds: changed.map(hostedRunId) });
   }
 
   #rows(): Map<string, HeardRow> {

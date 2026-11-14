@@ -751,7 +751,7 @@ export const CorePush = z.discriminatedUnion("type", [
   z.object({ type: z.literal("frame"), frame: Frame }),
   /** Cache keys whose data changed. The renderer refetches. */
   z.object({ type: z.literal("invalidate"), keys: z.array(z.string()) }),
-  /** Frames of these runs were lost on the way from the cloud brain; the renderer reloads them. */
+  /** These runs need a fresh snapshot: events were missed or their live state changed without an event. */
   z.object({ type: z.literal("gap"), runIds: z.array(z.string()) }),
   DevicePanelPush,
   /** Something worth telling the user about when they are looking elsewhere. */

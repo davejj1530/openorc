@@ -163,8 +163,8 @@ async function loadPage(s: Store, runId: string, request: LoadRequest): Promise<
     // Turns before the page still count, so turn numbers match checkpoints.
     run.turnsCompleted = page.fromTurn;
     applyEvents(run, page.events);
-    // A page that starts after the session did has no session.started to say whether it is still open.
-    if (page.fromTurn > 0) run.live = page.live;
+    // The snapshot knows whether the run is live now, even before a session event or after its last event.
+    run.live = page.live;
     if (!run.live) run.turnOpen = false;
     // The listing already reflects every buffered event up to the last one it holds, including streaming fragments
     // the ledger has since dropped because their completion replaced them. Only what came after is new.

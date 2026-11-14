@@ -87,7 +87,7 @@ describe("hosted threads", () => {
     await vi.waitFor(() => expect(hosted.threads.active).toBe(true));
     const thread = stand.addThread(ADA, { projectId: project, title: "New on the phone" });
     await vi.waitFor(() => expect(hosted.threads.holds({ thread })).toBe(true));
-    expect(seen.pushes).toContainEqual({ type: "invalidate", keys: ["threads", "runs"] });
+    expect(seen.pushes).toContainEqual({ type: "invalidate", keys: ["threads", `runs:thread:${thread}`] });
   });
 
   it("keeps its rows through a restart with the server down, offline, and lets them go on sign-out", async () => {
@@ -104,7 +104,7 @@ describe("hosted threads", () => {
     expect(hosted.threads.active).toBe(false);
     expect(hosted.threads.holds({ thread })).toBe(false);
     expect(device.threads).toBeNull();
-    expect(seen.pushes).toContainEqual({ type: "invalidate", keys: ["threads", "runs"] });
+    expect(seen.pushes).toContainEqual({ type: "invalidate", keys: ["threads", `runs:thread:${thread}`] });
   });
 
   it("draws an event it cannot read as one plain line in its place, never leaving it out", async () => {

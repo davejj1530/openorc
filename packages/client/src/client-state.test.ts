@@ -6,7 +6,7 @@ import { testClient } from "./test-fixtures/fake-connection.js";
 const started = (runId: string): AgentEvent => ({ type: "session.started", runId, ts: 1, agent: "codex", externalSessionId: runId, model: "m", eventId: `${runId}-start` });
 const ended = (runId: string): AgentEvent => ({ type: "session.completed", runId, ts: 3, status: "success", durationMs: 2, eventId: `${runId}-end` });
 const reply = (runId: string, text: string, eventId: string): AgentEvent => ({ type: "message.delta", runId, ts: 2, messageId: "m", role: "assistant", text, eventId });
-const page = (events: AgentEvent[], fromTurn = 0) => ({ events, fromTurn, live: false });
+const page = (events: AgentEvent[], fromTurn = 0, live = false) => ({ events, fromTurn, live });
 
 afterEach(() => vi.useRealTimers());
 
@@ -24,7 +24,7 @@ describe("frame interest", () => {
 
   it("asks for a run's frames before its page, so none fall between them", async () => {
     const { client, call, wire } = testClient("interest");
-    call.mockResolvedValueOnce(page([started("run")]));
+    call.mockResolvedValueOnce(page([started("run")], 0, true));
     await client.runs.hydrate("run");
     expect(wire.slice(0, 2)).toEqual(["interest run", "call events.page"]);
     expect(client.runs.get("run")?.live).toBe(true);
@@ -32,7 +32,7 @@ describe("frame interest", () => {
 
   it("leaves a window's connection alone, since a window hears every run", async () => {
     const { client, call, wire } = testClient("all");
-    call.mockResolvedValueOnce(page([started("run")]));
+    call.mockResolvedValueOnce(page([started("run")], 0, true));
     client.runs.retain(["run"]);
     await client.runs.hydrate("run");
     expect(wire).toEqual(["call events.page"]);

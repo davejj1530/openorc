@@ -10,7 +10,7 @@ export type ClientPush =
   | { type: "notify"; notice: Notice }
   /** A session with the core began. Resumed when one came before it, so pushes may have been missed in between. */
   | { type: "session"; resumed: boolean }
-  /** Frames for these runs were dropped while the session stayed up. */
+  /** These runs need a fresh snapshot: events were missed or their live state changed without an event. */
   | { type: "gap"; runIds: string[] };
 
 /**

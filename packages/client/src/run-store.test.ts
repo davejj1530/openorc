@@ -6,6 +6,13 @@ const { client, call } = testClient();
 const { runs } = client;
 beforeEach(() => runs.reset());
 
+it.each([true, false])("takes a full page's live state from its current snapshot (%s)", async (live) => {
+  const events: AgentEvent[] = live ? [] : [{ type: "session.started", runId: "run", ts: 1, agent: "codex", externalSessionId: null, model: null }];
+  call.mockResolvedValueOnce({ events, fromTurn: 0, live });
+  await runs.hydrate("run");
+  expect(runs.get("run")?.live).toBe(live);
+});
+
 it("restores an app declaration discovered after completion from the ledger", async () => {
   const mcp = { server: "screens", tool: "search", resourceUri: "ui://screens/gallery" };
   const events: AgentEvent[] = [

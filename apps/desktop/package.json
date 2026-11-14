@@ -92,6 +92,7 @@
   "devDependencies": {
     "@electron/fuses": "1.8.0",
     "@openorc/db": "workspace:*",
+    "@openorc/hosted": "workspace:*",
     "@openorc/link": "workspace:*",
     "@tailwindcss/vite": "^4.1.0",
     "@testing-library/dom": "^10.4.0",

@@ -11,7 +11,7 @@ export interface TaskDelivery {
   personal: boolean;
 }
 /** Each delivery opens only after its paired server and compatibility checks pass. */
-export const taskDelivery: Readonly<TaskDelivery> = { organization: false, execution: false, personal: false };
+export const taskDelivery: Readonly<TaskDelivery> = { organization: true, execution: false, personal: false };
 interface Dependencies extends Pick<HostedDeps, "push"> {
   session: Session;
   spaces: Pick<HostedSpaces, "status">;

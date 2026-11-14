@@ -43,11 +43,14 @@ async function client(email: string, overrides: Partial<HostedDeps> = {}): Promi
 }
 const create = (tasks: OnlineTasks, extra = {}) => tasks.create({ spaceId, projectId, requestId: randomUUID(), title: "Export activity", spec: "Keep the current filters.", ...extra });
 
-it("keeps undelivered tasks off without reading the server or changing Personal", async () => {
+it("enables organization documents while keeping execution and Personal delivery closed", async () => {
   const { hosted } = await client(ADMIN);
+  expect(hosted.tasks.state({ spaceId })).toMatchObject({ state: "ready", execution: false, personal: false });
+  expect((await hosted.tasks.list({ spaceId })).tasks).toEqual([]);
   const before = stand.requests.filter((request) => request.path.startsWith("/tasks")).length;
-  expect(hosted.tasks.state({ spaceId })).toEqual({ state: "unavailable" });
-  await expect(hosted.tasks.list({ spaceId })).rejects.toThrow("isn't available");
+  const personal = { spaceId: `personal-${ADMIN}` };
+  expect(hosted.tasks.state(personal)).toEqual({ state: "unavailable" });
+  await expect(hosted.tasks.list(personal)).rejects.toThrow("isn't available");
   expect(stand.requests.filter((request) => request.path.startsWith("/tasks"))).toHaveLength(before);
 });
 it("shows an assignment to both identities and acknowledges only its explicit open", async () => {

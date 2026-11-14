@@ -118,8 +118,8 @@ describe("sending to an OpenOrc Cloud thread", () => {
 
   it("refuses in words what a cloud thread does not take", async () => {
     const { hosted, thread } = await withThread();
-    await expect(hosted.threads.call("threads.fork", { id: thread })).rejects.toThrow("This isn't on OpenOrc Cloud yet.");
-    await expect(hosted.threads.call("git.threadLog", { threadId: thread })).rejects.toThrow("An OpenOrc Cloud thread's files aren't on this Mac.");
+    await expect(hosted.threads.call("threads.fork", { id: thread })).rejects.toThrow("Forking a cloud thread isn't available yet.");
+    await expect(hosted.threads.call("git.threadLog", { threadId: thread })).rejects.toThrow("Commit history isn't available in this cloud thread yet.");
   });
 
   it("refuses files in words until the server takes them", async () => {

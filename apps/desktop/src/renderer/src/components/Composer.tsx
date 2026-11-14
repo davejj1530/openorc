@@ -33,6 +33,8 @@ import { ComposerInput, type ComposerLists } from "./ComposerInput";
 import type { ComposerEditorHandle } from "./composer-editor/ComposerEditor";
 import { ComposerSendCluster } from "./ComposerSendButton";
 import { ContextUsage } from "./ContextUsage";
+import { useHostedControlReason } from "./HostedConversationBoundary";
+import { HostedUnknownContext, hostedCommandReason } from "./HostedComposerControls";
 import { Cloud, Eye, FileText, Laptop, Lightbulb, ShieldCheck, ShieldOff, X } from "./icons";
 import { type PickerAccounts } from "./ModelPickerAccounts";
 import { ComposerModelPicker, type ModelChoice } from "./ModelPicker";
@@ -224,6 +226,7 @@ function ComposerAlerts({ message, changes }: { message: ReactNode; changes: Com
 }
 
 export function Composer(props: ComposerProps) {
+  props = guardHostedCommand(props, useHostedControlReason("compact"));
   const isNewThread = props.presentation === "new-thread";
   const shell = useRef<HTMLDivElement>(null);
   const fitBar = useComposerFit();
@@ -400,9 +403,14 @@ export function Composer(props: ComposerProps) {
   return <ComposerReadOnly.Provider value={props.readOnlyReason ?? null}>{content}</ComposerReadOnly.Provider>;
 }
 
+function guardHostedCommand(props: ComposerProps, hosted: string | null): ComposerProps {
+  return hosted ? { ...props, disabledReason: props.disabledReason ?? hostedCommandReason(props.value) } : props;
+}
+
 /** Context remains readable when the composer cannot act; compaction shares the controls' reason. */
 function ComposerContext({ compacting, context, onCompact, compactDisabledReason }: Pick<ComposerProps, "compacting" | "context" | "onCompact" | "compactDisabledReason">) {
   const readOnlyReason = useContext(ComposerReadOnly);
+  const usageReason = useHostedControlReason("usage");
   return (
     <>
       {compacting ? (
@@ -410,7 +418,11 @@ function ComposerContext({ compacting, context, onCompact, compactDisabledReason
           Compacting context…
         </span>
       ) : null}
-      {context ? <ContextUsage used={context.used} window={context.window} onCompact={onCompact} compacting={compacting} disabledReason={readOnlyReason ?? compactDisabledReason} /> : null}
+      {context ? (
+        <ContextUsage used={context.used} window={context.window} onCompact={onCompact} compacting={compacting} disabledReason={readOnlyReason ?? compactDisabledReason} />
+      ) : (
+        usageReason && <HostedUnknownContext />
+      )}
     </>
   );
 }

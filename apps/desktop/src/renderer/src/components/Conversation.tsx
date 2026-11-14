@@ -53,6 +53,7 @@ import { useTurnFooters } from "../lib/turn-footers";
 import { useCloudSignInGate } from "./CloudSignInOffer";
 import { AnswersBlocked, AsksDocked } from "./ask-answer";
 import { useHostedComposer } from "./HostedSendNotice";
+import { HostedConversationBoundary } from "./HostedConversationBoundary";
 import { CloudPreparing, CloudStart } from "./CloudStart";
 import { Composer, type SlashCommand } from "./Composer";
 import { ComposerChoice } from "./ComposerChoice";
@@ -78,8 +79,9 @@ export type ConversationScope = { kind: "task"; task: Task } | { kind: "thread";
 type ConversationProps = { scope: ConversationScope; project: Project; toolbarTarget?: HTMLElement | null };
 
 export function Conversation({ scope, project }: ConversationProps) {
-  if (scope.kind === "thread" && isSubagentThread(scope.thread)) return <SubagentConversation thread={scope.thread} project={project} />;
-  return <IndividualConversation scope={scope} project={project} />;
+  const content =
+    scope.kind === "thread" && isSubagentThread(scope.thread) ? <SubagentConversation thread={scope.thread} project={project} /> : <IndividualConversation scope={scope} project={project} />;
+  return scope.kind === "thread" && scope.thread.owner?.brain === "hosted" ? <HostedConversationBoundary thread={scope.thread}>{content}</HostedConversationBoundary> : content;
 }
 
 /** A conversation that ran with one agent, now set to another: that agent starts fresh, from a brief. */
@@ -180,7 +182,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const activeRun: Run | undefined = runs[runs.length - 1];
   const links = linkFolder(scope, project);
   const target = useMessageTarget(scope);
-  const { merged, transcripts, liveTranscript, hasOlder, loadOlder } = useConversationTranscript({ runs, threadId: thread?.id ?? null, target });
+  const { merged, transcripts, liveTranscript, hasOlder, loadOlder } = useConversationTranscript({ runs, threadId: thread?.id ?? null, target, hosted: thread?.owner?.brain === "hosted" });
   const footers = useTurnFooters({
     threadId: thread?.id ?? null,
     transcripts,
@@ -336,7 +338,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
               liveByDefault
               steerable={canSteer}
               steerReason={steerReason}
-              context={thread?.context ?? null}
+              context={cloud.hosted ? (liveTranscript?.context ?? null) : (thread?.context ?? null)}
               compacting={compact.isPending}
               generatingImage={generatingImage}
               onCompact={thread && !working ? () => compact.mutate({ id: thread.id }) : undefined}

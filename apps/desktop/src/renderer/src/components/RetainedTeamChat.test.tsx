@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useThreadTabs } from "../lib/thread-tabs";
 import { RetainedTeamChat } from "./RetainedTeamChat";
 
-vi.mock("../views/TeamChatView", () => ({
-  TeamChatView: () => {
+vi.mock("./ProtectedTeamChat", () => ({
+  ProtectedTeamChat: () => {
     const [text, setText] = useState("");
     return <input aria-label="Draft" value={text} onChange={(event) => setText(event.target.value)} />;
   },

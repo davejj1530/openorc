@@ -58,7 +58,7 @@ vi.mock("./lib/client", async (original) => {
   };
   return {
     ...(await original<object>()),
-    queryClient: { setQueryData: vi.fn() },
+    queryClient: { setQueryData: vi.fn(), removeQueries: vi.fn() },
     useRpc: (method: string) => ({
       data: rpcData(method),
       isLoading: method === "system.info" && !harnesses,

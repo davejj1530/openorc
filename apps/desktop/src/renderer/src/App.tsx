@@ -34,6 +34,7 @@ import { Settings } from "./views/Settings";
 import { AgentUpdateNotice } from "./views/settings-agent-updates";
 import { TaskListView } from "./views/TaskList";
 import { RetainedTeamChat } from "./components/RetainedTeamChat";
+import { TeamChatProvider } from "./components/TeamChatProvider";
 
 // The diagnostics screen and its benchmark controls ship only in development and QA builds.
 const Diagnostics = __OPENORC_QA__ ? lazy(() => import("./views/Diagnostics").then((m) => ({ default: m.Diagnostics }))) : null;
@@ -57,9 +58,11 @@ export function App() {
   return (
     <TooltipProvider>
       <OrganizationProvider>
-        <AppOnboarding>
-          <DesktopApp />
-        </AppOnboarding>
+        <TeamChatProvider>
+          <AppOnboarding>
+            <DesktopApp />
+          </AppOnboarding>
+        </TeamChatProvider>
       </OrganizationProvider>
     </TooltipProvider>
   );

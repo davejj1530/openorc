@@ -3,7 +3,7 @@ import type { Route } from "../lib/router";
 import type { TeamChatRoute } from "../lib/team-chat-route";
 import { useThreadTabs } from "../lib/thread-tabs";
 import { TeamChatVisibility } from "../lib/team-chat-visibility";
-import { TeamChatView } from "../views/TeamChatView";
+import { ProtectedTeamChat } from "./ProtectedTeamChat";
 
 export function RetainedTeamChat({ route }: { route: Route }) {
   const [kept, setKept] = useState<TeamChatRoute | null>(null);
@@ -16,7 +16,7 @@ export function RetainedTeamChat({ route }: { route: Route }) {
   if (!target || (!visible && !open)) return null;
   return (
     <TeamChatVisibility value={visible}>
-      <TeamChatView target={target} />
+      <ProtectedTeamChat target={target} />
     </TeamChatVisibility>
   );
 }

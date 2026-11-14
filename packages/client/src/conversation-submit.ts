@@ -1,4 +1,4 @@
-import type { AgentKind, PermissionPreset, Run, RpcParams, RunMode, WorkspaceMode } from "@openorc/protocol";
+import type { AgentKind, OnlineTaskSendContext, PermissionPreset, Run, RpcParams, RunMode, WorkspaceMode } from "@openorc/protocol";
 import { conversationCanSteer } from "./conversation-presentation.js";
 import type { ModelChoice } from "./model-picker-selection.js";
 import type { ClientQueries } from "./query.js";
@@ -9,6 +9,8 @@ export type SubmitTarget = { kind: "thread"; threadId: string } | { kind: "task"
 /** Everything a send is decided from. */
 export interface SubmitInput {
   target: SubmitTarget;
+  /** A prepared server task captures its revision and the ordinary message's retry identity. */
+  task?: { context: OnlineTaskSendContext; requestId: string };
   /** The conversation is busy: a turn, background work, an image, a compaction. */
   working: boolean;
   /** The newest run's process is still attached. */
@@ -187,6 +189,7 @@ function startParams(request: SubmitRequest, plan: Extract<SubmitPlan, { kind: "
     resume: plan.resume,
     ...(request.claudeAccountId ? { claudeAccountId: request.claudeAccountId } : {}),
     ...(messageId ? { messageId } : {}),
+    ...(request.task ? { task: request.task.context } : {}),
   };
 }
 
@@ -202,16 +205,18 @@ export async function sendMessage(calls: SubmitCalls, randomId: () => string, re
   await request.waitForSave();
   const plan = planSubmit(request);
   const text = messageBody(message.text, message.attachments);
-  const { attachments, messageId } = message;
+  const { attachments } = message;
+  const messageId = request.task?.requestId ?? message.messageId;
+  const task = request.task ? { task: request.task.context } : {};
   switch (plan.kind) {
     case "blocked":
       throw new Error(plan.reason);
     case "steer":
     case "continue":
-      await calls.send.mutateAsync({ runId: plan.runId, text, attachments, ...(messageId ? { messageId } : {}) });
+      await calls.send.mutateAsync({ runId: plan.runId, text, attachments, ...(messageId ? { messageId } : {}), ...task });
       break;
     case "queue":
-      await calls.queue.mutateAsync({ id: plan.threadId, text, attachments, requestKey: randomId() });
+      await calls.queue.mutateAsync({ id: plan.threadId, text, attachments, requestKey: request.task?.requestId ?? randomId(), ...task });
       break;
     case "start":
       await calls.start.mutateAsync(startParams(request, plan, text, attachments, messageId));

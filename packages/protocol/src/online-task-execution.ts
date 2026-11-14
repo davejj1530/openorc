@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { OnlineTaskDelete, OnlineTaskEnvelope } from "./online-tasks.js";
+import { OnlineTaskDelete, OnlineTaskEnvelope, OnlineTaskRef } from "./online-tasks.js";
 import { SpaceId } from "./spaces.js";
 
 /** Free preparation returns the document revision to carry on the ordinary send. */
@@ -10,6 +10,17 @@ export type OnlineTaskOpen = z.infer<typeof OnlineTaskOpen>;
 export type OnlineTaskPreparation = ({ state: "ready" } & OnlineTaskThread) | ({ state: "conflict" } & z.infer<typeof OnlineTaskEnvelope>);
 export const OnlineTaskSendContext = z.object({ id: z.string().min(1), ifRevision: z.number().int().nonnegative() }).strict();
 export type OnlineTaskSendContext = z.infer<typeof OnlineTaskSendContext>;
+export const OnlineTaskThreadDraft = z
+  .object({
+    reference: OnlineTaskRef,
+    threadId: z.string().min(1),
+    ifRevision: OnlineTaskSendContext.shape.ifRevision,
+    prompt: z.string(),
+    inserted: z.boolean(),
+    requestId: z.uuid(),
+  })
+  .strict();
+export type OnlineTaskThreadDraft = z.infer<typeof OnlineTaskThreadDraft>;
 
 export const onlineTaskExecutionRpcParams = {
   "tasks.online.openThread": OnlineTaskOpen.extend({ spaceId: SpaceId, id: z.string().min(1) }).strict(),

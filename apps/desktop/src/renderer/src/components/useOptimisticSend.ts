@@ -113,7 +113,7 @@ export function useOptimisticSend({
   const send = useCallback(
     async (sent: SubmitRequest, message: { text: string; attachments: string[] }) => {
       const plan = planSubmit(sent);
-      if (!route && (!threadId || plan.kind === "blocked" || plan.kind === "queue")) {
+      if (!route && (sent.task || !threadId || plan.kind === "blocked" || plan.kind === "queue")) {
         setAwaiting((count) => count + 1);
         try {
           await submitter.submit(sent, message);

@@ -74,10 +74,10 @@ const statusTokens: Record<Mode, Record<string, string>> = {
   light: { "--ok": "#157447", "--warn": "#8b5c0a", "--bad": "#aa4538", ...statusSoft },
   dark: { "--ok": "#3fae74", "--warn": "#c0973a", "--bad": "#e27d6f", ...statusSoft },
 };
-// OpenOrc: one ground under the sidebar, the columns, every header and the panel; pieces set into it with keys inside
-// them and no ring or shadow; menus float on a strong hairline and one soft shadow; title ink over a softer reading
-// ink, and one ink action. Light is near white with grey pieces and white keys; dark is a neutral grey with no blue,
-// pieces carved to near black.
+// OpenOrc: one ground under the sidebar, the columns, every header and the panel; pieces on it with keys inside them;
+// menus float on a strong hairline and one soft shadow; title ink over a softer reading ink, and one ink action.
+// Light is near white with white pieces on a thin ring and grey keys; dark is a neutral grey with no blue, pieces
+// carved to near black with no ring.
 const openorcColors: ThemeTemplate["colors"] = {
   light: palette(
     {
@@ -103,7 +103,6 @@ const openorcColors: ThemeTemplate["colors"] = {
       "--prose-ink": "#555555",
       "--bubble-ink": "#252525",
       "--line-number": "#808080",
-      "--key": "#ffffff",
       "--ok": "#1e7359",
       "--ok-soft": "#e4f0ea",
       "--warn": "#8f5408",

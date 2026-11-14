@@ -33,8 +33,8 @@
   overflow-wrap: break-word;
 }
 
-/* One piece on the writing-area role (the --well unless a palette names its own), set into the ground with
-   the palette's --well-ring (none in light). Depth comes from the step to the ground around it. */
+/* One piece on the writing-area role (the --well unless a palette names its own), drawn with the palette's
+   --well-ring: a thin ring and a faint shadow in light, none in dark, where the carved step is its edge. */
 .composer-shell {
   position: relative;
   display: flex;

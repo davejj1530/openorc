@@ -185,13 +185,13 @@ First-run setup pairs a column of controls with a flat illustrated collage. Abov
 
 **Creative North Star: "A calm place to think with coding agents"**
 
-OpenOrc is a compact desktop workspace for several projects at once. The sidebar, the conversation, the panel and the page toolbars share one near-white ground. Pieces are set into it a step darker, with no ring and no shadow: the composer, the person's message, cards in the transcript, code in a reply, Settings' tiles; a control inside a piece is a white key, a control on the ground a soft grey fill. Only what floats is raised: menus and popovers are white planes on a strong hairline and one soft shadow. Dark is the same sheet carved: a neutral #171717 ground with no blue, pieces cut to near black, keys 8.5% of white over them, menus near black on a strong hairline and one deep shadow. Each screen has one ink pill; everything else is quiet. The interface is set in Immaculate Gothic at one regular weight.
+OpenOrc is a compact desktop workspace for several projects at once. The sidebar, the conversation, the panel and the page toolbars share one near-white ground. Pieces sit on it in white with a thin ring and a faint shadow: the composer and cards in the transcript; Settings' tiles are white with no ring. A control inside a piece is a soft grey key, as a control on the ground is a soft grey fill, and the person's message is a grey bubble. Only what floats is raised: menus and popovers are white planes on a strong hairline and one soft shadow. Dark is the same sheet carved: a neutral #171717 ground with no blue, pieces cut to near black with no ring, keys 8.5% of white over them, menus near black on a strong hairline and one deep shadow. Each screen has one ink pill; everything else is quiet. The interface is set in Immaculate Gothic at one regular weight.
 
 This record describes the built desktop interface. It preserves the workflows in [PRODUCT.md](../../PRODUCT.md), including drafts, task authorization, Orcling privacy, and project context. Original artwork and provider marks are documented in [artwork provenance](../../docs/artwork-provenance.md).
 
 **Key Characteristics:**
 
-- One near-white ground everywhere, pieces set into it, white keys inside them, grey fills on the ground, white floating planes.
+- One near-white ground everywhere, white pieces on a thin ring, grey keys inside them, grey fills on the ground, white floating planes.
 - Hierarchy from title ink, the softer reading ink, muted and faint text, and size, never from weight.
 - Round controls: pills for buttons, chips, tracks, and send; 34px rows with r10 corners.
 - Color only where it means something: diffs, results, attention dots, links, and selection.
@@ -203,7 +203,7 @@ The frontmatter records the OpenOrc palette in both modes; component entries sho
 
 ### Grounds and fills
 
-`--bg` is the ground, one flat color in every palette, kept opaque because the native window background follows it. `--sidebar` is the sidebar's ground, `--bg` unless a palette tints it. `--well` is a piece set into the ground (in light, the ground with 4.5% of its ink, so it follows custom colours and stays opaque in transparency mode), `--well-ring` its edge (none in light), and `--key` a control inside a piece. `--surface` is the plane under code, diffs and what floats, and `--raised-shadow` lifts a floating plane (OpenOrc's strong hairline and one soft shadow; an empty shadow elsewhere). `--surface-2` is the fill: hover for bare rows, ghost buttons, and menu items, and the resting fill of chips, tracks, fields, and file heads. `--surface-3` is the strong fill, kept for press, hover on controls that already rest on a fill, switch-off tracks, empty rings, disabled send, and meter tracks. `--line` appears only between rows, at `--hairline` width (half a pixel on high-density screens). Sidebar rows hover on `--navigation-hover`.
+`--bg` is the ground, one flat color in every palette, kept opaque because the native window background follows it. `--sidebar` is the sidebar's ground, `--bg` unless a palette tints it. `--well` is a piece on the ground (in light, the palette's plane, opaque in transparency mode; in dark, the ground carved toward black), `--well-ring` its edge (a thin ring and a faint shadow in light, none in dark), and `--key` a control inside a piece (the fill in light). `--surface` is the plane under code, diffs and what floats, and `--raised-shadow` lifts a floating plane (OpenOrc's strong hairline and one soft shadow; an empty shadow elsewhere). `--surface-2` is the fill: hover for bare rows, ghost buttons, and menu items, and the resting fill of chips, tracks, fields, and file heads. `--surface-3` is the strong fill, kept for press, hover on controls that already rest on a fill, switch-off tracks, empty rings, disabled send, and meter tracks. `--line` appears only between rows, at `--hairline` width (half a pixel on high-density screens). Sidebar rows hover on `--navigation-hover`.
 
 **The Contextual Fill Rule.** Selected rows paint `--current-row-fill` and secondary controls paint `--control-fill`. On the tile they are `--navigation-soft` and `--surface`. Every plane (`data-plane`, panel content, menus, dialogs, the composer) restates both as `--surface-2`, and a tile card inside a plane (settings cards, usage accounts, the memory control) restates them back to `--surface`. Mark new planes with `data-plane` instead of growing selector lists.
 
@@ -326,7 +326,7 @@ Agent and app update notices are r16 toasts in the upper-right stack with sm pil
 - Do keep one ink pill per screen and let everything else rest on fills.
 - Do keep every existing control and saved state; restyle, don't remove.
 - Do preserve saved widths, palettes, custom colors, keyboard access, native window clearance, drafts, and Orcling privacy.
-- Don't add borders to persistent surfaces, or any shadow but `--raised-shadow` on what floats, a palette's `--well-ring`, and the floating sidebar's overlay.
+- Don't add borders to persistent surfaces, or any shadow but `--raised-shadow` on what floats, a piece's `--well-ring`, and the floating sidebar's overlay.
 - Don't use bold, 11px text, or faint text on the strong fill.
 - Don't show shortcut hints or advertise what a control can do; reasons belong on disabled controls, on demand.
 - Don't ship a control that does nothing.

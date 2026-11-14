@@ -4,15 +4,15 @@ import { themePresets } from "./theme-palettes.js";
 const colors = (id: string) => themePresets.find((theme) => theme.id === id)!.colors;
 
 describe("themePresets", () => {
-  it("gives OpenOrc one ground in each mode, pieces set into it with keys inside, fills, and two inks; dark with no blue", () => {
+  it("gives OpenOrc one ground in each mode, pieces on it with keys inside, fills, and two inks; dark with no blue", () => {
     expect(colors("openorc").light).toMatchObject({
       "--bg": "#fafafa",
       "--sidebar": "var(--bg)",
       "--surface": "#ffffff",
       "--surface-2": "#eeeeee",
-      "--well": "color-mix(in srgb, var(--ink) 4.5%, var(--bg))",
-      "--well-ring": "0 0 #0000",
-      "--key": "#ffffff",
+      "--well": "var(--surface)",
+      "--well-ring": "0 0 0 1px var(--line), 0 1px 2px rgb(0 0 0 / 0.05)",
+      "--key": "var(--surface-2)",
       "--composer-input": "var(--well)",
       "--bubble": "#f0f0f0",
       "--navigation-soft": "#eaeaea",

@@ -85,8 +85,8 @@
      so there is no fill step to give it an edge. */
   --shadow-overlay: 0 0 32px -12px rgb(0 0 0 / 0.24);
   --ring: var(--accent-ink);
-  /* Pieces (transcript cards, provider and memory cards) are set into the ground: the palette's --well, with its
-     --well-ring (none in light). */
+  /* Pieces (transcript cards, provider and memory cards) sit on the ground: the palette's --well, with its
+     --well-ring (a thin ring in light, none in dark). */
   --plane-fill: var(--well);
   /* The selected segment of a --surface-2 track, such as the appearance modes. It sits one
      step lighter than the track. */
@@ -105,10 +105,10 @@
   --sidebar: var(--bg);
   --navigation-hover: var(--surface-2);
   --raised-shadow: 0 0 #0000;
-  /* A piece set into the ground, its ring, and a control inside it; each palette sets them per mode. */
-  --well: color-mix(in srgb, var(--ink) 4.5%, var(--bg));
-  --well-ring: 0 0 #0000;
-  --key: var(--surface);
+  /* A piece on the ground, its ring, and a control inside it; each palette sets them per mode. */
+  --well: var(--surface);
+  --well-ring: 0 0 0 1px var(--line), 0 1px 2px rgb(0 0 0 / 0.05);
+  --key: var(--surface-2);
   --prose-ink: var(--ink);
   --line-number: var(--ink-4);
   color-scheme: light;
@@ -822,7 +822,7 @@ body[data-resizing] .sidebar-shell {
   flex-shrink: 0;
 }
 
-/* CONTENT. Depth is a fill step: a piece is set into the ground on the palette's --well, with its --well-ring.
+/* CONTENT. A piece sits on the ground on the palette's --well, with its --well-ring.
    The surfaces a thread grows for a task, a turn's file changes, a question or an MCP app are pieces, in the
    transcript and the panel alike.
    Unlayered on purpose, so the fill beats the components' own bg utilities. The loading

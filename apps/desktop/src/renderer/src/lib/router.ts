@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { HarnessId } from "@openorc/protocol";
 import { useLayout } from "./layout";
+import { chatRouteFromSpec, chatRouteSpec, chatRouteTransition, type ChatWorkRoute, type TeamChatRoute } from "./team-chat-route";
 
 export type TaskTab = "chat" | "spec" | "files" | "commits" | "memory";
 
@@ -13,6 +14,7 @@ export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
 const settingsSections: ReadonlySet<string> = new Set<SettingsSection>(SETTINGS_SECTIONS);
 
 export type Route =
+  | TeamChatRoute
   | { view: "onboarding"; mode?: "first_run" | "recovery"; preview?: boolean }
   | { view: "newthread"; projectId?: string }
   /** A new thread under `parentId`, working in its folder. */
@@ -39,6 +41,7 @@ interface RouterState {
   route: Route;
   /** Visible threads in visual order. The route identifies the focused pane. */
   threadIds: string[];
+  chatWork: ChatWorkRoute | null;
   addThreadPane: (id: string) => void;
   closeThreadPane: (id: string) => void;
   focusThreadPane: (id: string) => void;
@@ -72,22 +75,22 @@ function reconcilePanel(ids: string[], focused: string | null, closeRemoved = fa
 
 /** Routes and visible panes change together, including history navigation. */
 export const useRouter = create<RouterState>((set, get) => {
-  const applyRoute = (route: Route) => {
-    const threadIds = panesForRoute(get(), route);
-    if (get().route.view === "thread" || route.view === "thread") reconcilePanel(threadIds, route.view === "thread" ? route.threadId : null);
-    return { route, threadIds };
+  const applyRoute = (route: Route, alone = false) => {
+    const chat = chatRouteTransition(get(), route);
+    if (chat) return chat;
+    let threadIds = panesForRoute(get(), route);
+    if (alone) threadIds = route.view === "thread" ? [route.threadId] : [];
+    if (get().route.view === "thread" || get().chatWork?.view === "thread" || route.view === "thread") reconcilePanel(threadIds, route.view === "thread" ? route.threadId : null);
+    return { route, threadIds, chatWork: null };
   };
   return {
     route: { view: "newthread" },
     threadIds: [],
+    chatWork: null,
     history: [],
     future: [],
     navigate: (route) => set({ ...applyRoute(route), history: [...get().history.slice(-49), get().route], future: [] }),
-    show: (route) => {
-      const threadIds = route.view === "thread" ? [route.threadId] : [];
-      if (get().route.view === "thread" || route.view === "thread") reconcilePanel(threadIds, route.view === "thread" ? route.threadId : null);
-      set({ route, threadIds });
-    },
+    show: (route) => set(applyRoute(route, true)),
     back: () => {
       const { history: h, future, route } = get();
       const prev = h[h.length - 1];
@@ -163,6 +166,7 @@ const idViews: Readonly<Record<string, (id: string, tab: string | undefined) => 
 
 /** "thread:<id>", "task:<id>:<tab>", "pull:<project>:<number>", or a plain screen name, as windows and autorun pass them. */
 export function routeFromSpec(spec: string): Route | null {
+  if (spec.startsWith("team-chat:")) return chatRouteFromSpec(spec);
   const [view, id, tab] = spec.split(":");
   if (view === "onboarding")
     return {
@@ -207,6 +211,8 @@ function onboardingSpec(route: Extract<Route, { view: "onboarding" }>): string {
 
 export function specFromRoute(route: Route): string {
   switch (route.view) {
+    case "team-chat":
+      return chatRouteSpec(route);
     case "settings":
       return settingsSpec(route);
     case "onboarding":

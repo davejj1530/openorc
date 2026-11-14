@@ -1,4 +1,5 @@
 import { OrganizationPalette } from "./OrganizationPalette";
+import { TeamChatPalette } from "./TeamChatPalette";
 import { useOrganization } from "../lib/organization-context";
 import { useSpaceProjects } from "../lib/space-queries";
 import { Command } from "cmdk";
@@ -71,6 +72,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
           <Command.List className="command-palette-list">
             <Command.Empty className="px-3 py-6 text-center text-base text-ink-3">{emptySearchMessage(query, mode === "messages", hits.isFetching)}</Command.Empty>
             {mode === "all" ? <PlaceGroups typed={typed} go={go} /> : null}
+            {mode === "all" && typed ? <TeamChatPalette onOpened={() => onOpenChange(false)} /> : null}
             <MessageHits hits={hits.data ?? []} go={go} />
             {mode === "all" && typed ? <ProjectGroup go={go} /> : null}
             {mode === "messages" ? null : (

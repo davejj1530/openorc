@@ -1,10 +1,7 @@
-import { useRef, useState } from "react";
-import { teamChatRoster, type TeamChatRow } from "@openorc/client";
-import type { TeamChatStatus } from "@openorc/protocol";
+import { teamChatRoster } from "@openorc/client";
 import { useTeamChatContext } from "../lib/team-chat-context";
-import { chatStateKey, useTeamChatState } from "../lib/team-chat-queries";
-import { core } from "../lib/rpc";
-import { queryClient } from "../lib/client";
+import { useTeamChatState } from "../lib/team-chat-queries";
+import { useOpenTeamChat } from "../lib/team-chat-open";
 import { useRouter } from "../lib/router";
 import { SidebarChat } from "./SidebarChat";
 
@@ -13,27 +10,7 @@ export function OrganizationChat() {
   const scope = useTeamChatContext();
   const state = useTeamChatState();
   const route = useRouter((s) => s.route);
-  const [opening, setOpening] = useState<TeamChatRow | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const turn = useRef(0);
-  const open = async (row: TeamChatRow) => {
-    if (!scope?.current()) return;
-    const attempt = ++turn.current;
-    const origin = useRouter.getState().route;
-    setOpening(row);
-    setError(null);
-    try {
-      const conversation = row.kind === "person" ? await core.call("teamChat.openDm", { spaceId: scope.spaceId, userIds: [row.person.id] }) : row.conversation;
-      if (!scope.current() || attempt !== turn.current || useRouter.getState().route !== origin) return;
-      queryClient.setQueryData<TeamChatStatus>(chatStateKey(scope), (old) =>
-        old?.state === "ready" ? { ...old, chat: { ...old.chat, conversations: [...old.chat.conversations.filter((item) => item.id !== conversation.id), conversation] } } : old,
-      );
-      useRouter.getState().navigate({ view: "team-chat", accountId: scope.accountId, spaceId: scope.spaceId, conversationId: conversation.id });
-      setOpening(null);
-    } catch (error) {
-      if (scope.current() && attempt === turn.current) setError(error instanceof Error ? error.message : "Chat could not be opened.");
-    }
-  };
+  const action = useOpenTeamChat();
   if (!scope || state.data?.state === "unavailable") return null;
   if (state.data?.state !== "ready")
     return state.error ? (
@@ -54,13 +31,13 @@ export function OrganizationChat() {
       rows={teamChatRoster(state.data.chat, scope.accountId)}
       self={scope.accountId}
       selected={route.view === "team-chat" ? route.conversationId : null}
-      opening={error ? null : (opening?.id ?? null)}
-      error={error}
+      opening={action.opening}
+      error={action.error}
       onOpen={(row) => {
-        void open(row);
+        void action.open(row);
       }}
       onRetry={() => {
-        if (opening) void open(opening);
+        void action.retry();
       }}
     />
   );

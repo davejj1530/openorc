@@ -96,6 +96,8 @@ const route = <T>(method: Route<T>["method"], path: string, reply: z.ZodType<T>)
 const get = <T>(path: string, reply: z.ZodType<T>): Route<T> => ({ method: "GET", path, reply });
 const empty = (method: Route<null>["method"], path: string): Route<null> => ({ method, path, reply: null });
 export const SPACE_ROUTES = {
+  acceptInvitation: route("POST", "/api/auth/organization/accept-invitation", z.object({ invitation: wireInvitation, member: wireMembership })),
+  declineInvitation: route("POST", "/api/auth/organization/reject-invitation", z.object({ invitation: wireInvitation, member: z.null() })),
   sentInvitations: get("/invitations", sentInvitations),
   invite: route("POST", "/api/auth/organization/invite-member", wireInvitation),
   revokeInvitation: route("POST", "/api/auth/organization/cancel-invitation", wireInvitation),

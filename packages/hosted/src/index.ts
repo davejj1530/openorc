@@ -119,6 +119,11 @@ export interface HostedAccount {
 }
 
 export interface HostedSpaces {
+  readonly received: {
+    accept(invitationId: string): Promise<RpcResults["spaces.invitation.accept"]>;
+    decline(invitationId: string): Promise<RpcResults["spaces.invitation.decline"]>;
+  };
+  refresh(): Promise<void>;
   readonly invitations: {
     list(spaceId: string): Promise<RpcResults["organization.invitations"]>;
     send(input: RpcParams<"organization.invite">): Promise<RpcResults["organization.invite"]>;

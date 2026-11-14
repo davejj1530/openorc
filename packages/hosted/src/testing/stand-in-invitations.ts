@@ -64,6 +64,8 @@ export class StandInInvitations {
     if (input.method !== "POST") return null;
     if (input.path === "/api/auth/organization/invite-member") return this.#send(input);
     if (input.path === "/api/auth/organization/cancel-invitation") return this.#cancel(input);
+    if (input.path === "/api/auth/organization/accept-invitation") return this.#respond(input, true);
+    if (input.path === "/api/auth/organization/reject-invitation") return this.#respond(input, false);
     return null;
   }
 
@@ -168,6 +170,26 @@ export class StandInInvitations {
     if (typeof space !== "string") return space;
     if (!this.deps.spaces.teams.has(space)) return refuse(409, "Your personal space is yours alone, so nobody can be invited to it.");
     return this.deps.spaces.member(space, who)?.role === "admin" ? null : refuse(403, "Only an admin can do that.");
+  }
+
+  #respond(input: Request, accepting: boolean): Reply {
+    const invite = this.records.find((invite) => invite.id === input.body["invitationId"]);
+    const team = invite && this.deps.spaces.teams.get(invite.spaceId);
+    if (!invite || !team || invite.status !== "pending" || (accepting && invite.expiresAt <= this.deps.now())) return unavailable();
+    if (invite.email !== input.who) return refuse(403, "This invitation is for another email address.", "YOU_ARE_NOT_THE_RECIPIENT_OF_THE_INVITATION");
+    if (!accepting) {
+      invite.status = "rejected";
+      this.#tell(invite);
+      return { status: 200, body: { invitation: bare(invite), member: null } };
+    }
+    if (this.deps.spaces.member(invite.spaceId, input.who)) return refuse(400, "That person is already in this organization.", "USER_IS_ALREADY_A_MEMBER_OF_THIS_ORGANIZATION");
+    if (team.members.length >= 100) return refuse(403, "This organization has reached its limit of 100 people.", "ORGANIZATION_MEMBERSHIP_LIMIT_REACHED");
+    const member = { id: randomUUID(), email: input.who, role: invite.role, createdAt: new Date(this.deps.now()).toISOString() };
+    team.members.push(member);
+    invite.status = "accepted";
+    for (const email of this.deps.spaces.readers(invite.spaceId)) this.deps.tell(email, ["members", "invitations", "projects", "threads", "spaces"], invite.spaceId);
+    this.deps.tell(input.who, ["spaces", "invitations"]);
+    return { status: 200, body: { invitation: bare(invite), member: { id: member.id, organizationId: invite.spaceId, userId: userOf(input.who), role: member.role, createdAt: member.createdAt } } };
   }
 
   #tell(invite: Invitation): void {

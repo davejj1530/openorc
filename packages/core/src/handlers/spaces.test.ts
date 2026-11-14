@@ -23,6 +23,9 @@ it("keeps organization methods off the phone and validates scope and pagination 
     "organization.invite",
     "organization.invitation.resend",
     "organization.invitation.revoke",
+    "spaces.refresh",
+    "spaces.invitation.accept",
+    "spaces.invitation.decline",
   ])
     expect(isRemoteMethod(method)).toBe(false);
   expect(rpcParams["spaces.projects"].safeParse({ spaceId: "" }).success).toBe(false);

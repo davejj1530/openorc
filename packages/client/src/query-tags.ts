@@ -32,6 +32,8 @@ const readRules: Rules = {
 };
 
 const mutationRules: Rules = {
+  "spaces.invitation.accept": () => ["spaces", "projects", "threads"],
+  "spaces.invitation.decline": () => ["spaces"],
   "organization.member.setRole": ({ spaceId }) => ["spaces", "projects", `people:${spaceId}`, `invitations:${spaceId}`],
   "organization.invite": ({ spaceId }) => ["spaces", `invitations:${spaceId}`],
   "organization.invitation.resend": ({ spaceId }) => [`invitations:${spaceId}`],

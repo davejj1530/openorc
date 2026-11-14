@@ -251,7 +251,7 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
   const tell = tellOf(peers, sockets);
   const organizations = organizationReads(options, spaces, people, billing, tell, (space) => hosted.accessChanged(space));
   const github = new StandInGithub(spaces, (who) => tell(who, ["projects", "github"]));
-  const payments = new StandInPayments(billing, tell, () => `http://127.0.0.1:${port}`);
+  const payments = new StandInPayments(billing, billingTopics(tell, organizations), () => `http://127.0.0.1:${port}`);
   const personal = personRoutes(signInWrites, payments);
   const answerSocket = socketAnswers(hosted);
   let serving = true;
@@ -508,6 +508,13 @@ function transportServer(deps: {
   return server;
 }
 
+function billingTopics(tell: (who: string, topics: string[]) => void, organizations: StandInOrganizations) {
+  return (who: string, topics: string[]) => {
+    tell(who, topics);
+    if (topics.includes("billing")) organizations.planChanged(who);
+  };
+}
+
 function organizationReads(
   options: StandInOptions,
   spaces: StandInSpaces,
@@ -520,7 +527,10 @@ function organizationReads(
     spaces,
     creationAllowed: options.signup === "open",
     person: (email) => people.get(email) ?? { name: nameFromEmail(email), image: null },
-    pro: (email) => billing.get(email)?.pro ?? false,
+    pro: (email) => {
+      const state = billing.get(email);
+      return Boolean(state?.pro && (state.standing === "live" || Date.parse(state.at) > (options.now ?? Date.now)()));
+    },
     tell,
     accessChanged,
     now: options.now ?? Date.now,

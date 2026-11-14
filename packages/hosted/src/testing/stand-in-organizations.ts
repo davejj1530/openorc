@@ -91,6 +91,10 @@ export class StandInOrganizations {
     return this.invitations.inbox(who);
   }
 
+  planChanged(who: string): void {
+    for (const [id, team] of this.deps.spaces.teams) if (team.members.some((member) => member.email === who)) for (const email of this.deps.spaces.readers(id)) this.deps.tell(email, ["members"], id);
+  }
+
   people(space: string, who: string, query: URLSearchParams): Reply {
     const team = this.deps.spaces.teams.get(space);
     const viewer = this.deps.spaces.member(space, who);

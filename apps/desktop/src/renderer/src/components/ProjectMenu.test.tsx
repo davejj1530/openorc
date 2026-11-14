@@ -87,7 +87,7 @@ it("keeps errors visible, prevents repeat submission while pending, and allows r
 });
 
 it("keeps No project permanent", async () => {
-  show(WORKSPACE_ID, "No project");
+  show(WORKSPACE_ID, "a project");
   expect(screen.queryByRole("button", { name: /Project options/ })).toBeNull();
   fireEvent.contextMenu(await screen.findByRole("button", { name: "No project" }));
   expect(screen.queryByRole("menuitem", { name: "Remove project…" })).toBeNull();

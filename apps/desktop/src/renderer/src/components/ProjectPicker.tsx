@@ -54,7 +54,7 @@ export function NewThreadQuestion({
 }) {
   return (
     <h1 className="new-thread-question">
-      What should we work on in{" "}
+      What should we work on {projectId === WORKSPACE_ID ? "outside" : "in"}{" "}
       <span className="new-thread-question-name">
         <ProjectPicker projectId={projectId} projects={projects} disabled={disabled} onProject={onProject} />?
       </span>
@@ -83,7 +83,7 @@ export function ProjectPicker({
   const options = projects ?? [];
   const current = options.find((project) => project.id === projectId);
   let name = projects ? "Choose project" : "…";
-  if (current) name = projectLabel(current);
+  if (current) name = current.id === WORKSPACE_ID ? "a project" : current.name;
   const typed = filter.trim().toLowerCase();
   const shown = typed ? options.filter((project) => projectLabel(project).toLowerCase().includes(typed)) : options;
   const filterable = options.length >= FILTER_FROM;

@@ -738,6 +738,17 @@ describe("AcpAdapter on a host", () => {
     expect(s.promptCalls()[0]!.params["prompt"]).toContainEqual({ type: "image", mimeType: "image/png", data: Buffer.from([137, 80, 78, 71]).toString("base64") });
   });
 
+  it("names placed images and files in the order chosen when the host reads images itself", async () => {
+    const sandbox = { ...host(), readAttachment: vi.fn(async () => new Uint8Array([137, 80, 78, 71])) };
+    const attachments = ["/home/sandbox/attachments/notes.md", "/home/sandbox/attachments/shot.png", "/home/sandbox/attachments/plan.md"];
+    const s = agent("autonomous", { attachments }, undefined, { revision: 0, binary: "opencode", env: { PATH: "/usr/bin" }, host: sandbox as never });
+    await vi.waitFor(() => expect(s.promptCalls()).toHaveLength(1));
+    const text = JSON.stringify(s.promptCalls()[0]!.params["prompt"]);
+    const order = ["/home/sandbox/uploads/notes.md", "/home/sandbox/attachments/shot.png", "/home/sandbox/uploads/plan.md"].map((path) => text.indexOf(path));
+    expect(order.every((at) => at >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+  });
+
   it("sends no image when the host refuses to read it, rather than reading this machine's disk", async () => {
     const local = path.join(mkdtempSync(path.join(os.tmpdir(), "acp-host-read-")), "shot.png");
     writeFileSync(local, Buffer.from([137, 80, 78, 71]));

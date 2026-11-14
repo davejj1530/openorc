@@ -114,6 +114,8 @@ Account shows only the signed-in person's selected paid allowance and cloud hour
 
 Cloud Changes uses Branch for the saved comparison and keeps Commit and an existing pull request link in their local positions. Push and pull request creation stay in Commits. Only server uncommitted work enables Commit; without a server dirty stat, its summary row says Uncommitted changes and never substitutes cumulative totals. Disabled cloud controls expose their specific reason on hover and keyboard focus.
 
+Cloud helper agents reuse the existing subthread tree and read-only conversation. Each child shows its own persisted history and status. Selected Stop requires the current server capability and host handle; unsupported Stop explains itself only on hover or focus. A pending or failed history read never appears as empty history. Unknown composer context shows nothing, and an uncounted Commit chip says only Commit.
+
 Human conversations use their own organization-scoped tabs, preserve the work pane and editor state, and never enter AgentEvent or Orcling run streams. A chat replaces only a pristine New thread placeholder. Words, an attachment or a chosen project keep that tab open beside the chat. Ordinary work-thread navigation keeps its existing behavior.
 
 Channel previews keep earlier history readable and replace the composer with Join channel. Private channels appear only to their members; an admin has no separate entry. Details use the server's current add and remove permissions. Public removal restores preview and preserves the draft; private removal clears content and keeps the tab's place with Close chat. Channel dialogs fit a short window without hiding their primary action.

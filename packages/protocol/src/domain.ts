@@ -223,6 +223,7 @@ export const ThreadSummary = Thread.extend({
       startedAt: z.number(),
       endedAt: z.number().nullable(),
       stoppable: z.boolean(),
+      hostRunId: z.string().nullable().optional(),
     })
     .optional(),
   /** Whether any execution has started; absent in older cached summaries. */

@@ -229,7 +229,7 @@ export const rpcParams = {
       settings: z.object({ agent: AgentKind, model: z.string().nullable(), effort: z.string().nullable(), mode: RunMode, permissionMode: PermissionPreset }).partial().optional(),
     })
     .strict(),
-  "subagents.stop": z.object({ threadId: z.string() }),
+  "subagents.stop": z.object({ threadId: z.string(), expectedRunId: z.string().optional() }),
   "threads.checkpoints": z.object({ id: z.string() }),
   /** What the turn that saved a checkpoint changed, against the checkpoint before it. */
   "threads.turnChanges": z.object({ id: z.string(), checkpointId: z.string(), includePatch: z.boolean().optional(), paths: z.array(z.string().min(1)).min(1).max(500).optional() }).strict(),

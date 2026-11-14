@@ -1,4 +1,4 @@
-import { placeOf, type Project, type ThreadSummary } from "@openorc/protocol";
+import { placeOf, type Project, type RpcParams, type ThreadSummary } from "@openorc/protocol";
 import { subagentStatusLabel, useTicking, workDuration } from "@openorc/client";
 import { useConversationTranscript, useRpc, useRpcMutation } from "../lib/client";
 import { openThread, useRouter } from "../lib/router";
@@ -7,6 +7,7 @@ import { CornerUpLeft } from "./icons";
 import { Button, Tooltip } from "./ui";
 import { ConversationVoice, useRunVoices } from "../lib/turn-authors";
 import { subagentLinkFolder } from "../lib/conversation-status-presentation";
+import { HostedSubagentHistoryError, HostedSubagentStop } from "./HostedSubagentState";
 
 export function SubagentConversation({ thread, project }: { thread: ThreadSummary; project: Project }) {
   const history = useRpc("runs.listForThread", { threadId: thread.id });
@@ -30,7 +31,12 @@ export function SubagentConversation({ thread, project }: { thread: ThreadSummar
               reveal={target}
             />
           ) : null}
-          {history.error ? <Button onClick={() => void history.refetch()}>Retry loading history</Button> : null}
+          {history.isPending && thread.owner?.brain === "hosted" ? (
+            <p role="status" className="p-4 text-sm text-ink-3">
+              Loading history…
+            </p>
+          ) : null}
+          {history.error ? <SubagentHistoryError hosted={thread.owner?.brain === "hosted"} error={history.error} retry={() => void history.refetch()} /> : null}
         </div>
         <SubagentStatusBar thread={thread} model={voice.agent?.model ?? thread.model} />
       </div>
@@ -54,11 +60,7 @@ function SubagentStatusBar({ thread, model }: { thread: ThreadSummary; model: st
             {subagentStatusLabel[child.status]} · {workDuration((child.endedAt ?? now) - child.startedAt)}
           </span>
         ) : null}
-        {child?.stoppable ? (
-          <Button size="sm" disabled={stop.isPending} onClick={() => stop.mutate({ threadId: thread.id })}>
-            {stop.isPending ? "Stopping…" : "Stop"}
-          </Button>
-        ) : null}
+        <SubagentStopControl thread={thread} pending={stop.isPending} stop={stop.mutate} />
       </div>
       {stop.error ? (
         <p role="alert" className="text-xs text-bad">
@@ -67,6 +69,20 @@ function SubagentStatusBar({ thread, model }: { thread: ThreadSummary; model: st
       ) : null}
     </div>
   );
+}
+
+function SubagentStopControl({ thread, pending, stop }: { thread: ThreadSummary; pending: boolean; stop(params: RpcParams<"subagents.stop">): void }) {
+  if (thread.owner?.brain === "hosted")
+    return <HostedSubagentStop thread={thread} pending={pending} onStop={() => stop({ threadId: thread.id, expectedRunId: thread.subagent?.hostRunId ?? undefined })} />;
+  return thread.subagent?.stoppable ? (
+    <Button size="sm" disabled={pending} onClick={() => stop({ threadId: thread.id })}>
+      {pending ? "Stopping…" : "Stop"}
+    </Button>
+  ) : null;
+}
+
+function SubagentHistoryError({ hosted, error, retry }: { hosted: boolean; error: Error; retry(): void }) {
+  return hosted ? <HostedSubagentHistoryError error={error} retry={retry} /> : <Button onClick={retry}>Retry loading history</Button>;
 }
 
 /** The thread a sub thread sits under, ahead of its title in the header. */

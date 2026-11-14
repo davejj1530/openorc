@@ -22,6 +22,7 @@ export const HOSTED_REASONS = {
   speed: "This speed setting isn't available for this cloud agent.",
   claudeAccount: "This cloud turn uses your Claude sign-in in Account.",
   personSubthreads: "Creating a subthread isn't available in this cloud thread yet.",
+  nativeSubthreads: "Subthreads aren't available in this cloud thread yet.",
   tasks: "Tasks aren't available in this cloud thread yet.",
   terminal: "A terminal isn't available in this cloud thread yet.",
   moveToMac: "Moving this conversation to your Mac isn't available yet.",

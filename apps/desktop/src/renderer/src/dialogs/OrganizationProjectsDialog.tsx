@@ -141,13 +141,14 @@ function RepositoryActions({
   pending: boolean;
   submit(): Promise<void>;
 }) {
+  const label = count ? `Add ${count} project${count === 1 ? "" : "s"}` : "Add projects";
   return (
     <div className="organization-actions">
       {failed ? <Button onClick={retry}>Try again</Button> : null}
       <Button onClick={cancel}>Cancel</Button>
       {canAdd ? (
         <Button variant="primary" disabled={!count || pending} onClick={() => void submit()}>
-          {pending ? "Adding…" : `Add ${count} project${count === 1 ? "" : "s"}`}
+          {pending ? "Adding…" : label}
         </Button>
       ) : null}
     </div>

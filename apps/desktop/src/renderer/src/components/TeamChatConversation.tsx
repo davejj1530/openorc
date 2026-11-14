@@ -16,6 +16,7 @@ export function TeamChatConversation({
   people,
   channels,
   groups,
+  unread = false,
 }: {
   scope: TeamChatContextValue;
   target: TeamChatRoute;
@@ -23,8 +24,9 @@ export function TeamChatConversation({
   people: TeamChatPerson[];
   channels: boolean;
   groups: boolean;
+  unread?: boolean;
 }) {
-  const content = useTeamChatConversation(scope, target, conversation);
+  const content = useTeamChatConversation(scope, target, conversation, unread);
   const [details, setDetails] = useState(false);
   const visible = useTeamChatVisible();
   if (details && !visible) setDetails(false);
@@ -45,6 +47,7 @@ export function TeamChatConversation({
         names={names}
         {...(!conversation.joined && { footer: <TeamChannelJoin scope={scope} conversationId={conversation.id} /> })}
         {...(hasDetails && { onDetails: () => setDetails(true) })}
+        tags={unread}
       />
       {details && hasDetails ? detail : null}
     </>

@@ -1,7 +1,7 @@
-import type { RpcParams, TeamChatStatus, TeamConversation } from "@openorc/protocol";
+import type { RpcParams, TeamChatRead, TeamChatStatus, TeamConversation } from "@openorc/protocol";
 import type { HostedDeps, HostedSpaces } from "./index.js";
 import { Refused, type Session } from "./session.js";
-import { CHAT_ROUTES, chatMessage, chatWatched, type ChatWatch } from "./wire-chat.js";
+import { CHAT_ROUTES, chatMessage, chatRead, chatWatched, type ChatWatch } from "./wire-chat.js";
 import { SOCKET, wireTopics, type Route } from "./wire.js";
 
 interface ChatDeps extends Pick<HostedDeps, "push"> {
@@ -43,6 +43,12 @@ export class TeamChat {
       if (!event.success || this.#closed) return;
       const { spaceId, conversationId } = event.data;
       if ([...this.#watches.values()].some((watch) => watch.spaceId === spaceId && watch.conversationId === conversationId)) this.#invalidate(spaceId, conversationId);
+    });
+    // Another of this person's apps moved their place: counts here follow without a watch.
+    deps.session.onSocket("chat:read", (body) => {
+      const event = chatRead.safeParse(body);
+      if (!event.success || this.#closed) return;
+      this.#invalidate(event.data.spaceId, event.data.conversationId);
     });
     deps.session.onSocket(SOCKET.changed, (body) => {
       const event = wireTopics.safeParse(body);
@@ -130,6 +136,31 @@ export class TeamChat {
       return await this.#request(spaceId, CHAT_ROUTES.react(messageId), { emoji });
     } finally {
       this.#invalidate(spaceId, conversationId);
+    }
+  }
+
+  async seen({ spaceId, conversationId, messageId }: RpcParams<"teamChat.seen">): Promise<TeamChatRead> {
+    try {
+      return await this.#request(spaceId, CHAT_ROUTES.seen(conversationId), { messageId });
+    } finally {
+      this.#invalidate(spaceId, conversationId);
+    }
+  }
+
+  /** Account-wide and names no space; an organization this app does not hold is never reported. */
+  async unreadSpaces(_input: RpcParams<"teamChat.unreadSpaces">): Promise<{ spaceIds: string[] }> {
+    const spaces = this.deps.spaces.status();
+    if (this.#closed || !this.deps.session.state.signedIn || spaces.state !== "ready") return { spaceIds: [] };
+    const generation = this.deps.session.generation;
+    try {
+      const reply = await this.deps.session.request(CHAT_ROUTES.unreadSpaces);
+      if (this.deps.session.generation !== generation) throw changedSession();
+      const now = this.deps.spaces.status();
+      const usable = new Set(now.state === "ready" ? now.spaces.filter((space) => space.kind === "organization").map((space) => space.id) : []);
+      return { spaceIds: reply.spaces.map((space) => space.spaceId).filter((id) => usable.has(id)) };
+    } catch (error) {
+      if (error instanceof Refused && error.status === 404) return { spaceIds: [] };
+      throw error;
     }
   }
 

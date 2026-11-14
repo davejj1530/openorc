@@ -21,6 +21,8 @@ export interface TeamChatProps extends TeamChatTranscriptProps {
   notice?: { message: string; dismiss(): void };
   footer?: ReactNode;
   onDetails?: () => void;
+  /** Whether people can be tagged here, which the server's unread capability brings. */
+  tags?: boolean;
 }
 export function TeamChat(props: TeamChatProps) {
   const title = teamConversationTitle(props.conversation, props.self);
@@ -60,11 +62,26 @@ export function TeamChat(props: TeamChatProps) {
           </button>
         </div>
       ) : null}
-      {!props.loading && !props.error ? (props.footer ?? <TeamChatComposer text={props.draft} placeholder={placeholder} reason={props.reason} onChange={props.onDraft} onSend={props.onSend} />) : null}
+      {!props.loading && !props.error
+        ? (props.footer ?? (
+            <TeamChatComposer
+              text={props.draft}
+              placeholder={placeholder}
+              reason={props.reason}
+              onChange={props.onDraft}
+              onSend={props.onSend}
+              taggable={props.tags ? taggable(props.conversation, props.people, props.self) : []}
+              named={props.tags ? props.people : []}
+            />
+          ))
+        : null}
     </main>
   );
 }
 
+/** A public channel may tag anyone in the organization; a private one, a group or a DM only the people in it. */
+const taggable = (conversation: TeamConversation, people: TeamChatProps["people"], self: string) =>
+  (conversation.kind === "channel" && !conversation.private ? people : conversation.members).filter((person) => person.id !== self);
 const others = (conversation: TeamConversation, self: string) => (conversation.participants ?? []).flatMap(({ person }) => (person.id === self ? [] : [person]));
 const spokenList = (names: readonly string[]) => (names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : (names[0] ?? "this chat"));
 

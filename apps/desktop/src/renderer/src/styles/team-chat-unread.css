@@ -1,0 +1,36 @@
+.team-chat-new {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0;
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
+  color: var(--ink-3);
+}
+.team-chat-new::before,
+.team-chat-new::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.sidebar-chat-row-unread {
+  color: var(--ink);
+}
+.sidebar-chat-marks {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  font-size: var(--text-sm);
+  line-height: 16px;
+  color: var(--ink-2);
+}
+.sidebar-chat-marks > svg {
+  flex-shrink: 0;
+}
+.sidebar-chat-count {
+  min-width: 16px;
+  text-align: center;
+}

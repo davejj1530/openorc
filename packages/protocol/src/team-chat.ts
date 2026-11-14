@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { SpaceId } from "./spaces.js";
 import { teamChatChannelRpcParams, type TeamChatChannelRpcResults } from "./team-chat-channels.js";
+import { teamChatReadRpcParams, type TeamChatReadRpcResults } from "./team-chat-read.js";
 
 const id = z.string().min(1).max(200);
 const seq = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
@@ -79,6 +80,7 @@ const scope = { spaceId: SpaceId };
 const conversation = { ...scope, conversationId: id };
 export const teamChatRpcParams = {
   ...teamChatChannelRpcParams,
+  ...teamChatReadRpcParams,
   "teamChat.state": z.object(scope).strict(),
   "teamChat.openDm": z.object({ ...scope, userIds: z.array(id).min(1).max(8) }).strict(),
   "teamChat.timeline": z
@@ -90,7 +92,7 @@ export const teamChatRpcParams = {
   "teamChat.watch": z.object({ ...conversation, requestId: z.uuid() }).strict(),
   "teamChat.unwatch": z.object({ ...conversation, requestId: z.uuid() }).strict(),
 };
-export interface TeamChatRpcResults extends TeamChatChannelRpcResults {
+export interface TeamChatRpcResults extends TeamChatChannelRpcResults, TeamChatReadRpcResults {
   "teamChat.state": TeamChatStatus;
   "teamChat.openDm": TeamConversation;
   "teamChat.timeline": TeamChatTimeline;

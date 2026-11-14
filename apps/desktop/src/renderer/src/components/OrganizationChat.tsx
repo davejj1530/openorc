@@ -40,6 +40,7 @@ export function OrganizationChat() {
         void action.open(row);
       }}
       onCloseGroup={(conversation) => closeTeamGroup(scope, conversation)}
+      unread={state.data.chat.features.includes("unread")}
       onRetry={() => {
         void action.retry();
       }}

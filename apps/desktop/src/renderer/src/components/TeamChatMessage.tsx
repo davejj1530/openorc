@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ContextMenu } from "@base-ui/react/context-menu";
 import type { TeamChatPerson, TeamChatReaction, TeamMessage } from "@openorc/protocol";
 import { cn } from "../lib/cn";
@@ -8,7 +8,10 @@ import { floatingGround } from "../lib/use-anchor-ground";
 import { Copy, SmilePlus } from "./icons";
 import { menuItem, menuPopup } from "./menu";
 import { TeamChatReactionPicker, TeamChatReactions } from "./TeamChatReactions";
-import { ThreadRichText } from "./ThreadImages";
+import { defaultRehypePlugins } from "streamdown";
+import { personTagText, rehypePersonTags } from "../lib/rehype-person-tags";
+import { RichText } from "./RichText";
+import { ThreadRichText, threadMarkdownComponents, threadUrlTransform } from "./ThreadImages";
 import { Tooltip } from "./ui";
 
 export function TeamChatMessage({
@@ -44,8 +47,9 @@ export function TeamChatMessage({
     return () => document.removeEventListener("pointerdown", outside);
   }, [open]);
   const mine = message.actor.person?.id === self;
+  const words = personTagText(message.body, (id) => people.find((person) => person.id === id)?.name);
   const copy = () => {
-    void navigator.clipboard.writeText(message.body).then(
+    void navigator.clipboard.writeText(words).then(
       () => setCopyError(false),
       () => setCopyError(true),
     );
@@ -53,9 +57,9 @@ export function TeamChatMessage({
   return (
     <div ref={row} className={cn("orcling-bubble-row team-chat-message", mine && "team-chat-message-mine")} data-open={(open && !reason) || undefined} data-message-id={message.id}>
       <ContextMenu.Root open={menuOpen && visible} onOpenChange={setMenuOpen}>
-        <ContextMenu.Trigger className={cn("orcling-bubble", mine && "message-bubble")} tabIndex={0} aria-label={`${message.actor.person?.name ?? "Former member"}: ${message.body}`}>
+        <ContextMenu.Trigger className={cn("orcling-bubble", mine && "message-bubble")} tabIndex={0} aria-label={`${message.actor.person?.name ?? "Former member"}: ${words}`}>
           <div className="text-prose text-ink prose-chat">
-            <ThreadRichText mode="static">{message.body}</ThreadRichText>
+            {words === message.body ? <ThreadRichText mode="static">{message.body}</ThreadRichText> : <TaggedText body={message.body} people={people} />}
           </div>
           <TeamChatReactions reactions={message.reactions} people={people} self={self} onReact={onReact} reason={reason} side={mine ? "start" : "end"} />
         </ContextMenu.Trigger>
@@ -89,5 +93,24 @@ export function TeamChatMessage({
         </span>
       ) : null}
     </div>
+  );
+}
+
+/** A message that tags people: the same Markdown, with each tag drawn as the person's name. */
+function TaggedText({ body, people }: { body: string; people: readonly TeamChatPerson[] }) {
+  const plugins = useMemo<NonNullable<Parameters<typeof RichText>[0]["rehypePlugins"]>>(
+    () => [
+      defaultRehypePlugins.raw!,
+      ...Object.entries(defaultRehypePlugins)
+        .filter(([name]) => name !== "raw")
+        .map(([, plugin]) => plugin),
+      [rehypePersonTags, { names: people.map((person) => [person.id, person.name] as const) }],
+    ],
+    [people],
+  );
+  return (
+    <RichText mode="static" components={threadMarkdownComponents} urlTransform={threadUrlTransform} rehypePlugins={plugins}>
+      {body}
+    </RichText>
   );
 }

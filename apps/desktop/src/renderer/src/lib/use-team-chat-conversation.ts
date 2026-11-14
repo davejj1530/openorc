@@ -5,13 +5,25 @@ import type { TeamChatRoute } from "./team-chat-route";
 import type { TeamChatContextValue } from "./team-chat-context";
 import { earlierTeamMessages, teamChatDrafts, useTeamChatTimeline } from "./team-chat-queries";
 import { reactToTeamMessage, sendTeamMessage } from "./team-chat-actions";
+import { useNewFrom, useTeamChatSeen } from "./team-chat-seen";
 
-export function useTeamChatConversation(scope: TeamChatContextValue, target: TeamChatRoute, conversation: TeamConversation): Omit<TeamChatProps, "conversation" | "people" | "names"> {
+export function useTeamChatConversation(scope: TeamChatContextValue, target: TeamChatRoute, conversation: TeamConversation, unread = false): Omit<TeamChatProps, "conversation" | "people" | "names"> {
   const timeline = useTeamChatTimeline(scope, target.conversationId, true);
+  const newFrom = useNewFrom(conversation, unread);
+  const seen = useTeamChatSeen(scope, target, conversation, unread && scope.reach !== "offline");
+  const first = timeline.data?.messages[0]?.seq;
+  // The reading place must be on the page before anything is acknowledged: fetch back to it first.
+  const placeLoaded = newFrom === null || first === undefined || first <= newFrom + 1 || !timeline.data?.older;
   const draft = useSyncExternalStore(teamChatDrafts.subscribe, () => teamChatDrafts.read(target));
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const offline = scope.reach === "offline";
+  useEffect(() => {
+    // A failed page stops here with its notice; it is not retried in a loop.
+    if (!placeLoaded && !loadingOlder && !actionError && scope.current()) void older();
+    // `older` is recreated each render; the page it loads changes `placeLoaded`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placeLoaded, loadingOlder, actionError]);
   useEffect(() => {
     if (timeline.data)
       teamChatDrafts.reconcile(
@@ -53,6 +65,8 @@ export function useTeamChatConversation(scope: TeamChatContextValue, target: Tea
     },
     older: timeline.data?.older ?? false,
     loadingOlder,
+    newFrom,
+    ...(placeLoaded && { onShown: seen }),
     onOlder: () => {
       void older();
     },

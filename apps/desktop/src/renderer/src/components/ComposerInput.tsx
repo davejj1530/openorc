@@ -32,7 +32,7 @@ interface ComposerInputProps {
   /** Enter sends its way; `otherWay` when Command or Control is held, which takes the other of send now and queue. */
   onSubmit: (otherWay: boolean) => void;
   onFiles: (files: File[]) => Promise<void>;
-  onReady?: (() => void) | undefined;
+  onReady?: ((why?: "focus" | "words") => void) | undefined;
   /** Where the draft's picked files are kept beside its attachments. */
   draftKey?: string | undefined;
   disabled: boolean;

@@ -1,7 +1,8 @@
 import type { ThreadCollaboration, ThreadPerson, ThreadSummary } from "@openorc/protocol";
 import { describe, expect, it } from "vitest";
-import { askAnswerBlock, personFirst, personName, queuedBy, threadWriteBlock, togetherActivity, withOthers, writesAsCreator } from "./thread-collaboration.js";
-import { asksBlocked, sendsBlocked } from "./hosted-send.js";
+import { askAnswerBlock, canStopTurn, personFirst, personName, queuedBy, sendPayer, threadWriteBlock, togetherActivity, withOthers, writesAsCreator } from "./thread-collaboration.js";
+import { asksBlocked, queueBlock, sendsBlocked } from "./hosted-send.js";
+import { sendCluster } from "./conversation-submit.js";
 import { rowFacts, threadActivity, threadWaitsOnYou } from "./thread-row.js";
 import { composerPlaceholder } from "./composer-presentation.js";
 
@@ -127,7 +128,7 @@ describe("people in a thread", () => {
   it("names people, former members included, and reads queue rights from the server", () => {
     expect([personName(MARA), personFirst(MARA), personName(null), personFirst(null)]).toEqual(["Mara Okafor", "Mara", "Former member", "Former member"]);
     const thread = row(together(THEO, { queue: [{ messageId: "m1", author: MARA, paused: false, canEdit: false, canRemove: false, canStart: false }] }));
-    expect(queuedBy(thread, "m1")).toEqual({ author: MARA, canEdit: false, canRemove: false });
+    expect(queuedBy(thread, "m1")).toEqual({ author: MARA, canEdit: false, canRemove: false, paused: false, canStart: false });
     expect(queuedBy(thread, "m2")).toBeNull();
   });
 
@@ -136,5 +137,47 @@ describe("people in a thread", () => {
     expect(threadActivity(old)).toEqual({ text: "Waiting on Mara", tone: "muted" });
     expect(sendsBlocked(old)).toBe("Only Mara can make changes in Mara's thread.");
     expect(asksBlocked(old)).toBe("Only Mara can answer in Mara's thread.");
+  });
+});
+
+describe("sending, queueing and stopping in a shared thread", () => {
+  const mara = { name: "Mara Okafor", image: null };
+  const open = (more: Partial<ThreadCollaboration> = {}) => together(THEO, { canWrite: true, send: "now", canStop: true, ...more });
+  const free = { state: "signed-in", reach: "live", plan: { pro: false }, hours: null, signIns: [], projects: [] } as unknown as Parameters<typeof queueBlock>[1];
+
+  it("says on demand whose sign-in and hours each way uses during a teammate's turn, never inferring a pronoun", () => {
+    expect(sendPayer(row(open({ live: live(MARA) }), "running", mara))).toEqual({
+      now: "Joins Mara's turn, on their sign-in and hours.",
+      queue: "After Mara's turn, using your sign-in and hours.",
+      send: null,
+      stop: "Stop Mara's turn",
+    });
+    expect(sendPayer(row(open(), "idle", mara))).toEqual({ now: null, queue: null, send: "Uses your sign-in and hours.", stop: null });
+    expect(sendPayer(row(open({ live: live(THEO) }), "running", mara))).toBeNull();
+    expect(sendPayer(row(together(THEO, { live: live(MARA) }), "running", mara))).toBeNull();
+    expect(sendPayer(row(together(THEO), "idle"))).toBeNull();
+  });
+
+  it("refuses Queue without the reader's own hours or sign-in, while Send now into the running turn stays open", () => {
+    const running = row(open({ live: live(MARA) }), "running", mara);
+    expect(queueBlock(running, free, { agent: "claude", model: null })).toBeTruthy();
+    expect(queueBlock(row(open({ live: live(THEO) }), "running", mara), free, { agent: "claude", model: null })).toBeNull();
+    expect(sendCluster({ queueing: true, liveByDefault: true, steerable: true, canStop: true, hasDraft: true, queueBlocked: "You need Pro." })).toEqual({
+      kind: "turn",
+      stop: true,
+      enter: "now",
+      other: { way: "queue", blocked: "You need Pro." },
+    });
+  });
+
+  it("lets the server decide who stops, keeping the creator on today's rule", () => {
+    expect(canStopTurn(row(open({ live: live(MARA), canStop: false }), "running", mara))).toBe(false);
+    expect(canStopTurn(row(open({ live: live(MARA) }), "running", mara))).toBe(true);
+    expect(canStopTurn(row(together(THEO, { live: live(THEO) }), "running"))).toBeUndefined();
+  });
+
+  it("reads a paused message and whether its author may start it", () => {
+    const paused = row(open({ queue: [{ messageId: "m1", author: THEO, paused: true, canEdit: true, canRemove: true, canStart: true }] }), "idle", mara);
+    expect(queuedBy(paused, "m1")).toMatchObject({ paused: true, canStart: true });
   });
 });

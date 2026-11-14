@@ -13,4 +13,6 @@ export const threadCollaborationHandlers: Pick<Handlers, keyof typeof threadColl
   "threads.collaboration": () => ({ supported: false }),
   "threads.authors": elsewhere,
   "threads.people": elsewhere,
+  "threads.startQueued": elsewhere,
+  "threads.retrySave": elsewhere,
 };

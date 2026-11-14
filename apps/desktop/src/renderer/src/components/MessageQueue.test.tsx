@@ -71,3 +71,29 @@ it("names each queued message's author in a thread others are in, and offers act
   fireEvent.click(screen.getByRole("button", { name: /Keep the same column order/ }));
   expect(onEdit).toHaveBeenCalledWith("mine");
 });
+
+it("pauses a stopped queue: only the reader's own message offers Start turn, on their sign-in and hours", () => {
+  const onStart = vi.fn();
+  const mine = { id: "mine", text: "Keep the same column order as the table.", attachments: [], queuedAt: 1 };
+  const theirs = { id: "theirs", text: "Check the export with an empty log.", attachments: [], queuedAt: 2 };
+  const theo = { id: "u-theo", name: "Theo Laurent", image: null };
+  const ines = { id: "u-ines", name: "Inês Duarte", image: null };
+  const people = {
+    hint: null,
+    pausedHint: "After the turn was stopped",
+    of: (id: string) =>
+      id === "mine"
+        ? { author: theo, mine: true, canEdit: true, canRemove: true, paused: true, canStart: true }
+        : { author: ines, mine: false, canEdit: false, canRemove: false, paused: true, canStart: false },
+  };
+  render(<MessageQueue canSend pending={false} onSend={vi.fn()} onRemove={vi.fn()} onStart={onStart} messages={[mine, theirs]} people={people} />);
+  const front = screen.getByRole("button", { name: /2 paused/ });
+  expect(front.textContent).toContain("After the turn was stopped");
+  fireEvent.click(front);
+  expect(screen.queryByRole("button", { name: "Send now" })).toBeNull();
+  const start = screen.getByRole("button", { name: "Start turn" });
+  expect(start.getAttribute("data-tip")).toBe("Uses your sign-in and hours.");
+  fireEvent.click(start);
+  expect(onStart).toHaveBeenCalledWith("mine");
+  expect(screen.getAllByRole("button", { name: "Start turn" })).toHaveLength(1);
+});

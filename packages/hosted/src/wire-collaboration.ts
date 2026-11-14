@@ -38,6 +38,7 @@ export const wirePeople = z.object({ people: z.array(person.extend({ email: z.st
 export const SENDERS_PER_READ = 100;
 
 const route = <T>(path: string, reply: z.ZodType<T>): Route<T> => ({ method: "GET", path, reply });
+const wireSent = z.discriminatedUnion("sent", [z.object({ sent: z.literal(true) }).loose(), z.object({ sent: z.literal(false), refusal: z.string() })]);
 const thread = (id: string) => `/hosted/threads/${encodeURIComponent(id)}`;
 
 export const COLLABORATION_ROUTES = {
@@ -47,6 +48,10 @@ export const COLLABORATION_ROUTES = {
   turnSenders: (id: string, turnIds: readonly string[]) => route(`${thread(id)}/turn-senders?${new URLSearchParams({ turnIds: turnIds.join(",") })}`, wireTurnSenders),
   /** Members with the thread's project, by name. */
   people: (id: string, q: string) => route(`${thread(id)}/people?${new URLSearchParams({ q })}`, wirePeople),
+  /** Starts the author's own paused message as their own turn, under an explicit request id kept across a lost reply. */
+  startQueued: (id: string, messageId: string): Route<z.infer<typeof wireSent>> => ({ method: "POST", path: `${thread(id)}/messages/${encodeURIComponent(messageId)}/start`, reply: wireSent }),
+  /** Saves the thread's work again after a failed save, as server recovery: no agent turn, no sign-in. Answered with nothing. */
+  retrySave: (id: string): Route<null> => ({ method: "POST", path: `${thread(id)}/retry-save`, reply: null }),
 };
 
 /** A person as a window draws them: a picture only when it is held in a data URL. */

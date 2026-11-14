@@ -7,6 +7,7 @@ import { lastMessage } from "./thread-history.js";
 import { capabilities } from "./capabilities.js";
 import { nativeRuns, stopNative } from "./subthreads.js";
 import * as together from "./collaboration.js";
+import * as shared from "./shared-sends.js";
 
 type Answer<M extends RoutedMethod> = (threads: Threads, params: RpcParams<M>) => Promise<RpcResults[M]> | RpcResults[M];
 
@@ -33,6 +34,8 @@ export const ANSWERS: { [M in RoutedMethod]: Answer<M> | ReturnType<typeof refus
   "threads.collaboration": together.collaboration,
   "threads.authors": together.authors,
   "threads.people": together.people,
+  "threads.startQueued": (threads, params) => shared.startQueued({ ...threads.calls, starts: threads.starts }, params),
+  "threads.retrySave": (threads, params) => shared.retrySave(threads.calls, params),
   "threads.get": (threads, { id }) => threads.summary(id),
   "runs.listForThread": nativeRuns,
   "events.page": (threads, params) => threads.page(params),

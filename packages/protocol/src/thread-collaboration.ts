@@ -91,10 +91,16 @@ export const threadCollaborationRpcParams = {
   "threads.collaboration": z.object({ threadId: z.string() }).strict(),
   "threads.authors": z.object({ threadId: z.string() }).strict(),
   "threads.people": z.object({ threadId: z.string(), q: z.string().max(100).optional() }).strict(),
+  /** Starts the reader's own paused message as their own turn, once the thread is idle. */
+  "threads.startQueued": z.object({ threadId: z.string(), messageId: z.string() }).strict(),
+  /** Asks the server to save the thread's work again after a failed save; no turn starts. */
+  "threads.retrySave": z.object({ threadId: z.string() }).strict(),
 };
 
 export interface ThreadCollaborationRpcResults {
   "threads.collaboration": { supported: false } | { supported: true; state: ThreadCollaboration };
   "threads.authors": ThreadAuthors;
   "threads.people": { people: ThreadTaggable[] };
+  "threads.startQueued": null;
+  "threads.retrySave": null;
 }

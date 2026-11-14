@@ -1,4 +1,4 @@
-import { composerActivity, composerSendBlock, sendCluster, sendsNow, type SkillCommand, type SkillListNotice, type WaitingAsk } from "@openorc/client";
+import { composerActivity, composerSendBlock, sendCluster, sendsNow, type SendPayer, type SkillCommand, type SkillListNotice, type WaitingAsk } from "@openorc/client";
 import {
   ExecutionMode,
   executionMode,
@@ -133,6 +133,12 @@ export interface ComposerProps {
   disabledReason?: string | null;
   /** Why this person may only read the thread. The draft stays editable; controls cannot act. */
   readOnlyReason?: string | null;
+  /** In a cloud thread others are in: whose sign-in and hours each way to send uses, said on demand. */
+  sendPayer?: SendPayer | null;
+  /** Why this person cannot Queue now, where joining the running turn stays open. */
+  queueBlocked?: string | null;
+  /** False where the server says this person may not stop the running turn. */
+  canStopTurn?: boolean | undefined;
   /** A saved task can start from its spec without an additional message. */
   allowEmpty?: boolean;
   /** Live-run controls, when a session is open. */
@@ -168,7 +174,7 @@ export interface ComposerProps {
   onConnectorsWanted?: () => void;
   autoFocus?: boolean;
   /** The person is about to write: they focused the message or started one. */
-  onReady?: (() => void) | undefined;
+  onReady?: ((why?: "focus" | "words") => void) | undefined;
   size?: "md" | "lg";
   /** The landing screen draws the roomier composer and places the Commit chip itself. A small chat keeps only attach and send. */
   presentation?: "conversation" | "new-thread" | "small";
@@ -261,7 +267,7 @@ export function Composer(props: ComposerProps) {
   const canSend =
     Boolean(props.allowEmpty || props.value.trim() || attachments.length > 0) && !props.busy && !submitting && !props.readOnlyReason && !props.disabledReason && !attachmentBlock && uploading === 0;
 
-  const canStop = !props.readOnlyReason && Boolean(props.stopAction?.working || (!props.stopAction && props.live?.working));
+  const canStop = turnStops(props);
   const asks = props.asks ?? [];
   const focusField = useCallback(() => editor.current?.focus(), []);
   const cluster = sendCluster({
@@ -270,6 +276,7 @@ export function Composer(props: ComposerProps) {
     liveByDefault: Boolean(props.liveByDefault),
     steerable: Boolean(props.steerable),
     steerReason: props.steerReason,
+    queueBlocked: props.queueBlocked,
     canStop,
     hasDraft: Boolean(props.value.trim()) || attachments.length > 0 || uploading > 0,
     startsTask: props.allowEmpty,
@@ -362,6 +369,7 @@ export function Composer(props: ComposerProps) {
               canSend={canSend}
               block={composerSendBlock({ disabledReason: props.readOnlyReason ?? props.disabledReason, attachmentBlock })}
               stopping={stopping}
+              payer={props.sendPayer}
               onSend={submit}
               onStop={stop}
             />
@@ -448,4 +456,10 @@ const modeIcons: Record<ExecutionMode, typeof ShieldCheck> = { plan: Lightbulb, 
 /** Every mode keeps its label for the trigger; the menu offers only the ones the agent can run. */
 function modeOptions(agent: AgentKind | undefined) {
   return ExecutionMode.options.map((value) => ({ value, ...executionModePresentation(agent, value), icon: modeIcons[value], hidden: !executionModeAvailable(agent, value) }));
+}
+
+/** Whether Stop is offered: something runs, the person may act here, and the server lets them stop it. */
+function turnStops(props: Pick<ComposerProps, "readOnlyReason" | "canStopTurn" | "stopAction" | "live">): boolean {
+  if (props.readOnlyReason || props.canStopTurn === false) return false;
+  return Boolean(props.stopAction?.working || (!props.stopAction && props.live?.working));
 }

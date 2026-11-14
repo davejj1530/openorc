@@ -214,3 +214,46 @@ it("tells the ask dock whose ask it is and why the reader cannot answer it", asy
   expect(composer.props!.asksLabel).toBe("Waiting on Mara");
   expect(composer.props!.asksBlocked).toBe("Mara Okafor can answer while this turn is running.");
 });
+
+const handoff = { code: "handoff_unavailable" as const, message: "Only Mara can run the agent in this cloud thread for now.", responsible: MARA, commandIds: [], retrySave: false };
+const joining = (more: Partial<ThreadCollaboration> = {}) => together(THEO, { canWrite: true, send: "now", handoff, live: { id: "t2", sender: MARA, startedAt: 0, stopping: false }, ...more });
+
+it("opens a teammate's composer to join Mara's running turn, with Queue and Stop as the server says", async () => {
+  await open(marasThread(joining(), { activity: "running" }));
+  expect(composer.props!.readOnlyReason).toBeNull();
+  expect(composer.props!.sendPayer).toMatchObject({ now: "Joins Mara's turn, on their sign-in and hours.", stop: "Stop Mara's turn" });
+  expect(composer.props!.queueBlocked).toBe(handoff.message);
+  expect(composer.props!.canStopTurn).toBe(false);
+  expect(screen.queryByRole("status", { name: "OpenOrc Cloud" })).toBeNull();
+});
+
+it("blocks a teammate's composer between turns in the server's words", async () => {
+  await open(marasThread(joining({ send: "blocked", live: null })));
+  expect(composer.props!.readOnlyReason).toBe(handoff.message);
+  expect(screen.getByRole("status", { name: "OpenOrc Cloud" }).textContent).toBe(handoff.message);
+});
+
+it("holds Send now while Mara's turn is stopping", async () => {
+  await open(marasThread(joining({ send: "after", live: { id: "t2", sender: MARA, startedAt: 0, stopping: true } }), { activity: "running" }));
+  expect([composer.props!.steerable, composer.props!.steerReason]).toEqual([false, "This turn is stopping."]);
+});
+
+it("keeps a join that missed its turn paused for its author, Start turn dimmed in the server's words", async () => {
+  const queue = [{ messageId: "late", author: THEO, paused: true, canEdit: true, canRemove: true, canStart: false }];
+  await open(marasThread(joining({ send: "blocked", live: null, queue }), { queued: [{ id: "late", text: "Keep the date first", attachments: [], queuedAt: 1 }] }));
+  fireEvent.click(screen.getByRole("button", { name: /1 paused/ }));
+  const start = screen.getByRole("button", { name: "Start turn" });
+  expect([start.hasAttribute("disabled"), start.getAttribute("data-tip")]).toEqual([true, handoff.message]);
+  expect(screen.getByRole("button", { name: "Remove queued message 1" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Send now" })).toBeNull();
+});
+
+it("never makes a shared thread ready on focus alone, only once there are words", async () => {
+  await open(marasThread(together(THEO, { canWrite: true, send: "now" })));
+  act(() => composer.props!.onReady?.("focus"));
+  await act(async () => undefined);
+  expect(vi.mocked(core.call).mock.calls.map(([method]) => method)).not.toContain("threads.ready");
+  act(() => composer.props!.onReady?.("words"));
+  await act(async () => undefined);
+  expect(vi.mocked(core.call).mock.calls.map(([method]) => method)).toContain("threads.ready");
+});

@@ -70,6 +70,8 @@ interface Message {
   after: boolean;
   createdAt: string;
   files: UploadedFile[];
+  /** Paused by someone's Stop or a failed handoff: no turn takes it until its author starts it. */
+  paused?: boolean;
 }
 
 interface Ask {
@@ -168,6 +170,10 @@ export class StandInThreads {
   readonly #threads = new Map<string, Thread>();
   /** Every message body a person posted, in order, as the server took it. */
   readonly sent: { threadId: string; body: Record<string, unknown> }[] = [];
+  /** Every Retry save asked, by thread. */
+  readonly saveRetries: string[] = [];
+  /** Each explicit Start's answer, by its request id. */
+  readonly #starts = new Map<string, Reply>();
   /** Every ready ask the stand-in stored, in order. */
   readonly readies: { threadId: string; settings: unknown }[] = [];
   /** Every POST /hosted/threads body, in order, with the space it named. */
@@ -201,15 +207,26 @@ export class StandInThreads {
     const asked = /^\/hosted\/asks\/([^/]+)\/answer$/.exec(path);
     if (asked && method === "POST") return this.#answer(who, space, decodeURIComponent(asked[1]!), body);
     if (method === "POST" && path === "/hosted/threads") return this.#create(who, space, body);
-    const together = this.#together(request, { who, space });
+    const together = this.#together(request, { who, space }, body);
     if (together) return together;
     const write = /^\/hosted\/threads\/([^/]+)\/(messages|stop|ready|mine)(?:\/([^/]+))?$/.exec(path);
     if (write) return this.#write(method, write, { who, space }, body);
     return this.#read(method, path, request.query, { who, space }, body);
   }
 
-  /** A thread's collaboration reads: the reader's view, its turns' senders, who can be tagged. */
-  #together(request: { method: string; path: string; query: URLSearchParams }, as: { who: string; space: string }): Reply | null {
+  /** A thread's collaboration reads, an author's Start of a paused message, and Retry save. */
+  #together(request: { method: string; path: string; query: URLSearchParams }, as: { who: string; space: string }, body: Record<string, unknown>): Reply | null {
+    const start = /^\/hosted\/threads\/([^/]+)\/messages\/([^/]+)\/start$/.exec(request.path);
+    const retry = /^\/hosted\/threads\/([^/]+)\/retry-save$/.exec(request.path);
+    const write = start ?? retry;
+    if (write && request.method === "POST") {
+      const thread = this.#readable(as, decodeURIComponent(write[1]!));
+      if (!thread) return missing();
+      if (!this.collaboration.sharedWrites) return READ_ONLY;
+      if (start) return this.#startPaused(thread, as.who, decodeURIComponent(start[2]!), body);
+      this.saveRetries.push(thread.id);
+      return { status: 202, body: null };
+    }
     const read = /^\/hosted\/threads\/([^/]+)\/(collaboration|turn-senders|people)$/.exec(request.path);
     if (!read) return null;
     const thread = this.#readable(as, decodeURIComponent(read[1]!));
@@ -250,9 +267,10 @@ export class StandInThreads {
     const key = `${method} ${verb}${messageId ? "/:id" : ""}`;
     if (key === "PUT mine") return this.#view(thread, as.who, body);
     if (thread.owner !== as.who && !this.collaboration.sharedWrites) return READ_ONLY;
-    if (key === "POST messages") return this.#send(thread, as.who, body);
-    if (key === "DELETE messages/:id") return this.#unsend(thread, decodeURIComponent(messageId!));
-    if (key === "POST stop") return this.#stop(thread);
+    if (key === "POST messages") return this.#joinRefusal(thread, as.who, body) ?? this.#send(thread, as.who, body);
+    if (key === "POST stop" && this.#joinsOnly(thread, as.who)) return READ_ONLY;
+    if (key === "DELETE messages/:id") return this.#unsend(thread, decodeURIComponent(messageId!), as.who);
+    if (key === "POST stop") return typeof body["turnId"] === "string" && this.collaboration.sharedWrites ? this.#stopShared(thread, as.who, body["turnId"]) : this.#stop(thread);
     if (key === "POST ready") return this.#ready(thread, as.who, body);
     return null;
   }
@@ -324,18 +342,115 @@ export class StandInThreads {
     const after = body["delivery"] === "after";
     const known = thread.messages.find((message) => message.id === id);
     if (known) return this.#again(thread, known, who, settings, after);
-    if (!thread.turn || !after) {
-      const refusal = thread.turn ? null : this.admit(who, settings);
-      if (refusal) return { status: 200, body: { sent: false, refusal } };
-    }
+    const place = this.collaboration.sharedWrites ? this.#placeShared(thread, who, body, settings, after) : this.#placeOwn(thread, who, settings, after);
+    if (place.refusal) return { status: 200, body: { sent: false, refusal: place.refusal } };
     const files = this.files.claim({ who, space: thread.space, projectId: thread.projectId ?? "", messageId: id, ids: body["fileIds"], thread: thread.messages });
     if (!Array.isArray(files)) return files;
-    const message: Message = { id, author: who, text: String(body["text"] ?? ""), state: "pending", refusal: null, after: Boolean(thread.turn) && after, createdAt: new Date().toISOString(), files };
+    const message: Message = {
+      id,
+      author: who,
+      text: String(body["text"] ?? ""),
+      state: "pending",
+      refusal: null,
+      after: place.queue,
+      createdAt: new Date().toISOString(),
+      files,
+      paused: place.paused,
+    };
     thread.messages.push(message);
     if (!thread.title.trim() && thread.messages.length === 1) thread.title = titleFromPrompt(message.text);
-    if (!message.after) this.#take(thread, message);
+    if ("settle" in place) this.#settle(thread, message, settings);
+    else if (!message.after) this.#take(thread, message);
     else this.#changed(thread);
     return { status: 200, body: { sent: true, message: messageOf(message) } };
+  }
+
+  /** A waiting message taken on an idle thread: its author's own turn if they may start one, else refused where it waits. */
+  #settle(thread: Thread, message: Message, settings: { agent: string; model: string | null }): void {
+    const refusal = this.admit(message.author, settings);
+    if (!refusal) return this.#take(thread, message);
+    message.state = "refused";
+    message.refusal = refusal;
+    this.#changed(thread);
+  }
+
+  /** While only joining is open, a teammate who is not the thread's creator. */
+  #joinsOnly(thread: Thread, who: string): boolean {
+    return this.collaboration.sharedWrites && this.collaboration.joinOnly && thread.owner !== who;
+  }
+
+  /** A teammate's write that would start a turn while only joining is open: refused with the block, nothing stored. */
+  #joinRefusal(thread: Thread, who: string, body: Record<string, unknown>): Reply | null {
+    if (!this.#joinsOnly(thread, who) || thread.messages.some((message) => message.id === body["id"])) return null;
+    const joins = body["delivery"] !== "after" && (thread.turn || typeof body["expectedTurnId"] === "string");
+    if (joins) return null;
+    const block = this.collaboration.joinBlock(thread);
+    return { status: 409, body: { code: block.code, message: block.message, block, statusCode: 409 } };
+  }
+
+  /** Where a message goes under the starter-only rule: into the running turn, after it, or a new turn if admitted. */
+  #placeOwn(thread: Thread, who: string, settings: { agent: string; model: string | null }, after: boolean) {
+    const refusal = thread.turn ? null : this.admit(who, settings);
+    return { refusal: after && thread.turn ? null : refusal, queue: Boolean(thread.turn) && after, paused: false };
+  }
+
+  /**
+   * Where a message goes once shared writing is open: Send now joins the turn it names, on that turn's sender, asking
+   * nothing of its author; one naming a turn that is gone or another waits as its author's own; Queue and a new turn
+   * need the author's own admission; a turn stopping takes nothing, so the message waits paused.
+   */
+  #placeShared(thread: Thread, who: string, body: Record<string, unknown>, settings: { agent: string; model: string | null }, after: boolean) {
+    const expected = typeof body["expectedTurnId"] === "string" ? body["expectedTurnId"] : null;
+    if (thread.stopping) return { refusal: null, queue: true, paused: true };
+    if (thread.turn && !after && (!expected || expected === thread.turnId)) return { refusal: null, queue: false, paused: false };
+    // Its turn ended or changed before it arrived: it waits as the author's own. While only joining is open it waits
+    // paused, since nothing a teammate sends may start a turn; else it is admitted as theirs when it is taken.
+    if (expected && !after && this.#joinsOnly(thread, who)) return { refusal: null, queue: true, paused: true };
+    if (thread.turn && !after) return { refusal: null, queue: true, paused: false };
+    if (expected && !after) return { refusal: null, queue: true, paused: false, settle: true };
+    return { refusal: this.admit(who, settings), queue: Boolean(thread.turn), paused: false };
+  }
+
+  /**
+   * An author starts their own paused message as their own turn, once the thread is idle and they may start one. The
+   * same request id again answers what it answered, and never starts a second turn.
+   */
+  #startPaused(thread: Thread, who: string, messageId: string, body: Record<string, unknown>): Reply {
+    const requestId = typeof body["requestId"] === "string" ? body["requestId"] : null;
+    const replay = requestId ? this.#starts.get(requestId) : undefined;
+    if (replay) return replay;
+    const message = thread.messages.find((each) => each.id === messageId);
+    if (!message || message.state !== "pending") return { status: 404, body: { message: "That message isn't here.", statusCode: 404 } };
+    if (message.author !== who) return { status: 403, body: { code: "message_author_only", message: "Only the sender can change this queued message.", statusCode: 403 } };
+    if (thread.turn) return { status: 409, body: { code: "thread_busy", message: "A turn is running. Wait for it to finish.", statusCode: 409 } };
+    if (this.#joinsOnly(thread, who)) {
+      const block = this.collaboration.joinBlock(thread);
+      return { status: 409, body: { code: block.code, message: block.message, block, statusCode: 409 } };
+    }
+    const refusal = this.admit(who, this.#settings(thread));
+    const reply: Reply = refusal ? { status: 200, body: { sent: false, refusal } } : { status: 200, body: { sent: true, message: messageOf(message) } };
+    if (!refusal) {
+      message.paused = false;
+      this.#take(thread, message);
+      (reply.body as { message: unknown }).message = messageOf(message);
+    }
+    if (requestId) this.#starts.set(requestId, reply);
+    return reply;
+  }
+
+  /** Stop of the turn the window saw: the stopper's own waiting messages go, everyone else's wait paused for their authors. */
+  #stopShared(thread: Thread, who: string, turnId: string): Reply {
+    if (thread.turnId !== turnId || !thread.turn) return { status: 409, body: { code: "turn_changed", message: "That turn ended. Check the thread before stopping again.", statusCode: 409 } };
+    for (const message of thread.messages) {
+      if (message.state !== "pending") continue;
+      if (message.author === who) message.state = "cancelled";
+      else message.paused = true;
+    }
+    const sender = this.collaboration.personOf(thread.turn)?.name.split(" ")[0] ?? "the previous sender";
+    const stopper = this.collaboration.personOf(who)?.name.split(" ")[0] ?? "Someone";
+    this.append(thread.id, [{ type: "message.completed", ts: Date.now(), messageId: randomUUID(), role: "system", text: `${stopper} stopped ${sender}'s turn.` }], { by: userOf(who) });
+    this.endTurn(thread.id, "cancelled");
+    return { status: 204, body: null };
   }
 
   /** The same message sent again: as it stands, but a waiting one sent now steers, and a refused one is admitted again. */
@@ -366,8 +481,10 @@ export class StandInThreads {
     if (starts) this.append(thread.id, [{ type: "turn.started", ts: Date.now(), turnId: thread.turnId }]);
   }
 
-  #unsend(thread: Thread, messageId: string): Reply {
+  #unsend(thread: Thread, messageId: string, who: string): Reply {
     const message = thread.messages.find((each) => each.id === messageId);
+    if (message && this.collaboration.sharedWrites && message.author !== who)
+      return { status: 403, body: { code: "message_author_only", message: "Only the sender can change this queued message.", statusCode: 403 } };
     if (message?.state === "pending" || message?.state === "refused") {
       message.state = "cancelled";
       this.#changed(thread);
@@ -447,7 +564,7 @@ export class StandInThreads {
     this.append(threadId, [{ type: "turn.completed", ts: Date.now(), turnId: thread.turnId ?? `turn-${threadId}`, status, durationMs: 1000 }]);
     thread.turnId = null;
     for (const message of thread.messages) if (message.state === "pending" && !this.#reads(message.author, thread)) message.state = "cancelled";
-    const next = thread.messages.find((message) => message.state === "pending");
+    const next = thread.messages.find((message) => message.state === "pending" && !message.paused);
     if (!next) return;
     const refusal = this.admit(next.author, this.#settings(thread));
     if (!refusal) return this.#take(thread, next);

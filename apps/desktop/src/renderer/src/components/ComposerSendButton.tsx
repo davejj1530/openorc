@@ -1,4 +1,4 @@
-import type { SendCluster, SendWay } from "@openorc/client";
+import type { SendCluster, SendPayer, SendWay } from "@openorc/client";
 import { useState } from "react";
 import { ArrowUp } from "./icons";
 
@@ -19,11 +19,12 @@ function useFoldingWords(words: string | null): string {
   return words ?? last;
 }
 
-/** What the ink button names when it shows no words: its glyph's meaning, or why it cannot be pressed. */
-function inkTip(stops: boolean, words: string | null, reason: string | undefined): string | undefined {
-  if (stops) return "Stop";
+/** What the ink button names on demand: why it cannot be pressed, else whose sign-in and hours it uses, else its glyph. */
+function inkTip(cluster: SendCluster, words: string | null, reason: string | undefined, payer: SendPayer | null): string | undefined {
+  if (cluster.kind === "stop") return payer?.stop ?? "Stop";
+  if (cluster.kind === "turn") return reason ?? payer?.[cluster.enter] ?? undefined;
   if (words) return reason;
-  return reason ?? "Send";
+  return reason ?? payer?.send ?? "Send";
 }
 
 /**
@@ -31,7 +32,8 @@ function inkTip(stops: boolean, words: string | null, reason: string | undefined
  * nothing running, the one Stop with nothing typed while something runs, and a pill carrying the word of what Enter
  * does mid-turn, so a turn starting or ending swaps it in place. Mid-turn, Stop steps aside as a white key and the other
  * way waits beside the pill as a quiet word, dimmed with its reason when the turn cannot take it. While an ask waits with
- * nothing typed, the ink is the ask's and Stop stands alone as the white key.
+ * nothing typed, the ink is the ask's and Stop stands alone as the white key. In a cloud thread others are in, each says
+ * on demand whose sign-in and hours it uses (`payer`).
  */
 export function ComposerSendCluster({
   cluster,
@@ -40,6 +42,7 @@ export function ComposerSendCluster({
   stopping,
   onSend,
   onStop,
+  payer = null,
 }: {
   cluster: SendCluster;
   canSend: boolean;
@@ -49,24 +52,31 @@ export function ComposerSendCluster({
   /** `other` is the quiet word's way rather than Enter's. */
   onSend: (other: boolean) => void;
   onStop: () => void;
+  payer?: SendPayer | null | undefined;
 }) {
   const reason = canSend ? undefined : (block ?? undefined);
   return (
     <div className="composer-send-cluster">
-      {cluster.kind === "asked" || (cluster.kind !== "stop" && cluster.stop) ? <StopKey stopping={stopping} onStop={onStop} /> : null}
+      {cluster.kind === "asked" || (cluster.kind !== "stop" && cluster.stop) ? <StopKey stopping={stopping} onStop={onStop} tip={payer?.stop ?? "Stop"} /> : null}
       {cluster.kind === "turn" ? (
-        <button type="button" onClick={() => onSend(true)} disabled={!canSend || Boolean(cluster.other.blocked)} data-tip={cluster.other.blocked ?? reason} className="composer-send-other">
+        <button
+          type="button"
+          onClick={() => onSend(true)}
+          disabled={!canSend || Boolean(cluster.other.blocked)}
+          data-tip={cluster.other.blocked ?? reason ?? payer?.[cluster.other.way] ?? undefined}
+          className="composer-send-other"
+        >
           {WAY_WORDS[cluster.other.way]}
         </button>
       ) : null}
-      {cluster.kind === "asked" ? null : <InkButton cluster={cluster} canSend={canSend} reason={reason} stopping={stopping} onSend={() => onSend(false)} onStop={onStop} />}
+      {cluster.kind === "asked" ? null : <InkButton cluster={cluster} canSend={canSend} reason={reason} payer={payer} stopping={stopping} onSend={() => onSend(false)} onStop={onStop} />}
     </div>
   );
 }
 
-function StopKey({ stopping, onStop }: { stopping: boolean; onStop: () => void }) {
+function StopKey({ stopping, onStop, tip }: { stopping: boolean; onStop: () => void; tip: string }) {
   return (
-    <button type="button" onClick={onStop} disabled={stopping} aria-label="Stop" data-tip="Stop" className="composer-stop">
+    <button type="button" onClick={onStop} disabled={stopping} aria-label="Stop" data-tip={tip} className="composer-stop">
       <span className="composer-stop-glyph" />
     </button>
   );
@@ -76,6 +86,7 @@ function InkButton({
   cluster,
   canSend,
   reason,
+  payer,
   stopping,
   onSend,
   onStop,
@@ -83,6 +94,7 @@ function InkButton({
   cluster: SendCluster;
   canSend: boolean;
   reason: string | undefined;
+  payer: SendPayer | null;
   stopping: boolean;
   onSend: () => void;
   onStop: () => void;
@@ -96,7 +108,7 @@ function InkButton({
       onClick={stops ? onStop : onSend}
       disabled={stops ? stopping : !canSend}
       aria-label={stops ? "Stop" : (words ?? "Send")}
-      data-tip={inkTip(stops, words, reason)}
+      data-tip={inkTip(cluster, words, reason, payer)}
       data-state={stops ? "stop" : "send"}
       data-words={words ? true : undefined}
       className="composer-send"

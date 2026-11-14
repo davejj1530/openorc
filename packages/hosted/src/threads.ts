@@ -97,6 +97,8 @@ export class Threads implements HostedThreads {
   readonly calls: sends.Calls;
   /** Who sent each turn and wrote each message of the threads read: collaboration.ts. */
   readonly voices = new ThreadVoices();
+  /** The request id of each explicit Start of a paused message not answered yet: shared-sends.ts. */
+  readonly starts = new Map<string, string>();
 
   constructor(private readonly deps: ThreadsDeps) {
     this.#cache = new AccountCache({ kept: deps.kept, part: "threads", server: deps.server, schema: keptThreads });
@@ -104,7 +106,7 @@ export class Threads implements HostedThreads {
     this.calls = {
       on: (threadId) => this.on(threadId),
       row: (threadId) => this.row(threadId),
-      readOnly: (threadId) => starterOf(this.row(threadId), this.#heard?.me ?? null) !== null,
+      readOnly: (threadId) => starterOf(this.row(threadId), this.#heard?.me ?? null) !== null && !this.row(threadId).collaboration?.canWrite,
       refresh: () => this.refresh(),
       account: () => deps.account.status(),
       refused: (refusal, settings) => deps.account.refused(refusal, settings),

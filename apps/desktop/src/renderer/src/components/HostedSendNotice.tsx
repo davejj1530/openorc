@@ -1,4 +1,18 @@
-import { placeUnreachable, sendsBlocked, threadReadOnlyReason, threadSendBlock, threadTogether, threadWriteBlock, type SendBlockAction } from "@openorc/client";
+import {
+  canStopTurn,
+  placeUnreachable,
+  steerBlock,
+  queueBlock,
+  sendPayer,
+  sendsBlocked,
+  threadReadOnlyReason,
+  threadSendBlock,
+  threadTogether,
+  threadWriteBlock,
+  withOthers,
+  type SendBlockAction,
+  type SendPayer,
+} from "@openorc/client";
 import { HOSTED_AGENTS, type HarnessId, type PermissionPreset, type RunMode, type ThreadSummary } from "@openorc/protocol";
 import type { ReactNode } from "react";
 import { useRpc, useRpcMutation } from "../lib/client";
@@ -26,7 +40,8 @@ const CLOUD_LIMITS: CloudComposerLimits = { accounts: undefined, onCompact: unde
  *              the server says this person cannot run the agent in this thread, in its words
  *   blocked    the same words, as the reason Send is disabled
  *   limits     the composer's controls a cloud thread leaves out, spread over its props
- *   onReady    the composer's ready signal: writing begins, so the thread is made ready for the message
+ *   onReady    the composer's ready signal: writing begins, so the thread is made ready for the message; in a thread
+ *              others are in, only once there are words, never on focus alone
  *   shown      the composer's error line, without a refusal the card already says in the same words
  *   hosted     a cloud thread runs elsewhere, so this Mac's skills and connectors are not offered in it
  *
@@ -41,8 +56,15 @@ export function useHostedComposer(
   hosted: boolean;
   notice: ReactNode;
   blocked: string | null;
-  limits: Partial<CloudComposerLimits> & { readOnlyReason: string | null };
-  onReady?: () => void;
+  limits: Partial<CloudComposerLimits> & {
+    readOnlyReason: string | null;
+    sendPayer?: SendPayer | null;
+    queueBlocked?: string | null;
+    canStopTurn?: boolean | undefined;
+    steerable?: false;
+    steerReason?: string;
+  };
+  onReady?: (why?: "focus" | "words") => void;
   shown: (error: string | null | undefined) => string | null | undefined;
 } {
   const hosted = thread?.owner?.brain === "hosted";
@@ -52,16 +74,26 @@ export function useHostedComposer(
   const ready = useRpcMutation("threads.ready");
   const blocked = sendsBlocked(thread);
   const agent = settings.choice?.agent ?? thread?.agent ?? "";
-  const block = threadSendBlock(thread, account.data, { agent, model: settings.choice?.model ?? thread?.model ?? null });
-  const readyNow = () => {
+  const turn = { agent, model: settings.choice?.model ?? thread?.model ?? null };
+  const block = threadSendBlock(thread, account.data, turn);
+  const stopping = steerBlock(thread);
+  const together = {
+    sendPayer: sendPayer(thread),
+    queueBlocked: queueBlock(thread, account.data, turn),
+    canStopTurn: canStopTurn(thread),
+    ...(stopping && { steerable: false as const, steerReason: stopping }),
+  };
+  const readyNow = (why?: "focus" | "words") => {
     if (!thread || !hosted || blocked || block || thread.activity === "running") return;
+    if (why === "focus" && withOthers(thread)) return;
     const { choice, mode, permission } = settings;
     ready.mutate({ id: thread.id, settings: { ...(choice && { agent: choice.agent, model: choice.model, effort: choice.effort ?? null }), mode, permissionMode: permission } });
   };
   if (!hosted) return { hosted, notice: null, blocked: null, limits, shown: (error) => error };
+  Object.assign(limits, together);
   return {
     hosted,
-    notice: hostedNotice({ block: block && !blocked ? block : null, writeBlock: placeUnreachable(thread) ? null : writeBlock }),
+    notice: hostedNotice({ block: block && !blocked ? block : null, writeBlock: placeUnreachable(thread) ? null : writeBlock, thread }),
     blocked: blocked ?? block?.words ?? null,
     limits,
     shown: (error) => (error === block?.words ? undefined : error),
@@ -69,10 +101,27 @@ export function useHostedComposer(
   };
 }
 
-/** The card for a block the account fixes, else for the server's word that this person cannot run the agent here. */
-function hostedNotice({ block, writeBlock }: { block: { words: string; action: SendBlockAction | null } | null; writeBlock: string | null }): ReactNode {
+/**
+ * The card for a block the account fixes, else for the server's word that this person cannot run the agent here, with
+ * Retry save for the one person the server lets ask for it. A command still running is stopped from its own row.
+ */
+function hostedNotice({ block, writeBlock, thread }: { block: { words: string; action: SendBlockAction | null } | null; writeBlock: string | null; thread: ThreadSummary | null }): ReactNode {
   if (block) return <SendBlockCard words={block.words} action={block.action} />;
-  return writeBlock ? <SendBlockCard words={writeBlock} action={null} /> : null;
+  if (!writeBlock) return null;
+  return threadTogether(thread)?.handoff?.retrySave && thread ? <RetrySaveCard threadId={thread.id} words={writeBlock} /> : <SendBlockCard words={writeBlock} action={null} />;
+}
+
+/** The thread's work could not be saved: its previous sender asks the server to save it again. No turn starts. */
+function RetrySaveCard({ threadId, words }: { threadId: string; words: string }) {
+  const retry = useRpcMutation("threads.retrySave");
+  return (
+    <section role="status" aria-label="OpenOrc Cloud" data-plane className={cn(card, "flex flex-wrap items-center justify-between gap-x-3")}>
+      <div className="py-1.5 text-ink">{retry.error?.message ?? words}</div>
+      <Button variant="secondary" disabled={retry.isPending} onClick={() => retry.mutate({ threadId })}>
+        Retry save
+      </Button>
+    </section>
+  );
 }
 
 /**

@@ -147,13 +147,15 @@ function appSide(event: AgentEvent): AgentEvent {
 }
 
 /**
- * The thread's waiting messages as the composer's queue shows them: those sent to wait for the running turn, and any
- * the server refused after taking it, with the words for why. A message sent now is in the log already.
+ * The thread's waiting messages as the composer's queue shows them: those sent to wait for the running turn, any the
+ * server paused for its author to start, and any it refused after taking it, with the words for why. A message sent now
+ * is in the log already.
  */
 export function toQueued(row: WireThread): QueuedMessage[] {
+  const paused = new Set(row.collaboration?.queue.filter((queued) => queued.paused).map((queued) => queued.messageId));
   return row.waiting.flatMap((message) => {
     const refused = message.state === "refused";
-    if (!refused && !(message.afterTurn && message.state === "pending")) return [];
+    if (!refused && !(message.state === "pending" && (message.afterTurn || paused.has(message.id)))) return [];
     const words = refused ? refusalWords(message.refusal, row.settings.agent) : null;
     return [{ id: message.id, text: message.text, attachments: (message.files ?? []).map(hostedFilePath), queuedAt: Date.parse(message.createdAt), error: words }];
   });

@@ -15,7 +15,7 @@ import {
 } from "@openorc/protocol";
 import { cloudTime, priceText } from "./account-words.js";
 import { rowStarter } from "./thread-row.js";
-import { askAnswerBlock, threadTogether, threadWriteBlock } from "./thread-collaboration.js";
+import { askAnswerBlock, threadTogether, threadWriteBlock, withOthers } from "./thread-collaboration.js";
 
 /**
  * Where the card above a cloud thread's composer leads: the Settings section that holds what is missing. Paying's three
@@ -68,6 +68,20 @@ export function asksBlocked(thread: Pick<ThreadSummary, "owner"> | null): string
   if (unreachable || threadTogether(thread)?.ask) return unreachable ?? askAnswerBlock(thread);
   const starter = thread ? rowStarter(thread) : null;
   return starter ? `Only ${starter.first} can answer in ${starter.first}'s thread.` : null;
+}
+
+/**
+ * Why this person cannot Queue during a running turn others are in: a queued message starts their own turn, so it needs
+ * what starting one needs: the server's leave to run the agent here (its block, in its words), then their own sign-in
+ * and hours. Joining the running turn needs none of it. Null otherwise.
+ */
+export function queueBlock(thread: Pick<ThreadSummary, "owner"> | null, account: AccountStatus | undefined, settings: { agent: string; model: string | null }): string | null {
+  const state = threadTogether(thread);
+  if (!state?.live || !withOthers(thread)) return null;
+  if (state.handoff) return state.handoff.message;
+  if (state.live.sender?.id === state.viewer.id) return null;
+  const why = hostedSendBlock(account, settings, false);
+  return why ? sendBlockWords(why, settings.agent) : null;
 }
 
 /**

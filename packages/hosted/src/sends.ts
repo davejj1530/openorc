@@ -32,7 +32,7 @@ export interface Calls {
   on(threadId: string): Requests;
   /** The row, or a rejection in words when the account no longer has it. */
   row(threadId: string): WireThread;
-  /** A teammate's thread, which the person reads and only its starter writes to. */
+  /** A teammate's thread the person only reads: its starter writes to it, until the server lets teammates write. */
   readOnly(threadId: string): boolean;
   /** Reads the rows again, and resolves once they are heard. */
   refresh(): Promise<void>;
@@ -68,8 +68,11 @@ async function post(
   const fileIds = await messageFileIds(calls.on(threadId), message.attachments);
   if (message.settings?.agent && !isHostedAgent(message.settings.agent)) throw new Refused(`${message.settings.agent} doesn't run on OpenOrc Cloud.`);
   const id = wireMessageId(message.id) ?? crypto.randomUUID();
+  // Send now joins the turn the window saw live; a server that finds another, or none, keeps it as the author's queue.
+  const live = message.after ? null : (row.collaboration?.live?.id ?? null);
   const body = {
     id,
+    ...(live && { expectedTurnId: live }),
     text: message.text,
     ...(fileIds.length && { fileIds }),
     ...(message.settings && { settings: message.settings }),
@@ -126,10 +129,16 @@ export async function sendQueued(calls: Calls, { id, messageId }: RpcParams<"thr
   return toQueued(calls.row(id));
 }
 
-/** runs.interrupt: the running turn stops, and messages not taken yet are cancelled, as Stop does on this Mac. */
+/**
+ * runs.interrupt: the running turn stops, as Stop does on this Mac. Where the server writes shared threads, Stop names
+ * the turn the window saw, so a late Stop never stops the next person's turn; the server cancels the stopper's own
+ * waiting messages and pauses everyone else's.
+ */
 export async function stop(calls: Calls, { runId }: RpcParams<"runs.interrupt">): Promise<void> {
   const threadId = threadOf(runId);
-  await calls.on(threadId).request(ROUTES.stop(threadId));
+  const together = calls.row(threadId).collaboration;
+  const turnId = together?.canWrite ? together.live?.id : undefined;
+  await calls.on(threadId).request(ROUTES.stop(threadId), turnId ? { turnId } : undefined);
   await calls.refresh();
 }
 

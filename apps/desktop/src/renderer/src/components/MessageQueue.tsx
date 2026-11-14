@@ -13,6 +13,11 @@ export interface QueuedBy {
   mine: boolean;
   canEdit: boolean;
   canRemove: boolean;
+  /** Stopped or held by the server: no turn takes it until its author starts it as their own. */
+  paused?: boolean;
+  canStart?: boolean;
+  /** Why its author cannot start it now, said on demand. */
+  startBlocked?: string | null;
 }
 
 /**
@@ -33,6 +38,7 @@ export function MessageQueue({
   onRemove,
   onEdit,
   people,
+  onStart,
 }: {
   messages: QueuedMessage[];
   canSend: boolean;
@@ -47,13 +53,16 @@ export function MessageQueue({
   /** Takes the message out of the queue and puts its words and files back in the composer, after what is there. */
   onEdit?: ((messageId: string) => void) | undefined;
   /** Who wrote each message and the reader's rights to it; the hint names whose turn the queue waits on. */
-  people?: { hint: string | null; of(messageId: string): QueuedBy | null } | undefined;
+  people?: { hint: string | null; pausedHint?: string | null; of(messageId: string): QueuedBy | null } | undefined;
+  /** Starts the reader's own paused message as their own turn. */
+  onStart?: ((messageId: string) => void) | undefined;
 }) {
   const [expanded, setExpanded] = useState(false);
   const remove = useComposerControl(pending, "Remove from queue");
   if (!messages.length) return null;
   const open = expanded || messages.some((message) => message.error || message.interrupted);
   const behind = open ? 0 : Math.min(2, messages.length);
+  const paused = messages.every((message) => people?.of(message.id)?.paused);
   return (
     <section className="message-queue" aria-label="Queued messages">
       {open ? (
@@ -65,7 +74,8 @@ export function MessageQueue({
               <li className="message-queue-card motion-arrive" key={message.id}>
                 <QueuedWords message={message} pending={pending} onEdit={edit} author={by?.author} />
                 <div className="message-queue-actions">
-                  {!by || by.mine ? <QueuedSend message={message} canSend={canSend} pending={pending} sendReason={sendReason} retryBlocked={retryBlocked} onSend={onSend} /> : null}
+                  {by?.paused && by.mine ? <QueuedStart canStart={Boolean(by.canStart)} blocked={by.startBlocked ?? null} pending={pending} onStart={() => onStart?.(message.id)} /> : null}
+                  {(!by || by.mine) && !by?.paused ? <QueuedSend message={message} canSend={canSend} pending={pending} sendReason={sendReason} retryBlocked={retryBlocked} onSend={onSend} /> : null}
                   {!by || by.canRemove ? (
                     <IconButton size="xs" disabled={remove.disabled} onClick={() => onRemove(message.id)} aria-label={`Remove queued message ${index + 1}`} data-tip={remove.reason}>
                       <X size={13} />
@@ -82,8 +92,10 @@ export function MessageQueue({
           <span key={index} className="message-queue-behind" data-depth={index + 1} aria-hidden="true" />
         ))}
         <button type="button" className="message-queue-front" aria-expanded={open} onClick={() => setExpanded(!open)}>
-          <span className="message-queue-count tabular">{messages.length} queued</span>
-          <span className="message-queue-hint">{people?.hint ?? queueHint(messages, agentName)}</span>
+          <span className="message-queue-count tabular">
+            {messages.length} {paused ? "paused" : "queued"}
+          </span>
+          <span className="message-queue-hint">{paused ? people?.pausedHint : (people?.hint ?? queueHint(messages, agentName))}</span>
           <ChevronDown size={14} className="message-queue-chevron" />
         </button>
       </div>
@@ -116,6 +128,16 @@ function QueuedWords({ message, pending, onEdit, author }: { message: QueuedMess
     <button type="button" className="message-queue-message" disabled={control.disabled} data-tip={control.reason} onClick={onEdit}>
       {body}
     </button>
+  );
+}
+
+/** The author's own paused message starts their own turn, on their sign-in and hours; not while a turn runs. */
+function QueuedStart({ canStart, blocked, pending, onStart }: { canStart: boolean; blocked: string | null; pending: boolean; onStart: () => void }) {
+  const control = useComposerControl(!canStart || pending, canStart ? "Uses your sign-in and hours." : (blocked ?? "This message can't start a turn now."));
+  return (
+    <Button size="sm" disabled={control.disabled} data-tip={control.reason} onClick={onStart}>
+      Start turn
+    </Button>
   );
 }
 

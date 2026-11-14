@@ -1,4 +1,4 @@
-import { personFirst, queuedBy, threadTogether, togetherActivity, withOthers, writesAsCreator } from "@openorc/client";
+import { personFirst, queuedBy, startBlock, threadTogether, togetherActivity, withOthers, writesAsCreator } from "@openorc/client";
 import { defaultHarnessId, harnessShortName, type ThreadSummary } from "@openorc/protocol";
 import { useRef } from "react";
 import { useRpcMutation } from "../lib/client";
@@ -17,17 +17,22 @@ export function useThreadControls(thread: ThreadSummary | null, runCount: number
   const composer = useRef<ComposerHandle>(null);
   const unqueue = useRpcMutation("threads.unqueue");
   const sendQueued = useRpcMutation("threads.sendQueued");
+  const startQueued = useRpcMutation("threads.startQueued");
   const stopCommand = useRpcMutation("threads.stopCommand");
   const queued = thread ? queueAfterStart(thread, runCount) : [];
   const queue = thread ? (
     <MessageQueue
       messages={queued}
       canSend={steer.canSteer}
-      pending={sendQueued.isPending || unqueue.isPending}
+      pending={sendQueued.isPending || unqueue.isPending || startQueued.isPending}
       sendReason={steer.reason}
       retryBlocked={steer.blocked}
       agentName={harnessShortName(thread.agent ?? defaultHarnessId)}
       people={queuePeople(thread)}
+      onStart={(messageId) => {
+        steer.onSent();
+        startQueued.mutate({ threadId: thread.id, messageId });
+      }}
       onSend={(messageId) => {
         steer.onSent();
         sendQueued.mutate({ id: thread.id, messageId });
@@ -43,7 +48,7 @@ export function useThreadControls(thread: ThreadSummary | null, runCount: number
   const commands = thread ? (
     <BackgroundCommands commands={thread.backgroundCommands ?? []} pending={stopCommand.isPending} onStop={(commandId) => stopCommand.mutate({ id: thread.id, commandId })} />
   ) : null;
-  return { queue, commands, composer, error: sendQueued.error ?? stopCommand.error ?? unqueue.error };
+  return { queue, commands, composer, error: sendQueued.error ?? startQueued.error ?? stopCommand.error ?? unqueue.error };
 }
 
 /**
@@ -51,7 +56,7 @@ export function useThreadControls(thread: ThreadSummary | null, runCount: number
  * the server's word on what the reader may do to it. The thread's creator keeps every action under the server's older
  * rule until shared writing opens. The hint names whose turn the queue waits on, when it is someone else's.
  */
-function queuePeople(thread: ThreadSummary): { hint: string | null; of(messageId: string): QueuedBy | null } | undefined {
+function queuePeople(thread: ThreadSummary): { hint: string | null; pausedHint: string | null; of(messageId: string): QueuedBy | null } | undefined {
   const together = threadTogether(thread);
   if (!together) return undefined;
   const shared = withOthers(thread);
@@ -59,12 +64,15 @@ function queuePeople(thread: ThreadSummary): { hint: string | null; of(messageId
   const hint = thread.activity === "running" && togetherActivity(thread) && sender ? `After ${personFirst(sender)}'s turn` : null;
   return {
     hint,
+    // A message pauses for a Stop, a join that missed its turn or a failed handoff; the thread says which.
+    pausedHint: null,
     of: (messageId) => {
       const by = queuedBy(thread, messageId);
       if (!by) return null;
       const mine = by.author?.id === together.viewer.id;
       const rights = writesAsCreator(thread) ? { canEdit: true, canRemove: true, mine: true } : { canEdit: by.canEdit, canRemove: by.canRemove, mine };
-      return { ...rights, ...(shared && { author: by.author }) };
+      const held = { paused: by.paused, canStart: by.canStart, startBlocked: by.canStart ? null : startBlock(thread) };
+      return { ...rights, ...held, ...(shared && { author: by.author }) };
     },
   };
 }

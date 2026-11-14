@@ -299,6 +299,7 @@ export {
   billingMoves,
   hostedStart,
   placeUnreachable,
+  queueBlock,
   sendsBlocked,
   threadReadOnlyReason,
   threadSendBlock,

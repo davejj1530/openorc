@@ -138,13 +138,15 @@ const TURN_TAKES_NOTHING = "This turn can’t take a message now.";
 export type SendCluster =
   { kind: "stop" } | { kind: "asked" } | { kind: "send"; stop: boolean; startsTask: boolean } | { kind: "turn"; stop: boolean; enter: SendWay; other: { way: SendWay; blocked: string | null } };
 
-export function sendCluster(input: ComposerActionsInput & { readOnly?: boolean; steerReason?: string | null | undefined; startsTask?: boolean; asked?: string | null | undefined }): SendCluster {
+export function sendCluster(
+  input: ComposerActionsInput & { readOnly?: boolean; steerReason?: string | null | undefined; startsTask?: boolean; asked?: string | null | undefined; queueBlocked?: string | null | undefined },
+): SendCluster {
   if (input.readOnly) return { kind: "send", stop: false, startsTask: false };
   if (input.asked) return askedCluster({ ...input, asked: input.asked });
   if (input.canStop && !input.hasDraft) return { kind: "stop" };
   if (!input.queueing) return { kind: "send", stop: input.canStop, startsTask: Boolean(input.startsTask && !input.hasDraft) };
   const enter: SendWay = input.liveByDefault && input.steerable ? "now" : "queue";
-  if (enter === "now") return { kind: "turn", stop: input.canStop, enter, other: { way: "queue", blocked: null } };
+  if (enter === "now") return { kind: "turn", stop: input.canStop, enter, other: { way: "queue", blocked: input.queueBlocked ?? null } };
   return { kind: "turn", stop: input.canStop, enter, other: { way: "now", blocked: input.steerable ? null : input.steerReason || TURN_TAKES_NOTHING } };
 }
 

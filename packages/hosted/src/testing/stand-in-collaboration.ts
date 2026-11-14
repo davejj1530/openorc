@@ -19,6 +19,8 @@ type Person = { id: string; name: string; image: string | null };
 /** What the projection reads of a stand-in thread. */
 export interface CollaborationThread {
   id: string;
+  /** Who started the thread, by address. */
+  owner: string;
   /** Who started the running turn, by address; null between turns. */
   turn: string | null;
   turnId: string | null;
@@ -27,13 +29,19 @@ export interface CollaborationThread {
   turnStartedAt: string | null;
   stopping: boolean;
   asks: { id: string; turnId: string; answered: boolean; parked: boolean }[];
-  messages: { id: string; author: string; state: string }[];
+  messages: { id: string; author: string; state: string; paused?: boolean }[];
 }
 
 /** live: the ask's own sender while its turn runs. start: a parked ask anyone who writes may answer. */
 const answerOf = (ownsLive: boolean, startable: boolean) => {
   if (ownsLive) return "live";
   return startable ? "start" : "blocked";
+};
+
+/** While only joining is open: a teammate joins a running turn and nothing else; the creator sends as today. */
+const joinSend = (thread: CollaborationThread, creator: boolean) => {
+  if (thread.turn) return sendOf(thread);
+  return creator ? "now" : "blocked";
 };
 
 /** A turn stopping takes no more messages: they wait for the next. */
@@ -44,6 +52,14 @@ export class StandInCollaboration {
   served = true;
   /** Shared writing open, as the server will answer once its launch isolation is proved. */
   sharedWrites = false;
+  /**
+   * With `sharedWrites`, the slice before handoff: a teammate may only join the running turn it names. Their idle send,
+   * Queue, Stop and Start are refused with the handoff block; a join that missed its turn waits paused for its author.
+   * The creator keeps every right of today.
+   */
+  joinOnly = false;
+  /** A blocker the server names for the next turn, such as a command of the previous sender's still running. */
+  handoff: { code: string; message: string; responsible: string | null; commandIds: string[]; retrySave: boolean } | null = null;
   /** Addresses whose accounts are gone: they read as null wherever a person is named. */
   readonly gone = new Set<string>();
 
@@ -59,20 +75,67 @@ export class StandInCollaboration {
   /** The reader's collaboration on a thread, for its row and its own read; undefined from an older server. */
   projection(thread: CollaborationThread, who: string) {
     if (!this.served) return undefined;
+    if (this.sharedWrites && this.joinOnly) return this.#joinProjection(thread, who);
     const open = this.sharedWrites;
     return {
       version: 1,
       viewer: this.personOf(who),
       canWrite: open,
       live: this.#live(thread),
-      send: open ? sendOf(thread) : "blocked",
-      handoff: null,
+      send: open && !(this.handoff && !thread.turn) ? sendOf(thread) : "blocked",
+      handoff: this.handoff ? { ...this.handoff, responsible: this.personOf(this.handoff.responsible) } : null,
       canPostNote: open,
       canStop: open && Boolean(thread.turn),
       ask: this.#ask(thread, who),
       queue: thread.messages
         .filter((message) => message.state === "pending" || message.state === "refused")
-        .map((message) => ({ messageId: message.id, author: this.personOf(message.author), paused: false, canEdit: message.author === who, canRemove: message.author === who, canStart: false })),
+        .map((message) => ({
+          messageId: message.id,
+          author: this.personOf(message.author),
+          paused: Boolean(message.paused),
+          canEdit: message.author === who,
+          canRemove: message.author === who,
+          canStart: open && Boolean(message.paused) && message.author === who && !thread.turn,
+        })),
+      mentions: { unread: false, firstUnreadNoteId: null },
+      noteHead: 0,
+    };
+  }
+
+  /** The block a teammate meets for anything that would start a turn while only joining is open. */
+  joinBlock(thread: CollaborationThread) {
+    const first = this.personOf(thread.owner)?.name.split(" ")[0];
+    return {
+      code: "handoff_unavailable",
+      message: first ? `Only ${first} can run the agent in this cloud thread for now.` : "The agent can't run in this cloud thread for now.",
+      responsible: this.personOf(thread.owner),
+      commandIds: [],
+      retrySave: false,
+    };
+  }
+
+  #joinProjection(thread: CollaborationThread, who: string) {
+    const creator = who === thread.owner;
+    return {
+      version: 1,
+      viewer: this.personOf(who),
+      canWrite: true,
+      live: this.#live(thread),
+      send: joinSend(thread, creator),
+      handoff: creator ? null : this.joinBlock(thread),
+      canPostNote: false,
+      canStop: creator && Boolean(thread.turn),
+      ask: this.#ask(thread, who, creator),
+      queue: thread.messages
+        .filter((message) => message.state === "pending" || message.state === "refused")
+        .map((message) => ({
+          messageId: message.id,
+          author: this.personOf(message.author),
+          paused: Boolean(message.paused),
+          canEdit: message.author === who,
+          canRemove: message.author === who,
+          canStart: creator && Boolean(message.paused) && message.author === who && !thread.turn,
+        })),
       mentions: { unread: false, firstUnreadNoteId: null },
       noteHead: 0,
     };
@@ -84,13 +147,13 @@ export class StandInCollaboration {
   }
 
   /** The open ask: live while its turn runs, answerable then only by its sender; parked after, by anyone who writes. */
-  #ask(thread: CollaborationThread, who: string) {
+  #ask(thread: CollaborationThread, who: string, mayStart = this.sharedWrites) {
     const ask = thread.asks.find((each) => !each.answered);
     if (!ask) return null;
     const sender = thread.turns.get(ask.turnId) ?? null;
     const live = !ask.parked && thread.turnId === ask.turnId;
     const ownsLive = live && sender === who;
-    const startable = this.sharedWrites && !live;
+    const startable = mayStart && !live;
     return {
       id: ask.id,
       turnId: ask.turnId,

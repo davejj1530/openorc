@@ -80,7 +80,49 @@ export function askAnswerBlock(thread: Row | null | undefined): string | null {
 }
 
 /** A queued message's author and what the reader may do to it; null when the server named none for it. */
-export function queuedBy(thread: Row | null | undefined, messageId: string): { author: ThreadPerson | null; canEdit: boolean; canRemove: boolean } | null {
+export function queuedBy(thread: Row | null | undefined, messageId: string): { author: ThreadPerson | null; canEdit: boolean; canRemove: boolean; paused: boolean; canStart: boolean } | null {
   const queued = threadTogether(thread)?.queue.find((each) => each.messageId === messageId);
-  return queued ? { author: queued.author, canEdit: queued.canEdit, canRemove: queued.canRemove } : null;
+  return queued ? { author: queued.author, canEdit: queued.canEdit, canRemove: queued.canRemove, paused: queued.paused, canStart: queued.canStart } : null;
+}
+
+/** What each way to send costs, said on demand on its control in a thread others are in; null where today's words stand. */
+export interface SendPayer {
+  now: string | null;
+  queue: string | null;
+  send: string | null;
+  stop: string | null;
+}
+
+/**
+ * Whose sign-in and hours each way uses, when it is not plainly the reader's own: Send now joins a teammate's running
+ * turn on its sender, Queue starts the reader's own turn after it, Stop stops the teammate's turn, and Send with nothing
+ * running starts the reader's own. Only in a thread others are in, and only where the reader may write.
+ */
+export function sendPayer(thread: Row | null | undefined): SendPayer | null {
+  const state = threadTogether(thread);
+  if (!state || !withOthers(thread) || threadWriteBlock(thread) || writesAsCreator(thread)) return null;
+  if (!state.live) return { now: null, queue: null, send: "Uses your sign-in and hours.", stop: null };
+  if (!other(state, state.live.sender)) return null;
+  const first = personFirst(state.live.sender);
+  return { now: `Joins ${first}'s turn, on their sign-in and hours.`, queue: `After ${first}'s turn, using your sign-in and hours.`, send: null, stop: `Stop ${first}'s turn` };
+}
+
+/** Why a turn takes no message now while the server holds the reader's for the next one: it is stopping. */
+export function steerBlock(thread: Row | null | undefined): string | null {
+  const state = threadTogether(thread);
+  return state?.live && state.send === "after" && !writesAsCreator(thread) ? "This turn is stopping." : null;
+}
+
+/** Why the reader cannot start their own paused message now: a turn runs, or the server's block. Null when they can. */
+export function startBlock(thread: Row | null | undefined): string | null {
+  const state = threadTogether(thread);
+  if (!state) return null;
+  if (state.live) return "A turn is running. Wait for it to finish.";
+  return state.handoff?.message ?? null;
+}
+
+/** Whether the server lets this reader stop the running turn; undefined where today's rule decides. */
+export function canStopTurn(thread: Row | null | undefined): boolean | undefined {
+  const state = threadTogether(thread);
+  return state && !writesAsCreator(thread) ? state.canStop : undefined;
 }

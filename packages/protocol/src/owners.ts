@@ -86,6 +86,8 @@ export const OWNER_ROUTES: { [M in RoutedMethod]: OwnerRoute<M> } & { [M in Excl
   "threads.collaboration": byThreadId,
   "threads.authors": byThreadId,
   "threads.people": byThreadId,
+  "threads.startQueued": byThreadId,
+  "threads.retrySave": byThreadId,
   "threads.start": { by: "start", cloud: (p) => (p.cloud ? p.projectId : undefined) },
   "cloud.warm": { by: "ahead", cloud: (p) => p.projectId },
   "threads.list": { by: "merge" },

@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
-import type { AccountStatus, BillingOffers } from "@openorc/protocol";
+import type { AccountStatus, BillingOffers, BillingPage } from "@openorc/protocol";
 import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { AccountSettings } from "./settings-account";
@@ -63,7 +63,7 @@ function fakeCore(start: AccountStatus, offers: BillingOffers | null = null) {
     if (method === "account.signIn.cancel") status = signedOut;
     if (method === "account.signOut") status = signedOut;
     if (method === "account.setSandbox" && status.state === "signed-in") status = { ...status, sandbox: { ...status.sandbox!, chosen: p.service! } };
-    if (method === "account.billing.open" && status.state === "signed-in") status = { ...status, paying: { page: (params as { page: "pro" }).page, since: 0 } };
+    if (method === "account.billing.open" && status.state === "signed-in") status = { ...status, paying: { ...(params as BillingPage), since: 0 } };
     if (method === "account.billing.leave" && status.state === "signed-in") status = { ...status, paying: null };
     return status;
   });
@@ -203,7 +203,7 @@ it("disables every move while OpenOrc Cloud can't be reached, saying why only on
 });
 
 it("stops watching for the purchase once the person leaves the screen, and not before", async () => {
-  fakeCore({ ...free, paying: { page: "pro", since: 0 } });
+  fakeCore({ ...free, paying: { page: "pro", period: "monthly", since: 0 } });
   const { rerender } = render(
     <QueryClientProvider client={queryClient}>
       <AccountSettings active />
@@ -248,4 +248,28 @@ it("shows no price and blocks nothing when the server can't say them", async () 
   show(<AccountSettings active />);
   expect(await screen.findByRole("radio", { name: "Yearly" })).toBeTruthy();
   expect(screen.getByRole<HTMLButtonElement>("button", { name: "Upgrade to Pro" }).disabled).toBe(false);
+});
+
+it("holds the checkout period, reopens it, and offers a quiet way to stop waiting", async () => {
+  fakeCore({ ...free, paying: { page: "pro", period: "yearly", since: 0 } });
+  show(<AccountSettings active />);
+  const yearly = await screen.findByRole<HTMLButtonElement>("radio", { name: "Yearly" });
+  expect(yearly.getAttribute("aria-checked")).toBe("true");
+  expect(yearly.disabled).toBe(true);
+  expect(screen.getByRole<HTMLButtonElement>("radio", { name: "Monthly" }).disabled).toBe(true);
+  fireEvent.click(screen.getByRole("button", { name: "Open again" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("account.billing.open", { page: "pro", period: "yearly" }));
+  fireEvent.click(screen.getByRole("button", { name: "Stop waiting" }));
+  expect(await screen.findByRole("button", { name: "Upgrade to Pro" })).toBeTruthy();
+  expect(screen.getByRole<HTMLButtonElement>("radio", { name: "Monthly" }).disabled).toBe(false);
+  expect(screen.queryByText("Waiting for your payment")).toBeNull();
+});
+
+it("reopens the hours checkout or stops waiting for it", async () => {
+  fakeCore({ ...pro, paying: { page: "hours", since: 0 } });
+  show(<AccountSettings active />);
+  fireEvent.click(await screen.findByRole("button", { name: "Open again" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("account.billing.open", { page: "hours" }));
+  fireEvent.click(screen.getByRole("button", { name: "Stop waiting" }));
+  expect(await screen.findByRole("button", { name: "Buy more hours" })).toBeTruthy();
 });

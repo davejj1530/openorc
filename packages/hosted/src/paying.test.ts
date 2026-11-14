@@ -41,6 +41,46 @@ const status = (hosted: Hosted) => hosted.account.status() as Extract<AccountSta
 const billingReads = (seen: Seen) => seen.timeline.filter((line) => line === "request /billing").length;
 
 describe("paying", () => {
+  it("coalesces concurrent opens and reopens the same checkout with its original period", async () => {
+    const { hosted } = await signedIn();
+    await Promise.all([hosted.account.openBilling({ page: "pro", period: "yearly" }), hosted.account.openBilling({ page: "pro", period: "yearly" })]);
+    await hosted.account.openBilling({ page: "pro", period: "monthly" });
+    expect(stand.checkouts).toHaveLength(1);
+    expect(opened).toEqual([stand.checkouts[0]!.url, stand.checkouts[0]!.url]);
+    expect(status(hosted).paying).toMatchObject({ page: "pro", period: "yearly" });
+    hosted.account.leaveBilling();
+    await hosted.account.openBilling({ page: "pro", period: "monthly" });
+    expect(stand.checkouts).toHaveLength(2);
+    expect(status(hosted).paying).toMatchObject({ page: "pro", period: "monthly" });
+  });
+
+  it("reopens the same hours checkout without making another", async () => {
+    stand.setBilling(ADA, { ...PRO, monthlyLeftSeconds: 3600 });
+    const { hosted } = await signedIn();
+    await hosted.account.openBilling({ page: "hours" });
+    await hosted.account.openBilling({ page: "hours" });
+    expect(stand.checkouts).toHaveLength(1);
+    expect(opened).toEqual([stand.checkouts[0]!.url, stand.checkouts[0]!.url]);
+  });
+
+  it("does not open a checkout whose answer arrives after sign-out", async () => {
+    const release = Promise.withResolvers<void>();
+    const { hosted } = await signedIn({
+      fetch: async (input, init) => {
+        const response = await fetch(input, init);
+        if (String(input).endsWith("/billing/checkout/pro")) await release.promise;
+        return response;
+      },
+    });
+    const opening = hosted.account.openBilling({ page: "pro", period: "monthly" });
+    await vi.waitFor(() => expect(stand.checkouts).toHaveLength(1));
+    await hosted.account.signOut();
+    release.resolve();
+    await opening;
+    expect(opened).toEqual([]);
+    expect(hosted.account.status().state).toBe("signed-out");
+  });
+
   it("opens the yearly Pro checkout in the browser alone, and shows Pro once the server says it was paid", async () => {
     const { hosted, seen } = await signedIn();
     await hosted.account.openBilling({ page: "pro", period: "yearly" });

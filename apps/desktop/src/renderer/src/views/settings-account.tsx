@@ -73,28 +73,59 @@ function SignedInAccount({ account, active }: { account: SignedIn; active: boole
  * ink pill, so a person sent here to upgrade, buy hours or fix a payment lands on that move. A page opened to pay is
  * watched by the core until its purchase lands or the person leaves this screen.
  */
-function PlanRows({ account, active, opening, onOpen }: { account: SignedIn; active: boolean; opening: boolean; onOpen: (page: BillingPage) => void }) {
-  const [period, setPeriod] = useState<ProPeriod>("monthly");
+type PaymentControls = { opening: boolean; onOpen: (page: BillingPage) => void };
+
+function PlanRows({ account, active, ...controls }: { account: SignedIn; active: boolean } & PaymentControls) {
   useLeaveBilling(active && account.paying !== null);
   // Asked again on each visit to this screen; a price missing or not read shows none and blocks nothing.
   const offers = useRpc("account.offers", {}, { enabled: active, staleTime: 0 }).data ?? null;
   const moves = billingMoves(account, offers);
-  const periods = PRO_PERIODS.map((value) => ({ value, label: periodLabel(value, offers?.pro.find((offer) => offer.period === value)?.price ?? null) }));
-  const waiting = (page: BillingPage["page"]) => (account.paying?.page === page && page !== "billing" ? "Waiting for your payment" : null);
-  const move = (each: BillingMove, page: BillingPage) => <BillingButton move={each} pending={opening} onClick={() => onOpen(page)} />;
+  const waitingForHours = account.paying?.page === "hours";
   return (
     <>
-      <SettingRow label="Plan" hint={waiting("pro") ?? planHint(account, offers)}>
-        <Status ok={account.plan.pro && account.plan.standing !== "grace"}>{account.plan.pro ? "Pro" : "Free"}</Status>
-        {moves.plan.page === "pro" ? <Segmented size="sm" label="Pay" value={period} options={periods} onChange={setPeriod} /> : null}
-        {move(moves.plan.page === "pro" ? { ...moves.plan, label: "Upgrade to Pro" } : moves.plan, moves.plan.page === "pro" ? { page: "pro", period } : { page: "billing" })}
-      </SettingRow>
+      <PlanRow account={account} offers={offers} move={moves.plan} {...controls} />
       {account.hours ? (
-        <SettingRow label="Cloud hours" hint={waiting("hours") ?? (hoursDetail(account.hours) || undefined)}>
+        <SettingRow label="Cloud hours" hint={waitingForHours ? "Waiting for your payment" : hoursDetail(account.hours) || undefined}>
           <span className="tabular">{cloudTime(account.hours.leftSeconds)} left</span>
-          {moves.hours ? move(moves.hours, { page: "hours" }) : null}
+          {moves.hours ? <PaymentAction move={moves.hours} page={{ page: "hours" }} waiting={waitingForHours} {...controls} /> : null}
         </SettingRow>
       ) : null}
+    </>
+  );
+}
+
+function PlanRow({ account, offers, move, ...controls }: { account: SignedIn; offers: BillingOffers | null; move: BillingMove } & PaymentControls) {
+  const [chosen, setChosen] = useState<ProPeriod>("monthly");
+  const waiting = account.paying?.page === "pro" ? account.paying : null;
+  const period = waiting?.period ?? chosen;
+  const periods = PRO_PERIODS.map((value) => ({
+    value,
+    label: periodLabel(value, offers?.pro.find((offer) => offer.period === value)?.price ?? null),
+    disabled: controls.opening || waiting !== null,
+    reason: "Stop waiting to choose another plan.",
+  }));
+  const purchase = move.page === "pro" ? { ...move, label: "Upgrade to Pro" } : move;
+  const page: BillingPage = move.page === "pro" ? { page: "pro", period } : { page: "billing" };
+  return (
+    <SettingRow label="Plan" hint={waiting ? "Waiting for your payment" : planHint(account, offers)}>
+      <Status ok={account.plan.pro && account.plan.standing !== "grace"}>{account.plan.pro ? "Pro" : "Free"}</Status>
+      {move.page === "pro" ? <Segmented size="sm" label="Pay" value={period} options={periods} onChange={setChosen} /> : null}
+      <PaymentAction move={purchase} page={page} waiting={waiting !== null} {...controls} />
+    </SettingRow>
+  );
+}
+
+/** A waiting checkout opens again at the same address, or can be left without canceling the payment. */
+function PaymentAction({ move, page, waiting, opening, onOpen }: { move: BillingMove; page: BillingPage; waiting: boolean } & PaymentControls) {
+  const leave = useRpcMutation("account.billing.leave");
+  return (
+    <>
+      {waiting ? (
+        <TextButton tone="muted" disabled={leave.isPending} onClick={() => leave.mutate({})}>
+          Stop waiting
+        </TextButton>
+      ) : null}
+      <BillingButton move={waiting ? { ...move, label: "Open again", blocked: null } : move} pending={opening} onClick={() => onOpen(page)} />
     </>
   );
 }

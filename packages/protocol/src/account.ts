@@ -103,7 +103,7 @@ export interface BillingOffers {
  * A page the app opened to pay, until what it is for lands, the person leaves Settings > Account, or it has been open
  * too long. Meanwhile the account is read every few seconds as well as on the server's word.
  */
-export type Paying = { page: BillingPage["page"]; since: number };
+export type Paying = BillingPage & { since: number };
 
 /**
  * Signing in to OpenOrc through the browser, under way, or the last one's words when it did not sign in. `page` is the

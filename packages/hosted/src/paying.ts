@@ -38,23 +38,41 @@ interface PayingDeps extends Pick<HostedDeps, "browser" | "now"> {
 }
 
 export class Paying {
-  #open: { page: Page; since: number; before: WireBilling | null; read: ReturnType<typeof setTimeout> | null; ends: ReturnType<typeof setTimeout> } | null = null;
+  #open: { target: BillingPage; url: string; since: number; before: WireBilling | null; read: ReturnType<typeof setTimeout> | null; ends: ReturnType<typeof setTimeout> } | null = null;
+  #starting: Promise<void> | null = null;
+  #generation = 0;
 
   constructor(private readonly deps: PayingDeps) {}
 
   get work(): PayingWork | null {
-    return this.#open && { page: this.#open.page, since: this.#open.since };
+    return this.#open && { ...this.#open.target, since: this.#open.since };
   }
 
   /** Resolves once the page is open in the browser; rejects in the server's words when it will not make one. */
   async open(page: BillingPage): Promise<void> {
     const browser = this.deps.browser;
     if (!browser) throw new Error(NO_BROWSER);
+    if (this.#open?.target.page === page.page) {
+      browser.open(this.#open.url);
+      return;
+    }
+    if (this.#starting) return this.#starting;
+    this.leave();
+    const starting = this.#begin(page, this.#generation);
+    this.#starting = starting;
+    try {
+      await starting;
+    } finally {
+      if (this.#starting === starting) this.#starting = null;
+    }
+  }
+
+  async #begin(page: BillingPage, generation: number): Promise<void> {
     const link =
       page.page === "pro" ? await this.deps.session.request(ROUTES.checkoutPro, { plan: page.period }) : await this.deps.session.request(page.page === "hours" ? ROUTES.checkoutHours : ROUTES.portal);
-    browser.open(link.url);
-    this.#stop();
-    this.#open = { page: page.page, since: this.deps.now(), before: this.deps.billing(), read: null, ends: setTimeout(() => this.leave(), OPEN_MS) };
+    if (generation !== this.#generation) return;
+    this.deps.browser!.open(link.url);
+    this.#open = { target: page, url: link.url, since: this.deps.now(), before: this.deps.billing(), read: null, ends: setTimeout(() => this.leave(), OPEN_MS) };
     this.#next();
     this.deps.changed();
   }
@@ -66,7 +84,7 @@ export class Paying {
 
   /** Billing was heard: an open page whose purchase shows in it is done. */
   heard(billing: WireBilling): void {
-    if (this.#open && LANDED[this.#open.page](this.#open.before, billing)) this.leave();
+    if (this.#open && LANDED[this.#open.target.page](this.#open.before, billing)) this.leave();
   }
 
   /** Signed out: nothing of it is remembered. */
@@ -86,6 +104,8 @@ export class Paying {
   }
 
   #stop(): boolean {
+    this.#generation++;
+    this.#starting = null;
     if (!this.#open) return false;
     if (this.#open.read) clearTimeout(this.#open.read);
     clearTimeout(this.#open.ends);

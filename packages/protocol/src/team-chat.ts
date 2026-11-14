@@ -69,7 +69,15 @@ export const TeamMessage = z.object({
 export type TeamMessage = z.infer<typeof TeamMessage>;
 export const TeamChatTimeline = z.object({ messages: z.array(TeamMessage).max(60), older: z.boolean(), newer: z.boolean(), headSeq: seq, read: TeamChatRead.nullable() });
 export type TeamChatTimeline = z.infer<typeof TeamChatTimeline>;
-export const PendingTeamMessage = z.object({ id: z.uuid(), body: z.string(), createdAt: z.string(), state: z.enum(["sending", "failed"]), error: z.string().nullable() });
+/** A message not yet confirmed, with the uploaded files it carries, so a retry sends the same message and the same files. */
+export const PendingTeamMessage = z.object({
+  id: z.uuid(),
+  body: z.string(),
+  files: z.array(TeamChatFile).max(10).default([]),
+  createdAt: z.string(),
+  state: z.enum(["sending", "failed"]),
+  error: z.string().nullable(),
+});
 export type PendingTeamMessage = z.infer<typeof PendingTeamMessage>;
 /** Local words and stable send identities, without an authorized history cache. */
 export const TeamChatDraft = z.object({ text: z.string(), pending: z.array(PendingTeamMessage) });
@@ -87,7 +95,10 @@ export const teamChatRpcParams = {
     .object({ ...conversation, beforeSeq: seq.optional(), afterSeq: seq.optional() })
     .strict()
     .refine((value) => value.beforeSeq === undefined || value.afterSeq === undefined),
-  "teamChat.send": z.object({ ...conversation, id: z.uuid(), body: z.string().min(1).max(10_000) }).strict(),
+  "teamChat.send": z
+    .object({ ...conversation, id: z.uuid(), body: z.string().max(10_000), fileIds: z.array(id).max(10).optional() })
+    .strict()
+    .refine((value) => value.body.trim().length > 0 || (value.fileIds?.length ?? 0) > 0, "Write something or attach a file."),
   "teamChat.react": z.object({ ...conversation, messageId: id, emoji: TeamChatReaction }).strict(),
   "teamChat.watch": z.object({ ...conversation, requestId: z.uuid() }).strict(),
   "teamChat.unwatch": z.object({ ...conversation, requestId: z.uuid() }).strict(),

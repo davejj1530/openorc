@@ -8,7 +8,13 @@ export async function sendTeamMessage(scope: TeamChatContextValue, target: TeamC
   if (!scope.current() || scope.reach !== "live") return;
   teamChatDrafts.attempt(target, message.id);
   try {
-    const sent = await core.call("teamChat.send", { spaceId: target.spaceId, conversationId: target.conversationId, id: message.id, body: message.body });
+    const sent = await core.call("teamChat.send", {
+      spaceId: target.spaceId,
+      conversationId: target.conversationId,
+      id: message.id,
+      body: message.body,
+      ...(message.files.length && { fileIds: message.files.map((file) => file.id) }),
+    });
     if (!scope.current()) {
       teamChatDrafts.failed(target, message.id, "Delivery couldn't be confirmed.");
       return;

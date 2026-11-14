@@ -1,14 +1,32 @@
+import type { ReactNode } from "react";
 import type { HostedDraftFile, HostedFileDraft } from "@openorc/protocol";
 import { isImageAttachment } from "../lib/file-imports";
 import { useHostedAsset } from "../lib/use-hosted-asset";
 import { hostedDraftAttachment } from "../lib/use-hosted-attachments";
 import { ComposerFile, type ComposerFileState } from "./ComposerFile";
 
-export function HostedComposerFile({ file, draft, retry, remove }: { file: HostedDraftFile; draft: HostedFileDraft; retry(): void; remove(): void }) {
+export function HostedComposerFile({
+  file,
+  draft,
+  retry,
+  remove,
+  refusal,
+}: {
+  file: HostedDraftFile;
+  draft: HostedFileDraft;
+  retry(): void;
+  remove(): void;
+  /** A destination's own words for a refusal and what can be done about it. */
+  refusal?: (message: string) => { message: string; after?: ReactNode } | null;
+}) {
   const image = isImageAttachment({ name: file.name, type: file.mime });
   const preview = useHostedAsset(image && file.imported === file.bytes ? { kind: "draft", ref: { ...draft, id: file.id } } : null);
   const attachment = { ...hostedDraftAttachment(file), url: preview.state.kind === "ready" ? preview.state.url : null };
-  return <ComposerFile attachment={attachment} state={fileState(file, retry)} remove={remove} previewFailed={preview.failed} />;
+  const state = fileState(file, retry);
+  const own = state?.kind === "failed" ? refusal?.(state.message) : null;
+  return (
+    <ComposerFile attachment={attachment} state={own && state?.kind === "failed" ? { ...state, message: own.message } : state} remove={remove} previewFailed={preview.failed} after={own?.after} />
+  );
 }
 
 function fileState(file: HostedDraftFile, retry: () => void): ComposerFileState | undefined {

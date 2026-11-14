@@ -57,6 +57,7 @@ function AuthorizedChat({ scope, target }: { scope: TeamChatContextValue; target
       channels={channels}
       groups={chat?.features.includes("groups") ?? false}
       unread={chat?.features.includes("unread") ?? false}
+      files={chat?.features.includes("files") ?? false}
     />
   );
 }

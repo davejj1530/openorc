@@ -10,6 +10,8 @@ import type { StandInChat } from "./stand-in-chat.js";
 /** Multipart storage and authorization use the same listener as the fixture API. */
 export class StandInUploads {
   readonly #rows = new Map<string, StoredUpload>();
+  /** Organizations whose pooled storage is full, as the uploads module refuses a start. */
+  readonly storageFull = new Set<string>();
   readonly #secret = randomUUID();
   readonly #bytes: StandInUploadBytes;
 
@@ -57,6 +59,21 @@ export class StandInUploads {
     return rows.map((row) => row!.file!);
   }
 
+  /** A chat message takes its sender's finished uploads to that conversation, each once. */
+  attachChat(input: { who: string; space: string; ids: string[]; messageId: string; conversationId: string }): UploadedFile[] | null {
+    const rows = input.ids.map((id) => this.#rows.get(id));
+    const usable = (row: StoredUpload | undefined) =>
+      row?.file &&
+      !expiredUpload(row) &&
+      row.who === input.who &&
+      row.space === input.space &&
+      row.conversationId === input.conversationId &&
+      (!row.attached || row.attached.messageId === input.messageId);
+    if (!rows.every(usable) || new Set(input.ids).size !== input.ids.length) return null;
+    for (const row of rows) row!.attached = { messageId: input.messageId, projectId: "" };
+    return rows.map((row) => row!.file!);
+  }
+
   /** A withdrawn message gives up one of its files, so its edited copy can take it. */
   release(id: string, messageId: string): boolean {
     const row = this.#rows.get(id);
@@ -69,6 +86,8 @@ export class StandInUploads {
     const parsed = startFileInput.safeParse(body);
     if (!parsed.success) return fileInputRefusal(parsed.error);
     const input = parsed.data;
+    if ("conversationId" in input && this.storageFull.has(space))
+      return { status: 409, body: { statusCode: 409, code: "organization_storage_full", message: "There isn't enough storage in this organization for this file.", recovery: "ask_admin" } };
     if (!input.bytes) return fileRefusal(400, "That file is empty.");
     if (input.bytes > MAX_FILE_BYTES) return { status: 413, body: { message: "Keep files under 500 MB.", code: "file_too_large", maxBytes: MAX_FILE_BYTES } };
     const conversationId = "conversationId" in input ? input.conversationId : null;

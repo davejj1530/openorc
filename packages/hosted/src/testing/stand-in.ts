@@ -268,6 +268,7 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
   const payments = new StandInPayments(billing, billingTopics(tell, organizations), () => `http://127.0.0.1:${port}`);
   const chat = new StandInChat({ spaces, person, peers: () => [...peers, ...sockets] });
   const uploads = new StandInUploads({ spaces, chat, origin: () => `http://127.0.0.1:${port}` });
+  chat.attachFiles = (input) => uploads.attachChat(input);
   hosted.files.uploads = uploads;
   const answerSocket = socketAnswers(hosted, chat);
 

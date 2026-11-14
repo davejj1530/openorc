@@ -37,10 +37,10 @@ export class TeamChatDrafts {
   write(at: TeamChatTarget, text: string): void {
     this.#save(at, { ...this.read(at), text });
   }
-  begin(at: TeamChatTarget): PendingTeamMessage | null {
+  begin(at: TeamChatTarget, files: PendingTeamMessage["files"] = []): PendingTeamMessage | null {
     const current = this.read(at);
-    if (!current.text.trim()) return null;
-    const message: PendingTeamMessage = { id: crypto.randomUUID(), body: current.text, createdAt: new Date().toISOString(), state: "sending", error: null };
+    if (!current.text.trim() && !files.length) return null;
+    const message: PendingTeamMessage = { id: crypto.randomUUID(), body: current.text, files, createdAt: new Date().toISOString(), state: "sending", error: null };
     this.#save(at, { text: "", pending: [...current.pending, message] });
     return message;
   }

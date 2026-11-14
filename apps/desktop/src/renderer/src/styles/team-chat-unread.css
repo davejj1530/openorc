@@ -43,3 +43,58 @@
   height: 20px;
   font-size: var(--text-2xs);
 }
+.team-chat-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+.team-chat-file {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  max-width: 320px;
+  padding: 10px 14px;
+  border-radius: var(--radius-xl);
+  background: var(--surface-2);
+  text-align: left;
+}
+.team-chat-file-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.team-chat-file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-md);
+  color: var(--ink);
+}
+.team-chat-file-size {
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+}
+.team-chat-pending-files {
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+  text-align: right;
+}
+.composer-file-hint {
+  font-size: var(--text-xs);
+  line-height: var(--text-xs--line-height);
+  color: var(--ink-3);
+}
+.team-chat-message-mine .team-chat-files {
+  justify-content: flex-end;
+}
+/* Words and their files: the bubble, then the files under it on the same side. */
+.team-chat-message.team-chat-message-files {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.team-chat-message-mine.team-chat-message-files {
+  align-items: flex-end;
+}

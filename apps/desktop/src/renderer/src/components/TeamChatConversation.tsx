@@ -8,6 +8,9 @@ import { TeamChat } from "./TeamChat";
 import { TeamChannelJoin } from "./TeamChannelJoin";
 import { TeamChannelDetails } from "./TeamChannelDetails";
 import { TeamChatDetails } from "./TeamChatDetails";
+import { useOrganization } from "../lib/organization-context";
+import { useRouter } from "../lib/router";
+import { teamChatFilesDraftKey, useTeamChatFileScope } from "../lib/team-chat-files";
 
 export function TeamChatConversation({
   scope,
@@ -17,6 +20,7 @@ export function TeamChatConversation({
   channels,
   groups,
   unread = false,
+  files = false,
 }: {
   scope: TeamChatContextValue;
   target: TeamChatRoute;
@@ -25,8 +29,19 @@ export function TeamChatConversation({
   channels: boolean;
   groups: boolean;
   unread?: boolean;
+  files?: boolean;
 }) {
   const content = useTeamChatConversation(scope, target, conversation, unread);
+  const fileScope = useTeamChatFileScope(scope, conversation.id, files && conversation.joined);
+  const organization = useOrganization()?.organization;
+  const place = fileScope
+    ? {
+        scope: fileScope,
+        draftKey: teamChatFilesDraftKey(scope, conversation.id),
+        organization: organization?.name ?? "This organization",
+        ...(organization?.role === "admin" && { addSeats: () => useRouter.getState().navigate({ view: "people", spaceId: scope.spaceId, section: "seats" }) }),
+      }
+    : null;
   const [details, setDetails] = useState(false);
   const visible = useTeamChatVisible();
   if (details && !visible) setDetails(false);
@@ -48,6 +63,7 @@ export function TeamChatConversation({
         {...(!conversation.joined && { footer: <TeamChannelJoin scope={scope} conversationId={conversation.id} /> })}
         {...(hasDetails && { onDetails: () => setDetails(true) })}
         tags={unread}
+        files={place}
       />
       {details && hasDetails ? detail : null}
     </>

@@ -1,10 +1,10 @@
-import type { TeamConversation } from "@openorc/protocol";
+import type { TeamChatFile, TeamConversation } from "@openorc/protocol";
 import type { ReactNode } from "react";
 import { teamChatShortNames, teamConversationTitle } from "@openorc/client";
 import { TopBar } from "./TopBar";
 import { ThreadTabs } from "./ThreadTabs";
 import { TeamChatFace, TeamConversationFace } from "./TeamChatFace";
-import { TeamChatComposer } from "./TeamChatComposer";
+import { TeamChatComposer, type TeamChatComposerFiles } from "./TeamChatComposer";
 import { TeamChatTranscript, type TeamChatTranscriptProps } from "./TeamChatTranscript";
 import { ChevronDown, Loader2, X } from "./icons";
 import { Button } from "./ui";
@@ -14,7 +14,7 @@ export interface TeamChatProps extends TeamChatTranscriptProps {
   conversation: TeamConversation;
   draft: string;
   onDraft(text: string): void;
-  onSend(): void;
+  onSend(files: TeamChatFile[]): void;
   error: string | null;
   loading: boolean;
   onReload(): void;
@@ -23,6 +23,8 @@ export interface TeamChatProps extends TeamChatTranscriptProps {
   onDetails?: () => void;
   /** Whether people can be tagged here, which the server's unread capability brings. */
   tags?: boolean;
+  /** Where this conversation's files go, when the server's files capability is on and the person has joined. */
+  files?: TeamChatComposerFiles | null;
 }
 export function TeamChat(props: TeamChatProps) {
   const title = teamConversationTitle(props.conversation, props.self);
@@ -72,6 +74,7 @@ export function TeamChat(props: TeamChatProps) {
               onSend={props.onSend}
               taggable={props.tags ? taggable(props.conversation, props.people, props.self) : []}
               named={props.tags ? props.people : []}
+              files={props.files ?? null}
             />
           ))
         : null}

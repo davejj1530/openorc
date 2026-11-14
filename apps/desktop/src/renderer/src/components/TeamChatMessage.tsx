@@ -7,6 +7,7 @@ import { CoversPreview } from "../lib/browser-preview";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { Copy, SmilePlus } from "./icons";
 import { menuItem, menuPopup } from "./menu";
+import { TeamChatFiles } from "./TeamChatFiles";
 import { TeamChatReactionPicker, TeamChatReactions } from "./TeamChatReactions";
 import { defaultRehypePlugins } from "streamdown";
 import { holdPersonTags, personTagText, rehypePersonTags } from "../lib/rehype-person-tags";
@@ -48,6 +49,8 @@ export function TeamChatMessage({
   }, [open]);
   const mine = message.actor.person?.id === self;
   const words = personTagText(message.body, (id) => people.find((person) => person.id === id)?.name);
+  // Words keep their bubble and the files go under it; files alone sit in the bubble, which carries reactions.
+  const withFiles = message.files.length > 0 && Boolean(message.body.trim());
   const copy = () => {
     void navigator.clipboard.writeText(words).then(
       () => setCopyError(false),
@@ -55,12 +58,15 @@ export function TeamChatMessage({
     );
   };
   return (
-    <div ref={row} className={cn("orcling-bubble-row team-chat-message", mine && "team-chat-message-mine")} data-open={(open && !reason) || undefined} data-message-id={message.id}>
+    <div
+      ref={row}
+      className={cn("orcling-bubble-row team-chat-message", mine && "team-chat-message-mine", withFiles && "team-chat-message-files")}
+      data-open={(open && !reason) || undefined}
+      data-message-id={message.id}
+    >
       <ContextMenu.Root open={menuOpen && visible} onOpenChange={setMenuOpen}>
         <ContextMenu.Trigger className={cn("orcling-bubble", mine && "message-bubble")} tabIndex={0} aria-label={`${message.actor.person?.name ?? "Former member"}: ${words}`}>
-          <div className="text-prose text-ink prose-chat">
-            {words === message.body ? <ThreadRichText mode="static">{message.body}</ThreadRichText> : <TaggedText body={message.body} people={people} />}
-          </div>
+          <BubbleContent message={message} people={people} words={words} />
           <TeamChatReactions reactions={message.reactions} people={people} self={self} onReact={onReact} reason={reason} side={mine ? "start" : "end"} />
         </ContextMenu.Trigger>
         <ContextMenu.Portal>
@@ -81,6 +87,7 @@ export function TeamChatMessage({
           </ContextMenu.Positioner>
         </ContextMenu.Portal>
       </ContextMenu.Root>
+      {withFiles ? <TeamChatFiles files={message.files} conversationId={message.channelId} /> : null}
       <Tooltip label={reason ?? "React"}>
         <button type="button" className="orcling-react-open" aria-label="React" aria-expanded={open} disabled={Boolean(reason)} onClick={() => setOpen(!open)}>
           <SmilePlus size={16} />
@@ -113,5 +120,12 @@ function TaggedText({ body, people }: { body: string; people: readonly TeamChatP
     <RichText mode="static" components={threadMarkdownComponents} urlTransform={threadUrlTransform} rehypePlugins={plugins}>
       {held.text}
     </RichText>
+  );
+}
+
+function BubbleContent({ message, people, words }: { message: TeamMessage; people: readonly TeamChatPerson[]; words: string }) {
+  if (!message.body.trim()) return <TeamChatFiles files={message.files} conversationId={message.channelId} />;
+  return (
+    <div className="text-prose text-ink prose-chat">{words === message.body ? <ThreadRichText mode="static">{message.body}</ThreadRichText> : <TaggedText body={message.body} people={people} />}</div>
   );
 }

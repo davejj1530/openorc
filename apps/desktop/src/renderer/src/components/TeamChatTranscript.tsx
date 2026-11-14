@@ -142,7 +142,8 @@ function PendingBubble({ message, reason, onRetry }: { message: PendingTeamMessa
   return (
     <div className="team-chat-pending journal-prompt">
       <div className="journal-message-body">
-        <div className="message-bubble whitespace-pre-wrap">{message.body}</div>
+        {message.body.trim() ? <div className="message-bubble whitespace-pre-wrap">{message.body}</div> : null}
+        {message.files.length ? <div className="team-chat-pending-files">{message.files.map((file) => file.name).join(", ")}</div> : null}
       </div>
       {message.state === "failed" ? (
         <div className="team-chat-send-error" role="status">

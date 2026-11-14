@@ -52,9 +52,9 @@ export function useTeamChatConversation(scope: TeamChatContextValue, target: Tea
     ...(actionError && { notice: { message: actionError, dismiss: () => setActionError(null) } }),
     reason: offline ? "Reconnect to send" : null,
     onDraft: (text) => teamChatDrafts.write(target, text),
-    onSend: () => {
+    onSend: (files) => {
       if (offline || !conversation.joined || !scope.current()) return;
-      const message = teamChatDrafts.begin(target);
+      const message = teamChatDrafts.begin(target, files);
       if (message) void sendTeamMessage(scope, target, message);
     },
     onRetry: (message) => {

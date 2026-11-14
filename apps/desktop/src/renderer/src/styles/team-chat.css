@@ -202,6 +202,10 @@ body:has(.sidebar-shell[data-open="true"]) .work-row[data-chat="true"] > .team-c
 .team-chat-compose .composer-bar {
   justify-content: flex-end;
 }
+/* With files on, the plus sits at the bar's start as in a cloud thread's composer. */
+.team-chat-compose .composer-bar.team-chat-bar-files {
+  justify-content: space-between;
+}
 .app-shell .team-chat-compose {
   flex-shrink: 0;
   padding-bottom: 24px;

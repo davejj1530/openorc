@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { Attachment } from "../lib/composer-attachments";
 import { cn } from "../lib/cn";
 import { formatBytes } from "../lib/file-imports";
@@ -8,7 +9,20 @@ import "./composer-file.css";
 export type ComposerFileState = { kind: "uploading"; percent: number } | { kind: "failed"; message: string; retry: (() => void) | null };
 
 /** Ready files keep the same chip; pending work and refusal belong only to the file concerned. */
-export function ComposerFile({ attachment, state, remove, previewFailed }: { attachment: Attachment; state?: ComposerFileState; remove(): void; previewFailed?: () => void }) {
+export function ComposerFile({
+  attachment,
+  state,
+  remove,
+  previewFailed,
+  after,
+}: {
+  attachment: Attachment;
+  state?: ComposerFileState;
+  remove(): void;
+  previewFailed?: () => void;
+  /** What the person can do about a refusal, under its words. */
+  after?: ReactNode;
+}) {
   const chip = (
     <div className="composer-attachment">
       {attachment.url ? (
@@ -44,6 +58,7 @@ export function ComposerFile({ attachment, state, remove, previewFailed }: { att
           {state.message}
         </p>
       ) : null}
+      {state.kind === "failed" ? after : null}
     </div>
   );
 }

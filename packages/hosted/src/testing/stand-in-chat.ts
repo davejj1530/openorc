@@ -17,7 +17,10 @@ export class StandInChat {
   channelsEnabled = false;
   groupsEnabled = false;
   unreadEnabled = false;
+  filesEnabled = false;
   readonly reads = new StandInChatReads();
+  /** Takes a message's uploaded files (StandInUploads.attachChat); null refuses them. */
+  attachFiles: ((input: { who: string; space: string; ids: string[]; messageId: string; conversationId: string }) => TeamMessage["files"] | null) | null = null;
   readonly frozen = new Set<string>();
   readonly records = new Map<string, StandInChatRecord>();
   readonly #watches = new WeakMap<StandInPeer, Map<string, { spaceId: string; conversationId: string }>>();
@@ -57,20 +60,37 @@ export class StandInChat {
     for (const peer of this.deps.peers()) if (peer.who() && this.deps.spaces.readers(spaceId).includes(peer.who() ?? "")) peer.send("changed", { organizationId: spaceId, topics });
   }
 
+  #features(): string[] {
+    const flags: [string, boolean][] = [
+      ["channels", this.channelsEnabled],
+      ["groups", this.groupsEnabled],
+      ["unread", this.unreadEnabled],
+      ["files", this.filesEnabled],
+    ];
+    return ["base", ...flags.flatMap(([name, on]) => (on ? [name] : []))];
+  }
+
+  /** Refusals before any conversation route: unknown or unreadable space, frozen access. */
+  #admission(spaceId: string | null, who: string): Reply | null {
+    if (!spaceId) return { status: 400, body: { message: "Name the organization in x-openorc-space." } };
+    if (!this.deps.spaces.teams.has(spaceId) || !this.deps.spaces.readers(spaceId).includes(who)) return absent();
+    if (this.frozen.has(who)) return { status: 403, body: { code: "organization_frozen", message: "Organization access is frozen." } };
+    return null;
+  }
+
   route(request: Request, who: string, body: unknown): Reply | null {
     if (!request.path.startsWith("/chat/")) return null;
     if (!this.enabled) return absent();
     if (request.method === "GET" && request.path === "/chat/unread-spaces") return this.#unreadSpaces(who);
-    const spaceId = request.space;
-    if (!spaceId) return { status: 400, body: { message: "Name the organization in x-openorc-space." } };
-    if (!this.deps.spaces.teams.has(spaceId) || !this.deps.spaces.readers(spaceId).includes(who)) return absent();
-    if (this.frozen.has(who)) return { status: 403, body: { code: "organization_frozen", message: "Organization access is frozen." } };
+    const refused = this.#admission(request.space, who);
+    if (refused) return refused;
+    const spaceId = request.space!;
     if (!this.#in(spaceId).some(({ conversation }) => conversation.name === "general")) this.seed(spaceId, { name: "general" });
     if (request.method === "GET" && request.path === "/chat/state")
       return {
         status: 200,
         body: {
-          features: ["base", ...(this.channelsEnabled ? ["channels"] : []), ...(this.groupsEnabled ? ["groups"] : []), ...(this.unreadEnabled ? ["unread"] : [])],
+          features: this.#features(),
           people: this.people(spaceId),
           conversations: this.#in(spaceId)
             .filter((record) => this.#readable(record, who))
@@ -185,31 +205,46 @@ export class StandInChat {
 
   #send(record: StandInChatRecord, who: string, body: unknown): Reply {
     const fields = body && typeof body === "object" ? body : {};
-    const { parentId: _parent, fileIds: _files, ...text } = { parentId: null, fileIds: [], ...fields };
+    const { parentId: _parent, fileIds: chosen, ...words } = { parentId: null, fileIds: [] as unknown, ...fields };
+    const fileIds = Array.isArray(chosen) ? chosen.filter((id): id is string => typeof id === "string") : [];
+    const text = { ...words, ...(fileIds.length && { fileIds }) };
     const input = teamChatRpcParams["teamChat.send"].safeParse({ ...text, spaceId: record.spaceId, conversationId: record.conversation.id });
     if (!input.success) return { status: 400, body: { message: "Write a message first." } };
     const refusal = this.unreadEnabled ? this.reads.refusal(record, input.data.body, this.people(record.spaceId)) : null;
     if (refusal) return refusal;
-    const previous = this.#in(record.spaceId)
-      .flatMap((each) => each.messages)
-      .find((message) => message.id === input.data.id);
-    if (previous)
-      return previous.actor.person?.id === userOf(who) && previous.channelId === record.conversation.id && previous.body === input.data.body
-        ? { status: 201, body: previous }
-        : { status: 409, body: { code: "message_id_conflict", message: "That message ID is already in use." } };
+    const previous = this.#replay(record, who, input.data.id, input.data.body);
+    if (previous) return previous;
+    const files = fileIds.length ? this.attachFiles?.({ who, space: record.spaceId, ids: fileIds, messageId: input.data.id, conversationId: record.conversation.id }) : [];
+    if (!files) return { status: 400, body: { message: "Attach files you uploaded to this conversation, once each." } };
     const message: TeamMessage = {
       id: input.data.id,
       channelId: record.conversation.id,
       seq: ++record.conversation.lastMessageSeq,
       actor: { kind: "person", person: { id: userOf(who), ...this.deps.person(who) } },
       body: input.data.body,
-      files: [],
+      files,
       reactions: [],
       call: null,
       createdAt: new Date().toISOString(),
     };
     record.messages.push(message);
     record.conversation.lastMessageAt = message.createdAt;
+    this.#deliver(record, message);
+    return { status: 201, body: message };
+  }
+
+  /** The same id again answers the stored message to its sender in this conversation, and refuses anything else. */
+  #replay(record: StandInChatRecord, who: string, id: string, body: string): Reply | null {
+    const previous = this.#in(record.spaceId)
+      .flatMap((each) => each.messages)
+      .find((message) => message.id === id);
+    if (!previous) return null;
+    return previous.actor.person?.id === userOf(who) && previous.channelId === record.conversation.id && previous.body === body
+      ? { status: 201, body: previous }
+      : { status: 409, body: { code: "message_id_conflict", message: "That message ID is already in use." } };
+  }
+
+  #deliver(record: StandInChatRecord, message: TeamMessage): void {
     for (const peer of this.deps.peers()) {
       const viewer = peer.who();
       if (!viewer || !this.#readable(record, viewer)) continue;
@@ -217,7 +252,6 @@ export class StandInChat {
         peer.send("chat:message", { spaceId: record.spaceId, conversationId: record.conversation.id, message });
       peer.send("changed", { organizationId: record.spaceId, topics: ["chat"] });
     }
-    return { status: 201, body: message };
   }
 
   #react(spaceId: string, who: string, id: string, body: unknown): Reply {

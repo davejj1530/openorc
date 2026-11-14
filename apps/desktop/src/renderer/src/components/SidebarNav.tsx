@@ -5,6 +5,7 @@ import { useRpc as useGlobalRpc } from "../lib/client";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
 import type { SidebarScreen } from "../lib/layout";
 import { useOrclingChatIds } from "../lib/orclings";
+import { useOrganizationStart } from "../lib/organization-start";
 import { newThread, useRouter, type Route } from "../lib/router";
 import { useTaskAttentionCount } from "../lib/task-list-source";
 import { Orclings, PenSquare } from "./icons";
@@ -55,9 +56,10 @@ export function SidebarNav({ route, projectId, orclings }: { route: Route; proje
   const tasks = useTaskAttentionCount();
   const counts: Partial<Record<SidebarScreen, number>> = { tasks };
   const waitingOrclings = useWaitingOrclings();
+  const organizationPage = useOrganizationStart(route.view === "newthread" ? route.projectId : null);
   return (
     <nav className="sidebar-nav" aria-label="Screens">
-      <NavRow icon={<PenSquare size={16} />} label="New thread" lead current={route.view === "newthread"} onClick={() => newThread(projectId ?? undefined)} />
+      <NavRow icon={<PenSquare size={16} />} label="New thread" lead current={route.view === "newthread" && !organizationPage} onClick={() => newThread(projectId ?? undefined)} />
       {SCREENS.map(({ id, label, Icon, route: to, views }) => (
         <NavRow key={id} icon={<Icon size={16} />} label={label} count={counts[id]} current={views.includes(route.view)} onClick={() => useRouter.getState().navigate(to)} />
       ))}

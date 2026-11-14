@@ -202,6 +202,7 @@ export const ROUTES = {
   /** Polar's portal, where the person changes or cancels what they pay for; 404 in words when they never bought anything. */
   portal: route("POST", "/billing/portal", wireBillingLink),
   person: route("GET", "/api/auth/get-session", wirePerson),
+  updateProfile: route("PATCH", "/account/profile", z.object({ id: z.string(), name: z.string(), email: z.string(), image: z.string().nullable() })),
   hostedSettings: route("GET", "/settings/hosted", wireHostedSettings),
   setHostedSettings: route("PATCH", "/settings/hosted", wireHostedSettings),
   signIns: route("GET", "/agent-sign-ins", z.array(wireSignIn)),

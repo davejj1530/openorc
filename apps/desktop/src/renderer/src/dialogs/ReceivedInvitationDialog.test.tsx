@@ -146,3 +146,15 @@ it("closing while Join waits prevents later navigation without undoing the membe
   expect(mock.select).not.toHaveBeenCalled();
   expect(joins()).toHaveLength(1);
 });
+
+it("updates the inviter's face and name in an already open detail", async () => {
+  show();
+  fireEvent.click(screen.getByText("Birch Studio"));
+  await screen.findByRole("dialog");
+  const image = "data:image/webp;base64,UklGRg==";
+  await act(async () => {
+    queryClient.setQueryData(["spaces.status", {}], { ...status, invitations: [{ ...invitation, inviter: { ...invitation.inviter, name: "Alex Lee", image } }] });
+  });
+  expect(screen.getByText("Alex Lee invited you.")).toBeTruthy();
+  expect(document.querySelector(".organization-received-person img")?.getAttribute("src")).toBe(image);
+});

@@ -1,5 +1,7 @@
+import type { ReceivedInvitation } from "@openorc/protocol";
 import { Button, Dialog } from "../components/ui";
 import { OrganizationMark } from "../components/OrganizationMark";
+import { AccountFace } from "../components/AccountFace";
 import { inviterLine, type ReceivedInvitationActions } from "../lib/received-invitations";
 import "./received-invitations.css";
 
@@ -24,14 +26,7 @@ export function ReceivedInvitationDialog({ actions }: { actions: ReceivedInvitat
           <p className="text-ink-3">You haven't joined {invitation.organization.name}.</p>
         ) : (
           <>
-            <div className="organization-received-identity">
-              <OrganizationMark {...invitation.organization} size={44} />
-              <div>
-                {inviterLine(invitation)}
-                {invitation.inviter.name ? "." : null}
-                {invitation.inviter.email ? <p className="text-ink-3">{invitation.inviter.email}</p> : null}
-              </div>
-            </div>
+            <InvitationIdentity invitation={invitation} />
             <div className="organization-received-email">{invitation.email}</div>
             {joined ? <p>You joined {invitation.organization.name}.</p> : null}
             {error ? (
@@ -61,5 +56,21 @@ export function ReceivedInvitationDialog({ actions }: { actions: ReceivedInvitat
         </div>
       </div>
     </Dialog>
+  );
+}
+
+function InvitationIdentity({ invitation }: { invitation: ReceivedInvitation }) {
+  return (
+    <div className="organization-received-identity">
+      <OrganizationMark {...invitation.organization} size={44} />
+      <div className="organization-received-person">
+        {invitation.inviter.name ? <AccountFace name={invitation.inviter.name} image={invitation.inviter.image ?? null} /> : null}
+        <div>
+          {inviterLine(invitation)}
+          {invitation.inviter.name ? "." : null}
+          {invitation.inviter.email ? <p className="text-ink-3">{invitation.inviter.email}</p> : null}
+        </div>
+      </div>
+    </div>
   );
 }

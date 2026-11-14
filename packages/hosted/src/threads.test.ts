@@ -219,7 +219,7 @@ describe("a team's threads", () => {
     const { hosted: bob } = await hostAs(BOB);
     await vi.waitFor(() => expect(bob.threads.holds({ thread: adas }) && bob.threads.holds({ thread: bobs })).toBe(true));
     const rows = new Map((bob.threads.listed("threads.list", { filter: "active", includeChildren: true })?.rows ?? []).map((row) => [row.id, row]));
-    expect(rows.get(adas)?.owner).toMatchObject({ brain: "hosted", startedBy: { name: "ada", image: null } });
+    expect(rows.get(adas)?.owner).toMatchObject({ brain: "hosted", startedBy: { name: "Ada", image: null } });
     expect(rows.get(bobs)?.owner?.startedBy).toBeUndefined();
     const page = await bob.threads.call("events.page", { runId: `hosted:${adas}`, turns: 1 });
     expect(page.events.map((event) => event.type)).toEqual(["message.completed"]);

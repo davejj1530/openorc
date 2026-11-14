@@ -11,10 +11,11 @@ export async function checkedLogo(value: unknown): Promise<LogoResult> {
   const signature = matchesSignature(value, bytes);
   if (!signature) return { error: "That file isn't the picture it says it is. Pick a PNG, JPEG or WebP." };
   try {
-    const raster = sharp(bytes, { limitInputPixels: 128 * 128, failOn: "warning" });
+    const raster = sharp(bytes, { limitInputPixels: 128 * 128, failOn: "warning", animated: true });
     const metadata = await raster.metadata();
     if (metadata.width !== 128 || metadata.height !== 128 || (metadata.pages ?? 1) !== 1) throw new Error("Invalid dimensions");
-    return { logo: `data:image/webp;base64,${(await raster.webp().toBuffer()).toString("base64")}` };
+    const logo = `data:image/webp;base64,${(await raster.webp({ lossless: true }).toBuffer()).toString("base64")}`;
+    return logo.length > 64_000 ? { error: "That picture is too big. Pick a smaller one." } : { logo };
   } catch {
     return { error: "That picture couldn't be read. Pick another PNG, JPEG or WebP." };
   }

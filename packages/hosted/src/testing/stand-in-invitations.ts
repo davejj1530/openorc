@@ -83,7 +83,7 @@ export class StandInInvitations {
                 role: invite.role,
                 expiresAt: new Date(invite.expiresAt).toISOString(),
                 organization: { id: invite.spaceId, name: team.name, logo: team.logo },
-                inviter: { name: this.deps.person(invite.inviter).name, email: invite.inviter },
+                inviter: { ...this.deps.person(invite.inviter), email: invite.inviter },
               },
             ]
           : [];

@@ -65,17 +65,35 @@ export function SaveStatus({ status, retry }: { status: string; retry: () => voi
 export const SectionLevel = createContext<2 | 3>(2);
 
 /** A titled section. Its rows sit in one card; `flush` sections lay out their own cards. */
-export function Section({ id, title, children, description, flush, actions }: { id?: string; title: string; children: ReactNode; description?: string; flush?: boolean; actions?: ReactNode }) {
+export function Section({
+  id,
+  title,
+  children,
+  description,
+  flush,
+  actions,
+  intro,
+}: {
+  id?: string;
+  title: string;
+  children: ReactNode;
+  description?: string;
+  flush?: boolean;
+  actions?: ReactNode;
+  intro?: ReactNode;
+}) {
   const Heading = useContext(SectionLevel) === 3 ? "h3" : "h2";
   return (
     <section id={id} className="settings-section">
-      <header className="settings-section-intro">
-        <div className="settings-section-heading">
-          <Heading>{title}</Heading>
-          {actions ? <div className="settings-section-actions">{actions}</div> : null}
-        </div>
-        {description && <p>{description}</p>}
-      </header>
+      {intro ?? (
+        <header className="settings-section-intro">
+          <div className="settings-section-heading">
+            <Heading>{title}</Heading>
+            {actions ? <div className="settings-section-actions">{actions}</div> : null}
+          </div>
+          {description && <p>{description}</p>}
+        </header>
+      )}
       <div className={flush ? "settings-section-body" : "settings-section-body settings-group"}>{children}</div>
     </section>
   );

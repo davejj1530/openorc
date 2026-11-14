@@ -8,6 +8,16 @@
   color: var(--ink-4);
   font-size: 13px;
 }
+.organization-received-person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.organization-received-person .account-face {
+  width: 24px;
+  height: 24px;
+  font-size: 11px;
+}
 .organization-received-email {
   padding: 12px 14px;
   border-radius: var(--radius-lg);

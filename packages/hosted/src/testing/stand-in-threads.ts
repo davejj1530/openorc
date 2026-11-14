@@ -164,6 +164,7 @@ export class StandInThreads {
     private readonly peers: () => Iterable<StandInPeer>,
     private readonly admit: Admit,
     private readonly spaces: StandInSpaces,
+    private readonly person: (email: string) => { name: string; image: string | null },
   ) {}
 
   /** The person's spaces, and the routes under /projects and /hosted, for `who` in the space they name; null for any other path. */
@@ -497,7 +498,7 @@ export class StandInThreads {
       pullRequest: null,
       actions: [],
       createdBy: userOf(thread.owner),
-      startedBy: { id: userOf(thread.owner), name: thread.owner.split("@")[0]!, image: null },
+      startedBy: { id: userOf(thread.owner), ...this.person(thread.owner) },
       createdAt: thread.createdAt,
       lastActivityAt: thread.lastActivityAt,
     };

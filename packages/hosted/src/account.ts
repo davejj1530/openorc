@@ -49,6 +49,7 @@ export class Account implements HostedAccount {
   #heard: Heard | null = null;
   #error: string | null = null;
   #announced = "";
+  #personRead = 0;
   readonly #signingIn: BrowserSignInTrip;
   readonly #signIns: SignIns;
   readonly #github: GithubConnect;
@@ -68,10 +69,10 @@ export class Account implements HostedAccount {
       changed: () => this.#announce(),
     });
     deps.session.onChange((change) => this.#changed(change));
-    // The person's own topics: what they pay for, their sign-ins and their GitHub, changed elsewhere.
+    // Personal space changes also carry profile edits from the person's other devices.
     deps.session.onSocket(SOCKET.changed, (body) => {
       const topics = wireTopics.safeParse(body);
-      if (topics.success && topics.data.topics.some((topic) => topic === "billing" || topic === "sign-ins" || topic === "github")) void this.#refresh();
+      if (topics.success && topics.data.topics.some((topic) => topic === "billing" || topic === "sign-ins" || topic === "github" || topic === "spaces")) void this.#refresh();
     });
   }
 
@@ -137,6 +138,15 @@ export class Account implements HostedAccount {
   async signOut(): Promise<void> {
     await this.deps.session.signOut();
     this.#announce();
+  }
+
+  async updateProfile(input: RpcParams<"account.profile.update">): Promise<void> {
+    const email = this.#signedInAs();
+    const generation = this.deps.session.generation;
+    const person = await this.deps.session.request(ROUTES.updateProfile, input);
+    if (!email || this.#signedInAs() !== email || this.deps.session.generation !== generation) return;
+    this.#personRead++;
+    this.#hear(email, { userId: person.id, person: { name: person.name, image: toImage(person.image) } });
   }
 
   /** Chooses where the person's cloud threads run. The server refuses a service it does not run threads on, in words. */
@@ -246,6 +256,7 @@ export class Account implements HostedAccount {
     const email = this.#signedInAs();
     const generation = this.deps.session.generation;
     if (!email) return;
+    const personRead = ++this.#personRead;
     const [person, billing, sandbox, signIns, github] = await Promise.allSettled([
       this.deps.session.request(ROUTES.person),
       this.deps.session.request(ROUTES.billing),
@@ -257,7 +268,9 @@ export class Account implements HostedAccount {
     if (person.status === "fulfilled" && person.value === null) return void this.deps.session.end("server");
     this.#error = billing.status === "rejected" && !(billing.reason instanceof OutOfReach) ? wordsOf(billing.reason) : null;
     this.#hear(email, {
-      ...(person.status === "fulfilled" && person.value && { userId: person.value.user.id, person: { name: person.value.user.name, image: toImage(person.value.user.image) } }),
+      ...(personRead === this.#personRead &&
+        person.status === "fulfilled" &&
+        person.value && { userId: person.value.user.id, person: { name: person.value.user.name, image: toImage(person.value.user.image) } }),
       ...(billing.status === "fulfilled" && { billing: billing.value }),
       ...(sandbox.status === "fulfilled" && { sandbox: sandbox.value }),
       ...(signIns.status === "fulfilled" && { signIns: signIns.value }),

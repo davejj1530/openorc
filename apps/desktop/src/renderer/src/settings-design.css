@@ -1,4 +1,44 @@
 /* Preference sheets share the workspace's quiet typography and independent accents. */
+.settings-profile-heading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 20px 32px;
+}
+.settings-profile-face {
+  width: 44px;
+  height: 44px;
+  font-size: 17px;
+}
+.settings-profile-identity {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.settings-profile-identity h2 {
+  font-size: 24px;
+  line-height: 30px;
+  letter-spacing: -0.02em;
+}
+.settings-profile-identity p {
+  margin-top: 3px;
+  color: var(--ink-4);
+  font-size: 13px;
+  line-height: 19px;
+}
+.profile-dialog-face {
+  width: 48px;
+  height: 48px;
+  font-size: 18px;
+}
+@media (max-width: 600px) {
+  .settings-profile-heading {
+    flex-wrap: wrap;
+  }
+  .settings-profile-identity {
+    min-width: 140px;
+  }
+}
 .settings-shell .settings-field > span:not(.settings-switch) {
   min-width: 160px;
 }

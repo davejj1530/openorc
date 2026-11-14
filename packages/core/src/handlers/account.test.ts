@@ -121,6 +121,16 @@ describe("the OpenOrc account in the core", () => {
     expect(await call("account.setSandbox", { service: "agent37" })).toMatchObject({ state: "signed-in", sandbox: { chosen: "agent37" } });
     await expect(call("account.setSandbox", { service: "local" })).rejects.toThrow("This server doesn't run threads on this machine.");
   });
+
+  it("saves the signed-in person's profile and keeps a refused change out of status", async () => {
+    await open();
+    await signIn();
+    expect(await call("account.profile.update", { name: "  Ada   Lee ", image: null })).toMatchObject({ name: "Ada Lee", image: null, email: EMAIL });
+    await expect(call("account.profile.update", { name: "example.com" })).rejects.toThrow("Use a name, not a link or a web address.");
+    expect(await call("account.status", {})).toMatchObject({ name: "Ada Lee" });
+    await call("account.signOut", {});
+    await expect(call("account.profile.update", { name: "Someone" })).rejects.toThrow();
+  });
 });
 
 describe("agent sign-ins on OpenOrc Cloud through the core", () => {

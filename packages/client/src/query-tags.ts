@@ -216,6 +216,7 @@ const fixedInvalidations: Partial<Record<RpcMethod, readonly string[]>> = {
   "account.signIn": ["account"],
   "account.signIn.cancel": ["account"],
   "account.signOut": ["account"],
+  "account.profile.update": ["account"],
   "account.setSandbox": ["account"],
   "account.signIns.connect": ["account"],
   "account.signIns.cancel": ["account"],

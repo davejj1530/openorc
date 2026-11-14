@@ -246,7 +246,8 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
   const peers = new Set<Peer>();
   const sockets = new Set<StandInPeer>();
   const spaces = new StandInSpaces();
-  const hosted = new StandInThreads(() => [...[...peers].filter((peer) => !peer.waiting), ...sockets], admitTurn, spaces);
+  const person = (email: string) => people.get(email) ?? { name: nameFromEmail(email), image: null };
+  const hosted = new StandInThreads(() => [...[...peers].filter((peer) => !peer.waiting), ...sockets], admitTurn, spaces, person);
   const signInWrites = new StandInSignIns(signIns);
   const tell = tellOf(peers, sockets);
   const organizations = organizationReads(options, spaces, people, billing, tell, (space) => hosted.accessChanged(space));
@@ -271,7 +272,7 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
           personal(method, path, who, body) ??
           hosted.route({ method, path, query, space }, who, body)
         );
-      return /^\/(spaces|organization|invitations|projects|hosted|github|agent-sign-ins|billing|api\/auth\/organization)\b/.test(path) ? unauthorized() : null;
+      return /^\/(account|spaces|organization|invitations|projects|hosted|github|agent-sign-ins|billing|api\/auth\/organization)\b/.test(path) ? unauthorized() : null;
     };
     const old = tooOld(request.headers["x-openorc-protocol"]) ? { status: 426, body: { statusCode: 426, message: APP_TOO_OLD } } : null;
     const reply: Reply = old ??
@@ -526,6 +527,7 @@ function organizationReads(
   return new StandInOrganizations({
     spaces,
     creationAllowed: options.signup === "open",
+    savePerson: (email, person) => void people.set(email, person),
     person: (email) => people.get(email) ?? { name: nameFromEmail(email), image: null },
     pro: (email) => {
       const state = billing.get(email);

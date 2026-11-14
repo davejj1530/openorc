@@ -47,7 +47,7 @@ export const wireReceivedInvitations = z.object({
       role,
       expiresAt: iso,
       organization: identity,
-      inviter: z.object({ name: z.string().nullable(), email: z.string().nullable() }),
+      inviter: z.object({ name: z.string().nullable(), email: z.string().nullable(), image: z.string().nullish() }),
     }),
   ),
 });

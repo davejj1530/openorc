@@ -83,7 +83,8 @@ export function useReceivedInvitations(onJoined: (spaceId: string, signal: Abort
     )
       void respond(decision.invitation, "join", true);
   });
-  return { decision, open, close, respond };
+  const invitation = status?.state === "ready" ? status.invitations.find((invite) => invite.id === decision?.invitation.id) : undefined;
+  return { decision: decision && invitation ? { ...decision, invitation } : decision, open, close, respond };
 }
 
 export type ReceivedInvitationActions = ReturnType<typeof useReceivedInvitations>;

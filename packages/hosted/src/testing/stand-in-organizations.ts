@@ -1,3 +1,4 @@
+import { profileRoute } from "./stand-in-profile.js";
 import { identityRoute } from "./stand-in-identity.js";
 import { membershipRoute } from "./stand-in-membership.js";
 import { projectAccessRoute } from "./stand-in-access.js";
@@ -9,6 +10,7 @@ interface OrganizationDeps {
   spaces: StandInSpaces;
   creationAllowed: boolean;
   person(email: string): { name: string; image: string | null };
+  savePerson(email: string, person: { name: string; image: string | null }): void;
   pro(email: string): boolean;
   tell(who: string, topics: string[], space?: string): void;
   accessChanged(space: string): void;
@@ -33,6 +35,11 @@ export class StandInOrganizations {
   }
 
   async route(request: { method: string; path: string; query: URLSearchParams; space: string | null }, who: string, body: Record<string, unknown> = {}): Promise<Reply | null> {
+    if (request.method === "PATCH" && request.path === "/account/profile")
+      return profileRoute(body, who, this.deps.person(who), (person) => {
+        this.deps.savePerson(who, person);
+        this.profileChanged(who);
+      });
     const invitation = this.invitations.route({ ...request, who, body });
     if (invitation) return invitation;
     const access = projectAccessRoute({ ...request, who, body, spaces: this.deps.spaces, accessChanged: this.deps.accessChanged, tell: this.deps.tell });
@@ -93,6 +100,16 @@ export class StandInOrganizations {
 
   planChanged(who: string): void {
     for (const [id, team] of this.deps.spaces.teams) if (team.members.some((member) => member.email === who)) for (const email of this.deps.spaces.readers(id)) this.deps.tell(email, ["members"], id);
+  }
+
+  profileChanged(who: string): void {
+    this.deps.tell(who, ["spaces"]);
+    for (const [id, team] of this.deps.spaces.teams) {
+      if (!team.members.some((member) => member.email === who)) continue;
+      for (const email of this.deps.spaces.readers(id)) this.deps.tell(email, ["members", "threads", "chat", "invitations"], id);
+    }
+    const recipients = new Set(this.received.filter((invite) => invite.inviter === who && invite.status === "pending" && invite.expiresAt > this.deps.now()).map((invite) => invite.email));
+    for (const email of recipients) this.deps.tell(email, ["invitations"]);
   }
 
   people(space: string, who: string, query: URLSearchParams): Reply {

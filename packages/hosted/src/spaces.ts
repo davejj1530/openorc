@@ -10,6 +10,7 @@ import { OrganizationAccess } from "./organization-access.js";
 import { OrganizationInvitations } from "./organization-invitations.js";
 import { ReceivedInvitations } from "./received-invitations.js";
 import { wireSpaces } from "./wire-spaces.js";
+import { toImage } from "./translate.js";
 
 const snapshot = z.object({ apiOrigin: z.string(), email: z.string(), index: wireSpaces, projects: z.array(scopedProject), heardAt: z.number() });
 type Snapshot = z.infer<typeof snapshot>;
@@ -131,7 +132,12 @@ export class Spaces implements HostedSpaces {
       if (!this.#current(generation)) return;
       this.#snapshot = { apiOrigin: this.#origin, email: state.email, index, projects: projects.rows, heardAt: this.deps.now() };
       this.#error = projects.error ?? inbox.error;
-      if (inbox.read) this.#invitations = inbox.read.invitations.map((invitation) => ({ ...invitation, expiresAt: Date.parse(invitation.expiresAt) }));
+      if (inbox.read)
+        this.#invitations = inbox.read.invitations.map((invitation) => ({
+          ...invitation,
+          inviter: { ...invitation.inviter, image: toImage(invitation.inviter.image) },
+          expiresAt: Date.parse(invitation.expiresAt),
+        }));
       this.#save();
       this.#setExpiry();
     } catch (error) {

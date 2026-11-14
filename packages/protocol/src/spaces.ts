@@ -25,7 +25,7 @@ export interface ReceivedInvitation {
   role: OrganizationRole;
   expiresAt: number;
   organization: OrganizationIdentity;
-  inviter: { name: string | null; email: string | null };
+  inviter: { name: string | null; email: string | null; image?: string | null };
 }
 
 export type SpacesStatus =

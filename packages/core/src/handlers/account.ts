@@ -15,6 +15,7 @@ export function createAccountHandlers(
   | "account.signIn"
   | "account.signIn.cancel"
   | "account.signOut"
+  | "account.profile.update"
   | "account.setSandbox"
   | "account.signIns.connect"
   | "account.signIns.cancel"
@@ -37,6 +38,7 @@ export function createAccountHandlers(
     "account.signIn": () => after((a) => a.signIn()),
     "account.signIn.cancel": () => after(async (a) => a.cancelSigningIn()),
     "account.signOut": () => after((a) => a.signOut()),
+    "account.profile.update": (input) => after((a) => a.updateProfile(input)),
     "account.setSandbox": ({ service }) => after((a) => a.setSandbox(service)),
     "account.signIns.connect": (input) => after((a) => a.connectSignIn(input)),
     "account.signIns.cancel": ({ agent }) => after(async (a) => a.cancelSignIn(agent)),

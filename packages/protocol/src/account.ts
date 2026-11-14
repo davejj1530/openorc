@@ -189,6 +189,11 @@ export const accountRpcParams = {
   "account.signIn.cancel": z.object({}).strict(),
   /** Forgets the session here first, then tells the server. */
   "account.signOut": z.object({}),
+  /** Changes the signed-in person's name and picture, independently of the selected space. */
+  "account.profile.update": z
+    .object({ name: z.string().max(1000, "Keep the name under 80 characters.").optional(), image: z.string().max(64_000, "That picture is too big. Pick a smaller one.").nullable().optional() })
+    .strict()
+    .refine((input) => input.name !== undefined || input.image !== undefined, "Say what to change."),
   /** Chooses the sandbox service the person's cloud threads run on; null goes back to the server's own choice. */
   "account.setSandbox": z.object({ service: z.string().min(1).max(64).nullable() }).strict(),
   "account.signIns.connect": ConnectSignIn,

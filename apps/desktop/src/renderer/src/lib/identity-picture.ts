@@ -1,5 +1,5 @@
 /** Decode, crop and re-encode locally so neither metadata nor the picked file crosses the account boundary. */
-export async function organizationLogo(file: File): Promise<string> {
+export async function identityPicture(file: File): Promise<string> {
   if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) throw new Error("Pick a PNG, JPEG or WebP picture.");
   let picture: ImageBitmap;
   try {

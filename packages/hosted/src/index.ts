@@ -97,6 +97,8 @@ export interface HostedAccount {
   cancelSigningIn(): void;
   /** Forgets the session and the kept answers first, then tells the server, so a server out of reach still signs out here. */
   signOut(): Promise<void>;
+  /** Saves and keeps the stored profile from the reply; subsequent reads cannot make this write fail. */
+  updateProfile(input: RpcParams<"account.profile.update">): Promise<void>;
   /** Chooses the sandbox service the person's cloud threads run on; null leaves it to the server. */
   setSandbox(service: string | null): Promise<void>;
   /** Signs an agent in on OpenOrc Cloud, one of its ways; what goes on after this resolves shows in `status().signingIn`. */

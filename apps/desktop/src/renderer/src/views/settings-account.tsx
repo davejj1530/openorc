@@ -2,6 +2,8 @@ import { billingMoves, cloudTime, hoursDetail, periodLabel, planDate, type Billi
 import { payBlock, PRO_PERIODS, sendBlockWords, type AccountStatus, type BillingOffers, type BillingPage, type ProPeriod } from "@openorc/protocol";
 import { useEffect, useState } from "react";
 import { Button, Segmented, TextButton, Tooltip } from "../components/ui";
+import { AccountFace } from "../components/AccountFace";
+import { ProfileDialog } from "../dialogs/ProfileDialog";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { Failure } from "./settings-secret-field";
 import { LoadError, Section, SettingRow, Status } from "./settings-shared";
@@ -46,25 +48,40 @@ function SignIn({ status }: { status: SignedOut }) {
 
 /** Who is signed in, what they have and the ways to pay, and whether OpenOrc Cloud answers now, with Sign out beside the name. */
 function SignedInAccount({ account, active }: { account: SignedIn; active: boolean }) {
+  const [editing, setEditing] = useState(false);
   const signOut = useRpcMutation("account.signOut");
   const open = useRpcMutation("account.billing.open");
   const live = account.reach === "live";
   return (
-    <Section
-      title={account.name ?? account.email}
-      description={account.name ? account.email : undefined}
-      actions={
-        <Button size="sm" disabled={signOut.isPending} onClick={() => signOut.mutate({})}>
-          Sign out
-        </Button>
-      }
-    >
-      <PlanRows account={account} active={active} opening={open.isPending} onOpen={(page) => open.mutate(page)} />
-      <SettingRow label="OpenOrc Cloud">
-        <Status ok={live}>{live ? "Connected" : "Can't be reached"}</Status>
-      </SettingRow>
-      <Failure error={open.error ?? signOut.error ?? (account.error ? new Error(account.error) : null)} />
-    </Section>
+    <>
+      <Section
+        title={account.name ?? account.email}
+        intro={
+          <header className="settings-profile-heading">
+            <AccountFace name={account.name ?? account.email} image={account.image} className="settings-profile-face" />
+            <div className="settings-profile-identity">
+              <h2>{account.name ?? account.email}</h2>
+              {account.name ? <p>{account.email}</p> : null}
+            </div>
+            <div className="settings-section-actions">
+              <Button size="sm" onClick={() => setEditing(true)}>
+                Edit
+              </Button>
+              <Button size="sm" disabled={signOut.isPending} onClick={() => signOut.mutate({})}>
+                Sign out
+              </Button>
+            </div>
+          </header>
+        }
+      >
+        <PlanRows account={account} active={active} opening={open.isPending} onOpen={(page) => open.mutate(page)} />
+        <SettingRow label="OpenOrc Cloud">
+          <Status ok={live}>{live ? "Connected" : "Can't be reached"}</Status>
+        </SettingRow>
+        <Failure error={open.error ?? signOut.error ?? (account.error ? new Error(account.error) : null)} />
+      </Section>
+      {editing ? <ProfileDialog key={account.email} account={account} close={() => setEditing(false)} /> : null}
+    </>
   );
 }
 

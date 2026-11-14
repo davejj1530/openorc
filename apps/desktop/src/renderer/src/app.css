@@ -125,6 +125,10 @@
 :where([data-plane], .menu-popup, .floating-popover, .project-picker-popup, .composer-context-popup, .model-picker-popup, .composer-effort-popup, [role="dialog"]) {
   --current-row-fill: var(--surface-2);
   --control-fill: var(--surface-2);
+  /* A plane's fill is a carved piece's own in dark, so a piece on a plane always draws its edge, and the person's
+     bubble takes the fill. */
+  --well-ring: 0 0 0 1px var(--line);
+  --bubble-fill: var(--surface-2);
 }
 :where(.composer-shell, .settings-group, .settings-card, .settings-disclosure, .usage-account, .memory-control) {
   --current-row-fill: var(--surface-2);

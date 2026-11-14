@@ -61,7 +61,7 @@ export function ThreadTreeList({
 }
 
 /** The tree's grid: a parent's line leaves under its title's start, and a sub thread steps in so its mark sits there. */
-const MARK_X = 18;
+const MARK_X = 16;
 const STEP = 24;
 
 /**

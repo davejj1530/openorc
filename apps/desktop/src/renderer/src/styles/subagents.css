@@ -34,7 +34,7 @@
 }
 .sidebar-tree-toggle {
   position: absolute;
-  right: 6px;
+  right: 4px;
   display: grid;
   place-items: center;
   width: 24px;

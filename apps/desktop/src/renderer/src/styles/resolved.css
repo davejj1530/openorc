@@ -9,7 +9,7 @@
   flex: none;
   flex-direction: column;
   height: min(calc(var(--resolved-head) + 8px + var(--resolved-rows, 0px)), 62%);
-  padding: 4px 10px;
+  padding: 4px 8px;
   transition: height var(--duration-resize) var(--ease-out);
 }
 .resolved-drawer[data-inviting] {
@@ -21,7 +21,7 @@
   align-items: center;
   gap: 6px;
   height: var(--resolved-head);
-  padding: 0 10px;
+  padding: 0 8px;
   border-radius: var(--radius-md);
   outline: 1px dashed transparent;
   outline-offset: -1px;

@@ -1,8 +1,8 @@
 /* The sidebar: one column under its own header, the app's screens by name, the threads grouped by
    project under Workspaces, and a footer. It sits on its own --sidebar ground (the window's in most
    palettes), a hairline seam at its edge from the window's top to its foot. Rows have a 10px corner; the current
-   row takes --current-row-fill and keeps --navigation-ink. Text starts 20px in: rows sit 10px in and
-   keep 10px of padding. */
+   row takes --current-row-fill and keeps --navigation-ink. Text starts 16px in, on the traffic lights' left edge:
+   rows sit 8px in and keep 8px of padding. */
 
 .app-shell .workspace-navigation {
   position: relative;
@@ -33,7 +33,7 @@ html[data-transparent-shell="true"] .app-shell .workspace-navigation {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 10px 0 16px;
+  padding: 0 12px 0 16px;
 }
 .workspace-navigation[data-traffic-lights="true"] .sidebar-header {
   padding-left: var(--spacing-traffic);
@@ -55,8 +55,8 @@ html[data-transparent-shell="true"] .app-shell .workspace-navigation {
   flex-shrink: 0;
 }
 /* Back and Forward need the name's width, a gap and their own 48px beside it. Short of that they go, and the keys
-   still step through the history. */
-@container (max-width: 141px) {
+   still step through the history. Forward's centre sits on the counts' line, 24px in from the edge. */
+@container (max-width: 139px) {
   .sidebar-history {
     display: none;
   }
@@ -176,13 +176,13 @@ html[data-transparent-shell="true"] .app-shell .workspace-navigation {
 }
 
 /* New thread, then the screens by name, 34px apart: a 16px glyph centred in the sidebar's 18px lead slot
-   20px in, so the name starts at 46 as a project's does, and a count at the end only where something waits. New thread keeps full ink at rest. Settings lists its sections the
+   16px in, so the name starts at 42 as a project's does, and a count at the end only where something waits. New thread keeps full ink at rest. Settings lists its sections the
    same way in their place. */
 .sidebar-nav {
   display: grid;
   flex-shrink: 0;
   gap: 2px;
-  padding: 2px 10px 0;
+  padding: 2px 8px 0;
 }
 .settings-destinations {
   display: grid;
@@ -192,7 +192,7 @@ html[data-transparent-shell="true"] .app-shell .workspace-navigation {
   gap: 1px;
   min-height: 0;
   overflow-y: auto;
-  padding: 6px 10px 10px;
+  padding: 6px 8px 10px;
 }
 .settings-destinations > .sidebar-nav-row {
   margin-bottom: 18px;
@@ -203,7 +203,7 @@ html[data-transparent-shell="true"] .app-shell .workspace-navigation {
   gap: 8px;
   width: 100%;
   height: 32px;
-  padding: 0 10px;
+  padding: 0 8px;
   border-radius: var(--radius-md);
   font-size: var(--text-base);
   line-height: 16px;
@@ -258,7 +258,7 @@ button.sidebar-nav-row:hover {
   background-color: var(--current-row-fill);
 }
 /* What waits on the person or failed, and nothing else, in amber: centred in a 16px slot on the line row marks
-   share, 28px in from the sidebar's edge. */
+   share, 24px in from the sidebar's edge. */
 .sidebar-count {
   flex-shrink: 0;
   min-width: 16px;
@@ -314,14 +314,14 @@ button.sidebar-nav-row:hover {
 .orcling-browser {
   margin-top: 18px;
 }
-/* The list's head: its quiet name 20px in, then Search, Add project and the filter at the end as 24px
-   buttons, the last one centred on the line the counts and row marks share, 28px in from the edge. */
+/* The list's head: its quiet name 16px in, then Search, Add project and the filter at the end as 24px
+   buttons, the last one centred on the line the counts and row marks share, 24px in from the edge. */
 .sidebar-list-head {
   display: flex;
   align-items: center;
   gap: 2px;
   height: var(--control-lg);
-  margin: 12px 10px 2px;
+  margin: 12px 8px 2px;
   flex-shrink: 0;
 }
 .sidebar-list-fold,
@@ -332,7 +332,7 @@ button.sidebar-nav-row:hover {
   gap: 4px;
   min-width: 0;
   height: 28px;
-  padding: 0 10px;
+  padding: 0 8px;
   font-size: var(--text-sm);
   color: var(--ink-3);
 }
@@ -359,7 +359,7 @@ button.sidebar-nav-row:hover {
   flex-shrink: 0;
   align-items: center;
   gap: 4px;
-  margin-right: 6px;
+  margin-right: 4px;
 }
 
 /* Lists */
@@ -374,14 +374,14 @@ button.sidebar-nav-row:hover {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 0 10px 12px;
+  padding: 0 8px 12px;
 }
 /* Pinned leads the list and stays put while the projects under it scroll. */
 .sidebar-pinned {
   flex-shrink: 0;
   max-height: 40%;
   overflow-y: auto;
-  padding: 0 10px;
+  padding: 0 8px;
   scrollbar-width: none;
 }
 .sidebar-pinned:not(:empty) {
@@ -426,13 +426,13 @@ button.sidebar-nav-row:hover {
    title, and the row's mark on the counts' centre line. */
 .sidebar-edge-line {
   position: absolute;
-  left: 10px;
-  right: 10px;
+  left: 8px;
+  right: 8px;
   display: flex;
   align-items: center;
   gap: 4px;
   height: 28px;
-  padding: 0 10px;
+  padding: 0 8px;
   border-radius: var(--radius-md);
   font-size: var(--text-base);
   color: var(--ink);
@@ -496,7 +496,7 @@ button.sidebar-nav-row:hover {
 .sidebar-project-head > .sidebar-project-tools {
   align-self: center;
   justify-self: end;
-  margin-right: 6px;
+  margin-right: 4px;
 }
 .sidebar-project-name {
   min-width: 0;
@@ -537,7 +537,7 @@ button.sidebar-nav-row:hover {
   color: var(--ink);
 }
 /* The project's mark leads its label in full, centred in the sidebar's 18px lead slot so the name starts at
-   46 as a screen's does. Rows stay flush with the slot's start. */
+   42 as a screen's does. Rows stay flush with the slot's start. */
 .sidebar-project-mark {
   display: inline-flex;
   flex-shrink: 0;
@@ -565,7 +565,7 @@ button.sidebar-nav-row:hover {
   width: 100%;
   min-width: 0;
   min-height: 44px;
-  padding: 4px 10px;
+  padding: 4px 8px;
   border-radius: var(--radius-md);
   color: var(--ink-2);
   text-align: left;
@@ -675,7 +675,7 @@ button.sidebar-nav-row:hover {
   gap: 4px;
   width: 100%;
   height: 28px;
-  padding: 0 10px;
+  padding: 0 8px;
   border-radius: var(--radius-md);
   font-size: var(--text-sm);
   color: var(--ink-2);
@@ -707,7 +707,7 @@ button.sidebar-nav-row:hover {
   align-items: center;
   width: 100%;
   min-height: var(--control-row);
-  padding: 0 10px 0 34px;
+  padding: 0 8px 0 32px;
   border-radius: var(--radius-md);
   font-size: var(--text-base);
   line-height: 16px;
@@ -721,15 +721,16 @@ button.browser-empty:hover,
 /* The list's own notes and paging line up with root titles; a sub thread's paging keeps its lead. */
 .browser-threads > :is(.browser-empty, .browser-load-more),
 .sidebar-thread-list > .browser-load-more {
-  padding-left: 10px;
+  padding-left: 8px;
 }
-/* Orclings: contacts with a face, a name and the last thing said. */
+/* Orclings: contacts with a face, a name and the last thing said. The 24px face is centred on the lead slot's
+   line, so the name starts at 42 as a screen's does. */
 .orcling-contact {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 5px;
   width: 100%;
-  padding: 6px 10px 6px 6px;
+  padding: 6px 8px 6px 5px;
   border-radius: var(--radius-md);
   text-align: left;
   font-size: var(--text-base);
@@ -754,8 +755,8 @@ button.browser-empty:hover,
   justify-content: flex-end;
   gap: 2px;
   height: 52px;
-  /* The gear's centre sits on the list's centre line, 28px in from the edge. */
-  padding: 0 12px 0 10px;
+  /* The gear's centre sits on the list's centre line, 24px in from the edge. */
+  padding: 0 8px;
   border-top: var(--hairline) solid var(--line);
 }
 /* The signed-in person at the foot's start: a 26px face, the name in ink, the plan in one quiet line. */
@@ -767,7 +768,7 @@ button.browser-empty:hover,
   min-width: 0;
   height: 40px;
   margin-right: auto;
-  padding: 0 8px 0 6px;
+  padding: 0 8px;
   border-radius: var(--radius-md);
   text-align: left;
   transition: background-color var(--duration-leave) var(--ease-out);

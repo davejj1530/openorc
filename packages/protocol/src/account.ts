@@ -94,6 +94,7 @@ export interface Price {
  * months they keep. A price is null where the server has no single amount for it.
  */
 export interface BillingOffers {
+  monthlySeconds: number | null;
   pro: { period: ProPeriod; price: Price | null }[];
   hours: { seconds: number; months: number; price: Price | null };
 }

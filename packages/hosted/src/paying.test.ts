@@ -133,6 +133,7 @@ describe("paying", () => {
   it("reads what Pro and a pack cost from the server, in the periods this app pays by, and nothing when it can't say", async () => {
     const { hosted, seen } = await signedIn();
     stand.setOffers({
+      monthlySeconds: 75 * 3600,
       pro: [
         { plan: "monthly", price: { amount: 2000, currency: "usd" } },
         { plan: "weekly", price: { amount: 600, currency: "usd" } },
@@ -141,6 +142,7 @@ describe("paying", () => {
       hours: { seconds: 50 * 3600, months: 12, price: { amount: 1000, currency: "eur" } },
     });
     expect(await hosted.account.offers()).toEqual({
+      monthlySeconds: 75 * 3600,
       pro: [
         { period: "monthly", price: { amount: 2000, currency: "usd" } },
         { period: "yearly", price: null },

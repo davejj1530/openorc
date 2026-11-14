@@ -24,10 +24,12 @@ const NOT_SET_UP = "Billing isn't set up on this server, so Pro and hours can't 
 
 /** What GET /billing/offers answers: amounts in the currency's smallest unit. */
 export type StandInOffers = {
+  monthlySeconds: number;
   pro: { plan: string; price: { amount: number; currency: string } | null }[];
   hours: { seconds: number; months: number; price: { amount: number; currency: string } | null };
 };
 const OFFERS: StandInOffers = {
+  monthlySeconds: 100 * 3600,
   pro: [
     { plan: "monthly", price: { amount: 2000, currency: "usd" } },
     { plan: "yearly", price: { amount: 20000, currency: "usd" } },

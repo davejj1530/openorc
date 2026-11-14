@@ -33,6 +33,7 @@ const wirePrice = z.object({ amount: z.number().int().nonnegative(), currency: z
 
 /** What Pro and an hours pack cost, as the server reads them from Polar's products. */
 export const wireOffers = z.object({
+  monthlySeconds: z.number().int().positive().nullable().default(null),
   pro: z.array(z.object({ plan: z.string(), price: wirePrice })),
   hours: z.object({ seconds: z.number().int().positive(), months: z.number().int().positive(), price: wirePrice }),
 });

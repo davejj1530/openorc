@@ -37,6 +37,7 @@ export function toPlan(billing: WireBilling): { plan: AccountPlan; hours: CloudH
 /** What can be bought, by the periods this app pays by; a period a newer server adds is left out. */
 export function toOffers(offers: WireOffers): BillingOffers {
   return {
+    monthlySeconds: offers.monthlySeconds,
     pro: PRO_PERIODS.flatMap((period) => offers.pro.filter((offer) => offer.plan === period).map((offer) => ({ period, price: offer.price }))),
     hours: offers.hours,
   };

@@ -164,9 +164,9 @@ it("lets a free person upgrade, monthly or yearly, as the one ink move, and open
   fakeCore(free);
   show(<AccountSettings active />);
   fireEvent.click(await screen.findByRole("radio", { name: "Yearly" }));
-  expect(ink("Upgrade")).toBe(true);
+  expect(ink("Upgrade to Pro")).toBe(true);
   expect(screen.queryByRole("button", { name: "Buy more hours" })).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Upgrade" }));
+  fireEvent.click(screen.getByRole("button", { name: "Upgrade to Pro" }));
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("account.billing.open", { page: "pro", period: "yearly" }));
   expect(await screen.findByText("Waiting for your payment")).toBeTruthy();
 });
@@ -220,6 +220,7 @@ it("stops watching for the purchase once the person leaves the screen, and not b
 });
 
 const OFFERS: BillingOffers = {
+  monthlySeconds: 75 * 3600,
   pro: [
     { period: "monthly", price: { amount: 2000, currency: "usd" } },
     { period: "yearly", price: { amount: 20000, currency: "usd" } },
@@ -232,7 +233,8 @@ it("prices each way of paying for Pro, and the pack on its Buy, as the server sa
   show(<AccountSettings active />);
   fireEvent.click(await screen.findByRole("radio", { name: /200.* a year$/ }));
   expect(screen.getByRole("radio", { name: /20.* a month$/ })).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Upgrade" }));
+  expect(screen.getByText("Pro includes 75 cloud hours a month.")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Upgrade to Pro" }));
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("account.billing.open", { page: "pro", period: "yearly" }));
   cleanup();
   queryClient.clear();
@@ -245,5 +247,5 @@ it("shows no price and blocks nothing when the server can't say them", async () 
   fakeCore(free, { ...OFFERS, pro: OFFERS.pro.map((offer) => ({ ...offer, price: null })) });
   show(<AccountSettings active />);
   expect(await screen.findByRole("radio", { name: "Yearly" })).toBeTruthy();
-  expect(screen.getByRole<HTMLButtonElement>("button", { name: "Upgrade" }).disabled).toBe(false);
+  expect(screen.getByRole<HTMLButtonElement>("button", { name: "Upgrade to Pro" }).disabled).toBe(false);
 });

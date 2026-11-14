@@ -1,5 +1,5 @@
 import { billingMoves, cloudTime, hoursDetail, periodLabel, planDate, type BillingMove } from "@openorc/client";
-import { payBlock, PRO_PERIODS, sendBlockWords, type AccountStatus, type BillingPage, type ProPeriod } from "@openorc/protocol";
+import { payBlock, PRO_PERIODS, sendBlockWords, type AccountStatus, type BillingOffers, type BillingPage, type ProPeriod } from "@openorc/protocol";
 import { useEffect, useState } from "react";
 import { Button, Segmented, TextButton, Tooltip } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
@@ -26,9 +26,10 @@ function SignIn({ status }: { status: SignedOut }) {
   const cancel = useRpcMutation("account.signIn.cancel");
   const waiting = status.signingIn?.state === "waiting";
   const failed = status.signingIn?.state === "failed" ? status.signingIn.error : status.error;
+  const endedHint = status.ended ? "Your session ended" : undefined;
   return (
     <Section title="OpenOrc account">
-      <SettingRow label={waiting ? "Signing in" : "Not signed in"} hint={waiting ? "Continue in your browser" : status.ended ? "Your session ended" : undefined}>
+      <SettingRow label={waiting ? "Signing in" : "Not signed in"} hint={waiting ? "Continue in your browser" : endedHint}>
         {waiting ? (
           <TextButton tone="muted" disabled={cancel.isPending} onClick={() => cancel.mutate({})}>
             Cancel
@@ -83,10 +84,10 @@ function PlanRows({ account, active, opening, onOpen }: { account: SignedIn; act
   const move = (each: BillingMove, page: BillingPage) => <BillingButton move={each} pending={opening} onClick={() => onOpen(page)} />;
   return (
     <>
-      <SettingRow label="Plan" hint={waiting("pro") ?? planHint(account)}>
+      <SettingRow label="Plan" hint={waiting("pro") ?? planHint(account, offers)}>
         <Status ok={account.plan.pro && account.plan.standing !== "grace"}>{account.plan.pro ? "Pro" : "Free"}</Status>
         {moves.plan.page === "pro" ? <Segmented size="sm" label="Pay" value={period} options={periods} onChange={setPeriod} /> : null}
-        {move(moves.plan, moves.plan.page === "pro" ? { page: "pro", period } : { page: "billing" })}
+        {move(moves.plan.page === "pro" ? { ...moves.plan, label: "Upgrade to Pro" } : moves.plan, moves.plan.page === "pro" ? { page: "pro", period } : { page: "billing" })}
       </SettingRow>
       {account.hours ? (
         <SettingRow label="Cloud hours" hint={waiting("hours") ?? (hoursDetail(account.hours) || undefined)}>
@@ -98,8 +99,9 @@ function PlanRows({ account, active, opening, onOpen }: { account: SignedIn; act
   );
 }
 
-/** When Pro renews or ends, or, for a month not paid for, that the payment has not gone through. */
-function planHint(account: SignedIn): string | undefined {
+/** The included allowance on Free, otherwise when Pro renews or needs a payment. */
+function planHint(account: SignedIn, offers: BillingOffers | null): string | undefined {
+  if (!account.plan.pro) return offers?.monthlySeconds ? `Pro includes ${offers.monthlySeconds / 3600} cloud hours a month.` : undefined;
   const unpaid = account.plan.pro && account.plan.standing === "live" && payBlock(account) === "awaiting_payment";
   return (unpaid ? sendBlockWords("awaiting_payment", "") : planDate(account.plan)) ?? undefined;
 }

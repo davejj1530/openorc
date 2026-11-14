@@ -475,7 +475,8 @@ const WorkTurn = memo(function WorkTurn({
   const ended = turn.status.kind === "failed" || turn.status.kind === "stopped";
   const footer = trailing?.(blocks);
   const hiddenRecovery = !open || !showActivity ? work.findLast((b): b is Extract<Block, { kind: "activity" }> => b.kind === "activity" && Boolean(b.recovery))?.recovery : undefined;
-  const spoke = Boolean((showActivity && work.length) || after.length || ended);
+  if (!showActivity && !before.length && !after.length && !ended && !footer) return null;
+  const spoke = Boolean(work.length || after.length || turn.live || ended);
   if (!before.length && !spoke && !footer) return null;
   // The fork rides the turn's actions once it has them; until then it stays on the prompt.
   const actions = head && spoke && !turn.live && (turn.reply || onFork);

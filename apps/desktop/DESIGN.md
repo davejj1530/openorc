@@ -292,7 +292,7 @@ An ask the agent waits on docks at the top of the composer's own piece, above a 
 
 ### Composer
 
-A turn with nothing to draw in the conversation has no head or empty space there. An ask waiting in the composer does not count as turn content. The person's prompt stays visible, and the agent's head appears with its work, reply or failure. Views without a dock keep asks in the conversation.
+A live turn shows its head and timer as soon as it starts. An ask waiting in the composer does not count as turn content; once its turn rests, an ask alone leaves no head or empty space in the conversation. Prompts and answered records stay visible. Views without a dock keep asks in the conversation.
 
 A teammate's thread that the person can only read keeps the field editable, with a quiet placeholder naming whose thread it is. Send and Queue are disabled, with the reason on demand; Enter cannot send. A thread whose place is out of reach uses the same disabled controls. Drafts stay on this device. Neither state adds a card above the composer.
 

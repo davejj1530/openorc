@@ -41,17 +41,22 @@ const end: Block = { id: "end", kind: "status", boundary: "turn", durationMs: 22
 
 const waitingQuestion: Block = { id: "ask", kind: "approval", approvalId: "question", approvalKind: "user_input", input: { questions: [{ question: "Which report?", options: [] }] } };
 
-it.each([true, false])("draws no turn for a docked ask alone, with live=%s", (live) => {
+it.each([true, false])("draws a head for a docked ask alone only while its turn is live (%s)", (live) => {
   const { container } = render(
     <AsksDocked.Provider value>
       <WorkTranscript runId="run" blocks={live ? [waitingQuestion] : [waitingQuestion, end]} live={live} author="Assistant" />
     </AsksDocked.Provider>,
   );
-  expect(container.textContent).toBe("");
-  expect(container.querySelector(".work-turn")).toBeNull();
+  if (live) {
+    expect(container.querySelector(".turn-head")?.textContent).toContain("Assistant");
+    expect(container.querySelector(".turn-head")?.getAttribute("data-state")).toBe("working");
+  } else {
+    expect(container.textContent).toBe("");
+    expect(container.querySelector(".work-turn")).toBeNull();
+  }
 });
 
-it("keeps the prompt without an empty head, then shows the head when the agent says something", () => {
+it("keeps the prompt and live head while an ask is docked, then adds the reply", () => {
   const prompt: Block = { id: "prompt", kind: "message", role: "user", text: "Check the report", streaming: false };
   const draw = (blocks: Block[]) => (
     <AsksDocked.Provider value>
@@ -60,7 +65,7 @@ it("keeps the prompt without an empty head, then shows the head when the agent s
   );
   const { container, rerender } = render(draw([prompt, waitingQuestion]));
   expect(screen.getByText("Check the report")).toBeTruthy();
-  expect(container.querySelector(".turn-head")).toBeNull();
+  expect(container.querySelector(".turn-head")?.textContent).toContain("Assistant");
   rerender(draw([prompt, reply, waitingQuestion]));
   expect(screen.getByText("The final answer.")).toBeTruthy();
   expect(container.querySelector(".turn-head")?.textContent).toContain("Assistant");
@@ -435,13 +440,9 @@ it("shows a manual compaction between turns as finished work, not a turn under w
     { type: "message.completed", runId, ts: 1792476572518, messageId: "user-f12095cd-e7e7-4b56-a774-b87e6c84964e", role: "user", text: "Thanks, now update the website." },
     { type: "turn.started", runId, ts: 1792476572650, turnId: "a1288048-7abe-43a4-8741-11e5680ce322" },
   ]);
-  // The next prompt opens a turn, but its head waits for something from the agent.
+  // The next prompt opens a turn before core's busy flag reaches the view.
   rerender(<Transcript run={runs.get(runId)!} working={false} />);
-  expect(heads()).toEqual(["done", "done"]);
-  expect(screen.getByText("Thanks, now update the website.")).toBeTruthy();
-  frame(4, [{ type: "message.delta", runId, ts: 1792476572700, messageId: "reply-next", role: "assistant", text: "Checking the page." }]);
-  rerender(<Transcript run={runs.get(runId)!} working={false} />);
-  expect(heads()).toEqual(["done", "done", "writing"]);
+  expect(heads()).toEqual(["done", "done", "working"]);
 });
 
 it("opens the folded work that holds a message asked for, with its whole narration, and marks that message", () => {

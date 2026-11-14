@@ -36,6 +36,9 @@ const answerOf = (ownsLive: boolean, startable: boolean) => {
   return startable ? "start" : "blocked";
 };
 
+/** A turn stopping takes no more messages: they wait for the next. */
+const sendOf = (thread: CollaborationThread) => (thread.stopping ? "after" : "now");
+
 export class StandInCollaboration {
   /** False: a server that predates working together. */
   served = true;
@@ -57,37 +60,45 @@ export class StandInCollaboration {
   projection(thread: CollaborationThread, who: string) {
     if (!this.served) return undefined;
     const open = this.sharedWrites;
-    const ask = thread.asks.find((each) => !each.answered) ?? null;
-    const askSender = ask ? (thread.turns.get(ask.turnId) ?? null) : null;
-    const askLive = Boolean(ask && !ask.parked && thread.turnId === ask.turnId);
-    const ownsLive = askLive && askSender === who;
-    const startable = open && !askLive;
-    const send = thread.stopping ? "after" : "now";
     return {
       version: 1,
       viewer: this.personOf(who),
       canWrite: open,
-      live: thread.turn && thread.turnId ? { id: thread.turnId, sender: this.personOf(thread.turn), startedAt: thread.turnStartedAt ?? new Date().toISOString(), stopping: thread.stopping } : null,
-      send: open ? send : "blocked",
+      live: this.#live(thread),
+      send: open ? sendOf(thread) : "blocked",
       handoff: null,
       canPostNote: open,
       canStop: open && Boolean(thread.turn),
-      ask: ask
-        ? {
-            id: ask.id,
-            turnId: ask.turnId,
-            state: askLive ? "waiting" : "parked",
-            sender: this.personOf(askSender),
-            answer: answerOf(ownsLive, startable),
-            canDecline: ownsLive || startable,
-            reason: askLive && askSender !== who ? `${this.personOf(askSender)?.name ?? "The previous sender"} can answer while this turn is running.` : null,
-          }
-        : null,
+      ask: this.#ask(thread, who),
       queue: thread.messages
         .filter((message) => message.state === "pending" || message.state === "refused")
         .map((message) => ({ messageId: message.id, author: this.personOf(message.author), paused: false, canEdit: message.author === who, canRemove: message.author === who, canStart: false })),
       mentions: { unread: false, firstUnreadNoteId: null },
       noteHead: 0,
+    };
+  }
+
+  #live(thread: CollaborationThread) {
+    if (!thread.turn || !thread.turnId) return null;
+    return { id: thread.turnId, sender: this.personOf(thread.turn), startedAt: thread.turnStartedAt ?? new Date().toISOString(), stopping: thread.stopping };
+  }
+
+  /** The open ask: live while its turn runs, answerable then only by its sender; parked after, by anyone who writes. */
+  #ask(thread: CollaborationThread, who: string) {
+    const ask = thread.asks.find((each) => !each.answered);
+    if (!ask) return null;
+    const sender = thread.turns.get(ask.turnId) ?? null;
+    const live = !ask.parked && thread.turnId === ask.turnId;
+    const ownsLive = live && sender === who;
+    const startable = this.sharedWrites && !live;
+    return {
+      id: ask.id,
+      turnId: ask.turnId,
+      state: live ? "waiting" : "parked",
+      sender: this.personOf(sender),
+      answer: answerOf(ownsLive, startable),
+      canDecline: ownsLive || startable,
+      reason: live && sender !== who ? `${this.personOf(sender)?.name ?? "The previous sender"} can answer while this turn is running.` : null,
     };
   }
 

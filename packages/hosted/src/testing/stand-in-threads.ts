@@ -201,14 +201,19 @@ export class StandInThreads {
     const asked = /^\/hosted\/asks\/([^/]+)\/answer$/.exec(path);
     if (asked && method === "POST") return this.#answer(who, space, decodeURIComponent(asked[1]!), body);
     if (method === "POST" && path === "/hosted/threads") return this.#create(who, space, body);
-    const together = /^\/hosted\/threads\/([^/]+)\/(collaboration|turn-senders|people)$/.exec(path);
-    if (together) {
-      const thread = this.#readable({ who, space }, decodeURIComponent(together[1]!));
-      return thread ? this.collaboration.route(method, together[2]!, request.query, thread, who) : missing();
-    }
+    const together = this.#together(request, { who, space });
+    if (together) return together;
     const write = /^\/hosted\/threads\/([^/]+)\/(messages|stop|ready|mine)(?:\/([^/]+))?$/.exec(path);
     if (write) return this.#write(method, write, { who, space }, body);
     return this.#read(method, path, request.query, { who, space }, body);
+  }
+
+  /** A thread's collaboration reads: the reader's view, its turns' senders, who can be tagged. */
+  #together(request: { method: string; path: string; query: URLSearchParams }, as: { who: string; space: string }): Reply | null {
+    const read = /^\/hosted\/threads\/([^/]+)\/(collaboration|turn-senders|people)$/.exec(request.path);
+    if (!read) return null;
+    const thread = this.#readable(as, decodeURIComponent(read[1]!));
+    return thread ? this.collaboration.route(request.method, read[2]!, request.query, thread, as.who) : missing();
   }
 
   /** The list, one thread, its log, its title and settings, its removal, and a background command's stop. */

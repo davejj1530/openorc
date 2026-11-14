@@ -4,8 +4,8 @@ import { useRouter, type Route } from "./router";
 import { movedBefore } from "./tab-order";
 import { navigationScope } from "./navigation-scope";
 
-/** What a tab holds: a thread, or a new thread being written. */
-export type TabRoute = Extract<Route, { view: "thread" } | { view: "newthread" }>;
+/** Work and organization conversations share a strip, with separate identities. */
+export type TabRoute = Extract<Route, { view: "thread" | "newthread" | "team-chat" }>;
 
 export interface ThreadTab {
   id: string;
@@ -28,13 +28,13 @@ interface ThreadTabsState {
 
 const KEY = "openorc.threadTabs";
 
-const isTabRoute = (route: Route): route is TabRoute => route.view === "thread" || route.view === "newthread";
+const isTabRoute = (route: Route): route is TabRoute => route.view === "thread" || route.view === "newthread" || route.view === "team-chat";
 const newTab = (route: TabRoute): ThreadTab => ({ id: crypto.randomUUID(), route });
 
 function saved(): Pick<ThreadTabsState, "tabs" | "active"> {
   try {
     const value = JSON.parse(localStorage.getItem(KEY) ?? "null") as Pick<ThreadTabsState, "tabs" | "active"> | null;
-    if (value && Array.isArray(value.tabs)) return { tabs: value.tabs.filter((tab) => tab && isTabRoute(tab.route)), active: value.active };
+    if (value && Array.isArray(value.tabs)) return { tabs: value.tabs.filter((tab) => tab && isTabRoute(tab.route) && tab.route.view !== "team-chat"), active: value.active };
   } catch {
     // A tab list that cannot be read starts over.
   }
@@ -44,7 +44,11 @@ function saved(): Pick<ThreadTabsState, "tabs" | "active"> {
 /** How long a closed tab takes to fold away: the shape-resize duration, or at once under reduced motion. */
 const foldMs = () => (typeof window.matchMedia === "function" && prefersReducedMotion() ? 0 : PANE_MS);
 
-const sameRoute = (a: TabRoute, b: TabRoute) => (a.view === "thread" ? b.view === "thread" && a.threadId === b.threadId : b.view === "newthread" && a.projectId === b.projectId);
+function sameRoute(a: TabRoute, b: TabRoute): boolean {
+  if (a.view === "thread") return b.view === "thread" && a.threadId === b.threadId;
+  if (a.view === "newthread") return b.view === "newthread" && a.projectId === b.projectId;
+  return b.view === "team-chat" && a.accountId === b.accountId && a.spaceId === b.spaceId && a.conversationId === b.conversationId;
+}
 
 /**
  * The work column's tabs, like a browser's: each holds a thread or a new thread. Going to a thread switches to its tab
@@ -113,7 +117,8 @@ function follow(route: Route): void {
   const { tabs, active } = state;
   const holding = staying(state).find((tab) => sameRoute(tab.route, shown));
   if (holding) return void useThreadTabs.setState({ active: holding.id, tabs: tabs.map((tab) => (tab.id === holding.id ? { ...tab, route: shown } : tab)) });
-  if (!tabs.some((tab) => tab.id === active)) {
+  const current = tabs.find((tab) => tab.id === active);
+  if (!current || shown.view === "team-chat" || current.route.view === "team-chat") {
     const tab = newTab(shown);
     return void useThreadTabs.setState({ tabs: [...tabs, tab], active: tab.id });
   }
@@ -130,7 +135,7 @@ useRouter.subscribe((state, previous) => {
 useThreadTabs.subscribe((state) => {
   if (navigationScope.active) return;
   try {
-    localStorage.setItem(KEY, JSON.stringify({ tabs: staying(state), active: state.active }));
+    localStorage.setItem(KEY, JSON.stringify({ tabs: staying(state).filter((tab) => tab.route.view !== "team-chat"), active: state.active }));
   } catch {
     // Tabs are a convenience; one that cannot be saved is rebuilt from where the column goes.
   }

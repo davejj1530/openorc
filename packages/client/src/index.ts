@@ -161,7 +161,20 @@ export {
   type ListEdges,
   type ListLayout,
 } from "./sidebar-list.js";
-export { cloudProjects, liveGroupedFold, projectGroups, waitingRoots, waitsOnYou, WORKSPACES_FOLD, type GroupProject, type ProjectGroup } from "./sidebar-groups.js";
+export {
+  cloudProjects,
+  inShownWorkspaces,
+  liveGroupedFold,
+  liveHiddenWorkspaces,
+  projectGroups,
+  threadFilterLabel,
+  toggleWorkspace,
+  waitingRoots,
+  waitsOnYou,
+  WORKSPACES_FOLD,
+  type GroupProject,
+  type ProjectGroup,
+} from "./sidebar-groups.js";
 export { snoozePresets, snoozePresetsChangeAt, snoozeWakeLabel } from "./snooze.js";
 export { startedWorkFromTool, taskActivity, taskCardStatusLabel, taskIdFromTool, taskStepLabel, uniqueTaskCards } from "./task-progress.js";
 export { pruneThreadFolds, threadFoldIds } from "./thread-folds.js";

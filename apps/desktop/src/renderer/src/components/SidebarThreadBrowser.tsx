@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Menu } from "@base-ui/react/menu";
 import { useQueryClient } from "@tanstack/react-query";
 import { isSubagentThread, WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
-import { CoversPreview } from "../lib/browser-preview";
-import { ALL_WORKSPACES, focusedProject, useLayout } from "../lib/layout";
+import { ALL_WORKSPACES, useLayout } from "../lib/layout";
 import {
   type GroupProject,
   type ListLayout,
@@ -21,6 +19,7 @@ import {
   subthreadStatuses,
   projectGroups,
   cloudProjects,
+  inShownWorkspaces,
   sidebarDayList,
   sidebarFoldKey,
   sidebarGroupsGrow,
@@ -41,16 +40,15 @@ import { useOrclingChatIds } from "../lib/orclings";
 import { useRpc, useRpcs } from "../lib/client";
 import { useRouter } from "../lib/router";
 import { useUi } from "../lib/ui";
-import { Check, ChevronRight, FolderPlus, Funnel, Pin, Search } from "./icons";
+import { ChevronRight, FolderPlus, Search } from "./icons";
 import { ResolvedDrawer, useResolveThread, useThreadDrop } from "./SidebarResolved";
 import { ListEdgeLines, useListEdges, type EdgeCall } from "./SidebarListEdge";
 import { SidebarListHead } from "./SidebarListHead";
 import { SidebarProjectGroup } from "./SidebarProjectGroup";
+import { SidebarThreadFilter } from "./SidebarThreadFilter";
 import type { RowProject } from "./ThreadLibraryRow";
 import { ThreadTreeList } from "./ThreadTreeList";
-import { menuItem, menuPopup, menuSeparator } from "./menu";
 import { IconButton, Tooltip } from "./ui";
-import { floatingGround } from "../lib/use-anchor-ground";
 import { useListHold } from "../lib/use-list-hold";
 import { useScrollEdges } from "../lib/use-scroll-edges";
 import { cn } from "../lib/cn";
@@ -117,6 +115,7 @@ export function SidebarThreadBrowser() {
 function useThreadList(children: ChildPages) {
   const queryClient = useQueryClient();
   const pinnedOnly = useLayout((s) => s.pinnedOnly);
+  const hidden = useLayout((s) => s.hiddenWorkspaces);
   const resolvedOpen = useLayout((s) => sidebarSectionOpen(s.collapsed, "resolved", SIDEBAR_LIST));
   const [limit, setLimit] = useState(THREAD_PAGE);
   const [resolvedLimit, setResolvedLimit] = useState(THREAD_PAGE);
@@ -135,15 +134,18 @@ function useThreadList(children: ChildPages) {
   const resolvedPending = resolvedOpen && !pinnedOnly && resolved.isPending;
   const fetched = queries.map((query, index) => (query.data ? { rows: query.data, limit } : cachedListPage(queryClient, params[index]!)));
   const family = useSelectedFamily(active.data, active.data?.archivedAt ? "archived" : "active", [...fetched.map((page) => page?.rows), resolved.data], children);
-  const selected = active.data && projectIds.includes(active.data.projectId) && (!pinnedOnly || active.data.pinnedAt) ? active.data : null;
+  const selected = active.data && projectIds.includes(active.data.projectId) && !hidden.includes(active.data.projectId) && (!pinnedOnly || active.data.pinnedAt) ? active.data : null;
+  const inShown = (rows: ThreadSummary[] | undefined) => rows && inShownWorkspaces(rows, hidden);
   const page = (rows: ThreadSummary[] | undefined, filter: SidebarFilter, shown: number) =>
-    sidebarThreadPage({ projectId: selected?.projectId ?? WORKSPACE_ID, fetched: withFamily(rows, family, projectIds), selected, filter, limit: shown, now: Date.now(), hidden: homes });
+    sidebarThreadPage({ projectId: selected?.projectId ?? WORKSPACE_ID, fetched: inShown(withFamily(rows, family, projectIds)), selected, filter, limit: shown, now: Date.now(), hidden: homes });
   const apart = (rows: ThreadSummary[] | undefined) =>
-    sidebarThreadPage({ projectId: WORKSPACE_ID, fetched: rows, selected: null, filter: "active", limit: Number.MAX_SAFE_INTEGER, now: Date.now(), hidden: homes });
+    sidebarThreadPage({ projectId: WORKSPACE_ID, fetched: inShown(rows), selected: null, filter: "active", limit: Number.MAX_SAFE_INTEGER, now: Date.now(), hidden: homes });
   const pages = fetched.map((fetchedPage) => page(fetchedPage?.rows, "active", fetchedPage?.limit ?? limit));
   const putRows = resolvedRows(resolvedOpen, resolved.data, selected);
   return {
     projects,
+    /** Every row read, hidden workspaces' too, so a cloud project the person hid still has its place in the filter. */
+    seen: [...fetched.map((each) => each?.rows), pins.data, needsYou.data, resolved.data].flatMap((rows) => rows ?? []),
     queries,
     pages,
     pinPage: apart(pins.data),
@@ -198,15 +200,20 @@ function groupProjects(projects: readonly { id: string; name: string; rootPath: 
 
 /**
  * Each project's group as the list shows it: open or folded by the reader, the most recently active on top. Every
- * project has one, an empty one too, but the Workspace only while it holds threads. While the list is `held`, rows that
+ * project has one, an empty one too, but the Workspace only while it holds threads or is hidden. While the list is `held`, rows that
  * would arrive, leave or move wait; what the person reaches for lands at once.
  */
 function useGroupPages(list: SidebarDayList, projects: readonly GroupProject[], collapsed: readonly string[], { ready, held, now }: { ready: boolean; held: boolean; now: number }) {
   const [more, setMore] = useState<readonly string[]>([]);
   const remembered = useRef<ListLayout | null>(null);
+  const hidden = useLayout((s) => s.hiddenWorkspaces);
+  const known = ready ? JSON.stringify(projects.map((project) => project.id)) : null;
+  useEffect(() => {
+    if (known) useLayout.getState().pruneHiddenWorkspaces(JSON.parse(known) as string[]);
+  }, [known]);
   const holding = new Set(list.shown(list.rest, false).map((root) => root.id));
   const holdsActive = (root: ThreadSummary) => holding.has(root.id);
-  const groups = projectGroups(projects, list.rest, list.all).filter((group) => group.project.id !== WORKSPACE_ID || group.roots.length);
+  const groups = projectGroups(projects, list.rest, list.all).filter((group) => group.project.id !== WORKSPACE_ID || group.roots.length || hidden.includes(WORKSPACE_ID));
   const statuses = rootStatuses(list.rest, list.all);
   const layout = listLayout(ready ? remembered.current : null, { groups, quiet: (root) => !statuses.get(root.id), now, held, own: [...more, ...holding] });
   useEffect(() => {
@@ -221,6 +228,12 @@ function useGroupPages(list: SidebarDayList, projects: readonly GroupProject[], 
 }
 
 type GroupPage = ReturnType<typeof useGroupPages>[number];
+
+/** The groups the list draws: none under the pinned filter, and none of a workspace the person hid. */
+function drawnGroups(groups: GroupPage[], { pinnedOnly, hidden }: { pinnedOnly: boolean; hidden: readonly string[] }) {
+  const shown = groups.filter((group) => !hidden.includes(group.project.id));
+  return { groups: pinnedOnly ? [] : shown, everyHidden: groups.length > 0 && !shown.length };
+}
 
 /** What calls the person in the groups, each by its row, or by its project's label while the project is folded. */
 function edgeCalls(groups: readonly GroupPage[], all: readonly ThreadSummary[]): EdgeCall[] {
@@ -263,11 +276,11 @@ function ThreadGroups({ children }: { children: ChildPages }) {
   const list = dayList(state, now);
   const open = !collapsed.includes(WORKSPACES_FOLD);
   const hold = useListHold();
-  const shownProjects = groupProjects(projects.data, list.all);
+  const shownProjects = groupProjects(projects.data, state.seen);
   const ready = !pending && !sidebarGroupsGrow({ end: list.end, hasMore: list.hasMore, limit: state.limit });
   // Under the pinned filter the groups are empty; their layout is not kept, so the list comes back as it was.
   const allGroups = useGroupPages(list, shownProjects, collapsed, { ready: ready && !pinnedOnly, held: hold.held, now });
-  const groups = pinnedOnly ? [] : allGroups;
+  const { groups, everyHidden } = drawnGroups(allGroups, { pinnedOnly, hidden: useLayout((s) => s.hiddenWorkspaces) });
   const pinsOpen = sidebarSectionOpen(collapsed, "pinned", SIDEBAR_LIST);
   const pins = pinOrder(list.shown(list.pinned, pinsOpen));
   const snoozedOpen = sidebarSectionOpen(collapsed, "snoozed", SIDEBAR_LIST);
@@ -290,7 +303,11 @@ function ThreadGroups({ children }: { children: ChildPages }) {
   ) : null;
   return (
     <section className="sidebar-workspaces" data-open={open || undefined} aria-label="Workspaces" {...hold.props}>
-      <SidebarListHead label="Workspaces" fold={{ open, waiting, onToggle: toggle(WORKSPACES_FOLD) }} tools={<ListTools empty={projects.data?.length === 0} />} />
+      <SidebarListHead
+        label="Workspaces"
+        fold={{ open, waiting, onToggle: toggle(WORKSPACES_FOLD) }}
+        tools={<ListTools empty={projects.data?.length === 0} workspaces={allGroups.map((group) => group.project)} />}
+      />
       <div className="conversation-browser" hidden={!open}>
         {pinnedOnly ? null : <div className="sidebar-pinned">{pinned}</div>}
         <GroupsView calls={edgeCalls(groups, list.all)} list={list}>
@@ -309,14 +326,14 @@ function ThreadGroups({ children }: { children: ChildPages }) {
               {rows(group.rows)}
             </SidebarProjectGroup>
           ))}
-          <ListFeedback state={state} shown={list.pinned.length + list.rest.length + list.resolved.roots.length} snoozed={list.snoozed.length} />
+          {everyHidden ? null : <ListFeedback state={state} shown={list.pinned.length + list.rest.length + list.resolved.roots.length} snoozed={list.snoozed.length} />}
           {list.snoozed.length ? (
             <Section label="Snoozed" count={list.snoozed.length} open={snoozedOpen} onToggle={toggle(sidebarFoldKey.snoozed(SIDEBAR_LIST))}>
               {rows(snoozed, true)}
             </Section>
           ) : null}
         </GroupsView>
-        {pinnedOnly ? null : (
+        {pinnedOnly || everyHidden ? null : (
           <ResolvedDrawer open={resolvedOpen} holding={resolvedShown.length > 0} onToggle={toggle(sidebarFoldKey.resolved(SIDEBAR_LIST))} accepts={resolvable(list, now)}>
             {rows(resolvedShown, true)}
             {resolvedOpen ? <ResolvedFeedback list={list} pending={state.resolvedPending || pending} onShowMore={state.loadMoreResolved} /> : null}
@@ -387,7 +404,7 @@ function ProjectsFailed({ projects }: { projects: ThreadList["projects"] }) {
  * The list head's tools: Search, the app's one search, which opens the palette over the window, then Add project and the
  * filter. With no project yet, Add project alone.
  */
-function ListTools({ empty }: { empty: boolean }) {
+function ListTools({ empty, workspaces }: { empty: boolean; workspaces: readonly GroupProject[] }) {
   const add = (
     <Tooltip label="Add project">
       <IconButton size="xs" aria-label="Add project" className="no-drag" onClick={() => useUi.getState().setImportProject(true)}>
@@ -404,7 +421,7 @@ function ListTools({ empty }: { empty: boolean }) {
         </IconButton>
       </Tooltip>
       {add}
-      <ThreadFilter />
+      <SidebarThreadFilter workspaces={workspaces} />
     </>
   );
 }
@@ -452,37 +469,5 @@ function Section({ label, count, open, onToggle, children }: { label: string; co
       </button>
       <div className={cn("sidebar-thread-list", animate && open && "motion-stagger")}>{children}</div>
     </div>
-  );
-}
-
-/** The thread list's filter: every thread or the pinned ones, and importing terminal sessions. */
-function ThreadFilter() {
-  const pinned = useLayout((s) => s.pinnedOnly);
-  const setPinnedOnly = useLayout((s) => s.setPinnedOnly);
-  const projectId = useLayout(focusedProject);
-  return (
-    <Menu.Root>
-      <Menu.Trigger render={<IconButton aria-label={`Filter threads${pinned ? ": Pinned threads" : ""}`} size="xs" className={cn("no-drag", pinned && "text-accent-ink")} />}>
-        {/* Pins show their own mark, so the pinned list never looks like the whole one. */}
-        {pinned ? <Pin size={16} /> : <Funnel size={16} />}
-      </Menu.Trigger>
-      <Menu.Portal>
-        <CoversPreview />
-        <Menu.Positioner sideOffset={6} align="end" className="z-40" collisionPadding={8}>
-          <Menu.Popup ref={floatingGround} className={menuPopup}>
-            {[false, true].map((value) => (
-              <Menu.Item key={String(value)} className={menuItem} onClick={() => setPinnedOnly(value)}>
-                <Check size={13} className={pinned === value ? "text-accent-ink" : "text-transparent"} />
-                {value ? "Pinned threads" : "All threads"}
-              </Menu.Item>
-            ))}
-            <Menu.Separator className={menuSeparator} />
-            <Menu.Item className={menuItem} onClick={() => useUi.getState().setImportSessions(true, projectId ?? undefined)}>
-              Import terminal sessions…
-            </Menu.Item>
-          </Menu.Popup>
-        </Menu.Positioner>
-      </Menu.Portal>
-    </Menu.Root>
   );
 }

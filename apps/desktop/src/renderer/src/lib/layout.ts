@@ -1,4 +1,4 @@
-import { liveGroupedFold, pruneThreadFolds, toggleSidebarFold, toggleThreadTree, type PanelTool } from "@openorc/client";
+import { liveGroupedFold, liveHiddenWorkspaces, pruneThreadFolds, toggleSidebarFold, toggleThreadTree, toggleWorkspace, type PanelTool } from "@openorc/client";
 import type { RpcParams } from "@openorc/protocol";
 import { WORKSPACE_ID } from "@openorc/protocol";
 import { create } from "zustand";
@@ -55,6 +55,8 @@ interface LayoutState {
   openThreadPanel: (id: string, tab: PanelTab) => void;
   /** Only the pinned threads. Never persisted: a relaunch lists them all again. */
   pinnedOnly: boolean;
+  /** Workspaces the person unticked in the sidebar's filter, kept on this device. What is hidden is stored, so a new one shows. */
+  hiddenWorkspaces: string[];
   /** Sidebar sections the user folded: namespaced project/pinned keys, plus opt-in snoozed-open keys. */
   collapsed: string[];
   revealThreads: (ancestors: readonly string[]) => void;
@@ -76,6 +78,9 @@ interface LayoutState {
   /** Work opened in another project brings a focused filter along to it; on All projects the filter stays. */
   followProject: (id: string) => void;
   setPinnedOnly: (pinnedOnly: boolean) => void;
+  toggleWorkspace: (id: string) => void;
+  /** Forgets hidden workspaces not in `known`, every workspace the list has. */
+  pruneHiddenWorkspaces: (known: readonly string[]) => void;
   toggleCollapsed: (key: string) => void;
   toggleThreadChildren: (id: string, expanded: boolean) => void;
   rememberPreviewUrl: (key: string, url: string) => void;
@@ -89,7 +94,7 @@ export const limits = {
 
 const KEY = "openorc.layout";
 
-type Saved = Partial<Pick<LayoutState, "sidebarOpen" | "panelOpen" | "panelWidth" | "panelSide" | "workspace" | "collapsed" | "previewUrls">> & {
+type Saved = Partial<Pick<LayoutState, "sidebarOpen" | "panelOpen" | "panelWidth" | "panelSide" | "workspace" | "hiddenWorkspaces" | "collapsed" | "previewUrls">> & {
   /** The whole sidebar's width. The rail's layouts saved `sidebarWidth`, the thread list's width beside it, which no longer applies. */
   navigationWidth?: number;
 };
@@ -113,6 +118,7 @@ function persist(s: LayoutState): void {
         panelWidth: s.panelWidth,
         panelSide: s.panelSide,
         workspace: s.workspace,
+        hiddenWorkspaces: s.hiddenWorkspaces,
         collapsed: s.collapsed,
         previewUrls: s.previewUrls,
       }),
@@ -162,6 +168,7 @@ export const useLayout = create<LayoutState>((set, get) => {
     workspace: typeof saved.workspace === "string" && saved.workspace ? saved.workspace : ALL_WORKSPACES,
     panelThreadId: null,
     pinnedOnly: false,
+    hiddenWorkspaces: Array.isArray(saved.hiddenWorkspaces) ? saved.hiddenWorkspaces.filter((id) => typeof id === "string") : [],
     collapsed: (saved.collapsed ?? []).filter(liveGroupedFold),
     previewUrls: saved.previewUrls ?? {},
     panelExpanded: false,
@@ -221,6 +228,11 @@ export const useLayout = create<LayoutState>((set, get) => {
       commit({ panelThreadId: id, panelOpen: open, ...(open ? {} : { panelExpanded: false }) });
     },
     setPinnedOnly: (pinnedOnly) => commit({ pinnedOnly }),
+    toggleWorkspace: (id) => commit({ hiddenWorkspaces: toggleWorkspace(get().hiddenWorkspaces, id) }),
+    pruneHiddenWorkspaces: (known) => {
+      const live = liveHiddenWorkspaces(get().hiddenWorkspaces, known);
+      if (live.length !== get().hiddenWorkspaces.length) commit({ hiddenWorkspaces: live });
+    },
     toggleCollapsed: (key) => commit({ collapsed: toggleSidebarFold(get().collapsed, key) }),
     toggleThreadChildren: (id, expanded) => commit({ collapsed: toggleThreadTree(get().collapsed, id, expanded) }),
     ...threadFoldActions(get, commit),

@@ -98,7 +98,7 @@ beforeEach(() => {
   fixture.tasks = undefined;
   localStorage.clear();
   useWindow.setState({ fullscreen: false });
-  useLayout.setState({ collapsed: [], workspace: ALL_WORKSPACES, sidebarOpen: true, pinnedOnly: false });
+  useLayout.setState({ collapsed: [], workspace: ALL_WORKSPACES, sidebarOpen: true, pinnedOnly: false, hiddenWorkspaces: [] });
   useRouter.setState({ route: { view: "newthread" }, history: [], future: [], threadIds: [] });
 });
 
@@ -710,6 +710,45 @@ it("keeps the pinned filter, and lists resolved threads in Resolved rather than 
   fireEvent.click(screen.getByRole("button", { name: "Resolved" }));
   await screen.findByRole("button", { name: /Archived notes/ });
   expect(useUi.getState().threadOrder.at(-1)).toBe("archived");
+});
+
+const drawnProjects = () => [...document.querySelectorAll(".sidebar-project")].map((section) => section.getAttribute("aria-label"));
+
+it("hides a workspace unticked in the filter, keeping the menu open, and names how many are hidden", async () => {
+  projectThreads();
+  mountSidebar();
+  await screen.findByRole("button", { name: /Other notes/ });
+  fireEvent.click(screen.getByRole("button", { name: "Filter threads" }));
+  expect((await screen.findAllByRole("menuitemcheckbox")).map((item) => item.textContent)).toEqual(["First project", "Second project"]);
+  fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "First project" }));
+  await waitFor(() => expect(drawnProjects()).toEqual(["Second project"]));
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  expect(screen.getByRole("menuitemcheckbox", { name: "First project" }).getAttribute("aria-checked")).toBe("false");
+  expect(screen.getByRole("menuitemcheckbox", { name: "Second project" }).getAttribute("aria-checked")).toBe("true");
+  expect(screen.queryByRole("button", { name: /Regular notes|Pinned notes/ })).toBeNull();
+  expect(screen.getByRole("button", { name: "Filter threads: 1 workspace hidden" }).classList).toContain("text-accent-ink");
+  expect(useLayout.getState().hiddenWorkspaces).toEqual(["one"]);
+});
+
+it("shows a workspace added after others were hidden, and forgets a hidden one that no longer exists", async () => {
+  projectThreads();
+  useLayout.setState({ hiddenWorkspaces: ["one", "removed"] });
+  fixture.projects.push({ id: "three", name: "Third project", rootPath: "/projects/three" });
+  mountSidebar();
+  await screen.findByRole("button", { name: /Other notes/ });
+  expect(drawnProjects()).toEqual(["Second project", "Third project"]);
+  await waitFor(() => expect(useLayout.getState().hiddenWorkspaces).toEqual(["one"]));
+});
+
+it("draws nothing under the head when every workspace is hidden", async () => {
+  projectThreads();
+  useLayout.setState({ hiddenWorkspaces: ["one", "two"] });
+  mountSidebar();
+  await screen.findByRole("button", { name: "Filter threads: 2 workspaces hidden" });
+  await waitFor(() => expect(screen.queryByText("Loading threads…")).toBeNull());
+  expect(drawnProjects()).toEqual([]);
+  expect(screen.queryByRole("button", { name: /Resolved|Pinned|Snoozed/ })).toBeNull();
+  expect(document.querySelector(".browser-empty")).toBeNull();
 });
 
 /** A drag as the browser carries it, for jsdom, which has no DataTransfer. */

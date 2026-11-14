@@ -1,7 +1,7 @@
 import type { ThreadSummary } from "@openorc/protocol";
 import { describe, expect, it } from "vitest";
 import { sidebarGroupsGrow } from "./sidebar-days.js";
-import { cloudProjects, liveGroupedFold, projectGroups, waitingRoots, WORKSPACES_FOLD } from "./sidebar-groups.js";
+import { cloudProjects, inShownWorkspaces, liveGroupedFold, liveHiddenWorkspaces, projectGroups, threadFilterLabel, toggleWorkspace, waitingRoots, WORKSPACES_FOLD } from "./sidebar-groups.js";
 
 function thread(id: string, projectId: string, values: Partial<ThreadSummary> = {}): ThreadSummary {
   return {
@@ -77,5 +77,33 @@ describe("cloudProjects", () => {
       { id: "openorc-cloud:api", name: "api", cloud: true },
       { id: "openorc-cloud:web", name: "website", cloud: true },
     ]);
+  });
+});
+
+describe("the workspace filter", () => {
+  it("an unticked workspace's threads leave the list and every other workspace's stay", () => {
+    const rows = [thread("a", "openorc"), thread("b", "immaculate"), thread("c", "openorc")];
+    expect(inShownWorkspaces(rows, ["openorc"]).map((t) => t.id)).toEqual(["b"]);
+    expect(inShownWorkspaces(rows, []).map((t) => t.id)).toEqual(["a", "b", "c"]);
+  });
+
+  it("stores what is hidden, so a workspace added later shows by itself", () => {
+    let hidden = toggleWorkspace([], "openorc");
+    expect(hidden).toEqual(["openorc"]);
+    const later = [thread("a", "openorc"), thread("n", "new-project")];
+    expect(inShownWorkspaces(later, hidden).map((t) => t.id)).toEqual(["n"]);
+    hidden = toggleWorkspace(hidden, "openorc");
+    expect(hidden).toEqual([]);
+  });
+
+  it("forgets a hidden workspace that no longer exists", () => {
+    expect(liveHiddenWorkspaces(["openorc", "removed"], ["openorc", "immaculate"])).toEqual(["openorc"]);
+  });
+
+  it("the filter's name says the pinned filter and how many workspaces are hidden", () => {
+    expect(threadFilterLabel({ pinnedOnly: false, hidden: 0 })).toBe("Filter threads");
+    expect(threadFilterLabel({ pinnedOnly: false, hidden: 1 })).toBe("Filter threads: 1 workspace hidden");
+    expect(threadFilterLabel({ pinnedOnly: true, hidden: 2 })).toBe("Filter threads: Pinned threads, 2 workspaces hidden");
+    expect(threadFilterLabel({ pinnedOnly: true, hidden: 0 })).toBe("Filter threads: Pinned threads");
   });
 });

@@ -59,3 +59,24 @@ export function projectGroups(projects: readonly GroupProject[], roots: readonly
     return { project, roots: own, waiting: waitingRoots(own, all) };
   });
 }
+
+/** The rows of the workspaces the person shows. A hidden workspace's threads leave the list, not the app. */
+export function inShownWorkspaces<T extends Pick<ThreadSummary, "projectId">>(rows: readonly T[], hidden: readonly string[]): T[] {
+  return hidden.length ? rows.filter((row) => !hidden.includes(row.projectId)) : [...rows];
+}
+
+/** The hidden workspaces after the person ticks or unticks one in the filter. */
+export function toggleWorkspace(hidden: readonly string[], id: string): string[] {
+  return hidden.includes(id) ? hidden.filter((each) => each !== id) : [...hidden, id];
+}
+
+/** The hidden workspaces that still exist; one removed since is forgotten. */
+export function liveHiddenWorkspaces(hidden: readonly string[], known: readonly string[]): string[] {
+  return hidden.filter((id) => known.includes(id));
+}
+
+/** The filter button's name: the pinned filter when it is on, and how many workspaces it hides. */
+export function threadFilterLabel({ pinnedOnly, hidden }: { pinnedOnly: boolean; hidden: number }): string {
+  const parts = [pinnedOnly ? "Pinned threads" : null, hidden ? `${hidden} ${hidden === 1 ? "workspace" : "workspaces"} hidden` : null].filter(Boolean);
+  return parts.length ? `Filter threads: ${parts.join(", ")}` : "Filter threads";
+}

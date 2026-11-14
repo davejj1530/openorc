@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Task } from "@openorc/protocol";
 import type { DocumentEditorHandle } from "../components/DocumentEditor";
 import { writeDraft } from "./drafts";
-import { acknowledgeTaskDraft, readTaskDraft, sameSavedTaskDraft, sameTaskDraft, taskDraftPatch, type TaskDocumentDraft } from "./task-draft";
+import { acknowledgeTaskDraft, readTaskDraft, sameSavedTaskDraft, sameTaskDraft, type TaskDocumentDraft } from "./task-draft";
 import { useTaskDraftActions } from "./task-draft-context";
 import { useRpcMutation } from "./client";
+import { useTaskDocumentSource, type TaskDraftTransport } from "./task-document-source";
 
 /** The locally kept draft when there is one. An unreadable draft is reported, never replaced. */
 function initialDraft(taskId: string, incoming: TaskDocumentDraft): { draft: TaskDocumentDraft; error: string | null } {
@@ -16,7 +17,8 @@ function initialDraft(taskId: string, incoming: TaskDocumentDraft): { draft: Tas
 }
 
 /** One mounted Overview owns its editor; the task barrier retains its draft after navigation. */
-export function useTaskDocumentDraft(task: Pick<Task, "id" | "title" | "spec" | "labels">) {
+export function useTaskDocumentDraft(task: Pick<Task, "id" | "title" | "spec" | "labels">, online?: { storageId: string; save: TaskDraftTransport }) {
+  const storageId = online?.storageId ?? task.id;
   const actions = useTaskDraftActions();
   const body = useRef<DocumentEditorHandle>(null);
   const mounted = useRef(false);
@@ -28,14 +30,15 @@ export function useTaskDocumentDraft(task: Pick<Task, "id" | "title" | "spec" | 
   const previousIncoming = useRef(incoming);
   const latestIncoming = useRef(incoming);
   latestIncoming.current = incoming;
-  const [initial] = useState(() => initialDraft(task.id, incoming));
+  const [initial] = useState(() => initialDraft(storageId, incoming));
   const [draft, setDraft] = useState(initial.draft);
   const [error, reportError] = useState<string | null>(initial.error);
   const unreadableDraft = useRef(initial.error);
   const [saved, setSaved] = useState(incoming);
   const savedRef = useRef(saved);
   const current = useRef(draft);
-  const save = useRpcMutation("tasks.update");
+  const localSave = useRpcMutation("tasks.update");
+  const save = online?.save ?? localSave;
   const saveRef = useRef(save.mutateAsync);
   saveRef.current = save.mutateAsync;
   const dirty = !sameTaskDraft(draft, saved);
@@ -44,52 +47,38 @@ export function useTaskDocumentDraft(task: Pick<Task, "id" | "title" | "spec" | 
     const next = { ...current.current, ...value };
     current.current = next;
     setDraft(next);
-    const stored = writeDraft(`task.${task.id}`, next);
+    const stored = writeDraft(`task.${storageId}`, next);
     setDraftStored(stored);
     if (stored) unreadableDraft.current = null;
     reportError(null);
   };
 
-  useLayoutEffect(() => {
-    mounted.current = true;
-    actions.register({
-      prepare: async () => {
-        if (unreadableDraft.current) throw new Error(unreadableDraft.current);
-        if (body.current) {
-          if (!(await body.current.flush())) throw new Error("A task image has not saved. Retry or remove it in Overview before continuing.");
-        } else if (!imagesReadyRef.current) {
-          throw new Error("A task image has not saved. Open Overview to retry or remove it before continuing.");
-        }
-      },
-      read: () => (sameTaskDraft(current.current, savedRef.current) ? null : { ...current.current }),
-      save: async (snapshot) => {
-        await saveRef.current({ id: task.id, patch: taskDraftPatch(snapshot) });
-      },
-      acknowledge: (snapshot) => {
-        // This completed write supersedes server values observed before it settled.
-        previousIncoming.current = latestIncoming.current;
-        savedRef.current = snapshot;
-        if (mounted.current) setSaved(snapshot);
-        acknowledgeTaskDraft(task.id, snapshot);
-      },
-    });
-    return () => {
-      mounted.current = false;
-      // Keep this source registered: Activity can still save an Overview draft
-      // that local storage could not retain. A remount replaces it in the barrier.
-    };
-  }, [actions, task.id]);
+  useTaskDocumentSource({
+    actions,
+    taskId: task.id,
+    storageId,
+    body,
+    unreadableDraft,
+    imagesReady: imagesReadyRef,
+    mounted,
+    current,
+    saved: savedRef,
+    latestIncoming,
+    previousIncoming,
+    save: saveRef,
+    setSaved,
+  });
 
   const flush = useCallback(async (): Promise<boolean> => {
     try {
-      await actions.flushTaskDraft(task.id);
+      await actions.flushTaskDraft(storageId);
       if (mounted.current) reportError(null);
       return true;
     } catch (failure) {
       if (mounted.current) reportError(failure instanceof Error ? failure.message : String(failure));
       return false;
     }
-  }, [actions, task.id]);
+  }, [actions, storageId]);
 
   useEffect(() => {
     if (!dirty || !imagesReady || save.isPending || save.error) return;
@@ -105,17 +94,27 @@ export function useTaskDocumentDraft(task: Pick<Task, "id" | "title" | "spec" | 
     previousIncoming.current = incoming;
     // Replacing the draft with the server's copy of it would move the caret mid-sentence.
     if (sameSavedTaskDraft(incoming, current.current)) return;
-    acknowledgeTaskDraft(task.id, current.current);
+    acknowledgeTaskDraft(storageId, current.current);
     current.current = incoming;
     savedRef.current = incoming;
     setDraft(incoming);
     setSaved(incoming);
-  }, [incoming, dirty, save.isPending, task.id]);
+  }, [incoming, dirty, save.isPending, storageId]);
 
   const reportImagesReady = useCallback((ready: boolean) => {
     imagesReadyRef.current = ready;
     setImagesReady(ready);
   }, []);
 
-  return { draft, patch, body, imagesReady, reportImagesReady, draftStored, dirty, saving: save.isPending, saveError: save.error, error, reportError, flush };
+  const replaceSaved = (next: TaskDocumentDraft) => {
+    acknowledgeTaskDraft(storageId, current.current);
+    current.current = next;
+    savedRef.current = next;
+    previousIncoming.current = latestIncoming.current;
+    setDraft(next);
+    setSaved(next);
+    reportError(null);
+  };
+
+  return { draft, patch, replaceSaved, body, imagesReady, reportImagesReady, draftStored, dirty, saving: save.isPending, saveError: save.error, error, reportError, flush };
 }

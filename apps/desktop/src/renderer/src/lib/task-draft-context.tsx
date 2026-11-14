@@ -1,5 +1,5 @@
 import { createContext, useContext, useRef, type ReactNode } from "react";
-import { createTaskDraftBarrier, taskDraftPatch } from "./task-draft";
+import { createTaskDraftBarrier, taskDraftPatch, type TaskDocumentDraft } from "./task-draft";
 import { core } from "./rpc";
 import { invalidateTags } from "./client";
 
@@ -7,10 +7,11 @@ type TaskDraftActions = ReturnType<typeof createTaskDraftBarrier>;
 const TaskDraftContext = createContext<TaskDraftActions | null>(null);
 
 /** Scoped to TaskView; panels and Activity share the Overview save barrier. */
-export function TaskDraftProvider({ taskId, children }: { taskId: string; children: ReactNode }) {
+export function TaskDraftProvider({ taskId, children, saveDraft }: { taskId: string; children: ReactNode; saveDraft?: (draft: TaskDocumentDraft) => Promise<void> }) {
   const actions = useRef<TaskDraftActions | null>(null);
   if (!actions.current)
     actions.current = createTaskDraftBarrier(taskId, async (draft) => {
+      if (saveDraft) return saveDraft(draft);
       await core.call("tasks.update", { id: taskId, patch: taskDraftPatch(draft) });
       invalidateTags(["tasks", "threads", `task:${taskId}`]);
     });

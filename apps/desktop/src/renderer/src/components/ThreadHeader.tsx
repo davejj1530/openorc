@@ -69,6 +69,7 @@ export function ThreadHeader({
   onRenamingChange: (renaming: boolean) => void;
   onRename: (title: string) => void;
 }) {
+  const lastPane = useRouter((s) => s.threadIds.at(-1) === t.id);
   // Before a split pane's title the parent reads as a crumb; among the first pane's facts, as a fact of its own.
   const lineage = (fact: boolean) => (
     <>
@@ -85,6 +86,7 @@ export function ThreadHeader({
   return (
     <TopBar
       windowDragSurface
+      orcling={lastPane}
       tabs={first}
       inSplit={!first}
       rightmost={last}

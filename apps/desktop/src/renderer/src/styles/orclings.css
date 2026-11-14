@@ -343,3 +343,58 @@
 .orcling-group-choice:hover {
   background: var(--surface-2);
 }
+
+/* An Orcling's face at the header's end; the unread dot rests on its top right corner, cut out by a ring of the ground. */
+.header-orcling {
+  position: relative;
+}
+.header-orcling [data-mark="unread"] {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  box-shadow: 0 0 0 1.5px var(--bg);
+}
+
+/* The small chat under that face: a floating plane, r20, with her name, her latest messages and a line to her. */
+.orcling-small-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(380px, calc(100vw - 16px));
+  max-height: min(600px, var(--available-height));
+  padding: 10px;
+  overflow: hidden;
+  border-radius: 20px;
+}
+.orcling-small-chat-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 0 0 6px;
+  font-size: var(--text-base);
+  line-height: var(--text-base--line-height);
+}
+.orcling-small-chat-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* Her face is the header's, so her bubbles take the whole width, as wide as a text in a narrow chat. */
+.orcling-small-chat .orcling-run {
+  grid-template-columns: minmax(0, 1fr);
+  column-gap: 0;
+}
+.orcling-small-chat .orcling-run-face {
+  display: none;
+}
+.orcling-small-chat :is(.orcling-run-name, .orcling-run-bubbles) {
+  grid-column: 1;
+}
+.orcling-small-chat .orcling-chat-drawing {
+  padding-inline-start: 0;
+}
+.orcling-small-chat .orcling-bubble-row {
+  max-width: 86%;
+}

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { PanelIcon } from "./icons";
 import { cn } from "../lib/cn";
 import { useLayout, type PanelSide } from "../lib/layout";
+import { HeaderOrcling } from "./HeaderOrcling";
 import { PageTitle } from "./PageTitle";
 import { PanelSideSwitch } from "./PanelSideSwitch";
 import { WindowCorner } from "./WindowCorner";
@@ -49,6 +50,7 @@ export function TopBar({
   tabs,
   windowDragSurface,
   rightmost: isRightmost,
+  orcling = true,
 }: {
   children: ReactNode;
   actions?: ReactNode;
@@ -59,6 +61,8 @@ export function TopBar({
   tabs?: boolean;
   windowDragSurface?: boolean;
   rightmost?: boolean;
+  /** The work column's last header carries an Orcling's face; false in every header before it. */
+  orcling?: boolean;
 }) {
   const sidebarOpen = useLayout((s) => s.sidebarOpen);
   const panelOpen = useLayout((s) => s.panelOpen);
@@ -96,6 +100,7 @@ export function TopBar({
           rectangle. Redeclare this gap after the clipped group, before actions. */}
       {windowDragSurface ? <span className="thread-header-gap w-2 shrink-0 self-stretch" aria-hidden="true" /> : null}
       <div className="topbar-actions flex shrink-0 items-center gap-1">
+        {orcling ? <HeaderOrcling /> : null}
         {actions}
         {panel && panelOpen ? <PanelSideSwitch docked="right" /> : null}
         {panel ? (

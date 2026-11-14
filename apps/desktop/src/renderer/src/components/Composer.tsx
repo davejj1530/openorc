@@ -161,8 +161,8 @@ export interface ComposerProps {
   /** The person is about to write: they focused the message or started one. */
   onReady?: (() => void) | undefined;
   size?: "md" | "lg";
-  /** The landing screen draws the roomier composer and places the Commit chip itself. */
-  presentation?: "conversation" | "new-thread";
+  /** The landing screen draws the roomier composer and places the Commit chip itself. A small chat keeps only attach and send. */
+  presentation?: "conversation" | "new-thread" | "small";
   error?: string | null;
   children?: ReactNode;
 }
@@ -349,8 +349,12 @@ export function Composer(props: ComposerProps) {
           <div className="composer-tools">
             <ComposerAddMenu onFiles={(chosen) => void addFiles(chosen)} attachmentsBlocked={props.attachmentsDisabledReason} offers={addOffers(props)} lists={lists} />
             {composerDestination(props)}
-            {composerModelControl(props)}
-            {composerModeControl(props)}
+            {props.presentation === "small" ? null : (
+              <>
+                {composerModelControl(props)}
+                {composerModeControl(props)}
+              </>
+            )}
           </div>
           <div className="composer-end">
             {activityLabel ? (

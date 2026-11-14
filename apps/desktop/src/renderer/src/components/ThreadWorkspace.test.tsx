@@ -10,6 +10,7 @@ const { mutate, planThreads, documents, teamThreads, subagentThreads } = vi.hois
   teamThreads: new Set<string>(),
   subagentThreads: new Set<string>(),
 }));
+vi.mock("./HeaderOrcling", () => ({ HeaderOrcling: () => null }));
 vi.mock("../lib/client", async (original) => {
   const rpcData = (method: string, params: { id?: string }) => {
     if (method === "projects.list" || method === "orclings.list" || method === "orclings.groups.list") return [];

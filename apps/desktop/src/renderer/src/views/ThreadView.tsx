@@ -6,6 +6,7 @@ import { ClaudeAccountScope } from "../lib/claude-account";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { useConversationPlans } from "../lib/conversation-plans";
 import { useLayout } from "../lib/layout";
+import { useReadWhileShown } from "../lib/read-while-shown";
 import { useRouter } from "../lib/router";
 
 /**
@@ -31,17 +32,7 @@ export function ThreadView({ threadId, first, last, focused, onClose }: { thread
     if (threadProject && focused) followProject(threadProject);
   }, [threadId, threadProject, focused, followProject]);
 
-  // Looking at the thread reads it. A reply that lands while the window is elsewhere stays unread until the user comes back.
-  useEffect(() => {
-    if (!t?.unread) return;
-    const mark = () => {
-      if (document.hasFocus()) update.mutate({ id: t.id, patch: { seen: true } });
-    };
-    mark();
-    window.addEventListener("focus", mark);
-    return () => window.removeEventListener("focus", mark);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- Resubscribe on new unread activity, not on this effect's own seen-mutation status updates.
-  }, [t?.id, t?.unread, t?.lastActivityAt]);
+  useReadWhileShown(t);
 
   useEffect(() => {
     if (thread.isSuccess && !t) useRouter.getState().closeThreadPane(threadId);

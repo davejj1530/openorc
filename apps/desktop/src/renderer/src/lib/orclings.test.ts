@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { defaultOrclingLook, type Orcling, type OrclingGroup } from "@openorc/protocol";
-import { afterOrclingChatDeleted, afterOrclingDeleted, groupsGoingWith } from "./orclings";
+import { afterOrclingChatDeleted, afterOrclingDeleted, groupsGoingWith, headerOrcling } from "./orclings";
 
 const orcling = (id: string) => ({ id, threadId: `${id}-chat`, name: id, look: defaultOrclingLook }) as Orcling;
 
@@ -28,4 +28,15 @@ it("lands on the chat beside a deleted group chat in the Orclings list, and on a
   expect(afterOrclingChatDeleted(list, groups, "last-group")).toEqual({ view: "thread", threadId: "first-group" });
   expect(afterOrclingChatDeleted(list, [group("only-group")], "only-group")).toEqual({ view: "thread", threadId: "bo-chat" });
   expect(afterOrclingChatDeleted([], [group("only-group")], "only-group")).toEqual({ view: "orcling" });
+});
+
+it("shows in the header the Orcling with the newest unread message, else the one read last, never one already on screen", () => {
+  const list = [orcling("pip"), orcling("bo"), orcling("rini")];
+  const chat = (lastActivityAt: number, seenAt: number | null, unread = false) => ({ unread, lastActivityAt, seenAt });
+  expect(headerOrcling(list, [chat(5, 1, true), chat(9, 2), chat(7, 3, true)], [])?.id).toBe("rini");
+  expect(headerOrcling(list, [chat(5, 1), chat(9, 8), chat(7, 3)], [])?.id).toBe("bo");
+  expect(headerOrcling(list, [chat(5, 1, true), chat(9, 8), chat(7, 3, true)], ["rini-chat"])?.id).toBe("pip");
+  expect(headerOrcling(list, [undefined, undefined, undefined], [])?.id).toBe("pip");
+  expect(headerOrcling(list, [chat(1, null), chat(1, null), chat(1, null)], ["pip-chat", "bo-chat", "rini-chat"])).toBeNull();
+  expect(headerOrcling([], [], [])).toBeNull();
 });

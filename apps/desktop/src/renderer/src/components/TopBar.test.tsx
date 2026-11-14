@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 
 vi.mock("./Sidebar", () => ({ WindowNav: () => null }));
+vi.mock("./HeaderOrcling", () => ({ HeaderOrcling: () => null }));
 vi.mock("../lib/window", () => ({ useTrafficLights: () => true, useWindowsControls: () => false }));
 vi.mock("./ui", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./ui")>()),

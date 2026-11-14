@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Orcling, OrclingGroup } from "@openorc/protocol";
+import type { Orcling, OrclingGroup, ThreadSummary } from "@openorc/protocol";
 import type { MentionEntry } from "./composer-mentions";
 import type { Route } from "./router";
 import { useRpc } from "./client";
@@ -71,4 +71,20 @@ export function afterOrclingChatDeleted(orclings: readonly Orcling[], groups: re
   const at = chats.indexOf(threadId);
   const beside = at < 0 ? undefined : (chats[at + 1] ?? chats[at - 1]);
   return beside ? { view: "thread", threadId: beside } : { view: "orcling" };
+}
+
+type ChatState = Pick<ThreadSummary, "unread" | "lastActivityAt" | "seenAt">;
+
+/**
+ * The Orcling the window's header shows: the one whose unread message is newest, else the one whose chat the person
+ * looked at last, else the first. One whose chat is already on screen is left out. `chats` follows `orclings`.
+ */
+export function headerOrcling(orclings: readonly Orcling[], chats: readonly (ChatState | null | undefined)[], shown: readonly string[]): Orcling | null {
+  const candidates = orclings.flatMap((orcling, index) => (shown.includes(orcling.threadId) ? [] : [{ orcling, chat: chats[index] }]));
+  const newest = (key: (chat: ChatState) => number | null) =>
+    candidates.reduce<{ orcling: Orcling; at: number } | null>((best, { orcling, chat }) => {
+      const at = chat ? key(chat) : null;
+      return at !== null && (!best || at > best.at) ? { orcling, at } : best;
+    }, null)?.orcling ?? null;
+  return newest((chat) => (chat.unread ? chat.lastActivityAt : null)) ?? newest((chat) => chat.seenAt) ?? candidates[0]?.orcling ?? null;
 }

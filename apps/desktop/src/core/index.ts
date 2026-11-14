@@ -80,8 +80,9 @@ const corePromise = OpenOrc.create({
   cloudBrainSecrets: secrets.store("cloud-brain.secrets"),
   cloudBrainMoveSecrets: secrets.store("cloud-brain-move.secrets"),
   accountSecrets: secrets.store("account.secrets"),
-  // No address is built in yet: a development build talks to the server this names, and to none without it.
-  accountServer: __OPENORC_QA__ ? process.env["OPENORC_ACCOUNT_SERVER"] || undefined : undefined,
+  // No address is built in yet: a development or QA build talks to the server OPENORC_ACCOUNT_SERVER names at launch,
+  // else to the one a development build was given (electron.vite.config.ts), and to none without either.
+  accountServer: __OPENORC_QA__ ? process.env["OPENORC_ACCOUNT_SERVER"] || __OPENORC_DEV_ACCOUNT_SERVER__ || undefined : undefined,
   terminal,
   presence: presence.inUse,
   trash: trash.move,

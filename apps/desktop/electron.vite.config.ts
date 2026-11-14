@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { defineConfig } from "electron-vite";
+import { loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import typegpu from "unplugin-typegpu/vite";
@@ -15,9 +16,12 @@ export default defineConfig(({ mode }) => {
   // Test switches (autorun, benchmarks, screenshots) exist only in development and QA builds. OPENORC_QA_BUILD=1 keeps
   // them in a production build for the benchmark job; release and local packages leave them out entirely.
   const define = { __OPENORC_QA__: JSON.stringify(mode === "development" || process.env["OPENORC_QA_BUILD"] === "1") };
+  // A development build signs in to the OpenOrc server named by OPENORC_ACCOUNT_SERVER, from the shell or from
+  // .env.development.local beside this file (git ignores it). Every other build is given none here.
+  const accountServer = mode === "development" ? (loadEnv(mode, import.meta.dirname, "OPENORC_ACCOUNT_SERVER")["OPENORC_ACCOUNT_SERVER"] ?? "") : "";
   return {
     main: {
-      define,
+      define: { ...define, __OPENORC_DEV_ACCOUNT_SERVER__: JSON.stringify(accountServer) },
       build: {
         rollupOptions: {
           input: {

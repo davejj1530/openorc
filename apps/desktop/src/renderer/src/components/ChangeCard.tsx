@@ -4,7 +4,7 @@ import { Button, IconButton } from "./ui";
 import { ChevronDown } from "./icons";
 import type { TurnFileChanges } from "@openorc/protocol";
 
-type ChangeFile = TurnFileChanges["files"][number];
+type ChangeFile = TurnFileChanges["files"][number] & { countLabel?: string };
 
 export const fileCount = (count: number) => `${count} ${count === 1 ? "file" : "files"}`;
 
@@ -33,6 +33,7 @@ export function ChangeCard({
   onReview,
   actions,
   className,
+  totals,
 }: {
   files: ChangeFile[];
   /** The saved diff has been read; counts are real rather than pending. */
@@ -48,15 +49,16 @@ export function ChangeCard({
   /** Extra controls beside Review, such as Undo. */
   actions?: ReactNode;
   className?: string;
+  totals?: { files: number; insertions: number; deletions: number };
 }) {
   const [open, setOpen] = useState(false);
-  const added = files.reduce((n, file) => n + (file.added ?? 0), 0);
-  const removed = files.reduce((n, file) => n + (file.removed ?? 0), 0);
+  const added = totals?.insertions ?? files.reduce((n, file) => n + (file.added ?? 0), 0);
+  const removed = totals?.deletions ?? files.reduce((n, file) => n + (file.removed ?? 0), 0);
   const listId = useId();
   return (
     <section className={cn("change-card", className)} data-plane aria-label="Code changes">
       <div className="change-heading">
-        <span className="change-title">{heading ?? `Changed ${fileCount(files.length)}`}</span>
+        <span className="change-title">{heading ?? `Changed ${fileCount(totals?.files ?? files.length)}`}</span>
         {counted ? <Counts added={added} removed={removed} className="change-totals" /> : <span className="change-totals change-counts">Counting…</span>}
         <div className="change-actions">
           {actions}
@@ -90,7 +92,8 @@ export function ChangeCard({
                 <button type="button" className="change-file" onClick={() => onReview([file.path])}>
                   {file.path}
                 </button>
-                {counted ? <Counts added={file.added} removed={file.removed} /> : null}
+                {file.countLabel ? <span className="change-counts">{file.countLabel}</span> : null}
+                {!file.countLabel && counted ? <Counts added={file.added} removed={file.removed} /> : null}
               </li>
             ))}
           </ul>

@@ -1,0 +1,197 @@
+import { QueryClientProvider } from "@tanstack/react-query";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import type { HostedReviewReply, RpcMethod, RpcParams, RpcResults } from "@openorc/protocol";
+import { ChangesPanel } from "../panels/ChangesPanel";
+import { PanelContent } from "./PanelContent";
+import { HostedTurnChangeCard } from "./HostedTurnChangeCard";
+import { useHostedReviewAction } from "../lib/hosted-review-action";
+import { core } from "../lib/rpc";
+import { queryClient } from "../lib/client";
+import { cloudReviewThread, localReviewThread, pendingAction, recordedChanges, recordedTurn, reviewFile, reviewProject, reviewState } from "./test-fixtures/hosted-review";
+
+vi.mock("./DiffView", () => ({ DiffView: ({ patch }: { patch: string }) => <pre data-testid="saved-diff">{patch}</pre> }));
+const reads = new Map<string, unknown>();
+let writes: { method: string; params: unknown }[];
+let response: HostedReviewReply | Error;
+beforeEach(() => {
+  queryClient.clear();
+  queryClient.setDefaultOptions({ queries: { retry: false, staleTime: Infinity } });
+  localStorage.clear();
+  reads.clear();
+  reads.set("account.status", { state: "signed-in", email: "reader@example.com" });
+  reads.set("hosted.review.changes", recordedChanges);
+  reads.set("hosted.review.state", reviewState);
+  reads.set("hosted.review.file", reviewFile);
+  reads.set("hosted.review.turn", recordedTurn);
+  writes = [];
+  response = { accepted: true, action: pendingAction };
+  vi.spyOn(core, "call").mockImplementation(async <M extends RpcMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> => {
+    if (method === "hosted.review.action") {
+      writes.push({ method, params });
+      if (response instanceof Error) throw response;
+      return response as RpcResults[M];
+    }
+    const value = reads.get(method);
+    if (value instanceof Error) throw value;
+    if (value === undefined) throw new Error(`Unexpected read: ${method}`);
+    return value as RpcResults[M];
+  });
+});
+afterEach(() => {
+  cleanup();
+  queryClient.clear();
+  vi.restoreAllMocks();
+});
+const mount = (children = <PanelContent context={{ kind: "thread", thread: cloudReviewThread, project: reviewProject }} page={{ kind: "changes", selection: null }} onNavigate={() => undefined} />) =>
+  render(<QueryClientProvider client={queryClient}>{children}</QueryClientProvider>);
+
+it("draws saved changes and publishing controls without a local Git or review-comment call", async () => {
+  mount();
+  expect((await screen.findByTestId("saved-diff")).textContent).toContain("+new");
+  expect(screen.getByText("Branch")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Commit" })).toBeTruthy();
+  expect(screen.queryByText("Clean workspace")).toBeNull();
+  expect(vi.mocked(core.call).mock.calls.every(([method]) => method.startsWith("hosted.review.") || method === "account.status")).toBe(true);
+});
+
+it.each([
+  { state: "missing", turnId: "turn-2", line: "This turn's changes were not saved." },
+  { state: "none", line: "No turn has ended yet." },
+])("keeps the $state checkpoint state separate from a clean workspace", async (changes) => {
+  reads.set("hosted.review.changes", changes);
+  mount();
+  expect(await screen.findByText(changes.line)).toBeTruthy();
+  expect(screen.queryByText("Clean workspace")).toBeNull();
+});
+
+it("shows a read failure without using stale change counts", async () => {
+  reads.set("hosted.review.changes", new Error("The saved changes could not be read."));
+  mount();
+  expect(await screen.findByText("The saved changes could not be read.")).toBeTruthy();
+  expect(screen.queryByTestId("saved-diff")).toBeNull();
+});
+
+it("keeps a later missing checkpoint, omitted files, and cut counts visible", async () => {
+  reads.set("hosted.review.changes", { ...recordedChanges, missing: "The latest turn was not recorded.", unlisted: 4 });
+  reads.set("hosted.review.file", { ...reviewFile, cut: { shownLines: 4, totalLines: 12000 } });
+  mount();
+  expect(await screen.findByText("The latest turn was not recorded.")).toBeTruthy();
+  expect(await screen.findByText("4 more files are not listed.")).toBeTruthy();
+  expect(await screen.findByText("Showing 4 of 12,000 lines.")).toBeTruthy();
+});
+
+it("does not call an earlier empty checkpoint clean when the latest checkpoint is missing", async () => {
+  reads.set("hosted.review.changes", { ...recordedChanges, files: [], totals: { files: 0, insertions: 0, deletions: 0 }, missing: "The latest turn was not recorded." });
+  mount();
+  expect(await screen.findByText("The latest turn was not recorded.")).toBeTruthy();
+  expect(screen.queryByText("No changes")).toBeNull();
+});
+
+it("shows the binary reason instead of an empty patch", async () => {
+  reads.set("hosted.review.file", { ...reviewFile, body: { kind: "binary" }, patch: "", note: "This is a binary file." });
+  mount();
+  expect(await screen.findByText("This is a binary file.")).toBeTruthy();
+});
+
+it("keeps PR title and body usable without fetching a template or local branches", async () => {
+  mount();
+  await screen.findByRole("button", { name: "PR" });
+  await waitFor(() => expect(screen.getByRole("button", { name: "PR" }).hasAttribute("disabled")).toBe(false));
+  fireEvent.click(screen.getByRole("button", { name: "PR" }));
+  fireEvent.change(await screen.findByRole("textbox", { name: "Title" }), { target: { value: "Saved example" } });
+  fireEvent.change(screen.getByRole("textbox", { name: "Body" }), { target: { value: "Check the example output." } });
+  expect(screen.getByRole("textbox", { name: "Base" }).getAttribute("readonly")).not.toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Open PR" }));
+  await waitFor(() => expect(writes).toHaveLength(1));
+  expect(writes[0]?.params).toMatchObject({ threadId: cloudReviewThread.id, action: { kind: "pull_request", title: "Saved example", body: "Check the example output.", id: expect.any(String) } });
+  expect(vi.mocked(core.call).mock.calls.some(([method]) => method === "review.threadPrTemplate" || method.startsWith("git."))).toBe(false);
+});
+
+it("draws a saved turn with the same totals and disables Restore with its own reason", async () => {
+  mount(<HostedTurnChangeCard threadId={cloudReviewThread.id} turnId="turn-1" />);
+  expect(await screen.findByText("Changed 1 file")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Undo" }).hasAttribute("disabled")).toBe(true);
+  expect(screen.getByLabelText("Undo this turn's changes").getAttribute("data-tip")).toBe("Restoring files isn't available in this cloud thread yet.");
+});
+
+it("shows a working turn's reason on a keyboard-reachable review control", async () => {
+  reads.set("hosted.review.turn", { state: "working", turnId: "turn-1", line: "This turn's changes aren't recorded yet." });
+  mount(<HostedTurnChangeCard threadId={cloudReviewThread.id} turnId="turn-1" />);
+  const control = await screen.findByLabelText("Review changes");
+  expect(control.getAttribute("tabindex")).toBe("0");
+  expect(control.getAttribute("data-tip")).toBe("This turn's changes aren't recorded yet.");
+  expect(screen.getByRole("button", { name: "Review changes" }).hasAttribute("disabled")).toBe(true);
+});
+
+it("leaves the local empty workspace and RPC path unchanged", async () => {
+  reads.set("review.threadDiff", { baseSha: null, files: [], patch: "", since: null });
+  mount(<ChangesPanel thread={localReviewThread} project={reviewProject} />);
+  expect(await screen.findByText("Clean workspace")).toBeTruthy();
+  expect(vi.mocked(core.call).mock.calls.every(([method]) => method === "review.threadDiff")).toBe(true);
+});
+
+function ActionProbe({ live = true, account = "reader@example.com" }: { live?: boolean; account?: string }) {
+  const action = useHostedReviewAction("cloud-example", live, account);
+  return (
+    <>
+      <button onClick={() => action.start({ kind: "push", id: pendingAction.id })}>Start</button>
+      <button onClick={action.retry}>Retry</button>
+      <span>{action.pending ? "Pending" : "Settled"}</span>
+      <span>{action.error ?? action.refusal ?? action.result?.state}</span>
+    </>
+  );
+}
+
+it("retains the same action across a lost response, unmount and reconnect", async () => {
+  response = new Error("OpenOrc Cloud can't be reached.");
+  const first = mount(<ActionProbe />);
+  fireEvent.click(screen.getByRole("button", { name: "Start" }));
+  await screen.findByText("OpenOrc Cloud can't be reached.");
+  first.unmount();
+  const reconnect = mount(<ActionProbe live={false} />);
+  expect(screen.getByText("Pending")).toBeTruthy();
+  expect(writes).toHaveLength(1);
+  response = { accepted: true, action: { ...pendingAction, state: "done", result: { kind: "pushed", branch: "example", sha: "abc1234" } } };
+  reconnect.rerender(
+    <QueryClientProvider client={queryClient}>
+      <ActionProbe />
+    </QueryClientProvider>,
+  );
+  await screen.findByText("done");
+  expect(writes).toHaveLength(2);
+  expect(writes[0]?.params).toEqual(writes[1]?.params);
+});
+
+it("keeps another account from replaying the first account's pending action", async () => {
+  const first = mount(<ActionProbe />);
+  fireEvent.click(screen.getByRole("button", { name: "Start" }));
+  await waitFor(() => expect(writes).toHaveLength(1));
+  first.unmount();
+  mount(<ActionProbe account="other@example.com" />);
+  await act(async () => undefined);
+  expect(screen.getByText("Settled")).toBeTruthy();
+  expect(writes).toHaveLength(1);
+});
+
+it("reconciles the same pending action on focus after a lost HTTP response", async () => {
+  response = new Error("The response was lost.");
+  mount(<ActionProbe />);
+  fireEvent.click(screen.getByRole("button", { name: "Start" }));
+  await screen.findByText("The response was lost.");
+  response = { accepted: true, action: { ...pendingAction, state: "done", result: { kind: "pushed", branch: "example", sha: "abc1234" } } };
+  fireEvent.focus(window);
+  await screen.findByText("done");
+  expect(writes[0]?.params).toEqual(writes[1]?.params);
+});
+
+it.each([
+  { accepted: false, refusal: "no_hours", line: "You have no cloud hours left." },
+  { accepted: true, action: { ...pendingAction, state: "failed", line: "The remote branch changed.", failure: "moved" } },
+] satisfies HostedReviewReply[])("keeps refused and failed actions separate from a successful push", async (reply) => {
+  response = reply;
+  mount(<ActionProbe />);
+  fireEvent.click(screen.getByRole("button", { name: "Start" }));
+  await screen.findByText("Settled");
+  expect(screen.queryByText("done")).toBeNull();
+});

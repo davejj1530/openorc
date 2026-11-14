@@ -1,9 +1,9 @@
 import { useMemo, useRef } from "react";
 import type { ThreadCheckpoint } from "@openorc/protocol";
-import { editedPaths, type Block, type RunTranscript } from "@openorc/client";
+import { editedPaths, hostedTurnCards, type Block, type RunTranscript } from "@openorc/client";
 import { useRpc } from "./client";
 
-export type TurnCard = { checkpointId: string; previousCheckpointId: string | null; paths: string[] };
+export type TurnCard = { checkpointId: string; previousCheckpointId: string | null; paths: string[]; hosted?: true };
 
 /** A checkpoint saved as a turn started, drawn as one line between turns with its own Undo. */
 export interface OutsideLine {
@@ -25,19 +25,22 @@ export function useTurnFooters({
   transcripts,
   blocks,
   basePath,
+  hosted = false,
 }: {
   threadId: string | null;
   transcripts: readonly (RunTranscript | undefined)[];
   blocks: readonly Block[] | undefined;
   /** Null for a conversation whose agent ran elsewhere: its cards name only the files the saved diff lists. */
   basePath: string | null;
+  hosted?: boolean;
 }): TurnFooters {
-  const checkpoints = useRpc("threads.checkpoints", { id: threadId ?? "" }, { enabled: Boolean(threadId) });
+  const checkpoints = useRpc("threads.checkpoints", { id: threadId ?? "" }, { enabled: Boolean(threadId) && !hosted });
   const history = threadId ? checkpoints.data : undefined;
   const computed = useMemo((): TurnFooters => {
+    if (hosted) return { cards: hostedTurnCards(transcripts), outside: new Map() };
     if (!history) return { cards: new Map(), outside: new Map() };
     return { cards: turnCards(history, transcripts, basePath), outside: outsideLines(history, transcripts, blocks ?? []) };
-  }, [history, transcripts, blocks, basePath]);
+  }, [history, transcripts, blocks, basePath, hosted]);
   // Streaming changes the transcript on every frame but the footers only when a turn ends; finished turns stay memoized.
   return useSameFooters(computed);
 }
@@ -117,7 +120,7 @@ export function outsideAnchor(blocks: readonly { id: string; at: number; startsT
 function useSameFooters(footers: TurnFooters): TurnFooters {
   const previous = useRef(footers);
   const sameCard = (a: TurnCard, b: TurnCard | undefined) =>
-    Boolean(b && a.checkpointId === b.checkpointId && a.previousCheckpointId === b.previousCheckpointId && a.paths.join("\n") === b.paths.join("\n"));
+    Boolean(b && a.hosted === b.hosted && a.checkpointId === b.checkpointId && a.previousCheckpointId === b.previousCheckpointId && a.paths.join("\n") === b.paths.join("\n"));
   const sameLines = (a: OutsideLine[], b: OutsideLine[] | undefined) =>
     Boolean(b && a.length === b.length && a.every((line, i) => line.checkpointId === b[i]!.checkpointId && line.previousCheckpointId === b[i]!.previousCheckpointId && line.by === b[i]!.by));
   if (!sameEntries(footers.cards, previous.current.cards, sameCard) || !sameEntries(footers.outside, previous.current.outside, sameLines)) previous.current = footers;

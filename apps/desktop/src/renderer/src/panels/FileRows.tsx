@@ -7,7 +7,7 @@ import { cn } from "../lib/cn";
 const toneClass: Record<FileMarkTone, string> = { ok: "text-ok", "ink-2": "text-ink-2", bad: "text-bad", warn: "text-warn" };
 
 /** The changed files, one compact row each, collapsible so the diff gets the height. */
-export function FileRows({ files, commented }: { files: FileChange[]; commented?: Set<string> }) {
+export function FileRows({ files, commented, onSelect, selected }: { files: FileChange[]; commented?: Set<string>; onSelect?: (path: string) => void; selected?: string }) {
   const [open, setOpen] = useState(true);
   return (
     <div className="shrink-0 max-h-56 flex flex-col">
@@ -17,15 +17,29 @@ export function FileRows({ files, commented }: { files: FileChange[]; commented?
       </button>
       {open ? (
         <div className="overflow-y-auto">
-          {files.map((f) => (
-            <div key={f.path} className="flex items-center gap-2 h-7 px-5 text-sm">
-              <span className={cn("w-3 font-mono text-xs", toneClass[fileMarks[f.status].tone])}>{fileMarks[f.status].letter}</span>
-              <span className="font-mono truncate text-ink" data-tip={f.path}>
-                {f.path}
-              </span>
-              {commented?.has(f.path) ? <MessageSquare size={11} className="ml-auto text-ink-4 shrink-0" /> : null}
-            </div>
-          ))}
+          {onSelect
+            ? files.map((f) => (
+                <button
+                  key={f.path}
+                  onClick={() => onSelect(f.path)}
+                  aria-pressed={selected === f.path}
+                  className={cn("flex items-center gap-2 h-7 px-5 text-sm w-full text-left hover:bg-surface-2", selected === f.path && "bg-surface-2")}
+                >
+                  <span className={cn("w-3 font-mono text-xs", toneClass[fileMarks[f.status].tone])}>{fileMarks[f.status].letter}</span>
+                  <span className="font-mono truncate text-ink" data-tip={f.path}>
+                    {f.path}
+                  </span>
+                </button>
+              ))
+            : files.map((f) => (
+                <div key={f.path} className="flex items-center gap-2 h-7 px-5 text-sm">
+                  <span className={cn("w-3 font-mono text-xs", toneClass[fileMarks[f.status].tone])}>{fileMarks[f.status].letter}</span>
+                  <span className="font-mono truncate text-ink" data-tip={f.path}>
+                    {f.path}
+                  </span>
+                  {commented?.has(f.path) ? <MessageSquare size={11} className="ml-auto text-ink-4 shrink-0" /> : null}
+                </div>
+              ))}
         </div>
       ) : null}
     </div>

@@ -27,24 +27,34 @@ export async function action(threads: Threads, { threadId, action: request }: Rp
 }
 
 export async function legacyChanges(threads: Threads, params: RpcParams<"review.threadChanges">) {
-  const result = await changes(threads, params);
   if (params.comparison === "head") throw new Refused("Uncommitted changes aren't available separately in this cloud thread yet.");
+  const result = await changes(threads, params);
   return reviewChanges(result);
+}
+
+export async function legacyFile(threads: Threads, params: RpcParams<"review.threadFileDiff">) {
+  if (params.comparison === "head") throw new Refused("Uncommitted changes aren't available separately in this cloud thread yet.");
+  return file(threads, params);
+}
+
+async function patches(threads: Threads, threadId: string, files: { path: string }[], turnId?: string) {
+  const on = threads.on(threadId);
+  const diffs = [];
+  for (const file of files) diffs.push(await on.request(REVIEW_ROUTES.file(threadId, file.path, turnId)));
+  return diffs;
 }
 
 export async function legacyDiff(threads: Threads, params: RpcParams<"review.threadDiff">): Promise<RpcResults["review.threadDiff"]> {
   const read = await legacyChanges(threads, params);
   if (read.unlisted) throw new Refused("Open Changes to read the full file count.");
-  const on = threads.on(params.threadId);
-  const files = await Promise.all(read.files.map((file) => on.request(REVIEW_ROUTES.file(params.threadId, file.path))));
+  const files = await patches(threads, params.threadId, read.files);
   return { baseSha: read.baseSha, files: read.files, patch: completePatch(files), since: null };
 }
 
 export async function legacyTurn(threads: Threads, params: RpcParams<"threads.turnChanges">): Promise<RpcResults["threads.turnChanges"]> {
   const read = await turn(threads, { threadId: params.id, turnId: params.checkpointId });
   const files = turnFiles(read).filter((file) => !params.paths || params.paths.includes(file.path));
-  const on = threads.on(params.id);
-  const diffs = params.includePatch ? await Promise.all(files.map((file) => on.request(REVIEW_ROUTES.file(params.id, file.path, params.checkpointId)))) : null;
+  const diffs = params.includePatch ? await patches(threads, params.id, files, params.checkpointId) : null;
   return { files, patch: diffs ? completePatch(diffs) : null };
 }
 

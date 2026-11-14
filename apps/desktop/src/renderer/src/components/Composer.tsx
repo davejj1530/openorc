@@ -69,6 +69,7 @@ export type SlashCommand = { name: string; hint: string; run: () => void; insert
 export interface ComposerChanges {
   projectName: string;
   files: number;
+  uncounted?: boolean;
   insertions: number;
   deletions: number;
   onReview: () => void;

@@ -1,0 +1,74 @@
+import { useEffect } from "react";
+import type { ThreadSummary } from "@openorc/protocol";
+import { fileCount } from "@openorc/client";
+import { HostedReviewState } from "../components/HostedReviewState";
+import { DiffStat, PanelBar, PanelBarMeta } from "../components/PanelBar";
+import { RefreshCw } from "../components/icons";
+import { Button, IconButton, Tooltip } from "../components/ui";
+import { useRpc } from "../lib/client";
+import { cn } from "../lib/cn";
+import { useLayout, type ChangeSelection } from "../lib/layout";
+import { HostedPublish } from "./HostedPublish";
+import { HostedReviewFiles } from "./HostedReviewFiles";
+
+export function HostedChangesPanel({ thread }: { thread: ThreadSummary }) {
+  const read = useRpc("hosted.review.changes", { threadId: thread.id });
+  const state = useRpc("hosted.review.state", { threadId: thread.id });
+  const refresh = () => {
+    void read.refetch();
+    void state.refetch();
+  };
+  useEffect(() => {
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
+  });
+  const changes = read.data;
+  const recorded = !read.error && changes?.state === "recorded" ? changes : null;
+  return (
+    <div className="h-full flex flex-col min-h-0">
+      <HostedPublish
+        key={thread.id}
+        thread={thread}
+        state={state.error ? undefined : state.data}
+        stateError={state.error}
+        changes={read.error ? undefined : changes}
+        heading={<span data-tip={recorded ? `Since ${thread.baseBranch ?? "the starting commit"} (${recorded.baseSha.slice(0, 7)}), turn ${recorded.turnId}` : undefined}>Branch</span>}
+        meta={
+          recorded ? (
+            <>
+              <PanelBarMeta>{fileCount(recorded.totals.files)}</PanelBarMeta>
+              <DiffStat add={recorded.totals.insertions} del={recorded.totals.deletions} />
+            </>
+          ) : null
+        }
+        refresh={
+          <Tooltip label="Refresh">
+            <IconButton onClick={refresh} aria-label="Refresh" className="text-ink-4">
+              <RefreshCw size={15} className={cn(read.isFetching && "animate-spin")} />
+            </IconButton>
+          </Tooltip>
+        }
+      />
+      <HostedReviewState changes={changes} error={read.error} retry={refresh} />
+      {!read.error && recorded && recorded.totals.files > 0 ? <HostedReviewFiles key={recorded.treeSha} threadId={thread.id} changes={recorded} /> : null}
+    </div>
+  );
+}
+
+export function HostedSavedChangesPanel({ selection }: { selection: ChangeSelection }) {
+  const read = useRpc("hosted.review.turn", { threadId: selection.id, turnId: selection.checkpointId });
+  const changes = read.data;
+  return (
+    <section className="h-full flex flex-col min-h-0" aria-label="Selected code changes">
+      <PanelBar title="Saved changes" meta={!read.error && changes?.state === "recorded" ? <PanelBarMeta>{fileCount(changes.totals.files)}</PanelBarMeta> : null}>
+        <Button variant="ghost" onClick={() => useLayout.getState().clearChanges()}>
+          All changes
+        </Button>
+      </PanelBar>
+      <HostedReviewState changes={changes} error={read.error} retry={() => void read.refetch()} />
+      {!read.error && changes?.state === "recorded" && changes.totals.files > 0 ? (
+        <HostedReviewFiles threadId={selection.id} changes={changes} turnId={selection.checkpointId} paths={selection.paths} />
+      ) : null}
+    </section>
+  );
+}

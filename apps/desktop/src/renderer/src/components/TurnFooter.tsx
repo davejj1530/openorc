@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import { ChangeCard, fileCount } from "./ChangeCard";
 import { ThreadChangeCard, UndoTurnButton } from "./ThreadChangeCard";
+import { HostedTurnChangeCard } from "./HostedTurnChangeCard";
 import { useRpc, useRpcs } from "../lib/client";
 import { useLayout } from "../lib/layout";
 import type { Block, TurnSize } from "@openorc/client";
@@ -36,7 +37,14 @@ const sizeOf = (files: { added: number | null; removed: number | null }[]): Turn
  * "+21 −8 in 3 files". The lookup only changes when a size does, so streaming leaves finished turns alone.
  */
 export function TurnChangesProvider({ footers, threadId, children }: { footers: TurnFooters; threadId: string | undefined; children: ReactNode }) {
-  const cards = [...footers.cards.values()];
+  const allCards = [...footers.cards.values()];
+  const cards = allCards.filter((card) => !card.hosted);
+  const hostedCards = allCards.filter((card) => card.hosted);
+  const hosted = useRpcs(
+    "hosted.review.turn",
+    hostedCards.map((card) => ({ threadId: threadId ?? "", turnId: card.checkpointId })),
+    { enabled: Boolean(threadId) },
+  );
   const summaries = useRpcs(
     "threads.turnChanges",
     cards.map((card) => ({ id: threadId ?? "", checkpointId: card.checkpointId })),
@@ -46,6 +54,10 @@ export function TurnChangesProvider({ footers, threadId, children }: { footers: 
     const files = summaries[index]?.data?.files;
     return files ? [[card.checkpointId, sizeOf(files)] as const] : [];
   });
+  for (const [index, card] of hostedCards.entries()) {
+    const changes = hosted[index]?.data;
+    if (!hosted[index]?.error && changes?.state === "recorded") sizes.push([card.checkpointId, { files: changes.totals.files, added: changes.totals.insertions, removed: changes.totals.deletions }]);
+  }
   const key = JSON.stringify(sizes);
   const lookup = useMemo(() => {
     const byCheckpoint = new Map<string, TurnSize>(JSON.parse(key) as [string, TurnSize][]);
@@ -71,7 +83,8 @@ export function useTurnFooter({ footers, threadId, working }: { footers: TurnFoo
       if (!threadId || (!card && !lines.length)) return null;
       return (
         <>
-          {card ? <ThreadChangeCard key={card.checkpointId} threadId={threadId} {...card} working={working} /> : null}
+          {card?.hosted ? <HostedTurnChangeCard key={card.checkpointId} threadId={threadId} turnId={card.checkpointId} /> : null}
+          {card && !card.hosted ? <ThreadChangeCard key={card.checkpointId} threadId={threadId} {...card} working={working} /> : null}
           {lines.map((line) => (
             <OutsideChangesLine key={line.checkpointId} line={line} threadId={threadId} working={working} />
           ))}

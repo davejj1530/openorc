@@ -12,6 +12,7 @@ export function ComposerChangesBar({ changes }: { changes: ComposerChanges | nul
 
 /** Commit and the diff totals share one pill: Commit opens the commit flow, the totals open the review. While the panel shows the changes, its Commit is the one. */
 export function ComposerCommitChip({ changes }: { changes: ComposerChanges | null | undefined }) {
+  if (changes?.uncounted) return <HostedCommitChip changes={changes} />;
   if (!changes || changes.files === 0 || changes.inPanel) return null;
   const fileLabel = changes.files === 1 ? "file" : "files";
   return (
@@ -39,6 +40,24 @@ export function ComposerCommitChip({ changes }: { changes: ComposerChanges | nul
             {changes.files} {fileLabel}
           </span>
         )}
+      </button>
+    </section>
+  );
+}
+
+function HostedCommitChip({ changes }: { changes: ComposerChanges }) {
+  if (changes.inPanel) return null;
+  return (
+    <section className="composer-changes" aria-label="Uncommitted changes">
+      <Tooltip label={changes.commitDisabledReason ?? "Commit changes"}>
+        <span className="composer-changes-commit-wrap" tabIndex={changes.commitDisabledReason ? 0 : undefined}>
+          <button type="button" className="composer-changes-commit" aria-label="Commit changes" disabled={Boolean(changes.commitDisabledReason)} onClick={changes.onCommit}>
+            Commit
+          </button>
+        </span>
+      </Tooltip>
+      <button type="button" className="composer-changes-summary" onClick={changes.onReview}>
+        Review
       </button>
     </section>
   );

@@ -1,6 +1,7 @@
 import { lazy } from "react";
 import type { PanelPage } from "../lib/panel-tabs";
 import { ChangesPanel } from "../panels/ChangesPanel";
+import { HostedChangesPanel, HostedSavedChangesPanel } from "../panels/HostedChangesPanel";
 import { CheckpointsPanel } from "../panels/CheckpointsPanel";
 import { CommitsPanel, type CommitSource } from "../panels/CommitsPanel";
 import { MemoryPanel } from "../panels/MemoryPanel";
@@ -29,8 +30,10 @@ function FileContent({ context, page }: ContentProps & { page: Extract<PanelPage
 }
 
 function ChangesContent({ context, page }: ContentProps & { page: Extract<PanelPage, { kind: "changes" }> }) {
+  if (page.selection && context.kind === "thread" && context.thread.owner?.brain === "hosted") return <HostedSavedChangesPanel key={JSON.stringify(page.selection)} selection={page.selection} />;
   if (page.selection) return <SavedChangesPanel key={JSON.stringify(page.selection)} selection={page.selection} />;
   if (context.kind === "task") return <ReviewPanel task={context.task} project={context.project} />;
+  if (context.kind === "thread" && context.thread.owner?.brain === "hosted") return <HostedChangesPanel key={context.thread.id} thread={context.thread} />;
   return (
     <ChangesPanel key={panelScope(context)} thread={context.kind === "thread" ? context.thread : undefined} task={context.kind === "thread" ? context.task : undefined} project={context.project} />
   );

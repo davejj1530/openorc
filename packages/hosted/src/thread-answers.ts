@@ -77,7 +77,7 @@ export const ANSWERS: { [M in RoutedMethod]: Answer<M> | ReturnType<typeof refus
   "review.comments.remove": NOT_YET,
   "review.comments.send": NOT_YET,
   "review.threadChanges": review.legacyChanges,
-  "review.threadFileDiff": review.file,
+  "review.threadFileDiff": review.legacyFile,
   "review.commitThread": review.commit,
   "review.pushThread": review.push,
   "review.createThreadPr": review.pullRequest,

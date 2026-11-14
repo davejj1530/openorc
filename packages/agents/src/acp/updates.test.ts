@@ -47,6 +47,20 @@ describe("AcpUpdateMapper", () => {
     expect(ended.text).toBe("A\n\nB");
   });
 
+  it("says a call's input when it comes after the call, once, as OpenCode names a command only when it runs", () => {
+    const mapper = new AcpUpdateMapper("run");
+    const command = "echo started >> slow.log && sleep 6";
+    expect(mapper.map({ sessionUpdate: "tool_call", toolCallId: "c1", title: "shell", name: "shell", kind: "execute", status: "pending", rawInput: { cwd: "/repo" } }, 1)).toEqual([
+      { type: "tool.started", runId: "run", ts: 1, toolCallId: "c1", name: "shell", input: { cwd: "/repo" }, parentToolCallId: null },
+    ]);
+    const running: SessionUpdate = { sessionUpdate: "tool_call_update", toolCallId: "c1", kind: "execute", status: "in_progress", title: command, rawInput: { command, cwd: "/repo" } };
+    expect(mapper.map(running, 2)).toEqual([{ type: "tool.updated", runId: "run", ts: 2, toolCallId: "c1", input: { command, cwd: "/repo" }, progress: command }]);
+    expect(mapper.map(running, 3), "the same update again says nothing").toEqual([]);
+    expect(mapper.map({ sessionUpdate: "tool_call_update", toolCallId: "c1", status: "completed", rawOutput: { metadata: { exit: 0 } } }, 4)).toMatchObject([
+      { type: "tool.completed", input: { command, cwd: "/repo" } },
+    ]);
+  });
+
   it("turns tool calls into started, output deltas from replaced snapshots, and completed", () => {
     const mapper = new AcpUpdateMapper("run");
     const started = mapper.map({ sessionUpdate: "tool_call", toolCallId: "c1", title: "ls", kind: "execute", status: "pending", rawInput: { command: "ls", cwd: "/repo" } }, 1);

@@ -203,7 +203,9 @@ export class AcpUpdateMapper {
     const events: AgentEvent[] = [];
     if (this.finished.has(update.toolCallId)) return events;
     const tool = this.toolFor(update, ts, events);
-    if (update.rawInput !== undefined && update.rawInput !== null) tool.input = update.rawInput;
+    // A call's input can come after the call: OpenCode names a command only once it runs.
+    const named = update.rawInput !== undefined && update.rawInput !== null && JSON.stringify(update.rawInput) !== JSON.stringify(tool.input);
+    if (named) tool.input = update.rawInput;
     events.push(...this.fileChanges(update.content, ts));
     const text = progressText(update);
     switch (update.status) {
@@ -227,14 +229,16 @@ export class AcpUpdateMapper {
         return events;
       }
       default: {
+        const news: { input?: unknown; progress?: string } = named ? { input: tool.input } : {};
         if (text !== null && text !== tool.text) {
           const delta = text.startsWith(tool.text) ? text.slice(tool.text.length) : text;
           tool.text = text;
           if (delta) events.push({ type: "tool.output.delta", runId: this.runId, ts, toolCallId: update.toolCallId, text: delta });
         } else if (update.title && update.title !== tool.title) {
           tool.title = update.title;
-          events.push({ type: "tool.updated", runId: this.runId, ts, toolCallId: update.toolCallId, progress: update.title });
+          news.progress = update.title;
         }
+        if (named || news.progress !== undefined) events.push({ type: "tool.updated", runId: this.runId, ts, toolCallId: update.toolCallId, ...news });
         return events;
       }
     }

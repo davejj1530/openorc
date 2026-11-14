@@ -5,7 +5,7 @@ it("answers one return on its path with a page, hands its query on unread, and s
   const waiting = await awaitBrowserReturn("/github-return", 60_000);
   expect((await fetch(`http://127.0.0.1:${waiting.port}/elsewhere`)).status).toBe(404);
   const page = await fetch(`http://127.0.0.1:${waiting.port}/github-return?code=abc&state=s%2F1`);
-  expect(await page.text()).toContain("Go back to OpenOrc to finish.");
+  expect(await page.text()).toContain("You can return to OpenOrc. You can close this tab.");
   await expect(waiting.query).resolves.toBe("code=abc&state=s%2F1");
   await expect(fetch(`http://127.0.0.1:${waiting.port}/github-return`)).rejects.toThrow();
 });

@@ -21,7 +21,7 @@ export interface BrowserReturn {
 }
 
 const TIMED_OUT = "The browser didn't come back in time. Try again.";
-const PAGE = '<!doctype html><meta charset=utf-8><title>OpenOrc</title><p style="font:15px system-ui;margin:3em">Go back to OpenOrc to finish. You can close this tab.</p>';
+const PAGE = '<!doctype html><meta charset=utf-8><title>OpenOrc</title><p style="font:15px system-ui;margin:3em">You can return to OpenOrc. You can close this tab.</p>';
 
 export async function awaitBrowserReturn(path: string, timeoutMs: number): Promise<BrowserReturn> {
   let resolve!: (query: string) => void;

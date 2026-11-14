@@ -1,10 +1,11 @@
-import type { TeamChatFile } from "@openorc/protocol";
+import { HOSTED_FILES_UNAVAILABLE, type HostedAvailability, type TeamChatFile } from "@openorc/protocol";
 import type { HostedDeps } from "./index.js";
 import { Refused, Unreadable, type Session } from "./session.js";
 import type { Spaces } from "./spaces.js";
 import { FILE_ROUTES, type UploadPlan } from "./wire-files.js";
 import { putFilePart, type FileByteSource } from "./file-transfer.js";
 import { SOCKET, wireTopics } from "./wire.js";
+import { PARITY_ROUTES } from "./wire-parity.js";
 
 export type FileDestination = { kind: "hosted"; projectId: string; threadId?: string } | { kind: "chat"; conversationId: string };
 export interface CloudFileScope {
@@ -60,6 +61,18 @@ export class Files {
       const plan = await this.deps.session.in(scope.spaceId).request(FILE_ROUTES.start, { ...file, ...destination }, cancel);
       if (plan.parts !== Math.ceil(file.bytes / plan.partBytes)) throw new Unreadable();
       return plan;
+    });
+  }
+
+  async availability(scope: CloudFileScope): Promise<HostedAvailability> {
+    return this.#transfer(scope, "read", undefined, async (signal) => {
+      try {
+        const reply = await this.deps.session.in(scope.spaceId).request(PARITY_ROUTES.capabilities, undefined, signal);
+        return reply.features.files ?? { available: false, reason: HOSTED_FILES_UNAVAILABLE };
+      } catch (error) {
+        if (error instanceof Refused && error.status === 404) return { available: false, reason: HOSTED_FILES_UNAVAILABLE };
+        throw error;
+      }
     });
   }
 

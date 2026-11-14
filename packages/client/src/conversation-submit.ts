@@ -171,6 +171,8 @@ export interface OutgoingMessage {
   text: string;
   attachments: string[];
   messageId?: string;
+  /** This exact message's own id, kept while its draft is unchanged, so sending it again after a lost answer is the same message. */
+  requestId?: string;
 }
 
 function startParams(request: SubmitRequest, plan: Extract<SubmitPlan, { kind: "start" }>, prompt: string, attachments: string[], messageId: string | undefined): RpcParams<"runs.start"> {
@@ -206,7 +208,7 @@ export async function sendMessage(calls: SubmitCalls, randomId: () => string, re
   const plan = planSubmit(request);
   const text = messageBody(message.text, message.attachments);
   const { attachments } = message;
-  const messageId = request.task?.requestId ?? message.messageId;
+  const messageId = message.requestId ?? request.task?.requestId ?? message.messageId;
   const task = request.task ? { task: request.task.context } : {};
   switch (plan.kind) {
     case "blocked":
@@ -216,7 +218,7 @@ export async function sendMessage(calls: SubmitCalls, randomId: () => string, re
       await calls.send.mutateAsync({ runId: plan.runId, text, attachments, ...(messageId ? { messageId } : {}), ...task });
       break;
     case "queue":
-      await calls.queue.mutateAsync({ id: plan.threadId, text, attachments, requestKey: request.task?.requestId ?? randomId(), ...task });
+      await calls.queue.mutateAsync({ id: plan.threadId, text, attachments, requestKey: message.requestId ?? request.task?.requestId ?? randomId(), ...task });
       break;
     case "start":
       await calls.start.mutateAsync(startParams(request, plan, text, attachments, messageId));

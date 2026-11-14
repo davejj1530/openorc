@@ -5,6 +5,8 @@ import type { Handlers } from "./types.js";
 export function createHostedFilesHandlers(files: HostedFiles): Pick<Handlers, keyof typeof hostedFilesRpcParams> {
   return {
     "hostedFiles.capture": ({ scope }) => files.capture(scope),
+    "hostedFiles.availability": ({ scope }) => files.availability(scope),
+    "hostedFiles.restore": (input) => files.restore(input),
     "hostedFiles.state": (input) => files.state(input),
     "hostedFiles.begin": (input) => files.begin(input),
     "hostedFiles.append": (input) => files.append(input),

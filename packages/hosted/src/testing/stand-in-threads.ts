@@ -30,6 +30,8 @@
 import { randomUUID } from "node:crypto";
 import { titleFromPrompt } from "@openorc/protocol";
 import { userOf, type StandInSpaces } from "./stand-in-spaces.js";
+import { attachedPath, StandInThreadFiles } from "./stand-in-thread-files.js";
+import type { UploadedFile } from "../wire-files.js";
 
 export interface StandInPeer {
   /** The address the socket's token is for, or null once its session ended. */
@@ -66,6 +68,7 @@ interface Message {
   refusal: string | null;
   after: boolean;
   createdAt: string;
+  files: UploadedFile[];
 }
 
 interface Ask {
@@ -126,7 +129,7 @@ function messageOf(message: Message) {
     id: message.id,
     authorId: userOf(message.author),
     text: message.text,
-    files: [],
+    files: message.files,
     state: message.state,
     delivery: message.state === "delivered" ? "started" : null,
     refusal: message.refusal,
@@ -161,6 +164,8 @@ export class StandInThreads {
   readonly readies: { threadId: string; settings: unknown }[] = [];
   /** Every POST /hosted/threads body, in order, with the space it named. */
   readonly started: { space: string; body: Record<string, unknown> }[] = [];
+  /** Capabilities, files on messages and the files unit's rules. */
+  readonly files = new StandInThreadFiles();
 
   constructor(
     private readonly peers: () => Iterable<StandInPeer>,
@@ -177,6 +182,7 @@ export class StandInThreads {
     const space = this.spaces.resolve(who, request.space);
     if (typeof space !== "string") return space;
     if (method === "GET" && path === "/projects") return { status: 200, body: this.spaces.listed(space, who) };
+    if (method === "GET" && path === "/hosted/capabilities") return this.files.capabilityReply();
     const asked = /^\/hosted\/asks\/([^/]+)\/answer$/.exec(path);
     if (asked && method === "POST") return this.#answer(who, space, decodeURIComponent(asked[1]!), body);
     if (method === "POST" && path === "/hosted/threads") return this.#create(who, space, body);
@@ -229,6 +235,14 @@ export class StandInThreads {
   /** A new thread on a project of the space, with its first message when one comes and can start a turn. */
   #create(who: string, space: string, body: Record<string, unknown>): Reply {
     this.started.push({ space, body });
+    const replayed = this.files.replayStart(who, space, body);
+    if (replayed) return replayed;
+    const reply = this.#createNew(who, space, body);
+    this.files.rememberStart(who, space, body, reply);
+    return reply;
+  }
+
+  #createNew(who: string, space: string, body: Record<string, unknown>): Reply {
     const project = this.spaces.project(space, typeof body["projectId"] === "string" ? body["projectId"] : null);
     if (!project || !this.spaces.canRead(space, project.id, who)) return NO_PROJECT;
     const settings = { model: null, effort: null, mode: "act", permissionMode: "trusted", ...(body["settings"] as Record<string, unknown>) } as Thread["settings"] & { agent?: string };
@@ -289,7 +303,9 @@ export class StandInThreads {
       const refusal = thread.turn ? null : this.admit(who, settings);
       if (refusal) return { status: 200, body: { sent: false, refusal } };
     }
-    const message: Message = { id, author: who, text: String(body["text"] ?? ""), state: "pending", refusal: null, after: Boolean(thread.turn) && after, createdAt: new Date().toISOString() };
+    const files = this.files.claim({ who, space: thread.space, projectId: thread.projectId ?? "", messageId: id, ids: body["fileIds"], thread: thread.messages });
+    if (!Array.isArray(files)) return files;
+    const message: Message = { id, author: who, text: String(body["text"] ?? ""), state: "pending", refusal: null, after: Boolean(thread.turn) && after, createdAt: new Date().toISOString(), files };
     thread.messages.push(message);
     if (!thread.title.trim() && thread.messages.length === 1) thread.title = titleFromPrompt(message.text);
     if (!message.after) this.#take(thread, message);
@@ -315,7 +331,10 @@ export class StandInThreads {
     const starts = !thread.turn;
     if (starts) thread.turn = message.author;
     thread.status = "working";
-    this.append(thread.id, [{ type: "message.completed", runId: message.id, ts: Date.now(), messageId: message.id, role: "user", text: message.text }], { by: userOf(message.author) });
+    const attachments = message.files.map(attachedPath);
+    this.append(thread.id, [{ type: "message.completed", runId: message.id, ts: Date.now(), messageId: message.id, role: "user", text: message.text, ...(attachments.length && { attachments }) }], {
+      by: userOf(message.author),
+    });
     // A person's own message is read by them.
     const view = viewOf(thread, message.author);
     thread.views.set(message.author, { ...view, seenSeq: Math.max(view.seenSeq, headOf(thread)) });

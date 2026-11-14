@@ -1,6 +1,7 @@
 /** Where the server's answers become the app's shapes. Pure functions, no I/O. */
 import {
   AgentEvent,
+  hostedFilePath,
   hostedRunId,
   isHostedAgent,
   isHostedRefusal,
@@ -149,7 +150,7 @@ export function toQueued(row: WireThread): QueuedMessage[] {
     const refused = message.state === "refused";
     if (!refused && !(message.afterTurn && message.state === "pending")) return [];
     const words = refused ? refusalWords(message.refusal, row.settings.agent) : null;
-    return [{ id: message.id, text: message.text, attachments: [], queuedAt: Date.parse(message.createdAt), error: words }];
+    return [{ id: message.id, text: message.text, attachments: (message.files ?? []).map(hostedFilePath), queuedAt: Date.parse(message.createdAt), error: words }];
   });
 }
 

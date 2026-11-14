@@ -57,6 +57,14 @@ export class StandInUploads {
     return rows.map((row) => row!.file!);
   }
 
+  /** A withdrawn message gives up one of its files, so its edited copy can take it. */
+  release(id: string, messageId: string): boolean {
+    const row = this.#rows.get(id);
+    if (row?.attached?.messageId !== messageId) return false;
+    row.attached = null;
+    return true;
+  }
+
   #start(who: string, space: string, body: Record<string, unknown>): FileReply {
     const parsed = startFileInput.safeParse(body);
     if (!parsed.success) return fileInputRefusal(parsed.error);

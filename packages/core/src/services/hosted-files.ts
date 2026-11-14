@@ -7,6 +7,7 @@ import { hostedFilePreview } from "./hosted-file-preview.js";
 import type { HostedFileRecord, NewHostedFile } from "./hosted-file-record.js";
 import type { OpenOrcOptions } from "../options.js";
 import type { Transport } from "../transport.js";
+import { restoreHostedFiles } from "./hosted-file-restore.js";
 
 type Dependencies = { dataDir: string; account(): Hosted | null; changed(): void; chooseDownload?: (name: string) => Promise<string | null> };
 
@@ -30,6 +31,22 @@ export class HostedFiles {
     const account = this.deps.account();
     if (!account) throw new Error("Sign in to OpenOrc to attach files.");
     return account.files.capture(scope);
+  }
+
+  async availability(scope: HostedFileScope): Promise<HostedFilesRpcResults["hostedFiles.availability"]> {
+    const captured = await this.capture(scope);
+    const account = this.deps.account();
+    if (!account) throw new Error("Sign in to OpenOrc to attach files.");
+    return account.files.availability(captured);
+  }
+
+  async restore(input: HostedFileDraft & { paths: string[] }): Promise<Record<string, never>> {
+    const scope = await this.capture(input.scope);
+    const account = this.deps.account();
+    if (!account) throw new Error("Sign in to OpenOrc to attach files.");
+    await restoreHostedFiles(this.#store, account.files, { ...input, scope });
+    this.deps.changed();
+    return {};
   }
 
   async state(input: HostedFileDraft): Promise<HostedFilesRpcResults["hostedFiles.state"]> {

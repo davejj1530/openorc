@@ -24,6 +24,7 @@ import { StandInSpaces } from "./stand-in-spaces.js";
 import { StandInTasks } from "./stand-in-tasks.js";
 import { StandInSeats } from "./stand-in-seats.js";
 import { StandInUploads } from "./stand-in-uploads.js";
+import type { StandInThreadFiles } from "./stand-in-thread-files.js";
 import { StandInOrganizations } from "./stand-in-organizations.js";
 import { StandInChat, socketAnswers } from "./stand-in-chat.js";
 import { billingState, leftSeconds, StandInPayments, type StandInBilling, type StandInOffers } from "./stand-in-billing.js";
@@ -92,6 +93,8 @@ export interface StandIn {
   sent: { threadId: string; body: Record<string, unknown> }[];
   /** Every POST /hosted/threads body, in order, with the space it was made in. */
   started: { space: string; body: Record<string, unknown> }[];
+  /** The capabilities the server answers and the files rules they turn on. */
+  threadFiles: StandInThreadFiles;
   /** GitHub as the server reaches it: what an install grants, and where its pages send the browser back. */
   github: Pick<StandInGithub, "grant" | "returnFor" | "configured">;
   organizations: StandInOrganizations;
@@ -265,6 +268,7 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
   const payments = new StandInPayments(billing, billingTopics(tell, organizations), () => `http://127.0.0.1:${port}`);
   const chat = new StandInChat({ spaces, person, peers: () => [...peers, ...sockets] });
   const uploads = new StandInUploads({ spaces, chat, origin: () => `http://127.0.0.1:${port}` });
+  hosted.files.uploads = uploads;
   const answerSocket = socketAnswers(hosted, chat);
 
   const server = transportServer({ connections, requests, holder, sockets, answerSocket, answer });
@@ -448,7 +452,7 @@ function paymentsFace(billing: Map<string, StandInBilling>, payments: StandInPay
 }
 
 /** What a test does to the stand-in's threads, as an agent's host or another person would. */
-function threadsFace(hosted: StandInThreads): Pick<StandIn, "addThread" | "append" | "set" | "stoppedCommands" | "ask" | "endTurn" | "readies" | "sent" | "started"> {
+function threadsFace(hosted: StandInThreads): Pick<StandIn, "addThread" | "append" | "set" | "stoppedCommands" | "ask" | "endTurn" | "readies" | "sent" | "started" | "threadFiles"> {
   return {
     addThread: (email, seed) => hosted.addThread(email.toLowerCase(), seed),
     append: (threadId, events, options) => hosted.append(threadId, events, options),
@@ -459,6 +463,7 @@ function threadsFace(hosted: StandInThreads): Pick<StandIn, "addThread" | "appen
     readies: hosted.readies,
     sent: hosted.sent,
     started: hosted.started,
+    threadFiles: hosted.files,
   };
 }
 

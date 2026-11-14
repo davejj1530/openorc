@@ -21,6 +21,7 @@ import {
 import { Refused, type Requests } from "./session.js";
 import { refusalWords, toQueued, wireMessageId } from "./translate.js";
 import { ROUTES, type WireThread } from "./wire.js";
+import { messageFileIds } from "./message-files.js";
 
 /** The settings one turn runs with, as the server names them; any left out are the thread's own. */
 export type TurnSettings = Partial<WireThread["settings"]>;
@@ -42,7 +43,6 @@ export interface Calls {
 }
 
 const GONE = "That conversation isn't on OpenOrc Cloud.";
-const FILES = "Files can't be sent to OpenOrc Cloud yet.";
 /** How often the person writing may ask the thread to be ready: a thread's machine rests two minutes before it sleeps. */
 const READY_AGAIN_MS = 60_000;
 
@@ -65,10 +65,17 @@ async function post(
   message: { id?: string | undefined; text: string; attachments?: readonly string[] | undefined; settings?: TurnSettings; after?: boolean; task?: OnlineTaskSendContext | undefined },
 ): Promise<void> {
   const row = calls.row(threadId);
-  if (message.attachments?.length) throw new Refused(FILES);
+  const fileIds = await messageFileIds(calls.on(threadId), message.attachments);
   if (message.settings?.agent && !isHostedAgent(message.settings.agent)) throw new Refused(`${message.settings.agent} doesn't run on OpenOrc Cloud.`);
   const id = wireMessageId(message.id) ?? crypto.randomUUID();
-  const body = { id, text: message.text, ...(message.settings && { settings: message.settings }), ...(message.after && { delivery: "after" }), ...(message.task && { task: message.task }) };
+  const body = {
+    id,
+    text: message.text,
+    ...(fileIds.length && { fileIds }),
+    ...(message.settings && { settings: message.settings }),
+    ...(message.after && { delivery: "after" }),
+    ...(message.task && { task: message.task }),
+  };
   const reply = await calls.on(threadId).request(ROUTES.send(threadId), body);
   if (!reply.sent) return refuse(calls, reply.refusal, turnSettings(row, message.settings));
   await calls.refresh();

@@ -1,8 +1,10 @@
 import { z } from "zod";
 import { TeamChatFile } from "./team-chat.js";
+import type { HostedAvailability } from "./hosted-parity.js";
 
 export const HOSTED_FILE_CHUNK_BYTES = 512 * 1024;
 export const HOSTED_FILE_MAX_BYTES = 500 * 1024 * 1024;
+export const HOSTED_FILES_UNAVAILABLE = "Files can't be sent to OpenOrc Cloud yet.";
 const id = z.string().min(1);
 const count = z.number().int().nonnegative();
 export const HostedFileScope = z
@@ -54,6 +56,8 @@ export function hostedFilePath(file: Pick<TeamChatFile, "id" | "name">): string 
 /** Window-only file transfer. Account credentials and arbitrary authenticated URLs never cross this boundary. */
 export const hostedFilesRpcParams = {
   "hostedFiles.capture": z.object({ scope: HostedFileScope }).strict(),
+  "hostedFiles.availability": z.object({ scope: HostedFileScope }).strict(),
+  "hostedFiles.restore": draft.extend({ paths: z.array(z.string()).max(10) }),
   "hostedFiles.state": draft,
   "hostedFiles.begin": source,
   "hostedFiles.append": ref.extend({
@@ -76,6 +80,8 @@ export const hostedFilesRpcParams = {
 };
 export interface HostedFilesRpcResults {
   "hostedFiles.capture": HostedFileScope;
+  "hostedFiles.availability": HostedAvailability;
+  "hostedFiles.restore": Record<string, never>;
   "hostedFiles.state": { files: HostedDraftFile[] };
   "hostedFiles.begin": HostedDraftFile;
   "hostedFiles.append": { imported: number };

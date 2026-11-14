@@ -2,7 +2,7 @@
  * The server's routes and the shapes it answers, parsed where they enter. Nothing outside the package sees a type from
  * this file: translate.ts turns each into the app's own.
  */
-import { AgentKind, AllowanceSource, BackgroundCommand, PermissionPreset, PrState, RunMode } from "@openorc/protocol";
+import { AgentKind, AllowanceSource, BackgroundCommand, PermissionPreset, PrState, RunMode, TeamChatFile } from "@openorc/protocol";
 import { z } from "zod";
 import { wireGithubChoose, wireGithubStatus } from "./wire-github.js";
 import { SPACE_ROUTES } from "./wire-spaces.js";
@@ -79,6 +79,7 @@ export const wireMessage = z.object({
   id: z.string(),
   authorId: z.string().nullable(),
   text: z.string(),
+  files: z.array(TeamChatFile).optional(),
   state: z.string(),
   refusal: z.string().nullable(),
   afterTurn: z.boolean().default(false),

@@ -130,7 +130,7 @@ describe("sendMessage", () => {
     const calls: Array<[RpcMethod, unknown]> = [];
     const call = (method: RpcMethod) => ({ mutateAsync: async (params: unknown) => void calls.push([method, params]) });
     const mutations = { start: call("runs.start"), send: call("runs.send"), queue: call("threads.queue") } as SubmitCalls;
-    return { calls, submit: (request: SubmitRequest, message: { text: string; attachments: string[] }) => sendMessage(mutations, () => "key", request, message) };
+    return { calls, submit: (request: SubmitRequest, message: { text: string; attachments: string[]; requestId?: string }) => sendMessage(mutations, () => "key", request, message) };
   }
 
   it("makes no call until every chosen setting is saved, then exactly the planned one", async () => {
@@ -171,6 +171,22 @@ describe("sendMessage", () => {
     const { calls, submit } = submitter();
     await submit({ ...base, claudeAccountId: "personal", waitForSave: async () => undefined }, { text: "Continue.", attachments: [] });
     expect(calls).toEqual([["runs.start", expect.objectContaining({ threadId: "thread", prompt: "Continue.", resume: true, claudeAccountId: "personal" })]]);
+  });
+
+  it("sends a message under its own request id whichever way it goes, before a task's", async () => {
+    const { calls, submit } = submitter();
+    const task = { context: { id: "task", ifRevision: 2 }, requestId: "task-request" };
+    const files = { text: "notes", attachments: ["/hosted/files/f1/a.pdf"], requestId: "exact" };
+    await submit({ ...base, task, waitForSave: async () => undefined }, files);
+    await submit({ ...base, working: true, live: true, activeRun: warm, waitForSave: async () => undefined }, files);
+    await submit({ ...base, working: true, live: true, activeRun: warm, now: true, waitForSave: async () => undefined }, files);
+    await submit({ ...base, task, waitForSave: async () => undefined }, { text: "go", attachments: [] });
+    expect(calls).toEqual([
+      ["runs.start", expect.objectContaining({ messageId: "exact", task: task.context })],
+      ["threads.queue", expect.objectContaining({ requestKey: "exact" })],
+      ["runs.send", expect.objectContaining({ runId: "A", messageId: "exact" })],
+      ["runs.start", expect.objectContaining({ messageId: "task-request" })],
+    ]);
   });
 
   it("fails with the reason when nothing can be sent", async () => {

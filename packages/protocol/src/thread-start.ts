@@ -35,6 +35,8 @@ export const ThreadStartParams = z
     baseRef: z.string().optional(),
     prompt: z.string().min(1),
     attachments: z.array(z.string()).optional(),
+    /** A start on OpenOrc Cloud with files, sent again under the same id after a lost answer, is the same start. */
+    requestId: z.uuid().optional(),
     title: z.string().optional(),
     /** Starts the thread under this one, in its folder, so a start that names it chooses no place of its own. */
     parentThreadId: z.string().min(1).optional(),

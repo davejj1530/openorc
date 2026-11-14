@@ -6,6 +6,7 @@ import { dismissCompactNavigation } from "../lib/compact-navigation";
 import type { SidebarScreen } from "../lib/layout";
 import { useOrclingChatIds } from "../lib/orclings";
 import { useOrganizationStart } from "../lib/organization-start";
+import { useFrozenWork } from "../lib/organization-frozen-work";
 import { newThread, useRouter, type Route } from "../lib/router";
 import { useTaskAttentionCount } from "../lib/task-list-source";
 import { Orclings, PenSquare } from "./icons";
@@ -56,12 +57,15 @@ export function SidebarNav({ route, projectId, orclings }: { route: Route; proje
   const tasks = useTaskAttentionCount();
   const counts: Partial<Record<SidebarScreen, number>> = { tasks };
   const waitingOrclings = useWaitingOrclings();
+  // The organization's own page or its frozen screen stands in for the route's screen, so no row is lit.
   const organizationPage = useOrganizationStart(route.view === "newthread" ? route.projectId : null);
+  const frozen = useFrozenWork(route);
+  const standIn = organizationPage || frozen !== null;
   return (
     <nav className="sidebar-nav" aria-label="Screens">
-      <NavRow icon={<PenSquare size={16} />} label="New thread" lead current={route.view === "newthread" && !organizationPage} onClick={() => newThread(projectId ?? undefined)} />
+      <NavRow icon={<PenSquare size={16} />} label="New thread" lead current={route.view === "newthread" && !standIn} onClick={() => newThread(projectId ?? undefined)} />
       {SCREENS.map(({ id, label, Icon, route: to, views }) => (
-        <NavRow key={id} icon={<Icon size={16} />} label={label} count={counts[id]} current={views.includes(route.view)} onClick={() => useRouter.getState().navigate(to)} />
+        <NavRow key={id} icon={<Icon size={16} />} label={label} count={counts[id]} current={!standIn && views.includes(route.view)} onClick={() => useRouter.getState().navigate(to)} />
       ))}
       {/* Pressed, the Orclings take the threads' place under it, and its row's end carries their tools. */}
       <div className="sidebar-nav-item">

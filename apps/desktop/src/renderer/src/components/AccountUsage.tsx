@@ -12,6 +12,7 @@ import { HarnessLogo } from "./HarnessLogo";
 import { AmountShare } from "./ContextUsage";
 import { Signal } from "./icons";
 import { Tooltip } from "./ui";
+import { HostedAccountUsage } from "./HostedAccountUsage";
 
 /** The footer's glyph size, the same as the sidebar's other tools. */
 const USAGE_ICON = 16;
@@ -290,6 +291,14 @@ const PLACE = { side: "top", align: "start", sideOffset: 8 } as const;
 
 /** Allowances and balances for the selected account, alongside reported conversation costs. */
 export function AccountUsage() {
+  return (
+    <HostedAccountUsage>
+      <LocalAccountUsage />
+    </HostedAccountUsage>
+  );
+}
+
+function LocalAccountUsage() {
   const account = useUsageAccount();
   const usage = useRpc("providers.usage", usageParams(account ?? { provider: "claude" }), { enabled: Boolean(account), staleTime: USAGE_MAX_AGE_MS });
   const cost = useConversationCost(account);

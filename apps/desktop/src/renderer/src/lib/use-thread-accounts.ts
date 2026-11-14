@@ -4,6 +4,8 @@ import type { PickerAccounts } from "../components/ModelPickerAccounts";
 import { useClaudeAccountId } from "./claude-account";
 import { useRpc, useRpcMutation } from "./client";
 
+const hasLocalClaudeAccount = (thread: ThreadSummary | null) => thread?.agent === "claude" && thread.owner?.brain !== "hosted";
+
 /**
  * A Claude conversation's accounts for its model picker: the project's choices, plus the thread's own when the project
  * stopped using it, so it stays listed until the thread moves. Choosing one moves the conversation between turns; the
@@ -11,7 +13,7 @@ import { useRpc, useRpcMutation } from "./client";
  */
 export function useThreadAccounts(thread: ThreadSummary | null, project: Pick<Project, "id" | "name" | "settings"> | null): PickerAccounts | undefined {
   const scoped = useClaudeAccountId();
-  const claude = thread?.agent === "claude";
+  const claude = hasLocalClaudeAccount(thread);
   const list = useRpc("claude.accounts.list", {}, { enabled: claude }).data;
   const switching = useRpcMutation("threads.switchClaudeAccount");
   if (!thread || !claude || !list || thread.teamInstanceId) return undefined;

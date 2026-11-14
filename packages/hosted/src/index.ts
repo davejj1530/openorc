@@ -25,6 +25,7 @@ import type {
   ThreadSummary,
 } from "@openorc/protocol";
 import { Account } from "./account.js";
+import { OrganizationBilling } from "./organization-billing.js";
 import { TeamChat } from "./chat.js";
 import { Follower } from "./follow.js";
 import { Files } from "./files.js";
@@ -60,8 +61,8 @@ export interface HostedDeps {
    */
   session: { load(): Promise<string | null>; save(value: string | null): Promise<void> };
   /**
-   * Keeps what the server last said that is no secret, in two parts (the account's plan and hours, and its thread
-   * rows), so they show offline and after a restart.
+   * Keeps account summaries, thread and space rows, and pending billing requests across launches.
+   * Credentials remain in the separate protected session store.
    */
   kept: { load(part: KeptPart): string | null; save(part: KeptPart, json: string | null): void };
   /** This device's projects with their git remotes. Hosted projects are matched to them by GitHub repository. */
@@ -164,7 +165,7 @@ export interface HostedSpaces {
   people(spaceId: string, offset?: number, limit?: number): Promise<OrganizationPeople>;
 }
 
-export type KeptPart = "account" | "threads" | "spaces";
+export type KeptPart = "account" | "threads" | "spaces" | "organizationBilling";
 
 /** The lists every place answers its own rows of, which the asker merges. */
 export type MergedMethod = "threads.list" | "threads.resolvedCount" | "inbox.list";
@@ -198,6 +199,7 @@ export type { HostedNotice, ThreadSummary };
 
 export interface Hosted {
   readonly account: HostedAccount;
+  readonly organizationBilling: OrganizationBilling;
   readonly threads: HostedThreads;
   readonly spaces: HostedSpaces;
   readonly chat: TeamChat;
@@ -213,6 +215,12 @@ export interface Hosted {
 export function createHosted(deps: HostedDeps): Hosted {
   const session = new Session(deps);
   const spaces = new Spaces({ ...deps, session });
+  const organizationBilling = new OrganizationBilling({
+    ...deps,
+    session,
+    spaces,
+    storage: { load: () => deps.kept.load("organizationBilling"), save: (value) => deps.kept.save("organizationBilling", value) },
+  });
   const chat = new TeamChat({ session, spaces, push: deps.push });
   const tasks = new OnlineTasks({ session, spaces, push: deps.push });
   const files = new Files({ session, spaces, fetch: deps.fetch, push: deps.push });
@@ -254,6 +262,7 @@ export function createHosted(deps: HostedDeps): Hosted {
   });
   return {
     account,
+    organizationBilling,
     threads,
     spaces,
     chat,
@@ -265,10 +274,12 @@ export function createHosted(deps: HostedDeps): Hosted {
     },
     awoke: () => {
       session.awoke();
+      void organizationBilling.awoke();
       void spaces.refresh();
       void threads.refresh();
     },
     close: () => {
+      organizationBilling.close();
       account.close();
       spaces.close();
       threads.close();

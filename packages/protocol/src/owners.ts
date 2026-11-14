@@ -66,6 +66,7 @@ const here = { by: "here" } as const;
  */
 export const OWNER_ROUTES: { [M in RoutedMethod]: OwnerRoute<M> } & { [M in Exclude<RpcMethod, RoutedMethod>]?: OwnerRoute<M> } = {
   "tasks.online.state": here,
+  "tasks.online.openThread": here,
   "tasks.online.list": here,
   "tasks.online.get": here,
   "tasks.online.create": here,

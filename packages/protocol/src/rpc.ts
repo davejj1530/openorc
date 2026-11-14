@@ -1,6 +1,8 @@
 import { z } from "zod";
+import { organizationBillingRpcParams, type OrganizationBillingRpcResults } from "./organization-billing.js";
 import { teamChatRpcParams, type TeamChatRpcResults } from "./team-chat.js";
 import { onlineTaskRpcParams, type OnlineTaskRpcResults } from "./online-tasks.js";
+import { onlineTaskExecutionRpcParams, type OnlineTaskExecutionRpcResults } from "./online-task-execution.js";
 import { hostedParityRpcParams, type HostedParityRpcResults } from "./hosted-parity.js";
 import { UsageHistoryParams } from "./usage-history.js";
 import { ProjectActivityParams } from "./project-activity.js";
@@ -78,8 +80,10 @@ const hasReviewScope = (scope: { threadId?: string; taskId?: string }) => Boolea
 const REVIEW_SCOPE_REQUIRED = "Review comments need a conversation or a task.";
 
 export const rpcParams = {
+  ...organizationBillingRpcParams,
   ...teamChatRpcParams,
   ...onlineTaskRpcParams,
+  ...onlineTaskExecutionRpcParams,
   ...hostedParityRpcParams,
   ...accountRpcParams,
   ...spacesRpcParams,
@@ -577,8 +581,10 @@ export interface ResolvedExtraction {
 
 export interface RpcResults
   extends
+    OrganizationBillingRpcResults,
     TeamChatRpcResults,
     OnlineTaskRpcResults,
+    OnlineTaskExecutionRpcResults,
     HostedParityRpcResults,
     PullRequestRpcResults,
     OrclingRpcResults,

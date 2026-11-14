@@ -9,6 +9,7 @@ export interface Device {
   /** The kept thread rows. */
   threads: string | null;
   spaces: string | null;
+  organizationBilling: string | null;
   /** This device's projects, as the core lists them. */
   projects: { id: string; remote: string | null }[];
 }
@@ -22,7 +23,7 @@ export interface Seen {
   sockets: { closed: boolean }[];
 }
 
-export const newDevice = (): Device => ({ stored: null, kept: null, threads: null, spaces: null, projects: [] });
+export const newDevice = (): Device => ({ stored: null, kept: null, threads: null, spaces: null, organizationBilling: null, projects: [] });
 
 /**
  * The person's browser, with this device's loopback held in memory. On OpenOrc's sign-in page the person signs in as

@@ -11,8 +11,8 @@ import { BenchGenerator } from "./bench.js";
 import { DeviceService } from "./devices/service.js";
 import { FrameCoalescer } from "./frames.js";
 import { createSpacesHandlers } from "./handlers/spaces.js";
-import { createAccountHandlers } from "./handlers/account.js";
 import { createTeamChatHandlers } from "./handlers/team-chat.js";
+import { createHostedAccountHandlers } from "./handlers/organization-billing.js";
 import { createOnlineTaskHandlers } from "./handlers/online-tasks.js";
 import { hostedParityHandlers } from "./handlers/hosted-parity.js";
 import { createAttachmentsHandlers } from "./handlers/attachments.js";
@@ -732,7 +732,7 @@ export class OpenOrc {
       }),
       createCloudCarryHandlers({ db: this.db, env: this.cloudParts.env, skills: this.cloudParts.skills, cloud: this.cloudParts.cloud }),
       createClaudeAccountHandlers(this.claudeAccounts),
-      createAccountHandlers(this.account?.account ?? null),
+      createHostedAccountHandlers(this.account ?? null),
       createTeamChatHandlers(this.account?.chat ?? null),
       createOnlineTaskHandlers(this.account?.tasks ?? null),
       hostedParityHandlers,

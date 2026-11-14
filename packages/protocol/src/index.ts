@@ -62,4 +62,6 @@ export * from "./organization-invitations.js";
 export * from "./hosted-parity.js";
 export * from "./team-chat.js";
 export * from "./organization-access.js";
+export * from "./organization-billing.js";
 export * from "./online-tasks.js";
+export * from "./online-task-execution.js";

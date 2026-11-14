@@ -22,6 +22,7 @@ import { StandInAppSignIns } from "./stand-in-app-sign-ins.js";
 import { StandInGithub } from "./stand-in-github.js";
 import { StandInSpaces } from "./stand-in-spaces.js";
 import { StandInTasks } from "./stand-in-tasks.js";
+import { StandInSeats } from "./stand-in-seats.js";
 import { StandInUploads } from "./stand-in-uploads.js";
 import { StandInOrganizations } from "./stand-in-organizations.js";
 import { StandInChat, socketAnswers } from "./stand-in-chat.js";
@@ -29,6 +30,7 @@ import { billingState, leftSeconds, StandInPayments, type StandInBilling, type S
 import { StandInThreads, type Admit, type StandInPeer, type StandInThreadSeed } from "./stand-in-threads.js";
 
 export interface StandIn {
+  seats: StandInSeats;
   uploads: StandInUploads;
   tasks: StandInTasks;
   chat: StandInChat;
@@ -256,7 +258,8 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
   const hosted = new StandInThreads(() => [...[...peers].filter((peer) => !peer.waiting), ...sockets], admitTurn, spaces, person);
   const signInWrites = new StandInSignIns(signIns);
   const tell = tellOf(peers, sockets);
-  const tasks = new StandInTasks({ spaces, person, tell });
+  const tasks = new StandInTasks({ spaces, person, tell, threads: hosted });
+  const seats = new StandInSeats({ spaces, tell, now: Date.now, origin: () => `http://127.0.0.1:${port}` });
   const organizations = organizationReads(options, spaces, people, billing, tell, (space) => hosted.accessChanged(space));
   const github = new StandInGithub(spaces, (who) => tell(who, ["projects", "github"]));
   const payments = new StandInPayments(billing, billingTopics(tell, organizations), () => `http://127.0.0.1:${port}`);
@@ -275,6 +278,7 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
     const signedInRoute = async (): Promise<Reply | null> => {
       if (who)
         return (
+          seats.route({ method, path, query, space }, who, body) ??
           tasks.route({ method, path, query, space }, who, body) ??
           chat.route({ method, path, query, space }, who, body) ??
           (await uploads.route(method, path, who, body, space)) ??
@@ -303,6 +307,7 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
 
   return {
     url: `http://127.0.0.1:${port}`,
+    seats,
     tasks,
     chat,
     uploads,

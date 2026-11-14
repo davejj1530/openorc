@@ -14,8 +14,8 @@ import { spawnWithPipes, type SpawnTerminal } from "./terminal-process.js";
 import { nameThread } from "./thread-naming.js";
 import type { TextGenerationService } from "./text-generation.js";
 
-/** What the server last said, by part, in the settings table. */
-const KEPT = { account: "hosted.kept", threads: "hosted.threads", spaces: "hosted.spaces" } as const;
+/** Durable hosted reads and pending organization payments in the settings table. */
+const KEPT = { account: "hosted.kept", threads: "hosted.threads", spaces: "hosted.spaces", organizationBilling: "hosted.organization-billing" } as const;
 const STORAGE = "Cannot access protected storage for your OpenOrc account. Unlock your OS keychain and retry.";
 /** How long a socket the server answered with an error other than a refusal waits before trying again. */
 const RETRY_MS = 10_000;

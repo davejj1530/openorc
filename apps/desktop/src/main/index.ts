@@ -29,6 +29,7 @@ import { installPreviewBridge } from "./preview-bridge";
 import { createPreviewHost } from "./preview-host";
 import { installPresence } from "./presence-ipc";
 import { installTrash } from "./trash-ipc";
+import { installDownloads } from "./download-ipc";
 import { installOpenBrowser } from "./open-browser-ipc";
 import { installPowerEvents } from "./power-ipc";
 import { cancelPtyUpdate, detachAllPtys, installPtyHost, killAllPtys, preparePtysForUpdate } from "./pty-host";
@@ -113,6 +114,7 @@ function startCore(): UtilityProcess {
   installPreviewBridge(child, previewHost);
   installPresence(child);
   installTrash(child);
+  installDownloads(child);
   installOpenBrowser(child);
   installPowerEvents(child);
   child.stdout?.on("data", (d: Buffer) => process.stdout.write(`[core] ${d}`));

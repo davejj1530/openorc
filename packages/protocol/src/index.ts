@@ -65,3 +65,4 @@ export * from "./organization-access.js";
 export * from "./organization-billing.js";
 export * from "./online-tasks.js";
 export * from "./online-task-execution.js";
+export * from "./hosted-files.js";

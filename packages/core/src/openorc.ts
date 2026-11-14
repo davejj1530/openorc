@@ -10,10 +10,8 @@ import { busyReason, fenceForUpdate, type BusyReason } from "./activity.js";
 import { BenchGenerator } from "./bench.js";
 import { DeviceService } from "./devices/service.js";
 import { FrameCoalescer } from "./frames.js";
-import { createSpacesHandlers } from "./handlers/spaces.js";
-import { createTeamChatHandlers } from "./handlers/team-chat.js";
-import { createHostedAccountHandlers } from "./handlers/organization-billing.js";
-import { createOnlineTaskHandlers } from "./handlers/online-tasks.js";
+import { createHostedHandlers } from "./handlers/hosted.js";
+import { hostedFilesFor, type HostedFiles } from "./services/hosted-files.js";
 import { hostedParityHandlers } from "./handlers/hosted-parity.js";
 import { createAttachmentsHandlers } from "./handlers/attachments.js";
 import { createBenchHandlers } from "./handlers/bench.js";
@@ -209,6 +207,7 @@ export class OpenOrc {
   readonly schedules: ScheduleService;
   readonly orclingWakes: OrclingWakeService;
   readonly files: FileService;
+  readonly hostedFiles: HostedFiles;
   readonly imports: ImportService;
   readonly devices: DeviceService;
   readonly workspaceWriters = new WorkspaceWriters();
@@ -351,6 +350,7 @@ export class OpenOrc {
       invalidate,
     });
     this.slack = new SlackService(this, options.slackSecrets, new AttachmentService(options.dataDir));
+    this.hostedFiles = hostedFilesFor(options, () => this.account, this.windows);
     this.handlers = this.buildHandlers(invalidate);
     invalidateOnLifecycle(options.preview, invalidate);
   }
@@ -670,6 +670,7 @@ export class OpenOrc {
     this.cloudParts.move?.close();
     this.cloudParts.coordinator?.close();
     this.brainRouting?.close();
+    await this.hostedFiles.close();
     this.account?.close();
     await this.remote.close(this.closingForUpdate ? "update" : "shutdown");
     await this.files.intelligence.close();
@@ -732,11 +733,8 @@ export class OpenOrc {
       }),
       createCloudCarryHandlers({ db: this.db, env: this.cloudParts.env, skills: this.cloudParts.skills, cloud: this.cloudParts.cloud }),
       createClaudeAccountHandlers(this.claudeAccounts),
-      createHostedAccountHandlers(this.account ?? null),
-      createTeamChatHandlers(this.account?.chat ?? null),
-      createOnlineTaskHandlers(this.account?.tasks ?? null),
+      createHostedHandlers(this.account, this.hostedFiles),
       hostedParityHandlers,
-      createSpacesHandlers(this.account?.spaces ?? null),
       createUsageHandlers({ db: this.db, ledger: this.ledger }),
       createConnectorHandlers({ db: this.db, connectors: this.connectors }),
       createBrainSyncHandlers({ db: this.db, memory: this.memory, textGeneration: this.textGeneration, cloudOnly: this.options.cloudOnly ?? false, invalidate }),

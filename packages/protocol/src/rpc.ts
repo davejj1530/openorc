@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { organizationBillingRpcParams, type OrganizationBillingRpcResults } from "./organization-billing.js";
+import { hostedFilesRpcParams, type HostedFilesRpcResults } from "./hosted-files.js";
 import { teamChatRpcParams, type TeamChatRpcResults } from "./team-chat.js";
 import { onlineTaskRpcParams, type OnlineTaskRpcResults } from "./online-tasks.js";
 import { onlineTaskExecutionRpcParams, type OnlineTaskExecutionRpcResults } from "./online-task-execution.js";
@@ -67,6 +68,7 @@ import type { TaskCheckoutState } from "./task-checkout.js";
 import { type CommentAttempt, CommentRecipient, type TaskComment, type TaskDiscussion } from "./task-comments.js";
 import { ThreadListParams } from "./thread-list.js";
 import { ThreadStartParams } from "./thread-start.js";
+import { threadSendRpcParams } from "./thread-send.js";
 import { BranchLoss, type ChangePreview, type FileDiff, type RemovalImpact, workspaceChangeRpcParams, type WorkspaceChanges } from "./workspace-changes.js";
 import { worktreeRpcParams, type WorktreeRpcResults } from "./worktrees.js";
 
@@ -80,6 +82,8 @@ const hasReviewScope = (scope: { threadId?: string; taskId?: string }) => Boolea
 const REVIEW_SCOPE_REQUIRED = "Review comments need a conversation or a task.";
 
 export const rpcParams = {
+  ...threadSendRpcParams,
+  ...hostedFilesRpcParams,
   ...organizationBillingRpcParams,
   ...teamChatRpcParams,
   ...onlineTaskRpcParams,
@@ -211,8 +215,6 @@ export const rpcParams = {
   "threads.movePreview": z.object({ id: z.string(), to: WorkspaceMode }),
   /** Ask the agent to summarise the conversation so far and continue from the summary. */
   "threads.compact": z.object({ id: z.string(), requestKey: z.string().min(1).max(200).optional() }),
-  /** Hold a message until the current turn ends, then send it. */
-  "threads.queue": z.object({ id: z.string(), text: z.string().min(1), attachments: z.array(z.string()).optional(), requestKey: z.string().min(1).optional() }),
   "threads.unqueue": z.object({ id: z.string(), messageId: z.string().min(1) }),
   "threads.sendQueued": z.object({ id: z.string(), messageId: z.string().min(1) }),
   /** Stop a command the agent left running in the background, such as a dev server. */
@@ -276,26 +278,6 @@ export const rpcParams = {
   "workspace.removalImpact": z.object({ taskId: z.string() }),
   "workspace.usage": z.object({ taskId: z.string() }),
   "tasks.start": z.object({ taskId: z.string(), workspaceMode: WorkspaceMode.optional(), executionTarget: z.never().optional() }),
-  "runs.start": z.object({
-    executionTarget: z.never().optional(),
-    taskId: z.string().optional(),
-    workspaceMode: WorkspaceMode.optional(),
-    threadId: z.string().optional(),
-    agent: AgentKind,
-    model: z.string().optional(),
-    effort: z.string().optional(),
-    fastMode: z.boolean().optional(),
-    attachments: z.array(z.string()).optional(),
-    mode: RunMode,
-    permissionMode: PermissionPreset,
-    prompt: z.string().min(1),
-    resume: z.boolean().optional(),
-    /** A conversation goes on with another Claude account: this turn and the next ones run there, resuming its session. */
-    claudeAccountId: ClaudeAccountId.optional(),
-    /** The id the prompt is recorded under, so a window that already shows it as sent sees the same message land. */
-    messageId: z.string().min(1).max(100).optional(),
-  }),
-  "runs.send": z.object({ runId: z.string(), text: z.string().min(1), attachments: z.array(z.string()).optional(), messageId: z.string().min(1).max(100).optional() }),
   "runs.interrupt": z.object({ runId: z.string() }),
   "runs.close": z.object({ runId: z.string() }),
   "runs.listForTask": z.object({ taskId: z.string() }),
@@ -581,6 +563,7 @@ export interface ResolvedExtraction {
 
 export interface RpcResults
   extends
+    HostedFilesRpcResults,
     OrganizationBillingRpcResults,
     TeamChatRpcResults,
     OnlineTaskRpcResults,

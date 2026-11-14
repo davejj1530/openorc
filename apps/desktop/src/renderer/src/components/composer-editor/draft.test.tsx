@@ -12,10 +12,10 @@ const sources: MarkSources = {
   members: [{ key: "rini", name: "Rini" }],
   files: ["src/app.ts"],
 };
-const KINDS = ["skill", "connector", "member", "file"] as const;
+const KINDS = ["skill", "connector", "member", "file", "person"] as const;
 /** The marks the box draws, by kind and what each stands for, in order. */
 const drawn = (field: HTMLElement) =>
-  [...field.querySelectorAll<HTMLElement>("[data-skill], [data-connector], [data-member], [data-file]")].map((mark) => {
+  [...field.querySelectorAll<HTMLElement>("[data-skill], [data-connector], [data-member], [data-file], [data-person]")].map((mark) => {
     const kind = KINDS.find((each) => mark.dataset[each] !== undefined)!;
     return [kind, mark.dataset[kind]];
   });
@@ -25,6 +25,7 @@ const named = (mark: Mark) =>
     connector: () => (mark as { connector: { name: string } }).connector.name,
     member: () => (mark as { key: string }).key,
     file: () => (mark as { path: string }).path,
+    person: () => (mark as { id: string }).id,
   })[mark.kind]();
 const expected = (text: string) => markPieces(text, sources).flatMap((piece) => (piece.mark ? [[piece.mark.kind, named(piece.mark)]] : []));
 

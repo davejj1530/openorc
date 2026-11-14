@@ -118,8 +118,24 @@ export class FileNode extends MarkNode<"file"> {
   }
 }
 
+/** A teammate tagged from the `@` list: the message carries their identity, the draft shows their name. */
+export class PersonNode extends MarkNode<"person"> {
+  static override getType() {
+    return "composer-person";
+  }
+  static override clone(node: PersonNode) {
+    return new PersonNode(node.__text, node.__mark, node.__key);
+  }
+  static override importJSON(json: SerializedMark) {
+    return $applyNodeReplacement(new PersonNode(json.text, json.mark as Extract<Mark, { kind: "person" }>));
+  }
+  constructor(text = "", mark: Extract<Mark, { kind: "person" }> = { kind: "person", id: "", name: "" }, key?: NodeKey) {
+    super(text, mark, key);
+  }
+}
+
 /** Every node a composer draft holds besides words and line breaks. */
-export const MARK_NODES = [SkillNode, ConnectorNode, MemberNode, FileNode];
+export const MARK_NODES = [SkillNode, ConnectorNode, MemberNode, FileNode, PersonNode];
 
 /** The node for a marked run, of the class its kind names. */
 export function $createMarkNode(text: string, mark: Mark): LexicalNode {
@@ -132,6 +148,8 @@ export function $createMarkNode(text: string, mark: Mark): LexicalNode {
       return $applyNodeReplacement(new MemberNode(text, mark));
     case "file":
       return $applyNodeReplacement(new FileNode(text, mark));
+    case "person":
+      return $applyNodeReplacement(new PersonNode(text, mark));
   }
 }
 

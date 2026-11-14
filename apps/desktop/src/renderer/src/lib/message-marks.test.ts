@@ -50,6 +50,21 @@ describe("markPieces", () => {
   });
 });
 
+describe("person tags", () => {
+  const people = [{ id: "u-1", name: "Robin" }];
+  it("reads a structured tag of a listed person as their name, and leaves typed names and unknown ids as words", () => {
+    const text = "@[user:u-1] and @Robin and @[user:gone] read this";
+    const pieces = markPieces(text, { people });
+    expect(pieces.filter((piece) => piece.mark).map((piece) => [piece.text, piece.mark])).toEqual([["@[user:u-1]", { kind: "person", id: "u-1", name: "Robin" }]]);
+    expect(piecesText(pieces)).toBe(text);
+  });
+  it("keeps a tag whole beside a skill and changes the key when a name changes", () => {
+    const pieces = markPieces("/code-review @[user:u-1]", { people, commands: [{ name: "code-review", insert: true, prefix: "/" }] });
+    expect(pieces.map((piece) => piece.mark?.kind ?? null)).toEqual(["skill", null, "person"]);
+    expect(sourcesKey({ people })).not.toBe(sourcesKey({ people: [{ id: "u-1", name: "Robin Lee" }] }));
+  });
+});
+
 describe("sourcesKey", () => {
   it("is the same for lists rebuilt with the same names, and differs when a name or an image changes", () => {
     expect(sourcesKey({ ...sources, commands: [...sources.commands!] })).toBe(sourcesKey(sources));

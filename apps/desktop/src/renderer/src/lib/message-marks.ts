@@ -3,7 +3,8 @@ import type { UsableConnector } from "@openorc/protocol";
 import { connectorSpans } from "./connector-mentions";
 
 /** What a word in a message can stand for. Each kind is drawn by its own mark and held by its own editor node. */
-export type Mark = { kind: "skill"; name: string } | { kind: "connector"; connector: UsableConnector } | { kind: "member"; key: string } | { kind: "file"; path: string };
+export type Mark =
+  { kind: "skill"; name: string } | { kind: "connector"; connector: UsableConnector } | { kind: "member"; key: string } | { kind: "file"; path: string } | { kind: "person"; id: string; name: string };
 
 export type MarkKind = Mark["kind"];
 
@@ -21,6 +22,31 @@ export interface MarkSources {
   members?: readonly { key: string; name: string }[] | undefined;
   /** Paths picked from the `@` list for this draft; a path the person typed is only words. */
   files?: readonly string[] | undefined;
+  /** People a structured `@[user:ID]` tag may name, with the name it reads as. A typed `@Name` is only words. */
+  people?: readonly { id: string; name: string }[] | undefined;
+}
+
+/** A tag of a person as the message carries it: their identity, never their name. */
+export const PERSON_TAG = /@\[user:([^\]\s]+)\]/g;
+export const personTag = (id: string) => `@[user:${id}]`;
+
+function splitPeople(pieces: Piece[], people: readonly { id: string; name: string }[]): Piece[] {
+  if (!people.length) return pieces;
+  const byId = new Map(people.map((person) => [person.id, person.name]));
+  return pieces.flatMap((piece) => {
+    if (piece.mark) return [piece];
+    const out: Piece[] = [];
+    let at = 0;
+    for (const match of piece.text.matchAll(PERSON_TAG)) {
+      const name = byId.get(match[1]!);
+      if (name === undefined) continue;
+      if (match.index > at) out.push({ text: piece.text.slice(at, match.index) });
+      out.push({ text: match[0], mark: { kind: "person", id: match[1]!, name } });
+      at = match.index + match[0].length;
+    }
+    if (at < piece.text.length) out.push({ text: piece.text.slice(at) });
+    return out;
+  });
 }
 
 const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&");
@@ -55,8 +81,12 @@ function splitWords(pieces: Piece[], words: ReadonlyMap<string, Mark>, { prefix,
 export function markPieces(text: string, sources: MarkSources): Piece[] {
   if (text === "") return [];
   const prefix = sources.commands?.find((command) => command.insert)?.prefix ?? "/";
-  let pieces: Piece[] = skillSegments(text, skillNames(sources.commands ?? []), prefix).map((segment) =>
-    segment.skill ? { text: segment.text, mark: { kind: "skill", name: segment.text.slice(1) } } : { text: segment.text },
+  let pieces: Piece[] = splitPeople([{ text }], sources.people ?? []).flatMap((piece) =>
+    piece.mark
+      ? [piece]
+      : skillSegments(piece.text, skillNames(sources.commands ?? []), prefix).map((segment): Piece =>
+          segment.skill ? { text: segment.text, mark: { kind: "skill", name: segment.text.slice(1) } } : { text: segment.text },
+        ),
   );
   pieces = splitWords(pieces, new Map((sources.members ?? []).map((member) => [member.name.toLowerCase(), { kind: "member", key: member.key } as Mark])), { prefix: "@", caseless: true });
   pieces = pieces.flatMap((piece) =>
@@ -76,11 +106,12 @@ export function samePiece(a: Piece, b: Piece): boolean {
 }
 
 /** What a set of sources marks, as one string: equal for lists rebuilt with the same names. */
-export function sourcesKey({ commands, connectors, members, files }: MarkSources): string {
+export function sourcesKey({ commands, connectors, members, files, people }: MarkSources): string {
   return JSON.stringify([
     (commands ?? []).filter((command) => command.insert).map((command) => [command.name, command.prefix, command.aliases]),
     (connectors ?? []).map((connector) => [connector.name, connector.title, connector.logo]),
     (members ?? []).map((member) => [member.key, member.name]),
     files ?? [],
+    (people ?? []).map((person) => [person.id, person.name]),
   ]);
 }

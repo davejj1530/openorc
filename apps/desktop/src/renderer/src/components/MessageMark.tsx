@@ -29,6 +29,12 @@ export function MessageMark({ text, mark }: { text: string; mark: Mark }) {
       );
     case "member":
       return <MemberPill text={text} memberKey={mark.key} />;
+    case "person":
+      return (
+        <mark className="person-token" data-person={mark.id}>
+          @{mark.name}
+        </mark>
+      );
     case "file":
       return (
         <MarkPill data={{ "data-file": mark.path }} glyph={<FileText size={MARK_SIZE} />}>

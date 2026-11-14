@@ -1628,3 +1628,8 @@
   line-height: var(--text-sm--line-height);
   color: var(--bad);
 }
+/* A teammate tagged in a message: plain blue words, never a chip. */
+.person-token {
+  background: none;
+  color: var(--mention-ink);
+}

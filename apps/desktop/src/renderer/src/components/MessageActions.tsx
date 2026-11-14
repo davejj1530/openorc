@@ -53,12 +53,12 @@ export function CopyMessage({ text }: { text: string }) {
 }
 
 /**
- * The end of a turn: copy the reply and, on the latest turn, fork the conversation from it. The latest turn shows
- * the row at rest; older turns show it on hover. The time stays a hover detail.
+ * The end of a turn: copy the reply and, on the latest turn, fork the conversation from it. The last visible turn
+ * shows the row at rest; older turns show it on hover. The time stays a hover detail.
  */
-export function TurnActions({ text, at, onFork, resting }: { text: string | undefined; at: number | undefined; onFork?: (() => void) | undefined; resting: boolean }) {
+export function TurnActions({ text, at, onFork }: { text: string | undefined; at: number | undefined; onFork?: (() => void) | undefined }) {
   return (
-    <div className="group turn-actions" data-resting={resting || undefined}>
+    <div className="group turn-actions">
       {text ? <CopyMessage text={text} /> : null}
       {onFork ? (
         <IconButton size="md" onClick={() => onFork()} data-tip="Continue this conversation in a new thread" aria-label="Fork thread" className="message-action">

@@ -1,7 +1,9 @@
+import { readFileSync } from "node:fs";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import type { Block } from "@openorc/client";
 import { TranscriptContents, WorkTranscript } from "./Transcript";
+import { AsksDocked } from "./ask-answer";
 
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
 vi.mock("./ThreadImages", () => ({
@@ -18,6 +20,29 @@ vi.mock("./QuestionCard", () => ({ QuestionCard: () => null }));
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+});
+
+it("keeps Copy visible on the last drawn turn when a later ask lives only in the dock", () => {
+  const styles = readFileSync("src/renderer/src/styles/conversation.css", "utf8");
+  const reply: Block = { kind: "message", id: "reply", role: "assistant", text: "The report is ready.", streaming: false };
+  const end: Block = { kind: "status", id: "end", boundary: "turn", outcome: "success", text: "turn finished", tone: "ok" };
+  const ask: Block = { kind: "approval", id: "ask", approvalId: "ask", approvalKind: "user_input", input: { questions: [{ question: "Which report?", options: [] }] } };
+  const draw = (blocks: Block[]) => (
+    <>
+      <style>{styles}</style>
+      <AsksDocked.Provider value>
+        <WorkTranscript runId="run" blocks={blocks} author="Assistant" />
+      </AsksDocked.Provider>
+    </>
+  );
+  const { container, rerender } = render(draw([reply, end, ask]));
+  expect(container.querySelectorAll(".work-turn")).toHaveLength(1);
+  expect(getComputedStyle(screen.getByRole("button", { name: "Copy message" })).opacity).toBe("1");
+  rerender(draw([reply, ask, end]));
+  expect(getComputedStyle(screen.getByRole("button", { name: "Copy message" })).opacity).toBe("1");
+  rerender(draw([reply, end, { kind: "message", id: "next", role: "user", text: "Check the next report.", streaming: false }]));
+  const previous = container.querySelector<HTMLButtonElement>(".turn-actions .message-action")!;
+  expect(getComputedStyle(previous).opacity).toBe("0");
 });
 
 it("copies each thread message's original text and reports success", async () => {

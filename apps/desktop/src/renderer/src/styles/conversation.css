@@ -259,7 +259,7 @@
   }
 }
 
-/* The end of a turn: copy and fork as faint icons, at rest on the latest turn, on hover elsewhere. */
+/* The end of a turn: copy and fork at rest on the last visible turn, on hover elsewhere. */
 .turn-actions {
   display: flex;
   align-items: center;
@@ -274,7 +274,7 @@
 }
 .group:is(:hover, :focus-within) :is(.message-action, .message-time),
 .work-turn:is(:hover, :focus-within) > .turn-actions :is(.message-action, .message-time),
-.turn-actions[data-resting] .message-action,
+.work-turn:not(:has(~ .work-turn)) > .turn-actions .message-action,
 .message-action:focus-visible,
 .copy-action:not([data-state="idle"]) {
   opacity: 1;

@@ -379,7 +379,7 @@ type WorkTranscriptProps = ComponentProps<typeof TranscriptContents> & {
   /** A message to bring into view; the turn that holds it opens its work when the message is there. */
   reveal?: Reveal | undefined;
 };
-type WorkTurnProps = WorkTranscriptProps & { id?: string; latest?: boolean };
+type WorkTurnProps = WorkTranscriptProps & { id?: string };
 
 /** The disclosure hierarchy stays consistent across turns and warm sessions. */
 /** An Orcling's own conversation reads as a chat with it; any other as turns of work. */
@@ -404,7 +404,6 @@ export function WorkTranscript({ blocks, live = false, onFork, reveal, ...props 
           reveal={reveal && turn.blocks.some((block) => block.id === reveal.messageId) ? reveal : undefined}
           blocks={turn.blocks}
           live={live && index === turns.length - 1}
-          latest={index === turns.length - 1}
         />
       ))}
     </>
@@ -449,20 +448,7 @@ function useWorkOpen(showActivity: boolean, live: boolean, reveal: Reveal | unde
   return { open, visited, choose: (next: boolean) => setChoice({ mode: showActivity, open: next }) };
 }
 
-const WorkTurn = memo(function WorkTurn({
-  id,
-  blocks,
-  live = false,
-  ambient = false,
-  author: named,
-  trailing,
-  showActivity = true,
-  head = true,
-  latest = false,
-  onFork,
-  reveal,
-  ...props
-}: WorkTurnProps) {
+const WorkTurn = memo(function WorkTurn({ id, blocks, live = false, ambient = false, author: named, trailing, showActivity = true, head = true, onFork, reveal, ...props }: WorkTurnProps) {
   props = { ...props, runId: blocks.find((b) => b.runId)?.runId ?? props.runId };
   const docked = useDockedAsks();
   const visible = useMemo(() => blocks.filter((block) => !docked(block)), [blocks, docked]);
@@ -513,7 +499,7 @@ const WorkTurn = memo(function WorkTurn({
       <FoldedRecovery work={work} open={open} showActivity={showActivity} />
       <TranscriptContents {...props} blocks={after} replyActions={!head} />
       {footer}
-      {actions ? <TurnActions text={turn.reply?.text} at={turn.reply?.at} onFork={onFork} resting={latest} /> : null}
+      {actions ? <TurnActions text={turn.reply?.text} at={turn.reply?.at} onFork={onFork} /> : null}
     </div>
   );
 });

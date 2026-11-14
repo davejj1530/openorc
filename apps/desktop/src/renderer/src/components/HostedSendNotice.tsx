@@ -1,4 +1,4 @@
-import { sendsBlocked, threadReadOnlyReason, threadSendBlock, type SendBlock } from "@openorc/client";
+import { placeUnreachable, sendsBlocked, threadReadOnlyReason, threadSendBlock, threadTogether, threadWriteBlock, type SendBlockAction } from "@openorc/client";
 import { HOSTED_AGENTS, type HarnessId, type PermissionPreset, type RunMode, type ThreadSummary } from "@openorc/protocol";
 import type { ReactNode } from "react";
 import { useRpc, useRpcMutation } from "../lib/client";
@@ -22,7 +22,8 @@ const CLOUD_LIMITS: CloudComposerLimits = { accounts: undefined, onCompact: unde
 
 /**
  * What an OpenOrc Cloud thread adds to its conversation, and nothing for any other thread:
- *   notice     the card above the composer when a send cannot start a turn, with its words and its way on
+ *   notice     the card above the composer when a send cannot start a turn, with its words and its way on, or when
+ *              the server says this person cannot run the agent in this thread, in its words
  *   blocked    the same words, as the reason Send is disabled
  *   limits     the composer's controls a cloud thread leaves out, spread over its props
  *   onReady    the composer's ready signal: writing begins, so the thread is made ready for the message
@@ -45,7 +46,8 @@ export function useHostedComposer(
   shown: (error: string | null | undefined) => string | null | undefined;
 } {
   const hosted = thread?.owner?.brain === "hosted";
-  const limits = { ...(hosted ? CLOUD_LIMITS : {}), readOnlyReason: threadReadOnlyReason(thread) };
+  const writeBlock = threadTogether(thread) ? threadWriteBlock(thread) : null;
+  const limits = { ...(hosted ? CLOUD_LIMITS : {}), readOnlyReason: threadTogether(thread) ? writeBlock : threadReadOnlyReason(thread) };
   const account = useRpc("account.status", {}, { enabled: hosted });
   const ready = useRpcMutation("threads.ready");
   const blocked = sendsBlocked(thread);
@@ -59,7 +61,7 @@ export function useHostedComposer(
   if (!hosted) return { hosted, notice: null, blocked: null, limits, shown: (error) => error };
   return {
     hosted,
-    notice: block && !blocked ? <SendBlockCard block={block} /> : null,
+    notice: hostedNotice({ block: block && !blocked ? block : null, writeBlock: placeUnreachable(thread) ? null : writeBlock }),
     blocked: blocked ?? block?.words ?? null,
     limits,
     shown: (error) => (error === block?.words ? undefined : error),
@@ -67,16 +69,21 @@ export function useHostedComposer(
   };
 }
 
+/** The card for a block the account fixes, else for the server's word that this person cannot run the agent here. */
+function hostedNotice({ block, writeBlock }: { block: { words: string; action: SendBlockAction | null } | null; writeBlock: string | null }): ReactNode {
+  if (block) return <SendBlockCard words={block.words} action={block.action} />;
+  return writeBlock ? <SendBlockCard words={writeBlock} action={null} /> : null;
+}
+
 /**
  * The card above the composer: why a send cannot start a turn on OpenOrc Cloud, and at the row's end a key to the
  * Settings section with the way on. A key, since the column's one ink pill is the send.
  */
-function SendBlockCard({ block }: { block: SendBlock }) {
+function SendBlockCard({ words, action }: { words: string; action: SendBlockAction | null }) {
   const navigate = useRouter((s) => s.navigate);
-  const { action } = block;
   return (
     <section role="status" aria-label="OpenOrc Cloud" data-plane className={cn(card, "flex flex-wrap items-center justify-between gap-x-3")}>
-      <div className="py-1.5 text-ink">{block.words}</div>
+      <div className="py-1.5 text-ink">{words}</div>
       {action ? (
         <Button variant="secondary" onClick={() => navigate({ view: "settings", section: action.section })}>
           {action.label}

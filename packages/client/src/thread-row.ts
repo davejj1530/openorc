@@ -8,6 +8,7 @@ import {
   type ThreadSummary,
   type WorkspaceMode,
 } from "@openorc/protocol";
+import { togetherActivity, withOthers } from "./thread-collaboration.js";
 
 /** A teammate's ask still has a question mark, but does not call the reader. */
 export type ThreadStatus = LocalThreadStatus | { kind: "waiting-other"; label: string };
@@ -15,11 +16,13 @@ export const STATUS_PRIORITY: readonly ThreadStatus["kind"][] = [...STATUS_ORDER
 
 /** Whether the waiting agent needs this person to answer. Reach does not change whose answer it needs. */
 export function threadWaitsOnYou(thread: Pick<ThreadSummary, "activity" | "owner">): boolean {
-  return thread.activity === "waiting" && !rowStarter(thread);
+  return thread.activity === "waiting" && threadActivity(thread)?.tone === "attention";
 }
 
 /** The short activity words and tone shared by a thread's header and row. */
 export function threadActivity(thread: Pick<ThreadSummary, "activity" | "owner">): { text: string; tone: "live" | "attention" | "muted" } | null {
+  const together = togetherActivity(thread);
+  if (together) return together;
   if (thread.activity === "waiting") {
     const starter = rowStarter(thread);
     return starter ? { text: `Waiting on ${starter.first}`, tone: "muted" } : { text: "Needs you", tone: "attention" };
@@ -138,7 +141,8 @@ export function rowStarter(thread: Pick<ThreadSummary, "owner">): { name: string
 
 /** Facts for a one-line row, including cloud-only projects whose group already names the cloud. */
 export function rowFacts(
-  thread: Pick<ThreadSummary, "lastActivityAt" | "treeActivityAt" | "lastAgentEventAt" | "workspaceMode" | "branch" | "cloud" | "owner" | "workingDirectory" | "prUrl" | "prState">,
+  thread: Pick<ThreadSummary, "lastActivityAt" | "treeActivityAt" | "lastAgentEventAt" | "workspaceMode" | "branch" | "cloud" | "owner" | "workingDirectory" | "prUrl" | "prState"> &
+    Partial<Pick<ThreadSummary, "activity">>,
   { now, project }: { now: number; project?: string },
 ) {
   const place = placeOf(thread);
@@ -154,6 +158,7 @@ export function rowFacts(
     cloud ?? (thread.workspaceMode === "worktree" ? "Worktree" : "This Mac"),
     thread.branch || folder,
     pull ? `#${pullRequestNumber(thread.prUrl)} ${pull.state}` : null,
+    thread.activity && withOthers(thread) ? togetherActivity({ activity: thread.activity, owner: thread.owner })?.text : null,
   ]
     .filter(Boolean)
     .join(" · ");

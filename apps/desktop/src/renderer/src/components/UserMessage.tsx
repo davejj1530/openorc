@@ -7,15 +7,23 @@ import { ThreadImage } from "./ThreadImages";
 import { IconButton } from "./ui";
 import { HostedMessageAttachments } from "./HostedMessageAttachments";
 import { useHostedConversation } from "./HostedConversationBoundary";
+import { useMessageAuthor } from "../lib/thread-authors";
+import { PromptAuthor } from "./ThreadVoice";
 
-/** The user's message: what they attached, then their words as the composer drew them, then copy, fork and when. A badge, such as a reaction, rests on the bubble. */
+/**
+ * The user's message: who wrote it, in a cloud thread others are in, what they attached, then their words as the
+ * composer drew them, then copy, fork and when. A badge, such as a reaction, rests on the bubble.
+ */
 export function UserMessage({
+  id,
   text,
   at,
   attachments,
   onFork,
   badge,
 }: {
+  /** The message's id, which names its author. */
+  id?: string | undefined;
   text: string;
   at?: number | undefined;
   attachments?: string[] | undefined;
@@ -26,9 +34,11 @@ export function UserMessage({
   const hosted = useHostedConversation();
   const bubble = useRef<HTMLDivElement>(null);
   const skillHover = useSkillHover(bubble);
+  const author = useMessageAuthor(id);
   return (
     <div className="group journal-message journal-prompt">
       <div className="journal-message-body grid gap-2">
+        {author !== undefined ? <PromptAuthor person={author} /> : null}
         {attachments?.length ? <MessageAttachments hosted={hosted} paths={attachments} /> : null}
         <div ref={bubble} className="message-bubble text-prose whitespace-pre-wrap" onPointerMove={skillHover.onPointerMove} onPointerLeave={skillHover.onPointerLeave}>
           <MarkedText text={text} commands={marks.commands} connectors={marks.connectors} />

@@ -49,3 +49,25 @@ it("takes a message back to the composer when its words are pressed, and keeps S
   fireEvent.click(screen.getByRole("button", { name: "Then open a pull request" }));
   expect(onEdit).toHaveBeenCalledWith("queued");
 });
+
+it("names each queued message's author in a thread others are in, and offers actions only on the reader's own", () => {
+  const onEdit = vi.fn();
+  const mine = { id: "mine", text: "Keep the same column order as the table.", attachments: [], queuedAt: 1 };
+  const theirs = { id: "theirs", text: "Check the export with an empty log.", attachments: [], queuedAt: 2 };
+  const theo = { id: "u-theo", name: "Theo Laurent", image: null };
+  const ines = { id: "u-ines", name: "Inês Duarte", image: null };
+  const people = {
+    hint: "After Mara's turn",
+    of: (id: string) => (id === "mine" ? { author: theo, mine: true, canEdit: true, canRemove: true } : { author: ines, mine: false, canEdit: false, canRemove: false }),
+  };
+  render(<MessageQueue canSend pending={false} onSend={vi.fn()} onRemove={vi.fn()} onEdit={onEdit} messages={[mine, theirs]} people={people} />);
+  expect(screen.getByRole("button", { name: /2 queued/ }).textContent).toContain("After Mara's turn");
+  fireEvent.click(screen.getByRole("button", { name: /2 queued/ }));
+  const cards = screen.getAllByRole("listitem");
+  expect(cards.map((card) => card.querySelector(".queue-author")?.textContent)).toEqual(["TLTheo Laurent", "IDInês Duarte"]);
+  expect(cards[0]!.querySelectorAll("button")).toHaveLength(3);
+  expect(cards[1]!.querySelectorAll("button")).toHaveLength(0);
+  expect(screen.getAllByRole("button", { name: /Remove queued message/ })).toHaveLength(1);
+  fireEvent.click(screen.getByRole("button", { name: /Keep the same column order/ }));
+  expect(onEdit).toHaveBeenCalledWith("mine");
+});

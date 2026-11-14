@@ -4,13 +4,17 @@ import { cn } from "../lib/cn";
 import { useRunVoice, useTurnAuthor } from "../lib/turn-authors";
 import { turnStatusWords, type TurnStatus } from "@openorc/client";
 import { HarnessLogo } from "./HarnessLogo";
+import { useTurnSender } from "../lib/thread-authors";
+import { TurnSender } from "./ThreadVoice";
 
 /**
  * One head per turn: the agent's mark and name, then its model and a status that swaps in place as the turn moves
- * from working to writing to done. A turn loaded from history mounts in its final state and does not animate.
+ * from working to writing to done, then, in a cloud thread others are in, who sent the turn. A turn loaded from history
+ * mounts in its final state and does not animate. `blocks`: the turn's, which name its sender.
  */
-export function TurnHead({ runId, named, status }: { runId: string; named?: string | undefined; status: TurnStatus }) {
+export function TurnHead({ runId, named, status, blocks }: { runId: string; named?: string | undefined; status: TurnStatus; blocks?: readonly { id: string }[] }) {
   const author = useTurnAuthor(named, runId);
+  const sender = useTurnSender(blocks);
   const voice = useRunVoice(runId);
   const first = useRef(status.kind);
   const name = author ?? (voice ? harnessShortName(voice.agent) : "Assistant");
@@ -26,6 +30,7 @@ export function TurnHead({ runId, named, status }: { runId: string; named?: stri
           </span>
         </span>
       ) : null}
+      {sender !== undefined ? <TurnSender person={sender} /> : null}
     </div>
   );
 }

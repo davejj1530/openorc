@@ -1,0 +1,54 @@
+/* Working together in a cloud thread: who sent a turn, beside its agent, and who wrote a message, above it. */
+.turn-head-sender {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 5px;
+  margin-inline-start: 4px;
+  font-size: var(--text-xs);
+  line-height: 16px;
+  color: var(--ink-3);
+}
+.turn-head-sender .account-face {
+  width: 16px;
+  height: 16px;
+  font-size: 7px;
+}
+.prompt-author {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+  margin-bottom: -2px;
+  padding-inline-end: 10px;
+  font-size: var(--text-xs);
+  line-height: 18px;
+  color: var(--ink-3);
+}
+.prompt-author .account-face {
+  width: 18px;
+  height: 18px;
+  font-size: 8px;
+}
+.prompt-author-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.queue-author {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  margin-bottom: 2px;
+  font-size: var(--text-xs);
+  line-height: 18px;
+  color: var(--ink-3);
+}
+.queue-author .account-face {
+  width: 16px;
+  height: 16px;
+  font-size: 7px;
+}

@@ -313,3 +313,4 @@ export { mergeTeamMessages, teamChatRoster, teamChatShortNames, teamConversation
 export * from "./seat-words.js";
 export * from "./hosted-capabilities.js";
 export { onlineTaskKey, onlineTaskTags, readOnlineTaskPages, type OnlineTaskScope } from "./online-tasks.js";
+export * from "./thread-collaboration.js";

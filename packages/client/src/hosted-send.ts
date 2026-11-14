@@ -15,6 +15,7 @@ import {
 } from "@openorc/protocol";
 import { cloudTime, priceText } from "./account-words.js";
 import { rowStarter } from "./thread-row.js";
+import { askAnswerBlock, threadTogether, threadWriteBlock } from "./thread-collaboration.js";
 
 /**
  * Where the card above a cloud thread's composer leads: the Settings section that holds what is missing. Paying's three
@@ -58,17 +59,24 @@ export function placeUnreachable(thread: Pick<ThreadSummary, "owner"> | null): s
 }
 
 /**
- * Why the asks a thread waits on can't be answered from here: its place can't be reached, or a teammate started it and
- * the person only reads it. Null when they can.
+ * Why the asks a thread waits on can't be answered from here: its place can't be reached, or the server says this reader
+ * may not answer this ask now. From a server that predates working together: a teammate started it and the person only
+ * reads it. Null when they can.
  */
 export function asksBlocked(thread: Pick<ThreadSummary, "owner"> | null): string | null {
+  const unreachable = placeUnreachable(thread);
+  if (unreachable || threadTogether(thread)?.ask) return unreachable ?? askAnswerBlock(thread);
   const starter = thread ? rowStarter(thread) : null;
-  return placeUnreachable(thread) ?? (starter ? `Only ${starter.first} can answer in ${starter.first}'s thread.` : null);
+  return starter ? `Only ${starter.first} can answer in ${starter.first}'s thread.` : null;
 }
 
-/** Why a thread takes no messages from this person now. Drafts stay on the device until they can be sent. */
+/**
+ * Why a thread takes no messages from this person now: its place can't be reached, or the server's capability closes
+ * it. From a server that predates working together: only its starter writes. Drafts stay on the device until they can
+ * be sent.
+ */
 export function sendsBlocked(thread: Pick<ThreadSummary, "owner"> | null): string | null {
-  return placeUnreachable(thread) ?? threadReadOnlyReason(thread);
+  return placeUnreachable(thread) ?? (threadTogether(thread) ? threadWriteBlock(thread) : threadReadOnlyReason(thread));
 }
 
 /** Why only the starter can change this thread. Reach does not change who may act. */

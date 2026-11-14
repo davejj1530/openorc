@@ -1,15 +1,26 @@
 import { useState } from "react";
 import { failureParts, queueHint } from "@openorc/client";
-import type { QueuedMessage } from "@openorc/protocol";
+import type { QueuedMessage, ThreadPerson } from "@openorc/protocol";
 import { ChevronDown, X } from "./icons";
 import { Button, IconButton } from "./ui";
 import { useComposerControl } from "./composer-read-only";
+import { QueueAuthor } from "./ThreadVoice";
+
+/** Who wrote a queued message in a cloud thread others are in, and what the reader may do to it, as the server says. */
+export interface QueuedBy {
+  /** Undefined: names stay off, as in a thread nobody else is in. */
+  author?: ThreadPerson | null | undefined;
+  mine: boolean;
+  canEdit: boolean;
+  canRemove: boolean;
+}
 
 /**
  * Messages waiting for the turn to finish, as a pile above the composer: a front card with the
  * count and up to two cards behind it. Clicking the front fans the pile out into the messages,
  * each with Send now and Remove; pressing a message's words takes it out of the queue and back
- * into the message being written. A message that failed to send opens it on its own.
+ * into the message being written. A message that failed to send opens it on its own. In a cloud thread others are in,
+ * each message names its author, and only the reader's own can go now, leave or go back (`people`).
  */
 export function MessageQueue({
   messages,
@@ -21,6 +32,7 @@ export function MessageQueue({
   onSend,
   onRemove,
   onEdit,
+  people,
 }: {
   messages: QueuedMessage[];
   canSend: boolean;
@@ -34,6 +46,8 @@ export function MessageQueue({
   onRemove: (messageId: string) => void;
   /** Takes the message out of the queue and puts its words and files back in the composer, after what is there. */
   onEdit?: ((messageId: string) => void) | undefined;
+  /** Who wrote each message and the reader's rights to it; the hint names whose turn the queue waits on. */
+  people?: { hint: string | null; of(messageId: string): QueuedBy | null } | undefined;
 }) {
   const [expanded, setExpanded] = useState(false);
   const remove = useComposerControl(pending, "Remove from queue");
@@ -44,17 +58,23 @@ export function MessageQueue({
     <section className="message-queue" aria-label="Queued messages">
       {open ? (
         <ol className="message-queue-list motion-stagger">
-          {messages.map((message, index) => (
-            <li className="message-queue-card motion-arrive" key={message.id}>
-              <QueuedWords message={message} pending={pending} onEdit={onEdit ? () => onEdit(message.id) : undefined} />
-              <div className="message-queue-actions">
-                <QueuedSend message={message} canSend={canSend} pending={pending} sendReason={sendReason} retryBlocked={retryBlocked} onSend={onSend} />
-                <IconButton size="xs" disabled={remove.disabled} onClick={() => onRemove(message.id)} aria-label={`Remove queued message ${index + 1}`} data-tip={remove.reason}>
-                  <X size={13} />
-                </IconButton>
-              </div>
-            </li>
-          ))}
+          {messages.map((message, index) => {
+            const by = people?.of(message.id) ?? null;
+            const edit = onEdit && (!by || by.canEdit) ? () => onEdit(message.id) : undefined;
+            return (
+              <li className="message-queue-card motion-arrive" key={message.id}>
+                <QueuedWords message={message} pending={pending} onEdit={edit} author={by?.author} />
+                <div className="message-queue-actions">
+                  {!by || by.mine ? <QueuedSend message={message} canSend={canSend} pending={pending} sendReason={sendReason} retryBlocked={retryBlocked} onSend={onSend} /> : null}
+                  {!by || by.canRemove ? (
+                    <IconButton size="xs" disabled={remove.disabled} onClick={() => onRemove(message.id)} aria-label={`Remove queued message ${index + 1}`} data-tip={remove.reason}>
+                      <X size={13} />
+                    </IconButton>
+                  ) : null}
+                </div>
+              </li>
+            );
+          })}
         </ol>
       ) : null}
       <div className="message-queue-pile" data-behind={behind}>
@@ -63,7 +83,7 @@ export function MessageQueue({
         ))}
         <button type="button" className="message-queue-front" aria-expanded={open} onClick={() => setExpanded(!open)}>
           <span className="message-queue-count tabular">{messages.length} queued</span>
-          <span className="message-queue-hint">{queueHint(messages, agentName)}</span>
+          <span className="message-queue-hint">{people?.hint ?? queueHint(messages, agentName)}</span>
           <ChevronDown size={14} className="message-queue-chevron" />
         </button>
       </div>
@@ -71,12 +91,13 @@ export function MessageQueue({
   );
 }
 
-/** A queued message's words, what went wrong with it and what it carries; pressed, they go back to the composer. */
-function QueuedWords({ message, pending, onEdit }: { message: QueuedMessage; pending: boolean; onEdit: (() => void) | undefined }) {
+/** A queued message's author, words, what went wrong with it and what it carries; pressed, they go back to the composer. */
+function QueuedWords({ message, pending, onEdit, author }: { message: QueuedMessage; pending: boolean; onEdit: (() => void) | undefined; author?: ThreadPerson | null | undefined }) {
   const words = message.text.trim() || "Attached images";
   const control = useComposerControl(pending, words);
   const body = (
     <>
+      {author !== undefined ? <QueueAuthor person={author} /> : null}
       <span className="message-queue-preview">{words}</span>
       {message.error ? (
         <span role="status" className="message-queue-error">

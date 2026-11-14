@@ -50,6 +50,8 @@ import { openThread, useRouter, type MessageTarget } from "../lib/router";
 import { useConnectorMentions } from "../lib/connector-mentions";
 import { useSkillCommands } from "../lib/skill-commands";
 import { ConversationVoice, useRunVoices } from "../lib/turn-authors";
+import { ThreadVoicesContext, useThreadVoices } from "../lib/thread-authors";
+import { VoicesFailed } from "./ThreadVoice";
 import { useTurnFooters } from "../lib/turn-footers";
 import { useCloudSignInGate } from "./CloudSignInOffer";
 import { AnswersBlocked, AsksDocked } from "./ask-answer";
@@ -151,16 +153,21 @@ function dockedAsks(heard: Parameters<typeof waitingAsks>[0], thread: ThreadSumm
   return { asks: waitingAsks(heard), asksLabel: threadActivity({ activity: "waiting", owner: thread?.owner })?.text, asksBlocked: blocked };
 }
 
-/** What a conversation's transcript reads from around it: whose voice each turn is, the marks its messages are drawn with, and its turns' change footers. */
+/**
+ * What a conversation's transcript reads from around it: whose voice each turn is, the marks its messages are drawn
+ * with, its turns' change footers, and in a cloud thread others are in, who sent each turn and wrote each message.
+ */
 function TranscriptContext({
   voice,
   marks,
   footers,
   threadId,
   answersBlocked = null,
+  together = null,
   children,
 }: {
   answersBlocked?: string | null;
+  together?: ComponentProps<typeof ThreadVoicesContext.Provider>["value"];
   voice: ComponentProps<typeof ConversationVoice.Provider>["value"];
   marks: ComponentProps<typeof MessageMarks.Provider>["value"];
   footers: ComponentProps<typeof TurnChangesProvider>["footers"];
@@ -172,7 +179,9 @@ function TranscriptContext({
       <MessageMarks.Provider value={marks}>
         <TurnChangesProvider footers={footers} threadId={threadId}>
           <AnswersBlocked.Provider value={answersBlocked}>
-            <AsksDocked.Provider value>{children}</AsksDocked.Provider>
+            <ThreadVoicesContext.Provider value={together}>
+              <AsksDocked.Provider value>{children}</AsksDocked.Provider>
+            </ThreadVoicesContext.Provider>
           </AnswersBlocked.Provider>
         </TurnChangesProvider>
       </MessageMarks.Provider>
@@ -207,6 +216,7 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
   const { choice, mode, permission, permissionReady, permissionError } = settings;
   const orclings = useOrclingConversation({ thread, runs, choice, onModel: settings.selectModel, accounts });
   const voice = useRunVoices(orclings.voice, runs, thread);
+  const together = useThreadVoices(thread);
   const draftKey = capturedKey ?? `conversation.${conversation.id}`;
   const { prompt, setPrompt, clearDraft, error: draftError } = useConversationDraft({ draftKey, threadId: thread?.id ?? null, initialText: thread?.draft ?? "" });
   const taskDraft = useTaskComposerDraft({ scope: hostedFiles ?? null, threadId: thread?.id ?? null, draftKey, prompt, setPrompt });
@@ -275,7 +285,7 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
   function renderTranscript() {
     if (heard && heard.blocks.length > 0)
       return (
-        <TranscriptContext voice={voice} marks={marks} footers={footers} threadId={threadId} answersBlocked={answersBlocked}>
+        <TranscriptContext voice={voice} marks={marks} footers={footers} threadId={threadId} answersBlocked={answersBlocked} together={together.voices}>
           <Transcript
             working={working}
             media={links ? { basePath: links, fileScope: conversation } : { fileLinks: "cite" }}
@@ -342,6 +352,7 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
                   ) : null}
                   {signIn.offer}
                   {cloud.notice}
+                  {together.failed ? <VoicesFailed onRetry={together.retry} /> : null}
                   <SwitchingNote agent={switching && choice ? choice.agent : null} />
                   <ApplyingAutonomous
                     shown={Boolean(settingsPending && activeRun && thread && activeRun.mode === "act" && permission === "autonomous" && activeRun.permissionMode !== permission)}

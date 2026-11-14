@@ -172,6 +172,10 @@ const idReadTags: MethodRules = {
   "teamChat.conversation": (p) => ["team-chat", `team-chat:${String(p["spaceId"])}`, `team-chat:${String(p["spaceId"])}:${String(p["conversationId"])}`],
   "teamChat.timeline": (p) => ["team-chat", `team-chat:${String(p["spaceId"])}`, `team-chat:${String(p["spaceId"])}:${String(p["conversationId"])}`],
   "hosted.capabilities": (p) => ["account", "threads", `thread:${String(p["threadId"])}`],
+  // A row's move and the thread's own events both name senders: the core says which with `authors:<id>`.
+  "threads.collaboration": (p) => ["threads", `thread:${String(p["threadId"])}`],
+  "threads.authors": (p) => ["threads", `authors:${String(p["threadId"])}`],
+  "threads.people": (p) => ["spaces", `thread:${String(p["threadId"])}`],
   ...each(["hosted.review.changes", "hosted.review.turn", "hosted.review.file", "hosted.review.state"], (p) => ["threads", `thread:${String(p["threadId"])}`, `threaddiff:${String(p["threadId"])}`]),
   "threads.importable": (p) => ["threads", `importable:${String(p["projectId"])}`],
   "runs.listForThread": (p) => [`runs:thread:${String(p["threadId"])}`],

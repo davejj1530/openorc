@@ -34,7 +34,9 @@ afterEach(async () => {
 });
 
 async function open(options: { accountServer?: string } = { accountServer: stand.url }) {
-  core = await OpenOrc.create({ dataDir: path.join(folder, "data"), transport: { push: (push) => void pushes.push(push) }, accountSecrets, ...options });
+  // On the sign-in page the person signs in, and the page sends the browser back to the core's loopback.
+  const openBrowser = (url: string) => void (new URL(url).pathname === "/sign-in" && fetch(stand.signInPage(url, EMAIL)));
+  core = await OpenOrc.create({ dataDir: path.join(folder, "data"), transport: { push: (push) => void pushes.push(push) }, accountSecrets, openBrowser, ...options });
   return core;
 }
 
@@ -49,8 +51,8 @@ function macProject(opened: OpenOrc) {
 }
 
 async function signIn() {
-  await call("account.sendCode", { email: EMAIL });
-  await call("account.signIn", { email: EMAIL, code: stand.codeFor(EMAIL)! });
+  await call("account.signIn", {});
+  await vi.waitFor(async () => expect(await call("account.status", {})).toMatchObject({ state: "signed-in" }), { timeout: 5_000 });
 }
 
 const list = (projectIds: string[]) => call("threads.list", { projectIds, filter: "active", includeChildren: true });

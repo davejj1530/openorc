@@ -104,6 +104,12 @@ export interface BillingOffers {
  */
 export type Paying = { page: BillingPage["page"]; since: number };
 
+/**
+ * Signing in to OpenOrc through the browser, under way, or the last one's words when it did not sign in. `page` is the
+ * sign-in page's address, which may be shown; nothing secret of the sign-in ever reaches a window.
+ */
+export type BrowserSignIn = { state: "waiting"; page: string } | { state: "failed"; error: string };
+
 /** A trip through GitHub's pages in the browser, under way, or the last one's words when it did not connect. */
 export type GithubWork = { state: "waiting" } | { state: "failed"; error: string };
 
@@ -118,12 +124,13 @@ export interface AccountProject {
   cloud: "added" | "addable" | "unreadable";
 }
 
-/** Everything the app knows about the OpenOrc account, in one answer. Signed out is the whole state of an app with no account. */
+/** Everything the app knows about the OpenOrc account, in one answer. `unavailable`: this build has no account server to sign in to. */
 export type AccountStatus =
+  | { state: "unavailable" }
   | {
       state: "signed-out";
-      /** A code was sent here and has not been used or timed out. */
-      codeSentTo: string | null;
+      /** Signing in through the browser, under way or the last that failed. */
+      signingIn: BrowserSignIn | null;
       /** The server ended the session (signed out elsewhere, or expired), as opposed to the person signing out here. */
       ended: boolean;
       error: string | null;
@@ -156,7 +163,6 @@ export type AccountStatus =
       error: string | null;
     };
 
-const Email = z.string().trim().toLowerCase().pipe(z.email().max(320));
 const Agent = z.enum(HOSTED_AGENTS);
 /** An OpenCode provider as OpenCode names it, as the server takes it. */
 const Provider = z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/, "Name the provider as OpenCode does, such as anthropic or openrouter.");
@@ -173,18 +179,13 @@ const ConnectSignIn = z.discriminatedUnion("way", [
 
 export const accountRpcParams = {
   "account.status": z.object({}),
-  /** Emails a six-digit code. */
-  "account.sendCode": z.object({ email: Email }).strict(),
-  /** The code signs in; the session's token goes to protected storage and never comes back out of the core. */
-  "account.signIn": z
-    .object({
-      email: Email,
-      code: z
-        .string()
-        .trim()
-        .regex(/^\d{6}$/, "Type the six-digit code from the email."),
-    })
-    .strict(),
+  /**
+   * Opens OpenOrc's sign-in page in the browser, which hands back to the app once the person signed in there; the
+   * session's token goes to protected storage and never comes back out of the core. Asked again while one waits, it
+   * opens the same page again.
+   */
+  "account.signIn": z.object({}).strict(),
+  "account.signIn.cancel": z.object({}).strict(),
   /** Forgets the session here first, then tells the server. */
   "account.signOut": z.object({}),
   /** Chooses the sandbox service the person's cloud threads run on; null goes back to the server's own choice. */

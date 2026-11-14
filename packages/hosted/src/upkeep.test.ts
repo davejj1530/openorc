@@ -1,7 +1,7 @@
 import { hostedRunId, type RpcParams } from "@openorc/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createHosted, type Hosted } from "./index.js";
-import { hostDeps, newDevice, type Device, type Seen } from "./test-fixtures/host.js";
+import { hostDeps, newDevice, signInAs, type Device, type Seen } from "./test-fixtures/host.js";
 import { standIn, type StandIn, type StandInBilling } from "./testing/stand-in.js";
 
 const ADA = "ada@example.com";
@@ -28,12 +28,11 @@ afterEach(async () => {
 async function withThread(seed: { status?: "idle" | "working" } = {}): Promise<{ hosted: Hosted; thread: string; seen: Seen }> {
   const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" });
   const thread = stand.addThread(ADA, { projectId: project, title: "Retry the cloud start", ...seed });
-  const { deps, seen } = hostDeps(stand, device);
+  const { deps, seen, browser } = hostDeps(stand, device);
   const hosted = createHosted(deps);
   hosts.push(hosted);
   await hosted.start();
-  await hosted.account.sendCode(ADA);
-  await hosted.account.signIn(ADA, stand.codeFor(ADA)!);
+  await signInAs(hosted, browser, ADA);
   await vi.waitFor(() => expect(hosted.threads.holds({ thread })).toBe(true));
   return { hosted, thread, seen };
 }

@@ -5,7 +5,7 @@
  *
  * It keeps the real server's rules that the app's behavior depends on:
  *   a code is six digits, works once, only for the address it was sent to, for five minutes and three tries
- *   signing in answers the signed token in `set-auth-token`; the body's `token` is the bare session id, which no route takes
+ *   signing in goes through the browser (stand-in-app-sign-ins.ts) and answers a signed token; a bare session id is no token
  *   every signed-in route answers 401 without `Authorization: Bearer <that token>`
  *   the socket takes the token in its handshake's `auth` and refuses any other with `UNAUTHORIZED`
  *   `revoke()` ends every session, so the next request answers 401, while a socket already open stays open
@@ -18,6 +18,7 @@ import type { AddressInfo, Socket } from "node:net";
 import type { LiveSocket } from "../index.js";
 import { engineSession } from "./stand-in-socket.js";
 import { StandInSignIns } from "./stand-in-sign-ins.js";
+import { StandInAppSignIns } from "./stand-in-app-sign-ins.js";
 import { StandInGithub } from "./stand-in-github.js";
 import { StandInSpaces } from "./stand-in-spaces.js";
 import { billingState, leftSeconds, StandInPayments, type StandInBilling, type StandInOffers } from "./stand-in-billing.js";
@@ -26,8 +27,13 @@ import { StandInThreads, type Admit, type StandInPeer, type StandInThreadSeed } 
 export interface StandIn {
   /** Its origin, for `HostedDeps.server` or `OpenOrcOptions.accountServer`. */
   url: string;
-  /** The code last emailed to an address, as the person would read it. */
-  codeFor(email: string): string | undefined;
+  /**
+   * The person signs in on the page the app opened, as `email`: the code mailed to them is typed in and the app's
+   * request approved. Answers where the page sends the browser; throws the page's words when it refuses.
+   */
+  signInPage(url: string, email: string): string;
+  /** Sign-ins through the browser: the device names they were started with, and every request running out at once. */
+  appSignIns: Pick<StandInAppSignIns, "devices" | "expire">;
   /** What the next GET /billing answers for a person. */
   setBilling(email: string, billing: StandInBilling): void;
   /** Every checkout the person's apps were given, in order. */
@@ -115,7 +121,7 @@ interface Peer extends StandInPeer {
   waiting: boolean;
 }
 
-type Reply = { status: number; body: unknown; token?: string };
+type Reply = { status: number; body: unknown };
 
 export interface StandInOptions {
   signup?: "open" | "invite";
@@ -157,6 +163,31 @@ function accounts(options: StandInOptions) {
     if (!id || !signature || signature !== sign(id)) return null;
     return sessions.get(id) ?? null;
   };
+  /** Checks the code last mailed to the person, spending it when it is right: null then, else the refusal. */
+  const checkCode = (email: string, otp: string): Reply | null => {
+    const sent = codes.get(email);
+    if (!sent) return codeRefused(400, "INVALID_OTP");
+    if (Date.now() - sent.at > CODE_MS) {
+      codes.delete(email);
+      return codeRefused(400, "OTP_EXPIRED");
+    }
+    if (sent.tries >= CODE_TRIES) {
+      codes.delete(email);
+      return codeRefused(403, "TOO_MANY_ATTEMPTS");
+    }
+    if (otp !== sent.code) {
+      sent.tries++;
+      return codeRefused(400, "INVALID_OTP");
+    }
+    codes.delete(email);
+    return null;
+  };
+  /** A new session for the person, as its signed token. */
+  const session = (email: string): string => {
+    const id = randomUUID().replaceAll("-", "");
+    sessions.set(id, email);
+    return `${id}.${sign(id)}`;
+  };
   /** Each route by method and path, given the request's body and its bearer token. */
   const routes: Record<string, (body: Record<string, unknown>, token: string | null) => Reply> = {
     "POST /api/auth/email-otp/send-verification-otp": (body) => {
@@ -165,27 +196,6 @@ function accounts(options: StandInOptions) {
       if (options.signup !== "open" && !(options.invited ?? []).includes(email)) return { status: 400, body: { code: "NOT_INVITED", message: NOT_INVITED } };
       codes.set(email, { code: String(randomInt(0, 1_000_000)).padStart(6, "0"), at: Date.now(), tries: 0 });
       return { status: 200, body: { success: true } };
-    },
-    "POST /api/auth/sign-in/email-otp": (body) => {
-      const email = String(body["email"] ?? "").toLowerCase();
-      const sent = codes.get(email);
-      if (!sent) return codeRefused(400, "INVALID_OTP");
-      if (Date.now() - sent.at > CODE_MS) {
-        codes.delete(email);
-        return codeRefused(400, "OTP_EXPIRED");
-      }
-      if (sent.tries >= CODE_TRIES) {
-        codes.delete(email);
-        return codeRefused(403, "TOO_MANY_ATTEMPTS");
-      }
-      if (body["otp"] !== sent.code) {
-        sent.tries++;
-        return codeRefused(400, "INVALID_OTP");
-      }
-      codes.delete(email);
-      const id = randomUUID().replaceAll("-", "");
-      sessions.set(id, email);
-      return { status: 200, body: { token: id, user: { id: `user-${email}`, email, name: email.split("@")[0], emailVerified: true } }, token: `${id}.${sign(id)}` };
     },
     "POST /api/auth/sign-out": (_body, token) => {
       if (holder(token)) sessions.delete(token!.split(".")[0]!);
@@ -219,11 +229,14 @@ function accounts(options: StandInOptions) {
       return { status: 200, body: hostedSettings(who) };
     },
   };
-  return { codes, sessions, billing, people, sandboxes, signIns, admit, holder, routes };
+  // The sign-in page mails the code as the apps ask for it, and the person reads it.
+  const mail = (who: string): Reply & { code?: string } => ({ ...routes["POST /api/auth/email-otp/send-verification-otp"]!({ email: who, type: "sign-in" }, null), code: codes.get(who)?.code });
+  return { codes, sessions, billing, people, sandboxes, signIns, admit, holder, routes, checkCode, session, mail };
 }
 
 export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
-  const { codes, sessions, billing, people, sandboxes, signIns, admit: admitTurn, holder, routes } = accounts(options);
+  const { sessions, billing, people, sandboxes, signIns, admit: admitTurn, holder, routes, checkCode, session, mail } = accounts(options);
+  const appSignIns = new StandInAppSignIns({ web: () => `http://127.0.0.1:${port}`, session, checkCode, mail });
   const requests: StandIn["requests"] = [];
   const connections = new Set<Socket>();
   const peers = new Set<Peer>();
@@ -260,8 +273,9 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
       return /^\/(projects|hosted|github|agent-sign-ins|billing|api\/auth\/organization)\b/.test(path) ? unauthorized() : null;
     };
     const old = tooOld(request.headers["x-openorc-protocol"]) ? { status: 426, body: { statusCode: 426, message: APP_TOO_OLD } } : null;
-    const reply: Reply = old ?? (route ? route(body, token) : signedInRoute()) ?? { status: 404, body: { message: `Cannot ${method} ${path}`, error: "Not Found", statusCode: 404 } };
-    response.writeHead(reply.status, { "content-type": "application/json", ...(reply.token && { "set-auth-token": reply.token, "access-control-expose-headers": "set-auth-token" }) });
+    const reply: Reply = old ??
+      (route ? route(body, token) : (appSignIns.route(method, path, body) ?? signedInRoute())) ?? { status: 404, body: { message: `Cannot ${method} ${path}`, error: "Not Found", statusCode: 404 } };
+    response.writeHead(reply.status, { "content-type": "application/json" });
     response.end(reply.body === null && reply.status !== 200 ? undefined : JSON.stringify(reply.body));
   }
 
@@ -277,7 +291,8 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
 
   return {
     url: `http://127.0.0.1:${port}`,
-    codeFor: (email) => codes.get(email.toLowerCase())?.code,
+    signInPage: (url, email) => appSignIns.signInPage(url, email.toLowerCase()),
+    appSignIns,
     ...paymentsFace(billing, payments),
     setPerson: (email, person) => void people.set(email.toLowerCase(), person),
     sandboxes,

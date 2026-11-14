@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createHosted, type Hosted } from "./index.js";
-import { hostDeps, newDevice, storedToken, type Device } from "./test-fixtures/host.js";
+import { hostDeps, newDevice, signInAs, storedToken, type Device, type TestBrowser } from "./test-fixtures/host.js";
 import { standIn, type StandIn } from "./testing/stand-in.js";
 
 const ADA = "ada@example.com";
@@ -21,60 +21,32 @@ afterEach(async () => {
   await stand.close();
 });
 
+/** Each account's host and browser, which signs it in. */
+const hostOf = new WeakMap<Hosted["account"], { hosted: Hosted; browser: TestBrowser }>();
+
 async function host(overrides: Parameters<typeof hostDeps>[2] = {}) {
-  const { deps, seen } = hostDeps(stand, device, overrides);
+  const { deps, seen, browser } = hostDeps(stand, device, overrides);
   const hosted = createHosted(deps);
   hosts.push(hosted);
+  hostOf.set(hosted.account, { hosted, browser });
   await hosted.start();
   return { account: hosted.account, hosted, seen };
 }
 
+/** Signs in as `email` through the browser, signing whoever is signed in out first. */
 async function signIn(account: Hosted["account"], email: string) {
-  await account.sendCode(email);
-  await account.signIn(email, stand.codeFor(email)!);
+  const { hosted, browser } = hostOf.get(account)!;
+  if (account.status().state === "signed-in") await account.signOut();
+  await signInAs(hosted, browser, email);
 }
 
 describe("the account", () => {
-  it("signs in with a code the server takes, and shows the address", async () => {
+  it("signs in through the browser and shows the address", async () => {
     const { account, seen } = await host();
-    expect(account.status()).toEqual({ state: "signed-out", codeSentTo: null, ended: false, error: null });
+    expect(account.status()).toEqual({ state: "signed-out", signingIn: null, ended: false, error: null });
     await signIn(account, ADA);
     expect(account.status()).toMatchObject({ state: "signed-in", email: ADA, plan: { pro: false }, hours: null, error: null });
     expect(seen.pushes).toContainEqual({ type: "invalidate", keys: ["account"] });
-  });
-
-  it("says a wrong code is wrong in the server's words and keeps nothing", async () => {
-    const { account } = await host();
-    await account.sendCode(ADA);
-    await expect(account.signIn(ADA, "000000")).rejects.toThrow("That code isn't right. Check the email and type it again.");
-    expect(account.status()).toMatchObject({ state: "signed-out" });
-    expect(device).toMatchObject({ stored: null, kept: null, threads: null });
-  });
-
-  it("reads an address nobody invited as words, not as a code name", async () => {
-    await stand.close();
-    stand = await standIn({ signup: "invite", invited: [GRACE] });
-    const { account } = await host();
-    const refusal = await account.sendCode(ADA).catch((error: Error) => error.message);
-    expect(refusal).toBe("This email doesn't belong to any organization yet.");
-    expect(refusal).not.toContain("NOT_INVITED");
-    await account.sendCode(GRACE);
-    expect(account.status()).toMatchObject({ codeSentTo: GRACE });
-  });
-
-  it("remembers where the code went until sign-in or ten minutes", async () => {
-    let now = Date.now();
-    const { account } = await host({ now: () => now });
-    await account.sendCode(ADA);
-    expect(account.status()).toMatchObject({ state: "signed-out", codeSentTo: ADA });
-    now += 9 * 60_000;
-    expect(account.status()).toMatchObject({ codeSentTo: ADA });
-    now += 2 * 60_000;
-    expect(account.status()).toMatchObject({ codeSentTo: null });
-    await account.sendCode(ADA);
-    await account.signIn(ADA, stand.codeFor(ADA)!);
-    await account.signOut();
-    expect(account.status()).toMatchObject({ state: "signed-out", codeSentTo: null });
   });
 
   it("shows Pro with its standing and its date, and Free with no hours", async () => {
@@ -123,18 +95,8 @@ describe("the account", () => {
     await signIn(account, ADA);
     await stand.down();
     await account.signOut();
-    expect(account.status()).toEqual({ state: "signed-out", codeSentTo: null, ended: false, error: null });
+    expect(account.status()).toEqual({ state: "signed-out", signingIn: null, ended: false, error: null });
     expect(device).toMatchObject({ stored: null, kept: null, threads: null });
-  });
-
-  it("signs the first address out when signing in as another", async () => {
-    const { account } = await host();
-    await signIn(account, ADA);
-    const first = storedToken(device);
-    await signIn(account, GRACE);
-    expect(account.status()).toMatchObject({ state: "signed-in", email: GRACE });
-    await vi.waitFor(async () => expect((await fetch(`${stand.url}/billing`, { headers: { authorization: `Bearer ${first}` } })).status).toBe(401));
-    expect((await fetch(`${stand.url}/billing`, { headers: { authorization: `Bearer ${storedToken(device)}` } })).status).toBe(200);
   });
 
   it("names the person as the server does, and keeps a picture only when a window can draw it", async () => {
@@ -155,7 +117,7 @@ describe("the account", () => {
     first.hosted.close();
     stand.revoke();
     const { account } = await host();
-    await vi.waitFor(() => expect(account.status()).toEqual({ state: "signed-out", codeSentTo: null, ended: true, error: null }));
+    await vi.waitFor(() => expect(account.status()).toEqual({ state: "signed-out", signingIn: null, ended: true, error: null }));
     expect(device).toMatchObject({ stored: null, kept: null, threads: null });
   });
 

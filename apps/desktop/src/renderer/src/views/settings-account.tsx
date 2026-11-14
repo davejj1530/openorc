@@ -1,7 +1,7 @@
 import { billingMoves, cloudTime, hoursDetail, periodLabel, planDate, type BillingMove } from "@openorc/client";
 import { payBlock, PRO_PERIODS, sendBlockWords, type AccountStatus, type BillingPage, type ProPeriod } from "@openorc/protocol";
-import { useEffect, useState, type KeyboardEvent } from "react";
-import { Button, Input, Segmented, TextButton, Tooltip } from "../components/ui";
+import { useEffect, useState } from "react";
+import { Button, Segmented, TextButton, Tooltip } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { Failure } from "./settings-secret-field";
 import { LoadError, Section, SettingRow, Status } from "./settings-shared";
@@ -13,67 +13,32 @@ type SignedIn = Extract<AccountStatus, { state: "signed-in" }>;
 export function AccountSettings({ active }: { active: boolean }) {
   const status = useRpc("account.status", {}, { enabled: active });
   if (status.isError) return <LoadError retry={() => void status.refetch()} />;
-  if (!status.data) return null;
+  if (!status.data || status.data.state === "unavailable") return null;
   return status.data.state === "signed-in" ? <SignedInAccount account={status.data} active={active} /> : <SignIn status={status.data} />;
 }
 
 /**
- * The address, then the code. Which step shows comes from the core (`codeSentTo`), so leaving to read the email and
- * coming back lands on the code. `changing` goes back to the address until the next code is sent.
+ * Sign in opens OpenOrc's sign-in page in the browser, which hands back to the app. While the page waits it can be
+ * opened again or the sign-in called off; one that did not finish says why.
  */
 function SignIn({ status }: { status: SignedOut }) {
-  const send = useRpcMutation("account.sendCode");
   const signIn = useRpcMutation("account.signIn");
-  const [email, setEmail] = useState(status.codeSentTo ?? "");
-  const [code, setCode] = useState("");
-  const [changing, setChanging] = useState(false);
-  const sentTo = changing ? null : status.codeSentTo;
-  const submit = () => {
-    if (sentTo) signIn.mutate({ email: sentTo, code: code.trim() }, { onSettled: () => setCode("") });
-    else send.mutate({ email: email.trim() }, { onSuccess: () => setChanging(false) });
-  };
-  const error = sentTo ? signIn.error : send.error;
-  const onEnter = (event: KeyboardEvent) => {
-    if (event.key === "Enter" && !send.isPending && !signIn.isPending) submit();
-  };
+  const cancel = useRpcMutation("account.signIn.cancel");
+  const waiting = status.signingIn?.state === "waiting";
+  const failed = status.signingIn?.state === "failed" ? status.signingIn.error : status.error;
   return (
-    <Section
-      title="Sign in"
-      description={status.ended ? "Your session ended. Sign in again." : undefined}
-      actions={
-        sentTo ? (
-          <TextButton tone="muted" disabled={signIn.isPending} onClick={() => setChanging(true)}>
-            Use another address
+    <Section title="OpenOrc account">
+      <SettingRow label={waiting ? "Signing in" : "Not signed in"} hint={waiting ? "Continue in your browser" : status.ended ? "Your session ended" : undefined}>
+        {waiting ? (
+          <TextButton tone="muted" disabled={cancel.isPending} onClick={() => cancel.mutate({})}>
+            Cancel
           </TextButton>
-        ) : null
-      }
-    >
-      {sentTo ? (
-        <SettingRow label="Code" hint={`Sent to ${sentTo}`}>
-          <Input
-            aria-label="Code"
-            inputMode="numeric"
-            autoComplete="one-time-code"
-            maxLength={6}
-            autoFocus
-            value={code}
-            disabled={signIn.isPending}
-            onKeyDown={onEnter}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-          />
-          <Button variant="primary" disabled={signIn.isPending || code.length !== 6} onClick={submit}>
-            {signIn.isPending ? "Signing in…" : "Sign in"}
-          </Button>
-        </SettingRow>
-      ) : (
-        <SettingRow label="Email">
-          <Input aria-label="Email" type="email" autoComplete="email" value={email} disabled={send.isPending} onKeyDown={onEnter} onChange={(e) => setEmail(e.target.value)} />
-          <Button variant="primary" disabled={send.isPending || !email.trim()} onClick={submit}>
-            {send.isPending ? "Sending…" : "Send code"}
-          </Button>
-        </SettingRow>
-      )}
-      <Failure error={error ?? (status.error ? new Error(status.error) : null)} />
+        ) : null}
+        <Button size="sm" variant={waiting ? "secondary" : "primary"} disabled={signIn.isPending} onClick={() => signIn.mutate({})}>
+          {waiting ? "Open again" : "Sign in"}
+        </Button>
+      </SettingRow>
+      <Failure error={signIn.error ?? cancel.error ?? (failed ? new Error(failed) : null)} />
     </Section>
   );
 }

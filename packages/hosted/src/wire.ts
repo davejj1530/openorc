@@ -174,15 +174,19 @@ export const SOCKET = { changed: "changed", watch: "hosted:watch", unwatch: "hos
 /** The words a refusal carries, from either Better Auth (`{ code, message }`) or the server's own routes (`{ message }`). */
 export const wireRefusal = z.object({ message: z.string().min(1) });
 
-/** Signing in answers the session's signed token in this header. The body's `token` is the bare session id, which no route takes. */
-export const TOKEN_HEADER = "set-auth-token";
+/** A sign-in through the browser the server started for an app waiting on a loopback port: the page the browser opens for it. */
+export const wireAppSignInStart = z.object({ request: z.string().min(1), url: z.url(), expiresInMs: z.number() });
+/** The session's bearer token, given once, for the request the browser approved. */
+export const wireAppSignInFinish = z.object({ token: z.string().min(1) });
 
 const route = <T = null>(method: Route<T>["method"], path: string, reply: z.ZodType<T> | null): Route<T> => ({ method, path, reply });
 
 /** Every route the app calls, in one list. The stand-in server in testing/ serves exactly these. */
 export const ROUTES = {
-  sendCode: route("POST", "/api/auth/email-otp/send-verification-otp", null),
-  signIn: route("POST", "/api/auth/sign-in/email-otp", null),
+  /** Starts a sign-in through the browser for an app waiting on a loopback port, with the challenge of a verifier only the app holds. */
+  appSignInStart: route("POST", "/app-sign-in/start", wireAppSignInStart),
+  /** Trades the code the browser brought back, and the verifier, for the session's token; 410 in words once it is spent or ran out. */
+  appSignInFinish: route("POST", "/app-sign-in/finish", wireAppSignInFinish),
   signOut: route("POST", "/api/auth/sign-out", null),
   billing: route("GET", "/billing", wireBilling),
   offers: route("GET", "/billing/offers", wireOffers),

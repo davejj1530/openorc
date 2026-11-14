@@ -6,7 +6,6 @@
  *               agents' sign-ins and their GitHub, with the address it was for, and the sign-ins it refused a turn on
  *               as signed out.
  *               Kept in `deps.kept`. Each part is replaced only by an answer for it.
- *   codeSent    the address a code was last sent to, and when.
  *   error       words for the last read that failed for a reason other than reach.
  *
  * `status()` is computed from these and the session each time it is asked. Nothing stores an AccountStatus.
@@ -16,13 +15,11 @@ import { z } from "zod";
 import type { HostedAccount, HostedDeps } from "./index.js";
 import { OutOfReach, Refused, type Session, type SessionChange } from "./session.js";
 import { githubRepoOf, signInKey, toImage, toOffers, toPlan, toSandbox, toSignIns } from "./translate.js";
+import { BrowserSignInTrip } from "./browser-sign-in.js";
 import { GithubConnect } from "./github.js";
 import { Paying } from "./paying.js";
 import { SignIns } from "./signins.js";
 import { ROUTES, SOCKET, wireBilling, wireGithubRepository, wireHostedSettings, wireSignIn, wireTopics } from "./wire.js";
-
-/** How long Settings keeps asking for the code it sent; the server's code lasts five minutes. */
-const CODE_REMEMBERED_MS = 10 * 60_000;
 
 const keptAnswers = z.object({
   email: z.string(),
@@ -40,18 +37,22 @@ const keptAnswers = z.object({
 type Heard = z.infer<typeof keptAnswers>;
 
 /** `cloud`: the repositories the person's spaces have as projects, and a read of them again. */
-type AccountDeps = { session: Session; cloud: { repos(): ReadonlySet<string>; reread(): Promise<void> } } & Pick<HostedDeps, "kept" | "push" | "now" | "mintClaudeToken" | "browser" | "projects">;
+type AccountDeps = { session: Session; cloud: { repos(): ReadonlySet<string>; reread(): Promise<void> } } & Pick<
+  HostedDeps,
+  "kept" | "push" | "now" | "mintClaudeToken" | "browser" | "deviceName" | "projects"
+>;
 
 export class Account implements HostedAccount {
   #heard: Heard | null = null;
-  #codeSent: { email: string; at: number } | null = null;
   #error: string | null = null;
   #announced = "";
+  readonly #signingIn: BrowserSignInTrip;
   readonly #signIns: SignIns;
   readonly #github: GithubConnect;
   readonly #paying: Paying;
 
   constructor(private readonly deps: AccountDeps) {
+    this.#signingIn = new BrowserSignInTrip({ session: deps.session, browser: deps.browser, deviceName: deps.deviceName, changed: () => this.#announce() });
     this.#signIns = new SignIns({ session: deps.session, mintClaudeToken: deps.mintClaudeToken, now: deps.now, changed: () => this.#announce(), landed: () => this.#refresh() });
     this.#github = new GithubConnect({ session: deps.session, browser: deps.browser, changed: () => this.#announce(), landed: () => this.#landed() });
     this.#paying = new Paying({
@@ -85,10 +86,7 @@ export class Account implements HostedAccount {
 
   status(): AccountStatus {
     const state = this.deps.session.state;
-    if (!state.signedIn) {
-      const codeSent = this.#codeSent && this.deps.now() - this.#codeSent.at < CODE_REMEMBERED_MS ? this.#codeSent.email : null;
-      return { state: "signed-out", codeSentTo: codeSent, ended: state.ended, error: this.#error };
-    }
+    if (!state.signedIn) return { state: "signed-out", signingIn: this.#signingIn.work, ended: state.ended, error: this.#error };
     const heard = this.#heard?.email === state.email ? this.#heard : null;
     const { plan, hours } = heard?.billing ? toPlan(heard.billing) : { plan: { pro: false as const }, hours: null };
     return {
@@ -122,27 +120,17 @@ export class Account implements HostedAccount {
     });
   }
 
-  /** The server's refusals read as its words: not invited, too many codes. */
-  async sendCode(email: string): Promise<void> {
-    await this.deps.session.anonymous(ROUTES.sendCode, { email, type: "sign-in" });
-    this.#codeSent = { email, at: this.deps.now() };
+  /** Opens the sign-in page in the browser; how it goes shows in `status().signingIn` until the session is kept. */
+  async signIn(): Promise<void> {
     this.#error = null;
-    this.#announce();
+    await this.#signingIn.start();
   }
 
-  /** Rejects with the server's words for a wrong or expired code, keeping nothing. Signing in as another address signs the current one out first. */
-  async signIn(email: string, code: string): Promise<void> {
-    const state = this.deps.session.state;
-    if (state.signedIn && state.email === email) return;
-    if (state.signedIn) await this.signOut();
-    await this.deps.session.signIn(email, code);
-    this.#codeSent = null;
-    this.#error = null;
-    await this.#refresh();
+  cancelSigningIn(): void {
+    this.#signingIn.cancel();
   }
 
   async signOut(): Promise<void> {
-    this.#codeSent = null;
     await this.deps.session.signOut();
     this.#announce();
   }
@@ -206,6 +194,7 @@ export class Account implements HostedAccount {
 
   /** The host is closing: nothing is watched any more. */
   close(): void {
+    this.#signingIn.forget();
     this.#paying.forget();
   }
 
@@ -230,7 +219,8 @@ export class Account implements HostedAccount {
   }
 
   #changed(change: SessionChange): void {
-    if (!this.deps.session.state.signedIn) {
+    if (this.deps.session.state.signedIn) this.#signingIn.forget();
+    else {
       // Before the session's own storage is cleared and before the server hears of it.
       this.#signIns.forget();
       this.#github.forget();

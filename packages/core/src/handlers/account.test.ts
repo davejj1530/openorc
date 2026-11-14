@@ -15,6 +15,11 @@ let folder: string;
 let stored: string | null;
 let pushed: unknown[] = [];
 let core: OpenOrc | null = null;
+/** Every page the core opened in the browser, and what the core's loopback answered the browser on its return. */
+let opened: string[] = [];
+let answered: string[] = [];
+/** Who signs in on the sign-in page; nobody leaves it open. */
+let person: string | null = EMAIL;
 const call = rpcClient(() => core!);
 
 /** Main's protected store for this profile, which outlives the core as the encrypted file does. */
@@ -28,6 +33,9 @@ beforeEach(async () => {
   folder = await mkdtemp(path.join(tmpdir(), "openorc-account-"));
   stored = null;
   pushed = [];
+  opened = [];
+  answered = [];
+  person = EMAIL;
 });
 
 afterEach(async () => {
@@ -37,20 +45,43 @@ afterEach(async () => {
   await rm(folder, { recursive: true, force: true });
 });
 
-async function open(options: { accountServer?: string; openBrowser?: (url: string) => void } = { accountServer: stand.url }) {
-  core = await OpenOrc.create({ dataDir: path.join(folder, "data"), ephemeral: true, transport: { push: (push) => void pushed.push(push) }, accountSecrets, ...options });
+/** The person's browser: on the sign-in page they sign in, and the page sends the browser back to the core's loopback. */
+function browse(url: string): void {
+  opened.push(url);
+  if (new URL(url).pathname !== "/sign-in" || !person) return;
+  void fetch(stand.signInPage(url, person)).then(async (response) => void answered.push(await response.text()));
+}
+
+async function open(options: { accountServer?: string } = { accountServer: stand.url }) {
+  core = await OpenOrc.create({ dataDir: path.join(folder, "data"), ephemeral: true, transport: { push: (push) => void pushed.push(push) }, accountSecrets, openBrowser: browse, ...options });
   return core;
 }
 
 async function signIn(): Promise<AccountStatus> {
-  await call("account.sendCode", { email: EMAIL });
-  return call("account.signIn", { email: EMAIL, code: stand.codeFor(EMAIL)! });
+  await call("account.signIn", {});
+  await vi.waitFor(async () => expect(await call("account.status", {})).toMatchObject({ state: "signed-in", email: EMAIL }), { timeout: 5_000 });
+  return call("account.status", {});
 }
 
 describe("the OpenOrc account in the core", () => {
   it("is signed out on a new profile", async () => {
     await open();
-    expect(await call("account.status", {})).toEqual({ state: "signed-out", codeSentTo: null, ended: false, error: null });
+    expect(await call("account.status", {})).toEqual({ state: "signed-out", signingIn: null, ended: false, error: null });
+  });
+
+  it("signs in through the browser, whose return to this Mac is answered with a line to go back to OpenOrc", async () => {
+    await open();
+    expect(await call("account.signIn", {})).toMatchObject({ state: "signed-out", signingIn: { state: "waiting", page: opened[0] } });
+    await vi.waitFor(async () => expect(await call("account.status", {})).toMatchObject({ state: "signed-in", email: EMAIL }), { timeout: 5_000 });
+    expect(answered).toEqual([expect.stringContaining("Go back to OpenOrc")]);
+    expect(stored).toContain(EMAIL);
+  });
+
+  it("calls a sign-in off while the page waits", async () => {
+    person = null;
+    await open();
+    await call("account.signIn", {});
+    expect(await call("account.signIn.cancel", {})).toEqual({ state: "signed-out", signingIn: null, ended: false, error: null });
   });
 
   it("stays signed in across closing the core and opening it on the same profile", async () => {
@@ -65,12 +96,12 @@ describe("the OpenOrc account in the core", () => {
     expect(stored).toBe("");
   });
 
-  it("answers signed out and refuses to sign in, in words, with no account server", async () => {
+  it("answers that accounts are unavailable, and refuses to sign in in words, with no account server", async () => {
     await open({});
-    expect(await call("account.status", {})).toEqual({ state: "signed-out", codeSentTo: null, ended: false, error: null });
-    await expect(call("account.sendCode", { email: EMAIL })).rejects.toThrow("OpenOrc accounts aren't available here.");
-    await expect(call("account.signIn", { email: EMAIL, code: "123456" })).rejects.toThrow("OpenOrc accounts aren't available here.");
+    expect(await call("account.status", {})).toEqual({ state: "unavailable" });
+    await expect(call("account.signIn", {})).rejects.toThrow("OpenOrc accounts aren't available here.");
     expect(stand.requests).toEqual([]);
+    expect(opened).toEqual([]);
   });
 
   it("makes no request and opens no socket for a profile nobody signed in on, at start or while Settings is open", async () => {
@@ -105,11 +136,10 @@ describe("agent sign-ins on OpenOrc Cloud through the core", () => {
 
 describe("paying through the core", () => {
   it("opens a checkout in the browser, never in a window, and answers Pro once the server says it was paid", async () => {
-    const browser: string[] = [];
-    await open({ accountServer: stand.url, openBrowser: (url) => void browser.push(url) });
+    await open();
     await signIn();
     expect(await call("account.billing.open", { page: "pro", period: "monthly" })).toMatchObject({ state: "signed-in", plan: { pro: false }, paying: { page: "pro" } });
-    expect(browser).toEqual([stand.checkouts[0]!.url]);
+    expect(opened.slice(1)).toEqual([stand.checkouts[0]!.url]);
     stand.pay(EMAIL);
     await vi.waitFor(async () => expect(await call("account.status", {})).toMatchObject({ plan: { pro: true }, paying: null }), { timeout: 5_000 });
     expect(JSON.stringify(pushed)).not.toContain(stand.checkouts[0]!.url);

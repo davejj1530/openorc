@@ -12,7 +12,7 @@ beforeEach(() => {
   vi.mocked(core.call).mockImplementation((async (method: string) => {
     if (method === "claude.accounts.list") return { accounts: accounts.list, defaultId: "claude-cli" };
     if (method === "agents.models") return [];
-    return { state: "signed-out", codeSentTo: null, ended: false, error: null };
+    return { state: "signed-out", signingIn: null, ended: false, error: null };
   }) as never);
   window.openorc = { ...window.openorc, openExternal: vi.fn() } as never;
 });

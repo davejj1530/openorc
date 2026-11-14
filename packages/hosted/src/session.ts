@@ -18,7 +18,7 @@
 import { ACCOUNT_PROTOCOL_HEADER, ACCOUNT_PROTOCOL_VERSION, type AccountReach } from "@openorc/protocol";
 import { z } from "zod";
 import type { HostedDeps, LiveSocket } from "./index.js";
-import { ROUTES, TOKEN_HEADER, wireRefusal, type Route } from "./wire.js";
+import { ROUTES, wireRefusal, type Route } from "./wire.js";
 
 /** The server cannot be reached now. Its message is the words a window shows. */
 export class OutOfReach extends Error {
@@ -51,6 +51,7 @@ export type SessionChange = "connected" | "changed";
 const SPACE_HEADER = "x-openorc-space";
 const SIGN_IN_FIRST = "Sign in to OpenOrc first.";
 const ENDED = "Your OpenOrc session ended. Sign in again.";
+const NOT_SIGNED_IN = "OpenOrc Cloud didn't sign you in. Try again.";
 const REQUEST_TIMEOUT_MS = 30_000;
 /** A socket drop shorter than this changes nothing on screen. */
 const BLIP_MS = 2_000;
@@ -147,18 +148,19 @@ export class Session {
     return this.#parse(route, response);
   }
 
-  /** A request no session needs, such as asking for a code. Refusals as in `request`, but a 401 ends nothing. */
-  async anonymous(route: Route<null>, body: unknown): Promise<void> {
-    await this.#parse(route, await this.#send(route, body, null));
+  /** A request no session needs, such as starting a sign-in. Refusals as in `request`, but a 401 ends nothing. */
+  async anonymous<T>(route: Route<T>, body: unknown): Promise<T> {
+    return this.#parse(route, await this.#send(route, body, null));
   }
 
-  /** The sign-in request alone answers its token, in a header. The token goes to `begin` and to nobody else. */
-  async signIn(email: string, code: string): Promise<void> {
-    const response = await this.#send(ROUTES.signIn, { email, otp: code }, null);
-    await this.#parse(ROUTES.signIn, response);
-    const token = response.headers.get(TOKEN_HEADER);
-    if (!token) throw new Unreadable();
-    await this.begin(token, email);
+  /**
+   * A token the server just gave this app: the server is asked with it who it is for, then it is begun. The token goes
+   * to that request and to `begin`, and to nobody else.
+   */
+  async adopt(token: string): Promise<void> {
+    const person = await this.#parse(ROUTES.person, await this.#send(ROUTES.person, undefined, token));
+    if (!person) throw new Refused(NOT_SIGNED_IN);
+    await this.begin(token, person.user.email);
   }
 
   /** Heard on sign-in, sign-out, every change of reach, and every new socket session. */

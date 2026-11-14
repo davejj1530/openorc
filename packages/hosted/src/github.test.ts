@@ -1,7 +1,7 @@
 import type { AccountStatus, RpcParams } from "@openorc/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createHosted, type Hosted, type HostedDeps } from "./index.js";
-import { hostDeps, newDevice, type Device } from "./test-fixtures/host.js";
+import { createHosted, type Hosted } from "./index.js";
+import { hostDeps, newDevice, signInAs, testBrowser, type Device } from "./test-fixtures/host.js";
 import { standIn, type StandIn } from "./testing/stand-in.js";
 
 const ADA = "ada@example.com";
@@ -32,33 +32,17 @@ afterEach(async () => {
   await stand.close();
 });
 
-/** A browser that goes through GitHub's page as the person would, and returns to the waiting loopback with GitHub's query. */
-function browser(): NonNullable<HostedDeps["browser"]> {
-  const waiting = new Map<number, { resolve(query: string): void; reject(error: Error): void }>();
-  let port = 40_000;
-  return {
-    awaitReturn: async () => {
-      const at = ++port;
-      const query = new Promise<string>((resolve, reject) => waiting.set(at, { resolve, reject }));
-      query.catch(() => undefined);
-      return { port: at, query, close: () => waiting.get(at)?.reject(new Error("")) };
-    },
-    open: (url) => {
-      opened.push(url);
-      if (onGithub === "wait") return;
-      const back = new URL(stand.github.returnFor(url, { denied: onGithub === "deny" }));
-      waiting.get(Number(back.port))?.resolve(back.search.slice(1));
-    },
-  };
-}
-
 async function signedIn() {
-  const { deps } = hostDeps(stand, device, { browser: browser() });
+  // On GitHub's page the person goes through it, or cancels; the server sends the browser on to the waiting loopback.
+  const browser = testBrowser(stand, (url, self) => {
+    opened.push(url);
+    if (onGithub !== "wait") self.back(stand.github.returnFor(url, { denied: onGithub === "deny" }));
+  });
+  const { deps } = hostDeps(stand, device, { browser });
   const hosted = createHosted(deps);
   hosts.push(hosted);
   await hosted.start();
-  await hosted.account.sendCode(ADA);
-  await hosted.account.signIn(ADA, stand.codeFor(ADA)!);
+  await signInAs(hosted, browser, ADA);
   await vi.waitFor(() => expect(hosted.threads.active).toBe(true));
   return hosted;
 }

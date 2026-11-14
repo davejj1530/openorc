@@ -65,6 +65,7 @@ function createAccount(deps: AccountDeps): Hosted {
     },
     mintClaudeToken: (id) => mintClaudeToken(deps.claude, deps.terminal ?? spawnWithPipes, id ?? deps.claude.defaultId()),
     ...(deps.openBrowser && { browser: { awaitReturn: awaitBrowserReturn, open: deps.openBrowser } }),
+    deviceName: process.platform === "darwin" ? "OpenOrc on this Mac" : "OpenOrc on this computer",
     now: Date.now,
     log: deps.log,
   });

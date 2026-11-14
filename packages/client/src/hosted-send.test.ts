@@ -101,7 +101,7 @@ it.each([
   },
   {
     name: "a session the server ended",
-    account: { state: "signed-out" as const, codeSentTo: null, ended: true, error: null },
+    account: { state: "signed-out" as const, signingIn: null, ended: true, error: null },
     projectId: "mac-notes",
     words: "Your OpenOrc session ended.",
     end: { fix: { label: "Sign in", section: "account" } },
@@ -119,7 +119,8 @@ it("offers OpenOrc Cloud to a new thread once every part is there, for each agen
     fix: null,
     reason: "Not with Cursor",
   });
-  expect(hostedStart({ state: "signed-out", codeSentTo: null, ended: false, error: null }, { projectId: "mac-notes", ...claude })).toEqual({ shown: false, blocked: null });
+  expect(hostedStart({ state: "signed-out", signingIn: null, ended: false, error: null }, { projectId: "mac-notes", ...claude })).toEqual({ shown: false, blocked: null });
+  expect(hostedStart({ state: "unavailable" }, { projectId: "mac-notes", ...claude })).toEqual({ shown: false, blocked: null });
 });
 
 const moveOf = (move: { label: string; primary: boolean; blocked: string | null } | null) => move && `${move.label}${move.primary ? " (ink)" : ""}${move.blocked ? ` [${move.blocked}]` : ""}`;

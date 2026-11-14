@@ -55,13 +55,16 @@ export interface HostedDeps {
    */
   mintClaudeToken?(claudeAccountId: string | undefined): { token: Promise<string>; cancel(): void };
   /**
-   * The person's browser, for GitHub's and Polar's pages: waits on this device's loopback for one return to `path` (its query, or a
-   * rejection on timeout or `close`), and opens a page. Absent where the device has neither.
+   * The person's browser, for OpenOrc's sign-in page and GitHub's and Polar's pages: waits on this device's loopback
+   * for one return to `path` (its query, or a rejection on timeout or `close`), and opens a page. Absent where the
+   * device has neither.
    */
   browser?: {
     awaitReturn(path: string, timeoutMs: number): Promise<{ port: number; query: Promise<string>; close(): void }>;
     open(url: string): void;
   };
+  /** What the sign-in page calls this device, such as "OpenOrc on this Mac". */
+  deviceName: string;
   now(): number;
   log: { info(message: string): void; warn(message: string): void };
 }
@@ -70,9 +73,12 @@ export interface HostedDeps {
 export interface HostedAccount {
   /** What is known now, without waiting. Changes are announced with `invalidate ["account"]`. */
   status(): AccountStatus;
-  sendCode(email: string): Promise<void>;
-  /** Nothing to do when already signed in as the same address. The session is in protected storage before this resolves. */
-  signIn(email: string, code: string): Promise<void>;
+  /**
+   * Opens OpenOrc's sign-in page in the browser; resolves once it is open, and what comes of it shows in
+   * `status().signingIn` until the session is in protected storage. Nothing to do when signed in.
+   */
+  signIn(): Promise<void>;
+  cancelSigningIn(): void;
   /** Forgets the session and the kept answers first, then tells the server, so a server out of reach still signs out here. */
   signOut(): Promise<void>;
   /** Chooses the sandbox service the person's cloud threads run on; null leaves it to the server. */
@@ -142,7 +148,17 @@ export function createHosted(deps: HostedDeps): Hosted {
   const session = new Session(deps);
   // The account says which of this Mac's projects are on OpenOrc Cloud, from the projects the thread rows were read with.
   const cloud = { repos: () => threads.cloudRepos(), reread: () => threads.refresh() };
-  const account = new Account({ session, kept: deps.kept, push: deps.push, now: deps.now, mintClaudeToken: deps.mintClaudeToken, browser: deps.browser, projects: deps.projects, cloud });
+  const account = new Account({
+    session,
+    kept: deps.kept,
+    push: deps.push,
+    now: deps.now,
+    mintClaudeToken: deps.mintClaudeToken,
+    browser: deps.browser,
+    deviceName: deps.deviceName,
+    projects: deps.projects,
+    cloud,
+  });
   // The follower reads a thread's log in the thread's space, which the rows know.
   const follower: Follower = new Follower({ session, on: (threadId) => threads.on(threadId), push: deps.push, log: deps.log });
   const threads: Threads = new Threads({ session, follower, account, kept: deps.kept, projects: deps.projects, push: deps.push, notify: deps.notify, now: deps.now, log: deps.log });

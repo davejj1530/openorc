@@ -1,7 +1,7 @@
 import type { AccountStatus } from "@openorc/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createHosted, type Hosted, type HostedDeps } from "./index.js";
-import { hostDeps, newDevice, type Device, type Seen } from "./test-fixtures/host.js";
+import { hostDeps, newDevice, signInAs, testBrowser, type Device, type Seen, type TestBrowser } from "./test-fixtures/host.js";
 import { standIn, type StandIn } from "./testing/stand-in.js";
 
 const ADA = "ada@example.com";
@@ -25,20 +25,16 @@ afterEach(async () => {
   await stand.close();
 });
 
-const browser: NonNullable<HostedDeps["browser"]> = {
-  awaitReturn: () => Promise.reject(new Error("No page of Polar's comes back to the app.")),
-  open: (url) => void opened.push(url),
-};
-
-async function signedIn(overrides: Partial<HostedDeps> = { browser }): Promise<{ hosted: Hosted; seen: Seen }> {
-  const { deps, seen } = hostDeps(stand, device, overrides);
+/** Signed in through the browser, whose other pages (Polar's) are only opened; `overrides` apply to the host made then. */
+async function signedIn(overrides: Partial<HostedDeps> = {}): Promise<{ hosted: Hosted; seen: Seen; browser: TestBrowser }> {
+  const browser = testBrowser(stand, (url) => void opened.push(url));
+  const { deps, seen } = hostDeps(stand, device, { browser, ...overrides });
   const hosted = createHosted(deps);
   hosts.push(hosted);
   await hosted.start();
-  await hosted.account.sendCode(ADA);
-  await hosted.account.signIn(ADA, stand.codeFor(ADA)!);
+  if (hosted.account.status().state !== "signed-in") await signInAs(hosted, browser, ADA);
   await vi.waitFor(() => expect(status(hosted).reach).toBe("live"));
-  return { hosted, seen };
+  return { hosted, seen, browser };
 }
 
 const status = (hosted: Hosted) => hosted.account.status() as Extract<AccountStatus, { state: "signed-in" }>;
@@ -122,15 +118,15 @@ describe("paying", () => {
   });
 
   it("asks for no page on a device with no browser, and forgets a page opened once signed out", async () => {
-    const bare = await signedIn({});
+    (await signedIn()).hosted.close();
+    const bare = await signedIn({ browser: undefined });
     await expect(bare.hosted.account.openBilling({ page: "pro", period: "monthly" })).rejects.toThrow("This device can't open the payment page.");
     expect(stand.checkouts).toEqual([]);
     bare.hosted.close();
-    const { hosted } = await signedIn();
+    const { hosted, browser } = await signedIn();
     await hosted.account.openBilling({ page: "pro", period: "monthly" });
     await hosted.account.signOut();
-    await hosted.account.sendCode(ADA);
-    await hosted.account.signIn(ADA, stand.codeFor(ADA)!);
+    await signInAs(hosted, browser, ADA);
     expect(status(hosted).paying).toBeNull();
   });
 

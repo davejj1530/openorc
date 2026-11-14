@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { ChevronLeft } from "./icons";
+import { useRpc } from "../lib/client";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
 import { useRouter, type Route } from "../lib/router";
 import { settingsSection, settingsSections } from "../lib/settings-sections";
@@ -23,15 +24,16 @@ function NavItem({ route, icon, label, active }: { route: Route; icon: ReactNode
   );
 }
 
-/** Settings lists its sections in the sidebar, under a way back to the screen it was opened from. */
+/** Settings lists its sections in the sidebar, under a way back to the screen it was opened from. Account only where there is an account server. */
 export function SidebarSettings({ route }: { route: Extract<Route, { view: "settings" }> }) {
+  const accounts = useRpc("account.status", {}).data?.state !== "unavailable";
   const opener = useRouter((s) => s.history.findLast((entry) => entry.view !== "settings"));
   const current = settingsSection(route).id;
   return (
     <div className="settings-destinations">
       <NavItem route={opener ?? { view: "newthread" }} icon={<ChevronLeft size={16} />} label="Back to app" active={false} />
       <nav className="grid grid-cols-1 gap-0.5 min-w-0" aria-label="Settings">
-        {settingsSections.map(({ id, label, Icon }) => (
+        {settingsSections.filter(({ id }) => accounts || id !== "account").map(({ id, label, Icon }) => (
           <NavItem key={id} route={{ view: "settings", section: id }} icon={<Icon size={16} />} label={label} active={id === current} />
         ))}
       </nav>

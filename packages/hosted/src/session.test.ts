@@ -1,7 +1,8 @@
+import { createHash } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createHosted } from "./index.js";
 import { OutOfReach, Refused, Session, Unreadable } from "./session.js";
-import { hostDeps, newDevice, storedToken, type Device } from "./test-fixtures/host.js";
+import { hostDeps, newDevice, signInAs, storedToken, type Device } from "./test-fixtures/host.js";
 import { standIn, type StandIn } from "./testing/stand-in.js";
 import { ROUTES } from "./wire.js";
 
@@ -28,9 +29,19 @@ function session(overrides: Parameters<typeof hostDeps>[2] = {}) {
   return { session: made, seen };
 }
 
+/** The token the server gives for `email` once a browser sign-in for it was approved, as an app's finish reads it. */
+async function tokenFor(email: string): Promise<string> {
+  const verifier = "v".repeat(43);
+  const challenge = createHash("sha256").update(verifier).digest("base64url");
+  const post = async (path: string, body: unknown) =>
+    (await (await fetch(new URL(path, stand.url), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) })).json()) as Record<string, string>;
+  const { request, url } = await post("/app-sign-in/start", { port: 40_001, challenge, device: "OpenOrc on this Mac" });
+  const code = new URL(stand.signInPage(url!, email)).searchParams.get("code");
+  return (await post("/app-sign-in/finish", { request, code, verifier })).token!;
+}
+
 async function signedIn(made: Session) {
-  await made.anonymous(ROUTES.sendCode, { email: EMAIL, type: "sign-in" });
-  await made.signIn(EMAIL, stand.codeFor(EMAIL)!);
+  await made.adopt(await tokenFor(EMAIL));
 }
 
 const live = (made: Session) => vi.waitFor(() => expect(made.state).toMatchObject({ signedIn: true, reach: "live" }));
@@ -46,7 +57,7 @@ describe("the session", () => {
     expect(billing.every((request) => request.authorized)).toBe(true);
   });
 
-  it("reads the token from the set-auth-token header and saves it before it holds it", async () => {
+  it("asks the server who a new token is for, and saves it before it holds it", async () => {
     let release = () => {};
     const saved = new Promise<void>((resolve) => (release = resolve));
     const { session: made } = session({
@@ -58,9 +69,8 @@ describe("the session", () => {
         },
       },
     });
-    await made.anonymous(ROUTES.sendCode, { email: EMAIL, type: "sign-in" });
-    const signing = made.signIn(EMAIL, stand.codeFor(EMAIL)!);
-    await vi.waitFor(() => expect(stand.requests.some((request) => request.path === "/api/auth/sign-in/email-otp")).toBe(true));
+    const signing = made.adopt(await tokenFor(EMAIL));
+    await vi.waitFor(() => expect(stand.requests.at(-1)).toEqual({ method: "GET", path: "/api/auth/get-session", authorized: true }));
     expect(made.state).toEqual({ signedIn: false, ended: false });
     release();
     await signing;
@@ -79,8 +89,7 @@ describe("the session", () => {
         },
       },
     });
-    await made.anonymous(ROUTES.sendCode, { email: EMAIL, type: "sign-in" });
-    await expect(made.signIn(EMAIL, stand.codeFor(EMAIL)!)).rejects.toThrow("Cannot access protected storage.");
+    await expect(made.adopt(await tokenFor(EMAIL))).rejects.toThrow("Cannot access protected storage.");
     expect(made.state).toEqual({ signedIn: false, ended: false });
     expect(seen.sockets).toEqual([]);
     await expect(made.request(ROUTES.billing)).rejects.toThrow("Sign in to OpenOrc first.");
@@ -148,18 +157,16 @@ describe("the session", () => {
   });
 
   it("never puts the token in an error, a log line or a status", async () => {
-    const { deps, seen } = hostDeps(stand, device);
+    const { deps, seen, browser } = hostDeps(stand, device);
     const hosted = createHosted(deps);
     const said: unknown[] = [];
     const collect = async (work: () => Promise<unknown>) => said.push(await work().catch((error: unknown) => (error instanceof Error ? error.message : error)));
     await hosted.start();
-    await collect(() => hosted.account.sendCode(EMAIL));
-    await collect(() => hosted.account.signIn(EMAIL, "000000"));
-    await collect(() => hosted.account.signIn(EMAIL, stand.codeFor(EMAIL)!));
+    await signInAs(hosted, browser, EMAIL);
     const token = storedToken(device);
     said.push(hosted.account.status());
     await stand.down();
-    await collect(() => hosted.account.sendCode(EMAIL));
+    await collect(() => hosted.account.setSandbox(null));
     said.push(hosted.account.status());
     stand.revoke();
     await stand.up();

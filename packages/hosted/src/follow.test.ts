@@ -1,7 +1,7 @@
 import type { AgentEvent, Frame } from "@openorc/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createHosted, type Hosted } from "./index.js";
-import { hostDeps, newDevice, type Device, type Seen } from "./test-fixtures/host.js";
+import { hostDeps, newDevice, signInAs, type Device, type Seen } from "./test-fixtures/host.js";
 import { standIn, type StandIn } from "./testing/stand-in.js";
 
 const ADA = "ada@example.com";
@@ -29,12 +29,11 @@ afterEach(async () => {
 });
 
 async function signedIn(): Promise<{ hosted: Hosted; seen: Seen }> {
-  const { deps, seen } = hostDeps(stand, device);
+  const { deps, seen, browser } = hostDeps(stand, device);
   const hosted = createHosted(deps);
   hosts.push(hosted);
   await hosted.start();
-  await hosted.account.sendCode(ADA);
-  await hosted.account.signIn(ADA, stand.codeFor(ADA)!);
+  await signInAs(hosted, browser, ADA);
   await vi.waitFor(() => expect(hosted.threads.holds({ thread })).toBe(true));
   return { hosted, seen };
 }

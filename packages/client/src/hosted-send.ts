@@ -88,7 +88,7 @@ function sendStartBlock(why: SendBlockWhy, agent: string): StartBlock {
 export function hostedStart(account: AccountStatus | undefined, input: { projectId: string; agent: string; model: string | null }): { shown: boolean; blocked: StartBlock | null } {
   if (account?.state === "signed-out")
     return account.ended ? { shown: true, blocked: { words: "Your OpenOrc session ended.", fix: { label: "Sign in", section: "account" } } } : { shown: false, blocked: null };
-  if (!account) return { shown: false, blocked: null };
+  if (account?.state !== "signed-in") return { shown: false, blocked: null };
   const why = hostedSendBlock(account, input, false);
   if (why && BEFORE_PROJECT.includes(why)) return { shown: true, blocked: sendStartBlock(why, input.agent) };
   const project = projectBlock(account, input.projectId);

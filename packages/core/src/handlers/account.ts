@@ -3,7 +3,7 @@ import type { AccountStatus } from "@openorc/protocol";
 import type { Handlers } from "./types.js";
 
 /** What a core with no account server answers. */
-const NO_ACCOUNT: AccountStatus = { state: "signed-out", codeSentTo: null, ended: false, error: null };
+const NO_ACCOUNT: AccountStatus = { state: "unavailable" };
 const UNAVAILABLE = "OpenOrc accounts aren't available here.";
 
 /** Every call answers the whole status. The package tells the windows itself when the status changes later. */
@@ -12,8 +12,8 @@ export function createAccountHandlers(
 ): Pick<
   Handlers,
   | "account.status"
-  | "account.sendCode"
   | "account.signIn"
+  | "account.signIn.cancel"
   | "account.signOut"
   | "account.setSandbox"
   | "account.signIns.connect"
@@ -34,8 +34,8 @@ export function createAccountHandlers(
   };
   return {
     "account.status": () => account?.status() ?? NO_ACCOUNT,
-    "account.sendCode": ({ email }) => after((a) => a.sendCode(email)),
-    "account.signIn": ({ email, code }) => after((a) => a.signIn(email, code)),
+    "account.signIn": () => after((a) => a.signIn()),
+    "account.signIn.cancel": () => after(async (a) => a.cancelSigningIn()),
     "account.signOut": () => after((a) => a.signOut()),
     "account.setSandbox": ({ service }) => after((a) => a.setSandbox(service)),
     "account.signIns.connect": (input) => after((a) => a.connectSignIn(input)),

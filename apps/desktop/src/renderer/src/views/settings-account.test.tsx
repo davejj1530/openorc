@@ -20,7 +20,8 @@ afterEach(() => {
 });
 
 const ADA = "ada@example.com";
-const signedOut: Extract<AccountStatus, { state: "signed-out" }> = { state: "signed-out", codeSentTo: null, ended: false, error: null };
+const signedOut: Extract<AccountStatus, { state: "signed-out" }> = { state: "signed-out", signingIn: null, ended: false, error: null };
+const PAGE = "http://localhost:3600/sign-in?request=r1";
 const pro: Extract<AccountStatus, { state: "signed-in" }> = {
   state: "signed-in",
   email: ADA,
@@ -47,45 +48,41 @@ const pro: Extract<AccountStatus, { state: "signed-in" }> = {
 };
 
 /** A core that keeps one account status and answers every account call with it, as the real one does. */
-function fakeCore(start: AccountStatus, signedIn: AccountStatus = pro, offers: BillingOffers | null = null) {
+function fakeCore(start: AccountStatus, offers: BillingOffers | null = null) {
   let status = start;
+  /** The browser hands back to the app, signed in, and the core announces it. */
+  const handBack = (to: AccountStatus = pro) => {
+    status = to;
+    void queryClient.invalidateQueries();
+  };
   vi.mocked(core.call).mockImplementation(async (method: string, params: unknown) => {
-    const p = params as { email?: string; code?: string; service?: string };
+    const p = params as { service?: string };
     if (method === "projects.list") return [];
     if (method === "account.offers") return offers;
-    if (method === "account.sendCode") status = { ...signedOut, codeSentTo: p.email! };
-    if (method === "account.signIn") {
-      if (p.code !== "123456") throw new Error("Invalid OTP");
-      status = signedIn;
-    }
+    if (method === "account.signIn") status = { ...signedOut, signingIn: { state: "waiting", page: PAGE } };
+    if (method === "account.signIn.cancel") status = signedOut;
     if (method === "account.signOut") status = signedOut;
     if (method === "account.setSandbox" && status.state === "signed-in") status = { ...status, sandbox: { ...status.sandbox!, chosen: p.service! } };
     if (method === "account.billing.open" && status.state === "signed-in") status = { ...status, paying: { page: (params as { page: "pro" }).page, since: 0 } };
     if (method === "account.billing.leave" && status.state === "signed-in") status = { ...status, paying: null };
     return status;
   });
+  return handBack;
 }
 
 function show(node: React.ReactNode) {
   render(<QueryClientProvider client={queryClient}>{node}</QueryClientProvider>);
 }
 
-it("sends a code to the address typed, then asks for the code", async () => {
-  fakeCore(signedOut);
+it("opens the sign-in page, says it waits for the browser, and shows the person, Pro, its renewal and the hours left once it hands back", async () => {
+  const handBack = fakeCore(signedOut);
   show(<AccountSettings active />);
-  fireEvent.change(await screen.findByRole("textbox", { name: "Email" }), { target: { value: ADA } });
-  fireEvent.click(screen.getByRole("button", { name: "Send code" }));
-  expect(await screen.findByText(`Sent to ${ADA}`)).toBeTruthy();
-  expect(core.call).toHaveBeenCalledWith("account.sendCode", { email: ADA });
-  fireEvent.click(screen.getByRole("button", { name: "Use another address" }));
-  expect(screen.getByRole("textbox", { name: "Email" })).toBeTruthy();
-});
-
-it("signs in with the code and shows the person, Pro, its renewal and the hours left", async () => {
-  fakeCore({ ...signedOut, codeSentTo: ADA });
-  show(<AccountSettings active />);
-  fireEvent.change(await screen.findByRole("textbox", { name: "Code" }), { target: { value: "123456" } });
-  fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Sign in" }));
+  expect(await screen.findByText("Continue in your browser")).toBeTruthy();
+  expect(core.call).toHaveBeenCalledWith("account.signIn", {});
+  fireEvent.click(screen.getByRole("button", { name: "Open again" }));
+  await waitFor(() => expect(vi.mocked(core.call).mock.calls.filter(([method]) => method === "account.signIn")).toHaveLength(2));
+  handBack();
   expect(await screen.findByRole("heading", { name: "Ada Lovelace" })).toBeTruthy();
   expect(screen.getByText(ADA)).toBeTruthy();
   expect(screen.getByText("Pro")).toBeTruthy();
@@ -94,13 +91,25 @@ it("signs in with the code and shows the person, Pro, its renewal and the hours 
   expect(screen.getByText("Connected")).toBeTruthy();
 });
 
-it("shows a refused code in an alert and keeps asking for one", async () => {
-  fakeCore({ ...signedOut, codeSentTo: ADA });
+it("calls a waiting sign-in off, and says in an alert why one did not finish", async () => {
+  fakeCore({ ...signedOut, signingIn: { state: "waiting", page: PAGE } });
   show(<AccountSettings active />);
-  fireEvent.change(await screen.findByRole("textbox", { name: "Code" }), { target: { value: "000000" } });
-  fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
-  expect((await screen.findByRole("alert")).textContent).toBe("Invalid OTP");
-  expect(screen.getByRole("textbox", { name: "Code" })).toBeTruthy();
+  fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+  expect(await screen.findByText("Not signed in")).toBeTruthy();
+  expect(core.call).toHaveBeenCalledWith("account.signIn.cancel", {});
+  cleanup();
+  queryClient.clear();
+  fakeCore({ ...signedOut, signingIn: { state: "failed", error: "That sign-in ran out. Sign in from OpenOrc again." } });
+  show(<AccountSettings active />);
+  expect((await screen.findByRole("alert")).textContent).toBe("That sign-in ran out. Sign in from OpenOrc again.");
+  expect(screen.getByRole("button", { name: "Sign in" })).toBeTruthy();
+});
+
+it("shows nothing in a build with no account server", async () => {
+  fakeCore({ state: "unavailable" });
+  show(<AccountSettings active />);
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("account.status", {}));
+  expect(screen.queryByRole("button")).toBeNull();
 });
 
 it("shows Free with no cloud hours, and says when OpenOrc Cloud can't be reached", async () => {
@@ -115,13 +124,13 @@ it("signs out back to the address", async () => {
   fakeCore(pro);
   show(<AccountSettings active />);
   fireEvent.click(await screen.findByRole("button", { name: "Sign out" }));
-  expect(await screen.findByRole("button", { name: "Send code" })).toBeTruthy();
+  expect(await screen.findByRole("button", { name: "Sign in" })).toBeTruthy();
 });
 
 it("says a session the server ended ended", async () => {
   fakeCore({ ...signedOut, ended: true });
   show(<AccountSettings active />);
-  expect(await screen.findByText("Your session ended. Sign in again.")).toBeTruthy();
+  expect(await screen.findByText("Your session ended")).toBeTruthy();
 });
 
 it("lets a Pro person choose where their threads run, by the server's names", async () => {
@@ -219,7 +228,7 @@ const OFFERS: BillingOffers = {
 };
 
 it("prices each way of paying for Pro, and the pack on its Buy, as the server says them", async () => {
-  fakeCore(free, pro, OFFERS);
+  fakeCore(free, OFFERS);
   show(<AccountSettings active />);
   fireEvent.click(await screen.findByRole("radio", { name: /200.* a year$/ }));
   expect(screen.getByRole("radio", { name: /20.* a month$/ })).toBeTruthy();
@@ -227,13 +236,13 @@ it("prices each way of paying for Pro, and the pack on its Buy, as the server sa
   await waitFor(() => expect(core.call).toHaveBeenCalledWith("account.billing.open", { page: "pro", period: "yearly" }));
   cleanup();
   queryClient.clear();
-  fakeCore({ ...pro, hours: { ...pro.hours!, leftSeconds: 0 } }, pro, OFFERS);
+  fakeCore({ ...pro, hours: { ...pro.hours!, leftSeconds: 0 } }, OFFERS);
   show(<AccountSettings active />);
   expect(ink((await screen.findByRole("button", { name: /^Buy 50 h for .*10$/ })).textContent!)).toBe(true);
 });
 
 it("shows no price and blocks nothing when the server can't say them", async () => {
-  fakeCore(free, pro, { ...OFFERS, pro: OFFERS.pro.map((offer) => ({ ...offer, price: null })) });
+  fakeCore(free, { ...OFFERS, pro: OFFERS.pro.map((offer) => ({ ...offer, price: null })) });
   show(<AccountSettings active />);
   expect(await screen.findByRole("radio", { name: "Yearly" })).toBeTruthy();
   expect(screen.getByRole<HTMLButtonElement>("button", { name: "Upgrade" }).disabled).toBe(false);

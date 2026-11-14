@@ -468,7 +468,6 @@ export type RpcParams<M extends RpcMethod> = z.infer<(typeof rpcParams)[M]>;
  * diagnostics test fails for a method with a credential field left off.
  */
 const SECRET_PARAMS: ReadonlySet<RpcMethod> = new Set<RpcMethod>([
-  "account.signIn",
   "account.signIns.connect",
   "memory.settings.set",
   "remote.push.setKey",

@@ -50,7 +50,7 @@ it("shows the signed-in person with their plan and cloud hours, and opens Settin
 });
 
 it("shows nothing while signed out", async () => {
-  show({ state: "signed-out", codeSentTo: null, ended: false, error: null });
+  show({ state: "signed-out", signingIn: null, ended: false, error: null });
   await new Promise((resolve) => setTimeout(resolve, 20));
   expect(screen.queryByRole("button")).toBeNull();
 });

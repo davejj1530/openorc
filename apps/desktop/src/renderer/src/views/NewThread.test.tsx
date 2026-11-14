@@ -363,7 +363,7 @@ describe("NewThread", () => {
   });
 
   it("never offers OpenOrc Cloud to someone with no account", async () => {
-    account = { state: "signed-out", codeSentTo: null, ended: false, error: null };
+    account = { state: "signed-out", signingIn: null, ended: false, error: null };
     render(<NewThread projectId="p1" />);
     fireEvent.click(screen.getByRole("button", { name: /^Where the thread works/ }));
     await screen.findByRole("menuitem", { name: /^Worktree/ });

@@ -1,7 +1,7 @@
 import type { RpcParams } from "@openorc/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createHosted, type Hosted } from "./index.js";
-import { hostDeps, newDevice, type Device } from "./test-fixtures/host.js";
+import { hostDeps, newDevice, signInAs, type TestBrowser, type Device } from "./test-fixtures/host.js";
 import { standIn, type StandIn } from "./testing/stand-in.js";
 
 const ADA = "ada@example.com";
@@ -22,17 +22,20 @@ afterEach(async () => {
   await stand.close();
 });
 
+/** Each host's browser, which signs it in. */
+const browsers = new WeakMap<Hosted, TestBrowser>();
+
 async function host() {
-  const { deps, seen } = hostDeps(stand, device);
+  const { deps, seen, browser } = hostDeps(stand, device);
   const hosted = createHosted(deps);
   hosts.push(hosted);
+  browsers.set(hosted, browser);
   await hosted.start();
   return { hosted, seen };
 }
 
 async function signIn(hosted: Hosted) {
-  await hosted.account.sendCode(ADA);
-  await hosted.account.signIn(ADA, stand.codeFor(ADA)!);
+  await signInAs(hosted, browsers.get(hosted)!, ADA);
 }
 
 const listed = (hosted: Hosted) => hosted.threads.listed("threads.list", LIST)?.rows ?? [];
@@ -162,12 +165,11 @@ describe("a team's threads", () => {
 
   async function hostAs(email: string, on = newDevice()) {
     on.projects = device.projects;
-    const { deps, seen } = hostDeps(stand, on);
+    const { deps, seen, browser } = hostDeps(stand, on);
     const hosted = createHosted(deps);
     hosts.push(hosted);
     await hosted.start();
-    await hosted.account.sendCode(email);
-    await hosted.account.signIn(email, stand.codeFor(email)!);
+    await signInAs(hosted, browser, email);
     return { hosted, seen };
   }
 
@@ -208,6 +210,10 @@ describe("a team's threads", () => {
     const hosted = createHosted(deps);
     hosts.push(hosted);
     await hosted.start();
-    await expect(hosted.account.sendCode(ADA)).rejects.toThrow("This version of OpenOrc is too old for OpenOrc Cloud. Update OpenOrc to keep using it.");
+    await hosted.account.signIn();
+    expect(hosted.account.status()).toMatchObject({
+      state: "signed-out",
+      signingIn: { state: "failed", error: "This version of OpenOrc is too old for OpenOrc Cloud. Update OpenOrc to keep using it." },
+    });
   });
 });

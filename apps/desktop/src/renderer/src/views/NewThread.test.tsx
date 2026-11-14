@@ -192,7 +192,7 @@ describe("NewThread", () => {
   it.each([
     ["while the project list is still loading", true],
     ["once the list says the project has no folder here", false],
-  ])("asks this Mac nothing about a cloud-only project's checkout %s", (_when, loading) => {
+  ])("asks this Mac nothing about a cloud-only project's checkout or skills %s", (_when, loading) => {
     projects = [{ ...makeProject("p1"), rootPath: "" }];
     listLoading = loading;
     spaceNavigation.getState().initialize("scoped", "personal", [
@@ -209,6 +209,7 @@ describe("NewThread", () => {
     reads.length = 0;
     render(<NewThread projectId="p1" />);
     expect(reads.filter(([method]) => method === "projects.git" || method === "projects.checkoutBranch")).toEqual([]);
+    expect(reads.filter(([method, params]) => method === "skills.list" && JSON.stringify(params).includes('"id":"p1"'))).toEqual([]);
   });
 
   it("asks for no project's activity while there is no project to start in", () => {

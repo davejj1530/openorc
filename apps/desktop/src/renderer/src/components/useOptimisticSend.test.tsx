@@ -97,3 +97,20 @@ it("sends a second quick message only after the first took hold, planned on what
   expect(calls[1]!.request.working).toBe(true);
   expect(calls[1]!.message.text).toBe("two");
 });
+
+it("awaits a message that names its own request id, shows no copy of it, and leaves its files to the composer when it fails", async () => {
+  const calls: Parameters<typeof setup>[0] = [];
+  const { hook, restore } = setup(calls);
+  let failed: unknown = null;
+  const sending = hook.result.current.send({ ...request, now: true }, { text: "read these", attachments: ["/hosted/files/f1/notes.txt"], requestId: "exact" }).catch((error: unknown) => {
+    failed = error;
+  });
+  await vi.waitFor(() => expect(calls).toHaveLength(1));
+  expect(calls[0]!.message).toEqual({ text: "read these", attachments: ["/hosted/files/f1/notes.txt"], requestId: "exact" });
+  expect(hook.result.current.run).toBeNull();
+  await act(async () => calls[0]!.reply.reject(new Error("Your OpenOrc session changed. Try again.")));
+  await sending;
+  expect(failed).toEqual(new Error("Your OpenOrc session changed. Try again."));
+  expect(restore).not.toHaveBeenCalled();
+  expect(restored).toEqual([]);
+});

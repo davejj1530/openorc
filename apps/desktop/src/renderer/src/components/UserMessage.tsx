@@ -5,6 +5,8 @@ import { MarkedText, MessageMarks, SkillHoverCard, useSkillHover } from "./Marke
 import { CopyMessage, MessageTime } from "./MessageActions";
 import { ThreadImage } from "./ThreadImages";
 import { IconButton } from "./ui";
+import { HostedMessageAttachments } from "./HostedMessageAttachments";
+import { useHostedConversation } from "./HostedConversationBoundary";
 
 /** The user's message: what they attached, then their words as the composer drew them, then copy, fork and when. A badge, such as a reaction, rests on the bubble. */
 export function UserMessage({
@@ -21,18 +23,13 @@ export function UserMessage({
   badge?: ReactNode;
 }) {
   const marks = useContext(MessageMarks);
+  const hosted = useHostedConversation();
   const bubble = useRef<HTMLDivElement>(null);
   const skillHover = useSkillHover(bubble);
   return (
     <div className="group journal-message journal-prompt">
       <div className="journal-message-body grid gap-2">
-        {attachments && attachments.length > 0 ? (
-          <div className="flex flex-wrap gap-2 justify-end">
-            {attachments.map((a) =>
-              isImagePath(a) ? <ThreadImage key={a} src={`openorc-asset://attachments/${a.split("/").pop() ?? ""}`} alt="Attached image" compact /> : <AttachedFile key={a} path={a} />,
-            )}
-          </div>
-        ) : null}
+        {attachments?.length ? <MessageAttachments hosted={hosted} paths={attachments} /> : null}
         <div ref={bubble} className="message-bubble text-prose whitespace-pre-wrap" onPointerMove={skillHover.onPointerMove} onPointerLeave={skillHover.onPointerLeave}>
           <MarkedText text={text} commands={marks.commands} connectors={marks.connectors} />
           {badge}
@@ -44,6 +41,17 @@ export function UserMessage({
           <MessageTime at={at} />
         </div>
       </div>
+    </div>
+  );
+}
+
+function MessageAttachments({ hosted, paths }: { hosted: ReturnType<typeof useHostedConversation>; paths: string[] }) {
+  if (hosted) return <HostedMessageAttachments thread={hosted} paths={paths} />;
+  return (
+    <div className="flex flex-wrap gap-2 justify-end">
+      {paths.map((path) =>
+        isImagePath(path) ? <ThreadImage key={path} src={`openorc-asset://attachments/${path.split("/").pop() ?? ""}`} alt="Attached image" compact /> : <AttachedFile key={path} path={path} />,
+      )}
     </div>
   );
 }

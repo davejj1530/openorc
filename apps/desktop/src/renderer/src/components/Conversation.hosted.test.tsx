@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { AccountStatus, Project, Run, ThreadSummary } from "@openorc/protocol";
+import type { AccountStatus, Project, Run, SpaceProject, SpacesStatus, ThreadSummary } from "@openorc/protocol";
 import { useRouter } from "../lib/router";
 import { runs as runStore } from "../lib/client";
 import { core } from "../lib/rpc";
@@ -76,8 +76,24 @@ const pro: AccountStatus = {
   error: null,
 };
 
-async function open(overrides: Partial<ThreadSummary> = {}, account: AccountStatus = pro) {
+const spaces: SpacesStatus = {
+  state: "ready",
+  userId: "ada",
+  apiOrigin: "https://api.example.com",
+  personalSpaceId: "personal",
+  spaces: [{ kind: "personal", id: "personal" }],
+  create: { allowed: true, reason: null },
+  invitations: [],
+  reach: "live",
+  heardAt: 1,
+  error: null,
+};
+const catalog: SpaceProject[] = [{ key: "project", localProjectId: "project", hostedProjectId: "server-project", name: "project", repo: "sample/project", connected: true }];
+
+async function open(overrides: Partial<ThreadSummary> = {}, account: AccountStatus = pro, status: SpacesStatus = spaces) {
   queries.set("account.status", account);
+  queries.set("spaces.status", status);
+  queries.set("spaces.projects", catalog);
   queries.set("runs.listForThread", [
     { id: RUN, threadId: "cloud", taskId: null, agent: "claude", model: "opus", mode: "act", permissionMode: "trusted", state: "success", startedAt: 1, endedAt: 2 } as unknown as Run,
   ]);
@@ -229,4 +245,45 @@ it.each([undefined, { brain: "hosted", reach: "live", heardAt: 1 }] satisfies Th
   expect(composer.props!.disabledReason).toBeNull();
   expect(composer.props!.readOnlyReason).toBeNull();
   expect(composer.props!.placeholder).toBe("Message Claude…");
+});
+
+it("keeps a cloud thread's unsent words and files to the signed-in person and space", async () => {
+  await open();
+  expect(composer.props!.draftKey).toContain("ada");
+  expect(composer.props!.draftKey).toContain("personal");
+  expect(composer.props!.hostedFiles).toEqual({
+    accountId: "ada",
+    apiOrigin: "https://api.example.com",
+    spaceId: "personal",
+    destination: { kind: "hosted", projectId: "server-project", threadId: "cloud" },
+  });
+});
+
+it("says so when the account server can't be reached, rather than showing an empty thread", async () => {
+  await open({}, pro, { state: "loading", error: "OpenOrc Cloud can't be reached." });
+  expect(composer.props).toBeNull();
+  expect(screen.getByText("OpenOrc Cloud can't be reached.")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+});
+
+it("sends a cloud message with files once under one id, again under the same id after a failure, and the next message under a new one", async () => {
+  await open();
+  const sent: Record<string, unknown>[] = [];
+  let failing = true;
+  vi.mocked(core.call).mockImplementation((async (method: string, params: Record<string, unknown>) => {
+    if (method === "events.page") return { events: [], fromTurn: 0, live: false };
+    if (method !== "runs.start") return undefined;
+    sent.push(params);
+    if (failing) throw new Error("Your OpenOrc session changed. Try again.");
+    return { id: RUN };
+  }) as never);
+  const files = ["/hosted/files/f1/notes.txt", "/hosted/files/f2/plan.md"];
+  await act(async () => void (await composer.props!.onSubmit("Read these", files, false).catch(() => undefined)));
+  failing = false;
+  await act(async () => void (await composer.props!.onSubmit("Read these", files, false)));
+  await act(async () => void (await composer.props!.onSubmit("Read these", files, false)));
+  expect(sent.map((params) => params["attachments"])).toEqual([files, files, files]);
+  expect(sent[0]!["messageId"]).toMatch(/^[0-9a-f-]{36}$/);
+  expect(sent[1]!["messageId"]).toBe(sent[0]!["messageId"]);
+  expect(sent[2]!["messageId"]).not.toBe(sent[0]!["messageId"]);
 });

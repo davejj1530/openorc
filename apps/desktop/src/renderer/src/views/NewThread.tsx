@@ -29,6 +29,7 @@ import { evaluateNewThreadAvailability, initialThreadChoice } from "../lib/new-t
 import { readNewThreadDraft, readNewThreadProject, rememberNewThreadProject, writeNewThreadDraft } from "../lib/new-thread-draft";
 import { useNewThreadLocation } from "../lib/new-thread-location";
 import { useNewThreadPreparation } from "../lib/new-thread-preparation";
+import { useNewThreadFiles } from "../lib/new-thread-files";
 import { orclingById, useOrclings } from "../lib/orclings";
 import { branchingReason, loadProjectGit, useProjectGit } from "../lib/project-git";
 import { openThread, useRouter } from "../lib/router";
@@ -190,6 +191,7 @@ function NewThreadProject({
         preferred: settings.data?.defaultWorkspaceMode,
       });
   const signIn = useCloudSignInGate(newCloudTurn(workspaceMode, choice, claudeAccountId, cloud));
+  const files = useNewThreadFiles(projectId, workspaceMode === "hosted");
   useCloudWarm(workspaceMode === "cloud" && cloud.can ? projectId : null, choice?.agent, draft.prompt);
 
   useEffect(() => {
@@ -241,6 +243,7 @@ function NewThreadProject({
       permissionMode: permission,
       text,
       attachments,
+      files,
       // A cloud start waits for the sign-in the cloud lacks, offered above the composer.
       launch: (params) => signIn.ready().then(() => startSpaceThread(params, start.mutateAsync, spaceId, key)),
     });
@@ -279,7 +282,8 @@ function NewThreadProject({
                     <ComposerCommitChip changes={composerChanges} />
                   </div>
                   <Composer
-                    draftKey={`newthread.${projectId}.attachments`}
+                    draftKey={files.draftKey}
+                    hostedFiles={files.hostedFiles}
                     autoFocus
                     value={draft.prompt}
                     onChange={(prompt) => changeDraft({ prompt })}

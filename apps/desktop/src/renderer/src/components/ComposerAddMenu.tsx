@@ -5,7 +5,7 @@ import { CoversPreview } from "../lib/browser-preview";
 import { floatingGround } from "../lib/use-anchor-ground";
 import type { ListKind } from "./composer-commands";
 import type { ComposerLists } from "./ComposerInput";
-import { BookText, ChevronRight, FileCode2, Image, Orcling, Plug, Plus, Slash, Upload } from "./icons";
+import { BookText, ChevronRight, ListTodo, FileCode2, Image, Orcling, Plug, Plus, Slash, Upload } from "./icons";
 import { menuItem, menuPopup, menuSeparator } from "./menu";
 import { useHostedControlReason } from "./HostedConversationBoundary";
 import { HostedMenuReason } from "./HostedMenuReason";
@@ -61,11 +61,13 @@ export function ComposerAddMenu({
   attachmentsBlocked,
   offers,
   lists,
+  onInsertTask,
 }: {
   onFiles: (files: File[]) => void;
   attachmentsBlocked?: string | null | undefined;
   offers: AddOffers;
   lists: RefObject<ComposerLists | null>;
+  onInsertTask?: (() => void) | undefined;
 }) {
   const control = useComposerControl(false, "Add to this message");
   const fileReason = useHostedControlReason("fileBrowser");
@@ -95,6 +97,12 @@ export function ComposerAddMenu({
               <Image size={15} />
               Photos…
             </Menu.Item>
+            {onInsertTask ? (
+              <Menu.Item className={menuItem} onClick={onInsertTask}>
+                <ListTodo size={15} />
+                Insert task
+              </Menu.Item>
+            ) : null}
             {groups.map((group, index) => (
               <Fragment key={index}>
                 <Menu.Separator className={menuSeparator} />

@@ -11,8 +11,9 @@ import { Button } from "./ui";
 import { RichText } from "./RichText";
 import { rehypeMentionNames } from "../lib/mention-names";
 import { CoversPreview } from "../lib/browser-preview";
+import { ImageDownload } from "./ImageDownload";
 
-type ImageSelection = { src: string; label: string; path: string | null };
+type ImageSelection = { src: string; label: string; path: string | null; download?: (() => Promise<unknown>) | undefined; onInvalidated?: ((close: () => void) => () => void) | undefined };
 const MediaContext = createContext<{
   basePath?: string;
   fileScope?: FileSelection["scope"];
@@ -51,6 +52,7 @@ export function ThreadMedia({
   const mentionNames = ownNames ?? inherited.mentionNames;
   const [selected, select] = useState<ImageSelection | null>(null);
   useEffect(() => select(null), [scopeKey]);
+  useEffect(() => selected?.onInvalidated?.(() => select(null)), [selected]);
   const opener = useRef<HTMLElement | null>(null);
   const openImage = useCallback((image: ImageSelection) => {
     opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -112,11 +114,7 @@ function ImageViewer({ image }: { image: ImageSelection }) {
           <Button variant="ghost" aria-label="Zoom in" disabled={failed || zoom === 4} onClick={() => zoomBy(0.25)}>
             <ZoomIn size={16} />
           </Button>
-          {image.path ? (
-            <Button variant="ghost" aria-label="Show image in folder" onClick={() => window.openorc.revealFile(image.path!)}>
-              <FolderOpen size={16} />
-            </Button>
-          ) : null}
+          <ImageFileAction image={image} />
         </div>
         <BaseDialog.Close aria-label="Close image viewer" className="rounded-md p-1.5 text-ink-3 hover:bg-surface-2 hover:text-ink">
           <X size={18} />
@@ -151,10 +149,37 @@ function ImageViewer({ image }: { image: ImageSelection }) {
   );
 }
 
-export function ThreadImage({ src = "", alt = "Image", compact = false }: { src?: string; alt?: string; compact?: boolean }) {
+function ImageFileAction({ image }: { image: ImageSelection }) {
+  if (image.download) return <ImageDownload name={image.label} download={image.download} />;
+  if (!image.path) return null;
+  return (
+    <Button variant="ghost" aria-label="Show image in folder" onClick={() => window.openorc.revealFile(image.path!)}>
+      <FolderOpen size={16} />
+    </Button>
+  );
+}
+
+export function ThreadImage({
+  src = "",
+  objectUrl,
+  alt = "Image",
+  compact = false,
+  download,
+  onInvalidated,
+  onError,
+}: {
+  src?: string;
+  /** A picture this window already holds, such as a cloud file's authorized preview; never a path or an agent's link. */
+  objectUrl?: string | undefined;
+  alt?: string;
+  compact?: boolean;
+  download?: ImageSelection["download"];
+  onInvalidated?: ImageSelection["onInvalidated"];
+  onError?: (() => void) | undefined;
+}) {
   const { basePath, openImage } = useContext(MediaContext);
   const [failed, setFailed] = useState(false);
-  const source = imageSource(src, basePath);
+  const source = objectUrl ?? imageSource(src, basePath);
   const path = localPath(src, basePath);
   const label = alt || path?.split(/[\\/]/).pop() || "Image";
   if (!source) return <span className="text-sm text-ink-3">Image preview unavailable</span>;
@@ -162,7 +187,7 @@ export function ThreadImage({ src = "", alt = "Image", compact = false }: { src?
     <button
       type="button"
       aria-label={`View image: ${label}`}
-      onClick={() => openImage({ src: source, label, path })}
+      onClick={() => openImage({ src: source, label, path, download, onInvalidated })}
       className="my-2 block max-w-full overflow-hidden rounded-xl bg-surface-2 text-left hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
     >
       {failed ? (
@@ -171,7 +196,16 @@ export function ThreadImage({ src = "", alt = "Image", compact = false }: { src?
           Image unavailable · {label}
         </span>
       ) : (
-        <img src={source} alt={label} loading="lazy" onError={() => setFailed(true)} className={compact ? "h-24 max-w-56 object-cover" : "block max-h-80 max-w-full object-contain"} />
+        <img
+          src={source}
+          alt={label}
+          loading="lazy"
+          onError={() => {
+            setFailed(true);
+            onError?.();
+          }}
+          className={compact ? "h-24 max-w-56 object-cover" : "block max-h-80 max-w-full object-contain"}
+        />
       )}
       {!compact && !failed ? (
         <span className="flex items-center gap-2 px-3 py-2 text-xs text-ink-3">

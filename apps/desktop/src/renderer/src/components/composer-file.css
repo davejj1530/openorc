@@ -1,0 +1,42 @@
+.composer-file-state {
+  display: grid;
+  justify-items: start;
+  align-content: start;
+  gap: 8px;
+  max-width: 440px;
+}
+.composer-file-state-image {
+  gap: 6px;
+}
+.composer-file-progress {
+  display: grid;
+  gap: 5px;
+  font-size: var(--text-sm);
+  line-height: 14px;
+  color: var(--ink-3);
+}
+.composer-file-progress-image {
+  width: 56px;
+  gap: 4px;
+  text-align: center;
+  font-size: var(--text-xs);
+  line-height: 20px;
+}
+.composer-file-progress-track {
+  display: block;
+  height: 3px;
+  border-radius: 3px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+.composer-file-progress-track > span {
+  display: block;
+  height: 100%;
+  background: var(--ink-3);
+}
+.composer-file-refusal {
+  margin: 0;
+  color: var(--bad);
+  font-size: var(--text-sm);
+  line-height: 18px;
+}

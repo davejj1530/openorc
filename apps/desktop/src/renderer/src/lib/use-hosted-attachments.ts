@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useLoaded } from "./use-loaded";
 import { hostedFilePath, type HostedDraftFile, type HostedFileDraft, type HostedFileScope } from "@openorc/protocol";
 import { hostedAttachments } from "./hosted-attachment-runtime";
 import { hostedAttachmentKey } from "./hosted-attachment-store";
@@ -10,7 +10,6 @@ import type { Attachment } from "./composer-attachments";
 
 const NONE: HostedDraftFile[] = [];
 const subscribeNothing = () => () => {};
-const WAITING = "Wait for this file to finish uploading.";
 
 export function hostedDraftAttachment(file: HostedDraftFile): Attachment {
   return { path: file.state.kind === "ready" ? hostedFilePath(file.state.file) : `hosted-draft:${file.id}`, name: file.name, bytes: file.bytes, url: null };
@@ -24,17 +23,10 @@ export function useHostedAttachments(scope: HostedFileScope | null, draftKey?: s
   const allowed = Boolean(draft && organizationContentGate.status(draft.scope.spaceId).allowed);
   const [actionError, setActionError] = useState<string | null>(null);
   useEffect(() => (draft ? startOrganizationContentGate() : undefined), [draft]);
-  const query = useQuery({
-    queryKey: ["hosted-attachments", key, authority.generation],
-    enabled: Boolean(draft && allowed),
-    gcTime: 0,
-    staleTime: Infinity,
-    retry: false,
-    queryFn: async () => {
-      if (!draft) throw new Error("Choose a cloud destination first.");
-      const captured = await hostedAttachments.capture(draft);
-      return { draft: captured, files: await hostedAttachments.files(captured) };
-    },
+  const query = useLoaded(draft && allowed ? JSON.stringify([key, authority.generation]) : null, async () => {
+    if (!draft) throw new Error("Choose a cloud destination first.");
+    const captured = await hostedAttachments.capture(draft);
+    return { draft: captured, files: await hostedAttachments.files(captured) };
   });
   const refresh = query.refetch;
   useEffect(() => {
@@ -89,8 +81,8 @@ export function useHostedAttachments(scope: HostedFileScope | null, draftKey?: s
     remove,
     accepted,
     uploading: files.filter((file) => file.state.kind !== "ready").length,
-    blocked: query.error?.message ?? (query.isLoading ? WAITING : null),
-    error: actionError,
+    loading: query.loading,
+    error: actionError ?? query.error?.message ?? null,
     clearError: () => setActionError(null),
     addFiles: (chosen: File[]) =>
       action(async (draft) => {

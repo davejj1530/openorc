@@ -13,16 +13,15 @@ import {
   type PermissionPreset,
   type RunMode,
   type UsableConnector,
+  type HostedFileScope,
 } from "@openorc/protocol";
 import { useCallback, useContext, useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from "react";
 import { useRpcMutation } from "../lib/client";
 import { cn } from "../lib/cn";
-import { removeAcceptedAttachments, restoreDraftAttachments, useComposerAttachments, type Attachment } from "../lib/composer-attachments";
+import { useComposerFiles } from "./useComposerFiles";
 import { type MentionEntry } from "../lib/composer-mentions";
 import { useComposerFit } from "../lib/composer-fit";
 import { useComposerSubmission } from "../lib/composer-submission";
-import { formatBytes } from "../lib/file-imports";
-import { isImagePath } from "../../../shared/image-paths";
 import { ComposerChoice } from "./ComposerChoice";
 import { ComposerReadOnly } from "./composer-read-only";
 import { ComposerDropZone, useComposerDrop } from "./ComposerDropZone";
@@ -35,7 +34,7 @@ import { ComposerSendCluster } from "./ComposerSendButton";
 import { ContextUsage } from "./ContextUsage";
 import { useHostedControlReason } from "./HostedConversationBoundary";
 import { hostedCommandReason } from "./HostedComposerControls";
-import { Cloud, Eye, FileText, Laptop, Lightbulb, ShieldCheck, ShieldOff, X } from "./icons";
+import { Cloud, Eye, Laptop, Lightbulb, ShieldCheck, ShieldOff } from "./icons";
 import { type PickerAccounts } from "./ModelPickerAccounts";
 import { ComposerModelPicker, type ModelChoice } from "./ModelPicker";
 import { Tooltip } from "./ui";
@@ -96,6 +95,8 @@ export interface ComposerProps {
   /** `now` requests live input; false explicitly queues during an active turn. */
   onSubmit: (text: string, attachments: string[], now: boolean) => Promise<void>;
   draftKey?: string;
+  hostedFiles?: HostedFileScope | null | undefined;
+  onInsertTask?: (() => void) | undefined;
   placeholder: string;
   model: ModelChoice | null;
   onModel: (choice: ModelChoice) => void;
@@ -198,12 +199,6 @@ function useSentGhost(text: string | null) {
  * changes sit in the Commit chip over its left edge. @ mentions a file, / runs a command.
  */
 /** A file a message carried, as the composer shows it again: an image by its served picture, anything else by its name. */
-function returnedAttachment(path: string): Attachment {
-  const stored = path.split(/[\\/]/).pop() ?? path;
-  const name = /^[a-f0-9-]{36}-/.test(stored) ? stored.slice(37) : stored;
-  return { path, url: isImagePath(path) ? `openorc-asset://attachments/${stored}` : null, name };
-}
-
 /** Why the last send or stop failed, and a failed read of the changes with its retry. */
 function ComposerAlerts({ message, changes }: { message: ReactNode; changes: ComposerProps["changes"] }) {
   return (
@@ -230,11 +225,12 @@ export function Composer(props: ComposerProps) {
   const isNewThread = props.presentation === "new-thread";
   const shell = useRef<HTMLDivElement>(null);
   const fitBar = useComposerFit();
-  const files = useComposerAttachments({ draftKey: props.draftKey, disabledReason: props.readOnlyReason ?? props.attachmentsDisabledReason });
-  const { attachments, uploading, remove: removeAttachments } = files;
+  const files = useComposerFiles({ scope: props.hostedFiles, draftKey: props.draftKey, disabledReason: props.readOnlyReason ?? props.attachmentsDisabledReason });
+  const { attachments, uploading } = files;
   const addFiles = (chosen: File[]) => (props.readOnlyReason ? Promise.resolve() : files.addFiles(chosen));
   const { value, onChange } = props;
   const editor = useRef<ComposerEditorHandle>(null);
+  const appendFiles = files.append;
   useImperativeHandle(
     props.handle,
     () => ({
@@ -242,10 +238,10 @@ export function Composer(props: ComposerProps) {
         const kept = value.trimEnd();
         const next = kept ? `${kept}\n${text}` : text;
         editor.current?.write(next, next.length);
-        restoreDraftAttachments(props.draftKey, paths.map(returnedAttachment));
+        appendFiles(paths);
       },
     }),
-    [value, props.draftKey],
+    [value, appendFiles],
   );
   const interrupt = useRpcMutation("runs.interrupt");
   const { submission, submit: submitDraft, acknowledge } = useComposerSubmission(props.draftKey);
@@ -258,11 +254,10 @@ export function Composer(props: ComposerProps) {
       onChange("");
       setSentText(submission.text);
     }
-    removeAttachments(submission.attachments);
     acknowledge();
-  }, [submission, value, onChange, acknowledge, removeAttachments]);
+  }, [submission, value, onChange, acknowledge]);
   const drop = useComposerDrop((dropped) => void addFiles(dropped));
-  const attachmentBlock = attachments.length > 0 ? props.attachmentsDisabledReason : null;
+  const attachmentBlock = files.pendingReason ?? (attachments.length > 0 ? files.blocked : null);
   const canSend =
     Boolean(props.allowEmpty || props.value.trim() || attachments.length > 0) && !props.busy && !submitting && !props.readOnlyReason && !props.disabledReason && !attachmentBlock && uploading === 0;
 
@@ -289,7 +284,7 @@ export function Composer(props: ComposerProps) {
     setSentText(null);
     submitDraft(text, sent, async () => {
       await props.onSubmit(text, sent, now);
-      removeAcceptedAttachments(props.draftKey, sent);
+      await files.accepted(sent);
     });
   };
 
@@ -310,31 +305,7 @@ export function Composer(props: ComposerProps) {
       <ComposerAlerts message={interrupt.error ? `Couldn’t stop the agent. ${interrupt.error.message}` : files.error || submission?.error || props.error} changes={props.changes} />
       <div ref={shell} className="composer-shell" data-dragging={drop.dragging || undefined} {...drop.handlers}>
         <ComposerAsk asks={asks} label={props.asksLabel} blocked={props.asksBlocked ?? null} fieldHasWords={Boolean(props.value.trim())} focusField={focusField} />
-        {attachments.length > 0 || uploading > 0 ? (
-          <div className="composer-attachments">
-            {attachments.map((attachment) => (
-              <div key={attachment.path} className="composer-attachment">
-                {attachment.url ? (
-                  <img src={attachment.url} alt={attachment.name} className="composer-thumbnail" />
-                ) : (
-                  <span className="composer-file">
-                    <FileText size={18} />
-                    <span className="composer-file-text">
-                      <span className="composer-file-name" data-tip={attachment.name}>
-                        {attachment.name}
-                      </span>
-                      {attachment.bytes ? <span className="composer-file-size tabular">{formatBytes(attachment.bytes)}</span> : null}
-                    </span>
-                  </span>
-                )}
-                <button onClick={() => removeAttachments([attachment.path])} aria-label={attachment.url ? "Remove image" : `Remove ${attachment.name}`} className="composer-remove-image">
-                  <X size={11} />
-                </button>
-              </div>
-            ))}
-            {uploading > 0 ? <div className="composer-thumbnail composer-uploading" /> : null}
-          </div>
-        ) : null}
+        {attachments.length > 0 || uploading > 0 ? <div className="composer-attachments">{files.content}</div> : null}
         <div className="composer-prompt">
           <ComposerInput
             value={props.value}
@@ -370,7 +341,7 @@ export function Composer(props: ComposerProps) {
         <div ref={fitBar} className="composer-bar">
           {/* Attach, then where and how the agent works. Chips truncate before the end group moves. */}
           <div className="composer-tools">
-            <ComposerAddMenu onFiles={(chosen) => void addFiles(chosen)} attachmentsBlocked={props.attachmentsDisabledReason} offers={addOffers(props)} lists={lists} />
+            <ComposerAddMenu onFiles={(chosen) => void addFiles(chosen)} attachmentsBlocked={files.blocked} offers={addOffers(props)} lists={lists} onInsertTask={props.onInsertTask} />
             {composerDestination(props)}
             {props.presentation === "small" ? null : (
               <>

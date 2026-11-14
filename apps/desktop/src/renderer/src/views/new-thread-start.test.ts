@@ -53,4 +53,23 @@ describe("new thread startup", () => {
     expect(readNewThreadDraft(project.id).prompt).toBe("Later prompt");
     expect(readDraft(attachmentKey, { attachments: [] as { path: string }[] }).attachments).toEqual([{ path: "/later.png" }]);
   });
+
+  it("starts on OpenOrc Cloud with files under their request id, the same when sent again, and forgets it once the thread exists", async () => {
+    storage();
+    const draft = { ...readNewThreadDraft(project.id), target: { kind: "model" as const, choice: { agent: "claude" as const, model: "opus", effort: null, fastMode: false } } };
+    const ids = ["request-1", "request-1"];
+    const files = { requestId: vi.fn(async () => ids.shift()), started: vi.fn() };
+    const launch = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("OpenOrc Cloud can't be reached."))
+      .mockResolvedValueOnce({ thread: { id: "thread-1" } });
+    const start = () =>
+      startNewThread({ draft, project, isWorkspace: false, workspaceMode: "hosted", permissionMode: "review", text: "Read these", attachments: ["/hosted/files/f1/notes.txt"], files, launch });
+    await expect(start()).rejects.toThrow("OpenOrc Cloud can't be reached.");
+    expect(files.started).not.toHaveBeenCalled();
+    await expect(start()).resolves.toBe("thread-1");
+    expect(launch.mock.calls.map(([params]) => params.requestId)).toEqual(["request-1", "request-1"]);
+    expect(files.requestId).toHaveBeenCalledWith({ text: "Read these", attachments: ["/hosted/files/f1/notes.txt"], settings: { target: draft.target, mode: draft.mode, permission: "review" } });
+    expect(files.started).toHaveBeenCalledOnce();
+  });
 });

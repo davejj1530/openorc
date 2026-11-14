@@ -30,6 +30,7 @@ import {
   type Task,
   type ThreadSummary,
   type WorkspaceMode,
+  type HostedFileScope,
 } from "@openorc/protocol";
 import { useCallback, useState, type ComponentProps, type ReactNode } from "react";
 import { useConversationSettings, useConversationTranscript, useRpc, useRpcMutation, useSubmit } from "../lib/client";
@@ -67,6 +68,9 @@ import { Button, Empty } from "./ui";
 import { useOrclingConversation } from "./useOrclingConversation";
 import { useOptimisticSend } from "./useOptimisticSend";
 import { useThreadControls } from "./useThreadControls";
+import { ConversationDraftBoundary } from "./ConversationDraftBoundary";
+import { useTaskComposerDraft } from "../lib/task-composer-draft";
+import { forgetHostedIntent, withHostedIntent } from "../lib/hosted-send-intent";
 
 export type ConversationScope = { kind: "task"; task: Task } | { kind: "thread"; thread: ThreadSummary };
 
@@ -79,6 +83,14 @@ export type ConversationScope = { kind: "task"; task: Task } | { kind: "thread";
 type ConversationProps = { scope: ConversationScope; project: Project; toolbarTarget?: HTMLElement | null };
 
 export function Conversation({ scope, project }: ConversationProps) {
+  if (scope.kind === "thread" && scope.thread.owner?.brain === "hosted" && !isSubagentThread(scope.thread))
+    return (
+      <HostedConversationBoundary thread={scope.thread}>
+        <ConversationDraftBoundary thread={scope.thread}>
+          {({ draftKey, scope: files }) => <IndividualConversation key={draftKey} scope={scope} project={project} draftKey={draftKey} hostedFiles={files} />}
+        </ConversationDraftBoundary>
+      </HostedConversationBoundary>
+    );
   const content =
     scope.kind === "thread" && isSubagentThread(scope.thread) ? <SubagentConversation thread={scope.thread} project={project} /> : <IndividualConversation scope={scope} project={project} />;
   return scope.kind === "thread" && scope.thread.owner?.brain === "hosted" ? <HostedConversationBoundary thread={scope.thread}>{content}</HostedConversationBoundary> : content;
@@ -168,7 +180,7 @@ function TranscriptContext({
   );
 }
 
-function IndividualConversation({ scope, project }: { scope: ConversationScope; project: Project }) {
+function IndividualConversation({ scope, project, draftKey: capturedKey, hostedFiles }: { scope: ConversationScope; project: Project; draftKey?: string; hostedFiles?: HostedFileScope | null }) {
   const runsQuery = useRpc(scope.kind === "task" ? "runs.listForTask" : "runs.listForThread", scope.kind === "task" ? { taskId: scope.task.id } : { threadId: scope.thread.id });
   const runs = runsQuery.data ?? [];
   const firstTaskRun = scope.kind === "task" && runs.length === 0;
@@ -195,8 +207,9 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
   const { choice, mode, permission, permissionReady, permissionError } = settings;
   const orclings = useOrclingConversation({ thread, runs, choice, onModel: settings.selectModel, accounts });
   const voice = useRunVoices(orclings.voice, runs, thread);
-  const draftKey = `conversation.${conversation.id}`;
+  const draftKey = capturedKey ?? `conversation.${conversation.id}`;
   const { prompt, setPrompt, clearDraft, error: draftError } = useConversationDraft({ draftKey, threadId: thread?.id ?? null, initialText: thread?.draft ?? "" });
+  const taskDraft = useTaskComposerDraft({ scope: hostedFiles ?? null, threadId: thread?.id ?? null, draftKey, prompt, setPrompt });
   const submitter = useSubmit();
   const [sends, setSends] = useState(0);
   const compact = useRpcMutation("threads.compact");
@@ -229,6 +242,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
     permissionReady,
     compacting: compact.isPending,
     waitForSave: settings.waitForSave,
+    task: taskDraft.task,
   };
   const optimistic = useOptimisticSend({ submitter, request, run: merged, attachmentsKey: `${draftKey}.attachments`, restore: setPrompt, route: orclings.route });
   const submit = async (text: string, attachments: string[], now: boolean) => {
@@ -236,8 +250,11 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
     // A message to an Orcling goes to the Orcling, not to this conversation's agent.
     if (await orclings.ask(messageBody(text, attachments), attachments)) return clearDraft();
     await signIn.ready();
-    await optimistic.send({ ...request, now }, { text, attachments });
-    clearDraft();
+    const sent = { ...request, now };
+    const message = await withHostedIntent(hostedFiles ? draftKey : null, sent, { text, attachments });
+    await optimistic.send(sent, message);
+    if ("requestId" in message) forgetHostedIntent(draftKey);
+    if (!taskDraft.accepted(text)) clearDraft();
   };
   const restart = () => submitter.submit({ ...request, now: false, restart: true }, { text: RESTART_PROMPT, attachments: [] }).then(clearDraft);
   const continueWith = (claudeAccountId: string) => submitter.submit({ ...request, now: false, claudeAccountId }, { text: CONTINUE_PROMPT, attachments: [] }).then(clearDraft);
@@ -289,10 +306,12 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
             <Composer
               handle={controls.composer}
               draftKey={`${draftKey}.attachments`}
+              hostedFiles={hostedFiles}
               value={prompt}
               onChange={setPrompt}
               onSubmit={submit}
-              onReady={cloud.onReady}
+              onReady={taskDraft.prepared ? undefined : cloud.onReady}
+              onInsertTask={taskDraft.insert}
               placeholder={orclings.placeholder ?? placeholder}
               mentions={orclings.mentions}
               modelControl={orclings.modelControl}
@@ -332,7 +351,7 @@ function IndividualConversation({ scope, project }: { scope: ConversationScope; 
               }
               busy={optimistic.busy}
               allowEmpty={firstTaskRun}
-              disabledReason={sendDisabledReason ?? cloud.blocked}
+              disabledReason={taskDraft.blocked ?? sendDisabledReason ?? cloud.blocked}
               live={live && activeRun ? { runId: activeRun.id, working } : null}
               queueing={Boolean(thread && working)}
               liveByDefault

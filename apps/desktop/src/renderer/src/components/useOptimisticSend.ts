@@ -56,7 +56,8 @@ function withEchoes(run: RunTranscript | null, echoes: readonly Echo[]): RunTran
  * again; the core records it under the same id, so the recorded copy takes its place without a flicker. Sends go out
  * one at a time, a later one planned on the conversation as it stands once the one before has taken hold, so two
  * quick messages never start two processes. A send that fails gives its words and files back to the composer. A
- * queued message and anything that is not a thread's next message go the old way: awaited, shown where they land.
+ * queued message, one with its own request id, and anything that is not a thread's next message go the old way:
+ * awaited, shown where they land.
  */
 export function useOptimisticSend({
   submitter,
@@ -111,9 +112,10 @@ export function useOptimisticSend({
   );
 
   const send = useCallback(
-    async (sent: SubmitRequest, message: { text: string; attachments: string[] }) => {
+    async (sent: SubmitRequest, message: { text: string; attachments: string[]; requestId?: string }) => {
       const plan = planSubmit(sent);
-      if (!route && (sent.task || !threadId || plan.kind === "blocked" || plan.kind === "queue")) {
+      // A message that names its own id keeps its draft until the server has it, so it is awaited too.
+      if (!route && (sent.task || !threadId || plan.kind === "blocked" || plan.kind === "queue" || message.requestId)) {
         setAwaiting((count) => count + 1);
         try {
           await submitter.submit(sent, message);

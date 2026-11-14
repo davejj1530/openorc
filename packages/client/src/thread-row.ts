@@ -1,4 +1,4 @@
-import { placeOf, STATUS_PRIORITY, threadStatus, WORKSPACE_ID, type PrState, type ThreadStatus, type ThreadSummary } from "@openorc/protocol";
+import { placeOf, STATUS_PRIORITY, threadStatus, WORKSPACE_ID, type PrState, type ThreadStatus, type ThreadSummary, type WorkspaceMode } from "@openorc/protocol";
 
 export { STATUS_PRIORITY, threadStatus, type ThreadStatus };
 
@@ -54,6 +54,55 @@ export function workspaceLabel(thread: Pick<ThreadSummary, "workspaceMode" | "br
   if (thread.branch) return thread.branch;
   if (thread.projectId === WORKSPACE_ID) return thread.workingDirectory?.split(/[\\/]/).filter(Boolean).at(-1) ?? null;
   return "checkout";
+}
+
+/**
+ * Where a sidebar row says its thread works, said only when that is not where its project's new threads start:
+ *   cloud     the person's own cloud (the glyph alone) or OpenOrc Cloud (the glyph and its name); a cloud-only project's
+ *             label already wears the cloud, so its rows say nothing
+ *   branch    the checkout, by its branch, when new threads start in a worktree
+ *   worktree  a worktree of its own, when new threads start in the checkout
+ *   folder    a thread in no project, by its folder
+ */
+export type RowPlace = { kind: "cloud"; label: string; word: string | null } | { kind: "branch" | "worktree" | "folder"; word: string };
+
+export function rowPlace(thread: Pick<ThreadSummary, "workspaceMode" | "branch" | "cloud" | "owner" | "projectId" | "workingDirectory">, usual: WorkspaceMode): RowPlace | null {
+  const place = placeOf(thread);
+  if (place.rowIcon) return thread.owner?.project ? null : { kind: "cloud", label: "OpenOrc Cloud", word: "OpenOrc Cloud" };
+  if (thread.cloud || place.brain) return { kind: "cloud", label: "Your own cloud", word: null };
+  if (thread.projectId === WORKSPACE_ID) {
+    const folder = thread.workingDirectory?.split(/[\\/]/).filter(Boolean).at(-1);
+    return folder ? { kind: "folder", word: folder } : null;
+  }
+  if (thread.workspaceMode === usual) return null;
+  return thread.workspaceMode === "worktree" ? { kind: "worktree", word: "worktree" } : { kind: "branch", word: thread.branch ?? "checkout" };
+}
+
+const MINUTE = 60_000;
+const DAY = 24 * 60 * MINUTE;
+
+/** How long since a row's latest activity, at a glance: "now", "12m", "2h", "3d", "3w", "2mo", "1y". */
+export function rowAge(at: number, now: number): string {
+  const ago = Math.max(0, now - at);
+  if (ago < MINUTE) return "now";
+  if (ago < 60 * MINUTE) return `${Math.floor(ago / MINUTE)}m`;
+  if (ago < DAY) return `${Math.floor(ago / (60 * MINUTE))}h`;
+  if (ago < 7 * DAY) return `${Math.floor(ago / DAY)}d`;
+  if (ago < 30 * DAY) return `${Math.floor(ago / (7 * DAY))}w`;
+  if (ago < 365 * DAY) return `${Math.floor(ago / (30 * DAY))}mo`;
+  return `${Math.floor(ago / (365 * DAY))}y`;
+}
+
+/** When a thread last saw work: a turn starting or ending, a message, its agent's latest event, or a sub thread's. */
+export function latestActivity(thread: Pick<ThreadSummary, "lastActivityAt" | "treeActivityAt" | "lastAgentEventAt">): number {
+  return Math.max(thread.lastActivityAt, thread.treeActivityAt ?? 0, thread.lastAgentEventAt ?? 0);
+}
+
+/** The teammate who started a thread the person shares, with the first name a row has room for; null for their own. */
+export function rowStarter(thread: Pick<ThreadSummary, "owner">): { name: string; first: string; image: string | null } | null {
+  const starter = thread.owner?.startedBy;
+  if (!starter) return null;
+  return { ...starter, first: starter.name.trim().split(/\s+/)[0] ?? starter.name };
 }
 
 /** The title a rename saves: what was typed, trimmed, or null when it is empty or unchanged and nothing should save. */

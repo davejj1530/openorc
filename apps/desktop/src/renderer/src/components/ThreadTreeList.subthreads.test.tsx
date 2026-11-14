@@ -4,8 +4,8 @@ import { WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 import { useLayout } from "../lib/layout";
 import { ThreadTreeList } from "./ThreadTreeList";
 
-vi.mock("../lib/orclings", async (original) => ({ ...(await original<typeof import("../lib/orclings")>()), useOrclings: () => [] }));
 vi.mock("../lib/browser-preview", () => ({ CoversPreview: () => null }));
+vi.mock("../lib/client", () => ({ useRpc: () => ({ data: undefined }) }));
 beforeEach(() => {
   vi.stubGlobal(
     "ResizeObserver",
@@ -40,13 +40,12 @@ const child = (id: string, activity: ThreadSummary["activity"], parentThreadId =
   ({ ...parent, id, title: `Sub ${id}`, activity, parentThreadId, parentRelation: "started" }) as ThreadSummary;
 const parentRow = () => screen.getByText("Openorc UI tweaks").closest("button")!;
 
-it("marks a folded parent whose sub threads work or need you, without sweeping its own title", () => {
+it("marks a folded parent whose sub threads work or need you", () => {
   useLayout.setState({ collapsed: ["thread-closed:parent"] });
   const all = [parent, child("a", "running"), child("b", "idle"), child("c", "running", "b")];
   const view = render(<ThreadTreeList roots={[parent]} all={all} activeId={null} />);
   expect(screen.queryByText("Sub a")).toBeNull();
   expect(within(parentRow()).getByRole("img", { name: "2 subthreads are working" })).toBeTruthy();
-  expect(parentRow().querySelector("[data-working]")).toBeNull();
 
   view.rerender(<ThreadTreeList roots={[parent]} all={[parent, child("a", "running"), child("b", "waiting")]} activeId={null} />);
   expect(within(parentRow()).getByRole("img", { name: "A subthread needs you" })).toBeTruthy();

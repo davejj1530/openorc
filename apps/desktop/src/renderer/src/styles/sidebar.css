@@ -447,9 +447,10 @@ button.sidebar-nav-row:hover {
   height: 14px;
 }
 
-/* Thread rows, 46px apart: the title, with the row's mark at its end, then one quiet line of where the
-   thread works and its pull request. No lead column: titles start where the group's label does. The
-   open row sits on the current-row fill with --navigation-ink. */
+/* Thread rows, 46px apart: the title, with the row's mark at its end, then one quiet line: the age, a
+   teammate, the place, and the pull request at the right. No lead column: titles start where the group's
+   label does. The title is the second ink at rest and full ink where the person looks or is needed. The
+   open row sits on the current-row fill. */
 .app-shell .thread-preview {
   position: relative;
   display: flex;
@@ -461,19 +462,24 @@ button.sidebar-nav-row:hover {
   min-height: 44px;
   padding: 4px 10px;
   border-radius: var(--radius-md);
-  color: var(--ink);
+  color: var(--ink-2);
   text-align: left;
   transition:
     background-color var(--duration-leave) var(--ease-out),
     color var(--duration-leave) var(--ease-out);
 }
-/* A sub thread is one line under its parent, and so is a row with nothing true to say on its quiet line. */
-.app-shell .thread-preview:is(.sidebar-thread-child, :has(> .thread-preview-line:empty)) {
+/* A sub thread is one line under its parent. */
+.app-shell .thread-preview.sidebar-thread-child {
   min-height: var(--control-row);
+}
+.app-shell .thread-preview:is(:hover, [data-attention]) {
+  color: var(--ink);
+}
+.app-shell .thread-preview[data-open] {
+  color: var(--navigation-ink);
 }
 .app-shell .thread-preview:hover {
   background-color: var(--navigation-hover);
-  color: var(--ink);
 }
 .app-shell .sidebar-shell .thread-preview[data-open]:not(:focus-visible) {
   background-color: var(--current-row-fill);
@@ -483,41 +489,46 @@ button.sidebar-nav-row:hover {
   align-items: center;
   gap: 6px;
   min-width: 0;
+  overflow: hidden;
   font-size: var(--text-xs);
   line-height: 16px;
-  color: var(--ink-4);
+  color: var(--ink-3);
   white-space: nowrap;
 }
-.thread-preview-line:empty {
-  display: none;
-}
-/* In a group of many projects the project leads the line; where the thread works gives way first. */
-.thread-preview-project {
+.thread-preview-line > * {
   flex-shrink: 0;
-  max-width: 60%;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
-.thread-preview-workspace {
+/* In a group of many projects the project follows the age and is cut before anything else is. */
+.thread-preview-project {
+  flex-shrink: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.thread-preview-project + .thread-preview-workspace::before {
-  content: "·" / "";
-  margin-right: 6px;
-}
-/* A thread off this Mac: the quiet cloud after where it works. */
+.thread-preview-who,
 .thread-preview-place {
   display: inline-flex;
-  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+}
+.thread-preview-face {
+  width: 14px;
+  height: 14px;
+  font-size: 7px;
+}
+/* What gives way, in order (lib/row-fit.ts): the place, whole, though a cloud keeps its glyph; then a
+   teammate's name, whose face stays. */
+.thread-preview-line:is([data-fit="no-place"], [data-fit="face"]) .thread-preview-place:not([data-cloud]),
+.thread-preview-line:is([data-fit="no-place"], [data-fit="face"]) .thread-preview-place .thread-preview-word,
+.thread-preview-line[data-fit="face"] .thread-preview-who .thread-preview-word {
+  display: none;
 }
 .thread-preview-pull {
   display: inline-flex;
-  flex-shrink: 0;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
   margin-left: auto;
+  padding-left: 4px;
 }
 .thread-preview-heading {
   display: flex;
@@ -543,35 +554,7 @@ button.sidebar-nav-row:hover {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.thread-preview[data-open] .thread-preview-title {
-  color: var(--navigation-ink);
-}
-/* A working title lights up left to right: a band of full ink sweeps across its muted words, on the open
-   row and under hover too, where the title is otherwise already in full ink and the band would not show. */
-.thread-preview-title[data-working] {
-  background: linear-gradient(90deg, var(--ink-3) 0% 35%, var(--ink) 50%, var(--ink-3) 65% 100%);
-  background-size: 250% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: thread-title-sweep 2s linear infinite;
-}
-@keyframes thread-title-sweep {
-  from {
-    background-position: 100% 0;
-  }
-  to {
-    background-position: 0 0;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .thread-preview-title[data-working] {
-    animation: none;
-    background: none;
-    -webkit-text-fill-color: currentColor;
-  }
-}
-/* A row's mark (spinner, question, failure, unread dot) at the end of its title line, before a parent's chevron. */
+/* A row's mark (the cube, question, failure, unread dot) at the end of its title line, before a parent's chevron. */
 .thread-preview-mark {
   display: flex;
   flex-shrink: 0;
@@ -586,17 +569,6 @@ button.sidebar-nav-row:hover {
 }
 .thread-preview[data-open] .thread-status-spinner {
   color: var(--ink-3);
-}
-/* Branch and provider details stay in the accessible label and hover title, not on screen. */
-.thread-preview-meta {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
 }
 .sidebar-section-toggle {
   display: flex;

@@ -623,7 +623,7 @@ it("leads with pinned threads however long ago they last worked", async () => {
   expect(screen.getAllByRole("button", { name: /Old notes/ })).toHaveLength(1);
 });
 
-it("puts where each thread works on its second line, its pull request at the end, and no word of what its agent is doing", async () => {
+it("puts how fresh each thread is on its second line, where it works only off the usual place, its pull request at the end, and no word of what its agent is doing", async () => {
   dayThreads();
   const [recent, yesterday] = fixture.threads;
   fixture.threads = [
@@ -632,26 +632,26 @@ it("puts where each thread works on its second line, its pull request at the end
   ];
   mountSidebar();
   const line = async (name: RegExp) => (await screen.findByRole("button", { name })).querySelector(".thread-preview-line")!;
-  expect((await line(/Recent notes/)).textContent).toBe("main");
+  const checkout = await line(/Recent notes/);
+  expect(checkout.querySelector(".thread-preview-place")).toBeNull();
+  expect(checkout.textContent).toMatch(/^(now|\d+(m|h|d|w|mo|y))$/);
   const worktree = await line(/Yesterday's notes/);
-  expect(worktree.querySelector(".thread-preview-workspace")).toMatchObject({ textContent: "worktree", dataset: { tip: "openorc/notes-a1b2c3" } });
+  expect(worktree.querySelector(".thread-preview-place")?.textContent).toBe("worktree");
   const pull = within(worktree as HTMLElement).getByRole("img", { name: "Pull request #8, merged" });
   expect(pull.textContent).toBe("#8");
   expect(pull.getAttribute("class")).toContain("text-ok");
   expect(screen.getByRole("button", { name: /Recent notes/ }).querySelector(".thread-preview-headline")).toBeNull();
 });
 
-it("ends the title line with what the thread needs or is doing, and sweeps a working title", async () => {
+it("ends the title line with what the thread needs or is doing", async () => {
   dayThreads();
   fixture.threads[0] = { ...fixture.threads[0]!, activity: "running" };
   fixture.threads[1] = { ...fixture.threads[1]!, activity: "waiting" };
   mountSidebar();
   const row = await screen.findByRole("button", { name: /Recent notes/ });
-  expect(row.querySelector(".thread-preview-title")?.hasAttribute("data-working")).toBe(true);
   expect(row.querySelector(".thread-preview-heading > .thread-preview-mark [aria-label='Working']")).not.toBeNull();
   const asking = screen.getByRole("button", { name: /Yesterday's notes/ });
   expect(asking.querySelector(".thread-preview-heading > .thread-preview-mark [aria-label='Needs you']")).not.toBeNull();
-  expect(asking.querySelector(".thread-preview-title")?.hasAttribute("data-working")).toBe(false);
 });
 
 it("reads on by itself until every group is whole, then pages Resolved when asked", async () => {

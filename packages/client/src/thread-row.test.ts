@@ -1,6 +1,6 @@
 import { WORKSPACE_ID } from "@openorc/protocol";
 import { describe, expect, it } from "vitest";
-import { pullRequestNumber, renamedTitle, threadMark, threadPlace, threadStatus, threadTreeStatus, workspaceLabel } from "./thread-row.js";
+import { latestActivity, pullRequestNumber, renamedTitle, rowAge, rowPlace, rowStarter, threadMark, threadPlace, threadStatus, threadTreeStatus, workspaceLabel } from "./thread-row.js";
 
 const resting = { activity: "idle", session: { status: "idle", message: null }, unread: false, prUrl: null, prState: null } as const;
 const pr = "https://github.com/me/openorc/pull/482";
@@ -86,6 +86,63 @@ describe("workspaceLabel", () => {
     expect(workspaceLabel({ ...checkout, prUrl: pr })).toBeNull();
     expect(workspaceLabel({ ...checkout, workspaceMode: "worktree", prUrl: pr })).toBeNull();
     expect(workspaceLabel({ ...checkout, workspaceMode: "worktree", prUrl: pr, cloud })).toBe("cloud");
+  });
+});
+
+describe("rowPlace", () => {
+  const checkout = { workspaceMode: "current", branch: "main", projectId: "p", workingDirectory: null } as const;
+  const worktree = { ...checkout, workspaceMode: "worktree", branch: "openorc/sidebar-a1b2c3" } as const;
+  const cloud = { provider: "vercel", state: "ready", step: null, setup: false, error: null } as const;
+
+  it("says nothing where the project's new threads start, and names the other local place", () => {
+    expect(rowPlace(checkout, "current")).toBeNull();
+    expect(rowPlace(worktree, "current")).toEqual({ kind: "worktree", word: "worktree" });
+    expect(rowPlace(worktree, "worktree")).toBeNull();
+    expect(rowPlace(checkout, "worktree")).toEqual({ kind: "branch", word: "main" });
+    expect(rowPlace({ ...checkout, branch: null }, "worktree")).toEqual({ kind: "branch", word: "checkout" });
+  });
+
+  it("tells the person's own cloud from OpenOrc Cloud, and leaves a cloud-only project's rows to its label", () => {
+    expect(rowPlace({ ...worktree, cloud }, "worktree")).toEqual({ kind: "cloud", label: "Your own cloud", word: null });
+    expect(rowPlace({ ...checkout, owner: { brain: "cloud", reach: "asleep", heardAt: 1 } }, "current")).toEqual({ kind: "cloud", label: "Your own cloud", word: null });
+    expect(rowPlace({ ...worktree, owner: { brain: "hosted", reach: "live", heardAt: 1 } }, "worktree")).toEqual({ kind: "cloud", label: "OpenOrc Cloud", word: "OpenOrc Cloud" });
+    expect(rowPlace({ ...worktree, owner: { brain: "hosted", reach: "live", heardAt: 1, project: { name: "site" } } }, "current")).toBeNull();
+  });
+
+  it("names the folder of a thread in no project", () => {
+    expect(rowPlace({ ...checkout, projectId: WORKSPACE_ID, workingDirectory: "/Users/me/notes" }, "current")).toEqual({ kind: "folder", word: "notes" });
+    expect(rowPlace({ ...checkout, projectId: WORKSPACE_ID }, "worktree")).toBeNull();
+  });
+});
+
+describe("rowAge", () => {
+  it("says how long ago in the fewest letters", () => {
+    const now = Date.UTC(2026, 10, 14);
+    const ago = (ms: number) => rowAge(now - ms, now);
+    expect([ago(0), ago(59_000), ago(12 * 60_000), ago(2 * 3_600_000), ago(3 * 86_400_000), ago(15 * 86_400_000), ago(65 * 86_400_000), ago(400 * 86_400_000)]).toEqual([
+      "now",
+      "now",
+      "12m",
+      "2h",
+      "3d",
+      "2w",
+      "2mo",
+      "1y",
+    ]);
+  });
+
+  it("reads a thread's latest activity from its turns, its agent's events and its sub threads", () => {
+    expect(latestActivity({ lastActivityAt: 10, treeActivityAt: undefined, lastAgentEventAt: null })).toBe(10);
+    expect(latestActivity({ lastActivityAt: 10, treeActivityAt: 30, lastAgentEventAt: 20 })).toBe(30);
+    expect(latestActivity({ lastActivityAt: 10, treeActivityAt: 5, lastAgentEventAt: 40 })).toBe(40);
+  });
+});
+
+describe("rowStarter", () => {
+  it("names a teammate by first name, and nobody on the person's own thread", () => {
+    expect(rowStarter({ owner: { brain: "hosted", reach: "live", heardAt: 1, startedBy: { name: "Ana Lee", image: null } } })).toEqual({ name: "Ana Lee", first: "Ana", image: null });
+    expect(rowStarter({ owner: { brain: "hosted", reach: "live", heardAt: 1 } })).toBeNull();
+    expect(rowStarter({})).toBeNull();
   });
 });
 

@@ -1,49 +1,41 @@
 import { ContextMenu } from "@base-ui/react/context-menu";
 import {
+  latestActivity,
   ownerMark,
   pullRequestMark,
   pullRequestNumber,
-  relativeTime,
+  rowAge,
+  rowPlace,
+  rowStarter,
   subagentStatusLabel,
   threadPlace,
   threadStatus,
+  threadTreeStatus,
+  useSidebarNow,
   useTicking,
   workDuration,
-  workspaceLabel,
-  type ThreadPlace,
+  type RowPlace,
   type ThreadStatus,
 } from "@openorc/client";
-import { harnessShortName, isHarnessId, placeOf, type ThreadSummary } from "@openorc/protocol";
+import { harnessShortName, type ThreadSummary } from "@openorc/protocol";
 import { cn } from "../lib/cn";
-import { useMemo, type ReactNode } from "react";
+import type { ComponentType } from "react";
 import { CoversPreview } from "../lib/browser-preview";
+import { useRpc } from "../lib/client";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
-import { orclingById, useOrclings } from "../lib/orclings";
 import { useRouter } from "../lib/router";
+import { rowFit } from "../lib/row-fit";
 import { endThreadDrag, startThreadDrag } from "../lib/thread-drag";
 import { floatingGround } from "../lib/use-anchor-ground";
-import { HarnessLogo } from "./HarnessLogo";
-import { OrclingAvatar } from "./OrclingAvatar";
+import { AccountFace } from "./AccountFace";
 import { ThreadMenuItems, type MenuParts } from "./ThreadActions";
 import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
 import { CircleCheck, CircleDashed, Cloud, Folder, GitBranch, GitMerge, GitPullRequest, GitPullRequestClosed, X } from "./icons";
 import { menuPopup } from "./menu";
-import { Tooltip } from "./ui";
 
-const placeIcons: Record<ThreadPlace["kind"], ReactNode> = {
-  branch: <GitBranch size={11} className="shrink-0" />,
-  pull: <GitPullRequest size={11} className="shrink-0" />,
-  folder: <Folder size={11} className="shrink-0" />,
-};
+const placeIcons: Record<RowPlace["kind"], ComponentType<{ size?: number }>> = { cloud: Cloud, branch: GitBranch, worktree: Folder, folder: Folder };
 
-/** The hover title for where a thread works: the branch, the pull request's address, or the folder. */
-function placeTitle(thread: ThreadSummary, place: ThreadPlace): string {
-  if (place.kind === "pull" && thread.prUrl) return thread.prUrl;
-  if (place.kind === "folder") return thread.workingDirectory ?? "No recorded branch";
-  return place.label;
-}
-
-const pullRequestTone = { open: "text-ink-4", merged: "text-ok", closed: "text-bad" } as const;
+const pullRequestTone = { open: undefined, merged: "text-ok", closed: "text-bad" } as const;
 const pullRequestIcons = { open: GitPullRequest, merged: GitMerge, closed: GitPullRequestClosed } as const;
 
 /** A resting sub thread's mark: the state of its pull request, if it has one. Most threads have none and show nothing. */
@@ -53,18 +45,18 @@ function PullRequestMark({ thread }: { thread: ThreadSummary }) {
   const Icon = pullRequestIcons[mark.state];
   return (
     <span role="img" aria-label={mark.label} data-tip={mark.label} className="size-4 shrink-0 inline-flex items-center justify-center">
-      <Icon size={14} className={pullRequestTone[mark.state]} />
+      <Icon size={14} className={pullRequestTone[mark.state] ?? "text-ink-3"} />
     </span>
   );
 }
 
-/** A thread's pull request at the end of its project line: the state's own icon and color, then the number. */
+/** A thread's pull request at the end of its second line: the state's own icon and color, then the number. */
 function PullRequestStatus({ thread }: { thread: ThreadSummary }) {
   const mark = pullRequestMark(thread);
   if (!mark) return null;
   const Icon = pullRequestIcons[mark.state];
   return (
-    <span className={`thread-preview-pull ${pullRequestTone[mark.state]}`} role="img" aria-label={mark.label} data-tip={mark.label}>
+    <span className={cn("thread-preview-pull", pullRequestTone[mark.state])} role="img" aria-label={mark.label}>
       <Icon size={12} />
       <span className="tabular">#{pullRequestNumber(thread.prUrl)}</span>
     </span>
@@ -77,92 +69,42 @@ export type RowProject = { name: string };
 type ThreadRowProps = { thread: ThreadSummary; subthreads?: ThreadStatus | null; active: boolean; project?: RowProject; compact?: boolean };
 
 /**
- * A thread row: its title with what it needs from you at the end, then where it works and its pull request. A sub
- * thread keeps its mark ahead of its title, where the tree's lines reach it. A parent's mark also tells of its sub
- * threads (`subthreads`) while they need you or work. ⌘-click opens it in the split; right-click gives every action.
+ * A thread row: its title with what it needs from you at the end, then how fresh it is, whose, where and its pull
+ * request. A sub thread keeps its mark ahead of its title, where the tree's lines reach it. A parent's mark also tells of
+ * its sub threads (`subthreads`) while they need you or work. ⌘-click opens it in the split; right-click gives every
+ * action.
  */
 export function ThreadRow({ thread, subthreads = null, active, project, compact = false }: ThreadRowProps) {
   const navigate = useRouter((s) => s.navigate);
   const addPane = useRouter((s) => s.addThreadPane);
   // Every thread open in a pane is marked alike; aria-current names only the focused one.
   const open = useRouter((s) => s.threadIds.includes(thread.id)) || active;
-  const orcling = orclingById(useOrclings(), thread.orclingId);
-  const agents = thread.agents?.length ? thread.agents : [thread.agent];
-  const providers = [...new Set(agents)].map((agent) => ({ agent, count: agents.filter((item) => item === agent).length }));
-  const team = agents.length > 1;
-  const agentLabel = providers.map(({ agent, count }) => `${team ? `${count} × ` : ""}${harnessShortName(agent)}`).join(", ");
-  const place = threadPlace(thread);
-  const title = placeTitle(thread, place);
-  const mark = ownerMark(thread);
+  const status = threadTreeStatus(threadStatus(thread), subthreads);
   return (
     <ContextMenu.Root>
-      <Tooltip
-        side="right"
-        label={
-          <>
-            <span className="block">{thread.title}</span>
-            <span className="block text-ink-3">
-              {rowAbout(thread, place.label)} · {agentLabel} · {relativeTime(thread.lastActivityAt)}
-            </span>
-          </>
-        }
+      <ContextMenu.Trigger
         render={
-          <ContextMenu.Trigger
-            render={
-              <button
-                draggable
-                onDragStart={(event) => startThreadDrag(event.dataTransfer, thread.id)}
-                onDragEnd={endThreadDrag}
-                onClick={(e) => {
-                  if (e.metaKey || e.ctrlKey) addPane(thread.id);
-                  else {
-                    dismissCompactNavigation();
-                    navigate({ view: "thread", threadId: thread.id });
-                  }
-                }}
-                aria-current={active ? "page" : undefined}
-                data-open={open || undefined}
-                className={`sidebar-thread-row thread-preview no-drag${compact ? " sidebar-thread-child" : ""}`}
-              />
-            }
+          <button
+            draggable
+            onDragStart={(event) => startThreadDrag(event.dataTransfer, thread.id)}
+            onDragEnd={endThreadDrag}
+            onClick={(e) => {
+              if (e.metaKey || e.ctrlKey) addPane(thread.id);
+              else {
+                dismissCompactNavigation();
+                navigate({ view: "thread", threadId: thread.id });
+              }
+            }}
+            aria-current={active ? "page" : undefined}
+            aria-description={rowDescription(thread)}
+            data-open={open || undefined}
+            data-attention={(status && status.kind !== "running" && status.kind !== "background") || undefined}
+            className={cn("sidebar-thread-row thread-preview no-drag", compact && "sidebar-thread-child")}
           />
         }
       >
         {compact ? <SubThreadLines thread={thread} subthreads={subthreads} /> : <ThreadLines thread={thread} subthreads={subthreads} project={project} />}
-        <span className="thread-preview-meta flex min-w-0 items-center gap-2 text-xs leading-4 text-ink-3">
-          <span className="flex flex-1 min-w-0 items-center gap-1" data-tip={title}>
-            {placeIcons[place.kind]}
-            <span className="truncate">{place.label}</span>
-          </span>
-          {mark ? (
-            <span className={`inline-flex shrink-0 items-center gap-1${mark.dim ? " opacity-60" : ""}`}>
-              <Cloud size={12} />
-              {mark.label}
-            </span>
-          ) : null}
-          {orcling ? (
-            <span className="inline-flex shrink-0 items-center gap-1" data-tip={orcling.name}>
-              <OrclingAvatar orcling={orcling} size={12} />
-              <span>{orcling.name}</span>
-            </span>
-          ) : (
-            <span
-              className="inline-flex shrink-0 items-center gap-1.5"
-              role="img"
-              aria-label={team ? `Agents: ${agentLabel}` : `Agent: ${agentLabel}`}
-              data-tip={team ? `Agents: ${agentLabel}` : agentLabel}
-            >
-              {providers.map(({ agent, count }) => (
-                <span key={agent} className="inline-flex items-center gap-1">
-                  {isHarnessId(agent) ? <HarnessLogo id={agent} size={12} className="shrink-0" /> : null}
-                  <span className="tabular">{team ? count : harnessShortName(agent)}</span>
-                </span>
-              ))}
-            </span>
-          )}
-          <span className="thread-preview-date">{relativeTime(thread.lastActivityAt)}</span>
-        </span>
-      </Tooltip>
+      </ContextMenu.Trigger>
       <ContextMenu.Portal>
         <CoversPreview />
         <ContextMenu.Positioner className="z-40" collisionPadding={8}>
@@ -175,68 +117,70 @@ export function ThreadRow({ thread, subthreads = null, active, project, compact 
   );
 }
 
-/** What a row's tooltip says it is: a subagent by the kind its agent started, any other thread by where it works. */
-function rowAbout(thread: ThreadSummary, place: string): string {
-  if (!thread.subagent) return place;
-  return thread.subagent.agentType ? `Subagent · ${thread.subagent.agentType}` : "Subagent";
-}
-
-/** How long one sweep of a working title takes; every working row sweeps on the same clock. */
-const SWEEP_MS = 2000;
-
-/** A row's title, its ink swept left to right while its agent works. The sweep keeps time with the wall clock, so every working row moves together. */
-function RowTitle({ title, working }: { title: string; working: boolean }) {
-  const delay = useMemo(() => (working ? -(Date.now() % SWEEP_MS) : 0), [working]);
-  return (
-    <span className="thread-preview-title" data-working={working || undefined} style={working ? { animationDelay: `${delay}ms` } : undefined}>
-      {title}
-    </span>
-  );
+/**
+ * What a row leaves to its spoken description: a subagent's kind, or where any other thread works and whether its
+ * host answers, then its agents.
+ */
+function rowDescription(thread: ThreadSummary): string {
+  const agents = thread.agents?.length ? thread.agents : [thread.agent];
+  const about = thread.subagent ? ["Subagent", thread.subagent.agentType] : [threadPlace(thread).label, ownerMark(thread)?.label];
+  return [...about, [...new Set(agents)].map(harnessShortName).join(", ")].filter(Boolean).join(" · ");
 }
 
 /**
- * A thread's two lines: its title, swept while it works, with its mark at the end (the spinner, what it or a sub thread
- * needs from you, a failure or an unread dot); then one quiet line of where it works and its pull request. A row in a
- * group of many projects (Pinned, Snoozed, Resolved) names its project there first.
+ * A thread's two lines: its title, cut whole into its tooltip, with its mark at the end (the cube while it works, what it
+ * or a sub thread needs from you, a failure or an unread dot); then, from the left, how fresh it is, whose it is when a
+ * teammate started it, and where it works when that is not the project's usual place, and at the right its pull
+ * request. A row in a group of many projects (Pinned, Snoozed, Resolved) names its project after the age.
  */
 function ThreadLines({ thread, subthreads, project }: { thread: ThreadSummary; subthreads: ThreadStatus | null; project?: RowProject }) {
-  const working = threadStatus(thread)?.kind === "running";
-  // The pull request shows beside it, so where the work is stays named even when there is one. A teammate's thread
-  // names who started it there instead; its branch stays on hover.
-  const workspace = thread.owner?.startedBy?.name ?? workspaceLabel({ ...thread, prUrl: null });
+  const now = useSidebarNow();
+  const usual = useRpc("app.settings.get", {}).data?.defaultWorkspaceMode ?? "current";
+  const place = rowPlace(thread, usual);
+  const starter = rowStarter(thread);
   return (
     <>
       <span className="thread-preview-heading">
-        <RowTitle title={thread.title} working={working} />
+        <span className="thread-preview-title" data-tip={thread.title}>
+          {thread.title}
+        </span>
         <span className="thread-preview-mark">
           <SidebarThreadMark thread={thread} subthreads={subthreads} pull={false} />
         </span>
       </span>
-      <span className="thread-preview-line">
+      <span ref={rowFit} className="thread-preview-line">
+        <span className="tabular">{rowAge(latestActivity(thread), now)}</span>
         {project ? (
           <span className="thread-preview-project" data-tip={project.name}>
             {project.name}
           </span>
         ) : null}
-        {workspace ? (
-          <span className="thread-preview-workspace" data-tip={thread.branch ?? undefined}>
-            {workspace}
+        {starter ? (
+          <span className="thread-preview-who" data-tip={starter.name}>
+            <AccountFace name={starter.name} image={starter.image} className="thread-preview-face" />
+            <span className="thread-preview-word">{starter.first}</span>
           </span>
         ) : null}
-        <PlaceIcon thread={thread} />
+        {place ? <RowPlaceMark place={place} thread={thread} /> : null}
         <PullRequestStatus thread={thread} />
       </span>
     </>
   );
 }
 
-/** Where a thread off this Mac lives, as the quiet cloud on its line, dimmed while that place can't be reached. */
-function PlaceIcon({ thread }: { thread: ThreadSummary }) {
-  const place = placeOf(thread);
-  if (!place.rowIcon || !place.mark) return null;
+/** Where the thread works: its glyph and word; a cloud dims while its host can't be reached and keeps its glyph when the word gives way. */
+function RowPlaceMark({ place, thread }: { place: RowPlace; thread: ThreadSummary }) {
+  const Icon = placeIcons[place.kind];
+  const cloud = place.kind === "cloud";
   return (
-    <span role="img" aria-label={place.mark} className={cn("thread-preview-place", thread.owner?.reach !== "live" && "opacity-60")}>
-      <Cloud size={12} />
+    <span
+      className={cn("thread-preview-place", cloud && thread.owner && thread.owner.reach !== "live" && "opacity-60")}
+      data-cloud={cloud || undefined}
+      data-tip={cloud ? place.label : place.word}
+      {...(cloud ? { role: "img", "aria-label": place.label } : {})}
+    >
+      <Icon size={12} />
+      {place.word ? <span className="thread-preview-word">{place.word}</span> : null}
     </span>
   );
 }
@@ -248,7 +192,9 @@ function SubThreadLines({ thread, subthreads }: { thread: ThreadSummary; subthre
       <span className="thread-preview-status">
         <SidebarThreadMark thread={thread} subthreads={subthreads} pull />
       </span>
-      <span className="thread-preview-title">{thread.title}</span>
+      <span className="thread-preview-title" data-tip={thread.title}>
+        {thread.title}
+      </span>
       {thread.subagent ? <SubagentRunTime thread={thread} /> : null}
     </span>
   );

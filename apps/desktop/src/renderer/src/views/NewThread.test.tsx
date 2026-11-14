@@ -151,46 +151,48 @@ function saveModelDraft(projectId: string, prompt: string) {
   return draft;
 }
 
+/** What the place control in the composer's bar says under the pointer: where the thread will work, and on which branch. */
+const placeSays = () => screen.getByRole("button", { name: /^Where the thread works/ }).getAttribute("data-tip");
+
 describe("NewThread", () => {
   it("shows the checked-out prod branch when the project default is dev", () => {
     projects[0]!.defaultBranch = "dev";
-    const { container } = render(<NewThread projectId="p1" />);
-    expect(container.querySelector(".composer-branch")?.textContent).toBe("prod");
+    render(<NewThread projectId="p1" />);
+    expect(placeSays()).toBe("Works in the local checkout on prod");
   });
 
   it("updates the branch after a checkout refresh", () => {
     const view = render(<NewThread projectId="p1" />);
-    expect(view.container.querySelector(".composer-branch")?.textContent).toBe("prod");
+    expect(placeSays()).toBe("Works in the local checkout on prod");
     branches.p1 = "hotfix";
     view.rerender(<NewThread projectId="p1" />);
-    expect(view.container.querySelector(".composer-branch")?.textContent).toBe("hotfix");
+    expect(placeSays()).toBe("Works in the local checkout on hotfix");
   });
 
   it.each([null, undefined])("does not substitute the default branch when the checkout branch is %s", (branch) => {
     branches.p1 = branch;
-    const { container } = render(<NewThread projectId="p1" />);
-    expect(container.querySelector(".composer-branch")).toBeNull();
+    render(<NewThread projectId="p1" />);
+    expect(placeSays()).toBe("Works in the local checkout");
   });
 
   it("hides a stale checkout branch if refreshing it fails", () => {
     branchError = true;
-    const { container } = render(<NewThread projectId="p1" />);
-    expect(container.querySelector(".composer-branch")).toBeNull();
+    render(<NewThread projectId="p1" />);
+    expect(placeSays()).toBe("Works in the local checkout");
   });
 
   it("keeps the default branch as the starting point for a new worktree", () => {
     projects[0]!.defaultBranch = "dev";
     writeNewThreadDraft({ ...readNewThreadDraft("p1"), workspace: "worktree" });
-    const { container } = render(<NewThread projectId="p1" />);
-    expect(container.querySelector(".composer-branch")?.textContent).toBe("dev");
+    render(<NewThread projectId="p1" />);
+    expect(placeSays()).toBe("Works in a new worktree off dev");
   });
 
   it("shows the selected folder without a branch in Workspace", () => {
     projects = [makeProject(WORKSPACE_ID)];
     writeNewThreadDraft({ ...readNewThreadDraft(WORKSPACE_ID), workingDirectory: "/chosen/folder" });
-    const { container } = render(<NewThread projectId={WORKSPACE_ID} />);
-    expect(container.querySelector(".composer-branch")).toBeNull();
-    expect(screen.getByText("/chosen/folder")).toBeTruthy();
+    render(<NewThread projectId={WORKSPACE_ID} />);
+    expect(screen.getByRole("button", { name: "Choose the folder for this conversation" }).getAttribute("data-tip")).toBe("Works in /chosen/folder");
   });
 
   it("starts a recovered draft from the keyboard and opens the accepted thread", async () => {
@@ -209,10 +211,10 @@ describe("NewThread", () => {
     saveModelDraft("p2", "Second project");
     const view = render(<NewThread projectId="p1" />);
     expect(messageOf(screen.getByRole("textbox", { name: "Message" }))).toBe("First project");
-    expect(view.container.querySelector(".composer-branch")?.textContent).toBe("prod");
+    expect(placeSays()).toBe("Works in the local checkout on prod");
     view.rerender(<NewThread projectId="p2" />);
     expect(messageOf(screen.getByRole("textbox", { name: "Message" }))).toBe("Second project");
-    expect(view.container.querySelector(".composer-branch")?.textContent).toBe("release");
+    expect(placeSays()).toBe("Works in the local checkout on release");
     expect(readNewThreadDraft("p1").prompt).toBe("First project");
   });
 
@@ -292,7 +294,7 @@ describe("NewThread", () => {
     render(<NewThread projectId="p1" />);
     fireEvent.click(screen.getByRole("button", { name: "Where the thread works: Your own cloud" }));
     expect((await screen.findByRole("menuitem", { name: "Your own cloud Vercel" })).getAttribute("aria-disabled")).not.toBe("true");
-    expect(screen.getByText(/Works in your own cloud, on a new branch from/)).toBeTruthy();
+    expect(placeSays()).toMatch(/^Works in your own cloud, on a new branch from/);
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ projectId: "p1", workspaceMode: "worktree", cloud: true })));
   });
@@ -344,7 +346,7 @@ describe("NewThread", () => {
     render(<NewThread projectId="p1" />);
     fireEvent.click(screen.getByRole("button", { name: /^Where the thread works/ }));
     fireEvent.click(await screen.findByRole("menuitem", { name: "OpenOrc Cloud 1 h" }));
-    expect(screen.getByText(/Works on OpenOrc Cloud, on a new branch from/)).toBeTruthy();
+    expect(placeSays()).toMatch(/^Works on OpenOrc Cloud, on a new branch from/);
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ projectId: "p1", hosted: true, prompt: "Add a health check" })));
     expect(start).toHaveBeenCalledWith(expect.not.objectContaining({ workspaceMode: expect.anything() }));

@@ -303,19 +303,20 @@ function NewThreadProject({
                     busy={start.isPending}
                     disabledReason={disabledReason}
                     error={start.error?.message ?? permissionError ?? storageError}
-                  />
+                  >
+                    <NewThreadOptions
+                      projectId={projectId}
+                      mode={workspaceMode}
+                      cloud={cloud}
+                      hosted={hosted}
+                      location={location}
+                      blocked={branchingReason(git.state, "Worktrees")}
+                      disabled={start.isPending}
+                      onFolder={(workingDirectory) => changeDraft({ workingDirectory })}
+                      onMode={(workspace) => changeDraft({ workspace })}
+                    />
+                  </Composer>
                 </div>
-                <NewThreadOptions
-                  projectId={projectId}
-                  mode={workspaceMode}
-                  cloud={cloud}
-                  hosted={hosted}
-                  location={location}
-                  blocked={branchingReason(git.state, "Worktrees")}
-                  disabled={start.isPending}
-                  onFolder={(workingDirectory) => changeDraft({ workingDirectory })}
-                  onMode={(workspace) => changeDraft({ workspace })}
-                />
                 {targetIssue || projectIssue ? (
                   <p role="status" className="text-xs text-warn mt-2 break-words">
                     {targetIssue ?? projectIssue}{" "}

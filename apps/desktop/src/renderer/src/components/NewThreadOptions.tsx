@@ -4,9 +4,8 @@ import { Tooltip } from "@base-ui/react/tooltip";
 import { cloudTime, type NewThreadPlace, type StartBlock, type StartFix } from "@openorc/client";
 import { WORKSPACE_ID, type CloudHours } from "@openorc/protocol";
 import type { ComposerProps } from "./Composer";
-import { Check, ChevronDown, Cloud, Folder, GitBranch } from "./icons";
+import { Check, Cloud, Folder, GitBranch } from "./icons";
 import { menuItem, menuPopup, menuSeparator } from "./menu";
-import { Button } from "./ui";
 import { CoversPreview } from "../lib/browser-preview";
 import { cn } from "../lib/cn";
 import type { NewThreadCloud, NewThreadHosted } from "../lib/cloud-offered";
@@ -64,15 +63,14 @@ function takeFix(fix: StartFix) {
 }
 
 /** Where the thread will work, said as a sentence with one verb for every place. */
-function LocationSentence({ mode, branch }: { mode: NewThreadPlace; branch: string | null }) {
-  const name = branch ? <span className="composer-branch">{branch}</span> : null;
-  const words: Record<NewThreadPlace, ReactNode> = {
-    current: <>Works in the local checkout{name ? <> on {name}</> : null}</>,
-    worktree: <>Works in a new worktree{name ? <> off {name}</> : null}</>,
-    cloud: <>Works in your own cloud, on a new branch{name ? <> from {name}</> : null}</>,
-    hosted: <>Works on OpenOrc Cloud, on a new branch{name ? <> from {name}</> : null}</>,
+function placeWords(mode: NewThreadPlace, branch: string | null): string {
+  const words: Record<NewThreadPlace, string> = {
+    current: `Works in the local checkout${branch ? ` on ${branch}` : ""}`,
+    worktree: `Works in a new worktree${branch ? ` off ${branch}` : ""}`,
+    cloud: `Works in your own cloud, on a new branch${branch ? ` from ${branch}` : ""}`,
+    hosted: `Works on OpenOrc Cloud, on a new branch${branch ? ` from ${branch}` : ""}`,
   };
-  return <span className="new-thread-sentence">{words[mode]}</span>;
+  return words[mode];
 }
 
 /**
@@ -109,12 +107,10 @@ function PlaceMenu(props: {
       <Menu.Trigger
         disabled={props.disabled || Boolean(props.disabledReason)}
         aria-label={`Where the thread works: ${current.label}`}
-        data-tip={props.disabledReason ?? undefined}
-        className="composer-text-choice"
+        data-tip={props.disabledReason ?? placeWords(props.mode, props.branch)}
+        className="composer-icon-button"
       >
-        <Icon size={14} />
-        <LocationSentence mode={props.mode} branch={props.branch} />
-        <ChevronDown size={12} className="composer-chip-chevron" />
+        <Icon size={16} />
       </Menu.Trigger>
       <Menu.Portal>
         <CoversPreview />
@@ -165,7 +161,7 @@ function PlaceMenu(props: {
   );
 }
 
-/** Under the New thread composer: where the thread works, a menu or the Workspace folder. The Claude account is in the model picker. */
+/** In the New thread composer's bar: where the thread works, as one icon that opens the places, or the Workspace folder's chooser. */
 export function NewThreadOptions(props: {
   projectId: string;
   mode: NewThreadPlace;
@@ -181,23 +177,18 @@ export function NewThreadOptions(props: {
     const folder = await window.openorc.pickDirectory();
     if (folder) props.onFolder(folder);
   };
-  return (
-    <div className="new-thread-options" role="group" aria-label="New thread context">
-      <div className="new-thread-location">
-        {props.projectId === WORKSPACE_ID ? (
-          <>
-            <span className="new-thread-folder" data-tip={props.location.directory}>
-              <Folder size={14} />
-              <span>{props.location.directory}</span>
-            </span>
-            <Button variant="ghost" size="sm" disabled={props.disabled} data-tip="Choose the folder for this conversation" onClick={() => void chooseFolder()}>
-              Choose folder
-            </Button>
-          </>
-        ) : (
-          <PlaceMenu mode={props.mode} branch={props.location.branch} cloud={props.cloud} hosted={props.hosted} disabled={props.disabled} disabledReason={props.blocked} onMode={props.onMode} />
-        )}
-      </div>
-    </div>
-  );
+  if (props.projectId === WORKSPACE_ID)
+    return (
+      <button
+        type="button"
+        className="composer-icon-button"
+        aria-label="Choose the folder for this conversation"
+        data-tip={`Works in ${props.location.directory}`}
+        disabled={props.disabled}
+        onClick={() => void chooseFolder()}
+      >
+        <Folder size={16} />
+      </button>
+    );
+  return <PlaceMenu mode={props.mode} branch={props.location.branch} cloud={props.cloud} hosted={props.hosted} disabled={props.disabled} disabledReason={props.blocked} onMode={props.onMode} />;
 }

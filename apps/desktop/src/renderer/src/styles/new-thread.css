@@ -70,9 +70,6 @@
 :root:active-view-transition-type(project) .composer-new-thread {
   view-transition-name: new-thread-composer;
 }
-:root:active-view-transition-type(project) .new-thread-options {
-  view-transition-name: new-thread-options;
-}
 :root:active-view-transition-type(project) .new-thread-activity {
   view-transition-name: new-thread-activity;
 }
@@ -147,34 +144,6 @@
   height: var(--control-send-hero);
 }
 
-/* Under the composer: where the thread works, then the Claude account at the row's end. */
-.new-thread-options {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  min-width: 0;
-  padding: 0 6px;
-  color: var(--ink-4);
-  font-size: var(--text-sm);
-  line-height: var(--text-sm--line-height);
-}
-.new-thread-location {
-  display: flex;
-  flex: 1;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-.new-thread-sentence,
-.new-thread-folder > span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.new-thread-sentence .composer-branch {
-  color: inherit;
-}
 /* The place menu: one-line rows, a hairline before the clouds. A blocked row is dimmed and ends in the way to its fix in
    ink, or in why in quiet ink where nothing here fixes it. */
 .new-thread-places {
@@ -214,15 +183,6 @@
 .new-thread-place-hours > svg {
   width: 14px;
   height: 14px;
-}
-.new-thread-folder {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-.new-thread-folder > svg {
-  flex-shrink: 0;
 }
 
 /* Activity: one dot a day, a week to a column, the week's first day on top. A dot grows and darkens with
@@ -349,12 +309,6 @@
   }
 }
 
-@container new-thread (max-width: 480px) {
-  .new-thread-options {
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-}
 @media (max-width: 900px) {
   .app-shell .new-thread-body {
     --new-thread-bottom: 48px;

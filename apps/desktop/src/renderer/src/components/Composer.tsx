@@ -40,9 +40,9 @@ export const permissionLabel: Record<PermissionPreset, string> = { review: "Revi
 export type { Attachment } from "../lib/composer-attachments";
 
 function composerDestination(props: ComposerProps): ReactNode {
-  if (props.hasStarted || props.presentation === "new-thread") return null;
+  if (props.hasStarted) return null;
   if (props.children) return <div className="composer-destination">{props.children}</div>;
-  if (!props.location.label) return null;
+  if (props.presentation === "new-thread" || !props.location.label) return null;
   return (
     <span className="composer-location">
       {props.location.cloud ? <Cloud size={14} /> : <Laptop size={14} />}

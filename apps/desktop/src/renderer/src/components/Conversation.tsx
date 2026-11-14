@@ -95,7 +95,7 @@ function SwitchingNote({ agent }: { agent: string | null }) {
  * publishes, which the agent may switch mid-conversation, and its uncommitted changes.
  */
 function useCheckout(thread: ThreadSummary | null, project: Project) {
-  const git = useProjectGit(project.id);
+  const git = useProjectGit(thread?.owner?.brain === "hosted" ? null : project.id);
   const checkout = useRpc(
     "git.threadPushState",
     { threadId: thread?.id ?? "" },

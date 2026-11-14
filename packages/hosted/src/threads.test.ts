@@ -41,6 +41,16 @@ async function signIn(hosted: Hosted) {
 const listed = (hosted: Hosted) => hosted.threads.listed("threads.list", LIST)?.rows ?? [];
 
 describe("hosted threads", () => {
+  it("refuses the unavailable speed before writing while keeping false compatible", async () => {
+    const id = stand.addThread(ADA, { title: "Example", projectId: null });
+    const { hosted } = await host();
+    await signIn(hosted);
+    await vi.waitFor(() => expect(hosted.threads.holds({ thread: id })).toBe(true));
+    await expect(hosted.threads.call("threads.update", { id, patch: { fastMode: true, title: "Changed" } })).rejects.toThrow("This speed setting isn't available for this cloud agent.");
+    expect(stand.requests.filter((request) => request.method === "PATCH" && request.path.endsWith(id))).toEqual([]);
+    expect(await hosted.threads.call("threads.update", { id, patch: { fastMode: false, draft: "Next" } })).toMatchObject({ title: "Example", draft: "Next" });
+  });
+
   it("lists nothing and holds nothing while nobody is signed in", async () => {
     const { hosted } = await host();
     expect(hosted.threads.active).toBe(false);

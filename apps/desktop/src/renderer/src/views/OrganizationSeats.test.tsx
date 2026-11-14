@@ -47,6 +47,25 @@ it("keeps the draft and refusal in the purchase dialog when checkout cannot be c
   expect(screen.getByRole("dialog").textContent).toContain("Seat payments are not configured.");
   expect(screen.getByRole<HTMLInputElement>("spinbutton", { name: "Seats" }).value).toBe("3");
 });
+
+it("keeps billing usable while the independent storage read has no answer", async () => {
+  const f = await show();
+  cleanup();
+  let resolve = (_value: { storage: { usedBytes: number; allowanceBytes: number }; error: null }) => {};
+  const storage = {
+    get: vi.fn(
+      () =>
+        new Promise<{ storage: { usedBytes: number; allowanceBytes: number }; error: null }>((done) => {
+          resolve = done;
+        }),
+    ),
+    subscribe: vi.fn(() => () => {}),
+  };
+  render(<OrganizationSeats spaceId="team-a" view={f.view} offers={f.offers} storage={storage} />);
+  expect(screen.getByRole<HTMLButtonElement>("button", { name: "Buy seats" }).disabled).toBe(false);
+  await act(async () => resolve({ storage: { usedBytes: 0, allowanceBytes: 0 }, error: null }));
+  expect(screen.getByText("0 KB of 0 KB used")).toBeTruthy();
+});
 it("keeps an unconfirmed return waiting and stops only the temporary watch", async () => {
   const f = await show(waiting);
   expect(screen.getByText("Waiting for your payment")).toBeTruthy();

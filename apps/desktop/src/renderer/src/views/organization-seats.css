@@ -52,6 +52,9 @@
   gap: 8px;
   flex: none;
 }
+.seats-summary .seats-storage {
+  margin-top: 14px;
+}
 .seats-inventory {
   margin-top: 8px;
 }

@@ -5,15 +5,17 @@ import { Button, Tooltip } from "../components/ui";
 import { BuySeatsDialog, type BuySeatsDialogProps } from "../dialogs/BuySeatsDialog";
 import type { OrganizationBillingView, OrganizationBillingViewState } from "../lib/organization-billing-state";
 import { SeatInventory } from "./SeatInventory";
+import { OrganizationStorage, type OrganizationStorageTransport } from "./OrganizationStorage";
 import "./organization-seats.css";
 
 interface Props {
   spaceId: string;
   view: OrganizationBillingView;
   offers: BuySeatsDialogProps["offers"];
+  storage?: OrganizationStorageTransport;
 }
 
-export function OrganizationSeats({ spaceId, view, offers }: Props) {
+export function OrganizationSeats({ spaceId, view, offers, storage }: Props) {
   const state = useSyncExternalStore(view.subscribe, view.getSnapshot);
   const [buying, setBuying] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -30,7 +32,7 @@ export function OrganizationSeats({ spaceId, view, offers }: Props) {
   };
   return (
     <>
-      {billing ? <SeatSummary billing={billing} state={state} buy={buy} manage={() => void view.open({ page: "billing" })} /> : null}
+      {billing ? <SeatSummary spaceId={spaceId} storage={storage} billing={billing} state={state} buy={buy} manage={() => void view.open({ page: "billing" })} /> : null}
       {!billing && state.loading ? <p className="seats-inline-state text-ink-3">Loading seats…</p> : null}
       {!formOpen ? <SeatPaymentState state={state} view={view} /> : null}
       {billing?.subscription?.overallocated ? <p className="seats-inline-state">More people hold seats than are paid for. Take back a seat or add seats.</p> : null}
@@ -60,7 +62,21 @@ async function buySeats(view: OrganizationBillingView, target: Parameters<Organi
   if (!state.uncertain && !state.error && !state.status?.payment?.error && outcome && outcome !== "failed") close();
 }
 
-function SeatSummary({ billing, state, buy, manage }: { billing: OrganizationBilling; state: OrganizationBillingViewState; buy(): void; manage(): void }) {
+function SeatSummary({
+  spaceId,
+  storage,
+  billing,
+  state,
+  buy,
+  manage,
+}: {
+  spaceId: string;
+  storage?: OrganizationStorageTransport;
+  billing: OrganizationBilling;
+  state: OrganizationBillingViewState;
+  buy(): void;
+  manage(): void;
+}) {
   const subscription = billing.subscription;
   const hasSubscription = subscription !== null && subscription.standing !== "ended";
   const payment = state.status?.payment;
@@ -73,6 +89,7 @@ function SeatSummary({ billing, state, buy, manage }: { billing: OrganizationBil
       <div>
         <h2>{seatSummaryTitle(billing)}</h2>
         {subscription ? <SeatRenewal subscription={subscription} /> : null}
+        {storage ? <OrganizationStorage spaceId={spaceId} revision={billing.revision} transport={storage} /> : null}
       </div>
       <div className="seats-summary-actions">
         {subscription ? (

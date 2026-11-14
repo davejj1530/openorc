@@ -1,9 +1,14 @@
 import type { OrganizationBillingOffers, OrganizationBillingPage, OrganizationBillingParams, OrganizationBillingRpcResults, OrganizationBillingStatus } from "@openorc/protocol";
 import type { Hosted } from "@openorc/hosted";
 import { createAccountHandlers } from "./account.js";
+import { createOrganizationStorageHandlers } from "./organization-storage.js";
 
 export function createHostedAccountHandlers(hosted: Hosted | null) {
-  return { ...createAccountHandlers(hosted?.account ?? null), ...createOrganizationBillingHandlers(hosted?.organizationBilling ?? null) };
+  return {
+    ...createAccountHandlers(hosted?.account ?? null),
+    ...createOrganizationBillingHandlers(hosted?.organizationBilling ?? null),
+    ...createOrganizationStorageHandlers(hosted?.organizationBilling ?? null),
+  };
 }
 
 interface BillingCalls {

@@ -1,4 +1,4 @@
-import { OrganizationBillingPage, type OrganizationBillingOffers } from "@openorc/protocol";
+import { OrganizationBillingPage, type OrganizationBillingOffers, type OrganizationStorage } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import type { WireOrganizationBilling } from "../organization-billing-wire.js";
 import type { StandInSpaces } from "./stand-in-spaces.js";
@@ -21,6 +21,7 @@ export class StandInSeats {
   configured = true;
   readonly checkouts: Checkout[] = [];
   readonly records = new Map<string, WireOrganizationBilling>();
+  readonly storage = new Map<string, OrganizationStorage>();
   prices: Record<"monthly" | "yearly", { amount: number; currency: string } | null> = { monthly: { amount: 2000, currency: "usd" }, yearly: { amount: 20000, currency: "usd" } };
   constructor(private readonly deps: Dependencies) {}
 
@@ -41,7 +42,7 @@ export class StandInSeats {
   }
 
   route(request: Request, who: string, body: unknown): Reply | null {
-    if (!/^\/organization\/billing(?:\/|$)/.test(request.path)) return null;
+    if (!/^\/organization\/(?:billing(?:\/|$)|storage$)/.test(request.path)) return null;
     if (!this.enabled) return refused(404, "Not found.");
     const spaceId = request.space;
     if (!spaceId) return refused(400, "Name the space in x-openorc-space.");
@@ -56,6 +57,7 @@ export class StandInSeats {
   }
 
   #get(request: Request, spaceId: string): Reply {
+    if (request.path === "/organization/storage") return ok(this.storage.get(spaceId) ?? { usedBytes: 0, allowanceBytes: 0 });
     if (request.path === "/organization/billing") return ok({ ...(this.records.get(spaceId) ?? this.seed(spaceId)), asOf: this.#now() });
     if (request.path !== "/organization/billing/offers") return refused(404, "Not found.");
     const seats = Number(request.query.get("seats"));

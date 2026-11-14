@@ -1,9 +1,17 @@
-import { organizationBillingRpcParams, type OrganizationBilling as Billing, type OrganizationBillingOffers, type OrganizationBillingPage, type OrganizationBillingStatus } from "@openorc/protocol";
+import {
+  organizationBillingRpcParams,
+  type OrganizationBilling as Billing,
+  type OrganizationBillingOffers,
+  type OrganizationBillingPage,
+  type OrganizationBillingStatus,
+  type OrganizationStorageRead,
+} from "@openorc/protocol";
 import type { HostedDeps, HostedSpaces } from "./index.js";
 import { OrganizationBillingPayment } from "./organization-billing-payment.js";
 import { OrganizationBillingStore, organizationBillingKey, type OrganizationBillingScope, type OrganizationBillingStorage } from "./organization-billing-store.js";
 import { ORGANIZATION_BILLING_ROUTES as routes, toOrganizationBilling } from "./organization-billing-wire.js";
 import { Refused, type Session } from "./session.js";
+import { organizationStorageRoute } from "./organization-storage.js";
 import { SOCKET, wireTopics, type Route } from "./wire.js";
 
 interface Dependencies extends Pick<HostedDeps, "browser" | "now" | "push" | "server"> {
@@ -67,6 +75,18 @@ export class OrganizationBilling {
     if (offers.offers.some((offer) => offer.seats !== seats)) throw new Error("The seat prices changed. Try again.");
     entry.exposed = true;
     return offers;
+  }
+
+  async storage(spaceId: string): Promise<OrganizationStorageRead> {
+    try {
+      const entry = this.#entry(spaceId);
+      const storage = await this.#request(entry, organizationStorageRoute);
+      this.#assert(entry);
+      entry.exposed = true;
+      return { storage, error: null };
+    } catch (error) {
+      return { storage: null, error: error instanceof Error ? error.message : "Storage could not be read." };
+    }
   }
 
   async open(spaceId: string, target: OrganizationBillingPage): Promise<OrganizationBillingStatus> {
@@ -148,7 +168,7 @@ export class OrganizationBilling {
     try {
       return await this.deps.session.in(entry.scope.spaceId).request(route, body);
     } catch (error) {
-      if (error instanceof Refused && [401, 403, 404].includes(error.status ?? 0)) this.#drop(entry);
+      if (error instanceof Refused && ([401, 403].includes(error.status ?? 0) || (error.status === 404 && route !== organizationStorageRoute))) this.#drop(entry);
       throw error;
     }
   }

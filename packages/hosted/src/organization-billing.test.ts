@@ -89,6 +89,56 @@ it("uses the explicit organization and never returns private billing to a member
   expect(f.reply).toHaveBeenCalledTimes(1);
 });
 
+it("reads the server's storage totals without deriving an allowance from seat quantity", async () => {
+  const f = fixture();
+  const storage = { usedBytes: 2516582400, allowanceBytes: 53687091200 };
+  f.reply.mockResolvedValueOnce(storage);
+  expect(await f.service.storage("team-a")).toEqual({ storage, error: null });
+  expect(f.reply).toHaveBeenCalledExactlyOnceWith("/organization/storage", undefined, "team-a");
+  expect((await f.service.storage("personal")).storage).toBeNull();
+  f.demote();
+  expect((await f.service.storage("team-a")).storage).toBeNull();
+  expect(f.reply).toHaveBeenCalledTimes(1);
+});
+
+it.each([-1, 1.5, Number.MAX_SAFE_INTEGER + 1])("does not publish invalid storage total %s", async (value) => {
+  const f = fixture();
+  f.reply.mockResolvedValueOnce({ usedBytes: value, allowanceBytes: 100 });
+  expect(await f.service.storage("team-a")).toMatchObject({ storage: null, error: expect.any(String) });
+});
+
+it("discards storage after an account change while its read is pending", async () => {
+  const f = fixture();
+  let resolve = (_value: unknown) => {};
+  f.reply.mockReturnValueOnce(
+    new Promise((done) => {
+      resolve = done;
+    }),
+  );
+  const reading = f.service.storage("team-a");
+  f.session.generation++;
+  resolve({ usedBytes: 20, allowanceBytes: 100 });
+  expect(await reading).toMatchObject({ storage: null, error: expect.any(String) });
+});
+
+it("a refused storage read purges cached billing before membership catches up", async () => {
+  const f = fixture();
+  await f.service.get("team-a");
+  f.reply.mockRejectedValueOnce(new Refused("Only an admin can do that.", 403));
+  expect(await f.service.storage("team-a")).toEqual({ storage: null, error: "Only an admin can do that." });
+  f.reply.mockRejectedValueOnce(new OutOfReach());
+  expect((await f.service.get("team-a")).billing).toBeNull();
+});
+
+it("an older server without storage does not discard the confirmed seat inventory", async () => {
+  const f = fixture();
+  await f.service.get("team-a");
+  f.reply.mockRejectedValueOnce(new Refused("Not found.", 404));
+  expect((await f.service.storage("team-a")).storage).toBeNull();
+  f.reply.mockRejectedValueOnce(new OutOfReach());
+  expect((await f.service.get("team-a")).billing?.organization.id).toBe("team-a");
+});
+
 it.each(["offers", "checkout"])("purges privileged snapshots when %s refuses stale admin rights", async (operation) => {
   const f = fixture();
   await f.service.get("team-a");

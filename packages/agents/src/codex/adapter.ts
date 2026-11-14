@@ -4,6 +4,7 @@ import { mapNotification } from "./notifications.js";
 import { codexUsageContext } from "./usage-context.js";
 import { codexMcpApps } from "./mcp-apps.js";
 import { CodexSubagents } from "./subagents.js";
+import { isCodexLogLine } from "./log-lines.js";
 import { modelEfforts, normalizeModelEffort, normalizeModelSettings } from "@openorc/protocol";
 import type { AgentEvent, ApprovalDecision, ApprovalKind, ApprovalResolution, RunSpec } from "@openorc/protocol";
 import { agentBinary } from "../bin.js";
@@ -389,7 +390,11 @@ export class CodexAdapter {
       emit({ type: "error", runId: spec.runId, ts: now(), message: e.message, fatal: true });
       if (!proc.pid) proc.emit("exit", null, null);
     });
-    rpc.on("stderr", (line) => emit({ type: "error", runId: spec.runId, ts: now(), message: line, fatal: false }));
+    rpc.on("stderr", (line) =>
+      emit(
+        isCodexLogLine(line) ? { type: "raw", runId: spec.runId, ts: now(), agent: "codex", payload: { stderr: line } } : { type: "error", runId: spec.runId, ts: now(), message: line, fatal: false },
+      ),
+    );
     rpc.on("parseError", (line) => emit({ type: "error", runId: spec.runId, ts: now(), message: `unparseable: ${line.slice(0, 200)}`, fatal: false }));
     rpc.on("notification", (n) => {
       emit({ type: "raw", runId: spec.runId, ts: now(), agent: "codex", payload: { method: n.method, params: n.params } });

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { OrganizationProjectAdded, OrganizationRepositories } from "@openorc/protocol";
 import { Button, Checkbox, Dialog, Input, TextButton } from "../components/ui";
 import { useRpc, useRpcMutation } from "../lib/client";
-import { OrganizationGithubChooser } from "./OrganizationGithubChooser";
+import { GithubRepositoryChooser } from "../components/GithubRepositoryChooser";
 import "../components/Organization.css";
 
 type Repository = OrganizationRepositories["repositories"][number];
@@ -58,7 +58,7 @@ function RepositoryPicker({ spaceId, onOpenChange, onAdded }: { spaceId: string;
     <div className="organization-form">
       {!data ? <p className="text-sm text-ink-3">{read.isError ? "Repositories couldn't load." : "Loading repositories…"}</p> : null}
       {data && data.installations.length > 0 ? <RepositoryChoices data={data} chosen={chosen} onChosen={setChosen} outcomes={outcomes} pending={add.isPending} /> : null}
-      {data ? <OrganizationGithubChooser data={data} waiting={waiting} connect={(another) => connect.mutate({ spaceId, ...(another && { another: true }) })} /> : null}
+      {data ? <GithubRepositoryChooser data={data} waiting={waiting} connect={(choice) => connect.mutate({ spaceId, ...choice })} /> : null}
       <RepositoryReadError error={readError} outcomes={outcomes} />
       <RepositoryError error={error} data={data} connectionFailed={Boolean(connect.error)} waiting={waiting} another={() => connect.mutate({ spaceId, another: true })} />
       {readError ? (

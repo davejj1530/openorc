@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Route } from "./wire.js";
 import { wireOrganizationAccess } from "./organization-access-wire.js";
+import { wireGithubStatus } from "./wire-github.js";
 
 const id = z.string().min(1);
 const iso = z.iso.datetime();
@@ -92,10 +93,6 @@ const sentInvitations = z.object({
 
 const settings = z.object({ name: z.string(), logo: z.string().nullable(), activityDays: z.union([z.literal(30), z.literal(90), z.literal(180), z.literal(365)]) });
 const projectAccess = z.object({ projectId: id, everyone: z.boolean(), memberIds: z.array(id) });
-const github = z.object({
-  configured: z.boolean(),
-  installations: z.array(z.object({ id, accountLogin: z.string(), accountType: z.enum(["User", "Organization"]), suspended: z.boolean(), settingsUrl: z.string().nullable().default(null) })),
-});
 const repositories = z.array(z.object({ installationId: id, repoId: z.number().int().positive(), fullName: z.string(), defaultBranch: z.string(), private: z.boolean() }));
 const route = <T>(method: Route<T>["method"], path: string, reply: z.ZodType<T>): Route<T> => ({ method, path, reply });
 const get = <T>(path: string, reply: z.ZodType<T>): Route<T> => ({ method: "GET", path, reply });
@@ -114,7 +111,7 @@ export const SPACE_ROUTES = {
   removeMember: (memberId: string) => empty("DELETE", `/organization/members/${encodeURIComponent(memberId)}`),
   createOrganization: route("POST", "/api/auth/organization/create", wireOrganization.extend({ members: z.array(wireMembership) })),
   updateOrganization: route("PATCH", "/settings/organization", settings),
-  organizationGithub: get("/github", github),
+  organizationGithub: get("/github", wireGithubStatus),
   organizationRepositories: get("/github/repositories", repositories),
   spaceIndex: get("/spaces", wireSpaces),
   receivedInvitations: get("/invitations/received", wireReceivedInvitations),

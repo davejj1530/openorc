@@ -1,6 +1,7 @@
 import type { AccountProject, AccountStatus } from "@openorc/protocol";
 import { useState } from "react";
 import { Button, Select, TextButton } from "../components/ui";
+import { GithubRepositoryChooser } from "../components/GithubRepositoryChooser";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { useRouter } from "../lib/router";
 import { Failure } from "./settings-secret-field";
@@ -12,7 +13,7 @@ type SignedIn = Extract<AccountStatus, { state: "signed-in" }>;
  * The person's GitHub on OpenOrc Cloud, which lets it read their repositories and names their commits.
  *   not connected   Connect GitHub
  *   connecting      waiting on the browser, with Cancel
- *   connected       who it is and what it reaches, Choose repositories (the same trip, to change what the app reaches)
+ *   connected       who it is and what it reaches, Choose repositories names one account to manage or connect
  *                   and Disconnect, which unlinks the account
  *   failed          the words, and Connect GitHub again
  * Absent when the server has no GitHub app.
@@ -25,6 +26,15 @@ export function GithubRow({ account }: { account: SignedIn }) {
   if (!github?.configured) return null;
   const busy = connect.isPending || cancel.isPending || disconnect.isPending;
   const connected = github.login !== null || github.installedOn.length > 0;
+  const chooser = (
+    <GithubRepositoryChooser
+      data={{ ...github, installations: github.installations ?? [] }}
+      waiting={busy}
+      connect={(choice) => connect.mutate(choice)}
+      label={connected ? "Choose repositories" : "Connect GitHub"}
+      button={!connected}
+    />
+  );
   const controls = () => {
     if (work?.state === "waiting")
       return (
@@ -35,12 +45,7 @@ export function GithubRow({ account }: { account: SignedIn }) {
           </Button>
         </>
       );
-    if (!connected)
-      return (
-        <Button disabled={busy} onClick={() => connect.mutate({})}>
-          Connect GitHub
-        </Button>
-      );
+    if (!connected) return chooser;
     return (
       <>
         <Status ok>Connected</Status>
@@ -49,9 +54,7 @@ export function GithubRow({ account }: { account: SignedIn }) {
             Disconnect
           </TextButton>
         ) : null}
-        <TextButton tone="muted" disabled={busy} onClick={() => connect.mutate({})}>
-          Choose repositories
-        </TextButton>
+        {chooser}
       </>
     );
   };

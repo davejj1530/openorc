@@ -1,28 +1,41 @@
 import { Menu } from "@base-ui/react/menu";
 import { Tooltip as BaseTooltip } from "@base-ui/react/tooltip";
-import type { OrganizationRepositories } from "@openorc/protocol";
+import type { GithubConnectChoice, OrganizationRepositories } from "@openorc/protocol";
 import { CoversPreview } from "../lib/browser-preview";
 import { floatingGround } from "../lib/use-anchor-ground";
-import { menuItem, menuPopup, menuSeparator } from "../components/menu";
-import { TextButton } from "../components/ui";
+import { menuItem, menuPopup, menuSeparator } from "./menu";
+import { Button, TextButton } from "./ui";
 
-export function OrganizationGithubChooser({ data, waiting, connect }: { data: OrganizationRepositories; waiting: boolean; connect(another: boolean): void }) {
-  const trigger = (
-    <TextButton
-      tone="muted"
-      className="text-sm"
-      disabled={!data.configured || waiting}
-      data-tip={!data.configured ? "GitHub isn't available on this server." : undefined}
-      onClick={data.installations.length ? undefined : () => connect(false)}
-    >
-      {waiting ? "Connecting…" : "Choose repositories on GitHub"}
+export function GithubRepositoryChooser({
+  data,
+  waiting,
+  connect,
+  label = "Choose repositories on GitHub",
+  button = false,
+}: {
+  data: Pick<OrganizationRepositories, "configured" | "installations" | "available">;
+  waiting: boolean;
+  connect(choice: GithubConnectChoice): void;
+  label?: string;
+  button?: boolean;
+}) {
+  const disabled = !data.configured || waiting;
+  const reason = !data.configured ? "GitHub isn't available on this server." : undefined;
+  const text = waiting ? "Connecting…" : label;
+  const trigger = button ? (
+    <Button disabled={disabled} data-tip={reason}>
+      {text}
+    </Button>
+  ) : (
+    <TextButton tone="muted" className="text-sm" disabled={disabled} data-tip={reason}>
+      {text}
     </TextButton>
   );
-  if (!data.installations.length) return <div>{trigger}</div>;
+  const available = data.available ?? [];
   return (
     <Menu.Root>
       <div>
-        <Menu.Trigger render={trigger} disabled={!data.configured || waiting} />
+        <Menu.Trigger render={trigger} disabled={disabled} />
       </div>
       <Menu.Portal>
         <CoversPreview />
@@ -31,8 +44,13 @@ export function OrganizationGithubChooser({ data, waiting, connect }: { data: Or
             {data.installations.map((installation) => (
               <AccountEntry key={installation.id} installation={installation} />
             ))}
-            <Menu.Separator className={menuSeparator} />
-            <Menu.Item className={menuItem} onClick={() => connect(true)}>
+            {available.map((installation) => (
+              <Menu.Item key={installation.installationId} className={menuItem} onClick={() => connect({ installationId: installation.installationId })}>
+                Connect {installation.accountLogin}
+              </Menu.Item>
+            ))}
+            {data.installations.length || available.length ? <Menu.Separator className={menuSeparator} /> : null}
+            <Menu.Item className={menuItem} onClick={() => connect({ another: true })}>
               Another account or organization
             </Menu.Item>
           </Menu.Popup>

@@ -4,6 +4,7 @@
  */
 import { AgentKind, AllowanceSource, BackgroundCommand, PermissionPreset, PrState, RunMode } from "@openorc/protocol";
 import { z } from "zod";
+import { wireGithubChoose, wireGithubStatus } from "./wire-github.js";
 import { SPACE_ROUTES } from "./wire-spaces.js";
 import { wireOrganizationAccess } from "./organization-access-wire.js";
 
@@ -151,7 +152,7 @@ export const wireSent = z.discriminatedUnion("sent", [z.object({ sent: z.literal
 export const wireCreated = z.object({ thread: wireThread.nullable(), first: wireSent.nullable() });
 
 /** The GitHub accounts OpenOrc's GitHub app is installed on for the space, and whether the server has the app at all. */
-export const wireGithub = z.object({ configured: z.boolean(), installations: z.array(z.object({ id: z.string(), accountLogin: z.string() })) });
+export const wireGithub = wireGithubStatus;
 /** The GitHub account the person linked. */
 export const wireGithubLink = z.object({ configured: z.boolean(), account: z.object({ login: z.string() }).nullable() });
 /** A repository an installation lets OpenOrc read, which can be made a project. */
@@ -159,6 +160,7 @@ export const wireGithubRepository = z.object({ installationId: z.string(), repoI
 export type WireGithubRepository = z.infer<typeof wireGithubRepository>;
 /** Starting a GitHub step for an app waiting on a loopback port: GitHub's page to go through, or how it went with none. */
 export const wireGithubStart = z.discriminatedUnion("kind", [
+  wireGithubChoose,
   z.object({ kind: z.literal("github"), step: z.enum(["link", "install"]), url: z.url(), expiresInMs: z.number() }),
   z.object({ kind: z.literal("settled"), outcome: z.string() }),
 ]);

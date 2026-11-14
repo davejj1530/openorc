@@ -116,7 +116,7 @@ export interface HostedAccount {
   cancelSignIn(agent: HostedAgent): void;
   removeSignIn(input: RpcParams<"account.signIns.remove">): Promise<void>;
   /** Connects the person's GitHub through as many browser trips as it takes; resolves once the first page is open, the rest shows in `status().connectingGithub`. */
-  connectGithub(): Promise<void>;
+  connectGithub(input?: RpcParams<"account.github.connect">): Promise<void>;
   cancelGithub(): void;
   /** Unlinks the person's GitHub account. */
   disconnectGithub(): Promise<void>;
@@ -156,7 +156,7 @@ export interface HostedSpaces {
     create(input: RpcParams<"spaces.create">): Promise<RpcResults["spaces.create"]>;
     update(input: RpcParams<"organization.update">): Promise<RpcResults["organization.update"]>;
     repositories(spaceId: string): Promise<RpcResults["organization.repositories"]>;
-    connect(spaceId: string, another?: boolean): Promise<RpcResults["organization.github.connect"]>;
+    connect(spaceId: string, choice?: Omit<RpcParams<"organization.github.connect">, "spaceId">): Promise<RpcResults["organization.github.connect"]>;
     addProjects(input: RpcParams<"organization.projects.add">): Promise<RpcResults["organization.projects.add"]>;
   };
   status(): SpacesStatus;

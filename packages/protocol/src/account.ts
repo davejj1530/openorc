@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { GithubConnectChoice, type OrganizationRepositories } from "./organization-setup.js";
 import { openCodeProvider } from "./cloud-sign-ins.js";
 import { harnessShortName } from "./harness.js";
 import type { AllowanceSource, OrganizationAccess } from "./organization-access.js";
@@ -70,6 +71,8 @@ export interface AccountGithub {
   login: string | null;
   installedOn: string[];
   repositories: string[];
+  installations?: OrganizationRepositories["installations"];
+  available?: OrganizationRepositories["available"];
 }
 
 /** How a person pays for their own Pro, as the server offers it. */
@@ -206,7 +209,7 @@ export const accountRpcParams = {
   "account.signIns.cancel": z.object({ agent: Agent }).strict(),
   "account.signIns.remove": z.object({ agent: Agent, provider: Provider.optional() }).strict(),
   /** Links the person's GitHub account and installs OpenOrc's GitHub app, through as many browser trips as GitHub asks for. */
-  "account.github.connect": z.object({}).strict(),
+  "account.github.connect": GithubConnectChoice,
   "account.github.cancel": z.object({}).strict(),
   /** Unlinks the person's GitHub account. What the app reaches on GitHub is changed on GitHub. */
   "account.github.disconnect": z.object({}).strict(),

@@ -21,6 +21,7 @@ import { Paying } from "./paying.js";
 import { SignIns } from "./signins.js";
 import { AccountCache } from "./account-cache.js";
 import { accountSeatFacts } from "./organization-access-wire.js";
+import { wireGithubStatus } from "./wire-github.js";
 import { ROUTES, SOCKET, wireBilling, wireGithubRepository, wireHostedSettings, wireSignIn, wireTopics } from "./wire.js";
 
 const keptAnswers = z.object({
@@ -33,7 +34,13 @@ const keptAnswers = z.object({
   /** Sign-ins the server refused a turn on as signed out, by agent and provider, with the `checkedAt` it had then. */
   ended: z.array(z.object({ key: z.string(), checkedAt: z.string().nullable() })).default([]),
   github: z
-    .object({ configured: z.boolean(), login: z.string().nullable(), installedOn: z.array(z.string()), repositories: z.array(wireGithubRepository) })
+    .object({
+      ...wireGithubStatus.shape,
+      installations: wireGithubStatus.shape.installations.default([]),
+      login: z.string().nullable(),
+      installedOn: z.array(z.string()),
+      repositories: z.array(wireGithubRepository),
+    })
     .nullable()
     .default(null),
 });
@@ -170,8 +177,8 @@ export class Account implements HostedAccount {
     return this.#signIns.remove(agent, provider);
   }
 
-  connectGithub(): Promise<void> {
-    return this.#github.connect();
+  connectGithub(input: RpcParams<"account.github.connect"> = {}): Promise<void> {
+    return this.#github.connect(input);
   }
 
   cancelGithub(): void {
@@ -300,11 +307,11 @@ export class Account implements HostedAccount {
         throw error;
       });
     const [installed, link, repositories] = await Promise.all([
-      adminOnly(this.deps.session.request(ROUTES.github), { configured: true, installations: [] }),
+      adminOnly(this.deps.session.request(ROUTES.github), { configured: true, installations: [], available: [] }),
       this.deps.session.request(ROUTES.githubLink),
       adminOnly(this.deps.session.request(ROUTES.githubRepositories), []),
     ]);
-    return { configured: installed.configured, login: link.account?.login ?? null, installedOn: installed.installations.map((each) => each.accountLogin), repositories };
+    return { ...installed, login: link.account?.login ?? null, installedOn: installed.installations.map((each) => each.accountLogin), repositories };
   }
 
   /** Puts what the server just answered for `email` beside what it said before, keeps it, and tells the windows. */

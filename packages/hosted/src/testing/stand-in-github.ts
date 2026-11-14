@@ -1,6 +1,5 @@
 /**
- * The stand-in's GitHub, as the real server's github and projects controllers answer an app, for the person's personal
- * space (the active one):
+ * The stand-in's GitHub, as the real server's github and projects controllers answer an app in the selected space:
  *   starting an install for an app on a loopback port answers GitHub's page: linking the person's account first when
  *   they have not, then installing OpenOrc's app; a page's state is good once, for the person it was made for
  *   GitHub returns the browser to the server, which sends it on to the app's port with GitHub's query
@@ -10,6 +9,7 @@
  *   repository already one answers that project
  */
 import { randomBytes } from "node:crypto";
+import { GithubConnectChoice } from "@openorc/protocol";
 import type { StandInSpaces } from "./stand-in-spaces.js";
 
 type Reply = { status: number; body: unknown };
@@ -87,6 +87,7 @@ export class StandInGithub {
         body: {
           configured: this.configured,
           installations: installed.map(({ id, accountLogin, accountType, settingsUrl }) => ({ id, accountLogin, accountType, suspended: false, settingsUrl: this.configured ? settingsUrl : null })),
+          available: person.login && this.configured ? this.#available(who, space) : [],
         },
       }),
       "GET /github/account": () => ({ status: 200, body: { configured: this.configured, account: person.login ? { login: person.login, name: null } : null } }),
@@ -94,7 +95,7 @@ export class StandInGithub {
         status: 200,
         body: installed.flatMap((installation) => installation.repositories.map((repository) => ({ installationId: installation.id, ...repository, defaultBranch: "main", private: true }))),
       }),
-      "POST /github/install/start": () => this.#start(who, person, Number(body["port"]), space, body["another"] === true),
+      "POST /github/install/start": () => this.#start(who, person, Number(body["port"]), space, body),
       "POST /github/link/finish": () => this.#finish(who, "link", String(body["query"] ?? "")),
       "POST /github/install/finish": () => this.#finish(who, "install", String(body["query"] ?? "")),
       "DELETE /github/account": () => {
@@ -106,21 +107,42 @@ export class StandInGithub {
     return routes[`${method} ${path}`]?.() ?? null;
   }
 
-  #start(who: string, person: Person, port: number, space: string, another: boolean): Reply {
-    const owned = [...this.#installations.values()].filter((installation) => installation.owner === who);
-    if (person.login && !another && owned.length) {
-      for (const installation of owned) {
-        const key = `${space}:${installation.installationId}`;
-        if (!this.#installations.has(key)) this.#installations.set(key, { ...installation, space, id: randomBytes(12).toString("hex") });
-      }
-      this.projectsChanged(who);
-      return { status: 200, body: { kind: "settled", outcome: "connected" } };
+  #available(who: string, space: string) {
+    const installed = [...this.#installations.values()];
+    const here = new Set(installed.filter((installation) => installation.space === space).map((installation) => installation.installationId));
+    return [
+      ...new Map(
+        installed
+          .filter((installation) => installation.owner === who && !here.has(installation.installationId))
+          .map(({ installationId, accountLogin, accountType }) => [installationId, { installationId, accountLogin, accountType }]),
+      ).values(),
+    ];
+  }
+
+  #start(who: string, person: Person, port: number, space: string, body: Record<string, unknown>): Reply {
+    const parsed = GithubConnectChoice.safeParse({ another: body["another"], installationId: body["installationId"] });
+    if (!parsed.success || (parsed.data.another && parsed.data.installationId !== undefined)) return { status: 400, body: { message: "Choose one GitHub account to connect." } };
+    const choice = parsed.data;
+    if (person.login && !choice.another) {
+      const settled = this.#chosen(who, space, choice.installationId);
+      if (settled) return settled;
     }
     const step = person.login ? "install" : "link";
     const state = randomBytes(12).toString("hex");
     this.#states.set(state, { who, step, port, space });
     const url = step === "link" ? `https://github.com/login/oauth/authorize?client_id=openorc&state=${state}` : `https://github.com/apps/openorc/installations/new?state=${state}`;
     return { status: 200, body: { kind: "github", step, url, expiresInMs: PAGE_MS } };
+  }
+
+  #chosen(who: string, space: string, installationId: number | undefined): Reply | null {
+    const owned = [...this.#installations.values()].filter((installation) => installation.owner === who);
+    if (installationId === undefined) return owned.length ? { status: 200, body: { kind: "choose", available: this.#available(who, space) } } : null;
+    const installation = owned.find((each) => each.installationId === installationId);
+    if (!installation) return { status: 200, body: { kind: "settled", outcome: "unverified" } };
+    const key = `${space}:${installationId}`;
+    if (!this.#installations.has(key)) this.#installations.set(key, { ...installation, space, id: randomBytes(12).toString("hex") });
+    this.projectsChanged(who);
+    return { status: 200, body: { kind: "settled", outcome: "connected" } };
   }
 
   #finish(who: string, step: "link" | "install", query: string): Reply {

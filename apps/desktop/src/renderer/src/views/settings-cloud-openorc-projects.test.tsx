@@ -7,6 +7,7 @@ import { core } from "../lib/rpc";
 import { CloudProjects, GithubRow } from "./settings-cloud-openorc-projects";
 
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
+vi.mock("../lib/browser-preview", () => ({ CoversPreview: () => null }));
 type SignedIn = Extract<AccountStatus, { state: "signed-in" }>;
 const account: SignedIn = {
   state: "signed-in",
@@ -47,7 +48,9 @@ const show = (node: React.ReactNode) => render(<QueryClientProvider client={quer
 it("connects GitHub, waits on the browser with Cancel, and says a failed trip in its words", async () => {
   show(<GithubRow account={account} />);
   fireEvent.click(screen.getByRole("button", { name: "Connect GitHub" }));
-  await waitFor(() => expect(core.call).toHaveBeenCalledWith("account.github.connect", {}));
+  expect(core.call).not.toHaveBeenCalledWith("account.github.connect", expect.anything());
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Another account or organization" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("account.github.connect", { another: true }));
   cleanup();
   show(<GithubRow account={{ ...account, connectingGithub: { state: "waiting" } }} />);
   expect(screen.getByText("Waiting for GitHub")).toBeTruthy();
@@ -57,6 +60,30 @@ it("connects GitHub, waits on the browser with Cancel, and says a failed trip in
   show(<GithubRow account={{ ...account, connectingGithub: { state: "failed", error: "GitHub sign-in was cancelled." } }} />);
   expect(screen.getByText("GitHub sign-in was cancelled.")).toBeTruthy();
   expect(screen.getByRole("button", { name: "Connect GitHub" })).toBeTruthy();
+});
+
+it("connects the named available account from Personal without changing the other choices", async () => {
+  show(
+    <GithubRow
+      account={{
+        ...account,
+        github: {
+          configured: true,
+          login: "ada",
+          installedOn: [],
+          repositories: [],
+          available: [
+            { installationId: 81, accountLogin: "birch", accountType: "Organization" },
+            { installationId: 82, accountLogin: "cedar", accountType: "User" },
+          ],
+        },
+      }}
+    />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Choose repositories" }));
+  expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual(["Connect birch", "Connect cedar", "Another account or organization"]);
+  fireEvent.click(screen.getByRole("menuitem", { name: "Connect cedar" }));
+  await waitFor(() => expect(core.call).toHaveBeenCalledWith("account.github.connect", { installationId: 82 }));
 });
 
 it("shows who GitHub is connected as and what it reaches, with Disconnect, and nothing when the server has no GitHub app", async () => {

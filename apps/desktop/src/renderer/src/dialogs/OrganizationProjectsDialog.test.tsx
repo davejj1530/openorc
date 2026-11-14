@@ -85,12 +85,14 @@ it("keeps every connected account listed when one settings page is unavailable",
   await waitFor(() => expect(mock.call).toHaveBeenCalledWith("organization.github.connect", { spaceId: "birch", another: true }));
 });
 
-it("starts the existing connection flow directly when the space has no connected account", async () => {
+it("keeps an empty space's chooser explicit even when there are no available accounts", async () => {
   repositories = { ...repositories, installations: [], repositories: [] };
   view();
   fireEvent.click(await screen.findByRole("button", { name: "Choose repositories on GitHub" }));
-  await waitFor(() => expect(mock.call).toHaveBeenCalledWith("organization.github.connect", { spaceId: "birch" }));
-  expect(screen.queryByRole("menu")).toBeNull();
+  expect(mock.call.mock.calls.filter(([method]) => method === "organization.github.connect")).toHaveLength(0);
+  expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual(["Another account or organization"]);
+  fireEvent.click(screen.getByRole("menuitem", { name: "Another account or organization" }));
+  await waitFor(() => expect(mock.call).toHaveBeenCalledWith("organization.github.connect", { spaceId: "birch", another: true }));
 });
 
 it("keeps a refused default connection and offers another account as a separate explicit action", async () => {
@@ -101,7 +103,22 @@ it("keeps a refused default connection and offers another account as a separate 
   fireEvent.click(screen.getByRole("button", { name: "Another account or organization" }));
   await waitFor(() => expect(mock.call).toHaveBeenCalledWith("organization.github.connect", { spaceId: "birch", another: true }));
   fireEvent.click(screen.getByRole("button", { name: "Choose repositories on GitHub" }));
-  await waitFor(() => expect(mock.call).toHaveBeenCalledWith("organization.github.connect", { spaceId: "birch" }));
+  await screen.findByRole("menuitem", { name: "Another account or organization" });
+  expect(mock.call.mock.calls.filter(([method]) => method === "organization.github.connect")).toHaveLength(1);
+});
+
+it("lists connected accounts before available accounts and connects only the selected account", async () => {
+  repositories.available = [
+    { installationId: 18, accountLogin: "cedar", accountType: "Organization" },
+    { installationId: 19, accountLogin: "spruce", accountType: "User" },
+  ];
+  view();
+  fireEvent.click(await screen.findByRole("button", { name: "Choose repositories on GitHub" }));
+  expect(screen.getAllByRole("menuitem").map((item) => item.textContent)).toEqual(["birch", "Connect cedar", "Connect spruce", "Another account or organization"]);
+  expect(mock.call.mock.calls.filter(([method]) => method === "organization.github.connect")).toHaveLength(0);
+  fireEvent.click(screen.getByRole("menuitem", { name: "Connect spruce" }));
+  await waitFor(() => expect(mock.call).toHaveBeenCalledWith("organization.github.connect", { spaceId: "birch", installationId: 19 }));
+  expect(window.openorc.openExternal).not.toHaveBeenCalled();
 });
 
 it("rereads on focus and reopening while retaining selected and already added repositories", async () => {

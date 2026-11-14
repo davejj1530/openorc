@@ -5,14 +5,14 @@
  *
  *   for up to three trips:
  *     listen on loopback, then ask the server to start installing OpenOrc's GitHub app, with the port
- *     settled at once (an installation the person owns is connected without GitHub): done, or its words
+ *     a named installation settles without a page; an unnamed choice rereads the available accounts
  *     else open GitHub's page, wait for the browser's return, and post the query to finish the step
  *     a link step that linked goes round again, for the install it was needed for
  *
  * What is under way, or the last that failed, is `work`. The account reads GitHub and the projects again once a trip
  * settles, whatever came of it.
  */
-import type { GithubWork } from "@openorc/protocol";
+import type { GithubConnectChoice, GithubWork } from "@openorc/protocol";
 import type { HostedDeps } from "./index.js";
 import type { Requests, Session } from "./session.js";
 import { ROUTES, type WireGithubStart } from "./wire.js";
@@ -60,7 +60,7 @@ export class GithubConnect {
   }
 
   /** Starts connecting; resolves once GitHub's first page is open, or rejects in words when it could not start. The rest goes on in `work`. */
-  async connect(another = false): Promise<void> {
+  async connect(choice: GithubConnectChoice = {}): Promise<void> {
     this.cancel();
     const browser = this.deps.browser;
     if (!browser) throw new Error(NO_BROWSER);
@@ -69,9 +69,9 @@ export class GithubConnect {
       live = false;
     };
     this.#set({ state: "waiting" });
-    const first = await this.#trip(browser, () => live, another).catch((error: unknown) => this.#failed(error, live));
+    const first = await this.#trip(browser, () => live, choice).catch((error: unknown) => this.#failed(error, live));
     if (!live || first === "done") return;
-    void this.#finish(browser, first, () => live, another);
+    void this.#finish(browser, first, () => live, choice);
   }
 
   cancel(): void {
@@ -93,14 +93,14 @@ export class GithubConnect {
   }
 
   /** The trips after the first page opened: each waits on the browser, finishes its step, and a link goes round again. */
-  async #finish(browser: NonNullable<HostedDeps["browser"]>, first: Trip, live: () => boolean, another: boolean): Promise<void> {
+  async #finish(browser: NonNullable<HostedDeps["browser"]>, first: Trip, live: () => boolean, choice: GithubConnectChoice): Promise<void> {
     try {
       let trip: Trip | "done" = first;
       for (let count = 1; trip !== "done"; count++) {
         const words = await this.#step(trip, live);
         if (!live()) return;
         if (words !== "again" || count >= TRIPS) return this.#settle(words === "again" ? FAILED : words, live);
-        trip = await this.#trip(browser, live, another);
+        trip = await this.#trip(browser, live, choice);
       }
       this.#settle(null, live);
     } catch (error) {
@@ -109,7 +109,7 @@ export class GithubConnect {
   }
 
   /** One trip: listen, start the step, and open GitHub's page; `done` when the server settled it without GitHub. */
-  async #trip(browser: NonNullable<HostedDeps["browser"]>, live: () => boolean, another: boolean): Promise<Trip | "done"> {
+  async #trip(browser: NonNullable<HostedDeps["browser"]>, live: () => boolean, choice: GithubConnectChoice): Promise<Trip | "done"> {
     const waiting = await browser.awaitReturn(RETURN_PATH, 15 * 60_000);
     if (!live()) {
       waiting.close();
@@ -122,14 +122,14 @@ export class GithubConnect {
     };
     let start: WireGithubStart;
     try {
-      start = await (this.deps.requests ?? this.deps.session).request(ROUTES.githubStart, { port: waiting.port, ...(another && { another: true }) });
+      start = await (this.deps.requests ?? this.deps.session).request(ROUTES.githubStart, { port: waiting.port, ...choice });
     } catch (error) {
       waiting.close();
       throw error;
     }
-    if (start.kind === "settled") {
+    if (start.kind !== "github") {
       waiting.close();
-      const words = INSTALL_WORDS[start.outcome];
+      const words = start.kind === "settled" ? INSTALL_WORDS[start.outcome] : null;
       this.#settle(words === undefined ? FAILED : words, live);
       return "done";
     }

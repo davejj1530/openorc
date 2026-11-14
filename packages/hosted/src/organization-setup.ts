@@ -98,7 +98,7 @@ export class OrganizationSetup {
     };
   }
 
-  async connect(spaceId: string, another = false): Promise<OrganizationRepositories> {
+  async connect(spaceId: string, choice: Omit<RpcParams<"organization.github.connect">, "spaceId"> = {}): Promise<OrganizationRepositories> {
     const generation = this.deps.session.generation;
     let connection = this.#connections.get(spaceId);
     if (!connection) {
@@ -114,7 +114,7 @@ export class OrganizationSetup {
       });
       this.#connections.set(spaceId, connection);
     }
-    if (connection.work?.state !== "waiting") await connection.connect(another);
+    if (connection.work?.state !== "waiting") await connection.connect(choice);
     this.#assert(generation);
     return this.repositories(spaceId);
   }

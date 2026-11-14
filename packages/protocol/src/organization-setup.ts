@@ -9,9 +9,19 @@ const logo = z
   .regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/);
 const repository = z.object({ installationId: SpaceId, repoId: z.number().int().positive() }).strict();
 
+export const AvailableGithubInstallation = z.object({
+  installationId: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  accountLogin: z.string(),
+  accountType: z.enum(["User", "Organization"]),
+});
+export type AvailableGithubInstallation = z.infer<typeof AvailableGithubInstallation>;
+export const GithubConnectChoice = z.object({ another: z.boolean().optional(), installationId: AvailableGithubInstallation.shape.installationId.optional() }).strict();
+export type GithubConnectChoice = z.infer<typeof GithubConnectChoice>;
+
 export interface OrganizationRepositories {
   configured: boolean;
   installations: { id: string; accountLogin: string; accountType: "User" | "Organization"; suspended: boolean; settingsUrl: string | null }[];
+  available?: AvailableGithubInstallation[];
   repositories: { installationId: string; repoId: number; fullName: string; defaultBranch: string; private: boolean; projectId: string | null }[];
   connecting: GithubWork | null;
 }
@@ -24,7 +34,7 @@ export const organizationSetupParams = {
     .strict()
     .refine((input) => input.name !== undefined || input.logo !== undefined, "Say what to change."),
   "organization.repositories": z.object({ spaceId: SpaceId }).strict(),
-  "organization.github.connect": z.object({ spaceId: SpaceId, another: z.boolean().optional() }).strict(),
+  "organization.github.connect": GithubConnectChoice.extend({ spaceId: SpaceId }),
   "organization.projects.add": z.object({ spaceId: SpaceId, repositories: z.array(repository).min(1).max(50) }).strict(),
 };
 export interface OrganizationSetupResults {

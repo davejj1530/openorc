@@ -109,7 +109,7 @@ it("binds GitHub and per-repository outcomes to the organization across the brow
   expect(outcomes).toMatchObject([{ state: "added" }, { state: "refused", error: "OpenOrc can't read that repository. Check the app's access on GitHub." }]);
   expect(await hosted.spaces.projects(organization)).toMatchObject([{ key: expect.stringMatching(/^openorc-cloud:/), localProjectId: null }]);
   expect(await hosted.spaces.projects(other)).toEqual([]);
-  await hosted.spaces.setup.connect(other);
+  await hosted.spaces.setup.connect(other, { installationId: 7001 });
   const connected = await hosted.spaces.setup.repositories(other);
   expect(connected.connecting).toBeNull();
   expect(connected.repositories).toHaveLength(2);
@@ -148,14 +148,14 @@ it("keeps another-account intent through linking and adds a second installation 
       return fetch(input, init);
     },
   });
-  await hosted.spaces.setup.connect(spaceId, true);
+  await hosted.spaces.setup.connect(spaceId, { another: true });
   await vi.waitFor(async () => expect((await hosted.spaces.setup.repositories(spaceId)).installations).toHaveLength(1));
   expect(starts).toHaveLength(2);
   expect(starts).toEqual([1, 2].map(() => ({ body: { port: expect.any(Number), another: true }, space: spaceId })));
   const first = (await hosted.spaces.setup.repositories(spaceId)).repositories[0]!;
   await hosted.spaces.setup.addProjects({ spaceId, repositories: [first] });
   stand.github.grant(ADMIN, ["cedar/tools"], { id: 7002, accountLogin: "cedar", accountType: "Organization", settingsUrl: "https://github.com/organizations/cedar/settings/installations/7002" });
-  await hosted.spaces.setup.connect(spaceId, true);
+  await hosted.spaces.setup.connect(spaceId, { another: true });
   await vi.waitFor(async () => expect((await hosted.spaces.setup.repositories(spaceId)).installations).toHaveLength(2));
   const data = await hosted.spaces.setup.repositories(spaceId);
   expect(data.installations.map(({ accountLogin, settingsUrl }) => ({ accountLogin, settingsUrl }))).toEqual([
@@ -183,4 +183,40 @@ it("rereads new grants and unavailable settings without losing a connected accou
     { fullName: "birch/tools", projectId: null },
   ]);
   expect(stand.requests.filter((request) => request.path === "/github/install/finish")).toHaveLength(1);
+});
+
+it("lists two available accounts without connecting, then connects only the named account and preserves its row on retry", async () => {
+  const original = stand.addTeam("Birch Studio", [ADMIN]);
+  const target = stand.addTeam("Cedar Studio", [ADMIN]);
+  stand.github.grant(ADMIN, ["birch/canvas"], { id: 7001, accountLogin: "birch" });
+  const hosted = await host();
+  await hosted.spaces.setup.connect(original, { another: true });
+  await vi.waitFor(async () => expect((await hosted.spaces.setup.repositories(original)).installations).toHaveLength(1));
+  stand.github.grant(ADMIN, ["cedar/tools"], { id: 7002, accountLogin: "cedar", accountType: "Organization" });
+  await hosted.spaces.setup.connect(original, { another: true });
+  await vi.waitFor(async () => expect((await hosted.spaces.setup.repositories(original)).installations).toHaveLength(2));
+  const before = await hosted.spaces.setup.repositories(original);
+  const choices = await hosted.spaces.setup.connect(target);
+  expect(choices).toMatchObject({
+    installations: [],
+    repositories: [],
+    connecting: null,
+    available: [
+      { installationId: 7001, accountLogin: "birch" },
+      { installationId: 7002, accountLogin: "cedar" },
+    ],
+  });
+  const named = await hosted.spaces.setup.connect(target, { installationId: 7002 });
+  expect(named.installations.map((row) => row.accountLogin)).toEqual(["cedar"]);
+  expect(named.available?.map((row) => row.accountLogin)).toEqual(["birch"]);
+  expect(named.repositories.map((row) => row.fullName)).toEqual(["cedar/tools"]);
+  const retry = await hosted.spaces.setup.connect(target, { installationId: 7002 });
+  expect(retry.installations).toEqual(named.installations);
+  expect((await hosted.spaces.setup.repositories(original)).installations).toEqual(before.installations);
+  expect(stand.requests.filter((request) => request.path === "/github/install/finish")).toHaveLength(2);
+  await hosted.account.disconnectGithub();
+  await hosted.spaces.setup.connect(target, { installationId: 7001 });
+  await vi.waitFor(async () => expect((await hosted.spaces.setup.repositories(target)).installations).toHaveLength(2));
+  expect(stand.requests.filter((request) => request.path === "/github/install/finish")).toHaveLength(2);
+  expect((await hosted.spaces.setup.repositories(target)).available).toEqual([]);
 });

@@ -3,7 +3,7 @@
  * server tells the sockets of the people who read them. It keeps the real server's rules the app depends on:
  *   a request about a thread is in the space it names (else the person's personal one); a thread of another space is
  *   not there (404). In a team, every member reads every thread; only its starter writes to it, and anyone else is
- *   refused in the real server's words (403). Each reader has a view of their own: seen, pinned, archived, snoozed
+ *   refused in the real server's words (403), until `collaboration.sharedWrites` opens writing to its project's readers. Each reader has a view of their own: seen, pinned, archived, snoozed
  *   `seq` rises by one per stored event; `eventId` is `${threadId}.${seq}`; `turnEnds` are the seqs of `turn.completed`
  *   a page by turn starts after the end of the turn before it, and `limit` still applies to it
  *   a stored batch goes to the sockets watching the thread as `hosted:events`, after it is stored; a socket may watch
@@ -31,6 +31,7 @@ import { randomUUID } from "node:crypto";
 import { titleFromPrompt } from "@openorc/protocol";
 import { userOf, type StandInSpaces } from "./stand-in-spaces.js";
 import { attachedPath, StandInThreadFiles } from "./stand-in-thread-files.js";
+import { StandInCollaboration } from "./stand-in-collaboration.js";
 import type { UploadedFile } from "../wire-files.js";
 
 export interface StandInPeer {
@@ -78,6 +79,8 @@ interface Ask {
   answered: boolean;
   /** Its turn parked: answering it starts a turn. */
   parked: boolean;
+  /** The turn that asked it. */
+  turnId: string;
 }
 
 /** One reader's own view of a thread. */
@@ -106,6 +109,11 @@ interface Thread {
   asks: Ask[];
   /** Who started the running turn; null between turns. */
   turn: string | null;
+  /** The running turn, or the last one; each turn's sender by address; when the running one started. */
+  turnId: string | null;
+  turns: Map<string, string>;
+  turnStartedAt: string | null;
+  stopping: boolean;
   createdAt: string;
   lastActivityAt: string;
 }
@@ -166,13 +174,20 @@ export class StandInThreads {
   readonly started: { space: string; body: Record<string, unknown> }[] = [];
   /** Capabilities, files on messages and the files unit's rules. */
   readonly files = new StandInThreadFiles();
+  /** Who writes, sends and waits in a thread, and the server's capability for it. */
+  readonly collaboration: StandInCollaboration;
 
   constructor(
     private readonly peers: () => Iterable<StandInPeer>,
     private readonly admit: Admit,
     private readonly spaces: StandInSpaces,
-    private readonly person: (email: string) => { name: string; image: string | null },
-  ) {}
+    person: (email: string) => { name: string; image: string | null },
+  ) {
+    this.collaboration = new StandInCollaboration(person, (threadId) => {
+      const thread = this.#threads.get(threadId);
+      return thread ? this.spaces.readers(thread.space).filter((who) => this.#reads(who, thread)) : [];
+    });
+  }
 
   /** The person's spaces, and the routes under /projects and /hosted, for `who` in the space they name; null for any other path. */
   route(request: { method: string; path: string; query: URLSearchParams; space: string | null }, who: string, body: Record<string, unknown> = {}): Reply | null {
@@ -186,6 +201,11 @@ export class StandInThreads {
     const asked = /^\/hosted\/asks\/([^/]+)\/answer$/.exec(path);
     if (asked && method === "POST") return this.#answer(who, space, decodeURIComponent(asked[1]!), body);
     if (method === "POST" && path === "/hosted/threads") return this.#create(who, space, body);
+    const together = /^\/hosted\/threads\/([^/]+)\/(collaboration|turn-senders|people)$/.exec(path);
+    if (together) {
+      const thread = this.#readable({ who, space }, decodeURIComponent(together[1]!));
+      return thread ? this.collaboration.route(method, together[2]!, request.query, thread, who) : missing();
+    }
     const write = /^\/hosted\/threads\/([^/]+)\/(messages|stop|ready|mine)(?:\/([^/]+))?$/.exec(path);
     if (write) return this.#write(method, write, { who, space }, body);
     return this.#read(method, path, request.query, { who, space }, body);
@@ -224,7 +244,7 @@ export class StandInThreads {
     if (!thread) return missing();
     const key = `${method} ${verb}${messageId ? "/:id" : ""}`;
     if (key === "PUT mine") return this.#view(thread, as.who, body);
-    if (thread.owner !== as.who) return READ_ONLY;
+    if (thread.owner !== as.who && !this.collaboration.sharedWrites) return READ_ONLY;
     if (key === "POST messages") return this.#send(thread, as.who, body);
     if (key === "DELETE messages/:id") return this.#unsend(thread, decodeURIComponent(messageId!));
     if (key === "POST stop") return this.#stop(thread);
@@ -329,7 +349,7 @@ export class StandInThreads {
     message.state = "delivered";
     message.refusal = null;
     const starts = !thread.turn;
-    if (starts) thread.turn = message.author;
+    if (starts) this.#startTurn(thread, message.author);
     thread.status = "working";
     const attachments = message.files.map(attachedPath);
     this.append(thread.id, [{ type: "message.completed", runId: message.id, ts: Date.now(), messageId: message.id, role: "user", text: message.text, ...(attachments.length && { attachments }) }], {
@@ -338,7 +358,7 @@ export class StandInThreads {
     // A person's own message is read by them.
     const view = viewOf(thread, message.author);
     thread.views.set(message.author, { ...view, seenSeq: Math.max(view.seenSeq, headOf(thread)) });
-    if (starts) this.append(thread.id, [{ type: "turn.started", ts: Date.now(), turnId: `turn-${thread.id}-${thread.events.length}` }]);
+    if (starts) this.append(thread.id, [{ type: "turn.started", ts: Date.now(), turnId: thread.turnId }]);
   }
 
   #unsend(thread: Thread, messageId: string): Reply {
@@ -386,7 +406,7 @@ export class StandInThreads {
     const refusal = startsTurn ? this.admit(who, this.#settings(thread)) : null;
     if (refusal) return { status: 200, body: { answered: false, refusal } };
     ask.answered = true;
-    if (startsTurn) thread.turn = who;
+    if (startsTurn) this.#startTurn(thread, who);
     this.append(thread.id, [{ type: "approval.resolved", ts: Date.now(), approvalId: ask.id, decision: body["decision"], ...(body["answers"] ? { answers: body["answers"] } : {}) }], {
       by: userOf(who),
     });
@@ -402,7 +422,7 @@ export class StandInThreads {
   ask(threadId: string, request: { kind: string; toolName?: string; input: unknown; detail: string }): string {
     const thread = this.#threads.get(threadId)!;
     const id = randomUUID();
-    thread.asks.push({ id, kind: request.kind, detail: request.detail, answered: false, parked: false });
+    thread.asks.push({ id, kind: request.kind, detail: request.detail, answered: false, parked: false, turnId: thread.turnId ?? `turn-${thread.id}` });
     thread.status = "needs_answer";
     this.append(threadId, [{ type: "approval.requested", ts: Date.now(), approvalId: id, kind: request.kind, input: request.input, ...(request.toolName && { toolName: request.toolName }) }]);
     return id;
@@ -415,9 +435,12 @@ export class StandInThreads {
   endTurn(threadId: string, status: "success" | "cancelled" = "success"): void {
     const thread = this.#threads.get(threadId)!;
     thread.turn = null;
+    thread.stopping = false;
+    thread.turnStartedAt = null;
     for (const ask of thread.asks) if (!ask.answered) ask.parked = true;
     thread.status = openAsk(thread) ? "needs_answer" : "idle";
-    this.append(threadId, [{ type: "turn.completed", ts: Date.now(), turnId: `turn-${threadId}`, status, durationMs: 1000 }]);
+    this.append(threadId, [{ type: "turn.completed", ts: Date.now(), turnId: thread.turnId ?? `turn-${threadId}`, status, durationMs: 1000 }]);
+    thread.turnId = null;
     for (const message of thread.messages) if (message.state === "pending" && !this.#reads(message.author, thread)) message.state = "cancelled";
     const next = thread.messages.find((message) => message.state === "pending");
     if (!next) return;
@@ -462,10 +485,15 @@ export class StandInThreads {
       events: [],
       messages: [],
       asks: [],
-      turn: seed.status === "working" ? email : null,
+      turn: null,
+      turnId: null,
+      turns: new Map(),
+      turnStartedAt: null,
+      stopping: false,
       createdAt: at,
       lastActivityAt: at,
     };
+    if (seed.status === "working") this.#startTurn(thread, email);
     this.#threads.set(id, thread);
     this.#tellReaders(thread);
     return id;
@@ -478,7 +506,7 @@ export class StandInThreads {
   append(threadId: string, events: Record<string, unknown>[], options: { by?: string; quiet?: boolean; turnId?: string } = {}): void {
     const thread = this.#threads.get(threadId)!;
     const first = headOf(thread) + 1;
-    const stored = events.map((event, index) => ({ seq: first + index, turnId: options.turnId ?? null, by: options.by ?? null, event: { runId: randomUUID(), ...event } }));
+    const stored = events.map((event, index) => ({ seq: first + index, turnId: options.turnId ?? thread.turnId, by: options.by ?? null, event: { runId: randomUUID(), ...event } }));
     thread.events.push(...stored);
     if (!options.quiet) this.#tellRoom(thread, "hosted:events", { threadId, events: stored.map((each) => wire(thread, each)), lastAgentSeq: lastAgentSeq(thread) });
     this.#changed(thread);
@@ -513,7 +541,10 @@ export class StandInThreads {
       turns: turnEnds(thread).length,
       ...viewOf(thread, who),
       lastAgentSeq: lastAgentSeq(thread),
-      turn: thread.turn ? { id: `turn-${thread.id}`, startedBy: userOf(thread.turn), startedAt: thread.lastActivityAt, state: "running" } : null,
+      turn:
+        thread.turn && thread.turnId
+          ? { id: thread.turnId, startedBy: userOf(thread.turn), startedAt: thread.turnStartedAt ?? thread.lastActivityAt, state: thread.stopping ? "stopping" : "running" }
+          : null,
       backgroundCommands: thread.backgroundCommands,
       waiting: thread.messages.filter((message) => message.state === "pending" || message.state === "refused").map(messageOf),
       ask: ask ? { id: ask.id, kind: ask.kind, detail: ask.detail } : null,
@@ -521,10 +552,19 @@ export class StandInThreads {
       pullRequest: null,
       actions: [],
       createdBy: userOf(thread.owner),
-      startedBy: { id: userOf(thread.owner), ...this.person(thread.owner) },
+      startedBy: this.collaboration.personOf(thread.owner),
+      ...(this.collaboration.served && { collaboration: this.collaboration.projection(thread, who) }),
       createdAt: thread.createdAt,
       lastActivityAt: thread.lastActivityAt,
     };
+  }
+
+  /** A new turn, sent by `who`: its own id, which the log's events of it carry. */
+  #startTurn(thread: Thread, who: string): void {
+    thread.turn = who;
+    thread.turnId = `turn-${thread.id.slice(0, 8)}-${thread.turns.size + 1}`;
+    thread.turns.set(thread.turnId, who);
+    thread.turnStartedAt = new Date().toISOString();
   }
 
   #title(thread: Thread): string {

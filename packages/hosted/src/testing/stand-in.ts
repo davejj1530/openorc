@@ -29,6 +29,7 @@ import { StandInOrganizations } from "./stand-in-organizations.js";
 import { StandInChat, socketAnswers } from "./stand-in-chat.js";
 import { billingState, leftSeconds, StandInPayments, type StandInBilling, type StandInOffers } from "./stand-in-billing.js";
 import { StandInThreads, type Admit, type StandInPeer, type StandInThreadSeed } from "./stand-in-threads.js";
+import type { StandInCollaboration } from "./stand-in-collaboration.js";
 
 export interface StandIn {
   seats: StandInSeats;
@@ -95,6 +96,8 @@ export interface StandIn {
   started: { space: string; body: Record<string, unknown> }[];
   /** The capabilities the server answers and the files rules they turn on. */
   threadFiles: StandInThreadFiles;
+  /** Working together in a thread: whether the server serves it, and whether shared writing is open. */
+  threadCollaboration: StandInCollaboration;
   /** GitHub as the server reaches it: what an install grants, and where its pages send the browser back. */
   github: Pick<StandInGithub, "grant" | "returnFor" | "configured">;
   organizations: StandInOrganizations;
@@ -453,7 +456,9 @@ function paymentsFace(billing: Map<string, StandInBilling>, payments: StandInPay
 }
 
 /** What a test does to the stand-in's threads, as an agent's host or another person would. */
-function threadsFace(hosted: StandInThreads): Pick<StandIn, "addThread" | "append" | "set" | "stoppedCommands" | "ask" | "endTurn" | "readies" | "sent" | "started" | "threadFiles"> {
+function threadsFace(
+  hosted: StandInThreads,
+): Pick<StandIn, "addThread" | "append" | "set" | "stoppedCommands" | "ask" | "endTurn" | "readies" | "sent" | "started" | "threadFiles" | "threadCollaboration"> {
   return {
     addThread: (email, seed) => hosted.addThread(email.toLowerCase(), seed),
     append: (threadId, events, options) => hosted.append(threadId, events, options),
@@ -465,6 +470,7 @@ function threadsFace(hosted: StandInThreads): Pick<StandIn, "addThread" | "appen
     sent: hosted.sent,
     started: hosted.started,
     threadFiles: hosted.files,
+    threadCollaboration: hosted.collaboration,
   };
 }
 

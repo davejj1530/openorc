@@ -10,6 +10,7 @@ interface MembershipRequest {
   spaces: StandInSpaces;
   recipients: string[];
   tell(who: string, topics: string[], space?: string): void;
+  accessChanged(space: string): void;
 }
 const refuse = (status: number, message: string): Reply => ({ status, body: { message } });
 const done: Reply = { status: 204, body: null };
@@ -34,6 +35,7 @@ export function membershipRoute(input: MembershipRequest): Reply | null {
 }
 
 function publishChange(input: MembershipRequest, space: string, members: string[], deleted: boolean): void {
+  input.accessChanged(space);
   for (const email of members) input.tell(email, ["spaces", "members", "projects"], space);
   if (deleted) for (const email of input.recipients) input.tell(email, ["invitations"]);
 }

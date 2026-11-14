@@ -35,6 +35,8 @@ interface Store {
   scheduled: boolean;
   readonly hydrating: Map<string, Frame[]>;
   readonly loads: Map<string, Promise<void>>;
+  readonly reads: Map<string, symbol>;
+  readonly discarded: Set<string>;
   readonly holds: Map<string, number>;
   readonly evictions: Map<string, ReturnType<typeof setTimeout>>;
   /** The run ids an interest connection was last told. */
@@ -65,6 +67,7 @@ function writable(s: Store): Map<string, RunTranscript> {
 /** The runs whose frames this client needs: shown ones, loading ones, and ones in memory that loaded or are live. */
 function interestOf(s: Store): Set<string> {
   const ids = new Set([...s.holds.keys(), ...s.hydrating.keys()]);
+  for (const id of s.discarded) if (!s.hydrating.has(id)) ids.delete(id);
   for (const run of s.current.values()) if (run.hydrated || run.live) ids.add(run.runId);
   return ids;
 }
@@ -120,6 +123,7 @@ function applyFrame(s: Store, frame: Frame): void {
     buffered.push(frame);
     return;
   }
+  if (s.discarded.has(frame.runId)) return;
   const previous = s.current.get(frame.runId) ?? emptyRun(frame.runId);
   const run = projectFrame(previous, frame, s.reportFrameError);
   if (run === previous) return;
@@ -136,7 +140,9 @@ async function hydrate(s: Store, runId: string, request: LoadRequest = {}): Prom
     // A load already in flight is awaited, and its failure is the caller's too rather than a cue to start another.
     const pending = s.loads.get(runId);
     if (pending) {
+      const read = s.reads.get(runId);
       await pending;
+      if (s.reads.get(runId) !== read) return;
       continue;
     }
     const run = s.current.get(runId);
@@ -146,17 +152,22 @@ async function hydrate(s: Store, runId: string, request: LoadRequest = {}): Prom
 }
 
 function load(s: Store, runId: string, request: LoadRequest): Promise<void> {
-  const loading = loadPage(s, runId, request).finally(() => s.loads.delete(runId));
+  const loading = loadPage(s, runId, request).finally(() => {
+    if (s.loads.get(runId) === loading) s.loads.delete(runId);
+  });
   s.loads.set(runId, loading);
   return loading;
 }
 
 async function loadPage(s: Store, runId: string, request: LoadRequest): Promise<void> {
+  const read = Symbol();
+  s.reads.set(runId, read);
   s.hydrating.set(runId, []);
   // Frames for the run are asked for before its page, so none fall between the two.
   syncInterest(s);
   try {
     const page = await s.connection.call("events.page", { runId, ...request });
+    if (s.reads.get(runId) !== read) return;
     let run = emptyRun(runId);
     run.hydrated = true;
     run.fromTurn = page.fromTurn;
@@ -171,15 +182,19 @@ async function loadPage(s: Store, runId: string, request: LoadRequest): Promise<
     run.eventCount = page.events.length;
     run = replayBuffered(run, s.hydrating.get(runId) ?? [], page.events, s.reportFrameError);
     keepUnchanged(run, s.current.get(runId));
+    s.discarded.delete(runId);
     replace(s, run);
     forgetFailures(s, [runId]);
   } catch (error) {
+    if (s.reads.get(runId) !== read) return;
     s.published.setState(({ failed }) => ({ failed: new Set(failed).add(runId) }));
     throw error;
   } finally {
-    s.hydrating.delete(runId);
-    syncInterest(s);
-    flush(s);
+    if (s.reads.get(runId) === read) {
+      s.hydrating.delete(runId);
+      syncInterest(s);
+      flush(s);
+    }
   }
 }
 
@@ -258,11 +273,29 @@ function drop(s: Store, runId: string): void {
   syncInterest(s);
 }
 
+/** A lost authority removes content immediately and fences pages and frames already on their way. */
+function forget(s: Store, runIds: readonly string[]): void {
+  for (const id of runIds) {
+    s.discarded.add(id);
+    s.reads.delete(id);
+    s.loads.delete(id);
+    s.hydrating.delete(id);
+    clearTimeout(s.evictions.get(id));
+    s.evictions.delete(id);
+    drop(s, id);
+  }
+  forgetFailures(s, runIds);
+  syncInterest(s);
+  flush(s);
+}
+
 /** Empties the store, for tests and fixtures, and for a client that moves to another core. */
 function reset(s: Store): void {
   s.current = new Map();
   s.hydrating.clear();
   s.loads.clear();
+  s.reads.clear();
+  s.discarded.clear();
   for (const timer of s.evictions.values()) clearTimeout(timer);
   s.evictions.clear();
   s.holds.clear();
@@ -355,6 +388,8 @@ export function createRunStore(connection: CoreConnection, scheduleFrame: (callb
     scheduled: false,
     hydrating: new Map(),
     loads: new Map(),
+    reads: new Map(),
+    discarded: new Set(),
     holds: new Map(),
     evictions: new Map(),
     interest: new Set(),
@@ -366,6 +401,7 @@ export function createRunStore(connection: CoreConnection, scheduleFrame: (callb
       hydrate: (runId: string, request?: LoadRequest) => hydrate(s, runId, request),
       retain: (runIds: readonly string[]) => retain(s, runIds),
       resync: (runIds?: readonly string[]) => resync(s, runIds),
+      forget: (runIds: readonly string[]) => forget(s, runIds),
       applyFrame: (frame: Frame) => applyFrame(s, frame),
       seed: (run: RunTranscript) => seed(s, run),
       reset: () => reset(s),

@@ -41,7 +41,8 @@ import { useOrclingChatIds } from "../lib/orclings";
 import { useSpaceRpc as useRpc, useSpaceRpcs as useRpcs } from "../lib/space-queries";
 import { useRouter } from "../lib/router";
 import { useUi } from "../lib/ui";
-import { ChevronRight, FolderPlus, Search } from "./icons";
+import { ChevronRight, Search } from "./icons";
+import { OrganizationAddProject } from "./OrganizationAddProject";
 import { ResolvedDrawer, useResolveThread, useThreadDrop } from "./SidebarResolved";
 import { ListEdgeLines, useListEdges, type EdgeCall } from "./SidebarListEdge";
 import { SidebarListHead } from "./SidebarListHead";
@@ -173,6 +174,7 @@ function useThreadList(children: ChildPages) {
 type ThreadList = ReturnType<typeof useThreadList>;
 
 function ListFeedback({ state, shown, snoozed }: { state: ThreadList; shown: number; snoozed: number }) {
+  const organization = useSpaceNavigation((state) => Boolean(state.current && state.current !== state.personal));
   const { projects, queries, pages, pinnedOnly, pending } = state;
   if (projects.isError) return null;
   const hasMore = pages.some((page) => page.hasMore);
@@ -187,7 +189,7 @@ function ListFeedback({ state, shown, snoozed }: { state: ThreadList; shown: num
   // Every project keeps its label, empty or not, so the list comes up empty only with no projects or under the pinned filter.
   if (shown || snoozed || hasMore) return null;
   if (pinnedOnly) return <p className="browser-empty">No pinned threads.</p>;
-  return projects.data?.length === 0 ? <p className="browser-empty">No projects yet.</p> : null;
+  return projects.data?.length === 0 ? <p className="browser-empty">{organization ? "No projects available" : "No projects yet."}</p> : null;
 }
 
 /** The list's parts from its pages: pins, the rest, snoozed threads apart, and Resolved. */
@@ -415,13 +417,7 @@ function ProjectsFailed({ projects }: { projects: ThreadList["projects"] }) {
  * filter. With no project yet, Add project alone.
  */
 function ListTools({ empty, workspaces }: { empty: boolean; workspaces: readonly GroupProject[] }) {
-  const add = (
-    <Tooltip label="Add project">
-      <IconButton size="xs" aria-label="Add project" className="no-drag" onClick={() => useUi.getState().setImportProject(true)}>
-        <FolderPlus size={16} />
-      </IconButton>
-    </Tooltip>
-  );
+  const add = <OrganizationAddProject />;
   if (empty) return add;
   return (
     <>

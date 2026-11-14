@@ -249,7 +249,7 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
   const hosted = new StandInThreads(() => [...[...peers].filter((peer) => !peer.waiting), ...sockets], admitTurn, spaces);
   const signInWrites = new StandInSignIns(signIns);
   const tell = tellOf(peers, sockets);
-  const organizations = organizationReads(options, spaces, people, billing, tell);
+  const organizations = organizationReads(options, spaces, people, billing, tell, (space) => hosted.accessChanged(space));
   const github = new StandInGithub(spaces, (who) => tell(who, ["projects", "github"]));
   const payments = new StandInPayments(billing, tell, () => `http://127.0.0.1:${port}`);
   const personal = personRoutes(signInWrites, payments);
@@ -514,6 +514,7 @@ function organizationReads(
   people: Map<string, { name: string; image: string | null }>,
   billing: Map<string, StandInBilling>,
   tell: (who: string, topics: string[], space?: string) => void,
+  accessChanged: (space: string) => void,
 ) {
   return new StandInOrganizations({
     spaces,
@@ -521,6 +522,7 @@ function organizationReads(
     person: (email) => people.get(email) ?? { name: nameFromEmail(email), image: null },
     pro: (email) => billing.get(email)?.pro ?? false,
     tell,
+    accessChanged,
     now: options.now ?? Date.now,
   });
 }

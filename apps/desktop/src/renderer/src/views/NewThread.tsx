@@ -44,7 +44,7 @@ const SWITCH_READS_MS = 250;
 /** Project changes remount the composer so prompt, target and image drafts move together. */
 export function NewThread({ projectId }: { projectId?: string }) {
   const personal = useSpaceNavigation((state) => !state.current || state.current === state.personal);
-  const projects = useSpaceProjects();
+  const projects = useSpaceProjects(false, true);
   const home = useRpc("workspace.get", {});
   // The project the screen was opened for, else the one the sidebar's filter focuses, else the last one chosen here.
   const focused = useLayout(focusedProject);
@@ -74,7 +74,8 @@ export function NewThread({ projectId }: { projectId?: string }) {
   useEffect(() => () => void switching.current++, []);
   const switchProject = (id: string) => {
     const turn = ++switching.current;
-    const reads = Promise.all([loadProjectGit(id), loadProjectActivity(id)]);
+    const local = projects.data?.some((project) => project.id === id && !project.rootPath) !== true;
+    const reads = local ? Promise.all([loadProjectGit(id), loadProjectActivity(id)]) : Promise.resolve();
     void Promise.race([reads, new Promise((resolve) => setTimeout(resolve, SWITCH_READS_MS))])
       .catch(() => undefined)
       .then(() => {
@@ -144,7 +145,7 @@ function NewThreadProject({
   const spaceId = useSpaceNavigation((state) => state.current);
   const cloudOnly = Boolean(spaceId && projects?.some((project) => project.id === projectId && !project.rootPath));
   const isWorkspace = projectId === WORKSPACE_ID;
-  const git = useProjectGit(projectId);
+  const git = useProjectGit(cloudOnly ? null : projectId);
   const [draft, setDraft] = useState(() => readNewThreadDraft(projectId));
   const orclings = useOrclings();
   // An Orcling runs on its own account; the account chosen here is for models.

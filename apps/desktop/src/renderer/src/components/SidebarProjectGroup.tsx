@@ -8,8 +8,9 @@ import { dismissCompactNavigation } from "../lib/compact-navigation";
 import { cn } from "../lib/cn";
 import { newThread, openProject } from "../lib/router";
 import { useUi } from "../lib/ui";
+import { useProjectAccess } from "../lib/project-access";
 import { floatingGround } from "../lib/use-anchor-ground";
-import { ChevronRight, Image as ImageIcon, MoreHorizontal, PenSquare, Plus, Settings, X } from "./icons";
+import { ChevronRight, Image as ImageIcon, MoreHorizontal, PenSquare, People, Plus, Settings, X } from "./icons";
 import { menuItem, menuItemDanger, menuPopup, menuSeparator } from "./menu";
 import { ProjectIconChooser, ProjectLogo } from "./ProjectIconPicker";
 import { RemoveProjectDialog } from "./ProjectMenu";
@@ -71,7 +72,7 @@ export function SidebarProjectGroup({
             {waiting ? <span className="sidebar-count tabular">{waiting}</span> : null}
           </ContextMenu.Trigger>
         </ProjectActions>
-        {project.cloud ? null : (
+        {project.cloud && !actions.organization ? null : (
           <div className="sidebar-project-tools">
             {project.id !== WORKSPACE_ID ? <ProjectMoreMenu project={project} actions={actions} /> : null}
             <Tooltip label="New thread">
@@ -99,43 +100,52 @@ type ProjectDialogs = ReturnType<typeof useProjectDialogs>;
 
 /** The dialogs a project's actions open, shared by its label's right click and the More button at its end. */
 function useProjectDialogs(project: GroupProject, anchor: RefObject<HTMLButtonElement | null>) {
+  const access = useProjectAccess(project.id);
   const [choosing, setChoosing] = useState(false);
   const [removing, setRemoving] = useState(false);
   const own = project.id !== WORKSPACE_ID;
   return {
+    organization: access.organization,
+    access: access.open,
     choose: () => setChoosing(true),
     remove: () => setRemoving(true),
     dialogs: (
       <>
         {own && project.rootPath ? <ProjectIconChooser rootPath={project.rootPath} open={choosing} onOpenChange={setChoosing} anchor={anchor} /> : null}
         {removing ? <RemoveProjectDialog project={project} onClose={() => setRemoving(false)} /> : null}
+        {access.dialog}
       </>
     ),
   };
 }
 
 /** Every action a project has, as menu items: a new thread or task there, its icon, its settings and its removal. */
-function ProjectMenuItems({ project, parts: M, onChoose, onRemove }: { project: GroupProject; parts: MenuParts; onChoose: () => void; onRemove: () => void }) {
+function ProjectMenuItems({ project, parts: M, actions }: { project: GroupProject; parts: MenuParts; actions: ProjectDialogs }) {
   const own = project.id !== WORKSPACE_ID;
   return (
     <>
       <M.Item className={menuItem} onClick={() => startThread(project.id)}>
         <PenSquare size={13} /> New thread
       </M.Item>
-      {own ? (
+      {actions.access ? (
+        <M.Item className={menuItem} onClick={actions.access}>
+          <People size={13} /> Project access…
+        </M.Item>
+      ) : null}
+      {own && !project.cloud ? (
         <>
           <M.Item className={menuItem} onClick={() => useUi.getState().openNewTask(project.id)}>
             <Plus size={13} /> New task
           </M.Item>
           <M.Separator className={menuSeparator} />
-          <M.Item className={menuItem} disabled={!project.rootPath} onClick={onChoose}>
+          <M.Item className={menuItem} disabled={!project.rootPath} onClick={actions.choose}>
             <ImageIcon size={13} /> Choose icon…
           </M.Item>
           <M.Item className={menuItem} onClick={() => openProject(project.id)}>
             <Settings size={13} /> Project settings
           </M.Item>
           <M.Separator className={menuSeparator} />
-          <M.Item className={menuItemDanger} onClick={onRemove}>
+          <M.Item className={menuItemDanger} onClick={actions.remove}>
             <X size={13} /> Remove project…
           </M.Item>
         </>
@@ -147,13 +157,13 @@ function ProjectMenuItems({ project, parts: M, onChoose, onRemove }: { project: 
 /** The project's actions on its label's right click, or the context menu key while the label has focus. */
 function ProjectActions({ project, actions, children }: { project: GroupProject; actions: ProjectDialogs; children: ReactNode }) {
   return (
-    <ContextMenu.Root disabled={project.cloud}>
+    <ContextMenu.Root disabled={project.cloud && !actions.organization}>
       {children}
       <ContextMenu.Portal>
         <CoversPreview />
         <ContextMenu.Positioner collisionPadding={8} className="z-40">
           <ContextMenu.Popup ref={floatingGround} className={menuPopup}>
-            <ProjectMenuItems project={project} parts={ContextMenu as unknown as MenuParts} onChoose={actions.choose} onRemove={actions.remove} />
+            <ProjectMenuItems project={project} parts={ContextMenu as unknown as MenuParts} actions={actions} />
           </ContextMenu.Popup>
         </ContextMenu.Positioner>
       </ContextMenu.Portal>
@@ -172,7 +182,7 @@ function ProjectMoreMenu({ project, actions }: { project: GroupProject; actions:
         <CoversPreview />
         <Menu.Positioner sideOffset={4} align="start" collisionPadding={8} className="z-40">
           <Menu.Popup ref={floatingGround} className={menuPopup}>
-            <ProjectMenuItems project={project} parts={Menu as unknown as MenuParts} onChoose={actions.choose} onRemove={actions.remove} />
+            <ProjectMenuItems project={project} parts={Menu as unknown as MenuParts} actions={actions} />
           </Menu.Popup>
         </Menu.Positioner>
       </Menu.Portal>

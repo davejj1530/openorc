@@ -74,12 +74,15 @@ export const wireInvitation = z.object({
 });
 
 const settings = z.object({ name: z.string(), logo: z.string().nullable(), activityDays: z.union([z.literal(30), z.literal(90), z.literal(180), z.literal(365)]) });
+const projectAccess = z.object({ projectId: id, everyone: z.boolean(), memberIds: z.array(id) });
 const github = z.object({ configured: z.boolean(), installations: z.array(z.object({ id, accountLogin: z.string(), accountType: z.enum(["User", "Organization"]), suspended: z.boolean() })) });
 const repositories = z.array(z.object({ installationId: id, repoId: z.number().int().positive(), fullName: z.string(), defaultBranch: z.string(), private: z.boolean() }));
 const route = <T>(method: Route<T>["method"], path: string, reply: z.ZodType<T>): Route<T> => ({ method, path, reply });
 const get = <T>(path: string, reply: z.ZodType<T>): Route<T> => ({ method: "GET", path, reply });
 const empty = (method: Route<null>["method"], path: string): Route<null> => ({ method, path, reply: null });
 export const SPACE_ROUTES = {
+  projectAccess: (projectId: string) => get(`/projects/${encodeURIComponent(projectId)}/access`, projectAccess),
+  setProjectAccess: (projectId: string) => route("PUT", `/projects/${encodeURIComponent(projectId)}/access`, projectAccess),
   leaveOrganization: empty("POST", "/organization/leave"),
   deleteOrganization: empty("DELETE", "/settings/organization"),
   setMemberRole: (memberId: string) => route("PATCH", `/organization/members/${encodeURIComponent(memberId)}`, wireMembership),

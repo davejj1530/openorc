@@ -1,9 +1,11 @@
 import type { Project, RpcMethod, RpcParams, SpaceProject, SpacesStatus, ThreadSummary } from "@openorc/protocol";
+import { WORKSPACE_ID } from "@openorc/protocol";
 import type { RpcQueryOptions } from "@openorc/client";
 import { useEffect } from "react";
 import { useRpc, useRpcs } from "./client";
 import { core } from "./rpc";
 import { spaceNavigation, useSpaceNavigation } from "./space-navigation";
+import { purgeSpaceAccess } from "./space-access";
 
 const SCOPED = new Set<RpcMethod>(["threads.list", "threads.resolvedCount", "threads.search", "tasks.list"]);
 
@@ -44,18 +46,26 @@ export function useSpaceRpcs<M extends RpcMethod>(method: M, params: readonly Rp
 
 /** Direct ID reads keep their wire shape; this window supplies the project's scoped presentation. */
 export function useSpaceThread(id: string, options?: RpcQueryOptions<"threads.get">) {
-  const result = useRpc("threads.get", { id }, options);
-  const projectId = useSpaceNavigation((state) => state.inventory.find((space) => space.id === state.current)?.threads.find((thread) => thread.id === id)?.projectId);
-  return { ...result, data: result.data && projectId ? { ...result.data, projectId } : result.data };
+  const unavailable = useUnavailableThread(id);
+  const result = useRpc("threads.get", { id }, { ...options, ...(unavailable && { enabled: false }) });
+  const known = useSpaceNavigation((state) => state.inventory.find((space) => space.id === state.current)?.threads.find((thread) => thread.id === id));
+  const awaitingAccess = !unavailable && result.isSuccess && result.data === null && known?.owner?.brain === "hosted";
+  const data = result.data && known?.projectId ? { ...result.data, projectId: known.projectId } : result.data;
+  return { ...result, awaitingAccess, knownTitle: known?.title, data: unavailable ? null : data };
+}
+
+export function useUnavailableThread(id: string) {
+  return useSpaceNavigation((state) => state.inventory.find((space) => space.id === state.current)?.unavailable?.find((row) => row.id === id));
 }
 
 /** Cloud-only presentations read the core's project facade; no folder or local settings are invented here. */
-export function useSpaceProjects(localOnly = false) {
+export function useSpaceProjects(localOnly = false, includeDetached = false) {
   const current = useSpaceNavigation((state) => state.current);
+  const detached = useSpaceNavigation((state) => (includeDetached ? state.inventory.find((space) => space.id === state.current)?.detached?.projects : undefined));
   const local = useRpc("projects.list", {});
   const scoped = useRpc("spaces.projects", { spaceId: current ?? "" }, { enabled: current !== null });
   const remote = useRpcs("projects.get", current ? (scoped.data ?? []).filter((project) => !project.localProjectId).map((project) => ({ id: project.key })) : []);
-  const data = current ? projectData(scoped.data, local.data, remote) : local.data;
+  const data = current ? projectData(scoped.data && [...scoped.data, ...(detached ?? [])], local.data, remote) : local.data;
   const queries = current ? [local, scoped, ...remote] : [local];
   return {
     ...local,
@@ -88,7 +98,7 @@ export async function reconcileSpaceNavigation(status: SpacesStatus, coreIdentit
     return;
   }
   if (status.state !== "ready") return;
-  const inventory = await Promise.all(
+  const listed = await Promise.all(
     status.spaces.map(async (space) => ({
       id: space.id,
       personal: space.kind === "personal",
@@ -98,6 +108,11 @@ export async function reconcileSpaceNavigation(status: SpacesStatus, coreIdentit
     })),
   );
   if (turn !== reading) return;
+  const inventory = listed.map((space) => ({
+    ...space,
+    threads: space.threads.filter((row) => (space.personal && row.projectId === WORKSPACE_ID) || space.projects.some((project) => project.key === row.projectId)),
+  }));
   const key = `openorc.spaces.v1:${encodeURIComponent(coreIdentity)}:${encodeURIComponent(status.apiOrigin)}:${encodeURIComponent(status.userId)}`;
+  if (spaceNavigation.getState().key === key) purgeSpaceAccess(spaceNavigation.getState().inventory, inventory);
   spaceNavigation.getState().initialize(key, status.personalSpaceId, inventory);
 }

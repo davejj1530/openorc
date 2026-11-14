@@ -239,6 +239,10 @@ Create organization and Edit organization share a 420px dialog with the built Cl
 
 People uses the shared list-page column with aligned Name, Plan and Role columns. Members see the same Pro facts as admins. The sole admin's own role is plain Admin; with another admin present, it becomes the normal role picker. A successful self-demotion immediately removes admin controls. More holds Edit organization, Leave organization and Delete organization with the appropriate permissions. Pending invitations are absent when there are none. Leaving or deleting restores Personal; removing someone keeps People open.
 
+Project access opens from the project menu for organization admins. Its 520px dialog offers Everyone or Only people you choose; admins stay checked and cannot be unchecked. Chosen people remain remembered when Everyone is selected. A member with no projects sees the organization, “An admin needs to give you access to a project.” and People, with no Add project control.
+
+When project access goes, its group and rows leave under the sidebar’s hold-still rule. An open cloud tab retains its title and position; the conversation and composer give way to the same quiet organization state, saying “You no longer have access to this project.” with People. Access returning restores the conversation in that tab. Open local conversations stay usable, including running turns, until closed or the space changes; their folders and rows belong in Personal. New thread aimed at a retained local folder offers this Mac’s places only. Project-scoped Tasks and Pull requests fall back to the space’s all-projects scope without a notice.
+
 Responsive rules:
 
 - At 900px and narrower, the sidebar floats over the page on its opaque ground with `--shadow-overlay`. Opening a destination dismisses it; switching between Threads and Orclings keeps it open.

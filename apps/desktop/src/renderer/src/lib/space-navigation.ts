@@ -7,6 +7,7 @@ import { useLayout } from "./layout";
 import { useUi } from "./ui";
 import { navigationScope } from "./navigation-scope";
 import { globalDestination } from "./global-navigation";
+import { retainUnavailable } from "./space-access";
 import { emptySpaceView, observeSpaceThreads, readSpaceRecord, validSpaceView, type SpaceInventory, type SpaceView } from "./space-view";
 
 interface Dependencies {
@@ -78,6 +79,7 @@ export function createSpaceNavigation(deps: Dependencies) {
         const space = get().inventory.find((space) => space.id === id);
         if (!space) return;
         get().remember();
+        departDetachedSpace(get(), id, set, save);
         restore(id, validSpaceView(get().views[id], space));
       },
       remember() {
@@ -87,7 +89,9 @@ export function createSpaceNavigation(deps: Dependencies) {
         const captured = deps.capture(ownership);
         // Settings is global and must not replace the organization's destination.
         if (isGlobal(deps, captured)) return;
-        const view = validSpaceView(captured, space);
+        const updated = retainUnavailable(inventory, inventory, { ...get().views, [current]: captured }, current);
+        if (JSON.stringify(updated) !== JSON.stringify(inventory)) set({ inventory: updated });
+        const view = validSpaceView(captured, updated.find((space) => space.id === current) ?? space);
         set({ views: { ...get().views, [current]: view } });
         save(current, view);
       },
@@ -102,6 +106,7 @@ export function createSpaceNavigation(deps: Dependencies) {
       },
       reconcile(inventory) {
         get().remember();
+        inventory = retainUnavailable(get().inventory, inventory, get().views, get().current);
         const views = Object.fromEntries(inventory.map((space) => [space.id, validSpaceView(get().views[space.id], space)]));
         const current = inventory.some((space) => space.id === get().current) ? get().current! : get().personal;
         set({ inventory, views });
@@ -128,6 +133,15 @@ export function createSpaceNavigation(deps: Dependencies) {
     };
   });
   return store;
+}
+
+function departDetachedSpace(state: Navigation, id: string, set: (value: Partial<Navigation>) => void, save: (id: string, view: SpaceView) => void): void {
+  const previous = state.inventory.find((space) => space.id === state.current);
+  if (id === state.current || !previous?.detached) return;
+  const { detached: _detached, ...clean } = previous;
+  const view = validSpaceView(state.views[previous.id], clean);
+  set({ inventory: state.inventory.map((space) => (space.id === previous.id ? clean : space)), views: { ...state.views, [previous.id]: view } });
+  save(previous.id, view);
 }
 
 const isGlobal = (deps: Dependencies, view: SpaceView) => ["settings", "onboarding", "orcling"].includes(view.destination.view) || deps.global?.(view.destination) === true;

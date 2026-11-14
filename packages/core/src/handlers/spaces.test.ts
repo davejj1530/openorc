@@ -9,11 +9,22 @@ it("answers unavailable without inventing a personal organization", () => {
 });
 
 it("keeps organization methods off the phone and validates scope and pagination at dispatch", () => {
-  for (const method of ["spaces.status", "spaces.projects", "organization.people", "organization.leave", "organization.delete", "organization.member.setRole", "organization.member.remove"])
+  for (const method of [
+    "spaces.status",
+    "spaces.projects",
+    "organization.people",
+    "organization.leave",
+    "organization.delete",
+    "organization.member.setRole",
+    "organization.member.remove",
+    "organization.project.access",
+    "organization.project.setAccess",
+  ])
     expect(isRemoteMethod(method)).toBe(false);
   expect(rpcParams["spaces.projects"].safeParse({ spaceId: "" }).success).toBe(false);
   expect(rpcParams["organization.people"].safeParse({ spaceId: "org", limit: 101 }).success).toBe(false);
   expect(rpcParams["organization.people"].safeParse({ spaceId: "org", offset: 0, limit: 100 }).success).toBe(true);
   expect(rpcParams["organization.member.setRole"].safeParse({ spaceId: "org", memberId: "member", role: "owner" }).success).toBe(false);
   expect(rpcParams["organization.member.remove"].safeParse({ spaceId: "org", memberId: "" }).success).toBe(false);
+  expect(rpcParams["organization.project.setAccess"].safeParse({ spaceId: "org", projectId: "project", everyone: false, memberIds: ["member", "member"] }).success).toBe(false);
 });

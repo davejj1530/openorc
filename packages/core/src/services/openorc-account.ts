@@ -97,25 +97,48 @@ function sessionStore(secrets: ProtectedSecretStore | undefined): { load(): Prom
 }
 
 /** `socket.io-client` on the websocket transport alone, as the server offers, with the token in the handshake's `auth`. */
-function liveSocket(url: string, token: string): LiveSocket {
+export function liveSocket(url: string, token: string): LiveSocket {
   const socket = io(url, { transports: ["websocket"], auth: { token }, extraHeaders: { [ACCOUNT_PROTOCOL_HEADER]: String(ACCOUNT_PROTOCOL_VERSION) }, reconnectionDelayMax: 60_000 });
   let retry: ReturnType<typeof setTimeout> | null = null;
+  let closed = false;
   const listeners: ((state: "up" | "down" | "refused") => void)[] = [];
   const emit = (state: "up" | "down" | "refused") => listeners.forEach((listener) => listener(state));
-  socket.on("connect", () => emit("up"));
-  socket.on("disconnect", () => emit("down"));
+  const clearRetry = () => {
+    if (retry) clearTimeout(retry);
+    retry = null;
+  };
+  const reconnect = (delay: number) => {
+    if (closed || retry || socket.active) return;
+    retry = setTimeout(() => {
+      retry = null;
+      if (!closed) socket.connect();
+    }, delay);
+  };
+  socket.on("connect", () => {
+    clearRetry();
+    emit("up");
+  });
+  socket.on("disconnect", (reason) => {
+    emit("down");
+    // Membership changes force a new handshake with the remaining spaces.
+    if (reason === "io server disconnect") reconnect(0);
+  });
   socket.on("connect_error", (error) => {
-    if (error.message === "UNAUTHORIZED") return emit("refused");
+    if (error.message === "UNAUTHORIZED") {
+      clearRetry();
+      return emit("refused");
+    }
     emit("down");
     // A refusal from the server's handshake stops the client's own retries; the network's errors do not.
-    if (!socket.active) retry = setTimeout(() => socket.connect(), RETRY_MS);
+    reconnect(RETRY_MS);
   });
   return {
     onState: (listener) => void listeners.push(listener),
     on: (event, listener) => void socket.on(event, listener),
     ask: (event, body) => socket.timeout(ASK_MS).emitWithAck(event, body) as Promise<unknown>,
     close: () => {
-      if (retry) clearTimeout(retry);
+      closed = true;
+      clearRetry();
       socket.close();
     },
   };

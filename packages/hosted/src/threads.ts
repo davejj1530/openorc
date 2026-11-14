@@ -23,10 +23,11 @@ import {
   type ThreadSummary,
 } from "@openorc/protocol";
 import { z } from "zod";
+import { ANSWERS, NOT_YET } from "./thread-answers.js";
 import type { HostedDeps, HostedThreads, MergedMethod, PlacePage } from "./index.js";
 import { READ_LIMIT, type Follower } from "./follow.js";
 import type { Account } from "./account.js";
-import type { Spaces } from "./spaces.js";
+import type { SpaceCatalog, Spaces } from "./spaces.js";
 import { spaceProjects } from "./space-projects.js";
 import { AccountCache } from "./account-cache.js";
 import { askNotice, endNotice, noticed } from "./notices.js";
@@ -65,126 +66,6 @@ type ThreadsDeps = { session: Session; spaces: Spaces; follower: Follower; accou
   "server" | "kept" | "projects" | "push" | "notify" | "now" | "log"
 >;
 
-type Answer<M extends RoutedMethod> = (threads: Threads, params: RpcParams<M>) => Promise<RpcResults[M]> | RpcResults[M];
-
-/** A call a hosted thread does not take, with the words the person reads. */
-const refused = (words: string) => ({ refused: words }) as const;
-/** A call the core's router never asks a place: it names a task, which no place holds, or is this Mac's own to answer. */
-const NOT_ASKED = { notAsked: true } as const;
-
-const NOT_YET = refused("This isn't on OpenOrc Cloud yet.");
-const NO_FILES = refused("An OpenOrc Cloud thread's files aren't on this Mac.");
-const STAYS = refused("An OpenOrc Cloud thread stays on OpenOrc Cloud.");
-
-/**
- * What a hosted thread does with each of the app's calls that name a thread, a run or a task: answers it, refuses it in
- * words, or is never asked it. Total over `RoutedMethod`, so a new such call does not compile until someone decides.
- */
-const ANSWERS: { [M in RoutedMethod]: Answer<M> | ReturnType<typeof refused> | typeof NOT_ASKED } = {
-  "threads.get": (threads, { id }) => threads.summary(id),
-  "runs.listForThread": (threads, { threadId }) => toRuns(threads.row(threadId), threads.reach),
-  "events.page": (threads, params) => threads.page(params),
-  "events.listForRun": (threads, { runId, afterSeq }) => threads.eventsAfter(runId, afterSeq ?? 0),
-  "threads.stopCommand": (threads, { id, commandId }) => threads.stopCommand(id, commandId),
-  "threads.update": (threads, { id, patch }) => threads.update(id, patch),
-  // Asked only of a start that chose OpenOrc Cloud.
-  "threads.start": (threads, params) => threads.startThread(params),
-  // The composer's sends, the queue, Stop and the answers to asks: sends.ts.
-  "runs.start": async (threads, params) => {
-    await sends.start(threads.calls, params);
-    return toRuns(threads.row(params.threadId!), threads.reach)[0]!;
-  },
-  "runs.send": (threads, params) => sends.send(threads.calls, params).then(() => null),
-  "threads.queue": (threads, params) => sends.queue(threads.calls, params),
-  "threads.unqueue": (threads, params) => sends.unqueue(threads.calls, params),
-  "threads.sendQueued": (threads, params) => sends.sendQueued(threads.calls, params),
-  "runs.interrupt": (threads, params) => sends.stop(threads.calls, params).then(() => null),
-  "approvals.resolve": (threads, params) => sends.answer(threads.calls, params).then(() => null),
-  "threads.ready": (threads, params) => sends.ready(threads.calls, threads.readied, params).then(() => null),
-  // Reads the thread view makes as it opens, for parts the server does not serve yet: their empty answers.
-  "threads.messages": () => [],
-  "threads.lastMessage": () => null,
-  "threads.plans": () => [],
-  "threads.checkpoints": () => [],
-  "orclings.reactions": () => [],
-  "review.comments.list": () => [],
-  "tasks.list": () => [],
-  // The server keeps a thread's changes (GET /hosted/threads/:id/changes); they are drawn here once translated.
-  "review.threadDiff": () => ({ baseSha: null, patch: "", files: [], since: null }),
-
-  "threads.delete": (threads, { id }) => threads.remove(id),
-  "threads.implementPlan": NOT_YET,
-  "threads.exportPlan": NOT_YET,
-  "threads.switchClaudeAccount": refused("An OpenOrc Cloud thread runs on your Claude sign-in there."),
-  "threads.compact": NOT_YET,
-  "threads.send": NOT_YET,
-  "threads.turnChanges": NOT_YET,
-  "threads.fork": NOT_YET,
-  "subagents.stop": NOT_YET,
-  "runs.close": NOT_YET,
-  "events.toolOutput": NOT_YET,
-  "tasks.create": NOT_YET,
-  "orclings.ask": NOT_YET,
-  "orclings.assign": NOT_YET,
-  "orclings.react": NOT_YET,
-  "orclings.origins": NOT_YET,
-  "orclings.groups.send": NOT_YET,
-  "orclings.groups.delete": NOT_YET,
-  "review.comments.add": NOT_YET,
-  "review.comments.remove": NOT_YET,
-  "review.comments.send": NOT_YET,
-  "review.threadChanges": NOT_YET,
-  "review.threadFileDiff": NOT_YET,
-  "review.commitThread": NOT_YET,
-  "review.pushThread": NOT_YET,
-  "review.createThreadPr": NOT_YET,
-  "review.threadPrTemplate": NOT_YET,
-  "git.threadLog": NO_FILES,
-  "git.commitRange": NO_FILES,
-  "git.threadPushState": NO_FILES,
-  "threads.moveWorkspace": NO_FILES,
-  "threads.movePreview": NO_FILES,
-  "threads.restore": NO_FILES,
-  "threads.restorePreview": NO_FILES,
-  "cloud.move": STAYS,
-
-  "cloud.bringToMac": NOT_ASKED,
-  "cloud.keep": NOT_ASKED,
-  "cloud.openOnMac": NOT_ASKED,
-  "cloud.closeOnMac": NOT_ASKED,
-  "threads.snapshot": NOT_ASKED,
-  "instructions.list": NOT_ASKED,
-  "instructions.save": NOT_ASKED,
-  "preview.state": NOT_ASKED,
-  "mcpApps.open": NOT_ASKED,
-  "tasks.get": NOT_ASKED,
-  "tasks.update": NOT_ASKED,
-  "tasks.delete": NOT_ASKED,
-  "tasks.start": NOT_ASKED,
-  "tasks.openThread": NOT_ASKED,
-  "tasks.executionThread": NOT_ASKED,
-  "tasks.prepareWorkspace": NOT_ASKED,
-  "tasks.comments.list": NOT_ASKED,
-  "tasks.comments.post": NOT_ASKED,
-  "tasks.comments.retry": NOT_ASKED,
-  "tasks.comments.cancel": NOT_ASKED,
-  "tasks.comments.execute": NOT_ASKED,
-  "runs.listForTask": NOT_ASKED,
-  "memory.forTask": NOT_ASKED,
-  "workspace.cleanup": NOT_ASKED,
-  "workspace.removalImpact": NOT_ASKED,
-  "workspace.usage": NOT_ASKED,
-  "review.diff": NOT_ASKED,
-  "review.snapshots": NOT_ASKED,
-  "review.markReviewed": NOT_ASKED,
-  "review.commit": NOT_ASKED,
-  "review.checkoutState": NOT_ASKED,
-  "review.exportPatch": NOT_ASKED,
-  "review.push": NOT_ASKED,
-  "review.createPr": NOT_ASKED,
-  "git.log": NOT_ASKED,
-};
-
 export class Threads implements HostedThreads {
   readonly #cache: AccountCache<Heard>;
   #generation = -1;
@@ -193,6 +74,8 @@ export class Threads implements HostedThreads {
   #reading: Promise<void> | null = null;
   #again: Promise<void> | null = null;
   #closed = false;
+  #revision = 0;
+  readonly #tickets = new Map<string, symbol>();
   /** The run states last announced to windows. A row can change these before any agent event arrives. */
   #toldRuns = new Map<string, ReturnType<typeof toRuns>>();
   /** When the person last asked each thread to be ready, so a thread is asked at most once a minute. */
@@ -214,7 +97,10 @@ export class Threads implements HostedThreads {
     deps.session.onChange((change) => this.#changed(change));
     deps.session.onSocket(SOCKET.changed, (body) => {
       const topics = wireTopics.safeParse(body);
-      if (topics.success && topics.data.topics.some((topic) => topic === "threads" || topic === "projects" || topic === "members" || topic === "spaces")) void this.refresh();
+      if (topics.success && topics.data.topics.some((topic) => topic === "threads" || topic === "projects" || topic === "members" || topic === "spaces")) {
+        if (topics.data.topics.some((topic) => topic === "projects" || topic === "members" || topic === "spaces")) this.#revision++;
+        void this.refresh();
+      }
     });
   }
 
@@ -246,7 +132,7 @@ export class Threads implements HostedThreads {
   }
 
   async call<M extends RoutedMethod>(method: M, params: RpcParams<M>): Promise<RpcResults[M]> {
-    const entry = ANSWERS[method] as Answer<M> | ReturnType<typeof refused> | typeof NOT_ASKED;
+    const entry = ANSWERS[method];
     if (typeof entry === "function") return entry(this, params);
     throw new Refused("refused" in entry ? entry.refused : GONE);
   }
@@ -306,6 +192,8 @@ export class Threads implements HostedThreads {
     const heard = this.#heard;
     if (heard) {
       heard.rows = heard.rows.filter((row) => row.id !== threadId);
+      this.#tickets.delete(threadId);
+      this.deps.follower.forget([threadId]);
       delete heard.here[threadId];
       this.#save();
       this.#tell();
@@ -328,6 +216,7 @@ export class Threads implements HostedThreads {
     const body = { projectId: project.id, ...(params.title && { title: params.title }), settings, first: { id: crypto.randomUUID(), text: params.prompt }, ready: true };
     const reply = await this.deps.session.in(project.space).request(ROUTES.start, body);
     if (generation !== this.deps.session.generation) throw new Refused("Your OpenOrc session changed. Try again.");
+    if (!this.#heard?.projects.some((row) => row.id === project.id && row.space === project.space)) throw new Refused("You no longer have access to this project.");
     if (!reply.thread) return sends.refuse(this.calls, reply.first?.sent === false ? reply.first.refusal : "", settings);
     const row = { ...reply.thread, space: project.space };
     const heard = this.#heard;
@@ -374,7 +263,21 @@ export class Threads implements HostedThreads {
 
   /** Requests about a thread, made in its space; a rejection in words when the account no longer has it. */
   on(threadId: string): Requests {
-    return this.deps.session.in(this.row(threadId).space);
+    const request = this.deps.session.in(this.row(threadId).space);
+    const generation = this.deps.session.generation;
+    const ticket = this.#tickets.get(threadId) ?? Symbol();
+    this.#tickets.set(threadId, ticket);
+    const assert = () => {
+      if (generation !== this.deps.session.generation || this.#tickets.get(threadId) !== ticket || !this.#rows().has(threadId)) throw new Refused("You no longer have access to this project.");
+    };
+    return {
+      request: async (route, body) => {
+        assert();
+        const result = await request.request(route, body);
+        assert();
+        return result;
+      },
+    };
   }
 
   summary(threadId: string, spaceId?: string): ThreadSummary {
@@ -398,7 +301,7 @@ export class Threads implements HostedThreads {
       fromTurn = Math.max(0, detail.turnEnds.length - params.turns);
     }
     const first = await space.request(ROUTES.events(threadId, { fromTurn }, READ_LIMIT));
-    const events = await this.#readOn(threadId, first.events, first.head);
+    const events = await this.#readOn(space, threadId, first.events, first.head);
     return { events: events.map((event) => toAppEvent(threadId, event)), fromTurn: first.fromTurn ?? fromTurn, live: runsNow(row, this.reach) };
   }
 
@@ -408,7 +311,7 @@ export class Threads implements HostedThreads {
     const space = this.on(threadId);
     await this.deps.follower.follow(threadId);
     const first = await space.request(ROUTES.events(threadId, { after }, READ_LIMIT));
-    const events = await this.#readOn(threadId, first.events, first.head);
+    const events = await this.#readOn(space, threadId, first.events, first.head);
     return events.map((event) => toAppEvent(threadId, event));
   }
 
@@ -420,11 +323,11 @@ export class Threads implements HostedThreads {
   }
 
   /** A page that came back full is read on until the head. */
-  async #readOn(threadId: string, events: WireEvent[], head: number): Promise<WireEvent[]> {
+  async #readOn(space: Requests, threadId: string, events: WireEvent[], head: number): Promise<WireEvent[]> {
     let read = events;
     let all = events;
     while (read.length === READ_LIMIT && (all.at(-1)?.seq ?? head) < head) {
-      read = (await this.on(threadId).request(ROUTES.events(threadId, { after: all.at(-1)!.seq }, READ_LIMIT))).events;
+      read = (await space.request(ROUTES.events(threadId, { after: all.at(-1)!.seq }, READ_LIMIT))).events;
       all = [...all, ...read];
     }
     return all;
@@ -459,6 +362,7 @@ export class Threads implements HostedThreads {
   async #read(): Promise<void> {
     const state = this.deps.session.state;
     const generation = this.deps.session.generation;
+    const revision = this.#revision;
     if (!state.signedIn) return;
     let read: Pick<Heard, "me" | "personal" | "rows" | "projects">;
     try {
@@ -468,10 +372,11 @@ export class Threads implements HostedThreads {
       return;
     }
     const now = this.deps.session.state;
-    if (this.#closed || !now.signedIn || this.deps.session.generation !== generation || now.email !== state.email) return;
+    if (this.#closed || !now.signedIn || this.deps.session.generation !== generation || now.email !== state.email || revision !== this.#revision) return;
     const before = JSON.stringify([this.#heard?.rows, this.#heard?.projects]);
     const projectsBefore = JSON.stringify(this.#heard?.projects);
     if (this.#heard?.email === state.email) this.#tellPerson(this.#heard.rows, read.rows);
+    this.#forgetRemoved(read.rows);
     this.#heard = { email: state.email, heardAt: this.deps.now(), ...read, here: this.#heard?.email === state.email ? this.#heard.here : {} };
     this.#save();
     if (JSON.stringify([this.#heard.rows, this.#heard.projects]) !== before) this.#tell();
@@ -479,10 +384,22 @@ export class Threads implements HostedThreads {
     if (JSON.stringify(this.#heard.projects) !== projectsBefore) this.deps.push({ type: "invalidate", keys: ["account"] });
   }
 
+  #forgetRemoved(rows: HeardRow[]): void {
+    const removed = this.#heard?.rows.filter((row) => !rows.some((next) => next.id === row.id)).map((row) => row.id) ?? [];
+    for (const id of removed) {
+      this.#tickets.delete(id);
+      if (this.#heard) delete this.#heard.here[id];
+    }
+    this.deps.follower.forget(removed);
+  }
+
   /** Every space's threads and projects, each tagged with its space, and the person's own id from their personal space. */
   async #readSpaces(): Promise<Pick<Heard, "me" | "personal" | "rows" | "projects">> {
+    const generation = this.deps.session.generation;
     await this.deps.spaces.refresh();
     const catalog = await this.deps.spaces.catalog();
+    if (generation !== this.deps.session.generation) throw new Refused("Your OpenOrc session changed. Try again.");
+    this.#restrict(catalog);
     const read = await Promise.allSettled(
       catalog.ids.map(async (id) => {
         const threads = await this.deps.session.in(id).request(ROUTES.threads);
@@ -494,7 +411,21 @@ export class Threads implements HostedThreads {
       if (answer.reason instanceof Refused && [403, 404].includes(answer.reason.status ?? 0)) return [];
       return this.#heard?.rows.filter((row) => row.space === catalog.ids[i]) ?? [];
     });
-    return { me: catalog.me, personal: catalog.personal, rows, projects: catalog.projects };
+    const visible = rows.filter((row) => !row.projectId || catalog.projects.some((project) => project.id === row.projectId && project.space === row.space));
+    return { me: catalog.me, personal: catalog.personal, rows: visible, projects: catalog.projects };
+  }
+
+  /** A confirmed project loss fences pending reads before the slower thread listings can return. */
+  #restrict(catalog: SpaceCatalog): void {
+    const heard = this.#heard;
+    if (!heard) return;
+    const rows = heard.rows.filter((row) => catalog.ids.includes(row.space) && (!row.projectId || catalog.projects.some((project) => project.id === row.projectId && project.space === row.space)));
+    if (rows.length === heard.rows.length) return;
+    this.#forgetRemoved(rows);
+    heard.rows = rows;
+    heard.projects = catalog.projects;
+    this.#save();
+    this.#tell();
   }
 
   /**
@@ -532,6 +463,7 @@ export class Threads implements HostedThreads {
       this.#generation = this.deps.session.generation;
       this.#reading = null;
       this.#again = null;
+      this.#tickets.clear();
       const state = this.deps.session.state;
       if (state.signedIn) this.#heard = this.#cache.load(state.email);
     }

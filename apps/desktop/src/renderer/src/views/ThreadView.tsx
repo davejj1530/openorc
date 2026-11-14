@@ -1,4 +1,4 @@
-import { useSpaceThread } from "../lib/space-queries";
+import { useSpaceThread, useUnavailableThread } from "../lib/space-queries";
 import { isSubagentThread } from "@openorc/protocol";
 import { useEffect, useRef, useState } from "react";
 import { Conversation } from "../components/Conversation";
@@ -9,12 +9,26 @@ import { useConversationPlans } from "../lib/conversation-plans";
 import { useLayout } from "../lib/layout";
 import { useReadWhileShown } from "../lib/read-while-shown";
 import { useRouter } from "../lib/router";
+import { UnavailableThread } from "./UnavailableThread";
+
+interface ThreadViewProps {
+  threadId: string;
+  first: boolean;
+  last: boolean;
+  focused: boolean;
+  onClose?: () => void;
+}
+
+export function ThreadView(props: ThreadViewProps) {
+  const unavailable = useUnavailableThread(props.threadId);
+  return unavailable ? <UnavailableThread title={unavailable.title} first={props.first} last={props.last} onClose={props.onClose} /> : <AccessibleThread {...props} />;
+}
 
 /**
  * A stable, thread-scoped conversation. The workspace owns the shared panel.
  */
 /** `first` and `last` say whether this pane's header starts or ends the work row, past any panel docked beside it. */
-export function ThreadView({ threadId, first, last, focused, onClose }: { threadId: string; first: boolean; last: boolean; focused: boolean; onClose?: () => void }) {
+function AccessibleThread({ threadId, first, last, focused, onClose }: ThreadViewProps) {
   const thread = useSpaceThread(threadId);
   const project = useRpc("projects.get", { id: thread.data?.projectId ?? "" }, { enabled: Boolean(thread.data) });
   const update = useRpcMutation("threads.update");
@@ -36,8 +50,10 @@ export function ThreadView({ threadId, first, last, focused, onClose }: { thread
   useReadWhileShown(t);
 
   useEffect(() => {
-    if (thread.isSuccess && !t) useRouter.getState().closeThreadPane(threadId);
-  }, [thread.isSuccess, t, threadId]);
+    if (thread.isSuccess && !thread.awaitingAccess && !t) useRouter.getState().closeThreadPane(threadId);
+  }, [thread.isSuccess, thread.awaitingAccess, t, threadId]);
+
+  if (thread.awaitingAccess) return <UnavailableThread title={thread.knownTitle ?? "Thread"} first={first} last={last} onClose={onClose} checking />;
 
   if (!t || !p) {
     return (

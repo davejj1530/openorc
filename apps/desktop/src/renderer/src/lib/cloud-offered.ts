@@ -21,8 +21,9 @@ export interface NewThreadCloud {
 }
 
 export function useNewThreadCloud(target: NewThreadTarget, projectId: string): NewThreadCloud {
+  const detached = useDetachedProject(projectId);
   const agent = target.kind === "model" ? targetModel(target)?.agent : null;
-  const shown = target.kind === "model";
+  const shown = target.kind === "model" && !detached;
   const offer = useRpc("cloud.offer", {}, { enabled: shown }).data;
   const blocked = shown ? cloudStartBlocked(offer, projectId, agent) : null;
   const provider = offer?.provider ?? null;
@@ -39,6 +40,7 @@ export interface NewThreadHosted {
 }
 
 export function useNewThreadHosted(target: NewThreadTarget, projectId: string): NewThreadHosted {
+  const detached = useDetachedProject(projectId);
   const account = useRpc("account.status", {}).data;
   const current = useSpaceNavigation((state) => state.current);
   const personal = useSpaceNavigation((state) => state.current === state.personal);
@@ -46,10 +48,14 @@ export function useNewThreadHosted(target: NewThreadTarget, projectId: string): 
   const choice = target.kind === "model" ? targetModel(target) : null;
   const scoped = scopedHostedAccount(account, current, projectId, project);
   const { shown, blocked } = hostedStart(scoped, { projectId, agent: choice?.agent ?? "", model: choice?.model ?? null });
-  const offered = shown && target.kind === "model" && projectId !== WORKSPACE_ID;
+  const offered = shown && target.kind === "model" && projectId !== WORKSPACE_ID && !detached;
   const scopeBlock: StartBlock | null = current && !personal && !project?.hostedProjectId ? { words: "This project isn't available in this space.", fix: null, reason: "No access" } : null;
   const denied = scopeBlock ?? blocked;
   return { shown: offered, blocked: denied, can: offered && choice !== null && !denied, hours: account?.state === "signed-in" ? account.hours : null };
+}
+
+function useDetachedProject(projectId: string): boolean {
+  return useSpaceNavigation((state) => Boolean(state.inventory.find((space) => space.id === state.current)?.detached?.projects.some((project) => project.key === projectId)));
 }
 
 function scopedHostedAccount(account: AccountStatus | undefined, current: string | null, projectId: string, project: SpaceProject | undefined): AccountStatus | undefined {

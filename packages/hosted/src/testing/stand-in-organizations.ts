@@ -1,5 +1,6 @@
 import { identityRoute } from "./stand-in-identity.js";
 import { membershipRoute } from "./stand-in-membership.js";
+import { projectAccessRoute } from "./stand-in-access.js";
 import { randomUUID } from "node:crypto";
 import { userOf, type StandInSpaces } from "./stand-in-spaces.js";
 
@@ -18,6 +19,7 @@ interface OrganizationDeps {
   person(email: string): { name: string; image: string | null };
   pro(email: string): boolean;
   tell(who: string, topics: string[], space?: string): void;
+  accessChanged(space: string): void;
   now(): number;
 }
 
@@ -36,12 +38,15 @@ export class StandInOrganizations {
   }
 
   async route(request: { method: string; path: string; query: URLSearchParams; space: string | null }, who: string, body: Record<string, unknown> = {}): Promise<Reply | null> {
+    const access = projectAccessRoute({ ...request, who, body, spaces: this.deps.spaces, accessChanged: this.deps.accessChanged, tell: this.deps.tell });
+    if (access) return access;
     const membership = membershipRoute({
       ...request,
       who,
       body,
       spaces: this.deps.spaces,
       tell: this.deps.tell,
+      accessChanged: this.deps.accessChanged,
       recipients: this.received.filter((invite) => invite.spaceId === request.space).map((invite) => invite.email),
     });
     if (membership) return membership;

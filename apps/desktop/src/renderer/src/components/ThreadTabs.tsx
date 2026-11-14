@@ -1,4 +1,4 @@
-import { useSpaceThread } from "../lib/space-queries";
+import { useSpaceThread, useUnavailableThread } from "../lib/space-queries";
 import { useCallback, useEffect, useLayoutEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 import { threadStatus } from "@openorc/client";
 import { isHarnessId, type ThreadSummary } from "@openorc/protocol";
@@ -23,7 +23,8 @@ import { IconButton, Tooltip } from "./ui";
 function TabFace({ tab, title }: { tab: ThreadTab; title?: ReactNode }) {
   const threadId = tab.route.view === "thread" ? tab.route.threadId : "";
   const read = useSpaceThread(threadId, { enabled: Boolean(threadId) });
-  const gone = Boolean(threadId) && read.isSuccess && read.data === null;
+  const unavailable = useUnavailableThread(threadId);
+  const gone = Boolean(threadId) && !unavailable && !read.awaitingAccess && read.isSuccess && read.data === null;
   useEffect(() => {
     if (gone) useThreadTabs.getState().close(tab.id);
   }, [gone, tab.id]);
@@ -39,7 +40,7 @@ function TabFace({ tab, title }: { tab: ThreadTab; title?: ReactNode }) {
   return (
     <>
       <TabGlyph thread={thread} />
-      <span className="work-tab-title">{title ?? thread?.title ?? "Thread"}</span>
+      <span className="work-tab-title">{title ?? unavailable?.title ?? thread?.title ?? read.knownTitle ?? "Thread"}</span>
     </>
   );
 }

@@ -33,14 +33,17 @@ export class Follower {
   readonly #joining = new Map<string, Promise<void>>();
   readonly #held = new Map<string, WireEvent[][]>();
   readonly #healing = new Map<string, Promise<void>>();
+  readonly #tickets = new Map<string, symbol>();
 
   /** `on`: requests about a thread, in its space. */
   constructor(private readonly deps: { session: Session; on(threadId: string): Requests } & Pick<HostedDeps, "push" | "log">) {
+    let generation = deps.session.generation;
     deps.session.onSocket(SOCKET.events, (body) => this.#onFrame(body));
     deps.session.onSocket(SOCKET.threadChanged, (body) => this.#onChanged(body));
     deps.session.onChange((change) => {
-      if (!deps.session.state.signedIn) this.forget();
+      if (!deps.session.state.signedIn || generation !== deps.session.generation) this.forget();
       else if (change === "connected") this.#rejoin();
+      generation = deps.session.generation;
     });
   }
 
@@ -52,36 +55,46 @@ export class Follower {
   async follow(threadId: string): Promise<void> {
     this.#renew(threadId);
     if (this.#joined.has(threadId)) return;
-    const joining = this.#joining.get(threadId) ?? this.#join(threadId);
+    const ticket = this.#tickets.get(threadId) ?? Symbol();
+    this.#tickets.set(threadId, ticket);
+    const joining = this.#joining.get(threadId) ?? this.#join(threadId, ticket);
     this.#joining.set(threadId, joining);
     await joining;
   }
 
-  /** Signed out: everything goes, cursors too. */
-  forget(): void {
-    for (const timer of this.#watched.values()) clearTimeout(timer);
-    this.#watched.clear();
-    this.#cursors.clear();
-    this.#joined.clear();
-    this.#held.clear();
+  /** Revocation or sign-out discards pending work as well as already joined rooms. */
+  forget(threadIds: readonly string[] = [...this.#tickets.keys()]): void {
+    for (const id of threadIds) {
+      clearTimeout(this.#watched.get(id));
+      this.#watched.delete(id);
+      this.#cursors.delete(id);
+      this.#joined.delete(id);
+      this.#held.delete(id);
+      this.#joining.delete(id);
+      this.#healing.delete(id);
+      this.#tickets.delete(id);
+    }
   }
 
-  async #join(threadId: string): Promise<void> {
+  async #join(threadId: string, ticket: symbol): Promise<void> {
     this.#held.set(threadId, []);
     try {
       const reply = await this.deps.session.ask(SOCKET.watch, threadId, wireWatched);
-      if (!reply.ok) return;
+      if (!reply.ok || this.#tickets.get(threadId) !== ticket) return;
       this.#joined.add(threadId);
       const known = this.#cursors.get(threadId);
       // The first time, the page the window reads next covers up to here; after a gap, what passed is read now.
       if (known === undefined) this.#cursors.set(threadId, reply.head);
       else if (reply.head > known) await this.#heal(threadId);
+      if (this.#tickets.get(threadId) !== ticket) return;
       for (const events of this.#held.get(threadId) ?? []) this.#take(threadId, events);
     } catch {
       // Out of reach: the read that follows fails in its own words, and a new session joins again.
     } finally {
-      this.#held.delete(threadId);
-      this.#joining.delete(threadId);
+      if (this.#tickets.get(threadId) === ticket) {
+        this.#held.delete(threadId);
+        this.#joining.delete(threadId);
+      }
     }
   }
 
@@ -121,21 +134,27 @@ export class Follower {
   #heal(threadId: string): Promise<void> {
     const running = this.#healing.get(threadId);
     if (running) return running;
-    const healing = this.#readOn(threadId).finally(() => this.#healing.delete(threadId));
+    const ticket = this.#tickets.get(threadId);
+    if (!ticket) return Promise.resolve();
+    const healing = this.#readOn(threadId, ticket).finally(() => {
+      if (this.#healing.get(threadId) === healing) this.#healing.delete(threadId);
+    });
     this.#healing.set(threadId, healing);
     return healing;
   }
 
-  async #readOn(threadId: string): Promise<void> {
+  async #readOn(threadId: string, ticket: symbol): Promise<void> {
     try {
       for (;;) {
         const after = this.#cursors.get(threadId);
-        if (after === undefined) return;
+        if (after === undefined || this.#tickets.get(threadId) !== ticket) return;
         const page = await this.deps.on(threadId).request(ROUTES.events(threadId, { after }, READ_LIMIT));
+        if (this.#tickets.get(threadId) !== ticket) return;
         this.#hand(threadId, page.events);
         if (page.events.length < READ_LIMIT || (this.#cursors.get(threadId) ?? 0) >= page.head) return;
       }
     } catch (error) {
+      if (this.#tickets.get(threadId) !== ticket) return;
       this.deps.log.warn(`OpenOrc Cloud thread ${threadId} lost frames: ${error instanceof Error ? error.message : String(error)}`);
       this.#cursors.delete(threadId);
       this.#joined.delete(threadId);
@@ -154,6 +173,10 @@ export class Follower {
   /** A new socket session: the server's rooms are gone. Every thread still of interest is joined again and healed. */
   #rejoin(): void {
     this.#joined.clear();
+    this.#tickets.clear();
+    this.#joining.clear();
+    this.#healing.clear();
+    this.#held.clear();
     for (const threadId of this.#watched.keys()) void this.follow(threadId);
   }
 

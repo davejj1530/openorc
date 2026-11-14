@@ -6,7 +6,9 @@ export interface SpaceInventory {
   id: string;
   personal: boolean;
   projects: SpaceProject[];
-  threads: Pick<ThreadSummary, "id" | "projectId" | "owner">[];
+  threads: (Pick<ThreadSummary, "id" | "projectId" | "owner"> & Partial<Pick<ThreadSummary, "title">>)[];
+  unavailable?: { id: string; title: string; projectId: string }[];
+  detached?: { projects: SpaceProject[]; threads: SpaceInventory["threads"] };
   taskIds: string[];
 }
 
@@ -14,15 +16,28 @@ export interface SpaceInventory {
 export function observeSpaceThreads(inventory: SpaceInventory[], spaceId: string, rows: SpaceInventory["threads"]): SpaceInventory[] {
   let changed = false;
   const next = inventory.map((space) => {
-    const visible = rows.filter((row) => (row.owner?.brain !== "hosted" || space.id === spaceId) && hasProject(row.projectId, space));
-    const additions = visible.filter((row) => !space.threads.some((known) => known.id === row.id && known.projectId === row.projectId && known.owner?.brain === row.owner?.brain));
-    if (!additions.length) return space;
+    const visible = rows.filter((row) => (row.owner?.brain !== "hosted" || space.id === spaceId) && hasListedProject(row.projectId, space));
+    const threads = observedThreads(space.threads, visible);
+    const detached = space.detached;
+    const local = detached
+      ? observedThreads(
+          detached.threads,
+          rows.filter((row) => row.owner?.brain !== "hosted" && detached.projects.some((project) => project.key === row.projectId)),
+        )
+      : undefined;
+    if (threads === space.threads && local === detached?.threads) return space;
     changed = true;
-    const threads = new Map(space.threads.map((row) => [row.id, row]));
-    for (const { id, projectId, owner } of additions) threads.set(id, { id, projectId, owner });
-    return { ...space, threads: [...threads.values()] };
+    return { ...space, threads, ...(detached && local && { detached: { ...detached, threads: local } }) };
   });
   return changed ? next : inventory;
+}
+
+function observedThreads(before: SpaceInventory["threads"], rows: SpaceInventory["threads"]): SpaceInventory["threads"] {
+  const additions = rows.filter((row) => !before.some((known) => known.id === row.id && known.projectId === row.projectId && known.owner?.brain === row.owner?.brain && known.title === row.title));
+  if (!additions.length) return before;
+  const threads = new Map(before.map((row) => [row.id, row]));
+  for (const { id, projectId, owner, title } of additions) threads.set(id, { id, projectId, owner, title });
+  return [...threads.values()];
 }
 export interface SpaceView {
   destination: Route;
@@ -49,8 +64,11 @@ const strings = (value: unknown): string[] => (Array.isArray(value) ? value.filt
 
 type SavedRoute = Record<string, unknown>;
 const text = (value: unknown) => (typeof value === "string" ? value : null);
-const hasProject = (id: string, inventory: SpaceInventory) => inventory.projects.some((row) => row.key === id) || (inventory.personal && id === WORKSPACE_ID);
+const hasListedProject = (id: string, inventory: SpaceInventory) => inventory.projects.some((row) => row.key === id) || (inventory.personal && id === WORKSPACE_ID);
+const hasProject = (id: string, inventory: SpaceInventory) => hasListedProject(id, inventory) || Boolean(inventory.detached?.projects.some((row) => row.key === id));
 const hasThread = (id: string, inventory: SpaceInventory) => inventory.threads.some((row) => row.id === id);
+const hasOpenThread = (id: string, inventory: SpaceInventory) =>
+  hasThread(id, inventory) || Boolean(inventory.unavailable?.some((row) => row.id === id)) || Boolean(inventory.detached?.threads.some((row) => row.id === id));
 
 function projectRoute(value: SavedRoute, inventory: SpaceInventory): Route | null {
   const view = value["view"];
@@ -74,7 +92,7 @@ function taskRoute(value: SavedRoute, inventory: SpaceInventory): Route | null {
 }
 function threadRoute(value: SavedRoute, inventory: SpaceInventory): Route | null {
   const id = text(value[value["view"] === "thread" ? "threadId" : "parentId"]);
-  if (!id || !hasThread(id, inventory)) return null;
+  if (!id || !(value["view"] === "thread" ? hasOpenThread(id, inventory) : hasThread(id, inventory))) return null;
   return value["view"] === "thread" ? { view: "thread", threadId: id } : { view: "newsubthread", parentId: id };
 }
 function peopleRoute(value: SavedRoute, inventory: SpaceInventory): Route | null {
@@ -124,7 +142,7 @@ export function validSpaceView(value: unknown, inventory: SpaceInventory): Space
   const panes =
     route.view === "thread"
       ? strings(value["panes"])
-          .filter((id) => inventory.threads.some((row) => row.id === id))
+          .filter((id) => hasOpenThread(id, inventory))
           .slice(0, 3)
       : [];
   if (route.view === "thread" && !panes.includes(route.threadId)) panes.unshift(route.threadId);

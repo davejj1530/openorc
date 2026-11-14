@@ -227,7 +227,7 @@ export class StandInThreads {
   #create(who: string, space: string, body: Record<string, unknown>): Reply {
     this.started.push({ space, body });
     const project = this.spaces.project(space, typeof body["projectId"] === "string" ? body["projectId"] : null);
-    if (!project) return NO_PROJECT;
+    if (!project || !this.spaces.canRead(space, project.id, who)) return NO_PROJECT;
     const settings = { model: null, effort: null, mode: "act", permissionMode: "trusted", ...(body["settings"] as Record<string, unknown>) } as Thread["settings"] & { agent?: string };
     const first = body["first"] as Record<string, unknown> | undefined;
     if (first) {
@@ -333,6 +333,20 @@ export class StandInThreads {
     return { status: 204, body: null };
   }
 
+  /** Access is checked before any more content can reach a former reader. */
+  accessChanged(space: string): void {
+    for (const thread of this.#threads.values()) {
+      if (thread.space !== space) continue;
+      for (const peer of this.peers()) if (!this.#reads(peer.who() ?? "", thread)) peer.watched.delete(thread.id);
+      for (const message of thread.messages) if (message.state === "pending" && !this.#reads(message.author, thread)) message.state = "cancelled";
+      if (thread.turn && !this.#reads(thread.turn, thread)) {
+        this.#stop(thread);
+        const turnId = String(thread.events.findLast((stored) => stored.event["type"] === "turn.completed")!.event["turnId"]);
+        this.append(thread.id, [{ type: "error", runId: turnId, ts: Date.now(), fatal: true, message: "This turn stopped because its sender no longer has access to this project." }], { turnId });
+      } else this.#changed(thread);
+    }
+  }
+
   #ready(thread: Thread, who: string, body: Record<string, unknown>): Reply {
     if (!this.admit(who, { ...this.#settings(thread), ...(body["settings"] as object | undefined) })) this.readies.push({ threadId: thread.id, settings: body["settings"] ?? null });
     return { status: 202, body: null };
@@ -380,6 +394,7 @@ export class StandInThreads {
     for (const ask of thread.asks) if (!ask.answered) ask.parked = true;
     thread.status = openAsk(thread) ? "needs_answer" : "idle";
     this.append(threadId, [{ type: "turn.completed", ts: Date.now(), turnId: `turn-${threadId}`, status, durationMs: 1000 }]);
+    for (const message of thread.messages) if (message.state === "pending" && !this.#reads(message.author, thread)) message.state = "cancelled";
     const next = thread.messages.find((message) => message.state === "pending");
     if (!next) return;
     const refusal = this.admit(next.author, this.#settings(thread));
@@ -436,10 +451,10 @@ export class StandInThreads {
    * Stores events in the thread's log, as an agent's host or a person's message does, and sends them to its watchers
    * unless `quiet`, as a frame lost on the way would be. `by` marks a person's own.
    */
-  append(threadId: string, events: Record<string, unknown>[], options: { by?: string; quiet?: boolean } = {}): void {
+  append(threadId: string, events: Record<string, unknown>[], options: { by?: string; quiet?: boolean; turnId?: string } = {}): void {
     const thread = this.#threads.get(threadId)!;
     const first = headOf(thread) + 1;
-    const stored = events.map((event, index) => ({ seq: first + index, turnId: null, by: options.by ?? null, event: { runId: randomUUID(), ...event } }));
+    const stored = events.map((event, index) => ({ seq: first + index, turnId: options.turnId ?? null, by: options.by ?? null, event: { runId: randomUUID(), ...event } }));
     thread.events.push(...stored);
     if (!options.quiet) this.#tellRoom(thread, "hosted:events", { threadId, events: stored.map((each) => wire(thread, each)), lastAgentSeq: lastAgentSeq(thread) });
     this.#changed(thread);

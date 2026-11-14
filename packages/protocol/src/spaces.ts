@@ -81,6 +81,12 @@ export interface OrganizationMembership {
   joinedAt: number;
 }
 
+export interface OrganizationProjectAccess {
+  projectId: string;
+  everyone: boolean;
+  memberIds: string[];
+}
+
 export const spacesRpcParams = {
   "spaces.status": z.object({}).strict(),
   "spaces.projects": z.object({ spaceId: SpaceId }).strict(),
@@ -89,6 +95,8 @@ export const spacesRpcParams = {
   "organization.delete": z.object({ spaceId: SpaceId, name: z.string().max(1000) }).strict(),
   "organization.member.setRole": z.object({ spaceId: SpaceId, memberId: SpaceId, role: OrganizationRole }).strict(),
   "organization.member.remove": z.object({ spaceId: SpaceId, memberId: SpaceId }).strict(),
+  "organization.project.access": z.object({ spaceId: SpaceId, projectId: SpaceId }).strict(),
+  "organization.project.setAccess": z.object({ spaceId: SpaceId, projectId: SpaceId, everyone: z.boolean(), memberIds: z.array(SpaceId).refine((ids) => new Set(ids).size === ids.length) }).strict(),
 };
 
 export interface SpacesRpcResults extends OrganizationSetupResults {
@@ -99,4 +107,6 @@ export interface SpacesRpcResults extends OrganizationSetupResults {
   "organization.delete": Record<string, never>;
   "organization.member.setRole": OrganizationMembership;
   "organization.member.remove": Record<string, never>;
+  "organization.project.access": OrganizationProjectAccess;
+  "organization.project.setAccess": OrganizationProjectAccess;
 }

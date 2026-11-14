@@ -128,3 +128,33 @@
   color: var(--bad);
   margin-top: 14px;
 }
+.organization-access-project {
+  font-size: 15px;
+}
+.organization-access-people {
+  max-height: 360px;
+  overflow-y: auto;
+}
+.organization-access-person {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 60px;
+}
+.organization-access-person + .organization-access-person {
+  border-top: 1px solid var(--line);
+}
+.organization-access-person .account-face {
+  width: 28px;
+  height: 28px;
+}
+.organization-access-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.organization-access-note {
+  color: var(--ink-3);
+  font-size: 13px;
+  margin-top: -8px;
+}

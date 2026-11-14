@@ -392,6 +392,35 @@ describe("NewThread", () => {
     await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ spaceId: "birch", projectId: "p1", hosted: true })));
   });
 
+  it("offers only this Mac for an open local folder detached from the organization", async () => {
+    account = openOrcCloud("added");
+    offer = { offered: true, provider: "vercel", brain: null };
+    const project = { key: "p1", name: "Canvas", repo: "example/canvas", localProjectId: "p1", hostedProjectId: "server-project", connected: true };
+    spaceNavigation.getState().initialize("scoped", "personal", [
+      { id: "personal", personal: true, projects: [], threads: [], taskIds: [] },
+      { id: "birch", personal: false, projects: [project], threads: [{ id: "local", projectId: "p1" }], taskIds: [] },
+    ]);
+    spaceNavigation.getState().select("birch");
+    useRouter.getState().navigate({ view: "thread", threadId: "local" });
+    spaceNavigation.getState().reconcile([
+      { id: "personal", personal: true, projects: [project], threads: [{ id: "local", projectId: "p1" }], taskIds: [] },
+      { id: "birch", personal: false, projects: [], threads: [], taskIds: [] },
+    ]);
+    saveModelDraft("p1", "Keep this on my Mac");
+    render(<NewThread projectId="p1" />);
+    fireEvent.click(screen.getByRole("button", { name: /^Where the thread works/ }));
+    expect(await screen.findByRole("menuitem", { name: "Local checkout" })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: "Worktree" })).toBeTruthy();
+    expect(screen.queryByRole("menuitem", { name: /^OpenOrc Cloud/ })).toBeNull();
+    expect(screen.queryByRole("menuitem", { name: /^Your own cloud/ })).toBeNull();
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ projectId: "p1", workspaceMode: "current" })));
+    expect(start).not.toHaveBeenCalledWith(expect.objectContaining({ spaceId: expect.anything() }));
+    expect(start).not.toHaveBeenCalledWith(expect.objectContaining({ hosted: true }));
+    expect(start).not.toHaveBeenCalledWith(expect.objectContaining({ cloud: true }));
+  });
+
   it("ends OpenOrc Cloud's row in adding a project not there yet, leading to its row in Cloud settings", async () => {
     account = openOrcCloud("addable");
     render(<NewThread projectId="p1" />);

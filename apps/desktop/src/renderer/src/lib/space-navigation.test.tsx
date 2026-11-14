@@ -195,3 +195,71 @@ it("does not restore another account or a malformed cache and leaves old local t
   spaceNavigation.getState().end();
   expect(spaceNavigation.getState().current).toBeNull();
 });
+
+it("holds an open revoked project tab in place and restores it on regrant while local work returns to Personal", () => {
+  const w = windowOf();
+  const before = structuredClone(spaces);
+  before[1]!.threads.find((row) => row.id === "cloud")!.title = "Retained title";
+  w.store.getState().initialize("key", "personal", before);
+  w.store.getState().select("birch");
+  w.edit({
+    destination: { view: "thread", threadId: "cloud" },
+    tabs: [{ id: "cloud-tab", route: { view: "thread", threadId: "cloud" } }],
+    activeTab: "cloud-tab",
+    panes: ["cloud"],
+    filter: { ...w.get().filter, project: "canvas" },
+  });
+  const personal = {
+    ...before[0]!,
+    projects: [...before[0]!.projects, before[1]!.projects[0]!],
+    threads: [...before[0]!.threads, ...before[1]!.threads.filter((row) => row.owner?.brain !== "hosted")],
+  };
+  const revoked = [personal, { ...before[1]!, projects: [], threads: [] }];
+  w.store.getState().reconcile(revoked);
+  expect(w.get()).toMatchObject({ destination: { view: "thread", threadId: "cloud" }, activeTab: "cloud-tab", panes: ["cloud"], filter: { project: "all" } });
+  expect(w.store.getState().inventory[1]!.unavailable).toEqual([{ id: "cloud", title: "Retained title", projectId: "canvas" }]);
+  const restarted = windowOf(w.durable, w.session);
+  restarted.store.getState().initialize("key", "personal", revoked);
+  expect(restarted.get()).toMatchObject({ destination: { view: "newthread" }, tabs: [] });
+  w.store.getState().reconcile(before);
+  expect(w.get().destination).toEqual({ view: "thread", threadId: "cloud" });
+  expect(w.store.getState().inventory[1]!.unavailable).toEqual([]);
+});
+
+it("quietly removes a lost project filter from Tasks and Pull requests", () => {
+  for (const view of ["tasks", "pulls"] as const) {
+    const w = windowOf();
+    w.store.getState().initialize("key", "personal", spaces);
+    w.store.getState().select("birch");
+    w.edit({ destination: { view }, filter: { ...w.get().filter, project: "canvas" } });
+    w.store.getState().reconcile([spaces[0]!, { ...spaces[1]!, projects: [], threads: [] }]);
+    expect(w.get().destination).toEqual({ view });
+    expect(w.get().filter.project).toBe("all");
+  }
+});
+
+it("keeps an already open local conversation usable until space switch after its paired project is lost", () => {
+  const w = windowOf();
+  w.store.getState().initialize("key", "personal", spaces);
+  w.store.getState().select("birch");
+  w.edit({ destination: { view: "thread", threadId: "a" }, tabs: [{ id: "a-tab", route: { view: "thread", threadId: "a" } }], panes: ["a"] });
+  const personal = {
+    ...spaces[0]!,
+    projects: [...spaces[0]!.projects, ...spaces[1]!.projects],
+    threads: [...spaces[0]!.threads, ...spaces[1]!.threads.filter((row) => row.owner?.brain !== "hosted")],
+  };
+  const lost = [personal, { ...spaces[1]!, projects: [], threads: [] }];
+  w.store.getState().reconcile(lost);
+  expect(w.get().destination).toEqual({ view: "thread", threadId: "a" });
+  expect(w.store.getState().inventory[1]!.detached?.threads.map((row) => row.id)).toEqual(["a"]);
+  expect(w.store.getState().inventory[1]!.projects).toEqual([]);
+  w.store.getState().reconcile(lost);
+  expect(w.get().destination).toEqual({ view: "thread", threadId: "a" });
+  w.store.getState().observe("birch", [{ id: "new-local", projectId: "canvas" }], "key");
+  w.edit({ destination: { view: "thread", threadId: "new-local" }, panes: ["new-local"], tabs: [...w.get().tabs, { id: "new-tab", route: { view: "thread", threadId: "new-local" } }] });
+  expect(w.store.getState().inventory[0]!.threads.some((row) => row.id === "new-local")).toBe(true);
+  expect(w.store.getState().inventory[1]!.threads).toEqual([]);
+  w.store.getState().select("personal");
+  w.store.getState().select("birch");
+  expect(w.get()).toMatchObject({ destination: { view: "newthread" }, tabs: [] });
+});

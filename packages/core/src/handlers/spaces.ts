@@ -8,6 +8,8 @@ export function createSpacesHandlers(spaces: HostedSpaces | null): Pick<Handlers
     return spaces;
   };
   return {
+    "organization.project.access": (input) => service().access.get(input),
+    "organization.project.setAccess": (input) => service().access.set(input),
     "organization.member.setRole": (input) => service().membership.setRole(input),
     "organization.member.remove": (input) => service().membership.remove(input),
     "organization.leave": (input) => service().membership.leave(input),

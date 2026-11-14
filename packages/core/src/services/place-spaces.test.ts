@@ -1,6 +1,8 @@
-import { projects, tasks, threads } from "@openorc/db";
+import { CodexAdapter, RunHandle } from "@openorc/agents";
+import { projects, runs, settings, tasks, threads } from "@openorc/db";
+import { git } from "@openorc/git";
 import { standIn, type StandIn } from "@openorc/hosted/testing";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -47,8 +49,88 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   await core?.close();
+  vi.restoreAllMocks();
   await stand?.close();
   await rm(folder, { recursive: true, force: true });
+});
+
+it("keeps a running local turn and its conversation usable when project access is revoked", async () => {
+  const manager = "manager@example.com";
+  const team = stand.addTeam("Birch Studio", [manager, EMAIL]);
+  const remote = stand.addProject(manager, { name: "Canvas", fullName: "example/canvas" }, team);
+  const { project } = local("Canvas", "https://github.com/example/canvas.git");
+  await mkdir(project.rootPath);
+  await git(project.rootPath, ["init", "-q", "-b", "main"]);
+  settings.set(core.db, "extraction.provider", "off");
+  vi.spyOn(core.textGeneration, "title").mockResolvedValue(null);
+  const interrupted = vi.fn();
+  const sent = vi.fn(async () => undefined);
+  const handles = new Map<string, RunHandle>();
+  vi.spyOn(CodexAdapter.prototype, "start").mockImplementation((spec) => {
+    let finish!: (code: number) => void;
+    const done = new Promise<number>((resolve) => {
+      finish = resolve;
+    });
+    const handle = new RunHandle(spec.runId, {
+      done,
+      send: sent,
+      interrupt: interrupted,
+      close() {
+        handle.emit("exit", 0);
+        finish(0);
+      },
+    });
+    handles.set(spec.runId, handle);
+    return handle;
+  });
+  let token: string | null = null;
+  const admin = await OpenOrc.create({
+    dataDir: path.join(folder, "admin"),
+    ephemeral: true,
+    transport: { push() {} },
+    accountServer: stand.url,
+    accountSecrets: {
+      load: async () => token,
+      save: async (value) => {
+        token = value;
+      },
+    },
+    openBrowser: (url) => {
+      void fetch(stand.signInPage(url, manager));
+    },
+    shellProbe: async () => core.environment.current(),
+  });
+  try {
+    const change = rpcClient(() => admin);
+    await change("account.signIn", {});
+    await signIn();
+    const started = await call("threads.start", {
+      projectId: project.id,
+      spaceId: team,
+      agent: "codex",
+      mode: "act",
+      permissionMode: "trusted",
+      workspaceMode: "current",
+      prompt: "Continue local work",
+    });
+    const runId = started.run!.id;
+    await vi.waitFor(() => expect(handles.has(runId)).toBe(true));
+    const handle = handles.get(runId)!;
+    handle.emit("event", { type: "session.started", runId, ts: Date.now(), agent: "codex", externalSessionId: "local-session", model: null });
+    handle.emit("event", { type: "turn.started", runId, turnId: "local-turn", ts: Date.now() });
+    await change("organization.project.setAccess", { spaceId: team, projectId: remote, everyone: false, memberIds: [] });
+    await vi.waitFor(async () => expect(await call("spaces.projects", { spaceId: team })).toEqual([]));
+    expect((await call("threads.list", { spaceId: `personal-${EMAIL}` })).some((row) => row.id === started.thread.id)).toBe(true);
+    expect(runs.get(core.db, runId)?.state).toBe("running");
+    expect(interrupted).not.toHaveBeenCalled();
+    handle.emit("event", { type: "message.completed", runId, messageId: "local-reply", role: "assistant", text: "Local work continued.", ts: Date.now() });
+    handle.emit("event", { type: "turn.completed", runId, turnId: "local-turn", status: "success", durationMs: 10, ts: Date.now() });
+    await vi.waitFor(async () => expect((await call("events.page", { runId })).events).toContainEqual(expect.objectContaining({ text: "Local work continued." })));
+    await call("threads.send", { id: started.thread.id, text: "Keep going locally" });
+    expect(sent).toHaveBeenCalledWith("Keep going locally", []);
+  } finally {
+    await admin.close();
+  }
 });
 
 function local(name: string, remote: string | null) {

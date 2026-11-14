@@ -25,6 +25,7 @@ const readRules: Rules = {
   ...fileReadRules,
   "organization.repositories": ({ spaceId }) => [`repositories:${spaceId}`, "spaces"],
   "organization.people": ({ spaceId }) => [`people:${spaceId}`, "spaces"],
+  "organization.project.access": ({ spaceId, projectId }) => [`access:${spaceId}:${projectId}`, "spaces", "projects"],
   "instructions.list": ({ threadId }) => ["instructions", "workspace-diff", `thread:${threadId}`],
   "review.comments.list": reviewCommentTags,
 };
@@ -32,6 +33,7 @@ const readRules: Rules = {
 const mutationRules: Rules = {
   "organization.member.setRole": ({ spaceId }) => ["spaces", "projects", `people:${spaceId}`, `invitations:${spaceId}`],
   "organization.member.remove": ({ spaceId }) => ["spaces", "projects", `people:${spaceId}`],
+  "organization.project.setAccess": ({ spaceId, projectId }) => ["spaces", "projects", "threads", `access:${spaceId}:${projectId}`],
   "organization.leave": () => ["spaces", "projects"],
   "organization.delete": () => ["spaces", "projects"],
   "spaces.create": () => ["spaces"],

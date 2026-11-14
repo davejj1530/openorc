@@ -149,7 +149,7 @@ export {
   callsThePerson,
   edgeWords,
   inListOrder,
-  listMembers,
+  listLayout,
   moreRows,
   nearestPast,
   pastEdges,
@@ -159,7 +159,7 @@ export {
   scrollToBring,
   type EdgeTarget,
   type ListEdges,
-  type ListMembers,
+  type ListLayout,
 } from "./sidebar-list.js";
 export { cloudProjects, liveGroupedFold, projectGroups, waitingRoots, waitsOnYou, WORKSPACES_FOLD, type GroupProject, type ProjectGroup } from "./sidebar-groups.js";
 export { snoozePresets, snoozePresetsChangeAt, snoozeWakeLabel } from "./snooze.js";

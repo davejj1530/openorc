@@ -2,7 +2,7 @@ import type { ThreadSummary } from "@openorc/protocol";
 import { threadStatus, threadTreeStatus, type ThreadStatus } from "./thread-row.js";
 import { subthreadStatuses } from "./thread-tree.js";
 
-/** How many rows a project opens the day with, its threads that are not quiet first, before "Show N more". */
+/** How many of its most recently active threads a project shows besides those that are not quiet, before "Show N more". */
 export const GROUP_PAGE = 4;
 
 /** How many more each "Show N more" adds. */
@@ -21,32 +21,26 @@ export function callsThePerson(status: ThreadStatus | null | undefined): boolean
   return Boolean(status && CALLS.has(status.kind));
 }
 
-/** A project's roots in the order the list keeps: the newest started on top. A change of state never moves one. */
-export function startedFirst(roots: readonly ThreadSummary[]): ThreadSummary[] {
-  return [...roots].sort((a, b) => b.createdAt - a.createdAt || a.id.localeCompare(b.id));
-}
-
 /** Pinned threads in the order they were pinned, so a pin never moves for its work. */
 export function pinOrder(pins: readonly ThreadSummary[]): ThreadSummary[] {
   return [...pins].sort((a, b) => (a.pinnedAt ?? 0) - (b.pinnedAt ?? 0) || a.id.localeCompare(b.id));
 }
 
 /**
- * Which roots have a row, remembered through the day. A project opens with every root that is not quiet and its newest
- * quiet ones, four rows in all; after that rows only join (a root that starts, wakes, or the person asks for) and none
- * leaves until the next day. `since` is when the day's page was made. `projects` is the projects' order as the day
- * found it, a project added since on top, so work in one never moves it past another.
+ * The rows each project shows, in their order, and the projects' order as the day found it, a project added since on
+ * top, so work in one never moves it past another. While the list is held the rows keep their places.
  */
-export type ListMembers = { day: number; since: number; ids: ReadonlySet<string>; projects: readonly string[] };
+export type ListLayout = { day: number; projects: readonly string[]; rows: ReadonlyMap<string, readonly string[]> };
 
-type MembersInput = {
+type LayoutInput = {
+  /** Each project's roots, the most recently active first, as the day's list orders them. */
   groups: readonly { project: { id: string }; roots: readonly ThreadSummary[] }[];
   /** Whether a root is quiet: nothing under way, nothing to answer or read, no command left running. */
   quiet: (root: ThreadSummary) => boolean;
   now: number;
-  /** The pointer or the keyboard is in the list: nothing arrives or leaves but what the person did. */
+  /** The pointer or the keyboard is in the list: no row arrives, leaves or moves but by the person's hand. */
   held: boolean;
-  /** Roots the person reached for: the open thread's, and those "Show N more" opened. They join at once. */
+  /** Roots the person reached for: the open thread's, and those "Show N more" opened. They show at once. */
   own: readonly string[];
 };
 
@@ -54,50 +48,50 @@ function startOfDay(now: number): number {
   return new Date(now).setHours(0, 0, 0, 0);
 }
 
-/** A project's first page: every root that is not quiet, then the newest quiet ones up to four rows. */
-function firstPage(roots: readonly ThreadSummary[], quiet: (root: ThreadSummary) => boolean): ThreadSummary[] {
-  const live = roots.filter((root) => !quiet(root));
-  return [...live, ...roots.filter(quiet).slice(0, Math.max(0, GROUP_PAGE - live.length))];
+/** A project's rows as its work stands: its four most recently active roots, every root that is not quiet, and those the person reached for. */
+function liveRows(roots: readonly ThreadSummary[], quiet: (root: ThreadSummary) => boolean, own: ReadonlySet<string>): string[] {
+  return roots.filter((root, index) => index < GROUP_PAGE || !quiet(root) || own.has(root.id)).map((root) => root.id);
 }
 
-/** The rows after the list's threads changed. `prev` is null before the first settled read. */
-export function listMembers(prev: ListMembers | null, { groups, quiet, now, held, own }: MembersInput): ListMembers {
-  if (prev && held) return own.every((id) => prev.ids.has(id)) ? prev : { ...prev, ids: new Set([...prev.ids, ...own]) };
+/** The rows a held list keeps: where they were, less a thread gone from the project, then what the person reached for. */
+function heldRows(kept: readonly string[], roots: readonly ThreadSummary[], own: ReadonlySet<string>): string[] {
+  const present = new Set(roots.map((root) => root.id));
+  const stay = kept.filter((id) => present.has(id));
+  return [...stay, ...roots.filter((root) => own.has(root.id) && !stay.includes(root.id)).map((root) => root.id)];
+}
+
+/** The list's layout after its threads changed. `prev` is null before the first settled read. */
+export function listLayout(prev: ListLayout | null, { groups, quiet, now, held, own }: LayoutInput): ListLayout {
+  const reached = new Set(own);
+  const rows = new Map(groups.map(({ project, roots }) => [project.id, prev && held ? heldRows(prev.rows.get(project.id) ?? [], roots, reached) : liveRows(roots, quiet, reached)]));
+  if (prev && held) return { ...prev, rows };
   const day = startOfDay(now);
-  const kept = prev?.day === day ? prev : null;
-  const since = kept?.since ?? now;
-  const ids = new Set([...(kept?.ids ?? []), ...own]);
-  for (const { project, roots } of groups) {
-    const ordered = startedFirst(roots);
-    const joining = kept?.projects.includes(project.id) ? ordered.filter((root) => !quiet(root) || root.createdAt >= since) : firstPage(ordered, quiet);
-    for (const root of joining) ids.add(root.id);
-  }
-  const known = kept?.projects ?? [];
-  const added = groups.map((group) => group.project.id).filter((id) => !known.includes(id));
-  return { day, since, ids, projects: kept ? [...added, ...known] : added };
+  const known = prev?.day === day ? prev.projects : null;
+  const added = groups.map((group) => group.project.id).filter((id) => !known?.includes(id));
+  return { day, rows, projects: [...added, ...(known ?? [])] };
 }
 
 /** The groups in the order the day keeps; one the day has not seen yet leads. */
-export function inListOrder<T extends { project: { id: string } }>(groups: readonly T[], members: ListMembers): T[] {
-  const place = (group: T) => members.projects.indexOf(group.project.id);
+export function inListOrder<T extends { project: { id: string } }>(groups: readonly T[], layout: ListLayout): T[] {
+  const place = (group: T) => layout.projects.indexOf(group.project.id);
   return [...groups].sort((a, b) => place(a) - place(b));
 }
 
 /**
  * What a project lists: folded, only the tree that holds the open thread, so the list never hides where you are; open,
- * its rows in their kept order. `hidden` is what "Show N more" reaches.
+ * its rows in the layout's order. `hidden` is what "Show N more" reaches.
  */
-export function projectRows(roots: readonly ThreadSummary[], { members, open, holdsActive }: { members: ReadonlySet<string>; open: boolean; holdsActive: (root: ThreadSummary) => boolean }) {
-  const ordered = startedFirst(roots);
-  if (!open) return { rows: ordered.filter(holdsActive), hidden: 0 };
-  const rows = ordered.filter((root) => members.has(root.id) || holdsActive(root));
-  return { rows, hidden: ordered.length - rows.length };
+export function projectRows(roots: readonly ThreadSummary[], { rows, open, holdsActive }: { rows: readonly string[]; open: boolean; holdsActive: (root: ThreadSummary) => boolean }) {
+  if (!open) return { rows: roots.filter(holdsActive), hidden: 0 };
+  const byId = new Map(roots.map((root) => [root.id, root]));
+  const shown = rows.flatMap((id) => byId.get(id) ?? []);
+  return { rows: shown, hidden: roots.length - shown.length };
 }
 
-/** The roots one press on "Show N more" adds: the newest of those without a row. */
-export function moreRows(roots: readonly ThreadSummary[], members: ReadonlySet<string>): string[] {
-  return startedFirst(roots)
-    .filter((root) => !members.has(root.id))
+/** The roots one press on "Show N more" adds: the most recently active of those without a row. */
+export function moreRows(roots: readonly ThreadSummary[], rows: readonly string[]): string[] {
+  return roots
+    .filter((root) => !rows.includes(root.id))
     .slice(0, GROUP_STEP)
     .map((root) => root.id);
 }

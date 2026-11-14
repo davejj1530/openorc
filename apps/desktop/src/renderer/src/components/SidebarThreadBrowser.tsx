@@ -6,13 +6,13 @@ import { CoversPreview } from "../lib/browser-preview";
 import { ALL_WORKSPACES, focusedProject, useLayout } from "../lib/layout";
 import {
   type GroupProject,
-  type ListMembers,
+  type ListLayout,
   type SidebarDayList,
   type SidebarFilter,
   cachedListPage,
   callsThePerson,
   inListOrder,
-  listMembers,
+  listLayout,
   moreRows,
   NEEDS_YOU_PAGE,
   pinOrder,
@@ -197,25 +197,26 @@ function groupProjects(projects: readonly { id: string; name: string; rootPath: 
 }
 
 /**
- * Each project's group as the list shows it: open or folded by the reader, its rows kept through the day in the order
- * they started. Every project has one, an empty one too, but the Workspace only while it holds threads. While the list
- * is `held`, rows that would arrive wait; what the person reaches for lands at once.
+ * Each project's group as the list shows it: open or folded by the reader, the most recently active on top. Every
+ * project has one, an empty one too, but the Workspace only while it holds threads. While the list is `held`, rows that
+ * would arrive, leave or move wait; what the person reaches for lands at once.
  */
 function useGroupPages(list: SidebarDayList, projects: readonly GroupProject[], collapsed: readonly string[], { ready, held, now }: { ready: boolean; held: boolean; now: number }) {
   const [more, setMore] = useState<readonly string[]>([]);
-  const remembered = useRef<ListMembers | null>(null);
+  const remembered = useRef<ListLayout | null>(null);
   const holding = new Set(list.shown(list.rest, false).map((root) => root.id));
   const holdsActive = (root: ThreadSummary) => holding.has(root.id);
   const groups = projectGroups(projects, list.rest, list.all).filter((group) => group.project.id !== WORKSPACE_ID || group.roots.length);
   const statuses = rootStatuses(list.rest, list.all);
-  const members = listMembers(ready ? remembered.current : null, { groups, quiet: (root) => !statuses.get(root.id), now, held, own: [...more, ...holding] });
+  const layout = listLayout(ready ? remembered.current : null, { groups, quiet: (root) => !statuses.get(root.id), now, held, own: [...more, ...holding] });
   useEffect(() => {
-    if (ready) remembered.current = members;
+    if (ready) remembered.current = layout;
   });
-  return inListOrder(groups, members).map((group) => {
+  return inListOrder(groups, layout).map((group) => {
     const id = group.project.id;
     const open = sidebarSectionOpen(collapsed, "project", id);
-    return { ...group, open, ...projectRows(group.roots, { members: members.ids, open, holdsActive }), showMore: () => setMore((old) => [...old, ...moreRows(group.roots, members.ids)]) };
+    const rows = layout.rows.get(id) ?? [];
+    return { ...group, open, ...projectRows(group.roots, { rows, open, holdsActive }), showMore: () => setMore((old) => [...old, ...moreRows(group.roots, rows)]) };
   });
 }
 
@@ -249,7 +250,7 @@ function useListUpkeep({ activeId, pinnedOnly, pending, limit, loadMore }: Threa
 }
 
 /**
- * The threads grouped by project, in the order projects come and the newest started first inside each, held still while
+ * The threads grouped by project, in the order projects come and the most recently active first inside each, held still while
  * the pointer or the keyboard is in the list. Pinned threads lead in a group of their own that never scrolls away,
  * snoozed ones follow the projects, and Resolved sits at the foot. A line at an edge names what calls the person past
  * it. The whole list folds under its head, which keeps Search and the filter; folded, it counts what waits on the person.
@@ -264,7 +265,8 @@ function ThreadGroups({ children }: { children: ChildPages }) {
   const hold = useListHold();
   const shownProjects = groupProjects(projects.data, list.all);
   const ready = !pending && !sidebarGroupsGrow({ end: list.end, hasMore: list.hasMore, limit: state.limit });
-  const allGroups = useGroupPages(list, shownProjects, collapsed, { ready, held: hold.held, now });
+  // Under the pinned filter the groups are empty; their layout is not kept, so the list comes back as it was.
+  const allGroups = useGroupPages(list, shownProjects, collapsed, { ready: ready && !pinnedOnly, held: hold.held, now });
   const groups = pinnedOnly ? [] : allGroups;
   const pinsOpen = sidebarSectionOpen(collapsed, "pinned", SIDEBAR_LIST);
   const pins = pinOrder(list.shown(list.pinned, pinsOpen));

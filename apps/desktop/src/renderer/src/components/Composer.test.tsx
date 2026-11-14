@@ -71,7 +71,7 @@ it.each([false, true])("keeps a read-only composer's controls inactive, with wor
     commands: [{ name: "compact", hint: "Summarize", run: command }],
   });
   expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
-  const send = screen.getByRole("button", { name: "Send", exact: true });
+  const send = screen.getByRole("button", { name: /^Send$/ });
   expect(send.hasAttribute("disabled")).toBe(true);
   expect(send.getAttribute("data-tip")).toBe(reason);
   expect(document.querySelectorAll(".composer-send-cluster button")).toHaveLength(1);
@@ -88,7 +88,7 @@ it.each([false, true])("keeps a read-only composer's controls inactive, with wor
   press(field, { key: "Enter" });
   expect(messageOf(field)).toBe("/compact");
   expect(document.querySelectorAll(".composer-send-cluster button")).toHaveLength(1);
-  expect(screen.getByRole("button", { name: "Send", exact: true }).hasAttribute("disabled")).toBe(true);
+  expect(screen.getByRole("button", { name: /^Send$/ }).hasAttribute("disabled")).toBe(true);
   expect(command).not.toHaveBeenCalled();
   expect(onSubmit).not.toHaveBeenCalled();
   expect(onStop).not.toHaveBeenCalled();

@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { WORKSPACE_ID, type MemorySource, type MemoryType } from "@openorc/protocol";
+import type { MemorySource, MemoryType } from "@openorc/protocol";
 import { memorySourceLabel } from "../components/MemoryCard";
 import { memoryTypeLabel, memoryTypeOrder } from "../components/memory";
 import { PageFilters, PageSearch } from "../components/PageFilters";
@@ -110,7 +110,7 @@ export function Memory() {
           <ScopedTitle
             unscoped={
               <span className="truncate">
-                Memory {selectedProject.id === WORKSPACE_ID ? "outside" : "in"} <ProjectPicker projectId={selectedProject.id} projects={projects.data} onProject={setChosen} />
+                Memory in <ProjectPicker projectId={selectedProject.id} projects={projects.data} onProject={setChosen} />
               </span>
             }
           >

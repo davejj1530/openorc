@@ -1,0 +1,187 @@
+.team-channel-join {
+  flex-shrink: 0;
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 24px;
+}
+.team-channel-error {
+  color: var(--bad);
+  font-size: var(--text-sm);
+}
+.team-channel-dialog[data-nested-dialog-open] {
+  visibility: hidden;
+}
+.team-channel-form {
+  display: grid;
+  gap: 20px;
+}
+.team-channel-form > .team-channel-error {
+  margin-top: -12px;
+}
+.team-channel-field {
+  display: grid;
+  gap: 8px;
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+}
+.team-channel-audience {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.team-channel-audience-choice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+  background: var(--surface-2);
+  border-radius: var(--radius-xl);
+  text-align: left;
+  font-size: var(--text-md);
+  line-height: 20px;
+}
+.team-channel-audience-choice > svg {
+  flex-shrink: 0;
+}
+.team-channel-audience-choice > span {
+  min-width: 0;
+  flex: 1;
+}
+.team-channel-audience-description {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  line-height: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.team-chat-heading-name > span:not(.team-chat-faces) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.team-chat-heading-name > svg {
+  flex-shrink: 0;
+}
+.team-channel-choose {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: var(--radius-xl);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: var(--text-md);
+  text-align: left;
+}
+.team-channel-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.team-channel-choose > span:not(.team-chat-faces) {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.team-channel-choose .account-face + .account-face {
+  margin-left: 8px;
+  box-shadow: none;
+}
+.team-channel-people,
+.team-channel-browser {
+  display: grid;
+  gap: 2px;
+  max-height: 264px;
+  overflow-y: auto;
+}
+.team-channel-person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+  padding: 2px 8px;
+  border-radius: var(--radius-lg);
+  font-size: var(--text-md);
+}
+.team-channel-person .account-face {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+}
+.team-channel-person-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.team-channel-browser-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: var(--radius-lg);
+  font-size: var(--text-md);
+  text-align: left;
+}
+.team-channel-browser-row > span:not(.team-channel-browser-state) {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.team-channel-browser-state {
+  flex-shrink: 0;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+.team-channel-browser-row > svg {
+  flex-shrink: 0;
+}
+.team-channel-browser-row:hover,
+.team-channel-person:has(input):hover {
+  background: var(--surface-2);
+}
+.team-channel-description {
+  color: var(--ink-3);
+  font-size: var(--text-md);
+}
+.team-channel-description p + p {
+  margin-top: 10px;
+  font-size: var(--text-sm);
+}
+.team-channel-details-actions {
+  justify-content: space-between;
+}
+.team-channel-remove {
+  flex-shrink: 0;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+.team-channel-you {
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+@media (max-width: 480px) {
+  .team-channel-audience {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-height: 700px) {
+  .dialog-sheet.team-channel-dialog {
+    top: 24px;
+    max-height: calc(100dvh - 48px);
+  }
+}

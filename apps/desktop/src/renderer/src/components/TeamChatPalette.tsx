@@ -10,6 +10,14 @@ export function TeamChatPalette({ onOpened }: { onOpened(): void }) {
   const state = useTeamChatState();
   const action = useOpenTeamChat();
   if (!scope || state.data?.state !== "ready") return null;
+  const rows = teamChatRoster(state.data.chat, scope.accountId);
+  if (state.data.chat.features.includes("channels")) {
+    rows.push(
+      ...state.data.chat.conversations
+        .filter((conversation) => conversation.kind === "channel" && !conversation.private && !conversation.joined)
+        .map((conversation): TeamChatRow => ({ kind: "conversation", id: conversation.id, title: conversation.name ?? "Channel", conversation })),
+    );
+  }
   const open = (row: TeamChatRow) => {
     void action.open(row).then((opened) => {
       if (opened) onOpened();
@@ -17,7 +25,7 @@ export function TeamChatPalette({ onOpened }: { onOpened(): void }) {
   };
   return (
     <Command.Group heading="Chat" className="command-palette-group">
-      {teamChatRoster(state.data.chat, scope.accountId).map((row) => (
+      {rows.map((row) => (
         <Command.Item key={`${row.kind}:${row.id}`} value={`chat ${row.title}`} className="command-palette-item" aria-busy={action.opening === row.id || undefined} onSelect={() => open(row)}>
           <span className="command-palette-icon">
             {row.kind === "person" ? <TeamChatFace people={[row.person]} /> : <TeamConversationFace conversation={row.conversation} self={scope.accountId} />}

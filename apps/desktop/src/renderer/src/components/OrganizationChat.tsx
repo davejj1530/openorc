@@ -4,6 +4,7 @@ import { useTeamChatState } from "../lib/team-chat-queries";
 import { useOpenTeamChat } from "../lib/team-chat-open";
 import { useRouter } from "../lib/router";
 import { SidebarChat } from "./SidebarChat";
+import { TeamChatAddMenu } from "./TeamChatAddMenu";
 
 /** The sidebar entry waits for the account's authorized capability and roster. */
 export function OrganizationChat() {
@@ -28,6 +29,7 @@ export function OrganizationChat() {
     ) : null;
   return (
     <SidebarChat
+      tools={state.data.chat.features.includes("channels") ? <TeamChatAddMenu key={JSON.stringify([scope.accountId, scope.spaceId, scope.generation])} scope={scope} chat={state.data.chat} /> : null}
       rows={teamChatRoster(state.data.chat, scope.accountId)}
       self={scope.accountId}
       selected={route.view === "team-chat" ? route.conversationId : null}

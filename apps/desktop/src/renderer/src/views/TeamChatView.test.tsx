@@ -7,6 +7,8 @@ import { core } from "../lib/rpc";
 import { queryClient } from "../lib/client";
 import { TeamChatContext, type TeamChatContextValue } from "../lib/team-chat-context";
 import { chatStateKey, chatTimelineKey, teamChatDrafts } from "../lib/team-chat-queries";
+import { channelDetailsKey } from "../lib/team-channel-queries";
+import { TeamChatVisibility } from "../lib/team-chat-visibility";
 import { TeamChatView } from "./TeamChatView";
 
 vi.mock("../components/TopBar", () => ({ TopBar: ({ children }: { children: ReactNode }) => <header>{children}</header> }));
@@ -35,10 +37,12 @@ const page: TeamChatTimeline = { messages: [], older: false, newer: false, headS
 function context(): TeamChatContextValue {
   return { ...target, generation: 1, reach: "live", current: () => true };
 }
-const tree = (scope: TeamChatContextValue | null) => (
+const tree = (scope: TeamChatContextValue | null, visible = true) => (
   <QueryClientProvider client={queryClient}>
     <TeamChatContext value={scope}>
-      <TeamChatView target={target} />
+      <TeamChatVisibility value={visible}>
+        <TeamChatView target={target} />
+      </TeamChatVisibility>
     </TeamChatContext>
   </QueryClientProvider>
 );
@@ -57,6 +61,22 @@ it("keeps local words when an older server has no chat capability", async () => 
   await waitFor(() => expect(screen.queryByText("Loading chat…")).toBeNull());
   expect(teamChatDrafts.read(target).text).toBe("Words from before the server changed");
 });
+it("closes channel details when the retained chat is no longer visible", async () => {
+  vi.spyOn(core, "call").mockImplementation(async (method) => {
+    if (method === "teamChat.state") return { ...state, chat: { ...state.chat, features: ["base", "channels"] } };
+    if (method === "teamChat.conversation") return conversation;
+    if (method === "teamChat.timeline") return page;
+    return { ok: true };
+  });
+  const scope = context();
+  const view = render(tree(scope));
+  fireEvent.click(await screen.findByRole("button", { name: "Details for #general" }));
+  await screen.findByRole("button", { name: "Done" });
+  view.rerender(tree(scope, false));
+  expect(screen.queryByRole("dialog")).toBeNull();
+  view.rerender(tree(scope));
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
 it("cannot send into a channel after its subscription is removed before channel joining is available", async () => {
   vi.spyOn(core, "call").mockImplementation(async (method) => {
     if (method === "teamChat.state") return state;
@@ -73,6 +93,33 @@ it("cannot send into a channel after its subscription is removed before channel 
   await waitFor(() => expect(screen.queryByRole("button", { name: "Send" })).toBeNull());
   expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
   expect(teamChatDrafts.read(target).text).toBe("Keep these words until I join again");
+});
+it("shows public history with explicit joining after a subscription is removed", async () => {
+  let joined = true;
+  vi.spyOn(core, "call").mockImplementation(async (method) => {
+    if (method === "teamChat.state") return { ...state, chat: { ...state.chat, features: ["base", "channels"], conversations: [{ ...conversation, joined }] } };
+    if (method === "teamChat.timeline") return page;
+    if (method === "teamChat.joinChannel") {
+      joined = true;
+      return conversation;
+    }
+    return { ok: true };
+  });
+  const scope = context();
+  teamChatDrafts.write(target, "Keep these words until I join again");
+  render(tree(scope));
+  await screen.findByRole("button", { name: "Send" });
+  joined = false;
+  await act(async () => {
+    await queryClient.invalidateQueries({ queryKey: chatStateKey(scope) });
+  });
+  const join = await screen.findByRole("button", { name: "Join channel" });
+  expect(screen.queryByRole("button", { name: "Send" })).toBeNull();
+  expect(screen.getByText("No messages yet")).toBeTruthy();
+  fireEvent.click(join);
+  await screen.findByRole("button", { name: "Send" });
+  expect(teamChatDrafts.read(target).text).toBe("Keep these words until I join again");
+  expect(core.call).toHaveBeenCalledWith("teamChat.joinChannel", { spaceId: target.spaceId, conversationId: target.conversationId });
 });
 it("keeps a frozen draft while a late private page cannot enter the cache", async () => {
   let finish = (_page: TeamChatTimeline) => {};
@@ -106,6 +153,37 @@ it("keeps a frozen draft while a late private page cannot enter the cache", asyn
   expect(screen.queryByText("Private history")).toBeNull();
   expect(queryClient.getQueryData(chatTimelineKey(scope, "general"))).toBeUndefined();
   expect(teamChatDrafts.read(target).text).toBe("Recover after access returns");
+});
+it("clears a removed private channel's draft and rejects its late details", async () => {
+  let finish = (_value: TeamConversation) => {};
+  const delayed = new Promise<TeamConversation>((resolve) => {
+    finish = resolve;
+  });
+  const privateChannel = { ...conversation, private: true, topic: "Private planning details" };
+  const ready: TeamChatStatus = { ...state, chat: { ...state.chat, features: ["base", "channels"], conversations: [privateChannel] } };
+  vi.spyOn(core, "call").mockImplementation(async (method) => {
+    if (method === "teamChat.state") return ready;
+    if (method === "teamChat.timeline") return page;
+    if (method === "teamChat.conversation") return delayed;
+    return { ok: true };
+  });
+  const scope = context();
+  teamChatDrafts.write(target, "Private unsent words");
+  render(tree(scope));
+  fireEvent.click(await screen.findByRole("button", { name: "Details for #general" }));
+  await screen.findByText("Loading channel…");
+  act(() => {
+    queryClient.setQueryData(chatStateKey(scope), { ...ready, chat: { ...ready.chat, conversations: [] } });
+  });
+  await screen.findByText("You no longer have access to this chat.");
+  await act(async () => {
+    finish(privateChannel);
+    await delayed;
+  });
+  expect(screen.queryByText("Private planning details")).toBeNull();
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(queryClient.getQueryData(channelDetailsKey(scope, "general"))).toBeUndefined();
+  expect(teamChatDrafts.read(target).text).toBe("");
 });
 it("shows one bubble when an unconfirmed send is found by a live refresh", async () => {
   let messages: TeamMessage[] = [];

@@ -1,11 +1,12 @@
 import type { TeamConversation } from "@openorc/protocol";
+import type { ReactNode } from "react";
 import { teamConversationTitle } from "@openorc/client";
 import { TopBar } from "./TopBar";
 import { ThreadTabs } from "./ThreadTabs";
 import { TeamChatFace, TeamConversationFace } from "./TeamChatFace";
 import { TeamChatComposer } from "./TeamChatComposer";
 import { TeamChatTranscript, type TeamChatTranscriptProps } from "./TeamChatTranscript";
-import { Loader2, X } from "./icons";
+import { ChevronDown, Loader2, X } from "./icons";
 import { Button } from "./ui";
 import "../styles/team-chat.css";
 
@@ -18,6 +19,8 @@ export interface TeamChatProps extends TeamChatTranscriptProps {
   loading: boolean;
   onReload(): void;
   notice?: { message: string; dismiss(): void };
+  footer?: ReactNode;
+  onDetails?: () => void;
 }
 export function TeamChat(props: TeamChatProps) {
   const title = teamConversationTitle(props.conversation, props.self);
@@ -28,10 +31,18 @@ export function TeamChat(props: TeamChatProps) {
         <ThreadTabs />
       </TopBar>
       <header className="team-chat-heading">
-        <div className="team-chat-heading-name">
-          <TeamConversationFace conversation={props.conversation} self={props.self} />
-          <span>{title}</span>
-        </div>
+        {props.onDetails ? (
+          <button type="button" className="team-chat-heading-name" onClick={props.onDetails} aria-label={`Details for #${title}`}>
+            <TeamConversationFace conversation={props.conversation} self={props.self} />
+            <span>{title}</span>
+            <ChevronDown size={12} />
+          </button>
+        ) : (
+          <div className="team-chat-heading-name">
+            <TeamConversationFace conversation={props.conversation} self={props.self} />
+            <span>{title}</span>
+          </div>
+        )}
         {props.conversation.kind === "channel" ? (
           <div className="team-chat-heading-people">
             <TeamChatFace people={props.conversation.members} max={3} />
@@ -48,7 +59,7 @@ export function TeamChat(props: TeamChatProps) {
           </button>
         </div>
       ) : null}
-      {!props.loading && !props.error ? <TeamChatComposer text={props.draft} placeholder={placeholder} reason={props.reason} onChange={props.onDraft} onSend={props.onSend} /> : null}
+      {!props.loading && !props.error ? (props.footer ?? <TeamChatComposer text={props.draft} placeholder={placeholder} reason={props.reason} onChange={props.onDraft} onSend={props.onSend} />) : null}
     </main>
   );
 }

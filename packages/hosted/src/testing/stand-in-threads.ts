@@ -41,6 +41,7 @@ export interface StandInPeer {
 export interface StandInThreadSeed {
   projectId: string | null;
   title: string;
+  createdAt?: string;
   status?: "idle" | "working" | "needs_answer";
   branch?: string;
   agent?: "claude" | "codex" | "opencode";
@@ -425,7 +426,7 @@ export class StandInThreads {
   /** A thread the person started, in the space of its project. Answers its id. */
   addThread(email: string, seed: StandInThreadSeed): string {
     const id = randomUUID();
-    const at = new Date().toISOString();
+    const at = seed.createdAt ?? new Date().toISOString();
     const thread: Thread = {
       id,
       space: this.spaces.spaceOfProject(seed.projectId, email),

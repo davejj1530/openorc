@@ -36,7 +36,7 @@ export class Follower {
   readonly #tickets = new Map<string, symbol>();
 
   /** `on`: requests about a thread, in its space. */
-  constructor(private readonly deps: { session: Session; on(threadId: string): Requests } & Pick<HostedDeps, "push" | "log">) {
+  constructor(private readonly deps: { session: Session; on(threadId: string): Requests; completed(threadId: string, seq: number): void } & Pick<HostedDeps, "push" | "log">) {
     let generation = deps.session.generation;
     deps.session.onSocket(SOCKET.events, (body) => this.#onFrame(body));
     deps.session.onSocket(SOCKET.threadChanged, (body) => this.#onChanged(body));
@@ -167,6 +167,7 @@ export class Follower {
     this.#cursors.set(threadId, events.at(-1)!.seq);
     const frame = toFrame(threadId, events);
     if (frame) this.deps.push({ type: "frame", frame });
+    for (const entry of events) if (entry.event["type"] === "turn.completed") this.deps.completed(threadId, entry.seq);
     this.#renew(threadId);
   }
 

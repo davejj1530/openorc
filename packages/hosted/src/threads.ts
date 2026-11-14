@@ -1,10 +1,11 @@
 /**
  * Hosted threads behind the app's own calls: the `HostedThreads` of index.ts.
  *
- * State, written only here and only from what the server answered:
+ * State kept here:
  *   heard   the thread rows and projects of every space the person is in, each row and project with its space, who
  *           the person is, the address they were read for and when. Kept through `deps.kept("threads")`, so rows show
  *           offline and after a restart, and forgotten on sign-out.
+ *   names   the account's completed title checks and retry positions, advanced by ThreadNames.
  *
  * Each question is one step through it: who owns an id is a lookup in the rows (a run id carries its thread); the
  * sidebar's rows are the rows filtered in memory; one thread is one row, and every request about it is made in its
@@ -30,7 +31,7 @@ import type { Account } from "./account.js";
 import type { SpaceCatalog, Spaces } from "./spaces.js";
 import { spaceProjects } from "./space-projects.js";
 import { AccountCache } from "./account-cache.js";
-import { ThreadNames } from "./thread-names.js";
+import { keptThreadNames, ThreadNames } from "./thread-names.js";
 import { askNotice, endNotice, noticed } from "./notices.js";
 import * as sends from "./sends.js";
 import { Refused, type Requests, type Session, type SessionChange } from "./session.js";
@@ -59,6 +60,7 @@ const keptThreads = z.object({
   rows: z.array(heardRow),
   projects: z.array(heardProject),
   here: z.record(z.string(), kept).default({}),
+  names: keptThreadNames.default({}),
 });
 type Heard = z.infer<typeof keptThreads>;
 
@@ -87,7 +89,7 @@ export class Threads implements HostedThreads {
 
   constructor(private readonly deps: ThreadsDeps) {
     this.#cache = new AccountCache({ kept: deps.kept, part: "threads", server: deps.server, schema: keptThreads });
-    this.#names = new ThreadNames({ nameThread: deps.nameThread, log: deps.log, on: (id) => this.on(id), saved: (row) => this.#hearRow(row) });
+    this.#names = new ThreadNames({ nameThread: deps.nameThread, now: deps.now, log: deps.log, on: (id) => this.on(id), saved: (row) => this.#hearRow(row), keep: () => this.#save() });
     this.calls = {
       on: (threadId) => this.on(threadId),
       row: (threadId) => this.row(threadId),
@@ -305,6 +307,7 @@ export class Threads implements HostedThreads {
     }
     const first = await space.request(ROUTES.events(threadId, { fromTurn }, READ_LIMIT));
     const events = await this.#readOn(space, threadId, first.events, first.head);
+    this.#names.observed(threadId, events, first.fromTurn ?? fromTurn);
     return { events: events.map((event) => toAppEvent(threadId, event)), fromTurn: first.fromTurn ?? fromTurn, live: runsNow(row, this.reach) };
   }
 
@@ -315,7 +318,13 @@ export class Threads implements HostedThreads {
     await this.deps.follower.follow(threadId);
     const first = await space.request(ROUTES.events(threadId, { after }, READ_LIMIT));
     const events = await this.#readOn(space, threadId, first.events, first.head);
+    if (after === 0) this.#names.observed(threadId, events, 0);
     return events.map((event) => toAppEvent(threadId, event));
+  }
+
+  /** A completion delivered to an open conversation can name its first turn even beyond discovery's age limit. */
+  completed(threadId: string, seq: number): void {
+    this.#names.completed(threadId, seq);
   }
 
   /** Stops one command the agent left running in the background, as the Stop beside it on this Mac does. */
@@ -380,8 +389,9 @@ export class Threads implements HostedThreads {
     const projectsBefore = JSON.stringify(this.#heard?.projects);
     if (this.#heard?.email === state.email) this.#tellPerson(this.#heard.rows, read.rows);
     this.#forgetRemoved(read.rows);
-    this.#heard = { email: state.email, heardAt: this.deps.now(), ...read, here: this.#heard?.email === state.email ? this.#heard.here : {} };
-    this.#names.refresh(read.rows, read.me);
+    const previous = this.#heard?.email === state.email ? this.#heard : null;
+    this.#heard = { email: state.email, heardAt: this.deps.now(), ...read, here: previous?.here ?? {}, names: previous?.names ?? {} };
+    this.#names.refresh(read.rows, read.me, this.#heard.names);
     this.#save();
     if (JSON.stringify([this.#heard.rows, this.#heard.projects]) !== before) this.#tell();
     // Settings shows which of this Mac's projects are on OpenOrc Cloud, read off these.

@@ -7,7 +7,7 @@ import type { HarnessId } from "@openorc/protocol";
 
 const TITLE_PROMPT = `Name this conversation between a user and a coding agent.
 Return ONLY minified JSON, no prose, no code fences: {"title":string}
-Rules: 3 to 6 words, sentence case, no quotes and no trailing period. Name the subject, not the request: "Sidebar collapse and traffic lights", not "Fix the sidebar".`;
+Rules: 2 to 4 words and at most 28 characters, sentence case, no quotes and no trailing period. Name the subject, not the request: "Sidebar traffic lights", not "Fix the sidebar".`;
 
 /** Codex enforces this schema on the title reply. */
 const TITLE_SCHEMA = { type: "object", additionalProperties: false, required: ["title"], properties: { title: { type: "string" } } };

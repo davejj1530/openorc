@@ -406,9 +406,7 @@
      measurements and must not scale. Linux measures its own window controls instead, since
      the desktop picks their end and size (lib/window.ts); these values stay macOS's and Windows'. */
   --spacing-well: 8px;
-  /* macOS's traffic lights start on the sidebar's 20px inset, which scales with the UI; their own 52px and the 18px
-     after them do not. */
-  --spacing-traffic: var(--window-controls-left, calc(20px + 70px / var(--window-zoom, 1)));
+  --spacing-traffic: var(--window-controls-left, calc(86px / var(--window-zoom, 1)));
   --spacing-controls: var(--window-controls-right, calc(140px / var(--window-zoom, 1)));
 }
 

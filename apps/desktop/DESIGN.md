@@ -227,7 +227,7 @@ Replies and prompts are 14/21; code is 12.5/20. Single-line rows use 16px leadin
 
 ## Layout
 
-The window has one navigation column, a conversation or destination, and an optional work panel. Toolbars are `max(52px, 32px / zoom)` and line up with the traffic lights, whose left edge sits on the sidebar's 20px inset. The sidebar defaults to 272px, resizes from 224 to 380, and respects saved widths. The panel defaults to 640px within 340 to 900.
+The window has one navigation column, a conversation or destination, and an optional work panel. Toolbars are `max(52px, 32px / zoom)` and line up with the traffic lights at x16. The sidebar defaults to 272px, resizes from 224 to 380, and respects saved widths. The panel defaults to 640px within 340 to 900.
 
 The conversation column is at most 800px with 32px reading gutters; the composer uses 24px. Both shrink to 12px at 520px and below and in narrow panes. Each column owns its scrolling. Split conversations keep their own header and panel ownership.
 

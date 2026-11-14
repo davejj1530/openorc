@@ -14,6 +14,7 @@ import { TaskNewFields } from "../components/task-list/TaskNewFields";
 import { OnlineNewTask } from "../components/task-online/NewTask";
 import { useTaskOnlineScope } from "../lib/task-online-query";
 import { ExecutionLocationSelect } from "../components/TaskExecutionSettings";
+import { TaskContentGate } from "../components/task-online/TaskContentGate";
 
 function newTaskProjectGate(input: { error: Error | null; loading: boolean; empty: boolean; retry: () => void; importProject: () => void }): ReactNode {
   if (input.error)
@@ -94,6 +95,14 @@ function NewTaskLocation(props: {
 }
 
 export function NewTask({ projectId, threadId }: { projectId?: string; threadId?: string }) {
+  return (
+    <TaskContentGate>
+      <NewTaskSource projectId={projectId} threadId={threadId} />
+    </TaskContentGate>
+  );
+}
+
+function NewTaskSource({ projectId, threadId }: { projectId?: string; threadId?: string }) {
   const { scope, status } = useTaskOnlineScope();
   if (scope) return <OnlineNewTask key={JSON.stringify([scope.accountId, scope.spaceId, projectId, threadId])} scope={scope} projectId={projectId} threadId={threadId} />;
   if (status.isLoading) return <div className="document-skeleton" aria-label="Loading projects" />;

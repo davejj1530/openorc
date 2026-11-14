@@ -2,11 +2,16 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { onlineTaskKey, onlineTaskTags } from "@openorc/client";
 import type { OnlineTaskRef } from "@openorc/protocol";
 import { core } from "./rpc";
+import { readTaskContent } from "./task-access-cache";
+import { organizationContentGate } from "./organization-content-gate";
 
 export function useTaskHistory(reference: OnlineTaskRef) {
   const history = useInfiniteQuery({
     queryKey: onlineTaskKey(reference, "activity", { id: reference.id }),
-    queryFn: ({ pageParam }) => core.call("tasks.online.activity", { spaceId: reference.spaceId, id: reference.id, limit: 100, ...(pageParam && { cursor: pageParam }) }),
+    queryFn: ({ pageParam }) =>
+      readTaskContent(organizationContentGate, reference, () =>
+        core.call("tasks.online.activity", { spaceId: reference.spaceId, id: reference.id, limit: 100, ...(pageParam && { cursor: pageParam }) }),
+      ),
     initialPageParam: "",
     getNextPageParam: (page) => page.cursor ?? undefined,
     meta: { tags: onlineTaskTags(reference.spaceId) },

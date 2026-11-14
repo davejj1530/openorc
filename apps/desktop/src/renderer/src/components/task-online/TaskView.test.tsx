@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -7,6 +7,9 @@ import { TaskListView } from "../../views/TaskList";
 import { core } from "../../lib/rpc";
 import { queryClient } from "../../lib/client";
 import { onlineReference, onlineTask } from "../../lib/test-fixtures/online-task";
+import { clearOnlineTaskListState } from "../../lib/task-list-state";
+import { taskAccess } from "../../lib/test-fixtures/task-access";
+import { organizationContentGate } from "../../lib/organization-content-gate";
 
 const navigation = vi.hoisted(() => ({
   current: "org:studio",
@@ -28,9 +31,11 @@ vi.mock("../ScopedTitle", () => ({ ScopedTitle: ({ children }: { children: React
 vi.mock("../DocumentEditor", () => ({ DocumentEditor: () => <div /> }));
 let task = onlineTask();
 let getFails = false;
+let access = taskAccess();
 const completed = onlineTask({ id: "task-completed", title: "Finished server work", status: "done" });
 beforeEach(() => {
   localStorage.clear();
+  clearOnlineTaskListState(["org:studio"]);
   navigation.current = "org:studio";
   task = onlineTask({
     assignee: { userId: "account-a", memberId: "member-a", name: "Alex", image: null, available: true },
@@ -38,6 +43,7 @@ beforeEach(() => {
     viewer: { ...onlineTask().viewer, unseenAssignment: true, attention: ["assignment"] },
   });
   getFails = false;
+  access = taskAccess();
   Element.prototype.scrollIntoView = vi.fn();
   vi.stubGlobal(
     "ResizeObserver",
@@ -48,6 +54,7 @@ beforeEach(() => {
     },
   );
   vi.mocked(core.call).mockImplementation(async (method, params) => {
+    if (method === "spaces.refresh") return { ...access, heardAt: Date.now() };
     if (method === "tasks.online.state") return { state: "ready", ...onlineReference, execution: false, personal: false };
     if (method === "tasks.online.list") return { accessRevision: 1, tasks: "status" in params && params.status === "done" ? [completed] : [task], cursor: null };
     if (method === "tasks.online.get") {
@@ -66,6 +73,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  organizationContentGate.reset();
   queryClient.clear();
   vi.resetAllMocks();
   vi.unstubAllGlobals();
@@ -105,4 +113,36 @@ it("reads the server's Done shelf instead of filtering an active-only page", asy
   fireEvent.click(await screen.findByRole("menuitemradio", { name: "Done" }));
   await screen.findByText(completed.title);
   expect(core.call).toHaveBeenCalledWith("tasks.online.list", expect.objectContaining({ status: "done", spaceId: onlineReference.spaceId }));
+});
+
+it("shows the selected shelf immediately while the previous list is held under the pointer", async () => {
+  render(wrap(<TaskListView onNewTask={() => {}} />));
+  await screen.findByText(task.title);
+  fireEvent.click(screen.getByRole("button", { name: "Filter tasks" }));
+  fireEvent.click(await screen.findByRole("menuitemradio", { name: "Done" }));
+  const done = await screen.findByText(completed.title);
+  fireEvent.pointerEnter(done.closest(".task-list")!);
+  fireEvent.click(screen.getByRole("button", { name: /Filter tasks/ }));
+  fireEvent.click(await screen.findByRole("menuitemradio", { name: "Active" }));
+  expect(screen.getByText(task.title)).toBeTruthy();
+});
+
+it("replaces an open protected document with the shared frozen screen while retaining the person's words", async () => {
+  render(wrap(<OnlineTaskView reference={onlineReference} tab="spec" />));
+  fireEvent.change(await screen.findByRole("textbox", { name: "Task title" }), { target: { value: "My unsaved words" } });
+  access = { ...access, organizationAccess: { state: "frozen", reason: "seat_removed", until: null, message: "Your day of grace has ended." } };
+  await act(async () => {
+    await organizationContentGate.refresh();
+  });
+  await screen.findByText("Your day of grace has ended.");
+  expect(screen.queryByRole("textbox", { name: "Task title" })).toBeNull();
+  expect(screen.queryByText(task.title)).toBeNull();
+  expect(Object.values(localStorage).join(" ")).toContain("My unsaved words");
+  expect(
+    queryClient
+      .getQueryCache()
+      .findAll({ queryKey: ["online-tasks"] })
+      .filter((query) => query.state.data !== undefined),
+  ).toHaveLength(0);
+  expect(vi.mocked(core.call).mock.calls.some(([method]) => method === "tasks.update" || method === "tasks.online.update")).toBe(false);
 });

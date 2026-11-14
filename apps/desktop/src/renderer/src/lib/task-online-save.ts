@@ -8,7 +8,7 @@ import { validateOnlineTaskSpec } from "./task-online-spec";
 
 export function useTaskOnlineSave(reference: OnlineTaskRef, task: OnlineTask) {
   const storageId = taskRefKey(reference);
-  const mutation = useTaskOnlineMutation("tasks.online.update");
+  const mutation = useTaskOnlineMutation(reference, "tasks.online.update");
   const write = useRef(mutation.mutateAsync);
   write.current = mutation.mutateAsync;
   const [controller] = useState(

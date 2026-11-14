@@ -2,11 +2,16 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { onlineTaskKey, onlineTaskTags } from "@openorc/client";
 import { core } from "./rpc";
 import type { TaskOnlineScope } from "./task-online-query";
+import { readTaskContent } from "./task-access-cache";
+import { organizationContentGate } from "./organization-content-gate";
 
 export function useTaskRoster(scope: TaskOnlineScope, projectId: string, enabled: boolean, search: string) {
   const roster = useInfiniteQuery({
     queryKey: onlineTaskKey(scope, "assignees", { projectId, search }),
-    queryFn: ({ pageParam }) => core.call("tasks.online.assignees", { spaceId: scope.spaceId, projectId, ...(search && { query: search }), ...(pageParam && { cursor: pageParam }) }),
+    queryFn: ({ pageParam }) =>
+      readTaskContent(organizationContentGate, scope, () =>
+        core.call("tasks.online.assignees", { spaceId: scope.spaceId, projectId, ...(search && { query: search }), ...(pageParam && { cursor: pageParam }) }),
+      ),
     initialPageParam: "",
     getNextPageParam: (page) => page.cursor ?? undefined,
     meta: { tags: onlineTaskTags(scope.spaceId) },

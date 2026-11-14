@@ -15,8 +15,17 @@ import { TaskWorkspace } from "../task-list/TaskWorkspace";
 import { Button, Empty } from "../ui";
 import { OnlineTaskDocument } from "./TaskDocument";
 import { TaskOnlineHistory } from "./TaskHistory";
+import { TaskContentGate } from "./TaskContentGate";
 
 export function OnlineTaskView({ reference, tab }: { reference: OnlineTaskRef; tab: TaskTab }) {
+  return (
+    <TaskContentGate spaceId={reference.spaceId}>
+      <OnlineTaskRead reference={reference} tab={tab} />
+    </TaskContentGate>
+  );
+}
+
+function OnlineTaskRead({ reference, tab }: { reference: OnlineTaskRef; tab: TaskTab }) {
   const { scope } = useTaskOnlineScope();
   const allowed = scope?.accountId === reference.accountId && scope.spaceId === reference.spaceId;
   const query = useTaskOnlineQuery(allowed ? reference : null, "tasks.online.get", { spaceId: reference.spaceId, id: reference.id });

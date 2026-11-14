@@ -69,7 +69,7 @@ export function OnlineTaskDocument({
             onPriority={(priority) => void controller.property({ priority })}
           />
           <TaskLinks task={task} beforeOpen={flush} />
-          <TaskOnlineDelete task={task} beforeDelete={flush} getTask={() => controller.getSnapshot().task} pending={pending} />
+          <TaskOnlineDelete reference={reference} task={task} beforeDelete={flush} getTask={() => controller.getSnapshot().task} pending={pending} />
         </article>
       </div>
       <footer className="document-footer">

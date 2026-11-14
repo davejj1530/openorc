@@ -4,15 +4,20 @@ import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { useTaskRoster } from "./task-roster";
 import { core } from "./rpc";
+import { organizationContentGate } from "./organization-content-gate";
+import { taskAccess } from "./test-fixtures/task-access";
 
 vi.mock("./rpc", () => ({ core: { call: vi.fn() } }));
 afterEach(() => {
   cleanup();
+  organizationContentGate.reset();
   vi.resetAllMocks();
 });
 it("hides previously read people when the roster read is refused", async () => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const person = { memberId: "member-a", userId: "account-a", name: "Alex", image: null, available: true };
+  vi.mocked(core.call).mockResolvedValueOnce(taskAccess("account-a", "space-a"));
+  await organizationContentGate.refresh();
   vi.mocked(core.call)
     .mockResolvedValueOnce({ accessRevision: 1, people: [person], cursor: null })
     .mockRejectedValueOnce(new Error("Project access changed"));

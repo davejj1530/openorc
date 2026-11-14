@@ -17,6 +17,16 @@ export const keepTaskListScroll = (key: string, value: number): void => {
   positions.set(key, value);
 };
 
+export function clearOnlineTaskListState(spaceIds: readonly string[]): void {
+  for (const entries of [saved, positions]) {
+    for (const key of entries.keys()) {
+      const scope: unknown = JSON.parse(key);
+      if (Array.isArray(scope) && typeof scope[1] === "string" && spaceIds.includes(scope[1])) entries.delete(key);
+    }
+  }
+  listeners.forEach((listener) => listener());
+}
+
 /** Organization preferences stay with the account and space; Personal keeps its existing component state. */
 export function useTaskListFilters(scope: TaskOnlineScope | null) {
   const key = scope ? JSON.stringify([scope.accountId, scope.spaceId]) : null;

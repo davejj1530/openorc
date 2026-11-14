@@ -14,7 +14,7 @@ import { useSpaceNavigation, spaceNavigation } from "./space-navigation";
 type Draft = { title: string; spec: string; projectId: string; priority: TaskPriority };
 export function useNewOnlineTask(scope: TaskOnlineScope, projectId?: string, threadId?: string) {
   const projects = useTaskProjects(scope);
-  const mutation = useTaskOnlineMutation("tasks.online.create");
+  const mutation = useTaskOnlineMutation(scope, "tasks.online.create");
   const write = useRef(mutation.mutateAsync);
   write.current = mutation.mutateAsync;
   const [creator] = useState(() => new TaskCreateDraft((input) => write.current(input)));

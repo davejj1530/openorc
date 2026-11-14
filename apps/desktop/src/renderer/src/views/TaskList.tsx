@@ -13,6 +13,7 @@ import { useTaskListSource } from "../lib/task-list-source";
 import { useTaskOnlineScope } from "../lib/task-online-query";
 import { useTaskListFilters, type TaskShelf } from "../lib/task-list-state";
 import type { TaskRecord } from "../lib/task-records";
+import { TaskContentGate } from "../components/task-online/TaskContentGate";
 import "./pages.css";
 
 function taskListBody(input: {
@@ -23,6 +24,7 @@ function taskListBody(input: {
   stage: TaskStatus | null;
   showProject: boolean;
   memoryKey: string | null;
+  rowKey: string | null;
   retry: () => void;
 }): ReactNode {
   if (input.error)
@@ -32,12 +34,20 @@ function taskListBody(input: {
       </Empty>
     );
   if (input.loading) return <div className="document-skeleton" aria-label="Loading tasks" />;
-  if (input.list.length > 0) return <TaskRows key={input.memoryKey ?? "local"} tasks={input.list} showProject={input.showProject} memoryKey={input.memoryKey} />;
+  if (input.list.length > 0) return <TaskRows key={input.rowKey ?? "local"} tasks={input.list} showProject={input.showProject} memoryKey={input.memoryKey} />;
   if (input.stage) return <Empty title={`No ${statusLabel[input.stage].toLowerCase()} tasks`} />;
   return <Empty title={input.shelf === "active" ? "No tasks yet" : `No ${input.shelf} tasks`} />;
 }
 
 export function TaskListView({ onNewTask }: { onNewTask: () => void }) {
+  return (
+    <TaskContentGate>
+      <TaskListContent onNewTask={onNewTask} />
+    </TaskContentGate>
+  );
+}
+
+function TaskListContent({ onNewTask }: { onNewTask: () => void }) {
   const projectId = useLayout(focusedProject);
   const { scope } = useTaskOnlineScope();
   const filters = useTaskListFilters(scope);
@@ -75,7 +85,17 @@ export function TaskListView({ onNewTask }: { onNewTask: () => void }) {
         <ScopedTitle>Tasks</ScopedTitle>
       </TopBar>
       <div className="page-column list-page">
-        {taskListBody({ error: tasks.error, loading: tasks.isLoading, list, shelf, stage, showProject: !projectId, memoryKey: filters.key, retry: () => void tasks.refetch() })}
+        {taskListBody({
+          error: tasks.error,
+          loading: tasks.isLoading,
+          list,
+          shelf,
+          stage,
+          showProject: !projectId,
+          memoryKey: filters.key,
+          rowKey: filters.key ? JSON.stringify([filters.key, projectId, shelf, stage, filters.assigned]) : null,
+          retry: () => void tasks.refetch(),
+        })}
       </div>
     </>
   );

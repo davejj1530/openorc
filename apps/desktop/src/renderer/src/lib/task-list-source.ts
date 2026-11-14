@@ -7,11 +7,13 @@ import { localTaskRecord, onlineTaskRecord } from "./task-records";
 import { useTaskOnlineScope, useTaskOnlineQuery, type TaskOnlineScope } from "./task-online-query";
 import { composedTaskAttention } from "./task-attention";
 import type { TaskShelf } from "./task-list-state";
+import { readTaskContent } from "./task-access-cache";
+import { organizationContentGate } from "./organization-content-gate";
 
 export function useTaskProjects(scope: TaskOnlineScope | null) {
   return useQuery({
     queryKey: ["online-tasks", scope?.accountId, scope?.spaceId, "projects"],
-    queryFn: () => core.call("spaces.projects", { spaceId: scope?.spaceId ?? "" }),
+    queryFn: () => readTaskContent(organizationContentGate, scope, () => core.call("spaces.projects", { spaceId: scope?.spaceId ?? "" })),
     meta: { tags: onlineTaskTags(scope?.spaceId ?? "") },
     enabled: Boolean(scope),
     retry: false,
@@ -32,7 +34,7 @@ function useOnlineTaskList(projectId: string | null, assignedToMe: boolean, shel
   const enabled = Boolean(scope && projects.data && (!projectId || selected?.hostedProjectId));
   const online = useQuery({
     queryKey: scope ? onlineTaskKey(scope, "list", { ...input, selected: projectId }) : ["online-tasks", "disabled-list"],
-    queryFn: () => readOnlineTaskPages((page) => core.call("tasks.online.list", page), input),
+    queryFn: () => readTaskContent(organizationContentGate, scope, () => readOnlineTaskPages((page) => core.call("tasks.online.list", page), input)),
     meta: { tags: onlineTaskTags(input.spaceId) },
     enabled,
     retry: false,

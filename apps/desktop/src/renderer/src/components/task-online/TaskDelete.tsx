@@ -1,15 +1,27 @@
 import { useRef, useState } from "react";
-import type { OnlineTask, OnlineTaskParams } from "@openorc/protocol";
+import type { OnlineTask, OnlineTaskParams, OnlineTaskRef } from "@openorc/protocol";
 import { useTaskOnlineMutation } from "../../lib/task-online-query";
 import { useRouter } from "../../lib/router";
 import { Trash2 } from "../icons";
 import { Button, Dialog, TextButton, Tooltip } from "../ui";
 
-export function TaskOnlineDelete({ task, beforeDelete, getTask, pending }: { task: OnlineTask; beforeDelete(): Promise<boolean>; getTask(): OnlineTask; pending: boolean }) {
+export function TaskOnlineDelete({
+  reference,
+  task,
+  beforeDelete,
+  getTask,
+  pending,
+}: {
+  reference: OnlineTaskRef;
+  task: OnlineTask;
+  beforeDelete(): Promise<boolean>;
+  getTask(): OnlineTask;
+  pending: boolean;
+}) {
   const [confirming, setConfirming] = useState(false);
   const [conflict, setConflict] = useState(false);
   const request = useRef<OnlineTaskParams<"tasks.online.delete"> | null>(null);
-  const remove = useTaskOnlineMutation("tasks.online.delete");
+  const remove = useTaskOnlineMutation(reference, "tasks.online.delete");
   if (!task.viewer.mayDelete) return null;
   const reason = task.viewer.liveExecution ? "Wait for this task’s current turn to finish before deleting it." : undefined;
   const confirm = async () => {

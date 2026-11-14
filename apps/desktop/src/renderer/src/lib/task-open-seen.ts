@@ -4,7 +4,7 @@ import { useTaskOnlineMutation } from "./task-online-query";
 
 /** Visibility in a list is never an acknowledgement; the mounted Overview names one generation. */
 export function useTaskOpenSeen(reference: OnlineTaskRef, task: OnlineTask, open: boolean) {
-  const seen = useTaskOnlineMutation("tasks.online.seen");
+  const seen = useTaskOnlineMutation(reference, "tasks.online.seen");
   const attempted = useRef<number | null>(null);
   const write = useRef(seen.mutate);
   write.current = seen.mutate;

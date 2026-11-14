@@ -516,38 +516,6 @@
   min-width: 0;
   margin-bottom: 10px;
 }
-/* Under a started thread's composer: where it works, then the account it runs on at the line's end. */
-.thread-place-line {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  min-width: 0;
-  padding: 0 6px;
-  color: var(--ink-4);
-  font-size: var(--text-sm);
-  line-height: var(--text-sm--line-height);
-}
-.thread-place-line[data-dim] .composer-text-choice {
-  opacity: 0.6;
-}
-.thread-place-line .new-thread-sentence .composer-branch {
-  color: inherit;
-}
-.thread-place-fact {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-.thread-place-account {
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-/* The place's actions end in the thread menu's hairline before its other items; here there are none after. */
-.thread-place-menu > [role="separator"]:last-child {
-  display: none;
-}
 .composer-branch {
   min-width: 0;
   overflow: hidden;

@@ -68,6 +68,7 @@ export function TeamChatReactionPicker({
       className="orcling-react-bar"
       role="toolbar"
       aria-label="Reactions"
+      aria-hidden={!open}
       inert={!open}
       onKeyDown={(event) => {
         if (event.key === "Escape") {

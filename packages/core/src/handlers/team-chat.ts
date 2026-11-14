@@ -14,6 +14,12 @@ export function createTeamChatHandlers(chat: ChatCalls | null): Pick<Handlers, k
   return {
     "teamChat.state": (input) => chat?.state(input) ?? { state: "unavailable" },
     "teamChat.openDm": (input) => requireChat().openDm(input),
+    "teamChat.conversation": (input) => requireChat().conversation(input),
+    "teamChat.createChannel": (input) => requireChat().createChannel(input),
+    "teamChat.joinChannel": (input) => requireChat().joinChannel(input),
+    "teamChat.leaveChannel": (input) => requireChat().leaveChannel(input),
+    "teamChat.addMembers": (input) => requireChat().addMembers(input),
+    "teamChat.removeMember": (input) => requireChat().removeMember(input),
     "teamChat.timeline": (input) => requireChat().timeline(input),
     "teamChat.send": (input) => requireChat().send(input),
     "teamChat.react": (input) => requireChat().react(input),

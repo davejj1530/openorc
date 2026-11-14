@@ -95,6 +95,30 @@ export class TeamChat {
     return this.#request(spaceId, CHAT_ROUTES.timeline(conversationId, cursor));
   }
 
+  conversation({ spaceId, conversationId }: RpcParams<"teamChat.conversation">) {
+    return this.#request(spaceId, CHAT_ROUTES.conversation(conversationId));
+  }
+
+  createChannel({ spaceId, ...input }: RpcParams<"teamChat.createChannel">) {
+    return this.#change(spaceId, CHAT_ROUTES.createChannel, input);
+  }
+
+  joinChannel({ spaceId, conversationId }: RpcParams<"teamChat.joinChannel">) {
+    return this.#change(spaceId, CHAT_ROUTES.joinChannel(conversationId));
+  }
+
+  leaveChannel({ spaceId, conversationId }: RpcParams<"teamChat.leaveChannel">) {
+    return this.#change(spaceId, CHAT_ROUTES.leaveChannel(conversationId));
+  }
+
+  addMembers({ spaceId, conversationId, userIds }: RpcParams<"teamChat.addMembers">) {
+    return this.#change(spaceId, CHAT_ROUTES.addMembers(conversationId), { userIds });
+  }
+
+  removeMember({ spaceId, conversationId, userId }: RpcParams<"teamChat.removeMember">) {
+    return this.#change(spaceId, CHAT_ROUTES.removeMember(conversationId, userId));
+  }
+
   async send({ spaceId, conversationId, id, body }: RpcParams<"teamChat.send">) {
     const message = await this.#request(spaceId, CHAT_ROUTES.send(conversationId), { id, body, parentId: null, fileIds: [] });
     this.#invalidate(spaceId, conversationId);
@@ -167,6 +191,14 @@ export class TeamChat {
       if (route.method !== "GET" || (this.#reads.get(spaceId) ?? 0) === readRevision) return result;
     }
     throw changedSession();
+  }
+
+  async #change<T>(spaceId: string, route: Route<T>, body?: unknown): Promise<T> {
+    try {
+      return await this.#request(spaceId, route, body);
+    } finally {
+      this.#invalidate(spaceId);
+    }
   }
 
   #invalidate(spaceId?: string, conversationId?: string): void {

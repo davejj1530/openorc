@@ -3,32 +3,37 @@ import { TeamChatReaction, teamChatRpcParams, type TeamChatPerson, type TeamConv
 import { chatWatch } from "../wire-chat.js";
 import { userOf, type StandInSpaces } from "./stand-in-spaces.js";
 import type { StandInPeer, StandInThreads } from "./stand-in-threads.js";
+import { StandInChatChannels } from "./stand-in-chat-channels.js";
 
 type Reply = { status: number; body: unknown };
 type Request = { method: string; path: string; query: URLSearchParams; space: string | null };
-type Record = { spaceId: string; conversation: TeamConversation; messages: TeamMessage[] };
+export type StandInChatRecord = { spaceId: string; conversation: TeamConversation; messages: TeamMessage[]; creatorId: string | null };
 const absent = (): Reply => ({ status: 404, body: { message: "That conversation isn't here." } });
 
 /** A real-transport fixture for the flat desktop contract, with explicit access and retry identity. */
 export class StandInChat {
   enabled = false;
+  channelsEnabled = false;
   readonly frozen = new Set<string>();
-  readonly records = new Map<string, Record>();
+  readonly records = new Map<string, StandInChatRecord>();
   readonly #watches = new WeakMap<StandInPeer, Map<string, { spaceId: string; conversationId: string }>>();
+  readonly #channels: StandInChatChannels;
 
-  constructor(private readonly deps: { spaces: StandInSpaces; peers(): StandInPeer[]; person(email: string): { name: string; image: string | null } }) {}
+  constructor(private readonly deps: { spaces: StandInSpaces; peers(): StandInPeer[]; person(email: string): { name: string; image: string | null } }) {
+    this.#channels = new StandInChatChannels(this, deps.spaces);
+  }
 
   people(spaceId: string): TeamChatPerson[] {
     return this.deps.spaces.readers(spaceId).map((email) => ({ id: userOf(email), ...this.deps.person(email) }));
   }
 
-  seed(spaceId: string, input: { name?: string; userIds?: string[]; private?: boolean } = {}): TeamConversation {
+  seed(spaceId: string, input: { name?: string; topic?: string; userIds?: string[]; private?: boolean; creatorId?: string } = {}): TeamConversation {
     const members = this.people(spaceId).filter((person) => !input.userIds || input.userIds.includes(person.id));
     const conversation: TeamConversation = {
       id: randomUUID(),
       kind: input.userIds && !input.name ? "dm" : "channel",
       name: input.name ?? null,
-      topic: null,
+      topic: input.topic || null,
       private: input.private ?? false,
       members,
       joined: true,
@@ -40,7 +45,7 @@ export class StandInChat {
       lastMessageSeq: 0,
       read: null,
     };
-    this.records.set(conversation.id, { spaceId, conversation, messages: [] });
+    this.records.set(conversation.id, { spaceId, conversation, messages: [], creatorId: input.creatorId ?? members[0]?.id ?? null });
     return conversation;
   }
 
@@ -60,7 +65,7 @@ export class StandInChat {
       return {
         status: 200,
         body: {
-          features: ["base"],
+          features: this.channelsEnabled ? ["base", "channels"] : ["base"],
           people: this.people(spaceId),
           conversations: this.#in(spaceId)
             .filter((record) => this.#readable(record, who))
@@ -72,6 +77,8 @@ export class StandInChat {
 
   #conversationRoute(request: Request, spaceId: string, who: string, body: unknown): Reply {
     if (request.method === "POST" && request.path === "/chat/dms") return this.#open(spaceId, who, body);
+    const channel = this.#channels.route(request, spaceId, who, body);
+    if (channel) return channel;
     const route = /^\/chat\/conversations\/([^/]+)(?:\/(timeline|messages))?$/.exec(request.path);
     if (route) {
       const record = this.records.get(decodeURIComponent(route[1] ?? ""));
@@ -109,10 +116,10 @@ export class StandInChat {
     return { ...parsed.data, ok };
   }
 
-  #in(spaceId: string): Record[] {
+  #in(spaceId: string): StandInChatRecord[] {
     return [...this.records.values()].filter((record) => record.spaceId === spaceId);
   }
-  #readable(record: Record, who: string): boolean {
+  #readable(record: StandInChatRecord, who: string): boolean {
     return (
       !this.frozen.has(who) &&
       this.deps.spaces.readers(record.spaceId).includes(who) &&
@@ -120,7 +127,7 @@ export class StandInChat {
     );
   }
   #view(conversation: TeamConversation, who: string): TeamConversation {
-    return { ...conversation, joined: conversation.members.some((person) => person.id === userOf(who)) };
+    return this.#channels.view(conversation, who);
   }
 
   #open(spaceId: string, who: string, body: unknown): Reply {
@@ -135,7 +142,7 @@ export class StandInChat {
     return { status: 200, body: prior?.conversation ?? this.seed(spaceId, { userIds }) };
   }
 
-  #timeline(record: Record, query: URLSearchParams): Reply {
+  #timeline(record: StandInChatRecord, query: URLSearchParams): Reply {
     const before = query.has("beforeSeq") ? Number(query.get("beforeSeq")) : Infinity;
     const after = query.has("afterSeq") ? Number(query.get("afterSeq")) : 0;
     const matching = record.messages.filter((message) => message.seq < before && message.seq > after);
@@ -152,7 +159,7 @@ export class StandInChat {
     };
   }
 
-  #send(record: Record, who: string, body: unknown): Reply {
+  #send(record: StandInChatRecord, who: string, body: unknown): Reply {
     const fields = body && typeof body === "object" ? body : {};
     const { parentId: _parent, fileIds: _files, ...text } = { parentId: null, fileIds: [], ...fields };
     const input = teamChatRpcParams["teamChat.send"].safeParse({ ...text, spaceId: record.spaceId, conversationId: record.conversation.id });

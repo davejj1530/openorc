@@ -8,6 +8,16 @@ export const CHAT_ROUTES = {
   state: route("GET", "/chat/state", TeamChatState),
   openDm: route("POST", "/chat/dms", TeamConversation),
   conversation: (id: string) => route("GET", conversationPath(id), TeamConversation),
+  createChannel: route("POST", "/chat/channels", TeamConversation),
+  joinChannel: (id: string) => route("POST", `${conversationPath(id)}/join`, TeamConversation),
+  leaveChannel: (id: string) =>
+    route(
+      "POST",
+      `${conversationPath(id)}/leave`,
+      z.null().transform(() => ({})),
+    ),
+  addMembers: (id: string) => route("POST", `${conversationPath(id)}/members`, TeamConversation),
+  removeMember: (id: string, userId: string) => route("DELETE", `${conversationPath(id)}/members/${encodeURIComponent(userId)}`, TeamConversation),
   timeline: (id: string, cursor: { beforeSeq?: number; afterSeq?: number }) => {
     let query = "";
     if (cursor.beforeSeq !== undefined) query = `?beforeSeq=${cursor.beforeSeq}`;

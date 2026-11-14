@@ -6,7 +6,7 @@ import { Tooltip } from "./ui";
 /** Menu items remain in the arrow-key path while disabled, so the same trigger can explain why. */
 export function HostedMenuReason({ parts: M, reason, children }: { parts: MenuParts; reason: string; children: ReactNode }) {
   return (
-    <Tooltip label={reason} render={<M.Item className={menuItem} disabled closeOnClick={false} />}>
+    <Tooltip label={reason} positionerClassName="z-50" render={<M.Item className={menuItem} disabled closeOnClick={false} />}>
       {children}
     </Tooltip>
   );

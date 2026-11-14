@@ -5,7 +5,7 @@ import { Tooltip } from "./ui";
 export function HostedControlReason({ reason, label, children }: { reason: string | null; label: string; children: ReactNode }) {
   if (!reason) return children;
   return (
-    <Tooltip label={reason} render={<span tabIndex={0} aria-label={label} aria-disabled="true" className="inline-flex" />}>
+    <Tooltip label={reason} positionerClassName="z-50" render={<span tabIndex={0} aria-label={label} aria-disabled="true" className="inline-flex" />}>
       {children}
     </Tooltip>
   );

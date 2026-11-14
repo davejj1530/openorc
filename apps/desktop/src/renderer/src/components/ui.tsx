@@ -292,13 +292,25 @@ export function TooltipProvider({ children }: { children: ReactNode }) {
  * Names a control on hover, above it unless `side` says otherwise. It wraps the control in a span, or with `render` the
  * given element is the trigger itself. Outside a TooltipProvider it keeps its own 400ms delay.
  */
-export function Tooltip({ label, side, render, children }: { label: ReactNode; side?: "top" | "right" | "bottom" | "left"; render?: ReactElement; children: ReactNode }) {
+export function Tooltip({
+  label,
+  side,
+  render,
+  positionerClassName,
+  children,
+}: {
+  label: ReactNode;
+  side?: "top" | "right" | "bottom" | "left";
+  render?: ReactElement;
+  positionerClassName?: string;
+  children: ReactNode;
+}) {
   const grouped = useContext(TooltipGroup);
   const tooltip = (
     <BaseTooltip.Root>
       <BaseTooltip.Trigger render={render ?? <span className="inline-flex" />}>{children}</BaseTooltip.Trigger>
       <BaseTooltip.Portal>
-        <BaseTooltip.Positioner sideOffset={6} {...(side ? { side } : {})}>
+        <BaseTooltip.Positioner className={positionerClassName} sideOffset={6} {...(side ? { side } : {})}>
           <BaseTooltip.Popup ref={floatingGround} className="tooltip-popup">
             {label}
           </BaseTooltip.Popup>

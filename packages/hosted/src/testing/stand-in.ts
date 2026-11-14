@@ -21,12 +21,14 @@ import { StandInSignIns } from "./stand-in-sign-ins.js";
 import { StandInAppSignIns } from "./stand-in-app-sign-ins.js";
 import { StandInGithub } from "./stand-in-github.js";
 import { StandInSpaces } from "./stand-in-spaces.js";
+import { StandInTasks } from "./stand-in-tasks.js";
 import { StandInOrganizations } from "./stand-in-organizations.js";
 import { StandInChat, socketAnswers } from "./stand-in-chat.js";
 import { billingState, leftSeconds, StandInPayments, type StandInBilling, type StandInOffers } from "./stand-in-billing.js";
 import { StandInThreads, type Admit, type StandInPeer, type StandInThreadSeed } from "./stand-in-threads.js";
 
 export interface StandIn {
+  tasks: StandInTasks;
   chat: StandInChat;
   /** Its origin, for `HostedDeps.server` or `OpenOrcOptions.accountServer`. */
   url: string;
@@ -252,6 +254,7 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
   const hosted = new StandInThreads(() => [...[...peers].filter((peer) => !peer.waiting), ...sockets], admitTurn, spaces, person);
   const signInWrites = new StandInSignIns(signIns);
   const tell = tellOf(peers, sockets);
+  const tasks = new StandInTasks({ spaces, person, tell });
   const organizations = organizationReads(options, spaces, people, billing, tell, (space) => hosted.accessChanged(space));
   const github = new StandInGithub(spaces, (who) => tell(who, ["projects", "github"]));
   const payments = new StandInPayments(billing, billingTopics(tell, organizations), () => `http://127.0.0.1:${port}`);
@@ -269,13 +272,14 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
     const signedInRoute = async (): Promise<Reply | null> => {
       if (who)
         return (
+          tasks.route({ method, path, query, space }, who, body) ??
           chat.route({ method, path, query, space }, who, body) ??
           (await organizations.route({ method, path, query, space }, who, body)) ??
           github.route(method, path, who, body, space) ??
           personRoutes(signInWrites, payments)(method, path, who, body) ??
           hosted.route({ method, path, query, space }, who, body)
         );
-      return /^\/(account|spaces|organization|invitations|projects|hosted|chat|github|agent-sign-ins|billing|api\/auth\/organization)\b/.test(path) ? unauthorized() : null;
+      return /^\/(account|spaces|organization|invitations|projects|hosted|chat|tasks|github|agent-sign-ins|billing|api\/auth\/organization)\b/.test(path) ? unauthorized() : null;
     };
     const old = tooOld(request.headers["x-openorc-protocol"]) ? { status: 426, body: { statusCode: 426, message: APP_TOO_OLD } } : null;
     const reply: Reply = old ??
@@ -294,6 +298,7 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
 
   return {
     url: `http://127.0.0.1:${port}`,
+    tasks,
     chat,
     signInPage: (url, email) => appSignIns.signInPage(url, email.toLowerCase()),
     appSignIns,
@@ -304,11 +309,7 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
     github,
     spaces,
     organizations,
-    addTeam: (name, members) =>
-      spaces.addTeam(
-        name,
-        members.map((email) => email.toLowerCase()),
-      ),
+    addTeam: teamAdder(spaces),
     addProject: (email, project, space) => spaces.addProject(email.toLowerCase(), project, space),
     setSignIns: (email, rows) => void signIns.set(email.toLowerCase(), rows),
     approveDevice: (email) => signInWrites.approveDevice(email.toLowerCase()),
@@ -339,6 +340,14 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
       serving = false;
     },
   };
+}
+
+function teamAdder(spaces: StandInSpaces): StandIn["addTeam"] {
+  return (name, members) =>
+    spaces.addTeam(
+      name,
+      members.map((email) => email.toLowerCase()),
+    );
 }
 
 /** A socket held in this process: the same rules as the WebSocket one, and its messages delivered a tick later. */
@@ -528,6 +537,7 @@ function organizationReads(
       const state = billing.get(email);
       return Boolean(state?.pro && (state.standing === "live" || Date.parse(state.at) > (options.now ?? Date.now)()));
     },
+    organizationAccess: (email) => billing.get(email)?.organizationAccess,
     tell,
     accessChanged,
     now: options.now ?? Date.now,

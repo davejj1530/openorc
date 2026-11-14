@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { teamChatRpcParams, type TeamChatRpcResults } from "./team-chat.js";
+import { onlineTaskRpcParams, type OnlineTaskRpcResults } from "./online-tasks.js";
 import { hostedParityRpcParams, type HostedParityRpcResults } from "./hosted-parity.js";
 import { UsageHistoryParams } from "./usage-history.js";
 import { ProjectActivityParams } from "./project-activity.js";
@@ -78,6 +79,7 @@ const REVIEW_SCOPE_REQUIRED = "Review comments need a conversation or a task.";
 
 export const rpcParams = {
   ...teamChatRpcParams,
+  ...onlineTaskRpcParams,
   ...hostedParityRpcParams,
   ...accountRpcParams,
   ...spacesRpcParams,
@@ -576,6 +578,7 @@ export interface ResolvedExtraction {
 export interface RpcResults
   extends
     TeamChatRpcResults,
+    OnlineTaskRpcResults,
     HostedParityRpcResults,
     PullRequestRpcResults,
     OrclingRpcResults,

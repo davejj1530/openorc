@@ -48,8 +48,10 @@ export class OnlineTasks {
       if (!parsed.success || this.#closed) return;
       const { topics, organizationId } = parsed.data;
       if (!topics.some((topic) => ["projects", "spaces", "members", "organization_access", "billing"].includes(topic))) return;
-      if (organizationId) this.#epochs.set(organizationId, (this.#epochs.get(organizationId) ?? 0) + 1);
-      else for (const [spaceId, epoch] of this.#epochs) this.#epochs.set(spaceId, epoch + 1);
+      if (topics.some((topic) => ["spaces", "members", "organization_access", "billing"].includes(topic))) {
+        if (organizationId) this.#epochs.set(organizationId, (this.#epochs.get(organizationId) ?? 0) + 1);
+        else for (const [spaceId, epoch] of this.#epochs) this.#epochs.set(spaceId, epoch + 1);
+      }
       this.#invalidate(organizationId);
     });
   }

@@ -13,6 +13,7 @@ import { FrameCoalescer } from "./frames.js";
 import { createSpacesHandlers } from "./handlers/spaces.js";
 import { createAccountHandlers } from "./handlers/account.js";
 import { createTeamChatHandlers } from "./handlers/team-chat.js";
+import { createOnlineTaskHandlers } from "./handlers/online-tasks.js";
 import { hostedParityHandlers } from "./handlers/hosted-parity.js";
 import { createAttachmentsHandlers } from "./handlers/attachments.js";
 import { createBenchHandlers } from "./handlers/bench.js";
@@ -733,6 +734,7 @@ export class OpenOrc {
       createClaudeAccountHandlers(this.claudeAccounts),
       createAccountHandlers(this.account?.account ?? null),
       createTeamChatHandlers(this.account?.chat ?? null),
+      createOnlineTaskHandlers(this.account?.tasks ?? null),
       hostedParityHandlers,
       createSpacesHandlers(this.account?.spaces ?? null),
       createUsageHandlers({ db: this.db, ledger: this.ledger }),

@@ -5,6 +5,8 @@ import { SpaceId } from "./spaces.js";
 const id = z.string().min(1).max(200);
 const revision = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const timestamp = z.number().finite();
+export const OnlineTaskRef = z.object({ kind: z.literal("online"), accountId: id, spaceId: SpaceId, projectId: id, id }).strict();
+export type OnlineTaskRef = z.infer<typeof OnlineTaskRef>;
 export const OnlineTaskPerson = z.object({ userId: id, name: z.string(), image: z.string().nullable() });
 export const OnlineTaskAssignee = OnlineTaskPerson.extend({ memberId: id, available: z.boolean() });
 export type OnlineTaskAssignee = z.infer<typeof OnlineTaskAssignee>;

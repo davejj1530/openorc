@@ -7,19 +7,21 @@ import type { Brain, OwnerReach } from "./thread-owner.js";
  * (`taskId`, or `id` on a tasks.* method). Derived from the schemas, so a new such method does not compile until
  * OWNER_ROUTES says how it routes.
  */
-type NamesThreadOrRun<M extends RpcMethod, P = RpcParams<M>> = string extends keyof P
+type NamesThreadOrRun<M extends RpcMethod, P = RpcParams<M>> = M extends `tasks.online.${string}`
   ? never
-  : "threadId" extends keyof P
-    ? M
-    : "runId" extends keyof P
+  : string extends keyof P
+    ? never
+    : "threadId" extends keyof P
       ? M
-      : "taskId" extends keyof P
+      : "runId" extends keyof P
         ? M
-        : M extends `threads.${string}` | `tasks.${string}`
-          ? "id" extends keyof P
-            ? M
-            : never
-          : never;
+        : "taskId" extends keyof P
+          ? M
+          : M extends `threads.${string}` | `tasks.${string}`
+            ? "id" extends keyof P
+              ? M
+              : never
+            : never;
 export type RoutedMethod = { [M in RpcMethod]: NamesThreadOrRun<M> }[RpcMethod];
 
 export type OwnerRoute<M extends RpcMethod> =
@@ -63,6 +65,17 @@ const here = { by: "here" } as const;
  * allowlist from it. Methods not listed and not RoutedMethod are host-level: the asked core answers about itself.
  */
 export const OWNER_ROUTES: { [M in RoutedMethod]: OwnerRoute<M> } & { [M in Exclude<RpcMethod, RoutedMethod>]?: OwnerRoute<M> } = {
+  "tasks.online.state": here,
+  "tasks.online.list": here,
+  "tasks.online.get": here,
+  "tasks.online.create": here,
+  "tasks.online.update": here,
+  "tasks.online.delete": here,
+  "tasks.online.seen": here,
+  "tasks.online.attention": here,
+  "tasks.online.assignees": here,
+  "tasks.online.activity": here,
+  "tasks.online.context": here,
   "hosted.review.changes": byThreadId,
   "hosted.review.turn": byThreadId,
   "hosted.review.file": byThreadId,

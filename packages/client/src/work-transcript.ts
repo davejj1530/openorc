@@ -60,10 +60,16 @@ export function workTurns(blocks: Block[]): WorkTurn[] {
   return turns;
 }
 
-/** A person's message reads before the turn's work, and so does a notice that opens the turn, such as who started it. */
-function readsFirst(block: Block, index: number): boolean {
-  return block.kind === "message" && (block.role === "user" || (block.role === "system" && index === 0));
+/**
+ * A person's message reads before the turn's work, and so do the notices that open the turn, such as who started it,
+ * or the lines people's actions leave outside any turn: every one before the agent does anything.
+ */
+function readsFirst(block: Block, opening: boolean): boolean {
+  return block.kind === "message" && (block.role === "user" || (block.role === "system" && opening));
 }
+
+/** A person's message or a notice: what can open a turn before the agent does anything. */
+const opens = (block: Block): boolean => block.kind === "message" && (block.role === "user" || block.role === "system");
 
 /** Where the turn's closing reply starts: the run of assistant messages its last one ends. -1 without a reply. */
 function replyStart(blocks: Block[]): number {
@@ -108,12 +114,14 @@ export function workParts(blocks: Block[], live: boolean, taskCards = true, ambi
   const before: Block[] = [],
     work: Block[] = [],
     after: Block[] = [];
+  let opening = true;
   for (const [index, b] of blocks.entries()) {
+    opening &&= opens(b);
     if (isSubagentBlock(b) && taskCards) {
       after.push(b);
       continue;
     }
-    if (readsFirst(b, index)) before.push(b);
+    if (readsFirst(b, opening)) before.push(b);
     else if (showsAfterWork(b, showReply && index >= finalStart, taskCards)) after.push(b);
     else if (b.kind !== "status" && !(b.kind === "approval" && b.decision)) work.push(b);
   }

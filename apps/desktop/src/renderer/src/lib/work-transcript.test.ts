@@ -128,3 +128,13 @@ it("ends a fatal run and exposes its error even when no completion event follows
   expect(workTiming(blocks, true)).toMatchObject({ live: false, outcome: "error" });
   expect(workParts(blocks, false).after).toContainEqual(expect.objectContaining({ kind: "status", text: "Provider lost connection" }));
 });
+
+it("reads a run of people's lines outside any turn as one opening, with no agent head between them", () => {
+  const committed: Block = { id: "committed", kind: "message", role: "system", text: "Theo Laurent committed bcab63c: Add the export header", streaming: false };
+  const pushed: Block = { id: "pushed", kind: "message", role: "system", text: "Theo Laurent pushed the branch.", streaming: false };
+  const [turn] = workTurns([committed, pushed]);
+  expect(turn!.blocks.map((block) => block.id)).toEqual(["committed", "pushed"]);
+  expect(workParts(turn!.blocks, false)).toEqual({ before: [committed, pushed], work: [], after: [] });
+  const stopped: Block = { id: "stopped", kind: "message", role: "system", text: "Theo stopped Mara's turn.", streaming: false };
+  expect(workParts([committed, tool, stopped], false)).toEqual({ before: [committed], work: [tool], after: [stopped] });
+});

@@ -1,3 +1,4 @@
+import type { Route } from "@openorc/protocol";
 import { expect, it, vi } from "vitest";
 import type { FakeMac, memoryKeys, memoryMacs } from "./connection/test-fixtures/fake-mac";
 
@@ -50,17 +51,11 @@ vi.mock("./connection/native", async () => {
       setTimeout: (callback: () => void, ms: number) => setTimeout(callback, ms),
       clearTimeout: (handle: unknown) => clearTimeout(handle as ReturnType<typeof setTimeout>),
     },
-    openSocket: mac.openSocket.bind(mac),
+    openSocket: (route: Route) => mac.openSocket(route),
     storedMacs: () => saved,
     keychainKeys: keys,
-    keychainDoorKeys: {
-      read: async (id: string) => doorKeys.get(id) ?? null,
-      write: async (id: string, value: string) => void doorKeys.set(id, value),
-      remove: async (id: string) => void doorKeys.delete(id),
-    },
-    postKnock: () => new Promise(() => undefined),
+    forgetDoorKey: async (id: string) => void doorKeys.delete(id),
     reachesInternet: async () => true,
-    callAddress: async () => null,
   };
 });
 

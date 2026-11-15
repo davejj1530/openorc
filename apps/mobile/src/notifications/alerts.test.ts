@@ -271,21 +271,21 @@ describe("asking iOS", () => {
 });
 
 describe("what the Mac said", () => {
-  it("registers with a cloud brain over its public route as with any Mac, and keeps each host's answer apart", async () => {
+  it("registers with each Mac it shows, and keeps each one's answer apart", async () => {
     const iphone = phone({ answer: "ready" });
     iphone.connect(1);
     await settle();
     iphone.answerWith("no-key");
     iphone.drop();
-    iphone.connect(2, { id: "cloud", name: "Cloud" }, { kind: "public", host: "sb-brain.vercel.run", port: 443 });
+    iphone.connect(2, { id: "laptop", name: "Laptop" }, { kind: "tailnet", host: "100.64.0.9", port: 47820 });
     await settle();
     expect(iphone.sent).toEqual([
       { macId: "studio", registration: registration() },
-      { macId: "cloud", registration: registration() },
+      { macId: "laptop", registration: registration() },
     ]);
     expect([...iphone.alerts.getState().senders]).toEqual([
       ["studio", "ready"],
-      ["cloud", "no-key"],
+      ["laptop", "no-key"],
     ]);
   });
 

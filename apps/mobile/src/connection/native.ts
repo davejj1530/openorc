@@ -1,11 +1,9 @@
 import { createNodeStyleCrypto, fromBase64Url, LinkCloseCode, linkUrl, toBase64Url, type LinkSocket } from "@openorc/link";
 import type { Route } from "@openorc/protocol";
-import { fetch as expoFetch } from "expo/fetch";
 import * as SecureStore from "expo-secure-store";
 import type { MMKV } from "react-native-mmkv";
 import QuickCrypto, { type KeyObject } from "react-native-quick-crypto";
 import { perfEnabled, timeRecord } from "../thread/perf-probe";
-import { streamLines, type DoorKeyStore, type DoorPost } from "./door";
 import type { OpeningSocket } from "./manager";
 import type { Clock } from "./route-race";
 import type { DeviceKeys, MacStore, SavedMac } from "./saved-macs";
@@ -40,19 +38,9 @@ export async function reachesInternet(signal: AbortSignal): Promise<boolean> {
   }
 }
 
-/** A plain GET to an address: its status once it answered, null when nothing did before the phone stopped waiting. */
-export async function callAddress(url: string, signal: AbortSignal): Promise<number | null> {
-  try {
-    const response = await expoFetch(url, { method: "GET", headers: { "cache-control": "no-store" }, signal });
-    return response.status;
-  } catch {
-    return null;
-  }
-}
-
-/** A React Native WebSocket to the host's link endpoint, as a session uses it. */
-export function openSocket(route: Route, hostKey: Uint8Array): OpeningSocket {
-  const ws = new WebSocket(linkUrl(route, hostKey, phoneCrypto));
+/** A React Native WebSocket to the Mac's link endpoint, as a session uses it. */
+export function openSocket(route: Route, macKey: Uint8Array): OpeningSocket {
+  const ws = new WebSocket(linkUrl(route, macKey, phoneCrypto));
   ws.binaryType = "arraybuffer";
   let onMessage: (data: Uint8Array) => void = () => undefined;
   let onClose: (code: number, reason: string) => void = () => undefined;
@@ -117,18 +105,8 @@ export function storedMacs(storage: MMKV): MacStore {
 const keychain: SecureStore.SecureStoreOptions = { keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY };
 const keyName = (macId: string) => `device-key.${macId}`;
 
-/** Each host's door key, in the Keychain beside the device key. */
-export const keychainDoorKeys: DoorKeyStore = {
-  read: (macId) => SecureStore.getItemAsync(`door-key.${macId}`, keychain),
-  write: (macId, value) => SecureStore.setItemAsync(`door-key.${macId}`, value, keychain),
-  remove: (macId) => SecureStore.deleteItemAsync(`door-key.${macId}`, keychain),
-};
-
-/** A knock through expo/fetch, whose body streams as it comes; React Native's own fetch hands it over only at the end. */
-export const postKnock: DoorPost = async (url, { body, signal }) => {
-  const response = await expoFetch(url, { method: "POST", headers: { "content-type": "application/json" }, body, signal });
-  return { status: response.status, text: () => response.text(), lines: () => streamLines(response.body) };
-};
+/** Deletes the door key an earlier build kept in the Keychain for a cloud brain, beside the device key. */
+export const forgetDoorKey = (macId: string): Promise<void> => SecureStore.deleteItemAsync(`door-key.${macId}`, keychain);
 
 /** This phone's private key for each Mac, in the Keychain. */
 export const keychainKeys: DeviceKeys = {

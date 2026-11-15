@@ -38,13 +38,13 @@ const MAX_ROUTES = 8;
 export const sameRoute = (a: Route, b: Route) => a.kind === b.kind && a.host === b.host && a.port === b.port;
 
 /**
- * The kinds of route that can answer on each network, fastest first. LAN addresses answer only on the host's own
- * network, so cellular leaves them out; a public route answers wherever the internet does, and is the slowest.
+ * The kinds of route that can answer on each network, fastest first. LAN addresses answer only on the Mac's own
+ * network, so cellular leaves them out. A public route, which only a cloud brain listed, is never tried.
  */
 const KINDS: Record<Exclude<NetworkKind, "none">, readonly Route["kind"][]> = {
-  wifi: ["lan", "tailnet", "public"],
-  other: ["lan", "tailnet", "public"],
-  cellular: ["tailnet", "public"],
+  wifi: ["lan", "tailnet"],
+  other: ["lan", "tailnet"],
+  cellular: ["tailnet"],
 };
 
 /** The routes worth trying on this network, in order. The last route that worked leads its kind. */

@@ -11,8 +11,7 @@ import { createAssetCache } from "./connection/asset-cache";
 import { linkHooks } from "./connection/link-hooks";
 import { forgetRemovedBrains, macsOnly, namedBrain } from "./connection/hosts";
 import { ConnectionManager, showsDemo, type LinkState } from "./connection/manager";
-import { phoneDoors } from "./connection/door";
-import { callAddress, keychainDoorKeys, keychainKeys, openSocket, phoneCrypto, postKnock, reachesInternet, storedMacs, systemClock } from "./connection/native";
+import { forgetDoorKey, keychainKeys, openSocket, phoneCrypto, reachesInternet, storedMacs, systemClock } from "./connection/native";
 import type { NetworkKind, SavedMac } from "./connection/saved-macs";
 import { createDemoMac, DEMO_MAC } from "./demo/demo-mac";
 import { forgetFolds } from "./home/fold-keys";
@@ -44,10 +43,8 @@ export const link = new ConnectionManager({
   keys: keychainKeys,
   deviceName: Constants.deviceName ?? "iPhone",
   reachesInternet,
-  callAddress,
-  doors: phoneDoors({ crypto: phoneCrypto, clock: systemClock, post: postKnock, keys: keychainDoorKeys }),
+  forgetDoorKey,
   brainsRemoved: forgetRemovedBrains(hosts, (id) => void link.forget(id)),
-  mayWake: () => true,
   macs,
   forgetCache: (macId) => {
     forgetLists(storage, macId);

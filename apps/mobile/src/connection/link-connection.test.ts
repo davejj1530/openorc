@@ -209,8 +209,8 @@ describe("calls over the link", () => {
     const projects = connection.call("projects.list", {});
     await advance(1_010);
     expect(await projects).toEqual([]);
-    // Every session also asks what the host is, renews this phone's key to its door and hears which brains it removed.
-    expect(wire(mac)).toEqual(["rpc session.negotiate", "interest run-1", "rpc host.kind", "rpc door.key", "rpc brains.removed", "rpc projects.list"]);
+    // Every session also hears which cloud brains the Mac removed, for a phone an earlier build paired with one.
+    expect(wire(mac)).toEqual(["rpc session.negotiate", "interest run-1", "rpc brains.removed", "rpc projects.list"]);
   });
 
   it("gives up on a call after 8 s without a session", async () => {
@@ -274,19 +274,7 @@ describe("calls over the link", () => {
     await advance(10);
     mac.live[0]!.close(LinkCloseCode.normal);
     await advance(1_000);
-    expect(wire(mac)).toEqual([
-      "rpc session.negotiate",
-      "interest ",
-      "rpc host.kind",
-      "rpc door.key",
-      "rpc brains.removed",
-      "interest run-1,run-2",
-      "rpc session.negotiate",
-      "interest run-1,run-2",
-      "rpc host.kind",
-      "rpc door.key",
-      "rpc brains.removed",
-    ]);
+    expect(wire(mac)).toEqual(["rpc session.negotiate", "interest ", "rpc brains.removed", "interest run-1,run-2", "rpc session.negotiate", "interest run-1,run-2", "rpc brains.removed"]);
     expect(pushes.filter((push) => push.type === "session")).toEqual([
       { type: "session", resumed: false },
       { type: "session", resumed: true },

@@ -23,10 +23,8 @@ vi.mock("./connection/native", () => ({
   openSocket: () => ({ opened: new Promise(() => undefined), close: () => undefined }),
   storedMacs: () => memoryMacs(),
   keychainKeys: memoryKeys(),
-  keychainDoorKeys: { read: async () => null, write: async () => undefined, remove: async () => undefined },
-  postKnock: () => new Promise(() => undefined),
+  forgetDoorKey: async () => undefined,
   reachesInternet: async () => true,
-  callAddress: async () => null,
 }));
 
 it("follows the shown Mac's look from the moment the app loads", async () => {

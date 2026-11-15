@@ -16,8 +16,6 @@ import {
   type Refusal,
 } from "@openorc/link";
 import type { Route } from "@openorc/protocol";
-import { wakeByAddress, type CallAddress } from "./address-wake";
-import type { PhoneDoors, WakeOutcome } from "./door";
 import { LinkConnection, type PhoneLine } from "./link-connection";
 import { raceRoutes, ROUTE_TIMEOUT_MS, type Attempt, type Clock, type RaceResult } from "./route-race";
 import { learnRoutes, routesFor, type DeviceKeys, type MacStore, type NetworkKind, type SavedMac } from "./saved-macs";
@@ -26,21 +24,18 @@ import { learnRoutes, routesFor, type DeviceKeys, type MacStore, type NetworkKin
  * Why the phone is not connected to the Mac it shows, as far as it knows. `unreachable`: no route answered, or the
  * session dropped. `silent`: the Mac has not answered for a minute, so it is likely asleep or on another network.
  * `tailnet`: on cellular, where only the Mac's tailnet addresses could answer, none did, though the internet answers.
- * `no-route`: this network has no way to the Mac (cellular, and it has no tailnet or public address). `offline`: nothing
- * gets out, with no network at all or one that reaches nowhere. The rest come from a host's door: `waking` while it
- * wakes the host, `wake-refused` when it does not take this phone's knock, `needs-mac` when only the host's Mac can help,
- * and `wake-failed` when the host did not start.
+ * `no-route`: this network has no way to the Mac (cellular, and it has no tailnet address). `offline`: nothing gets
+ * out, with no network at all or one that reaches nowhere. The rest are the Mac's own: `restarting`, `disabled` while
+ * phone access is off, and `busy` with too many phones.
  */
-export type DownReason = "unreachable" | "silent" | "tailnet" | "no-route" | "offline" | "restarting" | "disabled" | "busy" | "waking" | "wake-refused" | "needs-mac" | "wake-failed";
+export type DownReason = "unreachable" | "silent" | "tailnet" | "no-route" | "offline" | "restarting" | "disabled" | "busy";
 
-/** The reasons the Mac itself, or its door, gave, which still stand while it does not answer. */
-const macReasons: ReadonlySet<DownReason> = new Set(["restarting", "disabled", "busy", "wake-refused", "needs-mac"]);
+/** The reasons the Mac itself gave, which still stand while it does not answer. */
+const macReasons: ReadonlySet<DownReason> = new Set(["restarting", "disabled", "busy"]);
 
 export interface MacName {
   id: string;
   name: string;
-  /** A cloud brain or a Mac, as saved; hosts saved before read as Macs. */
-  kind?: "mac" | "brain";
 }
 
 /** Why the phone has no Mac any more: the Mac removed it, or the Keychain lost the key it pairs with. */
@@ -95,8 +90,8 @@ export interface OpeningSocket {
 }
 
 export interface ConnectionEffects {
-  /** `hostKey` names the host's path behind a proxy; a direct route does not use it. */
-  openSocket(route: Route, hostKey: Uint8Array): OpeningSocket;
+  /** `macKey` names the Mac to the link's address; a direct route does not use it. */
+  openSocket(route: Route, macKey: Uint8Array): OpeningSocket;
   crypto: LinkCrypto;
   clock: Clock;
   random(): number;
@@ -107,16 +102,9 @@ export interface ConnectionEffects {
   forgetCache(macId: string): void;
   /** Whether anything on the internet answers, for a race lost off Wi-Fi. Aborted once the phone stops waiting. */
   reachesInternet(signal: AbortSignal): Promise<boolean>;
-  /** Hosts' doors: each session's key, and the knock that wakes a host asleep behind its proxy. */
-  doors: PhoneDoors;
-  /** Wakes a cloud brain with no door (Agent37), whose service wakes it for any call to its address. */
-  callAddress: CallAddress;
-  /**
-   * Whether this link may wake its host when it does not answer: the shown host's may; the partner's only while the
-   * person has one of its screens open, so a brain looked past is left to sleep.
-   */
-  mayWake(): boolean;
-  /** A host named the cloud brains it removed. Only the shown host's link forgets hosts, so every link hands them there. */
+  /** Deletes the key an earlier build kept to wake a host through its door, which only a cloud brain had. */
+  forgetDoorKey(macId: string): Promise<void>;
+  /** A Mac named the cloud brains it removed, by the ids an earlier build saved them under. */
   brainsRemoved(macId: string, removed: readonly string[]): void;
 }
 
@@ -142,9 +130,6 @@ const INTERNET_WITHIN_MS = 3_000;
 const STALE_AFTER_MS = 5_000;
 /** How long a session replaced by a better route keeps answering calls already sent over it. */
 const DRAIN_MS = 5_000;
-/** A host is woken at most this often, counted from when the last wake ended. */
-const KNOCK_EVERY_MS = 60_000;
-const REFUSED = Number.POSITIVE_INFINITY;
 
 const closingReasons: ReadonlySet<string> = new Set<ClosingReason>(["update", "shutdown", "removed", "disabled"]);
 
@@ -187,9 +172,6 @@ export class ConnectionManager {
    */
   private unheardSince: number | null = null;
   private silentTimer: unknown = null;
-  /** When the phone last knocked on each host's door; never again, for one that refused it, until the person is back. */
-  private readonly knocked = new Map<string, number>();
-  private knocking: AbortController | null = null;
   private readonly keyPairs = new Map<string, KeyPair>();
   private readonly listeners = new Set<() => void>();
 
@@ -291,27 +273,10 @@ export class ConnectionManager {
   select(id: string): void {
     if (this.effects.macs.activeId() === id) return;
     this.effects.macs.setActiveId(id);
-    // Another link may have paired with this host anew meanwhile; the Keychain holds the key it uses now.
-    this.keyPairs.delete(id);
     this.abandon();
     this.clearSilence();
-    this.forgiveRefusal(id);
     this.attempt = 0;
     this.connectNow(null);
-  }
-
-  /**
-   * Shows no host, forgetting none: for a link that follows another's group, when the group has no partner. Its keys are
-   * read again next time, since the other link may have forgotten the host and paired with it anew meanwhile.
-   */
-  release(): void {
-    this.keyPairs.clear();
-    if (this.effects.macs.activeId() === null && this.phase.kind === "unpaired") return;
-    this.effects.macs.setActiveId(null);
-    this.abandon();
-    this.clearSilence();
-    this.attempt = 0;
-    this.enter({ kind: "unpaired", lost: null });
   }
 
   /**
@@ -324,7 +289,6 @@ export class ConnectionManager {
     const name = this.saved.find((mac) => mac.id === id)?.name ?? "Your Mac";
     this.removeMac(id);
     this.keyPairs.delete(id);
-    this.knocked.delete(id);
     this.effects.forgetCache(id);
     if (wasActive) {
       this.effects.macs.setActiveId(this.effects.macs.list()[0]?.id ?? null);
@@ -334,7 +298,7 @@ export class ConnectionManager {
       if (this.active()) this.connectNow(null);
       else this.enter({ kind: "unpaired", lost: lost && { why: lost, macName: name } });
     }
-    await Promise.all([this.effects.keys.remove(id), this.effects.doors.forget(id)]);
+    await Promise.all([this.effects.keys.remove(id), this.effects.forgetDoorKey(id)]);
   }
 
   appState(state: "active" | "background"): void {
@@ -423,7 +387,7 @@ export class ConnectionManager {
       // Off Wi-Fi every route runs over the internet, so with none nothing could have answered, Tailscale included.
       const online = result.ok || result.refused !== null || this.network === "wifi" || (await this.online());
       if (epoch !== this.epoch) return;
-      this.settleRace(mac, result, why, online, routes);
+      this.settleRace(mac, result, why, online);
     });
   }
 
@@ -445,7 +409,7 @@ export class ConnectionManager {
     });
   }
 
-  private settleRace(mac: SavedMac, result: RaceResult<Linked>, why: DownReason | null, online: boolean, tried: readonly Route[]): void {
+  private settleRace(mac: SavedMac, result: RaceResult<Linked>, why: DownReason | null, online: boolean): void {
     if (result.ok) return this.adopt(mac, result.route, result.value);
     switch (result.refused) {
       case "unpaired":
@@ -455,77 +419,19 @@ export class ConnectionManager {
       case "busy":
         return this.retryLater("busy");
       default:
-        if (online && this.mayKnock(mac.id)) return void this.knock(mac, why, tried);
-        return this.retryLater(this.unanswered(why, online, tried));
-    }
-  }
-
-  private mayKnock(macId: string): boolean {
-    const last = this.knocked.get(macId);
-    return last === undefined || this.effects.clock.now() - last >= KNOCK_EVERY_MS;
-  }
-
-  /** The person came back to the host, or it answered: a door that refused this phone is asked again. */
-  private forgiveRefusal(macId: string | null): void {
-    if (macId && this.knocked.get(macId) === REFUSED) this.knocked.delete(macId);
-  }
-
-  /**
-   * Nothing answered and the internet does: a host asleep behind its proxy fails just so, and its door can wake it. A
-   * cloud brain with no door (Agent37) wakes for a call to its address instead. Once the host is said ready, the phone
-   * races again at once. The door finishes a wake the phone left.
-   */
-  private async knock(mac: SavedMac, why: DownReason | null, tried: readonly Route[]): Promise<void> {
-    const epoch = this.epoch;
-    if (!this.effects.mayWake()) return this.retryLater(this.unanswered(why, true, tried));
-    const hasDoor = await this.effects.doors.has(mac.id);
-    if (epoch !== this.epoch) return;
-    const address = hasDoor || mac.kind !== "brain" ? undefined : tried.find((route) => route.kind === "public");
-    if (!hasDoor && !address) return this.retryLater(this.unanswered(why, true, tried));
-    this.knocked.set(mac.id, this.effects.clock.now());
-    // Once only the Mac can help, the phone asks again each minute under that reason rather than saying Waking.
-    const down = why === "needs-mac";
-    this.enter({ kind: "connecting", why: down ? why : "waking" });
-    const abort = new AbortController();
-    this.knocking = abort;
-    const outcome = address ? await wakeByAddress(address, this.effects.callAddress, this.effects.clock, abort.signal, down) : await this.effects.doors.knock(mac.id, abort.signal);
-    if (this.knocking === abort) this.knocking = null;
-    if (epoch !== this.epoch) return;
-    // A wake may take minutes; the next waits a minute from this one's end.
-    this.knocked.set(mac.id, this.effects.clock.now());
-    this.woke(mac, outcome, why, tried);
-  }
-
-  /** What a wake came to: race again at once once the host is ready, or wait saying why. */
-  private woke(mac: SavedMac, outcome: WakeOutcome, why: DownReason | null, tried: readonly Route[]): void {
-    switch (outcome.kind) {
-      case "ready": {
-        const saved = this.active() ?? mac;
-        this.saveMac({ ...saved, routes: learnRoutes(saved.routes, [outcome.route]) });
-        return this.connectNow("waking");
-      }
-      case "refused":
-        // Nothing changes that by itself; only pairing again does.
-        this.knocked.set(mac.id, REFUSED);
-        return this.retryLater("wake-refused");
-      case "needs-mac":
-        return this.retryLater("needs-mac");
-      case "failed":
-        return this.retryLater("wake-failed");
-      case "unanswered":
-        return this.retryLater(this.unanswered(why, true, tried));
+        return this.retryLater(this.unanswered(why, online));
     }
   }
 
   /**
-   * Why no route answered: nothing gets out, or a reason the Mac gave still stands; on cellular with only tailnet
-   * routes to try, Tailscale is the way in; otherwise a minute without hearing the Mac makes it not reachable rather
-   * than reconnecting. A host asleep behind its proxy fails like a Mac that is away.
+   * Why no route answered: nothing gets out, or a reason the Mac gave still stands; on cellular, where only tailnet
+   * routes are tried, Tailscale is the way in; otherwise a minute without hearing the Mac makes it not reachable rather
+   * than reconnecting.
    */
-  private unanswered(why: DownReason | null, online: boolean, tried: readonly Route[]): DownReason {
+  private unanswered(why: DownReason | null, online: boolean): DownReason {
     if (!online) return "offline";
     if (why && macReasons.has(why)) return why;
-    if (this.network === "cellular" && tried.every((route) => route.kind === "tailnet")) return "tailnet";
+    if (this.network === "cellular") return "tailnet";
     const since = this.unheardSince;
     return since !== null && this.effects.clock.now() - since >= SILENT_AFTER_MS ? "silent" : "unreachable";
   }
@@ -564,27 +470,13 @@ export class ConnectionManager {
     session.onClose((code, reason) => this.dropped(session, code, reason));
     this.schedulePing(session);
     if (session.closed) return this.dropped(session, LinkCloseCode.normal, "");
-    this.forgiveRefusal(mac.id);
-    void this.learnKind(mac.id, session);
-    void this.learnDoor(mac.id);
     void this.learnRemoved(mac.id);
   }
 
-  /** Asks the host what it is on every session. One from before the question answers with an error, as a Mac would. */
-  private async learnKind(macId: string, session: PhoneSession): Promise<void> {
-    let kind: "mac" | "brain";
-    try {
-      kind = (await this.connection.device("host.kind", {})) === "brain" ? "brain" : "mac";
-    } catch {
-      // A session that dropped before the answer says nothing about the host.
-      if (!this.isCurrent(session)) return;
-      kind = "mac";
-    }
-    const saved = this.effects.macs.list().find((mac) => mac.id === macId);
-    if (saved && saved.kind !== kind) this.saveMac({ ...saved, kind });
-  }
-
-  /** Hears which cloud brains the host removed, on every session. An older host, or a dropped session, says none. */
+  /**
+   * Hears which cloud brains the Mac removed, on every session, so a brain an earlier build saved goes with its keys. A
+   * Mac that does not take the question, or a dropped session, says none.
+   */
   private async learnRemoved(macId: string): Promise<void> {
     let removed: string[];
     try {
@@ -593,15 +485,6 @@ export class ConnectionManager {
       return;
     }
     if (removed.length) this.effects.brainsRemoved(macId, removed);
-  }
-
-  /** Renews this phone's key to the host's door on every session. An older host, or a dropped session, leaves what is saved. */
-  private async learnDoor(macId: string): Promise<void> {
-    try {
-      await this.effects.doors.learn(macId, await this.connection.device("door.key", {}));
-    } catch {
-      // Kept as it is.
-    }
   }
 
   private receive(session: PhoneSession, message: MacMessage): void {
@@ -637,7 +520,6 @@ export class ConnectionManager {
 
   private retryNow(why: DownReason | null): void {
     this.abandon();
-    this.forgiveRefusal(this.effects.macs.activeId());
     this.attempt = 0;
     this.connectNow(why);
   }
@@ -672,8 +554,6 @@ export class ConnectionManager {
   private abandon(): void {
     this.epoch++;
     this.effects.clock.clearTimeout(this.retryTimer);
-    this.knocking?.abort();
-    this.knocking = null;
     this.stopPings();
     const phase = this.phase;
     if (phase.kind !== "connected" && phase.kind !== "demo") return;
@@ -709,7 +589,7 @@ export class ConnectionManager {
   private enter(phase: Phase): void {
     this.phase = phase;
     const mac = this.active();
-    this.state = toState(phase, mac && { id: mac.id, name: mac.name, kind: mac.kind });
+    this.state = toState(phase, mac && { id: mac.id, name: mac.name });
     for (const listener of this.listeners) listener();
   }
 }

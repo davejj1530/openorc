@@ -32,13 +32,13 @@ it("clears only that Mac's delivered alerts for the thread just opened", async (
   expect(dismissed).toEqual(["a", "e"]);
 });
 
-describe("a phone paired with a Mac and its cloud brain", () => {
+describe("a notice heard more than once", () => {
   it("shows one banner per notice, however many times it arrives", () => {
     const shown = vi.fn(() => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }));
     const present = oncePerNotice(shown);
-    const alert = { macId: "brain", id: "notice-1", kind: "finished", threadId: "t" };
+    const alert = { macId: "mac", id: "notice-1", kind: "finished", threadId: "t" };
     expect(present(alert).shouldShowBanner).toBe(true);
-    expect(present({ ...alert, macId: "mac" }).shouldShowBanner).toBe(false);
+    expect(present({ ...alert }).shouldShowBanner).toBe(false);
     expect(present({ ...alert, id: "notice-2" }).shouldShowBanner).toBe(true);
     expect(shown).toHaveBeenCalledTimes(2);
   });

@@ -37,7 +37,7 @@ export { ompAgentDir } from "./omp/home.js";
 export { AcpUpdateMapper } from "./acp/updates.js";
 export { RunHandle, LiveInputUnavailable, type RunControls, type LiveSettings } from "./run-handle.js";
 export { captureLaunchEnvironment, captureProcessEnvironment, type AgentLaunchEnvironment, type ResolvedHarnessEnvironment } from "./launch-environment.js";
-export { stopProcess, waitForProcessGroup } from "./process-lifetime.js";
+export { stopProcess, stopProcessFromCallback, waitForProcessGroup } from "./process-lifetime.js";
 export type { AgentHost, AgentHostFile } from "./agent-host.js";
 export { recoverAgentProcesses } from "./process-recovery.js";
 export { agentBinary } from "./bin.js";

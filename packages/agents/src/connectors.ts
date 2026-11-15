@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import type { ConnectorSource, ConnectorSpec, ConnectorStatus } from "@openorc/protocol";
 import { launchCommand } from "./command-launch.js";
 import type { AgentLaunchEnvironment } from "./launch-environment.js";
-import { stopProcess } from "./process-lifetime.js";
+import { stopProcessFromCallback } from "./process-lifetime.js";
 
 /** One MCP server as one agent, in one place, reports it. */
 export interface ConnectorRow {
@@ -96,7 +96,7 @@ export function runAgentCommand(launch: Pick<AgentLaunchEnvironment, "binary" | 
     let output = "";
     proc.stdout.on("data", (chunk: Buffer) => (output += chunk.toString()));
     proc.stderr.on("data", (chunk: Buffer) => (output += chunk.toString()));
-    const timer = setTimeout(() => stopProcess(proc), timeoutMs);
+    const timer = setTimeout(() => stopProcessFromCallback(proc), timeoutMs);
     proc.once("error", (error) => {
       clearTimeout(timer);
       reject(error);

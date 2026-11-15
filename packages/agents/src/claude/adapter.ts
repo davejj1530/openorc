@@ -3,7 +3,7 @@ import { fileBoundaryHook } from "./file-boundary.js";
 import type { ChildProcessWithoutNullStreams } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
-import { stopProcess, waitForProcessGroup } from "../process-lifetime.js";
+import { stopProcess, stopProcessFromCallback, waitForProcessGroup } from "../process-lifetime.js";
 import readline from "node:readline";
 import { ULTRACODE_EFFORT, type AgentEvent, type FileBoundary, type RunSpec } from "@openorc/protocol";
 import { ClaudeStreamParser } from "./stream-json.js";
@@ -444,7 +444,8 @@ function startClaudeSession(spec: RunSpec, prepared: ReturnType<typeof prepareCl
       ending = true;
       proc.stdin.end();
       const timer = setTimeout(() => {
-        if (!exited()) stopProcess(proc);
+        // A timer cannot throw into the host: a group that cannot be signalled is left for the next close.
+        if (!exited()) stopProcessFromCallback(proc);
       }, IDLE_EXIT_GRACE_MS);
       timer.unref();
       proc.once("close", () => clearTimeout(timer));

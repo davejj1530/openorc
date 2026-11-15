@@ -3,7 +3,7 @@ import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, readl
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { SHARED_CLAUDE_CONFIG_DIR, captureLaunchEnvironment, claudeConfigDir, launchCommand, stopProcess } from "@openorc/agents";
+import { SHARED_CLAUDE_CONFIG_DIR, captureLaunchEnvironment, claudeConfigDir, launchCommand, stopProcess, stopProcessFromCallback } from "@openorc/agents";
 import { chromeExecutable, chromeIncognitoFlags } from "@openorc/agents/chrome-incognito";
 import { claudeAccounts, type Db } from "@openorc/db";
 import { DEFAULT_CLAUDE_ACCOUNT, type ClaudeAccount, type ClaudeAccountConnection, type ClaudeAccounts } from "@openorc/protocol";
@@ -237,7 +237,7 @@ export class ClaudeAccountService {
     const command = launchCommand(binary, ["--setting-sources", "user", "auth", "login", "--claudeai"]);
     const process = spawn(command.file, command.args, { ...command.options, env, cwd: directory, stdio: "ignore", detached: globalThis.process.platform !== "win32" });
     this.errors.delete(id);
-    const timer = setTimeout(() => stopProcess(process), 5 * 60_000);
+    const timer = setTimeout(() => stopProcessFromCallback(process), 5 * 60_000);
     const done = new Promise<void>((resolve) => {
       process.once("error", () => this.errors.set(id, "Claude could not start sign-in. Check its installation and retry."));
       process.once("close", (code) => {

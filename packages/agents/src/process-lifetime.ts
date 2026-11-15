@@ -88,3 +88,16 @@ export function stopProcess(proc: ChildProcess): void {
     throw error;
   }
 }
+
+/**
+ * `stopProcess` for a timer or an event callback, where a throw would end the whole host process. A group that is alive
+ * and cannot be signalled is left as it was, for a later stop to try again. Answers whether the stop was asked.
+ */
+export function stopProcessFromCallback(proc: ChildProcess): boolean {
+  try {
+    stopProcess(proc);
+    return true;
+  } catch {
+    return false;
+  }
+}

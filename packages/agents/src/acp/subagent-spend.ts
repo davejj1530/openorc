@@ -1,7 +1,7 @@
 import os from "node:os";
 import { definedEnv } from "../agent-host.js";
 import type { AgentLaunchEnvironment } from "../launch-environment.js";
-import { stopProcess } from "../process-lifetime.js";
+import { stopProcessFromCallback } from "../process-lifetime.js";
 import { spawnAgentProcess } from "../process-recovery.js";
 import type { AgentCommand } from "./profile.js";
 
@@ -21,7 +21,7 @@ export function agentCommand(launch: AgentLaunchEnvironment, runId: string, env:
         ? host.spawn(launch.binary, args, { runId: `${runId}-read-${++reads}`, cwd: host.home, env: definedEnv(env), files: [], dirs: [] })
         : spawnAgentProcess(launch.binary, args, { cwd: os.homedir(), env });
       const out: Buffer[] = [];
-      const timer = setTimeout(() => stopProcess(proc), READ_TIMEOUT_MS);
+      const timer = setTimeout(() => stopProcessFromCallback(proc), READ_TIMEOUT_MS);
       proc.stdout.on("data", (chunk: Buffer) => out.push(chunk));
       proc.stderr.resume();
       proc.once("error", (error) => {

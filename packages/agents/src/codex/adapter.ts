@@ -10,7 +10,7 @@ import type { AgentEvent, ApprovalDecision, ApprovalKind, ApprovalResolution, Ru
 import { agentBinary } from "../bin.js";
 import { StdioJsonRpc, type JsonRpcServerRequest } from "../jsonrpc.js";
 import { RunHandle } from "../run-handle.js";
-import { stopProcess, waitForProcessGroup } from "../process-lifetime.js";
+import { stopProcess, stopProcessFromCallback, waitForProcessGroup } from "../process-lifetime.js";
 import { partitionAttachments, withAttachedFiles } from "../attachments.js";
 import type { AgentLaunchEnvironment } from "../launch-environment.js";
 import { definedEnv, type AgentHost } from "../agent-host.js";
@@ -410,7 +410,7 @@ export class CodexAdapter {
         finishCompaction("error", error.message);
         compaction.reject(error);
       }
-      if (n.method === "thread/closed" && params.threadId === threadId) stopProcess(proc);
+      if (n.method === "thread/closed" && params.threadId === threadId) stopProcessFromCallback(proc);
       if (n.method === "turn/started" && turn?.id) {
         activeTurnId = turn.id;
         // A manual compaction runs as a turn of its own; it is maintenance, not a prompt being answered.

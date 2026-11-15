@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { execFile, type ChildProcess } from "node:child_process";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { stopProcess, waitForProcessGroup } from "./process-lifetime.js";
+import { stopProcess, stopProcessFromCallback, waitForProcessGroup } from "./process-lifetime.js";
 
 vi.mock("node:child_process", async (original) => ({ ...(await original<typeof import("node:child_process")>()), execFile: vi.fn() }));
 
@@ -82,5 +82,21 @@ describe.skipIf(process.platform === "win32")("process group teardown races", ()
     await vi.advanceTimersByTimeAsync(25);
     await closing;
     expect(closed).toBe(true);
+  });
+});
+
+describe.skipIf(process.platform === "win32")("a stop asked from a timer or an event", () => {
+  it("never throws into the host when the group is alive and cannot be signalled, and a later stop tries again", () => {
+    vi.useFakeTimers();
+    const proc = child();
+    let denied = true;
+    const kill = vi.spyOn(process, "kill").mockImplementation((_pid, signal) => {
+      if (signal !== 0 && denied) throw error("EPERM");
+      return true;
+    });
+    expect(stopProcessFromCallback(proc)).toBe(false);
+    denied = false;
+    expect(stopProcessFromCallback(proc)).toBe(true);
+    expect(kill.mock.calls.filter(([, signal]) => signal === "SIGTERM")).toHaveLength(2);
   });
 });

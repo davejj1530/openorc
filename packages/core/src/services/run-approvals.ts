@@ -6,6 +6,7 @@ import { executionMode, harnessCatalog, isHarnessId, stricterPermission, type Ag
 import { randomUUID } from "node:crypto";
 import type { Logger } from "../transport.js";
 import { appActionPolicy, blockedInPlan, type AppAction } from "./app-actions.js";
+import { artifactAsk } from "./artifact-approval.js";
 import type { LiveRun, PendingApproval, RunScope, ThreadPermissionState } from "./run-types.js";
 
 /** Words and answer requirements for one Codex transport request. */
@@ -58,17 +59,6 @@ function runAllowance(toolName: string, input: unknown): string | null {
   if (toolName === "WebFetch" && typeof url === "string" && URL.canParse(url)) return `${toolName} ${new URL(url).host}`;
   if (toolName.startsWith("mcp__")) return toolName;
   return `${toolName} ${JSON.stringify(input)}`;
-}
-
-/** What a Claude Artifact call does on claude.ai, in words: the permission prompt tool receives only its name and input, never Claude Code's own wording. */
-function artifactAsk(input: unknown): string {
-  const value = (input ?? {}) as Record<string, unknown>;
-  const action = typeof value["action"] === "string" ? value["action"] : "publish";
-  const file = typeof value["file_path"] === "string" ? value["file_path"] : null;
-  const page = typeof value["url"] === "string" ? value["url"] : null;
-  if (action !== "publish" || !file) return `Allow Artifact ${action} on claude.ai${page ? ` for ${page}` : ""}?`;
-  if (!page) return `Publish ${file} to claude.ai as a new private page?`;
-  return `Publish ${file} to claude.ai, replacing the page at ${page}${value["force"] === true ? " and overwriting any newer version there" : ""}?`;
 }
 
 function codexNeedsAnswer(kind: CodexApprovalRequest["kind"], input: Record<string, unknown>): boolean {

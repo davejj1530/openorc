@@ -154,9 +154,12 @@ function isolationArgs(spec: RunSpec, restricted: boolean, strictMcp: boolean): 
  * Claude Code's Artifact tool for one run: the environment that turns it on, and its entry on a restricted tool list.
  * A plan writes nothing but its plan file, so it goes without.
  */
-function artifactTool(spec: Pick<RunSpec, "mode">, env: NodeJS.ProcessEnv): { env: NodeJS.ProcessEnv; listed: string } {
-  return spec.mode === "plan" ? { env, listed: "" } : { env: withArtifactTool(env), listed: ",Artifact" };
+function artifactTool(spec: Pick<RunSpec, "mode">, env: NodeJS.ProcessEnv): { env: NodeJS.ProcessEnv; listed: string[] } {
+  return spec.mode === "plan" ? { env, listed: [] } : { env: withArtifactTool(env), listed: ["Artifact"] };
 }
+
+/** The tools a restricted run keeps. */
+const RESTRICTED_TOOLS = ["Read", "Grep", "Glob", "Bash", "Edit", "Write", "NotebookEdit", "WebFetch", "WebSearch", "AskUserQuestion", "ExitPlanMode", "Skill"];
 
 /** Prepare the exact CLI launch and private MCP file before a process owns them. */
 function prepareClaudeLaunch(spec: RunSpec, launch: AgentLaunchEnvironment, options: ClaudeAdapterOptions) {
@@ -198,11 +201,13 @@ function prepareClaudeLaunch(spec: RunSpec, launch: AgentLaunchEnvironment, opti
       claudePermissionMode(spec),
     ];
     const restricted = spec.mode === "plan" || spec.permissionMode !== "autonomous";
-    // Restrict mutation entry points to the tools covered by our explicit rules, plus Artifact.
+    // Restrict mutation entry points to the tools covered by our explicit rules.
     // Native subagents have independent policies; use OpenOrc's inherited-policy delegation instead.
     // Skill stays: the ask and deny rules still bind a skill's allowed-tools, its !`command` lines and its forked agent.
-    // No rule of ours covers Artifact: Claude Code checks each action, running reads and asking through the approve tool before it publishes.
-    if (restricted) args.push("--tools", `Read,Grep,Glob,Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,AskUserQuestion,ExitPlanMode,Skill${artifact.listed}`);
+    // No rule of ours covers Artifact, which also brings ArtifactComments and ArtifactData. Claude Code checks each action itself: it
+    // reads without asking and asks through the approve tool before it first publishes to a page. An ask rule would make every
+    // publish ask, but Claude Code then refuses to read a page at all, since only its own dialog can show that question.
+    if (restricted) args.push("--tools", [...RESTRICTED_TOOLS, ...artifact.listed].join(","));
     const strictMcp = Boolean(connection) && (spec.strictMcp ?? options.strictMcp) === true;
     args.push(...isolationArgs(spec, restricted, strictMcp));
     args.push(...sharedPluginArgs(shared));

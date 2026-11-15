@@ -4,8 +4,7 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { ThreadAction } from "../thread/thread-actions";
 import { fixtureThreads } from "./test-fixtures/threads";
-import { CloudOutOfReach } from "../spaces/cloud-reach";
-import { ThreadRow } from "./ThreadRow";
+import { cloudPlace, ThreadRow } from "./ThreadRow";
 
 const menus = vi.hoisted(() => ({ built: [] as ThreadAction[][][] }));
 vi.mock("../generated/icons", async (original) => ({
@@ -149,12 +148,9 @@ it("says whose turn it is on a cloud thread someone else is in, and dims its clo
   const row = render(<ThreadRow thread={{ ...working, id: "cloud", owner }} project="Canvas" arriving={false} />);
   expect(row.getByText("Mara's turn")).toBeTruthy();
   expect(row.queryByText("Working")).toBeNull();
-  expect(row.getByLabelText("Cloud glyph").getAttribute("class") ?? "").not.toContain("opacity-50");
-  row.unmount();
-  const away = render(
-    <CloudOutOfReach.Provider value>
-      <ThreadRow thread={{ ...working, id: "cloud", owner }} project="Canvas" arriving={false} />
-    </CloudOutOfReach.Provider>,
-  );
-  expect(away.getByLabelText("Cloud glyph").getAttribute("class") ?? "").toContain("opacity-50");
+  const cloud = { ...working, id: "cloud", owner };
+  expect(cloudPlace(cloud, "Canvas")).toMatchObject({ line: "Canvas · Mara", offline: false });
+  expect(cloudPlace(cloud, "Canvas", true)).toMatchObject({ offline: true });
+  expect(cloudPlace({ ...cloud, owner: { ...owner, reach: "offline" } }, "Canvas")).toMatchObject({ offline: true });
+  expect(cloudPlace(working, "Canvas")).toBeNull();
 });

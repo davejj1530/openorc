@@ -57,7 +57,7 @@ function rowFacts(thread: ThreadSummary, where: string): string[] {
  * the teammate who started it when it is not the person's own. The cloud dims while the Mac cannot reach it. Null for
  * a thread of this Mac.
  */
-function cloudPlace(thread: ThreadSummary, project: string | null, outOfReach = false): { line: string; spoken: string; offline: boolean } | null {
+export function cloudPlace(thread: ThreadSummary, project: string | null, outOfReach = false): { line: string; spoken: string; offline: boolean } | null {
   if (!placeOf(thread).rowIcon) return null;
   const name = project ?? thread.owner?.project?.name ?? null;
   const starter = rowStarter(thread);
@@ -145,7 +145,14 @@ function ProjectLine({ thread, project, trailing, onNode }: { thread: ThreadSumm
   const PullIcon = pull ? pullIcons[pull.state] : null;
   return (
     <View className="flex-row items-center gap-1.5" onLayout={(event) => onNode(event.nativeEvent.layout.y + event.nativeEvent.layout.height / 2)}>
-      {cloud ? <Cloud size={16} className={cn("text-ink-4", cloud.offline && "opacity-50")} /> : <Glyph size={16} className="text-ink-4" />}
+      {cloud ? (
+        // The glyph takes its ink from its class; its fade is the view's.
+        <View className={cn(cloud.offline && "opacity-40")}>
+          <Cloud size={16} className="text-ink-4" />
+        </View>
+      ) : (
+        <Glyph size={16} className="text-ink-4" />
+      )}
       <Text numberOfLines={1} className="flex-1 text-detail text-ink-4">
         {cloud ? cloud.line : [project, workspaceLabel(thread)].filter(Boolean).join(" · ")}
       </Text>

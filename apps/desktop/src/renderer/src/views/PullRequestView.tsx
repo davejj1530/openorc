@@ -5,16 +5,18 @@ import { ExternalLink, RefreshCw } from "../components/icons";
 import { PageCrumbs } from "../components/PageTitle";
 import { PullRequestReviewBar } from "../components/PullRequestReviewBar";
 import { PullRequestReviewer } from "../components/PullRequestReviewer";
+import { PullStateGlyph } from "../components/PullStateGlyph";
 import { RichText } from "../components/RichText";
 import { TopBar } from "../components/TopBar";
-import { Badge, Button, Empty, IconButton, Segmented, StatusDot, Tooltip } from "../components/ui";
+import { Badge, Button, Empty, IconButton, Segmented, Tooltip } from "../components/ui";
 import { cn } from "../lib/cn";
-import { diffComment, draftAuthor, pullRequestDot, pullRequestTone, pullRequestToneLabel, reviewDecisionLabel } from "../lib/pull-requests";
+import { diffComment, draftAuthor, pullRequestTone, pullRequestToneLabel, reviewDecisionLabel } from "../lib/pull-requests";
 import { invalidateTags, useRpc, useRpcMutation } from "../lib/client";
 import { useRouter } from "../lib/router";
 import { relativeTime } from "@openorc/client";
 import { useModelCatalog } from "../lib/use-model-catalog";
 import { useOrclings } from "../lib/orclings";
+import "./pull-requests.css";
 
 const DiffView = lazy(() => import("../components/DiffView").then((m) => ({ default: m.DiffView })));
 
@@ -24,9 +26,10 @@ const sections = [
   { value: "description", label: "Description" },
 ] as const;
 
+/** The pull request's title over its state, drawn as its row draws it, and the review decision while it is still open. */
 function PullRequestHeading({ pull }: { pull: PullRequestDetail }) {
   const tone = pullRequestTone(pull);
-  const decision = pull.reviewDecision ? reviewDecisionLabel[pull.reviewDecision] : null;
+  const decision = pull.state === "open" && pull.reviewDecision ? reviewDecisionLabel[pull.reviewDecision] : null;
   return (
     <div className="shrink-0 px-6 pt-5 pb-3">
       <h1 className="text-title-sm text-ink break-words">
@@ -34,7 +37,7 @@ function PullRequestHeading({ pull }: { pull: PullRequestDetail }) {
       </h1>
       <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-3">
         <span className="inline-flex items-center gap-2 text-ink-2">
-          <StatusDot tone={pullRequestDot[tone]} /> {pullRequestToneLabel[tone]}
+          <PullStateGlyph state={tone} /> {pullRequestToneLabel[tone]}
         </span>
         <span className="min-w-0">
           {pull.author} · <span className="font-mono text-ink-2">{pull.headRefName}</span> → <span className="font-mono text-ink-2">{pull.baseRefName}</span>

@@ -659,12 +659,163 @@ function pageStates({ mode, now, project, orclings, patch }: { mode: string; now
     labels: [],
     ...extra,
   });
-  const pulls = [
-    pull(482, "Build a thoughtful onboarding", { reviewDecision: "review_required" }),
-    pull(479, "Make the command menu open instantly", { author: "atlas", headRefName: "fast-command-menu", additions: 42, deletions: 31, reviewDecision: "approved" }),
-    pull(475, "Fold the duplicate color tokens into one scale", { isDraft: true, headRefName: "design-tokens", additions: 12, deletions: 96 }),
-    pull(471, "Check docs against the code", { author: "pip", headRefName: "docs-check", additions: 8, deletions: 2, reviewDecision: "changes_requested" }),
+  const labels = [
+    { name: "bug", color: "d73a4a", description: "Something isn't working" },
+    { name: "design", color: "c5def5", description: "Look and feel" },
+    { name: "docs", color: "0075ca", description: "Improvements or additions to documentation" },
+    { name: "good first issue", color: "7057ff", description: "Good for newcomers" },
+    { name: "onboarding", color: "0e8a16", description: "" },
+    { name: "performance", color: "fbca04", description: "" },
   ];
+  const labelled = (...names: string[]) => names.map((name) => labels.find((entry) => entry.name === name)!);
+  const hours = (count: number) => now - count * 3600000;
+  // Beyond the summary: who is assigned, the milestone and project, comment and reaction counts, and your part in
+  // its review, so every filter and order in the bar has something to show. "you" is the signed-in account.
+  const pulls = [
+    pull(482, "Build a thoughtful onboarding", {
+      reviewDecision: "review_required",
+      labels: labelled("onboarding", "design"),
+      createdAt: hours(30),
+      updatedAt: hours(1),
+      assignees: ["you"],
+      milestone: "Onboarding v2",
+      project: "acme/3",
+      comments: 14,
+      reactions: { rocket: 5, heart: 2 },
+      requested: ["you"],
+    }),
+    pull(479, "Make the command menu open instantly", {
+      author: "atlas",
+      headRefName: "fast-command-menu",
+      additions: 42,
+      deletions: 31,
+      reviewDecision: "approved",
+      labels: labelled("performance"),
+      createdAt: hours(52),
+      updatedAt: hours(5),
+      assignees: ["atlas"],
+      milestone: "1.0 launch",
+      comments: 3,
+      reactions: { thumbs_up: 9 },
+      reviewedBy: ["you"],
+    }),
+    pull(475, "Fold the duplicate color tokens into one scale", {
+      isDraft: true,
+      headRefName: "design-tokens",
+      additions: 12,
+      deletions: 96,
+      labels: labelled("design"),
+      createdAt: hours(8),
+      updatedAt: hours(7),
+      project: "acme/5",
+      comments: 0,
+    }),
+    pull(471, "Check docs against the code", {
+      author: "pip",
+      headRefName: "docs-check",
+      additions: 8,
+      deletions: 2,
+      reviewDecision: "changes_requested",
+      labels: labelled("docs", "bug", "good first issue"),
+      createdAt: hours(70),
+      updatedAt: hours(2),
+      assignees: ["you", "pip"],
+      milestone: "1.0 launch",
+      comments: 22,
+      reactions: { eyes: 3, thumbs_up: 1 },
+      reviewedBy: ["you"],
+    }),
+    pull(468, "Retry flaky provider sign-ins", {
+      author: "mara",
+      headRefName: "sign-in-retries",
+      additions: 64,
+      deletions: 9,
+      labels: labelled("bug"),
+      createdAt: hours(96),
+      updatedAt: hours(30),
+      comments: 6,
+      reactions: { hooray: 4 },
+      requested: ["you"],
+    }),
+    pull(466, "Your first pull request, still open", { author: "you", headRefName: "first-pass", createdAt: hours(120), updatedAt: hours(48), comments: 1 }),
+    pull(460, "Ship the 0.9 release notes", {
+      author: "pip",
+      state: "merged",
+      headRefName: "release-notes",
+      labels: labelled("docs"),
+      createdAt: hours(200),
+      updatedAt: hours(150),
+      milestone: "Beta",
+      comments: 4,
+    }),
+    pull(452, "Drop the old welcome screen", { author: "atlas", state: "closed", headRefName: "old-welcome", createdAt: hours(260), updatedAt: hours(240), comments: 2 }),
+  ];
+
+  type FixturePull = (typeof pulls)[number] & Row;
+  const reviewStates: Record<string, string | null> = { none: null, required: "review_required", approved: "approved", changes_requested: "changes_requested" };
+  const has = (entry: FixturePull, key: string, login: string) => ((entry[key] as string[] | undefined) ?? []).includes(login);
+  const reviewMatches: Record<string, (entry: FixturePull) => boolean> = {
+    reviewed_by_you: (entry) => has(entry, "reviewedBy", "you"),
+    not_reviewed_by_you: (entry) => !has(entry, "reviewedBy", "you"),
+    awaiting_you: (entry) => has(entry, "requested", "you"),
+    awaiting_you_or_team: (entry) => has(entry, "requested", "you"),
+  };
+  const states: Record<string, (entry: FixturePull) => boolean> = {
+    open: (entry) => entry.state === "open",
+    draft: (entry) => entry.state === "open" && Boolean(entry.isDraft),
+    merged: (entry) => entry.state === "merged",
+    closed: (entry) => entry.state === "closed",
+    any: () => true,
+  };
+  /** "@me" is the signed-in account, "you" in these pull requests. */
+  const person = (login: unknown) => (login === "@me" ? "you" : login);
+  const missingChecks: Record<string, (entry: FixturePull) => boolean> = {
+    label: (entry) => (entry.labels as unknown[]).length === 0,
+    assignee: (entry) => ((entry.assignees as string[] | undefined) ?? []).length === 0,
+    milestone: (entry) => !entry.milestone,
+  };
+  const reaction = (entry: FixturePull, name: string) => ((entry.reactions as Record<string, number> | undefined) ?? {})[name] ?? 0;
+  const orders: Record<string, (a: FixturePull, b: FixturePull) => number> = {
+    oldest: (a, b) => a.createdAt - b.createdAt,
+    most_commented: (a, b) => Number(b.comments ?? 0) - Number(a.comments ?? 0),
+    least_commented: (a, b) => Number(a.comments ?? 0) - Number(b.comments ?? 0),
+    recently_updated: (a, b) => b.updatedAt - a.updatedAt,
+    least_recently_updated: (a, b) => a.updatedAt - b.updatedAt,
+  };
+  const order = (sort: unknown) => {
+    const key = String(sort ?? "newest");
+    if (orders[key]) return orders[key];
+    if (key.startsWith("reactions_")) return (a: FixturePull, b: FixturePull) => reaction(b, key.slice("reactions_".length)) - reaction(a, key.slice("reactions_".length));
+    return (a: FixturePull, b: FixturePull) => b.createdAt - a.createdAt;
+  };
+  /** The list as GitHub's search narrows and orders it. */
+  const narrowed = (params: Record<string, unknown>) => {
+    const assignee = person(params.assignee);
+    const authors = Array.isArray(params.authors) ? params.authors.map(person) : null;
+    return (pulls as FixturePull[])
+      .filter(states[String(params.state)] ?? states.open!)
+      .filter((entry) => !authors || authors.includes(entry.author))
+      .filter((entry) => !Array.isArray(params.labels) || params.labels.every((name) => (entry.labels as { name: string }[]).some((label) => label.name === name)))
+      .filter((entry) => typeof assignee !== "string" || has(entry, "assignees", assignee))
+      .filter((entry) => typeof params.milestone !== "string" || entry.milestone === params.milestone)
+      .filter((entry) => typeof params.project !== "string" || entry.project === params.project)
+      .filter((entry) => typeof params.review !== "string" || (reviewMatches[params.review]?.(entry) ?? entry.reviewDecision === reviewStates[params.review]))
+      .filter((entry) => !Array.isArray(params.missing) || params.missing.every((what) => missingChecks[what]?.(entry)))
+      .sort(order(params.sort));
+  };
+  const choices: Record<string, unknown[]> = {
+    labels: labels.map((label) => ({ value: label.name, name: label.name, color: label.color, ...(label.description ? { detail: label.description } : {}) })),
+    assignees: ["atlas", "mara", "pip", "rini", "you"].map((login) => ({ value: login, name: login })),
+    milestones: [
+      { value: "Onboarding v2", name: "Onboarding v2" },
+      { value: "1.0 launch", name: "1.0 launch" },
+      { value: "Beta", name: "Beta", detail: "Closed" },
+    ],
+    projects: [
+      { value: "acme/3", name: "Roadmap", detail: "acme" },
+      { value: "acme/5", name: "Design system", detail: "acme" },
+    ],
+  };
   const memory = (id: string, type: string, title: string, body: string, source = "agent") => ({
     id,
     scope: "project",
@@ -717,7 +868,9 @@ function pageStates({ mode, now, project, orclings, patch }: { mode: string; now
     if (method === "orclings.create" || method === "orclings.update") return orclings[0];
     if (method === "system.info" && mode === "onboarding")
       return { dataDir: "/Users/you/Library/Application Support/OpenOrc", harnesses, codex: { installed: true, loggedIn: false }, gh: { installed: true, loggedIn: true } };
-    if (method === "pulls.list") return params.projectId === "studio" ? pulls : [];
+    if (method === "pulls.list") return params.projectId === "studio" ? narrowed(params) : [];
+    if (method === "pulls.choices") return params.projectId === "studio" ? choices[String(params.kind)] : [];
+    if (method === "pulls.counts") return Object.fromEntries(Object.keys(states).map((state) => [state, params.projectId === "studio" ? narrowed({ ...params, state }).length : 0]));
     if (method === "pulls.get")
       return { ...pulls[0], body: "Connect a project, then start a conversation.\n\n- A short welcome\n- One clear next step", headSha: "a".repeat(40), baseSha: "b".repeat(40), viewer: "you" };
     if (method === "pulls.diff") return { patch, headSha: "a".repeat(40) };

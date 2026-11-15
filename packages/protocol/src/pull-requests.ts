@@ -2,12 +2,115 @@ import { z } from "zod";
 import type { AgentKind } from "./events.js";
 import { ModelExecutionSettings } from "./execution-target.js";
 
-/** Which pull requests a list shows: open ones, those waiting on your review, your own, or closed and merged ones. */
-export const PullRequestFilter = z.enum(["open", "review_requested", "authored", "closed"]);
-export type PullRequestFilter = z.infer<typeof PullRequestFilter>;
+/**
+ * Which pull requests a list shows by state: open ones (drafts among them), drafts alone, merged ones, ones closed
+ * without merging, or any.
+ */
+export const PullRequestStateFilter = z.enum(["open", "draft", "merged", "closed", "any"]);
+export type PullRequestStateFilter = z.infer<typeof PullRequestStateFilter>;
+
+/** How many pull requests each state holds under the same filters. */
+export type PullRequestCounts = Record<PullRequestStateFilter, number>;
 
 export type PullRequestState = "open" | "closed" | "merged";
 export type PullRequestReviewDecision = "approved" | "changes_requested" | "review_required";
+
+/**
+ * GitHub's Reviews filter: no review yet, a review still required, approved, changes requested, reviewed or not yet
+ * reviewed by you, and waiting on your review alone or on you or a team you're in.
+ */
+export const PullRequestReviewFilter = z.enum(["none", "required", "approved", "changes_requested", "reviewed_by_you", "not_reviewed_by_you", "awaiting_you", "awaiting_you_or_team"]);
+export type PullRequestReviewFilter = z.infer<typeof PullRequestReviewFilter>;
+
+/** GitHub's Sort menu, the reactions included. Newest is how every list starts. */
+export const PullRequestSort = z.enum([
+  "newest",
+  "oldest",
+  "most_commented",
+  "least_commented",
+  "recently_updated",
+  "least_recently_updated",
+  "best_match",
+  "reactions_thumbs_up",
+  "reactions_thumbs_down",
+  "reactions_laugh",
+  "reactions_hooray",
+  "reactions_confused",
+  "reactions_heart",
+  "reactions_rocket",
+  "reactions_eyes",
+]);
+export type PullRequestSort = z.infer<typeof PullRequestSort>;
+
+/** What GitHub's `no:` qualifier asks to be missing: any label, any assignee, a milestone. */
+export const PullRequestMissing = z.enum(["label", "assignee", "milestone"]);
+export type PullRequestMissing = z.infer<typeof PullRequestMissing>;
+
+export const PULL_REQUEST_AUTHOR_LIMIT = 10;
+export const PULL_REQUEST_LABEL_LIMIT = 10;
+
+/**
+ * A GitHub login as gh names a pull request's author, an app's as `app/<slug>`. Managed users' logins end in
+ * `_<shortcode>`.
+ */
+export const GitHubLogin = z
+  .string()
+  .max(64)
+  .regex(/^(?:app\/)?[A-Za-z0-9][A-Za-z0-9_-]*(?:\[bot\])?$/, "Not a GitHub login.");
+
+/** A person a filter names: a GitHub login, or `@me` for the gh account. */
+const Person = z.union([GitHubLogin, z.literal("@me")]);
+
+/** A label or milestone name a search can quote: one line, and no quote of its own to end the quoting early. */
+export const SearchName = z
+  .string()
+  .trim()
+  .min(1)
+  .max(255)
+  .regex(/^[^\r\n"]+$/, "GitHub can't search for that name.");
+
+/** A project as GitHub's `project:` qualifier names it: its owner and number. */
+export const PullRequestProjectRef = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9-]*\/\d+$/, "Not a project.");
+
+/**
+ * What narrows a list the way GitHub's filter bar does: any of these authors, every one of these labels, one assignee,
+ * milestone, project and review state, what must be missing, and the order. `@me` is you, as on GitHub.
+ */
+export const PullRequestNarrowing = z
+  .object({
+    authors: z.array(Person).min(1).max(PULL_REQUEST_AUTHOR_LIMIT).optional(),
+    labels: z.array(SearchName).min(1).max(PULL_REQUEST_LABEL_LIMIT).optional(),
+    assignee: Person.optional(),
+    milestone: SearchName.optional(),
+    project: PullRequestProjectRef.optional(),
+    review: PullRequestReviewFilter.optional(),
+    missing: z.array(PullRequestMissing).min(1).max(3).optional(),
+    sort: PullRequestSort.optional(),
+  })
+  .strict();
+export type PullRequestNarrowing = z.infer<typeof PullRequestNarrowing>;
+
+/** The lists GitHub's filters choose from: the repository's labels, the people it can assign, its milestones and projects. */
+export const PullRequestChoiceKind = z.enum(["labels", "assignees", "milestones", "projects"]);
+export type PullRequestChoiceKind = z.infer<typeof PullRequestChoiceKind>;
+
+/**
+ * One entry in a filter's list. `value` is what the filter sends: a label or milestone's name, a login, a project's
+ * `owner/number`. `color` is a label's, `detail` a label's description, a project's owner or a milestone being closed.
+ */
+export interface PullRequestChoice {
+  value: string;
+  name: string;
+  color?: string;
+  detail?: string;
+}
+
+/** A label as GitHub draws it, on a pull request or in the label filter. `color` is six hex digits without the hash. */
+export interface PullRequestLabel {
+  name: string;
+  color: string;
+  description: string;
+}
 
 /** A pull request as a list shows it, read from GitHub through the user's own gh. */
 export interface PullRequestSummary {
@@ -26,7 +129,7 @@ export interface PullRequestSummary {
   deletions: number;
   changedFiles: number;
   reviewDecision: PullRequestReviewDecision | null;
-  labels: string[];
+  labels: PullRequestLabel[];
 }
 
 export interface PullRequestDetail extends PullRequestSummary {
@@ -124,7 +227,11 @@ const Side = z.enum(["old", "new"]);
 const REVIEW_TEXT_LIMIT = 65_536;
 
 export const pullRequestRpcParams = {
-  "pulls.list": z.object({ projectId: z.string().min(1), filter: PullRequestFilter }).strict(),
+  "pulls.list": z.object({ projectId: z.string().min(1), state: PullRequestStateFilter, ...PullRequestNarrowing.shape }).strict(),
+  /** How many pull requests each state holds under these filters, every count read in one GitHub request. */
+  "pulls.counts": z.object({ projectId: z.string().min(1), ...PullRequestNarrowing.shape }).strict(),
+  /** What one of GitHub's filters offers for the project's repository. */
+  "pulls.choices": z.object({ projectId: z.string().min(1), kind: PullRequestChoiceKind }).strict(),
   /** The branches a new pull request can target, with `prefer` among them when GitHub has it. */
   "pulls.branches": z.object({ projectId: z.string().min(1), prefer: BranchName.optional() }).strict(),
   "pulls.get": z.object(PullRequestRef).strict(),
@@ -168,6 +275,8 @@ export const pullRequestRpcParams = {
 
 export interface PullRequestRpcResults {
   "pulls.list": PullRequestSummary[];
+  "pulls.counts": PullRequestCounts;
+  "pulls.choices": PullRequestChoice[];
   "pulls.branches": PullRequestBranches;
   "pulls.get": PullRequestDetail;
   "pulls.diff": { patch: string; headSha: string };

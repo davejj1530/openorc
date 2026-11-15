@@ -25,6 +25,8 @@ export type Block = { at?: number; turnKey?: string; runId?: string; seq?: numbe
       runId?: string;
       /** Sent from this window and shown at once; the core has not recorded it yet. */
       pending?: boolean;
+      /** A notice said while a turn ran, such as who stopped it: it reads under that turn's head, never as its opening. */
+      inTurn?: boolean;
     }
   | { id: string; kind: "thinking"; text: string; startedAt: number; endedAt: number | null; explicit?: boolean; status?: ActivityStatus }
   | {
@@ -194,6 +196,9 @@ function approvalBlock(ev: Extract<AgentEvent, { type: "approval.requested" }>):
 type Handler<T extends AgentEventType> = (run: RunTranscript, ev: Extract<AgentEvent, { type: T }>) => void;
 const ignore = () => {};
 
+/** A notice said while the run's turn is open belongs to that turn, after its head. */
+const inTurn = (run: RunTranscript, role: string, existing: { inTurn?: boolean } | undefined) => (role === "system" && (existing?.inTurn || run.turnOpen) ? { inTurn: true } : {});
+
 /** What each event does to a run. Total over event types, so a new one does not compile until it has a decision. */
 const handlers: { [T in AgentEventType]: Handler<T> } = {
   "session.started": (run, ev) => {
@@ -202,12 +207,21 @@ const handlers: { [T in AgentEventType]: Handler<T> } = {
   },
   "message.delta": (run, ev) => {
     const existing = get(run, ev.messageId, "message");
-    upsert(run, { id: ev.messageId, kind: "message", role: ev.role, text: (existing?.text ?? "") + ev.text, streaming: true, at: existing?.at ?? ev.ts });
+    upsert(run, { id: ev.messageId, kind: "message", role: ev.role, text: (existing?.text ?? "") + ev.text, streaming: true, at: existing?.at ?? ev.ts, ...inTurn(run, ev.role, existing) });
   },
   "message.completed": (run, ev) => {
     if (ev.role === "assistant" && ev.text.trim()) replaceSubagentCompletionReply(run);
     const existing = get(run, ev.messageId, "message");
-    upsert(run, { id: ev.messageId, kind: "message", role: ev.role, text: ev.text, streaming: false, at: existing?.at ?? ev.ts, ...(ev.attachments ? { attachments: ev.attachments } : {}) });
+    upsert(run, {
+      id: ev.messageId,
+      kind: "message",
+      role: ev.role,
+      text: ev.text,
+      streaming: false,
+      at: existing?.at ?? ev.ts,
+      ...(ev.attachments ? { attachments: ev.attachments } : {}),
+      ...inTurn(run, ev.role, existing),
+    });
   },
   "thinking.started": (run, ev) => {
     const id = `think-${ev.messageId}`;

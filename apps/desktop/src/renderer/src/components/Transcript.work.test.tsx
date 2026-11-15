@@ -445,6 +445,28 @@ it("shows a manual compaction between turns as finished work, not a turn under w
   expect(heads()).toEqual(["done", "done", "working"]);
 });
 
+it("draws a turn a teammate stopped before its agent said anything under its own head, and the line under it", () => {
+  // Walk 8's cloud thread: Mara stopped Theo's turn three seconds in, before its agent said a word.
+  runs.reset();
+  const runId = "hosted:16a121e7-cd86-437b-9ed5-88ecbb061ce5";
+  runs.applyFrame({
+    runId,
+    seq: 1,
+    events: [
+      { type: "message.completed", runId, ts: 1794771807800, messageId: "user-theo", role: "user", text: "Work on the export" },
+      { type: "turn.started", runId, ts: 1794771807846, turnId: "f35c2bca-d48e-47a2-a9e5-b7ca87315a5b" },
+      { type: "message.completed", runId, ts: 1794771811121, messageId: "1bd34783-79af-4d45-96ac-cae806af41b8", role: "system", text: "Mara stopped Theo's turn." },
+      { type: "turn.completed", runId, ts: 1794771811148, turnId: "05c66b74-e7f1-4012-923a-ad70eb608d47", status: "cancelled", durationMs: 3302 },
+    ],
+  });
+  render(<Transcript run={runs.get(runId)!} working={false} />);
+  const head = document.querySelector(".turn-head")!;
+  const line = screen.getByText("Mara stopped Theo's turn.");
+  expect(head.getAttribute("data-state")).toBe("stopped");
+  expect(head.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(screen.getByText("Work on the export").compareDocumentPosition(head) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
 it("opens the folded work that holds a message asked for, with its whole narration, and marks that message", () => {
   const animate = vi.fn();
   HTMLElement.prototype.animate = animate;

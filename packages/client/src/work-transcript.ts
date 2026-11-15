@@ -65,11 +65,11 @@ export function workTurns(blocks: Block[]): WorkTurn[] {
  * or the lines people's actions leave outside any turn: every one before the agent does anything.
  */
 function readsFirst(block: Block, opening: boolean): boolean {
-  return block.kind === "message" && (block.role === "user" || (block.role === "system" && opening));
+  return block.kind === "message" && (block.role === "user" || (block.role === "system" && opening && !block.inTurn));
 }
 
-/** A person's message or a notice: what can open a turn before the agent does anything. */
-const opens = (block: Block): boolean => block.kind === "message" && (block.role === "user" || block.role === "system");
+/** A person's message or a notice said before the turn ran: what can open a turn before the agent does anything. */
+const opens = (block: Block): boolean => block.kind === "message" && (block.role === "user" || (block.role === "system" && !block.inTurn));
 
 /** Where the turn's closing reply starts: the run of assistant messages its last one ends. -1 without a reply. */
 function replyStart(blocks: Block[]): number {

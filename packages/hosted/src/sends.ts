@@ -149,10 +149,24 @@ export async function stop(calls: Calls, { runId }: RpcParams<"runs.interrupt">)
 export async function answer(calls: Calls, params: RpcParams<"approvals.resolve">): Promise<void> {
   const threadId = threadOf(params.runId);
   const row = calls.row(threadId);
-  const reply = await calls.on(threadId).request(ROUTES.answer(params.approvalId), { decision: params.decision, ...(params.answers && { answers: params.answers }) });
+  const asked = row.collaboration?.ask?.id === params.approvalId ? row.collaboration.ask : null;
+  // The answer names the phase the window saw, so it never continues on someone else's hours by surprise.
+  const bound = asked ? { expectedState: asked.state, expectedTurnId: asked.turnId } : {};
+  // Words instead of a parked ask of someone else's turn go with the answer, as one continuation of the answerer's own.
+  const note = params.note && params.decision === "deny" ? params.note : null;
+  const together = Boolean(asked && asked.state === "parked" && asked.sender?.id !== row.collaboration?.viewer?.id);
+  const body = { decision: params.decision, ...(params.answers && { answers: params.answers }), ...bound, ...(together && note && { message: note }) };
+  const reply = await calls
+    .on(threadId)
+    .request(ROUTES.answer(params.approvalId), body)
+    .catch(async (error: unknown) => {
+      // The ask may have changed: the window reads it again, and the person's words stay where they are.
+      await calls.refresh();
+      throw error;
+    });
   if (!reply.answered) return refuse(calls, reply.refusal, turnSettings(row, undefined));
   // A denial's note is the person's next message, as on this Mac: the server joins it to the turn or starts one.
-  if (params.note && params.decision === "deny") return post(calls, threadId, { text: params.note });
+  if (note && !together) return post(calls, threadId, { text: note });
   await calls.refresh();
 }
 

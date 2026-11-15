@@ -201,6 +201,90 @@ describe("a teammate's own turn once handoff opens", () => {
   });
 });
 
+describe("answering another sender's ask, bound to the phase the reader saw", () => {
+  const command = { kind: "command", toolName: "Bash", input: { command: "pnpm test" }, detail: "Bash: pnpm test" };
+  const answerOf = (askId: string) => stand.answered.filter((answer) => answer.askId === askId).map((answer) => answer.body);
+  async function asked() {
+    const made = await shared(true);
+    await made.ada.threads.call("runs.send", { runId: made.runId, text: "Start", messageId: id(1) });
+    await live(made.bob, made.thread, "Ada");
+    return { ...made, ask: stand.ask(made.thread, command) };
+  }
+  const parked = async (hosted: Hosted, thread: string) =>
+    vi.waitFor(async () => {
+      await (hosted.threads as unknown as { refresh(): Promise<void> }).refresh();
+      expect((await row(hosted, thread)).owner?.collaboration?.ask?.state).toBe("parked");
+    });
+
+  it("leaves a live ask to its turn's sender, and answers it parked as the answerer's own turn", async () => {
+    const { thread, bob, runId, ask } = await asked();
+    await vi.waitFor(async () => {
+      await (bob.threads as unknown as { refresh(): Promise<void> }).refresh();
+      expect((await row(bob, thread)).owner?.collaboration?.ask?.state).toBe("waiting");
+    });
+    await expect(bob.threads.call("approvals.resolve", { runId, approvalId: ask, decision: "allow" })).rejects.toThrow("Ada can answer while this turn is running.");
+    stand.endTurn(thread);
+    await parked(bob, thread);
+    await bob.threads.call("approvals.resolve", { runId, approvalId: ask, decision: "allow" });
+    expect(answerOf(ask).at(-1)).toMatchObject({ decision: "allow", expectedState: "parked", expectedTurnId: expect.any(String) });
+    await live(bob, thread, "Bob");
+  });
+
+  it("closes a parked ask with a bare deny for nothing, and starts the answerer's turn with their words in the same answer", async () => {
+    const { thread, bob, runId, ask } = await asked();
+    const next = stand.ask(thread, command);
+    stand.endTurn(thread);
+    await parked(bob, thread);
+    await bob.threads.call("approvals.resolve", { runId, approvalId: ask, decision: "deny" });
+    expect((await row(bob, thread)).activity).not.toBe("running");
+    await vi.waitFor(async () => {
+      await (bob.threads as unknown as { refresh(): Promise<void> }).refresh();
+      expect((await row(bob, thread)).owner?.collaboration?.ask).toMatchObject({ id: next, state: "parked" });
+    });
+    await bob.threads.call("approvals.resolve", { runId, approvalId: next, decision: "deny", note: "Run only the export tests" });
+    expect(answerOf(next).at(-1)).toMatchObject({ decision: "deny", message: "Run only the export tests", expectedState: "parked" });
+    // The words went with the answer, never as a message of their own.
+    expect(stand.sent.map((sent) => sent.body["text"])).not.toContain("Run only the export tests");
+    await live(bob, thread, "Bob");
+  });
+
+  it("refuses an answer whose ask changed since the reader saw it, in the server's words", async () => {
+    let frozen: string | null = null;
+    let last: string | null = null;
+    const listed = (input: unknown) => new URL(String(input)).pathname === "/hosted/threads";
+    stand.threadCollaboration.sharedWrites = true;
+    const team = stand.addTeam("Altalogy", [ADA, BOB]);
+    const project = stand.addProject(ADA, { name: "openorc", fullName: "altalogy/openorc" }, team);
+    for (const email of [ADA, BOB]) {
+      stand.setBilling(email, pro);
+      stand.setSignIns(email, [{ agent: "claude" }]);
+    }
+    const thread = stand.addThread(ADA, { projectId: project, title: "Export the log" });
+    const ada = await hostAs(ADA);
+    const bob = await hostAs(BOB, {
+      fetch: async (input, init) => {
+        const read = listed(input) && (!init?.method || init.method === "GET");
+        if (read && frozen) return new Response(frozen, { status: 200, headers: { "content-type": "application/json" } });
+        const answer = await fetch(input, init);
+        if (read) last = await answer.clone().text();
+        return answer;
+      },
+    });
+    const runId = `hosted:${thread}`;
+    await vi.waitFor(() => expect(bob.threads.holds({ thread })).toBe(true));
+    await ada.threads.call("runs.send", { runId, text: "Start", messageId: id(1) });
+    const ask = stand.ask(thread, command);
+    await vi.waitFor(async () => {
+      await (bob.threads as unknown as { refresh(): Promise<void> }).refresh();
+      expect((await row(bob, thread)).owner?.collaboration?.ask?.state).toBe("waiting");
+    });
+    frozen = last;
+    stand.endTurn(thread);
+    await expect(bob.threads.call("approvals.resolve", { runId, approvalId: ask, decision: "allow" })).rejects.toThrow("This request changed. Check it again before answering.");
+    expect(answerOf(ask).at(-1)).toMatchObject({ expectedState: "waiting" });
+  });
+});
+
 describe("while only joining is open (the slice before handoff)", () => {
   async function joinOnly() {
     const made = await shared();

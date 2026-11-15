@@ -174,6 +174,8 @@ export class StandInThreads {
   readonly sent: { threadId: string; body: Record<string, unknown> }[] = [];
   /** Every Retry save asked, by thread. */
   readonly saveRetries: string[] = [];
+  /** Every answer to an ask, as the server took it, before any check. */
+  readonly answered: { askId: string; who: string; body: Record<string, unknown> }[] = [];
   /** Each explicit Start's answer, by its request id. */
   readonly #starts = new Map<string, Reply>();
   /** Every ready ask the stand-in stored, in order. */
@@ -578,9 +580,16 @@ export class StandInThreads {
     const thread = [...this.#threads.values()].find((each) => each.asks.some((ask) => ask.id === askId));
     const ask = thread?.asks.find((each) => each.id === askId);
     if (!thread || !ask || !this.#readable({ who, space }, thread.id)) return { status: 404, body: { message: "That request isn't here.", statusCode: 404 } };
-    if (thread.owner !== who) return READ_ONLY;
+    if (thread.owner !== who && !this.collaboration.sharedWrites) return READ_ONLY;
+    this.answered.push({ askId, who, body });
     if (ask.answered) return { status: 409, body: { message: "This request was already answered.", statusCode: 409 } };
-    const startsTurn = ask.parked && body["decision"] !== "deny";
+    return this.collaboration.answerRefusal(thread, ask, who, body) ?? this.#resolve(thread, ask, who, body);
+  }
+
+  /** An answer taken: a turn starts where it starts work, admitted as the answerer's own, with any words sent instead. */
+  #resolve(thread: Thread, ask: Thread["asks"][number], who: string, body: Record<string, unknown>): Reply {
+    const words = typeof body["message"] === "string" && body["message"].trim() ? body["message"] : null;
+    const startsTurn = this.collaboration.answerStarts(thread, ask, body);
     const refusal = startsTurn ? this.admit(who, this.#settings(thread)) : null;
     if (refusal) return { status: 200, body: { answered: false, refusal } };
     ask.answered = true;
@@ -588,6 +597,7 @@ export class StandInThreads {
     this.append(thread.id, [{ type: "approval.resolved", ts: Date.now(), approvalId: ask.id, decision: body["decision"], ...(body["answers"] ? { answers: body["answers"] } : {}) }], {
       by: userOf(who),
     });
+    if (startsTurn && words) this.append(thread.id, [{ type: "message.completed", ts: Date.now(), messageId: randomUUID(), role: "user", text: words }], { by: userOf(who) });
     this.set(thread.id, { status: thread.turn ? "working" : "idle" });
     return { status: 200, body: { answered: true } };
   }

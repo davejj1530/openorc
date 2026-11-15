@@ -120,9 +120,9 @@ export class StandInCollaboration {
     return Boolean(block && block.responsible !== who);
   }
 
-  /** The handoff refusal of a new turn, in the server's words: 409 with the block. */
-  handoffRefusal(thread: { id: string }, who: string): Reply {
-    const block = this.#blockFor(thread, who)!;
+  /** The handoff refusal of a new turn, in the server's words: 409 with the block, this thread's or the one given. */
+  handoffRefusal(thread: { id: string }, who: string, given?: { code: string; message: string }): Reply {
+    const block = given ?? this.#blockFor(thread, who)!;
     return { status: 409, body: { code: block.code, message: block.message, block, statusCode: 409 } };
   }
 
@@ -137,6 +137,35 @@ export class StandInCollaboration {
         ? `${first ? `${first}'s` : "The previous sender's"} command is still running. Stop it before starting your turn.`
         : `The thread's work could not be saved.${first ? ` ${first} can retry the save.` : ""}`;
     return { code: block.code, message, responsible, commandIds: block.commandIds, retrySave: block.code === "handoff_save" && block.responsible === who };
+  }
+
+  /**
+   * Once anyone who writes may answer: an answer names the phase it saw, and one that has changed is refused; a live ask
+   * is its turn's sender's to answer; while only joining is open, a teammate answers nothing. Null when it may go on, and
+   * always while shared writing is closed, when only the thread's creator answers.
+   */
+  answerRefusal(thread: CollaborationThread, ask: CollaborationThread["asks"][number], who: string, body: Record<string, unknown>): Reply | null {
+    if (!this.sharedWrites) return null;
+    if (this.joinOnly && thread.owner !== who) return this.handoffRefusal(thread, who, this.joinBlock(thread));
+    const live = !ask.parked && thread.turnId === ask.turnId;
+    const sender = thread.turns.get(ask.turnId) ?? null;
+    const changed = { status: 409, body: { code: "ask_changed", message: "This request changed. Check it again before answering.", statusCode: 409 } };
+    if (typeof body["expectedState"] === "string") {
+      if (body["expectedState"] !== (live ? "waiting" : "parked") || body["expectedTurnId"] !== ask.turnId) return changed;
+    } else if (sender !== who) return changed;
+    if (!live || sender === who) return null;
+    const name = this.personOf(sender)?.name ?? "The previous sender";
+    return { status: 403, body: { code: "ask_sender_only", message: `${name} can answer while this turn is running.`, statusCode: 403 } };
+  }
+
+  /**
+   * Whether an answer starts a turn: a parked one does, and so do words sent instead; a bare denial closes the ask for
+   * nothing. An ask is parked once its turn is no longer the one running, as its projection reads it.
+   */
+  answerStarts(thread: CollaborationThread, ask: CollaborationThread["asks"][number], body: Record<string, unknown>): boolean {
+    const parked = ask.parked || thread.turnId !== ask.turnId;
+    const words = typeof body["message"] === "string" && body["message"].trim().length > 0;
+    return parked && (body["decision"] !== "deny" || words);
   }
 
   /** The block a teammate meets for anything that would start a turn while only joining is open. */

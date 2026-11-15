@@ -76,6 +76,22 @@ it("stops the turn it saw running in a cloud thread, by its id", async () => {
   expect(mac.calls).toEqual([{ method: "runs.interrupt", params: { runId, expectedTurnId: "turn-7" } }]);
 });
 
+it("sends into the running turn it saw by naming it, through the same send as on the Mac", async () => {
+  const steering = input(together({}));
+  const request = {
+    ...steering.request,
+    activeRun: { id: runId, agent: "claude" as const, mode: "act" as const, permissionMode: "trusted" as const },
+    choice: { agent: "claude" as const, model: "claude-opus", effort: null },
+    ...turnSeen(together({})),
+  };
+  const composer = renderHook(() => useComposer({ ...steering, request }), { wrapper: mac.phone!.wrapper });
+  act(() => composer.result.current.setText("Keep the annual toggle on top."));
+  await act(async () => composer.result.current.primary());
+  expect(mac.calls.filter((call) => call.method === "runs.send")).toEqual([
+    { method: "runs.send", params: expect.objectContaining({ runId, text: "Keep the annual toggle on top.", expectedTurnId: "turn-7" }) },
+  ]);
+});
+
 it("says why it cannot attach in a cloud thread instead of opening the photos", () => {
   const composer = renderHook(() => useComposer(input(together({}))), { wrapper: mac.phone!.wrapper });
   expect(composer.result.current.attachDimmed).toBe(true);

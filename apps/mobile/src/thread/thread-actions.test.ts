@@ -31,9 +31,9 @@ describe("a thread's menu on the phone", () => {
     expect(outline(threadMenu(thread("t-settings"), "header", wednesday)).map((section) => section[0])).toEqual(["Rename…", "New Subthread", "Pin", "Open Pull Request", "Resolve"]);
   });
 
-  it("starts a subthread under any thread but a team's, one that lives in the cloud, or an Orcling's", () => {
+  it("starts a subthread under any thread but a team's or an Orcling's", () => {
     expect(threadMenu(thread("t-plan"), "row", wednesday)[0]).toEqual([{ kind: "screen", label: "New Subthread", icon: "square.and.pencil", pathname: "/new-subthread" }]);
-    for (const other of [{ teamInstanceId: "team-1" }, { owner: { brain: "cloud" as const, reach: "live" as const, heardAt: 1 } }, { orclingId: "orc-1" }]) {
+    for (const other of [{ teamInstanceId: "team-1" }, { orclingId: "orc-1" }]) {
       for (const place of ["row", "header"] as const) expect(outline(threadMenu({ ...thread("t-plan"), ...other }, place, wednesday)).flat()).not.toContain("New Subthread");
     }
   });
@@ -87,33 +87,13 @@ describe("a thread's menu on the phone", () => {
     expect(row).not.toContain("Preview");
   });
 
-  it("offers Move to Cloud in the header after the pull request when the thread can move there, and never on a Home row", () => {
-    const menu = outline(threadMenu(thread("t-settings"), "header", wednesday, { uncommitted: null, preview: null, toCloud: true }));
-    expect(menu[3]).toEqual(["Open Pull Request", "Move to Cloud"]);
-    const move = { kind: "screen", label: "Move to Cloud", icon: "icloud.and.arrow.up", pathname: "/move-to-cloud" };
-    expect(threadMenu(thread("t-plan"), "header", wednesday, { uncommitted: null, preview: null, toCloud: true }).flat()).toContainEqual(move);
-    expect(outline(threadMenu(thread("t-settings"), "header", wednesday)).flat()).not.toContain("Move to Cloud");
-    expect(outline(threadMenu(thread("t-settings"), "row", wednesday, { uncommitted: null, preview: null, toCloud: true })).flat()).not.toContain("Move to Cloud");
-  });
-
-  it("brings an idle cloud brain thread to the Mac from the header, and offers to keep a thread where it is while it moves", () => {
-    const onBrain = { uncommitted: null, preview: null, moves: { mac: "mac-1", onBrain: true } };
-    const idle = { ...thread("t-settings"), activity: "idle" as const };
-    expect(threadMenu(idle, "header", wednesday, onBrain).flat()).toContainEqual({
-      kind: "move",
-      label: "Bring to Mac",
-      icon: "laptopcomputer.and.arrow.down",
-      method: "cloud.bringToMac",
-      mac: "mac-1",
-    });
-    expect(outline(threadMenu({ ...idle, activity: "running" }, "header", wednesday, onBrain)).flat()).not.toContain("Bring to Mac");
-    expect(outline(threadMenu(idle, "header", wednesday, { ...onBrain, moves: { mac: "mac-1", onBrain: false } })).flat()).not.toContain("Bring to Mac");
-    const coming = { ...idle, moving: { to: "mac" as const, since: 1 } };
-    expect(threadMenu(coming, "header", wednesday, onBrain).flat()).toContainEqual({ kind: "move", label: "Keep in Cloud", icon: "icloud", method: "cloud.keep", mac: "mac-1" });
-    const leaving = { ...idle, moving: { to: "cloud" as const, since: 1 } };
-    expect(outline(threadMenu(leaving, "header", wednesday, { ...onBrain, moves: { mac: "mac-1", onBrain: false } })).flat()).toContain("Keep on Mac");
-    expect(outline(threadMenu(coming, "header", wednesday)).flat()).not.toContain("Keep in Cloud");
-    expect(outline(threadMenu(idle, "row", wednesday, onBrain)).flat()).not.toContain("Bring to Mac");
+  it("offers no move for a thread an older Mac runs in a sandbox, brought from its brain or sent there", () => {
+    const sandboxed = { ...thread("t-settings"), activity: "idle" as const, cloud: { provider: "vercel" as const, state: "ready" as const, step: null, setup: true, error: null } };
+    for (const each of [sandboxed, { ...sandboxed, moving: { to: "mac" as const, since: 1 } }, { ...sandboxed, moving: { to: "cloud" as const, since: 1 } }]) {
+      const header = outline(threadMenu(each, "header", wednesday, { uncommitted: null, preview: null }));
+      expect(header).toEqual(outline(threadMenu(thread("t-settings"), "header", wednesday, { uncommitted: null, preview: null })));
+      expect(header.flat().filter((label) => /Cloud|Mac/.test(label))).toEqual([]);
+    }
   });
 
   it("leaves a team thread's snooze and resolving to the team on the Mac", () => {
@@ -131,10 +111,10 @@ describe("a thread's menu on the phone", () => {
   });
 });
 
-it("offers only parent navigation for a hosted child even when Git, cloud, and preview exist", () => {
+it("offers only parent navigation for a hosted child even when Git and preview exist", () => {
   const child = { ...thread("t-settings"), parentThreadId: "parent", parentRelation: "subagent" as const };
   for (const place of ["row", "header"] as const) {
-    expect(outline(threadMenu(child, place, wednesday, { uncommitted: 3, preview: { page: "Docs" }, toCloud: true }))).toEqual([["Open parent"]]);
+    expect(outline(threadMenu(child, place, wednesday, { uncommitted: 3, preview: { page: "Docs" } }))).toEqual([["Open parent"]]);
   }
   expect(
     threadMenu({ ...child, parentRelation: "started" }, "header", wednesday)

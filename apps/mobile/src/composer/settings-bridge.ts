@@ -1,10 +1,6 @@
 import type { ClientState } from "@openorc/client";
-import type { CloudProvider } from "@openorc/protocol";
 import { useEffect, useSyncExternalStore } from "react";
 import type { ProjectChoice } from "../projects";
-
-/** Where a new thread runs: on the Mac, as threads started there do, or in a sandbox of its own. */
-export type ThreadPlace = "mac" | "cloud";
 
 type ConversationSettings = ReturnType<ClientState["useConversationSettings"]>;
 
@@ -25,12 +21,11 @@ export type ModelSettings = Pick<ConversationSettings, "choice" | "selectModel">
 };
 
 /**
- * What the model, mode, account, place and project sheets read and change: an open thread's settings, or a new thread's
- * choices. Only a new thread has `place`, while the Mac offers cloud threads and the chosen agent runs there.
+ * What the model, mode, account and project sheets read and change: an open thread's settings, or a new thread's
+ * choices.
  */
 export type ComposerSettings = ModelSettings &
   Pick<ConversationSettings, "mode" | "permission" | "selectExecutionMode"> & {
-    place?: { chosen: ThreadPlace; provider: CloudProvider; select: (place: ThreadPlace) => void };
     /** A new thread's project picker; uploads and a pending start hold its selection. */
     project?: { chosen: string; choices: readonly ProjectChoice[]; disabled: boolean; select: (id: string) => void };
   };
@@ -64,7 +59,7 @@ export function useShareSettings(composerId: string, settings: ModelSettings | C
   );
 }
 
-/** A composer's settings, for its mode, place and project sheets; an Orcling shares none. */
+/** A composer's settings, for its mode and project sheets; an Orcling shares none. */
 export function useSharedSettings(composerId: string): ComposerSettings | undefined {
   return useSyncExternalStore(subscribe, () => {
     const settings = shared.get(composerId);

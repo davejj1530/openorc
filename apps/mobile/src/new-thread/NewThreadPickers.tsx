@@ -1,8 +1,7 @@
 import { WORKSPACE_ID } from "@openorc/protocol";
 import { router } from "expo-router";
 import { Keyboard, Pressable, View } from "react-native";
-import type { ThreadPlace } from "../composer/settings-bridge";
-import { ChevronDown, Cloud, FolderOpen, Globe, Laptop } from "../generated/icons";
+import { ChevronDown, FolderOpen, Globe } from "../generated/icons";
 import type { ProjectChoice } from "../projects";
 import { Text } from "../ui/Text";
 
@@ -29,35 +28,11 @@ function Picker({ label, name, Icon, disabled, onPress }: { label: string; name:
   );
 }
 
-/** The new thread's environment and project, side by side above the composer. */
-export function NewThreadPickers({
-  composerId,
-  project,
-  place,
-  starting,
-  uploading,
-}: {
-  composerId: string;
-  project: ProjectChoice | undefined;
-  place: ThreadPlace | undefined;
-  starting: boolean;
-  uploading: boolean;
-}) {
-  const placeName = place === "cloud" ? "Cloud" : "This Mac";
+/** The new thread's project, above the composer. */
+export function NewThreadPickers({ composerId, project, starting, uploading }: { composerId: string; project: ProjectChoice | undefined; starting: boolean; uploading: boolean }) {
   const projectName = project?.name ?? "Project";
   return (
     <View className="min-h-touch flex-row items-center gap-2 px-3">
-      {place ? (
-        <View className="min-h-touch flex-shrink-0 justify-center">
-          <Picker
-            label={`Runs on, ${placeName}`}
-            name={placeName}
-            Icon={place === "cloud" ? Cloud : Laptop}
-            disabled={starting}
-            onPress={() => router.push({ pathname: "/place", params: { composerId } })}
-          />
-        </View>
-      ) : null}
       <Picker
         label={`Project, ${projectName}`}
         name={projectName}

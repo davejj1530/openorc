@@ -1,6 +1,6 @@
 import { useKeyboardChatComposerInset } from "@legendapp/list/keyboard";
 import type { LegendListRef } from "@legendapp/list/react-native";
-import { conversationActivity, conversationSendDisabledReason, preparingCloud, processFit, queueAfterStart, startingInCloud, type SubmitRequest } from "@openorc/client";
+import { conversationActivity, conversationSendDisabledReason, processFit, type SubmitRequest } from "@openorc/client";
 import { isSubagentThread, type OrclingChatSummary, type Run, type ThreadSummary } from "@openorc/protocol";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement, type RefObject } from "react";
@@ -20,8 +20,6 @@ import { OrclingChatPane } from "../orclings/OrclingChatPane";
 import { OrclingHeader } from "../orclings/OrclingHeader";
 import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
-import { CloudStart } from "./CloudStart";
-import { MoveRefused } from "./MoveRefused";
 import { createDisclosure, DisclosureContext } from "./disclosure";
 import { useMarkSeen } from "./mark-seen";
 import { holdTranscriptList, perfEnabled, reportThreadOpened } from "./perf-probe";
@@ -105,7 +103,6 @@ function TranscriptPane({ threadId, thread, runs, loading, failed, retry, onActi
   useEffect(() => {
     if (blocks?.length) reportThreadOpened(threadId, blocks.length);
   }, [threadId, blocks?.length]);
-  if (startingInCloud(thread, runs.length)) return <CloudStart thread={thread} />;
   if (failed && !blocks?.length) return <LoadFailed retry={retry} />;
   if (!merged || !blocks?.length) return <View className="flex-1 items-center justify-center">{loading || runs.length ? <Spinner /> : <Text className="text-ink-4">Nothing yet</Text>}</View>;
   return (
@@ -202,7 +199,6 @@ export function ThreadScreen() {
       <ConversationHeader chat={chat} title={() => inScope(<ThreadTitle thread={thread} onRename={actions.rename} />)} menu={menu} />
       <DisclosureContext.Provider value={disclosure}>
         <VoicesContext.Provider value={voices}>
-          {thread ? <MoveRefused thread={thread} /> : null}
           {thread ? (
             <ConversationPane
               chat={chat}
@@ -230,8 +226,7 @@ export function ThreadScreen() {
           ) : (
             <Composer
               thread={thread}
-              queued={queueAfterStart(thread, runs.length)}
-              preparing={preparingCloud(thread, runs.length)}
+              queued={thread.queued}
               settings={settings}
               request={request}
               live={live && activeRun ? { runId: activeRun.id } : null}

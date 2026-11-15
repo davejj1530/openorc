@@ -1,4 +1,4 @@
-import { cloudPlaceLabel, snoozeWakeLabel, threadMark } from "@openorc/client";
+import { snoozeWakeLabel, threadMark } from "@openorc/client";
 import { isSubagentThread, WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 import { router } from "expo-router";
 import { Pressable } from "react-native";
@@ -9,7 +9,7 @@ import { Text } from "../ui/Text";
 const pullWords = { open: "PR open", merged: "PR merged", closed: "PR closed" } as const;
 
 /**
- * The header's faint line: where the thread lives and, for a cloud thread, runs, its pull request, when a snooze ends and what it is doing when that
+ * The header's faint line: where the thread lives, its pull request, when a snooze ends and what it is doing when that
  * is worth saying. While the phone is not connected, the connection's state takes the line instead.
  */
 export function statusLine(thread: ThreadSummary, project: string | undefined, now = Date.now()): string {
@@ -17,8 +17,7 @@ export function statusLine(thread: ThreadSummary, project: string | undefined, n
   const doing = mark && (mark.kind === "running" || mark.kind === "waiting" || mark.kind === "waiting-other" || mark.kind === "failed") ? mark.label : null;
   const pull = thread.prUrl ? pullWords[thread.prState ?? "open"] : null;
   const snoozed = thread.snoozedUntil && thread.snoozedUntil > now ? `Snoozed until ${snoozeWakeLabel(thread.snoozedUntil)}` : null;
-  const cloud = thread.cloud ? cloudPlaceLabel(thread.cloud) : null;
-  return [thread.projectId === WORKSPACE_ID ? "Workspace" : project, cloud, pull, snoozed, doing].filter(Boolean).join(" · ");
+  return [thread.projectId === WORKSPACE_ID ? "Workspace" : project, pull, snoozed, doing].filter(Boolean).join(" · ");
 }
 
 /** The thread's title over a faint line of where it lives and what it is doing, or how the link is. Tapping the title renames it. */

@@ -30,12 +30,15 @@ const mac = vi.hoisted(() => {
     start: vi.fn<(params: RpcParams<"threads.start">) => Promise<{ thread: { id: string } }>>(),
     /** What the shown Mac and its cloud brain were asked about git, by project. */
     gitAsked: { shown: [] as string[], brain: [] as string[] },
+    /** Every method the shown Mac was asked. */
+    asked: [] as RpcMethod[],
   };
 });
 
 vi.mock("../client", async () => {
   const { fakeMac } = await import("../test-fixtures/fake-mac");
   mac.phone = fakeMac((method, params) => {
+    mac.asked.push(method);
     if (method === "threads.start") return mac.start(params as RpcParams<"threads.start">);
     if (method === "projects.git") {
       mac.gitAsked.shown.push((params as RpcParams<"projects.git">).id);
@@ -57,7 +60,6 @@ function macState({ signedIn = ["codex", "claude"], defaultHarness = null }: { s
   mac.reads["agents.models"] = mac.models;
   mac.reads["agents.availability"] = harnessIds.map((id) => ({ id, state: signedIn.includes(id) ? "ready" : "sign_in" }));
   mac.reads["app.settings.get"] = { defaultWorkspaceMode: "worktree", defaultPermissionMode: "review", defaultHarness };
-  mac.reads["cloud.offer"] = { offered: false, provider: null };
 }
 
 beforeEach(() => {
@@ -67,6 +69,7 @@ beforeEach(() => {
   for (const id of Object.keys(mac.git)) delete mac.git[id];
   mac.gitAsked.shown.length = 0;
   mac.gitAsked.brain.length = 0;
+  mac.asked.length = 0;
   macState();
 });
 afterEach(cleanup);
@@ -157,48 +160,17 @@ it("asks the git of the host its screen is on, so a start on the cloud brain nev
   expect(mac.gitAsked).toEqual({ shown: [], brain: ["cloud-openorc"] });
 });
 
-it("offers the cloud where the Mac does, for a project, and starts there when chosen", async () => {
-  mac.reads["cloud.offer"] = { offered: true, provider: "vercel" };
+it("starts on the Mac, with no place to choose, though an older Mac still offers its cloud and the draft chose it", async () => {
+  mac.reads["cloud.offer"] = { offered: true, provider: "vercel", brain: { host: "brain-1", name: "Cloud", projects: [] } };
+  mac.phone!.saved.set("newthread.mac-1.openorc", JSON.stringify({ prompt: "Fix the build", mode: "act", workspace: "cloud" }));
   const sheet = open("openorc");
-  await write(sheet, "Fix the build");
-  await waitFor(() => expect(sheet.result.current.settings.place).toMatchObject({ chosen: "mac", provider: "vercel" }));
-  act(() => sheet.result.current.settings.place!.select("cloud"));
-  expect(sheet.result.current.settings.place?.chosen).toBe("cloud");
+  await waitFor(() => expect(sheet.result.current.controls.canSend).toBe(true));
+  expect(sheet.result.current.settings).not.toHaveProperty("place");
   mac.start.mockResolvedValue({ thread: { id: "thread-1" } });
-  await submit(sheet);
-  expect(sent()).toMatchObject({ projectId: "openorc", workspaceMode: "worktree", cloud: true });
-
-  const workspace = open(WORKSPACE_ID);
-  await write(workspace, "Plan the week");
-  expect(workspace.result.current.settings.place).toBeUndefined();
-});
-
-it("starts on the Mac once the Mac stops offering the cloud, whatever was chosen", async () => {
-  mac.reads["cloud.offer"] = { offered: true, provider: "local" };
-  const sheet = open("openorc");
-  await write(sheet, "Fix the build");
-  await waitFor(() => expect(sheet.result.current.settings.place).toBeDefined());
-  act(() => sheet.result.current.settings.place!.select("cloud"));
-  mac.reads["cloud.offer"] = { offered: false, provider: null };
-  await act(() => mac.phone!.module.queryClient.invalidateQueries());
-  await waitFor(() => expect(sheet.result.current.settings.place).toBeUndefined());
-  mac.start.mockResolvedValue({ thread: { id: "thread-1" } });
-  await submit(sheet);
-  expect(sent()).toMatchObject({ workspaceMode: "worktree" });
+  expect(await submit(sheet)).toBe("thread-1");
+  expect(sent()).toMatchObject({ projectId: "openorc", workspaceMode: "worktree" });
   expect(sent()).not.toHaveProperty("cloud");
-});
-
-it("says why a project with nothing to branch from cannot start in the cloud, and keeps the prompt", async () => {
-  mac.reads["cloud.offer"] = { offered: true, provider: "vercel" };
-  mac.git["notes"] = "no_commits";
-  const sheet = open("notes");
-  await write(sheet, "Tidy the notes folder");
-  await waitFor(() => expect(sheet.result.current.settings.place).toBeDefined());
-  act(() => sheet.result.current.settings.place!.select("cloud"));
-  expect(await submit(sheet)).toBeNull();
-  expect(mac.start).not.toHaveBeenCalled();
-  expect(sheet.result.current.error).toBe("A cloud thread starts on a branch of its own, and this project has no commit to branch from yet.");
-  expect(sheet.result.current.draft.prompt).toBe("Tidy the notes folder");
+  expect(mac.asked).not.toContain("cloud.offer");
 });
 
 it("asks the Mac's git when Start is tapped, holding the start meanwhile, then branches where it can", async () => {

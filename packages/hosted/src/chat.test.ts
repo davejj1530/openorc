@@ -185,6 +185,24 @@ it("reads the chat again, under the access as it now stands, when a billing and 
   expect(reads() - before).toBe(2);
 });
 
+it("keeps the last answer of a read that every attempt saw overtaken by a burst of notices, as a confirmed seat change sends", async () => {
+  let overtakes = 0;
+  const { hosted } = await host(FIRST, {
+    fetch: async (input, init) => {
+      const response = await fetch(input, init);
+      if (new URL(String(input)).pathname.endsWith("/timeline") && overtakes < 3) {
+        overtakes += 1;
+        stand.chat.changeAccess(spaceId);
+        await new Promise<void>((resolve) => setTimeout(resolve, 100));
+      }
+      return response;
+    },
+  });
+  const conversation = await hosted.chat.openDm({ spaceId, userIds: [userOf(SECOND)] });
+  expect((await hosted.chat.timeline({ spaceId, conversationId: conversation.id })).messages).toEqual([]);
+  expect(overtakes).toBe(3);
+});
+
 it("rereads a page when live delivery overtakes the response", async () => {
   let release = () => {};
   let delayed = false;

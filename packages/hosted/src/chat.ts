@@ -214,22 +214,25 @@ export class TeamChat {
   }
 
   /**
-   * One request, held to the account, session and access it began under. A read that a chat change or an access notice
+   * One request, held to the account and session it began under. A read that a chat change or an access notice
    * overtook (a seat count, billing or members change says so too, though nobody's access moved) is read again under the
-   * access as it now stands; a write, or a changed account or session, fails as changed.
+   * access as it now stands; the third answer stands even if more notices came, since the server gave it for the access
+   * as it then stood and refuses one that is gone. A write that access moved under, or a changed account or session,
+   * fails as changed.
    */
   async #request<T>(spaceId: string, route: Route<T>, body?: unknown): Promise<T> {
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; ; attempt++) {
       const identity = this.#identity(spaceId);
       const readRevision = this.#reads.get(spaceId) ?? 0;
       const result = await this.deps.session.in(spaceId).request(route, body);
       const now = this.#identity(spaceId);
-      const read = route.method === "GET";
-      if (read && now.accountId === identity.accountId && now.generation === identity.generation && now.revision !== identity.revision) continue;
-      this.#assert(spaceId, identity);
-      if (!read || (this.#reads.get(spaceId) ?? 0) === readRevision) return result;
+      if (route.method !== "GET" || now.accountId !== identity.accountId || now.generation !== identity.generation) {
+        this.#assert(spaceId, identity);
+        return result;
+      }
+      const overtaken = now.revision !== identity.revision || (this.#reads.get(spaceId) ?? 0) !== readRevision;
+      if (!overtaken || attempt === 2) return result;
     }
-    throw changedSession();
   }
 
   async #change<T>(spaceId: string, route: Route<T>, body?: unknown): Promise<T> {

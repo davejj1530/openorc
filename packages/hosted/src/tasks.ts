@@ -201,22 +201,26 @@ export class OnlineTasks {
   }
   /**
    * One request, held to the account, session and access it began under. A read that an access notice overtook (a seat
-   * count, billing or members change says so too, though nobody's access moved) is read again under the access as it now
-   * stands, which the server answers for or refuses; a write, or a changed account or session, fails as changed.
+   * count, billing or members change says so too, though nobody's access moved) is read again under the access as it
+   * now stands; the third answer stands even if more notices came, since the server gave it for the access as it then
+   * stood and refuses one that is gone. A write, or a changed account or session, fails as changed.
    */
   async #request<T>(spaceId: string, route: Route<T>, body?: unknown): Promise<T> {
     for (let attempt = 0; ; attempt++) {
       const identity = this.#identity(spaceId);
-      const again = () => route.method === "GET" && attempt < 2 && this.#overtaken(spaceId, identity);
+      const overtaken = () => route.method === "GET" && this.#overtaken(spaceId, identity);
+      const settle = (): "again" | "kept" | "held" => {
+        if (overtaken()) return attempt < 2 ? "again" : "kept";
+        this.#assert(spaceId, identity);
+        return "held";
+      };
       try {
         const result = await this.deps.session.in(spaceId).request(route, body);
-        if (again()) continue;
-        this.#assert(spaceId, identity);
+        if (settle() === "again") continue;
         this.#accept(spaceId, result);
         return result;
       } catch (error) {
-        if (again()) continue;
-        this.#assert(spaceId, identity);
+        if (settle() === "again") continue;
         if (error instanceof TaskChanged) this.#accept(spaceId, error.current);
         throw error;
       }

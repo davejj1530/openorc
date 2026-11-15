@@ -192,6 +192,34 @@ it("reads again, under the access as it now stands, a read that a billing and me
   expect(await read).toMatchObject({ count: 0 });
   expect(reads() - before).toBe(2);
 });
+it("keeps the last answer of a read that every attempt saw overtaken by a burst of notices", async () => {
+  const notices: ((body: unknown) => void)[] = [];
+  let overtakes = 0;
+  const a = await client(ADMIN, {
+    connect: (url, token) => {
+      const socket = stand.connect(url, token);
+      return {
+        onState: (listener) => socket.onState(listener),
+        on: (event, listener) => {
+          if (event === "changed") notices.push(listener);
+          socket.on(event, listener);
+        },
+        ask: (event, body) => socket.ask(event, body),
+        close: () => socket.close(),
+      };
+    },
+    fetch: async (url, init) => {
+      const response = await fetch(url, init);
+      if (new URL(String(url)).pathname === "/tasks/attention" && overtakes < 3) {
+        overtakes += 1;
+        for (const tell of notices) tell({ organizationId: spaceId, topics: ["billing", "spaces"] });
+      }
+      return response;
+    },
+  });
+  expect(await a.tasks.attention({ spaceId })).toMatchObject({ count: 0 });
+  expect(overtakes).toBe(3);
+});
 it("discards an outstanding task reply after sign-out", async () => {
   let release: (() => void) | undefined;
   const gate = new Promise<void>((resolve) => {

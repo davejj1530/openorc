@@ -69,6 +69,28 @@ export function threadWriteBlock(thread: Row | null | undefined): string | null 
   return starter ? `Only ${starter} can run the agent in this cloud thread for now.` : "The agent can't run in this cloud thread for now.";
 }
 
+/** The one move that releases a handoff block, for the reader the server lets make it. */
+export type HandoffAction = { kind: "retry-save" } | { kind: "stop-commands"; commandIds: string[] };
+
+const SAVE_FAILED = "The thread's work could not be saved.";
+
+/**
+ * The card for what keeps a turn from starting here: the server's words, and the move that releases it where the reader
+ * may make it. Retry save goes to the person the server lets ask for it, shown even when they may still run here
+ * themselves, and they are not told that they can, since the button says it. Stop goes with a command still running
+ * from the previous sender's turn. Otherwise the card shows only while it keeps the reader from starting a turn: a
+ * running turn takes their message, which no handoff holds.
+ */
+export function handoffCard(thread: Row | null | undefined): { words: string; action: HandoffAction | null } | null {
+  const state = threadTogether(thread);
+  const block = state?.handoff;
+  if (!state || !block || writesAsCreator(thread)) return null;
+  if (block.retrySave) return { words: block.responsible?.id === state.viewer.id ? SAVE_FAILED : block.message, action: { kind: "retry-save" } };
+  if (!threadWriteBlock(thread)) return null;
+  if (block.code === "handoff_command" && block.commandIds.length > 0) return { words: block.message, action: { kind: "stop-commands", commandIds: block.commandIds } };
+  return { words: block.message, action: null };
+}
+
 /** Why this reader cannot answer the thread's ask now: the server's reason, else the words for why no turn can start. */
 export function askAnswerBlock(thread: Row | null | undefined): string | null {
   const state = threadTogether(thread);

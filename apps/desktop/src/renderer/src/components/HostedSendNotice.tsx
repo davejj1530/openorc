@@ -1,5 +1,6 @@
 import {
   canStopTurn,
+  handoffCard,
   placeUnreachable,
   steerBlock,
   queueBlock,
@@ -10,6 +11,7 @@ import {
   threadTogether,
   threadWriteBlock,
   withOthers,
+  type HandoffAction,
   type SendBlockAction,
   type SendPayer,
 } from "@openorc/client";
@@ -93,7 +95,7 @@ export function useHostedComposer(
   Object.assign(limits, together);
   return {
     hosted,
-    notice: hostedNotice({ block: block && !blocked ? block : null, writeBlock: placeUnreachable(thread) ? null : writeBlock, thread }),
+    notice: hostedNotice({ block: block && !blocked ? block : null, ...reachableBlock(thread, writeBlock) }),
     blocked: blocked ?? block?.words ?? null,
     limits,
     shown: (error) => (error === block?.words ? undefined : error),
@@ -101,27 +103,50 @@ export function useHostedComposer(
   };
 }
 
+/** A place that can't be reached says so in the composer's own words; no card offers a move it can't take. */
+function reachableBlock(thread: ThreadSummary | null, writeBlock: string | null): { writeBlock: string | null; thread: ThreadSummary | null } {
+  return placeUnreachable(thread) ? { writeBlock: null, thread: null } : { writeBlock, thread };
+}
+
 /**
  * The card for a block the account fixes, else for the server's word that this person cannot run the agent here, with
- * Retry save for the one person the server lets ask for it. A command still running is stopped from its own row.
+ * the move that releases a handoff where the server lets this reader make it: Retry save, or Stop for the command that
+ * holds the turn.
  */
 function hostedNotice({ block, writeBlock, thread }: { block: { words: string; action: SendBlockAction | null } | null; writeBlock: string | null; thread: ThreadSummary | null }): ReactNode {
   if (block) return <SendBlockCard words={block.words} action={block.action} />;
+  const handoff = handoffCard(thread);
+  if (handoff?.action && thread) return <HandoffCard threadId={thread.id} words={handoff.words} action={handoff.action} />;
   if (!writeBlock) return null;
-  return threadTogether(thread)?.handoff?.retrySave && thread ? <RetrySaveCard threadId={thread.id} words={writeBlock} /> : <SendBlockCard words={writeBlock} action={null} />;
+  return <SendBlockCard words={handoff?.words ?? writeBlock} action={null} />;
 }
 
-/** The thread's work could not be saved: its previous sender asks the server to save it again. No turn starts. */
-function RetrySaveCard({ threadId, words }: { threadId: string; words: string }) {
+/**
+ * A handoff the reader can release: Retry save asks the server to save the thread's work again, and Stop ends the
+ * previous sender's commands that keep the thread from moving. Neither starts a turn.
+ */
+function HandoffCard({ threadId, words, action }: { threadId: string; words: string; action: HandoffAction }) {
   const retry = useRpcMutation("threads.retrySave");
+  const stop = useRpcMutation("threads.stopCommand");
+  const pending = retry.isPending || stop.isPending;
+  const release = async () => {
+    if (action.kind === "retry-save") return retry.mutate({ threadId });
+    for (const commandId of action.commandIds) await stop.mutateAsync({ id: threadId, commandId }).catch(() => undefined);
+  };
+  const label = handoffLabel(action);
   return (
     <section role="status" aria-label="OpenOrc Cloud" data-plane className={cn(card, "flex flex-wrap items-center justify-between gap-x-3")}>
-      <div className="py-1.5 text-ink">{retry.error?.message ?? words}</div>
-      <Button variant="secondary" disabled={retry.isPending} onClick={() => retry.mutate({ threadId })}>
-        Retry save
+      <div className="py-1.5 text-ink">{retry.error?.message ?? stop.error?.message ?? words}</div>
+      <Button variant="secondary" disabled={pending} onClick={() => void release()}>
+        {label}
       </Button>
     </section>
   );
+}
+
+function handoffLabel(action: HandoffAction): string {
+  if (action.kind === "retry-save") return "Retry save";
+  return action.commandIds.length > 1 ? "Stop commands" : "Stop command";
 }
 
 /**

@@ -170,6 +170,42 @@ it("reads the server's own block before any words of the app's", async () => {
   expect(composer.props!.readOnlyReason).toBe(handoff.message);
 });
 
+it("lets the next sender stop the command that holds their turn, from the card that says so", async () => {
+  const handoff = { code: "handoff_command" as const, message: "Mara's command is still running. Stop it before starting your turn.", responsible: MARA, commandIds: ["c1"], retrySave: false };
+  await open(marasThread(together(THEO, { canWrite: true, send: "blocked", handoff })));
+  const card = screen.getByRole("status", { name: "OpenOrc Cloud" });
+  expect(card.textContent).toBe(`${handoff.message}Stop command`);
+  vi.mocked(core.call).mockClear();
+  fireEvent.click(screen.getByRole("button", { name: "Stop command" }));
+  await act(async () => undefined);
+  expect(
+    vi
+      .mocked(core.call)
+      .mock.calls.filter(([method]) => method === "threads.stopCommand")
+      .map(([, params]) => params),
+  ).toEqual([{ id: "cloud", commandId: "c1" }]);
+});
+
+it("offers Retry save to the person the server lets ask, without telling them they can, and only says whose it is to others", async () => {
+  const words = "The thread's work could not be saved. Mara can retry the save.";
+  const handoff = { code: "handoff_save" as const, message: words, responsible: MARA, commandIds: [], retrySave: true };
+  await open(marasThread(together(MARA, { canWrite: true, send: "now", handoff })));
+  expect(screen.getByRole("status", { name: "OpenOrc Cloud" }).textContent).toBe("The thread's work could not be saved.Retry save");
+  vi.mocked(core.call).mockClear();
+  fireEvent.click(screen.getByRole("button", { name: "Retry save" }));
+  await act(async () => undefined);
+  expect(
+    vi
+      .mocked(core.call)
+      .mock.calls.filter(([method]) => method === "threads.retrySave")
+      .map(([, params]) => params),
+  ).toEqual([{ threadId: "cloud" }]);
+  cleanup();
+  await open(marasThread(together(THEO, { canWrite: true, send: "blocked", handoff: { ...handoff, retrySave: false } })));
+  expect(screen.getByRole("status", { name: "OpenOrc Cloud" }).textContent).toBe(words);
+  expect(screen.queryByRole("button", { name: "Retry save" })).toBeNull();
+});
+
 it("opens a teammate's composer by itself once the server says they may write", async () => {
   await open(marasThread(together(THEO, { canWrite: true, send: "now", canStop: true })));
   expect(composer.props!.readOnlyReason).toBeNull();

@@ -5,15 +5,17 @@ import { TaskChanged, taskCreation, taskRefusal, taskRequest, type TaskRefusal }
 import { taskThreadRoute } from "./task-thread-wire.js";
 import { prepareTaskThread } from "./task-threads.js";
 import { TASK_ROUTES } from "./wire-tasks.js";
+import { PARITY_ROUTES } from "./wire-parity.js";
 import { SOCKET, wireTopics, type Route } from "./wire.js";
 
 export interface TaskDelivery {
   organization: boolean;
-  execution: boolean;
   personal: boolean;
 }
-/** Each delivery opens only after its paired server and compatibility checks pass. */
-export const taskDelivery: Readonly<TaskDelivery> = { organization: true, execution: false, personal: false };
+/** Each delivery opens only after its paired server and compatibility checks pass. Opening task threads is the server's to say. */
+export const taskDelivery: Readonly<TaskDelivery> = { organization: true, personal: false };
+/** How long a space's answer on opening task threads holds before it is asked again. */
+const EXECUTION_HOLDS_MS = 5 * 60_000;
 interface Dependencies extends Pick<HostedDeps, "push"> {
   session: Session;
   spaces: Pick<HostedSpaces, "status">;
@@ -32,6 +34,7 @@ const unavailable = () => new Refused("This task isn't available.", 404);
 export class OnlineTasks {
   readonly #epochs = new Map<string, number>();
   readonly #revisions = new Map<string, number>();
+  readonly #executions = new Map<string, { generation: number; until: number; opens: Promise<boolean> }>();
   readonly #delivery: Readonly<TaskDelivery>;
   #generation: number;
   #closed = false;
@@ -43,6 +46,7 @@ export class OnlineTasks {
         this.#generation = deps.session.generation;
         this.#epochs.clear();
         this.#revisions.clear();
+        this.#executions.clear();
       }
       this.#invalidate();
     });
@@ -59,12 +63,9 @@ export class OnlineTasks {
     });
   }
 
-  state({ spaceId }: OnlineTaskParams<"tasks.online.state">): OnlineTaskAvailability {
-    const spaces = this.deps.spaces.status();
-    if (this.#closed || spaces.state !== "ready" || !this.deps.session.state.signedIn) return { state: "unavailable" };
-    const space = spaces.spaces.find((space) => space.id === spaceId);
-    if (!space || !(space.kind === "organization" ? this.#delivery.organization : this.#delivery.personal)) return { state: "unavailable" };
-    return { state: "ready", accountId: spaces.userId, spaceId, execution: this.#delivery.execution, personal: space.kind === "personal" };
+  async state({ spaceId }: OnlineTaskParams<"tasks.online.state">): Promise<OnlineTaskAvailability> {
+    const delivered = this.#delivered(spaceId);
+    return delivered ? { state: "ready", spaceId, ...delivered, execution: await this.#opens(spaceId) } : { state: "unavailable" };
   }
   /** Core captures this before resolving a local run's project association. It exposes no session secret. */
   capture(spaceId: string): { accountId: string; assert(): void } {
@@ -90,7 +91,7 @@ export class OnlineTasks {
     return this.#request(spaceId, TASK_ROUTES.context(id));
   }
   async openThread({ spaceId, id, ...input }: OnlineTaskExecutionParams) {
-    if (!this.#delivery.execution) throw new Refused("Opening this task's thread isn't available yet.");
+    if (!(await this.#opens(spaceId))) throw new Refused("Opening this task's thread isn't available yet.");
     const identity = this.#identity(spaceId);
     const result = await prepareTaskThread(this.#request(spaceId, taskThreadRoute(id), input));
     if (result.state === "ready") await this.deps.prepared?.(result.threadId);
@@ -146,14 +147,47 @@ export class OnlineTasks {
     this.#closed = true;
     this.#epochs.clear();
     this.#revisions.clear();
+    this.#executions.clear();
   }
 
+  /** The signed-in account and the space's kind, while this space's tasks are delivered to this app. */
+  #delivered(spaceId: string): { accountId: string; personal: boolean } | null {
+    const spaces = this.deps.spaces.status();
+    if (this.#closed || spaces.state !== "ready" || !this.deps.session.state.signedIn) return null;
+    const space = spaces.spaces.find((space) => space.id === spaceId);
+    if (!space || !(space.kind === "organization" ? this.#delivery.organization : this.#delivery.personal)) return null;
+    return { accountId: spaces.userId, personal: space.kind === "personal" };
+  }
+  /**
+   * Whether the space's server opens task threads: its `tasks` capability, held a few minutes, so a server that turns it
+   * on is heard without a restart. A server without capabilities says no, and is not asked again this session; a read
+   * that fails says no for now and is asked again next time.
+   */
+  #opens(spaceId: string): Promise<boolean> {
+    const generation = this.deps.session.generation;
+    const held = this.#executions.get(spaceId);
+    if (held && held.generation === generation && Date.now() < held.until) return held.opens;
+    const entry = { generation, until: Date.now() + EXECUTION_HOLDS_MS, opens: Promise.resolve(false) };
+    entry.opens = this.deps.session
+      .in(spaceId)
+      .request(PARITY_ROUTES.capabilities)
+      .then(
+        (reply) => reply.features.tasks?.available === true,
+        (error: unknown) => {
+          if (error instanceof Refused && error.status === 404) entry.until = Number.POSITIVE_INFINITY;
+          else if (this.#executions.get(spaceId) === entry) this.#executions.delete(spaceId);
+          return false;
+        },
+      );
+    this.#executions.set(spaceId, entry);
+    return entry.opens;
+  }
   #identity(spaceId: string): Identity {
-    const available = this.state({ spaceId });
-    if (available.state !== "ready") throw unavailable();
+    const delivered = this.#delivered(spaceId);
+    if (!delivered) throw unavailable();
     const epoch = this.#epochs.get(spaceId) ?? 0;
     this.#epochs.set(spaceId, epoch);
-    return { userId: available.accountId, generation: this.deps.session.generation, epoch };
+    return { userId: delivered.accountId, generation: this.deps.session.generation, epoch };
   }
   #assert(spaceId: string, before: Identity): void {
     const current = this.#identity(spaceId);

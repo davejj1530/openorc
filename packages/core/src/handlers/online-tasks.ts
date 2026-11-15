@@ -12,7 +12,7 @@ export function createOnlineTaskHandlers(tasks: OnlineTasks | null): OnlineTaskH
   };
   return {
     ...createOnlineTaskExecutionHandlers(tasks),
-    "tasks.online.state": (input) => tasks?.state(input) ?? { state: "unavailable" },
+    "tasks.online.state": async (input) => (tasks ? await tasks.state(input) : { state: "unavailable" }),
     "tasks.online.list": (input) => service().list(input),
     "tasks.online.get": (input) => service().get(input),
     "tasks.online.create": (input) => service().creation(input),

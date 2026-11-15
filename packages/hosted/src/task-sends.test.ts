@@ -17,7 +17,7 @@ it.each(["start", "send", "queue"] as const)("%s retains the task's seen revisio
   stand.setSignIns(email, [{ agent: "claude" }]);
   const projectId = stand.addProject(email, { name: "Fixture project", fullName: "example/fixture" });
   const threadId = stand.addThread(email, { projectId, title: "A prepared task", status: kind === "start" ? "idle" : "working" });
-  const current = await taskClient(stand, email, { organization: true, execution: true, personal: false });
+  const current = await taskClient(stand, email, { organization: true, personal: false });
   close = current.close;
   // The client sends to a thread it holds; under load its first read of the rows can still be on the way.
   await vi.waitFor(() => expect(current.hosted.threads.holds({ thread: threadId })).toBe(true));

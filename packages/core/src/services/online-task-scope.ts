@@ -19,7 +19,7 @@ export async function captureOnlineTaskScope(deps: OnlineTaskScopeDependencies, 
   const localProject = deps.projectFor(runId);
   const active = deps.captureProcess(runId);
   if (!account || !localProject || !active()) throw new Error("This run is no longer available.");
-  const available = account.tasks.state(target);
+  const available = await account.tasks.state(target);
   if (available.state !== "ready" || !available.execution) throw new Error("Online task tools aren't available here.");
   const identity = account.tasks.capture(target.spaceId);
   // The run's account, session, process and project as captured: any change after a wait ends the call before it writes.

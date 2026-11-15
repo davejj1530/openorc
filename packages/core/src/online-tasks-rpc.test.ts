@@ -2,9 +2,9 @@ import { expect, it } from "vitest";
 import { isRemoteMethod, onlineTaskRpcParams, rpcParams } from "@openorc/protocol";
 import { createOnlineTaskHandlers } from "./handlers/online-tasks.js";
 
-it("keeps online tasks unavailable without an account service and never falls through to a local task", () => {
+it("keeps online tasks unavailable without an account service and never falls through to a local task", async () => {
   const handlers = createOnlineTaskHandlers(null);
-  expect(handlers["tasks.online.state"]({ spaceId: "space" })).toEqual({ state: "unavailable" });
+  expect(await handlers["tasks.online.state"]({ spaceId: "space" })).toEqual({ state: "unavailable" });
   expect(() => handlers["tasks.online.get"]({ spaceId: "space", id: "local-task" })).toThrow("Online tasks aren't available here.");
   expect(() => handlers["tasks.online.update"]({ spaceId: "space", id: "local-task", requestId: crypto.randomUUID(), ifRevision: 1, patch: { status: "done" } })).toThrow(
     "Online tasks aren't available here.",

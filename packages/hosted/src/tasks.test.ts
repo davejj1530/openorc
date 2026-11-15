@@ -37,7 +37,7 @@ async function client(email: string, overrides: Partial<HostedDeps> = {}): Promi
   const session = new Session(deps);
   await session.begin(storedToken(device), email);
   close.push(() => session.close());
-  const tasks = new OnlineTasks({ session, spaces: hosted.spaces, push: deps.push, delivery: { organization: true, execution: false, personal: false } });
+  const tasks = new OnlineTasks({ session, spaces: hosted.spaces, push: deps.push, delivery: { organization: true, personal: false } });
   close.push(() => tasks.close());
   return { tasks, session, hosted };
 }
@@ -45,11 +45,11 @@ const create = (tasks: OnlineTasks, extra = {}) => tasks.create({ spaceId, proje
 
 it("enables organization documents while keeping execution and Personal delivery closed", async () => {
   const { hosted } = await client(ADMIN);
-  expect(hosted.tasks.state({ spaceId })).toMatchObject({ state: "ready", execution: false, personal: false });
+  expect(await hosted.tasks.state({ spaceId })).toMatchObject({ state: "ready", execution: false, personal: false });
   expect((await hosted.tasks.list({ spaceId })).tasks).toEqual([]);
   const before = stand.requests.filter((request) => request.path.startsWith("/tasks")).length;
   const personal = { spaceId: `personal-${ADMIN}` };
-  expect(hosted.tasks.state(personal)).toEqual({ state: "unavailable" });
+  expect(await hosted.tasks.state(personal)).toEqual({ state: "unavailable" });
   await expect(hosted.tasks.list(personal)).rejects.toThrow("isn't available");
   expect(stand.requests.filter((request) => request.path.startsWith("/tasks"))).toHaveLength(before);
 });

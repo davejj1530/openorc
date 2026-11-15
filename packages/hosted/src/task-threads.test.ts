@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { afterEach, beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { HostedDeps } from "./index.js";
 import { taskClient } from "./test-fixtures/task-client.js";
 import { standIn, type StandIn } from "./testing/stand-in.js";
@@ -22,8 +22,10 @@ afterEach(async () => {
     .forEach((stop) => stop());
   await stand.close();
 });
+const TASKS_OFF = { available: false as const, reason: "Task tools aren't available in cloud threads yet." };
 async function client(email = ADMIN, overrides: Partial<HostedDeps> = {}, execution = true) {
-  const result = await taskClient(stand, email, { organization: true, execution, personal: false }, overrides);
+  stand.threadFiles.capabilities = { tasks: execution ? { available: true } : TASKS_OFF };
+  const result = await taskClient(stand, email, { organization: true, personal: false }, overrides);
   close.push(result.close);
   return result.tasks;
 }
@@ -31,7 +33,8 @@ const seed = () => stand.tasks.seed(spaceId, ADMIN, projectId, { title: "Keep th
 const input = (task: ReturnType<typeof seed>) => ({ spaceId, id: task.id, ifRevision: task.revision, requestId: randomUUID() });
 
 it("knows a newly prepared thread in the hosted router before returning its destination", async () => {
-  const current = await taskClient(stand, ADMIN, { organization: true, execution: true, personal: false });
+  stand.threadFiles.capabilities = { tasks: { available: true } };
+  const current = await taskClient(stand, ADMIN, { organization: true, personal: false });
   close.push(current.close);
   const result = await current.tasks.openThread(input(seed()));
   if (result.state !== "ready") throw new Error("Preparation conflicted");
@@ -103,4 +106,34 @@ it("keeps the execution gate closed without a preparation request", async () => 
   const before = stand.requests.length;
   await expect(tasks.openThread(input(task))).rejects.toThrow("isn't available yet");
   expect(stand.requests.slice(before).some((request) => request.path.endsWith("/open-thread"))).toBe(false);
+});
+
+it("opens task threads as the server's tasks capability says, asking a server without one once a session", async () => {
+  const asked = () => stand.requests.filter((request) => request.path === "/hosted/capabilities").length;
+  stand.threadFiles.capabilities = null;
+  const older = await taskClient(stand, ADMIN, { organization: true, personal: false });
+  close.push(older.close);
+  expect(await older.tasks.state({ spaceId })).toMatchObject({ state: "ready", execution: false });
+  expect(await older.tasks.state({ spaceId })).toMatchObject({ state: "ready", execution: false });
+  await expect(older.tasks.openThread(input(seed()))).rejects.toThrow("isn't available yet");
+  expect(asked()).toBe(1);
+  expect(stand.requests.some((request) => request.path.endsWith("/open-thread"))).toBe(false);
+
+  stand.threadFiles.capabilities = { tasks: { available: true } };
+  const current = await taskClient(stand, ADMIN, { organization: true, personal: false });
+  close.push(current.close);
+  expect(await current.tasks.state({ spaceId })).toMatchObject({ state: "ready", execution: true });
+  expect((await current.tasks.openThread(input(seed()))).state).toBe("ready");
+  const before = asked();
+  stand.threadFiles.capabilities = { tasks: TASKS_OFF };
+  vi.useFakeTimers({ toFake: ["Date"] });
+  try {
+    expect(await current.tasks.state({ spaceId })).toMatchObject({ execution: true });
+    expect(asked()).toBe(before);
+    vi.setSystemTime(Date.now() + 5 * 60_000 + 1);
+    expect(await current.tasks.state({ spaceId })).toMatchObject({ execution: false });
+    expect(asked()).toBe(before + 1);
+  } finally {
+    vi.useRealTimers();
+  }
 });

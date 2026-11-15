@@ -14,7 +14,7 @@ it("refreshes task activity and attention on the existing thread change topic wi
     other = "sam@example.com";
   const spaceId = stand.addTeam("Birch Studio", [email, other]);
   const projectId = stand.addProject(email, { name: "Canvas", fullName: "example/canvas" }, spaceId);
-  const viewer = await taskClient(stand, other, { organization: true, execution: true, personal: false });
+  const viewer = await taskClient(stand, other, { organization: true, personal: false });
   cleanup.push(viewer.close);
   const task = stand.tasks.seed(spaceId, email, projectId);
   viewer.seen.pushes.length = 0;
@@ -28,7 +28,7 @@ it.each([false, true])("refreshes Personal task reads only when that delivery is
   cleanup.push(() => stand.close());
   const email = "person@example.com";
   const projectId = stand.addProject(email, { name: "Example", fullName: "example/project" });
-  const viewer = await taskClient(stand, email, { organization: true, execution: true, personal });
+  const viewer = await taskClient(stand, email, { organization: true, personal });
   cleanup.push(viewer.close);
   const status = viewer.hosted.spaces.status();
   if (status.state !== "ready") throw new Error("The account isn't ready.");

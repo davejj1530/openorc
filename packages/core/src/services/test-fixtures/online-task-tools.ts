@@ -6,13 +6,14 @@ import { OnlineTaskTools } from "../online-task-tools.js";
 export async function onlineToolsFixture(overrides: Partial<HostedDeps> = {}, execution = true) {
   const stand = await standIn({ signup: "open" });
   stand.tasks.enabled = true;
+  stand.threadFiles.capabilities = { tasks: execution ? { available: true } : { available: false, reason: "Task tools aren't available in cloud threads yet." } };
   const email = "person@example.com";
   const spaceId = stand.addTeam("Example Team", [email]);
   const projectId = stand.addProject(email, { name: "Example", fullName: "example/project" }, spaceId);
   const client = await taskClient(
     stand,
     email,
-    { organization: true, execution, personal: false },
+    { organization: true, personal: false },
     {
       projects: () => [{ id: "local-project", remote: "https://github.com/example/project" }],
       ...overrides,

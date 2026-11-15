@@ -92,7 +92,7 @@ keepLists(client.queryClient, storage, () => shownMac);
 /**
  * An earlier build paired a Mac's cloud brain as a second host, on the Mac's word in this answer. The word is still kept
  * on the Mac's record, and cleared once the Mac names none: it is how the phone knows whose brain a saved one is when a
- * Mac says it removed it. A Mac from before the question, or after it, answers with an error, which changes nothing.
+ * Mac says it removed it. A Mac that does not take the question answers with an error, which changes nothing.
  */
 let heardFrom = 0;
 link.subscribe(() => {

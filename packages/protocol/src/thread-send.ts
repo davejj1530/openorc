@@ -29,6 +29,8 @@ export const threadSendRpcParams = {
   }),
   "runs.send": z.object({
     runId: z.string(),
+    /** The running turn the sender saw, when they are not at this Mac: an OpenOrc Cloud thread joins that turn or keeps the message for its author, never a later turn. */
+    expectedTurnId: z.string().optional(),
     text: z.string().min(1),
     attachments: z.array(z.string()).optional(),
     messageId: z.string().min(1).max(100).optional(),

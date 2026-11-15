@@ -283,7 +283,8 @@ export const rpcParams = {
   "workspace.removalImpact": z.object({ taskId: z.string() }),
   "workspace.usage": z.object({ taskId: z.string() }),
   "tasks.start": z.object({ taskId: z.string(), workspaceMode: WorkspaceMode.optional(), executionTarget: z.never().optional() }),
-  "runs.interrupt": z.object({ runId: z.string() }),
+  /** `expectedTurnId`: the turn the person saw running, when they are not at this Mac, so a late Stop of an OpenOrc Cloud thread never stops the next person's turn. */
+  "runs.interrupt": z.object({ runId: z.string(), expectedTurnId: z.string().optional() }),
   "runs.close": z.object({ runId: z.string() }),
   "runs.listForTask": z.object({ taskId: z.string() }),
   "runs.listForThread": z.object({ threadId: z.string() }),
@@ -303,6 +304,9 @@ export const rpcParams = {
     answers: z.record(z.string(), z.array(z.string())).optional(),
     /** With a denial: what to do instead, sent to the agent as the person's next message to the same turn. */
     note: z.string().trim().min(1).optional(),
+    /** The ask as the person saw it, when they are not at this Mac: an OpenOrc Cloud thread refuses an answer to an ask that changed since. */
+    expectedState: z.enum(["waiting", "parked"]).optional(),
+    expectedTurnId: z.string().optional(),
   }),
   "review.diff": z.object({ taskId: z.string(), sinceReviewed: z.boolean().optional() }),
   /** Uncommitted changes in the project root, where threads work. */

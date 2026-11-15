@@ -13,7 +13,8 @@ const iso = z.iso.datetime();
 const person = z.object({ id: z.string(), name: z.string(), image: z.string().nullish() });
 type WirePerson = z.infer<typeof person>;
 
-const block = z.object({ code: z.string(), message: z.string(), responsible: person.nullable(), commandIds: z.array(z.string()), retrySave: z.boolean() });
+const note = z.object({ to: person, text: z.string(), mention: z.object({ start: z.number().int().nonnegative(), end: z.number().int().nonnegative() }) });
+const block = z.object({ code: z.string(), message: z.string(), responsible: person.nullable(), commandIds: z.array(z.string()), retrySave: z.boolean(), note: note.nullish() });
 
 export const wireCollaboration = z.object({
   version: z.number(),
@@ -135,6 +136,7 @@ export function toCollaboration(wire: WireCollaboration): ThreadCollaboration | 
           responsible: nullable(handoff.responsible),
           commandIds: handoff.commandIds,
           retrySave: handoff.retrySave,
+          note: handoff.note ? { to: toPerson(handoff.note.to), text: handoff.note.text, mention: handoff.note.mention } : null,
         }
       : null,
     canPostNote: wire.canPostNote,

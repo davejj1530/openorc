@@ -160,6 +160,15 @@ it("starts a reply with its author's tag before what is written, drawn by name",
   expect(field.querySelector("[data-person]")?.textContent).toBe("@Ben Ito");
 });
 
+it("writes the server's note to the person who can release a block as a note to post, their tag in place", async () => {
+  const { field, handle, post } = mount();
+  const note = { to: { id: BEN.id, name: BEN.name, image: null }, text: "@Ben the thread's work could not be saved. Can you retry the save?", mention: { start: 0, end: 4 } };
+  act(() => handle.current!.note(note));
+  expect(messageOf(field)).toBe("@[user:u-ben] the thread's work could not be saved. Can you retry the save?");
+  fireEvent.click(screen.getByRole("button", { name: "Post note" }));
+  await waitFor(() => expect(post).toHaveBeenCalledWith({ text: "@Ben Ito the thread's work could not be saved. Can you retry the save?", mentions: [{ userId: "u-ben", start: 0, end: 8 }] }));
+});
+
 it("asks for no readiness for a draft a reply starts, which is a note, but does for words to the agent", () => {
   const onReady = vi.fn();
   const { field, handle } = mount({ onReady });

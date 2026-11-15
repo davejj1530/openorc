@@ -1,4 +1,4 @@
-import type { ThreadCollaboration, ThreadPerson, ThreadSummary } from "@openorc/protocol";
+import type { ThreadCollaboration, ThreadHandoffNote, ThreadPerson, ThreadSummary } from "@openorc/protocol";
 
 /**
  * Working together in an OpenOrc Cloud thread, in words, from what the server told the reader. The server decides who
@@ -80,8 +80,8 @@ export function threadWriteBlock(thread: Row | null | undefined): string | null 
   return starter ? `Only ${starter} can run the agent in this cloud thread for now.` : "The agent can't run in this cloud thread for now.";
 }
 
-/** The one move that releases a handoff block, for the reader the server lets make it. */
-export type HandoffAction = { kind: "retry-save" } | { kind: "stop-commands"; commandIds: string[] };
+/** The one move a handoff block offers its reader: release it, or, with nothing else to press, ask the person who can. */
+export type HandoffAction = { kind: "retry-save" } | { kind: "stop-commands"; commandIds: string[] } | { kind: "note"; note: ThreadHandoffNote };
 
 const SAVE_FAILED = "The thread's work could not be saved.";
 
@@ -89,8 +89,9 @@ const SAVE_FAILED = "The thread's work could not be saved.";
  * The card for what keeps a turn from starting here: the server's words, and the move that releases it where the reader
  * may make it. Retry save goes to the person the server lets ask for it, shown even when they may still run here
  * themselves, and they are not told that they can, since the button says it. Stop goes with a command still running
- * from the previous sender's turn. Otherwise the card shows only while it keeps the reader from starting a turn: a
- * running turn takes their message, which no handoff holds.
+ * from the previous sender's turn. A reader with nothing else to press gets the server's note to the person who can.
+ * Otherwise the card shows only while it keeps the reader from starting a turn: a running turn takes their message,
+ * which no handoff holds.
  */
 export function handoffCard(thread: Row | null | undefined): { words: string; action: HandoffAction | null } | null {
   const state = threadTogether(thread);
@@ -99,7 +100,7 @@ export function handoffCard(thread: Row | null | undefined): { words: string; ac
   if (block.retrySave) return { words: block.responsible?.id === state.viewer.id ? SAVE_FAILED : block.message, action: { kind: "retry-save" } };
   if (!threadWriteBlock(thread)) return null;
   if (block.code === "handoff_command" && block.commandIds.length > 0) return { words: block.message, action: { kind: "stop-commands", commandIds: block.commandIds } };
-  return { words: block.message, action: null };
+  return { words: block.message, action: block.note ? { kind: "note", note: block.note } : null };
 }
 
 /**

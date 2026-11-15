@@ -14,6 +14,7 @@ import {
   type RunMode,
   type UsableConnector,
   type HostedFileScope,
+  type ThreadHandoffNote,
   type ThreadPerson,
 } from "@openorc/protocol";
 import { useCallback, useContext, useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from "react";
@@ -91,6 +92,8 @@ export interface ComposerHandle {
   append: (text: string, attachments: readonly string[]) => void;
   /** Puts a person's tag before what is written, as Reply to their note does, with the keyboard after it all. */
   tag: (person: ThreadPerson, replyTo?: string) => void;
+  /** Writes the server's note to the person who can release a block, their tag in place, before what is written. */
+  note: (note: ThreadHandoffNote) => void;
 }
 
 export interface ComposerProps {
@@ -265,6 +268,13 @@ export function Composer(props: ComposerProps) {
         else pickPerson(person);
         const next = `${personTag(person.id)} ${value.trimStart()}`;
         editor.current?.write(next, next.length);
+        editor.current?.focus();
+      },
+      note: ({ to, text, mention }) => {
+        pickPerson(to);
+        const words = `${text.slice(0, mention.start)}${personTag(to.id)}${text.slice(mention.end)}`;
+        const kept = value.trim();
+        editor.current?.write(kept ? `${words}\n\n${kept}` : words, words.length);
         editor.current?.focus();
       },
     }),

@@ -96,7 +96,14 @@ describe("a teammate's cloud thread on today's server", () => {
     const blocked = row(together(THEO, { live: live(MARA) }), "running", mara);
     expect(writesAsCreator(blocked)).toBe(false);
     expect(sendsBlocked(blocked)).toBe("Only Mara can run the agent in this cloud thread for now.");
-    const handoff = { code: "handoff_command" as const, message: "Mara's command is still running. Stop it before starting your turn.", responsible: MARA, commandIds: ["c1"], retrySave: false };
+    const handoff = {
+      code: "handoff_command" as const,
+      message: "Mara's command is still running. Stop it before starting your turn.",
+      responsible: MARA,
+      commandIds: ["c1"],
+      retrySave: false,
+      note: null,
+    };
     expect(threadWriteBlock(row(together(THEO, { canWrite: true, send: "blocked", handoff }), "idle", mara))).toBe(handoff.message);
     expect(sendsBlocked({ owner: { ...blocked.owner!, reach: "offline" } })).toBe("OpenOrc Cloud can't be reached.");
   });
@@ -104,7 +111,7 @@ describe("a teammate's cloud thread on today's server", () => {
   it("gives the handoff card the one move that releases it, to the reader the server lets make it", () => {
     const idle = (handoff: ThreadCollaboration["handoff"], viewer = THEO) => row(together(viewer, { canWrite: true, send: "blocked", handoff }), "idle", mara);
     const saveWords = "The thread's work could not be saved. Mara can retry the save.";
-    const save = { code: "handoff_save" as const, message: saveWords, responsible: MARA, commandIds: [], retrySave: false };
+    const save = { code: "handoff_save" as const, message: saveWords, responsible: MARA, commandIds: [], retrySave: false, note: null };
     expect(handoffCard(idle(save))).toEqual({ words: saveWords, action: null });
     // The person who can recover is not told that they can: the button says it.
     expect(handoffCard(idle({ ...save, retrySave: true }, MARA))).toEqual({ words: "The thread's work could not be saved.", action: { kind: "retry-save" } });
@@ -113,11 +120,21 @@ describe("a teammate's cloud thread on today's server", () => {
     expect(handoffCard(free)).toEqual({ words: "The thread's work could not be saved.", action: { kind: "retry-save" } });
     // An admin the server also lets retry reads whose save it is, with the same button.
     expect(handoffCard(idle({ ...save, retrySave: true }))).toEqual({ words: saveWords, action: { kind: "retry-save" } });
-    const command = { code: "handoff_command" as const, message: "Mara's command is still running. Stop it before starting your turn.", responsible: MARA, commandIds: ["c1"], retrySave: false };
+    const command = {
+      code: "handoff_command" as const,
+      message: "Mara's command is still running. Stop it before starting your turn.",
+      responsible: MARA,
+      commandIds: ["c1"],
+      retrySave: false,
+      note: null,
+    };
     expect(handoffCard(idle(command))).toEqual({ words: command.message, action: { kind: "stop-commands", commandIds: ["c1"] } });
     expect(handoffCard(idle({ ...command, commandIds: [] }))).toEqual({ words: command.message, action: null });
-    const unavailable = { code: "handoff_unavailable" as const, message: "Only Mara can run the agent in this cloud thread for now.", responsible: MARA, commandIds: [], retrySave: false };
+    const unavailable = { code: "handoff_unavailable" as const, message: "Only Mara can run the agent in this cloud thread for now.", responsible: MARA, commandIds: [], retrySave: false, note: null };
     expect(handoffCard(idle(unavailable))).toEqual({ words: unavailable.message, action: null });
+    // A reader with nothing else to press gets the server's note to the person who can release the block.
+    const note = { to: MARA, text: "@Mara the thread's work could not be saved. Can you retry the save?", mention: { start: 0, end: 5 } };
+    expect(handoffCard(idle({ ...save, note }))).toEqual({ words: saveWords, action: { kind: "note", note } });
     // Joining a running turn is not held by a handoff, so there is no card while one runs and takes messages.
     expect(handoffCard(row(together(THEO, { canWrite: true, send: "now", handoff: command, live: live(MARA) }), "running", mara))).toBeNull();
     expect(handoffCard(idle(null))).toBeNull();
@@ -267,6 +284,7 @@ describe("acting on a cloud thread's work: commit, push, publish", () => {
       responsible: MARA,
       commandIds: ["c1"],
       retrySave: false,
+      note: null,
     };
     expect(hostedPublishReason(live(row(together(THEO, { canWrite: true, send: "blocked", handoff }), "idle", mara)), state)).toBe(handoff.message);
   });

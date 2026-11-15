@@ -108,7 +108,7 @@ export class StandInCollaboration {
       canWrite: open,
       live: this.#live(thread),
       send: open && !(this.holds(thread, who) && !thread.turn) ? sendOf(thread) : "blocked",
-      handoff: this.#blockFor(thread, who),
+      handoff: this.#withNote(thread, who, this.#blockFor(thread, who), open),
       canPostNote: open,
       canStop: open && Boolean(thread.turn),
       ask: this.#ask(thread, who),
@@ -151,7 +151,22 @@ export class StandInCollaboration {
       block.code === "handoff_command"
         ? `${first ? `${first}'s` : "The previous sender's"} command is still running. Stop it before starting your turn.`
         : `The thread's work could not be saved.${first ? ` ${first} can retry the save.` : ""}`;
-    return { code: block.code, message, responsible, commandIds: block.commandIds, retrySave: block.code === "handoff_save" && block.responsible === who };
+    return { code: block.code, message, responsible, commandIds: block.commandIds, retrySave: block.code === "handoff_save" && block.responsible === who, note: null };
+  }
+
+  /**
+   * As the server reads it: the note a reader may post when they have nothing else to press, tagging the person who can
+   * release the block. None for a command they can stop, a save they can retry, a turn they can stop as one of the
+   * thread's people, the responsible person, or with notes off; never in a 409's block.
+   */
+  #withNote<B extends { code: string; responsible: object | null; retrySave: boolean }>(thread: CollaborationThread, who: string, block: B | null, notes: boolean) {
+    const held = this.handoffs.get(thread.id);
+    if (!block || !held || !notes || !block.responsible || held.responsible === who || block.code === "handoff_command" || block.retrySave) return block;
+    const inThread = thread.owner === who || [...thread.turns.values()].includes(who);
+    if (block.code === "handoff_unavailable" && inThread) return block;
+    const tag = `@${this.#firstName(held.responsible)}`;
+    const ask = block.code === "handoff_save" ? "the thread's work could not be saved. Can you retry the save?" : "your turn left work running here. Can you stop it, or tell me when it is done?";
+    return { ...block, note: { to: block.responsible, text: `${tag} ${ask}`, mention: { start: 0, end: tag.length } } };
   }
 
   /**
@@ -191,6 +206,7 @@ export class StandInCollaboration {
       responsible: this.personOf(thread.owner),
       commandIds: [],
       retrySave: false,
+      note: null,
     };
   }
 

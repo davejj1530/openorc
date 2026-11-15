@@ -1,6 +1,7 @@
 import {
   canStopTurn,
   handoffCard,
+  personFirst,
   placeUnreachable,
   steerBlock,
   queueBlock,
@@ -16,10 +17,11 @@ import {
   type SendPayer,
 } from "@openorc/client";
 import { HOSTED_AGENTS, type HarnessId, type PermissionPreset, type RunMode, type ThreadSummary } from "@openorc/protocol";
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { cn } from "../lib/cn";
 import { useRouter } from "../lib/router";
+import type { ComposerHandle } from "./Composer";
 import type { ModelChoice } from "./ModelPicker";
 import { Button } from "./ui";
 
@@ -54,6 +56,7 @@ const CLOUD_LIMITS: CloudComposerLimits = { accounts: undefined, onCompact: unde
 export function useHostedComposer(
   thread: ThreadSummary | null,
   settings: { choice: ModelChoice | null; mode: RunMode; permission: PermissionPreset },
+  composer: RefObject<ComposerHandle | null>,
 ): {
   hosted: boolean;
   notice: ReactNode;
@@ -95,7 +98,7 @@ export function useHostedComposer(
   Object.assign(limits, together);
   return {
     hosted,
-    notice: hostedNotice({ block: block && !blocked ? block : null, ...reachableBlock(thread, writeBlock) }),
+    notice: hostedNotice({ block: block && !blocked ? block : null, ...reachableBlock(thread, writeBlock), composer }),
     blocked: blocked ?? block?.words ?? null,
     limits,
     shown: (error) => (error === block?.words ? undefined : error),
@@ -113,23 +116,35 @@ function reachableBlock(thread: ThreadSummary | null, writeBlock: string | null)
  * the move that releases a handoff where the server lets this reader make it: Retry save, or Stop for the command that
  * holds the turn.
  */
-function hostedNotice({ block, writeBlock, thread }: { block: { words: string; action: SendBlockAction | null } | null; writeBlock: string | null; thread: ThreadSummary | null }): ReactNode {
+function hostedNotice({
+  block,
+  writeBlock,
+  thread,
+  composer,
+}: {
+  block: { words: string; action: SendBlockAction | null } | null;
+  writeBlock: string | null;
+  thread: ThreadSummary | null;
+  composer: RefObject<ComposerHandle | null>;
+}): ReactNode {
   if (block) return <SendBlockCard words={block.words} action={block.action} />;
   const handoff = handoffCard(thread);
-  if (handoff?.action && thread) return <HandoffCard threadId={thread.id} words={handoff.words} action={handoff.action} />;
+  if (handoff?.action && thread) return <HandoffCard threadId={thread.id} words={handoff.words} action={handoff.action} composer={composer} />;
   if (!writeBlock) return null;
   return <SendBlockCard words={handoff?.words ?? writeBlock} action={null} />;
 }
 
 /**
  * A handoff the reader can release: Retry save asks the server to save the thread's work again, and Stop ends the
- * previous sender's commands that keep the thread from moving. Neither starts a turn.
+ * previous sender's commands that keep the thread from moving. A reader with neither tags the person who can: the
+ * server's note opens in the composer, to post as it is or in their own words. None of them starts a turn.
  */
-function HandoffCard({ threadId, words, action }: { threadId: string; words: string; action: HandoffAction }) {
+function HandoffCard({ threadId, words, action, composer }: { threadId: string; words: string; action: HandoffAction; composer: RefObject<ComposerHandle | null> }) {
   const retry = useRpcMutation("threads.retrySave");
   const stop = useRpcMutation("threads.stopCommand");
   const pending = retry.isPending || stop.isPending;
   const release = async () => {
+    if (action.kind === "note") return composer.current?.note(action.note);
     if (action.kind === "retry-save") return retry.mutate({ threadId });
     for (const commandId of action.commandIds) await stop.mutateAsync({ id: threadId, commandId }).catch(() => undefined);
   };
@@ -145,6 +160,7 @@ function HandoffCard({ threadId, words, action }: { threadId: string; words: str
 }
 
 function handoffLabel(action: HandoffAction): string {
+  if (action.kind === "note") return `Tag ${personFirst(action.note.to)}`;
   if (action.kind === "retry-save") return "Retry save";
   return action.commandIds.length > 1 ? "Stop commands" : "Stop command";
 }

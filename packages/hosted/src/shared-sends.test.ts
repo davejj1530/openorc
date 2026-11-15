@@ -242,8 +242,14 @@ describe("a teammate's own turn once handoff opens", () => {
     expect((await collaborationOf(bob, thread))?.queue).toEqual([expect.objectContaining({ paused: true, canStart: false, pause: { kind: "handoff", message: words }, task: null })]);
     // Why it waits is its author's to read.
     expect((await collaborationOf(ada, thread))?.queue).toEqual([expect.objectContaining({ paused: true, pause: null, task: null })]);
+    // Bob has nothing to press, so the server gives him a note that tags Ada; Ada, who can retry, gets none.
+    expect((await collaborationOf(bob, thread))?.handoff?.note).toEqual({
+      to: expect.objectContaining({ name: "Ada" }),
+      text: "@Ada the thread's work could not be saved. Can you retry the save?",
+      mention: { start: 0, end: 4 },
+    });
     const [paused] = (await row(bob, thread)).queued;
-    expect(await collaborationOf(ada, thread)).toMatchObject({ handoff: { code: "handoff_save", retrySave: true } });
+    expect(await collaborationOf(ada, thread)).toMatchObject({ handoff: { code: "handoff_save", retrySave: true, note: null } });
     await ada.threads.call("threads.retrySave", { threadId: thread });
     // The save is back; the paused message waits for its author, never started by the retry.
     expect(await collaborationOf(bob, thread)).toMatchObject({ handoff: null, live: null, queue: [expect.objectContaining({ paused: true, canStart: true })] });

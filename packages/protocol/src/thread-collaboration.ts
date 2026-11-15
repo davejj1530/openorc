@@ -14,6 +14,10 @@ export const ThreadPerson = z.object({ id: z.string(), name: z.string(), image: 
 export type ThreadPerson = z.infer<typeof ThreadPerson>;
 
 /** Why a new turn cannot start here now, in the server's words, and what this reader may do about it. */
+/** The note a reader with no other move may post: words that tag the person who can release the block, and the tag's span. */
+export const ThreadHandoffNote = z.object({ to: ThreadPerson, text: z.string(), mention: z.object({ start: z.number().int().nonnegative(), end: z.number().int().nonnegative() }) });
+export type ThreadHandoffNote = z.infer<typeof ThreadHandoffNote>;
+
 export const ThreadHandoffBlock = z.object({
   code: z.enum(["handoff_command", "handoff_save", "handoff_unavailable"]),
   message: z.string(),
@@ -22,6 +26,8 @@ export const ThreadHandoffBlock = z.object({
   commandIds: z.array(z.string()),
   /** Whether this reader may ask the server to save the thread's work again. */
   retrySave: z.boolean(),
+  /** The note to post when the reader has nothing else to press; none from an older server. */
+  note: ThreadHandoffNote.nullable().default(null),
 });
 export type ThreadHandoffBlock = z.infer<typeof ThreadHandoffBlock>;
 

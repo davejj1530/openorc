@@ -31,7 +31,7 @@ import {
   type WorkspaceMode,
   type HostedFileScope,
 } from "@openorc/protocol";
-import { useCallback, useMemo, useState, type ComponentProps, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { useConversationSettings, useConversationTranscript, useRpc, useRpcMutation, useSubmit } from "../lib/client";
 import { useThreadAccounts } from "../lib/use-thread-accounts";
 import { MessageMarks, useMessageMarks } from "./MarkedText";
@@ -57,7 +57,7 @@ import { useTurnFooters } from "../lib/turn-footers";
 import { AnswersBlocked, AsksDocked } from "./ask-answer";
 import { useHostedComposer } from "./HostedSendNotice";
 import { HostedConversationBoundary } from "./HostedConversationBoundary";
-import { Composer, type SlashCommand } from "./Composer";
+import { Composer, type ComposerHandle, type SlashCommand } from "./Composer";
 import { ComposerChoice } from "./ComposerChoice";
 import { GitBranch, Laptop } from "./icons";
 import { SessionRecovery } from "./SessionRecovery";
@@ -241,8 +241,9 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
   const { live, working, generatingImage } = conversationActivity({ thread, activeRun, liveTranscript, compacting: compact.isPending });
   const { sameAgent, settingsPending, canSteer } = processFit({ live, activeRun, choice, mode, permission, compacting: compact.isPending });
   const steerReason = conversationSteerReason({ canSteer, compacting: compact.isPending, settingsPending, sameAgent, agent: activeRun?.agent });
-  const cloud = useHostedComposer(thread, { choice, mode, permission });
-  const controls = useThreadControls(thread, { canSteer, reason: steerReason, blocked: cloud.blocked, onSent: () => setSends((count) => count + 1) });
+  const composer = useRef<ComposerHandle>(null);
+  const cloud = useHostedComposer(thread, { choice, mode, permission }, composer);
+  const controls = useThreadControls(thread, { canSteer, reason: steerReason, blocked: cloud.blocked, onSent: () => setSends((count) => count + 1) }, composer);
   const sendDisabledReason = conversationSendDisabledReason({ permissionReady, historyLoading: runsQuery.isLoading, historyFailed: Boolean(runsQuery.error), hasModel: Boolean(choice), thread });
   const turnFooter = useTurnFooter({ footers, threadId, working });
   const switching = Boolean(thread && choice && runs.length > 0 && !runs.some((r) => r.agent === choice.agent));

@@ -15,7 +15,7 @@ const queries = vi.hoisted(() => new Map<string, unknown>());
 const refetched = vi.hoisted(() => ({ count: 0 }));
 const reads = vi.hoisted(() => [] as { method: string; params: unknown; enabled: boolean }[]);
 const watched = vi.hoisted(() => [] as ((entries: { target: Element; isIntersecting: boolean }[]) => void)[]);
-const composer = vi.hoisted(() => ({ props: null as ComposerProps | null, handle: { append: () => {}, tag: (_person: unknown, _replyTo?: string) => {} } }));
+const composer = vi.hoisted(() => ({ props: null as ComposerProps | null, handle: { append: () => {}, tag: (_person: unknown, _replyTo?: string) => {}, note: vi.fn() } }));
 vi.mock("../lib/rpc", () => ({
   core: new Proxy({ call: vi.fn() } as Record<string, unknown>, { get: (target, key: string) => (key in target ? target[key] : () => () => undefined) }),
 }));
@@ -180,13 +180,20 @@ it("blocks a teammate's composer in the designed words on today's server, on the
 });
 
 it("reads the server's own block before any words of the app's", async () => {
-  const handoff = { code: "handoff_save" as const, message: "The thread's work could not be saved. Mara can retry the save.", responsible: MARA, commandIds: [], retrySave: false };
+  const handoff = { code: "handoff_save" as const, message: "The thread's work could not be saved. Mara can retry the save.", responsible: MARA, commandIds: [], retrySave: false, note: null };
   await open(marasThread(together(THEO, { canWrite: true, send: "blocked", handoff })));
   expect(composer.props!.readOnlyReason).toBe(handoff.message);
 });
 
 it("lets the next sender stop the command that holds their turn, from the card that says so", async () => {
-  const handoff = { code: "handoff_command" as const, message: "Mara's command is still running. Stop it before starting your turn.", responsible: MARA, commandIds: ["c1"], retrySave: false };
+  const handoff = {
+    code: "handoff_command" as const,
+    message: "Mara's command is still running. Stop it before starting your turn.",
+    responsible: MARA,
+    commandIds: ["c1"],
+    retrySave: false,
+    note: null,
+  };
   await open(marasThread(together(THEO, { canWrite: true, send: "blocked", handoff })));
   const card = screen.getByRole("status", { name: "OpenOrc Cloud" });
   expect(card.textContent).toBe(`${handoff.message}Stop command`);
@@ -203,7 +210,7 @@ it("lets the next sender stop the command that holds their turn, from the card t
 
 it("offers Retry save to the person the server lets ask, without telling them they can, and only says whose it is to others", async () => {
   const words = "The thread's work could not be saved. Mara can retry the save.";
-  const handoff = { code: "handoff_save" as const, message: words, responsible: MARA, commandIds: [], retrySave: true };
+  const handoff = { code: "handoff_save" as const, message: words, responsible: MARA, commandIds: [], retrySave: true, note: null };
   await open(marasThread(together(MARA, { canWrite: true, send: "now", handoff })));
   expect(screen.getByRole("status", { name: "OpenOrc Cloud" }).textContent).toBe("The thread's work could not be saved.Retry save");
   vi.mocked(core.call).mockClear();
@@ -219,6 +226,16 @@ it("offers Retry save to the person the server lets ask, without telling them th
   await open(marasThread(together(THEO, { canWrite: true, send: "blocked", handoff: { ...handoff, retrySave: false } })));
   expect(screen.getByRole("status", { name: "OpenOrc Cloud" }).textContent).toBe(words);
   expect(screen.queryByRole("button", { name: "Retry save" })).toBeNull();
+});
+
+it("offers a teammate with nothing else to press the server's note, which opens in the composer", async () => {
+  const note = { to: MARA, text: "@Mara the thread's work could not be saved. Can you retry the save?", mention: { start: 0, end: 5 } };
+  const words = "The thread's work could not be saved. Mara can retry the save.";
+  const handoff = { code: "handoff_save" as const, message: words, responsible: MARA, commandIds: [], retrySave: false, note };
+  await open(marasThread(together(THEO, { canWrite: true, send: "blocked", handoff })));
+  expect(screen.getByRole("status", { name: "OpenOrc Cloud" }).textContent).toBe(`${words}Tag Mara`);
+  fireEvent.click(screen.getByRole("button", { name: "Tag Mara" }));
+  expect(composer.handle.note).toHaveBeenCalledWith(note);
 });
 
 it("opens a teammate's composer by itself once the server says they may write", async () => {
@@ -379,7 +396,7 @@ it("brings the first unread mention into view once as the thread opens, not agai
   expect(result.current).toBeUndefined();
 });
 
-const handoff = { code: "handoff_unavailable" as const, message: "Only Mara can run the agent in this cloud thread for now.", responsible: MARA, commandIds: [], retrySave: false };
+const handoff = { code: "handoff_unavailable" as const, message: "Only Mara can run the agent in this cloud thread for now.", responsible: MARA, commandIds: [], retrySave: false, note: null };
 const joining = (more: Partial<ThreadCollaboration> = {}) => together(THEO, { canWrite: true, send: "now", handoff, live: { id: "t2", sender: MARA, startedAt: 0, stopping: false }, ...more });
 
 it("opens a teammate's composer to join Mara's running turn, with Queue and Stop as the server says", async () => {

@@ -213,13 +213,21 @@ export class TeamChat {
     if (now.accountId !== before.accountId || now.generation !== before.generation || now.revision !== before.revision) throw changedSession();
   }
 
+  /**
+   * One request, held to the account, session and access it began under. A read that a chat change or an access notice
+   * overtook (a seat count, billing or members change says so too, though nobody's access moved) is read again under the
+   * access as it now stands; a write, or a changed account or session, fails as changed.
+   */
   async #request<T>(spaceId: string, route: Route<T>, body?: unknown): Promise<T> {
-    const identity = this.#identity(spaceId);
     for (let attempt = 0; attempt < 3; attempt++) {
+      const identity = this.#identity(spaceId);
       const readRevision = this.#reads.get(spaceId) ?? 0;
       const result = await this.deps.session.in(spaceId).request(route, body);
+      const now = this.#identity(spaceId);
+      const read = route.method === "GET";
+      if (read && now.accountId === identity.accountId && now.generation === identity.generation && now.revision !== identity.revision) continue;
       this.#assert(spaceId, identity);
-      if (route.method !== "GET" || (this.#reads.get(spaceId) ?? 0) === readRevision) return result;
+      if (!read || (this.#reads.get(spaceId) ?? 0) === readRevision) return result;
     }
     throw changedSession();
   }

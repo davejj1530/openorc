@@ -199,18 +199,33 @@ export class OnlineTasks {
     if (revision < (this.#revisions.get(spaceId) ?? 0)) throw changed();
     this.#revisions.set(spaceId, revision);
   }
+  /**
+   * One request, held to the account, session and access it began under. A read that an access notice overtook (a seat
+   * count, billing or members change says so too, though nobody's access moved) is read again under the access as it now
+   * stands, which the server answers for or refuses; a write, or a changed account or session, fails as changed.
+   */
   async #request<T>(spaceId: string, route: Route<T>, body?: unknown): Promise<T> {
-    const identity = this.#identity(spaceId);
-    try {
-      const result = await this.deps.session.in(spaceId).request(route, body);
-      this.#assert(spaceId, identity);
-      this.#accept(spaceId, result);
-      return result;
-    } catch (error) {
-      this.#assert(spaceId, identity);
-      if (error instanceof TaskChanged) this.#accept(spaceId, error.current);
-      throw error;
+    for (let attempt = 0; ; attempt++) {
+      const identity = this.#identity(spaceId);
+      const again = () => route.method === "GET" && attempt < 2 && this.#overtaken(spaceId, identity);
+      try {
+        const result = await this.deps.session.in(spaceId).request(route, body);
+        if (again()) continue;
+        this.#assert(spaceId, identity);
+        this.#accept(spaceId, result);
+        return result;
+      } catch (error) {
+        if (again()) continue;
+        this.#assert(spaceId, identity);
+        if (error instanceof TaskChanged) this.#accept(spaceId, error.current);
+        throw error;
+      }
     }
+  }
+  /** Only the access moved since `before`: the same account in the same session. */
+  #overtaken(spaceId: string, before: Identity): boolean {
+    const now = this.#identity(spaceId);
+    return now.userId === before.userId && now.generation === before.generation && now.epoch !== before.epoch;
   }
   #invalidate(spaceId?: string): void {
     if (this.#closed) return;

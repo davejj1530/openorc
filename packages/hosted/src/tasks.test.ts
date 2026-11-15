@@ -155,6 +155,43 @@ it("blocks frozen writes, keeps frozen assignment, and permits Done during work"
   expect(done.task.viewer.liveExecution).toBe(true);
   await expect(a.tasks.delete({ spaceId, id: made.task.id, requestId: randomUUID(), ifRevision: done.task.revision })).rejects.toThrow("turn to finish");
 });
+it("reads again, under the access as it now stands, a read that a billing and members notice overtook", async () => {
+  let release: (() => void) | undefined;
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  let held = false;
+  const reads = () => stand.requests.filter((request) => request.path === "/tasks/attention").length;
+  const notices: ((body: unknown) => void)[] = [];
+  const a = await client(ADMIN, {
+    connect: (url, token) => {
+      const socket = stand.connect(url, token);
+      return {
+        onState: (listener) => socket.onState(listener),
+        on: (event, listener) => {
+          if (event === "changed") notices.push(listener);
+          socket.on(event, listener);
+        },
+        ask: (event, body) => socket.ask(event, body),
+        close: () => socket.close(),
+      };
+    },
+    fetch: async (url, init) => {
+      const response = await fetch(url, init);
+      if (new URL(String(url)).pathname === "/tasks/attention" && !held) {
+        held = true;
+        await gate;
+      }
+      return response;
+    },
+  });
+  const before = reads();
+  const read = a.tasks.attention({ spaceId });
+  await vi.waitFor(() => expect(held).toBe(true));
+  // A seat count change tells the organization its billing and members changed; nobody's access did.
+  for (const tell of notices) tell({ organizationId: spaceId, topics: ["billing", "members"] });
+  release?.();
+  expect(await read).toMatchObject({ count: 0 });
+  expect(reads() - before).toBe(2);
+});
 it("discards an outstanding task reply after sign-out", async () => {
   let release: (() => void) | undefined;
   const gate = new Promise<void>((resolve) => {

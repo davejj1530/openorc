@@ -95,13 +95,15 @@ it("keeps the six reaction choices on the stored message", async () => {
 it("drops a page admitted before access froze", async () => {
   let release: (() => void) | undefined;
   let started: (() => void) | undefined;
+  let held = false;
   const waiting = new Promise<void>((resolve) => {
     started = resolve;
   });
   const { hosted } = await host(FIRST, {
     fetch: async (input, init) => {
       const response = await fetch(input, init);
-      if (new URL(String(input)).pathname.endsWith("/timeline")) {
+      if (!held && new URL(String(input)).pathname.endsWith("/timeline")) {
+        held = true;
         started?.();
         await new Promise<void>((resolve) => {
           release = resolve;
@@ -112,7 +114,8 @@ it("drops a page admitted before access froze", async () => {
   });
   const conversation = await hosted.chat.openDm({ spaceId, userIds: [userOf(SECOND)] });
   const read = hosted.chat.timeline({ spaceId, conversationId: conversation.id });
-  const rejected = expect(read).rejects.toThrow("session changed");
+  // The page is read again under the access as it now stands, which the server refuses.
+  const rejected = expect(read).rejects.toMatchObject({ code: "organization_frozen" });
   await waiting;
   stand.chat.frozen.add(FIRST);
   stand.chat.changeAccess(spaceId);
@@ -154,6 +157,32 @@ it("discards a delayed private page after a conversation-only removal", async ()
   await new Promise<void>((resolve) => queueMicrotask(resolve));
   release();
   await rejected;
+});
+
+it("reads the chat again, under the access as it now stands, when a billing and members notice overtakes the read", async () => {
+  let release: (() => void) | undefined;
+  let held = false;
+  const reads = () => stand.requests.filter((request) => request.path.endsWith("/timeline")).length;
+  const { hosted } = await host(FIRST, {
+    fetch: async (input, init) => {
+      const response = await fetch(input, init);
+      if (!held && new URL(String(input)).pathname.endsWith("/timeline")) {
+        held = true;
+        await new Promise<void>((resolve) => (release = resolve));
+      }
+      return response;
+    },
+  });
+  const conversation = await hosted.chat.openDm({ spaceId, userIds: [userOf(SECOND)] });
+  const before = reads();
+  const read = hosted.chat.timeline({ spaceId, conversationId: conversation.id });
+  await vi.waitFor(() => expect(held).toBe(true));
+  // A seat count change tells the organization its access may have moved; nobody's did.
+  stand.chat.changeAccess(spaceId);
+  await new Promise<void>((resolve) => setTimeout(resolve, 100));
+  release?.();
+  expect((await read).messages).toEqual([]);
+  expect(reads() - before).toBe(2);
 });
 
 it("rereads a page when live delivery overtakes the response", async () => {

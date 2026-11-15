@@ -1,10 +1,13 @@
 import type { OrganizationBilling, OrganizationPayment } from "@openorc/protocol";
 import { accountDay, formatUsageTime } from "@openorc/client";
-import { useState, useSyncExternalStore } from "react";
+import { useCallback, useState, useSyncExternalStore } from "react";
 import { Button, Tooltip } from "../components/ui";
 import { BuySeatsDialog, type BuySeatsDialogProps } from "../dialogs/BuySeatsDialog";
 import type { OrganizationBillingView, OrganizationBillingViewState } from "../lib/organization-billing-state";
+import { seatQuantityTransport } from "../lib/seat-quantity-rpc";
+import type { SeatQuantityTransport } from "../lib/seat-quantity-scope";
 import { SeatInventory } from "./SeatInventory";
+import { ChangeSeatsButton, ChangeSeatsFlow, SeatQuantityStatus, changeSeatsReason, type ChangeSeatsOpening } from "./SeatQuantityControls";
 import { SeatOperations } from "./SeatOperations";
 import { OrganizationStorage, type OrganizationStorageTransport } from "./OrganizationStorage";
 import "./organization-seats.css";
@@ -14,11 +17,14 @@ interface Props {
   view: OrganizationBillingView;
   offers: BuySeatsDialogProps["offers"];
   storage?: OrganizationStorageTransport;
+  quantity?: SeatQuantityTransport;
 }
 
-export function OrganizationSeats({ spaceId, view, offers, storage }: Props) {
+export function OrganizationSeats({ spaceId, view, offers, storage, quantity = seatQuantityTransport }: Props) {
   const state = useSyncExternalStore(view.subscribe, view.getSnapshot);
   const [buying, setBuying] = useState(false);
+  const [changing, setChanging] = useState<ChangeSeatsOpening | null>(null);
+  const manage = useCallback(() => void view.open({ page: "billing" }), [view]);
   const [submitted, setSubmitted] = useState(false);
   const billing = state.status?.billing;
   const payment = state.status?.payment ?? null;
@@ -33,9 +39,10 @@ export function OrganizationSeats({ spaceId, view, offers, storage }: Props) {
   };
   return (
     <>
-      {billing ? <SeatSummary spaceId={spaceId} storage={storage} billing={billing} state={state} buy={buy} manage={() => void view.open({ page: "billing" })} /> : null}
+      {billing ? <SeatSummary spaceId={spaceId} storage={storage} billing={billing} state={state} buy={buy} manage={manage} change={() => setChanging({ from: "number" })} /> : null}
       {!billing && state.loading ? <p className="seats-inline-state text-ink-3">Loading seats…</p> : null}
       {!formOpen ? <SeatPaymentState state={state} view={view} /> : null}
+      <SeatQuantity spaceId={spaceId} status={state.status} changing={changing} setChanging={setChanging} manage={manage} transport={quantity} />
       <SeatOperations />
       {billing?.subscription?.overallocated ? <p className="seats-inline-state">More people hold seats than are paid for. Take back a seat or add seats.</p> : null}
       {billing && billing.seats.length > 0 ? <SeatInventory seats={billing.seats} /> : null}
@@ -57,6 +64,40 @@ export function OrganizationSeats({ spaceId, view, offers, storage }: Props) {
   );
 }
 
+/** The number of seats: what is still to be known or decided about it, and the dialog that changes it. */
+function SeatQuantity({
+  spaceId,
+  status,
+  changing,
+  setChanging,
+  manage,
+  transport,
+}: {
+  spaceId: string;
+  status: OrganizationBillingViewState["status"];
+  changing: ChangeSeatsOpening | null;
+  setChanging(opening: ChangeSeatsOpening | null): void;
+  manage(): void;
+  transport: SeatQuantityTransport;
+}) {
+  const close = useCallback(() => setChanging(null), [setChanging]);
+  const billing = status?.billing;
+  const subscription = billing?.subscription;
+  if (!billing || !subscription || subscription.standing === "ended") return null;
+  return (
+    <>
+      <SeatQuantityStatus
+        subscription={subscription}
+        work={status?.quantity?.at(-1)}
+        onOpen={setChanging}
+        onManageBilling={manage}
+        onRead={(id) => void transport.operation(spaceId, id).catch(() => undefined)}
+      />
+      {changing ? <ChangeSeatsFlow spaceId={spaceId} billing={billing} opening={changing} transport={transport} onClose={close} onManageBilling={manage} /> : null}
+    </>
+  );
+}
+
 async function buySeats(view: OrganizationBillingView, target: Parameters<OrganizationBillingView["open"]>[0], close: () => void) {
   await view.open(target);
   const state = view.getSnapshot();
@@ -71,6 +112,7 @@ function SeatSummary({
   state,
   buy,
   manage,
+  change,
 }: {
   spaceId: string;
   storage?: OrganizationStorageTransport;
@@ -78,6 +120,7 @@ function SeatSummary({
   state: OrganizationBillingViewState;
   buy(): void;
   manage(): void;
+  change(): void;
 }) {
   const subscription = billing.subscription;
   const hasSubscription = subscription !== null && subscription.standing !== "ended";
@@ -96,6 +139,7 @@ function SeatSummary({
           </Button>
         ) : null}
         {!hasSubscription && !complete ? <SeatBuyButton disabled={disabled} reason={state.error ?? "The payment is still being checked."} buy={buy} /> : null}
+        {hasSubscription ? <ChangeSeatsButton reason={changeSeatsReason(state.status?.quantity?.at(-1), state.error)} onClick={change} /> : null}
       </div>
     </section>
   );

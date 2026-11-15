@@ -31,7 +31,7 @@ import {
   type WorkspaceMode,
   type HostedFileScope,
 } from "@openorc/protocol";
-import { useCallback, useState, type ComponentProps, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ComponentProps, type ReactNode } from "react";
 import { useConversationSettings, useConversationTranscript, useRpc, useRpcMutation, useSubmit } from "../lib/client";
 import { useThreadAccounts } from "../lib/use-thread-accounts";
 import { MessageMarks, useMessageMarks } from "./MarkedText";
@@ -285,7 +285,7 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
   const emptyHint = conversationEmptyHint({ task: scope.kind === "task", workspace: project.id === WORKSPACE_ID });
   const answersBlocked = asksBlocked(thread);
   const placeholder = composerPlaceholder(choice?.agent, thread);
-  const heard = optimistic.run ? heardTranscript(optimistic.run, thread) : null;
+  const heard = useMemo(() => (optimistic.run ? heardTranscript(optimistic.run, thread) : null), [optimistic.run, thread]);
   const notes = useThreadNotes(thread, heard?.blocks, controls.composer);
   const composerNotes = useComposerNotes(thread);
   const mention = useMentionReveal(thread);

@@ -1,3 +1,4 @@
+import type { ThreadCollaboration } from "@openorc/protocol";
 import { describe, expect, it } from "vitest";
 import {
   acceptsLiveInput,
@@ -62,6 +63,17 @@ describe("conversationActivity", () => {
     expect(conversationActivity({ thread: offline, activeRun: run, liveTranscript: live([replying]), compacting: false })).toMatchObject({ live: false, working: false });
     expect(heardTranscript({ ...live([replying]), turnOpen: true }, offline)).toMatchObject({ live: false, turnOpen: false });
     expect(heardTranscript({ ...live([replying]), turnOpen: true }, { owner: { ...offline.owner, reach: "live" } })).toMatchObject({ live: true, turnOpen: true });
+  });
+
+  it("leaves a message the server holds paused to the pile, and draws it in its place once it runs", () => {
+    const paused: Block = { id: "user-00000000-0000-4000-8000-000000000001", kind: "message", role: "user", text: "Use the short date format", streaming: false };
+    const asked: Block = { id: "user-00000000-0000-4000-8000-000000000002", kind: "message", role: "user", text: "Add the export", streaming: false };
+    const queue = (isPaused: boolean) => [
+      { messageId: "00000000-0000-4000-8000-000000000001", author: null, paused: isPaused, canEdit: true, canRemove: true, canStart: true, task: null, pause: null },
+    ];
+    const thread = (isPaused: boolean) => ({ owner: { brain: "hosted" as const, reach: "live" as const, heardAt: 1, collaboration: { queue: queue(isPaused) } as unknown as ThreadCollaboration } });
+    expect(heardTranscript(live([asked, paused, replying]), thread(true)).blocks.map((block) => block.id)).toEqual([asked.id, replying.id]);
+    expect(heardTranscript(live([asked, paused, replying]), thread(false)).blocks.map((block) => block.id)).toEqual([asked.id, paused.id, replying.id]);
   });
 
   it("never calls a run live once it ended, even when its transcript missed the end", () => {

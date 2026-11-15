@@ -1,6 +1,7 @@
 import { defaultHarnessId, harnessCatalog, harnessShortName, isHarnessId, type AgentKind, type Run, type ThreadSummary } from "@openorc/protocol";
 import { isImageGeneration } from "./image-activity.js";
 import { sendsBlocked } from "./hosted-send.js";
+import { threadTogether } from "./thread-collaboration.js";
 import type { RunTranscript } from "./transcript.js";
 
 const CONVERSATION_REASONS = {
@@ -72,9 +73,16 @@ export function conversationActivity(input: { thread: Pick<ThreadSummary, "activ
   return { live, working, generatingImage };
 }
 
-/** A transcript as the conversation shows it: a thread out of reach shows its last turn as heard, not as running now. */
-export function heardTranscript<T extends Pick<RunTranscript, "live" | "turnOpen">>(run: T, thread: Pick<ThreadSummary, "owner"> | null): T {
-  return thread?.owner?.reach === "offline" && (run.live || run.turnOpen) ? { ...run, live: false, turnOpen: false } : run;
+/**
+ * A transcript as the conversation shows it: a thread out of reach shows its last turn as heard, not as running now. A
+ * person's message the server holds paused is drawn in the queue's pile, not here; once a turn takes it, it stands in
+ * its place in the log again.
+ */
+export function heardTranscript<T extends Pick<RunTranscript, "live" | "turnOpen" | "blocks">>(run: T, thread: Pick<ThreadSummary, "owner"> | null): T {
+  const heard = thread?.owner?.reach === "offline" && (run.live || run.turnOpen) ? { ...run, live: false, turnOpen: false } : run;
+  const paused = new Set(threadTogether(thread)?.queue.flatMap((queued) => (queued.paused ? [queued.messageId, `user-${queued.messageId}`] : [])));
+  if (!paused.size) return heard;
+  return { ...heard, blocks: heard.blocks.filter((block) => !(block.kind === "message" && block.role === "user" && paused.has(block.id))) };
 }
 
 /**

@@ -50,6 +50,7 @@ import { useConnectorMentions } from "../lib/connector-mentions";
 import { useSkillCommands } from "../lib/skill-commands";
 import { ConversationVoice, useRunVoices } from "../lib/turn-authors";
 import { ThreadVoicesContext, useThreadVoices } from "../lib/thread-authors";
+import { ThreadNotesContext, useThreadNotes, type ThreadNotesValue } from "./ThreadNotes";
 import { VoicesFailed } from "./ThreadVoice";
 import { useTurnFooters } from "../lib/turn-footers";
 import { AnswersBlocked, AsksDocked } from "./ask-answer";
@@ -168,9 +169,11 @@ function TranscriptContext({
   threadId,
   answersBlocked = null,
   together = null,
+  notes,
   children,
 }: {
   answersBlocked?: string | null;
+  notes?: ThreadNotesValue | undefined;
   together?: ComponentProps<typeof ThreadVoicesContext.Provider>["value"];
   voice: ComponentProps<typeof ConversationVoice.Provider>["value"];
   marks: ComponentProps<typeof MessageMarks.Provider>["value"];
@@ -184,7 +187,7 @@ function TranscriptContext({
         <TurnChangesProvider footers={footers} threadId={threadId}>
           <AnswersBlocked.Provider value={answersBlocked}>
             <ThreadVoicesContext.Provider value={together}>
-              <AsksDocked.Provider value>{children}</AsksDocked.Provider>
+              <AsksDocked.Provider value>{notes ? <ThreadNotesContext.Provider value={notes}>{children}</ThreadNotesContext.Provider> : children}</AsksDocked.Provider>
             </ThreadVoicesContext.Provider>
           </AnswersBlocked.Provider>
         </TurnChangesProvider>
@@ -283,11 +286,12 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
   const answersBlocked = asksBlocked(thread);
   const placeholder = composerPlaceholder(choice?.agent, thread);
   const heard = optimistic.run ? heardTranscript(optimistic.run, thread) : null;
+  const notes = useThreadNotes(thread, heard?.blocks, prompt, setPrompt);
 
   function renderTranscript() {
     if (heard && heard.blocks.length > 0)
       return (
-        <TranscriptContext voice={voice} marks={marks} footers={footers} threadId={threadId} answersBlocked={answersBlocked} together={together.voices}>
+        <TranscriptContext voice={voice} marks={marks} footers={footers} threadId={threadId} answersBlocked={answersBlocked} together={together.voices} notes={notes}>
           <Transcript
             working={working}
             media={links ? { basePath: links, fileScope: conversation } : { fileLinks: "cite" }}

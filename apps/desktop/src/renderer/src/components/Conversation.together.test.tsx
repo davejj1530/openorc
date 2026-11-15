@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { AccountStatus, Project, Run, SpaceProject, SpacesStatus, ThreadAuthors, ThreadCollaboration, ThreadPerson, ThreadSummary } from "@openorc/protocol";
@@ -257,6 +257,34 @@ it("tells the ask dock that answering Mara's parked ask continues on the reader'
   expect(composer.props!.asksBlocked).toBeNull();
   expect(composer.props!.askContinues?.("a1")).toBe("Continues with your sign-in and hours.");
   expect(composer.props!.askContinues?.("another")).toBeNull();
+});
+
+it("draws a teammate's note in the thread with the person it tags, and Reply puts its author's tag in the draft", async () => {
+  queries.set("threads.notes", {
+    notes: [
+      {
+        id: "n1",
+        seq: 1,
+        author: MARA,
+        text: "@Theo Laurent Can you check the column order?",
+        mentions: [{ person: THEO, userId: THEO.id, start: 0, end: 13 }],
+        replyTo: null,
+        createdAt: "2026-11-15T10:00:00.000Z",
+        afterEventSeq: 0,
+        mentionedYou: true,
+        read: false,
+      },
+    ],
+    head: 1,
+    hasBefore: false,
+    hasAfter: false,
+  });
+  await open(marasThread(together(THEO, { canWrite: true, send: "now", canPostNote: true, noteHead: 1 })));
+  const note = screen.getByRole("article", { name: "Note from Mara Okafor" });
+  expect(note.textContent).toContain("Note");
+  expect(note.querySelector(".person-token")?.textContent).toBe("@Theo Laurent");
+  fireEvent.click(within(note).getByRole("button", { name: "Reply" }));
+  expect(composer.props!.value).toBe("@[user:u-mara] ");
 });
 
 const handoff = { code: "handoff_unavailable" as const, message: "Only Mara can run the agent in this cloud thread for now.", responsible: MARA, commandIds: [], retrySave: false };

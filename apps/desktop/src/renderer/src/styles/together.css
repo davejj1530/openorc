@@ -37,6 +37,20 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.note-author {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: var(--text-xs);
+  line-height: 18px;
+  color: var(--ink-2);
+}
+.note-author .account-face {
+  width: 18px;
+  height: 18px;
+  font-size: 8px;
+}
 .queue-author {
   display: flex;
   align-items: center;

@@ -12,7 +12,8 @@ const ACTIVITY_BLOCK = "activity-";
 export const activityBlockId = (activityId: string) => `${ACTIVITY_BLOCK}${activityId}`;
 export const activityIdOf = (blockId: string) => (blockId.startsWith(ACTIVITY_BLOCK) ? blockId.slice(ACTIVITY_BLOCK.length) : blockId);
 
-export type Block = { at?: number; turnKey?: string; runId?: string } & (
+/** `seq`: the place in a cloud thread's log of the event that made the block, where notes take theirs. */
+export type Block = { at?: number; turnKey?: string; runId?: string; seq?: number } & (
   | {
       id: string;
       kind: "message";
@@ -95,6 +96,8 @@ export interface RunTranscript {
   eventCount: number;
   /** Timestamp of the event being projected, including history replay. */
   eventAt?: number;
+  /** The place of the event being projected in a cloud thread's log; none for this Mac's own. */
+  eventSeq?: number;
   eventIds?: Set<string>;
   /** Turns finished before the newest block, counted from the run's start even when earlier turns are not loaded. */
   turnsCompleted: number;
@@ -115,7 +118,8 @@ function upsert(run: RunTranscript, block: Block): void {
   const i = run.blockIndex.get(block.id);
   const previous = i === undefined ? undefined : run.blocks[i];
   const turn = run.subagentCompletion?.turn ?? run.turnsCompleted;
-  block = { ...block, runId: run.runId, at: previous?.at ?? block.at ?? run.eventAt, turnKey: previous?.turnKey ?? `${run.runId}:${turn}` };
+  const seq = previous?.seq ?? block.seq ?? run.eventSeq;
+  block = { ...block, runId: run.runId, at: previous?.at ?? block.at ?? run.eventAt, turnKey: previous?.turnKey ?? `${run.runId}:${turn}`, ...(seq !== undefined && { seq }) };
   if (i === undefined) {
     run.turnOf.set(block.id, turn);
     const boundary = run.subagentCompletion && block.kind !== "status" ? run.blockIndex.get(run.subagentCompletion.boundaryId) : undefined;
@@ -358,8 +362,13 @@ function admit(run: RunTranscript, ev: AgentEvent): boolean {
   return true;
 }
 
+/** A cloud thread's event names its place in the thread's log: `<thread>.<seq>`. */
+const HOSTED_EVENT = /^[^.]+\.(\d+)$/;
+
 function project(run: RunTranscript, ev: AgentEvent): void {
   run.eventAt = ev.ts;
+  const hosted = ev.eventId ? HOSTED_EVENT.exec(ev.eventId) : null;
+  run.eventSeq = hosted ? Number(hosted[1]) : undefined;
   if (!ev.type.startsWith("thinking.") && ev.type !== "raw" && ev.type !== "usage.updated" && ev.type !== "background.updated") closeThinking(run, ev.ts);
   (handlers[ev.type] as Handler<AgentEventType>)(run, ev);
 }

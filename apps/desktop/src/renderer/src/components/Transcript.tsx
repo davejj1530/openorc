@@ -26,6 +26,7 @@ import { AgentPresence } from "./AgentPresence";
 import { toolIcons } from "./tool-icons";
 import { WorkNow, WorkSteps } from "./WorkSteps";
 import { TurnHead } from "./TurnHead";
+import { NoteList, useNotesAfter, useTopNotes } from "./ThreadNotes";
 import { TurnReceipt } from "./TurnReceipt";
 import { useTurnSize } from "./TurnFooter";
 import { ConversationVoice, useTurnAuthor } from "../lib/turn-authors";
@@ -391,10 +392,12 @@ function ConversationBody(props: WorkTranscriptProps) {
 
 export function WorkTranscript({ blocks, live = false, onFork, reveal, ...props }: WorkTranscriptProps) {
   const turns = useSteadyTurns(blocks);
+  const topNotes = useTopNotes();
   // A fork carries the whole conversation and the agent's latest session, so it is offered only at the latest message.
   const forkTurn = onFork ? turns.findLastIndex((turn) => turn.blocks.some((block) => block.kind === "message" && block.role === "user")) : -1;
   return (
     <>
+      <NoteList notes={topNotes} />
       {turns.map((turn, index) => (
         <WorkTurn
           key={turn.id}
@@ -455,6 +458,7 @@ const WorkTurn = memo(function WorkTurn({ id, blocks, live = false, ambient = fa
   const size = useTurnSize(blocks);
   const turn = useTurnModel(visible, live, props.taskCards, ambient, props.replyAction?.blockId, size);
   const { before, work, after } = turn.parts;
+  const notes = useTurnNotes(blocks, turn.parts);
   const revealWork = reveal && work.some((block) => block.id === reveal.messageId) ? reveal : undefined;
   const { open, visited, choose } = useWorkOpen(showActivity, turn.live, revealWork);
   const contentId = useId();
@@ -468,6 +472,7 @@ const WorkTurn = memo(function WorkTurn({ id, blocks, live = false, ambient = fa
   return (
     <div className="work-turn" data-turn={id}>
       <TranscriptContents {...props} onFork={actions ? undefined : onFork} blocks={before} />
+      <NoteList notes={notes.before} />
       {head && spoke ? <TurnHead runId={props.runId} named={named} status={turn.status} blocks={blocks} /> : null}
       {!head && ended ? <TurnOutcome named={named} runId={props.runId} failed={turn.status.kind === "failed"} /> : null}
       {showActivity && work.length ? (
@@ -496,13 +501,28 @@ const WorkTurn = memo(function WorkTurn({ id, blocks, live = false, ambient = fa
           </div>
         </section>
       ) : null}
+      <NoteList notes={notes.work} />
       <FoldedRecovery work={work} open={open} showActivity={showActivity} />
       <TranscriptContents {...props} blocks={after} replyActions={!head} />
       {footer}
       {actions ? <TurnActions text={turn.reply?.text} at={turn.reply?.at} onFork={onFork} /> : null}
+      <NoteList notes={notes.after} />
     </div>
   );
 });
+
+/**
+ * A turn's notes by the part they follow: its prompt, its work, which a fold never hides them in, or its reply. A note
+ * after a block the turn does not show, such as a docked ask, stands after the reply.
+ */
+function useTurnNotes(blocks: Block[], parts: { before: Block[]; work: Block[]; after: Block[] }) {
+  const before = useNotesAfter(parts.before);
+  const work = useNotesAfter(parts.work);
+  const shown = new Set([...parts.before, ...parts.work, ...parts.after].map((block) => block.id));
+  const hidden = useNotesAfter(blocks.filter((block) => !shown.has(block.id)));
+  const after = useNotesAfter(parts.after);
+  return { before, work, after: hidden.length ? [...after, ...hidden] : after };
+}
 
 /** Keep a recovery visible when its work is folded or hidden. */
 function FoldedRecovery({ work, open, showActivity }: { work: Block[]; open: boolean; showActivity: boolean }) {

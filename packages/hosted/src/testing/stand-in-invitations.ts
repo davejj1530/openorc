@@ -130,9 +130,8 @@ export class StandInInvitations {
       .trim()
       .toLowerCase();
     const role = input.body["role"];
-    if (!InvitationEmail.safeParse(email).success) return refuse(400, "Enter a full email address.");
-    if (role !== "admin" && role !== "member") return refuse(400, "Choose Admin or Member.");
-    if (this.deps.spaces.member(spaceId, email)) return refuse(400, "That person is already in this organization.", "USER_IS_ALREADY_A_MEMBER_OF_THIS_ORGANIZATION");
+    const invalid = this.#invalid(spaceId, email, role);
+    if (invalid || (role !== "admin" && role !== "member")) return invalid ?? refuse(400, "Choose Admin or Member.");
     const now = this.deps.now();
     const existing = this.records
       .filter((invite) => invite.spaceId === spaceId && invite.email === email && invite.status === "pending" && (input.body["resend"] === true || invite.expiresAt > now))
@@ -140,8 +139,7 @@ export class StandInInvitations {
     if (existing && input.body["resend"] !== true) return refuse(400, "That person already has an invitation. You can send it again from People.", "USER_IS_ALREADY_INVITED_TO_THIS_ORGANIZATION");
     const limited = this.#limit(input.who, spaceId, existing, now);
     if (limited) return limited;
-    const seatId = typeof input.body["seatId"] === "string" ? input.body["seatId"] : undefined;
-    const hold = this.seats?.reserve({ spaceId, seatId, invitationId: existing?.id ?? null });
+    const hold = this.#reserve(spaceId, input.body["seatId"], existing);
     if (hold && typeof hold !== "function") return hold;
     const id = existing?.id ?? this.seed(spaceId, email, input.who, role);
     const invite = this.records.find((invite) => invite.id === id)!;
@@ -152,6 +150,18 @@ export class StandInInvitations {
     this.ledger.push({ spaceId, who: input.who, at: now });
     this.#tell(invite);
     return { status: 200, body: bare(invite) };
+  }
+
+  /** A refusal, or the step that holds the seat once the invitation is written; nothing on a server without seats. */
+  #reserve(spaceId: string, seatId: unknown, existing: Invitation | undefined) {
+    return this.seats?.reserve({ spaceId, seatId: typeof seatId === "string" ? seatId : undefined, invitationId: existing?.id ?? null });
+  }
+
+  #invalid(spaceId: string, email: string, role: unknown): Reply | null {
+    if (!InvitationEmail.safeParse(email).success) return refuse(400, "Enter a full email address.");
+    if (role !== "admin" && role !== "member") return refuse(400, "Choose Admin or Member.");
+    if (this.deps.spaces.member(spaceId, email)) return refuse(400, "That person is already in this organization.", "USER_IS_ALREADY_A_MEMBER_OF_THIS_ORGANIZATION");
+    return null;
   }
 
   #limit(who: string, spaceId: string, existing: Invitation | undefined, now: number): Reply | null {

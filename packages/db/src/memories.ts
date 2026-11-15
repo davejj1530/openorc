@@ -260,10 +260,8 @@ export const memories = {
     return m;
   },
 
-  /** A project memory's removal is kept, so the copy on the Mac or its cloud brain drops it too and never brings it back. */
-  remove(db: Db, id: string, at = now()): void {
+  remove(db: Db, id: string): void {
     const rowid = memories.rowidFor(db, id);
-    db.stmt("INSERT OR IGNORE INTO memory_tombstones (id, project_id, removed_at) SELECT id, project_id, ? FROM memories WHERE id = ? AND project_id IS NOT NULL AND orcling_id IS NULL").run(at, id);
     db.stmt("DELETE FROM memories WHERE id = ?").run(id);
     if (rowid !== null && db.hasVectors) db.stmt("DELETE FROM memory_vec WHERE memory_rowid = ?").run(BigInt(rowid));
   },

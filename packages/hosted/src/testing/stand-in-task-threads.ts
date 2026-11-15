@@ -46,7 +46,13 @@ export class StandInTaskThreads {
     const task = taskFixtureView(this.deps, record, who);
     return {
       status: 200,
-      body: { accessRevision, task: taskFixtureWire(task), threadId: receipt.threadId, created: receipt.created, draft: `${task.title}\n\nTask ID: ${task.id}${task.spec ? `\n\n${task.spec}` : ""}` },
+      body: {
+        accessRevision,
+        task: taskFixtureWire(task),
+        threadId: receipt.threadId,
+        created: receipt.created,
+        draft: [`Work on "${task.title}" in this thread.`, ...(task.spec?.trim() ? [task.spec] : [])].join("\n\n"),
+      },
     };
   }
 }

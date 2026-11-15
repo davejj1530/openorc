@@ -86,8 +86,7 @@ it("opens one shared thread for two people without preparing or starting a paid 
   expect([first.created, second.created].filter(Boolean)).toHaveLength(1);
   expect(first.task.status).toBe("backlog");
   expect(first.task.activity).toBeNull();
-  expect(first.draft).toContain(task.spec);
-  expect(first.draft).toContain(task.id);
+  expect(first.draft).toBe(`Work on "${task.title}" in this thread.\n\n${task.spec}`);
   expect(stand.readies).toHaveLength(0);
   expect(stand.started).toHaveLength(0);
   expect(stand.sent).toHaveLength(0);

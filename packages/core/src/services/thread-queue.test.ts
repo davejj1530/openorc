@@ -11,7 +11,8 @@ import { inheritedProbe } from "./shell-environment.js";
 
 it("retains a busy conversation's queued message across restart and uses its current settings exactly once", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "durable-thread-queue-"));
-  const dataDir = path.join(root, "data");
+  // OpenOrc's data stays outside the checkout, whose starting checkpoint runs `git add -A` while the database changes.
+  const dataDir = await mkdtemp(path.join(os.tmpdir(), "durable-thread-queue-data-"));
   const launched: RunSpec[] = [];
   const adapter = vi.spyOn(CodexAdapter.prototype, "start").mockImplementation((spec) => {
     launched.push(spec);
@@ -65,11 +66,13 @@ it("retains a busy conversation's queued message across restart and uses its cur
     await core?.close();
     adapter.mockRestore();
     await rm(root, { recursive: true, force: true });
+    await rm(dataDir, { recursive: true, force: true });
   }
 });
 
 it.skipIf(process.platform === "win32")("cancels queued workspace preparation before waiting for queue delivery at shutdown", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "thread-queue-shutdown-"));
+  const dataDir = await mkdtemp(path.join(os.tmpdir(), "thread-queue-shutdown-data-"));
   let core: OpenOrc | undefined;
   const adapter = vi.spyOn(CodexAdapter.prototype, "start");
   try {
@@ -78,7 +81,7 @@ it.skipIf(process.platform === "win32")("cancels queued workspace preparation be
     await git(root, ["config", "user.email", "fixture@example.com"]);
     await writeFile(path.join(root, "README.md"), "# Queue\n");
     await commitAll(root, "Fixture");
-    core = await OpenOrc.create({ dataDir: path.join(root, "data"), shellProbe: inheritedProbe(), transport: { push() {} } });
+    core = await OpenOrc.create({ dataDir, shellProbe: inheritedProbe(), transport: { push() {} } });
     settings.set(core.db, "extraction.provider", "off");
     const project = await core.projects.import(root);
     const marker = path.join(root, "setup-started");
@@ -96,5 +99,6 @@ it.skipIf(process.platform === "win32")("cancels queued workspace preparation be
     await core?.close();
     adapter.mockRestore();
     await rm(root, { recursive: true, force: true });
+    await rm(dataDir, { recursive: true, force: true });
   }
 });

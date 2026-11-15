@@ -169,6 +169,25 @@ it.each([
   expect(onNavigate).toHaveBeenCalledWith({ kind: "changes", selection: null });
 });
 
+it("says why Undo is off when the pointer rests on it", async () => {
+  mount(
+    <>
+      <HostedTurnChangeCard threadId={cloudReviewThread.id} turnId="turn-1" />
+      <TipLayer />
+    </>,
+  );
+  expect(await screen.findByText("Changed 1 file")).toBeTruthy();
+  const undo = screen.getByRole("button", { name: "Undo" });
+  // A browser gives a disabled button no pointer events; this one lets them through to the span that holds the reason.
+  expect(undo.className).toContain("disabled:pointer-events-none");
+  const trigger = screen.getByLabelText("Undo this turn's changes");
+  fireEvent.pointerEnter(trigger, { pointerType: "mouse" });
+  fireEvent.mouseEnter(trigger);
+  fireEvent.mouseMove(trigger);
+  fireEvent.pointerMove(trigger, { pointerType: "mouse" });
+  expect(await screen.findByText("Restoring a cloud checkpoint isn't available yet.", undefined, { timeout: 2000 })).toBeTruthy();
+});
+
 it("shows a working turn's reason on a keyboard-reachable review control", async () => {
   reads.set("hosted.review.turn", { state: "working", turnId: "turn-1", line: "This turn's changes aren't recorded yet." });
   mount(<HostedTurnChangeCard threadId={cloudReviewThread.id} turnId="turn-1" />);

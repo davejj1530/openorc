@@ -242,7 +242,7 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
   const { sameAgent, settingsPending, canSteer } = processFit({ live, activeRun, choice, mode, permission, compacting: compact.isPending });
   const steerReason = conversationSteerReason({ canSteer, compacting: compact.isPending, settingsPending, sameAgent, agent: activeRun?.agent });
   const composer = useRef<ComposerHandle>(null);
-  const cloud = useHostedComposer(thread, { choice, mode, permission }, composer);
+  const cloud = useHostedComposer(thread, { choice, mode, permission }, composer, prompt);
   const controls = useThreadControls(thread, { canSteer, reason: steerReason, blocked: cloud.blocked, onSent: () => setSends((count) => count + 1) }, composer);
   const sendDisabledReason = conversationSendDisabledReason({ permissionReady, historyLoading: runsQuery.isLoading, historyFailed: Boolean(runsQuery.error), hasModel: Boolean(choice), thread });
   const turnFooter = useTurnFooter({ footers, threadId, working });

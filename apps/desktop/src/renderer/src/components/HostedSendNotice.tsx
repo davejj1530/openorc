@@ -1,5 +1,6 @@
 import {
   canStopTurn,
+  draftOfNote,
   handoffCard,
   personFirst,
   placeUnreachable,
@@ -57,6 +58,8 @@ export function useHostedComposer(
   thread: ThreadSummary | null,
   settings: { choice: ModelChoice | null; mode: RunMode; permission: PermissionPreset },
   composer: RefObject<ComposerHandle | null>,
+  /** What the composer holds now, so a note already staged in it is not offered again. */
+  draft: string,
 ): {
   hosted: boolean;
   notice: ReactNode;
@@ -98,7 +101,7 @@ export function useHostedComposer(
   Object.assign(limits, together);
   return {
     hosted,
-    notice: hostedNotice({ block: block && !blocked ? block : null, ...reachableBlock(thread, writeBlock), composer }),
+    notice: hostedNotice({ block: block && !blocked ? block : null, ...reachableBlock(thread, writeBlock), composer, draft }),
     blocked: blocked ?? block?.words ?? null,
     limits,
     shown: (error) => (error === block?.words ? undefined : error),
@@ -121,15 +124,20 @@ function hostedNotice({
   writeBlock,
   thread,
   composer,
+  draft,
 }: {
   block: { words: string; action: SendBlockAction | null } | null;
   writeBlock: string | null;
   thread: ThreadSummary | null;
   composer: RefObject<ComposerHandle | null>;
+  draft: string;
 }): ReactNode {
   if (block) return <SendBlockCard words={block.words} action={block.action} />;
   const handoff = handoffCard(thread);
-  if (handoff?.action && thread) return <HandoffCard threadId={thread.id} words={handoff.words} action={handoff.action} composer={composer} />;
+  // A note already staged in the composer is posted from there; the card offers it no second time.
+  const staged = handoff?.action?.kind === "note" && draft.includes(draftOfNote(handoff.action.note));
+  if (handoff?.action && thread && !staged) return <HandoffCard threadId={thread.id} words={handoff.words} action={handoff.action} composer={composer} />;
+  if (handoff && staged) return <SendBlockCard words={handoff.words} action={null} />;
   if (!writeBlock) return null;
   return <SendBlockCard words={handoff?.words ?? writeBlock} action={null} />;
 }

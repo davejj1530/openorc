@@ -9,6 +9,11 @@
 export const PERSON_TAG = /@\[user:([^\]\s]+)\]/g;
 export const personTag = (id: string): string => `@[user:${id}]`;
 
+/** A note given in words, as the server words one to a person with its tag's span, held as a draft: the tag in place. */
+export function draftOfNote({ to, text, mention }: { to: { id: string }; text: string; mention: { start: number; end: number } }): string {
+  return `${text.slice(0, mention.start)}${personTag(to.id)}${text.slice(mention.end)}`;
+}
+
 /** Whether a draft tags someone, so it posts as a note. */
 export function tagsPerson(draft: string): boolean {
   return new RegExp(PERSON_TAG.source).test(draft);

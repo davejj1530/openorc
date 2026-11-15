@@ -1,4 +1,16 @@
-import { composerActivity, composerSendBlock, personTag, sendCluster, sendsNow, tagsPerson, type SendPayer, type SkillCommand, type SkillListNotice, type WaitingAsk } from "@openorc/client";
+import {
+  composerActivity,
+  composerSendBlock,
+  draftOfNote,
+  personTag,
+  sendCluster,
+  sendsNow,
+  tagsPerson,
+  type SendPayer,
+  type SkillCommand,
+  type SkillListNotice,
+  type WaitingAsk,
+} from "@openorc/client";
 import {
   ExecutionMode,
   executionMode,
@@ -270,12 +282,14 @@ export function Composer(props: ComposerProps) {
         editor.current?.write(next, next.length);
         editor.current?.focus();
       },
-      note: ({ to, text, mention }) => {
-        pickPerson(to);
-        const words = `${text.slice(0, mention.start)}${personTag(to.id)}${text.slice(mention.end)}`;
+      note: (note) => {
+        pickPerson(note.to);
+        const words = draftOfNote(note);
         const kept = value.trim();
-        // Asked again while the note is already there, it stays as it is.
-        if (!kept.includes(words)) editor.current?.write(kept ? `${words}\n\n${kept}` : words, words.length);
+        // Asked again while the note is already there, it stays as it is; either way the keyboard is after its words.
+        const held = value.indexOf(words);
+        if (held >= 0) editor.current?.write(value, held + words.length);
+        else editor.current?.write(kept ? `${words}\n\n${kept}` : words, words.length);
         editor.current?.focus();
       },
     }),

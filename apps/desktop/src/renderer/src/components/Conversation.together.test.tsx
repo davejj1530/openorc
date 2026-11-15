@@ -236,6 +236,11 @@ it("offers a teammate with nothing else to press the server's note, which opens 
   expect(screen.getByRole("status", { name: "OpenOrc Cloud" }).textContent).toBe(`${words}Tag Mara`);
   fireEvent.click(screen.getByRole("button", { name: "Tag Mara" }));
   expect(composer.handle.note).toHaveBeenCalledWith(note);
+  cleanup();
+  // While the composer holds that note, it is posted from there: the card says why and offers no second Tag.
+  await open(marasThread(together(THEO, { canWrite: true, send: "blocked", handoff }), { draft: `@[user:${MARA.id}] the thread's work could not be saved. Can you retry the save?` }));
+  expect(screen.getByRole("status", { name: "OpenOrc Cloud" }).textContent).toBe(words);
+  expect(screen.queryByRole("button", { name: "Tag Mara" })).toBeNull();
 });
 
 it("opens a teammate's composer by itself once the server says they may write", async () => {

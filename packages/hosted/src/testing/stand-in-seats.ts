@@ -73,13 +73,9 @@ export class StandInSeats {
     if (frozen) return frozen;
     if (request.method === "DELETE" && request.path === "/settings/organization") return this.#holdsDeletion(request.space, who);
     if (!/^\/organization\/(?:billing(?:\/|$)|seats\/|storage$)/.test(request.path)) return null;
-    if (!this.enabled) return refused(404, "Not found.");
     const spaceId = request.space;
-    if (!spaceId) return refused(400, "Name the space in x-openorc-space.");
-    const resolved = this.deps.spaces.resolve(who, spaceId);
-    if (typeof resolved !== "string") return resolved;
-    if (!this.deps.spaces.teams.has(spaceId)) return refused(409, "Your personal space has no organization seats. Manage your own Pro in Account.");
-    if (this.deps.spaces.member(spaceId, who)?.role !== "admin") return refused(403, "Only an admin can do that.");
+    const denied = this.#denied(spaceId, who);
+    if (denied || !spaceId) return denied;
     const change = this.quantity.route(request.method, request.path, spaceId, who, body) ?? this.assignments.route(request.method, request.path, spaceId, who, body);
     if (change) return change;
     this.holds.sweep();
@@ -87,6 +83,16 @@ export class StandInSeats {
     if (request.method === "POST" && request.path === "/organization/billing/checkout") return this.#checkout(spaceId, body);
     if (request.method === "POST" && request.path === "/organization/billing/portal") return this.#portal(spaceId);
     return refused(404, "Not found.");
+  }
+
+  /** The seats of an organization are its admins' alone; a refusal for anyone and anywhere else. */
+  #denied(spaceId: string | null, who: string): Reply | null {
+    if (!this.enabled) return refused(404, "Not found.");
+    if (!spaceId) return refused(400, "Name the space in x-openorc-space.");
+    const resolved = this.deps.spaces.resolve(who, spaceId);
+    if (typeof resolved !== "string") return resolved;
+    if (!this.deps.spaces.teams.has(spaceId)) return refused(409, "Your personal space has no organization seats. Manage your own Pro in Account.");
+    return this.deps.spaces.member(spaceId, who)?.role === "admin" ? null : refused(403, "Only an admin can do that.");
   }
 
   /** An organization is not deleted from under its seats: the refusal an admin meets while they are paid, ending or being settled. */

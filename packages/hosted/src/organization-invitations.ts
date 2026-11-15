@@ -17,29 +17,31 @@ export class OrganizationInvitations {
     const read = await this.deps.session.in(spaceId).request(ROUTES.sentInvitations);
     this.#assert(generation);
     const now = this.deps.now();
-    return read.invitations.map((invite) => ({
+    return read.invitations.map(({ includesSeat, ...invite }) => ({
       ...invite,
       expiresAt: Date.parse(invite.expiresAt),
       delivery: invite.delivery ? { ...invite.delivery, at: Date.parse(invite.delivery.at) } : null,
       resendAt: now + invite.resendAfterMs,
+      ...(includesSeat !== undefined && { includesSeat }),
     }));
   }
 
-  async send({ spaceId, emails, role }: RpcParams<"organization.invite">): Promise<OrganizationInviteResult[]> {
+  async send({ spaceId, emails, role, seats }: RpcParams<"organization.invite">): Promise<OrganizationInviteResult[]> {
     const generation = this.deps.session.generation;
     const results: OrganizationInviteResult[] = [];
     for (const email of new Set(emails.map((email) => email.trim().toLowerCase()))) {
       this.#assert(generation);
-      results.push(await this.#send(spaceId, email, role, generation));
+      results.push(await this.#send({ spaceId, email, role, seatId: seats?.[email] }, generation));
     }
     await this.#changed(spaceId, generation);
     return results;
   }
 
-  async #send(spaceId: string, email: string, role: "admin" | "member", generation: number): Promise<OrganizationInviteResult> {
+  /** A seat is named only when the admin chose one; the server alone decides whether it can be held. */
+  async #send({ spaceId, email, role, seatId }: { spaceId: string; email: string; role: "admin" | "member"; seatId: string | undefined }, generation: number): Promise<OrganizationInviteResult> {
     if (!InvitationEmail.safeParse(email).success) return { email, state: "refused", error: "Enter a full email address." };
     try {
-      const record = await this.deps.session.in(spaceId).request(ROUTES.invite, { organizationId: spaceId, email, role });
+      const record = await this.deps.session.in(spaceId).request(ROUTES.invite, { organizationId: spaceId, email, role, ...(seatId !== undefined && { seatId }) });
       this.#assert(generation);
       let invitation: OrganizationInvitation | null = null;
       let error: string | null = null;

@@ -12,6 +12,8 @@ export interface OrganizationInvitation {
   url: string;
   delivery: null | { status: "sent" | "logged" | "failed"; reason: string | null; at: number };
   resendAt: number;
+  /** The invitation holds a paid seat, so joining comes with Pro. Absent from a server that knows no seats. */
+  includesSeat?: boolean;
 }
 
 export type OrganizationInviteResult = { email: string } & (
@@ -20,7 +22,10 @@ export type OrganizationInviteResult = { email: string } & (
 
 export const organizationInvitationParams = {
   "organization.invitations": z.object({ spaceId: SpaceId }).strict(),
-  "organization.invite": z.object({ spaceId: SpaceId, emails: z.array(z.string().max(320)).min(1).max(30), role: OrganizationRole }).strict(),
+  /** `seats` names the seat each address is to hold, by its address in lower case; an address not named gets none. */
+  "organization.invite": z
+    .object({ spaceId: SpaceId, emails: z.array(z.string().max(320)).min(1).max(30), role: OrganizationRole, seats: z.record(z.string().max(320), z.string().min(1).max(200)).optional() })
+    .strict(),
   "organization.invitation.resend": z.object({ spaceId: SpaceId, invitationId: SpaceId }).strict(),
   "organization.invitation.revoke": z.object({ spaceId: SpaceId, invitationId: SpaceId }).strict(),
 };

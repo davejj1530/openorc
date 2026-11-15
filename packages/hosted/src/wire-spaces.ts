@@ -64,6 +64,7 @@ export const wireReceivedInvitations = z.object({
       expiresAt: iso,
       organization: identity,
       inviter: z.object({ name: z.string().nullable(), email: z.string().nullable(), image: z.string().nullish() }),
+      includesSeat: z.boolean().optional(),
     }),
   ),
 });
@@ -100,6 +101,7 @@ const sentInvitations = z.object({
       url: z.url(),
       delivery: z.object({ status: z.enum(["sent", "logged", "failed"]), reason: z.string().nullable(), at: iso }).nullable(),
       resendAfterMs: z.number().nonnegative(),
+      includesSeat: z.boolean().optional(),
     }),
   ),
 });

@@ -22,6 +22,13 @@ interface Dependencies {
   tell(who: string, topics: string[], space?: string): void;
   now(): number;
 }
+/** The seat an invitation may hold; null is a server from before seats, which says nothing about them. */
+export interface InvitationSeats {
+  reserve(input: { spaceId: string; seatId: string | undefined; invitationId: string | null }): Reply | ((invitation: { id: string; email: string; expiresAt: number }) => void);
+  includes(invitationId: string): boolean;
+  release(invitationId: string): void;
+  accept(invitationId: string, member: { memberId: string; person: { id: string; name: string; email: string; image: string | null }; paysForPro: boolean }): void;
+}
 interface Request {
   method: string;
   path: string;
@@ -49,6 +56,7 @@ export class StandInInvitations {
   readonly records: Invitation[] = [];
   readonly delivery = new Map<string, Pick<Delivery, "status" | "reason">>();
   readonly ledger: { spaceId: string; who: string; at: number }[] = [];
+  seats: InvitationSeats | null = null;
   constructor(private readonly deps: Dependencies) {}
 
   seed(spaceId: string, email: string, inviter: string, role: OrganizationRole = "member"): string {
@@ -84,6 +92,7 @@ export class StandInInvitations {
                 expiresAt: new Date(invite.expiresAt).toISOString(),
                 organization: { id: invite.spaceId, name: team.name, logo: team.logo },
                 inviter: { ...this.deps.person(invite.inviter), email: invite.inviter },
+                ...this.#includes(invite),
               },
             ]
           : [];
@@ -108,6 +117,7 @@ export class StandInInvitations {
         url: `https://app.example.com/invite/${invite.id}`,
         delivery: invite.delivery ? { ...invite.delivery, at: new Date(invite.delivery.at).toISOString() } : null,
         resendAfterMs: Math.max(0, invite.sentAt + COOLDOWN - now),
+        ...this.#includes(invite),
       }));
     return { status: 200, body: { invitations } };
   }
@@ -130,10 +140,14 @@ export class StandInInvitations {
     if (existing && input.body["resend"] !== true) return refuse(400, "That person already has an invitation. You can send it again from People.", "USER_IS_ALREADY_INVITED_TO_THIS_ORGANIZATION");
     const limited = this.#limit(input.who, spaceId, existing, now);
     if (limited) return limited;
+    const seatId = typeof input.body["seatId"] === "string" ? input.body["seatId"] : undefined;
+    const hold = this.seats?.reserve({ spaceId, seatId, invitationId: existing?.id ?? null });
+    if (hold && typeof hold !== "function") return hold;
     const id = existing?.id ?? this.seed(spaceId, email, input.who, role);
     const invite = this.records.find((invite) => invite.id === id)!;
     invite.expiresAt = now + 7 * DAY;
     invite.sentAt = now;
+    hold?.(invite);
     invite.delivery = { ...(this.delivery.get(email) ?? { status: "sent", reason: null }), at: now };
     this.ledger.push({ spaceId, who: input.who, at: now });
     this.#tell(invite);
@@ -161,6 +175,7 @@ export class StandInInvitations {
     if (denied) return denied;
     if (invite.status !== "pending") return unavailable();
     invite.status = "canceled";
+    this.seats?.release(invite.id);
     this.#tell(invite);
     return { status: 200, body: bare(invite) };
   }
@@ -179,6 +194,7 @@ export class StandInInvitations {
     if (invite.email !== input.who) return refuse(403, "This invitation is for another email address.", "YOU_ARE_NOT_THE_RECIPIENT_OF_THE_INVITATION");
     if (!accepting) {
       invite.status = "rejected";
+      this.seats?.release(invite.id);
       this.#tell(invite);
       return { status: 200, body: { invitation: bare(invite), member: null } };
     }
@@ -187,9 +203,16 @@ export class StandInInvitations {
     const member = { id: randomUUID(), email: input.who, role: invite.role, createdAt: new Date(this.deps.now()).toISOString() };
     team.members.push(member);
     invite.status = "accepted";
+    this.seats?.accept(invite.id, { memberId: member.id, person: { id: userOf(input.who), email: input.who, ...this.deps.person(input.who) }, paysForPro: false });
     for (const email of this.deps.spaces.readers(invite.spaceId)) this.deps.tell(email, ["members", "invitations", "projects", "threads", "spaces"], invite.spaceId);
     this.deps.tell(input.who, ["spaces", "invitations"]);
     return { status: 200, body: { invitation: bare(invite), member: { id: member.id, organizationId: invite.spaceId, userId: userOf(input.who), role: member.role, createdAt: member.createdAt } } };
+  }
+
+  /** `includesSeat` as a server with seats answers it: only for an open, unexpired invitation holding a paid seat. */
+  #includes(invite: Invitation): { includesSeat?: boolean } {
+    if (!this.seats) return {};
+    return { includesSeat: invite.status === "pending" && invite.expiresAt > this.deps.now() && this.seats.includes(invite.id) };
   }
 
   #tell(invite: Invitation): void {

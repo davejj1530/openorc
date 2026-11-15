@@ -28,6 +28,8 @@ export interface ReceivedInvitation {
   expiresAt: number;
   organization: OrganizationIdentity;
   inviter: { name: string | null; email: string | null; image?: string | null };
+  /** The invitation holds a paid seat, so joining comes with Pro. Absent from a server that knows no seats. */
+  includesSeat?: boolean;
 }
 
 export type SpacesStatus =

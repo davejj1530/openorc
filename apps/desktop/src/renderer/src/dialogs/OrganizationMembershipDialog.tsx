@@ -69,15 +69,7 @@ export function OrganizationMembershipDialog({ action, onClose, onDone, onManage
           void submit();
         }}
       >
-        {action.kind === "remove" ? (
-          <div className="organization-person-identity">
-            <AccountFace name={action.person.name} image={action.person.image} />
-            <div>
-              {action.person.name}
-              <p>{action.person.email}</p>
-            </div>
-          </div>
-        ) : null}
+        <RemovedPerson action={action} />
         {!completed.current ? <p className="organization-membership-detail">{words.detail}</p> : null}
         {action.kind === "delete" && !held ? (
           <label className="organization-label">
@@ -107,6 +99,20 @@ export function OrganizationMembershipDialog({ action, onClose, onDone, onManage
         </div>
       </form>
     </Dialog>
+  );
+}
+
+/** Who is being removed, when the dialog removes a person. */
+function RemovedPerson({ action }: { action: MembershipAction }) {
+  if (action.kind !== "remove") return null;
+  return (
+    <div className="organization-person-identity">
+      <AccountFace name={action.person.name} image={action.person.image} />
+      <div>
+        {action.person.name}
+        <p>{action.person.email}</p>
+      </div>
+    </div>
   );
 }
 

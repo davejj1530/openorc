@@ -135,6 +135,31 @@ const installedPhone = (readRoutes: RouteReader) => ({
 
 export const INSTALLED_PHONES = { appStore: installedPhone(appStoreRoutes), testFlight: installedPhone(testFlightRoutes) };
 
+const anyText: Check = (value) => typeof value === "string";
+const list =
+  (item: Check, max: number): Check =>
+  (value) =>
+    Array.isArray(value) && value.length <= max && value.every(item);
+const push: Check = (value) => isRecord(value) && oneOf("frame", "invalidate", "notify", "ready", "preview", "preview.ended")(value["type"]);
+const macMessage = variants("t", {
+  "rpc.result": message({ id: count, result: present }),
+  "rpc.error": message({ id: count, message: anyText }),
+  push: message({ push }),
+  gap: message({ runIds: list(text(100), 4096) }),
+  "asset.bytes": message({ id: count, mime: text(100), size: count }),
+  "asset.error": message({ id: count, message: anyText }),
+  pong: message({ id: count }),
+  closing: message({ reason: oneOf("update", "shutdown", "removed", "disabled") }),
+});
+
+/**
+ * A host's message after the hello, as every released build reads it, from 85bf1c5e to 6170f205: these kinds with
+ * exactly these keys, and a push by its name alone. Throws where a build ends the session over the message.
+ */
+export function installedMacMessage(value: unknown): void {
+  if (!macMessage(value)) throw new Error("not a Mac message");
+}
+
 /** The host's hello as sent, unread: an installed phone's handshake on `socket`, which it then closes. */
 export function rawMacHello(options: { socket: LinkSocket; crypto: LinkCrypto; device: KeyPair; macKey: Uint8Array; pair?: { offerId: string; secret: string } }): Promise<unknown> {
   const { socket } = options;

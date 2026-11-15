@@ -7,6 +7,8 @@ const ADMIN = "alex@example.com",
   MEMBER = "mira@example.com";
 const active = { state: "active", reason: null, until: null, message: null } as const;
 const frozen = { state: "frozen", reason: "seat_removed", until: null, message: "Your seat was taken back, and your day of grace has ended." } as const;
+const grace = (until: number) =>
+  ({ state: "grace", reason: "seat_removed", until: new Date(until).toISOString(), message: "Your seat was taken back; you have one day to get Pro to keep using organizations." }) as const;
 const paid = (until = Date.now() + 86_400_000) => ({ pro: true, standing: "live" as const, at: new Date(until).toISOString(), monthlyLeftSeconds: 3600, packsLeftSeconds: 0 });
 let stand: StandIn;
 let thread: string;
@@ -44,5 +46,18 @@ it("keeps a frozen person's unsent words in an organization's thread for when ac
   stand.setBilling(MEMBER, { ...paid(), organizationAccess: active });
   await hosted.spaces.refresh();
   await vi.waitFor(() => expect(hosted.threads.holds({ thread })).toBe(true), { timeout: 5000 });
+  expect(await hosted.threads.call("threads.get", { id: thread })).toMatchObject({ draft: "Keep the filters as they are." });
+});
+
+it("closes an organization's threads at the grace deadline with nothing heard from the server, keeping their drafts", { timeout: 30_000 }, async () => {
+  const until = Date.now() + 2_500;
+  stand.setBilling(MEMBER, { ...paid(until), standing: "grace", organizationAccess: grace(until) });
+  const hosted = await member();
+  await stand.down();
+  await vi.waitFor(() => expect(hosted.threads.holds({ thread })).toBe(false), { timeout: 8000 });
+  stand.setBilling(MEMBER, { ...paid(), organizationAccess: active });
+  await stand.up();
+  await hosted.spaces.refresh();
+  await vi.waitFor(() => expect(hosted.threads.holds({ thread })).toBe(true), { timeout: 10000 });
   expect(await hosted.threads.call("threads.get", { id: thread })).toMatchObject({ draft: "Keep the filters as they are." });
 });

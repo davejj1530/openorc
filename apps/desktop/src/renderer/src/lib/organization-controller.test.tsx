@@ -118,3 +118,25 @@ it("closes an admin's dialog when they are made a member", async () => {
   });
   await waitFor(() => expect(hook.result.current.actions.dialog).toBeNull());
 });
+
+it("asks the organization nothing more once the person signs out", async () => {
+  await inBirch();
+  const before = asked("birch", "spaces.projects") + asked("birch", "threads.list") + asked("birch", "tasks.list");
+  mock.call.mockImplementation(async (method, params) => {
+    if (method === "spaces.status" || method === "spaces.refresh") return { state: "signed-out" };
+    if (method === "account.status") return { state: "signed-out", signingIn: null, ended: false, error: null };
+    if (method === "system.info") return { dataDir: "/profile" };
+    if (params.spaceId === "birch") throw new Error("You're not in this organization.");
+    return [];
+  });
+  // The core says the account and its spaces changed, as it does at sign out.
+  await act(async () => {
+    await organizationContentGate.refresh();
+    await queryClient.invalidateQueries();
+  });
+  await waitFor(() => expect(spaceNavigation.getState().key).toBeNull());
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  });
+  expect(asked("birch", "spaces.projects") + asked("birch", "threads.list") + asked("birch", "tasks.list")).toBe(before);
+});

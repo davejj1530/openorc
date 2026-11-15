@@ -48,6 +48,8 @@ export function protectOrganizationContent({ gate, queries, runs, navigation, ov
       storage,
       affected.filter((space) => departed.has(space.id)),
     );
+    // The spaces as last read are the departed account's: they are read again, never reconciled as they stand.
+    if (change.reason === "account") void queries.resetQueries({ queryKey: ["spaces.status"] });
     const standing = navigation.getState().current;
     navigation.getState().close(closed);
     if (standing && closed.includes(standing)) overlays.close();

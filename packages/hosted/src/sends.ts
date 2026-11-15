@@ -64,7 +64,16 @@ const turnSettings = (row: WireThread, asked: TurnSettings | undefined) => ({ ag
 async function post(
   calls: Calls,
   threadId: string,
-  message: { id?: string | undefined; text: string; attachments?: readonly string[] | undefined; settings?: TurnSettings; after?: boolean; task?: OnlineTaskSendContext | undefined },
+  message: {
+    id?: string | undefined;
+    text: string;
+    attachments?: readonly string[] | undefined;
+    settings?: TurnSettings;
+    after?: boolean;
+    task?: OnlineTaskSendContext | undefined;
+    /** The turn the sender saw running, when they are not at this Mac: a phone's screen can be older than the row. */
+    expectedTurnId?: string | undefined;
+  },
 ): Promise<void> {
   const row = calls.row(threadId);
   const fileIds = await messageFileIds(calls.on(threadId), message.attachments);
@@ -73,7 +82,7 @@ async function post(
   await calls.bring(threadId, turnSettings(row, message.settings).agent);
   const id = wireMessageId(message.id) ?? crypto.randomUUID();
   // Send now joins the turn the window saw live; a server that finds another, or none, keeps it as the author's queue.
-  const live = message.after ? null : (row.collaboration?.live?.id ?? null);
+  const live = message.after ? null : (message.expectedTurnId ?? row.collaboration?.live?.id ?? null);
   const body = {
     id,
     ...(live && { expectedTurnId: live }),
@@ -109,7 +118,7 @@ export async function start(calls: Calls, params: RpcParams<"runs.start">): Prom
 
 /** runs.send: into the running turn, or the next turn of a resting agent. The server tells which. */
 export function send(calls: Calls, params: RpcParams<"runs.send">): Promise<void> {
-  return post(calls, threadOf(params.runId), { id: params.messageId, text: params.text, attachments: params.attachments, task: params.task });
+  return post(calls, threadOf(params.runId), { id: params.messageId, text: params.text, attachments: params.attachments, task: params.task, expectedTurnId: params.expectedTurnId });
 }
 
 /** threads.queue: for after the running turn. Answers the queue as it now stands. */
@@ -138,10 +147,10 @@ export async function sendQueued(calls: Calls, { id, messageId }: RpcParams<"thr
  * the turn the window saw, so a late Stop never stops the next person's turn; the server cancels the stopper's own
  * waiting messages and pauses everyone else's.
  */
-export async function stop(calls: Calls, { runId }: RpcParams<"runs.interrupt">): Promise<void> {
+export async function stop(calls: Calls, { runId, expectedTurnId }: RpcParams<"runs.interrupt">): Promise<void> {
   const threadId = threadOf(runId);
   const together = calls.row(threadId).collaboration;
-  const turnId = together?.canWrite ? together.live?.id : undefined;
+  const turnId = expectedTurnId ?? (together?.canWrite ? together.live?.id : undefined);
   await calls.on(threadId).request(ROUTES.stop(threadId), turnId ? { turnId } : undefined);
   await calls.refresh();
 }
@@ -154,8 +163,9 @@ export async function answer(calls: Calls, params: RpcParams<"approvals.resolve"
   const threadId = threadOf(params.runId);
   const row = calls.row(threadId);
   const asked = row.collaboration?.ask?.id === params.approvalId ? row.collaboration.ask : null;
-  // The answer names the phase the window saw, so it never continues on someone else's hours by surprise.
-  const bound = asked ? { expectedState: asked.state, expectedTurnId: asked.turnId } : {};
+  // The answer names the phase the window saw (a phone names its own), so it never continues on someone else's hours by surprise.
+  const seen = params.expectedState && params.expectedTurnId ? { state: params.expectedState, turnId: params.expectedTurnId } : asked;
+  const bound = seen ? { expectedState: seen.state, expectedTurnId: seen.turnId } : {};
   // Words instead of a parked ask of someone else's turn go with the answer, as one continuation of the answerer's own.
   const note = params.note && params.decision === "deny" ? params.note : null;
   const together = Boolean(asked && asked.state === "parked" && asked.sender?.id !== row.collaboration?.viewer?.id);

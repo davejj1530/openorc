@@ -139,6 +139,24 @@ describe("sending, queueing and Stop in a shared thread", () => {
     await live(bob, thread, "Bob");
   });
 
+  it("binds a phone's Stop and Send now to the turn its screen showed, though this Mac's row has moved on", async () => {
+    const { thread, ada, bob, runId } = await shared(true);
+    await ada.threads.call("runs.send", { runId, text: "Start", messageId: id(1) });
+    await live(bob, thread, "Ada");
+    const seen = (await row(bob, thread)).owner!.collaboration!.live!.id;
+    stand.endTurn(thread);
+    await ada.threads.call("runs.send", { runId, text: "Again", messageId: id(8) });
+    await vi.waitFor(async () => {
+      await (bob.threads as unknown as { refresh(): Promise<void> }).refresh();
+      expect((await row(bob, thread)).owner?.collaboration?.live?.id).not.toBe(seen);
+    });
+    await expect(bob.threads.call("runs.interrupt", { runId, expectedTurnId: seen })).rejects.toThrow("That turn ended. Check the thread before stopping again.");
+    await bob.threads.call("runs.send", { runId, text: "Late from the phone", messageId: id(9), expectedTurnId: seen }).catch(() => undefined);
+    await live(bob, thread, "Ada");
+    const late = stand.sent.find((each) => each.threadId === thread && (each.body as { text?: string }).text === "Late from the phone");
+    expect((late?.body as { expectedTurnId?: string } | undefined)?.expectedTurnId).toBe(seen);
+  });
+
   it("refuses a Stop aimed at a turn that has changed, in the server's words", async () => {
     // Bob's list stops moving, so his window still shows the first turn when Ada's next one runs.
     let frozen: string | null = null;
@@ -279,6 +297,22 @@ describe("answering another sender's ask, bound to the phase the reader saw", ()
     // The words went with the answer, never as a message of their own.
     expect(stand.sent.map((sent) => sent.body["text"])).not.toContain("Run only the export tests");
     await live(bob, thread, "Bob");
+  });
+
+  it("answers with the phase a phone saw, though this Mac's row has moved on", async () => {
+    const { thread, bob, runId, ask } = await asked();
+    const seen = await vi.waitFor(async () => {
+      await (bob.threads as unknown as { refresh(): Promise<void> }).refresh();
+      const read = (await row(bob, thread)).owner?.collaboration?.ask;
+      expect(read?.state).toBe("waiting");
+      return read!;
+    });
+    stand.endTurn(thread);
+    await parked(bob, thread);
+    await expect(bob.threads.call("approvals.resolve", { runId, approvalId: ask, decision: "allow", expectedState: "waiting", expectedTurnId: seen.turnId })).rejects.toThrow(
+      "This request changed. Check it again before answering.",
+    );
+    expect(answerOf(ask).at(-1)).toMatchObject({ expectedState: "waiting", expectedTurnId: seen.turnId });
   });
 
   it("refuses an answer whose ask changed since the reader saw it, in the server's words", async () => {

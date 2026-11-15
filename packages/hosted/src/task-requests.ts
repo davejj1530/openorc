@@ -22,12 +22,20 @@ export function taskRequest<T>(route: Route<T>): Route<T> {
   };
 }
 
+export type TaskRefusal = Extract<OnlineTaskCreation, { state: "refused" }>;
+/** The server's definitive refusal of a task write, in its words; anything else is not one. */
+export function taskRefusal(error: unknown): TaskRefusal | null {
+  if (error instanceof Refused && error.status !== undefined && error.status >= 400 && error.status < 500) return { state: "refused", code: error.code ?? "TASK_REFUSED", message: error.message };
+  return null;
+}
+
 /** A definitive refusal lets the author correct a new task; an unknown reply keeps its receipt. */
 export async function taskCreation(write: Promise<OnlineTaskEnvelope>): Promise<OnlineTaskCreation> {
   try {
     return { state: "saved", ...(await write) };
   } catch (error) {
-    if (error instanceof Refused && error.status !== undefined && error.status >= 400 && error.status < 500) return { state: "refused", code: error.code ?? "TASK_REFUSED", message: error.message };
+    const refusal = taskRefusal(error);
+    if (refusal) return refusal;
     throw error;
   }
 }

@@ -1,7 +1,7 @@
 import type { OnlineTaskAvailability, OnlineTaskEnvelope, OnlineTaskExecutionParams, OnlineTaskMutation, OnlineTaskParams, OnlineTaskRpcResults } from "@openorc/protocol";
 import type { HostedDeps, HostedSpaces } from "./index.js";
 import { Refused, type Session } from "./session.js";
-import { TaskChanged, taskCreation, taskRequest } from "./task-requests.js";
+import { TaskChanged, taskCreation, taskRefusal, taskRequest, type TaskRefusal } from "./task-requests.js";
 import { taskThreadRoute } from "./task-thread-wire.js";
 import { prepareTaskThread } from "./task-threads.js";
 import { TASK_ROUTES } from "./wire-tasks.js";
@@ -66,6 +66,11 @@ export class OnlineTasks {
     if (!space || !(space.kind === "organization" ? this.#delivery.organization : this.#delivery.personal)) return { state: "unavailable" };
     return { state: "ready", accountId: spaces.userId, spaceId, execution: this.#delivery.execution, personal: space.kind === "personal" };
   }
+  /** Core captures this before resolving a local run's project association. It exposes no session secret. */
+  capture(spaceId: string): { accountId: string; assert(): void } {
+    const identity = this.#identity(spaceId);
+    return { accountId: identity.userId, assert: () => this.#assert(spaceId, identity) };
+  }
   list({ spaceId, ...input }: OnlineTaskParams<"tasks.online.list">) {
     return this.#request(spaceId, TASK_ROUTES.list(input));
   }
@@ -96,6 +101,16 @@ export class OnlineTasks {
 
   creation(input: OnlineTaskParams<"tasks.online.create">) {
     return taskCreation(this.create(input));
+  }
+  /** A change as an agent's tool makes it: saved, a conflict to read again, or refused in words. An unknown reply throws and keeps its request. */
+  async editing(input: OnlineTaskParams<"tasks.online.update">): Promise<OnlineTaskMutation | TaskRefusal> {
+    try {
+      return await this.update(input);
+    } catch (error) {
+      const refusal = taskRefusal(error);
+      if (refusal) return refusal;
+      throw error;
+    }
   }
   async create({ spaceId, ...input }: OnlineTaskParams<"tasks.online.create">): Promise<OnlineTaskEnvelope> {
     const result = await this.#request(spaceId, TASK_ROUTES.create, input);
@@ -164,6 +179,10 @@ export class OnlineTasks {
     }
   }
   #invalidate(spaceId?: string): void {
-    if (!this.#closed) this.deps.push({ type: "invalidate", keys: spaceId ? [`online-tasks:${spaceId}`] : ["online-tasks"] });
+    if (this.#closed) return;
+    const status = this.deps.spaces.status();
+    const space = status.state === "ready" ? status.spaces.find((row) => row.id === spaceId) : undefined;
+    if (space && !(space.kind === "organization" ? this.#delivery.organization : this.#delivery.personal)) return;
+    this.deps.push({ type: "invalidate", keys: spaceId ? [`online-tasks:${spaceId}`] : ["online-tasks"] });
   }
 }

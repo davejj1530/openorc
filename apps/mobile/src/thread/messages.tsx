@@ -11,6 +11,7 @@ import { messagePieces } from "./markdown-chunks";
 import { Markdown } from "./Markdown";
 import { replySegments } from "./reply-images";
 import type { MessageBlock, PieceSource } from "./rows";
+import { useOtherAuthor } from "./thread-authors";
 
 /** The name the person gave an attachment, after the id that keeps it unique. */
 function attachmentName(path: string): string {
@@ -18,11 +19,16 @@ function attachmentName(path: string): string {
   return /^[a-f0-9-]{36}-/.test(stored) ? stored.slice(37) : stored;
 }
 
-/** What the person wrote: an r18 plane bubble on the right, at most 88% wide, its images above it. */
+/**
+ * What a person wrote: an r18 plane bubble on the right, at most 88% wide, its images above it. In a cloud thread a
+ * teammate's words carry their first name over the bubble; the reader's own carry none.
+ */
 export const Prompt = memo(function Prompt({ block }: { block: MessageBlock }) {
   const attachments = block.attachments ?? [];
+  const author = useOtherAuthor(block.id);
   return (
     <View className="items-end gap-2 self-end" style={{ maxWidth: "88%" }}>
+      {author ? <Text className="-mb-1 pr-1 text-xs text-ink-4">{author}</Text> : null}
       {attachments.length ? (
         <View className="flex-row flex-wrap justify-end gap-2">
           {attachments.map((path) =>

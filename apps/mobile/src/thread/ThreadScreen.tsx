@@ -21,6 +21,7 @@ import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
 import { createDisclosure, DisclosureContext } from "./disclosure";
 import { useMarkSeen } from "./mark-seen";
+import { AuthorsContext, useThreadAuthors } from "./thread-authors";
 import { holdTranscriptList, perfEnabled, reportThreadOpened } from "./perf-probe";
 import { PerfProbe } from "./PerfProbe";
 import { useSnoozeClock } from "./snooze-clock";
@@ -167,6 +168,7 @@ export function ThreadScreen() {
   const actions = useThreadActions(thread, { onUnread: goBack });
   const now = useSnoozeClock();
   const menu = useThreadHeaderMenu(own, now, actions.run);
+  const authors = useThreadAuthors(thread);
   const linkState = useLinkState();
   const chat = chatFor(useOrclingChats().chats, id);
   useThreadOnScreen(linkState.kind === "unpaired" ? null : linkState.mac.id, id);
@@ -199,25 +201,27 @@ export function ThreadScreen() {
     <View className="flex-1 bg-bg">
       <ConversationHeader chat={chat} title={() => <ThreadTitle thread={thread} onRename={actions.rename} />} menu={menu} />
       <DisclosureContext.Provider value={disclosure}>
-        <VoicesContext.Provider value={voices}>
-          {thread ? (
-            <ConversationPane
-              chat={chat}
-              threadId={id}
-              thread={thread}
-              runs={runs}
-              loading={runsQuery.isLoading}
-              failed={Boolean(runsQuery.error)}
-              retry={() => void runsQuery.refetch()}
-              onActivity={setActivity}
-              composerInset={contentInsetEndAdjustment}
-              listRef={listRef}
-              followKey={sends}
-            />
-          ) : (
-            <View className="flex-1 items-center justify-center">{threadQuery.isLoading ? <Spinner /> : <Text className="text-ink-4">Thread not found</Text>}</View>
-          )}
-        </VoicesContext.Provider>
+        <AuthorsContext.Provider value={authors}>
+          <VoicesContext.Provider value={voices}>
+            {thread ? (
+              <ConversationPane
+                chat={chat}
+                threadId={id}
+                thread={thread}
+                runs={runs}
+                loading={runsQuery.isLoading}
+                failed={Boolean(runsQuery.error)}
+                retry={() => void runsQuery.refetch()}
+                onActivity={setActivity}
+                composerInset={contentInsetEndAdjustment}
+                listRef={listRef}
+                followKey={sends}
+              />
+            ) : (
+              <View className="flex-1 items-center justify-center">{threadQuery.isLoading ? <Spinner /> : <Text className="text-ink-4">Thread not found</Text>}</View>
+            )}
+          </VoicesContext.Provider>
+        </AuthorsContext.Provider>
       </DisclosureContext.Provider>
       {perfEnabled() ? <PerfProbe /> : null}
       {thread && !cloud ? (

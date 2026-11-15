@@ -157,7 +157,10 @@ function PairedHome({ state }: { state: Paired }) {
   const orclings = useOrclingChats();
   const faces = useOrclingFaces();
   const tasks = useTaskBoard().available;
-  const tabs = homeTabs({ orclings: orclings.supported, tasks });
+  const account = useSpaces();
+  // Orclings and the Mac's tasks are the person's own, so they stay with Personal; an organization shows its threads.
+  const own = account.state !== "ready" || account.current.kind === "personal";
+  const tabs = homeTabs({ orclings: own && orclings.supported, tasks: own && tasks });
   const [chosen, setTab] = useState<HomeTab>("threads");
   // A Mac too old for Orclings and task lists keeps Home as it was: threads alone, under the New thread pill.
   const tab = tabs.includes(chosen) ? chosen : "threads";
@@ -185,7 +188,7 @@ function PairedHome({ state }: { state: Paired }) {
         render={(each) => {
           if (each === "orclings") return <OrclingList chats={byRecent(orclings.chats)} top={HOME_BAR_HEIGHT} bottom={PILL_ROOM} shown={tab === "orclings"} />;
           if (each === "tasks") return <TaskList top={HOME_BAR_HEIGHT} bottom={PILL_ROOM} />;
-          return <Threads state={state} {...scroll} header={faces ? <OrclingFaces chats={orclings.chats} /> : null} />;
+          return <Threads state={state} {...scroll} header={faces && own ? <OrclingFaces chats={orclings.chats} /> : null} />;
         }}
       />
     </View>

@@ -1,4 +1,4 @@
-import type { AgentKind, FileScope, Frame, Run } from "@openorc/protocol";
+import type { AgentKind, AgentSkill, FileScope, Frame, Run } from "@openorc/protocol";
 import type { ClientPush, CoreConnection, Notice } from "./connection.js";
 import { useConversationSettingsWith, type SavedThreadSettings } from "./conversation-settings.js";
 import { useSubmitWith } from "./conversation-submit.js";
@@ -53,7 +53,8 @@ export function createClientState(connection: CoreConnection, options: ClientSta
     useSubmit: () => useSubmitWith(queries.useRpcMutation, options.randomId),
     useConversationTranscript: (input: { runs: Run[]; threadId: string | null; target?: ConversationTarget | undefined; hosted?: boolean }) => useConversationTranscriptWith(queries, store, input),
     useConversationSettings: (input: { thread: SavedThreadSettings | null; activeRun: Run | undefined }) => useConversationSettingsWith(queries, permissions, input),
-    useSkillCommands: (scope: FileScope | null, agent: AgentKind | null | undefined, claudeAccountId?: string) => useSkillCommandsWith(queries, scope, agent, claudeAccountId),
+    useSkillCommands: (scope: FileScope | null, agent: AgentKind | null | undefined, claudeAccountId?: string, only?: AgentSkill["source"]) =>
+      useSkillCommandsWith(queries, scope, agent, claudeAccountId, only),
     onNotify(listener: (notice: Notice) => void): () => void {
       notices.add(listener);
       return () => notices.delete(listener);

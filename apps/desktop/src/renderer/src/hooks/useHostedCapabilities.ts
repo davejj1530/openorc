@@ -20,3 +20,10 @@ export function useHostedChangesReason(threadId: string, enabled = true): string
   const feature = query.data.features.changes;
   return feature?.available ? null : (feature?.reason ?? HOSTED_REASONS.changes);
 }
+
+/** Whether a cloud thread's turns get the person's own skills from this Mac: only once its server says they do. */
+export function useHostedSkills(thread: ThreadSummary | null | undefined): boolean {
+  const hosted = thread?.owner?.brain === "hosted";
+  const query = useRpc("hosted.capabilities", { threadId: thread?.id ?? "" }, { enabled: hosted, staleTime: 60_000 });
+  return hosted && query.data?.features.skills?.available === true;
+}

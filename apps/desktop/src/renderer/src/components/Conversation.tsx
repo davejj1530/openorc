@@ -47,7 +47,8 @@ import {
 } from "../lib/conversation-status-presentation";
 import { openThread, useRouter, type MessageTarget } from "../lib/router";
 import { useConnectorMentions } from "../lib/connector-mentions";
-import { useSkillCommands } from "../lib/skill-commands";
+import { OWN_SKILLS_SCOPE, useSkillCommands } from "../lib/skill-commands";
+import { useHostedSkills } from "../hooks/useHostedCapabilities";
 import { ConversationVoice, useRunVoices } from "../lib/turn-authors";
 import { ThreadVoicesContext, useThreadVoices } from "../lib/thread-authors";
 import { ThreadNotesContext, useComposerNotes, useMentionReveal, useThreadNotes, type ThreadNotesValue } from "./ThreadNotes";
@@ -275,7 +276,10 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
   const continueWith = (claudeAccountId: string) => submitter.submit({ ...request, now: false, claudeAccountId }, { text: CONTINUE_PROMPT, attachments: [] }).then(clearDraft);
 
   const suggestScope = cloud.hosted ? null : conversation;
-  const skills = useSkillCommands(suggestScope, choice?.agent);
+  // A cloud thread's turns get the person's own skills from this Mac where its server serves them, and no project's from here.
+  const ownSkillsScope = useHostedSkills(thread) ? OWN_SKILLS_SCOPE : null;
+  const skillsAsked: Parameters<typeof useSkillCommands> = cloud.hosted ? [ownSkillsScope, choice?.agent, undefined, "user"] : [conversation, choice?.agent];
+  const skills = useSkillCommands(...skillsAsked);
   const connectorMentions = useConnectorMentions(suggestScope, choice?.agent, executionMode(mode, permission));
   const onFork = thread && !forkUnavailable(thread.agent) && !placeOf(thread).elsewhere ? forkConversation : undefined;
   const commands: SlashCommand[] = [...threadCommands({ thread, working, compact: cloud.hosted ? undefined : compact.mutate, fork: onFork }), ...skills.commands];

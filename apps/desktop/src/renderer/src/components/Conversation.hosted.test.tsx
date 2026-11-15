@@ -192,6 +192,31 @@ it("offers none of this Mac's skills or connectors in a cloud thread, which runs
   expect(composer.props!.connectors).toEqual([]);
 });
 
+it("offers the person's own skills in a cloud thread once the server gives its turns them, and never this Mac's project's or connectors", async () => {
+  const own = { name: "review-pr", description: "Review a pull request", source: "user", enabled: true };
+  const off = { name: "ship-it", description: "Ship", source: "user", enabled: false };
+  const projects = { name: "deploy", description: "Deploy this project", source: "project", enabled: true };
+  const asked: unknown[] = [];
+  vi.mocked(core.call).mockImplementation((async (method: string, params: unknown) => {
+    if (method === "skills.list") asked.push(params);
+    return method === "skills.list" ? [own, off, projects] : { events: [], fromTurn: 0, live: false };
+  }) as never);
+  queries.set("hosted.capabilities", { version: 1, features: { skills: { available: false, reason: "Your skills aren't available in cloud threads yet." } } });
+  await open();
+  expect(composer.props!.commands?.map((command) => command.name)).not.toContain("review-pr");
+  expect(asked).toEqual([]);
+  cleanup();
+  queries.set("hosted.capabilities", { version: 1, features: { skills: { available: true } } });
+  await open();
+  await waitFor(() => expect(composer.props!.commands?.map((command) => command.name)).toContain("review-pr"));
+  const names = composer.props!.commands?.map((command) => command.name);
+  expect(names).not.toContain("deploy");
+  expect(names).not.toContain("ship-it");
+  // They are read where no project's skills are: the Workspace, never the cloud thread's project on this Mac.
+  expect(asked).toEqual([{ scope: { kind: "project", id: "openorc-workspace" }, agent: "claude" }]);
+  expect(composer.props!.connectors).toEqual([]);
+});
+
 it("says a refused send once, on the card above the composer", async () => {
   const noHours = { ...pro, hours: { leftSeconds: 0, monthly: { grantedSeconds: 3600, leftSeconds: 0, resetsAt: 0 }, packsLeftSeconds: 0 } };
   await open();

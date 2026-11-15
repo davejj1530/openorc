@@ -57,14 +57,21 @@ function listNotice(prefix: SkillPrefix, reading: boolean, error: Error | null):
 }
 
 /**
- * The selected agent's skills where a conversation works, for any composer on any client. OpenCode loads skills
+ * The selected agent's skills where a conversation works, for any composer on any client, or with `only` the ones of
+ * that source alone, as a conversation that runs elsewhere takes the person's own. OpenCode loads skills
  * through its own tool, so it is offered none.
  *
  * Reading the list starts the agent's CLI, so it is read when a composer opens and again when the composer asks, as a
  * `/` or `$` word starts: a skill installed while a conversation is open shows up the next time the picker opens, not
  * on a timer.
  */
-export function useSkillCommandsWith(queries: ClientQueries, scope: FileScope | null, selectedAgent: AgentKind | null | undefined, claudeAccountId: string | undefined): SkillCommands {
+export function useSkillCommandsWith(
+  queries: ClientQueries,
+  scope: FileScope | null,
+  selectedAgent: AgentKind | null | undefined,
+  claudeAccountId: string | undefined,
+  only?: AgentSkill["source"],
+): SkillCommands {
   const agent = selectedAgent === "acp" ? "opencode" : selectedAgent;
   const enabled = Boolean(scope && agent && agent !== "opencode");
   const skills = queries.useRpc(
@@ -84,7 +91,7 @@ export function useSkillCommandsWith(queries: ClientQueries, scope: FileScope | 
       agent === "opencode"
         ? []
         : (found ?? [])
-            .filter((skill) => skill.enabled !== false)
+            .filter((skill) => skill.enabled !== false && (!only || skill.source === only))
             .sort((a, b) => SOURCE_ORDER[a.source] - SOURCE_ORDER[b.source])
             .map((skill) => ({
               // Pi and Oh My Pi call a skill by its command, `/skill:<name>`.
@@ -96,7 +103,7 @@ export function useSkillCommandsWith(queries: ClientQueries, scope: FileScope | 
               ...(skill.displayName ? { displayName: skill.displayName } : {}),
               ...(skill.icon ? { icon: skill.icon } : {}),
             })),
-    [agent, found, prefix],
+    [agent, found, prefix, only],
   );
   // A list read before keeps being offered while it is read again, and when that fails.
   const commandsNotice = enabled && !found ? listNotice(prefix, isFetching, skills.error) : null;

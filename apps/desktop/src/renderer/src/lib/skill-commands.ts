@@ -1,5 +1,5 @@
 import { useClaudeAccountId } from "./claude-account";
-import { WORKSPACE_ID, type AgentKind, type FileScope } from "@openorc/protocol";
+import { WORKSPACE_ID, type AgentKind, type AgentSkill, type FileScope } from "@openorc/protocol";
 import type { SkillCommands } from "@openorc/client";
 import { client } from "./client";
 
@@ -9,11 +9,14 @@ export function projectScope(projectId: string | null | undefined, folder?: stri
   return projectId === WORKSPACE_ID && folder ? { kind: "project", id: projectId, workingDirectory: folder } : { kind: "project", id: projectId };
 }
 
+/** Where the person's own skills are read for a conversation that runs elsewhere: the Workspace, which holds no project's. */
+export const OWN_SKILLS_SCOPE: FileScope = { kind: "project", id: WORKSPACE_ID };
+
 /**
  * The selected agent's skills where a conversation works (`useSkillCommandsWith` in @openorc/client), with the Claude
- * account this window works with when the composer chose none.
+ * account this window works with when the composer chose none. With `only`, the skills of that source alone.
  */
-export function useSkillCommands(scope: FileScope | null, selectedAgent: AgentKind | null | undefined, selectedAccountId?: string): SkillCommands {
+export function useSkillCommands(scope: FileScope | null, selectedAgent: AgentKind | null | undefined, selectedAccountId?: string, only?: AgentSkill["source"]): SkillCommands {
   const scopedAccountId = useClaudeAccountId();
-  return client.useSkillCommands(scope, selectedAgent, selectedAccountId ?? scopedAccountId);
+  return client.useSkillCommands(scope, selectedAgent, selectedAccountId ?? scopedAccountId, only);
 }

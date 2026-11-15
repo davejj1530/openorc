@@ -34,6 +34,7 @@ import { attachedPath, StandInThreadFiles } from "./stand-in-thread-files.js";
 import { StandInCollaboration } from "./stand-in-collaboration.js";
 import { StandInNotes } from "./stand-in-notes.js";
 import { headOf, lastAgentSeq, messageOf, pageOf, turnEnds, wire } from "./stand-in-thread-log.js";
+import { placeOwn, placeShared } from "./stand-in-thread-placement.js";
 import type { UploadedFile } from "../wire-files.js";
 
 export interface StandInPeer {
@@ -147,6 +148,10 @@ function heldWith(paused: boolean, body: Record<string, unknown>): Pick<Message,
   const missed = paused && typeof body["expectedTurnId"] === "string";
   return { pause: missed ? { kind: "join", message: "The turn this was sent to has ended." } : null, task: (body["task"] as Message["task"]) ?? null };
 }
+
+/** The settings a message was sent with, kept on it for the turn it starts. */
+const sentSettings = (body: Record<string, unknown>): Pick<Message, "settings"> =>
+  typeof body["settings"] === "object" && body["settings"] !== null ? { settings: body["settings"] as Message["settings"] } : {};
 
 export class StandInThreads {
   readonly #threads = new Map<string, Thread>();
@@ -371,7 +376,9 @@ export class StandInThreads {
     const after = body["delivery"] === "after";
     const known = thread.messages.find((message) => message.id === id);
     if (known) return this.#again(thread, known, who, settings, after);
-    const place = this.collaboration.sharedWrites ? this.#placeShared(thread, who, body, settings, after) : this.#placeOwn(thread, who, settings, after);
+    const place = this.collaboration.sharedWrites
+      ? placeShared({ admit: this.admit, joinsOnly: (at, person) => this.#joinsOnly(at, person) }, thread, who, body, settings, after)
+      : placeOwn(this.admit, thread, who, settings, after);
     if (place.refusal) return { status: 200, body: { sent: false, refusal: place.refusal } };
     const files = this.files.claim({ who, space: thread.space, projectId: thread.projectId ?? "", messageId: id, ids: body["fileIds"], thread: thread.messages });
     if (!Array.isArray(files)) return files;
@@ -385,13 +392,13 @@ export class StandInThreads {
       createdAt: new Date().toISOString(),
       files,
       paused: place.paused,
-      ...(typeof body["settings"] === "object" && body["settings"] !== null ? { settings: body["settings"] as Message["settings"] } : {}),
+      ...sentSettings(body),
       ...heldWith(place.paused, body),
-      ...("stoppedBy" in place && typeof place.stoppedBy === "string" ? { pause: this.#stopPause(place.stoppedBy) } : {}),
+      ...(place.stoppedBy ? { pause: this.#stopPause(place.stoppedBy) } : {}),
     };
     thread.messages.push(message);
     if (!thread.title.trim() && thread.messages.length === 1) thread.title = titleFromPrompt(message.text);
-    if ("settle" in place) this.#settle(thread, message, settings);
+    if (place.settle) this.#settle(thread, message, settings);
     else if (!message.after) this.#take(thread, message);
     else this.#changed(thread);
     return { status: 200, body: { sent: true, message: messageOf(message) } };
@@ -432,34 +439,6 @@ export class StandInThreads {
     const after = body["delivery"] === "after";
     const newTurn = after || (!thread.turn && typeof body["expectedTurnId"] !== "string");
     return newTurn ? this.collaboration.handoffRefusal(thread, who) : null;
-  }
-
-  /** Where a message goes under the starter-only rule: into the running turn, after it, or a new turn if admitted. */
-  #placeOwn(thread: Thread, who: string, settings: { agent: string; model: string | null }, after: boolean) {
-    const refusal = thread.turn ? null : this.admit(who, settings);
-    return { refusal: after && thread.turn ? null : refusal, queue: Boolean(thread.turn) && after, paused: false };
-  }
-
-  /**
-   * Where a message goes once shared writing is open: Send now joins the turn it names, on that turn's sender, asking
-   * nothing of its author; one naming a turn that is gone or another waits as its author's own; Queue and a new turn
-   * need the author's own admission; a turn stopping takes nothing, so the message waits paused.
-   */
-  #placeShared(thread: Thread, who: string, body: Record<string, unknown>, settings: { agent: string; model: string | null }, after: boolean) {
-    const expected = typeof body["expectedTurnId"] === "string" ? body["expectedTurnId"] : null;
-    // While a turn stops: what anyone but the stopper sends waits paused for its author, a join too; the stopper's own
-    // runs once the turn has ended. A stop nobody asked for pauses nothing but a join.
-    if (thread.stopping) {
-      const other = thread.stoppedBy !== null && thread.stoppedBy !== who ? thread.stoppedBy : null;
-      return { refusal: null, queue: true, paused: Boolean(other) || (Boolean(expected) && !after), stoppedBy: other };
-    }
-    if (thread.turn && !after && (!expected || expected === thread.turnId)) return { refusal: null, queue: false, paused: false };
-    // Its turn ended or changed before it arrived: it waits as the author's own. While only joining is open it waits
-    // paused, since nothing a teammate sends may start a turn; else it is admitted as theirs when it is taken.
-    if (expected && !after && this.#joinsOnly(thread, who)) return { refusal: null, queue: true, paused: true };
-    if (thread.turn && !after) return { refusal: null, queue: true, paused: false };
-    if (expected && !after) return { refusal: null, queue: true, paused: false, settle: true };
-    return { refusal: this.admit(who, settings), queue: Boolean(thread.turn), paused: false };
   }
 
   /**

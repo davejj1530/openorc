@@ -47,6 +47,12 @@ export class RunLive {
     return this.live;
   }
 
+  /** The process serving a run now: answers whether that same process still serves it, so its call never acts for a later one. */
+  capture(runId: string): () => boolean {
+    const process = this.live.get(runId);
+    return () => process !== undefined && this.live.get(runId) === process;
+  }
+
   get compactions(): ReadonlyMap<string, Promise<void>> {
     return this.pendingCompactions;
   }

@@ -159,13 +159,20 @@ export async function stop(calls: Calls, { runId, expectedTurnId }: RpcParams<"r
  * approvals.resolve: an answer to an ask, by its id. An ask whose turn has parked starts a turn when answered, so it can
  * be refused like a send; it then stays open.
  */
+/**
+ * The ask phase an answer is bound to, so it never continues on someone else's hours by surprise: the one its caller
+ * names (a phone names the one its screen showed), else the one this window holds.
+ */
+function boundPhase(params: RpcParams<"approvals.resolve">, asked: { state: string; turnId: string } | null) {
+  const seen = params.expectedState && params.expectedTurnId ? { state: params.expectedState, turnId: params.expectedTurnId } : asked;
+  return seen ? { expectedState: seen.state, expectedTurnId: seen.turnId } : {};
+}
+
 export async function answer(calls: Calls, params: RpcParams<"approvals.resolve">): Promise<void> {
   const threadId = threadOf(params.runId);
   const row = calls.row(threadId);
   const asked = row.collaboration?.ask?.id === params.approvalId ? row.collaboration.ask : null;
-  // The answer names the phase the window saw (a phone names its own), so it never continues on someone else's hours by surprise.
-  const seen = params.expectedState && params.expectedTurnId ? { state: params.expectedState, turnId: params.expectedTurnId } : asked;
-  const bound = seen ? { expectedState: seen.state, expectedTurnId: seen.turnId } : {};
+  const bound = boundPhase(params, asked);
   // Words instead of a parked ask of someone else's turn go with the answer, as one continuation of the answerer's own.
   const note = params.note && params.decision === "deny" ? params.note : null;
   const together = Boolean(asked && asked.state === "parked" && asked.sender?.id !== row.collaboration?.viewer?.id);

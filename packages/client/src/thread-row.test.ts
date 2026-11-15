@@ -97,15 +97,11 @@ describe("threadPlace", () => {
 
 describe("workspaceLabel", () => {
   const checkout = { workspaceMode: "current", branch: "main", prUrl: null, projectId: "p", workingDirectory: null } as const;
-  const cloud = { provider: "vercel", state: "ready", step: null, setup: false, error: null } as const;
 
-  it("names the cloud, else a worktree of its own, else the checkout's branch", () => {
+  it("names a worktree of its own, else the checkout's branch", () => {
     expect(workspaceLabel(checkout)).toBe("main");
     expect(workspaceLabel({ ...checkout, branch: null })).toBe("checkout");
     expect(workspaceLabel({ ...checkout, workspaceMode: "worktree", branch: "openorc/sidebar-a1b2c3" })).toBe("worktree");
-    expect(workspaceLabel({ ...checkout, workspaceMode: "worktree", cloud })).toBe("cloud");
-    expect(workspaceLabel({ ...checkout, owner: { brain: "cloud", reach: "asleep", heardAt: 1 } })).toBe("cloud");
-    expect(workspaceLabel({ ...checkout, owner: { brain: "mac", reach: "live", heardAt: 1 } })).toBe("main");
   });
 
   it("names the folder of a thread in no project, and nothing when it has none", () => {
@@ -116,17 +112,15 @@ describe("workspaceLabel", () => {
     expect(workspaceLabel(loose)).toBeNull();
   });
 
-  it("leaves a pull request to say where the work is, except that the next turn runs in the cloud", () => {
+  it("leaves a pull request to say where the work is", () => {
     expect(workspaceLabel({ ...checkout, prUrl: pr })).toBeNull();
     expect(workspaceLabel({ ...checkout, workspaceMode: "worktree", prUrl: pr })).toBeNull();
-    expect(workspaceLabel({ ...checkout, workspaceMode: "worktree", prUrl: pr, cloud })).toBe("cloud");
   });
 });
 
 describe("rowPlace", () => {
   const checkout = { workspaceMode: "current", branch: "main", projectId: "p", workingDirectory: null } as const;
   const worktree = { ...checkout, workspaceMode: "worktree", branch: "openorc/sidebar-a1b2c3" } as const;
-  const cloud = { provider: "vercel", state: "ready", step: null, setup: false, error: null } as const;
 
   it("says nothing where the project's new threads start, and names the other local place", () => {
     expect(rowPlace(checkout, "current")).toBeNull();
@@ -136,9 +130,7 @@ describe("rowPlace", () => {
     expect(rowPlace({ ...checkout, branch: null }, "worktree")).toEqual({ kind: "branch", word: "checkout" });
   });
 
-  it("tells the person's own cloud from OpenOrc Cloud, and leaves a cloud-only project's rows to its label", () => {
-    expect(rowPlace({ ...worktree, cloud }, "worktree")).toEqual({ kind: "cloud", label: "Your own cloud", word: null });
-    expect(rowPlace({ ...checkout, owner: { brain: "cloud", reach: "asleep", heardAt: 1 } }, "current")).toEqual({ kind: "cloud", label: "Your own cloud", word: null });
+  it("names OpenOrc Cloud, and leaves a cloud-only project's rows to its label", () => {
     expect(rowPlace({ ...worktree, owner: { brain: "hosted", reach: "live", heardAt: 1 } }, "worktree")).toEqual({ kind: "cloud", label: "OpenOrc Cloud", word: "OpenOrc Cloud" });
     expect(rowPlace({ ...worktree, owner: { brain: "hosted", reach: "live", heardAt: 1, project: { name: "site" } } }, "current")).toBeNull();
   });
@@ -216,9 +208,7 @@ describe("rowFacts", () => {
     expect(facts.pull?.label).toBe(`Pull request #8, ${prState}`);
   });
 
-  it("names an own cloud, uses a detached folder, and reads the latest child activity", () => {
-    expect(rowFacts({ ...local, owner: { brain: "cloud", reach: "asleep", heardAt: now } }, { now }).detail).toBe("3m · Your own cloud · main");
-    expect(rowFacts({ ...local, cloud: { provider: "vercel", state: "ready", step: null, setup: false, error: null } }, { now }).cloud).toBe("Your own cloud");
+  it("uses a detached folder, and reads the latest child activity", () => {
     expect(rowFacts({ ...local, branch: null, workingDirectory: "/tmp/example-project/notes", treeActivityAt: now - 60_000 }, { now }).detail).toBe("1m · This Mac · notes");
     expect(rowFacts({ ...local, branch: null, workingDirectory: "C:\\example-project\\notes\\" }, { now }).detail).toBe("3m · This Mac · notes");
   });

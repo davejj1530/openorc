@@ -7,25 +7,22 @@ export function conversationWorkspaceMode({ scope, firstTaskRun, selected }: { s
   return scope.task.workspaceMode;
 }
 
-/**
- * The folder a conversation's file links open in here, or null. A thread on the cloud brain has none unless it is open
- * on this Mac, in its read-only copy; without one its links read as references, as on the phone.
- */
+/** The folder a conversation's file links open in here, or null for a thread with no folder on this Mac, whose links read as references. */
 export function linkFolder(scope: ConversationScope, project: Pick<Project, "rootPath">): string | null {
   if (scope.kind === "task") return scope.task.worktreePath ?? project.rootPath;
-  if (placeOf(scope.thread).elsewhere) return scope.thread.worktreePath;
+  if (placeOf(scope.thread).elsewhere) return null;
   return scope.thread.workingDirectory ?? scope.thread.worktreePath ?? project.rootPath;
 }
 
-/** The folder a turn's tool calls name files under, or null when the agent ran in a sandbox, whose paths mean nothing here. */
+/** The folder a turn's tool calls name files under, or null when the agent ran elsewhere, whose paths mean nothing here. */
 export function toolPathBase(scope: ConversationScope, folder: string): string | null {
-  if (scope.kind === "thread" && (scope.thread.cloud || placeOf(scope.thread).elsewhere)) return null;
+  if (scope.kind === "thread" && placeOf(scope.thread).elsewhere) return null;
   return folder;
 }
 
-/** A subagent works in its parent's folder: on the cloud brain, the parent's read-only copy here once it is open. */
-export function subagentLinkFolder(thread: ThreadSummary, parent: ThreadSummary | null | undefined, project: Pick<Project, "rootPath">): string | null {
-  if (placeOf(thread).elsewhere) return parent?.worktreePath ?? null;
+/** A subagent works in its parent's folder; one that ran elsewhere has none here. */
+export function subagentLinkFolder(thread: ThreadSummary, project: Pick<Project, "rootPath">): string | null {
+  if (placeOf(thread).elsewhere) return null;
   return thread.workingDirectory ?? project.rootPath;
 }
 
@@ -49,10 +46,9 @@ export function conversationLocation({
   if (project.id === WORKSPACE_ID || plainFolder) return { label: null, branch: null, directory: basePath };
   if (scope.kind === "task")
     return { label: mode === "worktree" ? "Worktree" : "Local checkout", branch: mode === "current" ? (scope.task.branch ?? project.defaultBranch) : scope.task.branch, directory: basePath };
-  // A thread held elsewhere has no folder here unless it is open on this Mac, in its read-only copy.
+  // A thread held elsewhere has no folder here.
   const { mark } = placeOf(scope.thread);
-  if (mark && !scope.thread.worktreePath) return { label: mark, branch: scope.thread.branch, cloud: true };
-  if (scope.thread.cloud) return { label: "Cloud", branch: scope.thread.branch, directory: basePath, cloud: true };
+  if (mark) return { label: mark, branch: scope.thread.branch, cloud: true };
   if (scope.thread.workspaceMode === "worktree") return { label: "Worktree", branch: scope.thread.branch, directory: basePath };
   return { label: "Local checkout", branch: checkoutBranch ?? null, directory: basePath };
 }

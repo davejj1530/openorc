@@ -1,8 +1,7 @@
 import { useSpaceProjects } from "../lib/space-queries";
-import { newThreadWorkspaceMode, offeredAccount, projectAccountChoice, targetModel, type CloudTurnWho, type ModelChoice as Choice, type NewThreadDraft, type NewThreadPlace } from "@openorc/client";
+import { newThreadWorkspaceMode, offeredAccount, projectAccountChoice, targetModel, type NewThreadDraft } from "@openorc/client";
 import { WORKSPACE_ID, executionMode, type ClaudeAccounts, type Project } from "@openorc/protocol";
 import { useEffect, useRef, useState } from "react";
-import { useCloudSignInGate } from "../components/CloudSignInOffer";
 import { Composer } from "../components/Composer";
 import { ComposerCommitChip } from "../components/ComposerCommitChip";
 import { FolderPlus } from "../components/icons";
@@ -18,8 +17,7 @@ import { TopBar } from "../components/TopBar";
 import { Button, TextButton } from "../components/ui";
 import { ClaudeAccountScope } from "../lib/claude-account";
 import { usePermissionSelection, useRpc, useRpcMutation } from "../lib/client";
-import { useNewThreadCloud, useNewThreadHosted, type NewThreadCloud } from "../lib/cloud-offered";
-import { useCloudWarm } from "../lib/cloud-warm";
+import { useNewThreadHosted } from "../lib/cloud-offered";
 import { usePublishComposerAccount } from "../lib/composer-account";
 import { useComposerChanges } from "../lib/composer-changes";
 import { useDefaultHarness } from "../lib/default-harness";
@@ -117,11 +115,6 @@ function newThreadAccounts(choices: ClaudeAccounts | undefined, current: string,
   return choices ? { accounts: choices.accounts, current, choose, blocked: starting ? "Starting the thread…" : undefined } : undefined;
 }
 
-/** Who a new cloud thread's first turn signs in as; null for one that starts on this Mac. */
-function newCloudTurn(mode: NewThreadPlace, choice: Choice | null, claudeAccountId: string, cloud: NewThreadCloud): CloudTurnWho | null {
-  return mode === "cloud" && choice ? { agent: choice.agent, claudeAccountId, model: choice.model, brain: cloud.brain, local: cloud.local } : null;
-}
-
 /** The Orclings the model picker offers, the one chosen marked. */
 function orclingChoices(options: OrclingPickerChoices["options"], target: NewThreadDraft["target"], choose: (target: NewThreadDraft["target"]) => void): OrclingPickerChoices {
   return {
@@ -185,20 +178,16 @@ function NewThreadProject({
   // No thread action applies to the landing composer. Skills belong to the project or Workspace folder chosen here; a
   // cloud-only project has no folder on this Mac, so it offers none of this Mac's, as a cloud thread's composer does.
   const suggestions = useComposerSuggestions(projectScope(macFolder || isWorkspace ? projectId : null, draft.workingDirectory), choice?.agent, executionMode(draft.mode, permission), claudeAccountId);
-  const cloud = useNewThreadCloud(target, projectId);
   const hosted = useNewThreadHosted(target, projectId);
   const workspaceMode = cloudOnly
     ? "hosted"
     : newThreadWorkspaceMode({
         canBranch: !isWorkspace && !git.cannotBranch,
-        canCloud: cloud.can,
         canHosted: hosted.can,
         chosen: draft.workspace,
         preferred: settings.data?.defaultWorkspaceMode,
       });
-  const signIn = useCloudSignInGate(newCloudTurn(workspaceMode, choice, claudeAccountId, cloud));
   const files = useNewThreadFiles(projectId, workspaceMode === "hosted");
-  useCloudWarm(workspaceMode === "cloud" && cloud.can ? projectId : null, choice?.agent, draft.prompt);
 
   useEffect(() => {
     if (target.kind !== "model" || target.choice || !models.data || defaultHarness === undefined) return;
@@ -250,8 +239,7 @@ function NewThreadProject({
       text,
       attachments,
       files,
-      // A cloud start waits for the sign-in the cloud lacks, offered above the composer.
-      launch: (params) => signIn.ready().then(() => startSpaceThread(params, start.mutateAsync, spaceId, key)),
+      launch: (params) => startSpaceThread(params, start.mutateAsync, spaceId, key),
     });
     if (mounted.current && spaceNavigation.getState().generation === generation && useRouter.getState().route.view === "newthread") openThread(threadId);
   };
@@ -297,7 +285,6 @@ function NewThreadProject({
                     placeholder="Ask OpenOrc to build, fix bugs, explore"
                     size="lg"
                     presentation="new-thread"
-                    notices={signIn.offer}
                     model={choice}
                     onModel={chooseModel}
                     modelControl={
@@ -323,7 +310,6 @@ function NewThreadProject({
                       local={!cloudOnly}
                       projectId={projectId}
                       mode={workspaceMode}
-                      cloud={cloud}
                       hosted={hosted}
                       location={location}
                       blocked={branchingReason(git.state, "Worktrees")}

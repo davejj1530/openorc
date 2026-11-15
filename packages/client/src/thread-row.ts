@@ -77,12 +77,11 @@ export function threadPlace(thread: Pick<ThreadSummary, "branch" | "prUrl" | "pr
 }
 
 /**
- * The word a root row puts after its project for where its thread works: the cloud, a worktree of its own, the
- * checkout's branch, or the checkout itself when it is on none. A thread in no project names its folder. A pull request
- * already says where the work is, so beside one only the cloud shows, where the next turn runs.
+ * The word a root row puts after its project for where its thread works: a worktree of its own, the checkout's
+ * branch, or the checkout itself when it is on none. A thread in no project names its folder. A pull request already
+ * says where the work is, so beside one nothing shows.
  */
-export function workspaceLabel(thread: Pick<ThreadSummary, "workspaceMode" | "branch" | "prUrl" | "cloud" | "owner" | "projectId" | "workingDirectory">): string | null {
-  if (thread.cloud || placeOf(thread).brain) return "cloud";
+export function workspaceLabel(thread: Pick<ThreadSummary, "workspaceMode" | "branch" | "prUrl" | "projectId" | "workingDirectory">): string | null {
   if (pullRequestNumber(thread.prUrl) !== null) return null;
   if (thread.workspaceMode === "worktree") return "worktree";
   if (thread.branch) return thread.branch;
@@ -92,18 +91,16 @@ export function workspaceLabel(thread: Pick<ThreadSummary, "workspaceMode" | "br
 
 /**
  * Where a sidebar row says its thread works, said only when that is not where its project's new threads start:
- *   cloud     the person's own cloud (the glyph alone) or OpenOrc Cloud (the glyph and its name); a cloud-only project's
- *             label already wears the cloud, so its rows say nothing
+ *   cloud     OpenOrc Cloud, by the glyph and its name; a cloud-only project's label already wears the cloud, so its
+ *             rows say nothing
  *   branch    the checkout, by its branch, when new threads start in a worktree
  *   worktree  a worktree of its own, when new threads start in the checkout
  *   folder    a thread in no project, by its folder
  */
-export type RowPlace = { kind: "cloud"; label: string; word: string | null } | { kind: "branch" | "worktree" | "folder"; word: string };
+export type RowPlace = { kind: "cloud"; label: string; word: string } | { kind: "branch" | "worktree" | "folder"; word: string };
 
-export function rowPlace(thread: Pick<ThreadSummary, "workspaceMode" | "branch" | "cloud" | "owner" | "projectId" | "workingDirectory">, usual: WorkspaceMode): RowPlace | null {
-  const place = placeOf(thread);
-  if (place.rowIcon) return thread.owner?.project ? null : { kind: "cloud", label: "OpenOrc Cloud", word: "OpenOrc Cloud" };
-  if (thread.cloud || place.brain) return { kind: "cloud", label: "Your own cloud", word: null };
+export function rowPlace(thread: Pick<ThreadSummary, "workspaceMode" | "branch" | "owner" | "projectId" | "workingDirectory">, usual: WorkspaceMode): RowPlace | null {
+  if (placeOf(thread).rowIcon) return thread.owner?.project ? null : { kind: "cloud", label: "OpenOrc Cloud", word: "OpenOrc Cloud" };
   if (thread.projectId === WORKSPACE_ID) {
     const folder = thread.workingDirectory?.split(/[\\/]/).filter(Boolean).at(-1);
     return folder ? { kind: "folder", word: folder } : null;
@@ -132,6 +129,12 @@ export function latestActivity(thread: Pick<ThreadSummary, "lastActivityAt" | "t
   return Math.max(thread.lastActivityAt, thread.treeActivityAt ?? 0, thread.lastAgentEventAt ?? 0);
 }
 
+/** The quiet word a row shows for where it lives, dimmed while that place cannot be reached; null for this Mac's own. */
+export function ownerMark(thread: Pick<ThreadSummary, "owner" | "moving">): { label: string; dim: boolean } | null {
+  const { mark } = placeOf(thread);
+  return mark && thread.owner ? { label: mark, dim: thread.owner.reach !== "live" } : null;
+}
+
 /** The teammate who started a thread the person shares, with the first name a row has room for; null for their own. */
 export function rowStarter(thread: Pick<ThreadSummary, "owner">): { name: string; first: string; image: string | null } | null {
   const starter = thread.owner?.startedBy;
@@ -141,13 +144,11 @@ export function rowStarter(thread: Pick<ThreadSummary, "owner">): { name: string
 
 /** Facts for a one-line row, including cloud-only projects whose group already names the cloud. */
 export function rowFacts(
-  thread: Pick<ThreadSummary, "lastActivityAt" | "treeActivityAt" | "lastAgentEventAt" | "workspaceMode" | "branch" | "cloud" | "owner" | "workingDirectory" | "prUrl" | "prState"> &
+  thread: Pick<ThreadSummary, "lastActivityAt" | "treeActivityAt" | "lastAgentEventAt" | "workspaceMode" | "branch" | "owner" | "workingDirectory" | "prUrl" | "prState"> &
     Partial<Pick<ThreadSummary, "activity">>,
   { now, project }: { now: number; project?: string },
 ) {
-  const place = placeOf(thread);
-  const ownCloud = thread.cloud || place.brain ? "Your own cloud" : null;
-  const cloud = place.rowIcon ? "OpenOrc Cloud" : ownCloud;
+  const cloud = placeOf(thread).rowIcon ? "OpenOrc Cloud" : null;
   const starter = rowStarter(thread);
   const pull = pullRequestMark(thread);
   const folder = thread.workingDirectory?.split(/[\\/]/).filter(Boolean).at(-1);

@@ -14,8 +14,6 @@ interface UiState {
   deleteThreadId: string | null;
   /** The conversation whose move to or from a worktree is being confirmed. */
   moveThreadId: string | null;
-  /** The open move goes to the cloud rather than between the checkout and a worktree. */
-  moveThreadToCloud: boolean;
   /** The conversation whose worktree removal is being confirmed. */
   removeWorktreeThreadId: string | null;
   /** The folder New file is asking a path for. */
@@ -26,7 +24,7 @@ interface UiState {
   setPalette: (open: boolean, mode?: "all" | "messages") => void;
   setThreadOrder: (ids: string[]) => void;
   setDeleteThread: (id: string | null) => void;
-  setMoveThread: (id: string | null, to?: "cloud") => void;
+  setMoveThread: (id: string | null) => void;
   setRemoveWorktree: (id: string | null) => void;
   setNewFile: (scope: FileScope | null) => void;
 }
@@ -40,11 +38,10 @@ export const useUi = create<UiState>((set, get) => ({
   threadOrder: [],
   deleteThreadId: null,
   moveThreadId: null,
-  moveThreadToCloud: false,
   removeWorktreeThreadId: null,
   newFile: null,
   setDeleteThread: (deleteThreadId) => set({ deleteThreadId }),
-  setMoveThread: (moveThreadId, to) => set({ moveThreadId, moveThreadToCloud: to === "cloud" }),
+  setMoveThread: (moveThreadId) => set({ moveThreadId }),
   setRemoveWorktree: (removeWorktreeThreadId) => set({ removeWorktreeThreadId }),
   setNewFile: (newFile) => set({ newFile }),
   openNewTask: (projectId, threadId) => useRouter.getState().navigate({ view: "newtask", ...(projectId ? { projectId } : {}), ...(threadId ? { threadId } : {}) }),

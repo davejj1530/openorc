@@ -16,7 +16,6 @@ import { menuItem, menuItemDanger, menuPopup, menuSeparator } from "./menu";
 import { ThreadPlaceItems } from "./ThreadPlaceItems";
 import { HostedMenuReason } from "./HostedMenuReason";
 import { Button, Dialog } from "./ui";
-import { thisComputer } from "../lib/this-computer";
 
 /** The parts a dropdown and a context menu share, so one item list serves both. */
 export type MenuParts = Pick<typeof Menu, "Item" | "Separator" | "SubmenuRoot" | "SubmenuTrigger" | "Portal" | "Positioner" | "Popup">;
@@ -184,16 +183,8 @@ function LifecycleItems({ thread, parts: M, disabled, tip, patch }: { thread: Th
   );
 }
 
-/** Why an action that needs the thread's folder on this Mac can't be done: brought back from the cloud brain, or not yet on OpenOrc Cloud. */
-function awayWords(thread: ThreadSummary): string | null {
-  const place = placeOf(thread);
-  if (!place.elsewhere) return null;
-  return place.brain ? `Bring it to ${thisComputer} first.` : "This isn't on OpenOrc Cloud yet.";
-}
-
 /** A sidebar row's menu leads with it; the header's keeps it beside Fork. OpenOrc Cloud starts no thread under another, so it has none. */
 function NewSubthreadItem({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
-  const away = awayWords(thread);
   if (placeOf(thread) === PLACES.hosted)
     return (
       <HostedMenuReason parts={M} reason={HOSTED_REASONS.personSubthreads}>
@@ -201,7 +192,7 @@ function NewSubthreadItem({ thread, parts: M }: { thread: ThreadSummary; parts: 
       </HostedMenuReason>
     );
   return (
-    <M.Item className={menuItem} disabled={Boolean(thread.teamInstanceId) || away !== null} data-tip={away ?? undefined} onClick={() => newSubthread(thread.id)}>
+    <M.Item className={menuItem} disabled={Boolean(thread.teamInstanceId)} onClick={() => newSubthread(thread.id)}>
       <PenSquare size={13} /> New subthread
     </M.Item>
   );
@@ -210,7 +201,6 @@ function NewSubthreadItem({ thread, parts: M }: { thread: ThreadSummary; parts: 
 function ThreadForkActions({ thread, parts: M, header }: { thread: ThreadSummary; parts: MenuParts; header?: boolean }) {
   const fork = useRpcMutation("threads.fork");
   const mutating = useThreadMutationPending(thread.id);
-  const away = awayWords(thread);
   if (placeOf(thread) === PLACES.hosted)
     return (
       <>
@@ -230,8 +220,8 @@ function ThreadForkActions({ thread, parts: M, header }: { thread: ThreadSummary
       {header ? <NewSubthreadItem thread={thread} parts={M} /> : null}
       <M.Item
         className={menuItem}
-        disabled={Boolean(thread.teamInstanceId) || away !== null || mutating || fork.isPending || Boolean(forkUnavailable(thread.agent))}
-        data-tip={away ?? forkUnavailable(thread.agent) ?? undefined}
+        disabled={Boolean(thread.teamInstanceId) || mutating || fork.isPending || Boolean(forkUnavailable(thread.agent))}
+        data-tip={forkUnavailable(thread.agent) ?? undefined}
         onClick={() => fork.mutate({ id: thread.id }, { onSuccess: (t) => openThread(t.id) })}
       >
         <GitFork size={13} /> {fork.isPending ? "Forking…" : "Fork"}

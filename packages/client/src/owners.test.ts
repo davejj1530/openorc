@@ -1,6 +1,5 @@
 import { mergeInbox, mergeThreadPages, OWNER_SESSION_METHODS, type HostPage, type InboxList, type ThreadSummary } from "@openorc/protocol";
-import { offersBrainMove, ownerMark, threadMoveCard } from "./cloud-start.js";
-import { tabsFor } from "./panel-tools.js";
+import { ownerMark } from "./thread-row.js";
 import { describe, expect, it } from "vitest";
 
 function summary(id: string, lastActivityAt: number, extra: Partial<ThreadSummary> = {}): ThreadSummary {
@@ -103,63 +102,10 @@ describe("the Mac's session on the brain", () => {
 });
 
 describe("where a row lives", () => {
-  it("marks a cloud row, dimmed while the brain is out of reach, and a moving one", () => {
+  it("marks an OpenOrc Cloud row, dimmed while it is out of reach, and nothing on this Mac's own", () => {
     expect(ownerMark(summary("t", 1))).toBeNull();
-    expect(ownerMark(summary("t", 1, { owner: { brain: "cloud", reach: "live", heardAt: 1 } }))).toEqual({ label: "Cloud", dim: false });
-    expect(ownerMark(summary("t", 1, { owner: { brain: "cloud", reach: "asleep", heardAt: 1 } }))).toEqual({ label: "Cloud", dim: true });
-    expect(ownerMark(summary("t", 1, { owner: { brain: "mac", reach: "offline", heardAt: 1 } }))).toEqual({ label: "Mac asleep", dim: true });
-    expect(ownerMark(summary("t", 1, { moving: { to: "mac", since: 1 } }))).toEqual({ label: "Moving", dim: false });
-  });
-
-  it("offers the move for every agent's thread, with its tasks, and hides it for rows another host holds", () => {
-    for (const agent of ["claude", "codex", "opencode"] as const) expect(offersBrainMove(summary("t", 1, { agent }))).toBe(true);
-    expect(offersBrainMove(summary("t", 1, { openTaskCount: 1 }))).toBe(true);
-    expect(offersBrainMove(summary("t", 1, { owner: { brain: "cloud", reach: "live", heardAt: 1 } }))).toBe(false);
-  });
-
-  it("gives a cloud thread's panel no folder of this Mac's", () => {
-    const tools = tabsFor({ kind: "thread", thread: { worktreePath: null, branch: "b", orclingId: null, owner: { brain: "cloud", reach: "live", heardAt: 1 } }, project: { id: "p" } });
-    expect(tools).toContain("changes");
-    expect(tools).not.toContain("terminal");
-    expect(tools).not.toContain("file");
-  });
-});
-
-describe("the card on a conversation that moves", () => {
-  const states = (card: ReturnType<typeof threadMoveCard>) => (card?.kind === "moving" ? card.steps.map(({ label, state }) => `${label}: ${state}`) : undefined);
-
-  it("walks a move to the cloud through packing, waking the brain and sending, each step before the current done", () => {
-    const card = threadMoveCard(summary("t", 1, { moving: { to: "cloud", since: 1, step: "waking" } }));
-    expect(card?.title).toBe("Moving to your own cloud");
-    expect(states(card)).toEqual(["Packing the conversation: done", "Waking the cloud brain: running", "Sending it to your own cloud: pending"]);
-  });
-
-  it("wakes the brain first when bringing a thread to this Mac, and starts at the first step when none is known", () => {
-    expect(states(threadMoveCard(summary("t", 1, { moving: { to: "mac", since: 1, step: "sending" } })))).toEqual([
-      "Waking the cloud brain: done",
-      "Packing it in your own cloud: done",
-      "Bringing it to this Mac: running",
-    ]);
-    expect(states(threadMoveCard(summary("t", 1, { moving: { to: "mac", since: 1 } })))?.[0]).toBe("Waking the cloud brain: running");
-  });
-
-  it("says the cloud brain is waking on a cloud conversation, and nothing on one that is live or this Mac's own", () => {
-    expect(threadMoveCard(summary("t", 1, { owner: { brain: "cloud", reach: "waking", heardAt: 1 } }))).toEqual({
-      kind: "moving",
-      title: null,
-      steps: [{ step: "waking", label: "Waking the cloud brain", state: "running" }],
-    });
-    expect(threadMoveCard(summary("t", 1, { owner: { brain: "cloud", reach: "live", heardAt: 1 } }))).toBeNull();
-    expect(threadMoveCard(summary("t", 1, { owner: { brain: "cloud", reach: "asleep", heardAt: 1 } }))).toBeNull();
-    expect(threadMoveCard(summary("t", 1))).toBeNull();
-  });
-
-  it("says a refused move did not happen, with its reason and the move to try again, until the conversation does something", () => {
-    const refused = { to: "cloud" as const, reason: "OpenCode has no key for OpenRouter in the cloud. Add one in Settings > Cloud.", at: 10 };
-    expect(threadMoveCard(summary("t", 10, { moveRefused: refused }))).toEqual({ kind: "refused", title: "Didn't move", reason: refused.reason, retry: "cloud.move" });
-    expect(threadMoveCard(summary("t", 10, { moveRefused: { ...refused, to: "mac" } }))).toMatchObject({ retry: "cloud.bringToMac" });
-    // Newer activity, or a new move under way, takes it away.
-    expect(threadMoveCard(summary("t", 11, { moveRefused: refused }))).toBeNull();
-    expect(threadMoveCard(summary("t", 10, { moveRefused: refused, moving: { to: "cloud", since: 12 } }))?.kind).toBe("moving");
+    expect(ownerMark(summary("t", 1, { owner: { brain: "hosted", reach: "live", heardAt: 1 } }))).toEqual({ label: "OpenOrc Cloud", dim: false });
+    expect(ownerMark(summary("t", 1, { owner: { brain: "hosted", reach: "offline", heardAt: 1 } }))).toEqual({ label: "OpenOrc Cloud", dim: true });
+    expect(ownerMark(summary("t", 1, { owner: { brain: "mac", reach: "live", heardAt: 1 } }))).toBeNull();
   });
 });

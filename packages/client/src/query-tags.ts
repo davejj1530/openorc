@@ -87,23 +87,8 @@ const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "connectors.spec": ["connectors"],
   "workspace.get": ["workspace"],
   "slack.status": ["slack"],
-  "cloud.status": ["cloud"],
-  "cloud.sandboxes": ["cloud"],
   // Not "threads": sizing every worktree is slow, and threads change with every message.
   "worktrees.list": ["worktrees"],
-  "cloud.offer": ["cloud"],
-  // Asks Vercel, so not "cloud", which a running check or sandbox sends often.
-  "cloud.brain.status": ["cloud-brain"],
-  "cloud.brain.projects": ["cloud-brain", "projects"],
-  "cloud.brain.cost": ["cloud-brain"],
-  "cloud.brain.busy": ["cloud-brain"],
-  "cloud.brain.signIns": ["cloud-brain"],
-  "cloud.brain.phones": ["cloud-brain"],
-  "cloud.skills": ["cloud-skills"],
-  "cloud.env": ["cloud-env"],
-  "cloud.brain.copy": ["cloud-brain", "projects"],
-  // Each row comes from the store that keeps it: Claude's tokens and Codex ("cloud"), the brain's own ("cloud-brain").
-  "cloud.signIns": ["cloud-sign-ins", "cloud", "cloud-brain", "claude-accounts"],
   "remote.status": ["remote"],
   "system.info": ["system"],
   "system.gh": ["system"],
@@ -292,12 +277,12 @@ const fixedInvalidations: Partial<Record<RpcMethod, readonly string[]>> = {
   "remote.pairing.begin": ["remote"],
   "remote.pairing.cancel": ["remote"],
   "remote.devices.remove": ["remote"],
-  // A skill's switch, image or folder shows in every agent's listing that reads the same folders; the cloud's copy follows.
-  "skills.setEnabled": ["skills", "cloud-skills"],
+  // A skill's switch, image or folder shows in every agent's listing that reads the same folders.
+  "skills.setEnabled": ["skills"],
   "skills.setIcon": ["skills"],
-  "skills.create": ["skills", "cloud-skills"],
-  "skills.import": ["skills", "cloud-skills"],
-  "skills.remove": ["skills", "cloud-skills"],
+  "skills.create": ["skills"],
+  "skills.import": ["skills"],
+  "skills.remove": ["skills"],
 };
 
 function workspaceMutationTags(id: string): string[] {
@@ -339,8 +324,7 @@ const idInvalidations: MethodRules = {
 };
 
 export function invalidatesFor<M extends RpcMethod>(method: M, params: RpcParams<M>): string[] {
-  if (method === "app.settings.set" && "enabledHarnesses" in params)
-    return ["settings", "models", "system", "agent-updates", "connectors", "text-generation", "provider-usage", "cloud-sign-ins", "cloud-skills"];
+  if (method === "app.settings.set" && "enabledHarnesses" in params) return ["settings", "models", "system", "agent-updates", "connectors", "text-generation", "provider-usage"];
   const fixed = fixedInvalidations[method];
   if (fixed) return [...fixed];
   const rule = mutationRules[method];

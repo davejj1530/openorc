@@ -121,7 +121,7 @@ export interface ComposerProps {
   permissionDescriptionId?: string;
   attachmentsDisabledReason?: string | null;
   /** Where the agent runs. A caller supplying its own destination control may omit the static label.
-   * `cloud` when the agent works in a sandbox and `directory` is the worktree its changes arrive in. */
+   * `cloud` for a thread on OpenOrc Cloud, which has no folder here. */
   location: { label: string | null; branch: string | null; directory?: string; cloud?: boolean };
   /** Initial execution location is chosen before the conversation starts. */
   hasStarted?: boolean;

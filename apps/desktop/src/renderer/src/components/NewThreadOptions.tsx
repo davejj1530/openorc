@@ -8,7 +8,7 @@ import { Check, Cloud, Folder, GitBranch } from "./icons";
 import { menuItem, menuPopup, menuSeparator } from "./menu";
 import { CoversPreview } from "../lib/browser-preview";
 import { cn } from "../lib/cn";
-import type { NewThreadCloud, NewThreadHosted } from "../lib/cloud-offered";
+import type { NewThreadHosted } from "../lib/cloud-offered";
 import { useRouter } from "../lib/router";
 import { floatingGround } from "../lib/use-anchor-ground";
 
@@ -26,7 +26,7 @@ interface Place {
   fact?: ReactNode;
 }
 
-const ICONS: Record<NewThreadPlace, ComponentType<{ size?: number }>> = { current: GitBranch, worktree: Folder, cloud: Cloud, hosted: Cloud };
+const ICONS: Record<NewThreadPlace, ComponentType<{ size?: number }>> = { current: GitBranch, worktree: Folder, hosted: Cloud };
 
 /** The hours left on OpenOrc Cloud: a filled share of the month's, when there is one, and the time. */
 function HoursLeft({ hours }: { hours: CloudHours }) {
@@ -47,12 +47,11 @@ function HoursLeft({ hours }: { hours: CloudHours }) {
   );
 }
 
-/** Every place, from this folder outward: the checkout, a worktree beside it, the person's own cloud, then OpenOrc's. */
-function places(cloud: NewThreadCloud, hosted: NewThreadHosted, local: boolean): Place[] {
+/** Every place, from this folder outward: the checkout, a worktree beside it, then OpenOrc Cloud. */
+function places(hosted: NewThreadHosted, local: boolean): Place[] {
   const all: (Place & { shown: boolean })[] = [
     { value: "current", label: "Local checkout", icon: ICONS.current, cloud: false, blocked: null, shown: true },
     { value: "worktree", label: "Worktree", icon: ICONS.worktree, cloud: false, blocked: null, shown: true },
-    { value: "cloud", label: "Your own cloud", icon: ICONS.cloud, cloud: true, blocked: cloud.blocked, shown: cloud.shown, fact: cloud.service },
     {
       value: "hosted",
       label: "OpenOrc Cloud",
@@ -75,7 +74,6 @@ function placeWords(mode: NewThreadPlace, branch: string | null): string {
   const words: Record<NewThreadPlace, string> = {
     current: `Works in the local checkout${branch ? ` on ${branch}` : ""}`,
     worktree: `Works in a new worktree${branch ? ` off ${branch}` : ""}`,
-    cloud: `Works in your own cloud, on a new branch${branch ? ` from ${branch}` : ""}`,
     hosted: `Works on OpenOrc Cloud, on a new branch${branch ? ` from ${branch}` : ""}`,
   };
   return words[mode];
@@ -90,13 +88,12 @@ function PlaceMenu(props: {
   local: boolean;
   mode: NewThreadPlace;
   branch: string | null;
-  cloud: NewThreadCloud;
   hosted: NewThreadHosted;
   disabled: boolean;
   disabledReason: string | null;
   onMode: (mode: NewThreadPlace) => void;
 }) {
-  const rows = places(props.cloud, props.hosted, props.local);
+  const rows = places(props.hosted, props.local);
   const current = rows.find((row) => row.value === props.mode) ?? rows[0]!;
   const Icon = ICONS[props.mode];
   const [why, setWhy] = useState<{ anchor: HTMLElement; words: string } | null>(null);
@@ -175,7 +172,6 @@ export function NewThreadOptions(props: {
   local?: boolean;
   projectId: string;
   mode: NewThreadPlace;
-  cloud: NewThreadCloud;
   hosted: NewThreadHosted;
   location: ComposerProps["location"];
   blocked: string | null;
@@ -205,7 +201,6 @@ export function NewThreadOptions(props: {
       local={props.local ?? true}
       mode={props.mode}
       branch={props.location.branch}
-      cloud={props.cloud}
       hosted={props.hosted}
       disabled={props.disabled}
       disabledReason={props.local === false ? null : props.blocked}

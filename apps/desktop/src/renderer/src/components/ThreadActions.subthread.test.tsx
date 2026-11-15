@@ -51,11 +51,6 @@ it("opens a subthread's parent, whoever started it", () => {
   expect(useRouter.getState().route).toMatchObject({ view: "thread", threadId: "home" });
 });
 
-it("keeps New subthread for this Mac's threads", () => {
-  open({ owner: { brain: "cloud", reach: "live", heardAt: 1 } });
-  expect(screen.getByText("New subthread").closest("[role=menuitem]")?.getAttribute("data-tip")).toBe("Bring it to this Mac first.");
-});
-
 it("leads a sidebar row's menu with New subthread, and keeps it beside Fork in the header", () => {
   open({});
   const sidebar = screen.getAllByRole("menuitem").map((item) => item.textContent?.trim());

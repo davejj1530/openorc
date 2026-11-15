@@ -75,11 +75,11 @@ const contract: Array<[RpcMethod, RpcMethod[]]> = [
   ["remote.pairing.cancel", ["remote.status"]],
   ["remote.devices.remove", ["remote.status"]],
   ["skills.writeFile", ["skills.list", "skills.files", "skills.readFile"]],
-  ["skills.setEnabled", ["skills.list", "cloud.skills"]],
+  ["skills.setEnabled", ["skills.list"]],
   ["skills.setIcon", ["skills.list", "skills.files", "skills.readFile"]],
-  ["skills.create", ["skills.list", "cloud.skills"]],
-  ["skills.import", ["skills.list", "cloud.skills"]],
-  ["skills.remove", ["skills.list", "skills.files", "cloud.skills"]],
+  ["skills.create", ["skills.list"]],
+  ["skills.import", ["skills.list"]],
+  ["skills.remove", ["skills.list", "skills.files"]],
 ];
 
 const params = { id: "t1", taskId: "t1", threadId: "t1", projectId: "p1", scope: { kind: "thread" as const, id: "t1" }, path: "README.md", query: "", skill: "/skills/notes/SKILL.md" };
@@ -220,7 +220,7 @@ describe("query cache tags", () => {
 
 it("refreshes catalogs and agent availability when the enabled selection changes", () => {
   const changed = invalidatesFor("app.settings.set", { enabledHarnesses: ["claude"] });
-  for (const method of ["app.settings.get", "agents.models", "agents.modelCatalog", "agents.availability", "connectors.list", "cloud.signIns"] as const) {
+  for (const method of ["app.settings.get", "agents.models", "agents.modelCatalog", "agents.availability", "connectors.list"] as const) {
     expect(tagsFor(method, {}).some((tag) => changed.includes(tag))).toBe(true);
   }
   expect(invalidatesFor("app.settings.set", { sound: true })).toEqual(["settings"]);

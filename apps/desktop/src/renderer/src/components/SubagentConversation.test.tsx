@@ -51,22 +51,22 @@ it("uses the model catalog label in both the child turn heading and status bar",
   expect(screen.queryByText("opencode/deepseek-v4.1-flash-free")).toBeNull();
 });
 
-it("opens a cloud subagent's file links in its parent's copy on this Mac, and reads them as references without one", async () => {
+it("reads an OpenOrc Cloud subagent's file links as references, which have no folder on this Mac", async () => {
   const revealFile = vi.fn();
   vi.stubGlobal("openorc", { revealFile });
-  const cloud = { brain: "cloud", reach: "live", heardAt: 1 } as const;
-  const child = { id: "child", agent: "claude", model: "haiku", parentThreadId: "parent", workingDirectory: "/vercel/sandbox/repo", owner: cloud } as ThreadSummary;
-  rows.parent = { id: "parent", worktreePath: null, owner: cloud } as ThreadSummary;
+  const child = {
+    id: "child",
+    agent: "claude",
+    model: "haiku",
+    parentThreadId: "parent",
+    workingDirectory: "/vercel/sandbox/repo",
+    owner: { brain: "hosted", reach: "live", heardAt: 1 },
+  } as ThreadSummary;
   render(<SubagentConversation thread={child} project={{ rootPath: "/repo" } as Project} />);
   const reference = await screen.findByText("the footer");
   expect(reference.closest("a")).toBeNull();
   fireEvent.click(reference);
   expect(revealFile).not.toHaveBeenCalled();
-  cleanup();
-  rows.parent = { id: "parent", worktreePath: "/mirrors/footer", owner: { ...cloud, mirror: true } } as ThreadSummary;
-  render(<SubagentConversation thread={child} project={{ rootPath: "/repo" } as Project} />);
-  fireEvent.click(await screen.findByText("the footer"));
-  expect(revealFile).toHaveBeenCalledExactlyOnceWith("/mirrors/footer/src/footer.tsx");
 });
 
 it("stands among a header's facts as the thread it started from, and opens it", () => {

@@ -408,27 +408,18 @@ describe("new thread drafts", () => {
   });
 });
 
-describe("a new thread in the cloud", () => {
-  const draft = decodeNewThreadDraft("p-repo", {
-    projectId: "p-repo",
-    prompt: "Work up there",
-    target: { kind: "model", choice: { agent: "claude", model: "sonnet", effort: "low" } },
-    workspace: "cloud",
-  });
-
-  it("keeps the cloud choice in a saved draft", () => {
-    expect(draft.workspace).toBe("cloud");
-  });
-
-  it("starts on a worktree marked for the cloud", () => {
-    const place = newThreadWorkspaceMode({ canBranch: true, canCloud: true, chosen: draft.workspace, preferred: "current" });
-    expect(newThreadStartInput(draft, { workspaceMode: place, permissionMode: "trusted", prompt: "Work up there" })).toMatchObject({ workspaceMode: "worktree", cloud: true });
-  });
-
-  it("works in a worktree when the cloud can't take the thread, and in the folder when nothing can branch", () => {
-    const place = newThreadWorkspaceMode({ canBranch: true, canCloud: false, chosen: "cloud", preferred: "current" });
+describe("a draft saved with a place this app no longer has", () => {
+  it("reads as no choice, so the thread starts where new threads usually do", () => {
+    const draft = decodeNewThreadDraft("p-repo", {
+      projectId: "p-repo",
+      prompt: "Work up there",
+      target: { kind: "model", choice: { agent: "claude", model: "sonnet", effort: "low" } },
+      workspace: "cloud",
+    });
+    expect(draft.workspace).toBeNull();
+    expect(draft.prompt).toBe("Work up there");
+    const place = newThreadWorkspaceMode({ canBranch: true, chosen: draft.workspace, preferred: "worktree" });
     expect(place).toBe("worktree");
-    expect(newThreadStartInput(draft, { workspaceMode: place, permissionMode: "trusted", prompt: "Work here" })).not.toHaveProperty("cloud");
-    expect(newThreadWorkspaceMode({ canBranch: false, canCloud: true, chosen: "cloud", preferred: "current" })).toBe("current");
+    expect(newThreadStartInput(draft, { workspaceMode: place, permissionMode: "trusted", prompt: "Work up there" })).not.toHaveProperty("cloud");
   });
 });

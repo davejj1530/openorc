@@ -3,15 +3,12 @@ import { useRef, useState, type ReactNode } from "react";
 import { useRpc, useRpcMutation } from "../lib/client";
 import { useUi } from "../lib/ui";
 import { FileRows } from "../panels/FileRows";
-import { CloudMoveDialog } from "./CloudMoveDialog";
 import { Button, Dialog } from "./ui";
 
 /** One confirm for moving a conversation, listing the files that go with it. */
 export function ThreadMoveDialog() {
   const id = useUi((state) => state.moveThreadId);
-  const toCloud = useUi((state) => state.moveThreadToCloud);
-  if (!id) return null;
-  return toCloud ? <CloudMoveDialog key={`cloud:${id}`} threadId={id} /> : <MoveDialog key={id} threadId={id} />;
+  return id ? <MoveDialog key={id} threadId={id} /> : null;
 }
 
 function MoveDialog({ threadId }: { threadId: string }) {

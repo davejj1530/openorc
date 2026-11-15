@@ -1,6 +1,6 @@
 import { Menu } from "@base-ui/react/menu";
 import { snoozeWakeLabel, threadActivity } from "@openorc/client";
-import type { CloudThreadState, ThreadSummary as Thread } from "@openorc/protocol";
+import type { ThreadSummary as Thread } from "@openorc/protocol";
 import { isSubagentThread } from "@openorc/protocol";
 import { useCallback, useRef } from "react";
 import { CoversPreview } from "../lib/browser-preview";
@@ -13,10 +13,9 @@ import { ThreadTabs } from "./ThreadTabs";
 import { ThreadTitle } from "./ThreadTitle";
 import { ThreadTools } from "./ThreadTools";
 import { TopBar } from "./TopBar";
-import { AlarmClock, ArrowLeft, Cloud, GitFork, GitPullRequest, MoreHorizontal, X } from "./icons";
+import { AlarmClock, ArrowLeft, GitFork, GitPullRequest, MoreHorizontal, X } from "./icons";
 import { menuPopup } from "./menu";
 import { IconButton, StatusDot, Tooltip } from "./ui";
-import { thisComputer } from "../lib/this-computer";
 
 /** Whether the header starts or ends the work row, which decides who clears the native window controls. */
 type Placement = { first: boolean; last: boolean; onClose?: () => void };
@@ -139,41 +138,12 @@ function ThreadMenu({ thread, renaming, onRename }: { thread: Thread; renaming: 
   );
 }
 
-const cloudDot = { preparing: "live", failed: "bad", ready: null, removed: null } as const;
-
-const cloudPlaces = {
-  vercel: { label: "Vercel", tip: "Runs in Vercel Sandbox" },
-  agent37: { label: "Agent37", tip: "Runs in an Agent37 instance" },
-  local: { label: "Simulated", tip: `Runs in a sandbox simulated on ${thisComputer}` },
-} as const;
-
-function cloudTip(cloud: CloudThreadState, where: string): string {
-  if (cloud.state === "failed" && cloud.error) return cloud.error;
-  return cloud.state === "removed" ? "Its sandbox was removed; the next message sets up a new one" : where;
-}
-
-/** Where a cloud thread runs, with a dot while its sandbox is set up or after that failed. */
-function ThreadCloud({ cloud }: { cloud: CloudThreadState }) {
-  const place = cloudPlaces[cloud.provider];
-  const dot = cloudDot[cloud.state];
-  return (
-    <Tooltip label={cloudTip(cloud, place.tip)}>
-      <span className="thread-header-fact">
-        <Cloud size={12} />
-        {dot ? <StatusDot tone={dot} /> : null}
-        {place.label}
-      </span>
-    </Tooltip>
-  );
-}
-
-/** Where a cloud thread runs, activity, the pull request and snooze, as faint words with small marks. */
+/** Activity, the pull request and snooze, as faint words with small marks. */
 function ThreadFacts({ thread: t }: { thread: Thread }) {
   const snoozed = t.snoozedUntil && t.snoozedUntil > Date.now();
   const activity = threadActivity(t);
   return (
     <>
-      {t.cloud ? <ThreadCloud cloud={t.cloud} /> : null}
       {!t.teamInstanceId && activity ? (
         <span className="thread-header-fact">
           <StatusDot tone={activity.tone} />

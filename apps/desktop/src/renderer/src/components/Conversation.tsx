@@ -2,7 +2,6 @@ import { useComposerChanges } from "../lib/composer-changes";
 import { useHostedComposerChanges } from "../lib/hosted-composer-changes";
 import { useProjectGit } from "../lib/project-git";
 import {
-  cloudTurnOf,
   CONTINUE_PROMPT,
   conversationActivity,
   composerPlaceholder,
@@ -13,7 +12,6 @@ import {
   conversationSendDisabledReason,
   conversationSteerReason,
   messageBody,
-  preparingCloud,
   processFit,
   RESTART_PROMPT,
   type SubmitRequest,
@@ -53,17 +51,14 @@ import { ConversationVoice, useRunVoices } from "../lib/turn-authors";
 import { ThreadVoicesContext, useThreadVoices } from "../lib/thread-authors";
 import { VoicesFailed } from "./ThreadVoice";
 import { useTurnFooters } from "../lib/turn-footers";
-import { useCloudSignInGate } from "./CloudSignInOffer";
 import { AnswersBlocked, AsksDocked } from "./ask-answer";
 import { useHostedComposer } from "./HostedSendNotice";
 import { HostedConversationBoundary } from "./HostedConversationBoundary";
-import { CloudPreparing, CloudStart } from "./CloudStart";
 import { Composer, type SlashCommand } from "./Composer";
 import { ComposerChoice } from "./ComposerChoice";
 import { GitBranch, Laptop } from "./icons";
 import { SessionRecovery } from "./SessionRecovery";
 import { SubagentConversation } from "./SubagentConversation";
-import { ThreadMoveCard } from "./ThreadMoveCard";
 import { Transcript } from "./Transcript";
 import { TurnChangesProvider, useTurnFooter } from "./TurnFooter";
 import { Button, Empty } from "./ui";
@@ -234,11 +229,10 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
   const { sameAgent, settingsPending, canSteer } = processFit({ live, activeRun, choice, mode, permission, compacting: compact.isPending });
   const steerReason = conversationSteerReason({ canSteer, compacting: compact.isPending, settingsPending, sameAgent, agent: activeRun?.agent });
   const cloud = useHostedComposer(thread, { choice, mode, permission });
-  const controls = useThreadControls(thread, runs.length, { canSteer, reason: steerReason, blocked: cloud.blocked, onSent: () => setSends((count) => count + 1) });
+  const controls = useThreadControls(thread, { canSteer, reason: steerReason, blocked: cloud.blocked, onSent: () => setSends((count) => count + 1) });
   const sendDisabledReason = conversationSendDisabledReason({ permissionReady, historyLoading: runsQuery.isLoading, historyFailed: Boolean(runsQuery.error), hasModel: Boolean(choice), thread });
   const turnFooter = useTurnFooter({ footers, threadId, working });
   const switching = Boolean(thread && choice && runs.length > 0 && !runs.some((r) => r.agent === choice.agent));
-  const signIn = useCloudSignInGate(cloudTurnOf(thread, choice, live || working));
 
   const request: Omit<SubmitRequest, "now"> = {
     target: scope.kind === "task" ? { kind: "task", taskId: scope.task.id, ...(firstTaskRun ? { workspaceMode } : {}) } : { kind: "thread", threadId: scope.thread.id },
@@ -259,7 +253,6 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
     setSends((count) => count + 1);
     // A message to an Orcling goes to the Orcling, not to this conversation's agent.
     if (await orclings.ask(messageBody(text, attachments), attachments)) return clearDraft();
-    await signIn.ready();
     const sent = { ...request, now };
     const message = await withHostedIntent(hostedFiles ? draftKey : null, sent, { text, attachments });
     await optimistic.send(sent, message);
@@ -301,11 +294,7 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
         </TranscriptContext>
       );
     if (runsQuery.isLoading) return null;
-    return (
-      orclings.empty ?? (
-        <CloudStart thread={thread} runs={runs.length} fallback={<Empty title={conversationEmptyTitle({ count: runs.length, firstTaskRun })}>{runs.length === 0 ? emptyHint : ""}</Empty>} />
-      )
-    );
+    return orclings.empty ?? <Empty title={conversationEmptyTitle({ count: runs.length, firstTaskRun })}>{runs.length === 0 ? emptyHint : ""}</Empty>;
   }
   return (
     <div className="conversation-pane h-full min-w-0 flex flex-col min-h-0">
@@ -338,8 +327,6 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
               changes={composerChanges}
               notices={
                 <>
-                  <ThreadMoveCard thread={thread} />
-                  <CloudPreparing thread={preparingCloud(thread, runs.length)} />
                   {controls.queue}
                   {controls.commands}
                   {thread?.session && !working ? (
@@ -350,7 +337,6 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
                       onContinueWith={(id) => void continueWith(id).catch(() => {})}
                     />
                   ) : null}
-                  {signIn.offer}
                   {cloud.notice}
                   {together.failed ? <VoicesFailed onRetry={together.retry} /> : null}
                   <SwitchingNote agent={switching && choice ? choice.agent : null} />

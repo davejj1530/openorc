@@ -1,45 +1,29 @@
-import { canMoveToCloud, cloudServiceMissing, offersBrainMove, threadPlace } from "@openorc/client";
-import type { CloudOffer, ThreadSummary, WorktreeBlock } from "@openorc/protocol";
+import { threadPlace } from "@openorc/client";
+import type { ThreadSummary, WorktreeBlock } from "@openorc/protocol";
 import { HOSTED_REASONS, placeOf, WORKSPACE_ID, WORKTREE_BLOCK_WORDS } from "@openorc/protocol";
 import { HostedMenuReason } from "./HostedMenuReason";
 import type { ReactNode } from "react";
 import { CoversPreview } from "../lib/browser-preview";
-import { useRpc, useRpcMutation } from "../lib/client";
+import { useRpc } from "../lib/client";
 import { useUi } from "../lib/ui";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { ChevronRight, Cloud, Copy, Folder, GitBranch, GitPullRequest, Laptop, Trash2 } from "./icons";
 import { menuItem, menuPopup, menuSeparator } from "./menu";
 import type { MenuParts } from "./ThreadActions";
-import { machine, revealLabel, ThisComputer, thisComputer } from "../lib/this-computer";
-
-type Where = "moving" | "cloud" | "mac" | "hosted";
-
-/** Where the next turn runs, when the menu has a move to offer from there: this Mac only when the cloud is an option. */
-function whereKind(thread: ThreadSummary, offer: CloudOffer | undefined): Where | null {
-  if (thread.owner?.brain === "hosted") return "hosted";
-  if (thread.moving) return "moving";
-  const place = placeOf(thread);
-  if (place.brain) return "cloud";
-  if (place.elsewhere || !offer) return null;
-  return (offer.brain ? offersBrainMove(thread) : canMoveToCloud(thread)) ? "mac" : null;
-}
+import { machine, revealLabel } from "../lib/this-computer";
 
 /**
- * The top of a thread's menu: where it works. Its branch, in a worktree or the checkout, then this Mac or the cloud.
- * Each row's submenu holds the moves away from there, so the menu below is only about the conversation.
+ * The top of a thread's menu: where it works. Its branch, in a worktree or the checkout, then OpenOrc Cloud for a
+ * thread there. Each row's submenu holds the moves away from there, so the menu below is only about the conversation.
  */
 export function ThreadPlaceItems({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
-  const offer = useRpc("cloud.offer", {}).data;
   const branch = thread.projectId !== WORKSPACE_ID;
-  const where = whereKind(thread, offer);
-  if (!branch && !where) return null;
+  const hosted = thread.owner?.brain === "hosted";
+  if (!branch && !hosted) return null;
   return (
     <>
       {branch ? <BranchRow thread={thread} parts={M} /> : null}
-      {where === "moving" ? <MovingRow thread={thread} parts={M} /> : null}
-      {where === "cloud" ? <CloudRow thread={thread} parts={M} /> : null}
-      {where === "hosted" ? <HostedPlaceRow parts={M} /> : null}
-      {where === "mac" ? <MacRow thread={thread} parts={M} offer={offer} /> : null}
+      {hosted ? <HostedPlaceRow parts={M} /> : null}
       <M.Separator className={menuSeparator} />
     </>
   );
@@ -137,8 +121,7 @@ function MoveFolderItem({ thread, parts: M }: { thread: ThreadSummary; parts: Me
 
 /** What the summary already shows of why the core would refuse the removal; the core decides the rest. */
 function removalBlock(thread: ThreadSummary): WorktreeBlock | null {
-  if (thread.cloud) return "cloud";
-  return thread.activity !== "idle" || thread.backgroundCommands?.length || thread.moving ? "working" : null;
+  return thread.activity !== "idle" || thread.backgroundCommands?.length ? "working" : null;
 }
 
 /** Frees the folder on disk; the branch and conversation stay, and the next message makes the worktree again. */
@@ -148,56 +131,5 @@ function RemoveWorktreeItem({ thread, parts: M }: { thread: ThreadSummary; parts
     <M.Item className={menuItem} disabled={block !== null} data-tip={block ? WORKTREE_BLOCK_WORDS[block] : undefined} onClick={() => useUi.getState().setRemoveWorktree(thread.id)}>
       <Trash2 size={13} /> Remove worktree
     </M.Item>
-  );
-}
-
-function MenuError({ error }: { error: Error | null }) {
-  return error ? (
-    <p role="alert" className="max-w-64 px-2 py-1 text-xs text-bad break-words">
-      {error.message}
-    </p>
-  ) : null;
-}
-
-function MovingRow({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
-  const keep = useRpcMutation("cloud.keep");
-  const toCloud = thread.moving?.to === "cloud";
-  return (
-    <PlaceRow parts={M} icon={<Cloud size={13} />} label={toCloud ? "Moving to your own cloud" : `Moving to ${thisComputer}`}>
-      <MenuError error={keep.error} />
-      <M.Item className={menuItem} disabled={keep.isPending} onClick={() => keep.mutate({ threadId: thread.id })}>
-        {toCloud ? <Laptop size={13} /> : <Cloud size={13} />} {toCloud ? `Keep on ${thisComputer}` : "Keep in your own cloud"}
-      </M.Item>
-    </PlaceRow>
-  );
-}
-
-function CloudRow({ thread, parts: M }: { thread: ThreadSummary; parts: MenuParts }) {
-  const bring = useRpcMutation("cloud.bringToMac");
-  const openCopy = useRpcMutation("cloud.openOnMac");
-  const closeCopy = useRpcMutation("cloud.closeOnMac");
-  const mirrored = Boolean(thread.owner?.mirror);
-  return (
-    <PlaceRow parts={M} icon={<Cloud size={13} />} label="Your own cloud">
-      <MenuError error={bring.error ?? openCopy.error ?? closeCopy.error} />
-      <M.Item className={menuItem} disabled={thread.activity !== "idle" || bring.isPending} onClick={() => bring.mutate({ threadId: thread.id })}>
-        <Laptop size={13} /> Bring to {machine}
-      </M.Item>
-      <M.Item className={menuItem} disabled={openCopy.isPending || closeCopy.isPending} onClick={() => (mirrored ? closeCopy : openCopy).mutate({ threadId: thread.id })}>
-        <Folder size={13} /> {mirrored ? `Close on ${machine}` : `Open on ${machine}`}
-      </M.Item>
-    </PlaceRow>
-  );
-}
-
-/** With a cloud brain, the move is the brain's and may be refused with its reason; without one, today's sandbox move. */
-function MacRow({ thread, parts: M, offer }: { thread: ThreadSummary; parts: MenuParts; offer: CloudOffer | undefined }) {
-  const missing = cloudServiceMissing(offer);
-  return (
-    <PlaceRow parts={M} icon={<Laptop size={13} />} label={ThisComputer}>
-      <M.Item className={menuItem} disabled={thread.activity !== "idle" || Boolean(missing)} data-tip={missing ?? undefined} onClick={() => useUi.getState().setMoveThread(thread.id, "cloud")}>
-        <Cloud size={13} /> Move to your own cloud
-      </M.Item>
-    </PlaceRow>
   );
 }

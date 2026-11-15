@@ -57,7 +57,7 @@ describe("a cloud thread nobody else is in", () => {
     expect(threadWaitsOnYou(parked)).toBe(true);
     expect(asksBlocked(parked)).toBeNull();
     expect(
-      rowFacts({ ...parked, lastActivityAt: 0, lastAgentEventAt: null, workspaceMode: "worktree", branch: "b", cloud: null, workingDirectory: null, prUrl: null, prState: null }, { now: 0 }).detail,
+      rowFacts({ ...parked, lastActivityAt: 0, lastAgentEventAt: null, workspaceMode: "worktree", branch: "b", workingDirectory: null, prUrl: null, prState: null }, { now: 0 }).detail,
     ).not.toContain("Waiting");
   });
 });
@@ -110,7 +110,7 @@ describe("a teammate's cloud thread on today's server", () => {
   it("appends whose turn it is to the row's hover words", () => {
     const running = row(together(THEO, { live: live(MARA) }), "running", mara);
     const facts = rowFacts(
-      { ...running, lastActivityAt: 0, lastAgentEventAt: null, workspaceMode: "worktree", branch: "export-activity", cloud: null, workingDirectory: null, prUrl: null, prState: null },
+      { ...running, lastActivityAt: 0, lastAgentEventAt: null, workspaceMode: "worktree", branch: "export-activity", workingDirectory: null, prUrl: null, prState: null },
       { now: 0 },
     );
     expect(facts.detail).toBe("now · Mara Okafor · OpenOrc Cloud · export-activity · Mara's turn");

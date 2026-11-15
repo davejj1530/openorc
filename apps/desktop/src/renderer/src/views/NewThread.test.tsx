@@ -1,4 +1,4 @@
-import { WORKSPACE_ID, harnessIds, type AccountStatus, type CloudSignIns, type Project, type RpcResults } from "@openorc/protocol";
+import { WORKSPACE_ID, harnessIds, type AccountStatus, type Project, type RpcResults } from "@openorc/protocol";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readNewThreadDraft, readNewThreadProject, rememberNewThreadProject, writeNewThreadDraft } from "../lib/new-thread-draft";
@@ -17,8 +17,6 @@ let branches: Record<string, string | null | undefined>;
 let branchError: boolean;
 let accounts: RpcResults["claude.accounts.list"] | undefined;
 let settings: Partial<RpcResults["app.settings.get"]>;
-let offer: RpcResults["cloud.offer"] | undefined;
-let signIns: CloudSignIns;
 let account: AccountStatus | undefined;
 const mutated: [string, unknown][] = [];
 /** A project's git read held open by a test; any other project's is already in. */
@@ -41,8 +39,6 @@ vi.mock("../lib/client", async (original) => ({
       "system.info": system,
       "agents.models": models,
       "app.settings.get": settings,
-      "cloud.offer": offer,
-      "cloud.signIns": signIns,
       "account.status": account,
       "orchestration.availability": { enabled: true, reason: null, maxHierarchyDepth: 3 },
     };
@@ -54,7 +50,7 @@ vi.mock("../lib/client", async (original) => ({
       : { mutateAsync: vi.fn(), mutate: (params: unknown) => mutated.push([method, params]), reset: vi.fn(), isPending: false, error: null },
   usePermissionSelection: () => ({ permission: "review", ready: true, select: vi.fn(), error: null }),
 }));
-vi.mock("../lib/rpc", () => ({ core: { call: async (method: string) => (method === "cloud.signIns" ? signIns : null), onReady: () => () => {}, onPush: () => () => {} } }));
+vi.mock("../lib/rpc", () => ({ core: { call: async () => null, onReady: () => () => {}, onPush: () => () => {} } }));
 vi.mock("../lib/skill-commands", async (original) => ({
   projectScope: (await original<typeof import("../lib/skill-commands")>()).projectScope,
   useSkillCommands: (scope: unknown) => (reads.push(["skills.list", { scope }]), { commands: [], onCommandsWanted: () => {} }),
@@ -123,9 +119,7 @@ beforeEach(() => {
     accounts: ["personal", "work", "client"].map((id, createdAt) => ({ id, name: id, kind: "managed", enabled: true, createdAt, status: "ready", email: null, organization: null, message: null })),
   };
   settings = { defaultWorkspaceMode: "current", defaultHarness: null };
-  offer = undefined;
   account = undefined;
-  signIns = { rows: [], bringing: false };
   mutated.length = 0;
   models = [{ id: "codex-model", label: "Codex", agent: "codex", isDefault: true, efforts: ["medium"], defaultEffort: "medium" }];
   system = {
@@ -352,58 +346,6 @@ describe("NewThread", () => {
     await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ projectId: "p1", workspaceMode: "worktree", prompt: "Build in a separate checkout" })));
   });
 
-  it("starts a cloud thread on the cloud brain for a project it has a copy of", async () => {
-    offer = { offered: true, provider: "vercel", brain: { host: "brain-key", projects: [{ mac: "p1", cloud: "brain-p1" }] } };
-    writeNewThreadDraft({ ...saveModelDraft("p1", "Run this in the cloud"), workspace: "cloud" });
-    render(<NewThread projectId="p1" />);
-    fireEvent.click(screen.getByRole("button", { name: "Where the thread works: Your own cloud" }));
-    expect((await screen.findByRole("menuitem", { name: "Your own cloud Vercel" })).getAttribute("aria-disabled")).not.toBe("true");
-    expect(placeSays()).toMatch(/^Works in your own cloud, on a new branch from/);
-    fireEvent.click(screen.getByRole("button", { name: "Send" }));
-    await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ projectId: "p1", workspaceMode: "worktree", cloud: true })));
-  });
-
-  it("ends your own cloud's row in adding the project, and starts in a worktree, for a project the cloud brain has no copy of", async () => {
-    offer = { offered: true, provider: "vercel", brain: { host: "brain-key", projects: [{ mac: "p2", cloud: "brain-p2" }] } };
-    writeNewThreadDraft({ ...saveModelDraft("p1", "Run this in the cloud"), workspace: "cloud" });
-    render(<NewThread projectId="p1" />);
-    fireEvent.click(screen.getByRole("button", { name: "Where the thread works: Worktree" }));
-    const cloud = await screen.findByRole("menuitem", { name: "Your own cloud Add this project" });
-    expect(cloud.getAttribute("aria-description")).toBe("Not on your cloud brain yet.");
-    fireEvent.click(screen.getByRole("button", { name: "Send" }));
-    await waitFor(() => expect(start).toHaveBeenCalledWith(expect.not.objectContaining({ cloud: true })));
-    expect(start).toHaveBeenCalledWith(expect.objectContaining({ workspaceMode: "worktree" }));
-  });
-
-  it("offers to add a project the cloud brain has no copy of, in Cloud settings with its sheet open", async () => {
-    offer = { offered: true, provider: "vercel", brain: { host: "brain-key", projects: [{ mac: "p2", cloud: "brain-p2" }] } };
-    render(<NewThread projectId="p1" />);
-    fireEvent.click(screen.getByRole("button", { name: /^Where the thread works/ }));
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Your own cloud Add this project" }));
-    expect(useRouter.getState().route).toEqual({ view: "settings", section: "cloud", project: "p1" });
-  });
-
-  it("leads to Cloud settings from your own cloud's row, by pointer or key, when no cloud service is connected", async () => {
-    offer = { offered: true, provider: null, brain: null };
-    render(<NewThread projectId="p1" />);
-    fireEvent.click(screen.getByRole("button", { name: /^Where the thread works/ }));
-    const row = await screen.findByRole("menuitem", { name: "Your own cloud Set up" });
-    expect(row.getAttribute("aria-description")).toBe("Connect Vercel or Agent37 first.");
-    fireEvent.click(row);
-    expect(useRouter.getState().route).toEqual({ view: "settings", section: "cloud" });
-    expect(readNewThreadDraft("p1").workspace).not.toBe("cloud");
-  });
-
-  it("ends your own cloud's row in why for an agent that does not run there, and keeps it from being chosen", async () => {
-    models = [{ id: "cursor-model", label: "Cursor", agent: "cursor", isDefault: true, efforts: ["medium"], defaultEffort: "medium" }];
-    system = { ...system, harnesses: harnessIds.map((id) => ({ id, state: id === "cursor" ? "ready" : "sign_in", path: `/bin/${id}`, version: "1", revision: 1 })) };
-    offer = { offered: true, provider: "vercel", brain: null };
-    render(<NewThread projectId="p1" />);
-    fireEvent.click(screen.getByRole("button", { name: /^Where the thread works/ }));
-    const row = await screen.findByRole("menuitem", { name: "Your own cloud Not with Cursor" });
-    expect(row.getAttribute("aria-disabled")).toBe("true");
-  });
-
   it("starts a thread on OpenOrc Cloud for a project there, with no folder on this Mac", async () => {
     account = openOrcCloud("added");
     saveModelDraft("p1", "Add a health check");
@@ -452,7 +394,6 @@ describe("NewThread", () => {
 
   it("offers only this Mac for an open local folder detached from the organization", async () => {
     account = openOrcCloud("added");
-    offer = { offered: true, provider: "vercel", brain: null };
     const project = { key: "p1", name: "Canvas", repo: "example/canvas", localProjectId: "p1", hostedProjectId: "server-project", connected: true };
     spaceNavigation.getState().initialize("scoped", "personal", [
       { id: "personal", personal: true, projects: [], threads: [], taskIds: [] },
@@ -469,14 +410,12 @@ describe("NewThread", () => {
     fireEvent.click(screen.getByRole("button", { name: /^Where the thread works/ }));
     expect(await screen.findByRole("menuitem", { name: "Local checkout" })).toBeTruthy();
     expect(screen.getByRole("menuitem", { name: "Worktree" })).toBeTruthy();
-    expect(screen.queryByRole("menuitem", { name: /^OpenOrc Cloud/ })).toBeNull();
-    expect(screen.queryByRole("menuitem", { name: /^Your own cloud/ })).toBeNull();
+    expect(screen.getAllByRole("menuitem")).toHaveLength(2);
     fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ projectId: "p1", workspaceMode: "current" })));
     expect(start).not.toHaveBeenCalledWith(expect.objectContaining({ spaceId: expect.anything() }));
     expect(start).not.toHaveBeenCalledWith(expect.objectContaining({ hosted: true }));
-    expect(start).not.toHaveBeenCalledWith(expect.objectContaining({ cloud: true }));
   });
 
   it("ends OpenOrc Cloud's row in adding a project not there yet, leading to its row in Cloud settings", async () => {
@@ -565,48 +504,4 @@ it.each([
   type(screen.getByRole("textbox", { name: "Message" }), "Fix the build");
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
   await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ agent, prompt: "Fix the build" })));
-});
-
-it("offers the one sign-in a cloud start lacks where it was sent, and starts once it is ready", async () => {
-  models = [{ id: "claude-fixture", label: "Claude", agent: "claude", isDefault: true, efforts: [], defaultEffort: null }];
-  system.harnesses = system.harnesses.map((row) => ({ ...row, state: "ready" }));
-  offer = { offered: true, provider: "vercel", brain: null };
-  const work = { kind: "claude", accountId: "work", label: "Work", way: "private-window", error: null } as const;
-  signIns = { rows: [{ ...work, state: "missing" }], bringing: false };
-  writeNewThreadDraft({
-    ...readNewThreadDraft("p1"),
-    prompt: "Run this in the cloud",
-    workspace: "cloud",
-    target: { kind: "model", choice: { agent: "claude", model: "claude-fixture", effort: null } },
-  });
-  const view = render(<NewThread projectId="p1" />);
-  fireEvent.click(screen.getByRole("button", { name: "Send" }));
-  expect(await screen.findByText("Claude account “Work” has no sign-in for the cloud.")).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
-  expect(mutated).toEqual([["cloud.signIns.bring", { target: { kind: "claude", accountId: "work" } }]]);
-  expect(start).not.toHaveBeenCalled();
-  signIns = { rows: [{ ...work, state: "ready" }], bringing: false };
-  act(() => view.rerender(<NewThread projectId="p1" />));
-  await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ cloud: true, claudeAccountId: "work", prompt: "Run this in the cloud" })));
-  expect(screen.queryByText("Claude account “Work” has no sign-in for the cloud.")).toBeNull();
-});
-
-it("keeps the message when the person calls a waiting cloud start off", async () => {
-  models = [{ id: "claude-fixture", label: "Claude", agent: "claude", isDefault: true, efforts: [], defaultEffort: null }];
-  system.harnesses = system.harnesses.map((row) => ({ ...row, state: "ready" }));
-  offer = { offered: true, provider: "vercel", brain: null };
-  signIns = { rows: [{ kind: "claude", accountId: "work", label: "Work", way: "private-window", error: null, state: "missing" }], bringing: false };
-  writeNewThreadDraft({
-    ...readNewThreadDraft("p1"),
-    prompt: "Run this in the cloud",
-    workspace: "cloud",
-    target: { kind: "model", choice: { agent: "claude", model: "claude-fixture", effort: null } },
-  });
-  render(<NewThread projectId="p1" />);
-  fireEvent.click(screen.getByRole("button", { name: "Send" }));
-  fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
-  await waitFor(() => expect(screen.queryByText("Claude account “Work” has no sign-in for the cloud.")).toBeNull());
-  expect(messageOf(screen.getByRole("textbox", { name: "Message" }))).toBe("Run this in the cloud");
-  expect(screen.queryByRole("alert")).toBeNull();
-  expect(start).not.toHaveBeenCalled();
 });

@@ -5,32 +5,10 @@ export { askKeyAct, askKeyName, docks, waitingAsks, type AskAct, type AskKey, ty
 export { pageHost, pageLabel, publicAddress } from "./browser-page.js";
 export { isUnifiedDiff, toolDiff } from "./chat-diff.js";
 export { createClientState, type ClientState, type ClientStateOptions } from "./client-state.js";
-export {
-  offersBrainMove,
-  canMoveToCloud,
-  cloudServiceMissing,
-  cloudStartBlocked,
-  ownerMark,
-  cloudPlaceLabel,
-  cloudStartFailure,
-  cloudStartSteps,
-  failureParts,
-  preparingCloud,
-  queueAfterStart,
-  runsInCloud,
-  startingInCloud,
-  threadMoveCard,
-  missingCloudSignIn,
-  cloudTurnOf,
-  type CloudTurnWho,
-  type MoveCard,
-  type CloudStartStep,
-  type CloudStartStepState,
-  type StartingCloudThread,
-} from "./cloud-start.js";
 export { composerActivity, composerPlaceholder, composerSendBlock, queueHint } from "./composer-presentation.js";
 export type { ClientPush, CoreConnection, Notice } from "./connection.js";
 export { conversationCost, formatCost } from "./conversation-cost.js";
+export { failureParts } from "./failure-parts.js";
 export { conversationActivity, conversationCanSteer, conversationPlaceholder, heardTranscript, conversationSendDisabledReason, conversationSteerReason } from "./conversation-presentation.js";
 export type { SavedThreadSettings } from "./conversation-settings.js";
 export {
@@ -185,6 +163,7 @@ export { pruneThreadFolds, threadFoldIds } from "./thread-folds.js";
 export { threadHeadline, type ThreadHeadline } from "./thread-headline.js";
 export {
   latestActivity,
+  ownerMark,
   pullRequestMark,
   pullRequestNumber,
   renamedTitle,

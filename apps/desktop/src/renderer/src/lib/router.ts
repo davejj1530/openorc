@@ -35,7 +35,7 @@ export type Route =
   | { view: "scheduled" }
   /** The Orcling designer: a new Orcling, or one being changed. */
   | { view: "orcling"; orclingId?: string }
-  /** A section, optionally with what to bring into view there: a provider's usage, or a project to add to the cloud brain. */
+  /** A section, optionally with what to bring into view there: a provider's usage, or a project to add to OpenOrc Cloud. */
   | { view: "settings"; section?: SettingsSection; provider?: HarnessId; project?: string }
   | { view: "diagnostics" };
 

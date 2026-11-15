@@ -1,7 +1,7 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import type { AgentEvent, AgentKind, CloudSignIns, PermissionPreset, Project, Run, RunMode, ThreadSummary } from "@openorc/protocol";
+import type { AgentEvent, AgentKind, PermissionPreset, Project, Run, RunMode, ThreadSummary } from "@openorc/protocol";
 import { runs as runStore } from "../lib/client";
 import { core } from "../lib/rpc";
 import type { ComposerProps } from "./Composer";
@@ -219,39 +219,4 @@ it("offers only the accounts the thread's project uses after a usage limit, and 
   } finally {
     queries.delete("projects.get");
   }
-});
-
-it("holds a cloud turn whose sign-in the cloud lacks, offers that sign-in in place, and sends once it is ready", async () => {
-  const cloud = { provider: "vercel", state: "ready", step: null, setup: false, error: null } as const;
-  const codex = { kind: "codex", label: "Codex", way: "browser", error: null } as const;
-  let signIns: CloudSignIns = { rows: [{ ...codex, state: "missing" }], bringing: false };
-  const base = vi.mocked(core.call).getMockImplementation()!;
-  vi.mocked(core.call).mockImplementation((async (method: string, params: never) => (method === "cloud.signIns" ? signIns : base(method as never, params))) as never);
-  queries.set("cloud.signIns", signIns);
-  const { heard } = await open({ thread: { cloud }, runs: [{ id: "A", agent: "codex", live: false }] });
-  const sending = composer.props!.onSubmit("hello", [], false);
-  expect(await screen.findByText("Codex has no sign-in for the cloud.")).toBeTruthy();
-  const sent = () => vi.mocked(core.call).mock.calls.filter(([method]) => sends.has(method));
-  expect(sent()).toEqual([]);
-  signIns = { rows: [{ ...codex, state: "ready" }], bringing: false };
-  queries.set("cloud.signIns", signIns);
-  await act(async () => void fireEvent.click(screen.getByRole("button", { name: "Sign in" })));
-  expect(vi.mocked(core.call)).toHaveBeenCalledWith("cloud.signIns.bring", { target: { kind: "codex" } });
-  expect(sent()).toEqual([]);
-  act(heard);
-  await act(() => sending);
-  await waitFor(() => expect(sent()).toEqual(start(true, { messageId: expect.stringMatching(/^user-/) })));
-  expect(screen.queryByText("Codex has no sign-in for the cloud.")).toBeNull();
-});
-
-it("sends a cloud turn at once when the cloud has its sign-in, and never asks for a turn on this Mac", async () => {
-  const signIns: CloudSignIns = { rows: [{ kind: "codex", label: "Codex", way: "browser", error: null, state: "ready" }], bringing: false };
-  const base = vi.mocked(core.call).getMockImplementation()!;
-  vi.mocked(core.call).mockImplementation((async (method: string, params: never) => (method === "cloud.signIns" ? signIns : base(method as never, params))) as never);
-  const cloud = { provider: "vercel", state: "ready", step: null, setup: false, error: null } as const;
-  expect(await submit({ thread: { cloud }, runs: [{ id: "A", agent: "codex", live: false }] })).toEqual(start(true));
-  cleanup();
-  vi.mocked(core.call).mockClear();
-  await submit({ runs: [{ id: "A", agent: "codex", live: false }] });
-  expect(vi.mocked(core.call).mock.calls.some(([method]) => method === "cloud.signIns")).toBe(false);
 });

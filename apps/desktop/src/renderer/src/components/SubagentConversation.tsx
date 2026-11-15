@@ -1,4 +1,4 @@
-import { placeOf, type Project, type RpcParams, type ThreadSummary } from "@openorc/protocol";
+import type { Project, RpcParams, ThreadSummary } from "@openorc/protocol";
 import { subagentStatusLabel, useTicking, workDuration } from "@openorc/client";
 import { useConversationTranscript, useRpc, useRpcMutation } from "../lib/client";
 import { openThread, useRouter } from "../lib/router";
@@ -14,8 +14,7 @@ export function SubagentConversation({ thread, project }: { thread: ThreadSummar
   const target = useRouter(({ route }) => (route.view === "thread" && route.threadId === thread.id ? route.message : undefined));
   const { merged, hasOlder, loadOlder } = useConversationTranscript({ runs: history.data ?? [], threadId: thread.id, target, hosted: thread.owner?.brain === "hosted" });
   const voice = useRunVoices({ authors: new Map() }, history.data ?? [], thread);
-  const parent = useRpc("threads.get", { id: thread.parentThreadId ?? "" }, { enabled: placeOf(thread).elsewhere && Boolean(thread.parentThreadId) });
-  const links = subagentLinkFolder(thread, parent.data, project);
+  const links = subagentLinkFolder(thread, project);
   return (
     <ConversationVoice.Provider value={voice}>
       <div className="h-full min-w-0 flex flex-col min-h-0">

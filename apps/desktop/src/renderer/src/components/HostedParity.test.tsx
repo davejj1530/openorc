@@ -20,7 +20,6 @@ beforeEach(() => {
   queryClient.setDefaultOptions({ queries: { retry: false, staleTime: Infinity } });
   vi.spyOn(core, "call").mockImplementation(async <M extends RpcMethod>(method: M): Promise<RpcResults[M]> => {
     if (method === "hosted.capabilities") return { version: 1, features: {} } as RpcResults[M];
-    if (method === "cloud.offer") return { offered: false } as RpcResults[M];
     throw new Error(`Unexpected local read: ${method}`);
   });
 });

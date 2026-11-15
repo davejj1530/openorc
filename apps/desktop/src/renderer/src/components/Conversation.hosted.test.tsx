@@ -233,8 +233,8 @@ it.each([
   expect(composer.props!.asksLabel).toBe(label);
 });
 
-it.each(["hosted", "cloud"] as const)("blocks sending to a %s thread out of reach even if the account is online", async (brain) => {
-  await open({ owner: { brain, reach: "offline", heardAt: 1 } });
+it("blocks sending to a thread out of reach even if the account is online", async () => {
+  await open({ owner: { brain: "hosted", reach: "offline", heardAt: 1 } });
   expect(composer.props!.disabledReason).toMatch(/can't be reached/);
   expect(composer.props!.readOnlyReason).toBeNull();
   expect(screen.queryByRole("status", { name: "OpenOrc Cloud" })).toBeNull();

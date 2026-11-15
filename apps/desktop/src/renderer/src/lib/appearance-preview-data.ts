@@ -115,7 +115,6 @@ export function createAppearancePreviewRpc() {
       gh: { installed: true, loggedIn: false },
     },
     "claude.accounts.list": { accounts: [], defaultId: null },
-    "cloud.offer": { brain: null, provider: null, projects: [] },
     "providers.limits": [],
     "providers.usage": exampleUsage(now),
     "review.projectDiff": { baseSha: null, since: null, patch: "", files: [], branch: "main", base: "main", dirty: false },

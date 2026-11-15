@@ -2,11 +2,12 @@ import type { McpHost } from "@openorc/mcp";
 import { TaskPriority } from "@openorc/protocol";
 import type { ThreadService } from "../services/threads.js";
 import type { RunContext } from "./context.js";
-type Dependencies = { threadService: Pick<ThreadService, "toolCreate">; assertRunAvailable: RunContext["assertRunAvailable"] };
-export function createTaskCreateHost({ threadService, assertRunAvailable }: Dependencies): McpHost["tasks"]["create"] {
-  return (runId, input) => {
+import { onlineTasks, type OnlineTasksHost } from "./online-tasks.js";
+type Dependencies = { threadService: Pick<ThreadService, "toolCreate">; assertRunAvailable: RunContext["assertRunAvailable"]; online?: OnlineTasksHost };
+export function createTaskCreateHost({ threadService, assertRunAvailable, online = null }: Dependencies): McpHost["tasks"]["create"] {
+  return async (runId, input) => {
     assertRunAvailable(runId);
-    if (input.scope) throw new Error("Online task tools aren't available here.");
+    if (input.scope) return onlineTasks(online).create(runId, { ...input, scope: input.scope });
     return threadService.toolCreate(runId, {
       title: input.title,
       spec: input.spec,

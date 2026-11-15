@@ -69,6 +69,7 @@ import { createOrclingHost } from "./mcp-host/orcling.js";
 import { createRunHost } from "./mcp-host/run.js";
 import { createTaskCreateHost } from "./mcp-host/task-create.js";
 import { createTasksHost } from "./mcp-host/tasks.js";
+import { OnlineTaskTools } from "./services/online-task-tools.js";
 import { createThreadsHost } from "./mcp-host/threads.js";
 import type { OpenOrcOptions } from "./options.js";
 import { phoneCloudPlace } from "./remote/cloud-policy.js";
@@ -465,11 +466,24 @@ export class OpenOrc {
     if (!this.mcp) {
       const { assertRunAvailable, taskFor, projectFor } = createContextHost({ db: this.db });
       const threadsHost = createThreadsHost({ threadService: this.threads, db: this.db, assertRunAvailable });
+      // A Mac agent's tools for its own project's tasks on OpenOrc Cloud, where the server opens them.
+      const online = new OnlineTaskTools({
+        account: () => this.account,
+        projectFor: (runId) => {
+          try {
+            return projectFor(runId);
+          } catch {
+            return null;
+          }
+        },
+        captureProcess: (runId) => this.runs.captureProcess(runId),
+      });
       this.mcp = startMcpServer({
         ...createRunHost({ runService: this.runs, db: this.db, comments: this.comments, assertRunAvailable }),
         ...createBrowserHost({ db: this.db, runService: this.runs, browser: this.options.browser, assertRunAvailable }),
         ...createDeviceHost({ db: this.db, runService: this.runs, devices: this.devices, assertRunAvailable }),
-        ...createMemoryHost({ memoryService: this.memory, runService: this.runs, db: this.db, assertRunAvailable, taskFor, projectFor }),
+        ...createMemoryHost({ memoryService: this.memory, runService: this.runs, db: this.db, assertRunAvailable, taskFor, projectFor, online }),
+        onlineTaskScopes: (runId) => online.scopes(runId),
         execution: {
           available: (runId) => this.slack.executionAvailable(runId),
           context: (runId) => this.slack.executionContext(runId),
@@ -491,8 +505,8 @@ export class OpenOrc {
         }),
         pullReview: this.pullRequests.agentTools(),
         tasks: {
-          ...createTasksHost({ threadService: this.threads, dataDir: this.options.dataDir, assertRunAvailable }),
-          create: createTaskCreateHost({ threadService: this.threads, assertRunAvailable }),
+          ...createTasksHost({ threadService: this.threads, dataDir: this.options.dataDir, assertRunAvailable, online }),
+          create: createTaskCreateHost({ threadService: this.threads, assertRunAvailable, online }),
         },
       });
     }

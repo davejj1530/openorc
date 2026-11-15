@@ -89,3 +89,11 @@ it("an agent's update leaves its working conversation running, and its next turn
 it("answers a request to stop agent updates when none is running", async () => {
   expect(await core.handle({ type: "rpc", id: 903, method: "agents.updates.cancel", params: {} })).toMatchObject({ type: "rpc.result", id: 903, result: { updating: false } });
 });
+
+it("tells a call made for a run's process whether that same process still serves the run", async () => {
+  const run = await session(async () => {});
+  const active = core.runs.captureProcess(run.id);
+  expect(active()).toBe(true);
+  await core.runs.closeAndWait(run.id);
+  expect(active()).toBe(false);
+});

@@ -1,5 +1,5 @@
 import type { Hosted } from "@openorc/hosted";
-import type { TaskScope } from "@openorc/mcp";
+import type { OnlineTaskScopeChoice, TaskScope } from "@openorc/mcp";
 import type { OnlineTask } from "@openorc/protocol";
 
 const CHANGED = "This run's OpenOrc session or project access changed.";
@@ -47,3 +47,23 @@ export async function captureOnlineTaskScope(deps: OnlineTaskScopeDependencies, 
   };
 }
 export type CapturedOnlineTaskScope = Awaited<ReturnType<typeof captureOnlineTaskScope>>;
+
+/**
+ * The cloud projects a run's agent may name: its own local project, paired in each space whose tasks are delivered and
+ * whose server opens them, named as the person reads it. None while signed out, unpaired or closed.
+ */
+export async function onlineTaskScopeChoices(deps: OnlineTaskScopeDependencies, runId: string): Promise<OnlineTaskScopeChoice[]> {
+  const account = deps.account();
+  const local = deps.projectFor(runId);
+  const status = account?.spaces.status();
+  if (!account || !local || status?.state !== "ready") return [];
+  const choices: OnlineTaskScopeChoice[] = [];
+  for (const space of status.spaces) {
+    const available = await account.tasks.state({ spaceId: space.id });
+    if (available.state !== "ready" || !available.execution) continue;
+    for (const project of await account.spaces.projects(space.id))
+      if (project.localProjectId === local && project.hostedProjectId)
+        choices.push({ spaceId: space.id, projectId: project.hostedProjectId, name: `${space.kind === "organization" ? space.name : "Personal"} · ${project.name}` });
+  }
+  return choices;
+}

@@ -3,6 +3,7 @@ import { type McpHost } from "@openorc/mcp";
 import { MemoryService } from "../services/memory.js";
 import { RunService } from "../services/runs.js";
 import type { RunContext } from "./context.js";
+import { onlineTasks, type OnlineTasksHost } from "./online-tasks.js";
 type Dependencies = {
   memoryService: Pick<MemoryService, "enabled" | "assertEnabled" | "retrieve" | "taskContext" | "record" | "feedback">;
   runService: Pick<RunService, "authorizeAppAction">;
@@ -10,6 +11,7 @@ type Dependencies = {
   assertRunAvailable: RunContext["assertRunAvailable"];
   taskFor: RunContext["taskFor"];
   projectFor: RunContext["projectFor"];
+  online?: OnlineTasksHost;
 };
 export function createMemoryHost({
   memoryService,
@@ -18,6 +20,7 @@ export function createMemoryHost({
   assertRunAvailable,
   taskFor,
   projectFor,
+  online = null,
 }: Dependencies): Pick<McpHost, "memoryEnabled" | "memorySearch" | "taskContext" | "memoryRecord" | "memoryFeedback"> {
   return {
     memoryEnabled: () => memoryService.enabled(),
@@ -37,7 +40,7 @@ export function createMemoryHost({
     },
     taskContext: async (runId, options) => {
       assertRunAvailable(runId);
-      if (options?.scope) throw new Error("Online task tools aren't available here.");
+      if (options?.scope) return onlineTasks(online).context(runId, options.scope, options.taskId);
       const task = taskFor(runId);
       return task ? memoryService.taskContext(task) : "No task context.";
     },

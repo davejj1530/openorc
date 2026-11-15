@@ -723,6 +723,12 @@ export class RunService {
     return this.live.has(runId);
   }
 
+  /** The process serving a run now: answers whether that same process still serves it, so its call never acts for a later one. */
+  captureProcess(runId: string): () => boolean {
+    const process = this.live.get(runId);
+    return () => process !== undefined && this.live.get(runId) === process;
+  }
+
   /** A turn is in flight on this process. Live alone only means the session is open between turns. */
   isBusy(runId: string): boolean {
     return this.live.get(runId)?.busy === true;

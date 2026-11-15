@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { TaskCard, TaskScope, TaskTools } from "@openorc/mcp";
 import { TaskPriority, type OnlineTask } from "@openorc/protocol";
-import { captureOnlineTaskScope, type CapturedOnlineTaskScope, type OnlineTaskScopeDependencies } from "./online-task-scope.js";
+import type { OnlineTaskScopeChoice } from "@openorc/mcp";
+import { captureOnlineTaskScope, onlineTaskScopeChoices, type CapturedOnlineTaskScope, type OnlineTaskScopeDependencies } from "./online-task-scope.js";
 
 type CreateInput = Parameters<TaskTools["create"]>[1] & { scope: TaskScope };
 type UpdateInput = Parameters<TaskTools["update"]>[2] & { scope: TaskScope };
@@ -25,6 +26,11 @@ export class OnlineTaskTools {
   /** A write's request id until the server answers it, by captured target and the write's words. */
   readonly #requests = new Map<string, string>();
   constructor(readonly deps: OnlineTaskScopeDependencies) {}
+
+  /** The cloud projects this run's agent may name in its task tools. */
+  scopes(runId: string): Promise<OnlineTaskScopeChoice[]> {
+    return onlineTaskScopeChoices(this.deps, runId);
+  }
 
   /** As the Mac lists a project's tasks: every one but the archived, open ones first. */
   async list(runId: string, scope: TaskScope): Promise<TaskCard[]> {

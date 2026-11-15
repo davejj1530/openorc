@@ -93,3 +93,9 @@ it("keeps the paired execution gate closed", async () => {
   const { tools, scope } = await fixture({}, false);
   await expect(tools.list("run-one", scope)).rejects.toThrow("Online task tools aren't available");
 });
+it("offers the run's own cloud project as its scope, by name, and none while the server keeps task threads closed", async () => {
+  const { tools, scope } = await fixture();
+  expect(await tools.scopes("run-one")).toEqual([{ ...scope, name: expect.stringContaining("Example") }]);
+  const closed = await fixture({}, false);
+  expect(await closed.tools.scopes("run-one")).toEqual([]);
+});

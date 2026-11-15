@@ -1,7 +1,10 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 
-/** Who asked, set by RemoteSession only and never on the wire. A window's request has no origin. */
-export type RequestOrigin = { kind: "phone"; deviceId: string };
+/**
+ * Who asked, set by RemoteSession only and never on the wire. A window's request has no origin. `cloud` marks a phone
+ * whose session shares cloud threads: the one phone origin that may ask OpenOrc Cloud about what the account holds.
+ */
+export type RequestOrigin = { kind: "phone"; deviceId: string; cloud?: true };
 
 /** The origin of the request being handled, carried across every await of its handler. */
 export const requestOrigin = new AsyncLocalStorage<RequestOrigin | undefined>();

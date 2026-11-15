@@ -71,6 +71,9 @@ interface AccessSetting {
   port: number | null;
 }
 
+/** What a phone reads under: its lists, a thread's runs and who wrote in it, the spaces and their projects. Billing, people, invitations, repositories, tasks and files are not a phone's yet. */
+const cloudKey = (key: string): boolean => ["threads", "spaces", "projects"].includes(key) || /^(?:runs:thread|authors|access):/.test(key);
+
 type State = { state: "off" } | { state: "on"; listener: Listener; keys: KeyPair } | { state: "failed"; reason: string };
 
 function readSetting(db: Db): AccessSetting {
@@ -234,6 +237,30 @@ export class RemoteAccess {
     } catch (error) {
       // Logs are not delivered to phones, so this cannot loop back here.
       this.options.log.warn(`phone access dropped a push: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * What OpenOrc Cloud tells this Mac's windows, for the phones whose sessions share cloud threads and for no other
+   * phone: a thread's frames to those that asked for its run, a gap in them, and that threads, spaces or projects
+   * changed. Nothing else of the account's transport passes. Never throws into the core.
+   */
+  publishCloud(push: Broadcast): void {
+    const sessions = [...this.sessions].filter((session) => session.sharesCloud);
+    if (sessions.length === 0) return;
+    try {
+      if (push.type === "gap") for (const session of sessions) session.gap(push.runIds);
+      if (push.type === "invalidate") {
+        const keys = push.keys.filter(cloudKey);
+        if (keys.length) for (const session of sessions) session.push({ type: "invalidate", keys });
+      }
+      if (push.type !== "frame") return;
+      const listeners = sessions.filter((session) => session.wants(push.frame.runId));
+      if (listeners.length === 0) return;
+      const shaped = this.shaper.shape(push.frame);
+      for (const session of listeners) session.push({ type: "frame", frame: shaped.frame }, shaped.bytes);
+    } catch (error) {
+      this.options.log.warn(`phone access dropped a cloud push: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

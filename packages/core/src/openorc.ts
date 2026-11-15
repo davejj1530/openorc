@@ -1,6 +1,6 @@
 import { captureLaunchEnvironment, claudeConfigDir, recoverAgentProcesses } from "@openorc/agents";
 import { claudeAccounts as storedClaudeAccounts, Db, LedgerWriter, plans, redact, settings as storedSettings } from "@openorc/db";
-import type { Hosted } from "@openorc/hosted";
+import type { Hosted, HostedThreads } from "@openorc/hosted";
 import { startMcpServer, type OpenOrcMcpServer } from "@openorc/mcp";
 import { harnessAvailability, harnessInfo, harnessLoggedIn, rpcParams, type HarnessId, type RpcMethod, type RpcRequest } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
@@ -70,6 +70,7 @@ import { createTaskCreateHost } from "./mcp-host/task-create.js";
 import { createTasksHost } from "./mcp-host/tasks.js";
 import { createThreadsHost } from "./mcp-host/threads.js";
 import type { OpenOrcOptions } from "./options.js";
+import { phoneCloudPlace } from "./remote/cloud-policy.js";
 import { RemoteAccess } from "./remote/remote-access.js";
 import { requestOrigin, type RequestOrigin } from "./request-origin.js";
 import { guardContext } from "./remote/policy.js";
@@ -154,6 +155,8 @@ export class OpenOrc {
   readonly workspaces: WorkspaceService;
   private hosted: Hosted | null | undefined;
   private placeRouter: PlaceRouter | undefined;
+  private phonePlaceRouter: PlaceRouter | undefined;
+  private phonePlace: HostedThreads | undefined;
   readonly runs: RunService;
   readonly comments: TaskCommentService;
   readonly review: ReviewService;
@@ -189,6 +192,13 @@ export class OpenOrc {
   private readonly options: OpenOrcOptions;
   /** The windows alone, before the phone tap. */
   private readonly windows: OpenOrcOptions["transport"];
+  /** What the account sends: to the windows, and of it to phones only what `publishCloud` passes to a session that shares cloud threads. */
+  private readonly accountTransport: OpenOrcOptions["transport"] = {
+    push: (message) => {
+      this.windows.push(message);
+      this.remote.publishCloud(message);
+    },
+  };
   private closingForUpdate = false;
   private mcp: Promise<OpenOrcMcpServer> | null = null;
   private readonly handlers: Handlers;
@@ -305,7 +315,11 @@ export class OpenOrc {
   /** The OpenOrc account; null in a core given no account server. Made at its first use. */
   get account(): Hosted | null {
     if (this.hosted === undefined)
-      this.hosted = accountFor(this.options, { db: this.db, windows: this.windows, notices: () => this.settings.get().notifications, claude: this.claudeAccounts, log: this.log }, this.textGeneration);
+      this.hosted = accountFor(
+        this.options,
+        { db: this.db, windows: this.accountTransport, notices: () => this.settings.get().notifications, claude: this.claudeAccounts, log: this.log },
+        this.textGeneration,
+      );
     return this.hosted;
   }
 
@@ -490,8 +504,11 @@ export class OpenOrc {
    * request names its origin, which the handler's audit rows can read for as long as it runs.
    */
   async handle(request: RpcRequest, origin?: RequestOrigin): Promise<RpcReply> {
-    // A window's call may be about a thread OpenOrc Cloud holds; a phone's never goes there.
-    return origin ? this.dispatch(request, origin) : this.places.handle(request);
+    // A window's call may be about a thread OpenOrc Cloud holds.
+    if (!origin) return this.places.handle(request);
+    // A phone's stays on this Mac, unless its session shares cloud threads: then it asks what a phone may, as itself.
+    if (!origin.cloud) return this.dispatch(request, origin);
+    return requestOrigin.run(origin, () => this.phonePlaces.handle(request));
   }
 
   /** OpenOrc Cloud's threads first, by lookup; then this Mac. */
@@ -502,6 +519,22 @@ export class OpenOrc {
       next: (request) => this.dispatch(request),
     });
     return this.placeRouter;
+  }
+
+  /** The same router over OpenOrc Cloud cut down to what a phone may ask of it; what goes on to this Mac keeps the phone's origin. */
+  private get phonePlaces(): PlaceRouter {
+    this.phonePlaceRouter ??= new PlaceRouter({
+      place: () => this.phoneCloud(),
+      spaces: () => this.account?.spaces ?? null,
+      next: (request) => this.dispatch(request, requestOrigin.getStore()),
+    });
+    return this.phonePlaceRouter;
+  }
+
+  private phoneCloud(): HostedThreads | null {
+    const threads = this.account?.threads;
+    if (threads) this.phonePlace ??= phoneCloudPlace(threads);
+    return threads ? (this.phonePlace ?? null) : null;
   }
 
   private async dispatch(request: RpcRequest, origin?: RequestOrigin): Promise<RpcReply> {

@@ -1,13 +1,15 @@
 import { LinkCloseCode, type ClosingReason, type MacMessage, type MacSession, type PhoneMessage } from "@openorc/link";
 import {
   deviceRpcParams,
+  isCloudRemoteMethod,
   isDeviceMethod,
   isRemoteMethod,
   isSessionMethod,
-  PHONE_CAPABILITIES,
+  MAC_CAPABILITIES,
   phoneEvents,
   PREVIEW_INPUT_WORDS,
   sessionRpcParams,
+  supportsCloudThreads,
   supportsSubagents,
   type AssetRef,
   type DeviceMethod,
@@ -22,6 +24,7 @@ import type { RequestOrigin } from "../request-origin.js";
 import { PREVIEW_THREAD_GONE } from "../services/preview.js";
 import type { ImageFileRead } from "../services/profile-assets.js";
 import type { RpcReply } from "../transport.js";
+import { cloudReply } from "./cloud-policy.js";
 import { remoteError, type MacRoots } from "./phone-words.js";
 import { admitRemoteRequest, remoteParams, remoteReply, type GuardContext } from "./policy.js";
 import type { PreviewCasters } from "./preview-casters.js";
@@ -107,6 +110,19 @@ export class RemoteSession {
 
   wants(runId: string): boolean {
     return this.interest.has(runId);
+  }
+
+  /** Whether the phone asked for OpenOrc Cloud threads on this session, and so may hear and ask of them. */
+  get sharesCloud(): boolean {
+    return supportsCloudThreads(this.capabilities);
+  }
+
+  /** Frames of these runs were lost on their way to this Mac; the phone reloads those it follows. */
+  gap(runIds: readonly string[]): void {
+    const followed = runIds.filter((runId) => this.interest.has(runId));
+    if (this.link.closed || followed.length === 0) return;
+    this.queue.push({ t: "gap", runIds: followed });
+    this.schedule();
   }
 
   onClose(listener: () => void): void {
@@ -203,9 +219,15 @@ export class RemoteSession {
       return { type: "rpc.result", id, result: await this.deps.device(this.deviceId, method, parsed.data) };
     }
     if (isSessionMethod(method)) return this.ownSession(id, method, params);
+    // The mark is what lets a request ask OpenOrc Cloud. It is made here, from what this session negotiated, for every request anew.
+    const origin: RequestOrigin = this.sharesCloud ? { kind: "phone", deviceId: this.deviceId, cloud: true } : { kind: "phone", deviceId: this.deviceId };
+    if (origin.cloud && isCloudRemoteMethod(method)) {
+      const reply = await this.deps.answer({ type: "rpc", id, method, params }, origin);
+      return reply.type === "rpc.result" ? { ...reply, result: cloudReply(method, reply.result as never, { words: this.words, roots: this.deps.roots }) } : reply;
+    }
     const admission = admitRemoteRequest(method, params, this.deps.guard);
     if (!admission.ok || !isRemoteMethod(method)) return { type: "rpc.error", id, message: admission.ok ? "This is not available from a phone." : admission.message };
-    const reply = await this.deps.answer({ type: "rpc", id, method, params: remoteParams(method, params, this.capabilities) }, { kind: "phone", deviceId: this.deviceId });
+    const reply = await this.deps.answer({ type: "rpc", id, method, params: remoteParams(method, params, this.capabilities) }, origin);
     return reply.type === "rpc.result" ? { ...reply, result: remoteReply(method, reply.result as never, { words: this.words, roots: this.deps.roots, capabilities: this.capabilities }) } : reply;
   }
 
@@ -217,7 +239,7 @@ export class RemoteSession {
     switch (method) {
       case "session.negotiate": {
         const { capabilities } = parsed.data as SessionParams<"session.negotiate">;
-        this.capabilities = PHONE_CAPABILITIES.filter((capability) => capabilities.includes(capability));
+        this.capabilities = MAC_CAPABILITIES.filter((capability) => capabilities.includes(capability));
         return { type: "rpc.result", id, result: { capabilities: this.capabilities } };
       }
       case "preview.unwatch":

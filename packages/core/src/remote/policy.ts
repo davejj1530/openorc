@@ -174,7 +174,7 @@ function orclingInstructions({ id, body }: RpcParams<"orclings.instructions.save
   return stored && redact(stored).redacted ? "These instructions hold a secret, so edit them on your Mac." : null;
 }
 
-const NOT_FROM_PHONE = "This is not available from a phone.";
+export const NOT_FROM_PHONE = "This is not available from a phone.";
 
 /** Typed over REMOTE_METHODS: a method listed there without a guard here, or guarded but not listed, fails the build. */
 export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {

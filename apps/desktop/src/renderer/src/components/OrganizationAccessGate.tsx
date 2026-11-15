@@ -43,7 +43,11 @@ export function FrozenOrganization({
   return (
     <>
       <TopBar orcling={false}>{organization.name}</TopBar>
-      {menu ? <div className="page-column organization-frozen-head">{menu}</div> : null}
+      {menu ? (
+        <div className="page-column list-page organization-frozen-head">
+          <span className="organization-frozen-menu">{menu}</span>
+        </div>
+      ) : null}
       <section className="organization-frozen" aria-label={organization.name}>
         <div className="organization-frozen-content">
           <OrganizationMark name={organization.name} logo={organization.logo} size={40} />

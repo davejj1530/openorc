@@ -7,7 +7,11 @@ import { fixtureThreads } from "./test-fixtures/threads";
 import { ThreadRow } from "./ThreadRow";
 
 const menus = vi.hoisted(() => ({ built: [] as ThreadAction[][][] }));
-vi.mock("../generated/icons", async (original) => ({ ...(await original<object>()), CircleDashed: () => <svg aria-label="Neutral status mark" /> }));
+vi.mock("../generated/icons", async (original) => ({
+  ...(await original<object>()),
+  CircleDashed: () => <svg aria-label="Neutral status mark" />,
+  Cloud: () => <svg aria-label="Cloud glyph" />,
+}));
 
 vi.mock("expo-router", () => {
   const Link = ({ children }: { children: ReactNode }) => <div data-testid="opens-thread">{children}</div>;
@@ -102,4 +106,19 @@ it("keeps a parent's disclosure on its own row, beside the link that opens the t
   view.rerender(<ThreadRow thread={parent} project={null} arriving={false} tree={{ ...tree, expanded: true }} motion={{ folding: true }} onFold={onFold} />);
   fireEvent.click(view.getByRole("button", { name: `Expand ${parent.title}` }));
   expect(onFold).toHaveBeenLastCalledWith(parent.id, true);
+});
+
+it("marks an OpenOrc Cloud thread with the cloud, its project and the teammate who started it, and leaves its menu to the Mac", () => {
+  const mine = { ...fixtureThreads.find((thread) => thread.id === "t-plan")!, branch: null, prUrl: null };
+  const cloud = { ...mine, id: "cloud", owner: { brain: "hosted" as const, reach: "live" as const, heardAt: 1, startedBy: { name: "Mara Okafor", image: null } } };
+  const row = render(<ThreadRow thread={cloud} project="Canvas" arriving={false} />);
+  expect(row.getByText("Canvas · Mara")).toBeTruthy();
+  expect(row.getByLabelText("Cloud glyph")).toBeTruthy();
+  expect(row.getByRole("button").getAttribute("aria-label")).toContain("Canvas, OpenOrc Cloud, started by Mara Okafor");
+  expect(menus.built).toEqual([]);
+  row.unmount();
+
+  const own = render(<ThreadRow thread={mine} project="Canvas" arriving={false} />);
+  expect(own.queryByLabelText("Cloud glyph")).toBeNull();
+  expect(menus.built.length).toBeGreaterThan(0);
 });

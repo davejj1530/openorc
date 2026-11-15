@@ -1,5 +1,5 @@
 import { createClientState, type RpcQueryOptions } from "@openorc/client";
-import type { AssetRef, RemoteMethod, RpcParams, RpcResults } from "@openorc/protocol";
+import type { AssetRef, CloudRemoteMethod, RemoteMethod, RpcParams, RpcResults } from "@openorc/protocol";
 import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query";
 import Constants from "expo-constants";
 import { addNetworkStateListener, getNetworkStateAsync, NetworkStateType, type NetworkState } from "expo-network";
@@ -15,6 +15,7 @@ import { forgetDoorKey, keychainKeys, openSocket, phoneCrypto, reachesInternet, 
 import type { NetworkKind, SavedMac } from "./connection/saved-macs";
 import { createDemoMac, DEMO_MAC } from "./demo/demo-mac";
 import { forgetFolds } from "./home/fold-keys";
+import { spaceKey } from "./spaces/space-key";
 import { forgetLists, keepLists, restoreLists } from "./lists-cache";
 import { followMacLook } from "./look/look";
 import { PhoneAlerts } from "./notifications/alerts";
@@ -49,6 +50,7 @@ export const link = new ConnectionManager({
   forgetCache: (macId) => {
     forgetLists(storage, macId);
     forgetFolds(storage, macId);
+    storage.remove(spaceKey(macId));
     assets.forget(macId);
   },
 });
@@ -156,9 +158,12 @@ export function assetUri(ref: AssetRef): Promise<string> {
   return assets.uri(shownMac, ref);
 }
 
+/** What phone access allows: the Mac's own methods, and those of a Mac that shares its OpenOrc Cloud threads. */
+type PhoneMethod = RemoteMethod | CloudRemoteMethod;
+
 // The phone may call only what phone access allows; these narrow the shared hooks so anything else does not compile.
-export const useRpc = <M extends RemoteMethod>(method: M, params: RpcParams<M>, options?: RpcQueryOptions<M>): UseQueryResult<RpcResults[M]> => client.useRpc(method, params, options);
-export const useRpcs = <M extends RemoteMethod>(method: M, paramsList: readonly RpcParams<M>[], options?: RpcQueryOptions<M>): UseQueryResult<RpcResults[M]>[] =>
+export const useRpc = <M extends PhoneMethod>(method: M, params: RpcParams<M>, options?: RpcQueryOptions<M>): UseQueryResult<RpcResults[M]> => client.useRpc(method, params, options);
+export const useRpcs = <M extends PhoneMethod>(method: M, paramsList: readonly RpcParams<M>[], options?: RpcQueryOptions<M>): UseQueryResult<RpcResults[M]>[] =>
   client.useRpcs(method, paramsList, options);
 export const useRpcMutation = <M extends RemoteMethod>(method: M): UseMutationResult<RpcResults[M], Error, RpcParams<M>> => client.useRpcMutation(method);
 export const { queryClient, useRun } = client;

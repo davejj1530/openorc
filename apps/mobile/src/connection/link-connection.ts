@@ -2,7 +2,16 @@ import type { ClientPush, CoreConnection } from "@openorc/client";
 import type { MacMessage, PhoneSession } from "@openorc/link";
 import type { AssetRef, DeviceMethod, DeviceParams, DeviceRpcResults, RemotePush, RpcMethod, RpcParams, RpcResults, SessionMethod, SessionParams, SessionRpcResults } from "@openorc/protocol";
 import type { Clock } from "./route-race";
-import { PHONE_CAPABILITIES, supportsOrclingEdits, supportsOrclings, supportsReplyImages, supportsSkillLists, supportsSubthreadStarts, supportsTaskDetails } from "@openorc/protocol";
+import {
+  PHONE_CAPABILITIES,
+  supportsCloudThreads,
+  supportsOrclingEdits,
+  supportsOrclings,
+  supportsReplyImages,
+  supportsSkillLists,
+  supportsSubthreadStarts,
+  supportsTaskDetails,
+} from "@openorc/protocol";
 
 /** A watched Preview's newest state, or the end of the watch, which only its screen hears. */
 export type PreviewPush = Extract<RemotePush, { type: "preview" | "preview.ended" }>;
@@ -51,6 +60,7 @@ export const OLDER_MAC_TASKS = "Update OpenOrc on your Mac to open its tasks her
 export const OLDER_MAC_TASK_EDITS = "Update OpenOrc on your Mac to edit its tasks here.";
 export const OLDER_MAC_TASK_CREATES = "Update OpenOrc on your Mac to add tasks from your phone.";
 export const OLDER_MAC_SUBTHREADS = "Update OpenOrc on your Mac to start subthreads from your phone.";
+export const OLDER_MAC_CLOUD = "Update OpenOrc on your Mac to see OpenOrc Cloud here.";
 
 /** Methods an older Mac refuses as not available from a phone, each with what it takes to have them. */
 const gated: Partial<Record<RpcMethod, Gate>> = {
@@ -67,6 +77,11 @@ const gated: Partial<Record<RpcMethod, Gate>> = {
   "orclings.instructions.save": { supports: supportsOrclingEdits, refusal: OLDER_MAC_ORCLING_EDITS },
   "orclings.reactions": { supports: supportsOrclings, refusal: OLDER_MAC_ORCLINGS },
   "orclings.react": { supports: supportsOrclings, refusal: OLDER_MAC_ORCLINGS },
+  "spaces.status": { supports: supportsCloudThreads, refusal: OLDER_MAC_CLOUD },
+  "spaces.projects": { supports: supportsCloudThreads, refusal: OLDER_MAC_CLOUD },
+  "account.person": { supports: supportsCloudThreads, refusal: OLDER_MAC_CLOUD },
+  "threads.collaboration": { supports: supportsCloudThreads, refusal: OLDER_MAC_CLOUD },
+  "threads.authors": { supports: supportsCloudThreads, refusal: OLDER_MAC_CLOUD },
 };
 
 type Gate = { supports: (capabilities?: readonly string[]) => boolean; refusal: string };

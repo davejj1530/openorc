@@ -1,6 +1,9 @@
 import { Link } from "expo-router";
 import { Pressable, View } from "react-native";
 import type { LinkState } from "../../connection/manager";
+import { ChevronDown } from "../../generated/icons";
+import { SpaceMark } from "../../spaces/SpaceMark";
+import { spaceName, useSpaces } from "../../spaces/use-spaces";
 import { LinkDot } from "../../ui/LinkDot";
 import { TopFade } from "../../ui/ScrollFade";
 import { Wordmark, WORDMARK_MAX_SCALE } from "../../ui/Wordmark";
@@ -30,6 +33,24 @@ function PinnedStatus({ state }: { state: Exclude<LinkState, { kind: "unpaired" 
 }
 
 /**
+ * The bar's title for a paired Mac: OpenOrc's wordmark, or, once the Mac says who is signed in to OpenOrc on it, the
+ * space Home shows, by its mark and name in the wordmark's place and type. That one opens the spaces to choose from.
+ */
+function Title() {
+  const account = useSpaces();
+  if (account.state !== "ready") return <Wordmark className="self-stretch" />;
+  const space = account.current;
+  return (
+    <Link href="/space" asChild>
+      <Pressable accessibilityRole="button" accessibilityLabel={`${spaceName(space)}, space`} hitSlop={4} className="shrink flex-row items-center gap-1.5 self-stretch active:opacity-60">
+        <Wordmark name={spaceName(space)} mark={(size) => <SpaceMark space={space} size={size} />} className="shrink" />
+        <ChevronDown size={16} className="text-ink-4" />
+      </Pressable>
+    </Link>
+  );
+}
+
+/**
  * Home's first row, pinned as an opaque bar over the status bar's room so rows never show sliced under the clock: the
  * wordmark on the grid's lead and text columns, the header circles trailing (the connection among them), and a fade
  * rows pass into once they scroll under it. While the link is not healthy, the bar says so after the wordmark, which
@@ -39,7 +60,7 @@ export function HomeBar({ state, scroll, tab }: { state: LinkState; scroll?: Hom
   return (
     <View className="px-5 pt-1">
       <View className="h-13 flex-row items-center">
-        <Wordmark className="self-stretch" />
+        {state.kind === "unpaired" ? <Wordmark className="self-stretch" /> : <Title />}
         {state.kind === "unpaired" ? null : <PinnedStatus state={state} />}
         <View className="flex-1" />
         <HeaderButtons state={state} tab={tab} />

@@ -19,6 +19,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useRpc, useRpcs } from "../client";
 import { projectChoices } from "../projects";
+import { macScope, spaceScope } from "../spaces/list-scope";
+import { useSpaces } from "../spaces/use-spaces";
 import { homeItems, type HomeList, type HomeOptions } from "./home-items";
 import { useHomeFilter } from "./filter";
 import { pruneMissingFolds, toggleFold, toggleThreadChildren, useFolds } from "./folds";
@@ -49,42 +51,45 @@ function useOpening(): [string | null, (key: string) => void] {
 }
 
 /** The open thread's family when no loaded page holds it, so it shows in its day. */
-function useSelectedFamily(selected: ThreadSummary | null, filter: SidebarFilter, listed: ReadonlySet<string>, children: ReturnType<typeof useChildThreadPages>) {
+function useSelectedFamily(selected: ThreadSummary | null, filter: SidebarFilter, listed: ReadonlySet<string>, children: ReturnType<typeof useChildThreadPages>, space: { spaceId?: string }) {
   return useRpc(
     "threads.list",
-    { projectId: selected?.projectId, filter, includeChildren: true, limit: 1, selectedId: selected?.id, ...children.params(selected?.projectId) },
+    { ...space, projectId: selected?.projectId, filter, includeChildren: true, limit: 1, selectedId: selected?.id, ...children.params(selected?.projectId) },
     { enabled: Boolean(selected && !listed.has(selected.id)) },
   ).data;
 }
 
 /**
- * The Mac's threads as one list across its projects, newest work first, read a page at a time; pins come from their
+ * The threads of the Mac, or of the space Home shows, as one list across projects, newest work first, read a page at a time; pins come from their
  * own read so an old pin still leads, and so do the threads that need you, so a folded day can still show them, and,
  * while Resolved is open, the threads put there. The list reads on by itself until every open day is whole, and
  * Resolved pages on request.
  */
 function useThreadList(connected: boolean, selectedId: string | undefined, resolvedOpen: boolean) {
   const projects = useRpc("projects.list", {});
+  const account = useSpaces();
+  const space = account.state === "ready" ? account.current : null;
+  const spaceProjects = useRpc("spaces.projects", { spaceId: space?.id ?? "" }, { enabled: space !== null });
   const { pinnedOnly } = useHomeFilter();
   const [limit, setLimit] = useState(THREAD_PAGE);
   const [resolvedLimit, setResolvedLimit] = useState(THREAD_PAGE);
   const children = useChildThreadPages();
   const cache = useQueryClient();
-  const choices = projectChoices(projects.data);
-  const projectIds = choices.map((project) => project.id).sort();
-  const listed = { projectIds, filter: "active" as const, orderBy: "activity" as const, includeChildren: true, ...children.params() };
+  const scope = space ? spaceScope(space, spaceProjects.data) : macScope(projectChoices(projects.data));
+  const inSpace = "spaceId" in scope.asks ? scope.asks : {};
+  const listed = { ...scope.asks, filter: "active" as const, orderBy: "activity" as const, includeChildren: true, ...children.params() };
   const params = [{ ...listed, pinnedOnly, limit: limit + 1 }];
   const lists = useRpcs("threads.list", params, { refetchInterval: 60_000 });
   const besides = { enabled: !pinnedOnly, refetchInterval: 60_000 };
   const pins = useRpc("threads.list", { ...listed, pinnedOnly: true }, besides);
   const needsYou = useRpc("threads.list", { ...listed, needsYou: true, limit: NEEDS_YOU_PAGE }, besides);
   const resolved = useRpc("threads.list", { ...listed, filter: "archived", limit: resolvedLimit + 1 }, { ...besides, enabled: besides.enabled && resolvedOpen });
-  const resolvedCount = useRpc("threads.resolvedCount", { projectIds, quietBefore: resolvedBefore(Date.now()) }, besides);
+  const resolvedCount = useRpc("threads.resolvedCount", { ...inSpace, projectIds: scope.localIds, quietBefore: resolvedBefore(Date.now()) }, besides);
   const fetched = lists.map((list, index) => (list.data ? { rows: list.data, limit } : cachedListPage(cache, params[index]!)));
   const opened = useRpc("threads.get", { id: selectedId ?? "" }, { enabled: Boolean(selectedId) }).data;
-  const selected = opened && projectIds.includes(opened.projectId) ? opened : null;
+  const selected = opened && scope.names.has(opened.projectId) ? opened : null;
   const listedIds = new Set([...fetched.flatMap((page) => page?.rows ?? []), ...(resolved.data ?? [])].map((thread) => thread.id));
-  const family = useSelectedFamily(selected, selected?.archivedAt ? "archived" : "active", listedIds, children);
+  const family = useSelectedFamily(selected, selected?.archivedAt ? "archived" : "active", listedIds, children, inSpace);
   const now = useSidebarNow();
   const withFamily = (rows: readonly ThreadSummary[] | undefined) => (rows ? [...new Map([...rows, ...(family ?? [])].map((thread) => [thread.id, thread])).values()] : rows);
   const page = (rows: readonly ThreadSummary[] | undefined, filter: SidebarFilter, shown: number) =>
@@ -98,8 +103,8 @@ function useThreadList(connected: boolean, selectedId: string | undefined, resol
   const list: HomeList = {
     days,
     read,
-    names: new Map(choices.map(({ id, name }) => [id, name])),
-    failed: connected && lists.some((each) => each.isError),
+    names: scope.names,
+    failed: connected && (lists.some((each) => each.isError) || (space !== null && spaceProjects.isError)),
     listed: fetched.every(Boolean),
     resolvedCount: resolvedCount.data,
   };

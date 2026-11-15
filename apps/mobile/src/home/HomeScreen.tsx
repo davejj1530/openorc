@@ -26,6 +26,8 @@ import type { HomeItem } from "./home-items";
 import { refreshHome } from "./refresh";
 import { ThreadRow } from "./ThreadRow";
 import { Unpaired } from "./Unpaired";
+import { spaceNotice } from "../spaces/cloud-words";
+import { useSpaces } from "../spaces/use-spaces";
 import { useHomeItems } from "./use-home-items";
 import { UpdateReady } from "./UpdateReady";
 import { useOrclingFaces } from "../orclings/face-row";
@@ -93,6 +95,17 @@ function useSelectedThreadId(): string | undefined {
   return usePathname().startsWith("/thread/") ? params.id : undefined;
 }
 
+/** One plain line over the list: the space it shows is closed to the person, or the Mac cannot reach OpenOrc Cloud. */
+function SpaceNotice({ state }: { state: Paired }) {
+  const notice = spaceNotice(useSpaces(), state.mac.name, Date.now());
+  if (!notice) return null;
+  return (
+    <View className="px-5 pb-3 pt-2">
+      <Text className="text-md text-ink-3">{notice}</Text>
+    </View>
+  );
+}
+
 function Threads({ state, scrollY, header }: HomeScroll & { state: Paired; header: ReactNode }) {
   const insets = useSafeAreaInsets();
   const home = useHomeItems(state.kind === "connected", { selectedId: useSelectedThreadId() });
@@ -111,7 +124,12 @@ function Threads({ state, scrollY, header }: HomeScroll & { state: Paired; heade
         itemLayoutAnimation={still ? undefined : slide}
         extraData={folds.motions}
         renderItem={({ item, index }) => <HomeRow item={item} home={home} index={index} motion={rowMotion(folds.motions, item.key)} fold={folds.toggle} />}
-        ListHeaderComponent={<>{header}</>}
+        ListHeaderComponent={
+          <>
+            {header}
+            <SpaceNotice state={state} />
+          </>
+        }
         ListFooterComponent={<View className="h-24" />}
         sharedValues={sharedValues}
         contentContainerStyle={{ paddingTop: insets.top + HOME_BAR_HEIGHT, paddingBottom: insets.bottom }}

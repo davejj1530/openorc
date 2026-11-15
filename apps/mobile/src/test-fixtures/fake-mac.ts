@@ -13,11 +13,14 @@ const connected: LinkState = { kind: "connected", mac: { id: "mac-1", name: "Stu
  * standing in for the phone's MMKV. `wrapper` gives rendered hooks the cache.
  */
 export function fakeMac(answer: (method: RpcMethod, params: unknown) => Promise<unknown>) {
-  const connection: CoreConnection = {
+  /** What this Mac shares besides its own threads; none, as an older Mac, until a test adds one. */
+  const shared = new Set<string>();
+  const connection: CoreConnection & { shares(capability: string): Promise<boolean> } = {
     delivery: "interest",
     call: ((method: RpcMethod, params: unknown) => answer(method, params)) as CoreConnection["call"],
     onPush: () => () => undefined,
     setFrameInterest: () => undefined,
+    shares: async (capability) => shared.has(capability),
   };
   const client = createClientState(connection, {
     scheduleFrame: () => undefined,
@@ -34,6 +37,7 @@ export function fakeMac(answer: (method: RpcMethod, params: unknown) => Promise<
   const wrapper = ({ children }: { children: ReactNode }) => createElement(QueryClientProvider, { client: client.queryClient }, children);
   return {
     saved,
+    shared,
     wrapper,
     module: {
       client,

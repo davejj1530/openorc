@@ -1,7 +1,7 @@
 import { useKeyboardChatComposerInset } from "@legendapp/list/keyboard";
 import type { LegendListRef } from "@legendapp/list/react-native";
 import { conversationActivity, conversationSendDisabledReason, processFit, type SubmitRequest } from "@openorc/client";
-import { isSubagentThread, type OrclingChatSummary, type Run, type ThreadSummary } from "@openorc/protocol";
+import { isSubagentThread, placeOf, type OrclingChatSummary, type Run, type ThreadSummary } from "@openorc/protocol";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement, type RefObject } from "react";
 import { Pressable, View } from "react-native";
@@ -156,14 +156,17 @@ export function ThreadScreen() {
   const activeRun = runs.at(-1);
   const settings = { ...client.useConversationSettings({ thread, activeRun }), claudeAccountId: thread?.claudeAccountId ?? undefined, claudeAccount: useThreadClaudeAccount(thread) };
   useShareSettings(id, settings);
-  useMarkSeen(thread);
+  // An OpenOrc Cloud thread is read here; what a phone may change in one comes with writing in it.
+  const cloud = thread !== null && placeOf(thread).elsewhere;
+  const own = cloud ? null : thread;
+  useMarkSeen(own);
   useCoverHome();
   const voices = useVoices(runs);
   const [disclosure] = useState(createDisclosure);
   const [{ live, working, generatingImage }, setActivity] = useState(IDLE);
   const actions = useThreadActions(thread, { onUnread: goBack });
   const now = useSnoozeClock();
-  const menu = useThreadHeaderMenu(thread, now, actions.run);
+  const menu = useThreadHeaderMenu(own, now, actions.run);
   const linkState = useLinkState();
   const chat = chatFor(useOrclingChats().chats, id);
   useThreadOnScreen(linkState.kind === "unpaired" ? null : linkState.mac.id, id);
@@ -217,7 +220,7 @@ export function ThreadScreen() {
         </VoicesContext.Provider>
       </DisclosureContext.Provider>
       {perfEnabled() ? <PerfProbe /> : null}
-      {thread ? (
+      {thread && !cloud ? (
         <View className="absolute inset-x-0 bottom-0">
           {isSubagentThread(thread) ? (
             <SubagentStatusBar thread={thread} onLayout={onComposerLayout} />

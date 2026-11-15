@@ -1,5 +1,5 @@
-import { snoozeWakeLabel, threadMark } from "@openorc/client";
-import { isSubagentThread, WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
+import { snoozeWakeLabel, threadMark, togetherActivity } from "@openorc/client";
+import { isSubagentThread, placeOf, WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 import { router } from "expo-router";
 import { Pressable } from "react-native";
 import { useLinkState, useRpc } from "../client";
@@ -10,13 +10,16 @@ const pullWords = { open: "PR open", merged: "PR merged", closed: "PR closed" } 
 
 /**
  * The header's faint line: where the thread lives, its pull request, when a snooze ends and what it is doing when that
- * is worth saying. While the phone is not connected, the connection's state takes the line instead.
+ * is worth saying. While the phone is not connected, the connection's state takes the line instead. An OpenOrc Cloud
+ * thread says so after its project, and whose turn or ask it is when a teammate is in it, as the Mac's header does.
  */
 export function statusLine(thread: ThreadSummary, project: string | undefined, now = Date.now()): string {
   const mark = threadMark(thread);
   const doing = mark && (mark.kind === "running" || mark.kind === "waiting" || mark.kind === "waiting-other" || mark.kind === "failed") ? mark.label : null;
   const pull = thread.prUrl ? pullWords[thread.prState ?? "open"] : null;
   const snoozed = thread.snoozedUntil && thread.snoozedUntil > now ? `Snoozed until ${snoozeWakeLabel(thread.snoozedUntil)}` : null;
+  const place = placeOf(thread);
+  if (place.elsewhere) return [project ?? thread.owner?.project?.name, place.mark, pull, togetherActivity(thread)?.text ?? doing].filter(Boolean).join(" · ");
   return [thread.projectId === WORKSPACE_ID ? "Workspace" : project, pull, snoozed, doing].filter(Boolean).join(" · ");
 }
 
@@ -30,7 +33,8 @@ export function ThreadTitle({ thread, onRename }: { thread: ThreadSummary | null
   if (!thread) return null;
   const place = parentId ? parent.data?.title : statusLine(thread, project);
   const line = link.tone !== "ok" && link.status ? link.status : place;
-  const rename = isSubagentThread(thread) ? undefined : onRename;
+  // A cloud thread's title is everyone's in its project; a phone does not change it yet.
+  const rename = isSubagentThread(thread) || placeOf(thread).elsewhere ? undefined : onRename;
   return (
     <Pressable
       accessibilityRole="header"

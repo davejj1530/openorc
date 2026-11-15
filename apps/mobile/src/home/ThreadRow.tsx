@@ -2,6 +2,7 @@ import {
   pullRequestMark,
   pullRequestNumber,
   relativeTime,
+  rowStarter,
   subagentStatusLabel,
   threadHeadline,
   threadMark,
@@ -12,11 +13,11 @@ import {
   type ThreadMark,
   type ThreadTreeRow,
 } from "@openorc/client";
-import { harnessShortName, isHarnessId, isSubagentThread, WORKSPACE_ID, type PrState, type ThreadSummary } from "@openorc/protocol";
+import { harnessShortName, isHarnessId, isSubagentThread, placeOf, WORKSPACE_ID, type PrState, type ThreadSummary } from "@openorc/protocol";
 import { Link } from "expo-router";
 import { memo, useMemo, useState, type ComponentType, type ReactNode } from "react";
 import { View } from "react-native";
-import { Folder, GitMerge, GitPullRequest, GitPullRequestClosed, Globe } from "../generated/icons";
+import { Cloud, Folder, GitMerge, GitPullRequest, GitPullRequestClosed, Globe } from "../generated/icons";
 import { cn } from "../ui/cn";
 import type { IconProps } from "../ui/icon";
 import { ListPressable } from "../ui/ListPressable";
@@ -47,6 +48,22 @@ const headlineTones: Record<ThreadHeadline["tone"], string> = { live: "text-ink-
 /** Where it works, who works on it and when it last moved: the details a row keeps for its menu and for VoiceOver. */
 function rowFacts(thread: ThreadSummary, where: string): string[] {
   return [where, isHarnessId(thread.agent) ? harnessShortName(thread.agent) : thread.agent, relativeTime(thread.lastActivityAt)];
+}
+
+/**
+ * An OpenOrc Cloud thread's place, as the Mac's sidebar marks one: the cloud in the folder's place, its project, and
+ * the teammate who started it when it is not the person's own. The cloud dims while the Mac cannot reach it. Null for
+ * a thread of this Mac.
+ */
+function cloudPlace(thread: ThreadSummary, project: string | null): { line: string; spoken: string; offline: boolean } | null {
+  if (!placeOf(thread).rowIcon) return null;
+  const name = project ?? thread.owner?.project?.name ?? null;
+  const starter = rowStarter(thread);
+  return {
+    line: [name, starter?.first].filter(Boolean).join(" · "),
+    spoken: [name, "OpenOrc Cloud", starter ? `started by ${starter.name}` : null].filter(Boolean).join(", "),
+    offline: thread.owner?.reach !== "live",
+  };
 }
 
 /** How far a root row's mark reaches past its line's end, so its 28 pt box centers on the action column. */
@@ -121,13 +138,14 @@ function rowMarks(thread: ThreadSummary, compact: boolean) {
  */
 function ProjectLine({ thread, project, trailing, onNode }: { thread: ThreadSummary; project: string | null; trailing: ReactNode; onNode: (mid: number) => void }) {
   const pull = pullRequestMark(thread);
+  const cloud = cloudPlace(thread, project);
   const Glyph = thread.projectId === WORKSPACE_ID ? Globe : Folder;
   const PullIcon = pull ? pullIcons[pull.state] : null;
   return (
     <View className="flex-row items-center gap-1.5" onLayout={(event) => onNode(event.nativeEvent.layout.y + event.nativeEvent.layout.height / 2)}>
-      <Glyph size={16} className="text-ink-4" />
+      {cloud ? <Cloud size={16} className={cn("text-ink-4", cloud.offline && "opacity-50")} /> : <Glyph size={16} className="text-ink-4" />}
       <Text numberOfLines={1} className="flex-1 text-detail text-ink-4">
-        {[project, workspaceLabel(thread)].filter(Boolean).join(" · ")}
+        {cloud ? cloud.line : [project, workspaceLabel(thread)].filter(Boolean).join(" · ")}
       </Text>
       {pull && PullIcon ? (
         <View accessibilityLabel={pull.label} className="ml-auto flex-row items-center gap-1 pl-2">
@@ -199,11 +217,14 @@ export const ThreadRow = memo(
     const { status, working, mark } = rowMarks(thread, compact);
     const place = threadPlace(thread);
     const [nodeMid, setNodeMid] = useState(NODE_MID);
-    const where = [project, place.label].filter(Boolean).join(" · ");
+    const cloud = cloudPlace(thread, project);
+    const where = cloud?.spoken ?? [project, place.label].filter(Boolean).join(" · ");
     const facts = rowFacts(thread, where);
     const swipes = threadSwipes(thread);
-    const leading: SwipeAction | undefined = isSubagentThread(thread) ? undefined : { label: swipes.leading.label, tone: "review", run: () => actions.save(swipes.leading.patch) };
-    const trailing: SwipeAction | undefined = swipes.trailing ? { label: swipes.trailing.label, tone: "accent", run: () => actions.save(swipes.trailing!.patch) } : undefined;
+    // A cloud thread is read here and changed on the Mac: its row has no swipe and no menu yet.
+    const kept = isSubagentThread(thread) || cloud !== null;
+    const leading: SwipeAction | undefined = kept ? undefined : { label: swipes.leading.label, tone: "review", run: () => actions.save(swipes.leading.patch) };
+    const trailing: SwipeAction | undefined = swipes.trailing && !cloud ? { label: swipes.trailing.label, tone: "accent", run: () => actions.save(swipes.trailing!.patch) } : undefined;
     const pull = compact ? null : pullRequestMark(thread);
     const label = [thread.title, child ? subagentStatusLabel[child.status] : (mark ?? status)?.label, child?.agentType, compact ? null : headline?.text, pull?.label, ...facts]
       .filter(Boolean)
@@ -225,7 +246,7 @@ export const ThreadRow = memo(
                   {lines}
                 </ListPressable>
               </Link.Trigger>
-              {rowMenu(threadMenu(thread, "row", now), actions.run, { title: thread.title, subtitle: facts.join(" · ") })}
+              {cloud ? null : rowMenu(threadMenu(thread, "row", now), actions.run, { title: thread.title, subtitle: facts.join(" · ") })}
             </Link>
             {toggle}
           </View>

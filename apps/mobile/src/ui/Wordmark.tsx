@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useWindowDimensions, View } from "react-native";
 import { cn } from "./cn";
 import { OpenOrcMark } from "./OpenOrcMark";
@@ -19,17 +20,18 @@ export const WORDMARK_MAX_SCALE = 1.2;
 /**
  * OpenOrc's wordmark: the cube and the name in Immaculate Gothic, in ink. It grows with the reader's text size as one
  * drawn unit, cube, gap and name together, up to 1.2 times; VoiceOver reads it as the screen's heading.
+ *
+ * With `name`, the same unit titles Home for a space: its own `mark` at the cube's size and its name, which gives way
+ * on one line when the bar runs out of room.
  */
-export function Wordmark({ className }: { className?: string }) {
+export function Wordmark({ className, name, mark }: { className?: string; name?: string; mark?: (size: number) => ReactNode }) {
   const scale = Math.min(useWindowDimensions().fontScale, WORDMARK_MAX_SCALE);
   const ink = useColors().ink;
   return (
-    <View accessible accessibilityRole="header" accessibilityLabel="OpenOrc" className={cn("flex-row items-center", className)} style={{ gap: GAP * scale }}>
-      <View style={{ width: MARK * scale, height: MARK * scale }}>
-        <OpenOrcMark size={MARK * scale} color={ink} working={false} />
-      </View>
-      <Text maxFontSizeMultiplier={WORDMARK_MAX_SCALE} className="text-wordmark">
-        OpenOrc
+    <View accessible accessibilityRole="header" accessibilityLabel={name ?? "OpenOrc"} className={cn("flex-row items-center", className)} style={{ gap: GAP * scale }}>
+      <View style={{ width: MARK * scale, height: MARK * scale }}>{mark ? mark(MARK * scale) : <OpenOrcMark size={MARK * scale} color={ink} working={false} />}</View>
+      <Text numberOfLines={1} maxFontSizeMultiplier={WORDMARK_MAX_SCALE} className={cn("text-wordmark", name !== undefined && "shrink")}>
+        {name ?? "OpenOrc"}
       </Text>
     </View>
   );

@@ -16,12 +16,18 @@ vi.mock("../../client", async () => {
     endDemo: () => void demo.ended++,
   };
 });
+/** What the Mac says of its OpenOrc account: nothing, until a test signs someone in. */
+const account = vi.hoisted(() => ({ spaces: { state: "none" } as import("../../spaces/use-spaces").PhoneSpaces }));
+vi.mock("../../spaces/use-spaces", async (original) => ({ ...(await original<object>()), useSpaces: () => account.spaces }));
 vi.mock("../../generated/icons", async (original) => ({
   ...(await original<object>()),
   Laptop: () => <span data-testid="laptop" />,
 }));
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  account.spaces = { state: "none" };
+});
 
 const studio = { id: "studio", name: "Studio" };
 const connected: LinkState = { kind: "connected", mac: studio, route: { kind: "lan", host: "studio.local", port: 1 }, serial: 1 };
@@ -91,4 +97,21 @@ it("keeps the filter for Threads alone; over the Orclings and Tasks tabs the con
     bar(connected, tab);
     expect(circles()).toEqual(["Studio, Connected over Wi-Fi", "Settings"]);
   }
+});
+
+it("titles Home with the space it shows once the Mac's person is signed in to OpenOrc, and with the wordmark until then", () => {
+  const birch = { id: "org-birch", kind: "organization", name: "Birch Studio", logo: null, memberId: "member", role: "member", memberCount: 2 } as const;
+  const { unmount } = render(<HomeBar state={connected} />);
+  expect(screen.getByText("OpenOrc")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: /space$/ })).toBeNull();
+  unmount();
+  account.spaces = { state: "ready", spaces: [{ id: "personal-me", kind: "personal" }, birch], current: birch, access: null, offline: false };
+  render(<HomeBar state={connected} />);
+  expect(screen.getByRole("button", { name: "Birch Studio, space" })).toBeTruthy();
+  expect(screen.getByText("Birch Studio")).toBeTruthy();
+  expect(screen.queryByText("OpenOrc")).toBeNull();
+  cleanup();
+  account.spaces = { state: "signed-out" };
+  render(<HomeBar state={connected} />);
+  expect(screen.getByText("OpenOrc")).toBeTruthy();
 });

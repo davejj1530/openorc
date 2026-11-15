@@ -68,6 +68,7 @@ export default function RootLayout() {
             <Stack.Screen name="pair" dangerouslySingular options={{ presentation: "modal" }} />
             <Stack.Screen name="settings" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [1] }} />
             <Stack.Screen name="filter" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: "fitToContents" }} />
+            <Stack.Screen name="space" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: "fitToContents" }} />
             <Stack.Screen name="connection" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: "fitToContents" }} />
             <Stack.Screen name="tool" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [0.6, 1] }} />
             <Stack.Screen name="model" dangerouslySingular options={{ ...sheet, sheetAllowedDetents: [0.6, 1] }} />

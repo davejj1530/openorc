@@ -133,10 +133,21 @@ it("keeps a refused payment on the page with the organization's billing, and sti
   expect(open).toHaveBeenCalledExactlyOnceWith({ page: "billing" });
 });
 
-it("says the seats were updated when only the read after failed, and Try again only reads", async () => {
-  await show({ billing: billing(), quantity: [work("complete", null, "OpenOrc Cloud can't be reached.")] });
+it("offers the change again, not billing, for a change the server refused for another reason", async () => {
+  const STALE = "The seats have changed. Review the change again.";
+  await show({ billing: billing(), quantity: [work("failed", STALE)] });
+  expect(screen.getByRole("alert").textContent).toBe(STALE);
+  expect(screen.getAllByRole("button", { name: "Manage billing" })).toHaveLength(1);
+  fireEvent.click(button("Review again"));
+  await screen.findByRole("dialog", { name: "Add 2 seats" });
+  expect(transport.preview).toHaveBeenCalledExactlyOnceWith("team-a", 7);
+  expect(transport.confirm).not.toHaveBeenCalled();
+});
+
+it("says once that the seats were updated when only the read after failed, and Try again only reads", async () => {
+  await show({ billing: billing(), quantity: [work("complete", null, "OpenOrc Cloud can't be reached.")], error: "OpenOrc Cloud can't be reached." });
   expect(screen.getByText("Seats updated.")).toBeTruthy();
-  expect(screen.getByRole("alert").textContent).toBe("OpenOrc Cloud can't be reached.");
+  expect(screen.getAllByRole("alert").map((alert) => alert.textContent)).toEqual(["OpenOrc Cloud can't be reached."]);
   fireEvent.click(button("Try again"));
   await waitFor(() => expect(transport.operation).toHaveBeenCalledExactlyOnceWith("team-a", ID));
   expect(transport.confirm).not.toHaveBeenCalled();

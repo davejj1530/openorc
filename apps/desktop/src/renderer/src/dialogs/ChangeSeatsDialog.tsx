@@ -2,7 +2,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import type { OrganizationBilling, SeatQuantityPreview } from "@openorc/protocol";
 import { accountDay, formatUsageTime, periodLabel, priceText } from "@openorc/client";
 import { Button, Dialog, Input } from "../components/ui";
-import { hoursAndMinutes, quantityChange, type QuantityChange, type SeatQuantity, type SeatQuantityState } from "../lib/seat-quantity";
+import { hoursAndMinutes, needsBilling, quantityChange, type QuantityChange, type SeatQuantity, type SeatQuantityState } from "../lib/seat-quantity";
 import "../views/organization-seats.css";
 
 type Subscription = NonNullable<OrganizationBilling["subscription"]>;
@@ -22,7 +22,8 @@ const seats = (count: number) => `${count} ${count === 1 ? "seat" : "seats"}`;
 export function ChangeSeatsDialog({ view, billing, onClose, onManageBilling }: ChangeSeatsDialogProps) {
   const state = useSyncExternalStore(view.subscribe, view.getSnapshot);
   const subscription = billing.subscription;
-  const settled = state.state === "complete" && !state.error;
+  // Once the seats are updated the page says so, along with a read after it that failed.
+  const settled = state.state === "complete";
   useEffect(() => {
     if (settled) onClose();
   }, [settled, onClose]);
@@ -44,7 +45,7 @@ export function ChangeSeatsDialog({ view, billing, onClose, onManageBilling }: C
           </p>
         ) : null}
         <div className="organization-actions">
-          <Button onClick={onClose}>{state.work ? "Close" : "Cancel"}</Button>
+          <Button onClick={onClose}>{state.state === "submitting" || state.state === "pending" ? "Close" : "Cancel"}</Button>
           <ChangeAction state={state} view={view} subscription={subscription} onManageBilling={onManageBilling} />
         </div>
       </div>
@@ -54,8 +55,8 @@ export function ChangeSeatsDialog({ view, billing, onClose, onManageBilling }: C
 
 function ChangeBody({ state, view, billing, subscription }: { state: SeatQuantityState; view: SeatQuantity; billing: OrganizationBilling; subscription: Subscription }) {
   if (state.state === "submitting" || state.state === "pending") return <p role="status">Updating seats.</p>;
-  if (state.state === "complete") return <p role="status">Seats updated.</p>;
-  if (state.state === "preview" && state.preview) return <ChangeReview preview={state.preview} subscription={subscription} />;
+  const preview = reviewed(state);
+  if (preview) return <ChangeReview preview={preview} subscription={subscription} />;
   if (state.work) return null;
   return <SeatNumber state={state} view={view} billing={billing} subscription={subscription} />;
 }
@@ -85,10 +86,10 @@ function SeatNumber({ state, view, billing, subscription }: { state: SeatQuantit
           }}
         />
       </label>
-      {invalid ? <p className="seats-error">{BOUNDS}</p> : null}
       <p className="text-ink-3">
         {seats(subscription.quantity)} now · {assigned} assigned
       </p>
+      {invalid ? <p className="seats-error">{BOUNDS}</p> : null}
     </>
   );
 }
@@ -161,19 +162,22 @@ function ChangeAction({ state, view, subscription, onManageBilling }: { state: S
     );
   if (state.state === "failed" && state.work) {
     const again = state.work.request.seats;
-    return (
-      <>
-        <Button onClick={onManageBilling}>Manage billing</Button>
-        <Button
-          variant="primary"
-          onClick={() => {
-            view.select(again);
-            void view.review();
-          }}
-        >
-          Review again
+    if (needsBilling(state.error))
+      return (
+        <Button variant="primary" onClick={onManageBilling}>
+          Manage billing
         </Button>
-      </>
+      );
+    return (
+      <Button
+        variant="primary"
+        onClick={() => {
+          view.select(again);
+          void view.review();
+        }}
+      >
+        Review again
+      </Button>
     );
   }
   if (state.state === "draft" || state.state === "failed") {
@@ -184,7 +188,7 @@ function ChangeAction({ state, view, subscription, onManageBilling }: { state: S
       </Button>
     );
   }
-  if ((state.state === "pending" || state.state === "complete") && state.error)
+  if (state.state === "pending" && state.error)
     return (
       <Button variant="primary" onClick={() => void view.retry()}>
         Try again
@@ -195,10 +199,16 @@ function ChangeAction({ state, view, subscription, onManageBilling }: { state: S
 
 function title(state: SeatQuantityState, organization: string): string {
   if (state.state === "submitting" || state.state === "pending") return "Updating seats";
-  if (state.state === "complete") return "Seats updated";
-  if (state.state !== "preview" || !state.preview) return "Change seats";
-  const { from, to } = state.preview;
-  return { add: `Add ${seats(to - from)}`, reduce: `Reduce to ${seats(to)}`, end: `End ${organization}’s subscription`, keep: `Keep ${seats(to)}` }[quantityChange(state.preview)];
+  const preview = reviewed(state);
+  if (!preview) return "Change seats";
+  const { from, to } = preview;
+  return { add: `Add ${seats(to - from)}`, reduce: `Reduce to ${seats(to)}`, end: `End ${organization}’s subscription`, keep: `Keep ${seats(to)}` }[quantityChange(preview)];
+}
+
+/** The server's review on show: the one being confirmed, or the one a refused change was sent with. */
+function reviewed(state: SeatQuantityState): SeatQuantityPreview | null {
+  const shown = state.state === "preview" || (state.state === "failed" && state.work !== null);
+  return shown ? state.preview : null;
 }
 
 /** A whole number of seats from 0 to 100, or null for anything else. */

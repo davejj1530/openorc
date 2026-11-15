@@ -1,6 +1,6 @@
 import type { SeatQuantityPreview, SeatQuantityRequest, SeatQuantityWork } from "@openorc/protocol";
 import { expect, it, vi } from "vitest";
-import { SeatQuantity, hoursAndMinutes, quantityChange } from "./seat-quantity";
+import { SeatQuantity, hoursAndMinutes, needsBilling, quantityChange } from "./seat-quantity";
 
 const ID = "6b556141-a9de-41be-a557-aa938a09b8b8";
 const review = (to: number, from = 5): SeatQuantityPreview => ({
@@ -75,4 +75,21 @@ it("writes a part month of hours down to the minute", () => {
   expect(hoursAndMinutes(360_000)).toBe("100 h");
   expect(hoursAndMinutes(2700)).toBe("45 min");
   expect(hoursAndMinutes(0)).toBe("0 h");
+});
+
+it("sends only a refused payment to the organization's billing", () => {
+  expect(needsBilling("The payment for these seats didn't go through. Update the payment method in billing and try again.")).toBe(true);
+  expect(needsBilling("The seats have changed. Review the change again.")).toBe(false);
+  expect(needsBilling("The seats weren't changed. Review the change again.")).toBe(false);
+  expect(needsBilling(null)).toBe(false);
+});
+
+it("reads a settling change's message as its status, and only a failed one's as what went wrong", () => {
+  const request = { seats: 7, body: { id: ID, previewToken: "token-7" } };
+  const settling = flow().quantity;
+  settling.resume({ request, operation: { id: ID, kind: "quantity", state: "pending", message: "Updating seats." }, error: null });
+  expect(settling.getSnapshot()).toMatchObject({ state: "pending", error: null });
+  const refused = flow().quantity;
+  refused.resume({ request, operation: { id: ID, kind: "quantity", state: "failed", message: "The seats weren't changed. Review the change again." }, error: null });
+  expect(refused.getSnapshot()).toMatchObject({ state: "failed", error: "The seats weren't changed. Review the change again." });
 });

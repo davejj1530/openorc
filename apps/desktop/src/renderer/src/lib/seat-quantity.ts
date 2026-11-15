@@ -36,3 +36,10 @@ export function hoursAndMinutes(seconds: number): string {
   if (!minutes) return `${hours} h`;
   return hours ? `${hours} h ${minutes} min` : `${minutes} min`;
 }
+
+/**
+ * The server's sentence for a payment the provider refused. Only its words cross from the core, so the sentence's
+ * opening is what tells a change that needs the organization's billing from one that only needs reviewing again.
+ */
+const PAYMENT_REFUSED = "The payment for these seats didn't go through.";
+export const needsBilling = (message: string | null | undefined): boolean => Boolean(message?.startsWith(PAYMENT_REFUSED));

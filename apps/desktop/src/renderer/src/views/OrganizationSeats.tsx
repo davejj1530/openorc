@@ -7,7 +7,7 @@ import type { OrganizationBillingView, OrganizationBillingViewState } from "../l
 import { seatQuantityTransport } from "../lib/seat-quantity-rpc";
 import type { SeatQuantityTransport } from "../lib/seat-quantity-scope";
 import { SeatInventory } from "./SeatInventory";
-import { ChangeSeatsButton, ChangeSeatsFlow, SeatQuantityStatus, changeSeatsReason, type ChangeSeatsOpening } from "./SeatQuantityControls";
+import { ChangeSeatsButton, ChangeSeatsFlow, SeatQuantityStatus, changeReadFailed, changeSeatsReason, type ChangeSeatsOpening } from "./SeatQuantityControls";
 import { SeatOperations } from "./SeatOperations";
 import { OrganizationStorage, type OrganizationStorageTransport } from "./OrganizationStorage";
 import "./organization-seats.css";
@@ -41,7 +41,7 @@ export function OrganizationSeats({ spaceId, view, offers, storage, quantity = s
     <>
       {billing ? <SeatSummary spaceId={spaceId} storage={storage} billing={billing} state={state} buy={buy} manage={manage} change={() => setChanging({ from: "number" })} /> : null}
       {!billing && state.loading ? <p className="seats-inline-state text-ink-3">Loading seats…</p> : null}
-      {!formOpen ? <SeatPaymentState state={state} view={view} /> : null}
+      {!formOpen ? <SeatPaymentState state={state} view={view} said={changeReadFailed(state.status?.quantity?.at(-1))} /> : null}
       <SeatQuantity spaceId={spaceId} status={state.status} changing={changing} setChanging={setChanging} manage={manage} transport={quantity} />
       <SeatOperations />
       {billing?.subscription?.overallocated ? <p className="seats-inline-state">More people hold seats than are paid for. Take back a seat or add seats.</p> : null}
@@ -181,9 +181,10 @@ function SeatBuyButton({ disabled, reason, buy }: { disabled: boolean; reason: s
   );
 }
 
-function SeatPaymentState({ state, view }: { state: OrganizationBillingViewState; view: OrganizationBillingView }) {
+/** `said` when a finished seat change already says the read after it failed, so the failure is not said twice. */
+function SeatPaymentState({ state, view, said }: { state: OrganizationBillingViewState; view: OrganizationBillingView; said: boolean }) {
   const payment = state.status?.payment;
-  const error = state.error ?? payment?.error;
+  const error = said ? null : (state.error ?? payment?.error);
   const waiting = payment?.target.page === "checkout" && payment.watching && (payment.state === "waiting" || payment.state === "pending");
   return (
     <>

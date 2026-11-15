@@ -172,14 +172,17 @@ it("puts a refused review under the number, and reviews again", async () => {
   expect(preview).toHaveBeenCalledTimes(2);
 });
 
-it("keeps a refused payment with the change and offers the organization's billing", async () => {
+it("keeps a refused payment beside its review and offers the organization's billing, not the change again", async () => {
   const { manage, send } = show({ send: async (request) => done(request, "failed", PAYMENT) });
   type("7");
   fireEvent.click(button("Review change"));
   fireEvent.click(await screen.findByRole("button", { name: "Add seats" }));
   expect((await screen.findByRole("alert")).textContent).toBe(PAYMENT);
+  expect(screen.getByRole("dialog", { name: "Add 2 seats" })).toBeTruthy();
+  expect(fact("Seats")).toBe("5 → 7");
   expect(screen.queryByRole("button", { name: "Add seats" })).toBeNull();
-  expect(button("Review again")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Review again" })).toBeNull();
+  expect(button("Cancel")).toBeTruthy();
   fireEvent.click(button("Manage billing"));
   expect(manage).toHaveBeenCalledOnce();
   expect(send).toHaveBeenCalledOnce();
@@ -192,27 +195,23 @@ it("says Updating seats while the server settles the change, and Close leaves it
   fireEvent.click(await screen.findByRole("button", { name: "Add seats" }));
   await screen.findByRole("dialog", { name: "Updating seats" });
   expect(screen.getByRole("status").textContent).toBe("Updating seats.");
+  expect(screen.queryByRole("alert")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
   fireEvent.click(screen.getByText("Close"));
   expect(close).toHaveBeenCalledOnce();
   expect(send).toHaveBeenCalledOnce();
 });
 
-it("says the seats were updated when only the read after it failed, and Try again only reads", async () => {
-  const { send, read, close } = show({
-    send: async (request) => done(request, "complete", null, "OpenOrc Cloud can't be reached."),
-    read: async (id) => done({ seats: 7, body: { id, previewToken: "token-7" } }),
-  });
+it("closes once the seats are updated, even when only the read after it failed", async () => {
+  const { send, read, close } = show({ send: async (request) => done(request, "complete", null, "OpenOrc Cloud can't be reached.") });
   type("7");
   fireEvent.click(button("Review change"));
   fireEvent.click(await screen.findByRole("button", { name: "Add seats" }));
-  await screen.findByRole("dialog", { name: "Seats updated" });
-  expect(screen.getByRole("status").textContent).toBe("Seats updated.");
-  expect(screen.getByRole("alert").textContent).toBe("OpenOrc Cloud can't be reached.");
-  fireEvent.click(button("Try again"));
   await waitFor(() => expect(close).toHaveBeenCalledOnce());
-  expect(read).toHaveBeenCalledExactlyOnceWith(ID);
+  expect(screen.queryByRole("dialog")).toBeNull();
   expect(send).toHaveBeenCalledOnce();
+  expect(read).not.toHaveBeenCalled();
 });
 
 it("reviews again after a change the server refused as stale, with the server's words", async () => {
@@ -222,6 +221,8 @@ it("reviews again after a change the server refused as stale, with the server's 
   fireEvent.click(button("Review change"));
   fireEvent.click(await screen.findByRole("button", { name: "Add seats" }));
   expect((await screen.findByRole("alert")).textContent).toBe(STALE);
+  expect(screen.getByRole("dialog", { name: "Add 2 seats" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Manage billing" })).toBeNull();
   stale = false;
   fireEvent.click(button("Review again"));
   await screen.findByRole("button", { name: "Add seats" });

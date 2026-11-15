@@ -3,13 +3,16 @@ import type { OrganizationBilling, SeatQuantityWork } from "@openorc/protocol";
 import { accountDay, formatUsageTime } from "@openorc/client";
 import { Button } from "../components/ui";
 import { ChangeSeatsDialog } from "../dialogs/ChangeSeatsDialog";
+import { needsBilling } from "../lib/seat-quantity";
 import { useSeatQuantity, type SeatQuantityTransport } from "../lib/seat-quantity-scope";
 
 type Subscription = NonNullable<OrganizationBilling["subscription"]>;
-/** How the change dialog was opened: on the number, on the server's review of the number now, or on a journaled change. */
-export type ChangeSeatsOpening = { from: "number" } | { from: "keep" } | { from: "work"; work: SeatQuantityWork };
+/** How the change dialog was opened: on the number, straight on the server's review of a number, or on a journaled change. */
+export type ChangeSeatsOpening = { from: "number" } | { from: "review"; seats: number } | { from: "work"; work: SeatQuantityWork };
 
 const unsettled = (work: SeatQuantityWork | undefined): boolean => Boolean(work && (work.operation === null || work.operation.state === "pending"));
+/** The change is done and only the read after it failed: its row says so, and the page says it once. */
+export const changeReadFailed = (work: SeatQuantityWork | undefined): boolean => Boolean(work?.operation?.state === "complete" && work.error);
 /** Why the number cannot be changed right now; null when it can. */
 export const changeSeatsReason = (work: SeatQuantityWork | undefined, error: string | null): string | null => (unsettled(work) ? "Updating seats." : error);
 
@@ -39,7 +42,7 @@ export function SeatQuantityStatus({ subscription, work, onOpen, onManageBilling
   return (
     <div className="seats-inline-state">
       <span data-tip={formatUsageTime(scheduled.at)}>{scheduled.words}</span>
-      <Button onClick={() => onOpen({ from: "keep" })}>Keep current seats</Button>
+      <Button onClick={() => onOpen({ from: "review", seats: subscription.quantity })}>Keep current seats</Button>
     </div>
   );
 }
@@ -53,20 +56,22 @@ function ChangeStatus({ work, onOpen, onManageBilling, onRead }: Omit<StatusProp
         </Button>
       </div>
     );
-  if (work.operation?.state === "failed")
+  if (work.operation?.state === "failed") {
+    const message = work.operation.message ?? work.error;
     return (
       <div className="seats-inline-state">
         <span className="seats-error" role="alert">
-          {work.operation.message ?? work.error}
+          {message}
         </span>
-        <Button onClick={onManageBilling}>Manage billing</Button>
+        {needsBilling(message) ? <Button onClick={onManageBilling}>Manage billing</Button> : <Button onClick={() => onOpen({ from: "review", seats: work.request.seats })}>Review again</Button>}
       </div>
     );
+  }
   return (
     <div className="seats-inline-state">
       <span>
-        Seats updated.{" "}
-        <span className="seats-error" role="alert">
+        Seats updated.
+        <span className="seats-error block" role="alert">
           {work.error}
         </span>
       </span>
@@ -101,15 +106,14 @@ export function ChangeSeatsFlow({
 }) {
   const view = useSeatQuantity(spaceId, transport);
   const [started, setStarted] = useState(false);
-  const quantity = billing.subscription?.quantity;
   useEffect(() => {
     if (!view || started) return;
     setStarted(true);
     if (opening.from === "work") view.resume(opening.work);
-    else if (opening.from === "keep" && quantity !== undefined) {
-      view.select(quantity);
+    else if (opening.from === "review") {
+      view.select(opening.seats);
       void view.review();
     }
-  }, [view, started, opening, quantity]);
+  }, [view, started, opening]);
   return view && started ? <ChangeSeatsDialog view={view} billing={billing} onClose={onClose} onManageBilling={onManageBilling} /> : null;
 }

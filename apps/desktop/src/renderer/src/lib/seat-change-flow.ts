@@ -159,7 +159,9 @@ export class SeatChangeFlow<T, P extends { token: string; expiresAt: number }, R
 
   #accept(work: W): void {
     const state = work.operation?.state ?? "pending";
-    this.#publish({ state, work, reviewing: false, error: work.error ?? work.operation?.message ?? null });
+    // An operation's message is what went wrong only once it has failed; while it settles the message is its status.
+    const refusal = state === "failed" ? (work.operation?.message ?? null) : null;
+    this.#publish({ state, work, reviewing: false, error: work.error ?? refusal });
   }
 
   #expire(): void {

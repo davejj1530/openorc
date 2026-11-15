@@ -65,6 +65,8 @@ export class StandInCollaboration {
    * The creator keeps every right of today.
    */
   joinOnly = false;
+  /** A Stop leaves the turn stopping until `endTurn` ends it, as a host takes a moment to stop its agent. */
+  holdStops = false;
   /**
    * What keeps a thread from moving to its next sender, per thread: a command of the previous sender's still running, or
    * a save that failed. It holds only someone else's new turn, never a join, and the previous sender may retry the save.

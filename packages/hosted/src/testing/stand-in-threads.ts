@@ -122,6 +122,8 @@ export interface Thread {
   turns: Map<string, string>;
   turnStartedAt: string | null;
   stopping: boolean;
+  /** Who asked for the stop under way; null for none, or one the server made. */
+  stoppedBy: string | null;
   createdAt: string;
   lastActivityAt: string;
 }
@@ -382,6 +384,7 @@ export class StandInThreads {
       files,
       paused: place.paused,
       ...heldWith(place.paused, body),
+      ...("stoppedBy" in place && typeof place.stoppedBy === "string" ? { pause: this.#stopPause(place.stoppedBy) } : {}),
     };
     thread.messages.push(message);
     if (!thread.title.trim() && thread.messages.length === 1) thread.title = titleFromPrompt(message.text);
@@ -441,7 +444,12 @@ export class StandInThreads {
    */
   #placeShared(thread: Thread, who: string, body: Record<string, unknown>, settings: { agent: string; model: string | null }, after: boolean) {
     const expected = typeof body["expectedTurnId"] === "string" ? body["expectedTurnId"] : null;
-    if (thread.stopping) return { refusal: null, queue: true, paused: true };
+    // While a turn stops: what anyone but the stopper sends waits paused for its author, a join too; the stopper's own
+    // runs once the turn has ended. A stop nobody asked for pauses nothing but a join.
+    if (thread.stopping) {
+      const other = thread.stoppedBy !== null && thread.stoppedBy !== who ? thread.stoppedBy : null;
+      return { refusal: null, queue: true, paused: Boolean(other) || (Boolean(expected) && !after), stoppedBy: other };
+    }
     if (thread.turn && !after && (!expected || expected === thread.turnId)) return { refusal: null, queue: false, paused: false };
     // Its turn ended or changed before it arrived: it waits as the author's own. While only joining is open it waits
     // paused, since nothing a teammate sends may start a turn; else it is admitted as theirs when it is taken.
@@ -480,21 +488,29 @@ export class StandInThreads {
     return reply;
   }
 
+  #firstName(who: string): string {
+    return this.collaboration.personOf(who)?.name.split(" ")[0] ?? "Someone";
+  }
+  /** Why a message waits after someone stopped the turn it was waiting for. */
+  #stopPause(stopper: string): { kind: string; message: string } {
+    return { kind: "stop", message: `${this.#firstName(stopper)} stopped the turn this was waiting for.` };
+  }
+
   /** Stop of the turn the window saw: the stopper's own waiting messages go, everyone else's wait paused for their authors. */
   #stopShared(thread: Thread, who: string, turnId: string): Reply {
     if (thread.turnId !== turnId || !thread.turn) return { status: 409, body: { code: "turn_changed", message: "That turn ended. Check the thread before stopping again.", statusCode: 409 } };
     for (const message of thread.messages) {
       if (message.state !== "pending") continue;
       if (message.author === who) message.state = "cancelled";
-      else message.paused = true;
+      else Object.assign(message, { paused: true, pause: this.#stopPause(who) });
     }
     // Stopping another person's turn says so once; stopping one's own says nothing, as the server does.
     if (thread.turn !== who) {
       const sender = this.collaboration.personOf(thread.turn)?.name.split(" ")[0] ?? "the previous sender";
-      const stopper = this.collaboration.personOf(who)?.name.split(" ")[0] ?? "Someone";
-      this.append(thread.id, [{ type: "message.completed", ts: Date.now(), messageId: randomUUID(), role: "system", text: `${stopper} stopped ${sender}'s turn.` }], { by: userOf(who) });
+      this.append(thread.id, [{ type: "message.completed", ts: Date.now(), messageId: randomUUID(), role: "system", text: `${this.#firstName(who)} stopped ${sender}'s turn.` }], { by: userOf(who) });
     }
-    this.endTurn(thread.id, "cancelled");
+    if (this.collaboration.holdStops) Object.assign(thread, { stopping: true, stoppedBy: who });
+    else this.endTurn(thread.id, "cancelled");
     return { status: 204, body: null };
   }
 
@@ -627,6 +643,7 @@ export class StandInThreads {
     const thread = this.#threads.get(threadId)!;
     thread.turn = null;
     thread.stopping = false;
+    thread.stoppedBy = null;
     thread.turnStartedAt = null;
     for (const ask of thread.asks) if (!ask.answered) ask.parked = true;
     thread.status = openAsk(thread) ? "needs_answer" : "idle";
@@ -681,6 +698,7 @@ export class StandInThreads {
       turns: new Map(),
       turnStartedAt: null,
       stopping: false,
+      stoppedBy: null,
       createdAt: at,
       lastActivityAt: at,
     };

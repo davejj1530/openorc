@@ -124,6 +124,21 @@ describe("sending, queueing and Stop in a shared thread", () => {
     expect(await lines(ada)).toEqual(["Bob stopped Ada's turn."]);
   });
 
+  it("while a teammate stops a turn, pauses what anyone else sends for its author and runs the stopper's own after it", async () => {
+    stand.threadCollaboration.holdStops = true;
+    const { thread, ada, bob, runId } = await shared(true);
+    await ada.threads.call("runs.send", { runId, text: "Start", messageId: id(1) });
+    await live(bob, thread, "Ada");
+    await bob.threads.call("runs.interrupt", { runId });
+    await ada.threads.call("threads.queue", { id: thread, text: "Ada after", requestKey: id(2) });
+    await bob.threads.call("threads.queue", { id: thread, text: "Bob after", requestKey: id(3) });
+    const queued = async (hosted: Hosted, n: number) => (await row(hosted, thread)).owner!.collaboration!.queue.find((each) => each.messageId === id(n).slice(5));
+    expect(await queued(ada, 2)).toMatchObject({ paused: true, pause: { kind: "stop", message: "Bob stopped the turn this was waiting for." } });
+    expect(await queued(bob, 3)).toMatchObject({ paused: false });
+    stand.endTurn(thread, "cancelled");
+    await live(bob, thread, "Bob");
+  });
+
   it("refuses a Stop aimed at a turn that has changed, in the server's words", async () => {
     // Bob's list stops moving, so his window still shows the first turn when Ada's next one runs.
     let frozen: string | null = null;

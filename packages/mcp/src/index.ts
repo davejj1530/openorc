@@ -1,21 +1,14 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import {
-  AgentKind,
-  CommentIntent,
-  parseFileBoundary,
-  TaskStatus,
-  type ApprovalDecision,
-  type BrowserCommand,
-  type BrowserResult,
-  type DeviceToolInput,
-  type DeviceToolResult,
-} from "@openorc/protocol";
+import { AgentKind, CommentIntent, parseFileBoundary, type ApprovalDecision, type BrowserCommand, type BrowserResult, type DeviceToolInput, type DeviceToolResult } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import http from "node:http";
 import { z } from "zod";
 import { registerBrowserTool } from "./browser.js";
 import { registerDeviceTool } from "./device.js";
+import { registerTaskContext, registerTaskTools } from "./task-tools.js";
+import type { TaskContextOptions, TaskTools } from "./task-types.js";
+export type { TaskCard, TaskTools, TaskScope, TaskContextOptions } from "./task-types.js";
 import { fileBoundaryAnswer } from "./file-boundary.js";
 import { orclingToolNames, registerOrclingTools, type OrclingTools } from "./orcling-tools.js";
 import { registerPullReviewTools, type PullReviewTools } from "./pull-review.js";
@@ -69,8 +62,10 @@ export interface McpHost {
   approve(request: ApprovalRequest): Promise<ApprovalResult>;
   /** Omit memory tools while recall and recording are disabled. Task context stays available. */
   memoryEnabled?(): boolean;
+  /** Whether this run's task tools may name an online task's space and project. Any other run sees the Mac's tools. */
+  onlineTasks?(runId: string): boolean;
   memorySearch(runId: string, query: string, limit: number): Promise<MemorySearchHit[]>;
-  taskContext(runId: string): Promise<string>;
+  taskContext(runId: string, options?: TaskContextOptions): Promise<string>;
   memoryRecord(runId: string, entry: { type: string; title: string; body: string; topicKey?: string }): Promise<{ id: string }>;
   memoryFeedback(runId: string, id: string, verdict: "helpful" | "wrong" | "stale"): Promise<void>;
   tasks: TaskTools;
@@ -104,45 +99,6 @@ export interface ThreadTools {
     runId: string,
     input: { prompt: string; title?: string; agent?: AgentKind; model?: string; effort?: string; fast?: boolean },
   ): Promise<{ thread: { id: string; title: string }; agent: string; model: string | null; message: string }>;
-}
-
-export interface TaskCard {
-  spec?: string | null;
-  message?: string;
-  id: string;
-  title: string;
-  status: string;
-  branch: string | null;
-  /** True when this is the task the calling run is executing. */
-  current: boolean;
-  resultSummary: string | null;
-  activity?: {
-    runId: string;
-    state: "working" | "waiting" | "idle" | "completed" | "failed" | "cancelled";
-    latestMessage: string | null;
-    lastAction: string | null;
-    waitingFor: string | null;
-    updatedAt: number;
-  } | null;
-}
-
-export interface TaskTools {
-  /** Creates a task in the caller's thread, or returns the existing one when the title matches. */
-  create(
-    runId: string,
-    input: {
-      title: string;
-      spec: string;
-      priority?: string;
-      labels?: string[];
-      execution?: "backlog" | "delegate";
-      workspaceMode?: "current" | "worktree";
-    },
-  ): Promise<{ task: TaskCard; duplicate: boolean; started: boolean; message: string }>;
-  start(runId: string, id: string, options?: { workspaceMode?: "current" | "worktree" }): Promise<TaskCard>;
-  list(runId: string): Promise<TaskCard[]>;
-  get(runId: string, id: string): Promise<TaskCard | null>;
-  update(runId: string, id: string, patch: { status?: TaskStatus; spec?: string }): Promise<TaskCard | null>;
 }
 
 export interface OpenOrcMcpServer {
@@ -379,14 +335,7 @@ function buildServer(host: McpHost, runId: string): McpServer {
       },
     );
 
-  mcp.registerTool(
-    "task_context",
-    {
-      description: "The brief for the current task: spec, prior attempts, related decisions and lessons, commands that worked.",
-      inputSchema: {},
-    },
-    async () => ({ content: [{ type: "text", text: await host.taskContext(runId) }] }),
-  );
+  registerTaskContext(mcp, host, runId);
 
   if (memoryEnabled)
     mcp.registerTool(
@@ -422,92 +371,7 @@ function buildServer(host: McpHost, runId: string): McpServer {
       },
     );
 
-  mcp.registerTool(
-    "task_create",
-    {
-      description:
-        "Create a polished task document directly in OpenOrc, only when the user explicitly asks for a task. A task is work the user asked to have saved or built. Never create one on your own initiative, for follow-ups, ideas, or issues you notice; mention those in your reply instead. Conversation is not a task: greetings, questions, opinions, status and coordination are answered in your reply never captured or delegated as tasks. Defaults to backlog: no agent starts and no worktree is created, even in Act mode. 'Create a task' or 'add to backlog' requests capture, not implementation: save with execution=backlog and confirm. Act permits the requested action; it never overrides the user's intent. For ordinary tasks, creation only saves the document, including legacy execution=delegate requests. When asked to implement, call task_start and do the work in this same conversation; never forward it to a separate task agent. Use MCP directly, not Computer Use, browser automation, or database writes. Call task_list first to avoid duplicates. Only threads can create tasks.",
-      inputSchema: {
-        title: z.string().min(3).max(120).describe("Imperative, specific, unique within the thread"),
-        spec: z
-          .string()
-          .min(10)
-          .describe(
-            "Well-written Markdown document: Goal, Scope, Acceptance criteria (checklist), and Verification. Include relevant constraints and concrete outcomes; omit empty sections and do not invent requirements.",
-          ),
-        priority: z.enum(["none", "low", "medium", "high", "urgent"]).optional(),
-        labels: z.array(z.string().min(1).max(60)).max(20).optional(),
-        execution: z.enum(["backlog", "delegate"]).default("backlog").describe("Saves the task without starting an agent. Legacy delegate requests also save only."),
-        workspace_mode: z
-          .enum(["current", "worktree"])
-          .optional()
-          .describe(
-            "Current uses the existing checkout and branch, worktree creates an isolated workspace. Omit to save the user’s default. Exclusive workspace operations can block local startup; never silently fall back to a worktree.",
-          ),
-      },
-    },
-    async ({ title, spec, priority, labels, execution, workspace_mode }) => {
-      const result = await host.tasks.create(runId, {
-        title,
-        spec,
-        execution,
-        ...(workspace_mode !== undefined ? { workspaceMode: workspace_mode } : {}),
-        ...(priority ? { priority } : {}),
-        ...(labels ? { labels } : {}),
-      });
-      return { content: [{ type: "text", text: JSON.stringify(result) }] };
-    },
-  );
-
-  mcp.registerTool(
-    "task_start",
-    {
-      description:
-        "Mark an existing ordinary task in progress and implement it yourself in the current conversation and workspace. This does not launch or forward to another agent. Requires Act mode. Reuse the task ID. Creating a backlog task does not require starting it.",
-      inputSchema: {
-        id: z.string().min(1),
-        workspace_mode: z.enum(["current", "worktree"]).optional().describe("Tasks run in the current conversation workspace. Omit this field; a different location requires moving the thread."),
-      },
-    },
-    async ({ id, workspace_mode }) => ({
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify(
-            await host.tasks.start(runId, id, {
-              ...(workspace_mode !== undefined ? { workspaceMode: workspace_mode } : {}),
-            }),
-          ),
-        },
-      ],
-    }),
-  );
-
-  mcp.registerTool(
-    "task_list",
-    { description: "Tasks across all threads in this project with their status and branch. The task you are executing, if any, is marked current.", inputSchema: {} },
-    async () => ({ content: [{ type: "text", text: JSON.stringify(await host.tasks.list(runId)) }] }),
-  );
-
-  mcp.registerTool(
-    "task_get",
-    {
-      description:
-        "Read any task in this project by ID, regardless of its originating thread. Live progress includes: latest agent commentary, current action, permission/input wait, run outcome, and result summary. Use this when the user asks for a report; waiting means paused, not still implementing.",
-      inputSchema: { id: z.string() },
-    },
-    async ({ id }) => ({ content: [{ type: "text", text: JSON.stringify(await host.tasks.get(runId, id)) }] }),
-  );
-
-  mcp.registerTool(
-    "task_update",
-    {
-      description:
-        "Update any task in this project by ID, regardless of its originating thread or assigned agent. Set its board status or refine its spec. A status move does not stop an execution or change its recorded outcome.",
-      inputSchema: { id: z.string(), status: TaskStatus.optional(), spec: z.string().optional() },
-    },
-    async ({ id, status, spec }) => ({ content: [{ type: "text", text: JSON.stringify(await host.tasks.update(runId, id, { ...(status ? { status } : {}), ...(spec ? { spec } : {}) })) }] }),
-  );
+  registerTaskTools(mcp, host, runId);
 
   if (host.execution?.available(runId)) registerExecutionTools(mcp, host.execution, runId);
   mcp.registerTool(

@@ -35,8 +35,9 @@ export function createMemoryHost({
         confidence: memory.confidence,
       }));
     },
-    taskContext: async (runId) => {
+    taskContext: async (runId, options) => {
       assertRunAvailable(runId);
+      if (options?.scope) throw new Error("Online task tools aren't available here.");
       const task = taskFor(runId);
       return task ? memoryService.taskContext(task) : "No task context.";
     },

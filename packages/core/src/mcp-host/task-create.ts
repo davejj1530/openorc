@@ -6,6 +6,7 @@ type Dependencies = { threadService: Pick<ThreadService, "toolCreate">; assertRu
 export function createTaskCreateHost({ threadService, assertRunAvailable }: Dependencies): McpHost["tasks"]["create"] {
   return (runId, input) => {
     assertRunAvailable(runId);
+    if (input.scope) throw new Error("Online task tools aren't available here.");
     return threadService.toolCreate(runId, {
       title: input.title,
       spec: input.spec,

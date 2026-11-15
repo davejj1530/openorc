@@ -463,6 +463,33 @@ test("ordinary task workspace choices cross the MCP boundary and invalid locatio
   assert.equal(calls.length, 2);
 });
 
+test("task tools name a space, a project and a revision only for a run the host lets reach online tasks", async (t) => {
+  const { connect, host } = await fixture(t);
+  const argumentsOf = async (runId: string) =>
+    Object.fromEntries(
+      (await (await connect(runId)).listTools()).tools.filter((tool) => tool.name.startsWith("task_")).map((tool) => [tool.name, Object.keys(tool.inputSchema.properties ?? {}).sort()]),
+    );
+  const mac = {
+    task_context: [],
+    task_create: ["execution", "labels", "priority", "spec", "title", "workspace_mode"],
+    task_get: ["id"],
+    task_list: [],
+    task_start: ["id", "workspace_mode"],
+    task_update: ["id", "spec", "status"],
+  };
+  assert.deepEqual(await argumentsOf("mac-run"), mac);
+  host.onlineTasks = (runId) => runId === "online-run";
+  assert.deepEqual(await argumentsOf("online-run"), {
+    task_context: ["scope", "taskId"],
+    task_create: ["execution", "labels", "priority", "scope", "spec", "title", "workspace_mode"],
+    task_get: ["id", "scope"],
+    task_list: ["scope"],
+    task_start: ["id", "ifRevision", "scope", "workspace_mode"],
+    task_update: ["id", "ifRevision", "scope", "spec", "status"],
+  });
+  assert.deepEqual(await argumentsOf("other-run"), mac);
+});
+
 test("ask_user advertises a validated schema and returns correlated structured results", async (t) => {
   const { connect, host } = await fixture(t);
   const client = await connect("question-run");

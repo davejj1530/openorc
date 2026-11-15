@@ -11,22 +11,26 @@ export function createTasksHost({ threadService, dataDir, assertRunAvailable }: 
   return {
     start: async (runId, id, options) => {
       assertRunAvailable(runId);
+      if (options?.scope) throw new Error("Online task tools aren't available here.");
       const scoped = await threadService.toolGet(runId, id);
       if (!scoped) throw new Error("Task not found in this agent's project.");
       const images = await new AttachmentService(dataDir).forTask(scoped.spec ?? "");
       const task = await threadService.toolStart(runId, id, options?.workspaceMode);
       return images.length ? { ...task, message: `${task.message}\nTask images (open these paths):\n${images.join("\n")}` } : task;
     },
-    list: (runId) => {
+    list: (runId, scope) => {
       assertRunAvailable(runId);
+      if (scope) throw new Error("Online task tools aren't available here.");
       return threadService.toolList(runId);
     },
-    get: (runId, id) => {
+    get: (runId, id, scope) => {
       assertRunAvailable(runId);
+      if (scope) throw new Error("Online task tools aren't available here.");
       return threadService.toolGet(runId, id);
     },
     update: (runId, id, patch) => {
       assertRunAvailable(runId);
+      if (patch.scope) throw new Error("Online task tools aren't available here.");
       return threadService.toolUpdate(runId, id, patch);
     },
   };

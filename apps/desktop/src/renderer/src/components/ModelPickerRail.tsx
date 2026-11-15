@@ -75,33 +75,40 @@ export function ModelPickerRail({
           );
         })}
       </div>
-      {fast && fastReason ? (
-        <HostedControlReason label="Fast mode" reason={fastReason}>
-          <button type="button" className="model-picker-rail-button model-picker-fast" aria-label="Fast mode" disabled>
-            <Zap size={20} />
-          </button>
-        </HostedControlReason>
-      ) : fast ? (
-        <>
-          <button
-            type="button"
-            className="model-picker-rail-button model-picker-fast"
-            aria-label="Fast mode"
-            aria-pressed={fast.active}
-            data-blocked={fast.blocked || undefined}
-            aria-describedby={fastDescriptionId}
-            data-tip={`${fast.active ? "Turn off" : "Request"} Fast mode. ${fast.hint}`}
-            disabled={fast.disabled}
-            onClick={fast.onToggle}
-          >
-            <Zap size={20} />
-          </button>
-          <span className="sr-only" id={fastDescriptionId}>
-            {fastStatus(fast.active, fast.blocked)}
-            {fast.hint}
-          </span>
-        </>
-      ) : null}
+      {fast ? <RailFast fast={fast} reason={fastReason} descriptionId={fastDescriptionId} /> : null}
     </div>
+  );
+}
+
+/** Fast mode at the rail's end: dimmed with its reason where the conversation can't use it. */
+function RailFast({ fast, reason, descriptionId }: { fast: FastOption; reason: string | null; descriptionId: string }) {
+  if (reason)
+    return (
+      <HostedControlReason label="Fast mode" reason={reason}>
+        <button type="button" className="model-picker-rail-button model-picker-fast" aria-label="Fast mode" disabled>
+          <Zap size={20} />
+        </button>
+      </HostedControlReason>
+    );
+  return (
+    <>
+      <button
+        type="button"
+        className="model-picker-rail-button model-picker-fast"
+        aria-label="Fast mode"
+        aria-pressed={fast.active}
+        data-blocked={fast.blocked || undefined}
+        aria-describedby={descriptionId}
+        data-tip={`${fast.active ? "Turn off" : "Request"} Fast mode. ${fast.hint}`}
+        disabled={fast.disabled}
+        onClick={fast.onToggle}
+      >
+        <Zap size={20} />
+      </button>
+      <span className="sr-only" id={descriptionId}>
+        {fastStatus(fast.active, fast.blocked)}
+        {fast.hint}
+      </span>
+    </>
   );
 }

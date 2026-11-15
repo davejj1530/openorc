@@ -1,6 +1,8 @@
+import type { Space } from "@openorc/protocol";
 import { router } from "expo-router";
 import { Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRpc } from "../client";
 import { Check } from "../generated/icons";
 import { haptic } from "../ui/haptics";
 import { Text } from "../ui/Text";
@@ -17,6 +19,12 @@ export function SpaceSheet() {
   const account = useSpaces();
   const spaces = account.state === "ready" ? account.spaces : [];
   const current = account.state === "ready" ? account.current.id : null;
+  const person = useRpc("account.person", {}, { enabled: account.state === "ready" }).data?.name;
+  /** Under a space's name, as the Mac's menu has it: whose Personal it is, and how many people an organization has. */
+  const detail = (space: Space) => {
+    if (space.kind === "personal") return person ?? null;
+    return space.memberCount === 1 ? "1 person" : `${space.memberCount} people`;
+  };
   return (
     <View className="gap-1 bg-bg px-5 pt-6" style={{ paddingBottom: insets.bottom + 16 }} onAccessibilityEscape={() => router.back()}>
       <Text accessibilityRole="header" className="mb-2 text-xl">
@@ -42,9 +50,9 @@ export function SpaceSheet() {
             <Text numberOfLines={1} className="text-md">
               {spaceName(space)}
             </Text>
-            {space.kind === "organization" ? (
+            {detail(space) ? (
               <Text numberOfLines={1} className="text-sm text-ink-4">
-                {space.memberCount === 1 ? "1 person" : `${space.memberCount} people`}
+                {detail(space)}
               </Text>
             ) : null}
           </View>

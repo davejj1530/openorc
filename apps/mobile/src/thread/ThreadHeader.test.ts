@@ -14,3 +14,10 @@ it("names the starter when a shared thread waits on an answer", () => {
   expect(statusLine(thread, "Project")).not.toContain("Needs you");
   expect(statusLine({ ...thread, owner: undefined }, "Project")).toContain("Needs you");
 });
+
+it("says a cloud thread is on OpenOrc Cloud after its project, the Mac's own name for it or the server's", () => {
+  const cloud: ThreadSummary = { ...base, activity: "idle", owner: { brain: "hosted", reach: "live", heardAt: 1 } };
+  expect(statusLine(cloud, "canvas")).toBe("canvas · OpenOrc Cloud");
+  expect(statusLine({ ...cloud, owner: { ...cloud.owner!, project: { name: "billing-service" } } }, undefined)).toBe("billing-service · OpenOrc Cloud");
+  expect(statusLine({ ...cloud, owner: undefined }, "canvas")).toBe("canvas");
+});

@@ -125,11 +125,12 @@ function TranscriptPane({ threadId, thread, runs, loading, failed, retry, onActi
 }
 
 /** An Orcling's own conversation names it in a pill by the back button; any other thread titles itself under its More menu. */
-function ConversationHeader({ chat, title, menu }: { chat: OrclingChatSummary | null; title: () => ReactElement; menu: ReactElement | null }) {
+function ConversationHeader({ chat, title, menu }: { chat: OrclingChatSummary | null; title: (() => ReactElement) | null; menu: ReactElement | null }) {
   if (chat) return <OrclingHeader chat={chat} />;
   return (
     <>
-      <Stack.Screen options={{ headerTitle: title }} />
+      {/* No title until there is a thread to name: the bar sizes its title once, and a title that starts empty stays hidden unless a menu arrives to lay the bar out again. */}
+      <Stack.Screen options={{ headerTitle: title ?? "" }} />
       {menu}
     </>
   );
@@ -199,7 +200,7 @@ export function ThreadScreen() {
 
   return (
     <View className="flex-1 bg-bg">
-      <ConversationHeader chat={chat} title={() => <ThreadTitle thread={thread} onRename={actions.rename} />} menu={menu} />
+      <ConversationHeader chat={chat} title={thread ? () => <ThreadTitle thread={thread} onRename={actions.rename} /> : null} menu={menu} />
       <DisclosureContext.Provider value={disclosure}>
         <AuthorsContext.Provider value={authors}>
           <VoicesContext.Provider value={voices}>

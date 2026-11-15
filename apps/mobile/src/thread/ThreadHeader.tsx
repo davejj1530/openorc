@@ -1,7 +1,7 @@
 import { snoozeWakeLabel, threadMark, togetherActivity } from "@openorc/client";
 import { isSubagentThread, placeOf, WORKSPACE_ID, type ThreadSummary } from "@openorc/protocol";
 import { router } from "expo-router";
-import { Pressable } from "react-native";
+import { Pressable, View } from "react-native";
 import { useLinkState, useRpc } from "../client";
 import { useLinkWords } from "../connection/use-link-words";
 import { Text } from "../ui/Text";
@@ -35,13 +35,10 @@ export function ThreadTitle({ thread, onRename }: { thread: ThreadSummary | null
   const line = link.tone !== "ok" && link.status ? link.status : place;
   // A cloud thread's title is everyone's in its project; a phone does not change it yet.
   const rename = isSubagentThread(thread) || placeOf(thread).elsewhere ? undefined : onRename;
-  return (
-    <Pressable
-      accessibilityRole="header"
-      accessibilityLabel={[thread.title, line].filter(Boolean).join(", ")}
-      onPress={parentId ? () => router.push({ pathname: "/thread/[id]", params: { id: parentId } }) : rename}
-      className="max-w-60 items-center active:opacity-60"
-    >
+  const open = parentId ? () => router.push({ pathname: "/thread/[id]", params: { id: parentId } }) : rename;
+  const label = [thread.title, line].filter(Boolean).join(", ");
+  const lines = (
+    <>
       <Text numberOfLines={1} className="text-md leading-5">
         {thread.title}
       </Text>
@@ -50,6 +47,18 @@ export function ThreadTitle({ thread, onRename }: { thread: ThreadSummary | null
           {line}
         </Text>
       ) : null}
+    </>
+  );
+  // With nothing to do on a tap it is a plain heading, as a panel's title is.
+  if (!open)
+    return (
+      <View accessible accessibilityRole="header" accessibilityLabel={label} className="max-w-60 items-center">
+        {lines}
+      </View>
+    );
+  return (
+    <Pressable accessibilityRole="header" accessibilityLabel={label} onPress={open} className="max-w-60 items-center active:opacity-60">
+      {lines}
     </Pressable>
   );
 }

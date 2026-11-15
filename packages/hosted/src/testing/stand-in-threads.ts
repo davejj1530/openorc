@@ -74,6 +74,10 @@ export interface Message {
   files: UploadedFile[];
   /** Paused by someone's Stop or a failed handoff: no turn takes it until its author starts it. */
   paused?: boolean;
+  /** Why it waits paused, in the server's words; none for a Stop, which the server does not word yet. */
+  pause?: { kind: string; message: string } | null;
+  /** The task context it was sent with. */
+  task?: { id: string; ifRevision: number } | null;
 }
 
 interface Ask {
@@ -133,6 +137,12 @@ const agentTurn = (turnId: string) => `${turnId}-agent`;
 const openAsk = (thread: Thread) => thread.asks.find((ask) => !ask.answered) ?? null;
 const viewOf = (thread: Thread, who: string): View => thread.views.get(who) ?? { seenSeq: 0, pinnedAt: null, archivedAt: null, snoozedUntil: null };
 const UUID = /^[0-9a-f-]{36}$/i;
+
+/** Why a new message waits paused (a join that missed its turn), and the task context it was sent with. */
+function heldWith(paused: boolean, body: Record<string, unknown>): Pick<Message, "pause" | "task"> {
+  const missed = paused && typeof body["expectedTurnId"] === "string";
+  return { pause: missed ? { kind: "join", message: "The turn this was sent to has ended." } : null, task: (body["task"] as Message["task"]) ?? null };
+}
 
 export class StandInThreads {
   readonly #threads = new Map<string, Thread>();
@@ -371,6 +381,7 @@ export class StandInThreads {
       createdAt: new Date().toISOString(),
       files,
       paused: place.paused,
+      ...heldWith(place.paused, body),
     };
     thread.messages.push(message);
     if (!thread.title.trim() && thread.messages.length === 1) thread.title = titleFromPrompt(message.text);
@@ -461,6 +472,7 @@ export class StandInThreads {
     const reply: Reply = refusal ? { status: 200, body: { sent: false, refusal } } : { status: 200, body: { sent: true, message: messageOf(message) } };
     if (!refusal) {
       message.paused = false;
+      message.pause = null;
       this.#take(thread, message);
       (reply.body as { message: unknown }).message = messageOf(message);
     }
@@ -521,6 +533,7 @@ export class StandInThreads {
     this.collaboration.handoffs.set(thread.id, { code, responsible: previous, commandIds: [] });
     message.paused = true;
     const words = (this.collaboration.handoffRefusal(thread, message.author).body as { message: string }).message;
+    message.pause = { kind: "handoff", message: words };
     this.append(thread.id, [{ type: "error", runId: message.id, ts: Date.now(), fatal: true, message: words }], {});
     this.#changed(thread);
     return true;

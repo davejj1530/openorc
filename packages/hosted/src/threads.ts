@@ -38,6 +38,7 @@ import * as sends from "./sends.js";
 import { Refused, type Requests, type Session, type SessionChange } from "./session.js";
 import { CLOUD_PROJECT, githubRepoOf, listRows, projectPairs, resolvedCount, runsNow, starterOf, toAppEvent, toRuns, toSummary } from "./translate.js";
 import { ROUTES, SOCKET, wireProject, wireThread, wireTopics, type WireEvent, type WireThread } from "./wire.js";
+import type { QueuedStart } from "./shared-sends.js";
 
 import { firstMessage } from "./first-message.js";
 import { nativeRowFields } from "./wire-subthreads.js";
@@ -97,8 +98,8 @@ export class Threads implements HostedThreads {
   readonly calls: sends.Calls;
   /** Who sent each turn and wrote each message of the threads read: collaboration.ts. */
   readonly voices = new ThreadVoices();
-  /** The request id of each explicit Start of a paused message not answered yet: shared-sends.ts. */
-  readonly starts = new Map<string, string>();
+  /** Each explicit Start of a paused message not answered yet, with what it carries: shared-sends.ts. */
+  readonly starts = new Map<string, QueuedStart>();
 
   constructor(private readonly deps: ThreadsDeps) {
     this.#cache = new AccountCache({ kept: deps.kept, part: "threads", server: deps.server, schema: keptThreads });

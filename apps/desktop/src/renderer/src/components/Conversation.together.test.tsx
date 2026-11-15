@@ -391,8 +391,11 @@ it("holds Send now while Mara's turn is stopping", async () => {
 });
 
 it("keeps a join that missed its turn paused for its author, Start turn dimmed in the server's words", async () => {
-  const queue = [{ messageId: "late", author: THEO, paused: true, canEdit: true, canRemove: true, canStart: false }];
+  const pause = { kind: "join", message: "The turn this was sent to has ended." };
+  const queue = [{ messageId: "late", author: THEO, paused: true, canEdit: true, canRemove: true, canStart: false, task: null, pause }];
   await open(marasThread(joining({ send: "blocked", live: null, queue }), { queued: [{ id: "late", text: "Keep the date first", attachments: [], queuedAt: 1 }] }));
+  // The pile says why it waits, in the server's words.
+  expect(screen.getByRole("button", { name: /1 paused/ }).textContent).toContain(pause.message);
   fireEvent.click(screen.getByRole("button", { name: /1 paused/ }));
   const start = screen.getByRole("button", { name: "Start turn" });
   expect([start.hasAttribute("disabled"), start.getAttribute("data-tip")]).toEqual([true, handoff.message]);

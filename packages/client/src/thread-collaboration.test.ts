@@ -168,7 +168,7 @@ describe("a teammate's cloud thread on today's server", () => {
 
 describe("people in a thread", () => {
   it("counts a teammate in the reader's own thread through the live turn or the queue, and a former member as someone", () => {
-    expect(withOthers(row(together(THEO, { queue: [{ messageId: "m1", author: MARA, paused: false, canEdit: false, canRemove: false, canStart: false }] })))).toBe(true);
+    expect(withOthers(row(together(THEO, { queue: [{ messageId: "m1", author: MARA, paused: false, canEdit: false, canRemove: false, canStart: false, task: null, pause: null }] })))).toBe(true);
     expect(withOthers(row(together(THEO, { live: live(null) }), "running"))).toBe(true);
     expect(threadActivity(row(together(THEO, { live: live(null) }), "running"))).toEqual({ text: "Working", tone: "live" });
     expect(threadActivity(row(together(THEO, { ask: ask(null, "waiting", "blocked") }), "waiting"))).toEqual({ text: "Waiting for an answer", tone: "muted" });
@@ -176,7 +176,7 @@ describe("people in a thread", () => {
 
   it("names people, former members included, and reads queue rights from the server", () => {
     expect([personName(MARA), personFirst(MARA), personName(null), personFirst(null)]).toEqual(["Mara Okafor", "Mara", "Former member", "Former member"]);
-    const thread = row(together(THEO, { queue: [{ messageId: "m1", author: MARA, paused: false, canEdit: false, canRemove: false, canStart: false }] }));
+    const thread = row(together(THEO, { queue: [{ messageId: "m1", author: MARA, paused: false, canEdit: false, canRemove: false, canStart: false, task: null, pause: null }] }));
     expect(queuedBy(thread, "m1")).toEqual({ author: MARA, canEdit: false, canRemove: false, paused: false, canStart: false });
     expect(queuedBy(thread, "m2")).toBeNull();
   });
@@ -226,7 +226,7 @@ describe("sending, queueing and stopping in a shared thread", () => {
   });
 
   it("reads a paused message and whether its author may start it", () => {
-    const paused = row(open({ queue: [{ messageId: "m1", author: THEO, paused: true, canEdit: true, canRemove: true, canStart: true }] }), "idle", mara);
+    const paused = row(open({ queue: [{ messageId: "m1", author: THEO, paused: true, canEdit: true, canRemove: true, canStart: true, task: null, pause: null }] }), "idle", mara);
     expect(queuedBy(paused, "m1")).toMatchObject({ paused: true, canStart: true });
   });
 });

@@ -25,7 +25,18 @@ export const wireCollaboration = z.object({
   canPostNote: z.boolean(),
   canStop: z.boolean(),
   ask: z.object({ id: z.string(), turnId: z.string(), state: z.string(), sender: person.nullable(), answer: z.string(), canDecline: z.boolean(), reason: z.string().nullable() }).nullable(),
-  queue: z.array(z.object({ messageId: z.string(), author: person.nullable(), paused: z.boolean(), canEdit: z.boolean(), canRemove: z.boolean(), canStart: z.boolean() })),
+  queue: z.array(
+    z.object({
+      messageId: z.string(),
+      author: person.nullable(),
+      paused: z.boolean(),
+      canEdit: z.boolean(),
+      canRemove: z.boolean(),
+      canStart: z.boolean(),
+      task: z.object({ id: z.string(), ifRevision: z.number().int() }).nullable().optional(),
+      pause: z.object({ kind: z.string(), message: z.string() }).nullable().optional(),
+    }),
+  ),
   mentions: z.object({ unread: z.boolean(), firstUnreadNoteId: z.string().nullable() }),
   noteHead: z.number().int().nonnegative(),
 });
@@ -139,7 +150,7 @@ export function toCollaboration(wire: WireCollaboration): ThreadCollaboration | 
           reason: ask.reason,
         }
       : null,
-    queue: wire.queue.map((queued) => ({ ...queued, author: nullable(queued.author) })),
+    queue: wire.queue.map((queued) => ({ ...queued, author: nullable(queued.author), task: queued.task ?? null, pause: queued.pause ?? null })),
     mentions: wire.mentions,
     noteHead: wire.noteHead,
   };

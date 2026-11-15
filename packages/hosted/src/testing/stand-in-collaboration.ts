@@ -36,7 +36,7 @@ export interface CollaborationThread {
   turnStartedAt: string | null;
   stopping: boolean;
   asks: { id: string; turnId: string; answered: boolean; parked: boolean }[];
-  messages: { id: string; author: string; state: string; paused?: boolean }[];
+  messages: { id: string; author: string; state: string; paused?: boolean; pause?: { kind: string; message: string } | null; task?: { id: string; ifRevision: number } | null }[];
 }
 
 /** live: the ask's own sender while its turn runs. start: a parked ask anyone who writes may answer. */
@@ -113,6 +113,8 @@ export class StandInCollaboration {
           paused: Boolean(message.paused),
           canEdit: message.author === who,
           canRemove: message.author === who,
+          task: message.author === who ? (message.task ?? null) : null,
+          pause: message.author === who && message.paused ? (message.pause ?? null) : null,
           canStart: open && Boolean(message.paused) && message.author === who && !thread.turn && !this.holds(thread, who),
         })),
       mentions: this.mentionsOf(thread.id, who),
@@ -206,6 +208,8 @@ export class StandInCollaboration {
           paused: Boolean(message.paused),
           canEdit: message.author === who,
           canRemove: message.author === who,
+          task: message.author === who ? (message.task ?? null) : null,
+          pause: message.author === who && message.paused ? (message.pause ?? null) : null,
           canStart: creator && Boolean(message.paused) && message.author === who && !thread.turn,
         })),
       mentions: this.mentionsOf(thread.id, who),

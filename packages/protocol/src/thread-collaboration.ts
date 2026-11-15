@@ -39,7 +39,11 @@ export const ThreadAsk = z.object({
 });
 export type ThreadAsk = z.infer<typeof ThreadAsk>;
 
-/** One message waiting in the thread's queue, with its author and what this reader may do to it. */
+/**
+ * One message waiting in the thread's queue, with its author and what this reader may do to it. To its author alone:
+ * the task context it was sent with, and why it waits paused, in the server's words. A server that predates them sends
+ * neither.
+ */
 export const ThreadQueued = z.object({
   messageId: z.string(),
   author: ThreadPerson.nullable(),
@@ -47,6 +51,8 @@ export const ThreadQueued = z.object({
   canEdit: z.boolean(),
   canRemove: z.boolean(),
   canStart: z.boolean(),
+  task: z.object({ id: z.string(), ifRevision: z.number().int() }).nullable().default(null),
+  pause: z.object({ kind: z.string(), message: z.string() }).nullable().default(null),
 });
 export type ThreadQueued = z.infer<typeof ThreadQueued>;
 

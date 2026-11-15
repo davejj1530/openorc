@@ -190,7 +190,9 @@ describe("a teammate's own turn once handoff opens", () => {
     await bob.threads.call("runs.start", start(thread, 2));
     const words = "The thread's work could not be saved. Ada can retry the save.";
     await vi.waitFor(async () => expect(await collaborationOf(bob, thread)).toMatchObject({ live: null, send: "blocked", handoff: { code: "handoff_save", message: words, retrySave: false } }));
-    expect((await collaborationOf(bob, thread))?.queue).toEqual([expect.objectContaining({ paused: true, canStart: false })]);
+    expect((await collaborationOf(bob, thread))?.queue).toEqual([expect.objectContaining({ paused: true, canStart: false, pause: { kind: "handoff", message: words }, task: null })]);
+    // Why it waits is its author's to read.
+    expect((await collaborationOf(ada, thread))?.queue).toEqual([expect.objectContaining({ paused: true, pause: null, task: null })]);
     const [paused] = (await row(bob, thread)).queued;
     expect(await collaborationOf(ada, thread)).toMatchObject({ handoff: { code: "handoff_save", retrySave: true } });
     await ada.threads.call("threads.retrySave", { threadId: thread });

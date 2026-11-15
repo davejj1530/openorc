@@ -63,8 +63,8 @@ function queuePeople(thread: ThreadSummary): { hint: string | null; pausedHint: 
   const hint = thread.activity === "running" && togetherActivity(thread) && sender ? `After ${personFirst(sender)}'s turn` : null;
   return {
     hint,
-    // A message pauses for a Stop, a join that missed its turn or a failed handoff; the thread says which.
-    pausedHint: null,
+    // Why the reader's own message waits paused, in the server's words; only its author is told.
+    pausedHint: together.queue.find((queued) => queued.paused && queued.pause)?.pause?.message ?? null,
     of: (messageId) => {
       const by = queuedBy(thread, messageId);
       if (!by) return null;

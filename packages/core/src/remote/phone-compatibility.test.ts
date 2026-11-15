@@ -30,7 +30,8 @@ beforeAll(async () => {
     },
     remoteNetwork: { port: 0, machine: { name: () => "QA", lanHosts: () => ["127.0.0.1"], tailnetHosts: async () => [] } },
   });
-  await core.remote.attach((request) => core.handle(request));
+  // As the app attaches phones: the origin goes with every request, which keeps a phone's call on this Mac.
+  await core.remote.attach((request, origin) => core.handle(request, origin));
   await core.remote.configure(true);
 });
 afterAll(async () => {

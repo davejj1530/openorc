@@ -32,6 +32,8 @@ function openSocket(route: Route, macKey: Uint8Array, proxyTo: number | undefine
  */
 export class RemoteTestClient {
   readonly pushes: RemotePush[] = [];
+  /** Every message the Mac sent, as it arrived. */
+  readonly received: MacMessage[] = [];
   readonly gaps: string[][] = [];
   closing: ClosingReason | null = null;
   private nextId = 0;
@@ -138,6 +140,7 @@ export class RemoteTestClient {
   }
 
   private receive(message: MacMessage): void {
+    this.received.push(message);
     switch (message.t) {
       case "rpc.result":
         this.settle(message.id, (pending) => pending.resolve(message.result));

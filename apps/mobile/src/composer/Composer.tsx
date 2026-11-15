@@ -1,5 +1,5 @@
 import { composerActivity, conversationPlaceholder, type ClientState } from "@openorc/client";
-import { harnessShortName, isHarnessId, type QueuedMessage, type ThreadSummary } from "@openorc/protocol";
+import { harnessShortName, isHarnessId, placeOf, type QueuedMessage, type ThreadSummary } from "@openorc/protocol";
 import { useState } from "react";
 import { Pressable, View, type LayoutChangeEvent } from "react-native";
 import { KeyboardStickyView } from "react-native-keyboard-controller";
@@ -70,7 +70,8 @@ export function Composer({ thread, queued, settings, generatingImage, onLayout, 
   return (
     <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom }}>
       <View onLayout={onLayout} className="gap-2 bg-bg px-3 pt-2" style={{ paddingBottom: insets.bottom + 8 }}>
-        <Queue thread={thread} queued={queued} canSteer={input.canSteer} typing={typing} onSent={input.onSent} />
+        {/* A waiting message of a cloud thread goes now from the Mac, which sees the turn it would join. */}
+        <Queue thread={thread} queued={queued} canSteer={input.canSteer && !placeOf(thread).elsewhere} typing={typing} onSent={input.onSent} />
         {typing || input.working ? null : <SessionRecovery thread={thread} request={input.request} disabled={input.disabledReason !== null} onSent={input.onSent} />}
         {failure ? (
           <Text accessibilityRole="alert" className="px-1 text-sm text-bad">
@@ -93,6 +94,7 @@ export function Composer({ thread, queued, settings, generatingImage, onLayout, 
           onText={composer.setText}
           onRemoveImage={composer.removeImage}
           onAttach={composer.chooseImages}
+          attachDimmed={composer.attachDimmed}
           chips={!to}
         >
           {activity ? <Text className="text-sm text-ink-4">{activity}</Text> : null}

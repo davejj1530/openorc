@@ -17,6 +17,10 @@ export interface ComposerInput {
   canSteer: boolean;
   disabledReason: string | null;
   onSent: () => void;
+  /** In an OpenOrc Cloud thread: the running turn this screen saw, which a Stop names. */
+  turnSeen?: { expectedTurnId: string } | Record<string, never>;
+  /** Why images cannot be sent here, said when the attach button is tapped; null where they can. */
+  attachRefusal?: string | null;
 }
 
 /**
@@ -25,7 +29,7 @@ export interface ComposerInput {
  * keyboard stays up, so whatever is written next is the next message. A send that fails puts what it took back, ahead
  * of anything written since, and says why.
  */
-export function useComposer({ threadId, request, live, working, canSteer, disabledReason, onSent }: ComposerInput) {
+export function useComposer({ threadId, request, live, working, canSteer, disabledReason, onSent, turnSeen = {}, attachRefusal = null }: ComposerInput) {
   const [draft, setDraft] = useDraft(threadId);
   const [sending, setSending] = useState(false);
   // A second tap can land before the first send renders, so the send in flight is held here as well.
@@ -76,7 +80,7 @@ export function useComposer({ threadId, request, live, working, canSteer, disabl
   const stop = () => {
     if (!live || interrupt.isPending) return;
     haptic.tap();
-    interrupt.mutate({ runId: live.runId });
+    interrupt.mutate({ runId: live.runId, ...turnSeen });
   };
 
   return {
@@ -98,6 +102,7 @@ export function useComposer({ threadId, request, live, working, canSteer, disabl
     explainDim: dim.ask,
     queue: () => void send(false),
     stop,
-    chooseImages,
+    chooseImages: attachRefusal ? () => setError(attachRefusal) : chooseImages,
+    attachDimmed: attachRefusal !== null,
   };
 }

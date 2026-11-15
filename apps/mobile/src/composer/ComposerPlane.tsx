@@ -2,6 +2,7 @@ import type { FileScope } from "@openorc/protocol";
 import { useState, type ReactNode } from "react";
 import { Keyboard, Text as NativeText, Pressable, TextInput, View } from "react-native";
 import { Plus } from "../generated/icons";
+import { cn } from "../ui/cn";
 import { fonts } from "../generated/tokens";
 import { ComposerChips } from "./ComposerChips";
 import { ComposerImages } from "./ComposerImages";
@@ -27,6 +28,8 @@ export interface ComposerPlaneProps {
   onText: (text: string) => void;
   onRemoveImage: (path: string) => void;
   onAttach: () => void;
+  /** Images cannot be sent here: the button stays, faint, and a tap says why. */
+  attachDimmed?: boolean;
   /** Model and mode in the bar; an Orcling's chat leaves them to the Orcling, as texting has no such controls. */
   chips?: boolean;
   /** The bar's end: activity, then the actions, the ink pill last. */
@@ -50,6 +53,7 @@ export function ComposerPlane({
   onText,
   onRemoveImage,
   onAttach,
+  attachDimmed = false,
   chips = true,
   children,
 }: ComposerPlaneProps) {
@@ -104,7 +108,7 @@ export function ComposerPlane({
               hitSlop={8}
               className="h-control-sm w-7 items-center justify-center rounded-full active:bg-surface-2"
             >
-              <Plus size={16} className="text-ink-4" />
+              <Plus size={16} className={cn("text-ink-4", attachDimmed && "opacity-40")} />
             </Pressable>
             {chips ? <ComposerChips composerId={composerId} settings={settings} /> : null}
           </View>

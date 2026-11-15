@@ -1,7 +1,7 @@
 import { useKeyboardChatComposerInset } from "@legendapp/list/keyboard";
 import type { LegendListRef } from "@legendapp/list/react-native";
-import { conversationActivity, conversationSendDisabledReason, processFit, type SubmitRequest } from "@openorc/client";
-import { isSubagentThread, placeOf, type OrclingChatSummary, type Run, type ThreadSummary } from "@openorc/protocol";
+import { conversationActivity, conversationSendDisabledReason, processFit, threadWriteBlock, type SubmitRequest } from "@openorc/client";
+import { isSubagentThread, placeOf, type OrclingChatSummary, type Run, type ThreadCollaboration, type ThreadSummary } from "@openorc/protocol";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement, type RefObject } from "react";
 import { Pressable, View } from "react-native";
@@ -19,6 +19,7 @@ import { OrclingChatPane } from "../orclings/OrclingChatPane";
 import { OrclingHeader } from "../orclings/OrclingHeader";
 import { Spinner } from "../ui/Spinner";
 import { Text } from "../ui/Text";
+import { threadTogetherOf, TogetherContext, turnSeen } from "./cloud-together";
 import { createDisclosure, DisclosureContext } from "./disclosure";
 import { useMarkSeen } from "./mark-seen";
 import { AuthorsContext, useThreadAuthors } from "./thread-authors";
@@ -143,53 +144,17 @@ function ConversationPane({ chat, ...props }: PaneProps & { chat: OrclingChatSum
   return <OrclingChatPane chat={chat} thread={thread} runs={runs} loading={loading} onActivity={onActivity} composerInset={composerInset} listRef={listRef} followKey={followKey} />;
 }
 
-/**
- * A thread on the phone: its conversation at phone size, from the newest turn back a page at a time, with the composer
- * pinned above the keyboard. The send tree, the paging and the settings are the desktop's, from @openorc/client. The
- * header's More menu organizes the thread; marking it unread goes back to Home, since reading it here would mark it
- * read again.
- */
-export function ThreadScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+/** The thread the screen shows, and its runs; a retired team's conversation reads as none. */
+function useOpenThread(id: string) {
   const threadQuery = useRpc("threads.get", { id });
   const thread = threadQuery.data?.teamInstanceId ? null : (threadQuery.data ?? null);
   const runsQuery = useRpc("runs.listForThread", { threadId: id });
   const runs = thread ? (runsQuery.data ?? NO_RUNS) : NO_RUNS;
-  const activeRun = runs.at(-1);
-  const settings = { ...client.useConversationSettings({ thread, activeRun }), claudeAccountId: thread?.claudeAccountId ?? undefined, claudeAccount: useThreadClaudeAccount(thread) };
-  useShareSettings(id, settings);
-  // An OpenOrc Cloud thread is read here; what a phone may change in one comes with writing in it.
-  const cloud = thread !== null && placeOf(thread).elsewhere;
-  const own = cloud ? null : thread;
-  useMarkSeen(own);
-  useCoverHome();
-  const voices = useVoices(runs);
-  const [disclosure] = useState(createDisclosure);
-  const [{ live, working, generatingImage }, setActivity] = useState(IDLE);
-  const actions = useThreadActions(thread, { onUnread: goBack });
-  const now = useSnoozeClock();
-  const menu = useThreadHeaderMenu(own, now, actions.run);
-  const authors = useThreadAuthors(thread);
-  const linkState = useLinkState();
-  const chat = chatFor(useOrclingChats().chats, id);
-  useThreadOnScreen(linkState.kind === "unpaired" ? null : linkState.mac.id, id);
+  return { threadQuery, thread, runsQuery, runs, activeRun: runs.at(-1) };
+}
 
-  const { canSteer } = processFit({ live, activeRun, choice: settings.choice, mode: settings.mode, permission: settings.permission, compacting: false });
-  const disabledReason = sendBlocked(linkState, settings, runsQuery, thread);
-  const request: Omit<SubmitRequest, "now"> = {
-    target: { kind: "thread", threadId: id },
-    working,
-    live,
-    activeRun,
-    agentsUsed: runs.map((run) => run.agent),
-    choice: settings.choice,
-    mode: settings.mode,
-    permission: settings.permission,
-    permissionReady: settings.permissionReady,
-    compacting: false,
-    waitForSave: settings.waitForSave,
-  };
-
+/** The list under the composer: its ref, the room the composer and keyboard take, and a count that follows each send. */
+function useTranscriptRoom() {
   const listRef = useRef<LegendListRef>(null);
   // The composer reports its height on layout, so the hook has nothing to measure up front.
   const unmeasured: Parameters<typeof useKeyboardChatComposerInset>[1] = useRef(null);
@@ -197,52 +162,116 @@ export function ThreadScreen() {
   useEffect(() => holdTranscriptList(listRef), []);
   const [sends, setSends] = useState(0);
   const follow = useCallback(() => setSends((count) => count + 1), []);
+  return { listRef, composerInset: contentInsetEndAdjustment, onComposerLayout, sends, follow };
+}
+
+type Settings = ReturnType<typeof client.useConversationSettings> & { claudeAccountId?: string };
+
+/** A send as this screen makes it. In an OpenOrc Cloud thread Send now names the turn the screen saw running. */
+function submitRequest(input: {
+  id: string;
+  runs: Run[];
+  activeRun: Run | undefined;
+  settings: Settings;
+  activity: { working: boolean; live: boolean };
+  together: ThreadCollaboration | null;
+}): Omit<SubmitRequest, "now"> {
+  const { settings } = input;
+  return {
+    target: { kind: "thread", threadId: input.id },
+    working: input.activity.working,
+    live: input.activity.live,
+    activeRun: input.activeRun,
+    agentsUsed: input.runs.map((run) => run.agent),
+    choice: settings.choice,
+    mode: settings.mode,
+    permission: settings.permission,
+    permissionReady: settings.permissionReady,
+    compacting: false,
+    waitForSave: settings.waitForSave,
+    ...turnSeen(input.together),
+  };
+}
+
+/** A phone's images are files of its Mac, which an OpenOrc Cloud thread cannot read. */
+const NO_CLOUD_FILES = "Files can't be sent to a cloud thread from a phone yet.";
+
+/**
+ * The conversation: a thread of this Mac or of OpenOrc Cloud, its transcript and its composer. Covering Home keeps the
+ * list's own reads asleep; the header's More menu organizes a thread of this Mac; marking it unread goes back to Home,
+ * since reading it here would mark it read again.
+ */
+export function ThreadScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { threadQuery, thread, runsQuery, runs, activeRun } = useOpenThread(id);
+  const settings = { ...client.useConversationSettings({ thread, activeRun }), claudeAccountId: thread?.claudeAccountId ?? undefined, claudeAccount: useThreadClaudeAccount(thread) };
+  useShareSettings(id, settings);
+  // An OpenOrc Cloud thread's menu is the Mac's; the phone reads it, writes in it and marks it read.
+  const cloud = thread !== null && placeOf(thread).elsewhere;
+  const together = threadTogetherOf(thread);
+  useMarkSeen(thread);
+  useCoverHome();
+  const voices = useVoices(runs);
+  const [disclosure] = useState(createDisclosure);
+  const [{ live, working, generatingImage }, setActivity] = useState(IDLE);
+  const actions = useThreadActions(thread, { onUnread: goBack });
+  const menu = useThreadHeaderMenu(cloud ? null : thread, useSnoozeClock(), actions.run);
+  const authors = useThreadAuthors(thread);
+  const linkState = useLinkState();
+  const chat = chatFor(useOrclingChats().chats, id);
+  useThreadOnScreen(linkState.kind === "unpaired" ? null : linkState.mac.id, id);
+  const { canSteer } = processFit({ live, activeRun, choice: settings.choice, mode: settings.mode, permission: settings.permission, compacting: false });
+  const room = useTranscriptRoom();
 
   return (
     <View className="flex-1 bg-bg">
       <ConversationHeader chat={chat} title={thread ? () => <ThreadTitle thread={thread} onRename={actions.rename} /> : null} menu={menu} />
       <DisclosureContext.Provider value={disclosure}>
         <AuthorsContext.Provider value={authors}>
-          <VoicesContext.Provider value={voices}>
-            {thread ? (
-              <ConversationPane
-                chat={chat}
-                threadId={id}
-                thread={thread}
-                runs={runs}
-                loading={runsQuery.isLoading}
-                failed={Boolean(runsQuery.error)}
-                retry={() => void runsQuery.refetch()}
-                onActivity={setActivity}
-                composerInset={contentInsetEndAdjustment}
-                listRef={listRef}
-                followKey={sends}
-              />
-            ) : (
-              <View className="flex-1 items-center justify-center">{threadQuery.isLoading ? <Spinner /> : <Text className="text-ink-4">Thread not found</Text>}</View>
-            )}
-          </VoicesContext.Provider>
+          <TogetherContext.Provider value={together}>
+            <VoicesContext.Provider value={voices}>
+              {thread ? (
+                <ConversationPane
+                  chat={chat}
+                  threadId={id}
+                  thread={thread}
+                  runs={runs}
+                  loading={runsQuery.isLoading}
+                  failed={Boolean(runsQuery.error)}
+                  retry={() => void runsQuery.refetch()}
+                  onActivity={setActivity}
+                  composerInset={room.composerInset}
+                  listRef={room.listRef}
+                  followKey={room.sends}
+                />
+              ) : (
+                <View className="flex-1 items-center justify-center">{threadQuery.isLoading ? <Spinner /> : <Text className="text-ink-4">Thread not found</Text>}</View>
+              )}
+            </VoicesContext.Provider>
+          </TogetherContext.Provider>
         </AuthorsContext.Provider>
       </DisclosureContext.Provider>
       {perfEnabled() ? <PerfProbe /> : null}
-      {thread && !cloud ? (
+      {thread ? (
         <View className="absolute inset-x-0 bottom-0">
           {isSubagentThread(thread) ? (
-            <SubagentStatusBar thread={thread} onLayout={onComposerLayout} />
+            <SubagentStatusBar thread={thread} onLayout={room.onComposerLayout} />
           ) : (
             <Composer
               thread={thread}
               queued={thread.queued}
               settings={settings}
-              request={request}
+              request={submitRequest({ id, runs, activeRun, settings, activity: { working, live }, together })}
               live={live && activeRun ? { runId: activeRun.id } : null}
               working={working}
               generatingImage={generatingImage}
               canSteer={canSteer}
-              disabledReason={disabledReason}
-              onLayout={onComposerLayout}
-              onSent={follow}
+              disabledReason={sendBlocked(linkState, settings, runsQuery, thread) ?? threadWriteBlock(thread)}
+              onLayout={room.onComposerLayout}
+              onSent={room.follow}
               to={chat?.name}
+              turnSeen={turnSeen(together)}
+              attachRefusal={cloud ? NO_CLOUD_FILES : null}
             />
           )}
         </View>

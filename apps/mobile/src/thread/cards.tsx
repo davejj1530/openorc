@@ -6,6 +6,7 @@ import Animated, { useReducedMotion } from "react-native-reanimated";
 import { client, shownMacId, useRpcMutation } from "../client";
 import { AlertCircle, Check, Hammer, Image as ImageIcon, Terminal, X } from "../generated/icons";
 import { takeQueued, useQueuedAnswer } from "../notifications/answers";
+import { askSeen, askStanding, useTogether } from "./cloud-together";
 import { cn } from "../ui/cn";
 import { haptic } from "../ui/haptics";
 import { HarnessLogo } from "../ui/HarnessLogo";
@@ -41,15 +42,22 @@ function useRevealField(blockId: string) {
 }
 type Decision = "allow" | "allow_for_run" | "deny";
 
-/** Answers an agent's request once; a second tap while the answer is on its way does nothing. */
+/**
+ * Answers an agent's request once; a second tap while the answer is on its way does nothing. In an OpenOrc Cloud thread
+ * the answer names the ask as this screen saw it, and `standing` says whether this reader may answer it and what that does.
+ */
 function useResolve(runId: string, approvalId: string) {
   const resolve = useRpcMutation("approvals.resolve");
+  const together = useTogether();
+  const standing = askStanding(together, approvalId);
   return {
     pending: resolve.isPending,
     error: resolve.error?.message ?? null,
+    standing,
     send(decision: Decision, answers?: Record<string, string[]>) {
-      if (resolve.isPending) return;
-      resolve.mutate({ runId, approvalId, decision, ...(answers ? { answers } : {}) }, { onSuccess: decision === "deny" ? haptic.warn : haptic.confirm, onError: haptic.fail });
+      if (resolve.isPending || !(decision === "deny" ? standing.decline : standing.answer)) return;
+      const seen = askSeen(together, approvalId);
+      resolve.mutate({ runId, approvalId, decision, ...(answers ? { answers } : {}), ...seen }, { onSuccess: decision === "deny" ? haptic.warn : haptic.confirm, onError: haptic.fail });
     },
   };
 }
@@ -118,7 +126,26 @@ function useAlertAnswer(runId: string, block: ApprovalBlock, send: (decision: De
   }, [waiting, open, send, macId, runId, approvalId]);
 }
 
-/** The agent asks before it acts: what it wants to do, then Deny, Allow for this run and Allow, the one ink pill. */
+/**
+ * Deny, Allow for this run and Allow, the one ink pill, under the line that says who may answer and what answering does,
+ * and over why the last answer failed.
+ */
+function ApprovalAnswers({ resolve, onceOnly, stacked }: { resolve: ReturnType<typeof useResolve>; onceOnly: boolean; stacked: boolean }) {
+  const { pending, standing } = resolve;
+  return (
+    <>
+      {standing.line ? <Text className="text-sm text-ink-3">{standing.line}</Text> : null}
+      <View className={cn("gap-2", !stacked && "flex-row")}>
+        <Pill label="Deny" disabled={pending || !standing.decline} onPress={() => resolve.send("deny")} />
+        {onceOnly ? null : <Pill label="Allow for this run" disabled={pending || !standing.answer} onPress={() => resolve.send("allow_for_run")} />}
+        <Pill label="Allow" primary disabled={pending || !standing.answer} onPress={() => resolve.send("allow")} />
+      </View>
+      {resolve.error ? <Text className="text-sm text-bad">{resolve.error}</Text> : null}
+    </>
+  );
+}
+
+/** The agent asks before it acts: what it wants to do, then the answers. */
 export function ApprovalCard({ block, runId }: { block: ApprovalBlock; runId: string }) {
   const { width } = useWindowDimensions();
   const resolve = useResolve(runId, block.approvalId);
@@ -146,12 +173,7 @@ export function ApprovalCard({ block, runId }: { block: ApprovalBlock; runId: st
           </Pressable>
         </View>
       </View>
-      <View className={cn("gap-2", !stacked && "flex-row")}>
-        <Pill label="Deny" disabled={resolve.pending} onPress={() => resolve.send("deny")} />
-        {block.onceOnly ? null : <Pill label="Allow for this run" disabled={resolve.pending} onPress={() => resolve.send("allow_for_run")} />}
-        <Pill label="Allow" primary disabled={resolve.pending} onPress={() => resolve.send("allow")} />
-      </View>
-      {resolve.error ? <Text className="text-sm text-bad">{resolve.error}</Text> : null}
+      <ApprovalAnswers resolve={resolve} onceOnly={Boolean(block.onceOnly)} stacked={stacked} />
     </View>
   );
 }
@@ -341,8 +363,8 @@ export function QuestionCard({ block, runId }: { block: ApprovalBlock; runId: st
         decided={decided}
         asked={asked}
         agent={voice && isHarnessId(voice.agent) ? harnessShortName(voice.agent) : null}
-        hint={resolve.error ?? askHint(questions)}
-        ready={complete && !resolve.pending}
+        hint={resolve.error ?? resolve.standing.line ?? askHint(questions)}
+        ready={complete && !resolve.pending && resolve.standing.answer}
         pending={resolve.pending}
         onDecline={() => resolve.send("deny")}
         onAnswer={submit}

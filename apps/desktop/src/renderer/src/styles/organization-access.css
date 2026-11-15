@@ -1,4 +1,5 @@
 .organization-frozen {
+  position: relative;
   flex: 1;
   min-height: 0;
   display: grid;
@@ -15,8 +16,11 @@
   text-align: center;
 }
 /* The "…" sits where the organization page's heading holds it: the same column, then the heading's 8px padding and
-   its 52px of name and count, centred on them, 12px in from the right. */
+   its 52px of name and count, centred on them, 12px in from the right. It lies over the screen and takes no room, so
+   the mark, the name and the reason stay centred in the whole work area. */
 .page-column.organization-frozen-head {
+  position: absolute;
+  inset: 0 0 auto;
   flex: none;
   flex-direction: row;
   justify-content: flex-end;

@@ -1,9 +1,8 @@
 import type { ReactNode } from "react";
 import { ChevronLeft } from "./icons";
-import { useRpc } from "../lib/client";
 import { dismissCompactNavigation } from "../lib/compact-navigation";
-import { useRouter, type Route, type SettingsSection } from "../lib/router";
-import { settingsSection, settingsSections } from "../lib/settings-sections";
+import { useRouter, type Route } from "../lib/router";
+import { useSettingsSections } from "../lib/settings-sections";
 
 /** A sidebar row: a 16px muted glyph and the label. */
 function NavItem({ route, icon, label, active }: { route: Route; icon: ReactNode; label: string; active: boolean }) {
@@ -24,24 +23,17 @@ function NavItem({ route, icon, label, active }: { route: Route; icon: ReactNode
   );
 }
 
-/**
- * Settings lists its sections in the sidebar, under a way back to the screen it was opened from. Account only where
- * there is an account server, and Cloud only for a Pro person, whose OpenOrc Cloud it sets up.
- */
+/** Settings lists the sections this person has in the sidebar, under a way back to the screen it was opened from. */
 export function SidebarSettings({ route }: { route: Extract<Route, { view: "settings" }> }) {
-  const account = useRpc("account.status", {}).data;
-  const listed: Partial<Record<SettingsSection, boolean>> = { account: account?.state !== "unavailable", cloud: account?.state === "signed-in" && account.plan.pro };
+  const { sections, current } = useSettingsSections(route);
   const opener = useRouter((s) => s.history.findLast((entry) => entry.view !== "settings"));
-  const current = settingsSection(route).id;
   return (
     <div className="settings-destinations">
       <NavItem route={opener ?? { view: "newthread" }} icon={<ChevronLeft size={16} />} label="Back to app" active={false} />
       <nav className="grid grid-cols-1 gap-0.5 min-w-0" aria-label="Settings">
-        {settingsSections
-          .filter(({ id }) => listed[id] ?? true)
-          .map(({ id, label, Icon }) => (
-            <NavItem key={id} route={{ view: "settings", section: id }} icon={<Icon size={16} />} label={label} active={id === current} />
-          ))}
+        {sections.map(({ id, label, Icon }) => (
+          <NavItem key={id} route={{ view: "settings", section: id }} icon={<Icon size={16} />} label={label} active={id === current.id} />
+        ))}
       </nav>
     </div>
   );

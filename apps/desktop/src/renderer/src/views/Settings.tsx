@@ -12,7 +12,7 @@ import { useRpc } from "../lib/client";
 import { cn } from "../lib/cn";
 import { useLayout } from "../lib/layout";
 import { useRouter, type Route, type SettingsSection } from "../lib/router";
-import { settingsSection, settingsSections } from "../lib/settings-sections";
+import { settingsSections, useSettingsSections } from "../lib/settings-sections";
 import { floatingGround } from "../lib/use-anchor-ground";
 import { AccountSettings } from "./settings-account";
 import { AgentConnections } from "./settings-agent-updates";
@@ -38,7 +38,7 @@ type SettingsRoute = Extract<Route, { view: "settings" }>;
 
 /** The sidebar lists the sections, the route says which one is open, and the top bar names it. */
 export function Settings({ route }: { route: SettingsRoute }) {
-  const current = settingsSection(route);
+  const { sections, current } = useSettingsSections(route);
   const content = useRef<HTMLDivElement>(null);
   // Each section opens at its top, unless the link that opened it points further down.
   useEffect(() => {
@@ -51,7 +51,7 @@ export function Settings({ route }: { route: SettingsRoute }) {
   return (
     <div className="settings-sheet" data-section={current.id}>
       <TopBar actions={<span ref={setActionsSlot} className="flex items-center gap-1" />}>
-        <SettingsTitle current={current} />
+        <SettingsTitle current={current} sections={sections} />
       </TopBar>
       <SectionActionsSlot.Provider value={actionsSlot}>
         <div className="settings-shell">
@@ -78,7 +78,7 @@ function revealSetting(route: SettingsRoute) {
 }
 
 /** The open section's name, in the top bar. While the sidebar is hidden, it also switches sections. */
-export function SettingsTitle({ current }: { current: { id: SettingsSection; label: string } }) {
+export function SettingsTitle({ current, sections }: { current: { id: SettingsSection; label: string }; sections: readonly { id: SettingsSection; label: string }[] }) {
   const sidebarOpen = useLayout((s) => s.sidebarOpen);
   const navigate = useRouter((s) => s.navigate);
   if (sidebarOpen) return <h1 className="settings-window-title">{current.label}</h1>;
@@ -93,7 +93,7 @@ export function SettingsTitle({ current }: { current: { id: SettingsSection; lab
           <CoversPreview />
           <Menu.Positioner sideOffset={6} align="start" className="z-40" collisionPadding={8}>
             <Menu.Popup ref={floatingGround} className={menuPopup}>
-              {settingsSections.map(({ id, label }) => (
+              {sections.map(({ id, label }) => (
                 <Menu.Item key={id} className={menuItem} onClick={() => navigate({ view: "settings", section: id })}>
                   <Check size={13} className={cn("text-transparent", id === current.id && "text-ink")} />
                   <span className="truncate">{label}</span>

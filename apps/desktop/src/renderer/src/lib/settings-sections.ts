@@ -1,4 +1,5 @@
 import { BookText, Brain, CircleUser, Cloud, Laptop, Link2, MessageSquare, Plug, Signal, SlidersHorizontal, Smartphone, SunMoon, Tablet } from "../components/icons";
+import { useRpc } from "./client";
 import { SETTINGS_SECTIONS, type Route, type SettingsSection } from "./router";
 
 /** Each section's name and icon, and the line that leads it; Skills fills the body edge to edge, with none. */
@@ -18,11 +19,25 @@ const presentation: Record<SettingsSection, { label: string; description?: strin
   data: { label: "Data", description: "Your work lives on this device.", Icon: Laptop },
 };
 
-/** Settings' sections, in the order the sidebar lists them. */
+/** Every section, in the order the sidebar lists them. Each stays mounted while Settings is open. */
 export const settingsSections = SETTINGS_SECTIONS.map((id) => ({ id, ...presentation[id] }));
 
-/** The section a settings route opens: Usage, unless it names another. */
-export function settingsSection(route: Extract<Route, { view: "settings" }>) {
-  const id = route.section ?? "usage";
-  return { id, ...presentation[id] };
+const section = (id: SettingsSection) => ({ id, ...presentation[id] });
+
+/**
+ * The sections this person has, and the one a settings route opens: Usage, unless it names another. Account is listed
+ * only where there is an account server, and Cloud only for a Pro person, whose OpenOrc Cloud it sets up. A route to
+ * Cloud kept from before opens Account for a person known to have no Pro, so Settings never shows a page with nothing
+ * on it.
+ */
+export function useSettingsSections(route: Extract<Route, { view: "settings" }>) {
+  const account = useRpc("account.status", {}).data;
+  const accounts = account?.state !== "unavailable";
+  const pro = account?.state === "signed-in" && account.plan.pro;
+  const asked = section(route.section ?? "usage");
+  const elsewhere = asked.id === "cloud" && account && !pro;
+  return {
+    sections: settingsSections.filter(({ id }) => (id !== "account" || accounts) && (id !== "cloud" || pro)),
+    current: elsewhere ? section(accounts ? "account" : "usage") : asked,
+  };
 }

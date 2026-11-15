@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useLayout } from "../lib/layout";
 import { useRouter } from "../lib/router";
+import { settingsSections } from "../lib/settings-sections";
 import { SettingsTitle } from "./Settings";
 
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
@@ -15,7 +16,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 it("names the open section, and lists the others from the title while the sidebar is hidden", async () => {
-  render(<SettingsTitle current={{ id: "usage", label: "Usage" }} />);
+  render(<SettingsTitle current={{ id: "usage", label: "Usage" }} sections={settingsSections} />);
   expect(screen.getByRole("heading", { name: "Usage" })).toBeTruthy();
   expect(screen.queryByRole("button")).toBeNull();
 

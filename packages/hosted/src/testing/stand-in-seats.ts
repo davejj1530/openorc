@@ -2,6 +2,7 @@ import { OrganizationBillingPage, type OrganizationBillingOffers, type Organizat
 import { randomUUID } from "node:crypto";
 import type { WireOrganizationBilling } from "../organization-billing-wire.js";
 import type { StandInSpaces } from "./stand-in-spaces.js";
+import { StandInFrozenGate } from "./stand-in-frozen.js";
 import { StandInSeatAssignments } from "./stand-in-seat-assignments.js";
 
 type Request = { method: string; path: string; query: URLSearchParams; space: string | null };
@@ -19,6 +20,8 @@ interface Dependencies {
 /** Loopback capacity is created only by paid confirmation; a return alone does not settle a checkout. */
 export class StandInSeats {
   readonly assignments: StandInSeatAssignments;
+  /** Asked before every signed-in route, whether or not seats are switched on. */
+  readonly frozen: StandInFrozenGate;
   enabled = false;
   configured = true;
   readonly checkouts: Checkout[] = [];
@@ -26,6 +29,7 @@ export class StandInSeats {
   readonly storage = new Map<string, OrganizationStorage>();
   prices: Record<"monthly" | "yearly", { amount: number; currency: string } | null> = { monthly: { amount: 2000, currency: "usd" }, yearly: { amount: 20000, currency: "usd" } };
   constructor(private readonly deps: Dependencies) {
+    this.frozen = new StandInFrozenGate(deps.spaces);
     this.assignments = new StandInSeatAssignments({
       ...deps,
       records: this.records,
@@ -52,6 +56,8 @@ export class StandInSeats {
   }
 
   route(request: Request, who: string, body: unknown): Reply | null {
+    const frozen = this.frozen.refusal(request, who);
+    if (frozen) return frozen;
     if (!/^\/organization\/(?:billing(?:\/|$)|seats\/|storage$)/.test(request.path)) return null;
     if (!this.enabled) return refused(404, "Not found.");
     const spaceId = request.space;

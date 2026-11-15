@@ -271,6 +271,7 @@ export async function standIn(options: StandInOptions = {}): Promise<StandIn> {
   const organizations = organizationReads(options, spaces, people, billing, tell, (space) => hosted.accessChanged(space));
   seats.assignments.person = person;
   seats.assignments.paysForPro = (who) => billing.get(who)?.pro === true;
+  seats.frozen.access = (who) => billing.get(who)?.organizationAccess;
   organizations.seat = (spaceId, who) => seats.assignments.fact(spaceId, who);
   const github = new StandInGithub(spaces, (who) => tell(who, ["projects", "github"]));
   const payments = new StandInPayments(billing, billingTopics(tell, organizations), () => `http://127.0.0.1:${port}`);

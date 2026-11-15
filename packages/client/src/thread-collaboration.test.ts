@@ -19,6 +19,7 @@ import { asksBlocked, queueBlock, sendsBlocked } from "./hosted-send.js";
 import { sendCluster } from "./conversation-submit.js";
 import { rowFacts, threadActivity, threadWaitsOnYou } from "./thread-row.js";
 import { composerPlaceholder } from "./composer-presentation.js";
+import { hostedPublishReason } from "./hosted-review.js";
 
 const MARA: ThreadPerson = { id: "u-mara", name: "Mara Okafor", image: null };
 const THEO: ThreadPerson = { id: "u-theo", name: "Theo Laurent", image: null };
@@ -248,5 +249,34 @@ describe("a mention in a row's state slot", () => {
     expect(mentionLeads(row(together(THEO)), null)).toBe(false);
     expect(mentionLeads(row(undefined), null)).toBe(false);
     expect(mentionLeads({ owner: undefined }, null)).toBe(false);
+  });
+});
+
+describe("acting on a cloud thread's work: commit, push, publish", () => {
+  const live = (row: Row) => ({ ...row, owner: { ...row.owner!, reach: "live" as const } });
+  const state = { actions: [] } as unknown as Parameters<typeof hostedPublishReason>[1];
+  const mara = { name: "Mara Okafor", image: null };
+  it("lets a teammate act once the server lets them take their own turn, as the work then moves to them", () => {
+    expect(hostedPublishReason(live(row(together(THEO, { canWrite: true, send: "now" }), "idle", mara)), state)).toBeNull();
+  });
+
+  it("holds a teammate in the server's words while something holds their next turn", () => {
+    const handoff = {
+      code: "handoff_command" as const,
+      message: "Mara Okafor's command is still running. Stop it before starting your turn.",
+      responsible: MARA,
+      commandIds: ["c1"],
+      retrySave: false,
+    };
+    expect(hostedPublishReason(live(row(together(THEO, { canWrite: true, send: "blocked", handoff }), "idle", mara)), state)).toBe(handoff.message);
+  });
+
+  it("keeps a teammate out where the server closes writing, and on a server that predates working together", () => {
+    expect(hostedPublishReason(live(row(together(THEO), "idle", mara)), state)).toBe("Only Mara can make changes in Mara's thread.");
+    expect(hostedPublishReason(live(row(undefined, "idle", mara)), state)).toBe("Only Mara can make changes in Mara's thread.");
+  });
+
+  it("lets the creator act under the server's older rule", () => {
+    expect(hostedPublishReason(live(row(together(MARA))), state)).toBeNull();
   });
 });

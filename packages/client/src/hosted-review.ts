@@ -1,6 +1,7 @@
 import type { HostedFileDiff, HostedReviewAction, HostedReviewState, ThreadSummary } from "@openorc/protocol";
 import type { RunTranscript } from "./transcript.js";
 import { threadReadOnlyReason } from "./hosted-send.js";
+import { threadTogether, writesAsCreator } from "./thread-collaboration.js";
 
 export const hostedReviewPending = (action: HostedReviewAction | null | undefined): boolean => action?.state === "waiting" || action?.state === "running";
 
@@ -29,10 +30,22 @@ export function hostedActionLine(action: HostedReviewAction): string {
   }
 }
 
+/**
+ * Why this reader cannot act on the thread's work now. Where the server says who may write, a person who may write acts
+ * as they would take their own turn, the work moving to them, and is held in the server's words while something holds
+ * that turn; under the server's older rule, and from a server that predates working together, only the starter acts.
+ */
+function actionBlock(thread: Pick<ThreadSummary, "owner">): string | null {
+  const state = threadTogether(thread);
+  if (!state || writesAsCreator(thread)) return state ? null : threadReadOnlyReason(thread);
+  if (state.handoff) return state.handoff.message;
+  return state.canWrite ? null : threadReadOnlyReason(thread);
+}
+
 /** A saved base diff is never a count of what a commit would include. */
 export function hostedPublishReason(thread: Pick<ThreadSummary, "owner">, state: HostedReviewState | undefined): string | null {
   if (thread.owner?.reach !== "live") return "OpenOrc Cloud can't be reached.";
-  const readOnly = threadReadOnlyReason(thread);
+  const readOnly = actionBlock(thread);
   if (readOnly) return readOnly;
   if (!state) return "Refresh changes before continuing.";
   if (state.actions.some(hostedReviewPending)) return "Wait for the current action to finish.";

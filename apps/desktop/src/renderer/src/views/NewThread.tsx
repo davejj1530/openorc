@@ -187,7 +187,9 @@ function NewThreadProject({
         chosen: draft.workspace,
         preferred: settings.data?.defaultWorkspaceMode,
       });
-  const files = useNewThreadFiles(projectId, workspaceMode === "hosted");
+  // On OpenOrc Cloud the thread runs on the person's cloud sign-in, so this Mac's own agents and accounts never hold it.
+  const onCloud = workspaceMode === "hosted";
+  const files = useNewThreadFiles(projectId, onCloud);
 
   useEffect(() => {
     if (target.kind !== "model" || target.choice || !models.data || defaultHarness === undefined) return;
@@ -206,7 +208,7 @@ function NewThreadProject({
     projects,
     projectsFailed: Boolean(projectsError),
     permissionReady,
-    hosted: cloudOnly,
+    hosted: onCloud,
     target,
     choice,
     models: { data: models.data, failed: models.isError },
@@ -215,7 +217,7 @@ function NewThreadProject({
   const usesClaude = choice?.agent === "claude";
   const pickerAccounts = orcling || cloudOnly ? undefined : newThreadAccounts(accountChoices, claudeAccountId, start.isPending, (id) => changeDraft({ claudeAccountId: id }));
   const localReason = usesClaude && !accounts.data ? (accounts.error?.message ?? "Loading Claude accounts…") : targetDisabledReason;
-  const disabledReason = cloudOnly ? (hosted.blocked?.words ?? (!hosted.shown ? "Checking OpenOrc Cloud…" : targetDisabledReason)) : localReason;
+  const disabledReason = onCloud ? (hosted.blocked?.words ?? (!hosted.shown ? "Checking OpenOrc Cloud…" : targetDisabledReason)) : localReason;
   const location = useNewThreadLocation(projectId, selected, workspaceMode, draft.workingDirectory);
   const chooseModel = (model: ModelChoice) => changeDraft({ target: { kind: "model", choice: model } });
   const retry = () => {

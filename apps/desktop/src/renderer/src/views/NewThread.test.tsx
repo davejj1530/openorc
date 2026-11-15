@@ -364,6 +364,19 @@ describe("NewThread", () => {
     await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ projectId: "p1", hosted: true, prompt: "Add a health check" })));
   });
 
+  it("starts a thread on OpenOrc Cloud from a project with a folder on this Mac without this Mac's own agent sign-in", async () => {
+    account = openOrcCloud("added");
+    system = { ...system, harnesses: system.harnesses.map((row) => ({ ...row, state: "sign_in" as const })) };
+    saveModelDraft("p1", "Add a health check");
+    render(<NewThread projectId="p1" />);
+    fireEvent.click(screen.getByRole("button", { name: /^Where the thread works/ }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "OpenOrc Cloud 1 h" }));
+    const send = screen.getByRole("button", { name: "Send" });
+    expect(send.getAttribute("data-tip")).not.toMatch(/Sign in to/);
+    fireEvent.click(send);
+    await waitFor(() => expect(start).toHaveBeenCalledWith(expect.objectContaining({ projectId: "p1", hosted: true, prompt: "Add a health check" })));
+  });
+
   it("starts a thread on OpenOrc Cloud for a project there, with no folder on this Mac", async () => {
     account = openOrcCloud("added");
     saveModelDraft("p1", "Add a health check");

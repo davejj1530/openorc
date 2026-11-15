@@ -421,6 +421,7 @@ export class Threads implements HostedThreads {
     const generation = this.deps.session.generation;
     const revision = this.#revision;
     if (!state.signedIn || this.#closed) return;
+    this.#closeFrozen();
     let read: Pick<Heard, "me" | "personal" | "rows" | "projects">;
     try {
       read = await this.#readSpaces();
@@ -435,7 +436,7 @@ export class Threads implements HostedThreads {
     if (this.#heard?.email === state.email) this.#tellPerson(this.#heard.rows, read.rows);
     this.#forgetRemoved(read.rows);
     const previous = this.#heard?.email === state.email ? this.#heard : null;
-    this.#heard = { email: state.email, heardAt: this.deps.now(), ...read, here: previous?.here ?? {}, names: previous?.names ?? {} };
+    this.#heard = { email: state.email, heardAt: this.deps.now(), ...read, here: this.#keptHere(previous?.here ?? {}, read.rows), names: previous?.names ?? {} };
     this.#names.refresh(
       read.rows.filter((row) => !row.parentId),
       read.me,
@@ -452,14 +453,46 @@ export class Threads implements HostedThreads {
     return !this.#closed && this.deps.session.state.signedIn && this.deps.session.generation === generation && this.#revision === revision;
   }
 
+  /**
+   * Forgets the rows that left. A frozen person's threads come back with their access, so their unsent words stay; all
+   * else about those threads goes.
+   */
   #forgetRemoved(rows: HeardRow[]): void {
     const removed = this.#heard?.rows.filter((row) => !rows.some((next) => next.id === row.id)).map((row) => row.id) ?? [];
+    const keepDrafts = this.deps.spaces.frozen();
     for (const id of removed) {
       this.#tickets.delete(id);
-      if (this.#heard) delete this.#heard.here[id];
+      const here = this.#heard?.here;
+      const draft = here?.[id]?.draft;
+      if (here && keepDrafts && draft) here[id] = { draft };
+      else if (here) delete here[id];
     }
     this.deps.follower.forget(removed);
     this.voices.forget(removed);
+  }
+
+  /** What is kept of each thread here: only the listed ones', and while frozen the words of those that left. */
+  #keptHere(here: Heard["here"], rows: HeardRow[]): Heard["here"] {
+    if (this.deps.spaces.frozen()) return here;
+    return Object.fromEntries(Object.entries(here).filter(([id]) => rows.some((row) => row.id === id)));
+  }
+
+  /** The spaces whose threads the person may read now: while frozen, their Personal space alone. */
+  #readable(catalog: Pick<SpaceCatalog, "ids" | "personal">): string[] {
+    return this.deps.spaces.frozen() ? catalog.ids.filter((id) => id === catalog.personal) : catalog.ids;
+  }
+
+  /** While frozen, an organization's threads close here as well, even with no answer from the server. */
+  #closeFrozen(): void {
+    const heard = this.#heard;
+    if (!heard || !this.deps.spaces.frozen()) return;
+    const rows = heard.rows.filter((row) => row.space === heard.personal);
+    if (rows.length === heard.rows.length) return;
+    this.#forgetRemoved(rows);
+    heard.rows = rows;
+    heard.projects = heard.projects.filter((project) => project.space === heard.personal);
+    this.#save();
+    this.#tell();
   }
 
   /** Every space's threads and projects, each tagged with its space, and the person's own id from their personal space. */
@@ -470,8 +503,9 @@ export class Threads implements HostedThreads {
     const catalog = await this.deps.spaces.catalog();
     if (generation !== this.deps.session.generation) throw new Refused("Your OpenOrc session changed. Try again.");
     this.#restrict(catalog);
+    const ids = this.#readable(catalog);
     const read = await Promise.allSettled(
-      catalog.ids.map(async (id) => {
+      ids.map(async (id) => {
         const on = this.deps.session.in(id);
         const listed = await on.request(ROUTES.threads);
         const rows = await readNativeRows(on, listed.threads, this.#heard?.rows.filter((row) => row.space === id) ?? []);
@@ -481,7 +515,7 @@ export class Threads implements HostedThreads {
     const rows = read.flatMap((answer, i) => {
       if (answer.status === "fulfilled") return answer.value;
       if (answer.reason instanceof Refused && [403, 404].includes(answer.reason.status ?? 0)) return [];
-      return this.#heard?.rows.filter((row) => row.space === catalog.ids[i]) ?? [];
+      return this.#heard?.rows.filter((row) => row.space === ids[i]) ?? [];
     });
     const visible = rows.filter((row) => !row.projectId || catalog.projects.some((project) => project.id === row.projectId && project.space === row.space));
     return { me: catalog.me, personal: catalog.personal, rows: visible, projects: catalog.projects };
@@ -491,7 +525,8 @@ export class Threads implements HostedThreads {
   #restrict(catalog: SpaceCatalog): void {
     const heard = this.#heard;
     if (!heard) return;
-    const rows = heard.rows.filter((row) => catalog.ids.includes(row.space) && (!row.projectId || catalog.projects.some((project) => project.id === row.projectId && project.space === row.space)));
+    const ids = this.#readable(catalog);
+    const rows = heard.rows.filter((row) => ids.includes(row.space) && (!row.projectId || catalog.projects.some((project) => project.id === row.projectId && project.space === row.space)));
     if (rows.length === heard.rows.length) return;
     this.#forgetRemoved(rows);
     heard.rows = rows;

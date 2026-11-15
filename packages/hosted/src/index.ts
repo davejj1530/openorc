@@ -217,7 +217,15 @@ export interface Hosted {
 
 export function createHosted(deps: HostedDeps): Hosted {
   const session = new Session(deps);
-  const spaces = new Spaces({ ...deps, session, accessChanged: () => void account.reread() });
+  // A change of organization access, a grace deadline passing included, opens or closes their threads too.
+  const spaces = new Spaces({
+    ...deps,
+    session,
+    accessChanged: () => {
+      void account.reread();
+      void threads.refresh();
+    },
+  });
   const organizationBilling = new OrganizationBilling({
     ...deps,
     session,

@@ -29,6 +29,8 @@ export interface SubmitInput {
   restart?: boolean;
   /** Another Claude account to go on with, which takes a new process that resumes the conversation there. */
   claudeAccountId?: string;
+  /** The running turn the sender saw, when they are not at the Mac: a Send now into an OpenOrc Cloud thread joins that turn or waits as theirs. */
+  expectedTurnId?: string;
 }
 
 /** What one send does: exactly one call to the core, or the reason it cannot go yet. */
@@ -232,7 +234,14 @@ export async function sendMessage(calls: SubmitCalls, randomId: () => string, re
       throw new Error(plan.reason);
     case "steer":
     case "continue":
-      await calls.send.mutateAsync({ runId: plan.runId, text, attachments, ...(messageId ? { messageId } : {}), ...task });
+      await calls.send.mutateAsync({
+        runId: plan.runId,
+        text,
+        attachments,
+        ...(messageId ? { messageId } : {}),
+        ...(request.expectedTurnId ? { expectedTurnId: request.expectedTurnId } : {}),
+        ...task,
+      });
       break;
     case "queue":
       await calls.queue.mutateAsync({ id: plan.threadId, text, attachments, requestKey: message.requestId ?? request.task?.requestId ?? randomId(), ...task });

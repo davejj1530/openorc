@@ -184,6 +184,17 @@ describe("sendMessage", () => {
     ]);
   });
 
+  it("joins the running turn its sender saw, when they name one, and names none otherwise", async () => {
+    const { calls, submit } = submitter();
+    const steering = { ...base, working: true, live: true, activeRun: warm, now: true, waitForSave: async () => undefined };
+    await submit({ ...steering, expectedTurnId: "turn-seen" }, { text: "Use the other file", attachments: [] });
+    await submit(steering, { text: "Use the other file", attachments: [] });
+    expect(calls.map(([method, params]) => [method, (params as { expectedTurnId?: string }).expectedTurnId])).toEqual([
+      ["runs.send", "turn-seen"],
+      ["runs.send", undefined],
+    ]);
+  });
+
   it("names the Claude account a conversation goes on with", async () => {
     const { calls, submit } = submitter();
     await submit({ ...base, claudeAccountId: "personal", waitForSave: async () => undefined }, { text: "Continue.", attachments: [] });

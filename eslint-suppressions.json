@@ -52,7 +52,7 @@
       "count": 1
     },
     "@typescript-eslint/no-misused-promises": {
-      "count": 3
+      "count": 1
     }
   },
   "apps/desktop/src/renderer/src/views/TaskView.tsx": {

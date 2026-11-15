@@ -97,7 +97,7 @@ export function Composer({ thread, queued, settings, generatingImage, onLayout, 
           draft={composer.draft}
           uploading={composer.uploading}
           onFocusChange={setTyping}
-          placeholder={to ? `Message ${to}…` : conversationPlaceholder({ firstTaskRun: false, working: input.working, canSteer: input.canSteer, agent: settings.choice?.agent })}
+          placeholder={to ? `Message ${to}…` : conversationPlaceholder({ firstTaskRun: false, working: input.working, canSteer: input.canSteer, agent: settings.choice?.agent ?? thread.agent })}
           onText={composer.setText}
           onRemoveImage={composer.removeImage}
           onAttach={composer.chooseImages}

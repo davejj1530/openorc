@@ -276,6 +276,8 @@ export class Spaces implements HostedSpaces {
     if (future.length)
       this.#expiry = setTimeout(
         () => {
+          // The day of grace ran out on this clock: the account and the threads close now, heard from the server or not.
+          if (access?.state === "grace" && this.#snapshot?.index.organizationAccess === access && this.frozen()) this.deps.accessChanged?.();
           this.#tell();
           this.#setExpiry();
         },

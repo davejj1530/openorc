@@ -71,6 +71,10 @@ it("tells the windows when the grace deadline passes, with nothing heard from th
   const { hosted, seen } = await person();
   await vi.waitFor(async () => expect(keys(await hosted.spaces.projects(team))).toEqual(["local-canvas"]));
   seen.pushes.length = 0;
+  const billingReads = () => stand.requests.filter((request) => request.method === "GET" && request.path === "/billing").length;
+  const before = billingReads();
   await vi.waitFor(() => expect(seen.pushes).toContainEqual({ type: "invalidate", keys: ["spaces", "projects"] }), { timeout: 3000 });
+  // The account and the threads close at the same moment, on the core's own word.
+  await vi.waitFor(() => expect(billingReads()).toBeGreaterThan(before));
   expect(keys(await hosted.spaces.projects(team))).toEqual([]);
 });

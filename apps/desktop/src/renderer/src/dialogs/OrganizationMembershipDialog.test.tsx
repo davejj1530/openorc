@@ -1,6 +1,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { accountDay } from "@openorc/client";
 import { queryClient } from "../lib/client";
 import { OrganizationMembershipDialog, type MembershipAction } from "./OrganizationMembershipDialog";
 
@@ -56,24 +57,39 @@ it.each(cases)("keeps $label completed while its following read is retried", asy
   expect(mock.call.mock.calls.filter(([name]) => name === method)).toHaveLength(1);
 });
 
+const ENDS = Date.parse("2026-12-01T06:05:00.000Z");
+const DAY = accountDay(ENDS);
 it.each([
-  "This organization still pays for seats. Cancel the seats in billing; they will end on 2026-12-01.",
-  "This organization's seats end on 2026-12-01. You can delete the organization after they end.",
-  "This organization's billing is still being updated. Wait for it to finish before deleting the organization.",
-])("leads a deletion its seats refuse to the organization's seats, and offers no Delete again: %s", async (refusal) => {
-  mock.call.mockRejectedValue(new Error(refusal));
+  [
+    "This organization still pays for seats. Cancel the seats in billing; they will end on 2026-12-01.",
+    ENDS,
+    `This organization still pays for seats. Cancel the seats in billing; they will end on ${DAY}.`,
+  ],
+  ["This organization's seats end on 2026-12-01. You can delete the organization after they end.", ENDS, `This organization's seats end on ${DAY}. You can delete the organization after they end.`],
+  [
+    "This organization's billing is still being updated. Wait for it to finish before deleting the organization.",
+    null,
+    "This organization's billing is still being updated. Wait for it to finish before deleting the organization.",
+  ],
+])("leads a deletion its billing refuses to the organization's seats, with the day as every other day is written: %s", async (message, endsAt, words) => {
+  mock.call.mockResolvedValue({ refusal: { message, endsAt } });
   const seats = vi.fn();
+  const done = vi.fn();
+  const close = vi.fn();
   render(
     <QueryClientProvider client={queryClient}>
-      <OrganizationMembershipDialog action={{ kind: "delete", organization }} onClose={() => {}} onDone={() => {}} onManageSeats={seats} />
+      <OrganizationMembershipDialog action={{ kind: "delete", organization }} onClose={close} onDone={done} onManageSeats={seats} />
     </QueryClientProvider>,
   );
   fireEvent.change(screen.getByLabelText("Type Birch Studio to confirm"), { target: { value: "Birch Studio" } });
   fireEvent.click(screen.getByRole("button", { name: "Delete organization" }));
-  expect((await screen.findByRole("alert")).textContent).toBe(refusal);
+  expect((await screen.findByRole("alert")).textContent).toBe(words);
   expect(screen.queryByRole("button", { name: "Delete organization" })).toBeNull();
-  // Nothing is left to confirm once the seats refuse it.
+  // Nothing is left to confirm once its billing refuses it, and nothing was deleted.
   expect(screen.queryByRole("textbox")).toBeNull();
+  expect(screen.queryByText("Birch Studio was deleted.")).toBeNull();
+  expect(done).not.toHaveBeenCalled();
+  expect(close).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Manage seats" }));
   expect(seats).toHaveBeenCalledOnce();
   expect(mock.call.mock.calls.filter(([name]) => name === "organization.delete")).toHaveLength(1);

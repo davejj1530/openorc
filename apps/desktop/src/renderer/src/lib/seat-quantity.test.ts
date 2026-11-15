@@ -77,10 +77,19 @@ it("writes a part month of hours down to the minute", () => {
   expect(hoursAndMinutes(0)).toBe("0 h");
 });
 
-it("sends only a refused payment to the organization's billing", () => {
-  expect(needsBilling("The payment for these seats didn't go through. Update the payment method in billing and try again.")).toBe(true);
-  expect(needsBilling("The seats have changed. Review the change again.")).toBe(false);
-  expect(needsBilling("The seats weren't changed. Review the change again.")).toBe(false);
+it("sends only a refused payment to the organization's billing, by the server's code and never by its words", () => {
+  const failed = (code?: string | null) => ({
+    id: ID,
+    kind: "quantity" as const,
+    state: "failed" as const,
+    message: "The payment for these seats didn't go through.",
+    ...(code !== undefined && { code }),
+  });
+  expect(needsBilling(failed("payment_refused"))).toBe(true);
+  expect(needsBilling(failed("provider_refused"))).toBe(false);
+  expect(needsBilling(failed("not_changed"))).toBe(false);
+  expect(needsBilling(failed(null))).toBe(false);
+  expect(needsBilling(failed())).toBe(false);
   expect(needsBilling(null)).toBe(false);
 });
 

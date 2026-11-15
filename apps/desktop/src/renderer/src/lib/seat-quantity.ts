@@ -1,4 +1,4 @@
-import { SeatQuantityPreview, SeatQuantityWork, type SeatQuantityRequest } from "@openorc/protocol";
+import { SeatQuantityPreview, SeatQuantityWork, type SeatOperation, type SeatQuantityRequest } from "@openorc/protocol";
 import { SeatChangeFlow, type SeatChangeDeps, type SeatChangeKind, type SeatChangeState } from "./seat-change-flow";
 
 export type SeatQuantityState = SeatChangeState<number, SeatQuantityPreview, SeatQuantityWork>;
@@ -37,9 +37,5 @@ export function hoursAndMinutes(seconds: number): string {
   return hours ? `${hours} h ${minutes} min` : `${minutes} min`;
 }
 
-/**
- * The server's sentence for a payment the provider refused. Only its words cross from the core, so the sentence's
- * opening is what tells a change that needs the organization's billing from one that only needs reviewing again.
- */
-const PAYMENT_REFUSED = "The payment for these seats didn't go through.";
-export const needsBilling = (message: string | null | undefined): boolean => Boolean(message?.startsWith(PAYMENT_REFUSED));
+/** A change the provider would not charge for leads to the organization's billing; the server says which by its code. */
+export const needsBilling = (operation: Pick<SeatOperation, "code"> | null | undefined): boolean => operation?.code === "payment_refused";

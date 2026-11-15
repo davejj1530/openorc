@@ -1,6 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import type { OrganizationBilling, SeatQuantityPreview } from "@openorc/protocol";
-import { accountDay, formatUsageTime, periodLabel, priceText } from "@openorc/client";
+import { accountDay, cloudTime, formatUsageTime, periodLabel, priceText } from "@openorc/client";
 import { Button, Dialog, Input } from "../components/ui";
 import { hoursAndMinutes, needsBilling, quantityChange, type QuantityChange, type SeatQuantity, type SeatQuantityState } from "../lib/seat-quantity";
 import "../views/organization-seats.css";
@@ -136,6 +136,13 @@ function ChangeNote({ preview, change, subscription }: { preview: SeatQuantityPr
         All {seats(preview.to)} renew on {accountDay(subscription.paidUntil)}.
       </p>
     );
+  // What each seat gets at renewal is the server's to say; with nothing said, nothing is shown.
+  if (change === "add" && preview.renewalGrantSecondsPerSeat && preview.renewalGrantAt != null)
+    return (
+      <p className="text-ink-3" data-tip={formatUsageTime(preview.renewalGrantAt)}>
+        Each seat gets {cloudTime(preview.renewalGrantSecondsPerSeat)} on {accountDay(preview.renewalGrantAt)}.
+      </p>
+    );
   return null;
 }
 
@@ -162,7 +169,7 @@ function ChangeAction({ state, view, subscription, onManageBilling }: { state: S
     );
   if (state.state === "failed" && state.work) {
     const again = state.work.request.seats;
-    if (needsBilling(state.error))
+    if (needsBilling(state.work.operation))
       return (
         <Button variant="primary" onClick={onManageBilling}>
           Manage billing

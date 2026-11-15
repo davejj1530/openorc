@@ -51,9 +51,15 @@ const review = (to: number, extra: Partial<SeatQuantityPreview> = {}): SeatQuant
   firstGrantEndsAt: to > 5 ? RENEWS : null,
   ...extra,
 });
-const done = (request: SeatQuantityRequest, state: "complete" | "pending" | "failed" = "complete", message: string | null = null, error: string | null = null): SeatQuantityWork => ({
+const done = (
+  request: SeatQuantityRequest,
+  state: "complete" | "pending" | "failed" = "complete",
+  message: string | null = null,
+  error: string | null = null,
+  code: string | null = null,
+): SeatQuantityWork => ({
   request,
-  operation: { id: request.body.id, kind: "quantity", state, message },
+  operation: { id: request.body.id, kind: "quantity", state, message, code },
   error,
 });
 afterEach(cleanup);
@@ -116,6 +122,21 @@ it("shows more seats with the charge and hours as estimates, and adds them on Ad
   expect(send).toHaveBeenCalledExactlyOnceWith({ seats: 7, body: { id: ID, previewToken: "token-7" } });
 });
 
+it("says what each seat gets at renewal only from the server's own review", async () => {
+  show({ preview: async (seats) => review(seats, { renewalGrantSecondsPerSeat: 360_000, renewalGrantAt: RENEWS }) });
+  type("7");
+  fireEvent.click(button("Review change"));
+  await screen.findByRole("dialog", { name: "Add 2 seats" });
+  expect(screen.getByText(`Each seat gets 100 h on ${DAY}.`)).toBeTruthy();
+  cleanup();
+  // A server that does not say it: no line, and no number of the app's own.
+  show();
+  type("7");
+  fireEvent.click(button("Review change"));
+  await screen.findByRole("dialog", { name: "Add 2 seats" });
+  expect(screen.queryByText(/Each seat gets/)).toBeNull();
+});
+
 it("shows no charge where the server sends none, and never a made-up price", async () => {
   show({ preview: async (seats) => review(seats, { estimatedChargeNow: null, nextPrice: null }) });
   type("7");
@@ -173,7 +194,7 @@ it("puts a refused review under the number, and reviews again", async () => {
 });
 
 it("keeps a refused payment beside its review and offers the organization's billing, not the change again", async () => {
-  const { manage, send } = show({ send: async (request) => done(request, "failed", PAYMENT) });
+  const { manage, send } = show({ send: async (request) => done(request, "failed", PAYMENT, null, "payment_refused") });
   type("7");
   fireEvent.click(button("Review change"));
   fireEvent.click(await screen.findByRole("button", { name: "Add seats" }));
@@ -186,6 +207,16 @@ it("keeps a refused payment beside its review and offers the organization's bill
   fireEvent.click(button("Manage billing"));
   expect(manage).toHaveBeenCalledOnce();
   expect(send).toHaveBeenCalledOnce();
+});
+
+it("offers the change again for any other failure, whatever its words say", async () => {
+  show({ send: async (request) => done(request, "failed", PAYMENT, null, "provider_refused") });
+  type("7");
+  fireEvent.click(button("Review change"));
+  fireEvent.click(await screen.findByRole("button", { name: "Add seats" }));
+  expect((await screen.findByRole("alert")).textContent).toBe(PAYMENT);
+  expect(button("Review again")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Manage billing" })).toBeNull();
 });
 
 it("says Updating seats while the server settles the change, and Close leaves it running", async () => {

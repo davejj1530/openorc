@@ -63,7 +63,7 @@ function ChangeStatus({ work, onOpen, onManageBilling, onRead }: Omit<StatusProp
         <span className="seats-error" role="alert">
           {message}
         </span>
-        {needsBilling(message) ? <Button onClick={onManageBilling}>Manage billing</Button> : <Button onClick={() => onOpen({ from: "review", seats: work.request.seats })}>Review again</Button>}
+        {needsBilling(work.operation) ? <Button onClick={onManageBilling}>Manage billing</Button> : <Button onClick={() => onOpen({ from: "review", seats: work.request.seats })}>Review again</Button>}
       </div>
     );
   }

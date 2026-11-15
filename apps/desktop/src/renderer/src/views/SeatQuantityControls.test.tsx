@@ -43,9 +43,9 @@ function billing(standing: "live" | "ending" | "ended" = "live", pending: number
   };
 }
 const request: SeatQuantityRequest = { seats: 7, body: { id: ID, previewToken: "token-7" } };
-const work = (state: "pending" | "complete" | "failed" | null, message: string | null = null, error: string | null = null): SeatQuantityWork => ({
+const work = (state: "pending" | "complete" | "failed" | null, message: string | null = null, error: string | null = null, code: string | null = null): SeatQuantityWork => ({
   request,
-  operation: state && { id: ID, kind: "quantity", state, message },
+  operation: state && { id: ID, kind: "quantity", state, message, code },
   error,
 });
 const review = (to: number): SeatQuantityPreview => ({
@@ -126,7 +126,7 @@ it("says Updating seats while a change is being settled, holds Change seats with
 });
 
 it("keeps a refused payment on the page with the organization's billing, and still lets the number be changed", async () => {
-  const { open } = await show({ billing: billing(), quantity: [work("failed", PAYMENT)] });
+  const { open } = await show({ billing: billing(), quantity: [work("failed", PAYMENT, null, "payment_refused")] });
   expect(screen.getByRole("alert").textContent).toBe(PAYMENT);
   expect(button("Change seats").disabled).toBe(false);
   fireEvent.click(screen.getAllByRole("button", { name: "Manage billing" }).at(-1)!);
@@ -135,7 +135,7 @@ it("keeps a refused payment on the page with the organization's billing, and sti
 
 it("offers the change again, not billing, for a change the server refused for another reason", async () => {
   const STALE = "The seats have changed. Review the change again.";
-  await show({ billing: billing(), quantity: [work("failed", STALE)] });
+  await show({ billing: billing(), quantity: [work("failed", STALE, null, "not_changed")] });
   expect(screen.getByRole("alert").textContent).toBe(STALE);
   expect(screen.getAllByRole("button", { name: "Manage billing" })).toHaveLength(1);
   fireEvent.click(button("Review again"));

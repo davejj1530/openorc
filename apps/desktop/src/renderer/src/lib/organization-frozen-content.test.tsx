@@ -81,7 +81,9 @@ async function fixture(access: OrganizationAccess = active) {
   const forgotten: string[] = [];
   const overlays = { close: vi.fn() };
   await gate.refresh();
-  stops.push(protectOrganizationContent({ gate, queries, runs: { forget: (ids) => void forgotten.push(...ids) }, navigation, overlays }), () => gate.dispose());
+  const drafts = new Map(DRAFTS.map((key) => [key, "{}"]));
+  const storage = { keys: () => [...drafts.keys()], removeItem: (key: string) => void drafts.delete(key) };
+  stops.push(protectOrganizationContent({ gate, queries, runs: { forget: (ids) => void forgotten.push(...ids) }, navigation, overlays, storage }), () => gate.dispose());
   for (const [method, params] of [
     ["spaces.status", {}],
     ["projects.list", {}],
@@ -113,6 +115,7 @@ async function fixture(access: OrganizationAccess = active) {
     queries,
     navigation,
     forgotten,
+    drafts: () => [...drafts.keys()],
     overlays,
     cached,
     open: (patch: Partial<SpaceView>, space = "birch") => {
@@ -127,6 +130,16 @@ async function fixture(access: OrganizationAccess = active) {
     space: (id: string) => navigation.getState().inventory.find((space) => space.id === id),
   };
 }
+const DRAFTS = [
+  "openorc.draft.conversation.note",
+  "openorc.draft.conversation.mine",
+  "openorc.draft.conversation.birch-thread",
+  "openorc.draft.conversation.birch-thread.attachments",
+  "openorc.draft.conversation.cedar-thread",
+  "openorc.draft.newthread.cloud:hosted-atlas.execution",
+  "openorc.draft.newthread.canvas.execution",
+  "openorc.draft.newthread.notes.execution",
+];
 const LOCAL = ["spaces.status {}", "projects.list {}", 'threads.get {"id":"note"}', 'threads.get {"id":"mine"}', 'threads.list {"spaceId":"personal","filter":"all"}'];
 
 it("removes every cached read of each organization the moment the person is frozen, and keeps Personal and this Mac's threads", async () => {
@@ -246,4 +259,28 @@ it("closes the palette and the thread dialogs only for a window standing in a cl
   inside.open({});
   await inside.hear(status(frozen));
   expect(inside.overlays.close).toHaveBeenCalledTimes(1);
+});
+
+it("keeps every unsent draft through a freeze", async () => {
+  const f = await fixture();
+  await f.hear(status(frozen));
+  expect(f.drafts()).toEqual(DRAFTS);
+});
+
+it("drops the drafts of an organization the person no longer belongs to, and no other", async () => {
+  const f = await fixture();
+  await f.hear(status(active, [{ id: "personal", kind: "personal" }, organization("cedar", "admin")]));
+  expect(f.drafts()).toEqual([
+    "openorc.draft.conversation.note",
+    "openorc.draft.conversation.mine",
+    "openorc.draft.conversation.cedar-thread",
+    "openorc.draft.newthread.canvas.execution",
+    "openorc.draft.newthread.notes.execution",
+  ]);
+});
+
+it("drops every organization's drafts when another account signs in", async () => {
+  const f = await fixture();
+  await f.hear({ ...status(active, [{ id: "other-personal", kind: "personal" }]), userId: "someone-else", personalSpaceId: "other-personal" });
+  expect(f.drafts()).toEqual(["openorc.draft.conversation.note", "openorc.draft.conversation.mine", "openorc.draft.newthread.canvas.execution", "openorc.draft.newthread.notes.execution"]);
 });

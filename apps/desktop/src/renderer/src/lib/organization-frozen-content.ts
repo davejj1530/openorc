@@ -13,6 +13,8 @@ interface Dependencies {
   navigation: { getState(): { current: string | null; inventory: SpaceInventory[]; close(spaceIds: readonly string[]): void } };
   /** The palette and the dialogs that stand over the work area. */
   overlays: { close(): void };
+  /** Where unsent drafts are kept, by key. */
+  storage: { keys(): string[]; removeItem(key: string): void };
 }
 
 /**
@@ -21,7 +23,7 @@ interface Dependencies {
  * before the next paint. Personal, threads on this Mac and private drafts are never touched. What was cached while
  * closed is dropped again when access returns, so an organization is always read fresh.
  */
-export function protectOrganizationContent({ gate, queries, runs, navigation, overlays }: Dependencies): () => void {
+export function protectOrganizationContent({ gate, queries, runs, navigation, overlays, storage }: Dependencies): () => void {
   return gate.subscribeProtected((change) => {
     const inventory = navigation.getState().inventory;
     const closed = change.spaceIds.filter((id) => !gate.status(id).allowed);
@@ -36,6 +38,12 @@ export function protectOrganizationContent({ gate, queries, runs, navigation, ov
     void queries.cancelQueries({ predicate });
     queries.removeQueries({ predicate });
     runs.forget(runIds);
+    // A freeze keeps what the person had written; a membership or an account that is gone takes its drafts with it.
+    const departed = new Set(change.reason === "account" ? change.spaceIds : change.removed);
+    forgetDrafts(
+      storage,
+      affected.filter((space) => departed.has(space.id)),
+    );
     const standing = navigation.getState().current;
     navigation.getState().close(closed);
     if (standing && closed.includes(standing)) overlays.close();
@@ -45,6 +53,15 @@ export function protectOrganizationContent({ gate, queries, runs, navigation, ov
 const cloudThreads = (space: SpaceInventory): string[] => [...space.threads.filter((row) => row.owner?.brain === "hosted").map((row) => row.id), ...(space.unavailable ?? []).map((row) => row.id)];
 const cloudProjects = (space: SpaceInventory): string[] =>
   space.projects.flatMap((project) => [...(project.localProjectId ? [] : [project.key]), ...(project.hostedProjectId ? [project.hostedProjectId] : [])]);
+
+function forgetDrafts(storage: Dependencies["storage"], spaces: SpaceInventory[]): void {
+  const prefixes = spaces.flatMap((space) => [
+    ...cloudThreads(space).map((id) => `openorc.draft.conversation.${id}`),
+    ...space.projects.filter((project) => !project.localProjectId).map((project) => `openorc.draft.newthread.${project.key}.`),
+  ]);
+  if (!prefixes.length) return;
+  for (const key of storage.keys()) if (prefixes.some((prefix) => key === prefix || key.startsWith(prefix.endsWith(".") ? prefix : `${prefix}.`))) storage.removeItem(key);
+}
 
 /** A frozen admin: still a member, still an admin, closed only by Pro. */
 function admin(gate: OrganizationAccessStore, spaceId: string): boolean {

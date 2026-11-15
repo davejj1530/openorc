@@ -13,7 +13,18 @@ import { closeWorkOverlays } from "./work-overlays";
  */
 export function useOrganizationAuthority(organization: OrganizationSpace | null, dialog: OrganizationDialog | null, close: () => void) {
   const gate = useOrganizationContentGate(organization?.id ?? null);
-  useLayoutEffect(() => protectOrganizationContent({ gate: organizationContentGate, queries: queryClient, runs, navigation: spaceNavigation, overlays: { close: closeWorkOverlays } }), []);
+  useLayoutEffect(
+    () =>
+      protectOrganizationContent({
+        gate: organizationContentGate,
+        queries: queryClient,
+        runs,
+        navigation: spaceNavigation,
+        overlays: { close: closeWorkOverlays },
+        storage: { keys: () => Object.keys(localStorage), removeItem: (key) => localStorage.removeItem(key) },
+      }),
+    [],
+  );
   const frozen = gate.blocked === "frozen";
   const manages = organization?.role === "admin" && !frozen;
   const held = dialog?.kind === "projects" || dialog?.kind === "invite" ? manages : true;

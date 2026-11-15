@@ -13,7 +13,7 @@ beforeEach(() => {
   vi.stubGlobal(
     "ResizeObserver",
     class {
-      constructor(private readonly changed: () => void) {
+      constructor(changed: () => void) {
         resized.push(changed);
       }
       observe() {}

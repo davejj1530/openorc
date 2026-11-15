@@ -87,7 +87,16 @@ export class Spaces implements HostedSpaces {
   async projects(spaceId: string): Promise<SpaceProject[]> {
     await (this.#reading ?? (this.#snapshot ? undefined : this.refresh()));
     const heard = this.#require(spaceId);
-    return spaceProjects(spaceId, heard.index.personalSpaceId, heard.projects, this.deps.projects());
+    const personal = heard.index.personalSpaceId;
+    // A folder paired with an organization's project is the person's own again, in Personal, while they are frozen.
+    const listed = this.frozen() ? heard.projects.filter((project) => project.space === personal) : heard.projects;
+    return spaceProjects(spaceId, personal, listed, this.deps.projects());
+  }
+
+  /** The person's organizations are closed to them: the server said so, or their day of grace ran out on this clock. */
+  frozen(): boolean {
+    const access = this.#snapshot?.index.organizationAccess;
+    return access?.state === "frozen" || (access?.state === "grace" && this.deps.now() >= Date.parse(access.until));
   }
 
   /**
@@ -261,7 +270,9 @@ export class Spaces implements HostedSpaces {
   #setExpiry(): void {
     if (this.#expiry) clearTimeout(this.#expiry);
     this.#expiry = null;
-    const future = this.#invitations.map((invite) => invite.expiresAt - this.deps.now()).filter((left) => left > 0);
+    const access = this.#snapshot?.index.organizationAccess;
+    const deadlines = [...this.#invitations.map((invite) => invite.expiresAt), ...(access?.state === "grace" ? [Date.parse(access.until) - 1] : [])];
+    const future = deadlines.map((at) => at - this.deps.now()).filter((left) => left > 0);
     if (future.length)
       this.#expiry = setTimeout(
         () => {
@@ -281,7 +292,7 @@ export class Spaces implements HostedSpaces {
   #tell(): void {
     const status = this.status();
     const facts = status.state === "ready" ? { ...status, heardAt: 0 } : status;
-    const next = JSON.stringify([facts, this.#snapshot?.projects]);
+    const next = JSON.stringify([facts, this.#snapshot?.projects, this.frozen()]);
     if (next === this.#announced) return;
     this.#announced = next;
     this.deps.push({ type: "invalidate", keys: ["spaces", "projects"] });

@@ -1,11 +1,21 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, expect, it, vi } from "vitest";
 import type { Block } from "@openorc/client";
+import type { OnlineTaskRef } from "@openorc/protocol";
+import { core } from "../lib/rpc";
+import { taskAccess } from "../lib/test-fixtures/task-access";
+import { HostedConversationBoundary } from "./HostedConversationBoundary";
+import { cloudReviewThread } from "./test-fixtures/hosted-review";
 import { TranscriptContents, WorkTranscript } from "./Transcript";
 
 vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(), onReady: vi.fn(), onPush: () => () => {} } }));
 vi.mock("./AgentOrb", () => ({ AgentOrb: () => null }));
 vi.mock("./TaskCard", () => ({ TaskCard: ({ taskId }: { taskId: string }) => <div>Task {taskId}</div> }));
+vi.mock("./task-online/TaskCard", () => ({ OnlineTaskCard: ({ reference }: { reference: OnlineTaskRef }) => <div>Server task {reference.id}</div> }));
+vi.mock("../lib/hosted-file-scope", () => ({
+  useHostedFileScope: () => ({ accountId: "account-a", apiOrigin: "https://example.com", spaceId: "org:studio", destination: { kind: "hosted", projectId: "project-a", threadId: "cloud-example" } }),
+}));
 afterEach(cleanup);
 
 const taskId = "2ee7156d-b32d-465b-bb85-271ba9812402";
@@ -80,4 +90,19 @@ it("keeps a later turn's task reference visible", () => {
   expect(container.querySelectorAll(".work-turn")).toHaveLength(2);
   expect(cards).toHaveLength(2);
   expect(cards[0]!.closest(".work-turn")).not.toBe(cards[1]!.closest(".work-turn"));
+});
+
+it("draws a cloud thread's task result as the server's task, never asking this Mac for it", async () => {
+  vi.mocked(core.call).mockImplementation(async (method) => (method === "spaces.status" ? taskAccess() : null) as never);
+  const result = { id: taskId, status: "backlog", taskRef: { place: "server", spaceId: "org:studio", projectId: "project-a", id: taskId } };
+  const cloud: Block = { ...created, output: { content: [{ type: "text", text: JSON.stringify(result) }] } };
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <HostedConversationBoundary thread={cloudReviewThread}>
+        <WorkTranscript runId="run" blocks={[cloud]} />
+      </HostedConversationBoundary>
+    </QueryClientProvider>,
+  );
+  expect(await screen.findByText(`Server task ${taskId}`)).toBeTruthy();
+  expect(screen.queryByText(`Task ${taskId}`)).toBeNull();
 });

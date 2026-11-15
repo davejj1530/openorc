@@ -36,7 +36,7 @@ import { ApprovalCard, pretty } from "./ApprovalCard";
 import { useDockedAsks } from "./ask-answer";
 export { AgentPresence } from "./AgentPresence";
 import { StartedThreadCard } from "./StartedThreadCard";
-import { TaskCard } from "./TaskCard";
+import { TaskToolCard } from "./task-online/TaskToolCard";
 import { UsageRecovery } from "./UsageRecovery";
 import { SignInRecovery } from "./SignInRecovery";
 import { TranscriptErrorCard } from "./TranscriptErrorCard";
@@ -694,7 +694,7 @@ function AskView({ block, runId }: { block: Extract<Block, { kind: "approval" }>
 /** A tool call that saved or started work shows that work as a live card; any other call is a row. */
 function ToolBlock({ block, cards, details = false }: { block: Extract<Block, { kind: "tool" }>; cards: boolean; details?: boolean }) {
   const taskId = cards ? taskIdFromTool(block) : null;
-  if (taskId) return <TaskCard taskId={taskId} />;
+  if (taskId) return <TaskToolCard block={block} taskId={taskId} />;
   const started = cards ? startedWorkFromTool(block) : null;
   return started ? <StartedThreadCard threadId={started.threadId} /> : <ToolRow block={block} details={details} />;
 }

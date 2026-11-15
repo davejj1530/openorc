@@ -9,7 +9,7 @@ import { useRpc, useRpcMutation, runs as runStore, useRun } from "../lib/client"
 import { openTask, openThread } from "../lib/router";
 import { relativeTime, taskActivity, taskCardStatusLabel, taskStepLabel } from "@openorc/client";
 
-function taskActivityIcon({ waiting, failed, working, finished, successful }: { waiting: boolean; failed: boolean; working: boolean; finished: boolean; successful: boolean }) {
+export function taskActivityIcon({ waiting, failed, working, finished, successful }: { waiting: boolean; failed: boolean; working: boolean; finished: boolean; successful: boolean }) {
   if (waiting || failed) return <AlertCircle size={14} className={cn("shrink-0", failed ? "text-bad" : "text-warn")} />;
   if (working) return <WorkingCube />;
   if (finished && successful) return <WorkAgent size={16} className="shrink-0 text-ink-3" />;
@@ -17,7 +17,7 @@ function taskActivityIcon({ waiting, failed, working, finished, successful }: { 
 }
 
 /** In a thread a task is a card; in the panel's list it is a borderless row that takes the fill on hover. */
-function taskCardClass(compact: boolean): string {
+export function taskCardClass(compact: boolean): string {
   if (compact) return "min-w-0 rounded-xl px-3 py-2.5 transition-colors hover:bg-surface-2";
   return "surface-card min-w-0 rounded-2xl px-4 py-3";
 }

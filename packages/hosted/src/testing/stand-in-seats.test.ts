@@ -66,3 +66,31 @@ it("keeps retired slots when a confirmed ended subscription is replaced", () => 
   expect(f.seats.records.get(f.spaceId)?.seats.slice(0, previous.length)).toEqual(previous);
   expect(f.seats.records.get(f.spaceId)?.available).toBe(2);
 });
+
+it("refuses deleting an organization whose seats are paid, ending or still being settled, in the server's words", () => {
+  const f = fixture();
+  const remove = (who = "admin@example.com") => f.seats.route({ method: "DELETE", path: "/settings/organization", query: new URLSearchParams(), space: f.spaceId }, who, {});
+  expect(remove()).toBeNull();
+  const subscription = {
+    id: "s",
+    plan: "monthly" as const,
+    standing: "live" as const,
+    paidUntil: "2026-12-01T06:05:00.000Z",
+    graceUntil: null,
+    quantity: 2,
+    overallocated: false,
+    pendingQuantity: null,
+  };
+  f.seats.seed(f.spaceId, { subscription });
+  expect(remove()).toEqual({
+    status: 409,
+    body: { statusCode: 409, message: "This organization still pays for seats. Cancel the seats in billing; they will end on 2026-12-01.", endsAt: "2026-12-01T06:05:00.000Z" },
+  });
+  f.seats.seed(f.spaceId, { subscription: { ...subscription, standing: "ending" } });
+  expect(remove()?.body).toMatchObject({ message: "This organization's seats end on 2026-12-01. You can delete the organization after they end." });
+  f.seats.unsettled.add(f.spaceId);
+  expect(remove()?.body).toMatchObject({ message: "This organization's billing is still being updated. Wait for it to finish before deleting the organization." });
+  f.seats.unsettled.clear();
+  f.seats.seed(f.spaceId, { subscription: { ...subscription, standing: "ended" } });
+  expect(remove()).toBeNull();
+});

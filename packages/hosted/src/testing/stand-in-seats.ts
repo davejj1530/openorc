@@ -33,6 +33,8 @@ export class StandInSeats {
   readonly checkouts: Checkout[] = [];
   readonly records = new Map<string, WireOrganizationBilling>();
   readonly storage = new Map<string, OrganizationStorage>();
+  /** Organizations whose billing is still being settled with the provider. */
+  readonly unsettled = new Set<string>();
   prices: Record<"monthly" | "yearly", { amount: number; currency: string } | null> = { monthly: { amount: 2000, currency: "usd" }, yearly: { amount: 20000, currency: "usd" } };
   constructor(private readonly deps: Dependencies) {
     this.frozen = new StandInFrozenGate(deps.spaces);
@@ -69,6 +71,7 @@ export class StandInSeats {
   route(request: Request, who: string, body: unknown): Reply | null {
     const frozen = this.frozen.refusal(request, who, body);
     if (frozen) return frozen;
+    if (request.method === "DELETE" && request.path === "/settings/organization") return this.#holdsDeletion(request.space, who);
     if (!/^\/organization\/(?:billing(?:\/|$)|seats\/|storage$)/.test(request.path)) return null;
     if (!this.enabled) return refused(404, "Not found.");
     const spaceId = request.space;
@@ -84,6 +87,18 @@ export class StandInSeats {
     if (request.method === "POST" && request.path === "/organization/billing/checkout") return this.#checkout(spaceId, body);
     if (request.method === "POST" && request.path === "/organization/billing/portal") return this.#portal(spaceId);
     return refused(404, "Not found.");
+  }
+
+  /** An organization is not deleted from under its seats: the refusal an admin meets while they are paid, ending or being settled. */
+  #holdsDeletion(spaceId: string | null, who: string): Reply | null {
+    const subscription = this.records.get(spaceId ?? "")?.subscription;
+    if (!spaceId || !this.enabled || this.deps.spaces.member(spaceId, who)?.role !== "admin") return null;
+    const held = (message: string, endsAt?: string | null): Reply => ({ status: 409, body: { statusCode: 409, message, ...(endsAt && { endsAt }) } });
+    if (this.unsettled.has(spaceId)) return held("This organization's billing is still being updated. Wait for it to finish before deleting the organization.");
+    if (!subscription || subscription.standing === "ended") return null;
+    const day = subscription.paidUntil?.slice(0, 10);
+    if (subscription.standing === "ending") return held(`This organization's seats end on ${day}. You can delete the organization after they end.`, subscription.paidUntil);
+    return held(`This organization still pays for seats. Cancel the seats in billing; they will end on ${day}.`, subscription.paidUntil);
   }
 
   #get(request: Request, spaceId: string): Reply {

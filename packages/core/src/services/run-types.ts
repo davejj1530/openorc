@@ -1,7 +1,6 @@
 import type { AgentLaunchEnvironment, RunHandle } from "@openorc/agents";
 import type { AgentEvent, AgentKind, BackgroundCommand, CorePush, HarnessId, PermissionPreset, Project, Run, RunMode, RunSpec, Task, Thread, Usage } from "@openorc/protocol";
 import type { AppAction } from "./app-actions.js";
-import type { CloudRunHost } from "./cloud-workspaces.js";
 import type { EnvSnapshot } from "./shell-environment.js";
 import type { WorkspaceLease } from "./workspace-writers.js";
 
@@ -255,16 +254,6 @@ export interface RunHooks {
   threadContext?(thread: Thread): string | null;
   /** Whether a conversation works in a checkout of code the user hasn't vetted, such as a pull request it reviews. */
   untrustedCheckout?(thread: Thread): boolean;
-  /**
-   * Where a run's agent runs, or null when it runs on this Mac; asked for runs without a conversation too, which a
-   * cloud-only host refuses. MCP requests from there reach `mcpOrigin`.
-   */
-  cloudHost?(thread: Thread | null, mcpOrigin: string, run: { agent: string; claudeAccountId?: string | null | undefined }): Promise<CloudRunHost | null>;
-  /**
-   * Brings a cloud conversation's changes to its worktree on the Mac, after sending the worktree's own changes up when
-   * `push` is set; false when nothing changed or it runs on the Mac. Never rejects.
-   */
-  syncCloud?(thread: Thread, options?: { push?: boolean; turnEnded?: boolean }): Promise<boolean>;
   memoryEnabled?(): boolean;
   onRunFinished(run: Run, scope: RunScope, project: Project): void;
   /** Synchronous notification after capture; consumers queue follow-up work instead of awaiting it here. */

@@ -17,8 +17,8 @@ export interface PushKeysOptions {
   origins?: Record<PushEnvironment, string>;
 }
 
-/** The saved key itself, for the cloud brain's sealed handover and the route; null before one is added. */
-export async function savedPushKey(db: Db, secrets: ProtectedSecretStore | undefined): Promise<{ keyId: string; pem: string } | null> {
+/** The saved key itself; null before one is added. */
+async function savedPushKey(db: Db, secrets: ProtectedSecretStore | undefined): Promise<{ keyId: string; pem: string } | null> {
   const keyId = keyIdIn(db);
   const pem = keyId ? await secrets?.load() : null;
   return keyId && pem ? { keyId, pem } : null;

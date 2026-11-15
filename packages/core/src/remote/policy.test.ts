@@ -76,20 +76,10 @@ describe("phone policy", () => {
     }
   });
 
-  it("lets only the brain's own Mac name a new thread's id", () => {
-    const named = { id: "5b0e7a52-1c3f-4d8e-9a6b-2f4c8e1d7a90", projectId: "p", agent: "claude", mode: "act", permissionMode: "autonomous", cloud: true, prompt: "x" };
+  it("lets an Orcling acting for the person name a new thread's id, which a phone never does", () => {
+    const named = { id: "5b0e7a52-1c3f-4d8e-9a6b-2f4c8e1d7a90", projectId: "p", agent: "claude", mode: "act", permissionMode: "autonomous", prompt: "x" };
     expect(admitRemoteRequest("threads.start", named, context)).toEqual({ ok: false, message: "This is not available from a phone." });
-    expect(admitRemoteRequest("threads.start", named, context, "owner")).toEqual({ ok: true });
-  });
-
-  it("lets only the brain's own Mac list and delete the brain's sandboxes", () => {
-    for (const [method, params] of [
-      ["cloud.sandboxes", {}],
-      ["cloud.sandboxes.remove", { name: "openorc-t1" }],
-    ] as const) {
-      expect(admitRemoteRequest(method, params, context)).toEqual({ ok: false, message: "This is not available from a phone." });
-      expect(admitRemoteRequest(method, params, context, "owner")).toEqual({ ok: true });
-    }
+    expect(admitRemoteRequest("threads.start", named, context, "person")).toEqual({ ok: true });
   });
 
   it("lets a phone read Orclings' own conversations, open one's profile, change it, set its check-ins and react there, and keeps the rest on the Mac", () => {

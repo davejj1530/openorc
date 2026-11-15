@@ -23,10 +23,7 @@ import { ConnectorService, type ConnectorPlaces } from "./services/connectors.js
 import { accountFor } from "./services/openorc-account.js";
 import { PlaceRouter } from "./services/place-router.js";
 import { rememberedConnectors } from "./services/remembered-connectors.js";
-import { createBrainSyncHandlers } from "./handlers/brain-sync.js";
 import { createCloudHandlers } from "./handlers/cloud.js";
-import { createCloudCarryHandlers } from "./handlers/cloud-carry.js";
-import type { CloudProjectEnv } from "./services/cloud-env.js";
 import { createCodeExplanationHandlers } from "./handlers/code-explanations.js";
 import { createDeviceHandlers } from "./handlers/devices.js";
 import { invalidParamsMessage, rpcLogLine } from "./handlers/diagnostics.js";
@@ -41,7 +38,6 @@ import { createOrclingHandlers } from "./handlers/orclings.js";
 import { createPreviewHandlers } from "./handlers/preview.js";
 import { createProjectsHandlers } from "./handlers/projects.js";
 import { createPullRequestHandlers } from "./handlers/pull-requests.js";
-import { createBrainThreadHandlers } from "./handlers/brain-threads.js";
 import { createRemoteHandlers } from "./handlers/remote.js";
 import { createReviewCommentsHandlers } from "./handlers/review-comments.js";
 import { createReviewThreadHandlers } from "./handlers/review-thread.js";
@@ -75,21 +71,14 @@ import { createTasksHost } from "./mcp-host/tasks.js";
 import { createThreadsHost } from "./mcp-host/threads.js";
 import type { OpenOrcOptions } from "./options.js";
 import { RemoteAccess } from "./remote/remote-access.js";
-import { rememberRemovedBrain } from "./remote/removed-brains.js";
-import { MOVING_WORDS } from "./services/cloud-brain-move.js";
 import { requestOrigin, type RequestOrigin } from "./request-origin.js";
 import { guardContext } from "./remote/policy.js";
-import { forgetKeptSessions } from "./services/agent-sessions.js";
-import type { OpenCodeCloudKeys } from "./services/cloud-opencode.js";
 import { AgentUpdateService } from "./services/agent-updates.js";
 import { AttachmentService } from "./services/attachments.js";
 import { ClaudeAccountSwitch } from "./services/claude-account-switch.js";
 import { ClaudeSignInRetry } from "./services/claude-sign-in-retry.js";
 import { ClaudeAccountService } from "./services/claude-accounts.js";
 import { claudeRunAccount } from "./services/claude-run-account.js";
-import { withCloudCodexLogin } from "./services/cloud-codex.js";
-import { createCloud, type ClaudeCloudTokens, type CloudChecks, type CloudHandoff, type CloudSandboxes, type CloudSettings, type CloudStandby, type CodexCloudLogin } from "./services/cloud-setup.js";
-import { CLOUD_IDLE_PROCESS_MS, type CloudWorkspaceService } from "./services/cloud-workspaces.js";
 import { createFileService } from "./services/file-service-setup.js";
 import type { FileService } from "./services/files.js";
 import { ImportService } from "./services/imports.js";
@@ -97,12 +86,10 @@ import { LedgerUpkeep } from "./services/ledger-upkeep.js";
 import { LifecycleService } from "./services/lifecycle.js";
 import { MemoryService, type ProviderInfo } from "./services/memory.js";
 import { OrclingService } from "./services/orclings.js";
+import { removeOwnCloud } from "./services/own-cloud-cleanup.js";
 import { readPlanLimits } from "./services/plan-limits.js";
 import { invalidateOnLifecycle } from "./services/preview.js";
 import { ProjectService } from "./services/projects.js";
-import { assertRouteNotMoving } from "./services/relocation-fence.js";
-import type { ThreadRelocations } from "./services/relocations.js";
-import { BrainRouting } from "./services/brain-routing.js";
 import { ProviderLog } from "./services/provider-log.js";
 import { ProviderUsageService } from "./services/provider-usage.js";
 import { PullRequestService } from "./services/pull-requests.js";
@@ -132,32 +119,26 @@ import { transportLogger, type Logger, type RpcReply } from "./transport.js";
  * The renderer talks to it only through `handle`, so every capability is a
  * validated method and every push is a typed message.
  */
-/** Where each agent answers about connectors: Codex, OpenCode, Oh My Pi and every enabled Claude account. A cloud-only host has none. */
-function connectorPlaces(db: Db, cloudOnly: boolean, environment: () => EnvSnapshot, accounts: ClaudeAccountService): ConnectorPlaces {
-  const onTheMac = <T>(read: () => T): T => {
-    if (cloudOnly) throw new Error("Connectors are set up on your Mac.");
-    return read();
-  };
+/** Where each agent answers about connectors: Codex, OpenCode, Oh My Pi and every enabled Claude account. */
+function connectorPlaces(db: Db, environment: () => EnvSnapshot, accounts: ClaudeAccountService): ConnectorPlaces {
   return {
     claudeAccounts: () =>
-      onTheMac(() =>
-        storedClaudeAccounts.list(db).flatMap((account) => {
-          if (!account.enabled) return [];
-          try {
-            return [{ id: account.id, name: account.name, launch: captureLaunchEnvironment("claude", accounts.environment(environment(), account.id)) }];
-          } catch {
-            return [];
-          }
-        }),
-      ),
-    claudeLogin: () => onTheMac(() => captureLaunchEnvironment("claude", environment())),
-    codex: () => onTheMac(() => captureLaunchEnvironment("codex", environment())),
-    opencode: () => onTheMac(() => captureLaunchEnvironment("opencode", environment())),
-    omp: () => onTheMac(() => captureLaunchEnvironment("omp", environment())),
-    cursor: () => onTheMac(() => captureLaunchEnvironment("cursor", environment())),
-    pi: () => onTheMac(() => captureLaunchEnvironment("pi", environment())),
-    antigravity: () => onTheMac(() => captureLaunchEnvironment("antigravity", environment())),
-    fx: () => onTheMac(() => captureLaunchEnvironment("fx", environment())),
+      storedClaudeAccounts.list(db).flatMap((account) => {
+        if (!account.enabled) return [];
+        try {
+          return [{ id: account.id, name: account.name, launch: captureLaunchEnvironment("claude", accounts.environment(environment(), account.id)) }];
+        } catch {
+          return [];
+        }
+      }),
+    claudeLogin: () => captureLaunchEnvironment("claude", environment()),
+    codex: () => captureLaunchEnvironment("codex", environment()),
+    opencode: () => captureLaunchEnvironment("opencode", environment()),
+    omp: () => captureLaunchEnvironment("omp", environment()),
+    cursor: () => captureLaunchEnvironment("cursor", environment()),
+    pi: () => captureLaunchEnvironment("pi", environment()),
+    antigravity: () => captureLaunchEnvironment("antigravity", environment()),
+    fx: () => captureLaunchEnvironment("fx", environment()),
   };
 }
 
@@ -171,19 +152,8 @@ export class OpenOrc {
   readonly frames: FrameCoalescer;
   readonly projects: ProjectService;
   readonly workspaces: WorkspaceService;
-  /** Cloud conversations, their sandboxes, Settings and sign-ins, moving and carrying them on: see `createCloud`. */
-  readonly cloud: CloudWorkspaceService;
-  readonly cloudSettings: CloudSettings;
-  readonly claudeCloudTokens: ClaudeCloudTokens;
-  readonly codexCloudLogin: CodexCloudLogin;
-  readonly cloudChecks: CloudChecks;
-  readonly cloudSandboxes: CloudSandboxes;
-  readonly cloudHandoff: CloudHandoff;
-  readonly cloudStandby: CloudStandby;
-  private routing: BrainRouting | null | undefined;
   private hosted: Hosted | null | undefined;
   private placeRouter: PlaceRouter | undefined;
-  private readonly cloudParts: ReturnType<typeof createCloud>;
   readonly runs: RunService;
   readonly comments: TaskCommentService;
   readonly review: ReviewService;
@@ -271,7 +241,6 @@ export class OpenOrc {
       },
       (id) => Boolean(this.runs?.agentUpdating("claude") || this.memory?.hasPendingWork || this.textGeneration?.hasPendingWork || this.runs?.hasClaudeSessions(id)),
       (id) => this.runs.retireIdleClaudeSessions(id),
-      options.cloudOnly ? (id) => this.claudeCloudTokens.known(id) : undefined,
     );
     this.agentUpdates = new AgentUpdateService({
       info: (refresh) => this.system.info(refresh),
@@ -285,30 +254,7 @@ export class OpenOrc {
     // The renderer decides whether the thread is already on screen.
     const notify = (n: Omit<Notification, "type">) => this.notify(n);
     this.projects = new ProjectService(db);
-    const cloud = createCloud({
-      db,
-      ledger: this.ledger,
-      options,
-      accounts: this.claudeAccounts,
-      environment: () => this.environment.current(),
-      runs: () => this.runs,
-      threads: () => this.threads,
-      workspaces: () => this.workspaces,
-      invalidate,
-      routing: () => this.brainRouting,
-      memory: () => this.memory,
-      log: this.log,
-    });
-    this.cloudParts = cloud;
-    this.cloudSettings = cloud.settings;
-    this.claudeCloudTokens = cloud.tokens;
-    this.codexCloudLogin = cloud.codex;
-    this.cloud = cloud.cloud;
-    this.cloudChecks = cloud.checks;
-    this.cloudSandboxes = cloud.sandboxes;
-    this.cloudHandoff = cloud.handoff;
-    this.cloudStandby = cloud.standby;
-    this.workspaces = new WorkspaceService(db, { dataDir: options.dataDir, cloud: this.cloud }, this.log, this.workspaceWriters);
+    this.workspaces = new WorkspaceService(db, { dataDir: options.dataDir }, this.log, this.workspaceWriters);
     const backgroundProviders = this.backgroundProviders();
     this.memory = new MemoryService(db, { dataDir: options.dataDir, secrets: options.memorySecrets, embedder: options.embedder }, backgroundProviders, invalidate, this.log);
     this.textGeneration = new TextGenerationService(db, backgroundProviders, invalidate);
@@ -323,7 +269,7 @@ export class OpenOrc {
       this.log,
       (exchange, agent, accountId) => this.textGeneration.title(exchange, agent, accountId),
       this.workspaceWriters,
-      (id) => this.threadGone(id),
+      (id) => this.previewGone(id),
       (id) => claudeConfigDir(undefined, this.claudeAccounts.environment(this.environment.current(), id).env),
     );
     this.comments = new TaskCommentService(db, this.runs, this.threads, invalidate, options.dataDir);
@@ -356,50 +302,11 @@ export class OpenOrc {
     invalidateOnLifecycle(options.preview, invalidate);
   }
 
-  /** Threads moving between this host and the other brain. */
-  get relocations(): ThreadRelocations {
-    return this.cloudParts.relocations;
-  }
-
-  /**
-   * A Mac's windows reaching threads its cloud brain holds; null on the brain itself. An ephemeral core keeps no
-   * profile, so it neither caches a brain's lists nor dials one. Made at its first use, once the core's parts exist.
-   */
-  get brainRouting(): BrainRouting | null {
-    if (this.routing !== undefined) return this.routing;
-    const { options } = this;
-    this.routing =
-      options.cloudOnly || options.ephemeral
-        ? null
-        : new BrainRouting({
-            db: this.db,
-            dataDir: options.dataDir,
-            brain: this.cloudParts.brain,
-            windows: this.windows,
-            local: (request) => this.dispatch(request),
-            notificationsOn: () => this.settings.get().notifications,
-            log: this.log,
-            memory: this.memory,
-            textGeneration: this.textGeneration,
-            service: () => this.cloudParts.settings.service(),
-            holding: async () => ((await this.cloudParts.move?.holding()) ? MOVING_WORDS : null),
-            endpoint: options.brainEndpoint,
-          });
-    return this.routing;
-  }
-
-  /** The OpenOrc account; null on the cloud brain and in a core given no account server. Made at its first use. */
+  /** The OpenOrc account; null in a core given no account server. Made at its first use. */
   get account(): Hosted | null {
     if (this.hosted === undefined)
       this.hosted = accountFor(this.options, { db: this.db, windows: this.windows, notices: () => this.settings.get().notifications, claude: this.claudeAccounts, log: this.log }, this.textGeneration);
     return this.hosted;
-  }
-
-  /** The cloud brain is gone: moves to or from it settle now, its kept lists and read-only copies leave this Mac, and phones hear it went. */
-  private async brainRemoved(linkKey: string | null): Promise<void> {
-    if (linkKey) rememberRemovedBrain(this.db, linkKey);
-    await this.cloudParts.coordinator?.brainRemoved();
-    await this.brainRouting?.forget();
   }
 
   /** Phones choose their own alerts, so they hear every notice; "Desktop notifications" is the windows' switch. */
@@ -407,24 +314,6 @@ export class OpenOrc {
     const notice: Notification = { type: "notify", ...n, id: n.id ?? randomUUID() };
     this.remote.alert(notice);
     if (this.settings.get().notifications) this.options.transport.push(notice);
-  }
-
-  /** OpenCode's provider keys for cloud turns: entered on the Mac, handed over sealed to its brain. */
-  get openCodeCloudKeys(): OpenCodeCloudKeys {
-    return this.cloudParts.opencode;
-  }
-
-  /** Each project's cloud environment: set on the Mac, handed over sealed to its brain. */
-  get cloudProjectEnv(): CloudProjectEnv {
-    return this.cloudParts.env;
-  }
-
-  /** A deleted thread's Preview goes with it, and the session copies kept aside for it. */
-  private threadGone(threadId: string): void {
-    this.previewGone(threadId);
-    void forgetKeptSessions(this.options.dataDir, threadId).catch((error: unknown) =>
-      this.log.warn(`kept sessions of thread ${threadId} stay: ${error instanceof Error ? error.message : String(error)}`),
-    );
   }
 
   /** Phones watching its Preview hear so, and main closes its pages. */
@@ -460,10 +349,9 @@ export class OpenOrc {
       browserAvailable: Boolean(options.browser),
       enabledHarnesses: () => this.settings.enabledHarnesses(),
       processRegistry: path.join(options.dataDir, "agent-processes"),
-      idleTimeoutMs: (thread) => {
+      idleTimeoutMs: () => {
         const minutes = this.settings.get().idleProcessMinutes;
-        const setting = minutes ? minutes * 60_000 : null;
-        return thread && this.cloud.get(thread.id) ? Math.min(setting ?? CLOUD_IDLE_PROCESS_MS, CLOUD_IDLE_PROCESS_MS) : setting;
+        return minutes ? minutes * 60_000 : null;
       },
       claudeUserMcpServers: () => this.settings.get().claudeUserMcpServers,
       claudeConnectorsOff: () => this.settings.get().claudeConnectorsOff,
@@ -474,15 +362,6 @@ export class OpenOrc {
       brief: (project) => this.memory.brief(project),
       threadContext: (thread) => this.pullRequests.brief(thread),
       untrustedCheckout: (thread) => inUnvettedCopy(db, thread),
-      cloudHost: (thread, mcpOrigin, run) => this.cloud.host(thread, mcpOrigin, run),
-      syncCloud: (thread, sync) => {
-        // A turn on this Mac keeps its standby sandbox current, for the cloud to take it over if the Mac sleeps.
-        this.cloudStandby.observe(thread, sync);
-        return this.cloud.sync(thread, sync).catch((error: unknown) => {
-          this.log.warn(`could not bring thread ${thread.id}'s cloud changes to the Mac: ${error instanceof Error ? error.message : String(error)}`);
-          return false;
-        });
-      },
       memoryEnabled: () => this.memory.enabled(),
       environment: () => this.devices.launchEnvironment(this.environment.current()),
       claudeEnvironment: (snapshot, id) => this.claudeAccounts.environment(snapshot, id),
@@ -533,6 +412,7 @@ export class OpenOrc {
       await LedgerUpkeep.compact(db, file).catch((error: unknown) => transportLogger(options.transport).warn(`ledger compaction skipped: ${error instanceof Error ? error.message : String(error)}`));
     }
     await ensureWorkspaceHome(db, options.dataDir);
+    await removeOwnCloud(db, options.dataDir, transportLogger(options.transport));
     const core = new OpenOrc(options, db);
     // Runs the last instance left open get their ending before anyone sees them as alive.
     core.runs.recoverInterrupted();
@@ -541,7 +421,6 @@ export class OpenOrc {
     // Ready means launchable: nothing may be admitted before the login shell has answered once.
     const shell = await core.environment.refresh();
     if (!shell.ok) core.log.warn(`could not read the login shell environment, launching with the app's own: ${shell.error}`);
-    if (options.cloudOnly) await core.claudeCloudTokens.load();
     const mcp = await core.mcpServer();
     options.transport.push({ type: "ready", pid: process.pid, mcpPort: mcp.port });
     core.lifecycle.start();
@@ -549,14 +428,6 @@ export class OpenOrc {
     core.orclingWakes.start();
     core.threads.recoverQueue();
     core.upkeep.start();
-    core.cloudParts.brain.opened();
-    core.cloudParts.coordinator?.start();
-    core.cloudParts.move?.resume();
-    void core.cloudParts.relocations.cleanUpAll();
-    core.brainRouting?.link.onReach((reach) => {
-      if (reach === "live") core.cloudParts.coordinator?.reachable();
-    });
-    void core.brainRouting?.refresh();
     if (!options.ephemeral) core.agentUpdates.start();
     void core.account?.start();
     void core.devices.reapStale();
@@ -567,7 +438,7 @@ export class OpenOrc {
   /** Every agent's connectors, made on first use: reading them starts the agents' servers. */
   get connectors(): ConnectorService {
     this.connectorService ??= new ConnectorService(
-      connectorPlaces(this.db, this.options.cloudOnly ?? false, () => this.environment.current(), this.claudeAccounts),
+      connectorPlaces(this.db, () => this.environment.current(), this.claudeAccounts),
       this.settings,
       () => this.options.transport.push({ type: "invalidate", keys: ["connectors"] }),
       { remembered: rememberedConnectors(this.db) },
@@ -619,16 +490,16 @@ export class OpenOrc {
    * request names its origin, which the handler's audit rows can read for as long as it runs.
    */
   async handle(request: RpcRequest, origin?: RequestOrigin): Promise<RpcReply> {
-    // A window's call may be about a thread OpenOrc Cloud or the cloud brain holds; a phone's never goes there.
+    // A window's call may be about a thread OpenOrc Cloud holds; a phone's never goes there.
     return origin ? this.dispatch(request, origin) : this.places.handle(request);
   }
 
-  /** OpenOrc Cloud's threads first, by lookup; then the cloud brain's by absence, while one is set up; then this Mac. */
+  /** OpenOrc Cloud's threads first, by lookup; then this Mac. */
   private get places(): PlaceRouter {
     this.placeRouter ??= new PlaceRouter({
       place: () => this.account?.threads ?? null,
       spaces: () => this.account?.spaces ?? null,
-      next: (request) => (this.brainRouting?.active ? this.brainRouting.router.handle(request) : this.dispatch(request)),
+      next: (request) => this.dispatch(request),
     });
     return this.placeRouter;
   }
@@ -639,7 +510,6 @@ export class OpenOrc {
       if (!Object.hasOwn(rpcParams, method)) return { type: "rpc.error", id, message: `unknown method ${method}` };
       const parsed = rpcParams[method as RpcMethod].safeParse(request.params ?? {});
       if (!parsed.success) return { type: "rpc.error", id, message: invalidParamsMessage(method, parsed.error.message) };
-      assertRouteNotMoving(this.db, method as RpcMethod, parsed.data as Record<string, unknown>);
       const handler = this.handlers[method as RpcMethod] as (p: unknown) => Promise<unknown> | unknown;
       const started = Date.now();
       const result = await requestOrigin.run(origin, () => handler(parsed.data));
@@ -668,15 +538,11 @@ export class OpenOrc {
   }
 
   async close(): Promise<void> {
-    this.cloudParts.move?.close();
-    this.cloudParts.coordinator?.close();
-    this.brainRouting?.close();
     await this.hostedFiles.close();
     this.account?.close();
     await this.remote.close(this.closingForUpdate ? "update" : "shutdown");
     await this.files.intelligence.close();
     this.threads.stopAccepting();
-    await this.claudeCloudTokens.close();
     await this.claudeAccounts.close();
     await this.agentUpdates.close();
     await this.comments.close();
@@ -687,9 +553,7 @@ export class OpenOrc {
     this.orclingWakes.stop();
     await this.schedules.shutdown();
     await this.workspaces.shutdown();
-    this.cloudStandby.close();
     await this.runs.closeAll();
-    await this.cloud.close();
     await this.devices.close();
     await this.threads.shutdown();
     await this.memory.shutdown();
@@ -702,8 +566,7 @@ export class OpenOrc {
 
   private async claudeSystemInfo(id?: string | null, refresh = false) {
     if (refresh) await this.environment.refresh();
-    const info = await this.system.infoFor(this.claudeAccounts.inspectionEnvironment(this.environment.current(), id ?? undefined));
-    return this.options.cloudOnly ? withCloudCodexLogin(info, await this.codexCloudLogin.has()) : info;
+    return this.system.infoFor(this.claudeAccounts.inspectionEnvironment(this.environment.current(), id ?? undefined));
   }
 
   /** One call into the core as the Mac's own windows make it, for an Orcling acting for the person. */
@@ -725,21 +588,13 @@ export class OpenOrc {
   private buildHandlers(invalidate: (keys: string[]) => void): Handlers {
     return composeHandlers(
       createSlackHandlers({ slack: this.slack, invalidate }),
-      createCloudHandlers({
-        ...this.cloudParts,
-        offered: Boolean(this.options.cloudOffered && !this.options.cloudOnly),
-        simulated: this.options.cloudSimulated ?? true,
-        invalidate,
-        removed: (linkKey) => this.brainRemoved(linkKey),
-      }),
-      createCloudCarryHandlers({ db: this.db, env: this.cloudParts.env, skills: this.cloudParts.skills, cloud: this.cloudParts.cloud }),
+      createCloudHandlers(),
       createClaudeAccountHandlers(this.claudeAccounts),
       createHostedHandlers(this.account, this.hostedFiles),
       hostedParityHandlers,
       threadCollaborationHandlers,
       createUsageHandlers({ db: this.db, ledger: this.ledger }),
       createConnectorHandlers({ db: this.db, connectors: this.connectors }),
-      createBrainSyncHandlers({ db: this.db, memory: this.memory, textGeneration: this.textGeneration, cloudOnly: this.options.cloudOnly ?? false, invalidate }),
       createSystemHandlers({
         system: this.system,
         accountInfo: (refresh, id) => (id ? this.claudeSystemInfo(id, refresh) : this.system.info(refresh)),
@@ -750,7 +605,7 @@ export class OpenOrc {
         planLimits: () => this.planLimits(),
         invalidate,
       }),
-      createProjectsHandlers({ db: this.db, projectService: this.projects, invalidate, transport: this.options.transport, copies: this.options.cloudOnly ?? false }),
+      createProjectsHandlers({ db: this.db, projectService: this.projects, invalidate, transport: this.options.transport }),
       createPullRequestHandlers({ pullRequests: this.pullRequests }),
       createReviewerAppHandlers({ reviewerApp: this.reviewerApp }),
       createThreadQueriesHandlers({ threadService: this.threads, db: this.db, ledger: this.ledger, imports: this.imports }),
@@ -787,12 +642,11 @@ export class OpenOrc {
       createSettingsHandlers({ settings: this.settings, textGeneration: this.textGeneration, invalidate }),
       createSchedulesHandlers({ schedules: this.schedules }),
       createCatalogHandlers({ runService: this.runs, invalidate }),
-      createMemoryHandlers({ memory: this.memory, db: this.db, files: this.files, keyChanged: () => this.cloudParts.brain.signInsChanged() }),
+      createMemoryHandlers({ memory: this.memory, db: this.db, files: this.files }),
       createOrclingHandlers({ orclings: this.orclings, threads: this.threads, db: this.db, ledger: this.ledger }),
       createDeviceHandlers({ devices: this.devices }),
       createInboxHandlers({ runService: this.runs, db: this.db }),
-      createRemoteHandlers({ remote: this.remote, pushKeyChanged: () => this.cloudParts.brain.signInsChanged() }),
-      createBrainThreadHandlers({ db: this.db, cloud: this.cloud, mirrors: () => this.brainRouting?.mirrors ?? null }),
+      createRemoteHandlers({ remote: this.remote }),
       createPreviewHandlers({ db: this.db, preview: this.options.preview }),
       createBenchHandlers({ frames: this.frames, bench: this.bench, db: this.db, ledger: this.ledger, transport: this.options.transport, benchmarks: Boolean(this.options.benchmarks) }),
     );

@@ -86,7 +86,7 @@ function storedImages(paths: readonly string[] | undefined, context: GuardContex
 
 /** Each path must be an image or a file this profile stored, with attachments.save or attachments.saveFile. */
 function storedFiles(paths: readonly string[] | undefined, context: GuardContext): string | null {
-  return storedIn(paths, context, (name) => STORED_IMAGE.test(name) || STORED_FILE.test(name)) ? null : "This file did not reach the cloud. Attach it again.";
+  return storedIn(paths, context, (name) => STORED_IMAGE.test(name) || STORED_FILE.test(name)) ? null : "This file was not saved with OpenOrc. Attach it again.";
 }
 
 function phoneTitle(title: string | undefined): string | null {
@@ -214,7 +214,7 @@ export const remoteGuards: { [M in RemoteMethod]: Guard<M> } = {
   "cloud.sandboxes.remove": () => NOT_FROM_PHONE,
   "threads.start": (params, context) => {
     if (params.workingDirectory !== undefined) return "Choose a folder for this conversation on your Mac.";
-    // Only the brain's own Mac names a thread's id, for the thread its windows show before the brain has it.
+    // A phone never names a new thread's id.
     if (params.id !== undefined) return NOT_FROM_PHONE;
     return phoneTitle(params.title) ?? storedImages(params.attachments, context);
   },
@@ -377,27 +377,23 @@ export function remoteParams(method: RemoteMethod, params: unknown, capabilities
 export type RemoteAdmission = { ok: true } | { ok: false; message: string };
 
 /**
- * The brain's own Mac asks under a phone's guards except here, where its windows do more with the threads they forward:
- * they keep a thread's draft, done mark and pull request, and attach any file the Mac stored on the brain first; its
- * Settings list and delete the brain's sandboxes.
+ * An Orcling acting for the person asks under a phone's guards except here, where it does what the person's own windows
+ * do: it keeps a thread's draft, done mark and pull request, and attaches any file this Mac stored.
  */
-const ownerGuards: Partial<{ [M in RemoteMethod]: Guard<M> }> = {
+const personGuards: Partial<{ [M in RemoteMethod]: Guard<M> }> = {
   "threads.update": allow,
-  // Its Settings list the sandboxes the brain made for its threads, and delete one there.
-  "cloud.sandboxes": allow,
-  "cloud.sandboxes.remove": allow,
   "threads.start": ({ id: _id, ...params }, context) => remoteGuards["threads.start"]({ ...params, attachments: undefined }, context) ?? storedFiles(params.attachments, context),
   "runs.start": (params, context) => storedFiles(params.attachments, context),
   "runs.send": (params, context) => storedFiles(params.attachments, context),
   "threads.queue": (params, context) => storedFiles(params.attachments, context),
 };
 
-/** Admits one phone request, or one from the brain's own Mac, or says why not. Params a method's schema rejects pass through, so `handle` words the error. */
-export function admitRemoteRequest(method: string, params: unknown, context: GuardContext, from: "phone" | "owner" = "phone"): RemoteAdmission {
+/** Admits one request from a phone, or from an Orcling acting for the person, or says why not. Params a method's schema rejects pass through, so `handle` words the error. */
+export function admitRemoteRequest(method: string, params: unknown, context: GuardContext, from: "phone" | "person" = "phone"): RemoteAdmission {
   if (!isRemoteMethod(method)) return { ok: false, message: NOT_FROM_PHONE };
   const parsed = rpcParams[method].safeParse(params ?? {});
   if (!parsed.success) return { ok: true };
-  const guard = (from === "owner" ? ownerGuards[method] : undefined) ?? remoteGuards[method];
+  const guard = (from === "person" ? personGuards[method] : undefined) ?? remoteGuards[method];
   const refusal = (guard as Guard<RemoteMethod>)(parsed.data as RpcParams<RemoteMethod>, context);
   return refusal ? { ok: false, message: refusal } : { ok: true };
 }

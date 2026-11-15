@@ -1,11 +1,10 @@
 /** Why closing the core now would cut something short. Each table below is a Record over it, so a new reason must be handled in both. */
-export type BusyReason = "agent-updates" | "memory" | "schedules" | "background-commands" | "agents" | "queued-messages" | "cloud-sandboxes" | "text-generation" | "claude-sign-in" | "phones";
+export type BusyReason = "agent-updates" | "memory" | "schedules" | "background-commands" | "agents" | "queued-messages" | "text-generation" | "claude-sign-in" | "phones";
 
 /** The state each reason is read from, kept by the service that owns it, as the core holds them. Nothing here is copied or stored. */
 export interface ActivitySources {
   runs: { readonly busy: boolean; readonly backgroundCommandsRunning: boolean; prepareForUpdate(): boolean };
   threads: { readonly deliveringQueued: boolean };
-  cloud: { readonly busy: boolean };
   memory: { readonly hasPendingWork: boolean };
   textGeneration: { readonly hasPendingWork: boolean };
   schedules: { readonly hasPendingWork: boolean; stopAccepting(): void };
@@ -22,7 +21,6 @@ const CHECKS: { readonly [R in BusyReason]: (sources: ActivitySources) => boolea
   "background-commands": (s) => s.runs.backgroundCommandsRunning,
   agents: (s) => s.runs.busy,
   "queued-messages": (s) => s.threads.deliveringQueued,
-  "cloud-sandboxes": (s) => s.cloud.busy,
   "text-generation": (s) => s.textGeneration.hasPendingWork,
   "claude-sign-in": (s) => s.claudeAccounts.hasPendingWork,
   phones: (s) => s.remote.busy,
@@ -30,8 +28,7 @@ const CHECKS: { readonly [R in BusyReason]: (sources: ActivitySources) => boolea
 
 /**
  * What a refused update says for each reason. Null lets the update go ahead anyway, as it always has: a phone
- * reconnects, a message caught mid-delivery stays in its queue to retry, cloud work carries on in its VM, and a title
- * or a sign-in is tried again.
+ * reconnects, a message caught mid-delivery stays in its queue to retry, and a title or a sign-in is tried again.
  */
 const UPDATE_WORDS: { readonly [R in BusyReason]: string | null } = {
   "agent-updates": "Wait for agent updates to finish before restarting.",
@@ -40,7 +37,6 @@ const UPDATE_WORDS: { readonly [R in BusyReason]: string | null } = {
   "background-commands": "Stop the background commands running in your conversations before restarting to update.",
   agents: "Wait for agent work, approvals, and context maintenance to finish before restarting to update.",
   "queued-messages": null,
-  "cloud-sandboxes": null,
   "text-generation": null,
   "claude-sign-in": null,
   phones: null,

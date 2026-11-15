@@ -16,10 +16,7 @@ export function createSettingsHandlers({
     "app.settings.get": () => settings.get(),
     "app.settings.set": (patch) => {
       const next = settings.set(patch);
-      invalidate([
-        "settings",
-        ...(patch.enabledHarnesses === undefined ? [] : ["models", "system", "agent-updates", "connectors", "text-generation", "provider-usage", "cloud-sign-ins", "cloud-skills"]),
-      ]);
+      invalidate(["settings", ...(patch.enabledHarnesses === undefined ? [] : ["models", "system", "agent-updates", "connectors", "text-generation", "provider-usage"])]);
       return next;
     },
     "textGeneration.settings.get": () => textGeneration.settings(),

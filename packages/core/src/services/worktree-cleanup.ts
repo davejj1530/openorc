@@ -1,4 +1,4 @@
-import { frozenMoving, projects, retiredTeams, tasks, threads, type Db } from "@openorc/db";
+import { projects, retiredTeams, tasks, threads, type Db } from "@openorc/db";
 import { diskUsage } from "@openorc/git";
 import { WORKSPACE_ID, WORKTREE_BLOCK_WORDS, type Project, type Task, type Thread, type WorktreeBlock, type WorktreeEntry, type WorktreeOwner, type WorktreeRemoval } from "@openorc/protocol";
 import { stat } from "node:fs/promises";
@@ -18,7 +18,7 @@ interface Folder {
 
 export interface WorktreeCleanupDeps {
   db: Db;
-  workspaces: Pick<WorkspaceService, "cleanupThread" | "cleanup" | "cloudState">;
+  workspaces: Pick<WorkspaceService, "cleanupThread" | "cleanup">;
   runs: Pick<RunService, "liveRunForThread" | "liveRunForTask" | "threadActivity" | "threadBackgroundCommands" | "closeAndWait">;
   writers: Pick<WorkspaceWriters, "withLease" | "writing">;
   invalidate: (keys: string[]) => void;
@@ -118,15 +118,12 @@ export class WorktreeCleanup {
    * for its own, so those folders stay.
    */
   private async blocked(folder: Folder, leased = false): Promise<WorktreeBlock | null> {
-    const { runs, workspaces, writers, db } = this.deps;
+    const { runs, writers } = this.deps;
     const holders = sharers(folder);
     const taskCount = holders.filter((holder) => holder.kind === "task").length;
     if (holders.some((holder) => holder.hidden) || taskCount > 1 || (taskCount === 1 && holders.length > 1)) return "shared";
-    if (holders.some((holder) => holder.kind === "thread" && workspaces.cloudState(holder.record.id) !== null)) return "cloud";
     const busy = folder.holders.some((holder) =>
-      holder.kind === "task"
-        ? Boolean(runs.liveRunForTask(holder.record.id))
-        : runs.threadActivity(holder.record.id) !== "idle" || runs.threadBackgroundCommands(holder.record.id).length > 0 || frozenMoving(db, holder.record.id) !== null,
+      holder.kind === "task" ? Boolean(runs.liveRunForTask(holder.record.id)) : runs.threadActivity(holder.record.id) !== "idle" || runs.threadBackgroundCommands(holder.record.id).length > 0,
     );
     // Holding the folder's lease is what proves no other workspace operation is in it.
     if (busy || (!leased && (await writers.writing(folder.path)))) return "working";

@@ -1,14 +1,9 @@
 export { OpenOrc } from "./openorc.js";
 export type { OpenOrcOptions } from "./options.js";
-export type { BrainBundleSource } from "./services/cloud-brain-machine.js";
-export { ownerLinkKeys } from "./services/owner-link.js";
-export { markLeaving } from "./services/brain-leaving.js";
-export { handedEnv } from "./services/cloud-env.js";
-export { parseSkillsPayload, storeSkills } from "./services/cloud-skills.js";
 export { ShellEnvironment, pathProbe, resolveBinary, type EnvSnapshot, type HarnessBinaries, type RefreshResult, type ShellProbe } from "./services/shell-environment.js";
 export { FrameCoalescer } from "./frames.js";
 export type { Broadcast, Logger, RpcReply, Transport } from "./transport.js";
-export { usesHost, type RequestOrigin } from "./request-origin.js";
+export type { RequestOrigin } from "./request-origin.js";
 export { slugify, portBlockFor } from "./services/workspace.js";
 export type { SlackSecretStore } from "./services/slack/service.js";
 export type { ProtectedSecretStore } from "./services/extraction-credentials.js";

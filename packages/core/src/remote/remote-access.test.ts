@@ -333,25 +333,12 @@ describe("phone access", () => {
     expect((await core.remote.status()).push.phones).toBe(before);
   });
 
-  it("hands each phone its own key to a host's door, and none from a Mac", async () => {
-    const mac = await pairPhone();
-    expect(await mac.device("door.key", {})).toBeNull();
-    const directory = await mkdtemp(path.join(os.tmpdir(), "openorc-remote-door-"));
-    const door = (deviceId: string) => ({ host: "openorc-door-abcdefghijklmnop.vercel.app", device: deviceId, epoch: 685, ticket: `ticket-for-${deviceId}` });
-    const host = await OpenOrc.create({ dataDir: directory, ephemeral: true, transport: { push() {} }, remoteSecrets: memorySecrets(), remoteNetwork: { port: 0, machine, door } });
-    try {
-      await host.remote.attach((request) => host.handle(request));
-      await host.remote.configure(true);
-      const [first, second] = [client(await RemoteTestClient.pair((await host.remote.beginPairing()).url)), client(await RemoteTestClient.pair((await host.remote.beginPairing()).url))];
-      expect(await first.device("door.key", {})).toEqual(door(first.deviceId));
-      expect(await second.device("door.key", {})).toEqual(door(second.deviceId));
-      await expect(second.request("door.key", { deviceId: first.deviceId })).rejects.toThrow("invalid params for door.key");
-      first.close();
-      second.close();
-    } finally {
-      await host.close();
-      await rm(directory, { recursive: true, force: true });
-    }
+  it("answers what builds from before the own cloud went still ask of a Mac", async () => {
+    const phone = await pairPhone();
+    expect(await phone.device("door.key", {})).toBeNull();
+    expect(await phone.device("host.kind", {})).toBe("mac");
+    expect(await phone.device("moves.refused", {})).toEqual([]);
+    expect(await phone.device("brains.removed", {})).toEqual([]);
   });
 
   it("ends a removed phone's session and refuses it afterwards", async () => {

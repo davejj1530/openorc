@@ -9,6 +9,8 @@ import { linkSocket } from "./ws-socket.js";
 /** Phones, handshakes and connections that have not upgraded yet, all together. */
 const MAX_CONNECTIONS = 32;
 const MAX_UNAUTHENTICATED = 8;
+/** Handshakes one address may start in a minute. */
+const HANDSHAKES_PER_MINUTE = 20;
 /** For a connection to upgrade, and again for the upgraded socket to finish its handshake. */
 const HANDSHAKE_DEADLINE_MS = 5_000;
 const PING_EVERY_MS = 20_000;
@@ -21,14 +23,9 @@ export interface Listener {
   close(): Promise<void>;
 }
 
-/** Who reaches the listener: a Mac's private networks, or a TLS proxy in front of a cloud host, on `path` only. */
-export type Exposure = { kind: "private" } | { kind: "proxied"; path: string };
-
 export interface ListenOptions {
-  /** Tried first; privately, a free port when it is taken, or when it is 0. */
+  /** Tried first; a free port when it is taken, or when it is 0. */
   port: number;
-  /** Private when absent. */
-  exposure?: Exposure;
   /** Runs the handshake on a new socket and settles once the phone has been heard from over its session, or not admitted. */
   handshake(socket: LinkSocket, source: string): Promise<unknown>;
 }
@@ -74,66 +71,22 @@ async function bind(server: Server, port: number): Promise<number> {
   }
 }
 
-/** How the listener treats peers under an exposure, at each point it decides. */
-interface Gate {
-  /** Whether a connection from this address may stay. */
-  admits(address: string | undefined): boolean;
-  path: string;
-  /** Ends an upgrade on another path, or by another method. */
-  elsewhere(socket: Duplex): void;
-  /** Whose handshake budget an upgrade from this address spends. */
-  source(address: string | undefined): string;
-  handshakesPerMinute: number;
-  /** Whether a taken port falls back to a free one. */
-  anyPort: boolean;
-}
-
-// The proxy answers a reset upstream connection with 502, as it does for a host that is asleep; this says "not here".
-const NOT_FOUND = "HTTP/1.1 404 Not Found\r\nConnection: close\r\nContent-Length: 0\r\n\r\n";
-
-function gate(exposure: Exposure): Gate {
-  if (exposure.kind === "private")
-    return {
-      admits: (address) => isLocalPeer(address, interfaceAddresses()),
-      path: LINK_PATH,
-      elsewhere: (socket) => socket.destroy(),
-      source: (address) => address ?? "",
-      handshakesPerMinute: 20,
-      anyPort: true,
-    };
-  // The proxy is the only ingress, so every peer is the proxy: nothing to filter, and one budget for all. Forwarded
-  // headers are not read, as anyone may forge them. Only holders of the path's tag reach the budget at all. The proxy
-  // forwards to one port, so no other will do.
-  return {
-    admits: () => true,
-    path: exposure.path,
-    elsewhere(socket) {
-      socket.once("finish", () => socket.destroy());
-      socket.end(NOT_FOUND);
-    },
-    source: () => "proxy",
-    handshakesPerMinute: 60,
-    anyPort: false,
-  };
-}
-
 /**
- * The phone listener: one HTTP server on every interface, which upgrades only `GET` on its exposure's path. Privately
- * it drops any peer outside private networks and tailnets on connect. A browser's Origin header is not refused: the
- * handshake authenticates both ends, and React Native's WebSocket sends one.
+ * The phone listener: one HTTP server on every interface, which upgrades only `GET` on the link's path. It drops any
+ * peer outside private networks and tailnets on connect. A browser's Origin header is not refused: the handshake
+ * authenticates both ends, and React Native's WebSocket sends one.
  */
 export async function listen(options: ListenOptions): Promise<Listener> {
-  const peers = gate(options.exposure ?? { kind: "private" });
   const server = createServer({ headersTimeout: HANDSHAKE_DEADLINE_MS }, (_request, response) => response.writeHead(404).end());
   server.maxConnections = MAX_CONNECTIONS;
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_MESSAGE_BYTES, perMessageDeflate: false });
-  const budget = new HandshakeBudget(peers.handshakesPerMinute);
+  const budget = new HandshakeBudget(HANDSHAKES_PER_MINUTE);
   /** Every open connection, with the deadline it has to upgrade by. */
   const sockets = new Map<Duplex, ReturnType<typeof setTimeout>>();
   let unauthenticated = 0;
 
   server.on("connection", (socket) => {
-    if (!peers.admits(socket.remoteAddress)) {
+    if (!isLocalPeer(socket.remoteAddress, interfaceAddresses())) {
       socket.destroy();
       return;
     }
@@ -147,11 +100,11 @@ export async function listen(options: ListenOptions): Promise<Listener> {
   });
   server.on("upgrade", (request, socket, head) => {
     clearTimeout(sockets.get(socket));
-    if (request.method !== "GET" || request.url !== peers.path) {
-      peers.elsewhere(socket);
+    if (request.method !== "GET" || request.url !== LINK_PATH) {
+      socket.destroy();
       return;
     }
-    const source = peers.source(request.socket.remoteAddress);
+    const source = request.socket.remoteAddress ?? "";
     if (unauthenticated >= MAX_UNAUTHENTICATED || !budget.take(source, Date.now())) {
       socket.destroy();
       return;
@@ -182,7 +135,7 @@ export async function listen(options: ListenOptions): Promise<Listener> {
   try {
     port = await bind(server, options.port);
   } catch (error) {
-    if (errorCode(error) !== "EADDRINUSE" || options.port === 0 || !peers.anyPort) throw error;
+    if (errorCode(error) !== "EADDRINUSE" || options.port === 0) throw error;
     port = await bind(server, 0);
   }
   return {

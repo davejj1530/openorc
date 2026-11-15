@@ -47,52 +47,6 @@ importers:
         specifier: 8.70.1
         version: 8.70.1(eslint@10.11.0(jiti@2.7.0)(supports-color@8.1.1))(supports-color@8.1.1)(typescript@5.9.3)
 
-  apps/brain:
-    dependencies:
-      fastembed:
-        specifier: 2.1.0
-        version: 2.1.0(patch_hash=fd226f3b860b9f30c87a0a66ce6bd63cdbce457d46844e0e2e9f1a5e3e2e7161)
-      onnxruntime-node:
-        specifier: 1.21.0
-        version: 1.21.0
-      sqlite-vec:
-        specifier: 0.1.9
-        version: 0.1.9
-    devDependencies:
-      '@openorc/cloud':
-        specifier: workspace:*
-        version: link:../../packages/cloud
-      '@openorc/core':
-        specifier: workspace:*
-        version: link:../../packages/core
-      '@openorc/db':
-        specifier: workspace:*
-        version: link:../../packages/db
-      '@openorc/git':
-        specifier: workspace:*
-        version: link:../../packages/git
-      '@openorc/link':
-        specifier: workspace:*
-        version: link:../../packages/link
-      '@openorc/protocol':
-        specifier: workspace:*
-        version: link:../../packages/protocol
-      '@types/node':
-        specifier: ^24.0.0
-        version: 24.13.4
-      '@vercel/functions':
-        specifier: 3.10.4
-        version: 3.10.4(ws@8.21.3)
-      esbuild:
-        specifier: 0.28.2
-        version: 0.28.2
-      typescript:
-        specifier: ^5.9.0
-        version: 5.9.3
-      vitest:
-        specifier: ^4.1.11
-        version: 4.1.11(@types/node@24.13.4)(jsdom@26.1.0(supports-color@8.1.1))(vite@8.3.0(@types/node@24.13.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.13)(yaml@2.9.1))
-
   apps/desktop:
     dependencies:
       '@base-ui/react':
@@ -677,9 +631,6 @@ importers:
       '@openorc/agents':
         specifier: workspace:*
         version: link:../agents
-      '@openorc/cloud':
-        specifier: workspace:*
-        version: link:../cloud
       '@openorc/db':
         specifier: workspace:*
         version: link:../db
@@ -13275,6 +13226,7 @@ snapshots:
     dependencies:
       xdg-app-paths: 5.1.0
       zod: 4.1.11
+    optional: true
 
   '@vercel/cli-exec@1.0.1':
     dependencies:
@@ -13287,6 +13239,7 @@ snapshots:
       '@vercel/oidc': 4.0.4
     optionalDependencies:
       ws: 8.21.3
+    optional: true
 
   '@vercel/oidc@4.0.0':
     dependencies:
@@ -13299,6 +13252,7 @@ snapshots:
       '@vercel/cli-config': 0.3.4
       '@vercel/cli-exec': 1.0.1
       jose: 5.10.0
+    optional: true
 
   '@vercel/sandbox@3.9.1':
     dependencies:

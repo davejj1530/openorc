@@ -5,13 +5,16 @@ import { projects, settings, type Db } from "@openorc/db";
 import { git, pinObject, treeHash, worktree as worktrees } from "@openorc/git";
 import type { MirrorSnapshot } from "@openorc/protocol";
 import type { Logger } from "../transport.js";
-import type { ProjectMapping } from "./brain-link.js";
+
+/*
+ * Kept from the person's own cloud, which is gone, for the code of an OpenOrc Cloud thread to come back to this Mac on
+ * (see .local-development/multiplayer/ui/cloud-parity/build/from-own-cloud.md). Nothing in the app calls it today.
+ */
 
 const MIRRORS = "brain.mirrors";
-/** A bundle travels inside one link message, which holds 16 MB; base64 makes it a third larger. */
+/** The size one bundle may have as it travelled, base64 inside a single 16 MB message. */
 const MAX_BUNDLE_BYTES = 11 * 1024 * 1024;
 const IDENTITY = { GIT_AUTHOR_NAME: "OpenOrc", GIT_AUTHOR_EMAIL: "cloud@openorc.app", GIT_COMMITTER_NAME: "OpenOrc", GIT_COMMITTER_EMAIL: "cloud@openorc.app" };
-export const MIRROR_WORDS = "A copy of a conversation in the cloud. Bring it to this Mac to edit.";
 
 const snapshotRef = (threadId: string) => `refs/openorc/mirror/${threadId}/snapshot`;
 const exists = (file: string) =>
@@ -21,8 +24,8 @@ const exists = (file: string) =>
   );
 
 /**
- * The brain's side of Open on Mac: a thread's worktree as one commit (uncommitted and untracked work included) on its
- * head, pinned under a ref of the thread's own so threads in one copy never share it, and a bundle of what `known` lacks.
+ * The far side of a copy: a thread's worktree as one commit (uncommitted and untracked work included) on its head,
+ * pinned under a ref of the thread's own so threads in one copy never share it, and a bundle of what `known` lacks.
  */
 export async function snapshotFolder(root: string, folder: string, threadId: string, known: readonly string[]): Promise<MirrorSnapshot> {
   const tree = await treeHash(folder);
@@ -46,8 +49,8 @@ export async function snapshotFolder(root: string, folder: string, threadId: str
 }
 
 /**
- * Commits this Mac's project holds that the brain's copy likely holds too: the thread's base and the newest branch tips.
- * The brain bundles only what lies past those it has, so a first open never carries the history both share.
+ * Commits this Mac's project holds that the far copy likely holds too: the thread's base and the newest branch tips.
+ * The far side bundles only what lies past those it has, so a first open never carries the history both share.
  */
 async function sharedTips(root: string, base: string | null): Promise<string[]> {
   const tips = (await git(root, ["for-each-ref", "--count=32", "--sort=-committerdate", "--format=%(objectname)", "refs/heads", "refs/remotes"])).stdout.split("\n").filter(Boolean);
@@ -70,15 +73,20 @@ function records(db: Db): Record<string, MirrorRecord> {
   }
 }
 
-/** The read-only folder a cloud thread opened on this Mac has here, and the Mac project it belongs to; null when closed. */
+/** The threads with a copy open here. */
+export function openMirrors(db: Db): string[] {
+  return Object.keys(records(db));
+}
+
+/** The read-only folder a thread held elsewhere has here once opened, and the Mac project it belongs to; null when closed. */
 export function mirrorFolder(db: Db, threadId: string): { path: string; projectId: string } | null {
   const record = records(db)[threadId];
   return record ? { path: record.path, projectId: record.projectId } : null;
 }
 
 /**
- * Edits made in a copy stay findable under a ref of the thread's own, though they never go to the cloud. The ref, or
- * null when the copy holds the brain's files as they came.
+ * Edits made in a copy stay findable under a ref of the thread's own, though they never go back. The ref, or null when
+ * the copy holds the far side's files as they came.
  */
 async function keepEdits(root: string, threadId: string, folder: string, record: MirrorRecord): Promise<string | null> {
   const files = await treeHash(folder);
@@ -108,18 +116,20 @@ export async function closeMirror(db: Db, threadId: string, log: Pick<Logger, "i
 export interface MirrorDeps {
   db: Db;
   dataDir: string;
-  /** One call to the brain over the Mac's owner session, woken for it: opening a copy is the person's own intent. */
+  /** The thread's code as its holder has it now, with a bundle of what `known` lacks. */
   snapshot(threadId: string, known: string[]): Promise<MirrorSnapshot>;
+  /** The thread's project where it is held, and the commit it started from. */
   thread(threadId: string): Promise<{ projectId: string; baseSha: string | null }>;
-  mapping(): Promise<ProjectMapping>;
+  /** The project on this Mac that stands for one held elsewhere; null when this Mac has none. */
+  macProject(farProject: string): Promise<string | null>;
   changed(threadId: string): void;
   log: Logger;
 }
 
 /**
- * Open on Mac: a cloud thread's code mirrored into a folder of this Mac's project, read-only, one way from the brain.
- * Pulls on open and whenever the brain says the thread's files changed, one at a time per thread. Edits made in the copy
- * are never sent up; the next pull keeps them under a ref of the thread's own before the brain's files replace them.
+ * A thread's code mirrored into a folder of this Mac's project, read-only, one way from where the thread is held.
+ * Pulls on open and whenever asked, one at a time per thread. Edits made in the copy are never sent back; the next pull
+ * keeps them under a ref of the thread's own before the far side's files replace them.
  */
 export class BrainMirrors {
   private readonly pulls = new Map<string, Promise<void>>();
@@ -136,8 +146,8 @@ export class BrainMirrors {
 
   async open(threadId: string): Promise<void> {
     if (this.isOpen(threadId)) return this.pull(threadId);
-    const { projectId: cloudProject, baseSha } = await this.deps.thread(threadId);
-    const macProject = (await this.deps.mapping()).toMac(cloudProject);
+    const { projectId: farProject, baseSha } = await this.deps.thread(threadId);
+    const macProject = await this.deps.macProject(farProject);
     const project = macProject ? projects.get(this.deps.db, macProject) : null;
     if (!project) throw new Error("This conversation's project is not on this Mac.");
     const folder = path.join(this.deps.dataDir, "mirrors", threadId);
@@ -146,7 +156,7 @@ export class BrainMirrors {
     this.save(threadId, { projectId: project.id, path: folder, snapshot: snap.snapshot, tree: snap.tree });
   }
 
-  /** The brain's files again; one pull per thread at a time, the next one after it. */
+  /** The far side's files again; one pull per thread at a time, the next one after it. */
   pull(threadId: string): Promise<void> {
     const previous = this.pulls.get(threadId) ?? Promise.resolve();
     const next = previous
@@ -161,9 +171,9 @@ export class BrainMirrors {
     if (await closeMirror(this.deps.db, threadId, this.deps.log)) this.deps.changed(threadId);
   }
 
-  /** Every copy here, as when the brain they follow is removed. */
+  /** Every copy here. */
   async closeAll(): Promise<void> {
-    for (const threadId of Object.keys(records(this.deps.db)))
+    for (const threadId of openMirrors(this.deps.db))
       await this.close(threadId).catch((error: unknown) => this.deps.log.warn(`thread ${threadId}'s copy on this Mac was not removed: ${error instanceof Error ? error.message : String(error)}`));
   }
 
@@ -172,7 +182,7 @@ export class BrainMirrors {
     const root = record && projects.get(this.deps.db, record.projectId)?.rootPath;
     if (!record || !root) return;
     const snap = await this.deps.snapshot(threadId, [record.snapshot]);
-    // Closed while the brain answered, as when this Mac took the thread: nothing is left to refresh.
+    // Closed while the far side answered: nothing is left to refresh.
     if (snap.snapshot === record.snapshot || !this.isOpen(threadId)) return;
     await this.apply(root, threadId, record.path, snap, record);
     this.save(threadId, { ...record, snapshot: snap.snapshot, tree: snap.tree });

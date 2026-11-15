@@ -6,7 +6,6 @@ import { DEFAULT_CLAUDE_ACCOUNT, type AgentKind, type Run, type Thread } from "@
 import type { Logger } from "../transport.js";
 import { allowsAccount, NOT_A_PROJECT_ACCOUNT, projectAccountPolicy } from "./project-claude-accounts.js";
 import type { RunService, StartRunInput } from "./runs.js";
-import type { WorkspaceService } from "./workspace.js";
 
 /** The folder where an account's Claude keeps its login, settings and sessions on this Mac. */
 export type ClaudeFolder = (accountId: string) => string;
@@ -26,7 +25,6 @@ export function switchedClaudeAccount(db: Db, thread: Thread, agent: AgentKind, 
 interface ThreadSessionDependencies {
   db: Db;
   runs: Pick<RunService, "liveRunForThread" | "threadActivity" | "closeAndWait" | "validateFastMode">;
-  workspaces: Pick<WorkspaceService, "cloudState">;
   handoffFor(thread: Thread, own: Run[], agent: AgentKind, fresh: boolean | undefined): string | undefined;
   log: Pick<Logger, "warn">;
   claudeFolder?: ClaudeFolder | undefined;
@@ -48,13 +46,13 @@ export class ThreadSessions {
   /**
    * Closes the conversation's idle process, then says how the next run picks up its session. A conversation that went
    * on with another Claude account takes its newest session along: Claude resumes the copy, or starts over with a
-   * handoff when there is none to carry, as in a cloud conversation, whose session lives in its sandbox.
+   * handoff when there is none to carry.
    */
   async next(thread: Thread, own: Run[], agent: AgentKind, fresh: boolean | undefined, account: string | null): Promise<Pick<StartRunInput, "resume" | "resumeFrom" | "handoff">> {
     await this.closeIdle(thread);
     if (account) thread = threads.update(this.deps.db, thread.id, { claudeAccountId: account });
     const moved = agent === "claude" && !thread.orclingId ? movedSession(thread, own) : null;
-    const carried = moved && !fresh && !this.deps.workspaces.cloudState(thread.id) ? await this.carry(thread, moved) : null;
+    const carried = moved && !fresh ? await this.carry(thread, moved) : null;
     if (carried) return { resume: false, resumeFrom: carried };
     const restart = Boolean(fresh || moved);
     const handoff = this.deps.handoffFor(thread, own, agent, restart);
@@ -79,7 +77,7 @@ export class ThreadSessions {
     if (!thread.forkedFromId || runs.lastSession(db, { threadId: thread.id }, agent, null, thread.claudeAccountId ?? undefined)) return null;
     const parentSession = runs.lastSession(db, { threadId: thread.forkedFromId }, agent, null, thread.claudeAccountId ?? undefined);
     if (parentSession) return { resumeFrom: { sessionId: parentSession, fork: true } };
-    if (agent !== "claude" || this.deps.workspaces.cloudState(thread.id)) return null;
+    if (agent !== "claude") return null;
     const moved = movedSession(
       thread,
       runs.listForThread(db, thread.forkedFromId).filter((run) => !run.orclingId),

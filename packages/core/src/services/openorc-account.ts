@@ -41,13 +41,13 @@ export interface AccountDeps {
   textGeneration?: Pick<TextGenerationService, "title">;
 }
 
-/** The account for this core: none on the cloud brain, or with no account server. */
+/** The account for this core: none with no account server. */
 export function accountFor(
-  options: Pick<OpenOrcOptions, "cloudOnly" | "accountServer" | "accountSecrets" | "terminal" | "openBrowser">,
+  options: Pick<OpenOrcOptions, "accountServer" | "accountSecrets" | "terminal" | "openBrowser">,
   parts: Omit<AccountDeps, "server" | "secrets" | "terminal" | "openBrowser" | "textGeneration">,
   textGeneration?: AccountDeps["textGeneration"],
 ): Hosted | null {
-  if (options.cloudOnly || !options.accountServer) return null;
+  if (!options.accountServer) return null;
   return createAccount({ ...parts, textGeneration, server: options.accountServer, secrets: options.accountSecrets, terminal: options.terminal, openBrowser: options.openBrowser });
 }
 

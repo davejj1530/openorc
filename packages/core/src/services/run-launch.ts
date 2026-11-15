@@ -20,7 +20,6 @@ import {
 } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import type { Logger } from "../transport.js";
-import type { CloudRunHost } from "./cloud-workspaces.js";
 import { executionFolder } from "./conversation-folder.js";
 import {
   working,
@@ -37,7 +36,6 @@ import {
 import type { EnvSnapshot } from "./shell-environment.js";
 import { withOutsideNote, type OutsideChanges, type TurnStartCapture } from "./turn-start-checkpoint.js";
 import type { WorkspaceLease, WorkspaceWriters } from "./workspace-writers.js";
-import { assertNotMoving } from "./relocation-fence.js";
 
 type LaunchAttempt = {
   prepared: PreparedSession;
@@ -62,7 +60,7 @@ interface RunLaunchDependencies {
   writers: WorkspaceWriters;
   turnStarts: Pick<TurnStartCapture, "capture">;
   adapters: RunAdapterRegistry;
-  hooks: Pick<RunHooks, "taskImages" | "browserAvailable" | "claudeUserMcpServers" | "claudeConnectorsOff" | "processRegistry" | "untrustedCheckout" | "orclings" | "cloudHost" | "syncCloud">;
+  hooks: Pick<RunHooks, "taskImages" | "browserAvailable" | "claudeUserMcpServers" | "claudeConnectorsOff" | "processRegistry" | "untrustedCheckout" | "orclings">;
   log: Logger;
   isClosing: () => boolean;
   live: ReadonlyMap<string, LiveRun>;
@@ -129,7 +127,6 @@ export class RunLaunch {
     const assertAdmission = () => {
       this.deps.assertHarnessEnabled(admitted.agent);
       if (this.deps.isClosing()) throw new Error("OpenOrc is closing.");
-      if (admitted.scope.thread) assertNotMoving(this.deps.db, admitted.scope.thread.id);
       admitted.assertCanStart?.();
     };
     const timing: [string, number][] = [];
@@ -194,20 +191,15 @@ export class RunLaunch {
     phase("mcp");
     const internalMcp = this.internalMcp(input, runId, mcp);
     await this.lockTaskWorkspace(attempt);
-    const connecting = this.connectCloud(input, internalMcp.url);
     // Captured before the spec is built, so the prompt the provider receives can carry the outside-changes note.
     const outside = await this.captureTurnStart(input, lease);
-    const cloud = await connecting;
-    phase("cloud");
-    const spec = this.runSpec(prepared, lease, internalMcp, outside, cloud?.cwd);
+    const spec = this.runSpec(prepared, lease, internalMcp, outside);
     assertAdmission();
     const orclingCeiling = input.orclingId ? this.deps.hooks.orclings?.ceiling(input.orclingId) : undefined;
     // No await occurs between this permission read and the provider launch.
     phase("prepare");
     if (!isHarnessId(input.agent)) throw new Error(`Provider ${input.agent} has no executable adapter.`);
-    // In a cloud workspace the CLI is the sandbox's own, found on its PATH, with the sandbox's environment.
-    const placed = cloud ? { revision: launch.revision, binary: input.agent, env: cloud.env, host: cloud.host } : { ...launch, processRegistry: this.deps.hooks.processRegistry };
-    const handle = this.deps.adapters[input.agent].start(spec, placed);
+    const handle = this.deps.adapters[input.agent].start(spec, { ...launch, processRegistry: this.deps.hooks.processRegistry });
     phase("spawn");
     this.deps.emit({ type: "activity.updated", runId, ts: Date.now(), activityId: "startup", label: `Starting ${harnessName(input.agent)}`, status: "running" });
     const startTotal = timing.reduce((sum, [, ms]) => sum + ms, 0);
@@ -273,33 +265,22 @@ export class RunLaunch {
     };
   }
 
-  /** Where a cloud conversation's agent runs, connected while the turn's starting point is captured; null on this Mac. */
-  private connectCloud(input: StartRunInput, mcpUrl: string): Promise<CloudRunHost | null> {
-    const connecting = this.deps.hooks.cloudHost?.(input.scope.thread, new URL(mcpUrl).origin, { agent: input.agent, claudeAccountId: input.claudeAccountId }) ?? Promise.resolve(null);
-    // Awaited after the capture; a failure before then must not go unhandled.
-    void connecting.catch(() => undefined);
-    return connecting;
-  }
-
   /** The folder as this thread's turn begins. Tasks and comment runs keep their own capture at the end of the turn. */
   private async captureTurnStart(input: StartRunInput, lease: WorkspaceLease): Promise<OutsideChanges | null> {
     const thread = input.scope.thread;
     if (!thread) return null;
-    // Between turns the Mac may have committed or edited in a cloud conversation's worktree: that goes to the sandbox,
-    // then the worktree catches up with the sandbox before the turn's starting point is saved.
-    await this.deps.hooks.syncCloud?.(thread, { push: true });
     return this.deps.turnStarts.capture({ thread, project: input.project, cwd: lease.paths[0]! });
   }
 
-  /** `cwd` is the sandbox's checkout for a cloud conversation; otherwise the run works in its leased folder. */
-  private runSpec(prepared: PreparedSession, lease: WorkspaceLease, internalMcp: NonNullable<RunSpec["internalMcp"]>, outside: OutsideChanges | null, cwd?: string): RunSpec {
+  /** The run works in its leased folder. */
+  private runSpec(prepared: PreparedSession, lease: WorkspaceLease, internalMcp: NonNullable<RunSpec["internalMcp"]>, outside: OutsideChanges | null): RunSpec {
     const { input, runId, model, taskImages, resumeSessionId, forkSession } = prepared;
     return {
       mode: input.mode,
       runId,
       agent: input.agent,
       fastMode: input.fastMode ?? false,
-      cwd: cwd ?? lease.paths[0]!,
+      cwd: lease.paths[0]!,
       prompt: withOutsideNote(this.withTurnNote(input), outside),
       permissionMode: input.mode === "plan" ? "review" : input.permissionMode,
       systemPromptAppendix: this.systemPrompt(input, taskImages),

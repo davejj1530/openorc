@@ -95,7 +95,7 @@ export class SpaceRequests {
     return this.read(request, "threads.start", legacy);
   }
 
-  /** The inner routers retain their established request shapes, including the separately installed cloud brain. */
+  /** The inner routers retain their established request shapes. */
   private async read<M extends RpcMethod>(request: RpcRequest, method: M, params: RpcParams<M>): Promise<RpcResults[M]> {
     const reply = await this.deps.next({ ...request, method, params });
     if (reply.type === "rpc.error") throw new Error(reply.message);

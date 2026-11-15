@@ -1,12 +1,11 @@
 import { ProtectedSecretsClient } from "./protected-secrets";
-import { newestBrainBundle } from "./brain-bundle";
 import { BrowserClient } from "./browser-client";
 import { PreviewClient } from "./preview-client";
 import { PresenceClient } from "./presence";
 import { TrashClient } from "./trash";
 import { DownloadClient } from "./download";
 import { windowPorts } from "./reply";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import { Worker } from "node:worker_threads";
 import type { MessagePortMain } from "electron";
 import { OpenOrc, WorkerEmbedder, WorkerFormatter, WorkerIntelligence, type Broadcast, type EnvSnapshot, type RequestOrigin, type RpcReply, type SpawnTerminal, type Transport } from "@openorc/core";
@@ -44,12 +43,6 @@ const preview = new PreviewClient((message) => process.parentPort.postMessage(me
 const presence = new PresenceClient((message) => process.parentPort.postMessage(message));
 const trash = new TrashClient((message) => process.parentPort.postMessage(message));
 const downloads = new DownloadClient((message) => process.parentPort.postMessage(message));
-// The runner a cloud workspace runs is uploaded as source, so the bundle carries its files as text.
-const cloudRunner = import.meta.glob<string>(["../../../../packages/cloud/src/runner/*.ts", "!../../../../packages/cloud/src/runner/*.test.ts"], {
-  query: "?raw",
-  import: "default",
-  eager: true,
-});
 /**
  * A terminal for CLIs whose sign-in screens need one, such as `claude setup-token`. Wide, so a token is never wrapped
  * across lines. node-pty carries a native binding, so it loads on first use.
@@ -74,13 +67,6 @@ const corePromise = OpenOrc.create({
   githubSecrets: secrets.store("github.secrets"),
   remoteSecrets: secrets.store("remote.secrets"),
   pushSecrets: secrets.store("push.secrets"),
-  cloudSecrets: secrets.store("cloud.secrets"),
-  claudeCloudSecrets: secrets.store("claude-cloud.secrets"),
-  codexCloudSecrets: secrets.store("codex-cloud.secrets"),
-  opencodeCloudSecrets: secrets.store("opencode-cloud.secrets"),
-  cloudEnvSecrets: secrets.store("cloud-env.secrets"),
-  cloudBrainSecrets: secrets.store("cloud-brain.secrets"),
-  cloudBrainMoveSecrets: secrets.store("cloud-brain-move.secrets"),
   accountSecrets: secrets.store("account.secrets"),
   // No address is built in yet: a development or QA build talks to the server OPENORC_ACCOUNT_SERVER names at launch,
   // else to the one a development build was given (electron.vite.config.ts), and to none without either.
@@ -96,12 +82,6 @@ const corePromise = OpenOrc.create({
   formatter: new WorkerFormatter(() => new Worker(join(import.meta.dirname, "formatter-worker.mjs"))),
   intelligence: new WorkerIntelligence(() => new Worker(join(import.meta.dirname, "intelligence-worker.mjs"), { resourceLimits: { maxOldGenerationSizeMb: 1024 } })),
   benchmarks: __OPENORC_QA__,
-  cloudOffered: true,
-  // Development and QA builds simulate sandboxes on this Mac until a service is connected; a release asks for one.
-  cloudSimulated: __OPENORC_QA__,
-  cloudRunnerFiles: Object.entries(cloudRunner).map(([file, content]) => ({ name: basename(file), content: Buffer.from(content) })),
-  // A packaged app carries the brain in its resources; a build run from the repository uses the one built beside it.
-  cloudBrainBundle: () => newestBrainBundle(process.env["OPENORC_BRAIN_DIR"] ?? join(import.meta.dirname, "../../../brain/dist")),
 });
 
 // Main hosts the Terminal panels and wants the login PATH the core adopted.
@@ -153,22 +133,9 @@ process.parentPort.on("message", (e) => {
     void shutdown();
     return;
   }
-  if (e.data?.type === "power") {
-    const asleep = e.data.state === "suspend";
-    void corePromise
-      .then((core) => {
-        // Best effort before sleep: what is new on the chosen projects' branches reaches a brain that is awake.
-        if (asleep) return Promise.all([core.cloudStandby.away(), core.brainRouting?.freshen()]).then(() => undefined);
-        // Back from sleep, maybe on another network: the cloud brain and the account's server are dialed again now, not at
-        // the next retry, and the brain is woken if a phone used it meanwhile, so its new threads list here.
-        core.account?.awoke();
-        if (core.brainRouting?.active) {
-          core.brainRouting.link.awoke();
-          void core.brainRouting.catchUp();
-        }
-        return core.cloudStandby.back();
-      })
-      .catch((error: unknown) => console.error("[core] cloud takeover", error));
+  if (e.data?.type === "awoke") {
+    // Back from sleep, maybe on another network: the account's server is dialed again now, not at the next retry.
+    void corePromise.then((core) => core.account?.awoke()).catch((error: unknown) => console.error("[core] waking", error));
     return;
   }
   const [port, media] = e.ports;

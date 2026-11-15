@@ -80,10 +80,10 @@ function workerFor(orcling: Orcling, on: WorkSettings | undefined) {
 }
 
 /** A start's settings without where it works, which a thread started under another takes from its parent. */
-function withoutPlace<T extends { projectId: string; workingDirectory?: unknown; workspaceMode?: unknown; baseRef?: unknown; checkout?: unknown; cloud?: unknown; id?: unknown }>(
+function withoutPlace<T extends { projectId: string; workingDirectory?: unknown; workspaceMode?: unknown; baseRef?: unknown; checkout?: unknown; id?: unknown }>(
   settings: T,
-): Omit<T, "projectId" | "workingDirectory" | "workspaceMode" | "baseRef" | "checkout" | "cloud" | "id"> {
-  const { projectId: _projectId, workingDirectory: _folder, workspaceMode: _mode, baseRef: _base, checkout: _checkout, cloud: _cloud, id: _id, ...rest } = settings;
+): Omit<T, "projectId" | "workingDirectory" | "workspaceMode" | "baseRef" | "checkout" | "id"> {
+  const { projectId: _projectId, workingDirectory: _folder, workspaceMode: _mode, baseRef: _base, checkout: _checkout, id: _id, ...rest } = settings;
   return rest;
 }
 

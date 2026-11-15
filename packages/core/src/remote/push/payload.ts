@@ -1,9 +1,8 @@
 import type { PushEnvelope, PushNotice } from "@openorc/link";
 import type { AlertPlan } from "./plan.js";
 
-/** All Apple, and a phone that cannot open the alert, ever show, by the host that sent it. */
-export const OUTER_TEXT = { mac: "New activity on your Mac", cloud: "New activity in the cloud" } as const;
-export type AlertHost = keyof typeof OUTER_TEXT;
+/** All Apple, and a phone that cannot open the alert, ever show. */
+export const OUTER_TEXT = "New activity on your Mac";
 const TITLE_MAX = 120;
 const BODY_MAX = 600;
 const PAYLOAD_MAX_BYTES = 4096;
@@ -15,9 +14,9 @@ export function clip(text: string, max: number): string {
   return max < 1 ? "" : `${points.slice(0, max - 1).join("")}…`;
 }
 
-function apnsJson(envelope: PushEnvelope, plan: AlertPlan, host: AlertHost, face: PushEnvelope | null): string {
+function apnsJson(envelope: PushEnvelope, plan: AlertPlan, face: PushEnvelope | null): string {
   const aps = {
-    alert: { body: OUTER_TEXT[host] },
+    alert: { body: OUTER_TEXT },
     "mutable-content": 1,
     ...(plan.kind === "ring" && plan.sound ? { sound: "default" } : {}),
     ...(plan.kind === "quiet" ? { "interruption-level": "passive" } : {}),
@@ -29,10 +28,10 @@ function apnsJson(envelope: PushEnvelope, plan: AlertPlan, host: AlertHost, face
  * The APNs JSON for a notice, with an Orcling's sealed face beside it when it has one, its body halved until the whole
  * thing fits Apple's limit. Null when even no body is too much.
  */
-export function fitPayload(notice: PushNotice, plan: AlertPlan, seal: (notice: PushNotice) => PushEnvelope, host: AlertHost = "mac", face: PushEnvelope | null = null): string | null {
+export function fitPayload(notice: PushNotice, plan: AlertPlan, seal: (notice: PushNotice) => PushEnvelope, face: PushEnvelope | null = null): string | null {
   let fitted: PushNotice = { ...notice, title: clip(notice.title, TITLE_MAX), body: clip(notice.body, BODY_MAX) };
   for (;;) {
-    const payload = apnsJson(seal(fitted), plan, host, face);
+    const payload = apnsJson(seal(fitted), plan, face);
     if (Buffer.byteLength(payload) <= PAYLOAD_MAX_BYTES) return payload;
     const length = Array.from(fitted.body).length;
     if (length === 0) return null;

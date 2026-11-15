@@ -5,7 +5,6 @@ import { afterEach, expect, it, vi } from "vitest";
 import { antigravityAuthenticated, agentBinary, slotFor } from "@openorc/agents";
 import { executionModeAvailable, harnessCatalog } from "@openorc/protocol";
 import { detectAgentInstallation } from "./agent-update-installation.js";
-import { ANTIGRAVITY_LOCAL_ONLY } from "./cloud-agents.js";
 import { pathProbe } from "./shell-environment.js";
 import { harnessProbes } from "./system.js";
 
@@ -24,14 +23,13 @@ it("checks login without prompting a model or opening an authentication flow", (
   expect(antigravityAuthenticated("Please sign in", { GEMINI_API_KEY: " " })).toBe(false);
 });
 
-it("exposes native Plan and Autonomous while refusing cloud and session transfer", async () => {
+it("exposes native Plan and Autonomous while refusing session transfer", () => {
   expect(executionModeAvailable("antigravity", "plan")).toBe(true);
   expect(executionModeAvailable("antigravity", "autonomous")).toBe(true);
   expect(executionModeAvailable("antigravity", "review")).toBe(false);
   expect(executionModeAvailable("antigravity", "trusted")).toBe(false);
   expect(harnessCatalog.antigravity.cloud).toBe(false);
   expect(slotFor("antigravity")?.stays).toContain("stay on the computer");
-  await expect(ANTIGRAVITY_LOCAL_ONLY.assertCanRun("vercel", { claudeAccountId: null, model: null })).rejects.toThrow("connected computer");
 });
 
 it("discovers agy separately from the IDE and updates its native installation", async () => {

@@ -9,10 +9,13 @@ type Dependencies = {
   imports: Pick<ImportService, "import">;
 };
 
-/** A cloud conversation runs one model; Orclings start on this Mac. One for OpenOrc Cloud reaches this Mac only signed out of it. */
-function assertCloudTarget({ cloud, hosted, executionTarget: target }: Pick<RpcParams<"threads.start">, "cloud" | "hosted" | "executionTarget">): void {
+/**
+ * A start for OpenOrc Cloud reaches this Mac only signed out of it. One for the person's own cloud, which a phone build
+ * from before its removal may still ask for, is refused, never started here instead.
+ */
+function assertStartsHere({ cloud, hosted }: Pick<RpcParams<"threads.start">, "cloud" | "hosted">): void {
   if (hosted) throw new Error("Sign in to OpenOrc to start a thread on OpenOrc Cloud.");
-  if (cloud && target && target.kind !== "model") throw new Error("Cloud conversations run one model.");
+  if (cloud) throw new Error("This app no longer runs threads in your own cloud.");
 }
 
 /** The model a start runs on: its execution target's settings, or the separate fields older callers send. */
@@ -51,7 +54,7 @@ export function createThreadLaunchHandlers({
       title,
       parentThreadId,
     }) => {
-      assertCloudTarget({ cloud, hosted, executionTarget });
+      assertStartsHere({ cloud, hosted });
       if (executionTarget?.kind === "orcling") {
         return orclings.startThread(executionTarget.orclingId, {
           projectId,
@@ -76,7 +79,6 @@ export function createThreadLaunchHandlers({
         mode,
         permissionMode,
         ...(workspaceMode ? { workspaceMode } : {}),
-        cloud,
         ...(baseRef ? { baseRef } : {}),
         prompt,
         attachments,

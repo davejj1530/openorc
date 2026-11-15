@@ -216,14 +216,13 @@ it("starts as many threads working at once as it asks for, none of their own, an
   await expect(startThread(planning.runId, { prompt: "Do it" })).rejects.toThrow(/Plan mode/);
 });
 
-it("rejects Git, cloud and workspace mutations of a subagent before any side effects", async () => {
+it("rejects Git and workspace mutations of a subagent before any side effects", async () => {
   const { runId, thread: home } = await parent();
   turns.get(runId)!.handle.emit("event", { type: "subagent.started", runId, ts: Date.now(), subagentId: "child", title: "Explore" });
   const child = threads.children(core.db, home.id)[0]!;
   await expect(call("review.commitThread", { threadId: child.id, message: "Forbidden" })).rejects.toThrow(/read-only/);
   await expect(call("review.pushThread", { threadId: child.id })).rejects.toThrow(/read-only/);
   await expect(call("review.createThreadPr", { threadId: child.id, title: "Forbidden", body: "", base: "main" })).rejects.toThrow(/read-only/);
-  await expect(call("cloud.move", { threadId: child.id })).rejects.toThrow(/read-only/);
   await expect(call("threads.moveWorkspace", { id: child.id, to: "current" })).rejects.toThrow(/read-only/);
 });
 

@@ -2,16 +2,12 @@
  * The first stop of every window call: places besides this Mac that hold threads by lookup answer for what they hold,
  * and add their rows to the lists. OpenOrc Cloud is the one such place. Phones never come here.
  *
- * The cloud brain is deliberately not one. It claims by absence ("whatever this Mac's ledger lacks is mine") and merges
- * its own lists, so it stays behind this router, untouched, as `next`.
- *
  * Invariants:
  *   1. With no active place, `handle` is `next`: the same call, so an app with no account runs the code it ran before.
- *   2. A place is asked only about ids it said it holds, so a thread of this Mac or of the brain never reaches it, and
- *      one of its ids never falls through to "absent, so the brain's".
+ *   2. A place is asked only about ids it said it holds, so a thread of this Mac never reaches it.
  *   3. Lists never wait on a place: its rows come from what it last heard.
- *   4. A start that asks for OpenOrc Cloud goes to it, and never to this Mac or the brain, which would start the
- *      thread somewhere the person did not choose.
+ *   4. A start that asks for OpenOrc Cloud goes to it, and never to this Mac, which would start the thread somewhere
+ *      the person did not choose.
  */
 import type { HostedSpaces, HostedThreads } from "@openorc/hosted";
 import { mergeThreadPages, ownerRoute, rpcParams, type RoutedMethod, type RpcMethod, type RpcParams, type RpcRequest, type ThreadSummary } from "@openorc/protocol";
@@ -23,7 +19,7 @@ export interface PlaceRouterDeps {
   /** The place, or null while there is none (no account server). */
   place(): HostedThreads | null;
   spaces?(): Pick<HostedSpaces, "status" | "projects" | "people"> | null;
-  /** What answered every window call before this router existed: the brain router while a brain is set up, else dispatch. */
+  /** What answers a call no place holds: this Mac's own dispatch. */
   next(request: RpcRequest): Promise<RpcReply>;
 }
 
@@ -93,8 +89,8 @@ export class PlaceRouter {
   }
 
   /**
-   * This Mac's rows, with its brain's already merged in, and the place's, through the protocol's own merge. A later page
-   * asks everyone from 0 to its end and slices, as the brain router does, so the merged top `limit` is exact.
+   * This Mac's rows and the place's, through the protocol's own merge. A later page asks everyone from 0 to its end
+   * and slices, so the merged top `limit` is exact.
    */
   private async list(place: HostedThreads, request: RpcRequest, params: RpcParams<"threads.list">): Promise<RpcReply> {
     const page = place.listed("threads.list", params);
@@ -114,7 +110,7 @@ export class PlaceRouter {
     return result(request, rows.slice(offset));
   }
 
-  /** Resolved's count: this Mac's, with its brain's, and the place's quiet rows, so the count and the drawer agree. */
+  /** Resolved's count: this Mac's and the place's quiet rows, so the count and the drawer agree. */
   private async resolvedCount(place: HostedThreads, request: RpcRequest, params: RpcParams<"threads.resolvedCount">): Promise<RpcReply> {
     const base = await this.deps.next(request);
     const page = place.listed("threads.resolvedCount", params);

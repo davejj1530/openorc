@@ -28,7 +28,7 @@ export interface ContinueThreadInput {
 }
 
 export interface StartThreadInput {
-  /** The id its owner chose, as the cloud brain's Mac does; a new one unless given. */
+  /** The id its starter chose; a new one unless given. */
   id?: string;
   claudeAccountId?: string;
   /**
@@ -54,8 +54,6 @@ export interface StartThreadInput {
   promptRole?: "user" | "system";
   /** A worktree prepared elsewhere that the conversation adopts: a pull request checked out detached, or its parent's on its branch. */
   checkout?: { path: string; baseSha: string; branch?: string };
-  /** Runs the agent in a cloud sandbox; the conversation's worktree on the Mac mirrors it. */
-  cloud?: boolean;
 }
 
 /**

@@ -1,12 +1,11 @@
 import { projects, retiredTeams, tasks, threads, type Db } from "@openorc/db";
 import { WORKSPACE_ID, type ConversationScope, type Project, type Task, type Thread } from "@openorc/protocol";
 import { realpath } from "node:fs/promises";
-import { MIRROR_WORDS, mirrorFolder } from "./brain-mirrors.js";
 import { inUnvettedCopy } from "./review-copies.js";
 import { directory, executionProject, workspaceHome } from "./workspace-home.js";
 
 /** What kind of folder a conversation works in. It decides who may edit there. */
-export type FolderKind = "checkout" | "worktree" | "workspace" | "review" | "mirror";
+export type FolderKind = "checkout" | "worktree" | "workspace" | "review";
 
 export interface ConversationFolder {
   /** Real path, symlinks resolved. File paths are checked against it, and caches are keyed by it. */
@@ -43,9 +42,6 @@ export async function conversationFolder(db: Db, scope: FolderScope): Promise<Co
   if (scope.kind === "project") return projectFolder(db, scope.id, scope.workingDirectory);
   if (scope.kind === "thread") {
     const thread = threads.get(db, scope.id);
-    const mirror = thread ? null : mirrorFolder(db, scope.id);
-    const project = mirror && projects.get(db, mirror.projectId);
-    if (mirror && project) return { root: await folderRoot(mirror.path), kind: "mirror", project, readOnly: editBlocker("mirror") };
     if (!thread || retiredTeams.isHidden(db, thread.id)) throw new Error(`thread ${scope.id} not found`);
     return threadFolder(db, thread);
   }
@@ -104,6 +100,5 @@ async function folderRoot(folder: string): Promise<string> {
 
 /** A pull request copy contains someone else's code under review. */
 function editBlocker(kind: FolderKind): string | null {
-  if (kind === "mirror") return MIRROR_WORDS;
   return kind === "review" ? "Pull request copies are read-only." : null;
 }

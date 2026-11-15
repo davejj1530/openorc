@@ -17,7 +17,6 @@ import {
 import { createHash } from "node:crypto";
 import { checkoutBranch } from "./checkout-branch.js";
 import { projectGit } from "./project-git.js";
-import { assertTaskNotMoving } from "./relocation-fence.js";
 import type { RunService } from "./runs.js";
 import { titleFromPrompt, type StartThreadInput } from "./thread-inputs.js";
 import type { SpawnTaskInput, ThreadService } from "./threads.js";
@@ -26,7 +25,7 @@ import type { SpawnTaskInput, ThreadService } from "./threads.js";
  * How many agent messages in a row may pass between conversations before a person has to write. Agents end an
  * exchange by not replying; this only stops two of them that never do.
  */
-export const MAX_AGENT_HOPS = 50;
+export const MAX_AGENT_HOPS = 500;
 
 export interface ThreadStartInput {
   prompt: string;
@@ -232,7 +231,6 @@ export class ThreadAgentTools {
     const run = runRepo.get(this.db, runId);
     if (!scoped) throw new Error("Task not found in this agent's project.");
     const { task, currentTaskId } = scoped;
-    assertTaskNotMoving(this.db, task);
     this.assertTaskStartAllowed(task, run?.mode);
     const caller = this.scopeOf(runId).thread;
     this.assertTaskStartLocation(task, caller, workspaceMode);
@@ -279,7 +277,6 @@ export class ThreadAgentTools {
     if (!scoped) return null;
     const { task: t, currentTaskId } = scoped;
     if (t.retiredTeam) throw new Error("This item is no longer available.");
-    assertTaskNotMoving(this.db, t);
     const changes: { spec?: string; status?: TaskStatus; completedAt?: number | null } = {};
     if (patch.spec) changes.spec = patch.spec;
     if (patch.status) {
@@ -376,7 +373,7 @@ export class ThreadAgentTools {
    * A thread a person, or their Orcling, starts under another, working in its folder. Nothing limits how many or how
    * deep; a thread an agent starts with thread_start starts none of its own.
    */
-  startUnder(parentId: string, input: Omit<StartThreadInput, "id" | "projectId" | "workingDirectory" | "workspaceMode" | "baseRef" | "checkout" | "cloud">, admitted?: (child: Thread) => void) {
+  startUnder(parentId: string, input: Omit<StartThreadInput, "id" | "projectId" | "workingDirectory" | "workspaceMode" | "baseRef" | "checkout">, admitted?: (child: Thread) => void) {
     const parent = threads.get(this.db, parentId);
     if (!parent || retiredTeams.isHidden(this.db, parent.id)) throw new Error("Thread not found.");
     this.runs.subagents.assertExecutable({ threadId: parent.id });

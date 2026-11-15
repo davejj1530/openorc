@@ -5,7 +5,6 @@ import { afterEach, expect, it, vi } from "vitest";
 import { fxAuthenticated, slotFor } from "@openorc/agents";
 import { executionModeAvailable, executionModePresentation, harnessCatalog } from "@openorc/protocol";
 import { detectAgentInstallation, fetchAgentRelease } from "./agent-update-installation.js";
-import { LOCAL_ONLY_SIGN_INS } from "./cloud-agents.js";
 import { pathProbe } from "./shell-environment.js";
 import { harnessProbes } from "./system.js";
 
@@ -24,14 +23,13 @@ it("recognizes cached login, API keys and unauthenticated local providers withou
   expect(fxAuthenticated("request failed")).toBeNull();
 });
 
-it("exposes native permission modes and keeps unsupported planning and cloud actions unavailable", async () => {
+it("exposes native permission modes and keeps unsupported planning and session transfer unavailable", () => {
   expect(executionModeAvailable("fx", "plan")).toBe(false);
   expect(executionModePresentation("fx", "review").label).toBe("Ask");
   expect(executionModePresentation("fx", "trusted").label).toBe("Auto review");
   expect(executionModeAvailable("fx", "autonomous")).toBe(true);
   expect(harnessCatalog.fx.cloud).toBe(false);
   expect(slotFor("fx")?.stays).toContain("stay on the computer");
-  await expect(LOCAL_ONLY_SIGN_INS.fx.assertCanRun("vercel", { claudeAccountId: null, model: null })).rejects.toThrow("connected computer");
 });
 
 it("discovers the native binary and updates it from fx's release service", async () => {

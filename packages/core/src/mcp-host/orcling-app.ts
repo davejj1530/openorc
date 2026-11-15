@@ -164,7 +164,7 @@ export function appTools(deps: AppDependencies, speaker: (runId: string) => Orcl
       if (!isAppMethod(method)) throw new Error(`${method} is not something you can do for the person. orcling_app_methods lists what you can.`);
       const parsed = rpcParams[method].safeParse(params ?? {});
       if (!parsed.success) throw new Error(`${method} takes other parameters: ${parsed.error.message}`);
-      const refusal = selfRefusal(self, db, method, parsed.data) ?? (isRemote(method) ? admitRemoteRequest(method, parsed.data, deps.guard, "owner") : { ok: true as const });
+      const refusal = selfRefusal(self, db, method, parsed.data) ?? (isRemote(method) ? admitRemoteRequest(method, parsed.data, deps.guard, "person") : { ok: true as const });
       if (typeof refusal === "string") throw new Error(refusal);
       if (!refusal.ok) throw new Error(refusal.message);
       if (ACCESS[method] === "changes") {

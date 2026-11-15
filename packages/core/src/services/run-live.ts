@@ -28,7 +28,7 @@ interface RunLiveDependencies {
   db: Db;
   isClosing: () => boolean;
   closeAndWait: (runId: string) => Promise<void>;
-  hooks: Pick<RunHooks, "idleTimeoutMs" | "syncCloud">;
+  hooks: Pick<RunHooks, "idleTimeoutMs">;
   emit: (event: AgentEvent) => void;
   invalidate: (keys: string[]) => void;
   keysFor: (scope: LiveRun["scope"]) => string[];
@@ -131,10 +131,7 @@ export class RunLive {
     if (entry.scope.comment) return;
     const ticker = setInterval(() => {
       if (!working(entry)) return;
-      const thread = entry.scope.thread;
-      // A cloud conversation's files change in its sandbox; they reach the worktree on the Mac before its diffs refresh.
-      if (thread && this.deps.hooks.syncCloud) void this.deps.hooks.syncCloud(thread).then(() => this.refreshDiffs(entry, project));
-      else this.refreshDiffs(entry, project);
+      this.refreshDiffs(entry, project);
     }, WORKING_DIFF_REFRESH_MS);
     ticker.unref();
     this.diffRefreshes.set(entry.run.id, { ticker, window: null, owed: false });

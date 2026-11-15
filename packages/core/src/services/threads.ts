@@ -1,4 +1,4 @@
-import { audit, checkpoints, messages, plans, retiredTeams, runs as runRepo, settings, tasks, threadQueue, threads, type CloudProviderId, type Db } from "@openorc/db";
+import { audit, checkpoints, messages, plans, retiredTeams, runs as runRepo, settings, tasks, threads, type Db } from "@openorc/db";
 import { diffStat, git, pinObject, switchFiles, treeHash, workspaceTransfer } from "@openorc/git";
 import {
   THREAD_EXISTS,
@@ -39,7 +39,6 @@ import { summarizeThread } from "./thread-summary.js";
 import { ThreadTaskExecution } from "./thread-task-execution.js";
 import { directory, executionProject, worktreeShared } from "./workspace-home.js";
 import { workspaceWriters, type WorkspaceWriters } from "./workspace-writers.js";
-import { assertStaying } from "./brain-leaving.js";
 import type { WorkspaceService } from "./workspace.js";
 
 /** How many agent messages in a row may pass between conversations before a person has to write. */
@@ -96,9 +95,9 @@ export class ThreadService {
       send: (id, text, from) => this.send(id, text, from),
       messages: (id) => this.messages(id),
       withCheckoutBranches: (rows) => this.withCheckoutBranches(rows),
-      start: (input, internal) => this.start({ ...input, cloud: false }, internal),
+      start: (input, internal) => this.start(input, internal),
     });
-    this.sessions = new ThreadSessions({ db, runs, workspaces, log, claudeFolder, handoffFor: (...args) => this.agentTools.handoffFor(...args) });
+    this.sessions = new ThreadSessions({ db, runs, log, claudeFolder, handoffFor: (...args) => this.agentTools.handoffFor(...args) });
   }
 
   resolvedCount({ projectIds, quietBefore }: RpcParams<"threads.resolvedCount">): number {
@@ -127,7 +126,7 @@ export class ThreadService {
   }
 
   private summarize(t: Thread): ThreadSummary {
-    return summarizeThread({ db: this.db, runs: this.runs, workspaces: this.workspaces }, t);
+    return summarizeThread({ db: this.db, runs: this.runs }, t);
   }
 
   private thread(id: string): Thread {
@@ -141,18 +140,14 @@ export class ThreadService {
     if (threadId && retiredTeams.isHidden(this.db, threadId)) throw new Error("This item is no longer available.");
   }
 
-  /** A cloud thread returns at once with no run: its first message waits in the queue while its sandbox gets ready. */
   async start(input: StartThreadInput, internal?: ThreadAdmission): Promise<{ thread: Thread; run: Run | null }> {
-    assertStaying(this.db);
     input = { ...normalizeModelSettings(input), claudeAccountId: startAccount(this.db, input) };
     await this.runs.validateFastMode(input.agent, input.model, input.fastMode, undefined, undefined, input.claudeAccountId);
     internal?.assertCanAdmit();
     if (input.workingDirectory && input.projectId !== WORKSPACE_ID) throw new Error("Only Workspace conversations can choose a working folder.");
     const home = executionProject(this.db, { projectId: input.projectId });
     const project = input.projectId === WORKSPACE_ID ? { ...home, rootPath: await directory(input.workingDirectory ?? home.rootPath) } : home;
-    const cloud = input.cloud || this.workspaces.cloudOnly;
-    const cloudProvider = cloud ? await this.workspaces.placeCloud(input, project) : null;
-    const workspaceMode = input.checkout || cloud ? "worktree" : (input.workspaceMode ?? "current");
+    const workspaceMode = input.checkout ? "worktree" : (input.workspaceMode ?? "current");
     await this.workspaces.assertNewThreadWorkspace(project, workspaceMode, Boolean(input.checkout));
     const id = this.newThreadId(input.id);
     const title = input.title?.trim() || titleFromPrompt(input.prompt);
@@ -176,7 +171,6 @@ export class ThreadService {
             permissionMode: input.permissionMode,
             workspaceMode,
           });
-          if (cloudProvider) this.admitCloud(admitted.id, cloudProvider, input);
           audit.record(this.db, {
             actor: "user",
             action: "thread.create",
@@ -190,7 +184,6 @@ export class ThreadService {
           return adopted;
         });
         this.invalidate(["threads", `thread:${thread.id}`]);
-        if (cloudProvider) return { thread, run: null };
         try {
           thread = await this.workspaces.prepareThread(thread, project, input.baseRef, workspaceLease);
           const run = await this.runs.start({
@@ -229,13 +222,6 @@ export class ThreadService {
   private newThreadId(chosen: string | undefined): string {
     if (chosen && threads.get(this.db, chosen)) throw new Error(THREAD_EXISTS);
     return chosen ?? randomUUID();
-  }
-
-  /** In the admitting transaction: the sandbox record, the base the worktree will start from, and the queued first message. */
-  private admitCloud(threadId: string, provider: CloudProviderId, input: StartThreadInput): void {
-    this.workspaces.admitCloud(threadId, provider);
-    if (input.baseRef) threads.update(this.db, threadId, { baseBranch: input.baseRef });
-    threadQueue.enqueue(this.db, { threadId, text: input.prompt, attachments: input.attachments ?? [], requestKey: randomUUID() });
   }
 
   /** Admit a conversation without starting a provider: routing questions are real conversation turns. */
@@ -487,8 +473,6 @@ export class ThreadService {
         await this.workspaces.cleanupThread(thread, project, { save: !inUnvettedCopy(this.db, thread) }, lease);
       }
 
-      // Best effort: a sandbox the service could not delete now is not worth keeping the thread for.
-      await this.workspaces.removeCloud(id).catch((e: unknown) => this.log.warn(`the cloud workspace of thread ${id} was not deleted: ${e instanceof Error ? e.message : String(e)}`));
       threads.delete(this.db, id);
       // Its checkpoints go with it; nothing else keeps their trees.
       await unpinProjectRefs(project, checkpointRefs(id)).catch((e: unknown) => this.log.warn(`checkpoint refs of thread ${id} were kept: ${e instanceof Error ? e.message : String(e)}`));
@@ -504,7 +488,6 @@ export class ThreadService {
    * transcript leaves out.
    */
   fork(id: string): Thread {
-    assertStaying(this.db);
     this.runs.subagents.assertExecutable({ threadId: id });
     this.rejectRetiredThread(id);
     const parent = this.thread(id);

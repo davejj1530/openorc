@@ -1,16 +1,14 @@
-import { frozenMoving, refusedMove, subagents, tasks, threadQueue, type Db } from "@openorc/db";
+import { subagents, tasks, threadQueue, type Db } from "@openorc/db";
 import type { Thread, ThreadSummary } from "@openorc/protocol";
 import type { RunService } from "./runs.js";
-import type { WorkspaceService } from "./workspace.js";
 
 export interface SummaryDeps {
   db: Db;
   runs: RunService;
-  workspaces: Pick<WorkspaceService, "cloudState">;
 }
 
 /** A thread with what is happening on it right now, for lists and the sidebar. */
-export function summarizeThread({ db, runs, workspaces }: SummaryDeps, t: Thread): ThreadSummary {
+export function summarizeThread({ db, runs }: SummaryDeps, t: Thread): ThreadSummary {
   const own = tasks.list(db, { threadId: t.id });
   const activity = runs.threadActivity(t.id);
   return {
@@ -26,9 +24,6 @@ export function summarizeThread({ db, runs, workspaces }: SummaryDeps, t: Thread
     session: runs.threadSession(t.id),
     context: runs.threadContext(t.id),
     queued: threadQueue.list(db, t.id),
-    cloud: workspaces.cloudState(t.id),
-    moving: frozenMoving(db, t.id),
-    moveRefused: refusedMove(db, t.id),
     lastAgentEventAt: runs.threadLastAgentEventAt(t.id),
     liveRunId: liveRunId(db, runs, t.id),
     taskCount: own.filter((x) => x.status !== "archived").length,

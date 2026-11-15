@@ -5,10 +5,8 @@ import { afterEach, expect, it, vi } from "vitest";
 import { agentBinary, releaseOf, slotFor } from "@openorc/agents";
 import { executionModeAvailable, harnessCatalog } from "@openorc/protocol";
 import { detectAgentInstallation, fetchAgentRelease, newerRelease, releaseVersion } from "./agent-update-installation.js";
-import { CURSOR_LOCAL_ONLY } from "./cloud-agents.js";
 import { pathProbe, type EnvSnapshot } from "./shell-environment.js";
 import { harnessProbes } from "./system.js";
-import { everyVersion } from "./agent-homes.js";
 
 const dirs: string[] = [];
 afterEach(async () => {
@@ -39,13 +37,9 @@ it("checks Cursor's structured login status and exposes only its supported execu
   expect(executionModeAvailable("cursor", "trusted")).toBe(false);
 });
 
-it("refuses cloud use before any credentials or sessions can be copied", async () => {
+it("keeps its sessions on the computer they started on", () => {
   expect(harnessCatalog.cursor.cloud).toBe(false);
   expect(slotFor("cursor")?.stays).toContain("stay on the computer");
-  await expect(CURSOR_LOCAL_ONLY.assertCanRun("vercel", { claudeAccountId: null, model: "auto" })).rejects.toThrow("connected computer");
-  const version = vi.fn(async () => "1.0.0");
-  expect((await everyVersion(version)).cursor).toBeNull();
-  expect(version).not.toHaveBeenCalledWith("cursor");
 });
 
 it("uses Cursor's native updater and preserves its date and build hash", async () => {

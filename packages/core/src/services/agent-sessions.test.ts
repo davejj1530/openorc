@@ -1,20 +1,16 @@
 import { existsSync, readFileSync } from "node:fs";
-import { appendFile, chmod, mkdir, mkdtemp, readdir, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { claudeSessionFile, hostHome, sessionSlots, type AgentHome, type PackedSession, type SessionId } from "@openorc/agents";
-import type { WorkspaceLocation } from "@openorc/cloud";
+import { claudeSessionFile, hostHome, SessionRefused, sessionSlots, type AgentHome, type PackedSession, type SessionId } from "@openorc/agents";
 import { Db, projects, runs, threads } from "@openorc/db";
 import type { Thread } from "@openorc/protocol";
 import { spawn } from "node:child_process";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { agentHomes } from "./agent-homes.js";
 import { AgentSessions, keptSessionsFolder, type AgentHomes } from "./agent-sessions.js";
-import { RelocationRefused } from "./relocation-package.js";
 
 const ID = "0b9f3c3e-5d2a-4f1e-9c47-2a6f0d8e1b55" as SessionId;
-const REPO = "/vercel/sandbox/repo";
-const location = { repo: REPO } as WorkspaceLocation;
 const line = (cwd: string, text: string) => `${JSON.stringify({ type: "user", cwd, sessionId: ID, text })}\n`;
 
 let root: string;
@@ -22,21 +18,18 @@ let db: Db;
 let thread: Thread;
 let worktree: string;
 let mac: string;
-let sandbox: string;
 let writes: string[];
 /** Stands in for the CLI where only its version is asked: the one in `cli-version`, as `--version` prints it. */
 let cli: string;
-const log = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
 
 /** A home on this disk whose writes are counted. */
 const counted = (config: string): AgentHome => {
   const home = hostHome({ agent: "claude", userHome: root, env: { CLAUDE_CONFIG_DIR: config }, binary: cli, processEnv: {} });
   return { ...home, write: (file, bytes) => (writes.push(file), home.write(file, bytes)) };
 };
-const homes: AgentHomes = { here: () => counted(mac) as never, sandbox: async () => counted(sandbox) };
-const sessions = () => new AgentSessions({ db, dataDir: path.join(root, "data"), homes, log: log as never });
+const homes: AgentHomes = { here: () => counted(mac) as never };
+const sessions = () => new AgentSessions({ db, dataDir: path.join(root, "data"), homes });
 const macFile = () => claudeSessionFile(mac, worktree, ID);
-const sandboxFile = () => claudeSessionFile(sandbox, REPO, ID);
 const kept = async () => {
   const folder = keptSessionsFolder(path.join(root, "data"), thread.id);
   const labels = existsSync(folder) ? await readdir(folder) : [];
@@ -46,7 +39,6 @@ const kept = async () => {
 beforeEach(async () => {
   root = await realpath(await mkdtemp(path.join(os.tmpdir(), "openorc-agent-sessions-")));
   mac = path.join(root, "mac-claude");
-  sandbox = path.join(root, "sandbox-claude");
   worktree = path.join(root, "worktree");
   await mkdir(worktree);
   writes = [];
@@ -66,45 +58,15 @@ beforeEach(async () => {
 
 afterEach(async () => {
   db.close();
-  vi.clearAllMocks();
   await rm(root, { recursive: true, force: true });
 });
 
-it("sends the session to the sandbox under its folder there, and a turn's end brings it back under the worktree's", async () => {
-  const base = await sessions().send(thread, location, "vercel");
-  expect(await readFile(sandboxFile(), "utf8")).toBe(line(REPO, "Start on the Mac"));
-  await appendFile(sandboxFile(), line(REPO, "A turn in the cloud"));
-  const next = await sessions().keep(thread, location, "vercel", base, { required: false });
-  expect(await readFile(macFile(), "utf8")).toBe(line(worktree, "Start on the Mac") + line(worktree, "A turn in the cloud"));
-  expect(next).toEqual({ sessionId: ID, host: expect.any(String), sandbox: expect.any(String) });
-  expect(next?.sandbox).not.toBe(base?.sandbox);
-  expect(await kept()).toEqual([]);
-});
-
-it("writes nothing here when the sandbox's session did not change since what it got", async () => {
-  const base = await sessions().send(thread, location, "vercel");
-  writes.length = 0;
-  expect(await sessions().keep(thread, location, "vercel", base, { required: false })).toEqual(base);
-  expect(writes).toEqual([]);
-});
-
-it("keeps this host's copy aside when both sides changed, and takes the sandbox's, which holds the newest turn", async () => {
-  const base = await sessions().send(thread, location, "vercel");
-  await appendFile(macFile(), line(worktree, "The Mac's turn ran past the last send"));
-  await appendFile(sandboxFile(), line(REPO, "The sandbox carried on"));
-  await sessions().keep(thread, location, "vercel", base, { required: false });
-  expect(await kept()).toEqual([line(worktree, "Start on the Mac") + line(worktree, "The Mac's turn ran past the last send")]);
-  expect(await readFile(macFile(), "utf8")).toBe(line(worktree, "Start on the Mac") + line(worktree, "The sandbox carried on"));
-  expect(await readFile(sandboxFile(), "utf8")).toBe(line(REPO, "Start on the Mac") + line(REPO, "The sandbox carried on"));
-  expect(log.info).toHaveBeenCalledWith(expect.stringContaining("kept in"));
-});
-
-it("fails a leaving keep whose session did not come, and only warns after an ordinary turn", async () => {
-  const broken: AgentHomes = { ...homes, sandbox: async () => ({ ...counted(sandbox), read: () => Promise.reject(new Error("sandbox gone")) }) };
-  const leaving = new AgentSessions({ db, dataDir: path.join(root, "data"), homes: broken, log: log as never });
-  await expect(leaving.keep(thread, location, "vercel", null, { required: true })).rejects.toThrow("sandbox gone");
-  expect(await leaving.keep(thread, location, "vercel", null, { required: false })).toBeNull();
-  expect(log.warn).toHaveBeenCalledWith(expect.stringContaining("sandbox gone"));
+it("exports the thread's newest session with the CLI's version, and nothing before its first turn", async () => {
+  const packed = await sessions().export(thread);
+  expect(packed).toMatchObject({ agent: "claude", sessionId: ID, cliVersion: "2.1.317" });
+  expect(packed!.parts[0]!.bytes.toString("utf8")).toBe(line(worktree, "Start on the Mac"));
+  runs.update(db, "run-1", { externalSessionId: null });
+  expect(await sessions().export(thread)).toBeNull();
 });
 
 it("takes a session where Claude looks for it in a folder reached through a link, its real path", async () => {
@@ -112,7 +74,7 @@ it("takes a session where Claude looks for it in a folder reached through a link
   await mkdir(real, { recursive: true });
   await symlink(path.join(root, "data"), path.join(root, "linked"));
   const packed: PackedSession = { ...(await exportWithoutVersion()), cliVersion: "2.1.317" };
-  await sessions().take({ id: thread.id, agent: "claude", claudeAccountId: null, children: [] }, packed, path.join(root, "linked", "worktrees", "thread"), "r1", "cloud");
+  await sessions().take({ id: thread.id, agent: "claude", claudeAccountId: null, children: [] }, packed, path.join(root, "linked", "worktrees", "thread"), "r1");
   expect(await readFile(claudeSessionFile(mac, real, ID), "utf8")).toBe(line(real, "Start on the Mac"));
   expect(existsSync(claudeSessionFile(mac, path.join(root, "linked", "worktrees", "thread"), ID))).toBe(false);
 });
@@ -124,7 +86,7 @@ it("keeps a stale copy at the target aside under the move once, so repeating the
   const stale = claudeSessionFile(mac, target, ID);
   await mkdir(path.dirname(stale), { recursive: true });
   await writeFile(stale, line(target, "An older round trip"));
-  const take = () => sessions().take({ id: thread.id, agent: "claude", claudeAccountId: null, children: [] }, packed, target, "r1", "cloud");
+  const take = () => sessions().take({ id: thread.id, agent: "claude", claudeAccountId: null, children: [] }, packed, target, "r1");
   await take();
   await take();
   expect(await kept()).toEqual([line(target, "An older round trip")]);
@@ -134,8 +96,8 @@ it("keeps a stale copy at the target aside under the move once, so repeating the
 it("refuses a session the CLI here could not resume, in words, and one of another agent", async () => {
   const packed: PackedSession = { ...(await exportWithoutVersion()), cliVersion: "2.1.317" };
   const cut = { ...packed, parts: [{ name: "session.jsonl", bytes: Buffer.from(line(worktree, "x").trimEnd()) }] };
-  const take = (saved: PackedSession) => sessions().take({ id: thread.id, agent: "claude", claudeAccountId: null, children: [] }, saved, worktree, "r2", "cloud");
-  await expect(take(cut)).rejects.toThrow(new RelocationRefused("Claude's conversation ends partway through a line."));
+  const take = (saved: PackedSession) => sessions().take({ id: thread.id, agent: "claude", claudeAccountId: null, children: [] }, saved, worktree, "r2");
+  await expect(take(cut)).rejects.toThrow(new SessionRefused("Claude's conversation ends partway through a line."));
   await expect(take({ ...packed, agent: "codex" })).rejects.toThrow("belongs to another agent");
 });
 
@@ -144,22 +106,21 @@ async function exportWithoutVersion() {
   return (await sessionSlots.claude.export(counted(mac), { sessionId: ID, cwd: worktree, children: [] }))!;
 }
 
-it("refuses a session a newer CLI wrote than the one here, naming which side to update, and takes one this CLI reads", async () => {
+it("refuses a session a newer CLI wrote than the one here, naming what to update, and takes one this CLI reads", async () => {
   const packed: PackedSession = { ...(await exportWithoutVersion()), cliVersion: "2.1.318" };
-  const take = (from: "cloud" | "mac") => sessions().take({ id: thread.id, agent: "claude", claudeAccountId: null, children: [] }, packed, worktree, "r3", from);
-  await expect(take("cloud")).rejects.toThrow(new RelocationRefused("This conversation last ran on Claude 2.1.318 in the cloud; this Mac has 2.1.317. Update Claude Code, then try again."));
-  await expect(take("mac")).rejects.toThrow("on your Mac; the cloud brain has 2.1.317. Try again once the cloud brain has updated it.");
+  const take = () => sessions().take({ id: thread.id, agent: "claude", claudeAccountId: null, children: [] }, packed, worktree, "r3");
+  await expect(take()).rejects.toThrow(new SessionRefused("This conversation last ran on Claude 2.1.318 in the cloud; this Mac has 2.1.317. Update Claude Code, then try again."));
   expect(await kept()).toEqual([]);
   await writeFile(path.join(root, "cli-version"), "2.1.318");
-  await take("cloud");
+  await take();
 });
 
 it("refuses, before anything is written, a thread whose agent's conversations stay, or whose Claude account is not here", () => {
   const taken = { id: thread.id, claudeAccountId: "gone", children: [] };
-  expect(() => sessions().assertTakeable({ ...taken, agent: "acp" })).toThrow(new RelocationRefused("This agent's conversations stay where they started."));
+  expect(() => sessions().assertTakeable({ ...taken, agent: "acp" })).toThrow(new SessionRefused("This agent's conversations stay where they started."));
   const environment = () => ({ env: {}, binaries: { claude: null, codex: null, opencode: null } }) as never;
-  const real = new AgentSessions({ db, dataDir: path.join(root, "data"), homes: agentHomes({ environment, claudeFolder: () => null, agents: {} as never }), log: log as never });
-  expect(() => real.assertTakeable({ ...taken, agent: "claude" })).toThrow(new RelocationRefused("Its Claude account is not here."));
+  const real = new AgentSessions({ db, dataDir: path.join(root, "data"), homes: agentHomes({ environment, claudeFolder: () => null }) });
+  expect(() => real.assertTakeable({ ...taken, agent: "claude" })).toThrow(new SessionRefused("Its Claude account is not here."));
   expect(() => real.assertTakeable({ ...taken, agent: "codex" })).not.toThrow();
 });
 
@@ -170,7 +131,7 @@ describe("a take cut short by a crash", () => {
     return { ...home, write: (file, bytes) => (++writes === at ? Promise.reject(new Error("died")) : home.write(file, bytes)) };
   };
   const take = (homes: AgentHomes, agent: "claude" | "codex", saved: PackedSession, folder: string) =>
-    new AgentSessions({ db, dataDir: path.join(root, "data"), homes, log: log as never }).take({ id: thread.id, agent, claudeAccountId: null, children: [] }, saved, folder, "r1", "cloud");
+    new AgentSessions({ db, dataDir: path.join(root, "data"), homes }).take({ id: thread.id, agent, claudeAccountId: null, children: [] }, saved, folder, "r1");
 
   it.each([
     ["after the stale copy was kept aside", 1],
@@ -183,7 +144,7 @@ describe("a take cut short by a crash", () => {
     await writeFile(stale, line(target, "An older round trip"));
     const packed: PackedSession = { ...(await exportWithoutVersion()), cliVersion: "2.1.317" };
     const withSubagent = { ...packed, parts: [...packed.parts, { name: "subagents/agent-a1.jsonl", bytes: Buffer.from(line(worktree, "Looked around")) }] };
-    await expect(take({ ...homes, here: () => dying(counted(mac), at) as never }, "claude", withSubagent, target)).rejects.toThrow("died");
+    await expect(take({ here: () => dying(counted(mac), at) as never }, "claude", withSubagent, target)).rejects.toThrow("died");
     await take(homes, "claude", withSubagent, target);
     expect(await readFile(stale, "utf8")).toBe(line(target, "Start on the Mac"));
     expect(await readFile(path.join(stale.slice(0, -6), "subagents", "agent-a1.jsonl"), "utf8")).toBe(line(target, "Looked around"));
@@ -224,8 +185,8 @@ describe("a take cut short by a crash", () => {
         ),
     });
     await writeFile(path.join(root, "cli-version"), "0.166.0");
-    await expect(take({ ...homes, here: () => codex(2) as never }, "codex", saved, worktree)).rejects.toThrow("died");
-    await take({ ...homes, here: () => codex(0) as never }, "codex", saved, worktree);
+    await expect(take({ here: () => codex(2) as never }, "codex", saved, worktree)).rejects.toThrow("died");
+    await take({ here: () => codex(0) as never }, "codex", saved, worktree);
     expect(await readFile(path.join(codexHome, rollout(ID)), "utf8")).toBe(fork);
     expect(await readFile(path.join(codexHome, rollout("parent-1")), "utf8")).toBe(parent);
     expect(await kept()).toEqual([older]);

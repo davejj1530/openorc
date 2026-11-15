@@ -2,7 +2,6 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Sandbox } from "@openorc/cloud";
 import { busyReason, fenceForUpdate, type BusyReason } from "./activity.js";
 import { OpenOrc } from "./openorc.js";
 import { RemoteTestClient } from "./remote/test-client.js";
@@ -31,7 +30,6 @@ const busySource: Record<BusyReason, (sources: Sources) => void> = {
   "background-commands": (s) => void (s.runs.backgroundCommandsRunning = true),
   agents: (s) => void (s.runs.busy = true),
   "queued-messages": (s) => void (s.threads.deliveringQueued = true),
-  "cloud-sandboxes": (s) => void (s.cloud.busy = true),
   "text-generation": (s) => void (s.textGeneration.hasPendingWork = true),
   "claude-sign-in": (s) => void (s.claudeAccounts.hasPendingWork = true),
   phones: (s) => void (s.remote.busy = true),
@@ -44,7 +42,6 @@ const refusals: Record<BusyReason, RegExp | null> = {
   "background-commands": /background commands/,
   agents: /agent work, approvals, and context maintenance/,
   "queued-messages": null,
-  "cloud-sandboxes": null,
   "text-generation": null,
   "claude-sign-in": null,
   phones: null,
@@ -131,16 +128,6 @@ describe("a core's busy signal", () => {
     expect(core.busy()).toBe("phones");
     expect(core.prepareForUpdate()).toBeNull();
     phone.close();
-    await vi.waitFor(() => expect(core.busy()).toBeNull());
-  });
-
-  it("reads a cloud sandbox held awake as busy until it is let go", async () => {
-    await open();
-    const sandbox = { awayMs: 200, keepAwake: async () => undefined, stop: async () => undefined } as unknown as Sandbox;
-    const release = core.cloud.holdAwake("thread", sandbox);
-    expect(core.busy()).toBe("cloud-sandboxes");
-    expect(core.prepareForUpdate()).toBeNull();
-    release();
     await vi.waitFor(() => expect(core.busy()).toBeNull());
   });
 });

@@ -444,7 +444,6 @@ function startClaudeSession(spec: RunSpec, prepared: ReturnType<typeof prepareCl
       ending = true;
       proc.stdin.end();
       const timer = setTimeout(() => {
-        // A timer cannot throw into the host: a group that cannot be signalled is left for the next close.
         if (!exited()) stopProcessFromCallback(proc);
       }, IDLE_EXIT_GRACE_MS);
       timer.unref();

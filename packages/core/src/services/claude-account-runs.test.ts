@@ -320,6 +320,39 @@ it("leaves a stopped conversation alone when no account has 5-hour usage left, o
   expect([start.mock.calls.length, threads.get(db, thread.id)?.claudeAccountId]).toEqual([1, personal]);
 });
 
+/** A plan with no 5-hour window at all: its report names only the week. */
+function weekOnlyReport(weekUsed: number): ProviderUsage {
+  const report = fiveHourReport(0, weekUsed);
+  return { ...report, windows: report.windows.filter((window) => window.id !== "five_hour") };
+}
+
+it("goes on with an account that has no 5-hour window when its week has room, after the accounts that show an open one", async () => {
+  const [work, personal, weekly, spent] = ["Work", "Personal", "Weekly", "Spent"].map((name) => accounts.add(name).id) as [string, string, string, string];
+  const reports: Record<string, ProviderUsage> = { [personal]: fiveHourReport(100), [weekly]: weekOnlyReport(3), [spent]: weekOnlyReport(100) };
+  const recent = vi.fn(async (_provider: string, id: string | undefined) => reports[id!] ?? signedOut());
+  const switcher = new ClaudeAccountSwitch({ db, settings: { get: () => ({ claudeAccountAutoSwitch: true }) }, usage: { recent }, runs: service, threads: conversations, log: quiet });
+  turnSettled = (run, scope, _project, outcome) => switcher.settled(run, scope, outcome);
+  const limit = (handle: RunHandle, runId: string) => {
+    const ts = Date.now();
+    handle.emit("event", { type: "activity.updated", runId, ts, activityId: "rate-limit", label: "Rate limit reached", status: "error", recovery: { kind: "usage", provider: "claude" } });
+    handle.emit("event", { type: "turn.completed", runId, ts, turnId: "fixture", status: "error", resultText: "You've hit your 5-hour limit", durationMs: 1 });
+  };
+
+  // Personal's 5-hour window is used up and Spent's week is gone: Weekly, with no 5-hour window and most of its week, is the place.
+  const { thread, run } = await conversations.start({ ...input, projectId: project.id, claudeAccountId: work });
+  limit(start.mock.results[0]!.value, run!.id);
+  await vi.waitFor(() => expect(start).toHaveBeenCalledTimes(2));
+  expect(threads.get(db, thread.id)?.claudeAccountId).toBe(weekly);
+
+  // An account that shows an open 5-hour window is taken before one that shows none, however much week that one has.
+  reports[personal] = fiveHourReport(90);
+  const other = await conversations.start({ ...input, projectId: project.id, claudeAccountId: work });
+  limit(start.mock.results[2]!.value, other.run!.id);
+  await vi.waitFor(() => expect(start).toHaveBeenCalledTimes(4));
+  expect(threads.get(db, other.thread.id)?.claudeAccountId).toBe(personal);
+  switcher.close();
+});
+
 it("keeps looking when no account has anything left, says why once, and goes on with the first that does", async () => {
   const [work, personal] = ["Work", "Personal"].map((name) => accounts.add(name).id) as [string, string];
   const reports: Record<string, ProviderUsage> = { [personal]: fiveHourReport(100) };

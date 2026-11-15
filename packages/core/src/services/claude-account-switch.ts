@@ -18,21 +18,35 @@ export interface AccountReport {
 }
 
 /**
- * The account with the most of its 5-hour window left. Only a current report counts, and an account whose 5-hour or
- * week-long limit is reached is never chosen: the conversation would stop again on its first turn.
+ * The account to go on with. One that shows an open 5-hour window comes first, the one with the most of it left. When
+ * none does, a plan that has no 5-hour window at all is a place too, by what is left of its week. Only a current report
+ * counts, and an account whose 5-hour or week-long limit is reached is never chosen: the conversation would stop again
+ * on its first turn.
  */
 export function mostFiveHourLeft(reports: readonly AccountReport[], now: number): string | null {
   const open = (window: AllowanceWindow | null) => window !== null && !window.exhausted && (percentLeft(window) ?? 0) > 0 && now - window.observedAt < CURRENT_MS;
   let best: { id: string; left: number } | null = null;
+  let weekly: { id: string; left: number } | null = null;
   for (const { id, usage } of reports) {
     if (usage.status !== "available") continue;
     const session = sessionWindow(usage.windows);
     const week = weeklyWindow(usage.windows);
-    if (!open(session) || (week && !open(week))) continue;
-    const left = percentLeft(session!)!;
-    if (!best || left > best.left) best = { id, left };
+    if (week && !open(week)) continue;
+    if (session) {
+      if (!open(session)) continue;
+      const left = percentLeft(session)!;
+      if (!best || left > best.left) best = { id, left };
+    } else if (week) {
+      const left = percentLeft(week)!;
+      if (!weekly || left > weekly.left) weekly = { id, left };
+    }
   }
-  return best?.id ?? null;
+  return best?.id ?? weekly?.id ?? null;
+}
+
+/** When the account's limits were last read: its 5-hour window's reading, or its week's on a plan without one. */
+function readAt(usage: ProviderUsage): number {
+  return (sessionWindow(usage.windows) ?? weeklyWindow(usage.windows))?.observedAt ?? 0;
 }
 
 /** How a stopped conversation with no account to go on with keeps looking: soon, then at a steady pace, for a while. */
@@ -61,9 +75,9 @@ function whyNot(report: AccountReport | null, now: number): string {
   if (report.usage.status !== "available") return "its usage is not available";
   const session = sessionWindow(report.usage.windows);
   const week = weeklyWindow(report.usage.windows);
-  if (!session) return "it reports no 5-hour window";
-  if (now - session.observedAt >= CURRENT_MS) return "its last usage reading is too old";
-  if (session.exhausted || (percentLeft(session) ?? 0) <= 0) return "its 5-hour limit is reached";
+  if (!session && !week) return "it reports no limits to judge by";
+  if (now - readAt(report.usage) >= CURRENT_MS) return "its last usage reading is too old";
+  if (session && (session.exhausted || (percentLeft(session) ?? 0) <= 0)) return "its 5-hour limit is reached";
   if (week && (week.exhausted || (percentLeft(week) ?? 0) <= 0)) return "its week's limit is reached";
   return "nothing left";
 }
@@ -171,7 +185,7 @@ export class ClaudeAccountSwitch {
       ),
     );
     const now = Date.now();
-    const reports = read.filter((report) => report !== null).filter((report) => report.id !== from || (sessionWindow(report.usage.windows)?.observedAt ?? 0) > since);
+    const reports = read.filter((report) => report !== null).filter((report) => report.id !== from || readAt(report.usage) > since);
     const to = mostFiveHourLeft(reports, now);
     const thread = threads.get(db, threadId);
     // While usage was read, the person may have moved the conversation, or written to it, or changed what its project allows.

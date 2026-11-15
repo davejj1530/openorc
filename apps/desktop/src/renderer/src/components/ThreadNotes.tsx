@@ -1,22 +1,25 @@
 import { personName, placeNotes, type Block } from "@openorc/client";
 import type { ThreadNote, ThreadSummary } from "@openorc/protocol";
-import { createContext, useCallback, useContext, useMemo, useRef, type ReactNode, type RefObject } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useRpc, useRpcMutation } from "../lib/client";
+import type { Reveal } from "../lib/message-reveal";
+import { noteReader, type NoteReader } from "../lib/note-reading";
 import "../styles/together.css";
 import { AccountFace } from "./AccountFace";
 import type { ComposerHandle, ComposerNotes } from "./Composer";
 
 /**
  * A cloud thread's notes where the conversation draws them: those before every loaded block, those after each block,
- * and the way to answer one. Empty for any other thread.
+ * the way to answer one, and what marks read a note that tags the reader once they see it. Empty for any other thread.
  */
 export interface ThreadNotesValue {
   top: readonly ThreadNote[];
   after: ReadonlyMap<string, readonly ThreadNote[]>;
   onReply: ((note: ThreadNote) => void) | null;
+  reader: NoteReader | null;
 }
 
-const NONE: ThreadNotesValue = { top: [], after: new Map(), onReply: null };
+const NONE: ThreadNotesValue = { top: [], after: new Map(), onReply: null, reader: null };
 
 export const ThreadNotesContext = createContext<ThreadNotesValue>(NONE);
 
@@ -24,25 +27,68 @@ export const ThreadNotesContext = createContext<ThreadNotesValue>(NONE);
 const NOTES_PER_READ = 200;
 
 /**
- * A cloud thread's notes placed among its blocks, read once the thread has any. The value stays the same object while
- * the notes stand where they stood, which streaming never changes (a new block comes after every note's place), so the
- * transcript's turns do not draw again for it. Reply puts the author's tag before the composer's draft.
+ * A cloud thread's notes placed among its blocks, read once the thread has any: the newest, and those around the
+ * reader's first unread mention, however far back it is. The value stays the same object while the notes stand where
+ * they stood, which streaming never changes (a new block comes after every note's place), so the transcript's turns do
+ * not draw again for it. Reply puts the author's tag before the composer's draft.
  */
 export function useThreadNotes(thread: ThreadSummary | null, blocks: readonly Block[] | undefined, composer: RefObject<ComposerHandle | null>): ThreadNotesValue {
-  const head = thread?.owner?.brain === "hosted" ? (thread.owner.collaboration?.noteHead ?? 0) : 0;
-  const read = useRpc("threads.notes", { threadId: thread?.id ?? "", limit: NOTES_PER_READ }, { enabled: Boolean(thread) && head > 0 });
-  const notes = read.data?.notes;
+  const collaboration = thread?.owner?.brain === "hosted" ? thread.owner.collaboration : undefined;
+  const threadId = thread?.id ?? "";
+  const noted = Boolean(thread) && (collaboration?.noteHead ?? 0) > 0;
+  const mention = collaboration?.mentions.firstUnreadNoteId ?? null;
+  const newest = useRpc("threads.notes", { threadId, limit: NOTES_PER_READ }, { enabled: noted });
+  const around = useRpc("threads.notes", { threadId, around: mention ?? "", limit: NOTES_PER_READ }, { enabled: noted && mention !== null });
+  const notes = useMemo(() => joinPages(newest.data?.notes, mention ? around.data?.notes : undefined), [newest.data, around.data, mention]);
   const onReply = useCallback((note: ThreadNote) => note.author && composer.current?.tag(note.author, note.id), [composer]);
+  const reader = useNoteReader(noted ? threadId : null);
   const last = useRef<{ key: string; value: ThreadNotesValue } | null>(null);
   return useMemo(() => {
-    if (!notes?.length) return NONE;
+    if (!notes.length) return NONE;
     const placed = placeNotes(blocks ?? [], notes);
-    const key = JSON.stringify([placed.top.map((note) => note.id), [...placed.after].map(([id, each]) => [id, each.map((note) => `${note.id}:${note.seq}`)])]);
-    if (last.current?.key === key && last.current.value.onReply === onReply) return last.current.value;
-    const value = { ...placed, onReply };
+    const key = JSON.stringify([placed.top.map((note) => note.id), [...placed.after].map(([id, each]) => [id, each.map((note) => `${note.id}:${note.seq}:${note.read}`)])]);
+    if (last.current?.key === key && last.current.value.onReply === onReply && last.current.value.reader === reader) return last.current.value;
+    const value = { ...placed, onReply, reader };
     last.current = { key, value };
     return value;
-  }, [notes, blocks, onReply]);
+  }, [notes, blocks, onReply, reader]);
+}
+
+/** Two pages of a thread's notes as one, each note once, in `seq` order. */
+function joinPages(...pages: (readonly ThreadNote[] | undefined)[]): ThreadNote[] {
+  const byId = new Map(pages.flatMap((page) => page ?? []).map((note) => [note.id, note]));
+  return [...byId.values()].sort((a, b) => a.seq - b.seq);
+}
+
+/** What marks read the notes that tag the reader in this thread as they see them; none while it has no notes. */
+function useNoteReader(threadId: string | null): NoteReader | null {
+  const { mutateAsync } = useRpcMutation("threads.readNotes");
+  const [reader, setReader] = useState<NoteReader | null>(null);
+  useEffect(() => {
+    if (!threadId) return;
+    const made = noteReader((ids) => mutateAsync({ threadId, ids }));
+    setReader(made);
+    return () => {
+      made.close();
+      setReader(null);
+    };
+  }, [threadId, mutateAsync]);
+  return reader;
+}
+
+/**
+ * The reader's first unread mention as the thread opened, to bring into view once, as a search result is. It stays
+ * while the thread stays open, so reading it, or a note that comes later, never moves the view.
+ */
+export function useMentionReveal(thread: ThreadSummary | null): Reveal | undefined {
+  const id = thread?.id ?? null;
+  const first = thread?.owner?.brain === "hosted" ? (thread.owner.collaboration?.mentions.firstUnreadNoteId ?? null) : null;
+  const opened = (): { threadId: string | null; reveal: Reveal | undefined } => ({ threadId: id, reveal: first ? { messageId: first } : undefined });
+  const [shown, setShown] = useState(opened);
+  if (shown.threadId === id) return shown.reveal;
+  const next = opened();
+  setShown(next);
+  return next.reveal;
 }
 
 /**
@@ -84,13 +130,17 @@ export function NoteList({ notes }: { notes: readonly ThreadNote[] }) {
 
 /**
  * A note in the thread: its own filled block with its author's face and name and the word Note, never the agent's mark
- * or a turn's status, and its words with the people it tags in blue. Reply starts a note back to its author.
+ * or a turn's status, and its words with the people it tags in blue. Reply starts a note back to its author. One that
+ * tags the reader unread is read once they see it; a search or an opened mention finds it by its id.
  */
 function NoteView({ note }: { note: ThreadNote }) {
-  const { onReply } = useContext(ThreadNotesContext);
+  const { onReply, reader } = useContext(ThreadNotesContext);
   const name = personName(note.author);
+  const place = useRef<HTMLElement>(null);
+  const unread = note.mentionedYou && !note.read;
+  useEffect(() => (unread && reader && place.current ? reader.watch(place.current, note.id) : undefined), [unread, reader, note.id]);
   return (
-    <article aria-label={`Note from ${name}`} className="transcript-block mt-3 rounded-2xl bg-bubble px-4 py-3.5">
+    <article ref={place} aria-label={`Note from ${name}`} data-message={note.id} className="transcript-block mt-3 rounded-2xl bg-bubble px-4 py-3.5">
       <header className="note-author">
         {note.author ? <AccountFace name={name} image={note.author.image} /> : null}
         <span className="prompt-author-name">{name}</span>

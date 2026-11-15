@@ -50,7 +50,7 @@ import { useConnectorMentions } from "../lib/connector-mentions";
 import { useSkillCommands } from "../lib/skill-commands";
 import { ConversationVoice, useRunVoices } from "../lib/turn-authors";
 import { ThreadVoicesContext, useThreadVoices } from "../lib/thread-authors";
-import { ThreadNotesContext, useComposerNotes, useThreadNotes, type ThreadNotesValue } from "./ThreadNotes";
+import { ThreadNotesContext, useComposerNotes, useMentionReveal, useThreadNotes, type ThreadNotesValue } from "./ThreadNotes";
 import { VoicesFailed } from "./ThreadVoice";
 import { useTurnFooters } from "../lib/turn-footers";
 import { AnswersBlocked, AsksDocked } from "./ask-answer";
@@ -288,6 +288,7 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
   const heard = optimistic.run ? heardTranscript(optimistic.run, thread) : null;
   const notes = useThreadNotes(thread, heard?.blocks, controls.composer);
   const composerNotes = useComposerNotes(thread);
+  const mention = useMentionReveal(thread);
 
   function renderTranscript() {
     if (heard && heard.blocks.length > 0)
@@ -302,7 +303,7 @@ function IndividualConversation({ scope, project, draftKey: capturedKey, hostedF
             onFork={onFork}
             hasOlder={hasOlder}
             onLoadOlder={loadOlder}
-            reveal={target}
+            reveal={target ?? mention}
             trailing={turnFooter}
           />
         </TranscriptContext>

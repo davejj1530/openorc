@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, renderHook, screen, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { AccountStatus, Project, Run, SpaceProject, SpacesStatus, ThreadAuthors, ThreadCollaboration, ThreadPerson, ThreadSummary } from "@openorc/protocol";
@@ -6,18 +6,22 @@ import { runs as runStore } from "../lib/client";
 import { core } from "../lib/rpc";
 import type { ComposerProps } from "./Composer";
 import { Conversation } from "./Conversation";
+import { useMentionReveal } from "./ThreadNotes";
 
 // Window chrome some transcript cards import reads the preload's platform as the module loads.
 vi.hoisted(() => void ((window as unknown as { openorc?: object }).openorc ??= { platform: "darwin" }));
 const queries = vi.hoisted(() => new Map<string, unknown>());
 const refetched = vi.hoisted(() => ({ count: 0 }));
+const reads = vi.hoisted(() => [] as { method: string; params: unknown; enabled: boolean }[]);
+const watched = vi.hoisted(() => [] as ((entries: { target: Element; isIntersecting: boolean }[]) => void)[]);
 const composer = vi.hoisted(() => ({ props: null as ComposerProps | null, handle: { append: () => {}, tag: (_person: unknown, _replyTo?: string) => {} } }));
 vi.mock("../lib/rpc", () => ({
   core: new Proxy({ call: vi.fn() } as Record<string, unknown>, { get: (target, key: string) => (key in target ? target[key] : () => () => undefined) }),
 }));
 vi.mock("../lib/client", async (original) => ({
   ...(await original<object>()),
-  useRpc: (method: string, _params: unknown, options?: { enabled?: boolean }) => {
+  useRpc: (method: string, params: unknown, options?: { enabled?: boolean }) => {
+    reads.push({ method, params, enabled: options?.enabled !== false });
     const value = options?.enabled === false ? undefined : queries.get(method);
     const failed = value instanceof Error;
     return { data: failed ? undefined : value, isLoading: false, isPending: false, isError: failed, error: failed ? value : null, refetch: () => void refetched.count++ };
@@ -34,7 +38,11 @@ vi.mock("./Composer", async (original) => ({
 vi.mock("./AgentOrb", () => ({ AgentOrb: () => null }));
 Object.assign(globalThis, {
   IntersectionObserver: class {
+    constructor(seen: (entries: { target: Element; isIntersecting: boolean }[]) => void) {
+      watched.push(seen);
+    }
     observe() {}
+    unobserve() {}
     disconnect() {}
   },
   ResizeObserver: class {
@@ -148,6 +156,8 @@ beforeEach(() => {
   runStore.reset();
   queries.clear();
   refetched.count = 0;
+  reads.length = 0;
+  watched.length = 0;
   composer.props = null;
   vi.mocked(core.call).mockReset();
   vi.mocked(core.call).mockImplementation((async (method: string) => (method === "events.page" ? { events: structuredClone(events), fromTurn: 0, live: false } : undefined)) as never);
@@ -305,6 +315,46 @@ it("posts a tagged draft as the reader's note, the same note again after a lost 
     .map(([, params]) => params as { id: string });
   expect(posts).toEqual([expect.objectContaining({ threadId: "cloud", ...note }), expect.objectContaining({ threadId: "cloud", ...note })]);
   expect(posts[0]!.id).toBe(posts[1]!.id);
+});
+
+const marasNote = {
+  id: "n1",
+  seq: 1,
+  author: MARA,
+  text: "@Theo Laurent Can you check the column order?",
+  mentions: [{ person: THEO, userId: THEO.id, start: 0, end: 13 }],
+  replyTo: null,
+  createdAt: "2026-11-15T10:00:00.000Z",
+  afterEventSeq: 0,
+  mentionedYou: true,
+  read: false,
+};
+
+it("opens at the reader's first unread mention, reading the notes around it, and marks it read once seen in the focused window", async () => {
+  queries.set("threads.notes", { notes: [marasNote], head: 1, hasBefore: false, hasAfter: false });
+  const focus = vi.spyOn(document, "hasFocus").mockReturnValue(true);
+  await open(marasThread(together(THEO, { canWrite: true, send: "now", noteHead: 1, mentions: { unread: true, firstUnreadNoteId: "n1" } })));
+  expect(reads).toContainEqual({ method: "threads.notes", params: { threadId: "cloud", around: "n1", limit: 200 }, enabled: true });
+  const note = screen.getByRole("article", { name: "Note from Mara Okafor" });
+  expect(note.dataset["message"]).toBe("n1");
+  expect(vi.mocked(core.call).mock.calls.map(([method]) => method)).not.toContain("threads.readNotes");
+  act(() => watched.forEach((seen) => seen([{ target: note, isIntersecting: true }])));
+  await act(() => new Promise((resolve) => setTimeout(resolve, 450)));
+  expect(vi.mocked(core.call)).toHaveBeenCalledWith("threads.readNotes", { threadId: "cloud", ids: ["n1"] });
+  focus.mockRestore();
+});
+
+it("brings the first unread mention into view once as the thread opens, not again as notes are read or come", () => {
+  const thread = (firstUnreadNoteId: string | null, id = "cloud") => marasThread(together(THEO, { noteHead: 1, mentions: { unread: Boolean(firstUnreadNoteId), firstUnreadNoteId } }), { id });
+  const { result, rerender } = renderHook(({ shown }) => useMentionReveal(shown), { initialProps: { shown: thread("n1") } });
+  const first = result.current;
+  expect(first).toEqual({ messageId: "n1" });
+  rerender({ shown: thread(null) });
+  expect(result.current).toBe(first);
+  rerender({ shown: thread("n4", "other") });
+  expect(result.current).toEqual({ messageId: "n4" });
+  rerender({ shown: thread(null, "next") });
+  expect(result.current).toBeUndefined();
 });
 
 const handoff = { code: "handoff_unavailable" as const, message: "Only Mara can run the agent in this cloud thread for now.", responsible: MARA, commandIds: [], retrySave: false };

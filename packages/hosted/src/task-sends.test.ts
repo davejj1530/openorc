@@ -1,5 +1,5 @@
 import { hostedRunId } from "@openorc/protocol";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { taskClient } from "./test-fixtures/task-client.js";
 import { standIn, type StandIn } from "./testing/stand-in.js";
 
@@ -19,6 +19,8 @@ it.each(["start", "send", "queue"] as const)("%s retains the task's seen revisio
   const threadId = stand.addThread(email, { projectId, title: "A prepared task", status: kind === "start" ? "idle" : "working" });
   const current = await taskClient(stand, email, { organization: true, execution: true, personal: false });
   close = current.close;
+  // The client sends to a thread it holds; under load its first read of the rows can still be on the way.
+  await vi.waitFor(() => expect(current.hosted.threads.holds({ thread: threadId })).toBe(true));
   const requestId = crypto.randomUUID();
   const task = { id: "saved-task", ifRevision: 7 };
   if (kind === "start")

@@ -32,11 +32,13 @@ export function protectOrganizationContent({ gate, queries, runs, navigation, ov
     if (!closed.length && !reopened.length) return;
     const threads = affected.flatMap(cloudThreads);
     const runIds = threads.map(hostedRunId);
-    const ids = new Set([...closed, ...reopened, ...threads, ...runIds, ...affected.flatMap(cloudProjects)]);
+    const content = new Set([...threads, ...runIds, ...affected.flatMap(cloudProjects)]);
+    const ids = new Set([...closed, ...reopened, ...content]);
     const kept = new Set(closed.filter((id) => admin(gate, id)));
-    // A read is the organization's when it was asked by one of these names, or when what it answered holds one: the
-    // sidebar's lists name projects on this Mac and still carry the cloud threads of a project paired with them.
-    const predicate = (query: Query) => (names(query.queryKey[1], ids) || names(query.state.data, ids)) && !(RECOVERY.has(String(query.queryKey[0])) && kept.has(spaceOf(query.queryKey[1])));
+    // A read is the organization's when it was asked by one of these names, or when what it answered holds a thread,
+    // run or cloud project of it: the sidebar's lists name projects on this Mac and still carry the cloud threads of a
+    // project paired with them. An answer that only names the organization, as the person's spaces do, stays.
+    const predicate = (query: Query) => (names(query.queryKey[1], ids) || names(query.state.data, content)) && !(RECOVERY.has(String(query.queryKey[0])) && kept.has(spaceOf(query.queryKey[1])));
     void queries.cancelQueries({ predicate });
     queries.removeQueries({ predicate });
     runs.forget(runIds);

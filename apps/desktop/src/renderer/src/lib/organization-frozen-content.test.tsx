@@ -298,3 +298,12 @@ it("removes a list that names no space but holds a closed organization's thread,
   expect(f.queries.getQueryData(unscoped)).toBeUndefined();
   expect(f.queries.getQueryData(local)).toEqual([{ id: "note", title: "My note" }]);
 });
+
+it("keeps the reads that only name an organization, the person's spaces and account among them", async () => {
+  const f = await fixture();
+  f.queries.setQueryData(["spaces.status", {}], status(active));
+  f.queries.setQueryData(["account.status", {}], { state: "signed-in", allowanceSource: { kind: "organization", organizationId: "birch", organizationName: "birch" } });
+  await f.hear(status(frozen));
+  expect(f.queries.getQueryData(["spaces.status", {}])).toBeDefined();
+  expect(f.queries.getQueryData(["account.status", {}])).toBeDefined();
+});

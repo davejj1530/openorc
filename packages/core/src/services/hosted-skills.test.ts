@@ -115,10 +115,36 @@ describe("the person's own skills on this Mac, for their cloud turns", () => {
     expect((await packOf(own[0]!)).toString()).toBe(frame("review/SKILL.md", "-", "First."));
   });
 
-  it("says which skill could not be read, and gives none of them", async () => {
+  it("says which skill and which of its files could not be read, and the two ways out, and gives none of them", async () => {
     const gone: Listed = { name: "gone", description: "", source: "user", path: path.join(home, "user", "gone", "SKILL.md") };
-    const { skills } = skillsOf(async () => [await skill("user", "review"), gone]);
-    await expect(skills.own("claude")).rejects.toThrow("The skill gone couldn't be read on this Mac.");
+    await expect(skillsOf(async () => [await skill("user", "review"), gone]).skills.own("claude")).rejects.toThrow(
+      "Your skill gone couldn't be read on this Mac. Fix its folder, or turn the skill off in Settings > Skills, then send again.",
+    );
+    const locked = await skill("user", "tdd", { "SKILL.md": "Test first.", "notes/private.md": "Mine." });
+    await chmod(path.join(home, "user/tdd/notes/private.md"), 0o000);
+    await expect(skillsOf(() => [locked]).skills.own("claude")).rejects.toThrow(
+      "Your skill tdd couldn't be read on this Mac (notes/private.md). Fix that file, or turn the skill off in Settings > Skills, then send again.",
+    );
+    await symlink(path.join(home, "nowhere.md"), path.join(home, "user/tdd/linked.md"));
+    await chmod(path.join(home, "user/tdd/notes/private.md"), 0o644);
+    await expect(skillsOf(() => [locked]).skills.own("claude")).rejects.toThrow("Your skill tdd couldn't be read on this Mac (linked.md).");
+  });
+
+  it("asks the agent again at once after a skill could not be read, so the skill turned off is left out of the very next send", async () => {
+    let now = 1_000_000;
+    const locked = await skill("user", "tdd", { "SKILL.md": "Test first.", "notes.md": "Mine." });
+    await chmod(path.join(home, "user/tdd/notes.md"), 0o000);
+    let listed: Listed[] = [await skill("user", "review"), locked];
+    const { skills, list } = skillsOf(
+      () => listed,
+      () => now,
+    );
+    await expect(skills.own("claude")).rejects.toThrow("Your skill tdd couldn't be read on this Mac (notes.md).");
+    // The person turns it off in Settings; the agent now lists it as off, and the next send, a second later, goes.
+    listed = [listed[0]!, { ...locked, enabled: false }];
+    now += 1_000;
+    expect((await skills.own("claude")).map((own) => own.name)).toEqual(["review"]);
+    expect(list).toHaveBeenCalledTimes(2);
   });
 
   it("refuses to send a skill whose file changed since it was listed", async () => {

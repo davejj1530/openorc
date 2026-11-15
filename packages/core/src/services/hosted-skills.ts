@@ -23,22 +23,42 @@ const CHUNK_BYTES = 256 * 1024;
 /** One file of a skill as it stood when it was listed. */
 type SkillFile = { rel: string; at: string; bytes: number; modified: number; runs: boolean };
 
-const unreadable = (name: string) => new Error(`The skill ${name} couldn't be read on this Mac.`);
+/**
+ * A skill this Mac could not read, with the file in it that could not be, by its place in the skill, or none for the
+ * skill's folder itself. Its words name the two ways on that the app already has.
+ */
+class SkillUnreadable extends Error {
+  constructor(name: string, rel: string | null) {
+    super(
+      rel
+        ? `Your skill ${name} couldn't be read on this Mac (${rel}). Fix that file, or turn the skill off in Settings > Skills, then send again.`
+        : `Your skill ${name} couldn't be read on this Mac. Fix its folder, or turn the skill off in Settings > Skills, then send again.`,
+    );
+  }
+}
+
 const changed = (name: string) => new Error(`The skill ${name} changed while it was being sent. Send again.`);
 
-/** Every file of the skill in `folder`, links read through, in the order of their paths. A folder met twice is walked once. */
-async function filesOf(folder: string): Promise<SkillFile[]> {
+/** Every file of the skill `name` in `folder`, links read through, in the order of their paths. A folder met twice is walked once. */
+async function filesOf(name: string, folder: string): Promise<SkillFile[]> {
   const files: SkillFile[] = [];
   const walked = new Set<string>();
   const walk = async (dir: string): Promise<void> => {
-    const real = await realpath(path.join(folder, dir));
+    const real = await realpath(path.join(folder, dir)).catch(() => {
+      throw new SkillUnreadable(name, dir || null);
+    });
     if (walked.has(real)) return;
     walked.add(real);
-    for (const name of await readdir(real)) {
-      if (LEFT_OUT.has(name)) continue;
-      const rel = dir ? `${dir}/${name}` : name;
-      const at = path.join(real, name);
-      const info = await stat(at);
+    const entries = await readdir(real).catch(() => {
+      throw new SkillUnreadable(name, dir || null);
+    });
+    for (const entry of entries) {
+      if (LEFT_OUT.has(entry)) continue;
+      const rel = dir ? `${dir}/${entry}` : entry;
+      const at = path.join(real, entry);
+      const info = await stat(at).catch(() => {
+        throw new SkillUnreadable(name, rel);
+      });
       if (info.isDirectory()) await walk(rel);
       else if (info.isFile()) files.push({ rel, at, bytes: info.size, modified: info.mtimeMs, runs: (info.mode & 0o111) !== 0 });
     }
@@ -96,20 +116,26 @@ export class HostedSkills {
     },
   ) {}
 
-  /** The agent's own skills that are on. Rejects in words when the agent cannot list them or one cannot be read. */
+  /**
+   * The agent's own skills that are on. Rejects in words when the agent cannot list them or one cannot be read; after
+   * one could not be, the agent is asked again at the next call, so a skill turned off in Settings is left out then.
+   */
   async own(agent: HarnessId): Promise<OwnSkill[]> {
     const own: OwnSkill[] = [];
     const taken = new Set<string>();
-    for (const skill of await this.list(agent)) {
-      const folder = path.dirname(skill.path);
-      const name = path.basename(folder);
-      // The agent finds one skill under a name; its first is the one it runs.
-      if (!skill.path || name.startsWith(".") || taken.has(name)) continue;
-      taken.add(name);
-      const files = await filesOf(folder).catch(() => {
-        throw unreadable(name);
-      });
-      own.push({ name, digest: await this.digest(folder, name, files), pack: () => packOf(name, files) });
+    try {
+      for (const skill of await this.list(agent)) {
+        const folder = path.dirname(skill.path);
+        const name = path.basename(folder);
+        // The agent finds one skill under a name; its first is the one it runs.
+        if (!skill.path || name.startsWith(".") || taken.has(name)) continue;
+        taken.add(name);
+        const files = await filesOf(name, folder);
+        own.push({ name, digest: await this.digest(folder, name, files), pack: () => packOf(name, files) });
+      }
+    } catch (error) {
+      if (error instanceof SkillUnreadable) this.listed.delete(agent);
+      throw error;
     }
     return own;
   }
@@ -120,10 +146,13 @@ export class HostedSkills {
     const held = this.digests.get(key);
     if (held?.standing === now) return held.digest;
     const hash = createHash("sha256");
-    try {
-      for await (const chunk of packOf(name, files)) hash.update(chunk);
-    } catch {
-      throw unreadable(name);
+    for (const file of files) {
+      hash.update(header(name, file));
+      try {
+        for await (const chunk of bytesOf(name, file)) hash.update(chunk);
+      } catch {
+        throw new SkillUnreadable(name, file.rel);
+      }
     }
     const digest = hash.digest("hex");
     this.digests.set(key, { standing: now, digest });

@@ -463,7 +463,7 @@ test("ordinary task workspace choices cross the MCP boundary and invalid locatio
   assert.equal(calls.length, 2);
 });
 
-test("task tools name a space, a project and a revision only for a run the host lets reach online tasks", async (t) => {
+void test("task tools name a space, a project and a revision only for a run the host lets reach online tasks", async (t) => {
   const { connect, host } = await fixture(t);
   const argumentsOf = async (runId: string) =>
     Object.fromEntries(

@@ -16,6 +16,13 @@ import { userOf } from "./stand-in-spaces.js";
 type Reply = { status: number; body: unknown };
 type Person = { id: string; name: string; image: string | null };
 
+/** A handoff block as the stand-in keeps it: whose turn left it, by address, and the commands that must end. */
+export interface StandInHandoff {
+  code: "handoff_command" | "handoff_save";
+  responsible: string | null;
+  commandIds: string[];
+}
+
 /** What the projection reads of a stand-in thread. */
 export interface CollaborationThread {
   id: string;
@@ -58,8 +65,13 @@ export class StandInCollaboration {
    * The creator keeps every right of today.
    */
   joinOnly = false;
-  /** A blocker the server names for the next turn, such as a command of the previous sender's still running. */
-  handoff: { code: string; message: string; responsible: string | null; commandIds: string[]; retrySave: boolean } | null = null;
+  /**
+   * What keeps a thread from moving to its next sender, per thread: a command of the previous sender's still running, or
+   * a save that failed. It holds only someone else's new turn, never a join, and the previous sender may retry the save.
+   */
+  readonly handoffs = new Map<string, StandInHandoff>();
+  /** The next turn a teammate starts fails its handoff this way: the message waits paused for its author. */
+  failNextHandoff: StandInHandoff["code"] | null = null;
   /** Addresses whose accounts are gone: they read as null wherever a person is named. */
   readonly gone = new Set<string>();
 
@@ -82,8 +94,8 @@ export class StandInCollaboration {
       viewer: this.personOf(who),
       canWrite: open,
       live: this.#live(thread),
-      send: open && !(this.handoff && !thread.turn) ? sendOf(thread) : "blocked",
-      handoff: this.handoff ? { ...this.handoff, responsible: this.personOf(this.handoff.responsible) } : null,
+      send: open && !(this.holds(thread, who) && !thread.turn) ? sendOf(thread) : "blocked",
+      handoff: this.#blockFor(thread, who),
       canPostNote: open,
       canStop: open && Boolean(thread.turn),
       ask: this.#ask(thread, who),
@@ -95,11 +107,36 @@ export class StandInCollaboration {
           paused: Boolean(message.paused),
           canEdit: message.author === who,
           canRemove: message.author === who,
-          canStart: open && Boolean(message.paused) && message.author === who && !thread.turn,
+          canStart: open && Boolean(message.paused) && message.author === who && !thread.turn && !this.holds(thread, who),
         })),
       mentions: { unread: false, firstUnreadNoteId: null },
       noteHead: 0,
     };
+  }
+
+  /** Whether the thread's handoff keeps this person from starting a turn: someone else's command, or a failed save. */
+  holds(thread: { id: string }, who: string): boolean {
+    const block = this.handoffs.get(thread.id);
+    return Boolean(block && block.responsible !== who);
+  }
+
+  /** The handoff refusal of a new turn, in the server's words: 409 with the block. */
+  handoffRefusal(thread: { id: string }, who: string): Reply {
+    const block = this.#blockFor(thread, who)!;
+    return { status: 409, body: { code: block.code, message: block.message, block, statusCode: 409 } };
+  }
+
+  /** The block as this person reads it; the previous sender's own command holds nobody's turn but someone else's. */
+  #blockFor(thread: { id: string }, who: string) {
+    const block = this.handoffs.get(thread.id);
+    if (!block || (block.code === "handoff_command" && block.responsible === who)) return null;
+    const responsible = this.personOf(block.responsible);
+    const first = responsible?.name.split(" ")[0];
+    const message =
+      block.code === "handoff_command"
+        ? `${first ? `${first}'s` : "The previous sender's"} command is still running. Stop it before starting your turn.`
+        : `The thread's work could not be saved.${first ? ` ${first} can retry the save.` : ""}`;
+    return { code: block.code, message, responsible, commandIds: block.commandIds, retrySave: block.code === "handoff_save" && block.responsible === who };
   }
 
   /** The block a teammate meets for anything that would start a turn while only joining is open. */

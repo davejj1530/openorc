@@ -147,6 +147,60 @@ describe("sending, queueing and Stop in a shared thread", () => {
   });
 });
 
+describe("a teammate's own turn once handoff opens", () => {
+  const collaborationOf = async (hosted: Hosted, thread: string) => {
+    await (hosted.threads as unknown as { refresh(): Promise<void> }).refresh();
+    return (await row(hosted, thread)).owner?.collaboration;
+  };
+  const start = (threadId: string, n: number) => ({ threadId, prompt: "Mine", agent: "claude", mode: "act", permissionMode: "trusted", messageId: id(n) }) as const;
+
+  it("starts a teammate's own turn when nothing runs, on their own sign-in and hours", async () => {
+    const { thread, ada, bob, runId } = await shared(true);
+    await ada.threads.call("runs.send", { runId, text: "Start", messageId: id(1) });
+    stand.endTurn(thread);
+    await bob.threads.call("runs.start", start(thread, 2));
+    await live(ada, thread, "Bob");
+  });
+
+  it("holds a teammate's new turn behind the previous sender's command, which the teammate may stop", async () => {
+    const { thread, ada, bob, runId } = await shared(true);
+    stand.threadCollaboration.handoffs.set(thread, { code: "handoff_command", responsible: ADA, commandIds: ["c1"] });
+    const words = "Ada's command is still running. Stop it before starting your turn.";
+    expect(await collaborationOf(bob, thread)).toMatchObject({ send: "blocked", handoff: { code: "handoff_command", message: words, commandIds: ["c1"], retrySave: false } });
+    // The previous sender's own command holds only someone else's turn.
+    expect(await collaborationOf(ada, thread)).toMatchObject({ send: "now", handoff: null });
+    await expect(bob.threads.call("runs.start", start(thread, 2))).rejects.toThrow(words);
+    expect((await row(ada, thread)).queued).toEqual([]);
+    await ada.threads.call("runs.send", { runId, text: "Mine", messageId: id(3) });
+    await live(bob, thread, "Ada");
+    // A running turn takes the teammate's message: no handoff holds a join.
+    await expect(bob.threads.call("runs.send", { runId, text: "Join", messageId: id(4) })).resolves.toBeNull();
+    stand.endTurn(thread);
+    await bob.threads.call("threads.stopCommand", { id: thread, commandId: "c1" });
+    expect(await collaborationOf(bob, thread)).toMatchObject({ send: "now", handoff: null });
+    await bob.threads.call("runs.start", start(thread, 5));
+    await live(ada, thread, "Bob");
+  });
+
+  it("pauses a teammate's message whose handoff fails, for them to start once the save is retried", async () => {
+    const { thread, ada, bob, runId } = await shared(true);
+    await ada.threads.call("runs.send", { runId, text: "Start", messageId: id(1) });
+    stand.endTurn(thread);
+    stand.threadCollaboration.failNextHandoff = "handoff_save";
+    await bob.threads.call("runs.start", start(thread, 2));
+    const words = "The thread's work could not be saved. Ada can retry the save.";
+    await vi.waitFor(async () => expect(await collaborationOf(bob, thread)).toMatchObject({ live: null, send: "blocked", handoff: { code: "handoff_save", message: words, retrySave: false } }));
+    expect((await collaborationOf(bob, thread))?.queue).toEqual([expect.objectContaining({ paused: true, canStart: false })]);
+    const [paused] = (await row(bob, thread)).queued;
+    expect(await collaborationOf(ada, thread)).toMatchObject({ handoff: { code: "handoff_save", retrySave: true } });
+    await ada.threads.call("threads.retrySave", { threadId: thread });
+    // The save is back; the paused message waits for its author, never started by the retry.
+    expect(await collaborationOf(bob, thread)).toMatchObject({ handoff: null, live: null, queue: [expect.objectContaining({ paused: true, canStart: true })] });
+    await bob.threads.call("threads.startQueued", { threadId: thread, messageId: paused!.id });
+    await live(ada, thread, "Bob");
+  });
+});
+
 describe("while only joining is open (the slice before handoff)", () => {
   async function joinOnly() {
     const made = await shared();

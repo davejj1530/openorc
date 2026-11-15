@@ -227,6 +227,12 @@ export class StandInThreads {
       if (!this.collaboration.sharedWrites) return READ_ONLY;
       if (start) return this.#startPaused(thread, as.who, decodeURIComponent(start[2]!), body);
       this.saveRetries.push(thread.id);
+      const block = this.collaboration.handoffs.get(thread.id);
+      // The save succeeds for the previous sender; nothing paused starts by itself.
+      if (block?.code === "handoff_save" && block.responsible === as.who) {
+        this.collaboration.handoffs.delete(thread.id);
+        this.#changed(thread);
+      }
       return { status: 202, body: null };
     }
     const read = /^\/hosted\/threads\/([^/]+)\/(collaboration|turn-senders|people)$/.exec(request.path);
@@ -248,9 +254,20 @@ export class StandInThreads {
     if (method === "GET" && match[2] === "/events") return { status: 200, body: pageOf(thread, query) };
     if (!match[2]) return this.#one(method, thread, as.who, body);
     if (method !== "POST" || !match[3]) return null;
-    if (thread.owner !== as.who) return READ_ONLY;
-    thread.stopped.push(decodeURIComponent(match[3]));
+    if (thread.owner !== as.who && !this.collaboration.sharedWrites) return READ_ONLY;
+    const commandId = decodeURIComponent(match[3]);
+    thread.stopped.push(commandId);
+    this.#released(thread, commandId);
     return { status: 204, body: null };
+  }
+
+  /** A stopped command no longer holds the thread's handoff; once none does, the next sender may start. */
+  #released(thread: Thread, commandId: string): void {
+    const block = this.collaboration.handoffs.get(thread.id);
+    if (block?.code !== "handoff_command" || !block.commandIds.includes(commandId)) return;
+    block.commandIds = block.commandIds.filter((each) => each !== commandId);
+    if (block.commandIds.length === 0) this.collaboration.handoffs.delete(thread.id);
+    this.#changed(thread);
   }
 
   /** One thread by its own path: read by any reader; renamed or deleted by its starter. */
@@ -269,7 +286,7 @@ export class StandInThreads {
     const key = `${method} ${verb}${messageId ? "/:id" : ""}`;
     if (key === "PUT mine") return this.#view(thread, as.who, body);
     if (thread.owner !== as.who && !this.collaboration.sharedWrites) return READ_ONLY;
-    if (key === "POST messages") return this.#joinRefusal(thread, as.who, body) ?? this.#send(thread, as.who, body);
+    if (key === "POST messages") return this.#turnRefusal(thread, as.who, body) ?? this.#send(thread, as.who, body);
     if (key === "POST stop" && this.#joinsOnly(thread, as.who)) return READ_ONLY;
     if (key === "DELETE messages/:id") return this.#unsend(thread, decodeURIComponent(messageId!), as.who);
     if (key === "POST stop") return typeof body["turnId"] === "string" && this.collaboration.sharedWrites ? this.#stopShared(thread, as.who, body["turnId"]) : this.#stop(thread);
@@ -390,6 +407,24 @@ export class StandInThreads {
     return { status: 409, body: { code: block.code, message: block.message, block, statusCode: 409 } };
   }
 
+  /** A write that may not start a turn: only joining is open, or the thread's handoff holds this person's new turn. */
+  #turnRefusal(thread: Thread, who: string, body: Record<string, unknown>): Reply | null {
+    return this.#joinRefusal(thread, who, body) ?? this.#handoffRefusal(thread, who, body);
+  }
+
+  /**
+   * A new turn the thread's handoff holds: an idle send, or an explicit Queue, by someone the block stops. Refused with
+   * the block, nothing stored. A join of the running turn is never held, and a join that missed its turn is checked when
+   * it is taken.
+   */
+  #handoffRefusal(thread: Thread, who: string, body: Record<string, unknown>): Reply | null {
+    if (!this.collaboration.sharedWrites || this.collaboration.joinOnly || !this.collaboration.holds(thread, who)) return null;
+    if (thread.messages.some((message) => message.id === body["id"])) return null;
+    const after = body["delivery"] === "after";
+    const newTurn = after || (!thread.turn && typeof body["expectedTurnId"] !== "string");
+    return newTurn ? this.collaboration.handoffRefusal(thread, who) : null;
+  }
+
   /** Where a message goes under the starter-only rule: into the running turn, after it, or a new turn if admitted. */
   #placeOwn(thread: Thread, who: string, settings: { agent: string; model: string | null }, after: boolean) {
     const refusal = thread.turn ? null : this.admit(who, settings);
@@ -425,6 +460,7 @@ export class StandInThreads {
     if (!message || message.state !== "pending") return { status: 404, body: { message: "That message isn't here.", statusCode: 404 } };
     if (message.author !== who) return { status: 403, body: { code: "message_author_only", message: "Only the sender can change this queued message.", statusCode: 403 } };
     if (thread.turn) return { status: 409, body: { code: "thread_busy", message: "A turn is running. Wait for it to finish.", statusCode: 409 } };
+    if (!this.collaboration.joinOnly && this.collaboration.holds(thread, who)) return this.collaboration.handoffRefusal(thread, who);
     if (this.#joinsOnly(thread, who)) {
       const block = this.collaboration.joinBlock(thread);
       return { status: 409, body: { code: block.code, message: block.message, block, statusCode: 409 } };
@@ -468,6 +504,7 @@ export class StandInThreads {
 
   /** A turn takes the message: logged as the person's, steering the running turn or starting one. */
   #take(thread: Thread, message: Message): void {
+    if (!thread.turn && this.#handoffFails(thread, message)) return;
     message.state = "delivered";
     message.refusal = null;
     const starts = !thread.turn;
@@ -481,6 +518,23 @@ export class StandInThreads {
     const view = viewOf(thread, message.author);
     thread.views.set(message.author, { ...view, seenSeq: Math.max(view.seenSeq, headOf(thread)) });
     if (starts) this.append(thread.id, [{ type: "turn.started", ts: Date.now(), turnId: agentTurn(thread.turnId!) }]);
+  }
+
+  /**
+   * The handoff to a new sender failed after the message was accepted: it stays pending and paused for its author, the
+   * block names the previous sender, and the thread says so in the block's words. No turn starts and nobody is charged.
+   */
+  #handoffFails(thread: Thread, message: Message): boolean {
+    const code = this.collaboration.failNextHandoff;
+    const previous = [...thread.turns.values()].at(-1) ?? null;
+    if (!code || !previous || previous === message.author) return false;
+    this.collaboration.failNextHandoff = null;
+    this.collaboration.handoffs.set(thread.id, { code, responsible: previous, commandIds: [] });
+    message.paused = true;
+    const words = (this.collaboration.handoffRefusal(thread, message.author).body as { message: string }).message;
+    this.append(thread.id, [{ type: "error", runId: message.id, ts: Date.now(), fatal: true, message: words }], {});
+    this.#changed(thread);
+    return true;
   }
 
   #unsend(thread: Thread, messageId: string, who: string): Reply {

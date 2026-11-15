@@ -1,8 +1,10 @@
-import type { HostedFileScope, OnlineTask, OnlineTaskExecutionParams, OnlineTaskPreparation, OnlineTaskRef, OnlineTaskThread } from "@openorc/protocol";
+import type { HostedFileScope, OnlineTask, OnlineTaskExecutionParams, OnlineTaskPreparation, OnlineTaskRef, OnlineTaskThread, OnlineTaskThreadSettings } from "@openorc/protocol";
 import type { HostedTaskDraftScope } from "./task-thread-storage";
 
 interface OpenTask {
   scope: HostedTaskDraftScope;
+  /** The model a new cloud thread starts with, which a task's new thread is made with; none while the catalog loads. */
+  settings?: OnlineTaskThreadSettings | null;
   task(): OnlineTask;
   flush(): Promise<boolean>;
   current(): boolean;
@@ -23,7 +25,7 @@ export class TaskThreadOpener {
     const task = input.task();
     const ref = this.reference;
     if (task.id !== ref.id || task.projectId !== ref.projectId || task.spaceId !== ref.spaceId) throw new Error("This task isn't available here.");
-    this.#request ??= { spaceId: ref.spaceId, id: ref.id, ifRevision: task.revision, requestId: crypto.randomUUID() };
+    this.#request ??= { spaceId: ref.spaceId, id: ref.id, ifRevision: task.revision, requestId: crypto.randomUUID(), ...(input.settings && { settings: input.settings }) };
     const result = await this.prepare(this.#request);
     this.#check(input);
     if (result.state === "conflict") {

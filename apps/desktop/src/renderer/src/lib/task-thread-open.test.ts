@@ -23,6 +23,12 @@ it("flushes before capturing the revision and waits for existing files before st
   expect(input.stage).toHaveBeenCalledWith(scope, onlineReference, ready(), 2);
   expect(input.navigate).toHaveBeenCalledWith("carrying-thread");
 });
+it("makes a task's new thread with the model a new cloud thread starts with", async () => {
+  const prepare = vi.fn(async () => ready());
+  const settings = { agent: "claude", model: "claude-sonnet-5", effort: "medium" } as const;
+  await new TaskThreadOpener(onlineReference, prepare).open({ ...fixture(), settings });
+  expect(prepare).toHaveBeenCalledWith(expect.objectContaining({ settings }));
+});
 it("retains a lost reply's request id and revision before considering later words", async () => {
   const prepare = vi.fn<() => Promise<OnlineTaskPreparation>>().mockRejectedValueOnce(new Error("Lost reply")).mockResolvedValue(ready());
   const open = new TaskThreadOpener(onlineReference, prepare);

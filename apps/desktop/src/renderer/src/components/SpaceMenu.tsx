@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Menu } from "@base-ui/react/menu";
 import { Tooltip as BaseTooltip } from "@base-ui/react/tooltip";
 import type { Space } from "@openorc/protocol";
@@ -13,12 +13,14 @@ import { menuItem, menuSeparator } from "./menu";
 import { ReceivedInvitationRow } from "./ReceivedInvitationRow";
 import { TextButton, Tooltip } from "./ui";
 import { useUnreadChatSpaces } from "../lib/team-chat-unread";
+import { useMentionSpaces } from "../lib/mention-spaces";
 
 export function SpaceMenu({ actions }: { actions: OrganizationActions }) {
   const current = useSpaceNavigation((state) => state.current);
   const data = actions.status?.state === "ready" ? actions.status : null;
   const spaces = data ? [...data.spaces.filter((space) => space.kind === "organization"), ...data.spaces.filter((space) => space.kind === "personal")] : [];
   const unread = useUnreadChatSpaces(data?.userId ?? null);
+  const mentioned = useMentionSpaces(data?.userId ?? null);
   return (
     <>
       {spaces.map((space) => (
@@ -28,6 +30,7 @@ export function SpaceMenu({ actions }: { actions: OrganizationActions }) {
           person={actions.person}
           checked={space.id === (current ?? data?.personalSpaceId)}
           unread={space.id !== current && unread.includes(space.id)}
+          mentioned={mentioned.includes(space.id)}
           onClick={() => actions.select(space.id)}
         />
       ))}
@@ -62,11 +65,24 @@ export function SpaceMenu({ actions }: { actions: OrganizationActions }) {
   );
 }
 
-function SpaceRow({ space, person, checked, unread = false, onClick }: { space: Space; person: string; checked: boolean; unread?: boolean; onClick(): void }) {
+/** The space's mark with the one neutral dot an unread mention there puts on it, its words on demand. */
+function MentionedMark({ children }: { children: ReactNode }) {
+  return (
+    <Tooltip label="Unread mention">
+      <span className="organization-invitation-mark">
+        {children}
+        <span className="organization-invitation-dot" role="img" aria-label="Unread mention" />
+      </span>
+    </Tooltip>
+  );
+}
+
+function SpaceRow({ space, person, checked, unread = false, mentioned = false, onClick }: { space: Space; person: string; checked: boolean; unread?: boolean; mentioned?: boolean; onClick(): void }) {
   const label = space.kind === "personal" ? "Personal" : space.name;
+  const mark = space.kind === "personal" ? <OpenOrcMark size={24} /> : <OrganizationMark {...space} size={24} />;
   return (
     <Menu.Item className={cn(menuItem, "space-menu-row")} role="menuitemradio" aria-checked={checked} onClick={onClick}>
-      <span className="space-menu-mark">{space.kind === "personal" ? <OpenOrcMark size={24} /> : <OrganizationMark {...space} size={24} />}</span>
+      <span className="space-menu-mark">{mentioned ? <MentionedMark>{mark}</MentionedMark> : mark}</span>
       <span className="space-menu-label">
         <span data-tip={label}>{label}</span>
         <span className="space-menu-detail">{space.kind === "personal" ? person : `${space.memberCount} ${space.memberCount === 1 ? "person" : "people"}`}</span>

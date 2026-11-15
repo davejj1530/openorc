@@ -42,6 +42,15 @@ export function BackgroundMark(props: MarkProps) {
   return <SolidMark name="background" {...props} shape={<rect x="1.5" y="2.5" width="13" height="11" rx="3" />} cut="M4.9 6.4l2 1.6-2 1.6 M8.6 9.9h2.4" cutWidth={1.35} />;
 }
 
+/** A note in the thread tags the person and they have not read it: the @ in the slot's own ink. */
+export function MentionMark() {
+  return (
+    <span data-mark="mention" className="mention-mark">
+      @
+    </span>
+  );
+}
+
 /** A result the person has not read: a 7px dot. */
 export function UnreadMark() {
   return <span data-mark="unread" className="size-1.75 shrink-0 rounded-full bg-ink" />;

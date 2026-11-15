@@ -5,6 +5,7 @@ import {
   askContinues,
   canStopTurn,
   handoffCard,
+  mentionLeads,
   personFirst,
   personName,
   queuedBy,
@@ -226,5 +227,26 @@ describe("sending, queueing and stopping in a shared thread", () => {
   it("reads a paused message and whether its author may start it", () => {
     const paused = row(open({ queue: [{ messageId: "m1", author: THEO, paused: true, canEdit: true, canRemove: true, canStart: true }] }), "idle", mara);
     expect(queuedBy(paused, "m1")).toMatchObject({ paused: true, canStart: true });
+  });
+});
+
+describe("a mention in a row's state slot", () => {
+  const mentioned = row(together(THEO, { mentions: { unread: true, firstUnreadNoteId: "n1" } }));
+  it.each([
+    { name: "nothing else to say", status: null, leads: true },
+    { name: "an unread result", status: { kind: "unread" }, leads: true },
+    { name: "a teammate's quiet wait", status: { kind: "waiting-other" }, leads: true },
+    { name: "an ask that needs the reader", status: { kind: "waiting" }, leads: false },
+    { name: "a failure", status: { kind: "failed" }, leads: false },
+    { name: "a turn under way", status: { kind: "running" }, leads: false },
+    { name: "commands left running", status: { kind: "background" }, leads: false },
+  ])("stands before $name: $leads", ({ status, leads }) => {
+    expect(mentionLeads(mentioned, status)).toBe(leads);
+  });
+
+  it("is none for a thread with no unread mention, an older server, or one of this Mac", () => {
+    expect(mentionLeads(row(together(THEO)), null)).toBe(false);
+    expect(mentionLeads(row(undefined), null)).toBe(false);
+    expect(mentionLeads({ owner: undefined }, null)).toBe(false);
   });
 });

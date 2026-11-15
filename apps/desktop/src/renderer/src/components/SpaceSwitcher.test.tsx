@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { OrganizationSpace, SpacesStatus } from "@openorc/protocol";
+import { queryClient } from "../lib/client";
 import { OrganizationContext, type OrganizationActions } from "../lib/organization-context";
 import { core } from "../lib/rpc";
 import { SpaceSwitcher } from "./SpaceSwitcher";
@@ -57,6 +58,8 @@ function view(value: OrganizationActions) {
 }
 beforeEach(() => {
   queries = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // The switcher's account-wide reads live in the app's own client, which outlasts each test's.
+  queryClient.clear();
   vi.mocked(core.call).mockReset();
   vi.stubGlobal(
     "ResizeObserver",
@@ -103,6 +106,16 @@ it("keeps Personal checked on a first read failure with an explicit retry and a 
   await waitFor(() => expect(value.refresh).toHaveBeenCalledTimes(1));
   expect(value.create).not.toHaveBeenCalled();
   expect(screen.queryByLabelText(/invitation waiting/)).toBeNull();
+});
+
+it("adds an unread mention to the one neutral dot, in the open space too, with its words on demand and on its menu mark", async () => {
+  vi.mocked(core.call).mockImplementation((async (method: string) => (method === "spaces.mentions" ? { spaceIds: ["birch"] } : undefined)) as typeof core.call);
+  render(view(actions()));
+  await waitFor(() => expect(screen.getByLabelText("Unread mention in Birch Studio")).toBeTruthy());
+  expect(screen.getByRole("button", { name: "Switch space, Birch Studio, unread mention in Birch Studio" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: /Switch space/ }));
+  const row = await screen.findByRole("menuitemradio", { name: /Birch Studio/ });
+  expect(row.querySelector('[aria-label="Unread mention"]')).toBeTruthy();
 });
 
 it("adds unread chat in another organization to the one neutral dot, with its words on demand and on its menu row", async () => {

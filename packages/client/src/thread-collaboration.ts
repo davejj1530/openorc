@@ -37,6 +37,17 @@ export function withOthers(thread: Row | null | undefined): boolean {
   return [state.live?.sender, state.ask?.sender, ...state.queue.map((queued) => queued.author)].some((person) => other(state, person));
 }
 
+/**
+ * Whether a row's state slot shows the reader's unread mention, a note in the thread that tags them. An ask that needs
+ * them, a failure, and work under way (a turn, or commands left running) keep their marks; the mention stands before a
+ * quiet wait or an unread result. Only this Mac's row draws it: the shared status that the phone also reads is left as it
+ * was.
+ */
+export function mentionLeads(thread: Row | null | undefined, status: { kind: string } | null): boolean {
+  if (!threadTogether(thread)?.mentions.unread) return false;
+  return !status || status.kind === "unread" || status.kind === "waiting-other";
+}
+
 /** The reader started the thread and writes under the server's older rule, which shared writing has not opened yet. */
 export function writesAsCreator(thread: Row | null | undefined): boolean {
   const state = threadTogether(thread);

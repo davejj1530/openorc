@@ -7,7 +7,13 @@ import { TooltipProvider } from "./ui";
 import { useRouter } from "../lib/router";
 
 vi.mock("../lib/browser-preview", () => ({ CoversPreview: () => null }));
-vi.mock("../lib/client", () => ({ useRpc: () => ({ data: { defaultWorkspaceMode: "current" } }) }));
+const notes = vi.hoisted(() => ({ page: null as unknown }));
+vi.mock("../lib/client", () => ({
+  useRpc: (method: string, _params: unknown, options?: { enabled?: boolean }) => {
+    if (method !== "threads.notes") return { data: { defaultWorkspaceMode: "current" } };
+    return { data: options?.enabled === false ? undefined : notes.page };
+  },
+}));
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
@@ -104,6 +110,45 @@ it("shows a cloud glyph, dims it offline, and preserves place and teammate names
   expect(row.textContent).not.toContain("Ana");
   expect(row.getAttribute("aria-description")).toContain("Ana Lee · OpenOrc Cloud");
   expect(row.getAttribute("data-tip-detail")).toContain("Ana Lee · OpenOrc Cloud");
+});
+
+it("marks an unread mention with @ in the state slot and names who wrote it on demand, unless work holds the slot", () => {
+  const mara = { id: "u-mara", name: "Mara Okafor", image: null };
+  notes.page = {
+    notes: [{ id: "n1", seq: 1, author: mara, text: "@Theo look", mentions: [], replyTo: null, createdAt: "", afterEventSeq: 0, mentionedYou: true, read: false }],
+    head: 1,
+    hasBefore: false,
+    hasAfter: false,
+  };
+  const collaboration = { viewer: { id: "u-theo", name: "Theo Laurent", image: null }, mentions: { unread: true, firstUnreadNoteId: "n1" }, live: null, ask: null, queue: [] };
+  const marked = {
+    ...subagent,
+    id: "export",
+    title: "Export the log",
+    activity: "idle",
+    session: { status: "idle", message: null },
+    parentThreadId: null,
+    parentRelation: null,
+    subagent: undefined,
+    owner: { brain: "hosted", reach: "live", heardAt: 0, startedBy: { name: "Mara Okafor", image: null }, collaboration },
+  } as unknown as ThreadSummary;
+  const { rerender } = render(<ThreadRow thread={marked} active={false} />);
+  const slot = screen.getByRole("img", { name: "Mentioned you" });
+  expect(slot.textContent).toBe("@");
+  const row = screen.getByText("Export the log").closest("button")!;
+  expect(row.getAttribute("data-tip-detail")).toMatch(/ · Mara Okafor · OpenOrc Cloud · main · Mara mentioned you$/);
+  expect(row.getAttribute("aria-description")).toContain("Mara mentioned you");
+  rerender(<ThreadRow thread={{ ...marked, activity: "running" }} active={false} />);
+  expect(screen.queryByRole("img", { name: "Mentioned you" })).toBeNull();
+  expect(row.getAttribute("data-tip-detail")).toContain("Mara mentioned you");
+  rerender(
+    <ThreadRow
+      thread={{ ...marked, owner: { ...marked.owner!, collaboration: { ...collaboration, mentions: { unread: false, firstUnreadNoteId: null } } } } as unknown as ThreadSummary}
+      active={false}
+    />,
+  );
+  expect(screen.queryByRole("img", { name: "Mentioned you" })).toBeNull();
+  expect(row.getAttribute("data-tip-detail")).not.toContain("mentioned you");
 });
 
 it("keeps all four facts together, with the teammate's waiting mark separate from its PR", () => {

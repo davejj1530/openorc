@@ -1,11 +1,14 @@
 import type { ReactNode } from "react";
-import { threadStatus, threadTreeStatus, type ThreadStatus } from "@openorc/client";
+import { mentionLeads, threadStatus, threadTreeStatus, type ThreadStatus } from "@openorc/client";
 import type { ThreadSummary } from "@openorc/protocol";
 import { cn } from "../lib/cn";
 import { WorkingCube } from "./OpenOrcMark";
-import { AskMark, BackgroundMark, FailedMark, UnreadMark } from "./StateMarks";
+import { AskMark, BackgroundMark, FailedMark, MentionMark, UnreadMark } from "./StateMarks";
+import "../styles/together.css";
 
 type StatusFields = Pick<ThreadSummary, "activity" | "session" | "unread" | "doneAt" | "backgroundCommands" | "owner">;
+
+const MENTION = { label: "Mentioned you", mark: <MentionMark /> };
 
 const indicators: Record<ThreadStatus["kind"], ReactNode> = {
   waiting: <AskMark className="text-attention" />,
@@ -21,14 +24,16 @@ const indicators: Record<ThreadStatus["kind"], ReactNode> = {
  * question while it needs you, a red triangle on failure, a rounded square with a prompt in the third ink while
  * commands the agent left running go on, and a 7px ink dot when a result waits unread. The working cube while an agent
  * works. `subthreads` is what its sub
- * threads are doing, shown when it is more pressing than the thread's own state. With nothing to report, `idle` shows.
+ * threads are doing, shown when it is more pressing than the thread's own state. An unread note that tags the person
+ * shows its @ before a quiet wait or an unread result. With nothing to report, `idle` shows.
  */
 export function ThreadStatusIndicator({ thread, subthreads = null, idle = null, className }: { thread: StatusFields; subthreads?: ThreadStatus | null; idle?: ReactNode; className?: string }) {
   const status = threadTreeStatus(threadStatus(thread), subthreads);
-  if (!status) return idle;
+  const shown = mentionLeads(thread, status) ? MENTION : status && { label: status.label, mark: indicators[status.kind] };
+  if (!shown) return idle;
   return (
-    <span role="img" aria-label={status.label} data-tip={status.label} className={cn("thread-status size-4 shrink-0 inline-flex items-center justify-center", className)}>
-      {indicators[status.kind]}
+    <span role="img" aria-label={shown.label} data-tip={shown.label} className={cn("thread-status size-4 shrink-0 inline-flex items-center justify-center", className)}>
+      {shown.mark}
     </span>
   );
 }

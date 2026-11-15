@@ -1,5 +1,5 @@
 import { ContextMenu } from "@base-ui/react/context-menu";
-import { ownerMark, rowFacts, subagentStatusLabel, threadStatus, threadTreeStatus, useSidebarNow, useTicking, workDuration, type ThreadStatus } from "@openorc/client";
+import { mentionLeads, ownerMark, rowFacts, subagentStatusLabel, threadStatus, threadTreeStatus, useSidebarNow, useTicking, workDuration, type ThreadStatus } from "@openorc/client";
 import { harnessShortName, type ThreadSummary } from "@openorc/protocol";
 import { cn } from "../lib/cn";
 import { CoversPreview } from "../lib/browser-preview";
@@ -7,6 +7,7 @@ import { dismissCompactNavigation } from "../lib/compact-navigation";
 import { useRouter } from "../lib/router";
 import { endThreadDrag, startThreadDrag } from "../lib/thread-drag";
 import { floatingGround } from "../lib/use-anchor-ground";
+import { useMentionWords } from "../lib/mention-words";
 import { AccountFace } from "./AccountFace";
 import { ThreadMenuItems, type MenuParts } from "./ThreadActions";
 import { ThreadStatusIndicator } from "./ThreadStatusIndicator";
@@ -31,7 +32,10 @@ export function ThreadRow({ thread, subthreads = null, active, project, compact 
   const facts = rowFacts(thread, { now: useSidebarNow(), project: project?.name });
   const child = thread.subagent;
   const ticking = useTicking(child?.status === "running");
-  const detail = child?.status === "running" ? `${facts.detail} · Running for ${workDuration(ticking - child.startedAt)}` : facts.detail;
+  const mentioned = useMentionWords(thread);
+  const running = child?.status === "running" ? `Running for ${workDuration(ticking - child.startedAt)}` : null;
+  const detail = [facts.detail, running, mentioned].filter(Boolean).join(" · ");
+  const mention = mentionLeads(thread, status);
   return (
     <ContextMenu.Root>
       <ContextMenu.Trigger
@@ -52,12 +56,12 @@ export function ThreadRow({ thread, subthreads = null, active, project, compact 
             data-tip={thread.title}
             data-tip-detail={detail}
             data-open={open || undefined}
-            data-attention={(status && status.kind !== "running" && status.kind !== "background") || undefined}
+            data-attention={mention || (status && status.kind !== "running" && status.kind !== "background") || undefined}
             className={cn("sidebar-thread-row thread-preview no-drag", compact && "sidebar-thread-child")}
           />
         }
       >
-        <ThreadLine thread={thread} subthreads={subthreads} facts={facts} status={status} />
+        <ThreadLine thread={thread} subthreads={subthreads} facts={facts} status={status} mention={mention} />
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
         <CoversPreview />
@@ -78,10 +82,22 @@ function rowDescription(thread: ThreadSummary, detail: string): string {
   return [detail, ...about, ownerMark(thread)?.label, [...new Set(agents)].map(harnessShortName).join(", ")].filter(Boolean).join(" · ");
 }
 
-function ThreadLine({ thread, subthreads, facts, status }: { thread: ThreadSummary; subthreads: ThreadStatus | null; facts: ReturnType<typeof rowFacts>; status: ThreadStatus | null }) {
+function ThreadLine({
+  thread,
+  subthreads,
+  facts,
+  status,
+  mention,
+}: {
+  thread: ThreadSummary;
+  subthreads: ThreadStatus | null;
+  facts: ReturnType<typeof rowFacts>;
+  status: ThreadStatus | null;
+  mention: boolean;
+}) {
   const { starter, pull, cloud } = facts;
   const PullIcon = pull ? pullRequestIcons[pull.state] : GitPullRequest;
-  const state = status || thread.subagent ? <SidebarThreadMark thread={thread} subthreads={subthreads} /> : null;
+  const state = status || thread.subagent || mention ? <SidebarThreadMark thread={thread} subthreads={subthreads} /> : null;
   const slots = [
     { kind: "starter", mark: starter ? <AccountFace name={starter.name} image={starter.image} className="thread-preview-face" /> : null },
     {

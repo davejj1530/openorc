@@ -6,6 +6,7 @@ import { useOrganization } from "../lib/organization-context";
 import { useSpaceLabel } from "../lib/space-label";
 import { useSpaceNavigation } from "../lib/space-navigation";
 import { useUnreadChatSpaces } from "../lib/team-chat-unread";
+import { useMentionSpaces } from "../lib/mention-spaces";
 import { ChevronsUpDown } from "./icons";
 import { OpenOrcMark } from "./OpenOrcMark";
 import { OrganizationMark } from "./OrganizationMark";
@@ -23,19 +24,21 @@ export function SpaceSwitcher({ fallback = null, hidden = false }: { fallback?: 
   const fit = useSpaceLabel(label, actions?.signedIn === true);
   const status = actions?.status?.state === "ready" ? actions.status : null;
   const unread = useUnreadChatSpaces(status?.userId ?? null);
+  const mentioned = useMentionSpaces(status?.userId ?? null);
   const current = useSpaceNavigation((state) => state.current);
   if (!actions?.signedIn) return fallback;
   const count = status ? status.invitations.length : 0;
   const chats = (status?.spaces ?? []).flatMap((space) => (space.kind === "organization" && space.id !== current && unread.includes(space.id) ? [space.name] : []));
+  const mentions = (status?.spaces ?? []).flatMap((space) => (space.kind === "organization" && mentioned.includes(space.id) ? [space.name] : []));
   return (
     <Menu.Root open={open} onOpenChange={setOpen}>
       <Menu.Trigger
         ref={fit.button}
         className={cn("space-switcher no-drag", hidden && "space-switcher-hidden")}
-        aria-label={`Switch space, ${label}${count ? `, ${count} invitation${count === 1 ? "" : "s"}` : ""}${chats.length ? `, unread chat in ${chats.join(", ")}` : ""}`}
+        aria-label={switchLabel(label, count, chats, mentions)}
         data-tip={fit.clipped ? label : undefined}
       >
-        <InvitationIndicator count={count} chats={chats}>
+        <InvitationIndicator count={count} chats={chats} mentions={mentions}>
           {organization ? <OrganizationMark {...organization} /> : <OpenOrcMark size={16} />}
         </InvitationIndicator>
         <span className="space-switcher-name">
@@ -61,4 +64,14 @@ export function SpaceSwitcher({ fallback = null, hidden = false }: { fallback?: 
       </Menu.Portal>
     </Menu.Root>
   );
+}
+
+/** The switcher's spoken name: the space, then what waits, as its dot says on demand. */
+function switchLabel(label: string, count: number, chats: readonly string[], mentions: readonly string[]): string {
+  const waiting = [
+    count ? `${count} invitation${count === 1 ? "" : "s"}` : "",
+    chats.length ? `unread chat in ${chats.join(", ")}` : "",
+    mentions.length ? `unread mention in ${mentions.join(", ")}` : "",
+  ].filter(Boolean);
+  return [`Switch space, ${label}`, ...waiting].join(", ");
 }

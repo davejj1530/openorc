@@ -51,6 +51,12 @@
   height: 18px;
   font-size: 8px;
 }
+.mention-mark {
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 16px;
+  color: var(--ink);
+}
 .queue-author {
   display: flex;
   align-items: center;

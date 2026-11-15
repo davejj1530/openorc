@@ -1,7 +1,7 @@
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useContext, useState, type CSSProperties, type ReactNode } from "react";
 import { answerFor, emptyDraft, keptAnswers, LINE, lineWaiting, readQuestions, stepAnswers, type AnswerAction, type AnswerDraft, type Question, type WaitingAsk } from "@openorc/client";
 import { harnessShortName, isHarnessId } from "@openorc/protocol";
-import { answeredInThisWindow, useAskAnswer } from "./ask-answer";
+import { answeredInThisWindow, AskContinues, useAskAnswer } from "./ask-answer";
 import { useRunVoice } from "../lib/turn-authors";
 import { Button } from "./ui";
 import { cn } from "../lib/cn";
@@ -108,10 +108,12 @@ export function QuestionAsk({ ask, more, fieldHasWords, onStep }: { ask: Waiting
   const questions = readQuestions(ask.block.input);
   const voice = useRunVoice(ask.runId);
   const reply = useAskAnswer(ask.runId, ask.block.approvalId);
+  // A parked ask of someone else's turn starts the reader's own paid turn: its answer waits for Answer and continue.
+  const continues = useContext(AskContinues)(ask.block.approvalId);
   const [draft, setDraft] = useState<AnswerDraft>(emptyDraft);
   const hold: Hold = { off: reply.pending || Boolean(reply.blocked), tip: reply.blocked ?? undefined };
   const act = (action: AnswerAction) => {
-    const next = stepAnswers(questions, draft, action);
+    const next = stepAnswers(questions, draft, action, Boolean(continues));
     if (next.send) return reply.answer("allow", next.send);
     if (next.draft.step !== draft.step || next.draft.review !== draft.review) onStep?.();
     setDraft(next.draft);
@@ -134,10 +136,10 @@ export function QuestionAsk({ ask, more, fieldHasWords, onStep }: { ask: Waiting
       </AskTop>
       <div className="composer-ask-body">
         <KeptAnswers questions={questions} draft={draft} hold={hold} act={act} />
-        {q ? <QuestionStep q={q} draft={draft} keepWords={many || q.multi ? "Keep" : "Answer"} ink={!fieldHasWords} hold={hold} act={act} /> : null}
+        {q ? <QuestionStep q={q} draft={draft} confirm={Boolean(continues)} keepWords={many || q.multi || continues ? "Keep" : "Answer"} ink={!fieldHasWords} hold={hold} act={act} /> : null}
       </div>
       <AskError error={reply.error} />
-      <QuestionRow q={q} many={many} draft={draft} ink={!fieldHasWords && !lineWaiting(q, draft)} hold={hold} act={act} />
+      <QuestionRow q={q} many={many} continues={continues} draft={draft} ink={!fieldHasWords && !lineWaiting(q, draft)} hold={hold} act={act} />
     </>
   );
 }
@@ -167,10 +169,27 @@ function KeptAnswers({ questions, draft, hold, act }: { questions: readonly Ques
 
 /**
  * The ask's row, once its answer is more than one press: Next while questions remain, Answer for the last, the ask's
- * one ink unless words wait elsewhere. With every answer in view it always shows.
+ * one ink unless words wait elsewhere. With every answer in view it always shows. An answer that continues on the
+ * reader's own hours is always confirmed here, and says so on demand.
  */
-function QuestionRow({ q, many, draft, ink, hold, act }: { q: Question | undefined; many: boolean; draft: AnswerDraft; ink: boolean; hold: Hold; act: (action: AnswerAction) => void }) {
-  if (q && !((q.multi || many) && answerFor(q, draft).length > 0)) return null;
+function QuestionRow({
+  q,
+  many,
+  continues,
+  draft,
+  ink,
+  hold,
+  act,
+}: {
+  q: Question | undefined;
+  many: boolean;
+  continues: string | null;
+  draft: AnswerDraft;
+  ink: boolean;
+  hold: Hold;
+  act: (action: AnswerAction) => void;
+}) {
+  if (q && !((q.multi || many || continues) && answerFor(q, draft).length > 0)) return null;
   return (
     <div className="composer-ask-row">
       <Button
@@ -180,18 +199,44 @@ function QuestionRow({ q, many, draft, ink, hold, act }: { q: Question | undefin
         tabIndex={-1}
         data-ask-control="action"
         disabled={hold.off}
-        data-tip={hold.tip}
+        data-tip={hold.tip ?? continues ?? undefined}
         onClick={() => act({ kind: "answer" })}
       >
-        {many && q ? "Next" : "Answer"}
+        {rowWords(many && Boolean(q), continues)}
       </Button>
     </div>
   );
 }
 
-/** The question that shows: its choices, then its own line for words when its agent takes them. */
-function QuestionStep({ q, draft, keepWords, ink, hold, act }: { q: Question; draft: AnswerDraft; keepWords: string; ink: boolean; hold: Hold; act: (action: AnswerAction) => void }) {
+/** Next while questions remain, else Answer, and Answer and continue where the answer starts the reader's own turn. */
+function rowWords(next: boolean, continues: string | null): string {
+  if (next) return "Next";
+  return continues ? "Answer and continue" : "Answer";
+}
+
+/**
+ * The question that shows: its choices, then its own line for words when its agent takes them. A choice that is only
+ * picked, as several choices are or one whose answer is confirmed, says so and wears its check.
+ */
+function QuestionStep({
+  q,
+  draft,
+  confirm,
+  keepWords,
+  ink,
+  hold,
+  act,
+}: {
+  q: Question;
+  draft: AnswerDraft;
+  confirm: boolean;
+  keepWords: string;
+  ink: boolean;
+  hold: Hold;
+  act: (action: AnswerAction) => void;
+}) {
   const picked = draft.picked[q.key] ?? [];
+  const picks = q.multi || confirm;
   const words = draft.lines[q.key] ?? "";
   return (
     <>
@@ -201,7 +246,7 @@ function QuestionStep({ q, draft, keepWords, ink, hold, act }: { q: Question; dr
           type="button"
           tabIndex={-1}
           className="composer-ask-choice focus-ring"
-          aria-pressed={q.multi ? picked.includes(option.label) : undefined}
+          aria-pressed={picks ? picked.includes(option.label) : undefined}
           data-picked={picked.includes(option.label) || undefined}
           data-ask-control="choice"
           disabled={hold.off}
@@ -210,7 +255,7 @@ function QuestionStep({ q, draft, keepWords, ink, hold, act }: { q: Question; dr
         >
           <span>{option.label}</span>
           {option.description ? <span className="composer-ask-choice-description">{option.description}</span> : null}
-          {q.multi ? <Check size={16} className="composer-ask-check" /> : null}
+          {picks ? <Check size={16} className="composer-ask-check" /> : null}
         </button>
       ))}
       {q.allowOther ? (

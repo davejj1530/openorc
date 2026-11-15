@@ -185,6 +185,8 @@ export interface ComposerProps {
   asksLabel?: string | undefined;
   /** Why the asks can't be answered now, as when the thread's place can't be reached. */
   asksBlocked?: string | null;
+  /** Whether an ask's answer continues on the reader's own sign-in and hours, in words; null where it does not. */
+  askContinues?: ((approvalId: string) => string | null) | undefined;
   children?: ReactNode;
 }
 
@@ -319,7 +321,7 @@ export function Composer(props: ComposerProps) {
         changes={props.changes}
       />
       <div ref={shell} className="composer-shell" data-dragging={drop.dragging || undefined} {...drop.handlers}>
-        <ComposerAsk asks={asks} label={props.asksLabel} blocked={props.asksBlocked ?? null} fieldHasWords={Boolean(props.value.trim())} focusField={focusField} />
+        <ComposerAsk asks={asks} label={props.asksLabel} blocked={props.asksBlocked ?? null} continues={props.askContinues} fieldHasWords={Boolean(props.value.trim())} focusField={focusField} />
         {attachments.length > 0 || uploading > 0 ? <div className="composer-attachments">{files.content}</div> : null}
         <div className="composer-prompt">
           <ComposerInput

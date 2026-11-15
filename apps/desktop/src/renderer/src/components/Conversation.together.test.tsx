@@ -251,6 +251,14 @@ it("tells the ask dock whose ask it is and why the reader cannot answer it", asy
   expect(composer.props!.asksBlocked).toBe("Mara Okafor can answer while this turn is running.");
 });
 
+it("tells the ask dock that answering Mara's parked ask continues on the reader's own sign-in and hours", async () => {
+  const ask = { id: "a1", turnId: "t1", state: "parked" as const, sender: MARA, answer: "start" as const, canDecline: true, reason: null };
+  await open(marasThread(together(THEO, { canWrite: true, send: "now", ask }), { activity: "waiting" }));
+  expect(composer.props!.asksBlocked).toBeNull();
+  expect(composer.props!.askContinues?.("a1")).toBe("Continues with your sign-in and hours.");
+  expect(composer.props!.askContinues?.("another")).toBeNull();
+});
+
 const handoff = { code: "handoff_unavailable" as const, message: "Only Mara can run the agent in this cloud thread for now.", responsible: MARA, commandIds: [], retrySave: false };
 const joining = (more: Partial<ThreadCollaboration> = {}) => together(THEO, { canWrite: true, send: "now", handoff, live: { id: "t2", sender: MARA, startedAt: 0, stopping: false }, ...more });
 

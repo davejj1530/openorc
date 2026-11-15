@@ -1,10 +1,12 @@
 import type { WaitingAsk } from "@openorc/client";
 import { useEffect, useLayoutEffect, useRef, useState, type SyntheticEvent } from "react";
 import { prefersReducedMotion } from "../lib/motion";
-import { AnswersBlocked } from "./ask-answer";
+import { AnswersBlocked, AskContinues } from "./ask-answer";
 import { askKeyDown } from "./AskParts";
 import { ApprovalAsk } from "./ApprovalCard";
 import { QuestionAsk } from "./QuestionCard";
+
+const noContinuation = () => null;
 
 /** How long an ask that takes another's place takes to land, in which it takes no press or key. */
 const LANDING_MS = 240;
@@ -96,12 +98,14 @@ export function ComposerAsk({
   asks,
   label = "Waiting on you",
   blocked,
+  continues,
   fieldHasWords,
   focusField,
 }: {
   asks: WaitingAsk[];
   label?: string | undefined;
   blocked: string | null;
+  continues?: ((approvalId: string) => string | null) | undefined;
   fieldHasWords: boolean;
   focusField: () => void;
 }) {
@@ -133,25 +137,27 @@ export function ComposerAsk({
 
   return (
     <AnswersBlocked.Provider value={blocked}>
-      <div ref={motion.dock} className="composer-ask-dock" inert={motion.leaving || undefined}>
-        <div
-          ref={root}
-          role="group"
-          aria-label={label}
-          className="composer-ask"
-          data-ask={ask.block.approvalKind === "user_input" ? "question" : "approval"}
-          data-landing={landing || undefined}
-          onKeyDown={askKeyDown(focusField)}
-          onKeyDownCapture={hold}
-          onClickCapture={hold}
-        >
-          {ask.block.approvalKind === "user_input" ? (
-            <QuestionAsk key={ask.block.approvalId} ask={ask} more={asks.length - 1} fieldHasWords={fieldHasWords} onStep={focusField} />
-          ) : (
-            <ApprovalAsk key={ask.block.approvalId} ask={ask} more={asks.length - 1} fieldHasWords={fieldHasWords} />
-          )}
+      <AskContinues.Provider value={continues ?? noContinuation}>
+        <div ref={motion.dock} className="composer-ask-dock" inert={motion.leaving || undefined}>
+          <div
+            ref={root}
+            role="group"
+            aria-label={label}
+            className="composer-ask"
+            data-ask={ask.block.approvalKind === "user_input" ? "question" : "approval"}
+            data-landing={landing || undefined}
+            onKeyDown={askKeyDown(focusField)}
+            onKeyDownCapture={hold}
+            onClickCapture={hold}
+          >
+            {ask.block.approvalKind === "user_input" ? (
+              <QuestionAsk key={ask.block.approvalId} ask={ask} more={asks.length - 1} fieldHasWords={fieldHasWords} onStep={focusField} />
+            ) : (
+              <ApprovalAsk key={ask.block.approvalId} ask={ask} more={asks.length - 1} fieldHasWords={fieldHasWords} />
+            )}
+          </div>
         </div>
-      </div>
+      </AskContinues.Provider>
     </AnswersBlocked.Provider>
   );
 }

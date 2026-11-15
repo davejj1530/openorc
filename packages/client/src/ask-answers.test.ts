@@ -11,13 +11,17 @@ const checks = {
   multiSelect: true,
 };
 
-/** Plays presses on an ask, returning the draft it ends on and every send it made. */
+/** Plays presses on an ask, returning the draft it ends on and every send it made. `confirm`: every answer waits for Answer. */
 function play(questions: unknown[], ...actions: AnswerAction[]): { draft: AnswerDraft; sent: Record<string, string[]>[] } {
+  return playing(false, questions, ...actions);
+}
+
+function playing(confirm: boolean, questions: unknown[], ...actions: AnswerAction[]): { draft: AnswerDraft; sent: Record<string, string[]>[] } {
   const qs = readQuestions({ questions });
   let draft = emptyDraft;
   const sent: Record<string, string[]>[] = [];
   for (const action of actions) {
-    const step = stepAnswers(qs, draft, action);
+    const step = stepAnswers(qs, draft, action, confirm);
     draft = step.draft;
     if (step.send) sent.push(step.send);
   }
@@ -27,6 +31,14 @@ function play(questions: unknown[], ...actions: AnswerAction[]): { draft: Answer
 describe("answering a question ask", () => {
   it("answers a single choice at its press", () => {
     expect(play([land], { kind: "choose", label: "Ask each time" }).sent).toEqual([{ land: ["Ask each time"] }]);
+  });
+
+  it("picks a single choice without sending when its answer is confirmed, then sends it at Answer", () => {
+    const picked = playing(true, [land], { kind: "choose", label: "Ask each time" });
+    expect(picked.sent).toEqual([]);
+    expect(picked.draft.picked).toEqual({ land: ["Ask each time"] });
+    expect(playing(true, [land], { kind: "choose", label: "Ask each time" }, { kind: "choose", label: "Downloads folder" }, { kind: "answer" }).sent).toEqual([{ land: ["Downloads folder"] }]);
+    expect(playing(true, [land], { kind: "write", text: "Beside the filter" }, { kind: "keep" }).sent).toEqual([]);
   });
 
   it("toggles several choices and sends them only at Answer", () => {

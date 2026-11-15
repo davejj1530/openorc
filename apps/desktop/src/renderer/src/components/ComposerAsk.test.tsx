@@ -74,7 +74,7 @@ const waiting = (name: AskName, id: string = name): WaitingAsk => ({
 });
 
 /** A conversation's composer mid-turn, its asks arriving as the agent sends them, with what reached the agent. */
-function mount({ draft = "", blocked = null, parked = false, label }: { draft?: string; blocked?: string | null; parked?: boolean; label?: string } = {}) {
+function mount({ draft = "", blocked = null, parked = false, label, continues }: { draft?: string; blocked?: string | null; parked?: boolean; label?: string; continues?: string } = {}) {
   const onSubmit = vi.fn(async (_text: string, _files: string[], _now: boolean) => {});
   const outside: { setAsks: (update: (asks: WaitingAsk[]) => WaitingAsk[]) => void } = { setAsks: () => {} };
   function Host() {
@@ -104,6 +104,7 @@ function mount({ draft = "", blocked = null, parked = false, label }: { draft?: 
           asks={asks}
           asksLabel={label}
           asksBlocked={blocked}
+          askContinues={continues ? () => continues : undefined}
         />
       </>
     );
@@ -419,6 +420,33 @@ describe("a docked approval, answered on purpose", () => {
     expect(within(c.dock()!).queryByRole("button", { name: "Allow for this run" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Show request" }));
     expect(within(c.dock()!).getByText(/"channel": "#releases"/)).toBeTruthy();
+  });
+});
+
+describe("a parked ask of someone else's turn, answered as the reader's own paid continuation", () => {
+  const continues = "Continues with your sign-in and hours.";
+
+  it("picks a choice without answering, and answers at Answer and continue, which says whose hours it uses", () => {
+    const c = mount({ parked: true, continues });
+    c.arrive("export");
+    fireEvent.click(screen.getByRole("button", { name: /Ask each time/ }));
+    expect(c.answered()).toEqual([]);
+    expect(screen.getByRole("button", { name: /Ask each time/ }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: /Downloads folder/ }).getAttribute("aria-pressed")).toBe("false");
+    const go = screen.getByRole("button", { name: "Answer and continue" });
+    expect(go.getAttribute("data-tip")).toBe(continues);
+    fireEvent.click(go);
+    expect(c.answered()).toEqual([{ runId: "run", approvalId: "export", decision: "allow", answers: { land: ["Ask each time"] } }]);
+  });
+
+  it("approves and continues, or denies and continues with the words written instead; a bare Deny stays free", () => {
+    const c = mount({ parked: true, continues });
+    c.arrive("build");
+    expect(screen.queryByRole("button", { name: "Allow for this run" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Approve and continue" }).getAttribute("data-tip")).toBe(continues);
+    fireEvent.change(screen.getByRole("textbox", { name: "What to do instead of Bash" }), { target: { value: "Run only the export tests" } });
+    fireEvent.click(screen.getByRole("button", { name: "Deny and continue" }));
+    expect(c.answered()).toEqual([{ runId: "run", approvalId: "build", decision: "deny", note: "Run only the export tests" }]);
   });
 });
 

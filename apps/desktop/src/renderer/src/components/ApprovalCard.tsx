@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { approvalDetail, approvalSummary, type Block, type WaitingAsk } from "@openorc/client";
 import { Hammer, Terminal, X } from "./icons";
-import { useAskAnswer } from "./ask-answer";
+import { AskContinues, useAskAnswer } from "./ask-answer";
 import { askKeyDown, AskError, AskLine, AskTop, AskWay } from "./AskParts";
 import { Button } from "./ui";
 
@@ -59,13 +59,15 @@ export function ApprovalAsk({ ask, more, fieldHasWords }: { ask: WaitingAsk; mor
   const [raw, setRaw] = useState(false);
   const [note, setNote] = useState("");
   const reply = useAskAnswer(ask.runId, block.approvalId);
+  // A parked ask of someone else's turn starts the reader's own paid turn, approved or with words instead; Deny is free.
+  const continues = useContext(AskContinues)(block.approvalId);
   const label = block.toolName ?? block.approvalKind;
   const command = typeof approvalDetail(block) === "string";
   const Icon = command ? Terminal : Hammer;
   const off = reply.pending || Boolean(reply.blocked);
   const tip = reply.blocked ?? undefined;
   const noted = note.trim().length > 0;
-  const allow = (decision: "allow" | "allow_for_run") => ({ disabled: off, "data-tip": tip, onClick: () => reply.answer(decision) });
+  const allow = (decision: Allow) => ({ disabled: off, "data-tip": tip ?? continues ?? undefined, onClick: () => reply.answer(decision) });
   return (
     <>
       <AskTop
@@ -96,22 +98,46 @@ export function ApprovalAsk({ ask, more, fieldHasWords }: { ask: WaitingAsk; mor
           secret={false}
           value={note}
           onChange={setNote}
-          send={noted ? { words: "Deny and send", ink: !fieldHasWords, onSend: () => reply.answer("deny", undefined, note.trim()) } : null}
+          send={
+            noted ? { words: continues ? "Deny and continue" : "Deny and send", ink: !fieldHasWords, tip: continues ?? undefined, onSend: () => reply.answer("deny", undefined, note.trim()) } : null
+          }
           disabled={off}
           tip={tip}
         />
       </div>
       <AskError error={reply.error} />
-      <div className="composer-ask-row">
-        {block.onceOnly ? null : (
-          <Button size="md" variant="secondary" className="focus-ring" tabIndex={-1} data-ask-control="action" {...allow("allow_for_run")}>
-            Allow for this run
-          </Button>
-        )}
-        <Button size="md" variant={fieldHasWords || noted ? "secondary" : "primary"} className="focus-ring" tabIndex={-1} data-ask-control="action" {...allow("allow")}>
-          Allow once
-        </Button>
-      </div>
+      <ApprovalRow onceOnly={Boolean(block.onceOnly)} continues={continues} ink={!(fieldHasWords || noted)} allow={allow} />
     </>
+  );
+}
+
+type Allow = "allow" | "allow_for_run";
+
+/**
+ * The approval's row: Allow for this run and Allow once, or, where the answer continues on the reader's own sign-in and
+ * hours, Approve and continue alone. The row's ink unless words wait elsewhere.
+ */
+function ApprovalRow({
+  onceOnly,
+  continues,
+  ink,
+  allow,
+}: {
+  onceOnly: boolean;
+  continues: string | null;
+  ink: boolean;
+  allow: (decision: Allow) => { disabled: boolean; "data-tip": string | undefined; onClick: () => void };
+}) {
+  return (
+    <div className="composer-ask-row">
+      {onceOnly || continues ? null : (
+        <Button size="md" variant="secondary" className="focus-ring" tabIndex={-1} data-ask-control="action" {...allow("allow_for_run")}>
+          Allow for this run
+        </Button>
+      )}
+      <Button size="md" variant={ink ? "primary" : "secondary"} className="focus-ring" tabIndex={-1} data-ask-control="action" {...allow("allow")}>
+        {continues ? "Approve and continue" : "Allow once"}
+      </Button>
+    </div>
   );
 }

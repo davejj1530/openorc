@@ -91,6 +91,16 @@ export function handoffCard(thread: Row | null | undefined): { words: string; ac
   return { words: block.message, action: null };
 }
 
+/**
+ * A parked ask the reader may answer, in a thread others are in, starts the reader's own turn: its answer is confirmed,
+ * and what it uses is said on demand. Null for any other ask, and in a thread nobody else is in, which answers as before.
+ */
+export function askContinues(thread: Row | null | undefined, approvalId: string): string | null {
+  const ask = threadTogether(thread)?.ask;
+  if (!ask || ask.id !== approvalId || ask.state !== "parked" || ask.answer !== "start" || !withOthers(thread)) return null;
+  return "Continues with your sign-in and hours.";
+}
+
 /** Why this reader cannot answer the thread's ask now: the server's reason, else the words for why no turn can start. */
 export function askAnswerBlock(thread: Row | null | undefined): string | null {
   const state = threadTogether(thread);

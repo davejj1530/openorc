@@ -53,7 +53,7 @@ export function AskLine({
   picked?: boolean;
   value: string;
   onChange: (value: string) => void;
-  send: { words: string; ink: boolean; onSend: () => void } | null;
+  send: { words: string; ink: boolean; onSend: () => void; tip?: string | undefined } | null;
   disabled: boolean;
   tip: string | undefined;
 }) {
@@ -74,7 +74,7 @@ export function AskLine({
         onChange={(event) => onChange(event.target.value)}
       />
       {send ? (
-        <Button size="sm" variant={send.ink ? "primary" : "secondary"} tabIndex={-1} data-ask-send="" disabled={disabled} onClick={send.onSend}>
+        <Button size="sm" variant={send.ink ? "primary" : "secondary"} tabIndex={-1} data-ask-send="" disabled={disabled} data-tip={send.tip} onClick={send.onSend}>
           {send.words}
         </Button>
       ) : null}

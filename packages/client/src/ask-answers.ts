@@ -102,10 +102,12 @@ function answer(questions: readonly Question[], draft: AnswerDraft): AnswerStep 
   return unchanged(answered ? onward(questions, draft) : draft);
 }
 
-export function stepAnswers(questions: readonly Question[], draft: AnswerDraft, action: AnswerAction): AnswerStep {
+export function stepAnswers(questions: readonly Question[], draft: AnswerDraft, action: AnswerAction, confirm = false): AnswerStep {
   if (action.kind === "reopen") return unchanged({ ...draft, step: action.step, review: false });
   if (action.kind === "answer") return answer(questions, draft);
   const q = questions[draft.step];
   if (!q || draft.review) return unchanged(draft);
-  return (STEPS[action.kind] as Step<typeof action.kind>)(questions, draft, q, action as never);
+  const step = (STEPS[action.kind] as Step<typeof action.kind>)(questions, draft, q, action as never);
+  // An answer the person confirms waits for Answer, even a single choice: it starts paid work.
+  return confirm && step.send ? unchanged(step.draft) : step;
 }

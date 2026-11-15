@@ -6,6 +6,12 @@ import { core } from "../lib/rpc";
 /** Why the asks in a conversation can't be answered now, as when the thread's place can't be reached; null when they can. */
 export const AnswersBlocked = createContext<string | null>(null);
 
+/**
+ * Whether an ask's answer continues on the reader's own sign-in and hours, as a parked ask of someone else's turn does:
+ * its words, said on demand, or null. Such an answer is confirmed, never sent by a single press.
+ */
+export const AskContinues = createContext<(approvalId: string) => string | null>(() => null);
+
 /** Whether this conversation's composer takes its waiting asks, so they show there and not where they were asked. */
 export const AsksDocked = createContext(false);
 

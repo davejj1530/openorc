@@ -6,6 +6,7 @@ import {
   conversationActivity,
   composerPlaceholder,
   heardTranscript,
+  askContinues,
   asksBlocked,
   waitingAsks,
   threadActivity,
@@ -143,9 +144,17 @@ function threadCommands({
   ];
 }
 
-/** What the composer's dock is given: the asks that wait, whose answer they wait on in words, and why they can't be answered from here. */
+/**
+ * What the composer's dock is given: the asks that wait, whose answer they wait on in words, why they can't be answered
+ * from here, and which answers continue on the reader's own sign-in and hours.
+ */
 function dockedAsks(heard: Parameters<typeof waitingAsks>[0], thread: ThreadSummary | null, blocked: string | null) {
-  return { asks: waitingAsks(heard), asksLabel: threadActivity({ activity: "waiting", owner: thread?.owner })?.text, asksBlocked: blocked };
+  return {
+    asks: waitingAsks(heard),
+    asksLabel: threadActivity({ activity: "waiting", owner: thread?.owner })?.text,
+    asksBlocked: blocked,
+    askContinues: (approvalId: string) => askContinues(thread, approvalId),
+  };
 }
 
 /**

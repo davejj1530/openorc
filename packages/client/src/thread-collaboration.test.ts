@@ -1,6 +1,19 @@
 import type { ThreadCollaboration, ThreadPerson, ThreadSummary } from "@openorc/protocol";
 import { describe, expect, it } from "vitest";
-import { askAnswerBlock, canStopTurn, handoffCard, personFirst, personName, queuedBy, sendPayer, threadWriteBlock, togetherActivity, withOthers, writesAsCreator } from "./thread-collaboration.js";
+import {
+  askAnswerBlock,
+  askContinues,
+  canStopTurn,
+  handoffCard,
+  personFirst,
+  personName,
+  queuedBy,
+  sendPayer,
+  threadWriteBlock,
+  togetherActivity,
+  withOthers,
+  writesAsCreator,
+} from "./thread-collaboration.js";
 import { asksBlocked, queueBlock, sendsBlocked } from "./hosted-send.js";
 import { sendCluster } from "./conversation-submit.js";
 import { rowFacts, threadActivity, threadWaitsOnYou } from "./thread-row.js";
@@ -106,6 +119,18 @@ describe("a teammate's cloud thread on today's server", () => {
     // Joining a running turn is not held by a handoff, so there is no card while one runs and takes messages.
     expect(handoffCard(row(together(THEO, { canWrite: true, send: "now", handoff: command, live: live(MARA) }), "running", mara))).toBeNull();
     expect(handoffCard(idle(null))).toBeNull();
+  });
+
+  it("says a parked ask the reader may answer continues on their own sign-in and hours, in a thread others are in", () => {
+    const parked = row(together(THEO, { canWrite: true, send: "now", ask: ask(MARA, "parked", "start") }), "waiting", mara);
+    expect(askContinues(parked, "ask-1")).toBe("Continues with your sign-in and hours.");
+    expect(askContinues(parked, "another")).toBeNull();
+    expect(
+      askContinues(row(together(THEO, { canWrite: true, send: "now", ask: ask(MARA, "waiting", "blocked", "Mara Okafor can answer while this turn is running.") }), "waiting", mara), "ask-1"),
+    ).toBeNull();
+    expect(askContinues(row(together(THEO, { canWrite: true, send: "now", ask: ask(THEO, "waiting", "live") }), "waiting", mara), "ask-1")).toBeNull();
+    // A thread nobody else is in answers as it always did.
+    expect(askContinues(row(together(THEO, { canWrite: true, send: "now", ask: ask(THEO, "parked", "start") }), "waiting"), "ask-1")).toBeNull();
   });
 
   it("lights up without another change once the server opens shared writing", () => {

@@ -29,8 +29,18 @@ describe("private seat words", () => {
 
   it("changes tomorrow to today at local midnight, retaining the exact short deadline", () => {
     const until = Date.parse("2026-11-15T06:05:00Z");
-    expect(graceDeadlineWords(until, Date.parse("2026-11-14T15:59:59Z"), "en-GB", "Asia/Manila")).toEqual({ long: "Pro ends tomorrow at 14:05", short: "Pro ends 15 Nov, 14:05" });
+    expect(graceDeadlineWords(until, Date.parse("2026-11-14T15:59:59Z"), "en-GB", "Asia/Manila")).toEqual({ long: "Pro ends tomorrow at 14:05", short: "Pro ends Sun 14:05" });
     expect(graceDeadlineWords(until, Date.parse("2026-11-14T16:00:00Z"), "en-GB", "Asia/Manila").long).toBe("Pro ends today at 14:05");
+  });
+
+  it("keeps the short words short on a twelve-hour clock, still naming the day and the time", () => {
+    const until = Date.parse("2026-11-17T20:54:00Z");
+    expect(graceDeadlineWords(until, Date.parse("2026-11-16T21:00:00Z"), "en-US", "America/Los_Angeles")).toEqual({ long: "Pro ends tomorrow at 12:54 PM", short: "Pro ends Tue 12:54 PM" });
+  });
+
+  it("names the date for a deadline further off than tomorrow, where a weekday alone could mislead", () => {
+    const until = Date.parse("2026-11-25T06:05:00Z");
+    expect(graceDeadlineWords(until, Date.parse("2026-11-14T06:05:00Z"), "en-GB", "Asia/Manila")).toEqual({ long: "Pro ends 25 Nov, 14:05", short: "Pro ends 25 Nov, 14:05" });
   });
 
   it("compares calendar days across a daylight-saving change and year boundary", () => {

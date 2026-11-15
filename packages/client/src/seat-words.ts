@@ -24,13 +24,20 @@ export function seatDeadline(at: number, locale?: string, timeZone?: string): st
   return `${accountDay(at, locale, timeZone)}, ${time}`;
 }
 
-/** Calendar days are compared in the display timezone, including across daylight-saving changes. */
+/**
+ * The day of grace's deadline in two lengths: "today" or "tomorrow" with the time where there is room, the weekday
+ * with the time where there is not. A deadline further off names its date in both, where a weekday alone could
+ * mislead. Calendar days are compared in the display timezone, including across daylight-saving changes.
+ */
 export function graceDeadlineWords(until: number, now: number, locale?: string, timeZone?: string): { long: string; short: string } {
-  const short = `Pro ends ${seatDeadline(until, locale, timeZone)}`;
   const days = localDay(until, timeZone) - localDay(now, timeZone);
-  if (days !== 0 && days !== 86400000) return { long: short, short };
+  if (days !== 0 && days !== 86400000) {
+    const dated = `Pro ends ${seatDeadline(until, locale, timeZone)}`;
+    return { long: dated, short: dated };
+  }
   const time = new Date(until).toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit", timeZone });
-  return { long: `Pro ends ${days === 0 ? "today" : "tomorrow"} at ${time}`, short };
+  const weekday = new Date(until).toLocaleDateString(locale, { weekday: "short", timeZone });
+  return { long: `Pro ends ${days === 0 ? "today" : "tomorrow"} at ${time}`, short: `Pro ends ${weekday} ${time}` };
 }
 
 function localDay(at: number, timeZone?: string): number {

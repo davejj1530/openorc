@@ -761,21 +761,28 @@ button.browser-empty:hover,
 .sidebar-account-plan {
   white-space: nowrap;
 }
-.sidebar-grace-short {
-  display: none;
-}
+/* In the day of grace the plan line says when Pro ends, and the usage chip leaves the row to it. The words take the
+   row's whole width, so the longer words are measured against the room there really is. */
 .sidebar-account[data-grace="true"] {
-  padding-left: 4px;
+  /* The words may run to the row's end; Settings keeps its own 8px around its glyph. */
   padding-right: 0;
-  gap: 7px;
 }
-@container account-footer (max-width: 220px) {
-  .sidebar-grace-long {
-    display: none;
-  }
-  .sidebar-grace-short {
-    display: inline;
-  }
+.sidebar-account[data-grace="true"] .sidebar-account-words {
+  flex: 1;
+}
+.sidebar-account-grace {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar-grace-measure {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+}
+.sidebar-grace-measure::before {
+  content: attr(data-words);
 }
 /* Words that don't fit wrap onto a second line that never shows, so the name loses whole words, never letters. */
 .sidebar-account-name {

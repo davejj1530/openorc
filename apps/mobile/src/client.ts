@@ -165,5 +165,5 @@ type PhoneMethod = RemoteMethod | CloudRemoteMethod;
 export const useRpc = <M extends PhoneMethod>(method: M, params: RpcParams<M>, options?: RpcQueryOptions<M>): UseQueryResult<RpcResults[M]> => client.useRpc(method, params, options);
 export const useRpcs = <M extends PhoneMethod>(method: M, paramsList: readonly RpcParams<M>[], options?: RpcQueryOptions<M>): UseQueryResult<RpcResults[M]>[] =>
   client.useRpcs(method, paramsList, options);
-export const useRpcMutation = <M extends RemoteMethod>(method: M): UseMutationResult<RpcResults[M], Error, RpcParams<M>> => client.useRpcMutation(method);
+export const useRpcMutation = <M extends PhoneMethod>(method: M): UseMutationResult<RpcResults[M], Error, RpcParams<M>> => client.useRpcMutation(method);
 export const { queryClient, useRun } = client;

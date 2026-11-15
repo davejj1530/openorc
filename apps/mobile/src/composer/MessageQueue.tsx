@@ -1,9 +1,11 @@
 import { failureParts, queueHint } from "@openorc/client";
 import type { QueuedMessage } from "@openorc/protocol";
+import type { PausedMessage } from "../thread/cloud-together";
 import { useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { ChevronDown, X } from "../generated/icons";
+import { cn } from "../ui/cn";
 import { arrive } from "../ui/motion";
 import { Text } from "../ui/Text";
 
@@ -13,6 +15,39 @@ function QueuedText({ text }: { text: string }) {
   return (
     <Pressable accessibilityRole="button" accessibilityState={{ expanded: full }} onPress={() => setFull(!full)}>
       <Text numberOfLines={full ? undefined : 2}>{text}</Text>
+    </Pressable>
+  );
+}
+
+/** A queued message's one action: Start turn for the reader's own paused message, else Retry or Send now. */
+function QueuedAction({
+  message,
+  paused,
+  canSend,
+  pending,
+  onSend,
+  onStart,
+}: {
+  message: QueuedMessage;
+  paused: PausedMessage | undefined;
+  canSend: boolean;
+  pending: boolean;
+  onSend: (messageId: string) => void;
+  onStart: ((messageId: string) => void) | undefined;
+}) {
+  const start = paused && onStart;
+  const disabled = pending || (start ? !paused.canStart : !canSend && !message.interrupted);
+  const again = message.interrupted ? "Retry" : "Send now";
+  const label = start ? "Start turn" : again;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      disabled={disabled}
+      onPress={() => (start ? onStart(message.id) : onSend(message.id))}
+      hitSlop={{ top: 8, bottom: 8 }}
+      className="h-control-sm justify-center rounded-full px-2.5 active:bg-surface-2"
+    >
+      <Text className={cn("text-sm text-ink-2", disabled && "text-ink-4")}>{label}</Text>
     </Pressable>
   );
 }
@@ -34,6 +69,8 @@ export function MessageQueue({
   typing,
   onSend,
   onRemove,
+  paused,
+  onStart,
 }: {
   messages: QueuedMessage[];
   canSend: boolean;
@@ -43,11 +80,14 @@ export function MessageQueue({
   typing: boolean;
   onSend: (messageId: string) => void;
   onRemove: (messageId: string) => void;
+  /** In a cloud thread, the reader's own messages that wait paused, which start as their own turn rather than go now. */
+  paused?: ReadonlyMap<string, PausedMessage>;
+  onStart?: (messageId: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const still = useReducedMotion();
   if (!messages.length) return null;
-  const open = expanded || messages.some((message) => message.error || message.interrupted);
+  const open = expanded || messages.some((message) => message.error || message.interrupted || paused?.has(message.id));
   const behind = open ? 0 : Math.min(2, messages.length - 1);
   return (
     <View accessibilityLabel="Queued messages" className="gap-1 px-3.5">
@@ -63,21 +103,18 @@ export function MessageQueue({
                     {failureParts(message.error).headline}
                   </Text>
                 ) : null}
+                {paused?.get(message.id)?.hint ? (
+                  <Text numberOfLines={2} className="text-sm text-ink-4">
+                    {paused.get(message.id)!.hint}
+                  </Text>
+                ) : null}
                 {message.attachments.length ? (
                   <Text className="text-sm text-ink-4">
                     {message.attachments.length} {message.attachments.length === 1 ? "image" : "images"} attached
                   </Text>
                 ) : null}
               </View>
-              <Pressable
-                accessibilityRole="button"
-                disabled={(!canSend && !message.interrupted) || pending}
-                onPress={() => onSend(message.id)}
-                hitSlop={{ top: 8, bottom: 8 }}
-                className="h-control-sm justify-center rounded-full px-2.5 active:bg-surface-2"
-              >
-                <Text className={(!canSend && !message.interrupted) || pending ? "text-sm text-ink-4" : "text-sm text-ink-2"}>{message.interrupted ? "Retry" : "Send now"}</Text>
-              </Pressable>
+              <QueuedAction message={message} paused={paused?.get(message.id)} canSend={canSend} pending={pending} onSend={onSend} onStart={onStart} />
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={`Remove queued message ${index + 1}`}

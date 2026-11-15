@@ -1,6 +1,6 @@
 import type { ThreadCollaboration } from "@openorc/protocol";
 import { expect, it } from "vitest";
-import { askSeen, askStanding, turnSeen } from "./cloud-together";
+import { askSeen, askStanding, ownPaused, turnSeen } from "./cloud-together";
 
 const mara = { id: "u-mara", name: "Mara Okafor", image: null };
 const state = (facts: Partial<ThreadCollaboration>): ThreadCollaboration => ({
@@ -51,4 +51,23 @@ it("says who may answer and what answering does, in the server's words where it 
   expect(askStanding(state({ ask: ask({ state: "parked", answer: "start" }) }), "ask-1").line).toBe("Answering starts your own turn, on your sign-in and hours.");
   // An ask the screen has not caught up with yet waits, rather than be answered unbound.
   expect(askStanding(state({}), "ask-1")).toEqual({ answer: false, decline: false, line: null });
+});
+
+it("finds the reader's own paused messages, with whether they may start them and why they wait, and no one else's", () => {
+  const riley = { id: "u-riley", name: "Riley Chen", image: null };
+  const queued = (messageId: string, author: typeof riley, paused: boolean, canStart: boolean, message: string | null) => ({
+    messageId,
+    author,
+    paused,
+    canEdit: true,
+    canRemove: true,
+    canStart,
+    task: null,
+    pause: message ? { kind: "join", message } : null,
+  });
+  const read = ownPaused(
+    state({ queue: [queued("mine", riley, true, true, "The turn this was sent to has ended."), queued("waiting", riley, false, false, null), queued("hers", mara, true, false, "Stopped.")] }),
+  );
+  expect([...read]).toEqual([["mine", { canStart: true, hint: "The turn this was sent to has ended." }]]);
+  expect(ownPaused(null).size).toBe(0);
 });

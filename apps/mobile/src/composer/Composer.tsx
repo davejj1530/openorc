@@ -6,6 +6,7 @@ import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRpcMutation } from "../client";
 import { Square } from "../generated/icons";
+import { ownPaused, threadTogetherOf } from "../thread/cloud-together";
 import { SessionRecovery } from "../thread/SessionRecovery";
 import { cn } from "../ui/cn";
 import { Text } from "../ui/Text";
@@ -35,13 +36,14 @@ export interface ComposerProps extends Omit<ComposerInput, "threadId"> {
 function Queue({ thread, queued, canSteer, typing, onSent }: { thread: ThreadSummary; queued: QueuedMessage[]; canSteer: boolean; typing: boolean; onSent: () => void }) {
   const unqueue = useRpcMutation("threads.unqueue");
   const sendQueued = useRpcMutation("threads.sendQueued");
-  const failure = (unqueue.error ?? sendQueued.error)?.message;
+  const startQueued = useRpcMutation("threads.startQueued");
+  const failure = (unqueue.error ?? sendQueued.error ?? startQueued.error)?.message;
   return (
     <>
       <MessageQueue
         messages={queued}
         canSend={canSteer}
-        pending={unqueue.isPending || sendQueued.isPending}
+        pending={unqueue.isPending || sendQueued.isPending || startQueued.isPending}
         agentName={harnessShortName(isHarnessId(thread.agent) ? thread.agent : "codex")}
         typing={typing}
         onSend={(messageId) => {
@@ -49,6 +51,11 @@ function Queue({ thread, queued, canSteer, typing, onSent }: { thread: ThreadSum
           onSent();
         }}
         onRemove={(messageId) => unqueue.mutate({ id: thread.id, messageId })}
+        paused={ownPaused(threadTogetherOf(thread))}
+        onStart={(messageId) => {
+          startQueued.mutate({ threadId: thread.id, messageId });
+          onSent();
+        }}
       />
       {failure ? <Text className="px-1 text-sm text-bad">{failure}</Text> : null}
     </>

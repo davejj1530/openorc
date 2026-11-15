@@ -38,3 +38,15 @@ export function askStanding(state: ThreadCollaboration | null, approvalId: strin
   if (ask.answer === "start") return { answer: true, decline: true, line: "Answering starts your own turn, on your sign-in and hours." };
   return { answer: true, decline: true, line: null };
 }
+
+/** One of the reader's own messages that waits paused: whether they may start it as their turn now, and why it waits. */
+export interface PausedMessage {
+  canStart: boolean;
+  hint: string | null;
+}
+
+/** The reader's own paused messages in a cloud thread, by id. Another person's paused message is theirs to start. */
+export function ownPaused(state: ThreadCollaboration | null): ReadonlyMap<string, PausedMessage> {
+  const own = (state?.queue ?? []).filter((queued) => queued.paused && queued.author?.id === state?.viewer.id);
+  return new Map(own.map((queued) => [queued.messageId, { canStart: queued.canStart, hint: queued.pause?.message ?? null }]));
+}

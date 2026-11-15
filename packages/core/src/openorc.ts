@@ -1,6 +1,6 @@
 import { captureLaunchEnvironment, claudeConfigDir, recoverAgentProcesses } from "@openorc/agents";
 import { claudeAccounts as storedClaudeAccounts, Db, LedgerWriter, plans, redact, settings as storedSettings } from "@openorc/db";
-import type { Hosted, HostedThreads } from "@openorc/hosted";
+import type { Hosted, HostedThreads, OwnSkills } from "@openorc/hosted";
 import { startMcpServer, type OpenOrcMcpServer } from "@openorc/mcp";
 import { harnessAvailability, harnessInfo, harnessLoggedIn, rpcParams, type HarnessId, type RpcMethod, type RpcRequest } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
@@ -22,6 +22,7 @@ import { createClaudeAccountHandlers } from "./handlers/claude-accounts.js";
 import { createConnectorHandlers } from "./handlers/connectors.js";
 import { ConnectorService, type ConnectorPlaces } from "./services/connectors.js";
 import { accountFor } from "./services/openorc-account.js";
+import { HostedSkills } from "./services/hosted-skills.js";
 import { PlaceRouter } from "./services/place-router.js";
 import { rememberedConnectors } from "./services/remembered-connectors.js";
 import { createCloudHandlers } from "./handlers/cloud.js";
@@ -319,10 +320,19 @@ export class OpenOrc {
     if (this.hosted === undefined)
       this.hosted = accountFor(
         this.options,
-        { db: this.db, windows: this.accountTransport, notices: () => this.settings.get().notifications, claude: this.claudeAccounts, log: this.log },
+        { db: this.db, windows: this.accountTransport, notices: () => this.settings.get().notifications, claude: this.claudeAccounts, skills: this.ownSkills(), log: this.log },
         this.textGeneration,
       );
     return this.hosted;
+  }
+
+  /** The person's own skills on this Mac, each agent's, as their cloud turns get them. Claude's are its default account's. */
+  private ownSkills(): OwnSkills {
+    const skills = new HostedSkills({
+      root: this.options.dataDir,
+      claudeEnv: () => this.claudeAccounts.environment(this.environment.current(), this.claudeAccounts.defaultId()).env,
+    });
+    return (agent) => skills.own(agent);
   }
 
   /** Phones choose their own alerts, so they hear every notice; "Desktop notifications" is the windows' switch. */

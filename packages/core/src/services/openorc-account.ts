@@ -1,6 +1,6 @@
 /** Mounts `@openorc/hosted` in the Mac's core: hands it what only this Mac has. Handlers call the package's own account. */
 import { projects, settings, type Db } from "@openorc/db";
-import { createHosted, type Hosted, type LiveSocket } from "@openorc/hosted";
+import { createHosted, type Hosted, type LiveSocket, type OwnSkills } from "@openorc/hosted";
 import { ACCOUNT_PROTOCOL_HEADER, ACCOUNT_PROTOCOL_VERSION } from "@openorc/protocol";
 import { randomUUID } from "node:crypto";
 import { io } from "socket.io-client";
@@ -44,6 +44,8 @@ export interface AccountDeps {
   claude: ClaudeSignInLaunch & { defaultId(): string };
   terminal: SpawnTerminal | undefined;
   openBrowser: ((url: string) => void) | undefined;
+  /** The person's own skills on this Mac, which their cloud turns get where the server serves skills. */
+  skills: OwnSkills;
   log: Logger;
   textGeneration?: Pick<TextGenerationService, "title">;
 }
@@ -78,6 +80,7 @@ function createAccount(deps: AccountDeps): Hosted {
     mintClaudeToken: (id) => mintClaudeToken(deps.claude, deps.terminal ?? spawnWithPipes, id ?? deps.claude.defaultId()),
     ...(deps.openBrowser && { browser: { awaitReturn: awaitBrowserReturn, open: deps.openBrowser } }),
     deviceName: process.platform === "darwin" ? "OpenOrc on this Mac" : "OpenOrc on this computer",
+    skills: deps.skills,
     now: Date.now,
     log: deps.log,
     nameThread: generator ? (thread, exchange) => nameThread(thread, exchange, (input, agent, account) => generator.title(input, agent, account), deps.log) : undefined,

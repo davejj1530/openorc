@@ -1,7 +1,7 @@
 import type { AgentEvent } from "./events.js";
 
 /** Declared per session, before interests/RPCs. An absent declaration means an installed legacy phone. */
-export const PHONE_CAPABILITIES = ["subagent-threads", "reply-images", "skill-lists", "orclings", "task-details", "subthread-starts", "orcling-edits"] as const;
+export const PHONE_CAPABILITIES = ["subagent-threads", "reply-images", "skill-lists", "orclings", "task-details", "subthread-starts", "orcling-edits", "cloud-threads"] as const;
 export const supportsSubagents = (capabilities: readonly string[] = []): boolean => capabilities.includes("subagent-threads");
 /** The Mac answers `session.negotiate` with the capabilities it shares; an older Mac's link refuses a reply image. */
 export const supportsReplyImages = (capabilities: readonly string[] = []): boolean => capabilities.includes("reply-images");

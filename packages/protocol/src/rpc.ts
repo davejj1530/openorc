@@ -7,6 +7,7 @@ import { onlineTaskRpcParams, type OnlineTaskRpcResults } from "./online-tasks.j
 import { onlineTaskExecutionRpcParams, type OnlineTaskExecutionRpcResults } from "./online-task-execution.js";
 import { hostedParityRpcParams, type HostedParityRpcResults } from "./hosted-parity.js";
 import { threadCollaborationRpcParams, type ThreadCollaborationRpcResults } from "./thread-collaboration.js";
+import { cloudRemoteRpcParams, type CloudRemoteRpcResults } from "./cloud-remote.js";
 import { UsageHistoryParams } from "./usage-history.js";
 import { ProjectActivityParams } from "./project-activity.js";
 import type { AgentUpdates } from "./agent-updates.js";
@@ -94,6 +95,7 @@ export const rpcParams = {
   ...onlineTaskExecutionRpcParams,
   ...hostedParityRpcParams,
   ...threadCollaborationRpcParams,
+  ...cloudRemoteRpcParams,
   ...accountRpcParams,
   ...spacesRpcParams,
   ...organizationInvitationParams,
@@ -569,6 +571,7 @@ export interface RpcResults
     OnlineTaskExecutionRpcResults,
     HostedParityRpcResults,
     ThreadCollaborationRpcResults,
+    CloudRemoteRpcResults,
     PullRequestRpcResults,
     OrclingRpcResults,
     ProjectRpcResults,

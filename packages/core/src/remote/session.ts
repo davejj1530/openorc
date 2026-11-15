@@ -5,7 +5,7 @@ import {
   isDeviceMethod,
   isRemoteMethod,
   isSessionMethod,
-  MAC_CAPABILITIES,
+  PHONE_CAPABILITIES,
   phoneEvents,
   PREVIEW_INPUT_WORDS,
   sessionRpcParams,
@@ -239,7 +239,7 @@ export class RemoteSession {
     switch (method) {
       case "session.negotiate": {
         const { capabilities } = parsed.data as SessionParams<"session.negotiate">;
-        this.capabilities = MAC_CAPABILITIES.filter((capability) => capabilities.includes(capability));
+        this.capabilities = PHONE_CAPABILITIES.filter((capability) => capabilities.includes(capability));
         return { type: "rpc.result", id, result: { capabilities: this.capabilities } };
       }
       case "preview.unwatch":

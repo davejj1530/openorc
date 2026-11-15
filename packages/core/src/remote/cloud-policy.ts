@@ -48,6 +48,8 @@ const cloudReplies: { [M in CloudRemoteMethod]: Reply<M> } = {
   "spaces.status": phoneSpaces,
   // Names, repositories and ids; a project's folder on this Mac is named by its id alone.
   "spaces.projects": same,
+  // The handler gives a name and a picture alone.
+  "account.person": same,
   // People by id, name and picture, as the server gives them to everyone in the thread. No mail, plan or balance.
   "threads.collaboration": same,
   "threads.authors": same,

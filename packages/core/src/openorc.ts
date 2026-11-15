@@ -14,6 +14,7 @@ import { createHostedHandlers } from "./handlers/hosted.js";
 import { hostedFilesFor, type HostedFiles } from "./services/hosted-files.js";
 import { hostedParityHandlers } from "./handlers/hosted-parity.js";
 import { threadCollaborationHandlers } from "./handlers/thread-collaboration.js";
+import { createAccountPersonHandlers } from "./handlers/account-person.js";
 import { createAttachmentsHandlers } from "./handlers/attachments.js";
 import { createBenchHandlers } from "./handlers/bench.js";
 import { createCatalogHandlers } from "./handlers/catalog.js";
@@ -626,6 +627,7 @@ export class OpenOrc {
       createHostedHandlers(this.account, this.hostedFiles),
       hostedParityHandlers,
       threadCollaborationHandlers,
+      createAccountPersonHandlers(() => this.account),
       createUsageHandlers({ db: this.db, ledger: this.ledger }),
       createConnectorHandlers({ db: this.db, connectors: this.connectors }),
       createSystemHandlers({

@@ -1,5 +1,5 @@
+import { z } from "zod";
 import type { RoutedMethod } from "./owners.js";
-import { PHONE_CAPABILITIES } from "./phone-compatibility.js";
 import type { RpcMethod } from "./rpc.js";
 
 /**
@@ -10,15 +10,29 @@ import type { RpcMethod } from "./rpc.js";
 export const CLOUD_THREADS = "cloud-threads";
 export const supportsCloudThreads = (capabilities: readonly string[] = []): boolean => capabilities.includes(CLOUD_THREADS);
 
-/** What a Mac shares with a session that asks for it: what this version's phone asks for, and cloud threads, which it does not ask for yet. */
-export const MAC_CAPABILITIES = [...PHONE_CAPABILITIES, CLOUD_THREADS] as const;
+/** Who is signed in on the Mac a phone reads OpenOrc Cloud through: their name and picture, and nothing else of the account. */
+export interface AccountPerson {
+  /** Null until the server first answers with it. */
+  name: string | null;
+  /** Their picture as a data URL; null for their initials. */
+  image: string | null;
+}
+
+export const cloudRemoteRpcParams = {
+  /** The person signed in to OpenOrc on this Mac; null with nobody signed in, or no account here. */
+  "account.person": z.object({}).strict(),
+};
+
+export interface CloudRemoteRpcResults {
+  "account.person": AccountPerson | null;
+}
 
 /**
  * What a session that shares cloud threads may call besides REMOTE_METHODS. Default deny like that list, with a guard
- * and a shaped reply per method in the core: the person's spaces, a space's projects, and who is at work in a cloud
- * thread and who wrote what in it.
+ * and a shaped reply per method in the core: the person's spaces, a space's projects, who the person is, and who is at
+ * work in a cloud thread and who wrote what in it.
  */
-export const CLOUD_REMOTE_METHODS = ["spaces.status", "spaces.projects", "threads.collaboration", "threads.authors"] as const satisfies readonly RpcMethod[];
+export const CLOUD_REMOTE_METHODS = ["spaces.status", "spaces.projects", "account.person", "threads.collaboration", "threads.authors"] as const satisfies readonly RpcMethod[];
 export type CloudRemoteMethod = (typeof CLOUD_REMOTE_METHODS)[number];
 
 const cloudRemoteMethods: ReadonlySet<string> = new Set(CLOUD_REMOTE_METHODS);

@@ -138,7 +138,7 @@ export function TaskListRow({
               Review
             </Button>
           ) : null}
-          {task.status === "backlog" || task.status === "proposed" ? <TaskOnlineOpen task={record.task} /> : null}
+          {task.status === "backlog" || task.status === "proposed" ? <TaskOnlineOpen task={record.task} reference={record.reference} /> : null}
         </span>
       )}
     </div>

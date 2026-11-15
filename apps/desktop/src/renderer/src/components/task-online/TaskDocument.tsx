@@ -5,12 +5,11 @@ import { useTaskDocumentDraft } from "../../lib/task-document-draft";
 import { taskRefKey } from "../../lib/task-ref";
 import { TaskDocumentFields } from "../task-list/TaskDocumentFields";
 import { taskDraftStatus, type TaskDocumentHandle } from "../../views/TaskDocument";
-import { ArrowUpRight } from "../icons";
-import { Button, Tooltip } from "../ui";
 import { TaskAssignee } from "./TaskAssignee";
 import { TaskSaveConflict } from "./TaskSaveConflict";
 import { TaskLinks } from "./TaskLinks";
 import { TaskOnlineDelete } from "./TaskDelete";
+import { TaskThreadLink } from "./TaskThreadLink";
 
 export function OnlineTaskDocument({
   reference,
@@ -90,11 +89,7 @@ export function OnlineTaskDocument({
           </div>
         )}
         <span className="hidden sm:inline-flex text-xs text-ink-3">OpenOrc Cloud</span>
-        <Tooltip label={task.execution.state === "unavailable" ? "This task’s thread is unavailable." : "Opening cloud task threads isn’t available yet."}>
-          <Button disabled>
-            Open thread <ArrowUpRight size={13} />
-          </Button>
-        </Tooltip>
+        <TaskThreadLink reference={reference} task={task} beforeOpen={flush} getTask={() => controller.getSnapshot().task} onConflict={(current) => controller.observe(current)} />
       </footer>
     </div>
   );

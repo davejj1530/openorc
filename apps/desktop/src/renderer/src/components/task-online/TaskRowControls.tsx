@@ -3,10 +3,11 @@ import type { OnlineTask, OnlineTaskRef } from "@openorc/protocol";
 import { useTaskProperty } from "../../lib/task-property";
 import { CoversPreview } from "../../lib/browser-preview";
 import { floatingGround } from "../../lib/use-anchor-ground";
-import { Check, MessageSquare } from "../icons";
+import { Check } from "../icons";
 import { menuItem, menuPopup } from "../menu";
 import { StatusIcon, statusLabel, statusOrder } from "../status";
-import { IconButton, Tooltip } from "../ui";
+import { IconButton } from "../ui";
+import { TaskThreadLink } from "./TaskThreadLink";
 
 export function TaskOnlineRowStatus({ reference, task, onMoved }: { reference: OnlineTaskRef; task: OnlineTask; onMoved: () => void }) {
   const update = useTaskProperty(reference, task);
@@ -52,12 +53,6 @@ export function TaskOnlineRowStatus({ reference, task, onMoved }: { reference: O
   );
 }
 
-export function TaskOnlineOpen({ task }: { task: OnlineTask }) {
-  return (
-    <Tooltip label={task.execution.state === "unavailable" ? "This task’s thread is unavailable." : "Opening cloud task threads isn’t available yet."}>
-      <IconButton size="xs" aria-label={`Open thread for ${task.title}`} disabled>
-        <MessageSquare size={14} />
-      </IconButton>
-    </Tooltip>
-  );
+export function TaskOnlineOpen({ task, reference }: { task: OnlineTask; reference: OnlineTaskRef }) {
+  return <TaskThreadLink compact reference={reference} task={task} />;
 }

@@ -22,12 +22,12 @@ export function preparedTaskFor(scope: HostedTaskDraftScope, threadId: string): 
   const task = preparedTaskDraft(hostedConversationDraftKey(scope, threadId));
   return task?.threadId === threadId && task.reference.accountId === scope.accountId && task.reference.spaceId === scope.spaceId ? task : null;
 }
-export function stageStoredTask(scope: HostedTaskDraftScope, reference: OnlineTaskRef, prepared: OnlineTaskThread): string {
+export function stageStoredTask(scope: HostedTaskDraftScope, reference: OnlineTaskRef, prepared: OnlineTaskThread, attachments = 0): string {
   if (scope.accountId !== reference.accountId || scope.spaceId !== reference.spaceId) throw new Error("This task isn't available.");
   const key = hostedConversationDraftKey(scope, prepared.threadId);
   const current = storedDraft(key);
   const files = readDraft<{ attachments: unknown }>(`${key}.attachments`, { attachments: [] });
-  const count = Array.isArray(files.attachments) ? files.attachments.length : 1;
+  const count = Math.max(attachments, Array.isArray(files.attachments) ? files.attachments.length : 1);
   const staged = stageTaskDraft(current.task ?? null, reference, prepared, { text: current.text, attachments: count }, crypto.randomUUID());
   save(key, staged);
   return key;

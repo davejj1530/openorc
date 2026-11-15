@@ -15,7 +15,6 @@ const leave = vi.fn();
 let people: People;
 let failure: string | null;
 let gate: unknown;
-const frozenWords = "Your seat was taken back, and your day of grace has ended.";
 const gateStatus = (state: "active" | "frozen") => ({
   state: "ready",
   userId: "user-alex",
@@ -30,7 +29,8 @@ const gateStatus = (state: "active" | "frozen") => ({
   reach: "live",
   heardAt: Date.now(),
   error: null,
-  organizationAccess: state === "frozen" ? { state, reason: "seat_removed", until: null, message: frozenWords } : { state, reason: null, until: null, message: null },
+  organizationAccess:
+    state === "frozen" ? { state, reason: "seat_removed", until: null, message: "Your seat was taken back, and your day of grace has ended." } : { state, reason: null, until: null, message: null },
 });
 beforeEach(() => {
   vi.clearAllMocks();
@@ -191,9 +191,8 @@ it("shows a frozen admin the people and their plans, with no project count, role
   gate = "frozen";
   show();
   await screen.findByText("mira@example.com");
-  const invite = await screen.findByRole("button", { name: "Invite people" });
-  await waitFor(() => expect(invite.getAttribute("data-tip")).toBe(frozenWords));
-  expect(invite).toHaveProperty("disabled", true);
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Role for Mira Chen" })).toBeNull());
+  expect(screen.getByRole("button", { name: "Invite people" })).toHaveProperty("disabled", false);
   expect(screen.getByText("3 people")).toBeTruthy();
   expect(mock.call.mock.calls.some(([method]) => method === "spaces.projects")).toBe(false);
   expect(screen.queryByRole("button", { name: "Role for Mira Chen" })).toBeNull();

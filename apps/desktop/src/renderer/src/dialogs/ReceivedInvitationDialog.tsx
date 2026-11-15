@@ -2,6 +2,7 @@ import type { ReceivedInvitation } from "@openorc/protocol";
 import { Button, Dialog } from "../components/ui";
 import { OrganizationMark } from "../components/OrganizationMark";
 import { AccountFace } from "../components/AccountFace";
+import { InvitationProLine } from "../components/InvitationProLine";
 import { inviterLine, type ReceivedInvitationActions } from "../lib/received-invitations";
 import "./received-invitations.css";
 
@@ -27,6 +28,7 @@ export function ReceivedInvitationDialog({ actions }: { actions: ReceivedInvitat
         ) : (
           <>
             <InvitationIdentity invitation={invitation} />
+            {!joined ? <InvitationProLine organization={invitation.organization.name} includesSeat={invitation.includesSeat} /> : null}
             <div className="organization-received-email">{invitation.email}</div>
             {joined ? <p>You joined {invitation.organization.name}.</p> : null}
             {error ? (

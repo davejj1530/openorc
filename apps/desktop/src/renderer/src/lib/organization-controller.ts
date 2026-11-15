@@ -83,7 +83,7 @@ export function useOrganizationController() {
       if (signedIn && data?.create.allowed) setDialog({ kind: "create" });
     },
     invite: () => {
-      if (organization && authority.manages) setDialog({ kind: "invite", organization });
+      if (organization && authority.invites) setDialog({ kind: "invite", organization });
     },
     addProjects: () => {
       if (organization && authority.manages) setDialog({ kind: "projects", spaceId: organization.id });

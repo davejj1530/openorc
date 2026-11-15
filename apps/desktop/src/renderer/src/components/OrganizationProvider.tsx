@@ -23,7 +23,9 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
             onSaved={saved}
           />
         ) : null}
-        {dialog?.kind === "invite" ? <OrganizationInviteDialog organization={dialog.organization} onClose={actions.close} onViewInvitations={() => actions.people("invitations")} /> : null}
+        {dialog?.kind === "invite" ? (
+          <OrganizationInviteDialog organization={dialog.organization} onClose={actions.close} onViewInvitations={() => actions.people("invitations")} onBuySeats={() => actions.people("seats")} />
+        ) : null}
         {dialog?.kind === "projects" ? (
           <OrganizationProjectsDialog
             open

@@ -57,3 +57,30 @@
   align-items: flex-start;
   gap: 2px;
 }
+.organization-invite-seats {
+  display: grid;
+  gap: 12px;
+  font-size: 13px;
+}
+.organization-invite-seats > label,
+.organization-invite-capacity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.organization-invite-seats > label > span:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.organization-invite-seat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  color: var(--ink-3);
+}
+.organization-invite-capacity {
+  min-height: 28px;
+  color: var(--ink-3);
+}

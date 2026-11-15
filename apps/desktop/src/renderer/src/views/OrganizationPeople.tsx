@@ -34,7 +34,7 @@ export function OrganizationPeople(props: Props) {
 
 function OrganizationPeopleBody({ spaceId, onInvite, onLeft }: Props) {
   const people = useOrganizationPeople(spaceId);
-  // A frozen admin keeps the people, their seats and the invitations; the reason shows on what waits for their access.
+  // A frozen admin keeps the people, their seats and the invitations, and may invite with a seat.
   const frozen = useFrozenReason(spaceId);
   const held = Boolean(people.error || frozen);
   const [dialog, setDialog] = useState<{ action: Action; trigger: HTMLButtonElement | null } | null>(null);
@@ -67,7 +67,7 @@ function OrganizationPeopleBody({ spaceId, onInvite, onLeft }: Props) {
           <>
             <OrganizationPeopleHeading people={data} projects={!frozen}>
               {admin && section.section === "people" ? (
-                <Button variant="primary" size="lg" disabled={held} data-tip={frozen} onClick={onInvite}>
+                <Button variant="primary" size="lg" disabled={Boolean(people.error)} onClick={onInvite}>
                   Invite people
                 </Button>
               ) : null}

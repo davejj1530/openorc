@@ -16,7 +16,7 @@ export interface OrganizationActions {
   create(): void;
   invite(): void;
   addProjects(): void;
-  people(section?: "invitations"): void;
+  people(section?: "invitations" | "seats"): void;
   select(id: string): void;
   refresh(): Promise<void>;
   logoSaved(): void;

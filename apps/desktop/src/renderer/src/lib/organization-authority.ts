@@ -26,15 +26,18 @@ export function useOrganizationAuthority(organization: OrganizationSpace | null,
     [],
   );
   const frozen = gate.blocked === "frozen";
-  const manages = organization?.role === "admin" && !frozen;
-  const held = dialog?.kind === "projects" || dialog?.kind === "invite" ? manages : true;
+  const admin = organization?.role === "admin";
+  const manages = admin && !frozen;
+  // A frozen admin still invites, with a seat for every address; the organization's projects wait for their access.
+  const open = { projects: manages, invite: admin, create: true };
+  const held = dialog ? open[dialog.kind] : true;
   const closing = useRef(close);
   closing.current = close;
   useLayoutEffect(() => {
     if (!held) closing.current();
   }, [held]);
   /** `generation` moves whenever the gate's authority does: the spaces are reconciled again on each move. */
-  return { frozen, manages, generation: gate.generation };
+  return { frozen, manages, invites: admin, generation: gate.generation };
 }
 
 /** This person's private words for why the organization is frozen to them; nothing while it is open. */

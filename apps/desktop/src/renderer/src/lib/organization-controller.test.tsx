@@ -95,7 +95,7 @@ it("reads the organization fresh when access returns", async () => {
   expect(birch()?.closed).toBeUndefined();
 });
 
-it("closes Add projects and Invite people when the person is frozen, and opens neither while frozen", async () => {
+it("closes Add projects when the person is frozen and does not open it again, while a frozen admin can still invite", async () => {
   const hook = await inBirch();
   act(() => hook.result.current.actions.addProjects());
   expect(hook.result.current.actions.dialog).toEqual({ kind: "projects", spaceId: "birch" });
@@ -103,8 +103,9 @@ it("closes Add projects and Invite people when the person is frozen, and opens n
   await hear();
   expect(hook.result.current.actions.dialog).toBeNull();
   act(() => hook.result.current.actions.addProjects());
-  act(() => hook.result.current.actions.invite());
   expect(hook.result.current.actions.dialog).toBeNull();
+  act(() => hook.result.current.actions.invite());
+  expect(hook.result.current.actions.dialog?.kind).toBe("invite");
 });
 
 it("closes an admin's dialog when they are made a member", async () => {

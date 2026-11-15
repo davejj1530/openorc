@@ -172,6 +172,8 @@ function InvitationIdentity({ invitation, now }: { invitation: OrganizationInvit
   if (expired) detail = `${role} · Expired`;
   else if (failed) detail = "Email wasn't sent";
   else if (invitation.delivery?.status === "sent") detail = `${role} · Sent ${sentAgo(invitation.delivery.at, now)}`;
+  // Only what the server says of the invitation now: an expired or unpaid hold promises nothing.
+  if (invitation.includesSeat === true && !expired) detail += " · Includes Pro";
   return (
     <div className="people-invitation-identity">
       <span>{invitation.email}</span>

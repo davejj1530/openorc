@@ -158,3 +158,21 @@ it("updates the inviter's face and name in an already open detail", async () => 
   expect(screen.getByText("Alex Lee invited you.")).toBeTruthy();
   expect(document.querySelector(".organization-received-person img")?.getAttribute("src")).toBe(image);
 });
+
+it("says the organization includes Pro only while the invitation read now says so", async () => {
+  status = { ...status, invitations: [{ ...invitation, includesSeat: true }] };
+  show();
+  fireEvent.click(screen.getByRole("button", { name: "Birch Studio" }));
+  expect(await screen.findByText("Birch Studio includes Pro with this invitation.")).toBeTruthy();
+  status = { ...status, invitations: [{ ...invitation, includesSeat: false }] };
+  await act(() => queryClient.invalidateQueries({ queryKey: ["spaces.status"] }));
+  await waitFor(() => expect(screen.queryByText("Birch Studio includes Pro with this invitation.")).toBeNull());
+  expect(screen.getByRole("button", { name: "Join Birch Studio" })).toBeTruthy();
+});
+
+it("says nothing about Pro for an invitation from a server that knows no seats", async () => {
+  show();
+  fireEvent.click(screen.getByRole("button", { name: "Birch Studio" }));
+  await screen.findByRole("dialog", { name: "Join Birch Studio" });
+  expect(screen.queryByText(/includes Pro/)).toBeNull();
+});

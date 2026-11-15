@@ -100,3 +100,20 @@ it("updates the expiry and resend deadline without a server event", async () => 
   expect(screen.getByText("Member · Expired")).toBeTruthy();
   expect(screen.getByRole<HTMLButtonElement>("button", { name: "Resend" }).disabled).toBe(false);
 });
+
+it("says an invitation includes Pro only while the server says it holds a paid seat", async () => {
+  rows = [{ ...rows[0]!, includesSeat: true }];
+  const shown = show();
+  expect(await screen.findByText("Member · Sent 2 minutes ago · Includes Pro")).toBeTruthy();
+  rows = [{ ...rows[0]!, includesSeat: false }];
+  await act(() => queryClient.invalidateQueries({ queryKey: ["organization.invitations"] }));
+  expect(await screen.findByText("Member · Sent 2 minutes ago")).toBeTruthy();
+  shown.unmount();
+});
+
+it("promises nothing for an expired invitation, whatever an old answer said", async () => {
+  rows = [{ ...rows[0]!, state: "expired", expiresAt: Date.now() - 1000, includesSeat: true }];
+  show();
+  expect(await screen.findByText("Member · Expired")).toBeTruthy();
+  expect(screen.queryByText(/Includes Pro/)).toBeNull();
+});

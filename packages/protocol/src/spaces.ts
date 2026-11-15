@@ -95,6 +95,8 @@ export interface OrganizationProjectAccess {
 export const spacesRpcParams = {
   "spaces.status": z.object({}).strict(),
   "spaces.refresh": z.object({}).strict(),
+  /** The organizations where a note tags the person and they have not read it: only which, never how many or what. */
+  "spaces.mentions": z.object({}).strict(),
   "spaces.invitation.accept": z.object({ invitationId: SpaceId }).strict(),
   "spaces.invitation.decline": z.object({ invitationId: SpaceId }).strict(),
   "spaces.projects": z.object({ spaceId: SpaceId }).strict(),
@@ -110,6 +112,7 @@ export const spacesRpcParams = {
 export interface SpacesRpcResults extends OrganizationSetupResults, OrganizationInvitationResults {
   "spaces.status": SpacesStatus;
   "spaces.refresh": SpacesStatus;
+  "spaces.mentions": { spaceIds: string[] };
   "spaces.invitation.accept": { spaceId: string };
   "spaces.invitation.decline": Record<string, never>;
   "spaces.projects": SpaceProject[];

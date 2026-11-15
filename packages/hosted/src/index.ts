@@ -138,6 +138,8 @@ export interface HostedSpaces {
     decline(invitationId: string): Promise<RpcResults["spaces.invitation.decline"]>;
   };
   refresh(): Promise<void>;
+  /** The usable organizations where a note tags the person unread. */
+  mentions(): Promise<RpcResults["spaces.mentions"]>;
   readonly invitations: {
     list(spaceId: string): Promise<RpcResults["organization.invitations"]>;
     send(input: RpcParams<"organization.invite">): Promise<RpcResults["organization.invite"]>;

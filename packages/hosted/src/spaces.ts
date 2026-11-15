@@ -88,6 +88,22 @@ export class Spaces implements HostedSpaces {
     return spaceProjects(spaceId, heard.index.personalSpaceId, heard.projects, this.deps.projects());
   }
 
+  /** Account-wide and names no space; one this app does not hold as a usable organization is never reported. */
+  async mentions(): Promise<{ spaceIds: string[] }> {
+    const status = this.status();
+    if (status.state !== "ready") return { spaceIds: [] };
+    const generation = this.deps.session.generation;
+    try {
+      const reply = await this.deps.session.request(ROUTES.mentions);
+      this.#assertCurrent(generation);
+      const usable = new Set(status.spaces.filter((space) => space.kind === "organization").map((space) => space.id));
+      return { spaceIds: reply.spaces.map((space) => space.spaceId).filter((id) => usable.has(id)) };
+    } catch (error) {
+      if (error instanceof Refused && error.status === 404) return { spaceIds: [] };
+      throw error;
+    }
+  }
+
   async people(spaceId: string, offset = 0, limit = 100): Promise<OrganizationPeople> {
     const generation = this.deps.session.generation;
     const read = await this.deps.session.in(spaceId).request(ROUTES.people(offset, limit));

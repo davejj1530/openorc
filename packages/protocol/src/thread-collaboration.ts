@@ -144,6 +144,17 @@ export const threadCollaborationRpcParams = {
       replyTo: z.string().optional(),
     })
     .strict(),
+  /** Marks read the notes the reader saw, each by id; a note they did not see stays as it was. */
+  "threads.readNotes": z
+    .object({
+      threadId: z.string(),
+      ids: z
+        .array(z.string())
+        .min(1)
+        .max(100)
+        .refine((ids) => new Set(ids).size === ids.length),
+    })
+    .strict(),
 };
 
 export interface ThreadCollaborationRpcResults {
@@ -154,4 +165,5 @@ export interface ThreadCollaborationRpcResults {
   "threads.retrySave": null;
   "threads.notes": ThreadNotesPage;
   "threads.postNote": { note: ThreadNote };
+  "threads.readNotes": null;
 }

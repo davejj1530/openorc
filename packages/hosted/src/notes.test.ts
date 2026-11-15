@@ -47,7 +47,7 @@ async function shared() {
   const ada = await hostAs(ADA);
   const bob = await hostAs(BOB);
   await vi.waitFor(() => expect(ada.threads.holds({ thread }) && bob.threads.holds({ thread })).toBe(true));
-  return { thread, ada, bob, project };
+  return { thread, ada, bob, project, team };
 }
 
 const adaTag = (text: string) => ({ text: `@Ada ${text}`, mentions: [{ userId: "user-ada@example.com", start: 0, end: 4 }] });
@@ -95,5 +95,46 @@ describe("a thread's notes", () => {
     expect(await ada.threads.call("threads.notes", { threadId: thread, before: 4, limit: 2 })).toMatchObject({ hasBefore: true, hasAfter: true, notes: [{ seq: 2 }, { seq: 3 }] });
     expect((await ada.threads.call("threads.notes", { threadId: thread, after: 3 })).notes.map((note) => note.seq)).toEqual([4, 5]);
     expect((await ada.threads.call("threads.notes", { threadId: thread, around: noteId(3), limit: 3 })).notes.map((note) => note.seq)).toEqual([2, 3, 4]);
+    await expect(ada.threads.call("threads.notes", { threadId: thread, around: noteId(9) })).rejects.toThrow("That note isn't here.");
+  });
+
+  it("posts a reply to a note in the same thread, and refuses one to a note that is not here", async () => {
+    const { thread, ada, bob } = await shared();
+    await bob.threads.call("threads.postNote", { threadId: thread, id: noteId(1), ...adaTag("first") });
+    const bobTag = { text: "@Bob done", mentions: [{ userId: "user-bob@example.com", start: 0, end: 4 }] };
+    expect((await ada.threads.call("threads.postNote", { threadId: thread, id: noteId(2), ...bobTag, replyTo: noteId(1) })).note.replyTo).toBe(noteId(1));
+    await expect(ada.threads.call("threads.postNote", { threadId: thread, id: noteId(3), ...bobTag, replyTo: noteId(9) })).rejects.toThrow("That note isn't here.");
+  });
+});
+
+describe("reading a thread's notes", () => {
+  const mentions = async (hosted: Hosted, thread: string) => {
+    const read = await hosted.threads.call("threads.collaboration", { threadId: thread });
+    return read.supported ? read.state.mentions : null;
+  };
+
+  it("marks read only the notes the reader saw, keeps an earlier one unread, and the thread's mention and the space's follow", async () => {
+    const { thread, ada, bob, team } = await shared();
+    for (let n = 1; n <= 2; n++) await bob.threads.call("threads.postNote", { threadId: thread, id: noteId(n), ...adaTag(`note ${n}`) });
+    expect(await mentions(ada, thread)).toEqual({ unread: true, firstUnreadNoteId: noteId(1) });
+    expect(await ada.spaces.mentions()).toEqual({ spaceIds: [team] });
+    expect(await mentions(bob, thread)).toEqual({ unread: false, firstUnreadNoteId: null });
+    expect((await bob.threads.call("threads.notes", { threadId: thread })).notes.map((note) => note.read)).toEqual([true, true]);
+
+    await ada.threads.call("threads.readNotes", { threadId: thread, ids: [noteId(2)] });
+    expect((await ada.threads.call("threads.notes", { threadId: thread })).notes.map((note) => note.read)).toEqual([false, true]);
+    expect(await mentions(ada, thread)).toEqual({ unread: true, firstUnreadNoteId: noteId(1) });
+
+    await ada.threads.call("threads.readNotes", { threadId: thread, ids: [noteId(1), noteId(2)] });
+    expect(await mentions(ada, thread)).toEqual({ unread: false, firstUnreadNoteId: null });
+    expect(await ada.spaces.mentions()).toEqual({ spaceIds: [] });
+    await expect(ada.threads.call("threads.readNotes", { threadId: thread, ids: [noteId(9)] })).rejects.toThrow("That note isn't here.");
+  });
+
+  it("names no space on a server that predates mentions", async () => {
+    await shared();
+    stand.threadCollaboration.mentionSpaces = false;
+    const ada = await hostAs(ADA);
+    expect(await ada.spaces.mentions()).toEqual({ spaceIds: [] });
   });
 });

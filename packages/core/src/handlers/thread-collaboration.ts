@@ -17,4 +17,5 @@ export const threadCollaborationHandlers: Pick<Handlers, keyof typeof threadColl
   "threads.retrySave": elsewhere,
   "threads.notes": elsewhere,
   "threads.postNote": elsewhere,
+  "threads.readNotes": elsewhere,
 };

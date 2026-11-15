@@ -75,6 +75,7 @@ export const OWNER_ROUTES: { [M in RoutedMethod]: OwnerRoute<M> } & { [M in Excl
   "threads.retrySave": byThreadId,
   "threads.notes": byThreadId,
   "threads.postNote": byThreadId,
+  "threads.readNotes": byThreadId,
   "threads.start": { by: "start" },
   "threads.list": { by: "merge" },
   "threads.resolvedCount": { by: "merge" },

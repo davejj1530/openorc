@@ -33,6 +33,7 @@ import { userOf, type StandInSpaces } from "./stand-in-spaces.js";
 import { attachedPath, StandInThreadFiles } from "./stand-in-thread-files.js";
 import { StandInCollaboration } from "./stand-in-collaboration.js";
 import { StandInNotes } from "./stand-in-notes.js";
+import { headOf, lastAgentSeq, messageOf, pageOf, turnEnds, wire } from "./stand-in-thread-log.js";
 import type { UploadedFile } from "../wire-files.js";
 
 export interface StandInPeer {
@@ -52,7 +53,7 @@ export interface StandInThreadSeed {
   backgroundCommands?: { id: string; description: string }[];
 }
 
-interface Stored {
+export interface Stored {
   seq: number;
   turnId: string | null;
   by: string | null;
@@ -62,7 +63,7 @@ interface Stored {
 /** Whether a person may start a turn with these settings, as billing and their sign-ins say; the refusal when not. */
 export type Admit = (who: string, settings: { agent: string; model: string | null }) => string | null;
 
-interface Message {
+export interface Message {
   id: string;
   author: string;
   text: string;
@@ -94,7 +95,7 @@ interface View {
   snoozedUntil: string | null;
 }
 
-interface Thread {
+export interface Thread {
   id: string;
   space: string;
   owner: string;
@@ -127,47 +128,11 @@ const missing = (): Reply => ({ status: 404, body: { message: "That thread isn't
 const READ_ONLY: Reply = { status: 403, body: { message: "You can read this thread, but only the people in it can send to it or act on it.", statusCode: 403 } };
 const NO_PROJECT: Reply = { status: 404, body: { message: "That project isn't here.", statusCode: 404 } };
 
-const lastAgentSeq = (thread: Thread) => thread.events.findLast((stored) => stored.by === null)?.seq ?? 0;
-const headOf = (thread: Thread) => thread.events.at(-1)?.seq ?? 0;
-const turnEnds = (thread: Thread) => thread.events.filter((stored) => stored.event["type"] === "turn.completed").map((stored) => stored.seq);
 /** The agent's own id for a turn. Its host's turn events carry it; the server names the turn by its row's id, on each stored event. */
 const agentTurn = (turnId: string) => `${turnId}-agent`;
-const wire = (thread: Thread, stored: Stored) => ({ seq: stored.seq, turnId: stored.turnId, by: stored.by, event: { ...stored.event, eventId: `${thread.id}.${stored.seq}` } });
 const openAsk = (thread: Thread) => thread.asks.find((ask) => !ask.answered) ?? null;
 const viewOf = (thread: Thread, who: string): View => thread.views.get(who) ?? { seenSeq: 0, pinnedAt: null, archivedAt: null, snoozedUntil: null };
 const UUID = /^[0-9a-f-]{36}$/i;
-
-function messageOf(message: Message) {
-  return {
-    id: message.id,
-    authorId: userOf(message.author),
-    text: message.text,
-    files: message.files,
-    state: message.state,
-    delivery: message.state === "delivered" ? "started" : null,
-    refusal: message.refusal,
-    afterTurn: message.after,
-    createdAt: message.createdAt,
-  };
-}
-
-/** A stretch of the log: from a turn, or after a seq, at most `limit` events, with the head. */
-function pageOf(thread: Thread, query: URLSearchParams) {
-  const limit = Number(query.get("limit") ?? 500);
-  const ends = turnEnds(thread);
-  const fromTurn = query.has("fromTurn") ? Math.min(Number(query.get("fromTurn")), ends.length) : undefined;
-  if (query.has("before")) {
-    const before = Number(query.get("before"));
-    const events = thread.events.filter((stored) => stored.seq < before).slice(-limit);
-    return { events: events.map((stored) => wire(thread, stored)), head: headOf(thread) };
-  }
-  const after = fromTurn === undefined ? Number(query.get("after") ?? 0) : (ends[fromTurn - 1] ?? 0);
-  const events = thread.events
-    .filter((stored) => stored.seq > after)
-    .slice(0, limit)
-    .map((stored) => wire(thread, stored));
-  return { events, head: headOf(thread), ...(fromTurn !== undefined && { fromTurn }) };
-}
 
 export class StandInThreads {
   readonly #threads = new Map<string, Thread>();
@@ -203,12 +168,14 @@ export class StandInThreads {
     this.collaboration = new StandInCollaboration(person, readers);
     this.notes = new StandInNotes((email) => this.collaboration.personOf(email), readers);
     this.collaboration.noteHead = (threadId) => this.notes.head(threadId);
+    this.collaboration.mentionsOf = (threadId, who) => this.notes.mentionsOf(threadId, who);
   }
 
   /** The person's spaces, and the routes under /projects and /hosted, for `who` in the space they name; null for any other path. */
   route(request: { method: string; path: string; query: URLSearchParams; space: string | null }, who: string, body: Record<string, unknown> = {}): Reply | null {
     const { method, path } = request;
-    if (method === "GET" && path === "/api/auth/organization/list") return { status: 200, body: this.spaces.spacesOf(who) };
+    const account = method === "GET" ? this.#account(path, who) : null;
+    if (account) return account;
     if (!/^\/(projects|hosted)\b/.test(path)) return null;
     const space = this.spaces.resolve(who, request.space);
     if (typeof space !== "string") return space;
@@ -251,14 +218,23 @@ export class StandInThreads {
     return thread ? this.collaboration.route(request.method, read[2]!, request.query, thread, as.who) : missing();
   }
 
-  /** A thread's notes: posted once shared writing opens past joining, paged by any reader. */
+  /** A thread's notes: posted once shared writing opens past joining, paged and read by any reader. */
   #notesRoute(request: { method: string; path: string; query: URLSearchParams }, as: { who: string; space: string }, body: Record<string, unknown>): Reply | null {
-    const noted = /^\/hosted\/threads\/([^/]+)\/notes$/.exec(request.path);
+    const noted = /^\/hosted\/threads\/([^/]+)\/notes(\/read)?$/.exec(request.path);
     if (!noted) return null;
     const thread = this.#readable(as, decodeURIComponent(noted[1]!));
     if (!thread) return missing();
     if (request.method === "POST" && (!this.collaboration.sharedWrites || this.collaboration.joinOnly)) return READ_ONLY;
-    return this.notes.route(request.method, request.query, body, { id: thread.id, head: headOf(thread) }, as.who, () => this.#changed(thread));
+    return this.notes.route(request.method, Boolean(noted[2]), { query: request.query, body }, { id: thread.id, head: headOf(thread) }, as.who, () => this.#changed(thread));
+  }
+
+  /** The person's spaces, and those with a note that tags them unread across every thread they read; null for any other path. */
+  #account(path: string, who: string): Reply | null {
+    if (path === "/api/auth/organization/list") return { status: 200, body: this.spaces.spacesOf(who) };
+    if (path !== "/hosted/mentions") return null;
+    if (!this.collaboration.mentionSpaces) return missing();
+    const read = [...this.#threads.values()].filter((thread) => this.#reads(who, thread));
+    return { status: 200, body: { spaces: this.notes.unreadSpaces(read, who) } };
   }
 
   /** The list, one thread, its log, its title and settings, its removal, and a background command's stop. */

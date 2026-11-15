@@ -74,6 +74,10 @@ export class StandInCollaboration {
   failNextHandoff: StandInHandoff["code"] | null = null;
   /** The thread's last note `seq`, which every reader's collaboration carries. */
   noteHead: (threadId: string) => number = () => 0;
+  /** The reader's first unread note that tags them. */
+  mentionsOf: (threadId: string, who: string) => { unread: boolean; firstUnreadNoteId: string | null } = () => ({ unread: false, firstUnreadNoteId: null });
+  /** Whether the server answers `GET /hosted/mentions`; an older one does not. */
+  mentionSpaces = true;
   /** Addresses whose accounts are gone: they read as null wherever a person is named. */
   readonly gone = new Set<string>();
 
@@ -111,7 +115,7 @@ export class StandInCollaboration {
           canRemove: message.author === who,
           canStart: open && Boolean(message.paused) && message.author === who && !thread.turn && !this.holds(thread, who),
         })),
-      mentions: { unread: false, firstUnreadNoteId: null },
+      mentions: this.mentionsOf(thread.id, who),
       noteHead: this.noteHead(thread.id),
     };
   }
@@ -204,7 +208,7 @@ export class StandInCollaboration {
           canRemove: message.author === who,
           canStart: creator && Boolean(message.paused) && message.author === who && !thread.turn,
         })),
-      mentions: { unread: false, firstUnreadNoteId: null },
+      mentions: this.mentionsOf(thread.id, who),
       noteHead: this.noteHead(thread.id),
     };
   }

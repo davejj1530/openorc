@@ -18,6 +18,12 @@ export async function notes(threads: Threads, { threadId, after, before, around,
   return { ...page, notes: page.notes.map(toNote) };
 }
 
+/** threads.readNotes: the notes this reader saw, read on every device; the server keeps any other note as it was. */
+export async function readNotes(threads: Threads, { threadId, ids }: RpcParams<"threads.readNotes">): Promise<RpcResults["threads.readNotes"]> {
+  await threads.on(threadId).request(COLLABORATION_ROUTES.readNotes(threadId), { ids });
+  return null;
+}
+
 /** threads.postNote: the note as the server stored it. Every window, this one included, hears it as the thread's change. */
 export async function postNote(threads: Threads, { threadId, ...note }: RpcParams<"threads.postNote">): Promise<RpcResults["threads.postNote"]> {
   const posted = await threads.on(threadId).request(COLLABORATION_ROUTES.postNote(threadId), note);

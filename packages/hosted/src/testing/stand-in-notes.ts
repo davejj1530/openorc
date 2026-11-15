@@ -2,7 +2,9 @@
  * The stand-in's notes, with the real server's rules the app depends on (the contract's notes section): a note tags at
  * least one person who reads the thread's project, by ranges of its text; the same id again is the same note, another
  * note under it is refused; a note takes its place after the thread's events stored so far; pages run by `seq`. A note
- * starts nothing and reaches no agent. Refusals are in the server's words.
+ * starts nothing and reaches no agent. Each reader reads a note by marking it read by id, never by a high-water mark, so a
+ * note they skipped stays unread; their first unread note that tags them is their thread's mention. Refusals are in the
+ * server's words.
  */
 import { userOf } from "./stand-in-spaces.js";
 
@@ -21,6 +23,7 @@ interface StoredNote {
 }
 
 const refused = (status: number, code: string, message: string): Reply => ({ status, body: { code, message, statusCode: status } });
+const gone = () => refused(404, "note_gone", "That note isn't here.");
 const emailOf = (userId: string) => (userId.startsWith("user-") ? userId.slice(5) : null);
 
 /** Ranges sorted, apart, inside the text and each naming some of it. */
@@ -37,6 +40,8 @@ function rangesHold(text: string, mentions: unknown): mentions is StoredNote["me
 
 export class StandInNotes {
   readonly #notes = new Map<string, StoredNote[]>();
+  /** The notes each reader of each thread has read, by id. */
+  readonly #read = new Map<string, Map<string, Set<string>>>();
 
   constructor(
     private readonly personOf: (email: string | null) => Person | null,
@@ -48,13 +53,53 @@ export class StandInNotes {
     return this.#notes.get(threadId)?.at(-1)?.seq ?? 0;
   }
 
-  /** `POST` posts one, `GET` pages them; `posted` is told of a note stored, for the thread's readers to hear. */
-  route(method: string, query: URLSearchParams, body: Record<string, unknown>, thread: { id: string; head: number }, who: string, posted: () => void): Reply | null {
-    if (method === "GET") return { status: 200, body: this.#page(thread.id, query, who) };
+  /** The reader's first unread note that tags them, which their row marks. */
+  mentionsOf(threadId: string, who: string): { unread: boolean; firstUnreadNoteId: string | null } {
+    const first = (this.#notes.get(threadId) ?? []).find((note) => this.#tags(note, who) && !this.#seen(threadId, who).has(note.id));
+    return { unread: Boolean(first), firstUnreadNoteId: first?.id ?? null };
+  }
+
+  /** The spaces, in id order, of the threads the person reads where a note tags them unread. */
+  unreadSpaces(threads: Iterable<{ id: string; space: string }>, who: string): { spaceId: string }[] {
+    const spaces = new Set([...threads].filter((thread) => this.mentionsOf(thread.id, who).unread).map((thread) => thread.space));
+    return [...spaces].sort().map((spaceId) => ({ spaceId }));
+  }
+
+  /**
+   * `POST` posts one, `GET` pages them, `PUT .../read` marks the ones the reader saw; `changed` is told of a note stored
+   * or read, for the thread's readers to hear.
+   */
+  route(method: string, read: boolean, request: { query: URLSearchParams; body: Record<string, unknown> }, thread: { id: string; head: number }, who: string, changed: () => void): Reply | null {
+    const { query, body } = request;
+    if (read) return method === "PUT" ? this.#markRead(thread.id, who, body["ids"], changed) : null;
+    if (method === "GET") return this.#page(thread.id, query, who);
     if (method !== "POST") return null;
     const reply = this.#post(thread, who, body);
-    if (reply.status === 200) posted();
+    if (reply.status === 200) changed();
     return reply;
+  }
+
+  #markRead(threadId: string, who: string, ids: unknown, changed: () => void): Reply {
+    const notes = new Set((this.#notes.get(threadId) ?? []).map((note) => note.id));
+    if (!Array.isArray(ids) || ids.length === 0 || ids.length > 100 || new Set(ids).size !== ids.length) return refused(400, "note_ids_invalid", "Name between one and a hundred notes.");
+    if (ids.some((id) => !notes.has(id as string))) return gone();
+    const seen = this.#seen(threadId, who);
+    for (const id of ids as string[]) seen.add(id);
+    changed();
+    return { status: 204, body: null };
+  }
+
+  #seen(threadId: string, who: string): Set<string> {
+    const thread = this.#read.get(threadId) ?? new Map<string, Set<string>>();
+    this.#read.set(threadId, thread);
+    const seen = thread.get(who) ?? new Set<string>();
+    thread.set(who, seen);
+    return seen;
+  }
+
+  /** A note tags the person, and is someone else's: tagging yourself is no mention. */
+  #tags(note: StoredNote, who: string): boolean {
+    return note.author !== who && note.mentions.some((mention) => mention.userId === userOf(who));
   }
 
   #post(thread: { id: string; head: number }, who: string, body: Record<string, unknown>): Reply {
@@ -79,7 +124,7 @@ export class StandInNotes {
     if (mentions.some((mention) => !readers.has(emailOf(mention.userId) ?? ""))) {
       return refused(409, "note_recipient_unavailable", "Someone you tagged no longer has access to this project. Choose the people again.");
     }
-    if (replyTo && !notes.some((note) => note.id === replyTo)) return refused(404, "note_gone", "That note isn't here.");
+    if (replyTo && !notes.some((note) => note.id === replyTo)) return gone();
     return null;
   }
 
@@ -100,9 +145,10 @@ export class StandInNotes {
     return { status: 200, body: { note: this.#wire(thread.id, note, who) } };
   }
 
-  /** At most one bound: the newest page, the notes after or before a `seq`, or those around one note. */
-  #page(threadId: string, query: URLSearchParams, who: string) {
+  /** At most one bound: the newest page, the notes after or before a `seq`, or those around one note, which must be here. */
+  #page(threadId: string, query: URLSearchParams, who: string): Reply {
     const notes = this.#notes.get(threadId) ?? [];
+    if (query.get("around") !== null && !notes.some((note) => note.id === query.get("around"))) return gone();
     const limit = Math.min(200, Math.max(1, Number(query.get("limit") ?? 50)));
     const after = query.get("after");
     const before = query.get("before");
@@ -115,7 +161,7 @@ export class StandInNotes {
     if (from < 0) from = notes.length;
     const end = before !== null ? Math.min(notes.length, notes.filter((note) => note.seq < Number(before)).length) : Math.min(notes.length, from + limit);
     const page = notes.slice(from, end);
-    return { notes: page.map((note) => this.#wire(threadId, note, who)), head: this.head(threadId), hasBefore: from > 0, hasAfter: end < notes.length };
+    return { status: 200, body: { notes: page.map((note) => this.#wire(threadId, note, who)), head: this.head(threadId), hasBefore: from > 0, hasAfter: end < notes.length } };
   }
 
   #wire(threadId: string, note: StoredNote, who: string) {
@@ -124,8 +170,8 @@ export class StandInNotes {
       threadId,
       author: this.personOf(note.author),
       mentions: note.mentions.map((mention) => ({ ...mention, person: this.personOf(emailOf(mention.userId)) })),
-      mentionedYou: note.author !== who && note.mentions.some((mention) => mention.userId === userOf(who)),
-      read: false,
+      mentionedYou: this.#tags(note, who),
+      read: note.author === who || this.#seen(threadId, who).has(note.id),
     };
   }
 }

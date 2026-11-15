@@ -127,6 +127,8 @@ export const SPACE_ROUTES = {
   organizationGithub: get("/github", wireGithubStatus),
   organizationRepositories: get("/github/repositories", repositories),
   spaceIndex: get("/spaces", wireSpaces),
+  /** The organizations with a note that tags the person unread; a 404 from a server that predates notes. */
+  mentions: get("/hosted/mentions", z.object({ spaces: z.array(z.object({ spaceId: z.string() })) })),
   receivedInvitations: get("/invitations/received", wireReceivedInvitations),
   people: (offset = 0, limit = 100) => get(`/organization/people?offset=${offset}&limit=${limit}`, wirePeople),
 };

@@ -12,6 +12,7 @@ export function createSpacesHandlers(spaces: HostedSpaces | null): Pick<Handlers
       await spaces?.refresh();
       return spaces?.status() ?? { state: "unavailable" };
     },
+    "spaces.mentions": async () => (await spaces?.mentions()) ?? { spaceIds: [] },
     "spaces.invitation.accept": ({ invitationId }) => service().received.accept(invitationId),
     "spaces.invitation.decline": ({ invitationId }) => service().received.decline(invitationId),
     "organization.invitations": ({ spaceId }) => service().invitations.list(spaceId),

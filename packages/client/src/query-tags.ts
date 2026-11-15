@@ -78,6 +78,8 @@ function scopedTask(p: Params): string[] {
 /** Reads whose tags never depend on their parameters. */
 const fixedTags: Partial<Record<RpcMethod, readonly string[]>> = {
   "spaces.status": ["spaces"],
+  // A note posted or read is a change of its thread, which every space's thread change reads again.
+  "spaces.mentions": ["mentions", "threads"],
   "spaces.projects": ["spaces", "projects"],
   "account.status": ["account"],
   // Not "account": prices are read once per visit to the screen, not again on every change to the account.
@@ -305,6 +307,7 @@ const idInvalidations: MethodRules = {
   "threads.startQueued": (p) => ["threads", `thread:${String(p["threadId"])}`, `runs:thread:${String(p["threadId"])}`],
   "threads.retrySave": (p) => ["threads", `thread:${String(p["threadId"])}`],
   "threads.postNote": (p) => [`notes:${String(p["threadId"])}`],
+  "threads.readNotes": (p) => [`notes:${String(p["threadId"])}`, "mentions"],
   "review.commitThread": (p) => ["workspace-diff", `threaddiff:${String(p["threadId"])}`, `threadlog:${String(p["threadId"])}`, `thread:${String(p["threadId"])}`, "threads"],
   "review.pushThread": (p) => ["workspace-diff", "threads", `thread:${String(p["threadId"])}`, `threaddiff:${String(p["threadId"])}`, `threadlog:${String(p["threadId"])}`],
   "review.createThreadPr": (p) => ["threads", `thread:${String(p["threadId"])}`, `threaddiff:${String(p["threadId"])}`, `threadlog:${String(p["threadId"])}`],

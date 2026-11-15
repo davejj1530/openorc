@@ -38,6 +38,7 @@ export const ANSWERS: { [M in RoutedMethod]: Answer<M> | ReturnType<typeof refus
   "threads.retrySave": (threads, params) => shared.retrySave(threads.calls, params),
   "threads.notes": notes.notes,
   "threads.postNote": notes.postNote,
+  "threads.readNotes": notes.readNotes,
   "threads.get": (threads, { id }) => threads.summary(id),
   "runs.listForThread": nativeRuns,
   "events.page": (threads, params) => threads.page(params),

@@ -90,6 +90,8 @@ export const COLLABORATION_ROUTES = {
   notes: (id: string, query: URLSearchParams) => route(`${thread(id)}/notes${query.size ? `?${query}` : ""}`, wireNotesPage),
   /** Posts a note; the same id again answers the note it made. */
   postNote: (id: string): Route<z.infer<typeof wirePosted>> => ({ method: "POST", path: `${thread(id)}/notes`, reply: wirePosted }),
+  /** Marks the notes the reader saw read; answered with nothing. */
+  readNotes: (id: string): Route<null> => ({ method: "PUT", path: `${thread(id)}/notes/read`, reply: null }),
 };
 
 /** A person as a window draws them: a picture only when it is held in a data URL. */

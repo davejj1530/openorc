@@ -28,10 +28,22 @@ export function OrganizationAccessGate({ spaceId, children }: { spaceId: string 
 }
 
 /** The private reason stays on this person's screen, never a shared transcript or activity event. */
-export function FrozenOrganization({ organization, access, onAccount }: { organization: OrganizationIdentity; access: Extract<OrganizationAccess, { state: "frozen" }>; onAccount(): void }) {
+export function FrozenOrganization({
+  organization,
+  access,
+  onAccount,
+  menu,
+}: {
+  organization: OrganizationIdentity;
+  access: Extract<OrganizationAccess, { state: "frozen" }>;
+  onAccount(): void;
+  /** The organization page's "…", in the same place as on that page. */
+  menu?: ReactNode;
+}) {
   return (
     <>
       <TopBar orcling={false}>{organization.name}</TopBar>
+      {menu ? <div className="page-column organization-frozen-head">{menu}</div> : null}
       <section className="organization-frozen" aria-label={organization.name}>
         <div className="organization-frozen-content">
           <OrganizationMark name={organization.name} logo={organization.logo} size={40} />

@@ -1,13 +1,17 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { OrganizationAccess } from "@openorc/protocol";
 import { spaceNavigation } from "../lib/space-navigation";
 import type { Route } from "../lib/router";
 import { OrganizationWorkGate } from "./OrganizationWorkGate";
+import { OrganizationContext, type OrganizationActions } from "../lib/organization-context";
+import { core } from "../lib/rpc";
 
 const gate = vi.hoisted(() => ({ state: null as unknown }));
 vi.mock("../lib/organization-content-gate", () => ({ useOrganizationContentGate: () => gate.state }));
 vi.mock("./TopBar", () => ({ TopBar: ({ children }: { children: React.ReactNode }) => <header>{children}</header> }));
+vi.mock("../lib/rpc", () => ({ core: { call: vi.fn(async () => ({})), onReady: () => () => {}, onPush: () => () => {} } }));
 
 afterEach(() => {
   cleanup();
@@ -72,4 +76,35 @@ it("changes nothing for an organization that is open or still being read, or for
   spaceNavigation.getState().select("personal");
   gate.state = state("frozen");
   expect(shows({ view: "newthread" })).toEqual({ work: true, frozen: false });
+});
+
+it("lets a frozen member leave from the organization page's own menu, which holds nothing else", async () => {
+  gate.state = state("frozen");
+  const refresh = vi.fn(async () => {});
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <OrganizationContext.Provider value={{ refresh } as unknown as OrganizationActions}>
+        <OrganizationWorkGate route={{ view: "tasks" }}>
+          <p>Team work</p>
+        </OrganizationWorkGate>
+      </OrganizationContext.Provider>
+    </QueryClientProvider>,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "More for Northwind" }));
+  expect((await screen.findAllByRole("menuitem")).map((item) => item.textContent)).toEqual(["Leave organization…"]);
+  fireEvent.click(screen.getByRole("menuitem", { name: "Leave organization…" }));
+  const dialog = await screen.findByRole("dialog", { name: "Leave Northwind?" });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Leave organization" }));
+  await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+  expect(vi.mocked(core.call)).toHaveBeenCalledWith("organization.leave", { spaceId: "north" });
+});
+
+it("gives a frozen admin's frozen screen no menu: their own People page keeps the organization's", () => {
+  gate.state = state("frozen", "admin");
+  render(
+    <OrganizationWorkGate route={{ view: "tasks" }}>
+      <p>Team work</p>
+    </OrganizationWorkGate>,
+  );
+  expect(screen.queryByRole("button", { name: "More for Northwind" })).toBeNull();
 });

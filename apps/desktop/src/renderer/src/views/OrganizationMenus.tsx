@@ -52,6 +52,26 @@ export function OrganizationMoreMenu({
   );
 }
 
+/** The organization page's "…" for someone whose access is frozen: leaving is all it holds. */
+export function OrganizationLeaveMenu({ name, onLeave }: { name: string; onLeave(trigger: HTMLButtonElement | null): void }) {
+  const trigger = useRef<HTMLButtonElement>(null);
+  return (
+    <Menu.Root>
+      <Menu.Trigger ref={trigger} render={<IconButton aria-label={`More for ${name}`} />}>
+        <MoreHorizontal size={17} />
+      </Menu.Trigger>
+      <Menu.Portal>
+        <CoversPreview />
+        <Menu.Positioner sideOffset={8} align="end" collisionPadding={8} className="z-40">
+          <Menu.Popup ref={floatingGround} className={`${menuPopup} people-organization-menu`}>
+            <LeaveAction disabled={false} onlyAdmin={false} onClick={() => onLeave(trigger.current)} />
+          </Menu.Popup>
+        </Menu.Positioner>
+      </Menu.Portal>
+    </Menu.Root>
+  );
+}
+
 function LeaveAction({ disabled, onlyAdmin, onClick }: { disabled: boolean; onlyAdmin: boolean; onClick(): void }) {
   const content = (
     <>

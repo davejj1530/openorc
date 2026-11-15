@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { hostedRunId, ownerRoute, REMOTE_METHODS, type RemotePush } from "@openorc/protocol";
+import { CLOUD_THREAD_WRITES, hostedRunId, ownerRoute, REMOTE_METHODS, type RemotePush } from "@openorc/protocol";
 import { OpenOrc } from "../openorc.js";
 import { requestOrigin } from "../request-origin.js";
 import type { Broadcast } from "../transport.js";
@@ -161,32 +161,23 @@ describe("a session that shares cloud threads", () => {
     expect(capable.pushes.filter((push) => push.type === "notify" && push.threadId !== at.mac.threadId)).toEqual([]);
   });
 
-  it("is refused every change to a cloud thread, and the account takes none", async () => {
+  it("is refused every change a phone may not make to a cloud thread, and a Stop or an answer that names nothing it saw", async () => {
     const before = { sent: at.stand.sent.length, answered: at.stand.answered.length, started: at.stand.started.length, readies: at.stand.readies.length };
     const requests = at.stand.requests.length;
     const threadId = at.cloud.threads.teammate;
     const runId = hostedRunId(threadId);
     const ask = at.stand.ask(threadId, { kind: "command", toolName: "Bash", input: { command: "pnpm build" }, detail: "Run the build" });
-    const settings = { agent: "claude", mode: "act", permissionMode: "trusted" };
-    const [project] = await at.window("spaces.projects", { spaceId: at.cloud.birch });
     const changes: [string, unknown][] = [
-      ["runs.start", { threadId, ...settings, prompt: "From a phone" }],
-      ["runs.send", { runId, text: "From a phone" }],
       ["runs.interrupt", { runId }],
       ["approvals.resolve", { runId, approvalId: ask, decision: "allow" }],
-      ["threads.queue", { id: threadId, text: "From a phone" }],
-      ["threads.unqueue", { id: threadId, messageId: "message" }],
       ["threads.sendQueued", { id: threadId, messageId: "message" }],
-      ["threads.update", { id: threadId, patch: { title: "Renamed from a phone" } }],
-      ["threads.update", { id: threadId, patch: { pinned: true } }],
-      ["threads.start", { projectId: project!.key, spaceId: at.cloud.birch, hosted: true, ...settings, prompt: "From a phone" }],
-      ["threads.start", { projectId: at.cloud.projects.birch, hosted: true, ...settings, prompt: "From a phone" }],
     ];
     for (const [method, params] of changes) expect([method, await refusal(capable.request(method, params))]).toEqual([method, FROM_PHONE]);
-    // Every other call a phone may make about one thread or run: refused for a cloud thread, never passed to this Mac
-    // (whose answer would be "not found") and never to the server. A call whose params do not fit is refused as such.
+    // Every other call a phone may make about one thread or run that is no read and no allowed change: refused for a
+    // cloud thread, never passed to this Mac (whose answer would be "not found") and never to the server.
     const reads = new Set(["threads.get", "runs.listForThread", "events.page", "threads.messages", "threads.lastMessage"]);
-    const aboutOne = REMOTE_METHODS.filter((each) => ["owner", "run", "here"].includes(ownerRoute(each)?.by ?? "") && !reads.has(each) && !changes.some(([changed]) => changed === each));
+    const allowed = new Set<string>([...CLOUD_THREAD_WRITES, ...changes.map(([method]) => method)]);
+    const aboutOne = REMOTE_METHODS.filter((each) => ["owner", "run", "here"].includes(ownerRoute(each)?.by ?? "") && !reads.has(each) && !allowed.has(each));
     expect(aboutOne.length).toBeGreaterThan(10);
     for (const method of aboutOne) {
       const answer = await refusal(capable.request(method, { threadId, id: threadId, runId }));
@@ -194,7 +185,6 @@ describe("a session that shares cloud threads", () => {
     }
     expect({ sent: at.stand.sent.length, answered: at.stand.answered.length, started: at.stand.started.length, readies: at.stand.readies.length }).toEqual(before);
     expect(at.stand.requests.slice(requests).filter((request) => request.method !== "GET")).toEqual([]);
-    expect(await at.window("threads.get", { id: threadId })).toMatchObject({ title: "Birch pricing page", pinnedAt: null });
   });
 
   it("is refused a space and a thread the person cannot read, never answered from this Mac", async () => {

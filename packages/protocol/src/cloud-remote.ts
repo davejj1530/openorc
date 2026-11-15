@@ -32,13 +32,21 @@ export interface CloudRemoteRpcResults {
  * and a shaped reply per method in the core: the person's spaces, a space's projects, who the person is, and who is at
  * work in a cloud thread and who wrote what in it.
  */
-export const CLOUD_REMOTE_METHODS = ["spaces.status", "spaces.projects", "account.person", "threads.collaboration", "threads.authors"] as const satisfies readonly RpcMethod[];
+export const CLOUD_REMOTE_METHODS = [
+  "spaces.status",
+  "spaces.projects",
+  "account.person",
+  "threads.collaboration",
+  "threads.authors",
+  // Starts the reader's own paused message as their own turn.
+  "threads.startQueued",
+] as const satisfies readonly RpcMethod[];
 export type CloudRemoteMethod = (typeof CLOUD_REMOTE_METHODS)[number];
 
 const cloudRemoteMethods: ReadonlySet<string> = new Set(CLOUD_REMOTE_METHODS);
 export const isCloudRemoteMethod = (method: string): method is CloudRemoteMethod => cloudRemoteMethods.has(method);
 
-/** Every call such a session may make about an OpenOrc Cloud thread. All are reads: a phone changes nothing there yet. */
+/** What such a session may read of an OpenOrc Cloud thread. */
 export const CLOUD_THREAD_READS = [
   "threads.get",
   "threads.messages",
@@ -47,4 +55,23 @@ export const CLOUD_THREAD_READS = [
   "events.page",
   "threads.collaboration",
   "threads.authors",
+] as const satisfies readonly RoutedMethod[];
+
+/**
+ * What such a session may change in an OpenOrc Cloud thread, as the person signed in on the Mac: start one, send, queue,
+ * take a waiting message back, start a paused one, stop a turn, answer an ask, and keep the thread as its windows do.
+ * Stop and an answer must name the turn and the ask the phone saw, and a send into a running turn names its turn: a
+ * phone's screen is always a moment behind the Mac. Sending a queued message now is left to the Mac, which sees the
+ * turn it would join.
+ */
+export const CLOUD_THREAD_WRITES = [
+  "threads.start",
+  "runs.start",
+  "runs.send",
+  "threads.queue",
+  "threads.unqueue",
+  "threads.startQueued",
+  "runs.interrupt",
+  "approvals.resolve",
+  "threads.update",
 ] as const satisfies readonly RoutedMethod[];

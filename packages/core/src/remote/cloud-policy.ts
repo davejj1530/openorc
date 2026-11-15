@@ -1,21 +1,38 @@
 import type { HostedThreads } from "@openorc/hosted";
-import { CLOUD_THREAD_READS, type CloudRemoteMethod, type RoutedMethod, type RpcParams, type RpcResults, type SpacesStatus } from "@openorc/protocol";
+import { CLOUD_THREAD_READS, CLOUD_THREAD_WRITES, type CloudRemoteMethod, type RoutedMethod, type RpcParams, type RpcResults, type SpacesStatus } from "@openorc/protocol";
 import type { PhoneShaping } from "./phone-words.js";
 import { NOT_FROM_PHONE } from "./policy.js";
 
 /*
  * What a phone whose session shares cloud threads may ask of the account signed in on this Mac. It acts as that
  * person, so the server's own answer is the permission; this is least privilege on top, as policy.ts is for the Mac:
- * the spaces, a space's projects and threads, and reading a cloud thread. Nothing here changes anything on the server.
+ * the spaces, a space's projects and threads, reading a cloud thread, and the changes a conversation needs.
  */
 
 const cloudReads: ReadonlySet<string> = new Set(CLOUD_THREAD_READS);
+const cloudWrites: ReadonlySet<string> = new Set(CLOUD_THREAD_WRITES);
+
+/** A phone's images are files of this Mac, which a cloud thread cannot read. */
+export const NO_CLOUD_FILES = "Files can't be sent to a cloud thread from a phone yet.";
 
 /**
- * OpenOrc Cloud as a phone's requests meet it: the place the windows ask, cut down to reading. A thread, run or project
- * is held exactly as for a window, so a cloud id is never answered from this Mac. Its rows join a list only for the
- * space a request names, so a list that names none stays this Mac's. Every other call about a cloud thread is refused
- * here, before the server hears of it.
+ * Why a phone's change to a cloud thread stops here, before the server hears of it; null lets it on to the server,
+ * which decides as it does for the person's own window. Stop and an answer go on only with the turn and the ask the
+ * phone saw: unnamed, they would take whatever turn or ask the Mac holds a moment later, which may be another person's.
+ */
+function phoneWriteRefusal(method: string, params: Record<string, unknown>): string | null {
+  if (!cloudWrites.has(method)) return NOT_FROM_PHONE;
+  if (Array.isArray(params["attachments"]) && params["attachments"].length > 0) return NO_CLOUD_FILES;
+  if (method === "runs.interrupt") return typeof params["expectedTurnId"] === "string" ? null : NOT_FROM_PHONE;
+  if (method === "approvals.resolve") return typeof params["expectedState"] === "string" && typeof params["expectedTurnId"] === "string" ? null : NOT_FROM_PHONE;
+  return null;
+}
+
+/**
+ * OpenOrc Cloud as a phone's requests meet it: the place the windows ask, cut down to what a phone may read and change.
+ * A thread, run or project is held exactly as for a window, so a cloud id is never answered from this Mac. Its rows
+ * join a list only for the space a request names, so a list that names none stays this Mac's. Every other call about a
+ * cloud thread is refused here, before the server hears of it.
  */
 export function phoneCloudPlace(place: HostedThreads): HostedThreads {
   return {
@@ -26,7 +43,10 @@ export function phoneCloudPlace(place: HostedThreads): HostedThreads {
     holds: (ref) => place.holds(ref),
     project: (id) => place.project(id),
     listed: (method, params) => ("spaceId" in params && typeof params.spaceId === "string" ? place.listed(method, params) : null),
-    call: <M extends RoutedMethod>(method: M, params: RpcParams<M>) => (cloudReads.has(method) ? place.call(method, params) : Promise.reject(new Error(NOT_FROM_PHONE))),
+    call: <M extends RoutedMethod>(method: M, params: RpcParams<M>) => {
+      const refusal = cloudReads.has(method) ? null : phoneWriteRefusal(method, params as Record<string, unknown>);
+      return refusal ? Promise.reject(new Error(refusal)) : place.call(method, params);
+    },
   };
 }
 
@@ -53,6 +73,8 @@ const cloudReplies: { [M in CloudRemoteMethod]: Reply<M> } = {
   // People by id, name and picture, as the server gives them to everyone in the thread. No mail, plan or balance.
   "threads.collaboration": same,
   "threads.authors": same,
+  // The queue as it now stands: messages' own words and their state.
+  "threads.startQueued": same,
 };
 
 export function cloudReply<M extends CloudRemoteMethod>(method: M, result: RpcResults[M], context: PhoneShaping): RpcResults[M] {

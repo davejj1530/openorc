@@ -281,7 +281,8 @@ export class Spaces implements HostedSpaces {
           this.#tell();
           this.#setExpiry();
         },
-        Math.min(...future, 2_147_483_647) + 1,
+        // The longest timer the clock keeps; a later deadline is set again when it fires.
+        Math.min(Math.min(...future) + 1, 2_147_483_647),
       );
   }
 

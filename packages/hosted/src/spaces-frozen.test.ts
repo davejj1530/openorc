@@ -96,3 +96,19 @@ it("carries each organization's own words for why it is closed to the person, an
   const open = hosted.spaces.status();
   expect(open.state === "ready" && open.spaces.find((space) => space.id === team)).toMatchObject({ accessMessage: null });
 });
+
+it("waits for a grace deadline weeks away, past the longest timer the clock keeps, instead of telling the windows at once", async () => {
+  const until = Date.now() + 30 * 86_400_000;
+  stand.setBilling(MEMBER, { pro: true, standing: "grace", at: new Date(until).toISOString(), monthlyLeftSeconds: 0, packsLeftSeconds: 0, organizationAccess: grace(until) });
+  const overflows: string[] = [];
+  const heard = (warning: Error) => void (warning.name === "TimeoutOverflowWarning" && overflows.push(warning.message));
+  process.on("warning", heard);
+  try {
+    const { hosted } = await person();
+    await vi.waitFor(async () => expect(keys(await hosted.spaces.projects(team))).toEqual(["local-canvas"]));
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  } finally {
+    process.off("warning", heard);
+  }
+  expect(overflows).toEqual([]);
+});

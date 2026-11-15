@@ -150,16 +150,22 @@ function isolationArgs(spec: RunSpec, restricted: boolean, strictMcp: boolean): 
   return [...(untrusted ? ["--setting-sources", "user"] : []), ...(restricted || strictMcp || untrusted ? ["--strict-mcp-config"] : [])];
 }
 
+/**
+ * Claude Code's Artifact tool for one run: the environment that turns it on, and its entry on a restricted tool list.
+ * A plan writes nothing but its plan file, so it goes without.
+ */
+function artifactTool(spec: Pick<RunSpec, "mode">, env: NodeJS.ProcessEnv): { env: NodeJS.ProcessEnv; listed: string } {
+  return spec.mode === "plan" ? { env, listed: "" } : { env: withArtifactTool(env), listed: ",Artifact" };
+}
+
 /** Prepare the exact CLI launch and private MCP file before a process owns them. */
 function prepareClaudeLaunch(spec: RunSpec, launch: AgentLaunchEnvironment, options: ClaudeAdapterOptions) {
   if (process.platform === "win32" && (spec.mode === "plan" || spec.permissionMode === "trusted"))
     throw new Error("This mode requires a file-boundary hook that is not yet supported on Windows. Choose Review everything.");
   const binary = launch.binary;
   const place = launchPlace(launch.host);
-  // A plan writes nothing but its plan file, so it goes without Claude Code's Artifact tool.
-  const artifactTool = spec.mode !== "plan";
-  const launched: NodeJS.ProcessEnv = { ...launch.env, ...options.env };
-  const env = artifactTool ? withArtifactTool(launched) : launched;
+  const artifact = artifactTool(spec, { ...launch.env, ...options.env });
+  const env = artifact.env;
   // Claude Code refuses to nest inside itself; the app is not a Claude session.
   delete env["CLAUDECODE"];
   const shared = env[SHARED_CLAUDE_CONFIG_DIR];
@@ -196,7 +202,7 @@ function prepareClaudeLaunch(spec: RunSpec, launch: AgentLaunchEnvironment, opti
     // Native subagents have independent policies; use OpenOrc's inherited-policy delegation instead.
     // Skill stays: the ask and deny rules still bind a skill's allowed-tools, its !`command` lines and its forked agent.
     // No rule of ours covers Artifact: Claude Code checks each action, running reads and asking through the approve tool before it publishes.
-    if (restricted) args.push("--tools", `Read,Grep,Glob,Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,AskUserQuestion,ExitPlanMode,Skill${artifactTool ? ",Artifact" : ""}`);
+    if (restricted) args.push("--tools", `Read,Grep,Glob,Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,AskUserQuestion,ExitPlanMode,Skill${artifact.listed}`);
     const strictMcp = Boolean(connection) && (spec.strictMcp ?? options.strictMcp) === true;
     args.push(...isolationArgs(spec, restricted, strictMcp));
     args.push(...sharedPluginArgs(shared));

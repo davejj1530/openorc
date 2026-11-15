@@ -11,7 +11,7 @@ import { Conversation } from "./Conversation";
 vi.hoisted(() => void ((window as unknown as { openorc?: object }).openorc ??= { platform: "darwin" }));
 const queries = vi.hoisted(() => new Map<string, unknown>());
 const refetched = vi.hoisted(() => ({ count: 0 }));
-const composer = vi.hoisted(() => ({ props: null as ComposerProps | null, handle: { append: () => {}, tag: (_person: unknown) => {} } }));
+const composer = vi.hoisted(() => ({ props: null as ComposerProps | null, handle: { append: () => {}, tag: (_person: unknown, _replyTo?: string) => {} } }));
 vi.mock("../lib/rpc", () => ({
   core: new Proxy({ call: vi.fn() } as Record<string, unknown>, { get: (target, key: string) => (key in target ? target[key] : () => () => undefined) }),
 }));
@@ -286,7 +286,7 @@ it("draws a teammate's note in the thread with the person it tags, and Reply put
   expect(note.querySelector(".person-token")?.textContent).toBe("@Theo Laurent");
   const tag = vi.spyOn(composer.handle, "tag");
   fireEvent.click(within(note).getByRole("button", { name: "Reply" }));
-  expect(tag).toHaveBeenCalledWith(MARA);
+  expect(tag).toHaveBeenCalledWith(MARA, "n1");
 });
 
 it("posts a tagged draft as the reader's note, the same note again after a lost answer, and offers none until the server lets them", async () => {

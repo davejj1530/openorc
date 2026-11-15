@@ -90,7 +90,7 @@ export interface ComposerHandle {
   /** Puts a message's words back after what is written, as one step to undo, and its files back beside it. */
   append: (text: string, attachments: readonly string[]) => void;
   /** Puts a person's tag before what is written, as Reply to their note does, with the keyboard after it all. */
-  tag: (person: ThreadPerson) => void;
+  tag: (person: ThreadPerson, replyTo?: string) => void;
 }
 
 export interface ComposerProps {
@@ -250,7 +250,7 @@ export function Composer(props: ComposerProps) {
   const editor = useRef<ComposerEditorHandle>(null);
   const appendFiles = files.append;
   const note = useDraftNote(props.notes, props.draftKey, value, attachments.length + uploading);
-  const pickPerson = note.pick;
+  const { pick: pickPerson, reply: replyTo } = note;
   useImperativeHandle(
     props.handle,
     () => ({
@@ -260,14 +260,15 @@ export function Composer(props: ComposerProps) {
         editor.current?.write(next, next.length);
         appendFiles(paths);
       },
-      tag: (person) => {
-        pickPerson(person);
+      tag: (person, noteId) => {
+        if (noteId) replyTo(person, noteId);
+        else pickPerson(person);
         const next = `${personTag(person.id)} ${value.trimStart()}`;
         editor.current?.write(next, next.length);
         editor.current?.focus();
       },
     }),
-    [value, appendFiles, pickPerson],
+    [value, appendFiles, pickPerson, replyTo],
   );
   const interrupt = useRpcMutation("runs.interrupt");
   const { submission, submit: submitDraft, acknowledge } = useComposerSubmission(props.draftKey);

@@ -1,5 +1,5 @@
 import { personName, placeNotes, type Block } from "@openorc/client";
-import type { ThreadNote, ThreadPerson, ThreadSummary } from "@openorc/protocol";
+import type { ThreadNote, ThreadSummary } from "@openorc/protocol";
 import { createContext, useCallback, useContext, useMemo, useRef, type ReactNode, type RefObject } from "react";
 import { useRpc, useRpcMutation } from "../lib/client";
 import "../styles/together.css";
@@ -13,7 +13,7 @@ import type { ComposerHandle, ComposerNotes } from "./Composer";
 export interface ThreadNotesValue {
   top: readonly ThreadNote[];
   after: ReadonlyMap<string, readonly ThreadNote[]>;
-  onReply: ((author: ThreadPerson) => void) | null;
+  onReply: ((note: ThreadNote) => void) | null;
 }
 
 const NONE: ThreadNotesValue = { top: [], after: new Map(), onReply: null };
@@ -32,7 +32,7 @@ export function useThreadNotes(thread: ThreadSummary | null, blocks: readonly Bl
   const head = thread?.owner?.brain === "hosted" ? (thread.owner.collaboration?.noteHead ?? 0) : 0;
   const read = useRpc("threads.notes", { threadId: thread?.id ?? "", limit: NOTES_PER_READ }, { enabled: Boolean(thread) && head > 0 });
   const notes = read.data?.notes;
-  const onReply = useCallback((author: ThreadPerson) => composer.current?.tag(author), [composer]);
+  const onReply = useCallback((note: ThreadNote) => note.author && composer.current?.tag(note.author, note.id), [composer]);
   const last = useRef<{ key: string; value: ThreadNotesValue } | null>(null);
   return useMemo(() => {
     if (!notes?.length) return NONE;
@@ -98,7 +98,7 @@ function NoteView({ note }: { note: ThreadNote }) {
       </header>
       <p className="mt-2 text-prose text-ink whitespace-pre-wrap wrap-anywhere">{noteWords(note)}</p>
       {onReply && note.author ? (
-        <button type="button" className="focus-ring mt-2 rounded-sm text-sm text-ink-3 hover:text-ink" onClick={() => onReply(note.author!)}>
+        <button type="button" className="focus-ring mt-2 rounded-sm text-sm text-ink-3 hover:text-ink" onClick={() => onReply(note)}>
           Reply
         </button>
       ) : null}

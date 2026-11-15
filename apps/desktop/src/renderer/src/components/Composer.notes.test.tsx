@@ -140,6 +140,19 @@ it("keeps a tagged person named when the draft comes back", async () => {
   expect(screen.getByRole("button", { name: "Post note" })).toBeTruthy();
 });
 
+it("posts a reply as a reply to its note while the draft still tags its author", async () => {
+  const { field, handle, post } = mount();
+  act(() => handle.current!.tag({ id: BEN.id, name: BEN.name, image: null }, "note-1"));
+  type(field, "@[user:u-ben] The columns match.");
+  fireEvent.click(screen.getByRole("button", { name: "Post note" }));
+  await waitFor(() => expect(post).toHaveBeenCalledWith({ text: "@Ben Ito The columns match.", mentions: [{ userId: "u-ben", start: 0, end: 8 }], replyTo: "note-1" }));
+  act(() => handle.current!.tag({ id: BEN.id, name: BEN.name, image: null }, "note-2"));
+  await tagAda(field);
+  type(field, "@[user:u-ada] Not a reply any more");
+  fireEvent.click(screen.getByRole("button", { name: "Post note" }));
+  await waitFor(() => expect(post).toHaveBeenLastCalledWith({ text: "@Ada Park Not a reply any more", mentions: [{ userId: "u-ada", start: 0, end: 9 }] }));
+});
+
 it("starts a reply with its author's tag before what is written, drawn by name", () => {
   const { field, handle } = mount({ value: "The columns match." });
   act(() => handle.current!.tag({ id: BEN.id, name: BEN.name, image: null }));

@@ -7,7 +7,7 @@ import { RefreshCw } from "../components/icons";
 import { Button, IconButton, Tooltip } from "../components/ui";
 import { useRpc } from "../lib/client";
 import { cn } from "../lib/cn";
-import { useLayout, type ChangeSelection } from "../lib/layout";
+import type { ChangeSelection } from "../lib/layout";
 import { HostedPublish } from "./HostedPublish";
 import { HostedReviewFiles } from "./HostedReviewFiles";
 import { useHostedChangesReason } from "../hooks/useHostedCapabilities";
@@ -57,14 +57,14 @@ export function HostedChangesPanel({ thread }: { thread: ThreadSummary }) {
   );
 }
 
-export function HostedSavedChangesPanel({ selection }: { selection: ChangeSelection }) {
+export function HostedSavedChangesPanel({ selection, onAll }: { selection: ChangeSelection; onAll: () => void }) {
   const off = useHostedChangesReason(selection.id);
   const read = useRpc("hosted.review.turn", { threadId: selection.id, turnId: selection.checkpointId }, { enabled: off === null });
   const changes = read.data;
   return (
     <section className="h-full flex flex-col min-h-0" aria-label="Selected code changes">
       <PanelBar title="Saved changes" meta={!read.error && changes?.state === "recorded" ? <PanelBarMeta>{fileCount(changes.totals.files)}</PanelBarMeta> : null}>
-        <Button variant="ghost" onClick={() => useLayout.getState().clearChanges()}>
+        <Button variant="ghost" onClick={onAll}>
           All changes
         </Button>
       </PanelBar>

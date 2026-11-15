@@ -1,4 +1,5 @@
 import { lazy } from "react";
+import { useLayout } from "../lib/layout";
 import type { PanelPage } from "../lib/panel-tabs";
 import { ChangesPanel } from "../panels/ChangesPanel";
 import { HostedChangesPanel, HostedSavedChangesPanel } from "../panels/HostedChangesPanel";
@@ -31,9 +32,16 @@ function FileContent({ context, page }: ContentProps & { page: Extract<PanelPage
   return <FileExplorer scope={panelFileScope(context)} directory={panelDirectory(context)} />;
 }
 
-function ChangesContent({ context, page }: ContentProps & { page: Extract<PanelPage, { kind: "changes" }> }) {
-  if (page.selection && context.kind === "thread" && context.thread.owner?.brain === "hosted") return <HostedSavedChangesPanel key={JSON.stringify(page.selection)} selection={page.selection} />;
-  if (page.selection) return <SavedChangesPanel key={JSON.stringify(page.selection)} selection={page.selection} />;
+function ChangesContent({ context, page, onNavigate }: ContentProps & { page: Extract<PanelPage, { kind: "changes" }> }) {
+  // From one turn's saved changes to all of them, in the same tab: the layout's selection goes too, so no later
+  // request for the changes tab brings the turn back.
+  const all = () => {
+    useLayout.getState().clearChanges();
+    onNavigate({ kind: "changes", selection: null });
+  };
+  if (page.selection && context.kind === "thread" && context.thread.owner?.brain === "hosted")
+    return <HostedSavedChangesPanel key={JSON.stringify(page.selection)} selection={page.selection} onAll={all} />;
+  if (page.selection) return <SavedChangesPanel key={JSON.stringify(page.selection)} selection={page.selection} onAll={all} />;
   if (context.kind === "task") return <ReviewPanel task={context.task} project={context.project} />;
   if (context.kind === "thread" && context.thread.owner?.brain === "hosted") return <HostedChangesPanel key={context.thread.id} thread={context.thread} />;
   return (

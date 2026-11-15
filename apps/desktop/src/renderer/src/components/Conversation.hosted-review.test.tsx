@@ -1,5 +1,6 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { Suspense } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { HOSTED_REASONS, type HostedReviewReply, type RpcMethod, type RpcParams, type RpcResults } from "@openorc/protocol";
 import { ChangesPanel } from "../panels/ChangesPanel";
@@ -147,6 +148,25 @@ it("draws a saved turn with the same totals and disables Restore with its own re
   expect(screen.queryByText("Restoring a cloud checkpoint isn't available yet.")).toBeNull();
   await act(async () => screen.getByLabelText("Undo this turn's changes").focus());
   expect(await screen.findByText("Restoring a cloud checkpoint isn't available yet.")).toBeTruthy();
+});
+
+it.each([
+  ["cloud", cloudReviewThread],
+  ["Mac", localReviewThread],
+])("goes from a turn's saved changes to all of the thread's changes in the same panel (%s)", async (_where, thread) => {
+  reads.set("threads.turnChanges", { files: [], patch: "" });
+  const onNavigate = vi.fn();
+  mount(
+    <Suspense>
+      <PanelContent
+        context={{ kind: "thread", thread, project: reviewProject }}
+        page={{ kind: "changes", selection: { kind: "thread", id: thread.id, checkpointId: "turn-1" } }}
+        onNavigate={onNavigate}
+      />
+    </Suspense>,
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "All changes" }));
+  expect(onNavigate).toHaveBeenCalledWith({ kind: "changes", selection: null });
 });
 
 it("shows a working turn's reason on a keyboard-reachable review control", async () => {

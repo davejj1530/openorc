@@ -2,13 +2,12 @@ import { lazy, Suspense, type ReactNode } from "react";
 import { PanelBar, PanelBarMeta } from "../components/PanelBar";
 import { Button } from "../components/ui";
 import { useRpc } from "../lib/client";
-import { useLayout, type ChangeSelection } from "../lib/layout";
+import type { ChangeSelection } from "../lib/layout";
 
 const DiffView = lazy(() => import("../components/DiffView").then((module) => ({ default: module.DiffView })));
 
 /** A card opens only its immutable saved diff; later workspace edits never leak into this review. */
-export function SavedChangesPanel({ selection }: { selection: ChangeSelection }) {
-  const clear = useLayout((state) => state.clearChanges);
+export function SavedChangesPanel({ selection, onAll }: { selection: ChangeSelection; onAll: () => void }) {
   const diff = useRpc("threads.turnChanges", { ...withoutKind(selection), includePatch: true }, { staleTime: Infinity });
   let diffContent: ReactNode;
   if (diff.isError) {
@@ -38,7 +37,7 @@ export function SavedChangesPanel({ selection }: { selection: ChangeSelection })
   return (
     <section className="h-full flex flex-col min-h-0" aria-label="Selected code changes">
       <PanelBar title="Saved changes" meta={diff.data ? <PanelBarMeta>{`${diff.data.files.length} ${diff.data.files.length === 1 ? "file" : "files"}`}</PanelBarMeta> : null}>
-        <Button variant="ghost" onClick={clear}>
+        <Button variant="ghost" onClick={onAll}>
           All changes
         </Button>
       </PanelBar>
